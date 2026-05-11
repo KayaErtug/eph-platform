@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -15,7 +15,8 @@ const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Admin",
 };
 
-export default function KayitPage() {
+// ✅ useSearchParams kullanan kısmı ayrı bir component'e aldık
+function KayitForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -215,5 +216,14 @@ export default function KayitPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ✅ Ana sayfa: KayitForm'u Suspense ile sarıyoruz
+export default function KayitPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Yükleniyor...</div>}>
+      <KayitForm />
+    </Suspense>
   );
 }
