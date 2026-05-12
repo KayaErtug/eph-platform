@@ -1,6 +1,7 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import FinancialTicker from "@/components/FinancialTicker";
 
 const STATS = [
   { label: "Aktif Üye", value: "344+" },
@@ -74,24 +75,11 @@ function KrediHesapla() {
 
 export default function LandingPage() {
   const [showForm, setShowForm] = useState(false);
-  const [dolar, setDolar] = useState(32.84);
-  const [euro, setEuro] = useState(35.21);
-  const [altin, setAltin] = useState(2847);
   const [form, setForm] = useState({ ad: "", tel: "", email: "", meslek: "", kod: "" });
-
-  useEffect(() => {
-    const iv = setInterval(() => {
-      setDolar(v => parseFloat((v + (Math.random() - 0.5) * 0.03).toFixed(2)));
-      setEuro(v => parseFloat((v + (Math.random() - 0.5) * 0.03).toFixed(2)));
-      setAltin(v => Math.round(v + (Math.random() - 0.5) * 2));
-    }, 3000);
-    return () => clearInterval(iv);
-  }, []);
 
   return (
     <>
       <style>{`
-        @keyframes lp-ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
         @keyframes lp-shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
         @keyframes lp-pulse{0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.3)}50%{box-shadow:0 0 0 8px rgba(37,99,235,0)}}
         @keyframes lp-fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
@@ -105,32 +93,15 @@ export default function LandingPage() {
           .lp-features{grid-template-columns:1fr!important;}
           .lp-steps{grid-template-columns:1fr!important;}
           .lp-testi{grid-template-columns:1fr!important;}
-          .lp-kredi-grid{grid-template-columns:1fr!important;}
           .lp-nav-links{display:none!important;}
           .lp-hero-btns{flex-direction:column!important;}
-          .lp-about-grid{grid-template-columns:1fr!important;}
         }
       `}</style>
 
       <div style={{ background: "#f8faff", color: "#0f172a", fontFamily: "'DM Sans',system-ui,sans-serif", overflowX: "hidden" }}>
 
         {/* TICKER */}
-        <div style={{ background: "#1e3a8a", padding: "5px 0", overflow: "hidden" }}>
-          <div style={{ display: "flex", animation: "lp-ticker 35s linear infinite", whiteSpace: "nowrap", width: "200%" }}>
-            {[0, 1].map(i => (
-              <span key={i} style={{ paddingRight: 40, fontSize: 10 }}>
-                <span style={{ color: "rgba(255,255,255,0.5)", marginRight: 5 }}>USD/TRY</span>
-                <span style={{ color: "#86efac", fontWeight: 600, marginRight: 24 }}>{dolar} ₺</span>
-                <span style={{ color: "rgba(255,255,255,0.5)", marginRight: 5 }}>EUR/TRY</span>
-                <span style={{ color: "#86efac", fontWeight: 600, marginRight: 24 }}>{euro} ₺</span>
-                <span style={{ color: "rgba(255,255,255,0.5)", marginRight: 5 }}>Altın/gr</span>
-                <span style={{ color: "#fcd34d", fontWeight: 600, marginRight: 24 }}>{altin.toLocaleString("tr-TR")} ₺</span>
-                <span style={{ color: "rgba(255,255,255,0.3)", marginRight: 24 }}>·</span>
-                <span style={{ color: "rgba(255,255,255,0.45)", marginRight: 24 }}>Paylaşan Kazanır · Meslektaşınız Rakibiniz Değil İş Ortağınız Olsun · Birlikte Daha Fazla Portföy Daha Fazla Satış · Emlakta Yeni Nesil İş Birliği · Portföy Gücü Meslektaş Dayanışması</span>
-              </span>
-            ))}
-          </div>
-        </div>
+        <FinancialTicker />
 
         {/* NAV */}
         <nav style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "14px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 1px 8px rgba(0,0,0,0.06)" }}>
@@ -218,7 +189,6 @@ export default function LandingPage() {
               ))}
             </div>
 
-            {/* İstatistikler */}
             <div className="lp-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0, maxWidth: 520, margin: "0 auto", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 16px rgba(0,0,0,0.06)" }}>
               {STATS.map((s, i) => (
                 <div key={s.label} style={{ padding: "18px 20px", textAlign: "center", borderRight: i < 3 ? "1px solid #f1f5f9" : "none" }}>
@@ -322,7 +292,7 @@ export default function LandingPage() {
                 "Pilot bölge olarak seçilen Denizli'de yürütülen çalışmalar son derece olumlu sonuçlar vermiş; platform kısa sürede emlakçılar, müteahhitler ve inşaat firmaları arasında güvenilir bir iş birliği köprüsüne dönüşmüştür. Gerçek zamanlı stok takibi, yapay zeka destekli ilan görseli oluşturma ve entegre CRM sistemi gibi yenilikçi özellikleriyle EPH, sektörde dijital dönüşümün öncüsü olmayı hedeflemektedir.",
                 "2027 yılı itibarıyla Türkiye geneline açılmayı ve en az 10 şehri kapsayan güçlü bir büyüme ivmesi yakalamayı hedefleyen EPH Platform, merkez ofisini Denizli'nin prestijli iş adreslerinden Skycity İş Merkezi'nde konumlandırmıştır. Meslektaşlığı iş ortaklığına, rekabeti iş birliğine dönüştüren bu vizyonla EPH; Türkiye'nin en büyük kapalı devre emlak profesyonelleri ağı olmaya kararlıdır.",
               ].map((p, i) => (
-                <p key={i} style={{ color: "#64748b", fontSize: 14, lineHeight: 1.9, borderLeft: "3px solid #bfdbfe", paddingLeft: 20, borderRadius: "0 4px 4px 0" }}>{p}</p>
+                <p key={i} style={{ color: "#64748b", fontSize: 14, lineHeight: 1.9, borderLeft: "3px solid #bfdbfe", paddingLeft: 20 }}>{p}</p>
               ))}
             </div>
             <div style={{ marginTop: 36, background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: 20, display: "flex", alignItems: "flex-start", gap: 14 }}>
