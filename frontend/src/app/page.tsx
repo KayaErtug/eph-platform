@@ -339,6 +339,38 @@ export default function LandingPage() {
           </div>
         </div>
 
+        {/* HAKKIMIZDA */}
+        <div style={{ padding: "64px 40px", background: "#04080f" }}>
+          <div style={{ maxWidth: 760, margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: 40 }}>
+              <div style={{ color: "#3b82f6", fontSize: 10, fontWeight: 600, letterSpacing: "2px", marginBottom: 10 }}>HAKKIMIZDA</div>
+              <h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.5px" }}>Biz Kimiz?</h2>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              {[
+                "EPH (Emlak Portföy Havuzu), gayrimenkul sektörünün gerçek ihtiyaçlarından yola çıkılarak; emlakçı, müteahhit ve yazılım alanlarında uzman dört girişimci tarafından Denizli'de hayata geçirilmiştir. Platform, sektördeki en kritik sorunu — doğru mülkü doğru müşteriye zamanında ulaştıramamayı — çözmek amacıyla geliştirilmiş; kapalı devre, davet bazlı ve yalnızca doğrulanmış profesyonellere açık bir B2B ağ olarak tasarlanmıştır.",
+                "Pilot bölge olarak seçilen Denizli'de yürütülen çalışmalar son derece olumlu sonuçlar vermiş; platform kısa sürede emlakçılar, müteahhitler ve inşaat firmaları arasında güvenilir bir iş birliği köprüsüne dönüşmüştür. Gerçek zamanlı stok takibi, yapay zeka destekli ilan görseli oluşturma ve entegre CRM sistemi gibi yenilikçi özellikleriyle EPH, sektörde dijital dönüşümün öncüsü olmayı hedeflemektedir.",
+                "2027 yılı itibarıyla Türkiye geneline açılmayı ve en az 10 şehri kapsayan güçlü bir büyüme ivmesi yakalamayı hedefleyen EPH Platform, merkez ofisini Denizli'nin prestijli iş adreslerinden Skycity İş Merkezi'nde konumlandırmıştır. Meslektaşlığı iş ortaklığına, rekabeti iş birliğine dönüştüren bu vizyonla EPH; Türkiye'nin en büyük kapalı devre emlak profesyonelleri ağı olmaya kararlıdır.",
+              ].map((p, i) => (
+                <p key={i} style={{ color: "#64748b", fontSize: 14, lineHeight: 1.9, borderLeft: "2px solid rgba(37,99,235,0.3)", paddingLeft: 20 }}>{p}</p>
+              ))}
+            </div>
+            <div style={{ marginTop: 36, background: "rgba(255,255,255,0.03)", border: "0.5px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: 20, display: "flex", alignItems: "flex-start", gap: 14 }}>
+              <div style={{ width: 36, height: 36, background: "rgba(37,99,235,0.12)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+              </div>
+              <div>
+                <div style={{ color: "#f1f5f9", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Merkez Ofis</div>
+                <div style={{ color: "#475569", fontSize: 12, lineHeight: 1.8 }}>
+                  Skycity İş Merkezi, 4. Kat No:36<br />
+                  Sümer Mah. 2482/2 Sok. No:4/1<br />
+                  20020 Merkezefendi / Denizli
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* TESTİMONİALS */}
         <div style={{ padding: "64px 40px", background: "#060b16" }}>
           <div style={{ textAlign: "center", marginBottom: 44 }}>
