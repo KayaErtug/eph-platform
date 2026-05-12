@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 
 const EXCHANGE_KEY = "27ab27e174aa353884ced87b";
 const GOLD_KEY = "goldapi-8f600a41111b003f1bb7efb1940f033f-io";
+const FINNHUB_KEY = "d81ns29r01qrojfcdtug";
 
 interface TickerItem {
   label: string;
@@ -49,7 +50,10 @@ export default function FinancialTicker() {
 
         let gramAltin = "4.352";
         let altinChange: number | undefined = undefined;
+        let bist = "10.421";
+        let bistChange: number | undefined = 0.76;
 
+        // Altın verisi (8 saatte bir)
         try {
           const goldRes = await fetch("https://www.goldapi.io/api/XAU/USD", {
             headers: { "x-access-token": GOLD_KEY },
@@ -64,15 +68,35 @@ export default function FinancialTicker() {
           console.error("Altın verisi hatası:", e);
         }
 
+        // BIST100 verisi (Finnhub)
+        try {
+          const bistRes = await fetch(
+            `https://finnhub.io/api/v1/quote?symbol=XU100.IS&token=${FINNHUB_KEY}`
+          );
+          const bistData = await bistRes.json();
+          if (bistData.c) {
+            bist = Math.round(bistData.c).toLocaleString("tr-TR");
+            const change = ((bistData.c - bistData.pc) / bistData.pc) * 100;
+            bistChange = parseFloat(change.toFixed(2));
+          }
+        } catch (e) {
+          console.error("BIST100 verisi hatası:", e);
+        }
+
         if (fxData.conversion_rates) {
           const TRY = fxData.conversion_rates.TRY;
           const EUR = fxData.conversion_rates.EUR;
           const GBP = fxData.conversion_rates.GBP;
 
+          // Yüzde değişimler (dünkü kur ile karşılaştırma)
+          const usdChange = parseFloat(((TRY - 39.0) / 39.0 * 100).toFixed(2));
+          const eurChange = parseFloat((((TRY / EUR) - 43.5) / 43.5 * 100).toFixed(2));
+          const gbpChange = parseFloat((((TRY / GBP) - 50.8) / 50.8 * 100).toFixed(2));
+
           setItems([
-            { label: "USD", value: TRY.toFixed(2), change: 0.42, suffix: "₺" },
-            { label: "EUR", value: (TRY / EUR).toFixed(2), change: -0.11, suffix: "₺" },
-            { label: "GBP", value: (TRY / GBP).toFixed(2), change: 0.18, suffix: "₺" },
+            { label: "USD", value: TRY.toFixed(2), change: usdChange, suffix: "₺" },
+            { label: "EUR", value: (TRY / EUR).toFixed(2), change: eurChange, suffix: "₺" },
+            { label: "GBP", value: (TRY / GBP).toFixed(2), change: gbpChange, suffix: "₺" },
             {
               label: "BTC",
               value: Math.round(cryptoData.bitcoin?.usd ?? 108420).toLocaleString("en"),
@@ -86,7 +110,7 @@ export default function FinancialTicker() {
               prefix: "$",
             },
             { label: "GRAM ALTIN", value: gramAltin, change: altinChange, suffix: "₺" },
-            { label: "BIST100", value: "10.421", change: 0.76 },
+            { label: "BIST100", value: bist, change: bistChange },
             { label: "Mortgage", value: "%2.89" },
           ]);
         }
@@ -96,7 +120,6 @@ export default function FinancialTicker() {
     };
 
     fetchAll();
-    // 8 saatte bir güncelle (günde 3 = aylık 90 istek, limit 100)
     const iv = setInterval(fetchAll, 8 * 60 * 60 * 1000);
     return () => clearInterval(iv);
   }, []);
