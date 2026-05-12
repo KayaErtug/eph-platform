@@ -13,30 +13,16 @@ interface TickerItem {
   suffix?: string;
 }
 
-interface NewsItem {
-  title: string;
-  link: string;
-}
-
 export default function FinancialTicker() {
   const [items, setItems] = useState<TickerItem[]>([
-    { label: "USD", value: "39.21", change: 0.42, suffix: "₺" },
-    { label: "EUR", value: "44.10", change: -0.11, suffix: "₺" },
-    { label: "GBP", value: "51.20", change: 0.18, suffix: "₺" },
+    { label: "USD", value: "39.21", suffix: "₺" },
+    { label: "EUR", value: "44.10", suffix: "₺" },
+    { label: "GBP", value: "51.20", suffix: "₺" },
     { label: "BTC", value: "108,420", change: 1.8, prefix: "$" },
     { label: "ETH", value: "3,240", change: 0.9, prefix: "$" },
     { label: "GRAM ALTIN", value: "4.352", suffix: "₺" },
     { label: "BIST100", value: "10.421", change: 0.76 },
-    { label: "Mortgage", value: "%2.89" },
   ]);
-
-  const [news, setNews] = useState<NewsItem[]>([
-    { title: "EPH Platformu Denizli'de pilot çalışmalarını başarıyla tamamladı", link: "#" },
-    { title: "Türkiye'de konut satışları bu yıl rekor kırdı", link: "#" },
-    { title: "Denizli'de gayrimenkul yatırımlarına ilgi artıyor", link: "#" },
-  ]);
-  const [newsIdx, setNewsIdx] = useState(0);
-  const [newsVisible, setNewsVisible] = useState(true);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -51,9 +37,8 @@ export default function FinancialTicker() {
         let gramAltin = "4.352";
         let altinChange: number | undefined = undefined;
         let bist = "10.421";
-        let bistChange: number | undefined = 0.76;
+        let bistChange: number | undefined = undefined;
 
-        // Altın verisi (8 saatte bir)
         try {
           const goldRes = await fetch("https://www.goldapi.io/api/XAU/USD", {
             headers: { "x-access-token": GOLD_KEY },
@@ -68,7 +53,6 @@ export default function FinancialTicker() {
           console.error("Altın verisi hatası:", e);
         }
 
-        // BIST100 verisi (Finnhub)
         try {
           const bistRes = await fetch(
             `https://finnhub.io/api/v1/quote?symbol=XU100.IS&token=${FINNHUB_KEY}`
@@ -88,15 +72,10 @@ export default function FinancialTicker() {
           const EUR = fxData.conversion_rates.EUR;
           const GBP = fxData.conversion_rates.GBP;
 
-          // Yüzde değişimler (dünkü kur ile karşılaştırma)
-          const usdChange = parseFloat(((TRY - 39.0) / 39.0 * 100).toFixed(2));
-          const eurChange = parseFloat((((TRY / EUR) - 43.5) / 43.5 * 100).toFixed(2));
-          const gbpChange = parseFloat((((TRY / GBP) - 50.8) / 50.8 * 100).toFixed(2));
-
           setItems([
-            { label: "USD", value: TRY.toFixed(2), change: usdChange, suffix: "₺" },
-            { label: "EUR", value: (TRY / EUR).toFixed(2), change: eurChange, suffix: "₺" },
-            { label: "GBP", value: (TRY / GBP).toFixed(2), change: gbpChange, suffix: "₺" },
+            { label: "USD", value: TRY.toFixed(2), suffix: "₺" },
+            { label: "EUR", value: (TRY / EUR).toFixed(2), suffix: "₺" },
+            { label: "GBP", value: (TRY / GBP).toFixed(2), suffix: "₺" },
             {
               label: "BTC",
               value: Math.round(cryptoData.bitcoin?.usd ?? 108420).toLocaleString("en"),
@@ -111,7 +90,6 @@ export default function FinancialTicker() {
             },
             { label: "GRAM ALTIN", value: gramAltin, change: altinChange, suffix: "₺" },
             { label: "BIST100", value: bist, change: bistChange },
-            { label: "Mortgage", value: "%2.89" },
           ]);
         }
       } catch (e) {
@@ -124,36 +102,6 @@ export default function FinancialTicker() {
     return () => clearInterval(iv);
   }, []);
 
-  useEffect(() => {
-    const fetchNews = async () => {
-      try {
-        const res = await fetch(
-          `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent("https://www.bloomberght.com/rss")}&count=8`
-        );
-        const data = await res.json();
-        if (data.status === "ok" && data.items?.length > 0) {
-          setNews(data.items.map((item: any) => ({ title: item.title, link: item.link })));
-        }
-      } catch (e) {
-        console.error("Haber hatası:", e);
-      }
-    };
-    fetchNews();
-    const iv = setInterval(fetchNews, 10 * 60 * 1000);
-    return () => clearInterval(iv);
-  }, []);
-
-  useEffect(() => {
-    const iv = setInterval(() => {
-      setNewsVisible(false);
-      setTimeout(() => {
-        setNewsIdx(i => (i + 1) % news.length);
-        setNewsVisible(true);
-      }, 400);
-    }, 5000);
-    return () => clearInterval(iv);
-  }, [news.length]);
-
   return (
     <>
       <style>{`
@@ -162,15 +110,26 @@ export default function FinancialTicker() {
           100% { transform: translateX(-50%); }
         }
       `}</style>
-      <div style={{ background: "#0f172a", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "stretch", overflow: "hidden", height: 30 }}>
+      <div style={{
+        background: "#0f172a",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        overflow: "hidden",
+        height: 30,
+        display: "flex",
+        alignItems: "center",
+      }}>
         <div style={{ flex: 1, overflow: "hidden", display: "flex", alignItems: "center" }}>
           <div style={{ display: "flex", animation: "tk-scroll 50s linear infinite", whiteSpace: "nowrap" }}>
             {[0, 1].map(ri => (
               <span key={ri} style={{ display: "inline-flex", alignItems: "center" }}>
                 {items.map((item, i) => (
                   <span key={`${ri}-${i}`} style={{ display: "inline-flex", alignItems: "center", gap: 5, marginRight: 20 }}>
-                    <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 9.5, fontWeight: 600, letterSpacing: "0.8px" }}>{item.label}</span>
-                    <span style={{ color: "#fff", fontSize: 10.5, fontWeight: 700 }}>{item.prefix}{item.value}{item.suffix}</span>
+                    <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 9.5, fontWeight: 600, letterSpacing: "0.8px" }}>
+                      {item.label}
+                    </span>
+                    <span style={{ color: "#fff", fontSize: 10.5, fontWeight: 700 }}>
+                      {item.prefix}{item.value}{item.suffix}
+                    </span>
                     {item.change !== undefined && (
                       <span style={{ color: item.change >= 0 ? "#86efac" : "#fca5a5", fontSize: 9.5, fontWeight: 700 }}>
                         {item.change >= 0 ? "▲" : "▼"} %{Math.abs(item.change)}
@@ -182,11 +141,6 @@ export default function FinancialTicker() {
               </span>
             ))}
           </div>
-        </div>
-        <div style={{ background: "#1e3a8a", padding: "0 14px", display: "flex", alignItems: "center", gap: 7, flexShrink: 0, width: 320, borderLeft: "1px solid rgba(255,255,255,0.08)", overflow: "hidden" }}>
-          <span style={{ color: "#60a5fa", fontSize: 9, fontWeight: 700, letterSpacing: "1px", flexShrink: 0 }}>HABER</span>
-          <span style={{ color: "rgba(255,255,255,0.2)", flexShrink: 0 }}>·</span>
-          <a href={news[newsIdx]?.link ?? "#"} target="_blank" rel="noopener noreferrer" style={{ color: "#bfdbfe", fontSize: 10, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: "none", opacity: newsVisible ? 1 : 0, transition: "opacity 0.4s" }}>{news[newsIdx]?.title}</a>
         </div>
       </div>
     </>
