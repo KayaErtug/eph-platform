@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 
 const EXCHANGE_KEY = "27ab27e174aa353884ced87b";
+const GOLD_KEY = "goldapi-8f600a41111b003f1bb7efb1940f033f-io";
 
 interface TickerItem {
   label: string;
@@ -37,7 +38,7 @@ export default function FinancialTicker() {
   const [newsVisible, setNewsVisible] = useState(true);
 
   useEffect(() => {
-    const fetchFinancial = async () => {
+    const fetchAll = async () => {
       try {
         const [fxRes, cryptoRes] = await Promise.all([
           fetch(`https://v6.exchangerate-api.com/v6/${EXCHANGE_KEY}/latest/USD`),
@@ -45,17 +46,46 @@ export default function FinancialTicker() {
         ]);
         const fxData = await fxRes.json();
         const cryptoData = await cryptoRes.json();
+
+        let gramAltin = "4.352";
+        let altinChange: number | undefined = undefined;
+
+        try {
+          const goldRes = await fetch("https://www.goldapi.io/api/XAU/USD", {
+            headers: { "x-access-token": GOLD_KEY },
+          });
+          const goldData = await goldRes.json();
+          if (goldData.price_gram_24k && fxData.conversion_rates?.TRY) {
+            const gramTRY = goldData.price_gram_24k * fxData.conversion_rates.TRY;
+            gramAltin = Math.round(gramTRY).toLocaleString("tr-TR");
+            altinChange = parseFloat((goldData.chp ?? 0).toFixed(2));
+          }
+        } catch (e) {
+          console.error("Altın verisi hatası:", e);
+        }
+
         if (fxData.conversion_rates) {
           const TRY = fxData.conversion_rates.TRY;
           const EUR = fxData.conversion_rates.EUR;
           const GBP = fxData.conversion_rates.GBP;
+
           setItems([
             { label: "USD", value: TRY.toFixed(2), change: 0.42, suffix: "₺" },
             { label: "EUR", value: (TRY / EUR).toFixed(2), change: -0.11, suffix: "₺" },
             { label: "GBP", value: (TRY / GBP).toFixed(2), change: 0.18, suffix: "₺" },
-            { label: "BTC", value: Math.round(cryptoData.bitcoin?.usd ?? 108420).toLocaleString("en"), change: parseFloat((cryptoData.bitcoin?.usd_24h_change ?? 1.8).toFixed(2)), prefix: "$" },
-            { label: "ETH", value: Math.round(cryptoData.ethereum?.usd ?? 3240).toLocaleString("en"), change: parseFloat((cryptoData.ethereum?.usd_24h_change ?? 0.9).toFixed(2)), prefix: "$" },
-            { label: "GRAM ALTIN", value: "4.352", suffix: "₺" },
+            {
+              label: "BTC",
+              value: Math.round(cryptoData.bitcoin?.usd ?? 108420).toLocaleString("en"),
+              change: parseFloat((cryptoData.bitcoin?.usd_24h_change ?? 1.8).toFixed(2)),
+              prefix: "$",
+            },
+            {
+              label: "ETH",
+              value: Math.round(cryptoData.ethereum?.usd ?? 3240).toLocaleString("en"),
+              change: parseFloat((cryptoData.ethereum?.usd_24h_change ?? 0.9).toFixed(2)),
+              prefix: "$",
+            },
+            { label: "GRAM ALTIN", value: gramAltin, change: altinChange, suffix: "₺" },
             { label: "BIST100", value: "10.421", change: 0.76 },
             { label: "Mortgage", value: "%2.89" },
           ]);
@@ -64,8 +94,10 @@ export default function FinancialTicker() {
         console.error("Finansal veri hatası:", e);
       }
     };
-    fetchFinancial();
-    const iv = setInterval(fetchFinancial, 5 * 60 * 1000);
+
+    fetchAll();
+    // 8 saatte bir güncelle (günde 3 = aylık 90 istek, limit 100)
+    const iv = setInterval(fetchAll, 8 * 60 * 60 * 1000);
     return () => clearInterval(iv);
   }, []);
 
