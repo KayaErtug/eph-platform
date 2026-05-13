@@ -11,6 +11,8 @@ interface Stats {
   approvedUsers: number;
   totalInvitations: number;
   pendingDocuments: number;
+  pendingNominations: number;
+  pendingApplications: number;
   byRole: { role: string; count: number }[];
 }
 
@@ -32,6 +34,33 @@ interface Document {
   fileUrl: string;
   fileName: string;
   user?: { firstName: string; lastName: string; email: string; role: string };
+}
+
+interface Nomination {
+  id: string;
+  candidateName: string;
+  candidateEmail: string;
+  candidatePhone: string;
+  candidateRole: string;
+  note?: string;
+  status: string;
+  adminNote?: string;
+  createdAt: string;
+  nominator: { firstName: string; lastName: string; email: string; role: string };
+}
+
+interface Application {
+  id: string;
+  applicantName: string;
+  applicantEmail: string;
+  applicantPhone: string;
+  requestedRole: string;
+  message?: string;
+  referralCode?: string;
+  status: string;
+  adminNote?: string;
+  createdAt: string;
+  referrer?: { firstName: string; lastName: string; email: string; role: string };
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -61,18 +90,37 @@ const DOC_STATUS_LABELS: Record<string, string> = {
   PENDING: "Bekliyor", APPROVED: "Onaylandı", REJECTED: "Reddedildi"
 };
 
+const NOM_STATUS_COLORS: Record<string, string> = {
+  PENDING: "bg-yellow-950 text-yellow-300 border-yellow-800",
+  APPROVED: "bg-green-950 text-green-300 border-green-800",
+  REJECTED: "bg-red-950 text-red-300 border-red-800",
+  INVITED: "bg-blue-950 text-blue-300 border-blue-800",
+  REGISTERED: "bg-purple-950 text-purple-300 border-purple-800",
+};
+
+const NOM_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Bekliyor", APPROVED: "Onaylandı", REJECTED: "Reddedildi",
+  INVITED: "Davet Gönderildi", REGISTERED: "Kayıt Oldu"
+};
+
 export default function AdminPage() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [activeTab, setActiveTab] = useState<"users" | "documents">("users");
+  const [nominations, setNominations] = useState<Nomination[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [activeTab, setActiveTab] = useState<"users" | "documents" | "nominations" | "applications">("users");
   const [userFilter, setUserFilter] = useState<"all" | "pending" | "approved">("all");
   const [docFilter, setDocFilter] = useState<"pending" | "approved" | "rejected" | "all">("all");
+  const [nomFilter, setNomFilter] = useState<"all" | "PENDING" | "APPROVED" | "REJECTED" | "INVITED" | "REGISTERED">("all");
+  const [appFilter, setAppFilter] = useState<"all" | "PENDING" | "APPROVED" | "REJECTED" | "INVITED" | "REGISTERED">("all");
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [noteModal, setNoteModal] = useState<{ type: "nomination" | "application"; id: string } | null>(null);
+  const [noteText, setNoteText] = useState("");
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -85,28 +133,64 @@ export default function AdminPage() {
 
   useEffect(() => { if (hydrated && user) fetchUsers(); }, [userFilter]);
   useEffect(() => { if (hydrated && user) fetchDocuments(); }, [docFilter]);
+  useEffect(() => { if (hydrated && user) fetchNominations(); }, [nomFilter]);
+  useEffect(() => { if (hydrated && user) fetchApplications(); }, [appFilter]);
 
   const fetchAll = async () => {
     try {
-      const [s, u, d] = await Promise.all([
+      const [s, u, d, n, a] = await Promise.all([
         api.get("/admin/stats"),
         api.get(`/admin/users?filter=${userFilter}`),
         api.get(`/admin/documents?filter=${docFilter}`),
+        api.get(`/admin/nominations?status=${nomFilter}`),
+        api.get(`/admin/applications?status=${appFilter}`),
       ]);
       setStats(s.data);
       setUsers(u.data);
       setDocuments(d.data);
+      setNominations(n.data);
+      setApplications(a.data);
     } finally { setLoading(false); }
   };
 
   const fetchStats = async () => { const r = await api.get("/admin/stats"); setStats(r.data); };
   const fetchUsers = async () => { const r = await api.get(`/admin/users?filter=${userFilter}`); setUsers(r.data); };
   const fetchDocuments = async () => { const r = await api.get(`/admin/documents?filter=${docFilter}`); setDocuments(r.data); };
+  const fetchNominations = async () => { const r = await api.get(`/admin/nominations?status=${nomFilter}`); setNominations(r.data); };
+  const fetchApplications = async () => { const r = await api.get(`/admin/applications?status=${appFilter}`); setApplications(r.data); };
 
   const handleApproveUser = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/users/${id}/approve`); await Promise.all([fetchUsers(), fetchStats()]); } finally { setActionLoading(null); } };
   const handleRejectUser = async (id: string) => { if (!confirm("Emin misiniz?")) return; setActionLoading(id); try { await api.delete(`/admin/users/${id}/reject`); await Promise.all([fetchUsers(), fetchStats()]); } finally { setActionLoading(null); } };
   const handleApproveDoc = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/documents/${id}/approve`); await Promise.all([fetchDocuments(), fetchStats()]); } finally { setActionLoading(null); } };
   const handleRejectDoc = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/documents/${id}/reject`); await Promise.all([fetchDocuments(), fetchStats()]); } finally { setActionLoading(null); } };
+
+  const handleNominationStatus = async (id: string, status: string) => {
+    setActionLoading(id);
+    try { await api.patch(`/admin/nominations/${id}/status`, { status }); await Promise.all([fetchNominations(), fetchStats()]); }
+    finally { setActionLoading(null); }
+  };
+
+  const handleApplicationStatus = async (id: string, status: string) => {
+    setActionLoading(id);
+    try { await api.patch(`/admin/applications/${id}/status`, { status }); await Promise.all([fetchApplications(), fetchStats()]); }
+    finally { setActionLoading(null); }
+  };
+
+  const handleSaveNote = async () => {
+    if (!noteModal) return;
+    setActionLoading(noteModal.id);
+    try {
+      if (noteModal.type === "nomination") {
+        await api.patch(`/admin/nominations/${noteModal.id}/status`, { status: nominations.find(n => n.id === noteModal.id)?.status, adminNote: noteText });
+        await fetchNominations();
+      } else {
+        await api.patch(`/admin/applications/${noteModal.id}/status`, { status: applications.find(a => a.id === noteModal.id)?.status, adminNote: noteText });
+        await fetchApplications();
+      }
+      setNoteModal(null);
+      setNoteText("");
+    } finally { setActionLoading(null); }
+  };
 
   if (!hydrated || loading) return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -116,6 +200,32 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
+
+      {/* Not Modal */}
+      {noteModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-white font-medium mb-4">Admin Notu</h3>
+            <textarea
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Notunuzu yazın..."
+              rows={4}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 resize-none mb-4"
+            />
+            <div className="flex gap-3">
+              <button onClick={handleSaveNote} disabled={actionLoading === noteModal.id}
+                className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-sm px-5 py-2 rounded-lg transition-colors font-medium">
+                {actionLoading === noteModal.id ? "..." : "Kaydet"}
+              </button>
+              <button onClick={() => { setNoteModal(null); setNoteText(""); }}
+                className="text-gray-400 border border-gray-700 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors">
+                İptal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="border-b border-gray-800 bg-gray-950 sticky top-0 z-10">
@@ -127,13 +237,11 @@ export default function AdminPage() {
             <span className="text-white font-semibold">EPH</span>
             <span className="text-gray-600 text-sm">/ Admin</span>
           </div>
-
           <nav className="flex items-center gap-1">
             <Link href="/dashboard" className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">Ana Sayfa</Link>
             <Link href="/stok" className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">Stok</Link>
             <Link href="/admin" className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gray-800">Admin</Link>
           </nav>
-
           <button onClick={() => { logout(); router.push("/giris"); }}
             className="flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-gray-700 px-4 py-2 rounded-lg transition-colors">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -143,7 +251,6 @@ export default function AdminPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
-
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-white mb-1">Admin Paneli</h1>
           <p className="text-gray-500 text-sm">Üye ve belge yönetimi</p>
@@ -151,26 +258,34 @@ export default function AdminPage() {
 
         {/* Stats */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
               <p className="text-gray-500 text-xs mb-2">Toplam Üye</p>
               <p className="text-2xl font-semibold text-white">{stats.totalUsers}</p>
             </div>
-            <div className="bg-gray-900 border border-yellow-900 rounded-xl p-5">
+            <div className="bg-gray-900 border border-yellow-900 rounded-xl p-4">
               <p className="text-yellow-500 text-xs mb-2">Onay Bekleyen</p>
               <p className="text-2xl font-semibold text-yellow-300">{stats.pendingUsers}</p>
             </div>
-            <div className="bg-gray-900 border border-green-900 rounded-xl p-5">
+            <div className="bg-gray-900 border border-green-900 rounded-xl p-4">
               <p className="text-green-500 text-xs mb-2">Onaylanan</p>
               <p className="text-2xl font-semibold text-green-300">{stats.approvedUsers}</p>
             </div>
-            <div className="bg-gray-900 border border-blue-900 rounded-xl p-5">
+            <div className="bg-gray-900 border border-blue-900 rounded-xl p-4">
               <p className="text-blue-500 text-xs mb-2">Davet Kodu</p>
               <p className="text-2xl font-semibold text-blue-300">{stats.totalInvitations}</p>
             </div>
-            <div className="bg-gray-900 border border-orange-900 rounded-xl p-5">
+            <div className="bg-gray-900 border border-orange-900 rounded-xl p-4">
               <p className="text-orange-500 text-xs mb-2">Bekleyen Belge</p>
               <p className="text-2xl font-semibold text-orange-300">{stats.pendingDocuments}</p>
+            </div>
+            <div className="bg-gray-900 border border-purple-900 rounded-xl p-4">
+              <p className="text-purple-500 text-xs mb-2">Bekleyen Tavsiye</p>
+              <p className="text-2xl font-semibold text-purple-300">{stats.pendingNominations}</p>
+            </div>
+            <div className="bg-gray-900 border border-pink-900 rounded-xl p-4">
+              <p className="text-pink-500 text-xs mb-2">Bekleyen Başvuru</p>
+              <p className="text-2xl font-semibold text-pink-300">{stats.pendingApplications}</p>
             </div>
           </div>
         )}
@@ -190,7 +305,7 @@ export default function AdminPage() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 flex-wrap">
           <button onClick={() => setActiveTab("users")}
             className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors ${activeTab === "users" ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
             Kullanıcılar
@@ -200,6 +315,20 @@ export default function AdminPage() {
             Belgeler
             {stats && stats.pendingDocuments > 0 && (
               <span className="bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{stats.pendingDocuments}</span>
+            )}
+          </button>
+          <button onClick={() => setActiveTab("nominations")}
+            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === "nominations" ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
+            Tavsiyeler
+            {stats && stats.pendingNominations > 0 && (
+              <span className="bg-purple-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{stats.pendingNominations}</span>
+            )}
+          </button>
+          <button onClick={() => setActiveTab("applications")}
+            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === "applications" ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
+            Başvurular
+            {stats && stats.pendingApplications > 0 && (
+              <span className="bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{stats.pendingApplications}</span>
             )}
           </button>
         </div>
@@ -287,7 +416,7 @@ export default function AdminPage() {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                       </div>
                       <div>
-                        <p className="text-white font-medium text-sm">{DOC_LABELS[doc.type]}</p>
+                        <p className="text-white font-medium text-sm">{DOC_LABELS[doc.type] ?? doc.type}</p>
                         <p className="text-gray-500 text-xs">{doc.fileName}</p>
                         {doc.user && <p className="text-gray-600 text-xs">{doc.user.firstName} {doc.user.lastName} · {ROLE_LABELS[doc.user.role]}</p>}
                       </div>
@@ -318,6 +447,153 @@ export default function AdminPage() {
             )}
           </div>
         )}
+
+        {/* Tavsiyeler */}
+        {activeTab === "nominations" && (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+              <h2 className="font-medium text-white">Tavsiyeler</h2>
+              <div className="flex gap-2 flex-wrap">
+                {(["all", "PENDING", "APPROVED", "REJECTED", "INVITED", "REGISTERED"] as const).map((f) => (
+                  <button key={f} onClick={() => setNomFilter(f)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${nomFilter === f ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
+                    {f === "all" ? "Tümü" : NOM_STATUS_LABELS[f]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {nominations.length === 0 ? (
+              <div className="px-6 py-12 text-center text-gray-600 text-sm">Tavsiye bulunamadı.</div>
+            ) : (
+              <div className="divide-y divide-gray-800">
+                {nominations.map((nom) => (
+                  <div key={nom.id} className="px-6 py-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 bg-purple-900 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 text-purple-300">
+                          {nom.candidateName[0]}
+                        </div>
+                        <div>
+                          <p className="text-white font-medium text-sm">{nom.candidateName}</p>
+                          <p className="text-gray-500 text-xs">{nom.candidateEmail} · {nom.candidatePhone}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`border rounded-full px-2.5 py-0.5 text-xs font-medium ${ROLE_COLORS[nom.candidateRole]}`}>{ROLE_LABELS[nom.candidateRole]}</span>
+                            <span className={`border rounded-full px-2.5 py-0.5 text-xs font-medium ${NOM_STATUS_COLORS[nom.status]}`}>{NOM_STATUS_LABELS[nom.status]}</span>
+                          </div>
+                          {nom.note && <p className="text-gray-500 text-xs mt-2 italic">"{nom.note}"</p>}
+                          {nom.adminNote && <p className="text-yellow-600 text-xs mt-1">📝 {nom.adminNote}</p>}
+                          <p className="text-gray-700 text-xs mt-2">
+                            Öneren: {nom.nominator.firstName} {nom.nominator.lastName} · {ROLE_LABELS[nom.nominator.role]} · {new Date(nom.createdAt).toLocaleDateString("tr-TR")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button onClick={() => { setNoteModal({ type: "nomination", id: nom.id }); setNoteText(nom.adminNote || ""); }}
+                          className="text-gray-400 border border-gray-700 hover:text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
+                          Not
+                        </button>
+                        {nom.status === "PENDING" && (
+                          <>
+                            <button onClick={() => handleNominationStatus(nom.id, "APPROVED")} disabled={actionLoading === nom.id}
+                              className="bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
+                              {actionLoading === nom.id ? "..." : "Onayla"}
+                            </button>
+                            <button onClick={() => handleNominationStatus(nom.id, "REJECTED")} disabled={actionLoading === nom.id}
+                              className="bg-red-950 hover:bg-red-900 border border-red-900 text-red-400 text-xs px-3 py-1.5 rounded-lg transition-colors">
+                              {actionLoading === nom.id ? "..." : "Reddet"}
+                            </button>
+                          </>
+                        )}
+                        {nom.status === "APPROVED" && (
+                          <button onClick={() => handleNominationStatus(nom.id, "INVITED")} disabled={actionLoading === nom.id}
+                            className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
+                            {actionLoading === nom.id ? "..." : "Davet Gönderildi"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Başvurular */}
+        {activeTab === "applications" && (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+              <h2 className="font-medium text-white">Başvurular</h2>
+              <div className="flex gap-2 flex-wrap">
+                {(["all", "PENDING", "APPROVED", "REJECTED", "INVITED", "REGISTERED"] as const).map((f) => (
+                  <button key={f} onClick={() => setAppFilter(f)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${appFilter === f ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
+                    {f === "all" ? "Tümü" : NOM_STATUS_LABELS[f]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {applications.length === 0 ? (
+              <div className="px-6 py-12 text-center text-gray-600 text-sm">Başvuru bulunamadı.</div>
+            ) : (
+              <div className="divide-y divide-gray-800">
+                {applications.map((app) => (
+                  <div key={app.id} className="px-6 py-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 bg-pink-900 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 text-pink-300">
+                          {app.applicantName[0]}
+                        </div>
+                        <div>
+                          <p className="text-white font-medium text-sm">{app.applicantName}</p>
+                          <p className="text-gray-500 text-xs">{app.applicantEmail} · {app.applicantPhone}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`border rounded-full px-2.5 py-0.5 text-xs font-medium ${ROLE_COLORS[app.requestedRole]}`}>{ROLE_LABELS[app.requestedRole]}</span>
+                            <span className={`border rounded-full px-2.5 py-0.5 text-xs font-medium ${NOM_STATUS_COLORS[app.status]}`}>{NOM_STATUS_LABELS[app.status]}</span>
+                            {app.referrer && <span className="text-green-400 text-xs">🔗 Referanslı</span>}
+                          </div>
+                          {app.message && <p className="text-gray-500 text-xs mt-2 italic">"{app.message}"</p>}
+                          {app.adminNote && <p className="text-yellow-600 text-xs mt-1">📝 {app.adminNote}</p>}
+                          {app.referrer && (
+                            <p className="text-gray-700 text-xs mt-1">
+                              Referans: {app.referrer.firstName} {app.referrer.lastName} · {ROLE_LABELS[app.referrer.role]}
+                            </p>
+                          )}
+                          <p className="text-gray-700 text-xs mt-1">{new Date(app.createdAt).toLocaleDateString("tr-TR")}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button onClick={() => { setNoteModal({ type: "application", id: app.id }); setNoteText(app.adminNote || ""); }}
+                          className="text-gray-400 border border-gray-700 hover:text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
+                          Not
+                        </button>
+                        {app.status === "PENDING" && (
+                          <>
+                            <button onClick={() => handleApplicationStatus(app.id, "APPROVED")} disabled={actionLoading === app.id}
+                              className="bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
+                              {actionLoading === app.id ? "..." : "Onayla"}
+                            </button>
+                            <button onClick={() => handleApplicationStatus(app.id, "REJECTED")} disabled={actionLoading === app.id}
+                              className="bg-red-950 hover:bg-red-900 border border-red-900 text-red-400 text-xs px-3 py-1.5 rounded-lg transition-colors">
+                              {actionLoading === app.id ? "..." : "Reddet"}
+                            </button>
+                          </>
+                        )}
+                        {app.status === "APPROVED" && (
+                          <button onClick={() => handleApplicationStatus(app.id, "INVITED")} disabled={actionLoading === app.id}
+                            className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
+                            {actionLoading === app.id ? "..." : "Davet Gönderildi"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   );
