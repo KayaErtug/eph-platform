@@ -9,6 +9,8 @@ import { ProfileModule } from './profile/profile.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { ProjectsModule } from './projects/projects.module';
 import { UnitsModule } from './units/units.module';
+import { NominationsModule } from './nominations/nominations.module';
+import { ApplicationsModule } from './applications/applications.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { UnitsModule } from './units/units.module';
     ProfileModule,
     ProjectsModule,
     UnitsModule,
+    NominationsModule,
+    ApplicationsModule,
   ],
 })
 export class AppModule {}

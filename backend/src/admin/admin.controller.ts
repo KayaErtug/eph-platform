@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Delete, Param, Query, UseGuards } from "@nestjs/common";
+import { Controller, Get, Patch, Delete, Param, Query, Body, UseGuards } from "@nestjs/common";
 import { AdminService } from "./admin.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
@@ -12,9 +12,7 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get("stats")
-  getStats() {
-    return this.adminService.getStats();
-  }
+  getStats() { return this.adminService.getStats(); }
 
   @Get("users")
   getUsers(@Query("filter") filter?: "pending" | "approved" | "all") {
@@ -22,19 +20,13 @@ export class AdminController {
   }
 
   @Patch("users/:id/approve")
-  approveUser(@Param("id") id: string) {
-    return this.adminService.approveUser(id);
-  }
+  approveUser(@Param("id") id: string) { return this.adminService.approveUser(id); }
 
   @Delete("users/:id/reject")
-  rejectUser(@Param("id") id: string) {
-    return this.adminService.rejectUser(id);
-  }
+  rejectUser(@Param("id") id: string) { return this.adminService.rejectUser(id); }
 
   @Get("invitations")
-  getInvitations() {
-    return this.adminService.getInvitations();
-  }
+  getInvitations() { return this.adminService.getInvitations(); }
 
   @Get("documents")
   getDocuments(@Query("filter") filter?: "pending" | "approved" | "rejected" | "all") {
@@ -42,12 +34,26 @@ export class AdminController {
   }
 
   @Patch("documents/:id/approve")
-  approveDocument(@Param("id") id: string) {
-    return this.adminService.approveDocument(id);
-  }
+  approveDocument(@Param("id") id: string) { return this.adminService.approveDocument(id); }
 
   @Patch("documents/:id/reject")
-  rejectDocument(@Param("id") id: string) {
-    return this.adminService.rejectDocument(id);
-  }
+  rejectDocument(@Param("id") id: string) { return this.adminService.rejectDocument(id); }
+
+  @Get("nominations")
+  getNominations(@Query("status") status?: string) { return this.adminService.getNominations(status); }
+
+  @Patch("nominations/:id/status")
+  updateNominationStatus(
+    @Param("id") id: string,
+    @Body() body: { status: string; adminNote?: string },
+  ) { return this.adminService.updateNominationStatus(id, body.status, body.adminNote); }
+
+  @Get("applications")
+  getApplications(@Query("status") status?: string) { return this.adminService.getApplications(status); }
+
+  @Patch("applications/:id/status")
+  updateApplicationStatus(
+    @Param("id") id: string,
+    @Body() body: { status: string; adminNote?: string },
+  ) { return this.adminService.updateApplicationStatus(id, body.status, body.adminNote); }
 }

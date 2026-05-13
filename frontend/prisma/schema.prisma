@@ -26,6 +26,12 @@ enum DocumentType {
   YETKI_BELGESI
   TICARET_SICIL
   KIMLIK
+  MYK_BELGESI
+  IMZA_SIRKULERI
+  FAALIYET_BELGESI
+  IS_BITIRME_BELGESI
+  YAMBIS_BELGESI
+  REFERANS_PROJE
   DIGER
 }
 
@@ -43,7 +49,6 @@ enum UnitStatus {
 }
 
 enum UnitType {
-  // Konut
   DAIRE
   VILLA
   REZIDANS
@@ -51,8 +56,6 @@ enum UnitType {
   KOSK_YALI
   CIFTLIK_EVI
   PREFABRIK_EV
-
-  // Ticari
   DUKKAN_MAGAZA
   OFIS_BURO
   PLAZA_KATI
@@ -60,33 +63,50 @@ enum UnitType {
   FABRIKA_ATOLYE
   OTEL_PANSIYON
   DUGUN_SALONU
-
-  // Arsa & Arazi
   ARSA
   TARLA
   BAHCE
   ZEYTINLIK
   ADA
-
-  // Diger
   DEVRE_MULK
   TURISTIK_TESIS
 }
 
+enum NominationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  INVITED
+  REGISTERED
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  INVITED
+  REGISTERED
+}
+
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
-  phone        String     @unique
-  passwordHash String
-  firstName    String
-  lastName     String
-  role         Role
-  isVerified   Boolean    @default(false)
-  isApproved   Boolean    @default(false)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  documents    Document[]
-  projects     Project[]
+  id               String        @id @default(uuid())
+  email            String        @unique
+  phone            String        @unique
+  passwordHash     String
+  firstName        String
+  lastName         String
+  role             Role
+  isVerified       Boolean       @default(false)
+  isApproved       Boolean       @default(false)
+  nominationPoints Int           @default(0)
+  nominationQuota  Int           @default(10)
+  referralCode     String?       @unique
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  documents        Document[]
+  projects         Project[]
+  nominations      Nomination[]
+  applications     Application[]
 }
 
 model Invitation {
@@ -141,4 +161,35 @@ model Unit {
   description String?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+}
+
+model Nomination {
+  id             String           @id @default(uuid())
+  nominatorId    String
+  nominator      User             @relation(fields: [nominatorId], references: [id], onDelete: Cascade)
+  candidateName  String
+  candidateEmail String
+  candidatePhone String
+  candidateRole  Role
+  note           String?
+  status         NominationStatus @default(PENDING)
+  adminNote      String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model Application {
+  id             String            @id @default(uuid())
+  applicantName  String
+  applicantEmail String
+  applicantPhone String
+  requestedRole  Role
+  message        String?
+  referralCode   String?
+  referrerId     String?
+  referrer       User?             @relation(fields: [referrerId], references: [id], onDelete: SetNull)
+  status         ApplicationStatus @default(PENDING)
+  adminNote      String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 }
