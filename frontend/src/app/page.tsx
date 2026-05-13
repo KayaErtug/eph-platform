@@ -71,47 +71,120 @@ function KrediHesapla() {
 function AiChat() {
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setShown(true), 2000); return () => clearTimeout(t); }, []);
+  const [bubble, setBubble] = useState(false);
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setShown(true), 5000);
+    const t2 = setTimeout(() => setBubble(true), 6500);
+    const t3 = setTimeout(() => setBubble(false), 11000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, []);
+
+  if (!shown) return null;
+
   return (
-    <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 999, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
-      {shown && !open && (
-        <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: "16px 16px 4px 16px", padding: "10px 14px", fontSize: 12, color: "#374151", boxShadow: "0 4px 20px rgba(0,0,0,0.12)", maxWidth: 200, lineHeight: 1.5, animation: "fadeUp 0.4s ease" }}>
-          Merhaba! Size nasıl yardımcı olabilirim? 👋
+    <>
+      <style>{`
+        @keyframes neonPulse {
+          0% { box-shadow: 0 0 0 0 rgba(232,56,13,0.8), 0 0 0 0 rgba(255,100,50,0.6), 0 0 20px rgba(232,56,13,0.4); }
+          50% { box-shadow: 0 0 0 12px rgba(232,56,13,0), 0 0 0 24px rgba(255,100,50,0), 0 0 40px rgba(232,56,13,0.6); }
+          100% { box-shadow: 0 0 0 0 rgba(232,56,13,0.8), 0 0 0 0 rgba(255,100,50,0.6), 0 0 20px rgba(232,56,13,0.4); }
+        }
+        @keyframes neonRing {
+          0% { transform: scale(1); opacity: 0.8; }
+          100% { transform: scale(2.2); opacity: 0; }
+        }
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          30% { transform: translateY(-12px); }
+          60% { transform: translateY(-6px); }
+        }
+        @keyframes slideInBubble {
+          from { opacity: 0; transform: translateX(20px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes avatarAppear {
+          from { opacity: 0; transform: scale(0.5) translateY(30px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .ai-avatar-btn {
+          animation: avatarAppear 0.6s cubic-bezier(0.34,1.56,0.64,1) both, bounce 1s ease 1s 3, neonPulse 2s ease-in-out 4s infinite;
+        }
+        .neon-ring {
+          position: absolute; inset: -8px; border-radius: 50%;
+          border: 2px solid #E8380D;
+          animation: neonRing 1.5s ease-out infinite;
+        }
+        .neon-ring-2 {
+          position: absolute; inset: -8px; border-radius: 50%;
+          border: 2px solid #FF6B35;
+          animation: neonRing 1.5s ease-out 0.5s infinite;
+        }
+        .neon-ring-3 {
+          position: absolute; inset: -8px; border-radius: 50%;
+          border: 2px solid #FFB347;
+          animation: neonRing 1.5s ease-out 1s infinite;
+        }
+      `}</style>
+
+      <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 999, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
+
+        {/* Konuşma balonu */}
+        {bubble && !open && (
+          <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: "16px 16px 4px 16px", padding: "12px 16px", fontSize: 13, color: "#374151", boxShadow: "0 8px 32px rgba(0,0,0,0.15)", maxWidth: 220, lineHeight: 1.6, animation: "slideInBubble 0.4s ease", fontWeight: 500 }}>
+            👋 Merhaba! Size nasıl yardımcı olabilirim?
+            <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 4 }}>EPH Asistan • Çevrimiçi</div>
+          </div>
+        )}
+
+        {/* Avatar butonu */}
+        <div style={{ position: "relative", cursor: "pointer" }} onClick={() => { setOpen(v => !v); setBubble(false); }}>
+          <div className="neon-ring" />
+          <div className="neon-ring-2" />
+          <div className="neon-ring-3" />
+          <img
+            src={AVATAR}
+            alt="EPH Asistan"
+            className="ai-avatar-btn"
+            style={{ width: 90, height: 90, borderRadius: "50%", objectFit: "cover", border: "3px solid #E8380D", display: "block", position: "relative", zIndex: 2 }}
+          />
+          <div style={{ position: "absolute", bottom: 4, right: 4, width: 18, height: 18, background: "#22C55E", borderRadius: "50%", border: "3px solid #fff", zIndex: 3 }} />
         </div>
-      )}
-      <div onClick={() => setOpen(v => !v)} style={{ cursor: "pointer", position: "relative" }}>
-        <img src={AVATAR} alt="EPH Asistan" style={{ width: 90, height: 90, borderRadius: "50%", objectFit: "cover", border: "3px solid #E8380D", boxShadow: "0 4px 20px rgba(232,56,13,0.35)" }} />
-        <div style={{ position: "absolute", bottom: 4, right: 4, width: 16, height: 16, background: "#22C55E", borderRadius: "50%", border: "2.5px solid #fff" }} />
+
+        {/* Chat penceresi */}
+        {open && (
+          <div style={{ position: "absolute", bottom: 105, right: 0, width: 320, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden", animation: "slideInBubble 0.3s ease" }}>
+            <div style={{ background: "#E8380D", padding: "16px 18px", display: "flex", alignItems: "center", gap: 12 }}>
+              <img src={AVATAR} alt="Asistan" style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,0.5)" }} />
+              <div>
+                <div style={{ color: "#fff", fontSize: 14, fontWeight: 600 }}>EPH Asistan</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <div style={{ width: 7, height: 7, background: "#22C55E", borderRadius: "50%" }} />
+                  <span style={{ color: "rgba(255,255,255,0.9)", fontSize: 11 }}>Çevrimiçi</span>
+                </div>
+              </div>
+              <button onClick={(e) => { e.stopPropagation(); setOpen(false); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "#fff", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ padding: "16px 18px" }}>
+              <div style={{ background: "#F3F4F6", borderRadius: "12px 12px 12px 4px", padding: "12px 14px", fontSize: 12, color: "#374151", lineHeight: 1.7, marginBottom: 14 }}>
+                Merhaba! EPH Platform hakkında merak ettiklerinizi sorabilirsiniz. Üyelik, davet kodu veya platform özellikleri konusunda yardımcı olabilirim. 😊
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, marginBottom: 14 }}>
+                {["Üyelik nasıl alınır?", "Davet kodu nedir?", "İletişim"].map(q => (
+                  <button key={q} style={{ background: "#FFF0ED", border: "1px solid #FECDC5", color: "#E8380D", fontSize: 10, padding: "5px 10px", borderRadius: 20, cursor: "pointer", fontWeight: 500 }}>{q}</button>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input placeholder="Mesajınızı yazın..." style={{ flex: 1, border: "1.5px solid #E5E7EB", borderRadius: 8, padding: "9px 12px", fontSize: 12, outline: "none" }} />
+                <button style={{ background: "#E8380D", border: "none", borderRadius: 8, padding: "9px 14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-      {open && (
-        <div style={{ position: "absolute", bottom: 105, right: 0, width: 320, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.15)", overflow: "hidden" }}>
-          <div style={{ background: "#E8380D", padding: "16px 18px", display: "flex", alignItems: "center", gap: 12 }}>
-            <img src={AVATAR} alt="Asistan" style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,0.5)" }} />
-            <div>
-              <div style={{ color: "#fff", fontSize: 14, fontWeight: 600 }}>EPH Asistan</div>
-              <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 11 }}>Çevrimiçi</div>
-            </div>
-            <button onClick={(e) => { e.stopPropagation(); setOpen(false); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "#fff", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
-          </div>
-          <div style={{ padding: "16px 18px" }}>
-            <div style={{ background: "#F3F4F6", borderRadius: "12px 12px 12px 4px", padding: "12px 14px", fontSize: 12, color: "#374151", lineHeight: 1.6, marginBottom: 14 }}>
-              Merhaba! EPH Platform hakkında merak ettiklerinizi sorabilirsiniz. Üyelik, davet kodu veya platform özellikleri konusunda yardımcı olabilirim.
-            </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, marginBottom: 14 }}>
-              {["Üyelik nasıl alınır?", "Davet kodu nedir?", "İletişim"].map(q => (
-                <button key={q} style={{ background: "#FFF0ED", border: "1px solid #FECDC5", color: "#E8380D", fontSize: 10, padding: "5px 10px", borderRadius: 20, cursor: "pointer", fontWeight: 500 }}>{q}</button>
-              ))}
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input placeholder="Mesajınızı yazın..." style={{ flex: 1, border: "1.5px solid #E5E7EB", borderRadius: 8, padding: "9px 12px", fontSize: 12, outline: "none" }} />
-              <button style={{ background: "#E8380D", border: "none", borderRadius: 8, padding: "9px 14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
 
@@ -135,7 +208,6 @@ export default function LandingPage() {
           .lp-steps{grid-template-columns:1fr!important;}
           .lp-testi{grid-template-columns:1fr!important;}
           .lp-nav-links{display:none!important;}
-          .lp-kredi{grid-template-columns:1fr!important;}
         }
       `}</style>
 
@@ -146,7 +218,7 @@ export default function LandingPage() {
         {/* NAV */}
         <nav style={{ background: "#fff", borderBottom: "1px solid #F3F4F6", padding: "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, height: 68, boxShadow: "0 1px 8px rgba(0,0,0,0.06)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img src="/LOGO_EPH.png" alt="EPH" style={{ width: 36, height: 36, objectFit: "contain" }} />
+            <img src="/LOGO_EPH.png" alt="EPH" style={{ width: 44, height: 44, objectFit: "contain" }} />
             <div>
               <div style={{ color: "#111827", fontSize: 15, fontWeight: 700 }}>EPH Platform</div>
               <div style={{ color: "#E8380D", fontSize: 8, letterSpacing: "1.5px", fontWeight: 600 }}>EMLAK PORTFÖY HAVUZU</div>
@@ -397,7 +469,7 @@ export default function LandingPage() {
         {/* FOOTER */}
         <div style={{ padding: "24px 40px", background: "#1A1A1A", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" as const, gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img src="/LOGO_EPH.png" alt="EPH" style={{ width: 24, height: 24, objectFit: "contain" }} />
+            <img src="/LOGO_EPH.png" alt="EPH" style={{ width: 28, height: 28, objectFit: "contain" }} />
             <span style={{ color: "#6B7280", fontSize: 11 }}>© 2026 EPH Platform. Tüm hakları saklıdır.</span>
           </div>
           <div style={{ display: "flex", gap: 20 }}>
