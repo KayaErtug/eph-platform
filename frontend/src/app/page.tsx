@@ -25,6 +25,8 @@ const TESTIMONIALS = [
   { initials: "SY", name: "Selin Y.", role: "İnşaat Firması — İzmir", text: "Gerçek zamanlı stok takibi ve anlık bildirimler sayesinde hiçbir fırsatı kaçırmıyoruz. Sahadayken bile tüm portföyümüze anında ulaşıyoruz.", featured: false },
 ];
 
+const AVATAR = "https://aday.segem.org.tr/files/image/avatar.png";
+
 function KrediHesapla() {
   const [tutar, setTutar] = useState(1000000);
   const [sure, setSure] = useState(120);
@@ -78,35 +80,31 @@ function AiChat() {
         </div>
       )}
       <div onClick={() => setOpen(v => !v)} style={{ cursor: "pointer", position: "relative" }}>
-        <img
-          src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=80&h=80&fit=crop&crop=face"
-          alt="EPH Asistan"
-          style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", border: "3px solid #E8380D", boxShadow: "0 4px 16px rgba(232,56,13,0.3)" }}
-        />
-        <div style={{ position: "absolute", bottom: 2, right: 2, width: 14, height: 14, background: "#22C55E", borderRadius: "50%", border: "2px solid #fff" }} />
+        <img src={AVATAR} alt="EPH Asistan" style={{ width: 90, height: 90, borderRadius: "50%", objectFit: "cover", border: "3px solid #E8380D", boxShadow: "0 4px 20px rgba(232,56,13,0.35)" }} />
+        <div style={{ position: "absolute", bottom: 4, right: 4, width: 16, height: 16, background: "#22C55E", borderRadius: "50%", border: "2.5px solid #fff" }} />
       </div>
       {open && (
-        <div style={{ position: "absolute", bottom: 80, right: 0, width: 300, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", overflow: "hidden" }}>
-          <div style={{ background: "#E8380D", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-            <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=40&h=40&fit=crop&crop=face" alt="Asistan" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,0.5)" }} />
+        <div style={{ position: "absolute", bottom: 105, right: 0, width: 320, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+          <div style={{ background: "#E8380D", padding: "16px 18px", display: "flex", alignItems: "center", gap: 12 }}>
+            <img src={AVATAR} alt="Asistan" style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,0.5)" }} />
             <div>
-              <div style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>EPH Asistan</div>
-              <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 10 }}>Çevrimiçi</div>
+              <div style={{ color: "#fff", fontSize: 14, fontWeight: 600 }}>EPH Asistan</div>
+              <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 11 }}>Çevrimiçi</div>
             </div>
-            <button onClick={() => setOpen(false)} style={{ marginLeft: "auto", background: "none", border: "none", color: "#fff", cursor: "pointer", fontSize: 18 }}>×</button>
+            <button onClick={(e) => { e.stopPropagation(); setOpen(false); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "#fff", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
           </div>
-          <div style={{ padding: 16 }}>
-            <div style={{ background: "#F3F4F6", borderRadius: "12px 12px 12px 4px", padding: "10px 14px", fontSize: 12, color: "#374151", lineHeight: 1.6, marginBottom: 12 }}>
+          <div style={{ padding: "16px 18px" }}>
+            <div style={{ background: "#F3F4F6", borderRadius: "12px 12px 12px 4px", padding: "12px 14px", fontSize: 12, color: "#374151", lineHeight: 1.6, marginBottom: 14 }}>
               Merhaba! EPH Platform hakkında merak ettiklerinizi sorabilirsiniz. Üyelik, davet kodu veya platform özellikleri konusunda yardımcı olabilirim.
             </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, marginBottom: 12 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, marginBottom: 14 }}>
               {["Üyelik nasıl alınır?", "Davet kodu nedir?", "İletişim"].map(q => (
                 <button key={q} style={{ background: "#FFF0ED", border: "1px solid #FECDC5", color: "#E8380D", fontSize: 10, padding: "5px 10px", borderRadius: 20, cursor: "pointer", fontWeight: 500 }}>{q}</button>
               ))}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <input placeholder="Mesajınızı yazın..." style={{ flex: 1, border: "1.5px solid #E5E7EB", borderRadius: 8, padding: "8px 12px", fontSize: 12, outline: "none" }} />
-              <button style={{ background: "#E8380D", border: "none", borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>
+              <input placeholder="Mesajınızı yazın..." style={{ flex: 1, border: "1.5px solid #E5E7EB", borderRadius: 8, padding: "9px 12px", fontSize: 12, outline: "none" }} />
+              <button style={{ background: "#E8380D", border: "none", borderRadius: 8, padding: "9px 14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               </button>
             </div>
@@ -120,7 +118,6 @@ function AiChat() {
 export default function LandingPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ad: "", tel: "", email: "", meslek: "", kod: "" });
-  const [mobileMenu, setMobileMenu] = useState(false);
 
   return (
     <>
@@ -144,7 +141,6 @@ export default function LandingPage() {
 
       <div style={{ background: "#fff", color: "#111827", fontFamily: "system-ui,-apple-system,sans-serif", overflowX: "hidden" }}>
 
-        {/* TICKER */}
         <FinancialTicker />
 
         {/* NAV */}
@@ -359,8 +355,8 @@ export default function LandingPage() {
             </div>
             <div style={{ display: "flex", flexDirection: "column" as const, gap: 16 }}>
               {[
-                "EPH (Emlak Portföy Havuzu), gayrimenkul sektörünün gerçek ihtiyaçlarından yola çıkılarak; emlakçı, müteahhit ve yazılım alanlarında uzman dört girişimci tarafından Denizli'de hayata geçirilmiştir.",
-                "Pilot bölge olarak seçilen Denizli'de yürütülen çalışmalar son derece olumlu sonuçlar vermiş; platform kısa sürede emlakçılar, müteahhitler ve inşaat firmaları arasında güvenilir bir iş birliği köprüsüne dönüşmüştür.",
+                "EPH (Emlak Portföy Havuzu), gayrimenkul sektörünün gerçek ihtiyaçlarından yola çıkılarak; emlakçı, müteahhit ve yazılım alanlarında uzman dört girişimci tarafından Denizli'de hayata geçirilmiştir. Platform, sektördeki en kritik sorunu — doğru mülkü doğru müşteriye zamanında ulaştıramamayı — çözmek amacıyla geliştirilmiş; kapalı devre, davet bazlı ve yalnızca doğrulanmış profesyonellere açık bir B2B ağ olarak tasarlanmıştır.",
+                "Pilot bölge olarak seçilen Denizli'de yürütülen çalışmalar son derece olumlu sonuçlar vermiş; platform kısa sürede emlakçılar, müteahhitler ve inşaat firmaları arasında güvenilir bir iş birliği köprüsüne dönüşmüştür. Gerçek zamanlı stok takibi, yapay zeka destekli ilan görseli oluşturma ve entegre CRM sistemi gibi yenilikçi özellikleriyle EPH, sektörde dijital dönüşümün öncüsü olmayı hedeflemektedir.",
                 "2027 yılı itibarıyla Türkiye geneline açılmayı ve en az 10 şehri kapsayan güçlü bir büyüme ivmesi yakalamayı hedefleyen EPH Platform, merkez ofisini Denizli'nin prestijli iş adreslerinden Skycity İş Merkezi'nde konumlandırmıştır.",
               ].map((p, i) => (
                 <p key={i} style={{ color: "#4B5563", fontSize: 14, lineHeight: 1.9, borderLeft: "3px solid #E8380D", paddingLeft: 18, margin: 0 }}>{p}</p>
@@ -411,9 +407,7 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* AI ASISTAN */}
         <AiChat />
-
       </div>
     </>
   );
