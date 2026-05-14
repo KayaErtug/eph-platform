@@ -50,6 +50,53 @@ export class MailService {
     });
   }
 
+  async sendApplicationApproved(email: string, name: string) {
+    await this.transporter.sendMail({
+      from: '"EPH Platform" <bildirim@emlakportfoyhavuzu.com>',
+      to: email,
+      subject: '✅ EPH Platform - Başvurunuz Onaylandı!',
+      html: `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+          <div style="background:#16A34A;padding:20px;border-radius:8px 8px 0 0;">
+            <h2 style="color:#fff;margin:0;">Başvurunuz Onaylandı! 🎉</h2>
+          </div>
+          <div style="background:#f9f9f9;padding:24px;border-radius:0 0 8px 8px;border:1px solid #eee;">
+            <p>Merhaba <strong>${name}</strong>,</p>
+            <p>EPH Platform üyelik başvurunuz admin tarafından onaylandı. En kısa sürede size davet bilgileriniz iletilecektir.</p>
+            <p style="color:#666;font-size:13px;">Herhangi bir sorunuz için bizimle iletişime geçebilirsiniz.</p>
+            <p style="color:#666;">📧 info@emlakportfoyhavuzu.com</p>
+          </div>
+        </div>
+      `,
+    });
+  }
+
+  async sendApplicationInvited(email: string, name: string) {
+    await this.transporter.sendMail({
+      from: '"EPH Platform" <bildirim@emlakportfoyhavuzu.com>',
+      to: email,
+      subject: '🎉 EPH Platform - Davetiniz Hazır!',
+      html: `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+          <div style="background:#E8380D;padding:20px;border-radius:8px 8px 0 0;">
+            <h2 style="color:#fff;margin:0;">Davetiniz Hazır! 🚀</h2>
+          </div>
+          <div style="background:#f9f9f9;padding:24px;border-radius:0 0 8px 8px;border:1px solid #eee;">
+            <p>Merhaba <strong>${name}</strong>,</p>
+            <p>EPH Platform'a katılmaya davet edildiniz! Aşağıdaki butona tıklayarak kayıt işleminizi tamamlayabilirsiniz.</p>
+            <div style="background:#FFF0ED;border:1px solid #FECDC5;border-radius:8px;padding:16px;margin:20px 0;">
+              <p style="margin:0;color:#666;font-size:13px;">Kayıt olmak için aşağıdaki linki kullanın:</p>
+            </div>
+            <div style="margin-top:20px;">
+              <a href="https://emlakportfoyhavuzu.com/kayit" style="background:#E8380D;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Kayıt Ol →</a>
+            </div>
+            <p style="color:#666;font-size:12px;margin-top:24px;">Herhangi bir sorunuz için: info@emlakportfoyhavuzu.com</p>
+          </div>
+        </div>
+      `,
+    });
+  }
+
   async sendNewNomination(data: {
     candidateName: string;
     candidateEmail: string;

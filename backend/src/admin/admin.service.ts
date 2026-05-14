@@ -15,19 +15,15 @@ export class AdminService {
     const pendingUsers = await this.prisma.user.count({ where: { isApproved: false } });
     const approvedUsers = await this.prisma.user.count({ where: { isApproved: true } });
     const totalInvitations = await this.prisma.invitation.count();
-    const usedInvitations = await this.prisma.invitation.count({ where: { status: "USED" } });
     const pendingDocuments = await this.prisma.document.count({ where: { status: "PENDING" } });
     const pendingNominations = await this.prisma.nomination.count({ where: { status: "PENDING" } });
     const pendingApplications = await this.prisma.application.count({ where: { status: "PENDING" } });
-
     const byRole = await this.prisma.user.groupBy({
-      by: ["role"],
-      _count: { role: true },
+      by: ["role"], _count: { role: true },
     });
-
     return {
       totalUsers, pendingUsers, approvedUsers, totalInvitations,
-      usedInvitations, pendingDocuments, pendingNominations, pendingApplications,
+      pendingDocuments, pendingNominations, pendingApplications,
       byRole: byRole.map((r) => ({ role: r.role, count: r._count.role })),
     };
   }
@@ -171,6 +167,14 @@ export class AdminService {
       where: { id },
       data: { status: status as any, ...(adminNote !== undefined && { adminNote }) },
     });
+    try {
+      if (status === "APPROVED") {
+        await this.mail.sendApplicationApproved(application.applicantEmail, application.applicantName);
+      }
+      if (status === "INVITED") {
+        await this.mail.sendApplicationInvited(application.applicantEmail, application.applicantName);
+      }
+    } catch {}
     if (status === "REGISTERED" && application.referrerId) {
       await this.prisma.user.update({
         where: { id: application.referrerId },
