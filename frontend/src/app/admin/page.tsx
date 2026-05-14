@@ -63,6 +63,19 @@ interface Application {
   referrer?: { firstName: string; lastName: string; email: string; role: string };
 }
 
+interface Lead {
+  id: string;
+  fullName?: string;
+  phone?: string;
+  email?: string;
+  profession?: string;
+  city?: string;
+  interest?: string;
+  conversation?: string;
+  source: string;
+  createdAt: string;
+}
+
 const ROLE_LABELS: Record<string, string> = {
   EMLAKCI: "Emlakçı", MUTEAHHIT: "Müteahhit",
   INSAAT_FIRMASI: "İnşaat Firması", ADMIN: "Admin"
@@ -111,7 +124,8 @@ export default function AdminPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [activeTab, setActiveTab] = useState<"users" | "documents" | "nominations" | "applications">("users");
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [activeTab, setActiveTab] = useState<"users" | "documents" | "nominations" | "applications" | "leads">("users");
   const [userFilter, setUserFilter] = useState<"all" | "pending" | "approved">("all");
   const [docFilter, setDocFilter] = useState<"pending" | "approved" | "rejected" | "all">("all");
   const [nomFilter, setNomFilter] = useState<"all" | "PENDING" | "APPROVED" | "REJECTED" | "INVITED" | "REGISTERED">("all");
@@ -121,6 +135,7 @@ export default function AdminPage() {
   const [hydrated, setHydrated] = useState(false);
   const [noteModal, setNoteModal] = useState<{ type: "nomination" | "application"; id: string } | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [expandedLead, setExpandedLead] = useState<string | null>(null);
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -138,18 +153,20 @@ export default function AdminPage() {
 
   const fetchAll = async () => {
     try {
-      const [s, u, d, n, a] = await Promise.all([
+      const [s, u, d, n, a, l] = await Promise.all([
         api.get("/admin/stats"),
         api.get(`/admin/users?filter=${userFilter}`),
         api.get(`/admin/documents?filter=${docFilter}`),
         api.get(`/admin/nominations?status=${nomFilter}`),
         api.get(`/admin/applications?status=${appFilter}`),
+        api.get("/leads"),
       ]);
       setStats(s.data);
       setUsers(u.data);
       setDocuments(d.data);
       setNominations(n.data);
       setApplications(a.data);
+      setLeads(l.data);
     } finally { setLoading(false); }
   };
 
@@ -158,6 +175,7 @@ export default function AdminPage() {
   const fetchDocuments = async () => { const r = await api.get(`/admin/documents?filter=${docFilter}`); setDocuments(r.data); };
   const fetchNominations = async () => { const r = await api.get(`/admin/nominations?status=${nomFilter}`); setNominations(r.data); };
   const fetchApplications = async () => { const r = await api.get(`/admin/applications?status=${appFilter}`); setApplications(r.data); };
+  const fetchLeads = async () => { const r = await api.get("/leads"); setLeads(r.data); };
 
   const handleApproveUser = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/users/${id}/approve`); await Promise.all([fetchUsers(), fetchStats()]); } finally { setActionLoading(null); } };
   const handleRejectUser = async (id: string) => { if (!confirm("Emin misiniz?")) return; setActionLoading(id); try { await api.delete(`/admin/users/${id}/reject`); await Promise.all([fetchUsers(), fetchStats()]); } finally { setActionLoading(null); } };
@@ -201,18 +219,12 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
 
-      {/* Not Modal */}
       {noteModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md">
             <h3 className="text-white font-medium mb-4">Admin Notu</h3>
-            <textarea
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Notunuzu yazın..."
-              rows={4}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 resize-none mb-4"
-            />
+            <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Notunuzu yazın..." rows={4}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 resize-none mb-4" />
             <div className="flex gap-3">
               <button onClick={handleSaveNote} disabled={actionLoading === noteModal.id}
                 className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-sm px-5 py-2 rounded-lg transition-colors font-medium">
@@ -329,6 +341,13 @@ export default function AdminPage() {
             Başvurular
             {stats && stats.pendingApplications > 0 && (
               <span className="bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{stats.pendingApplications}</span>
+            )}
+          </button>
+          <button onClick={() => { setActiveTab("leads"); fetchLeads(); }}
+            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === "leads" ? "bg-rose-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
+            🤖 Lina Leads
+            {leads.length > 0 && (
+              <span className="bg-rose-500 text-white text-xs rounded-full px-2 py-0.5">{leads.length}</span>
             )}
           </button>
         </div>
@@ -585,6 +604,102 @@ export default function AdminPage() {
                             {actionLoading === app.id ? "..." : "Davet Gönderildi"}
                           </button>
                         )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Lina Leads */}
+        {activeTab === "leads" && (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h2 className="font-medium text-white">Lina Leads</h2>
+                <span className="bg-rose-900 text-rose-300 border border-rose-800 text-xs px-2.5 py-0.5 rounded-full">{leads.length} lead</span>
+              </div>
+              <button onClick={fetchLeads} className="text-gray-400 border border-gray-700 hover:text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
+                Yenile
+              </button>
+            </div>
+            {leads.length === 0 ? (
+              <div className="px-6 py-12 text-center">
+                <p className="text-gray-600 text-sm">Henüz Lina'dan lead gelmedi.</p>
+                <p className="text-gray-700 text-xs mt-2">Lina ile konuşan kullanıcıların bilgileri burada görünecek.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-800">
+                {leads.map((lead) => (
+                  <div key={lead.id} className="px-6 py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 bg-rose-900 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 text-rose-300">
+                          {lead.fullName ? lead.fullName[0].toUpperCase() : "?"}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-white font-medium text-sm">{lead.fullName || "İsimsiz"}</p>
+                            <span className="bg-rose-950 text-rose-400 border border-rose-900 text-xs px-2 py-0.5 rounded-full">🤖 {lead.source}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
+                            {lead.phone && (
+                              <p className="text-gray-500 text-xs flex items-center gap-1">
+                                <span className="text-gray-600">📞</span> {lead.phone}
+                              </p>
+                            )}
+                            {lead.email && (
+                              <p className="text-gray-500 text-xs flex items-center gap-1">
+                                <span className="text-gray-600">✉️</span> {lead.email}
+                              </p>
+                            )}
+                            {lead.profession && (
+                              <p className="text-gray-500 text-xs flex items-center gap-1">
+                                <span className="text-gray-600">💼</span> {lead.profession}
+                              </p>
+                            )}
+                            {lead.city && (
+                              <p className="text-gray-500 text-xs flex items-center gap-1">
+                                <span className="text-gray-600">📍</span> {lead.city}
+                              </p>
+                            )}
+                            {lead.interest && (
+                              <p className="text-gray-500 text-xs flex items-center gap-1 col-span-2">
+                                <span className="text-gray-600">🎯</span> {lead.interest}
+                              </p>
+                            )}
+                          </div>
+                          <p className="text-gray-700 text-xs mt-2">{new Date(lead.createdAt).toLocaleDateString("tr-TR")} · {new Date(lead.createdAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</p>
+
+                          {lead.conversation && (
+                            <button
+                              onClick={() => setExpandedLead(expandedLead === lead.id ? null : lead.id)}
+                              className="text-rose-400 text-xs mt-2 hover:text-rose-300 transition-colors">
+                              {expandedLead === lead.id ? "▲ Konuşmayı gizle" : "▼ Konuşmayı gör"}
+                            </button>
+                          )}
+
+                          {expandedLead === lead.id && lead.conversation && (
+                            <div className="mt-3 bg-gray-800 rounded-lg p-3 max-h-48 overflow-y-auto">
+                              {(() => {
+                                try {
+                                  const msgs = JSON.parse(lead.conversation);
+                                  return msgs.map((m: { role: string; content: string }, i: number) => (
+                                    <div key={i} className={`mb-2 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                                      <div className={`text-xs px-3 py-1.5 rounded-lg max-w-xs ${m.role === "user" ? "bg-blue-900 text-blue-200" : "bg-gray-700 text-gray-300"}`}>
+                                        {m.content}
+                                      </div>
+                                    </div>
+                                  ));
+                                } catch {
+                                  return <p className="text-gray-500 text-xs">{lead.conversation}</p>;
+                                }
+                              })()}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
