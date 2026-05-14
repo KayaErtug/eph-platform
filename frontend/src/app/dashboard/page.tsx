@@ -55,6 +55,7 @@ export default function DashboardPage() {
   const [nomLoading, setNomLoading] = useState(false);
   const [nomSuccess, setNomSuccess] = useState(false);
   const [nomError, setNomError] = useState("");
+  const [copied, setCopied] = useState(false);
   const [nomForm, setNomForm] = useState({
     candidateName: "",
     candidateEmail: "",
@@ -98,6 +99,12 @@ export default function DashboardPage() {
     }
   };
 
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   if (!hydrated || !user) return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
       <p className="text-gray-500 text-sm">Yükleniyor...</p>
@@ -105,6 +112,9 @@ export default function DashboardPage() {
   );
 
   const remainingQuota = 10 - nominations.length;
+  const referralLink = user.referralCode
+    ? `https://emlakportfoyhavuzu.com/kayit?davet=${user.referralCode}`
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -209,7 +219,60 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* TAVSİYE ET BÖLÜMÜ — Sadece onaylı üyeler */}
+        {/* REFERANS KODU BÖLÜMÜ — Sadece onaylı normal üyeler */}
+        {user.isApproved && user.role !== "ADMIN" && user.referralCode && (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 bg-yellow-950 border border-yellow-900 rounded-xl flex items-center justify-center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              </div>
+              <div>
+                <h2 className="text-white font-medium">Referans Kodunuz</h2>
+                <p className="text-gray-500 text-xs">Tanıdıklarınızı platforma davet edin</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Referans kodu */}
+              <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+                <p className="text-gray-500 text-xs mb-2">Referans Kodunuz</p>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-yellow-300 text-lg font-mono font-bold tracking-widest">{user.referralCode}</span>
+                  <button onClick={() => handleCopy(user.referralCode!)}
+                    className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white border border-gray-600 px-3 py-1.5 rounded-lg transition-colors">
+                    {copied ? (
+                      <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg> Kopyalandı!</>
+                    ) : (
+                      <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Kopyala</>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Davet linki */}
+              <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+                <p className="text-gray-500 text-xs mb-2">Davet Linkiniz</p>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-gray-300 text-xs truncate">{referralLink}</span>
+                  <button onClick={() => handleCopy(referralLink!)}
+                    className="flex-shrink-0 flex items-center gap-1.5 text-xs text-gray-400 hover:text-white border border-gray-600 px-3 py-1.5 rounded-lg transition-colors">
+                    {copied ? (
+                      <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg> Kopyalandı!</>
+                    ) : (
+                      <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Kopyala</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-gray-600 text-xs mt-3">
+              💡 Referans kodunuzu paylaşarak tanıdıklarınızın platforma katılmasını sağlayabilirsiniz.
+            </p>
+          </div>
+        )}
+
+        {/* TAVSİYE ET BÖLÜMÜ — Sadece onaylı normal üyeler */}
         {user.isApproved && user.role !== "ADMIN" && (
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8">
             <div className="flex items-center justify-between mb-5">
@@ -237,7 +300,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Başarı mesajı */}
             {nomSuccess && (
               <div className="bg-green-950 border border-green-900 rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -245,7 +307,6 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Tavsiye formu */}
             {showNomForm && (
               <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 mb-5">
                 <h3 className="text-white text-sm font-medium mb-4">Yeni Tavsiye</h3>
@@ -299,7 +360,6 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Tavsiye listesi */}
             {nominations.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-600 text-sm">Henüz tavsiyeniz yok.</p>
