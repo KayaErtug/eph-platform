@@ -13,49 +13,127 @@ const DOC_TYPES = [
   { value: "DIGER", label: "Diğer" },
 ];
 
-const DOC_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-950 text-yellow-300 border-yellow-800",
-  APPROVED: "bg-green-950 text-green-300 border-green-800",
-  REJECTED: "bg-red-950 text-red-300 border-red-800",
-};
-
-const DOC_STATUS_LABELS: Record<string, string> = {
-  PENDING: "İncelemede",
-  APPROVED: "Onaylandı",
-  REJECTED: "Reddedildi",
+const DOC_STATUS: Record<string, { label: string; color: string; bg: string }> = {
+  PENDING:  { label: "İncelemede", color: "#B8860B", bg: "#FFFBF0" },
+  APPROVED: { label: "Onaylandı",  color: "#2D6A4F", bg: "#F0FAF4" },
+  REJECTED: { label: "Reddedildi", color: "#C0392B", bg: "#FEF0EE" },
 };
 
 const ROLE_LABELS: Record<string, string> = {
-  EMLAKCI: "Emlakçı",
-  MUTEAHHIT: "Müteahhit",
-  INSAAT_FIRMASI: "İnşaat Firması",
-  ADMIN: "Admin",
-};
-
-const ROLE_COLORS: Record<string, string> = {
-  EMLAKCI: "bg-blue-950 text-blue-300 border-blue-800",
-  MUTEAHHIT: "bg-green-950 text-green-300 border-green-800",
-  INSAAT_FIRMASI: "bg-orange-950 text-orange-300 border-orange-800",
-  ADMIN: "bg-purple-950 text-purple-300 border-purple-800",
+  EMLAKCI: "Emlakçı", MUTEAHHIT: "Müteahhit",
+  INSAAT_FIRMASI: "İnşaat Firması", ADMIN: "Admin",
 };
 
 interface Profile {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  role: string;
-  isApproved: boolean;
-  documents: {
-    id: string;
-    type: string;
-    status: string;
-    fileUrl: string;
-    fileName: string;
-    createdAt: string;
-  }[];
+  id: string; firstName: string; lastName: string;
+  email: string; phone: string; role: string; isApproved: boolean;
+  documents: { id: string; type: string; status: string; fileUrl: string; fileName: string; createdAt: string }[];
 }
+
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --navy:#0F2044;--gold:#C9A84C;--cream:#F5F3EF;--warm:#FAFAF8;
+  --text:#1A1A2E;--muted:#8A8A8A;--border:#E2DDD5;
+  --serif:'Cormorant Garamond',Georgia,serif;--sans:'DM Sans',system-ui,sans-serif;
+}
+body{font-family:var(--sans);background:var(--warm);color:var(--text);}
+
+/* NAV */
+.pr-nav{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 48px;position:sticky;top:0;z-index:100;}
+@media(max-width:768px){.pr-nav{padding:0 20px;}}
+.pr-logo{display:flex;align-items:center;gap:12px;text-decoration:none;}
+.pr-logo img{width:34px;height:34px;object-fit:contain;}
+.pr-logo-text{font-family:var(--serif);font-size:18px;font-weight:500;color:var(--navy);}
+.pr-logo-sub{font-size:7px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);}
+.pr-nav-links{display:flex;align-items:center;gap:4px;}
+.pr-nav-item{padding:8px 14px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:all 0.2s;border-bottom:2px solid transparent;}
+.pr-nav-item:hover{color:var(--navy);border-bottom-color:var(--gold);}
+.pr-nav-item.active{color:var(--navy);border-bottom-color:var(--gold);}
+.pr-logout{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:1px solid var(--border);padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
+.pr-logout:hover{border-color:var(--navy);color:var(--navy);}
+
+/* MAIN */
+.pr-main{max-width:800px;margin:0 auto;padding:56px 48px 100px;}
+@media(max-width:768px){.pr-main{padding:32px 20px;}}
+
+/* HEADER */
+.pr-header{margin-bottom:48px;padding-bottom:40px;border-bottom:1px solid var(--border);}
+.pr-title{font-family:var(--serif);font-size:clamp(36px,4vw,52px);font-weight:300;color:var(--navy);letter-spacing:-0.5px;line-height:1.1;}
+.pr-title em{font-style:italic;color:var(--gold);}
+.pr-sub{font-size:13px;color:var(--muted);margin-top:8px;font-weight:300;}
+
+/* PROFILE CARD */
+.pr-card{background:#fff;border:1px solid var(--border);margin-bottom:24px;}
+.pr-card-header{padding:32px 36px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:20px;}
+@media(max-width:600px){.pr-card-header{flex-direction:column;align-items:flex-start;}}
+.pr-avatar{width:56px;height:56px;background:var(--navy);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:24px;color:var(--cream);font-weight:400;flex-shrink:0;}
+.pr-user-name{font-family:var(--serif);font-size:24px;font-weight:400;color:var(--navy);margin-bottom:4px;}
+.pr-user-email{font-size:12px;color:var(--muted);font-weight:300;}
+.pr-user-meta{display:flex;align-items:center;gap:12px;margin-top:8px;}
+.pr-role-tag{font-size:8px;letter-spacing:2px;text-transform:uppercase;border:1px solid var(--border);padding:4px 12px;color:var(--navy);}
+.pr-status{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:1px;text-transform:uppercase;}
+.pr-status-dot{width:5px;height:5px;border-radius:50%;}
+.pr-edit-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:8px 16px;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all 0.2s;flex-shrink:0;}
+.pr-edit-btn:hover{border-color:var(--navy);color:var(--navy);}
+.pr-edit-btn.active{border-color:var(--navy);background:var(--navy);color:var(--cream);}
+
+/* FORM */
+.pr-card-body{padding:32px 36px;}
+.pr-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+@media(max-width:600px){.pr-grid{grid-template-columns:1fr;}}
+.pr-field{margin-bottom:0;}
+.pr-field label{display:block;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-weight:500;}
+.pr-field-value{font-size:14px;color:var(--navy);padding:10px 0;border-bottom:1.5px solid var(--border);font-weight:300;}
+.pr-field-value.muted{color:var(--muted);}
+.pr-input{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:10px 0;font-size:14px;color:var(--navy);font-family:var(--sans);outline:none;transition:border-color 0.3s;font-weight:300;}
+.pr-input:focus{border-bottom-color:var(--navy);}
+.pr-save-btn{margin-top:32px;width:100%;background:var(--navy);color:var(--cream);border:none;padding:14px;font-size:9px;letter-spacing:3px;text-transform:uppercase;font-family:var(--sans);cursor:pointer;transition:all 0.3s;position:relative;overflow:hidden;}
+.pr-save-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:var(--gold);transition:left 0.4s;}
+.pr-save-btn:hover::before{left:0;}
+.pr-save-btn:hover{color:var(--navy);}
+.pr-save-btn span{position:relative;z-index:1;}
+.pr-save-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.pr-save-btn:disabled::before{display:none;}
+
+/* SUCCESS / ERROR */
+.pr-success{background:#F0FAF4;border-left:3px solid #2D6A4F;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:10px;font-size:12px;color:#2D6A4F;font-weight:300;}
+.pr-error{background:#FEF0EE;border-left:3px solid #C0392B;padding:14px 18px;margin-top:16px;font-size:12px;color:#C0392B;font-weight:300;}
+
+/* UPLOAD */
+.pr-upload-card{background:#fff;border:1px solid var(--border);margin-bottom:24px;}
+.pr-upload-header{padding:24px 36px;border-bottom:1px solid var(--border);}
+.pr-upload-title{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--navy);margin-bottom:4px;}
+.pr-upload-sub{font-size:11px;color:var(--muted);font-weight:300;}
+.pr-upload-body{padding:24px 36px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;}
+.pr-select{background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:10px 0;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;appearance:none;cursor:pointer;font-weight:300;min-width:200px;}
+.pr-upload-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:12px 22px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;display:flex;align-items:center;gap:8px;white-space:nowrap;}
+.pr-upload-btn:hover{background:#1a3060;}
+.pr-upload-btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+/* DOCS */
+.pr-docs-card{background:#fff;border:1px solid var(--border);}
+.pr-docs-header{padding:24px 36px;border-bottom:1px solid var(--border);}
+.pr-docs-title{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--navy);}
+.pr-docs-list{padding:0;}
+.pr-doc-item{padding:20px 36px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px;transition:background 0.2s;}
+.pr-doc-item:hover{background:var(--warm);}
+.pr-doc-item:last-child{border-bottom:none;}
+.pr-doc-icon{width:36px;height:36px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.pr-doc-name{font-size:13px;color:var(--navy);font-weight:400;margin-bottom:3px;}
+.pr-doc-file{font-size:10px;color:var(--muted);font-weight:300;}
+.pr-doc-status{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid;padding:4px 10px;font-weight:500;}
+.pr-doc-view{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--navy);text-decoration:none;border:1px solid var(--border);padding:6px 14px;transition:all 0.2s;}
+.pr-doc-view:hover{border-color:var(--navy);background:var(--navy);color:var(--cream);}
+.pr-docs-empty{padding:60px 36px;text-align:center;}
+.pr-docs-empty-text{font-family:var(--serif);font-size:18px;font-style:italic;color:var(--muted);margin-bottom:6px;}
+.pr-docs-empty-sub{font-size:12px;color:#B8B2A8;font-weight:300;}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.pr-main{animation:fadeUp 0.5s ease;}
+`;
 
 export default function ProfilPage() {
   const { user, setAuth, logout } = useAuthStore();
@@ -74,7 +152,6 @@ export default function ProfilPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setHydrated(true); }, []);
-
   useEffect(() => {
     if (!hydrated) return;
     if (!user) { router.push("/giris"); return; }
@@ -90,14 +167,12 @@ export default function ProfilPage() {
   };
 
   const handleSave = async () => {
-    setSaveLoading(true);
-    setSaveSuccess(false);
+    setSaveLoading(true); setSaveSuccess(false);
     try {
       const res = await api.patch("/profile", form);
-      setProfile((prev) => prev ? { ...prev, ...res.data } : prev);
+      setProfile(prev => prev ? { ...prev, ...res.data } : prev);
       setAuth({ ...user!, ...res.data }, localStorage.getItem("token")!);
-      setEditMode(false);
-      setSaveSuccess(true);
+      setEditMode(false); setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } finally { setSaveLoading(false); }
   };
@@ -105,16 +180,12 @@ export default function ProfilPage() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadLoading(true);
-    setUploadError("");
-    setUploadSuccess(false);
+    setUploadLoading(true); setUploadError(""); setUploadSuccess(false);
     const formData = new FormData();
     formData.append("file", file);
     formData.append("type", selectedDocType);
     try {
-      await api.post("/profile/documents", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      await api.post("/profile/documents", formData, { headers: { "Content-Type": "multipart/form-data" } });
       setUploadSuccess(true);
       setTimeout(() => setUploadSuccess(false), 3000);
       fetchProfile();
@@ -127,200 +198,187 @@ export default function ProfilPage() {
   };
 
   if (!hydrated || loading) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <p className="text-gray-500 text-sm">Yükleniyor...</p>
+    <div style={{ minHeight: "100vh", background: "#FAFAF8", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <style>{CSS}</style>
+      <div style={{ width: 32, height: 32, border: "2px solid #C9A84C", borderTop: "2px solid transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
     </div>
   );
 
+  const docStatus = DOC_STATUS[profile?.documents?.[0]?.status || "PENDING"];
+
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <>
+      <style>{CSS}</style>
 
-      {/* Header */}
-      <div className="border-b border-gray-800 bg-gray-950 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            </div>
-            <span className="text-white font-semibold">EPH</span>
+      {/* NAV */}
+      <nav className="pr-nav">
+        <a href="/dashboard" className="pr-logo">
+          <img src="/LOGO_EPH.png" alt="EPH" />
+          <div>
+            <div className="pr-logo-text">EPH Platform</div>
+            <div className="pr-logo-sub">Emlak Portföy Havuzu</div>
           </div>
-
-          <nav className="flex items-center gap-1">
-            <Link href="/dashboard" className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">Ana Sayfa</Link>
-            <Link href="/profil" className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gray-800">Profilim</Link>
-            <Link href="/stok" className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">Stok</Link>
-            {user?.role === "ADMIN" && (
-              <Link href="/admin" className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">Admin</Link>
-            )}
-          </nav>
-
-          <button onClick={() => { logout(); router.push("/giris"); }}
-            className="flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-gray-700 px-4 py-2 rounded-lg transition-colors">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-            Çıkış
-          </button>
+        </a>
+        <div className="pr-nav-links">
+          <Link href="/dashboard" className="pr-nav-item">Ana Sayfa</Link>
+          <Link href="/profil" className="pr-nav-item active">Profilim</Link>
+          <Link href="/stok" className="pr-nav-item">Stok</Link>
+          {user?.role === "ADMIN" && <Link href="/admin" className="pr-nav-item">Admin</Link>}
         </div>
-      </div>
+        <button className="pr-logout" onClick={() => { logout(); router.push("/giris"); }}>Çıkış</button>
+      </nav>
 
-      <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+      <main className="pr-main">
 
-        <div className="mb-2">
-          <h1 className="text-2xl font-semibold text-white mb-1">Profilim</h1>
-          <p className="text-gray-500 text-sm">Hesap bilgilerinizi yönetin</p>
+        {/* HEADER */}
+        <div className="pr-header">
+          <h1 className="pr-title">Profilim<br /><em style={{ fontSize: "0.7em" }}>Hesap Yönetimi</em></h1>
+          <p className="pr-sub">Kişisel bilgilerinizi güncelleyin ve belgelerinizi yönetin</p>
         </div>
 
-        {/* Profil Kartı */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center text-xl font-semibold">
-                {profile?.firstName[0]}{profile?.lastName[0]}
-              </div>
+        {/* SUCCESS GLOBAL */}
+        {saveSuccess && (
+          <div className="pr-success">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+            Profil başarıyla güncellendi.
+          </div>
+        )}
+
+        {/* PROFİL KARTI */}
+        <div className="pr-card">
+          <div className="pr-card-header">
+            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+              <div className="pr-avatar">{profile?.firstName[0]}{profile?.lastName[0]}</div>
               <div>
-                <h2 className="text-white font-semibold">{profile?.firstName} {profile?.lastName}</h2>
-                <p className="text-gray-500 text-sm">{profile?.email}</p>
-                <div className="flex items-center gap-2 mt-1.5">
-                  <span className={`text-xs border rounded-full px-2.5 py-0.5 ${ROLE_COLORS[profile?.role || ""]}`}>
-                    {ROLE_LABELS[profile?.role || ""]}
-                  </span>
-                  {profile?.isApproved ? (
-                    <span className="flex items-center gap-1 text-green-400 text-xs">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                      Onaylandı
+                <div className="pr-user-name">{profile?.firstName} {profile?.lastName}</div>
+                <div className="pr-user-email">{profile?.email}</div>
+                <div className="pr-user-meta">
+                  <span className="pr-role-tag">{ROLE_LABELS[profile?.role || ""]}</span>
+                  <div className="pr-status">
+                    <div className="pr-status-dot" style={{ background: profile?.isApproved ? "#2D6A4F" : "#B8860B" }} />
+                    <span style={{ color: profile?.isApproved ? "#2D6A4F" : "#B8860B" }}>
+                      {profile?.isApproved ? "Onaylı" : "Onay Bekliyor"}
                     </span>
-                  ) : (
-                    <span className="text-yellow-500 text-xs">Onay bekliyor</span>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
-            <button onClick={() => setEditMode(!editMode)}
-              className={`text-sm px-4 py-2 rounded-lg border transition-colors ${editMode ? "border-gray-700 text-gray-400 hover:text-white" : "border-blue-800 text-blue-400 hover:text-blue-300"}`}>
+            <button
+              className={`pr-edit-btn ${editMode ? "active" : ""}`}
+              onClick={() => { setEditMode(!editMode); }}
+            >
               {editMode ? "Vazgeç" : "Düzenle"}
             </button>
           </div>
 
-          {saveSuccess && (
-            <div className="bg-green-950 border border-green-900 rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              <p className="text-green-400 text-sm">Profil başarıyla güncellendi.</p>
+          <div className="pr-card-body">
+            <div className="pr-grid">
+              <div className="pr-field">
+                <label>Ad</label>
+                {editMode
+                  ? <input className="pr-input" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
+                  : <div className="pr-field-value">{profile?.firstName}</div>
+                }
+              </div>
+              <div className="pr-field">
+                <label>Soyad</label>
+                {editMode
+                  ? <input className="pr-input" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
+                  : <div className="pr-field-value">{profile?.lastName}</div>
+                }
+              </div>
+              <div className="pr-field">
+                <label>E-posta</label>
+                <div className="pr-field-value muted">{profile?.email}</div>
+              </div>
+              <div className="pr-field">
+                <label>Telefon</label>
+                {editMode
+                  ? <input className="pr-input" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                  : <div className="pr-field-value">{profile?.phone}</div>
+                }
+              </div>
             </div>
-          )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-gray-500 text-xs mb-1.5">Ad</label>
-              {editMode ? (
-                <input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors" />
-              ) : (
-                <p className="bg-gray-800 rounded-xl px-4 py-3 text-white text-sm">{profile?.firstName}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-gray-500 text-xs mb-1.5">Soyad</label>
-              {editMode ? (
-                <input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors" />
-              ) : (
-                <p className="bg-gray-800 rounded-xl px-4 py-3 text-white text-sm">{profile?.lastName}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-gray-500 text-xs mb-1.5">Email</label>
-              <p className="bg-gray-800 rounded-xl px-4 py-3 text-gray-500 text-sm">{profile?.email}</p>
-            </div>
-            <div>
-              <label className="block text-gray-500 text-xs mb-1.5">Telefon</label>
-              {editMode ? (
-                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors" />
-              ) : (
-                <p className="bg-gray-800 rounded-xl px-4 py-3 text-white text-sm">{profile?.phone}</p>
-              )}
-            </div>
+            {editMode && (
+              <button className="pr-save-btn" onClick={handleSave} disabled={saveLoading}>
+                <span>{saveLoading ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}</span>
+              </button>
+            )}
           </div>
-
-          {editMode && (
-            <button onClick={handleSave} disabled={saveLoading}
-              className="mt-4 w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white font-medium py-3 rounded-xl transition-colors text-sm">
-              {saveLoading ? "Kaydediliyor..." : "Kaydet"}
-            </button>
-          )}
         </div>
 
-        {/* Belge Yükleme */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-          <h3 className="text-white font-medium mb-1">Belge Yükle</h3>
-          <p className="text-gray-500 text-xs mb-4">PDF, JPG veya PNG · Maks 50MB</p>
-
-          <div className="flex gap-3">
-            <select value={selectedDocType} onChange={(e) => setSelectedDocType(e.target.value)}
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500">
-              {DOC_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
-            <label className={`flex items-center gap-2 px-5 py-3 rounded-xl font-medium cursor-pointer transition-colors text-sm ${uploadLoading ? "bg-gray-700 text-gray-500" : "bg-blue-600 hover:bg-blue-500 text-white"}`}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        {/* BELGE YÜKLEME */}
+        <div className="pr-upload-card">
+          <div className="pr-upload-header">
+            <div className="pr-upload-title">Belge Yükle</div>
+            <div className="pr-upload-sub">PDF, JPG veya PNG — Maksimum 50MB</div>
+          </div>
+          <div className="pr-upload-body">
+            <div>
+              <label style={{ fontSize: 8, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)", display: "block", marginBottom: 10 }}>Belge Türü</label>
+              <select className="pr-select" value={selectedDocType} onChange={e => setSelectedDocType(e.target.value)}>
+                {DOC_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <label className="pr-upload-btn" style={{ cursor: uploadLoading ? "not-allowed" : "pointer", opacity: uploadLoading ? 0.5 : 1 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
               {uploadLoading ? "Yükleniyor..." : "Dosya Seç"}
-              <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleUpload} disabled={uploadLoading} className="hidden" />
+              <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleUpload} disabled={uploadLoading} style={{ display: "none" }} />
             </label>
           </div>
-
           {uploadSuccess && (
-            <div className="bg-green-950 border border-green-900 rounded-xl px-4 py-3 mt-3 flex items-center gap-2">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              <p className="text-green-400 text-sm">Belge başarıyla yüklendi.</p>
+            <div className="pr-success" style={{ margin: "0 36px 24px" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+              Belge başarıyla yüklendi.
             </div>
           )}
-          {uploadError && (
-            <div className="bg-red-950 border border-red-900 rounded-xl px-4 py-3 mt-3">
-              <p className="text-red-400 text-sm">{uploadError}</p>
-            </div>
-          )}
+          {uploadError && <div className="pr-error" style={{ margin: "0 36px 24px" }}>{uploadError}</div>}
         </div>
 
-        {/* Belgelerim */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-          <h3 className="text-white font-medium mb-4">Belgelerim</h3>
+        {/* BELGELERİM */}
+        <div className="pr-docs-card">
+          <div className="pr-docs-header">
+            <div className="pr-docs-title">Belgelerim</div>
+          </div>
           {!profile?.documents || profile.documents.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              </div>
-              <p className="text-gray-600 text-sm">Henüz belge yüklenmedi.</p>
+            <div className="pr-docs-empty">
+              <div className="pr-docs-empty-text">Henüz belge yüklenmedi</div>
+              <div className="pr-docs-empty-sub">Onay sürecinizi hızlandırmak için belgelerinizi yükleyin</div>
             </div>
           ) : (
-            <div className="space-y-3">
-              {profile.documents.map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <div className="pr-docs-list">
+              {profile.documents.map(doc => {
+                const ds = DOC_STATUS[doc.status] || DOC_STATUS.PENDING;
+                return (
+                  <div key={doc.id} className="pr-doc-item">
+                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                      <div className="pr-doc-icon">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="pr-doc-name">{DOC_TYPES.find(t => t.value === doc.type)?.label}</div>
+                        <div className="pr-doc-file">{doc.fileName}</div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-white text-sm font-medium">{DOC_TYPES.find((t) => t.value === doc.type)?.label}</p>
-                      <p className="text-gray-500 text-xs">{doc.fileName}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span className="pr-doc-status" style={{ borderColor: ds.color, color: ds.color, background: ds.bg }}>
+                        {ds.label}
+                      </span>
+                      <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="pr-doc-view">Görüntüle</a>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`border rounded-full px-2.5 py-0.5 text-xs font-medium ${DOC_STATUS_COLORS[doc.status]}`}>
-                      {DOC_STATUS_LABELS[doc.status]}
-                    </span>
-                    <a href={doc.fileUrl} target="_blank" rel="noreferrer"
-                      className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-xs transition-colors">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                      Görüntüle
-                    </a>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-      </div>
-    </div>
+      </main>
+    </>
   );
 }
