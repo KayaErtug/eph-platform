@@ -117,19 +117,19 @@ export default function AdminPage() {
     fetchAll();
   }, [hydrated, user]);
 
-  useEffect(() => { if (hydrated && user) fetchUsers(); }, [userFilter]);
-  useEffect(() => { if (hydrated && user) fetchDocuments(); }, [docFilter]);
-  useEffect(() => { if (hydrated && user) fetchNominations(); }, [nomFilter]);
-  useEffect(() => { if (hydrated && user) fetchApplications(); }, [appFilter]);
+  useEffect(() => { if (hydrated && user) fetchUsers(userFilter); }, [userFilter]);
+  useEffect(() => { if (hydrated && user) fetchDocuments(docFilter); }, [docFilter]);
+  useEffect(() => { if (hydrated && user) fetchNominations(nomFilter); }, [nomFilter]);
+  useEffect(() => { if (hydrated && user) fetchApplications(appFilter); }, [appFilter]);
 
   const fetchAll = async () => {
     try {
       const [s, u, d, n, a, l] = await Promise.all([
         api.get("/admin/stats"),
-        api.get(`/admin/users?filter=${userFilter}`),
-        api.get(`/admin/documents?filter=${docFilter}`),
-        api.get(`/admin/nominations?status=${nomFilter}`),
-        api.get(`/admin/applications?status=${appFilter}`),
+        api.get("/admin/users?filter=all"),
+        api.get("/admin/documents?filter=all"),
+        api.get("/admin/nominations?status=all"),
+        api.get("/admin/applications?status=all"),
         api.get("/leads"),
       ]);
       setStats(s.data); setUsers(u.data); setDocuments(d.data);
@@ -138,27 +138,27 @@ export default function AdminPage() {
   };
 
   const fetchStats = async () => { const r = await api.get("/admin/stats"); setStats(r.data); };
-  const fetchUsers = async () => { const r = await api.get(`/admin/users?filter=${userFilter}`); setUsers(r.data); };
-  const fetchDocuments = async () => { const r = await api.get(`/admin/documents?filter=${docFilter}`); setDocuments(r.data); };
-  const fetchNominations = async () => { const r = await api.get(`/admin/nominations?status=${nomFilter}`); setNominations(r.data); };
-  const fetchApplications = async () => { const r = await api.get(`/admin/applications?status=${appFilter}`); setApplications(r.data); };
+  const fetchUsers = async (filter = "all") => { const r = await api.get(`/admin/users?filter=${filter}`); setUsers(r.data); };
+  const fetchDocuments = async (filter = "all") => { const r = await api.get(`/admin/documents?filter=${filter}`); setDocuments(r.data); };
+  const fetchNominations = async (filter = "all") => { const r = await api.get(`/admin/nominations?status=${filter}`); setNominations(r.data); };
+  const fetchApplications = async (filter = "all") => { const r = await api.get(`/admin/applications?status=${filter}`); setApplications(r.data); };
   const fetchLeads = async () => { const r = await api.get("/leads"); setLeads(r.data); };
 
-  const handleApproveUser = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/users/${id}/approve`); await Promise.all([fetchUsers(), fetchStats()]); } finally { setActionLoading(null); } };
-  const handleRejectUser = async (id: string) => { if (!confirm("Kullanıcı silinecek. Emin misiniz?")) return; setActionLoading(id); try { await api.delete(`/admin/users/${id}/reject`); await Promise.all([fetchUsers(), fetchStats()]); } finally { setActionLoading(null); } };
-  const handleSuspendUser = async (id: string) => { if (!confirm("Kullanıcı askıya alınacak. Emin misiniz?")) return; setActionLoading(id); try { await api.patch(`/admin/users/${id}/suspend`); await Promise.all([fetchUsers(), fetchStats()]); } finally { setActionLoading(null); } };
-  const handleApproveDoc = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/documents/${id}/approve`); await Promise.all([fetchDocuments(), fetchStats()]); } finally { setActionLoading(null); } };
-  const handleRejectDoc = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/documents/${id}/reject`); await Promise.all([fetchDocuments(), fetchStats()]); } finally { setActionLoading(null); } };
+  const handleApproveUser = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/users/${id}/approve`); await Promise.all([fetchUsers(userFilter), fetchStats()]); } finally { setActionLoading(null); } };
+  const handleRejectUser = async (id: string) => { if (!confirm("Kullanıcı silinecek. Emin misiniz?")) return; setActionLoading(id); try { await api.delete(`/admin/users/${id}/reject`); await Promise.all([fetchUsers(userFilter), fetchStats()]); } finally { setActionLoading(null); } };
+  const handleSuspendUser = async (id: string) => { if (!confirm("Kullanıcı askıya alınacak. Emin misiniz?")) return; setActionLoading(id); try { await api.patch(`/admin/users/${id}/suspend`); await Promise.all([fetchUsers(userFilter), fetchStats()]); } finally { setActionLoading(null); } };
+  const handleApproveDoc = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/documents/${id}/approve`); await Promise.all([fetchDocuments(docFilter), fetchStats()]); } finally { setActionLoading(null); } };
+  const handleRejectDoc = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/documents/${id}/reject`); await Promise.all([fetchDocuments(docFilter), fetchStats()]); } finally { setActionLoading(null); } };
 
   const handleNominationStatus = async (id: string, status: string) => {
     setActionLoading(id);
-    try { await api.patch(`/admin/nominations/${id}/status`, { status }); await Promise.all([fetchNominations(), fetchStats()]); }
+    try { await api.patch(`/admin/nominations/${id}/status`, { status }); await Promise.all([fetchNominations(nomFilter), fetchStats()]); }
     finally { setActionLoading(null); }
   };
 
   const handleApplicationStatus = async (id: string, status: string) => {
     setActionLoading(id);
-    try { await api.patch(`/admin/applications/${id}/status`, { status }); await Promise.all([fetchApplications(), fetchStats()]); }
+    try { await api.patch(`/admin/applications/${id}/status`, { status }); await Promise.all([fetchApplications(appFilter), fetchStats()]); }
     finally { setActionLoading(null); }
   };
 
@@ -168,10 +168,10 @@ export default function AdminPage() {
     try {
       if (noteModal.type === "nomination") {
         await api.patch(`/admin/nominations/${noteModal.id}/status`, { status: nominations.find(n => n.id === noteModal.id)?.status, adminNote: noteText });
-        await fetchNominations();
+        await fetchNominations(nomFilter);
       } else {
         await api.patch(`/admin/applications/${noteModal.id}/status`, { status: applications.find(a => a.id === noteModal.id)?.status, adminNote: noteText });
-        await fetchApplications();
+        await fetchApplications(appFilter);
       }
       setNoteModal(null); setNoteText("");
     } finally { setActionLoading(null); }
@@ -180,7 +180,7 @@ export default function AdminPage() {
   const handleChangeRole = async () => {
     if (!roleModal || !newRole) return;
     setActionLoading(roleModal.id);
-    try { await api.patch(`/admin/users/${roleModal.id}/role`, { role: newRole }); await fetchUsers(); setRoleModal(null); setNewRole(""); }
+    try { await api.patch(`/admin/users/${roleModal.id}/role`, { role: newRole }); await fetchUsers(userFilter); setRoleModal(null); setNewRole(""); }
     finally { setActionLoading(null); }
   };
 
@@ -193,7 +193,7 @@ export default function AdminPage() {
       await api.post("/admin/users", createUserForm);
       setCreateUserModal(false);
       setCreateUserForm({ firstName: "", lastName: "", email: "", phone: "", password: "", role: "EMLAKCI" });
-      await Promise.all([fetchUsers(), fetchStats()]);
+      await Promise.all([fetchUsers(userFilter), fetchStats()]);
     } catch (e: any) {
       setCreateUserError(e?.response?.data?.message || "Bir hata oluştu.");
     } finally { setCreateUserLoading(false); }
@@ -381,10 +381,10 @@ export default function AdminPage() {
         {/* Tabs */}
         <div className="flex gap-2 mb-6 flex-wrap">
           {[
-            { key: "users", label: "Kullanıcılar", badge: null },
-            { key: "documents", label: "Belgeler", badge: stats?.pendingDocuments },
-            { key: "nominations", label: "Tavsiyeler", badge: stats?.pendingNominations },
-            { key: "applications", label: "Başvurular", badge: stats?.pendingApplications },
+            { key: "users", label: "Kullanıcılar", badge: null, color: "blue" },
+            { key: "documents", label: "Belgeler", badge: stats?.pendingDocuments, color: "blue" },
+            { key: "nominations", label: "Tavsiyeler", badge: stats?.pendingNominations, color: "blue" },
+            { key: "applications", label: "Başvurular", badge: stats?.pendingApplications, color: "blue" },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key as any)}
               className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === t.key ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
@@ -419,7 +419,7 @@ export default function AdminPage() {
               <div className="divide-y divide-gray-800">
                 {users.map((u) => (
                   <div key={u.id} className="px-6 py-4">
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0">
                           {u.firstName[0]}{u.lastName[0]}
@@ -430,14 +430,12 @@ export default function AdminPage() {
                           <p className="text-gray-600 text-xs">{u.phone}</p>
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 justify-end">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className={`border rounded-full px-3 py-1 text-xs font-medium ${ROLE_COLORS[u.role]}`}>{ROLE_LABELS[u.role]}</span>
                         {u.documents?.length > 0 && <span className="text-gray-600 text-xs">{u.documents.length} belge</span>}
-                        <span className={`text-xs ${u.isApproved ? "text-green-400" : "text-yellow-400"}`}>
+                        <span className={`text-xs font-medium ${u.isApproved ? "text-green-400" : "text-yellow-400"}`}>
                           {u.isApproved ? "✓ Onaylı" : "⏳ Bekliyor"}
                         </span>
-
-                        {/* Onay / Askıya Al */}
                         {!u.isApproved ? (
                           <button onClick={() => handleApproveUser(u.id)} disabled={actionLoading === u.id}
                             className="bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
@@ -451,16 +449,12 @@ export default function AdminPage() {
                             </button>
                           )
                         )}
-
-                        {/* Rol Değiştir */}
                         {u.role !== "ADMIN" && (
                           <button onClick={() => { setRoleModal({ id: u.id, currentRole: u.role }); setNewRole(u.role); }}
                             className="bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs px-3 py-1.5 rounded-lg transition-colors">
                             Rol Değiştir
                           </button>
                         )}
-
-                        {/* Sil */}
                         {u.role !== "ADMIN" && (
                           <button onClick={() => handleRejectUser(u.id)} disabled={actionLoading === u.id}
                             className="bg-red-950 hover:bg-red-900 border border-red-900 text-red-400 text-xs px-3 py-1.5 rounded-lg transition-colors">
