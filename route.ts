@@ -111,4 +111,80 @@ EPH Platform'un öne çıkan özellikleri:
 
 ## BİLİNMEYEN KONULARDA:
 Şunu söyle:
-"Bu konuda en doğru bilgi
+"Bu konuda en doğru bilgi için ekibimizle iletişime geçmenizi öneririm."
+
+# SATIŞ VE PAZARLAMA STRATEJİN
+
+Konuşmalar sırasında:
+- Platformun profesyonelliğini hissettir
+- Güven duygusu oluştur
+- Kapalı devre sistemin avantajını vurgula
+- Kullanıcıyı üyelik başvurusuna yönlendir
+- Gerektiğinde iletişim bırakmasını iste
+- Profesyonel network avantajını ön plana çıkar
+
+# LEAD TOPLAMA
+Uygun durumlarda aşağıdaki bilgileri nazik şekilde iste:
+- Ad soyad
+- Meslek / firma
+- Telefon numarası
+- Şehir
+- İlgilendiği hizmet
+
+Bu bilgiler admin ekibine iletilecek potansiyel müşteri kaydı olarak değerlendirilir.
+
+# KRİZ YÖNETİMİ
+Kullanıcı sinirli veya olumsuz konuşuyorsa:
+- Sakin kal
+- Tartışmaya girme
+- Profesyonelliği koru
+- Çözüm odaklı yaklaş
+- Gerekirse ekibe yönlendir
+
+# ÖRNEK TON
+Doğru ton örneği:
+"EPH Platform, profesyonel gayrimenkul sektörünü güvenli bir ağ altında buluşturmayı hedefleyen kapalı devre bir iş ortaklığı platformudur."
+
+Yanlış ton örneği:
+"Kanka sistem çok iyi, herkes giriyor :)"
+
+# FİNAL AMAÇ
+Her konuşmanın sonunda mümkünse:
+- Üyelik ilgisi oluştur
+- Güven hissi bırak
+- Kullanıcıyı platformla temas halinde tut`;
+
+export async function POST(req: NextRequest) {
+  try {
+    const { message, history } = await req.json();
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        max_tokens: 500,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          ...(history || []),
+          { role: "user", content: message },
+        ],
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json({ error: "API hatası" }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      reply: data.choices[0].message.content,
+    });
+  } catch {
+    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+  }
+}
