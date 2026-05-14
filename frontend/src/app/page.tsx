@@ -26,6 +26,7 @@ const TESTIMONIALS = [
 ];
 
 const AVATAR = "https://aday.segem.org.tr/files/image/avatar.png";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://emlakportfoyhavuzu.com/api";
 
 function KrediHesapla() {
   const [tutar, setTutar] = useState(1000000);
@@ -123,10 +124,7 @@ function AiChat() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: msg,
-          history: newMessages.slice(0, -1).slice(-40),
-        }),
+        body: JSON.stringify({ message: msg, history: newMessages.slice(0, -1).slice(-40) }),
       });
       const data = await res.json();
       setMessages(prev => [...prev, { role: "assistant", content: data.reply || "Bir hata oluştu, lütfen tekrar deneyin." }]);
@@ -153,85 +151,35 @@ function AiChat() {
           50% { box-shadow: 0 0 0 14px rgba(232,56,13,0), 0 0 40px rgba(232,56,13,0.7); }
           100% { box-shadow: 0 0 0 0 rgba(232,56,13,0.9), 0 0 15px rgba(232,56,13,0.5); }
         }
-        @keyframes neonRing {
-          0% { transform: scale(1); opacity: 0.9; }
-          100% { transform: scale(2.4); opacity: 0; }
-        }
-        @keyframes bounce {
-          0%,100%{transform:translateY(0)}
-          30%{transform:translateY(-14px)}
-          60%{transform:translateY(-6px)}
-        }
-        @keyframes slideInBubble {
-          from{opacity:0;transform:translateX(20px)}
-          to{opacity:1;transform:translateX(0)}
-        }
-        @keyframes avatarAppear {
-          from{opacity:0;transform:scale(0.4) translateY(40px)}
-          to{opacity:1;transform:scale(1) translateY(0)}
-        }
-        @keyframes slideUp {
-          from{opacity:0;transform:translateY(20px)}
-          to{opacity:1;transform:translateY(0)}
-        }
-        @keyframes typingDot {
-          0%,100%{opacity:0.3;transform:translateY(0)}
-          50%{opacity:1;transform:translateY(-3px)}
-        }
-        .ai-avatar-img {
-          animation: avatarAppear 0.7s cubic-bezier(0.34,1.56,0.64,1) both, bounce 1s ease 1s 3;
-          width: 90px; height: 90px; border-radius: 50%; object-fit: cover;
-          border: 3px solid #E8380D; display: block; position: relative; z-index: 2;
-        }
+        @keyframes neonRing { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(2.4); opacity: 0; } }
+        @keyframes bounce { 0%,100%{transform:translateY(0)} 30%{transform:translateY(-14px)} 60%{transform:translateY(-6px)} }
+        @keyframes slideInBubble { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+        @keyframes avatarAppear { from{opacity:0;transform:scale(0.4) translateY(40px)} to{opacity:1;transform:scale(1) translateY(0)} }
+        @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes typingDot { 0%,100%{opacity:0.3;transform:translateY(0)} 50%{opacity:1;transform:translateY(-3px)} }
+        .ai-avatar-img { animation: avatarAppear 0.7s cubic-bezier(0.34,1.56,0.64,1) both, bounce 1s ease 1s 3; width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid #E8380D;display:block;position:relative;z-index:2; }
         .neon-ring { position:absolute;inset:-8px;border-radius:50%;border:2.5px solid #E8380D;animation:neonRing 1.5s ease-out infinite; }
         .neon-ring-2 { position:absolute;inset:-8px;border-radius:50%;border:2px solid #FF6B35;animation:neonRing 1.5s ease-out 0.5s infinite; }
         .neon-ring-3 { position:absolute;inset:-8px;border-radius:50%;border:2px solid #FFB347;animation:neonRing 1.5s ease-out 1s infinite; }
         .neon-glow { animation: neonPulse 1.5s ease-in-out infinite !important; }
-        .chat-scroll::-webkit-scrollbar{width:4px}
-        .chat-scroll::-webkit-scrollbar-track{background:#f1f1f1}
-        .chat-scroll::-webkit-scrollbar-thumb{background:#E8380D;border-radius:2px}
+        .chat-scroll::-webkit-scrollbar{width:4px} .chat-scroll::-webkit-scrollbar-track{background:#f1f1f1} .chat-scroll::-webkit-scrollbar-thumb{background:#E8380D;border-radius:2px}
         .chat-input:focus { border-color: #E8380D !important; outline: none; }
       `}</style>
 
       <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 999, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
-
         {bubble && !open && (
           <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: "16px 16px 4px 16px", padding: "12px 16px", fontSize: 13, color: "#374151", boxShadow: "0 8px 32px rgba(0,0,0,0.15)", maxWidth: 220, lineHeight: 1.6, animation: "slideInBubble 0.4s ease", fontWeight: 500 }}>
             👋 Merhaba! Size nasıl yardımcı olabilirim?
             <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 4 }}>Lina • EPH Asistan</div>
           </div>
         )}
-
         <div style={{ position: "relative", cursor: "pointer" }} onClick={() => { setOpen(v => !v); setBubble(false); }}>
-          {glowing && (
-            <>
-              <div className="neon-ring" />
-              <div className="neon-ring-2" />
-              <div className="neon-ring-3" />
-            </>
-          )}
-          <img src={AVATAR} alt="Lina - EPH Asistan" className={`ai-avatar-img${glowing ? " neon-glow" : ""}`} />
+          {glowing && (<><div className="neon-ring" /><div className="neon-ring-2" /><div className="neon-ring-3" /></>)}
+          <img src={AVATAR} alt="Lina" className={`ai-avatar-img${glowing ? " neon-glow" : ""}`} />
           <div style={{ position: "absolute", bottom: 4, right: 4, width: 18, height: 18, background: "#22C55E", borderRadius: "50%", border: "3px solid #fff", zIndex: 3 }} />
         </div>
-
         {open && (
-          <div style={{
-            position: "fixed",
-            bottom: chatBottom,
-            right: chatRight,
-            width: chatWidth,
-            height: chatHeight,
-            background: "#fff",
-            border: isMobile ? "none" : "1px solid #E5E7EB",
-            borderRadius: chatBorderRadius,
-            boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
-            overflow: "hidden",
-            animation: isMobile ? "slideUp 0.3s ease" : "slideInBubble 0.3s ease",
-            display: "flex",
-            flexDirection: "column",
-            zIndex: 1000,
-          }}>
-            {/* Header */}
+          <div style={{ position: "fixed", bottom: chatBottom, right: chatRight, width: chatWidth, height: chatHeight, background: "#fff", border: isMobile ? "none" : "1px solid #E5E7EB", borderRadius: chatBorderRadius, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden", animation: isMobile ? "slideUp 0.3s ease" : "slideInBubble 0.3s ease", display: "flex", flexDirection: "column", zIndex: 1000 }}>
             <div style={{ background: "#E8380D", padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
               <img src={AVATAR} alt="Lina" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,0.5)" }} />
               <div>
@@ -243,24 +191,11 @@ function AiChat() {
               </div>
               <button onClick={(e) => { e.stopPropagation(); setOpen(false); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "#fff", cursor: "pointer", fontSize: 24, lineHeight: 1, padding: "4px 8px" }}>×</button>
             </div>
-
-            {/* Mesajlar */}
             <div className="chat-scroll" style={{ flex: 1, overflowY: "auto", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
               {messages.map((m, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 8 }}>
-                  {m.role === "assistant" && (
-                    <img src={AVATAR} alt="" style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                  )}
-                  <div style={{
-                    background: m.role === "user" ? "#E8380D" : "#F3F4F6",
-                    color: m.role === "user" ? "#fff" : "#374151",
-                    borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                    padding: "10px 14px",
-                    fontSize: isMobile ? 14 : 12,
-                    lineHeight: 1.6,
-                    maxWidth: isMobile ? "80%" : "75%",
-                    whiteSpace: "pre-wrap",
-                  }}>
+                  {m.role === "assistant" && (<img src={AVATAR} alt="" style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />)}
+                  <div style={{ background: m.role === "user" ? "#E8380D" : "#F3F4F6", color: m.role === "user" ? "#fff" : "#374151", borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px", padding: "10px 14px", fontSize: isMobile ? 14 : 12, lineHeight: 1.6, maxWidth: isMobile ? "80%" : "75%", whiteSpace: "pre-wrap" as const }}>
                     {m.content}
                   </div>
                 </div>
@@ -269,16 +204,12 @@ function AiChat() {
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
                   <img src={AVATAR} alt="" style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover" }} />
                   <div style={{ background: "#F3F4F6", borderRadius: "18px 18px 18px 4px", padding: "12px 16px", display: "flex", gap: 5 }}>
-                    {[0, 0.2, 0.4].map((d, i) => (
-                      <div key={i} style={{ width: 8, height: 8, background: "#9CA3AF", borderRadius: "50%", animation: `typingDot 1s ease ${d}s infinite` }} />
-                    ))}
+                    {[0, 0.2, 0.4].map((d, i) => (<div key={i} style={{ width: 8, height: 8, background: "#9CA3AF", borderRadius: "50%", animation: `typingDot 1s ease ${d}s infinite` }} />))}
                   </div>
                 </div>
               )}
               <div ref={messagesEndRef} />
             </div>
-
-            {/* Hızlı sorular */}
             {messages.length === 1 && (
               <div style={{ padding: "0 16px 10px", display: "flex", gap: 6, flexWrap: "wrap" as const }}>
                 {["Üyelik nasıl olur?", "Platform ne işe yarar?", "Ücretli mi?"].map(q => (
@@ -286,20 +217,10 @@ function AiChat() {
                 ))}
               </div>
             )}
-
-            {/* Input */}
             <div style={{ padding: "10px 16px 16px", borderTop: "1px solid #F3F4F6", display: "flex", gap: 8, flexShrink: 0 }}>
-              <input
-                className="chat-input"
-                placeholder="Bir şeyler yazın..."
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                style={{ flex: 1, border: "1.5px solid #E5E7EB", borderRadius: 24, padding: isMobile ? "12px 18px" : "9px 14px", fontSize: isMobile ? 14 : 12, outline: "none", transition: "border-color 0.2s" }}
-              />
-              <button
-                onClick={() => sendMessage()}
-                disabled={loading || !input.trim()}
+              <input className="chat-input" placeholder="Bir şeyler yazın..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                style={{ flex: 1, border: "1.5px solid #E5E7EB", borderRadius: 24, padding: isMobile ? "12px 18px" : "9px 14px", fontSize: isMobile ? 14 : 12, outline: "none", transition: "border-color 0.2s" }} />
+              <button onClick={() => sendMessage()} disabled={loading || !input.trim()}
                 style={{ background: loading || !input.trim() ? "#D1D5DB" : "#E8380D", border: "none", borderRadius: "50%", width: isMobile ? 48 : 40, height: isMobile ? 48 : 40, cursor: loading || !input.trim() ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.2s" }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               </button>
@@ -314,6 +235,45 @@ function AiChat() {
 export default function LandingPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ad: "", tel: "", email: "", meslek: "", kod: "" });
+  const [formLoading, setFormLoading] = useState(false);
+  const [formSuccess, setFormSuccess] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  const handleFormSubmit = async () => {
+    if (!form.ad || !form.tel || !form.email || !form.meslek) {
+      setFormError("Lütfen tüm zorunlu alanları doldurun.");
+      return;
+    }
+    setFormLoading(true);
+    setFormError("");
+    try {
+      const ROLE_MAP: Record<string, string> = {
+        "Emlakçı": "EMLAKCI",
+        "Müteahhit": "MUTEAHHIT",
+        "İnşaat Firması": "INSAAT_FIRMASI",
+      };
+      const res = await fetch(`${API_URL}/applications`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicantName: form.ad,
+          applicantPhone: form.tel,
+          applicantEmail: form.email,
+          requestedRole: ROLE_MAP[form.meslek] || "EMLAKCI",
+          referralCode: form.kod || undefined,
+          message: "",
+        }),
+      });
+      if (!res.ok) throw new Error("Hata");
+      setFormSuccess(true);
+      setForm({ ad: "", tel: "", email: "", meslek: "", kod: "" });
+      setShowForm(false);
+    } catch {
+      setFormError("Bir hata oluştu, lütfen tekrar deneyin.");
+    } finally {
+      setFormLoading(false);
+    }
+  };
 
   return (
     <>
@@ -331,12 +291,10 @@ export default function LandingPage() {
           .lp-steps{grid-template-columns:1fr!important;}
           .lp-testi{grid-template-columns:1fr!important;}
           .lp-nav-links{display:none!important;}
-          .lp-kredi{grid-template-columns:1fr!important;}
         }
       `}</style>
 
       <div style={{ background: "#fff", color: "#111827", fontFamily: "system-ui,-apple-system,sans-serif", overflowX: "hidden" }}>
-
         <FinancialTicker />
 
         <nav style={{ background: "#fff", borderBottom: "1px solid #F3F4F6", padding: "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, height: 68, boxShadow: "0 1px 8px rgba(0,0,0,0.06)" }}>
@@ -354,7 +312,7 @@ export default function LandingPage() {
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <Link href="/giris" className="hov" style={{ color: "#E8380D", fontSize: 13, textDecoration: "none", padding: "8px 18px", border: "1.5px solid #E8380D", borderRadius: 6, fontWeight: 600 }}>Giriş Yap</Link>
-            <button onClick={() => setShowForm(v => !v)} className="hov" style={{ color: "#fff", fontSize: 13, padding: "8px 18px", background: "#E8380D", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Üyelik Talebi</button>
+            <button onClick={() => { setShowForm(v => !v); setFormSuccess(false); setFormError(""); }} className="hov" style={{ color: "#fff", fontSize: 13, padding: "8px 18px", background: "#E8380D", border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>Üyelik Talebi</button>
           </div>
         </nav>
 
@@ -376,7 +334,7 @@ export default function LandingPage() {
                 EPH bu kayıp satışları sıfıra indiren akıllı eşleştirme sistemiyle; emlakçı, müteahhit ve inşaat firmalarının portföy ve taleplerini güvenle paylaştığı kapalı devre profesyonel ağdır.
               </p>
               <div style={{ display: "flex", gap: 12, marginBottom: 32, flexWrap: "wrap" as const }}>
-                <button onClick={() => setShowForm(v => !v)} className="hov" style={{ background: "#E8380D", color: "#fff", border: "none", padding: "12px 26px", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                <button onClick={() => { setShowForm(v => !v); setFormSuccess(false); setFormError(""); }} className="hov" style={{ background: "#E8380D", color: "#fff", border: "none", padding: "12px 26px", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   Üyelik Talebinde Bulun →
                 </button>
                 <Link href="/giris" className="hov" style={{ border: "1.5px solid #D1D5DB", color: "#374151", padding: "12px 22px", borderRadius: 6, fontSize: 13, textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
@@ -384,26 +342,46 @@ export default function LandingPage() {
                   Giriş Yap
                 </Link>
               </div>
+
+              {/* Başarı mesajı */}
+              {formSuccess && (
+                <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10, padding: "14px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, animation: "fadeUp 0.3s ease" }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  <div>
+                    <p style={{ color: "#16A34A", fontSize: 13, fontWeight: 600, margin: 0 }}>Talebiniz alındı!</p>
+                    <p style={{ color: "#4B7A5A", fontSize: 11, margin: 0 }}>En kısa sürede sizinle iletişime geçeceğiz.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Form */}
               {showForm && (
                 <div style={{ background: "#fff", border: "1.5px solid #E5E7EB", borderRadius: 12, padding: 20, marginBottom: 24, animation: "fadeUp 0.3s ease" }}>
                   <div style={{ color: "#111827", fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Üyelik Talebinde Bulunun</div>
                   <div style={{ color: "#6B7280", fontSize: 11, marginBottom: 14 }}>Bilgilerinizi bırakın, sizinle iletişime geçelim.</div>
                   <div style={{ display: "flex", flexDirection: "column" as const, gap: 8 }}>
-                    {[{ ph: "Ad Soyad", key: "ad" }, { ph: "Telefon", key: "tel" }, { ph: "Email", key: "email" }].map(({ ph, key }) => (
+                    {[{ ph: "Ad Soyad *", key: "ad" }, { ph: "Telefon *", key: "tel" }, { ph: "Email *", key: "email" }].map(({ ph, key }) => (
                       <input key={key} placeholder={ph} value={form[key as keyof typeof form]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
                         style={{ background: "#F9FAFB", border: "1.5px solid #E5E7EB", borderRadius: 6, padding: "9px 12px", fontSize: 12, width: "100%", boxSizing: "border-box" as const, outline: "none" }} />
                     ))}
                     <select value={form.meslek} onChange={e => setForm(f => ({ ...f, meslek: e.target.value }))}
                       style={{ background: "#F9FAFB", border: "1.5px solid #E5E7EB", borderRadius: 6, padding: "9px 12px", fontSize: 12 }}>
-                      <option value="">Mesleğiniz</option>
+                      <option value="">Mesleğiniz *</option>
                       <option>Emlakçı</option><option>Müteahhit</option><option>İnşaat Firması</option>
                     </select>
                     <input placeholder="Referans Kodu (varsa)" value={form.kod} onChange={e => setForm(f => ({ ...f, kod: e.target.value }))}
                       style={{ background: "#F9FAFB", border: "1.5px solid #E5E7EB", borderRadius: 6, padding: "9px 12px", fontSize: 12, boxSizing: "border-box" as const, outline: "none" }} />
-                    <button style={{ background: "#E8380D", color: "#fff", border: "none", borderRadius: 6, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Talebi Gönder</button>
+                    {formError && <p style={{ color: "#DC2626", fontSize: 11, margin: 0 }}>{formError}</p>}
+                    <button
+                      onClick={handleFormSubmit}
+                      disabled={formLoading || !form.ad || !form.tel || !form.email || !form.meslek}
+                      style={{ background: formLoading || !form.ad || !form.tel || !form.email || !form.meslek ? "#D1D5DB" : "#E8380D", color: "#fff", border: "none", borderRadius: 6, padding: "10px", fontSize: 13, fontWeight: 600, cursor: formLoading || !form.ad || !form.tel || !form.email || !form.meslek ? "not-allowed" : "pointer", transition: "background 0.2s" }}>
+                      {formLoading ? "Gönderiliyor..." : "Talebi Gönder"}
+                    </button>
                   </div>
                 </div>
               )}
+
               <div className="lp-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 12, overflow: "hidden" }}>
                 {STATS.map((s, i) => (
                   <div key={s.label} style={{ padding: "16px 12px", textAlign: "center" as const, borderRight: i < 3 ? "1px solid #E5E7EB" : "none" }}>
@@ -413,6 +391,7 @@ export default function LandingPage() {
                 ))}
               </div>
             </div>
+
             <div style={{ display: "flex", flexDirection: "column" as const, gap: 12 }}>
               {[
                 { icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z", color: "#E8380D", bg: "#FFF0ED", title: "Doğrulanmış Üyelik", desc: "Yetki belgesi ve mesleki belgeler ile doğrulanmış profesyoneller" },
@@ -436,13 +415,7 @@ export default function LandingPage() {
         <div style={{ background: "#F9FAFB", borderBottom: "1px solid #F3F4F6", padding: "10px 40px" }}>
           <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", alignItems: "center", gap: "2rem", flexWrap: "wrap" as const }}>
             <span style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 600, letterSpacing: "0.5px", whiteSpace: "nowrap" as const }}>CANLI PİYASA</span>
-            {[
-              { label: "USD/TRY", val: "38.42", up: true },
-              { label: "EUR/TRY", val: "41.85", up: false },
-              { label: "Gram Altın", val: "3.840 ₺", up: true },
-              { label: "BIST 100", val: "9.240", up: true },
-              { label: "BTC", val: "$94.200", up: true },
-            ].map(p => (
+            {[{ label: "USD/TRY", val: "38.42", up: true }, { label: "EUR/TRY", val: "41.85", up: false }, { label: "Gram Altın", val: "3.840 ₺", up: true }, { label: "BIST 100", val: "9.240", up: true }, { label: "BTC", val: "$94.200", up: true }].map(p => (
               <div key={p.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 12, color: "#4B5563" }}>{p.label}</span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: p.up ? "#16A34A" : "#DC2626" }}>{p.val} {p.up ? "▲" : "▼"}</span>
@@ -460,15 +433,13 @@ export default function LandingPage() {
             </div>
             <div className="lp-steps" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 24 }}>
               {[
-                { n: "1", title: "Başvur", desc: "Üyelik talebi oluştur veya davet kodu ile kayıt ol", color: "#E8380D" },
+                { n: "1", title: "Başvur", desc: "Üyelik talebi oluştur veya referans kodu ile kayıt ol", color: "#E8380D" },
                 { n: "2", title: "Belgele", desc: "Mesleki belgelerini yükle, kimliğini doğrulat", color: "#2563EB" },
                 { n: "3", title: "Onayla", desc: "Admin onayının ardından platforma erişim sağla", color: "#16A34A" },
                 { n: "4", title: "Kazan", desc: "Stok paylaş, ortak sat, komisyon kazan", color: "#D97706" },
               ].map((s, i) => (
                 <div key={s.n} style={{ textAlign: "center" as const, padding: "0 10px" }}>
-                  <div style={{ width: 56, height: 56, background: s.color, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 22, fontWeight: 700, color: "#fff", animation: `float 3s ease ${i * 0.3}s infinite` }}>
-                    {s.n}
-                  </div>
+                  <div style={{ width: 56, height: 56, background: s.color, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 22, fontWeight: 700, color: "#fff", animation: `float 3s ease ${i * 0.3}s infinite` }}>{s.n}</div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", marginBottom: 6 }}>{s.title}</div>
                   <div style={{ fontSize: 12, color: "#6B7280", lineHeight: 1.6 }}>{s.desc}</div>
                 </div>
@@ -543,9 +514,9 @@ export default function LandingPage() {
             </div>
             <div style={{ display: "flex", flexDirection: "column" as const, gap: 16 }}>
               {[
-                "EPH (Emlak Portföy Havuzu), gayrimenkul sektörünün gerçek ihtiyaçlarından yola çıkılarak; emlakçı, müteahhit ve yazılım alanlarında uzman dört girişimci tarafından Denizli'de hayata geçirilmiştir. Platform, sektördeki en kritik sorunu — doğru mülkü doğru müşteriye zamanında ulaştıramamayı — çözmek amacıyla geliştirilmiş; kapalı devre, davet bazlı ve yalnızca doğrulanmış profesyonellere açık bir B2B ağ olarak tasarlanmıştır.",
-                "Pilot bölge olarak seçilen Denizli'de yürütülen çalışmalar son derece olumlu sonuçlar vermiş; platform kısa sürede emlakçılar, müteahhitler ve inşaat firmaları arasında güvenilir bir iş birliği köprüsüne dönüşmüştür. Gerçek zamanlı stok takibi, yapay zeka destekli ilan görseli oluşturma ve entegre CRM sistemi gibi yenilikçi özellikleriyle EPH, sektörde dijital dönüşümün öncüsü olmayı hedeflemektedir.",
-                "2027 yılı itibarıyla Türkiye geneline açılmayı ve en az 10 şehri kapsayan güçlü bir büyüme ivmesi yakalamayı hedefleyen EPH Platform, merkez ofisini Denizli'nin prestijli iş adreslerinden Skycity İş Merkezi'nde konumlandırmıştır.",
+                "EPH (Emlak Portföy Havuzu), gayrimenkul sektörünün gerçek ihtiyaçlarından yola çıkılarak; emlakçı, müteahhit ve yazılım alanlarında uzman dört girişimci tarafından Denizli'de hayata geçirilmiştir.",
+                "Pilot bölge olarak seçilen Denizli'de yürütülen çalışmalar son derece olumlu sonuçlar vermiş; platform kısa sürede emlakçılar, müteahhitler ve inşaat firmaları arasında güvenilir bir iş birliği köprüsüne dönüşmüştür.",
+                "2027 yılı itibarıyla Türkiye geneline açılmayı hedefleyen EPH Platform, merkez ofisini Denizli'nin prestijli iş adreslerinden Skycity İş Merkezi'nde konumlandırmıştır.",
               ].map((p, i) => (
                 <p key={i} style={{ color: "#4B5563", fontSize: 14, lineHeight: 1.9, borderLeft: "3px solid #E8380D", paddingLeft: 18, margin: 0 }}>{p}</p>
               ))}
@@ -573,10 +544,10 @@ export default function LandingPage() {
           </div>
           <h2 style={{ fontSize: 32, fontWeight: 700, marginBottom: 12, color: "#fff" }}>Platforma katılmaya<br />hazır mısınız?</h2>
           <p style={{ color: "rgba(255,255,255,0.85)", fontSize: 13, lineHeight: 1.7, maxWidth: 420, margin: "0 auto 32px" }}>
-            Davet kodunuzu alın, belgelerinizi yükleyin ve Türkiye&apos;nin en güçlü emlak ağına katılın.
+            Referans kodunuzu alın veya üyelik talebinde bulunun ve Türkiye&apos;nin en güçlü emlak ağına katılın.
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" as const }}>
-            <button onClick={() => setShowForm(v => !v)} className="hov" style={{ background: "#fff", color: "#E8380D", border: "none", padding: "13px 32px", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Üyelik Talebinde Bulun</button>
+            <button onClick={() => { setShowForm(v => !v); setFormSuccess(false); setFormError(""); }} className="hov" style={{ background: "#fff", color: "#E8380D", border: "none", padding: "13px 32px", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Üyelik Talebinde Bulun</button>
             <Link href="/giris" className="hov" style={{ background: "rgba(255,255,255,0.15)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.4)", padding: "13px 32px", borderRadius: 6, fontSize: 13, textDecoration: "none", fontWeight: 500 }}>Giriş Yap</Link>
           </div>
         </div>
