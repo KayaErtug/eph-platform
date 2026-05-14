@@ -210,7 +210,7 @@ export default function DashboardPage() {
         </div>
 
         {/* TAVSİYE ET BÖLÜMÜ — Sadece onaylı üyeler */}
-        {user.isApproved && (
+        {user.isApproved && user.role !== "ADMIN" && (
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
