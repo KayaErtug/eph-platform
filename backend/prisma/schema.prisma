@@ -200,3 +200,16 @@ model Application {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 }
+
+model Lead {
+  id          String   @id @default(uuid())
+  fullName    String?
+  phone       String?
+  email       String?
+  profession  String?
+  city        String?
+  interest    String?
+  conversation String?
+  source      String   @default("LINA")
+  createdAt   DateTime @default(now())
+}
