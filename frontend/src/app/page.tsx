@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import FinancialTicker from "@/components/FinancialTicker";
 
@@ -75,9 +75,22 @@ function AiChat() {
   const [glowing, setGlowing] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
-    { role: "assistant", content: "Merhaba! EPH Platform hakkında merak ettiklerinizi sorabilirsiniz. Üyelik, davet kodu veya platform özellikleri konusunda yardımcı olabilirim. 😊" }
+    { role: "assistant", content: "Merhaba! 👋 Ben Lina, EPH Platform'un asistanıyım. Size nasıl yardımcı olabilirim?" }
   ]);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   useEffect(() => {
     const t1 = setTimeout(() => setShown(true), 5000);
@@ -110,18 +123,27 @@ function AiChat() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg, history: newMessages.slice(0, -1).slice(-6) }),
+        body: JSON.stringify({
+          message: msg,
+          history: newMessages.slice(0, -1).slice(-40),
+        }),
       });
       const data = await res.json();
       setMessages(prev => [...prev, { role: "assistant", content: data.reply || "Bir hata oluştu, lütfen tekrar deneyin." }]);
     } catch {
-      setMessages(prev => [...prev, { role: "assistant", content: "Bağlantı hatası, lütfen tekrar deneyin." }]);
+      setMessages(prev => [...prev, { role: "assistant", content: "Bağlantı hatası oluştu, lütfen tekrar deneyin." }]);
     } finally {
       setLoading(false);
     }
   };
 
   if (!shown) return null;
+
+  const chatWidth = isMobile ? "100vw" : "360px";
+  const chatHeight = isMobile ? "100dvh" : "520px";
+  const chatBottom = isMobile ? "0" : "110px";
+  const chatRight = isMobile ? "0" : "0";
+  const chatBorderRadius = isMobile ? "0" : "16px";
 
   return (
     <>
@@ -148,6 +170,10 @@ function AiChat() {
           from{opacity:0;transform:scale(0.4) translateY(40px)}
           to{opacity:1;transform:scale(1) translateY(0)}
         }
+        @keyframes slideUp {
+          from{opacity:0;transform:translateY(20px)}
+          to{opacity:1;transform:translateY(0)}
+        }
         @keyframes typingDot {
           0%,100%{opacity:0.3;transform:translateY(0)}
           50%{opacity:1;transform:translateY(-3px)}
@@ -164,6 +190,7 @@ function AiChat() {
         .chat-scroll::-webkit-scrollbar{width:4px}
         .chat-scroll::-webkit-scrollbar-track{background:#f1f1f1}
         .chat-scroll::-webkit-scrollbar-thumb{background:#E8380D;border-radius:2px}
+        .chat-input:focus { border-color: #E8380D !important; outline: none; }
       `}</style>
 
       <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 999, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
@@ -171,7 +198,7 @@ function AiChat() {
         {bubble && !open && (
           <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: "16px 16px 4px 16px", padding: "12px 16px", fontSize: 13, color: "#374151", boxShadow: "0 8px 32px rgba(0,0,0,0.15)", maxWidth: 220, lineHeight: 1.6, animation: "slideInBubble 0.4s ease", fontWeight: 500 }}>
             👋 Merhaba! Size nasıl yardımcı olabilirim?
-            <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 4 }}>EPH Asistan • Çevrimiçi</div>
+            <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 4 }}>Lina • EPH Asistan</div>
           </div>
         )}
 
@@ -183,35 +210,56 @@ function AiChat() {
               <div className="neon-ring-3" />
             </>
           )}
-          <img src={AVATAR} alt="EPH Asistan" className={`ai-avatar-img${glowing ? " neon-glow" : ""}`} />
+          <img src={AVATAR} alt="Lina - EPH Asistan" className={`ai-avatar-img${glowing ? " neon-glow" : ""}`} />
           <div style={{ position: "absolute", bottom: 4, right: 4, width: 18, height: 18, background: "#22C55E", borderRadius: "50%", border: "3px solid #fff", zIndex: 3 }} />
         </div>
 
         {open && (
-          <div style={{ position: "absolute", bottom: 110, right: 0, width: 340, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden", animation: "slideInBubble 0.3s ease" }}>
-            <div style={{ background: "#E8380D", padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
-              <img src={AVATAR} alt="Asistan" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,0.5)" }} />
+          <div style={{
+            position: "fixed",
+            bottom: chatBottom,
+            right: chatRight,
+            width: chatWidth,
+            height: chatHeight,
+            background: "#fff",
+            border: isMobile ? "none" : "1px solid #E5E7EB",
+            borderRadius: chatBorderRadius,
+            boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
+            overflow: "hidden",
+            animation: isMobile ? "slideUp 0.3s ease" : "slideInBubble 0.3s ease",
+            display: "flex",
+            flexDirection: "column",
+            zIndex: 1000,
+          }}>
+            {/* Header */}
+            <div style={{ background: "#E8380D", padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+              <img src={AVATAR} alt="Lina" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,0.5)" }} />
               <div>
-                <div style={{ color: "#fff", fontSize: 14, fontWeight: 600 }}>EPH Asistan</div>
+                <div style={{ color: "#fff", fontSize: 14, fontWeight: 600 }}>Lina</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                   <div style={{ width: 7, height: 7, background: "#22C55E", borderRadius: "50%" }} />
-                  <span style={{ color: "rgba(255,255,255,0.9)", fontSize: 11 }}>Çevrimiçi · AI Destekli</span>
+                  <span style={{ color: "rgba(255,255,255,0.9)", fontSize: 11 }}>EPH Asistan • Çevrimiçi</span>
                 </div>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); setOpen(false); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "#fff", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
+              <button onClick={(e) => { e.stopPropagation(); setOpen(false); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "#fff", cursor: "pointer", fontSize: 24, lineHeight: 1, padding: "4px 8px" }}>×</button>
             </div>
 
-            <div className="chat-scroll" style={{ height: 280, overflowY: "auto", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* Mesajlar */}
+            <div className="chat-scroll" style={{ flex: 1, overflowY: "auto", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
               {messages.map((m, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+                <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 8 }}>
                   {m.role === "assistant" && (
-                    <img src={AVATAR} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", marginRight: 8, flexShrink: 0, alignSelf: "flex-end" }} />
+                    <img src={AVATAR} alt="" style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
                   )}
                   <div style={{
                     background: m.role === "user" ? "#E8380D" : "#F3F4F6",
                     color: m.role === "user" ? "#fff" : "#374151",
-                    borderRadius: m.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                    padding: "9px 13px", fontSize: 12, lineHeight: 1.6, maxWidth: "80%"
+                    borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                    padding: "10px 14px",
+                    fontSize: isMobile ? 14 : 12,
+                    lineHeight: 1.6,
+                    maxWidth: isMobile ? "80%" : "75%",
+                    whiteSpace: "pre-wrap",
                   }}>
                     {m.content}
                   </div>
@@ -219,37 +267,41 @@ function AiChat() {
               ))}
               {loading && (
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
-                  <img src={AVATAR} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
-                  <div style={{ background: "#F3F4F6", borderRadius: "16px 16px 16px 4px", padding: "10px 14px", display: "flex", gap: 4 }}>
+                  <img src={AVATAR} alt="" style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover" }} />
+                  <div style={{ background: "#F3F4F6", borderRadius: "18px 18px 18px 4px", padding: "12px 16px", display: "flex", gap: 5 }}>
                     {[0, 0.2, 0.4].map((d, i) => (
-                      <div key={i} style={{ width: 7, height: 7, background: "#9CA3AF", borderRadius: "50%", animation: `typingDot 1s ease ${d}s infinite` }} />
+                      <div key={i} style={{ width: 8, height: 8, background: "#9CA3AF", borderRadius: "50%", animation: `typingDot 1s ease ${d}s infinite` }} />
                     ))}
                   </div>
                 </div>
               )}
+              <div ref={messagesEndRef} />
             </div>
 
+            {/* Hızlı sorular */}
             {messages.length === 1 && (
               <div style={{ padding: "0 16px 10px", display: "flex", gap: 6, flexWrap: "wrap" as const }}>
-                {["Üyelik nasıl alınır?", "Davet kodu nedir?", "Hangi belgeler lazım?"].map(q => (
-                  <button key={q} onClick={() => sendMessage(q)} style={{ background: "#FFF0ED", border: "1px solid #FECDC5", color: "#E8380D", fontSize: 10, padding: "5px 10px", borderRadius: 20, cursor: "pointer", fontWeight: 500 }}>{q}</button>
+                {["Üyelik nasıl olur?", "Platform ne işe yarar?", "Ücretli mi?"].map(q => (
+                  <button key={q} onClick={() => sendMessage(q)} style={{ background: "#FFF0ED", border: "1px solid #FECDC5", color: "#E8380D", fontSize: isMobile ? 12 : 10, padding: "6px 12px", borderRadius: 20, cursor: "pointer", fontWeight: 500 }}>{q}</button>
                 ))}
               </div>
             )}
 
-            <div style={{ padding: "10px 16px 14px", borderTop: "1px solid #F3F4F6", display: "flex", gap: 8 }}>
+            {/* Input */}
+            <div style={{ padding: "10px 16px 16px", borderTop: "1px solid #F3F4F6", display: "flex", gap: 8, flexShrink: 0 }}>
               <input
-                placeholder="Mesajınızı yazın..."
+                className="chat-input"
+                placeholder="Bir şeyler yazın..."
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && sendMessage()}
-                style={{ flex: 1, border: "1.5px solid #E5E7EB", borderRadius: 8, padding: "9px 12px", fontSize: 12, outline: "none" }}
+                onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                style={{ flex: 1, border: "1.5px solid #E5E7EB", borderRadius: 24, padding: isMobile ? "12px 18px" : "9px 14px", fontSize: isMobile ? 14 : 12, outline: "none", transition: "border-color 0.2s" }}
               />
               <button
                 onClick={() => sendMessage()}
                 disabled={loading || !input.trim()}
-                style={{ background: loading || !input.trim() ? "#D1D5DB" : "#E8380D", border: "none", borderRadius: 8, padding: "9px 14px", cursor: loading || !input.trim() ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.2s" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                style={{ background: loading || !input.trim() ? "#D1D5DB" : "#E8380D", border: "none", borderRadius: "50%", width: isMobile ? 48 : 40, height: isMobile ? 48 : 40, cursor: loading || !input.trim() ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.2s" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               </button>
             </div>
           </div>
@@ -279,6 +331,7 @@ export default function LandingPage() {
           .lp-steps{grid-template-columns:1fr!important;}
           .lp-testi{grid-template-columns:1fr!important;}
           .lp-nav-links{display:none!important;}
+          .lp-kredi{grid-template-columns:1fr!important;}
         }
       `}</style>
 
