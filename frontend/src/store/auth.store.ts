@@ -8,6 +8,9 @@ interface User {
   email: string;
   role: string;
   isApproved: boolean;
+  referralCode?: string;
+  nominationPoints?: number;
+  nominationQuota?: number;
 }
 
 interface AuthState {
