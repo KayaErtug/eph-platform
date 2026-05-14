@@ -4,12 +4,12 @@ import * as nodemailer from 'nodemailer';
 @Injectable()
 export class MailService {
   private transporter = nodemailer.createTransport({
-    host: 'mail.emlakportfoyhavuzu.com',
+    host: 'mail.kurumsaleposta.com',
     port: 587,
     secure: false,
     auth: {
-      user: 'info@emlakportfoyhavuzu.com',
-      pass: 'EmlaK_635122',
+      user: 'bildirim@emlakportfoyhavuzu.com',
+      pass: 'EmlaK_635122!Eph',
     },
     tls: { rejectUnauthorized: false },
   });
@@ -25,7 +25,7 @@ export class MailService {
       EMLAKCI: 'Emlakçı', MUTEAHHIT: 'Müteahhit', INSAAT_FIRMASI: 'İnşaat Firması'
     };
     await this.transporter.sendMail({
-      from: '"EPH Platform" <info@emlakportfoyhavuzu.com>',
+      from: '"EPH Platform" <bildirim@emlakportfoyhavuzu.com>',
       to: 'info@emlakportfoyhavuzu.com',
       subject: '🆕 Yeni Üyelik Başvurusu',
       html: `
@@ -62,7 +62,7 @@ export class MailService {
       EMLAKCI: 'Emlakçı', MUTEAHHIT: 'Müteahhit', INSAAT_FIRMASI: 'İnşaat Firması'
     };
     await this.transporter.sendMail({
-      from: '"EPH Platform" <info@emlakportfoyhavuzu.com>',
+      from: '"EPH Platform" <bildirim@emlakportfoyhavuzu.com>',
       to: 'info@emlakportfoyhavuzu.com',
       subject: '👥 Yeni Tavsiye',
       html: `
@@ -97,7 +97,7 @@ export class MailService {
     interest?: string;
   }) {
     await this.transporter.sendMail({
-      from: '"EPH Platform - Lina" <info@emlakportfoyhavuzu.com>',
+      from: '"EPH Platform - Lina" <bildirim@emlakportfoyhavuzu.com>',
       to: 'info@emlakportfoyhavuzu.com',
       subject: '🤖 Lina Yeni Lead Topladı',
       html: `
@@ -126,7 +126,7 @@ export class MailService {
 
   async sendUserApproved(email: string, firstName: string) {
     await this.transporter.sendMail({
-      from: '"EPH Platform" <info@emlakportfoyhavuzu.com>',
+      from: '"EPH Platform" <bildirim@emlakportfoyhavuzu.com>',
       to: email,
       subject: '✅ EPH Platform - Hesabınız Onaylandı!',
       html: `
@@ -148,7 +148,7 @@ export class MailService {
 
   async sendUserSuspended(email: string, firstName: string) {
     await this.transporter.sendMail({
-      from: '"EPH Platform" <info@emlakportfoyhavuzu.com>',
+      from: '"EPH Platform" <bildirim@emlakportfoyhavuzu.com>',
       to: email,
       subject: '⚠️ EPH Platform - Hesabınız Askıya Alındı',
       html: `
