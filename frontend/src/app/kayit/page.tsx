@@ -9,13 +9,10 @@ import { useAuthStore } from "@/store/auth.store";
 import { registerSchema, RegisterFormData } from "@/schemas/auth.schema";
 
 const ROLE_LABELS: Record<string, string> = {
-  EMLAKCI: "Emlakci",
-  MUTEAHHIT: "Muteahhit",
-  INSAAT_FIRMASI: "Insaat Firmasi",
-  ADMIN: "Admin",
+  EMLAKCI: "Emlakçı", MUTEAHHIT: "Müteahhit",
+  INSAAT_FIRMASI: "İnşaat Firması", ADMIN: "Admin",
 };
 
-// ✅ useSearchParams kullanan kısmı ayrı bir component'e aldık
 function KayitForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,191 +35,333 @@ function KayitForm() {
 
   useEffect(() => {
     if (!inviteCode || inviteCode.length < 10) {
-      setDetectedRole(null);
-      setCodeStatus("idle");
-      return;
+      setDetectedRole(null); setCodeStatus("idle"); return;
     }
     const timer = setTimeout(async () => {
       setCodeStatus("checking");
       try {
         const res = await api.get(`/invitations/validate/${inviteCode}`);
-        setDetectedRole(res.data.role);
-        setCodeStatus("valid");
+        setDetectedRole(res.data.role); setCodeStatus("valid");
       } catch {
-        setDetectedRole(null);
-        setCodeStatus("invalid");
+        setDetectedRole(null); setCodeStatus("invalid");
       }
     }, 600);
     return () => clearTimeout(timer);
   }, [inviteCode]);
 
   const onSubmit = async (data: RegisterFormData) => {
-    setLoading(true);
-    setServerError("");
+    setLoading(true); setServerError("");
     try {
       const res = await api.post("/auth/register", data);
       setAuth(res.data.user, res.data.token);
       router.push("/dashboard");
     } catch (err: any) {
-      setServerError(err.response?.data?.message || "Bir hata olustu.");
-    } finally {
-      setLoading(false);
-    }
+      setServerError(err.response?.data?.message || "Bir hata oluştu.");
+    } finally { setLoading(false); }
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 flex">
-      <div className="hidden lg:flex w-5/12 bg-gray-900 border-r border-gray-800 flex-col justify-between p-12">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            </div>
-            <span className="text-white text-xl font-semibold">EPH</span>
-          </div>
-          <p className="text-gray-500 text-sm">Emlak Portfoy Havuzu</p>
-        </div>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0;}
+        :root{
+          --navy:#0F2044;--gold:#C9A84C;--cream:#F5F3EF;--warm:#FAFAF8;
+          --muted:#8A8A8A;--border:#E2DDD5;
+          --serif:'Cormorant Garamond',Georgia,serif;
+          --sans:'DM Sans',system-ui,sans-serif;
+        }
+        body{font-family:var(--sans);background:var(--warm);}
 
-        <div>
-          <div className="inline-flex items-center gap-2 bg-blue-950 border border-blue-900 rounded-full px-3 py-1.5 mb-6">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-400"></div>
-            <span className="text-blue-400 text-xs font-medium">Davet koduyla kayit</span>
-          </div>
-          <h1 className="text-white text-4xl font-bold leading-tight mb-4">
-            Platforma<br/>
-            <span className="text-blue-400">Katıl</span>
-          </h1>
-          <p className="text-gray-500 text-sm leading-relaxed">
-            Davet kodunuzu girin, rol otomatik atansin ve hemen baslayin.
-          </p>
+        .kayit-root{min-height:100vh;display:grid;grid-template-columns:5fr 7fr;}
+        @media(max-width:900px){.kayit-root{grid-template-columns:1fr;}}
 
-          <div className="mt-10 space-y-6">
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">1</div>
-              <div>
-                <p className="text-white text-sm font-medium">Davet kodunuzu girin</p>
-                <p className="text-gray-500 text-xs mt-0.5">Mevcut bir uyeden davet kodu alin</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">2</div>
-              <div>
-                <p className="text-white text-sm font-medium">Rolunuz otomatik atanir</p>
-                <p className="text-gray-500 text-xs mt-0.5">Emlakci, Muteahhit veya Insaat Firmasi</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">3</div>
-              <div>
-                <p className="text-white text-sm font-medium">Admin onayini bekleyin</p>
-                <p className="text-gray-500 text-xs mt-0.5">Belgelerinizi yukleyin ve onay alin</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        /* SOL */
+        .kayit-left{
+          background:var(--navy);padding:56px 52px;
+          display:flex;flex-direction:column;justify-content:space-between;
+          position:relative;overflow:hidden;
+        }
+        @media(max-width:900px){.kayit-left{display:none;}}
 
-        <p className="text-gray-700 text-xs">2026 EPH. Tum haklari saklidir.</p>
-      </div>
+        .kayit-left::after{
+          content:'';position:absolute;
+          bottom:-80px;right:-80px;
+          width:320px;height:320px;border-radius:50%;
+          background:radial-gradient(circle,rgba(201,168,76,0.1) 0%,transparent 70%);
+          pointer-events:none;
+        }
 
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-sm">
-          <div className="mb-8">
-            <h2 className="text-white text-2xl font-semibold mb-1">Hesap olustur</h2>
-            <p className="text-gray-500 text-sm">Platforma katılmak icin formu doldurun</p>
-          </div>
+        .kayit-logo{display:flex;align-items:center;gap:12px;}
+        .kayit-logo img{width:38px;height:38px;object-fit:contain;}
+        .kayit-logo-text{font-family:var(--serif);font-size:20px;font-weight:500;color:var(--cream);}
+        .kayit-logo-sub{font-size:7px;letter-spacing:2.5px;text-transform:uppercase;color:rgba(201,168,76,0.7);}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        .kayit-hero{position:relative;z-index:1;}
+        .kayit-badge{
+          display:inline-flex;align-items:center;gap:8px;
+          border:1px solid rgba(201,168,76,0.25);padding:6px 14px;
+          margin-bottom:28px;width:fit-content;
+        }
+        .kayit-badge-dot{width:5px;height:5px;border-radius:50%;background:var(--gold);animation:pulse 2s ease infinite;}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+        .kayit-badge-text{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);}
+
+        .kayit-headline{
+          font-family:var(--serif);font-size:48px;font-weight:300;
+          line-height:1.05;color:var(--cream);letter-spacing:-0.5px;margin-bottom:24px;
+        }
+        .kayit-headline em{font-style:italic;color:var(--gold);}
+
+        .kayit-steps{display:flex;flex-direction:column;gap:0;margin-top:40px;}
+        .kayit-step{
+          display:flex;align-items:flex-start;gap:20px;
+          padding:20px 0;border-bottom:1px solid rgba(255,255,255,0.05);
+        }
+        .kayit-step:last-child{border-bottom:none;}
+        .kayit-step-num{
+          font-family:var(--serif);font-size:13px;color:var(--gold);
+          min-width:20px;margin-top:2px;font-weight:300;
+        }
+        .kayit-step-title{font-size:14px;color:var(--cream);font-weight:400;margin-bottom:4px;}
+        .kayit-step-desc{font-size:11px;color:rgba(245,243,239,0.4);font-weight:300;line-height:1.6;}
+
+        .kayit-footer-text{font-size:10px;color:rgba(245,243,239,0.15);letter-spacing:1px;}
+
+        /* SAĞ */
+        .kayit-right{
+          background:var(--warm);display:flex;align-items:center;
+          justify-content:center;padding:60px 80px;position:relative;
+        }
+        @media(max-width:768px){.kayit-right{padding:40px 24px;}}
+
+        .kayit-right::before{
+          content:'';position:absolute;top:0;left:0;right:0;height:3px;
+          background:linear-gradient(90deg,var(--gold),var(--navy));
+        }
+
+        .kayit-form-wrap{width:100%;max-width:420px;animation:fadeUp 0.5s ease;}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+        .kayit-title{font-family:var(--serif);font-size:36px;font-weight:400;color:var(--navy);margin-bottom:6px;letter-spacing:-0.3px;}
+        .kayit-sub{font-size:13px;color:var(--muted);margin-bottom:12px;font-weight:300;}
+        .kayit-divider{width:36px;height:2px;background:var(--gold);margin-bottom:32px;}
+
+        .kayit-field{margin-bottom:20px;}
+        .kayit-label{display:block;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--navy);font-weight:500;margin-bottom:10px;}
+        .kayit-input-wrap{position:relative;}
+        .kayit-input{
+          width:100%;background:transparent;border:none;
+          border-bottom:1.5px solid var(--border);padding:10px 0;
+          font-size:14px;color:var(--navy);font-family:var(--sans);
+          outline:none;transition:border-color 0.3s;font-weight:300;
+        }
+        .kayit-input:focus{border-bottom-color:var(--navy);}
+        .kayit-input::placeholder{color:#C0BAB0;}
+        .kayit-input-line{
+          position:absolute;bottom:0;left:0;height:1.5px;width:0;
+          background:var(--gold);transition:width 0.4s cubic-bezier(0.4,0,0.2,1);
+        }
+        .kayit-input:focus~.kayit-input-line{width:100%;}
+        .kayit-input-status{position:absolute;right:0;top:50%;transform:translateY(-50%);}
+
+        .kayit-code-valid{
+          background:#F0FAF4;border-left:3px solid #2D6A4F;
+          padding:10px 14px;margin:8px 0;
+          font-size:12px;color:#2D6A4F;font-weight:300;
+          display:flex;align-items:center;gap:8px;
+        }
+        .kayit-code-invalid{
+          background:#FEF0EE;border-left:3px solid #C0392B;
+          padding:10px 14px;margin:8px 0;
+          font-size:12px;color:#C0392B;font-weight:300;
+        }
+
+        .kayit-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+
+        .kayit-error{font-size:11px;color:#C0392B;margin-top:6px;}
+        .kayit-server-error{background:#FEF0EE;border-left:3px solid #C0392B;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#C0392B;font-weight:300;}
+
+        .kayit-btn{
+          width:100%;background:var(--navy);color:var(--cream);border:none;
+          padding:16px;font-size:10px;letter-spacing:3px;text-transform:uppercase;
+          font-family:var(--sans);font-weight:500;cursor:pointer;margin-top:28px;
+          position:relative;overflow:hidden;transition:all 0.3s;
+        }
+        .kayit-btn::before{
+          content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;
+          background:var(--gold);transition:left 0.4s cubic-bezier(0.4,0,0.2,1);
+        }
+        .kayit-btn:hover::before{left:0;}
+        .kayit-btn:hover{color:var(--navy);}
+        .kayit-btn span{position:relative;z-index:1;}
+        .kayit-btn:disabled{opacity:0.4;cursor:not-allowed;}
+        .kayit-btn:disabled::before{display:none;}
+
+        .kayit-bottom{
+          margin-top:28px;text-align:center;
+          font-size:12px;color:var(--muted);font-weight:300;
+        }
+        .kayit-bottom a{
+          color:var(--navy);text-decoration:none;font-weight:500;
+          border-bottom:1px solid var(--gold);padding-bottom:1px;transition:color 0.2s;
+        }
+        .kayit-bottom a:hover{color:var(--gold);}
+      `}</style>
+
+      <div className="kayit-root">
+        {/* SOL */}
+        <div className="kayit-left">
+          <div className="kayit-logo">
+            <img src="/LOGO_EPH.png" alt="EPH" />
             <div>
-              <label className="block text-gray-400 text-sm font-medium mb-2">Davet Kodu</label>
-              <div className="relative">
-                <input {...register("inviteCode")} placeholder="EMK-XXXX-XXXX"
-                  className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors font-mono tracking-wider uppercase" />
-                {codeStatus === "checking" && <span className="absolute right-3 top-3 text-gray-500 text-xs">kontrol...</span>}
-                {codeStatus === "valid" && (
-                  <span className="absolute right-3 top-3 text-green-400">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                  </span>
+              <div className="kayit-logo-text">EPH Platform</div>
+              <div className="kayit-logo-sub">Emlak Portföy Havuzu</div>
+            </div>
+          </div>
+
+          <div className="kayit-hero">
+            <div className="kayit-badge">
+              <div className="kayit-badge-dot" />
+              <span className="kayit-badge-text">Davet Kodu ile Kayıt</span>
+            </div>
+            <h1 className="kayit-headline">
+              Platforma<br />
+              <em>Katılın</em>
+            </h1>
+            <div className="kayit-steps">
+              {[
+                { n: "01", title: "Davet Kodunuzu Girin", desc: "Mevcut bir üyeden aldığınız kodu girin, rolünüz otomatik atanır." },
+                { n: "02", title: "Bilgilerinizi Doldurun", desc: "Ad, soyad, e-posta ve şifrenizi kaydedin." },
+                { n: "03", title: "Admin Onayını Bekleyin", desc: "Belgelerinizi yükleyin ve hızlıca onay alın." },
+                { n: "04", title: "Platforma Erişin", desc: "Onaylanınca tüm özelliklere tam erişim sağlayın." },
+              ].map(s => (
+                <div key={s.n} className="kayit-step">
+                  <div className="kayit-step-num">{s.n}</div>
+                  <div>
+                    <div className="kayit-step-title">{s.title}</div>
+                    <div className="kayit-step-desc">{s.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p className="kayit-footer-text">© 2026 EPH Platform — Denizli, Türkiye</p>
+        </div>
+
+        {/* SAĞ */}
+        <div className="kayit-right">
+          <div className="kayit-form-wrap">
+            <h2 className="kayit-title">Hesap Oluştur</h2>
+            <p className="kayit-sub">Platforma katılmak için formu doldurun</p>
+            <div className="kayit-divider" />
+
+            <form onSubmit={handleSubmit(onSubmit)}>
+              {/* DAVET KODU */}
+              <div className="kayit-field">
+                <label className="kayit-label">Davet Kodu *</label>
+                <div className="kayit-input-wrap">
+                  <input
+                    {...register("inviteCode")}
+                    placeholder="EMK-XXXX-XXXX"
+                    className="kayit-input"
+                    style={{ fontFamily: "monospace", letterSpacing: 2, textTransform: "uppercase" }}
+                  />
+                  <div className="kayit-input-line" />
+                  <div className="kayit-input-status">
+                    {codeStatus === "checking" && <span style={{ fontSize: 10, color: "var(--muted)" }}>kontrol...</span>}
+                    {codeStatus === "valid" && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>}
+                    {codeStatus === "invalid" && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C0392B" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>}
+                  </div>
+                </div>
+                {codeStatus === "valid" && detectedRole && (
+                  <div className="kayit-code-valid">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    <strong>{ROLE_LABELS[detectedRole]}</strong> olarak kaydoluyorsunuz
+                  </div>
                 )}
-                {codeStatus === "invalid" && (
-                  <span className="absolute right-3 top-3 text-red-400">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  </span>
-                )}
+                {codeStatus === "invalid" && <div className="kayit-code-invalid">Geçersiz veya süresi dolmuş davet kodu.</div>}
               </div>
-              {codeStatus === "invalid" && <p className="text-red-400 text-xs mt-1.5">Gecersiz veya suresi dolmus davet kodu.</p>}
-            </div>
 
-            {detectedRole && (
-              <div className="bg-blue-950 border border-blue-900 rounded-xl px-4 py-3 flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                <span className="text-blue-300 text-sm">
-                  <span className="font-semibold">{ROLE_LABELS[detectedRole]}</span> olarak kaydoluyorsunuz
-                </span>
+              {/* AD SOYAD */}
+              <div className="kayit-grid">
+                <div className="kayit-field">
+                  <label className="kayit-label">Ad *</label>
+                  <div className="kayit-input-wrap">
+                    <input {...register("firstName")} placeholder="Ahmet" className="kayit-input" />
+                    <div className="kayit-input-line" />
+                  </div>
+                  {errors.firstName && <p className="kayit-error">{errors.firstName.message}</p>}
+                </div>
+                <div className="kayit-field">
+                  <label className="kayit-label">Soyad *</label>
+                  <div className="kayit-input-wrap">
+                    <input {...register("lastName")} placeholder="Yılmaz" className="kayit-input" />
+                    <div className="kayit-input-line" />
+                  </div>
+                  {errors.lastName && <p className="kayit-error">{errors.lastName.message}</p>}
+                </div>
               </div>
-            )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-gray-400 text-sm font-medium mb-2">Ad</label>
-                <input {...register("firstName")} placeholder="Ahmet"
-                  className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors" />
-                {errors.firstName && <p className="text-red-400 text-xs mt-1">{errors.firstName.message}</p>}
+              {/* EMAIL */}
+              <div className="kayit-field">
+                <label className="kayit-label">E-posta *</label>
+                <div className="kayit-input-wrap">
+                  <input {...register("email")} type="email" placeholder="ornek@email.com" className="kayit-input" />
+                  <div className="kayit-input-line" />
+                </div>
+                {errors.email && <p className="kayit-error">{errors.email.message}</p>}
               </div>
-              <div>
-                <label className="block text-gray-400 text-sm font-medium mb-2">Soyad</label>
-                <input {...register("lastName")} placeholder="Yilmaz"
-                  className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors" />
-                {errors.lastName && <p className="text-red-400 text-xs mt-1">{errors.lastName.message}</p>}
+
+              {/* TELEFON */}
+              <div className="kayit-field">
+                <label className="kayit-label">Telefon *</label>
+                <div className="kayit-input-wrap">
+                  <input {...register("phone")} placeholder="+90 5__ ___ __ __" className="kayit-input" />
+                  <div className="kayit-input-line" />
+                </div>
+                {errors.phone && <p className="kayit-error">{errors.phone.message}</p>}
               </div>
-            </div>
 
-            <div>
-              <label className="block text-gray-400 text-sm font-medium mb-2">Email</label>
-              <input {...register("email")} type="email" placeholder="ornek@email.com"
-                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors" />
-              {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>}
-            </div>
-
-            <div>
-              <label className="block text-gray-400 text-sm font-medium mb-2">Telefon</label>
-              <input {...register("phone")} placeholder="+90 5__ ___ __ __"
-                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors" />
-              {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone.message}</p>}
-            </div>
-
-            <div>
-              <label className="block text-gray-400 text-sm font-medium mb-2">Sifre</label>
-              <input {...register("password")} type="password" placeholder="En az 6 karakter"
-                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors" />
-              {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password.message}</p>}
-            </div>
-
-            {serverError && (
-              <div className="bg-red-950 border border-red-900 rounded-xl px-4 py-3">
-                <p className="text-red-400 text-sm">{serverError}</p>
+              {/* ŞİFRE */}
+              <div className="kayit-field">
+                <label className="kayit-label">Şifre *</label>
+                <div className="kayit-input-wrap">
+                  <input {...register("password")} type="password" placeholder="En az 6 karakter" className="kayit-input" />
+                  <div className="kayit-input-line" />
+                </div>
+                {errors.password && <p className="kayit-error">{errors.password.message}</p>}
               </div>
-            )}
 
-            <button type="submit" disabled={loading || codeStatus !== "valid"}
-              className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-600 text-white font-semibold py-3 rounded-xl transition-colors text-sm">
-              {loading ? "Kayit olunuyor..." : "Kayit Ol"}
-            </button>
-          </form>
+              {serverError && <div className="kayit-server-error">{serverError}</div>}
 
-          <p className="text-center text-gray-600 text-sm mt-6">
-            Zaten hesabiniz var mi?{" "}
-            <Link href="/giris" className="text-blue-400 hover:text-blue-300 font-medium">Giris yapin</Link>
-          </p>
+              <button
+                type="submit"
+                disabled={loading || codeStatus !== "valid"}
+                className="kayit-btn"
+              >
+                <span>{loading ? "Kayıt yapılıyor..." : "Kayıt Ol"}</span>
+              </button>
+            </form>
+
+            <div className="kayit-bottom">
+              Zaten hesabınız var mı? <Link href="/giris">Giriş yapın</Link>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
-// ✅ Ana sayfa: KayitForm'u Suspense ile sarıyoruz
 export default function KayitPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Yükleniyor...</div>}>
+    <Suspense fallback={
+      <div style={{ minHeight: "100vh", background: "#FAFAF8", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 18, color: "#8A8A8A", fontStyle: "italic" }}>Yükleniyor...</div>
+      </div>
+    }>
       <KayitForm />
     </Suspense>
   );
