@@ -3,6 +3,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import api from "@/lib/api";
 
 const ROLE_LABELS: Record<string, string> = {
   EMLAKCI: "Emlakçı",
@@ -18,21 +19,92 @@ const ROLE_COLORS: Record<string, string> = {
   ADMIN: "bg-purple-950 text-purple-300 border-purple-800",
 };
 
+const NOM_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Bekliyor",
+  APPROVED: "Onaylandı",
+  REJECTED: "Reddedildi",
+  INVITED: "Davet Gönderildi",
+  REGISTERED: "Platforma Katıldı 🎉",
+};
+
+const NOM_STATUS_COLORS: Record<string, string> = {
+  PENDING: "text-yellow-400",
+  APPROVED: "text-green-400",
+  REJECTED: "text-red-400",
+  INVITED: "text-blue-400",
+  REGISTERED: "text-purple-400",
+};
+
+interface Nomination {
+  id: string;
+  candidateName: string;
+  candidateEmail: string;
+  candidatePhone: string;
+  candidateRole: string;
+  note?: string;
+  status: string;
+  createdAt: string;
+}
+
 export default function DashboardPage() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
   const [hydrated, setHydrated] = useState(false);
+  const [nominations, setNominations] = useState<Nomination[]>([]);
+  const [showNomForm, setShowNomForm] = useState(false);
+  const [nomLoading, setNomLoading] = useState(false);
+  const [nomSuccess, setNomSuccess] = useState(false);
+  const [nomError, setNomError] = useState("");
+  const [nomForm, setNomForm] = useState({
+    candidateName: "",
+    candidateEmail: "",
+    candidatePhone: "",
+    candidateRole: "EMLAKCI",
+    note: "",
+  });
 
   useEffect(() => { setHydrated(true); }, []);
+
   useEffect(() => {
     if (hydrated && !user) router.push("/giris");
+    if (hydrated && user?.isApproved) fetchMyNominations();
   }, [hydrated, user]);
+
+  const fetchMyNominations = async () => {
+    try {
+      const r = await api.get("/nominations/my");
+      setNominations(r.data);
+    } catch {}
+  };
+
+  const handleNomSubmit = async () => {
+    if (!nomForm.candidateName || !nomForm.candidateEmail || !nomForm.candidatePhone) {
+      setNomError("Ad, email ve telefon zorunludur.");
+      return;
+    }
+    setNomLoading(true);
+    setNomError("");
+    try {
+      await api.post("/nominations", nomForm);
+      setNomSuccess(true);
+      setNomForm({ candidateName: "", candidateEmail: "", candidatePhone: "", candidateRole: "EMLAKCI", note: "" });
+      setShowNomForm(false);
+      await fetchMyNominations();
+      setTimeout(() => setNomSuccess(false), 4000);
+    } catch (e: any) {
+      setNomError(e?.response?.data?.message || "Bir hata oluştu.");
+    } finally {
+      setNomLoading(false);
+    }
+  };
 
   if (!hydrated || !user) return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
       <p className="text-gray-500 text-sm">Yükleniyor...</p>
     </div>
   );
+
+  const remainingQuota = 10 - nominations.length;
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -46,7 +118,6 @@ export default function DashboardPage() {
             </div>
             <span className="text-white font-semibold">EPH</span>
           </div>
-
           <nav className="flex items-center gap-1">
             <Link href="/dashboard" className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gray-800">Ana Sayfa</Link>
             <Link href="/profil" className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">Profilim</Link>
@@ -55,7 +126,6 @@ export default function DashboardPage() {
               <Link href="/admin" className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">Admin</Link>
             )}
           </nav>
-
           <button onClick={() => { logout(); router.push("/giris"); }}
             className="flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-600 px-4 py-2 rounded-lg transition-colors">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -138,6 +208,128 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+
+        {/* TAVSİYE ET BÖLÜMÜ — Sadece onaylı üyeler */}
+        {user.isApproved && (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-950 border border-indigo-900 rounded-xl flex items-center justify-center">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </div>
+                <div>
+                  <h2 className="text-white font-medium">Tanıdık Öner</h2>
+                  <p className="text-gray-500 text-xs">Platforma değer katacak profesyonelleri tavsiye edin</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-indigo-300 text-sm font-semibold">{remainingQuota}/10</p>
+                  <p className="text-gray-600 text-xs">kalan hak</p>
+                </div>
+                {remainingQuota > 0 && (
+                  <button onClick={() => { setShowNomForm(v => !v); setNomError(""); setNomSuccess(false); }}
+                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-4 py-2 rounded-lg transition-colors font-medium">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Tavsiye Et
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Başarı mesajı */}
+            {nomSuccess && (
+              <div className="bg-green-950 border border-green-900 rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <p className="text-green-400 text-sm">Tavsiyeniz iletildi! Admin inceleyecek.</p>
+              </div>
+            )}
+
+            {/* Tavsiye formu */}
+            {showNomForm && (
+              <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 mb-5">
+                <h3 className="text-white text-sm font-medium mb-4">Yeni Tavsiye</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="text-gray-500 text-xs mb-1 block">Ad Soyad *</label>
+                    <input placeholder="Ahmet Yılmaz" value={nomForm.candidateName}
+                      onChange={e => setNomForm(f => ({ ...f, candidateName: e.target.value }))}
+                      className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-gray-500 text-xs mb-1 block">Email *</label>
+                    <input placeholder="ahmet@example.com" value={nomForm.candidateEmail}
+                      onChange={e => setNomForm(f => ({ ...f, candidateEmail: e.target.value }))}
+                      className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-gray-500 text-xs mb-1 block">Telefon *</label>
+                    <input placeholder="+90 555 000 00 00" value={nomForm.candidatePhone}
+                      onChange={e => setNomForm(f => ({ ...f, candidatePhone: e.target.value }))}
+                      className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-gray-500 text-xs mb-1 block">Rol</label>
+                    <select value={nomForm.candidateRole}
+                      onChange={e => setNomForm(f => ({ ...f, candidateRole: e.target.value }))}
+                      className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500">
+                      <option value="EMLAKCI">Emlakçı</option>
+                      <option value="MUTEAHHIT">Müteahhit</option>
+                      <option value="INSAAT_FIRMASI">İnşaat Firması</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <label className="text-gray-500 text-xs mb-1 block">Neden öneriyorsunuz? (isteğe bağlı)</label>
+                  <textarea placeholder="Bu kişiyi tanıyorum, sektörde deneyimli bir profesyonel..." value={nomForm.note}
+                    onChange={e => setNomForm(f => ({ ...f, note: e.target.value }))} rows={2}
+                    className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 resize-none" />
+                </div>
+                {nomError && <p className="text-red-400 text-xs mb-3">{nomError}</p>}
+                <div className="flex gap-3">
+                  <button onClick={handleNomSubmit} disabled={nomLoading}
+                    className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 text-white text-sm px-5 py-2 rounded-lg transition-colors font-medium">
+                    {nomLoading ? "Gönderiliyor..." : "Tavsiyeyi Gönder"}
+                  </button>
+                  <button onClick={() => { setShowNomForm(false); setNomError(""); }}
+                    className="text-gray-400 border border-gray-700 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors">
+                    İptal
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Tavsiye listesi */}
+            {nominations.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600 text-sm">Henüz tavsiyeniz yok.</p>
+                <p className="text-gray-700 text-xs mt-1">Platforma değer katacak profesyonelleri önerin!</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {nominations.map((nom) => (
+                  <div key={nom.id} className="flex items-center justify-between bg-gray-800 border border-gray-700 rounded-xl px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-indigo-900 rounded-full flex items-center justify-center text-xs font-semibold text-indigo-300 flex-shrink-0">
+                        {nom.candidateName[0]}
+                      </div>
+                      <div>
+                        <p className="text-white text-sm font-medium">{nom.candidateName}</p>
+                        <p className="text-gray-500 text-xs">{nom.candidateEmail}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-xs font-medium ${NOM_STATUS_COLORS[nom.status]}`}>
+                        {NOM_STATUS_LABELS[nom.status]}
+                      </span>
+                      <span className="text-gray-700 text-xs">{new Date(nom.createdAt).toLocaleDateString("tr-TR")}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Alt bilgi */}
         <div className="border-t border-gray-800 pt-6">
