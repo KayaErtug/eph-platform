@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Delete, Param, Query, Body, UseGuards } from "@nestjs/common";
+import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards } from "@nestjs/common";
 import { AdminService } from "./admin.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
@@ -25,6 +25,20 @@ export class AdminController {
   @Delete("users/:id/reject")
   rejectUser(@Param("id") id: string) { return this.adminService.rejectUser(id); }
 
+  @Patch("users/:id/suspend")
+  suspendUser(@Param("id") id: string) { return this.adminService.suspendUser(id); }
+
+  @Patch("users/:id/role")
+  changeUserRole(@Param("id") id: string, @Body() body: { role: string }) {
+    return this.adminService.changeUserRole(id, body.role);
+  }
+
+  @Post("users")
+  createUser(@Body() body: {
+    firstName: string; lastName: string; email: string;
+    phone: string; password: string; role: string;
+  }) { return this.adminService.createUser(body); }
+
   @Get("invitations")
   getInvitations() { return this.adminService.getInvitations(); }
 
@@ -43,17 +57,15 @@ export class AdminController {
   getNominations(@Query("status") status?: string) { return this.adminService.getNominations(status); }
 
   @Patch("nominations/:id/status")
-  updateNominationStatus(
-    @Param("id") id: string,
-    @Body() body: { status: string; adminNote?: string },
-  ) { return this.adminService.updateNominationStatus(id, body.status, body.adminNote); }
+  updateNominationStatus(@Param("id") id: string, @Body() body: { status: string; adminNote?: string }) {
+    return this.adminService.updateNominationStatus(id, body.status, body.adminNote);
+  }
 
   @Get("applications")
   getApplications(@Query("status") status?: string) { return this.adminService.getApplications(status); }
 
   @Patch("applications/:id/status")
-  updateApplicationStatus(
-    @Param("id") id: string,
-    @Body() body: { status: string; adminNote?: string },
-  ) { return this.adminService.updateApplicationStatus(id, body.status, body.adminNote); }
+  updateApplicationStatus(@Param("id") id: string, @Body() body: { status: string; adminNote?: string }) {
+    return this.adminService.updateApplicationStatus(id, body.status, body.adminNote);
+  }
 }

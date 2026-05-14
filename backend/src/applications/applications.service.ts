@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 
 @Injectable()
 export class ApplicationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mail: MailService,
+  ) {}
 
   async create(dto: CreateApplicationDto) {
     let referrerId: string | undefined;
@@ -16,7 +20,7 @@ export class ApplicationsService {
       if (referrer) referrerId = referrer.id;
     }
 
-    return this.prisma.application.create({
+    const application = await this.prisma.application.create({
       data: {
         applicantName: dto.applicantName,
         applicantEmail: dto.applicantEmail,
@@ -27,6 +31,18 @@ export class ApplicationsService {
         referrerId,
       },
     });
+
+    try {
+      await this.mail.sendNewApplication({
+        applicantName: dto.applicantName,
+        applicantEmail: dto.applicantEmail,
+        applicantPhone: dto.applicantPhone,
+        requestedRole: dto.requestedRole,
+        referralCode: dto.referralCode,
+      });
+    } catch {}
+
+    return application;
   }
 
   async findAll(status?: string) {

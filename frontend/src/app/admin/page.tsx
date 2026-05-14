@@ -6,79 +6,44 @@ import api from "@/lib/api";
 import Link from "next/link";
 
 interface Stats {
-  totalUsers: number;
-  pendingUsers: number;
-  approvedUsers: number;
-  totalInvitations: number;
-  pendingDocuments: number;
-  pendingNominations: number;
-  pendingApplications: number;
+  totalUsers: number; pendingUsers: number; approvedUsers: number;
+  totalInvitations: number; pendingDocuments: number;
+  pendingNominations: number; pendingApplications: number;
   byRole: { role: string; count: number }[];
 }
 
 interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  role: string;
-  isApproved: boolean;
+  id: string; firstName: string; lastName: string; email: string;
+  phone: string; role: string; isApproved: boolean;
   documents: { id: string; type: string; status: string; fileUrl: string; fileName: string }[];
 }
 
 interface Document {
-  id: string;
-  type: string;
-  status: string;
-  fileUrl: string;
-  fileName: string;
+  id: string; type: string; status: string; fileUrl: string; fileName: string;
   user?: { firstName: string; lastName: string; email: string; role: string };
 }
 
 interface Nomination {
-  id: string;
-  candidateName: string;
-  candidateEmail: string;
-  candidatePhone: string;
-  candidateRole: string;
-  note?: string;
-  status: string;
-  adminNote?: string;
-  createdAt: string;
-  nominator: { firstName: string; lastName: string; email: string; role: string };
+  id: string; candidateName: string; candidateEmail: string; candidatePhone: string;
+  candidateRole: string; note?: string; status: string; adminNote?: string;
+  createdAt: string; nominator: { firstName: string; lastName: string; email: string; role: string };
 }
 
 interface Application {
-  id: string;
-  applicantName: string;
-  applicantEmail: string;
-  applicantPhone: string;
-  requestedRole: string;
-  message?: string;
-  referralCode?: string;
-  status: string;
-  adminNote?: string;
-  createdAt: string;
+  id: string; applicantName: string; applicantEmail: string; applicantPhone: string;
+  requestedRole: string; message?: string; referralCode?: string; status: string;
+  adminNote?: string; createdAt: string;
   referrer?: { firstName: string; lastName: string; email: string; role: string };
 }
 
 interface Lead {
-  id: string;
-  fullName?: string;
-  phone?: string;
-  email?: string;
-  profession?: string;
-  city?: string;
-  interest?: string;
-  conversation?: string;
-  source: string;
-  createdAt: string;
+  id: string; fullName?: string; phone?: string; email?: string;
+  profession?: string; city?: string; interest?: string;
+  conversation?: string; source: string; createdAt: string;
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  EMLAKCI: "Emlakçı", MUTEAHHIT: "Müteahhit",
-  INSAAT_FIRMASI: "İnşaat Firması", ADMIN: "Admin"
+  EMLAKCI: "Emlakçı", MUTEAHHIT: "Müteahhit", INSAAT_FIRMASI: "İnşaat Firması", ADMIN: "Admin"
 };
 
 const ROLE_COLORS: Record<string, string> = {
@@ -136,6 +101,12 @@ export default function AdminPage() {
   const [noteModal, setNoteModal] = useState<{ type: "nomination" | "application"; id: string } | null>(null);
   const [noteText, setNoteText] = useState("");
   const [expandedLead, setExpandedLead] = useState<string | null>(null);
+  const [roleModal, setRoleModal] = useState<{ id: string; currentRole: string } | null>(null);
+  const [newRole, setNewRole] = useState("");
+  const [createUserModal, setCreateUserModal] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({ firstName: "", lastName: "", email: "", phone: "", password: "", role: "EMLAKCI" });
+  const [createUserLoading, setCreateUserLoading] = useState(false);
+  const [createUserError, setCreateUserError] = useState("");
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -161,12 +132,8 @@ export default function AdminPage() {
         api.get(`/admin/applications?status=${appFilter}`),
         api.get("/leads"),
       ]);
-      setStats(s.data);
-      setUsers(u.data);
-      setDocuments(d.data);
-      setNominations(n.data);
-      setApplications(a.data);
-      setLeads(l.data);
+      setStats(s.data); setUsers(u.data); setDocuments(d.data);
+      setNominations(n.data); setApplications(a.data); setLeads(l.data);
     } finally { setLoading(false); }
   };
 
@@ -178,7 +145,8 @@ export default function AdminPage() {
   const fetchLeads = async () => { const r = await api.get("/leads"); setLeads(r.data); };
 
   const handleApproveUser = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/users/${id}/approve`); await Promise.all([fetchUsers(), fetchStats()]); } finally { setActionLoading(null); } };
-  const handleRejectUser = async (id: string) => { if (!confirm("Emin misiniz?")) return; setActionLoading(id); try { await api.delete(`/admin/users/${id}/reject`); await Promise.all([fetchUsers(), fetchStats()]); } finally { setActionLoading(null); } };
+  const handleRejectUser = async (id: string) => { if (!confirm("Kullanıcı silinecek. Emin misiniz?")) return; setActionLoading(id); try { await api.delete(`/admin/users/${id}/reject`); await Promise.all([fetchUsers(), fetchStats()]); } finally { setActionLoading(null); } };
+  const handleSuspendUser = async (id: string) => { if (!confirm("Kullanıcı askıya alınacak. Emin misiniz?")) return; setActionLoading(id); try { await api.patch(`/admin/users/${id}/suspend`); await Promise.all([fetchUsers(), fetchStats()]); } finally { setActionLoading(null); } };
   const handleApproveDoc = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/documents/${id}/approve`); await Promise.all([fetchDocuments(), fetchStats()]); } finally { setActionLoading(null); } };
   const handleRejectDoc = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/documents/${id}/reject`); await Promise.all([fetchDocuments(), fetchStats()]); } finally { setActionLoading(null); } };
 
@@ -205,9 +173,30 @@ export default function AdminPage() {
         await api.patch(`/admin/applications/${noteModal.id}/status`, { status: applications.find(a => a.id === noteModal.id)?.status, adminNote: noteText });
         await fetchApplications();
       }
-      setNoteModal(null);
-      setNoteText("");
+      setNoteModal(null); setNoteText("");
     } finally { setActionLoading(null); }
+  };
+
+  const handleChangeRole = async () => {
+    if (!roleModal || !newRole) return;
+    setActionLoading(roleModal.id);
+    try { await api.patch(`/admin/users/${roleModal.id}/role`, { role: newRole }); await fetchUsers(); setRoleModal(null); setNewRole(""); }
+    finally { setActionLoading(null); }
+  };
+
+  const handleCreateUser = async () => {
+    if (!createUserForm.firstName || !createUserForm.lastName || !createUserForm.email || !createUserForm.phone || !createUserForm.password) {
+      setCreateUserError("Tüm alanlar zorunludur."); return;
+    }
+    setCreateUserLoading(true); setCreateUserError("");
+    try {
+      await api.post("/admin/users", createUserForm);
+      setCreateUserModal(false);
+      setCreateUserForm({ firstName: "", lastName: "", email: "", phone: "", password: "", role: "EMLAKCI" });
+      await Promise.all([fetchUsers(), fetchStats()]);
+    } catch (e: any) {
+      setCreateUserError(e?.response?.data?.message || "Bir hata oluştu.");
+    } finally { setCreateUserLoading(false); }
   };
 
   if (!hydrated || loading) return (
@@ -219,6 +208,7 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
 
+      {/* Not Modal */}
       {noteModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md">
@@ -231,6 +221,71 @@ export default function AdminPage() {
                 {actionLoading === noteModal.id ? "..." : "Kaydet"}
               </button>
               <button onClick={() => { setNoteModal(null); setNoteText(""); }}
+                className="text-gray-400 border border-gray-700 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors">
+                İptal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rol Değiştir Modal */}
+      {roleModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="text-white font-medium mb-4">Rol Değiştir</h3>
+            <select value={newRole} onChange={e => setNewRole(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 mb-4">
+              <option value="">Rol Seçin</option>
+              <option value="EMLAKCI">Emlakçı</option>
+              <option value="MUTEAHHIT">Müteahhit</option>
+              <option value="INSAAT_FIRMASI">İnşaat Firması</option>
+            </select>
+            <div className="flex gap-3">
+              <button onClick={handleChangeRole} disabled={!newRole || actionLoading === roleModal.id}
+                className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-sm px-5 py-2 rounded-lg transition-colors font-medium">
+                {actionLoading === roleModal.id ? "..." : "Değiştir"}
+              </button>
+              <button onClick={() => { setRoleModal(null); setNewRole(""); }}
+                className="text-gray-400 border border-gray-700 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors">
+                İptal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manuel Üye Ekle Modal */}
+      {createUserModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-white font-medium mb-4">Manuel Üye Ekle</h3>
+            <div className="flex flex-col gap-3 mb-4">
+              {[
+                { ph: "Ad", key: "firstName" }, { ph: "Soyad", key: "lastName" },
+                { ph: "Email", key: "email" }, { ph: "Telefon", key: "phone" },
+                { ph: "Şifre", key: "password" },
+              ].map(({ ph, key }) => (
+                <input key={key} placeholder={ph} type={key === "password" ? "password" : "text"}
+                  value={createUserForm[key as keyof typeof createUserForm]}
+                  onChange={e => setCreateUserForm(f => ({ ...f, [key]: e.target.value }))}
+                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500" />
+              ))}
+              <select value={createUserForm.role} onChange={e => setCreateUserForm(f => ({ ...f, role: e.target.value }))}
+                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500">
+                <option value="EMLAKCI">Emlakçı</option>
+                <option value="MUTEAHHIT">Müteahhit</option>
+                <option value="INSAAT_FIRMASI">İnşaat Firması</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </div>
+            {createUserError && <p className="text-red-400 text-xs mb-3">{createUserError}</p>}
+            <div className="flex gap-3">
+              <button onClick={handleCreateUser} disabled={createUserLoading}
+                className="bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-sm px-5 py-2 rounded-lg transition-colors font-medium">
+                {createUserLoading ? "Ekleniyor..." : "Ekle"}
+              </button>
+              <button onClick={() => { setCreateUserModal(false); setCreateUserError(""); }}
                 className="text-gray-400 border border-gray-700 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors">
                 İptal
               </button>
@@ -263,9 +318,16 @@ export default function AdminPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-white mb-1">Admin Paneli</h1>
-          <p className="text-gray-500 text-sm">Üye ve belge yönetimi</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-white mb-1">Admin Paneli</h1>
+            <p className="text-gray-500 text-sm">Üye ve belge yönetimi</p>
+          </div>
+          <button onClick={() => setCreateUserModal(true)}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white text-sm px-4 py-2 rounded-lg transition-colors font-medium">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Manuel Üye Ekle
+          </button>
         </div>
 
         {/* Stats */}
@@ -318,37 +380,22 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6 flex-wrap">
-          <button onClick={() => setActiveTab("users")}
-            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors ${activeTab === "users" ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
-            Kullanıcılar
-          </button>
-          <button onClick={() => setActiveTab("documents")}
-            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === "documents" ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
-            Belgeler
-            {stats && stats.pendingDocuments > 0 && (
-              <span className="bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{stats.pendingDocuments}</span>
-            )}
-          </button>
-          <button onClick={() => setActiveTab("nominations")}
-            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === "nominations" ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
-            Tavsiyeler
-            {stats && stats.pendingNominations > 0 && (
-              <span className="bg-purple-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{stats.pendingNominations}</span>
-            )}
-          </button>
-          <button onClick={() => setActiveTab("applications")}
-            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === "applications" ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
-            Başvurular
-            {stats && stats.pendingApplications > 0 && (
-              <span className="bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{stats.pendingApplications}</span>
-            )}
-          </button>
+          {[
+            { key: "users", label: "Kullanıcılar", badge: null },
+            { key: "documents", label: "Belgeler", badge: stats?.pendingDocuments },
+            { key: "nominations", label: "Tavsiyeler", badge: stats?.pendingNominations },
+            { key: "applications", label: "Başvurular", badge: stats?.pendingApplications },
+          ].map(t => (
+            <button key={t.key} onClick={() => setActiveTab(t.key as any)}
+              className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === t.key ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
+              {t.label}
+              {t.badge && t.badge > 0 && <span className="bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{t.badge}</span>}
+            </button>
+          ))}
           <button onClick={() => { setActiveTab("leads"); fetchLeads(); }}
             className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === "leads" ? "bg-rose-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
             🤖 Lina Leads
-            {leads.length > 0 && (
-              <span className="bg-rose-500 text-white text-xs rounded-full px-2 py-0.5">{leads.length}</span>
-            )}
+            {leads.length > 0 && <span className="bg-rose-500 text-white text-xs rounded-full px-2 py-0.5">{leads.length}</span>}
           </button>
         </div>
 
@@ -371,37 +418,56 @@ export default function AdminPage() {
             ) : (
               <div className="divide-y divide-gray-800">
                 {users.map((u) => (
-                  <div key={u.id} className="px-6 py-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0">
-                        {u.firstName[0]}{u.lastName[0]}
+                  <div key={u.id} className="px-6 py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0">
+                          {u.firstName[0]}{u.lastName[0]}
+                        </div>
+                        <div>
+                          <p className="text-white font-medium text-sm">{u.firstName} {u.lastName}</p>
+                          <p className="text-gray-500 text-xs">{u.email}</p>
+                          <p className="text-gray-600 text-xs">{u.phone}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-white font-medium text-sm">{u.firstName} {u.lastName}</p>
-                        <p className="text-gray-500 text-xs">{u.email}</p>
-                        <p className="text-gray-600 text-xs">{u.phone}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`border rounded-full px-3 py-1 text-xs font-medium ${ROLE_COLORS[u.role]}`}>{ROLE_LABELS[u.role]}</span>
-                      {u.documents?.length > 0 && <span className="text-gray-600 text-xs">{u.documents.length} belge</span>}
-                      {!u.isApproved ? (
-                        <div className="flex gap-2">
+                      <div className="flex flex-wrap items-center gap-2 justify-end">
+                        <span className={`border rounded-full px-3 py-1 text-xs font-medium ${ROLE_COLORS[u.role]}`}>{ROLE_LABELS[u.role]}</span>
+                        {u.documents?.length > 0 && <span className="text-gray-600 text-xs">{u.documents.length} belge</span>}
+                        <span className={`text-xs ${u.isApproved ? "text-green-400" : "text-yellow-400"}`}>
+                          {u.isApproved ? "✓ Onaylı" : "⏳ Bekliyor"}
+                        </span>
+
+                        {/* Onay / Askıya Al */}
+                        {!u.isApproved ? (
                           <button onClick={() => handleApproveUser(u.id)} disabled={actionLoading === u.id}
                             className="bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
                             {actionLoading === u.id ? "..." : "Onayla"}
                           </button>
-                          <button onClick={() => handleRejectUser(u.id)} disabled={actionLoading === u.id}
-                            className="bg-red-950 hover:bg-red-900 border border-red-900 disabled:bg-gray-700 text-red-400 text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
-                            {actionLoading === u.id ? "..." : "Reddet"}
+                        ) : (
+                          u.role !== "ADMIN" && (
+                            <button onClick={() => handleSuspendUser(u.id)} disabled={actionLoading === u.id}
+                              className="bg-yellow-950 hover:bg-yellow-900 border border-yellow-800 text-yellow-400 text-xs px-3 py-1.5 rounded-lg transition-colors">
+                              {actionLoading === u.id ? "..." : "Askıya Al"}
+                            </button>
+                          )
+                        )}
+
+                        {/* Rol Değiştir */}
+                        {u.role !== "ADMIN" && (
+                          <button onClick={() => { setRoleModal({ id: u.id, currentRole: u.role }); setNewRole(u.role); }}
+                            className="bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs px-3 py-1.5 rounded-lg transition-colors">
+                            Rol Değiştir
                           </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-green-400 text-xs">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                          Onaylandı
-                        </div>
-                      )}
+                        )}
+
+                        {/* Sil */}
+                        {u.role !== "ADMIN" && (
+                          <button onClick={() => handleRejectUser(u.id)} disabled={actionLoading === u.id}
+                            className="bg-red-950 hover:bg-red-900 border border-red-900 text-red-400 text-xs px-3 py-1.5 rounded-lg transition-colors">
+                            {actionLoading === u.id ? "..." : "Sil"}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -501,16 +567,12 @@ export default function AdminPage() {
                           </div>
                           {nom.note && <p className="text-gray-500 text-xs mt-2 italic">"{nom.note}"</p>}
                           {nom.adminNote && <p className="text-yellow-600 text-xs mt-1">📝 {nom.adminNote}</p>}
-                          <p className="text-gray-700 text-xs mt-2">
-                            Öneren: {nom.nominator.firstName} {nom.nominator.lastName} · {ROLE_LABELS[nom.nominator.role]} · {new Date(nom.createdAt).toLocaleDateString("tr-TR")}
-                          </p>
+                          <p className="text-gray-700 text-xs mt-2">Öneren: {nom.nominator.firstName} {nom.nominator.lastName} · {new Date(nom.createdAt).toLocaleDateString("tr-TR")}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <button onClick={() => { setNoteModal({ type: "nomination", id: nom.id }); setNoteText(nom.adminNote || ""); }}
-                          className="text-gray-400 border border-gray-700 hover:text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
-                          Not
-                        </button>
+                          className="text-gray-400 border border-gray-700 hover:text-white text-xs px-3 py-1.5 rounded-lg transition-colors">Not</button>
                         {nom.status === "PENDING" && (
                           <>
                             <button onClick={() => handleNominationStatus(nom.id, "APPROVED")} disabled={actionLoading === nom.id}
@@ -573,19 +635,13 @@ export default function AdminPage() {
                           </div>
                           {app.message && <p className="text-gray-500 text-xs mt-2 italic">"{app.message}"</p>}
                           {app.adminNote && <p className="text-yellow-600 text-xs mt-1">📝 {app.adminNote}</p>}
-                          {app.referrer && (
-                            <p className="text-gray-700 text-xs mt-1">
-                              Referans: {app.referrer.firstName} {app.referrer.lastName} · {ROLE_LABELS[app.referrer.role]}
-                            </p>
-                          )}
+                          {app.referrer && <p className="text-gray-700 text-xs mt-1">Referans: {app.referrer.firstName} {app.referrer.lastName}</p>}
                           <p className="text-gray-700 text-xs mt-1">{new Date(app.createdAt).toLocaleDateString("tr-TR")}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <button onClick={() => { setNoteModal({ type: "application", id: app.id }); setNoteText(app.adminNote || ""); }}
-                          className="text-gray-400 border border-gray-700 hover:text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
-                          Not
-                        </button>
+                          className="text-gray-400 border border-gray-700 hover:text-white text-xs px-3 py-1.5 rounded-lg transition-colors">Not</button>
                         {app.status === "PENDING" && (
                           <>
                             <button onClick={() => handleApplicationStatus(app.id, "APPROVED")} disabled={actionLoading === app.id}
@@ -621,85 +677,55 @@ export default function AdminPage() {
                 <h2 className="font-medium text-white">Lina Leads</h2>
                 <span className="bg-rose-900 text-rose-300 border border-rose-800 text-xs px-2.5 py-0.5 rounded-full">{leads.length} lead</span>
               </div>
-              <button onClick={fetchLeads} className="text-gray-400 border border-gray-700 hover:text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
-                Yenile
-              </button>
+              <button onClick={fetchLeads} className="text-gray-400 border border-gray-700 hover:text-white text-xs px-3 py-1.5 rounded-lg transition-colors">Yenile</button>
             </div>
             {leads.length === 0 ? (
               <div className="px-6 py-12 text-center">
                 <p className="text-gray-600 text-sm">Henüz Lina'dan lead gelmedi.</p>
-                <p className="text-gray-700 text-xs mt-2">Lina ile konuşan kullanıcıların bilgileri burada görünecek.</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-800">
                 {leads.map((lead) => (
                   <div key={lead.id} className="px-6 py-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 bg-rose-900 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 text-rose-300">
-                          {lead.fullName ? lead.fullName[0].toUpperCase() : "?"}
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 bg-rose-900 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 text-rose-300">
+                        {lead.fullName ? lead.fullName[0].toUpperCase() : "?"}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-white font-medium text-sm">{lead.fullName || "İsimsiz"}</p>
+                          <span className="bg-rose-950 text-rose-400 border border-rose-900 text-xs px-2 py-0.5 rounded-full">🤖 {lead.source}</span>
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="text-white font-medium text-sm">{lead.fullName || "İsimsiz"}</p>
-                            <span className="bg-rose-950 text-rose-400 border border-rose-900 text-xs px-2 py-0.5 rounded-full">🤖 {lead.source}</span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
-                            {lead.phone && (
-                              <p className="text-gray-500 text-xs flex items-center gap-1">
-                                <span className="text-gray-600">📞</span> {lead.phone}
-                              </p>
-                            )}
-                            {lead.email && (
-                              <p className="text-gray-500 text-xs flex items-center gap-1">
-                                <span className="text-gray-600">✉️</span> {lead.email}
-                              </p>
-                            )}
-                            {lead.profession && (
-                              <p className="text-gray-500 text-xs flex items-center gap-1">
-                                <span className="text-gray-600">💼</span> {lead.profession}
-                              </p>
-                            )}
-                            {lead.city && (
-                              <p className="text-gray-500 text-xs flex items-center gap-1">
-                                <span className="text-gray-600">📍</span> {lead.city}
-                              </p>
-                            )}
-                            {lead.interest && (
-                              <p className="text-gray-500 text-xs flex items-center gap-1 col-span-2">
-                                <span className="text-gray-600">🎯</span> {lead.interest}
-                              </p>
-                            )}
-                          </div>
-                          <p className="text-gray-700 text-xs mt-2">{new Date(lead.createdAt).toLocaleDateString("tr-TR")} · {new Date(lead.createdAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</p>
-
-                          {lead.conversation && (
-                            <button
-                              onClick={() => setExpandedLead(expandedLead === lead.id ? null : lead.id)}
-                              className="text-rose-400 text-xs mt-2 hover:text-rose-300 transition-colors">
-                              {expandedLead === lead.id ? "▲ Konuşmayı gizle" : "▼ Konuşmayı gör"}
-                            </button>
-                          )}
-
-                          {expandedLead === lead.id && lead.conversation && (
-                            <div className="mt-3 bg-gray-800 rounded-lg p-3 max-h-48 overflow-y-auto">
-                              {(() => {
-                                try {
-                                  const msgs = JSON.parse(lead.conversation);
-                                  return msgs.map((m: { role: string; content: string }, i: number) => (
-                                    <div key={i} className={`mb-2 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                                      <div className={`text-xs px-3 py-1.5 rounded-lg max-w-xs ${m.role === "user" ? "bg-blue-900 text-blue-200" : "bg-gray-700 text-gray-300"}`}>
-                                        {m.content}
-                                      </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
+                          {lead.phone && <p className="text-gray-500 text-xs">📞 {lead.phone}</p>}
+                          {lead.email && <p className="text-gray-500 text-xs">✉️ {lead.email}</p>}
+                          {lead.profession && <p className="text-gray-500 text-xs">💼 {lead.profession}</p>}
+                          {lead.city && <p className="text-gray-500 text-xs">📍 {lead.city}</p>}
+                          {lead.interest && <p className="text-gray-500 text-xs col-span-2">🎯 {lead.interest}</p>}
+                        </div>
+                        <p className="text-gray-700 text-xs mt-2">{new Date(lead.createdAt).toLocaleDateString("tr-TR")} · {new Date(lead.createdAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</p>
+                        {lead.conversation && (
+                          <button onClick={() => setExpandedLead(expandedLead === lead.id ? null : lead.id)}
+                            className="text-rose-400 text-xs mt-2 hover:text-rose-300 transition-colors">
+                            {expandedLead === lead.id ? "▲ Konuşmayı gizle" : "▼ Konuşmayı gör"}
+                          </button>
+                        )}
+                        {expandedLead === lead.id && lead.conversation && (
+                          <div className="mt-3 bg-gray-800 rounded-lg p-3 max-h-48 overflow-y-auto">
+                            {(() => {
+                              try {
+                                const msgs = JSON.parse(lead.conversation);
+                                return msgs.map((m: { role: string; content: string }, i: number) => (
+                                  <div key={i} className={`mb-2 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                                    <div className={`text-xs px-3 py-1.5 rounded-lg max-w-xs ${m.role === "user" ? "bg-blue-900 text-blue-200" : "bg-gray-700 text-gray-300"}`}>
+                                      {m.content}
                                     </div>
-                                  ));
-                                } catch {
-                                  return <p className="text-gray-500 text-xs">{lead.conversation}</p>;
-                                }
-                              })()}
-                            </div>
-                          )}
-                        </div>
+                                  </div>
+                                ));
+                              } catch { return <p className="text-gray-500 text-xs">{lead.conversation}</p>; }
+                            })()}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -708,7 +734,6 @@ export default function AdminPage() {
             )}
           </div>
         )}
-
       </div>
     </div>
   );

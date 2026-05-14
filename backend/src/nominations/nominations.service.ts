@@ -1,10 +1,14 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail.service';
 import { CreateNominationDto } from './dto/create-nomination.dto';
 
 @Injectable()
 export class NominationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mail: MailService,
+  ) {}
 
   async create(nominatorId: string, dto: CreateNominationDto) {
     const nominator = await this.prisma.user.findUnique({ where: { id: nominatorId } });
@@ -25,6 +29,17 @@ export class NominationsService {
       where: { id: nominatorId },
       data: { nominationQuota: { decrement: 1 } },
     });
+
+    try {
+      await this.mail.sendNewNomination({
+        candidateName: dto.candidateName,
+        candidateEmail: dto.candidateEmail,
+        candidatePhone: dto.candidatePhone,
+        candidateRole: dto.candidateRole,
+        nominatorName: `${nominator.firstName} ${nominator.lastName}`,
+        note: dto.note,
+      });
+    } catch {}
 
     return nomination;
   }

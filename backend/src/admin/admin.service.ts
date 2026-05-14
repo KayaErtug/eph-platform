@@ -1,9 +1,14 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { MailService } from "../mail.service";
+import * as bcrypt from "bcryptjs";
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mail: MailService,
+  ) {}
 
   async getStats() {
     const totalUsers = await this.prisma.user.count();
@@ -21,49 +26,21 @@ export class AdminService {
     });
 
     return {
-      totalUsers,
-      pendingUsers,
-      approvedUsers,
-      totalInvitations,
-      usedInvitations,
-      pendingDocuments,
-      pendingNominations,
-      pendingApplications,
+      totalUsers, pendingUsers, approvedUsers, totalInvitations,
+      usedInvitations, pendingDocuments, pendingNominations, pendingApplications,
       byRole: byRole.map((r) => ({ role: r.role, count: r._count.role })),
     };
   }
 
   async getUsers(filter?: "pending" | "approved" | "all") {
-    const where =
-      filter === "pending" ? { isApproved: false }
-      : filter === "approved" ? { isApproved: true }
-      : {};
-
+    const where = filter === "pending" ? { isApproved: false } : filter === "approved" ? { isApproved: true } : {};
     return this.prisma.user.findMany({
       where,
       select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        role: true,
-        isApproved: true,
-        isVerified: true,
-        nominationPoints: true,
-        nominationQuota: true,
-        referralCode: true,
-        createdAt: true,
-        documents: {
-          select: {
-            id: true,
-            type: true,
-            status: true,
-            fileUrl: true,
-            fileName: true,
-            createdAt: true,
-          },
-        },
+        id: true, firstName: true, lastName: true, email: true, phone: true,
+        role: true, isApproved: true, isVerified: true,
+        nominationPoints: true, nominationQuota: true, referralCode: true, createdAt: true,
+        documents: { select: { id: true, type: true, status: true, fileUrl: true, fileName: true, createdAt: true } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -72,11 +49,12 @@ export class AdminService {
   async approveUser(id: string) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException("Kullanici bulunamadi.");
-    return this.prisma.user.update({
-      where: { id },
-      data: { isApproved: true },
+    const updated = await this.prisma.user.update({
+      where: { id }, data: { isApproved: true },
       select: { id: true, firstName: true, lastName: true, email: true, role: true, isApproved: true },
     });
+    try { await this.mail.sendUserApproved(user.email, user.firstName); } catch {}
+    return updated;
   }
 
   async rejectUser(id: string) {
@@ -85,24 +63,57 @@ export class AdminService {
     return this.prisma.user.delete({ where: { id } });
   }
 
+  async suspendUser(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException("Kullanici bulunamadi.");
+    if (user.role === "ADMIN") throw new BadRequestException("Admin askıya alınamaz.");
+    const updated = await this.prisma.user.update({
+      where: { id }, data: { isApproved: false },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true, isApproved: true },
+    });
+    try { await this.mail.sendUserSuspended(user.email, user.firstName); } catch {}
+    return updated;
+  }
+
+  async changeUserRole(id: string, role: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException("Kullanici bulunamadi.");
+    if (user.role === "ADMIN") throw new BadRequestException("Admin rolü değiştirilemez.");
+    return this.prisma.user.update({
+      where: { id }, data: { role: role as any },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true, isApproved: true },
+    });
+  }
+
+  async createUser(data: {
+    firstName: string; lastName: string; email: string;
+    phone: string; password: string; role: string;
+  }) {
+    const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
+    if (existing) throw new BadRequestException("Bu email zaten kayıtlı.");
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    return this.prisma.user.create({
+      data: {
+        firstName: data.firstName, lastName: data.lastName,
+        email: data.email, phone: data.phone,
+        passwordHash, role: data.role as any,
+        isApproved: true, isVerified: true,
+      },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true, isApproved: true },
+    });
+  }
+
   async getInvitations() {
     return this.prisma.invitation.findMany({ orderBy: { createdAt: "desc" } });
   }
 
   async getDocuments(filter?: "pending" | "approved" | "rejected" | "all") {
-    const where =
-      filter === "pending" ? { status: "PENDING" as const }
+    const where = filter === "pending" ? { status: "PENDING" as const }
       : filter === "approved" ? { status: "APPROVED" as const }
-      : filter === "rejected" ? { status: "REJECTED" as const }
-      : {};
-
+      : filter === "rejected" ? { status: "REJECTED" as const } : {};
     return this.prisma.document.findMany({
       where,
-      include: {
-        user: {
-          select: { id: true, firstName: true, lastName: true, email: true, role: true },
-        },
-      },
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } } },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -123,11 +134,7 @@ export class AdminService {
     const where = status && status !== "all" ? { status: status as any } : {};
     return this.prisma.nomination.findMany({
       where,
-      include: {
-        nominator: {
-          select: { id: true, firstName: true, lastName: true, email: true, role: true },
-        },
-      },
+      include: { nominator: { select: { id: true, firstName: true, lastName: true, email: true, role: true } } },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -135,19 +142,16 @@ export class AdminService {
   async updateNominationStatus(id: string, status: string, adminNote?: string) {
     const nomination = await this.prisma.nomination.findUnique({ where: { id } });
     if (!nomination) throw new NotFoundException("Tavsiye bulunamadi.");
-
     const updated = await this.prisma.nomination.update({
       where: { id },
       data: { status: status as any, ...(adminNote !== undefined && { adminNote }) },
     });
-
     if (status === "APPROVED") {
       await this.prisma.user.update({
         where: { id: nomination.nominatorId },
         data: { nominationPoints: { increment: 1 } },
       });
     }
-
     return updated;
   }
 
@@ -155,11 +159,7 @@ export class AdminService {
     const where = status && status !== "all" ? { status: status as any } : {};
     return this.prisma.application.findMany({
       where,
-      include: {
-        referrer: {
-          select: { id: true, firstName: true, lastName: true, email: true, role: true },
-        },
-      },
+      include: { referrer: { select: { id: true, firstName: true, lastName: true, email: true, role: true } } },
       orderBy: [{ referrerId: "desc" }, { createdAt: "desc" }],
     });
   }
@@ -167,19 +167,16 @@ export class AdminService {
   async updateApplicationStatus(id: string, status: string, adminNote?: string) {
     const application = await this.prisma.application.findUnique({ where: { id } });
     if (!application) throw new NotFoundException("Basvuru bulunamadi.");
-
     const updated = await this.prisma.application.update({
       where: { id },
       data: { status: status as any, ...(adminNote !== undefined && { adminNote }) },
     });
-
     if (status === "REGISTERED" && application.referrerId) {
       await this.prisma.user.update({
         where: { id: application.referrerId },
         data: { nominationPoints: { increment: 1 } },
       });
     }
-
     return updated;
   }
 }
