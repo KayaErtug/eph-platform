@@ -72,13 +72,42 @@ function AiChat() {
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState(false);
   const [bubble, setBubble] = useState(false);
+  const [glowing, setGlowing] = useState(false);
 
   useEffect(() => {
+    // 5 saniye sonra görün
     const t1 = setTimeout(() => setShown(true), 5000);
+    // 6.5 saniye sonra balon çık
     const t2 = setTimeout(() => setBubble(true), 6500);
+    // 11 saniye sonra balon kapat
     const t3 = setTimeout(() => setBubble(false), 11000);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    // 5 saniye sonra parlama başlasın
+    const t4 = setTimeout(() => setGlowing(true), 5000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
   }, []);
+
+  // 10sn parlasın 20sn dursun döngüsü
+  useEffect(() => {
+    if (!glowing) return;
+    // İlk 10sn parlıyor (glowing=true zaten)
+    const stop = setTimeout(() => setGlowing(false), 10000);
+    return () => clearTimeout(stop);
+  }, []);
+
+  useEffect(() => {
+    if (glowing) return;
+    if (!shown) return;
+    // 20sn dur sonra tekrar parlat
+    const restart = setTimeout(() => setGlowing(true), 20000);
+    return () => clearTimeout(restart);
+  }, [glowing, shown]);
+
+  useEffect(() => {
+    if (!glowing) return;
+    // 10sn parlayınca durdur
+    const stop = setTimeout(() => setGlowing(false), 10000);
+    return () => clearTimeout(stop);
+  }, [glowing]);
 
   if (!shown) return null;
 
@@ -86,50 +115,40 @@ function AiChat() {
     <>
       <style>{`
         @keyframes neonPulse {
-          0% { box-shadow: 0 0 0 0 rgba(232,56,13,0.8), 0 0 0 0 rgba(255,100,50,0.6), 0 0 20px rgba(232,56,13,0.4); }
-          50% { box-shadow: 0 0 0 12px rgba(232,56,13,0), 0 0 0 24px rgba(255,100,50,0), 0 0 40px rgba(232,56,13,0.6); }
-          100% { box-shadow: 0 0 0 0 rgba(232,56,13,0.8), 0 0 0 0 rgba(255,100,50,0.6), 0 0 20px rgba(232,56,13,0.4); }
+          0% { box-shadow: 0 0 0 0 rgba(232,56,13,0.9), 0 0 15px rgba(232,56,13,0.5); }
+          50% { box-shadow: 0 0 0 14px rgba(232,56,13,0), 0 0 40px rgba(232,56,13,0.7); }
+          100% { box-shadow: 0 0 0 0 rgba(232,56,13,0.9), 0 0 15px rgba(232,56,13,0.5); }
         }
         @keyframes neonRing {
-          0% { transform: scale(1); opacity: 0.8; }
-          100% { transform: scale(2.2); opacity: 0; }
+          0% { transform: scale(1); opacity: 0.9; }
+          100% { transform: scale(2.4); opacity: 0; }
         }
         @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          30% { transform: translateY(-12px); }
-          60% { transform: translateY(-6px); }
+          0%,100%{transform:translateY(0)}
+          30%{transform:translateY(-14px)}
+          60%{transform:translateY(-6px)}
         }
         @keyframes slideInBubble {
-          from { opacity: 0; transform: translateX(20px); }
-          to { opacity: 1; transform: translateX(0); }
+          from{opacity:0;transform:translateX(20px)}
+          to{opacity:1;transform:translateX(0)}
         }
         @keyframes avatarAppear {
-          from { opacity: 0; transform: scale(0.5) translateY(30px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
+          from{opacity:0;transform:scale(0.4) translateY(40px)}
+          to{opacity:1;transform:scale(1) translateY(0)}
         }
-        .ai-avatar-btn {
-          animation: avatarAppear 0.6s cubic-bezier(0.34,1.56,0.64,1) both, bounce 1s ease 1s 3, neonPulse 2s ease-in-out 4s infinite;
+        .ai-avatar-img {
+          animation: avatarAppear 0.7s cubic-bezier(0.34,1.56,0.64,1) both, bounce 1s ease 1s 3;
+          width: 90px; height: 90px; border-radius: 50%; object-fit: cover;
+          border: 3px solid #E8380D; display: block; position: relative; z-index: 2;
         }
-        .neon-ring {
-          position: absolute; inset: -8px; border-radius: 50%;
-          border: 2px solid #E8380D;
-          animation: neonRing 1.5s ease-out infinite;
-        }
-        .neon-ring-2 {
-          position: absolute; inset: -8px; border-radius: 50%;
-          border: 2px solid #FF6B35;
-          animation: neonRing 1.5s ease-out 0.5s infinite;
-        }
-        .neon-ring-3 {
-          position: absolute; inset: -8px; border-radius: 50%;
-          border: 2px solid #FFB347;
-          animation: neonRing 1.5s ease-out 1s infinite;
-        }
+        .neon-ring { position:absolute;inset:-8px;border-radius:50%;border:2.5px solid #E8380D;animation:neonRing 1.5s ease-out infinite; }
+        .neon-ring-2 { position:absolute;inset:-8px;border-radius:50%;border:2px solid #FF6B35;animation:neonRing 1.5s ease-out 0.5s infinite; }
+        .neon-ring-3 { position:absolute;inset:-8px;border-radius:50%;border:2px solid #FFB347;animation:neonRing 1.5s ease-out 1s infinite; }
+        .neon-glow { animation: neonPulse 1.5s ease-in-out infinite !important; }
       `}</style>
 
       <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 999, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
 
-        {/* Konuşma balonu */}
         {bubble && !open && (
           <div style={{ background: "#fff", border: "1px solid #E5E7EB", borderRadius: "16px 16px 4px 16px", padding: "12px 16px", fontSize: 13, color: "#374151", boxShadow: "0 8px 32px rgba(0,0,0,0.15)", maxWidth: 220, lineHeight: 1.6, animation: "slideInBubble 0.4s ease", fontWeight: 500 }}>
             👋 Merhaba! Size nasıl yardımcı olabilirim?
@@ -137,23 +156,24 @@ function AiChat() {
           </div>
         )}
 
-        {/* Avatar butonu */}
         <div style={{ position: "relative", cursor: "pointer" }} onClick={() => { setOpen(v => !v); setBubble(false); }}>
-          <div className="neon-ring" />
-          <div className="neon-ring-2" />
-          <div className="neon-ring-3" />
+          {glowing && (
+            <>
+              <div className="neon-ring" />
+              <div className="neon-ring-2" />
+              <div className="neon-ring-3" />
+            </>
+          )}
           <img
             src={AVATAR}
             alt="EPH Asistan"
-            className="ai-avatar-btn"
-            style={{ width: 90, height: 90, borderRadius: "50%", objectFit: "cover", border: "3px solid #E8380D", display: "block", position: "relative", zIndex: 2 }}
+            className={`ai-avatar-img${glowing ? " neon-glow" : ""}`}
           />
           <div style={{ position: "absolute", bottom: 4, right: 4, width: 18, height: 18, background: "#22C55E", borderRadius: "50%", border: "3px solid #fff", zIndex: 3 }} />
         </div>
 
-        {/* Chat penceresi */}
         {open && (
-          <div style={{ position: "absolute", bottom: 105, right: 0, width: 320, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden", animation: "slideInBubble 0.3s ease" }}>
+          <div style={{ position: "absolute", bottom: 110, right: 0, width: 320, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden", animation: "slideInBubble 0.3s ease" }}>
             <div style={{ background: "#E8380D", padding: "16px 18px", display: "flex", alignItems: "center", gap: 12 }}>
               <img src={AVATAR} alt="Asistan" style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,0.5)" }} />
               <div>
