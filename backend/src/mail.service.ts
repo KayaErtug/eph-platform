@@ -71,26 +71,30 @@ export class MailService {
     });
   }
 
-  async sendApplicationInvited(email: string, name: string) {
+  async sendApplicationInvited(email: string, name: string, inviteCode: string) {
+    const kayitLink = `https://emlakportfoyhavuzu.com/kayit?davet=${inviteCode}`;
     await this.transporter.sendMail({
       from: '"EPH Platform" <bildirim@emlakportfoyhavuzu.com>',
       to: email,
-      subject: '🎉 EPH Platform - Davetiniz Hazır!',
+      subject: '🎉 EPH Platform - Davet Kodunuz Hazır!',
       html: `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
           <div style="background:#E8380D;padding:20px;border-radius:8px 8px 0 0;">
-            <h2 style="color:#fff;margin:0;">Davetiniz Hazır! 🚀</h2>
+            <h2 style="color:#fff;margin:0;">Davet Kodunuz Hazır! 🚀</h2>
           </div>
           <div style="background:#f9f9f9;padding:24px;border-radius:0 0 8px 8px;border:1px solid #eee;">
             <p>Merhaba <strong>${name}</strong>,</p>
-            <p>EPH Platform'a katılmaya davet edildiniz! Aşağıdaki butona tıklayarak kayıt işleminizi tamamlayabilirsiniz.</p>
-            <div style="background:#FFF0ED;border:1px solid #FECDC5;border-radius:8px;padding:16px;margin:20px 0;">
-              <p style="margin:0;color:#666;font-size:13px;">Kayıt olmak için aşağıdaki linki kullanın:</p>
+            <p>EPH Platform'a katılmaya davet edildiniz! Aşağıdaki davet kodunuzu kullanarak kayıt işleminizi tamamlayabilirsiniz.</p>
+            <div style="background:#FFF0ED;border:2px dashed #E8380D;border-radius:8px;padding:20px;margin:20px 0;text-align:center;">
+              <p style="margin:0 0 8px;color:#666;font-size:13px;">Davet Kodunuz</p>
+              <p style="margin:0;color:#E8380D;font-size:28px;font-weight:700;letter-spacing:3px;font-family:monospace;">${inviteCode}</p>
             </div>
-            <div style="margin-top:20px;">
-              <a href="https://emlakportfoyhavuzu.com/kayit" style="background:#E8380D;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Kayıt Ol →</a>
+            <p style="color:#666;font-size:13px;">Veya aşağıdaki butona tıklayarak davet kodunuz otomatik girilmiş şekilde kayıt sayfasına ulaşabilirsiniz:</p>
+            <div style="margin-top:16px;text-align:center;">
+              <a href="${kayitLink}" style="background:#E8380D;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Kayıt Ol →</a>
             </div>
-            <p style="color:#666;font-size:12px;margin-top:24px;">Herhangi bir sorunuz için: info@emlakportfoyhavuzu.com</p>
+            <p style="color:#999;font-size:11px;margin-top:24px;">Bu davet kodu 30 gün geçerlidir ve yalnızca 1 kez kullanılabilir.</p>
+            <p style="color:#666;font-size:12px;">Herhangi bir sorunuz için: info@emlakportfoyhavuzu.com</p>
           </div>
         </div>
       `,

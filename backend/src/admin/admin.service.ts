@@ -10,6 +10,12 @@ export class AdminService {
     private mail: MailService,
   ) {}
 
+  private generateInviteCode(): string {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const part = (len: number) => Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    return `EMK-${part(4)}-${part(4)}`;
+  }
+
   async getStats() {
     const totalUsers = await this.prisma.user.count();
     const pendingUsers = await this.prisma.user.count({ where: { isApproved: false } });
@@ -163,24 +169,59 @@ export class AdminService {
   async updateApplicationStatus(id: string, status: string, adminNote?: string) {
     const application = await this.prisma.application.findUnique({ where: { id } });
     if (!application) throw new NotFoundException("Basvuru bulunamadi.");
+
     const updated = await this.prisma.application.update({
       where: { id },
       data: { status: status as any, ...(adminNote !== undefined && { adminNote }) },
     });
+
     try {
       if (status === "APPROVED") {
-        await this.mail.sendApplicationApproved(application.applicantEmail, application.applicantName);
+        await this.mail.sendApplicationApproved(
+          application.applicantEmail,
+          application.applicantName,
+        );
       }
+
       if (status === "INVITED") {
-        await this.mail.sendApplicationInvited(application.applicantEmail, application.applicantName);
+        // Davet kodu oluştur
+        const code = this.generateInviteCode();
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
+
+        // Rol belirle
+        const role = application.requestedRole;
+
+        // DB'ye kaydet
+        await this.prisma.invitation.create({
+          data: {
+            code,
+            role: role as any,
+            status: "PENDING",
+            maxUses: 1,
+            usedCount: 0,
+            expiresAt,
+          },
+        });
+
+        // Davet e-postası gönder
+        await this.mail.sendApplicationInvited(
+          application.applicantEmail,
+          application.applicantName,
+          code,
+        );
       }
-    } catch {}
+    } catch (e) {
+      console.error("Mail hatası:", e.message);
+    }
+
     if (status === "REGISTERED" && application.referrerId) {
       await this.prisma.user.update({
         where: { id: application.referrerId },
         data: { nominationPoints: { increment: 1 } },
       });
     }
+
     return updated;
   }
 }
