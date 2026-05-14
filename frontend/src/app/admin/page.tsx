@@ -11,31 +11,26 @@ interface Stats {
   pendingNominations: number; pendingApplications: number;
   byRole: { role: string; count: number }[];
 }
-
 interface User {
   id: string; firstName: string; lastName: string; email: string;
   phone: string; role: string; isApproved: boolean;
   documents: { id: string; type: string; status: string; fileUrl: string; fileName: string }[];
 }
-
 interface Document {
   id: string; type: string; status: string; fileUrl: string; fileName: string;
   user?: { firstName: string; lastName: string; email: string; role: string };
 }
-
 interface Nomination {
   id: string; candidateName: string; candidateEmail: string; candidatePhone: string;
   candidateRole: string; note?: string; status: string; adminNote?: string;
   createdAt: string; nominator: { firstName: string; lastName: string; email: string; role: string };
 }
-
 interface Application {
   id: string; applicantName: string; applicantEmail: string; applicantPhone: string;
   requestedRole: string; message?: string; referralCode?: string; status: string;
   adminNote?: string; createdAt: string;
   referrer?: { firstName: string; lastName: string; email: string; role: string };
 }
-
 interface Lead {
   id: string; fullName?: string; phone?: string; email?: string;
   profession?: string; city?: string; interest?: string;
@@ -45,41 +40,162 @@ interface Lead {
 const ROLE_LABELS: Record<string, string> = {
   EMLAKCI: "Emlakçı", MUTEAHHIT: "Müteahhit", INSAAT_FIRMASI: "İnşaat Firması", ADMIN: "Admin"
 };
-
-const ROLE_COLORS: Record<string, string> = {
-  EMLAKCI: "bg-blue-950 text-blue-300 border-blue-800",
-  MUTEAHHIT: "bg-green-950 text-green-300 border-green-800",
-  INSAAT_FIRMASI: "bg-orange-950 text-orange-300 border-orange-800",
-  ADMIN: "bg-purple-950 text-purple-300 border-purple-800",
-};
-
 const DOC_LABELS: Record<string, string> = {
   VERGI_LEVHASI: "Vergi Levhası", YETKI_BELGESI: "Yetki Belgesi",
   TICARET_SICIL: "Ticaret Sicil", KIMLIK: "Kimlik", DIGER: "Diğer"
 };
-
-const DOC_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-950 text-yellow-300 border-yellow-800",
-  APPROVED: "bg-green-950 text-green-300 border-green-800",
-  REJECTED: "bg-red-950 text-red-300 border-red-800",
-};
-
-const DOC_STATUS_LABELS: Record<string, string> = {
-  PENDING: "Bekliyor", APPROVED: "Onaylandı", REJECTED: "Reddedildi"
-};
-
-const NOM_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-950 text-yellow-300 border-yellow-800",
-  APPROVED: "bg-green-950 text-green-300 border-green-800",
-  REJECTED: "bg-red-950 text-red-300 border-red-800",
-  INVITED: "bg-blue-950 text-blue-300 border-blue-800",
-  REGISTERED: "bg-purple-950 text-purple-300 border-purple-800",
-};
-
-const NOM_STATUS_LABELS: Record<string, string> = {
+const STATUS_LABELS: Record<string, string> = {
   PENDING: "Bekliyor", APPROVED: "Onaylandı", REJECTED: "Reddedildi",
   INVITED: "Davet Gönderildi", REGISTERED: "Kayıt Oldu"
 };
+
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --navy:#0F2044;--gold:#C9A84C;--cream:#F5F3EF;--warm:#FAFAF8;
+  --text:#1A1A2E;--muted:#8A8A8A;--border:#E2DDD5;--red:#C0392B;--green:#2D6A4F;
+  --serif:'Cormorant Garamond',Georgia,serif;--sans:'DM Sans',system-ui,sans-serif;
+}
+body{font-family:var(--sans);background:var(--warm);color:var(--text);}
+
+/* NAV */
+.an-nav{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 48px;position:sticky;top:0;z-index:100;}
+@media(max-width:768px){.an-nav{padding:0 20px;}}
+.an-logo{display:flex;align-items:center;gap:12px;text-decoration:none;}
+.an-logo img{width:34px;height:34px;object-fit:contain;}
+.an-logo-text{font-family:var(--serif);font-size:18px;font-weight:500;color:var(--navy);}
+.an-logo-sub{font-size:7px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);}
+.an-logo-badge{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.7);border:1px solid rgba(201,168,76,0.3);padding:3px 10px;margin-left:4px;}
+.an-nav-links{display:flex;align-items:center;gap:4px;}
+.an-nav-item{display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:all 0.2s;border-bottom:2px solid transparent;}
+.an-nav-item:hover{color:var(--navy);border-bottom-color:var(--gold);}
+.an-nav-item.active{color:var(--navy);border-bottom-color:var(--gold);}
+.an-logout{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:1px solid var(--border);padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
+.an-logout:hover{border-color:var(--navy);color:var(--navy);}
+
+/* MAIN */
+.an-main{padding:48px;max-width:1300px;margin:0 auto;}
+@media(max-width:768px){.an-main{padding:24px 20px;}}
+
+/* HEADER */
+.an-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:40px;padding-bottom:32px;border-bottom:1px solid var(--border);}
+@media(max-width:768px){.an-header{flex-direction:column;align-items:flex-start;gap:16px;}}
+.an-title{font-family:var(--serif);font-size:40px;font-weight:300;color:var(--navy);letter-spacing:-0.5px;line-height:1.1;}
+.an-title em{font-style:italic;color:var(--gold);}
+.an-sub{font-size:12px;color:var(--muted);margin-top:6px;font-weight:300;}
+.an-add-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:12px 20px;cursor:pointer;font-family:var(--sans);transition:all 0.3s;position:relative;overflow:hidden;display:flex;align-items:center;gap:8px;}
+.an-add-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:var(--gold);transition:left 0.4s;}
+.an-add-btn:hover::before{left:0;}
+.an-add-btn:hover{color:var(--navy);}
+.an-add-btn span{position:relative;z-index:1;}
+
+/* STATS */
+.an-stats{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);margin-bottom:40px;}
+@media(max-width:1100px){.an-stats{grid-template-columns:repeat(4,1fr);}}
+@media(max-width:600px){.an-stats{grid-template-columns:repeat(2,1fr);}}
+.an-stat{background:#fff;padding:24px 20px;}
+.an-stat-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.an-stat-num{font-family:var(--serif);font-size:32px;font-weight:300;color:var(--navy);line-height:1;}
+.an-stat-num.gold{color:var(--gold);}
+.an-stat-num.green{color:#2D6A4F;}
+.an-stat-num.orange{color:#B8860B;}
+
+/* ROLES */
+.an-roles{background:#fff;border:1px solid var(--border);padding:20px 24px;margin-bottom:32px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.an-roles-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.an-role-tag{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid var(--border);padding:4px 12px;color:var(--navy);}
+
+/* TABS */
+.an-tabs{display:flex;gap:0;margin-bottom:32px;border-bottom:1px solid var(--border);}
+.an-tab{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;padding:12px 20px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;display:flex;align-items:center;gap:8px;position:relative;bottom:-1px;}
+.an-tab:hover{color:var(--navy);}
+.an-tab.active{color:var(--navy);border-bottom-color:var(--gold);}
+.an-tab-badge{font-size:8px;background:var(--gold);color:var(--navy);padding:2px 7px;font-weight:500;}
+
+/* FILTERS */
+.an-filters{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+.an-filter{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:6px 14px;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all 0.2s;}
+.an-filter:hover{border-color:var(--navy);color:var(--navy);}
+.an-filter.active{border-color:var(--navy);background:var(--navy);color:var(--cream);}
+
+/* TABLE */
+.an-table{background:#fff;border:1px solid var(--border);}
+.an-table-head{display:grid;padding:14px 24px;background:var(--warm);border-bottom:1px solid var(--border);}
+.an-table-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.an-row{border-bottom:1px solid var(--border);padding:20px 24px;transition:background 0.2s;}
+.an-row:hover{background:var(--warm);}
+.an-row:last-child{border-bottom:none;}
+.an-empty{padding:60px 24px;text-align:center;font-family:var(--serif);font-size:18px;font-style:italic;color:var(--muted);}
+
+/* USER ROW */
+.an-user-info{display:flex;align-items:center;gap:14px;}
+.an-avatar{width:38px;height:38px;background:var(--navy);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:16px;color:var(--cream);font-weight:400;flex-shrink:0;}
+.an-user-name{font-size:14px;font-weight:400;color:var(--navy);}
+.an-user-email{font-size:11px;color:var(--muted);font-weight:300;}
+.an-user-phone{font-size:10px;color:#B8B2A8;font-weight:300;}
+
+/* STATUS BADGE */
+.an-badge{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid;padding:4px 10px;font-weight:500;}
+.an-badge-pending{border-color:#B8860B;color:#B8860B;background:#FFFBF0;}
+.an-badge-approved{border-color:#2D6A4F;color:#2D6A4F;background:#F0FAF4;}
+.an-badge-rejected{border-color:var(--red);color:var(--red);background:#FEF0EE;}
+.an-badge-invited{border-color:#1A4A7A;color:#1A4A7A;background:#EEF4FF;}
+.an-badge-registered{border-color:#5B2D8E;color:#5B2D8E;background:#F5F0FF;}
+
+/* ACTIONS */
+.an-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.an-btn{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:none;padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;font-weight:500;}
+.an-btn-approve{background:var(--green);color:#fff;}
+.an-btn-approve:hover{background:#1F4A35;}
+.an-btn-reject{background:transparent;border:1px solid var(--red)!important;color:var(--red);}
+.an-btn-reject:hover{background:var(--red);color:#fff;}
+.an-btn-warn{background:transparent;border:1px solid #B8860B!important;color:#B8860B;}
+.an-btn-warn:hover{background:#B8860B;color:#fff;}
+.an-btn-navy{background:var(--navy);color:var(--cream);}
+.an-btn-navy:hover{background:#1a3060;}
+.an-btn-ghost{background:transparent;border:1px solid var(--border)!important;color:var(--muted);}
+.an-btn-ghost:hover{border-color:var(--navy)!important;color:var(--navy);}
+.an-btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+/* MODAL */
+.an-overlay{position:fixed;inset:0;background:rgba(15,32,68,0.6);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn 0.2s ease;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.an-modal{background:#fff;width:100%;max-width:460px;padding:40px;position:relative;animation:slideUp 0.3s ease;}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.an-modal-title{font-family:var(--serif);font-size:28px;font-weight:400;color:var(--navy);margin-bottom:6px;}
+.an-modal-sub{font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:300;}
+.an-modal-divider{width:28px;height:2px;background:var(--gold);margin-bottom:28px;}
+.an-modal-close{position:absolute;top:16px;right:16px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;}
+.an-field{margin-bottom:18px;}
+.an-field label{display:block;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--navy);margin-bottom:10px;font-weight:500;}
+.an-input{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:10px 0;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;transition:border-color 0.3s;font-weight:300;}
+.an-input:focus{border-bottom-color:var(--navy);}
+.an-select{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:10px 0;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;appearance:none;cursor:pointer;font-weight:300;}
+.an-textarea{width:100%;background:var(--warm);border:1px solid var(--border);padding:12px;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;resize:none;font-weight:300;}
+.an-textarea:focus{border-color:var(--navy);}
+.an-modal-actions{display:flex;gap:10px;margin-top:24px;}
+.an-modal-submit{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:12px 24px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
+.an-modal-submit:hover{background:#1a3060;}
+.an-modal-submit:disabled{opacity:0.4;cursor:not-allowed;}
+.an-modal-cancel{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:12px 20px;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all 0.2s;}
+.an-modal-cancel:hover{border-color:var(--navy);color:var(--navy);}
+.an-modal-error{font-size:11px;color:var(--red);margin-top:8px;}
+
+/* LEAD */
+.an-lead-row{border-bottom:1px solid var(--border);padding:20px 24px;transition:background 0.2s;}
+.an-lead-row:hover{background:var(--warm);}
+.an-lead-conv{margin-top:12px;background:var(--warm);border:1px solid var(--border);padding:16px;max-height:200px;overflow-y:auto;}
+.an-conv-msg{display:flex;margin-bottom:8px;}
+.an-conv-msg.user{justify-content:flex-end;}
+.an-conv-bubble{font-size:11px;padding:8px 12px;max-width:75%;line-height:1.5;}
+.an-conv-bubble.assistant{background:#fff;border:1px solid var(--border);color:var(--navy);}
+.an-conv-bubble.user{background:var(--navy);color:var(--cream);}
+.an-conv-toggle{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);background:none;border:none;cursor:pointer;font-family:var(--sans);margin-top:8px;transition:color 0.2s;}
+.an-conv-toggle:hover{color:var(--navy);}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+`;
 
 export default function AdminPage() {
   const { user, logout } = useAuthStore();
@@ -90,33 +206,31 @@ export default function AdminPage() {
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [activeTab, setActiveTab] = useState<"users" | "documents" | "nominations" | "applications" | "leads">("users");
-  const [userFilter, setUserFilter] = useState<"all" | "pending" | "approved">("all");
-  const [docFilter, setDocFilter] = useState<"pending" | "approved" | "rejected" | "all">("all");
-  const [nomFilter, setNomFilter] = useState<"all" | "PENDING" | "APPROVED" | "REJECTED" | "INVITED" | "REGISTERED">("all");
-  const [appFilter, setAppFilter] = useState<"all" | "PENDING" | "APPROVED" | "REJECTED" | "INVITED" | "REGISTERED">("all");
+  const [activeTab, setActiveTab] = useState<"users"|"documents"|"nominations"|"applications"|"leads">("users");
+  const [userFilter, setUserFilter] = useState("all");
+  const [docFilter, setDocFilter] = useState("all");
+  const [nomFilter, setNomFilter] = useState("all");
+  const [appFilter, setAppFilter] = useState("all");
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string|null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [noteModal, setNoteModal] = useState<{ type: "nomination" | "application"; id: string } | null>(null);
+  const [noteModal, setNoteModal] = useState<{type:"nomination"|"application";id:string}|null>(null);
   const [noteText, setNoteText] = useState("");
-  const [expandedLead, setExpandedLead] = useState<string | null>(null);
-  const [roleModal, setRoleModal] = useState<{ id: string; currentRole: string } | null>(null);
+  const [expandedLead, setExpandedLead] = useState<string|null>(null);
+  const [roleModal, setRoleModal] = useState<{id:string;currentRole:string}|null>(null);
   const [newRole, setNewRole] = useState("");
   const [createUserModal, setCreateUserModal] = useState(false);
-  const [createUserForm, setCreateUserForm] = useState({ firstName: "", lastName: "", email: "", phone: "", password: "", role: "EMLAKCI" });
+  const [createUserForm, setCreateUserForm] = useState({firstName:"",lastName:"",email:"",phone:"",password:"",role:"EMLAKCI"});
   const [createUserLoading, setCreateUserLoading] = useState(false);
   const [createUserError, setCreateUserError] = useState("");
 
   useEffect(() => { setHydrated(true); }, []);
-
   useEffect(() => {
     if (!hydrated) return;
     if (!user) { router.push("/giris"); return; }
     if (user.role !== "ADMIN") { router.push("/dashboard"); return; }
     fetchAll();
   }, [hydrated, user]);
-
   useEffect(() => { if (hydrated && user) fetchUsers(userFilter); }, [userFilter]);
   useEffect(() => { if (hydrated && user) fetchDocuments(docFilter); }, [docFilter]);
   useEffect(() => { if (hydrated && user) fetchNominations(nomFilter); }, [nomFilter]);
@@ -124,611 +238,486 @@ export default function AdminPage() {
 
   const fetchAll = async () => {
     try {
-      const [s, u, d, n, a, l] = await Promise.all([
-        api.get("/admin/stats"),
-        api.get("/admin/users?filter=all"),
-        api.get("/admin/documents?filter=all"),
-        api.get("/admin/nominations?status=all"),
-        api.get("/admin/applications?status=all"),
-        api.get("/leads"),
+      const [s,u,d,n,a,l] = await Promise.all([
+        api.get("/admin/stats"), api.get("/admin/users?filter=all"),
+        api.get("/admin/documents?filter=all"), api.get("/admin/nominations?status=all"),
+        api.get("/admin/applications?status=all"), api.get("/leads"),
       ]);
       setStats(s.data); setUsers(u.data); setDocuments(d.data);
       setNominations(n.data); setApplications(a.data); setLeads(l.data);
     } finally { setLoading(false); }
   };
-
   const fetchStats = async () => { const r = await api.get("/admin/stats"); setStats(r.data); };
-  const fetchUsers = async (filter = "all") => { const r = await api.get(`/admin/users?filter=${filter}`); setUsers(r.data); };
-  const fetchDocuments = async (filter = "all") => { const r = await api.get(`/admin/documents?filter=${filter}`); setDocuments(r.data); };
-  const fetchNominations = async (filter = "all") => { const r = await api.get(`/admin/nominations?status=${filter}`); setNominations(r.data); };
-  const fetchApplications = async (filter = "all") => { const r = await api.get(`/admin/applications?status=${filter}`); setApplications(r.data); };
+  const fetchUsers = async (f="all") => { const r = await api.get(`/admin/users?filter=${f}`); setUsers(r.data); };
+  const fetchDocuments = async (f="all") => { const r = await api.get(`/admin/documents?filter=${f}`); setDocuments(r.data); };
+  const fetchNominations = async (f="all") => { const r = await api.get(`/admin/nominations?status=${f}`); setNominations(r.data); };
+  const fetchApplications = async (f="all") => { const r = await api.get(`/admin/applications?status=${f}`); setApplications(r.data); };
   const fetchLeads = async () => { const r = await api.get("/leads"); setLeads(r.data); };
 
-  const handleApproveUser = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/users/${id}/approve`); await Promise.all([fetchUsers(userFilter), fetchStats()]); } finally { setActionLoading(null); } };
-  const handleRejectUser = async (id: string) => { if (!confirm("Kullanıcı silinecek. Emin misiniz?")) return; setActionLoading(id); try { await api.delete(`/admin/users/${id}/reject`); await Promise.all([fetchUsers(userFilter), fetchStats()]); } finally { setActionLoading(null); } };
-  const handleSuspendUser = async (id: string) => { if (!confirm("Kullanıcı askıya alınacak. Emin misiniz?")) return; setActionLoading(id); try { await api.patch(`/admin/users/${id}/suspend`); await Promise.all([fetchUsers(userFilter), fetchStats()]); } finally { setActionLoading(null); } };
-  const handleApproveDoc = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/documents/${id}/approve`); await Promise.all([fetchDocuments(docFilter), fetchStats()]); } finally { setActionLoading(null); } };
-  const handleRejectDoc = async (id: string) => { setActionLoading(id); try { await api.patch(`/admin/documents/${id}/reject`); await Promise.all([fetchDocuments(docFilter), fetchStats()]); } finally { setActionLoading(null); } };
-
-  const handleNominationStatus = async (id: string, status: string) => {
-    setActionLoading(id);
-    try { await api.patch(`/admin/nominations/${id}/status`, { status }); await Promise.all([fetchNominations(nomFilter), fetchStats()]); }
-    finally { setActionLoading(null); }
+  const act = async (id:string, fn:()=>Promise<any>) => {
+    setActionLoading(id); try { await fn(); } finally { setActionLoading(null); }
   };
 
-  const handleApplicationStatus = async (id: string, status: string) => {
-    setActionLoading(id);
-    try { await api.patch(`/admin/applications/${id}/status`, { status }); await Promise.all([fetchApplications(appFilter), fetchStats()]); }
-    finally { setActionLoading(null); }
-  };
-
-  const handleSaveNote = async () => {
-    if (!noteModal) return;
-    setActionLoading(noteModal.id);
-    try {
-      if (noteModal.type === "nomination") {
-        await api.patch(`/admin/nominations/${noteModal.id}/status`, { status: nominations.find(n => n.id === noteModal.id)?.status, adminNote: noteText });
-        await fetchNominations(nomFilter);
-      } else {
-        await api.patch(`/admin/applications/${noteModal.id}/status`, { status: applications.find(a => a.id === noteModal.id)?.status, adminNote: noteText });
-        await fetchApplications(appFilter);
-      }
-      setNoteModal(null); setNoteText("");
-    } finally { setActionLoading(null); }
-  };
-
-  const handleChangeRole = async () => {
-    if (!roleModal || !newRole) return;
-    setActionLoading(roleModal.id);
-    try { await api.patch(`/admin/users/${roleModal.id}/role`, { role: newRole }); await fetchUsers(userFilter); setRoleModal(null); setNewRole(""); }
-    finally { setActionLoading(null); }
-  };
-
-  const handleCreateUser = async () => {
-    if (!createUserForm.firstName || !createUserForm.lastName || !createUserForm.email || !createUserForm.phone || !createUserForm.password) {
-      setCreateUserError("Tüm alanlar zorunludur."); return;
-    }
-    setCreateUserLoading(true); setCreateUserError("");
-    try {
-      await api.post("/admin/users", createUserForm);
-      setCreateUserModal(false);
-      setCreateUserForm({ firstName: "", lastName: "", email: "", phone: "", password: "", role: "EMLAKCI" });
-      await Promise.all([fetchUsers(userFilter), fetchStats()]);
-    } catch (e: any) {
-      setCreateUserError(e?.response?.data?.message || "Bir hata oluştu.");
-    } finally { setCreateUserLoading(false); }
+  const getBadge = (status:string) => {
+    const map:Record<string,string> = {PENDING:"pending",APPROVED:"approved",REJECTED:"rejected",INVITED:"invited",REGISTERED:"registered"};
+    return `an-badge an-badge-${map[status]||"pending"}`;
   };
 
   if (!hydrated || loading) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <p className="text-gray-500 text-sm">Yükleniyor...</p>
+    <div style={{minHeight:"100vh",background:"#FAFAF8",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <style>{CSS}</style>
+      <div style={{width:32,height:32,border:"2px solid #C9A84C",borderTop:"2px solid transparent",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <>
+      <style>{CSS}</style>
 
-      {/* Not Modal */}
+      {/* NOT MODAL */}
       {noteModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-medium mb-4">Admin Notu</h3>
-            <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Notunuzu yazın..." rows={4}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 resize-none mb-4" />
-            <div className="flex gap-3">
-              <button onClick={handleSaveNote} disabled={actionLoading === noteModal.id}
-                className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-sm px-5 py-2 rounded-lg transition-colors font-medium">
-                {actionLoading === noteModal.id ? "..." : "Kaydet"}
-              </button>
-              <button onClick={() => { setNoteModal(null); setNoteText(""); }}
-                className="text-gray-400 border border-gray-700 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors">
-                İptal
-              </button>
+        <div className="an-overlay" onClick={()=>{setNoteModal(null);setNoteText("");}}>
+          <div className="an-modal" onClick={e=>e.stopPropagation()}>
+            <button className="an-modal-close" onClick={()=>{setNoteModal(null);setNoteText("");}}>×</button>
+            <h3 className="an-modal-title">Admin Notu</h3>
+            <p className="an-modal-sub">Bu not sadece admin panelinde görünür.</p>
+            <div className="an-modal-divider"/>
+            <textarea className="an-textarea" rows={4} value={noteText} onChange={e=>setNoteText(e.target.value)} placeholder="Notunuzu yazın..."/>
+            <div className="an-modal-actions">
+              <button className="an-modal-submit" disabled={actionLoading===noteModal.id} onClick={async()=>{
+                setActionLoading(noteModal.id);
+                try {
+                  if(noteModal.type==="nomination"){
+                    await api.patch(`/admin/nominations/${noteModal.id}/status`,{status:nominations.find(n=>n.id===noteModal.id)?.status,adminNote:noteText});
+                    await fetchNominations(nomFilter);
+                  } else {
+                    await api.patch(`/admin/applications/${noteModal.id}/status`,{status:applications.find(a=>a.id===noteModal.id)?.status,adminNote:noteText});
+                    await fetchApplications(appFilter);
+                  }
+                  setNoteModal(null); setNoteText("");
+                } finally { setActionLoading(null); }
+              }}>{actionLoading===noteModal.id?"...":"Kaydet"}</button>
+              <button className="an-modal-cancel" onClick={()=>{setNoteModal(null);setNoteText("");}}>İptal</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Rol Değiştir Modal */}
+      {/* ROL MODAL */}
       {roleModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm">
-            <h3 className="text-white font-medium mb-4">Rol Değiştir</h3>
-            <select value={newRole} onChange={e => setNewRole(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 mb-4">
-              <option value="">Rol Seçin</option>
-              <option value="EMLAKCI">Emlakçı</option>
-              <option value="MUTEAHHIT">Müteahhit</option>
-              <option value="INSAAT_FIRMASI">İnşaat Firması</option>
-            </select>
-            <div className="flex gap-3">
-              <button onClick={handleChangeRole} disabled={!newRole || actionLoading === roleModal.id}
-                className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-sm px-5 py-2 rounded-lg transition-colors font-medium">
-                {actionLoading === roleModal.id ? "..." : "Değiştir"}
-              </button>
-              <button onClick={() => { setRoleModal(null); setNewRole(""); }}
-                className="text-gray-400 border border-gray-700 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors">
-                İptal
-              </button>
+        <div className="an-overlay" onClick={()=>{setRoleModal(null);setNewRole("");}}>
+          <div className="an-modal" onClick={e=>e.stopPropagation()}>
+            <button className="an-modal-close" onClick={()=>{setRoleModal(null);setNewRole("");}}>×</button>
+            <h3 className="an-modal-title">Rol Değiştir</h3>
+            <p className="an-modal-sub">Üyenin platformdaki rolünü güncelleyin.</p>
+            <div className="an-modal-divider"/>
+            <div className="an-field">
+              <label>Yeni Rol</label>
+              <select className="an-select" value={newRole} onChange={e=>setNewRole(e.target.value)}>
+                <option value="">Seçiniz</option>
+                <option value="EMLAKCI">Emlakçı</option>
+                <option value="MUTEAHHIT">Müteahhit</option>
+                <option value="INSAAT_FIRMASI">İnşaat Firması</option>
+              </select>
+            </div>
+            <div className="an-modal-actions">
+              <button className="an-modal-submit" disabled={!newRole||actionLoading===roleModal.id} onClick={async()=>{
+                await act(roleModal.id,async()=>{ await api.patch(`/admin/users/${roleModal.id}/role`,{role:newRole}); await fetchUsers(userFilter); setRoleModal(null); setNewRole(""); });
+              }}>{actionLoading===roleModal.id?"...":"Değiştir"}</button>
+              <button className="an-modal-cancel" onClick={()=>{setRoleModal(null);setNewRole("");}}>İptal</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Manuel Üye Ekle Modal */}
+      {/* KULLANICI EKLE MODAL */}
       {createUserModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-medium mb-4">Manuel Üye Ekle</h3>
-            <div className="flex flex-col gap-3 mb-4">
-              {[
-                { ph: "Ad", key: "firstName" }, { ph: "Soyad", key: "lastName" },
-                { ph: "Email", key: "email" }, { ph: "Telefon", key: "phone" },
-                { ph: "Şifre", key: "password" },
-              ].map(({ ph, key }) => (
-                <input key={key} placeholder={ph} type={key === "password" ? "password" : "text"}
-                  value={createUserForm[key as keyof typeof createUserForm]}
-                  onChange={e => setCreateUserForm(f => ({ ...f, [key]: e.target.value }))}
-                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500" />
+        <div className="an-overlay" onClick={()=>{setCreateUserModal(false);setCreateUserError("");}}>
+          <div className="an-modal" onClick={e=>e.stopPropagation()}>
+            <button className="an-modal-close" onClick={()=>{setCreateUserModal(false);setCreateUserError("");}}>×</button>
+            <h3 className="an-modal-title">Yeni Üye</h3>
+            <p className="an-modal-sub">Manuel olarak platforma üye ekleyin.</p>
+            <div className="an-modal-divider"/>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 20px"}}>
+              {[{ph:"Ad",k:"firstName"},{ph:"Soyad",k:"lastName"}].map(({ph,k})=>(
+                <div key={k} className="an-field">
+                  <label>{ph}</label>
+                  <input className="an-input" placeholder={ph} value={createUserForm[k as keyof typeof createUserForm]}
+                    onChange={e=>setCreateUserForm(f=>({...f,[k]:e.target.value}))}/>
+                </div>
               ))}
-              <select value={createUserForm.role} onChange={e => setCreateUserForm(f => ({ ...f, role: e.target.value }))}
-                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500">
+            </div>
+            {[{ph:"E-posta",k:"email",t:"email"},{ph:"Telefon",k:"phone",t:"tel"},{ph:"Şifre",k:"password",t:"password"}].map(({ph,k,t})=>(
+              <div key={k} className="an-field">
+                <label>{ph}</label>
+                <input className="an-input" type={t} placeholder={ph} value={createUserForm[k as keyof typeof createUserForm]}
+                  onChange={e=>setCreateUserForm(f=>({...f,[k]:e.target.value}))}/>
+              </div>
+            ))}
+            <div className="an-field">
+              <label>Rol</label>
+              <select className="an-select" value={createUserForm.role} onChange={e=>setCreateUserForm(f=>({...f,role:e.target.value}))}>
                 <option value="EMLAKCI">Emlakçı</option>
                 <option value="MUTEAHHIT">Müteahhit</option>
                 <option value="INSAAT_FIRMASI">İnşaat Firması</option>
                 <option value="ADMIN">Admin</option>
               </select>
             </div>
-            {createUserError && <p className="text-red-400 text-xs mb-3">{createUserError}</p>}
-            <div className="flex gap-3">
-              <button onClick={handleCreateUser} disabled={createUserLoading}
-                className="bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-sm px-5 py-2 rounded-lg transition-colors font-medium">
-                {createUserLoading ? "Ekleniyor..." : "Ekle"}
-              </button>
-              <button onClick={() => { setCreateUserModal(false); setCreateUserError(""); }}
-                className="text-gray-400 border border-gray-700 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors">
-                İptal
-              </button>
+            {createUserError && <p className="an-modal-error">{createUserError}</p>}
+            <div className="an-modal-actions">
+              <button className="an-modal-submit" disabled={createUserLoading} onClick={async()=>{
+                if(!createUserForm.firstName||!createUserForm.lastName||!createUserForm.email||!createUserForm.phone||!createUserForm.password){setCreateUserError("Tüm alanlar zorunludur.");return;}
+                setCreateUserLoading(true); setCreateUserError("");
+                try { await api.post("/admin/users",createUserForm); setCreateUserModal(false); setCreateUserForm({firstName:"",lastName:"",email:"",phone:"",password:"",role:"EMLAKCI"}); await Promise.all([fetchUsers(userFilter),fetchStats()]); }
+                catch(e:any){ setCreateUserError(e?.response?.data?.message||"Bir hata oluştu."); }
+                finally { setCreateUserLoading(false); }
+              }}>{createUserLoading?"Ekleniyor...":"Üye Ekle"}</button>
+              <button className="an-modal-cancel" onClick={()=>{setCreateUserModal(false);setCreateUserError("");}}>İptal</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Header */}
-      <div className="border-b border-gray-800 bg-gray-950 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      {/* NAV */}
+      <nav className="an-nav">
+        <div style={{display:"flex",alignItems:"center",gap:16}}>
+          <a href="/dashboard" className="an-logo">
+            <img src="/LOGO_EPH.png" alt="EPH"/>
+            <div>
+              <div className="an-logo-text">EPH Platform</div>
+              <div className="an-logo-sub">Emlak Portföy Havuzu</div>
             </div>
-            <span className="text-white font-semibold">EPH</span>
-            <span className="text-gray-600 text-sm">/ Admin</span>
-          </div>
-          <nav className="flex items-center gap-1">
-            <Link href="/dashboard" className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">Ana Sayfa</Link>
-            <Link href="/stok" className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">Stok</Link>
-            <Link href="/admin" className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gray-800">Admin</Link>
-          </nav>
-          <button onClick={() => { logout(); router.push("/giris"); }}
-            className="flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-gray-700 px-4 py-2 rounded-lg transition-colors">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-            Çıkış
-          </button>
+          </a>
+          <span className="an-logo-badge">Admin</span>
         </div>
-      </div>
+        <div className="an-nav-links">
+          <Link href="/dashboard" className="an-nav-item">Ana Sayfa</Link>
+          <Link href="/stok" className="an-nav-item">Stok</Link>
+          <Link href="/admin" className="an-nav-item active">Admin</Link>
+        </div>
+        <button className="an-logout" onClick={()=>{logout();router.push("/giris");}}>Çıkış</button>
+      </nav>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="mb-8 flex items-center justify-between">
+      <main className="an-main">
+
+        {/* HEADER */}
+        <div className="an-header">
           <div>
-            <h1 className="text-2xl font-semibold text-white mb-1">Admin Paneli</h1>
-            <p className="text-gray-500 text-sm">Üye ve belge yönetimi</p>
+            <h1 className="an-title">Yönetim<br/><em>Paneli</em></h1>
+            <p className="an-sub">Üye, belge ve başvuru yönetimi</p>
           </div>
-          <button onClick={() => setCreateUserModal(true)}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white text-sm px-4 py-2 rounded-lg transition-colors font-medium">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Manuel Üye Ekle
+          <button className="an-add-btn" onClick={()=>setCreateUserModal(true)}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{position:"relative",zIndex:1}}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Yeni Üye Ekle</span>
           </button>
         </div>
 
-        {/* Stats */}
+        {/* STATS */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-              <p className="text-gray-500 text-xs mb-2">Toplam Üye</p>
-              <p className="text-2xl font-semibold text-white">{stats.totalUsers}</p>
-            </div>
-            <div className="bg-gray-900 border border-yellow-900 rounded-xl p-4">
-              <p className="text-yellow-500 text-xs mb-2">Onay Bekleyen</p>
-              <p className="text-2xl font-semibold text-yellow-300">{stats.pendingUsers}</p>
-            </div>
-            <div className="bg-gray-900 border border-green-900 rounded-xl p-4">
-              <p className="text-green-500 text-xs mb-2">Onaylanan</p>
-              <p className="text-2xl font-semibold text-green-300">{stats.approvedUsers}</p>
-            </div>
-            <div className="bg-gray-900 border border-blue-900 rounded-xl p-4">
-              <p className="text-blue-500 text-xs mb-2">Davet Kodu</p>
-              <p className="text-2xl font-semibold text-blue-300">{stats.totalInvitations}</p>
-            </div>
-            <div className="bg-gray-900 border border-orange-900 rounded-xl p-4">
-              <p className="text-orange-500 text-xs mb-2">Bekleyen Belge</p>
-              <p className="text-2xl font-semibold text-orange-300">{stats.pendingDocuments}</p>
-            </div>
-            <div className="bg-gray-900 border border-purple-900 rounded-xl p-4">
-              <p className="text-purple-500 text-xs mb-2">Bekleyen Tavsiye</p>
-              <p className="text-2xl font-semibold text-purple-300">{stats.pendingNominations}</p>
-            </div>
-            <div className="bg-gray-900 border border-pink-900 rounded-xl p-4">
-              <p className="text-pink-500 text-xs mb-2">Bekleyen Başvuru</p>
-              <p className="text-2xl font-semibold text-pink-300">{stats.pendingApplications}</p>
-            </div>
+          <div className="an-stats">
+            {[
+              {label:"Toplam Üye",val:stats.totalUsers,cls:""},
+              {label:"Onay Bekleyen",val:stats.pendingUsers,cls:"orange"},
+              {label:"Onaylanan",val:stats.approvedUsers,cls:"green"},
+              {label:"Davet Kodu",val:stats.totalInvitations,cls:"gold"},
+              {label:"Bekleyen Belge",val:stats.pendingDocuments,cls:"orange"},
+              {label:"Bekleyen Tavsiye",val:stats.pendingNominations,cls:"orange"},
+              {label:"Bekleyen Başvuru",val:stats.pendingApplications,cls:"orange"},
+            ].map(s=>(
+              <div key={s.label} className="an-stat">
+                <div className="an-stat-label">{s.label}</div>
+                <div className={`an-stat-num ${s.cls}`}>{s.val}</div>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Rol Dağılımı */}
+        {/* ROL DAĞILIMI */}
         {stats && stats.byRole.length > 0 && (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
-            <p className="text-gray-500 text-xs mb-3">Rol Dağılımı</p>
-            <div className="flex gap-3 flex-wrap">
-              {stats.byRole.map((r) => (
-                <div key={r.role} className={`border rounded-full px-4 py-1.5 text-xs font-medium ${ROLE_COLORS[r.role]}`}>
-                  {ROLE_LABELS[r.role]}: {r.count}
-                </div>
-              ))}
-            </div>
+          <div className="an-roles">
+            <span className="an-roles-label">Rol Dağılımı</span>
+            {stats.byRole.map(r=>(
+              <span key={r.role} className="an-role-tag">{ROLE_LABELS[r.role]}: {r.count}</span>
+            ))}
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 flex-wrap">
+        {/* TABS */}
+        <div className="an-tabs">
           {[
-            { key: "users", label: "Kullanıcılar", badge: null, color: "blue" },
-            { key: "documents", label: "Belgeler", badge: stats?.pendingDocuments, color: "blue" },
-            { key: "nominations", label: "Tavsiyeler", badge: stats?.pendingNominations, color: "blue" },
-            { key: "applications", label: "Başvurular", badge: stats?.pendingApplications, color: "blue" },
-          ].map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key as any)}
-              className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === t.key ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
+            {key:"users",label:"Kullanıcılar",badge:null},
+            {key:"documents",label:"Belgeler",badge:stats?.pendingDocuments},
+            {key:"nominations",label:"Tavsiyeler",badge:stats?.pendingNominations},
+            {key:"applications",label:"Başvurular",badge:stats?.pendingApplications},
+            {key:"leads",label:"Lina Leads",badge:leads.length},
+          ].map(t=>(
+            <button key={t.key} className={`an-tab ${activeTab===t.key?"active":""}`}
+              onClick={()=>{setActiveTab(t.key as any); if(t.key==="leads") fetchLeads();}}>
               {t.label}
-              {t.badge && t.badge > 0 && <span className="bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{t.badge}</span>}
+              {t.badge && t.badge > 0 && <span className="an-tab-badge">{t.badge}</span>}
             </button>
           ))}
-          <button onClick={() => { setActiveTab("leads"); fetchLeads(); }}
-            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === "leads" ? "bg-rose-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
-            🤖 Lina Leads
-            {leads.length > 0 && <span className="bg-rose-500 text-white text-xs rounded-full px-2 py-0.5">{leads.length}</span>}
-          </button>
         </div>
 
-        {/* Kullanıcılar */}
-        {activeTab === "users" && (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-              <h2 className="font-medium text-white">Kullanıcılar</h2>
-              <div className="flex gap-2">
-                {(["all", "pending", "approved"] as const).map((f) => (
-                  <button key={f} onClick={() => setUserFilter(f)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${userFilter === f ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
-                    {f === "pending" ? "Bekleyen" : f === "approved" ? "Onaylanan" : "Tümü"}
-                  </button>
-                ))}
-              </div>
+        {/* KULLANICILAR */}
+        {activeTab==="users" && (
+          <>
+            <div className="an-filters">
+              {[["all","Tümü"],["pending","Bekleyen"],["approved","Onaylanan"]].map(([f,l])=>(
+                <button key={f} className={`an-filter ${userFilter===f?"active":""}`} onClick={()=>setUserFilter(f)}>{l}</button>
+              ))}
             </div>
-            {users.length === 0 ? (
-              <div className="px-6 py-12 text-center text-gray-600 text-sm">Kullanıcı bulunamadı.</div>
-            ) : (
-              <div className="divide-y divide-gray-800">
-                {users.map((u) => (
-                  <div key={u.id} className="px-6 py-4">
-                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0">
-                          {u.firstName[0]}{u.lastName[0]}
-                        </div>
+            <div className="an-table">
+              {users.length===0 ? <div className="an-empty">Kullanıcı bulunamadı.</div> :
+                users.map(u=>(
+                  <div key={u.id} className="an-row">
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
+                      <div className="an-user-info">
+                        <div className="an-avatar">{u.firstName[0]}{u.lastName[0]}</div>
                         <div>
-                          <p className="text-white font-medium text-sm">{u.firstName} {u.lastName}</p>
-                          <p className="text-gray-500 text-xs">{u.email}</p>
-                          <p className="text-gray-600 text-xs">{u.phone}</p>
+                          <div className="an-user-name">{u.firstName} {u.lastName}</div>
+                          <div className="an-user-email">{u.email}</div>
+                          <div className="an-user-phone">{u.phone}</div>
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`border rounded-full px-3 py-1 text-xs font-medium ${ROLE_COLORS[u.role]}`}>{ROLE_LABELS[u.role]}</span>
-                        {u.documents?.length > 0 && <span className="text-gray-600 text-xs">{u.documents.length} belge</span>}
-                        <span className={`text-xs font-medium ${u.isApproved ? "text-green-400" : "text-yellow-400"}`}>
-                          {u.isApproved ? "✓ Onaylı" : "⏳ Bekliyor"}
+                      <div className="an-actions">
+                        <span className="an-role-tag" style={{fontSize:"8px"}}>{ROLE_LABELS[u.role]}</span>
+                        {u.documents?.length>0 && <span style={{fontSize:10,color:"var(--muted)"}}>{u.documents.length} belge</span>}
+                        <span className={`an-badge ${u.isApproved?"an-badge-approved":"an-badge-pending"}`}>
+                          {u.isApproved?"Onaylı":"Bekliyor"}
                         </span>
                         {!u.isApproved ? (
-                          <button onClick={() => handleApproveUser(u.id)} disabled={actionLoading === u.id}
-                            className="bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
-                            {actionLoading === u.id ? "..." : "Onayla"}
+                          <button className="an-btn an-btn-approve" disabled={actionLoading===u.id}
+                            onClick={()=>act(u.id,async()=>{await api.patch(`/admin/users/${u.id}/approve`);await Promise.all([fetchUsers(userFilter),fetchStats()]);})}> 
+                            {actionLoading===u.id?"...":"Onayla"}
                           </button>
-                        ) : (
-                          u.role !== "ADMIN" && (
-                            <button onClick={() => handleSuspendUser(u.id)} disabled={actionLoading === u.id}
-                              className="bg-yellow-950 hover:bg-yellow-900 border border-yellow-800 text-yellow-400 text-xs px-3 py-1.5 rounded-lg transition-colors">
-                              {actionLoading === u.id ? "..." : "Askıya Al"}
-                            </button>
-                          )
-                        )}
-                        {u.role !== "ADMIN" && (
-                          <button onClick={() => { setRoleModal({ id: u.id, currentRole: u.role }); setNewRole(u.role); }}
-                            className="bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs px-3 py-1.5 rounded-lg transition-colors">
-                            Rol Değiştir
+                        ) : u.role!=="ADMIN" && (
+                          <button className="an-btn an-btn-warn" disabled={actionLoading===u.id}
+                            onClick={()=>{if(!confirm("Askıya alınacak."))return; act(u.id,async()=>{await api.patch(`/admin/users/${u.id}/suspend`);await Promise.all([fetchUsers(userFilter),fetchStats()]);});}}>
+                            {actionLoading===u.id?"...":"Askıya Al"}
                           </button>
                         )}
-                        {u.role !== "ADMIN" && (
-                          <button onClick={() => handleRejectUser(u.id)} disabled={actionLoading === u.id}
-                            className="bg-red-950 hover:bg-red-900 border border-red-900 text-red-400 text-xs px-3 py-1.5 rounded-lg transition-colors">
-                            {actionLoading === u.id ? "..." : "Sil"}
+                        {u.role!=="ADMIN" && (
+                          <button className="an-btn an-btn-ghost" onClick={()=>{setRoleModal({id:u.id,currentRole:u.role});setNewRole(u.role);}}>Rol Değiştir</button>
+                        )}
+                        {u.role!=="ADMIN" && (
+                          <button className="an-btn an-btn-reject" disabled={actionLoading===u.id}
+                            onClick={()=>{if(!confirm("Silinecek. Emin misiniz?"))return; act(u.id,async()=>{await api.delete(`/admin/users/${u.id}/reject`);await Promise.all([fetchUsers(userFilter),fetchStats()]);});}}>
+                            {actionLoading===u.id?"...":"Sil"}
                           </button>
                         )}
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                ))
+              }
+            </div>
+          </>
         )}
 
-        {/* Belgeler */}
-        {activeTab === "documents" && (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-              <h2 className="font-medium text-white">Belgeler</h2>
-              <div className="flex gap-2">
-                {(["all", "pending", "approved", "rejected"] as const).map((f) => (
-                  <button key={f} onClick={() => setDocFilter(f)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${docFilter === f ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
-                    {f === "pending" ? "Bekleyen" : f === "approved" ? "Onaylanan" : f === "rejected" ? "Reddedilen" : "Tümü"}
-                  </button>
-                ))}
-              </div>
+        {/* BELGELER */}
+        {activeTab==="documents" && (
+          <>
+            <div className="an-filters">
+              {[["all","Tümü"],["pending","Bekleyen"],["approved","Onaylanan"],["rejected","Reddedilen"]].map(([f,l])=>(
+                <button key={f} className={`an-filter ${docFilter===f?"active":""}`} onClick={()=>setDocFilter(f)}>{l}</button>
+              ))}
             </div>
-            {documents.length === 0 ? (
-              <div className="px-6 py-12 text-center text-gray-600 text-sm">Belge bulunamadı.</div>
-            ) : (
-              <div className="divide-y divide-gray-800">
-                {documents.map((doc) => (
-                  <div key={doc.id} className="px-6 py-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-gray-800 border border-gray-700 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                      </div>
-                      <div>
-                        <p className="text-white font-medium text-sm">{DOC_LABELS[doc.type] ?? doc.type}</p>
-                        <p className="text-gray-500 text-xs">{doc.fileName}</p>
-                        {doc.user && <p className="text-gray-600 text-xs">{doc.user.firstName} {doc.user.lastName} · {ROLE_LABELS[doc.user.role]}</p>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`border rounded-full px-3 py-1 text-xs font-medium ${DOC_STATUS_COLORS[doc.status]}`}>{DOC_STATUS_LABELS[doc.status]}</span>
-                      <a href={doc.fileUrl} target="_blank" rel="noreferrer"
-                        className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-xs border border-blue-900 px-3 py-1.5 rounded-lg transition-colors">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                        Görüntüle
-                      </a>
-                      {doc.status === "PENDING" && (
-                        <div className="flex gap-2">
-                          <button onClick={() => handleApproveDoc(doc.id)} disabled={actionLoading === doc.id}
-                            className="bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
-                            {actionLoading === doc.id ? "..." : "Onayla"}
-                          </button>
-                          <button onClick={() => handleRejectDoc(doc.id)} disabled={actionLoading === doc.id}
-                            className="bg-red-950 hover:bg-red-900 border border-red-900 text-red-400 text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
-                            {actionLoading === doc.id ? "..." : "Reddet"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tavsiyeler */}
-        {activeTab === "nominations" && (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-              <h2 className="font-medium text-white">Tavsiyeler</h2>
-              <div className="flex gap-2 flex-wrap">
-                {(["all", "PENDING", "APPROVED", "REJECTED", "INVITED", "REGISTERED"] as const).map((f) => (
-                  <button key={f} onClick={() => setNomFilter(f)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${nomFilter === f ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
-                    {f === "all" ? "Tümü" : NOM_STATUS_LABELS[f]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {nominations.length === 0 ? (
-              <div className="px-6 py-12 text-center text-gray-600 text-sm">Tavsiye bulunamadı.</div>
-            ) : (
-              <div className="divide-y divide-gray-800">
-                {nominations.map((nom) => (
-                  <div key={nom.id} className="px-6 py-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 bg-purple-900 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 text-purple-300">
-                          {nom.candidateName[0]}
+            <div className="an-table">
+              {documents.length===0 ? <div className="an-empty">Belge bulunamadı.</div> :
+                documents.map(doc=>(
+                  <div key={doc.id} className="an-row">
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
+                      <div className="an-user-info">
+                        <div className="an-avatar" style={{background:"var(--warm)",border:"1px solid var(--border)"}}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         </div>
                         <div>
-                          <p className="text-white font-medium text-sm">{nom.candidateName}</p>
-                          <p className="text-gray-500 text-xs">{nom.candidateEmail} · {nom.candidatePhone}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className={`border rounded-full px-2.5 py-0.5 text-xs font-medium ${ROLE_COLORS[nom.candidateRole]}`}>{ROLE_LABELS[nom.candidateRole]}</span>
-                            <span className={`border rounded-full px-2.5 py-0.5 text-xs font-medium ${NOM_STATUS_COLORS[nom.status]}`}>{NOM_STATUS_LABELS[nom.status]}</span>
-                          </div>
-                          {nom.note && <p className="text-gray-500 text-xs mt-2 italic">"{nom.note}"</p>}
-                          {nom.adminNote && <p className="text-yellow-600 text-xs mt-1">📝 {nom.adminNote}</p>}
-                          <p className="text-gray-700 text-xs mt-2">Öneren: {nom.nominator.firstName} {nom.nominator.lastName} · {new Date(nom.createdAt).toLocaleDateString("tr-TR")}</p>
+                          <div className="an-user-name">{DOC_LABELS[doc.type]??doc.type}</div>
+                          <div className="an-user-email">{doc.fileName}</div>
+                          {doc.user && <div className="an-user-phone">{doc.user.firstName} {doc.user.lastName} · {ROLE_LABELS[doc.user.role]}</div>}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button onClick={() => { setNoteModal({ type: "nomination", id: nom.id }); setNoteText(nom.adminNote || ""); }}
-                          className="text-gray-400 border border-gray-700 hover:text-white text-xs px-3 py-1.5 rounded-lg transition-colors">Not</button>
-                        {nom.status === "PENDING" && (
+                      <div className="an-actions">
+                        <span className={getBadge(doc.status)}>{STATUS_LABELS[doc.status]}</span>
+                        <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="an-btn an-btn-ghost" style={{textDecoration:"none",display:"inline-block"}}>Görüntüle</a>
+                        {doc.status==="PENDING" && (
                           <>
-                            <button onClick={() => handleNominationStatus(nom.id, "APPROVED")} disabled={actionLoading === nom.id}
-                              className="bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
-                              {actionLoading === nom.id ? "..." : "Onayla"}
-                            </button>
-                            <button onClick={() => handleNominationStatus(nom.id, "REJECTED")} disabled={actionLoading === nom.id}
-                              className="bg-red-950 hover:bg-red-900 border border-red-900 text-red-400 text-xs px-3 py-1.5 rounded-lg transition-colors">
-                              {actionLoading === nom.id ? "..." : "Reddet"}
-                            </button>
+                            <button className="an-btn an-btn-approve" disabled={actionLoading===doc.id}
+                              onClick={()=>act(doc.id,async()=>{await api.patch(`/admin/documents/${doc.id}/approve`);await Promise.all([fetchDocuments(docFilter),fetchStats()]);})}>{actionLoading===doc.id?"...":"Onayla"}</button>
+                            <button className="an-btn an-btn-reject" disabled={actionLoading===doc.id}
+                              onClick={()=>act(doc.id,async()=>{await api.patch(`/admin/documents/${doc.id}/reject`);await Promise.all([fetchDocuments(docFilter),fetchStats()]);})}>{actionLoading===doc.id?"...":"Reddet"}</button>
                           </>
-                        )}
-                        {nom.status === "APPROVED" && (
-                          <button onClick={() => handleNominationStatus(nom.id, "INVITED")} disabled={actionLoading === nom.id}
-                            className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
-                            {actionLoading === nom.id ? "..." : "Davet Gönderildi"}
-                          </button>
                         )}
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                ))
+              }
+            </div>
+          </>
         )}
 
-        {/* Başvurular */}
-        {activeTab === "applications" && (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-              <h2 className="font-medium text-white">Başvurular</h2>
-              <div className="flex gap-2 flex-wrap">
-                {(["all", "PENDING", "APPROVED", "REJECTED", "INVITED", "REGISTERED"] as const).map((f) => (
-                  <button key={f} onClick={() => setAppFilter(f)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${appFilter === f ? "bg-blue-600 text-white" : "text-gray-400 border border-gray-700 hover:text-white"}`}>
-                    {f === "all" ? "Tümü" : NOM_STATUS_LABELS[f]}
-                  </button>
-                ))}
-              </div>
+        {/* TAVSİYELER */}
+        {activeTab==="nominations" && (
+          <>
+            <div className="an-filters">
+              {[["all","Tümü"],["PENDING","Bekliyor"],["APPROVED","Onaylandı"],["REJECTED","Reddedildi"],["INVITED","Davet Gönderildi"],["REGISTERED","Kayıt Oldu"]].map(([f,l])=>(
+                <button key={f} className={`an-filter ${nomFilter===f?"active":""}`} onClick={()=>setNomFilter(f)}>{l}</button>
+              ))}
             </div>
-            {applications.length === 0 ? (
-              <div className="px-6 py-12 text-center text-gray-600 text-sm">Başvuru bulunamadı.</div>
-            ) : (
-              <div className="divide-y divide-gray-800">
-                {applications.map((app) => (
-                  <div key={app.id} className="px-6 py-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 bg-pink-900 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 text-pink-300">
-                          {app.applicantName[0]}
-                        </div>
+            <div className="an-table">
+              {nominations.length===0 ? <div className="an-empty">Tavsiye bulunamadı.</div> :
+                nominations.map(nom=>(
+                  <div key={nom.id} className="an-row">
+                    <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
+                      <div className="an-user-info" style={{alignItems:"flex-start"}}>
+                        <div className="an-avatar">{nom.candidateName[0]}</div>
                         <div>
-                          <p className="text-white font-medium text-sm">{app.applicantName}</p>
-                          <p className="text-gray-500 text-xs">{app.applicantEmail} · {app.applicantPhone}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className={`border rounded-full px-2.5 py-0.5 text-xs font-medium ${ROLE_COLORS[app.requestedRole]}`}>{ROLE_LABELS[app.requestedRole]}</span>
-                            <span className={`border rounded-full px-2.5 py-0.5 text-xs font-medium ${NOM_STATUS_COLORS[app.status]}`}>{NOM_STATUS_LABELS[app.status]}</span>
-                            {app.referrer && <span className="text-green-400 text-xs">🔗 Referanslı</span>}
+                          <div className="an-user-name">{nom.candidateName}</div>
+                          <div className="an-user-email">{nom.candidateEmail} · {nom.candidatePhone}</div>
+                          <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap"}}>
+                            <span className="an-role-tag" style={{fontSize:"8px"}}>{ROLE_LABELS[nom.candidateRole]}</span>
+                            <span className={getBadge(nom.status)}>{STATUS_LABELS[nom.status]}</span>
                           </div>
-                          {app.message && <p className="text-gray-500 text-xs mt-2 italic">"{app.message}"</p>}
-                          {app.adminNote && <p className="text-yellow-600 text-xs mt-1">📝 {app.adminNote}</p>}
-                          {app.referrer && <p className="text-gray-700 text-xs mt-1">Referans: {app.referrer.firstName} {app.referrer.lastName}</p>}
-                          <p className="text-gray-700 text-xs mt-1">{new Date(app.createdAt).toLocaleDateString("tr-TR")}</p>
+                          {nom.note && <div style={{fontSize:11,color:"var(--muted)",fontStyle:"italic",marginTop:8}}>"{nom.note}"</div>}
+                          {nom.adminNote && <div style={{fontSize:10,color:"#B8860B",marginTop:4}}>📝 {nom.adminNote}</div>}
+                          <div style={{fontSize:10,color:"#B8B2A8",marginTop:6}}>Öneren: {nom.nominator.firstName} {nom.nominator.lastName} · {new Date(nom.createdAt).toLocaleDateString("tr-TR")}</div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button onClick={() => { setNoteModal({ type: "application", id: app.id }); setNoteText(app.adminNote || ""); }}
-                          className="text-gray-400 border border-gray-700 hover:text-white text-xs px-3 py-1.5 rounded-lg transition-colors">Not</button>
-                        {app.status === "PENDING" && (
+                      <div className="an-actions">
+                        <button className="an-btn an-btn-ghost" onClick={()=>{setNoteModal({type:"nomination",id:nom.id});setNoteText(nom.adminNote||"");}}>Not</button>
+                        {nom.status==="PENDING" && (
                           <>
-                            <button onClick={() => handleApplicationStatus(app.id, "APPROVED")} disabled={actionLoading === app.id}
-                              className="bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
-                              {actionLoading === app.id ? "..." : "Onayla"}
-                            </button>
-                            <button onClick={() => handleApplicationStatus(app.id, "REJECTED")} disabled={actionLoading === app.id}
-                              className="bg-red-950 hover:bg-red-900 border border-red-900 text-red-400 text-xs px-3 py-1.5 rounded-lg transition-colors">
-                              {actionLoading === app.id ? "..." : "Reddet"}
-                            </button>
+                            <button className="an-btn an-btn-approve" disabled={actionLoading===nom.id}
+                              onClick={()=>act(nom.id,async()=>{await api.patch(`/admin/nominations/${nom.id}/status`,{status:"APPROVED"});await Promise.all([fetchNominations(nomFilter),fetchStats()]);})}>{actionLoading===nom.id?"...":"Onayla"}</button>
+                            <button className="an-btn an-btn-reject" disabled={actionLoading===nom.id}
+                              onClick={()=>act(nom.id,async()=>{await api.patch(`/admin/nominations/${nom.id}/status`,{status:"REJECTED"});await Promise.all([fetchNominations(nomFilter),fetchStats()]);})}>{actionLoading===nom.id?"...":"Reddet"}</button>
                           </>
                         )}
-                        {app.status === "APPROVED" && (
-                          <button onClick={() => handleApplicationStatus(app.id, "INVITED")} disabled={actionLoading === app.id}
-                            className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors font-medium">
-                            {actionLoading === app.id ? "..." : "Davet Gönderildi"}
-                          </button>
+                        {nom.status==="APPROVED" && (
+                          <button className="an-btn an-btn-navy" disabled={actionLoading===nom.id}
+                            onClick={()=>act(nom.id,async()=>{await api.patch(`/admin/nominations/${nom.id}/status`,{status:"INVITED"});await Promise.all([fetchNominations(nomFilter),fetchStats()]);})}>{actionLoading===nom.id?"...":"Davet Gönderildi"}</button>
                         )}
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                ))
+              }
+            </div>
+          </>
         )}
 
-        {/* Lina Leads */}
-        {activeTab === "leads" && (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h2 className="font-medium text-white">Lina Leads</h2>
-                <span className="bg-rose-900 text-rose-300 border border-rose-800 text-xs px-2.5 py-0.5 rounded-full">{leads.length} lead</span>
-              </div>
-              <button onClick={fetchLeads} className="text-gray-400 border border-gray-700 hover:text-white text-xs px-3 py-1.5 rounded-lg transition-colors">Yenile</button>
+        {/* BAŞVURULAR */}
+        {activeTab==="applications" && (
+          <>
+            <div className="an-filters">
+              {[["all","Tümü"],["PENDING","Bekliyor"],["APPROVED","Onaylandı"],["REJECTED","Reddedildi"],["INVITED","Davet Gönderildi"],["REGISTERED","Kayıt Oldu"]].map(([f,l])=>(
+                <button key={f} className={`an-filter ${appFilter===f?"active":""}`} onClick={()=>setAppFilter(f)}>{l}</button>
+              ))}
             </div>
-            {leads.length === 0 ? (
-              <div className="px-6 py-12 text-center">
-                <p className="text-gray-600 text-sm">Henüz Lina'dan lead gelmedi.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-800">
-                {leads.map((lead) => (
-                  <div key={lead.id} className="px-6 py-4">
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-rose-900 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 text-rose-300">
-                        {lead.fullName ? lead.fullName[0].toUpperCase() : "?"}
+            <div className="an-table">
+              {applications.length===0 ? <div className="an-empty">Başvuru bulunamadı.</div> :
+                applications.map(app=>(
+                  <div key={app.id} className="an-row">
+                    <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
+                      <div className="an-user-info" style={{alignItems:"flex-start"}}>
+                        <div className="an-avatar" style={{background:"#3D1A1A",color:"#F5A0A0"}}>{app.applicantName[0]}</div>
+                        <div>
+                          <div className="an-user-name">{app.applicantName}</div>
+                          <div className="an-user-email">{app.applicantEmail} · {app.applicantPhone}</div>
+                          <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap"}}>
+                            <span className="an-role-tag" style={{fontSize:"8px"}}>{ROLE_LABELS[app.requestedRole]}</span>
+                            <span className={getBadge(app.status)}>{STATUS_LABELS[app.status]}</span>
+                            {app.referrer && <span style={{fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:"#2D6A4F",border:"1px solid #2D6A4F",padding:"4px 10px"}}>Referanslı</span>}
+                          </div>
+                          {app.message && <div style={{fontSize:11,color:"var(--muted)",fontStyle:"italic",marginTop:8}}>"{app.message}"</div>}
+                          {app.adminNote && <div style={{fontSize:10,color:"#B8860B",marginTop:4}}>📝 {app.adminNote}</div>}
+                          {app.referrer && <div style={{fontSize:10,color:"#B8B2A8",marginTop:4}}>Referans: {app.referrer.firstName} {app.referrer.lastName}</div>}
+                          <div style={{fontSize:10,color:"#B8B2A8",marginTop:4}}>{new Date(app.createdAt).toLocaleDateString("tr-TR")}</div>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-white font-medium text-sm">{lead.fullName || "İsimsiz"}</p>
-                          <span className="bg-rose-950 text-rose-400 border border-rose-900 text-xs px-2 py-0.5 rounded-full">🤖 {lead.source}</span>
+                      <div className="an-actions">
+                        <button className="an-btn an-btn-ghost" onClick={()=>{setNoteModal({type:"application",id:app.id});setNoteText(app.adminNote||"");}}>Not</button>
+                        {app.status==="PENDING" && (
+                          <>
+                            <button className="an-btn an-btn-approve" disabled={actionLoading===app.id}
+                              onClick={()=>act(app.id,async()=>{await api.patch(`/admin/applications/${app.id}/status`,{status:"APPROVED"});await Promise.all([fetchApplications(appFilter),fetchStats()]);})}>{actionLoading===app.id?"...":"Onayla"}</button>
+                            <button className="an-btn an-btn-reject" disabled={actionLoading===app.id}
+                              onClick={()=>act(app.id,async()=>{await api.patch(`/admin/applications/${app.id}/status`,{status:"REJECTED"});await Promise.all([fetchApplications(appFilter),fetchStats()]);})}>{actionLoading===app.id?"...":"Reddet"}</button>
+                          </>
+                        )}
+                        {app.status==="APPROVED" && (
+                          <button className="an-btn an-btn-navy" disabled={actionLoading===app.id}
+                            onClick={()=>act(app.id,async()=>{await api.patch(`/admin/applications/${app.id}/status`,{status:"INVITED"});await Promise.all([fetchApplications(appFilter),fetchStats()]);})}>{actionLoading===app.id?"...":"Davet Gönderildi"}</button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          </>
+        )}
+
+        {/* LINA LEADS */}
+        {activeTab==="leads" && (
+          <>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <span style={{fontFamily:"var(--serif)",fontSize:14,color:"var(--muted)",fontStyle:"italic"}}>{leads.length} lead toplandı</span>
+              </div>
+              <button className="an-btn an-btn-ghost" onClick={fetchLeads}>Yenile</button>
+            </div>
+            <div className="an-table">
+              {leads.length===0 ? <div className="an-empty">Henüz Lina'dan lead gelmedi.</div> :
+                leads.map(lead=>(
+                  <div key={lead.id} className="an-lead-row">
+                    <div style={{display:"flex",alignItems:"flex-start",gap:14}}>
+                      <div className="an-avatar" style={{background:"#3D0A1E",color:"#F5A0B8",flexShrink:0}}>
+                        {lead.fullName?lead.fullName[0].toUpperCase():"?"}
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                          <span className="an-user-name">{lead.fullName||"İsimsiz"}</span>
+                          <span style={{fontSize:8,letterSpacing:1.5,textTransform:"uppercase",border:"1px solid #F5A0B8",color:"#C0394F",padding:"3px 8px"}}>Lina</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
-                          {lead.phone && <p className="text-gray-500 text-xs">📞 {lead.phone}</p>}
-                          {lead.email && <p className="text-gray-500 text-xs">✉️ {lead.email}</p>}
-                          {lead.profession && <p className="text-gray-500 text-xs">💼 {lead.profession}</p>}
-                          {lead.city && <p className="text-gray-500 text-xs">📍 {lead.city}</p>}
-                          {lead.interest && <p className="text-gray-500 text-xs col-span-2">🎯 {lead.interest}</p>}
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"4px 24px"}}>
+                          {lead.phone && <span className="an-user-email">📞 {lead.phone}</span>}
+                          {lead.email && <span className="an-user-email">✉️ {lead.email}</span>}
+                          {lead.profession && <span className="an-user-email">💼 {lead.profession}</span>}
+                          {lead.city && <span className="an-user-email">📍 {lead.city}</span>}
+                          {lead.interest && <span className="an-user-email" style={{gridColumn:"span 2"}}>🎯 {lead.interest}</span>}
                         </div>
-                        <p className="text-gray-700 text-xs mt-2">{new Date(lead.createdAt).toLocaleDateString("tr-TR")} · {new Date(lead.createdAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</p>
+                        <div style={{fontSize:10,color:"#B8B2A8",marginTop:8}}>
+                          {new Date(lead.createdAt).toLocaleDateString("tr-TR")} · {new Date(lead.createdAt).toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"})}
+                        </div>
                         {lead.conversation && (
-                          <button onClick={() => setExpandedLead(expandedLead === lead.id ? null : lead.id)}
-                            className="text-rose-400 text-xs mt-2 hover:text-rose-300 transition-colors">
-                            {expandedLead === lead.id ? "▲ Konuşmayı gizle" : "▼ Konuşmayı gör"}
-                          </button>
-                        )}
-                        {expandedLead === lead.id && lead.conversation && (
-                          <div className="mt-3 bg-gray-800 rounded-lg p-3 max-h-48 overflow-y-auto">
-                            {(() => {
-                              try {
-                                const msgs = JSON.parse(lead.conversation);
-                                return msgs.map((m: { role: string; content: string }, i: number) => (
-                                  <div key={i} className={`mb-2 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                                    <div className={`text-xs px-3 py-1.5 rounded-lg max-w-xs ${m.role === "user" ? "bg-blue-900 text-blue-200" : "bg-gray-700 text-gray-300"}`}>
-                                      {m.content}
-                                    </div>
+                          <>
+                            <button className="an-conv-toggle" onClick={()=>setExpandedLead(expandedLead===lead.id?null:lead.id)}>
+                              {expandedLead===lead.id?"▲ Konuşmayı Gizle":"▼ Konuşmayı Gör"}
+                            </button>
+                            {expandedLead===lead.id && (
+                              <div className="an-lead-conv">
+                                {(()=>{try{const msgs=JSON.parse(lead.conversation);return msgs.map((m:{role:string;content:string},i:number)=>(
+                                  <div key={i} className={`an-conv-msg ${m.role}`}>
+                                    <div className={`an-conv-bubble ${m.role}`}>{m.content}</div>
                                   </div>
-                                ));
-                              } catch { return <p className="text-gray-500 text-xs">{lead.conversation}</p>; }
-                            })()}
-                          </div>
+                                ));}catch{return <p style={{fontSize:11,color:"var(--muted)"}}>{lead.conversation}</p>;}})()}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                ))
+              }
+            </div>
+          </>
         )}
-      </div>
-    </div>
+
+      </main>
+    </>
   );
 }
