@@ -256,9 +256,10 @@ export default function StokPage() {
   };
 
   const generateAiDescription = async () => {
-    setAiLoading(true); setAiResult("");
+    setAiLoading(true);
+    setAiResult("");
     try {
-      const prompt = `Bir emlak ilanı için kısa ve profesyonel Türkçe açıklama yaz. Bilgiler: Tip: ${TYPE_LABELS[unitForm.type] || unitForm.type}, Oda: ${unitForm.roomCount}, Alan: ${unitForm.area}m², Kat: ${unitForm.floor}, Durum: ${STATUS_LABELS[unitForm.status]}, Sehir: ${projectForm.city}, Ilce: ${projectForm.district}. Maksimum 3 cumle, samimi ve dogal bir dil kullan. Abartili ifadelerden kacin.`;
+      const prompt = `Bir emlak ilani icin kisa ve profesyonel Turkce aciklama yaz. Bilgiler: Tip: ${TYPE_LABELS[unitForm.type] || unitForm.type}, Oda: ${unitForm.roomCount}, Alan: ${unitForm.area}m2, Kat: ${unitForm.floor}, Durum: ${STATUS_LABELS[unitForm.status]}, Sehir: ${projectForm.city}, Ilce: ${projectForm.district}. Maksimum 3 cumle, samimi ve dogal bir dil kullan.`;
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -268,7 +269,9 @@ export default function StokPage() {
       setAiResult(data.reply || "Aciklama olusturulamadi.");
     } catch {
       setAiResult("Baglanti hatasi. Lutfen tekrar deneyin.");
-    } finally { setAiLoading(false); }
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -340,7 +343,7 @@ export default function StokPage() {
                 <div className="st-modal-section-title">Proje</div>
                 {myProjects.length > 0 && (
                   <div className="st-field" style={{ marginBottom: 16 }}>
-                    <label>Mevcut Projeye Ekle (istege bagli)</label>
+                    <label>Mevcut Projeye Ekle</label>
                     <select className="st-fselect" value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)}>
                       <option value="">Yeni Proje Olustur</option>
                       {myProjects.map(p => <option key={p.id} value={p.id}>{p.name} ({p.city})</option>)}
@@ -350,7 +353,7 @@ export default function StokPage() {
                 {!selectedProjectId && (
                   <div className="st-form-grid">
                     <div className="st-field">
-                      <label>Proje / Site Adi *</label>
+                      <label>Proje Adi *</label>
                       <input className="st-input" placeholder="Denizli Merkez" value={projectForm.name} onChange={e => setProjectForm(f => ({ ...f, name: e.target.value }))} />
                     </div>
                     <div className="st-field">
@@ -400,7 +403,7 @@ export default function StokPage() {
                     <input className="st-input" type="number" placeholder="3" value={unitForm.floor} onChange={e => setUnitForm(f => ({ ...f, floor: e.target.value }))} />
                   </div>
                   <div className="st-field">
-                    <label>Daire / Birim No *</label>
+                    <label>Daire No *</label>
                     <input className="st-input" placeholder="301" value={unitForm.number} onChange={e => setUnitForm(f => ({ ...f, number: e.target.value }))} />
                   </div>
                   <div className="st-field" style={{ gridColumn: "span 2" }}>
@@ -440,7 +443,7 @@ export default function StokPage() {
                   )}
                 </div>
                 <div className="st-field">
-                  <label>Ilan Aciklamasi (duzenleyebilirsiniz)</label>
+                  <label>Ilan Aciklamasi</label>
                   <textarea className="st-textarea" placeholder="Mulk hakkinda kisa aciklama..." value={unitForm.description} onChange={e => setUnitForm(f => ({ ...f, description: e.target.value }))} />
                 </div>
               </div>

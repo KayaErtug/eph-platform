@@ -219,3 +219,79 @@ model Lead {
   source       String   @default("LINA")
   createdAt    DateTime @default(now())
 }
+
+enum CustomerStatus {
+  YENI_LEAD
+  ILK_GORUSME
+  PORTFOLYO_GONDERILDI
+  YER_GOSTERIMI
+  TEKLIF_SURECI
+  PAZARLIK
+  KAPANDI
+  KAYBEDILDI
+}
+
+enum ActivityType {
+  TELEFON
+  WHATSAPP
+  EMAIL
+  YER_GOSTERIMI
+  TEKLIF
+  NOT
+  DIGER
+}
+
+enum TaskStatus {
+  BEKLIYOR
+  TAMAMLANDI
+  IPTAL
+}
+
+model Customer {
+  id              String         @id @default(uuid())
+  ownerId         String
+  owner           User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  firstName       String
+  lastName        String
+  phone           String?
+  email           String?
+  city            String?
+  profession      String?
+  company         String?
+  budget          Float?
+  interestedArea  String?
+  interestedType  String?
+  source          String?
+  status          CustomerStatus @default(YENI_LEAD)
+  tags            String[]
+  notes           String?
+  lastContactedAt DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  activities      Activity[]
+  tasks           Task[]
+}
+
+model Activity {
+  id          String       @id @default(uuid())
+  customerId  String
+  customer    Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        ActivityType
+  note        String
+  createdAt   DateTime     @default(now())
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  customerId  String
+  customer    Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  dueDate     DateTime?
+  status      TaskStatus @default(BEKLIYOR)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
