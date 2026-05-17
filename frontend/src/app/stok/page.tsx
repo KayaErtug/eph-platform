@@ -566,7 +566,7 @@ export default function StokPage() {
               <div className="st-empty">
                 <div className="st-empty-text">Henüz proje eklenmemiş</div>
                 <div className="st-empty-sub">
-                  {canAddUnit ? "Sağ üstteki "İlan Ekle" butonuna tıklayın" : "Portföyünüzü oluşturmaya başlayın"}
+                  {canAddUnit ? "Sağ üstteki İlan Ekle" butonuna tıklayın" : "Portföyünüzü oluşturmaya başlayın"}
                 </div>
               </div>
             ) : projects.map(p => {
