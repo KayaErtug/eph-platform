@@ -92,13 +92,7 @@ export default function DashboardPage() {
         }
         body{font-family:var(--sans);background:var(--warm);color:var(--text);}
         .db-root{min-height:100vh;display:grid;grid-template-rows:auto 1fr;}
-        
-        /* NAV */
-        .db-nav{
-          height:68px;background:#fff;border-bottom:1px solid var(--border);
-          display:flex;align-items:center;justify-content:space-between;
-          padding:0 48px;position:sticky;top:0;z-index:100;
-        }
+        .db-nav{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 48px;position:sticky;top:0;z-index:100;}
         @media(max-width:768px){.db-nav{padding:0 20px;}}
         .db-nav-logo{display:flex;align-items:center;gap:12px;text-decoration:none;}
         .db-nav-logo img{width:34px;height:34px;object-fit:contain;}
@@ -106,37 +100,16 @@ export default function DashboardPage() {
         .db-nav-logo-sub{font-size:7px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);}
         .db-nav-links{display:flex;align-items:center;gap:4px;}
         @media(max-width:768px){.db-nav-links .db-nav-lbl{display:none;}}
-        .db-nav-item{
-          display:flex;align-items:center;gap:8px;padding:8px 16px;
-          font-size:11px;letter-spacing:1.5px;text-transform:uppercase;
-          color:var(--muted);text-decoration:none;transition:all 0.2s;
-          border-bottom:2px solid transparent;font-weight:400;
-        }
+        .db-nav-item{display:flex;align-items:center;gap:8px;padding:8px 16px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:all 0.2s;border-bottom:2px solid transparent;font-weight:400;}
         .db-nav-item:hover{color:var(--navy);border-bottom-color:var(--gold);}
         .db-nav-item.active{color:var(--navy);border-bottom-color:var(--gold);}
         .db-nav-right{display:flex;align-items:center;gap:12px;}
-        .db-nav-user{
-          display:flex;align-items:center;gap:10px;
-          font-size:12px;color:var(--muted);font-weight:300;
-        }
-        .db-nav-avatar{
-          width:32px;height:32px;background:var(--navy);
-          display:flex;align-items:center;justify-content:center;
-          font-family:var(--serif);font-size:14px;color:var(--cream);font-weight:400;
-        }
-        .db-nav-logout{
-          font-size:10px;letter-spacing:2px;text-transform:uppercase;
-          color:var(--muted);background:none;border:1px solid var(--border);
-          padding:7px 14px;cursor:pointer;font-family:var(--sans);
-          transition:all 0.2s;
-        }
+        .db-nav-user{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);font-weight:300;}
+        .db-nav-avatar{width:32px;height:32px;background:var(--navy);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:14px;color:var(--cream);font-weight:400;}
+        .db-nav-logout{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:1px solid var(--border);padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
         .db-nav-logout:hover{border-color:var(--navy);color:var(--navy);}
-
-        /* MAIN */
         .db-main{padding:48px 48px 80px;max-width:1200px;margin:0 auto;width:100%;}
         @media(max-width:768px){.db-main{padding:32px 20px;}}
-
-        /* HEADER */
         .db-header{margin-bottom:48px;padding-bottom:40px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;align-items:end;gap:24px;}
         @media(max-width:768px){.db-header{grid-template-columns:1fr;}}
         .db-greeting{font-family:var(--serif);font-size:clamp(32px,4vw,48px);font-weight:300;color:var(--navy);line-height:1.1;letter-spacing:-0.5px;}
@@ -145,31 +118,17 @@ export default function DashboardPage() {
         .db-status{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;}
         .db-status-dot{width:6px;height:6px;border-radius:50%;}
         .db-role-tag{font-size:9px;letter-spacing:2px;text-transform:uppercase;border:1px solid var(--border);padding:5px 12px;color:var(--navy);font-weight:500;}
-
-        /* CARDS GRID */
-        .db-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin-bottom:48px;}
+        .db-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:48px;}
+        @media(max-width:1024px){.db-cards{grid-template-columns:1fr 1fr;}}
         @media(max-width:768px){.db-cards{grid-template-columns:1fr;}}
-        .db-card{
-          background:#fff;padding:36px 32px;
-          display:flex;flex-direction:column;
-          cursor:pointer;text-decoration:none;
-          transition:background 0.3s;position:relative;overflow:hidden;
-        }
-        .db-card::before{
-          content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
-          background:var(--gold);transform:scaleX(0);transform-origin:left;
-          transition:transform 0.4s cubic-bezier(0.4,0,0.2,1);
-        }
+        .db-card{background:#fff;padding:36px 32px;display:flex;flex-direction:column;cursor:pointer;text-decoration:none;transition:background 0.3s;position:relative;overflow:hidden;}
+        .db-card::before{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--gold);transform:scaleX(0);transform-origin:left;transition:transform 0.4s cubic-bezier(0.4,0,0.2,1);}
         .db-card:hover{background:var(--warm);}
         .db-card:hover::before{transform:scaleX(1);}
-        .db-card-disabled{background:#FAFAF8;opacity:0.5;cursor:not-allowed;}
-        .db-card-disabled::before{display:none;}
         .db-card-icon{width:40px;height:40px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin-bottom:24px;}
         .db-card-num{font-family:var(--serif);font-size:11px;color:var(--gold);letter-spacing:2px;margin-bottom:8px;}
         .db-card-title{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--navy);margin-bottom:8px;}
         .db-card-desc{font-size:12px;color:var(--muted);font-weight:300;line-height:1.6;}
-
-        /* REFERANS */
         .db-ref{background:#fff;border:1px solid var(--border);padding:36px;margin-bottom:32px;}
         .db-ref-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;}
         .db-ref-title{font-family:var(--serif);font-size:24px;font-weight:400;color:var(--navy);}
@@ -180,31 +139,17 @@ export default function DashboardPage() {
         .db-ref-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
         .db-ref-value{font-family:var(--serif);font-size:24px;font-weight:400;color:var(--gold);letter-spacing:2px;margin-bottom:12px;}
         .db-ref-link{font-size:11px;color:var(--muted);font-weight:300;word-break:break-all;margin-bottom:12px;}
-        .db-ref-copy{
-          font-size:9px;letter-spacing:2px;text-transform:uppercase;
-          background:none;border:1px solid var(--border);padding:7px 14px;
-          cursor:pointer;font-family:var(--sans);color:var(--navy);
-          transition:all 0.2s;display:flex;align-items:center;gap:6px;
-        }
+        .db-ref-copy{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:7px 14px;cursor:pointer;font-family:var(--sans);color:var(--navy);transition:all 0.2s;display:flex;align-items:center;gap:6px;}
         .db-ref-copy:hover{border-color:var(--navy);background:var(--navy);color:var(--cream);}
-
-        /* NOMİNATION */
         .db-nom{background:#fff;border:1px solid var(--border);padding:36px;}
         .db-nom-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;}
         .db-nom-title{font-family:var(--serif);font-size:24px;font-weight:400;color:var(--navy);}
         .db-nom-quota{font-size:11px;color:var(--muted);font-weight:300;margin-top:4px;}
-        .db-nom-btn{
-          font-size:9px;letter-spacing:2px;text-transform:uppercase;
-          background:var(--navy);color:var(--cream);border:none;
-          padding:10px 20px;cursor:pointer;font-family:var(--sans);
-          transition:all 0.3s;position:relative;overflow:hidden;
-        }
+        .db-nom-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:10px 20px;cursor:pointer;font-family:var(--sans);transition:all 0.3s;position:relative;overflow:hidden;}
         .db-nom-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:var(--gold);transition:left 0.4s;}
         .db-nom-btn:hover::before{left:0;}
         .db-nom-btn:hover{color:var(--navy);}
         .db-nom-btn span{position:relative;z-index:1;}
-
-        /* NOM FORM */
         .db-nom-form{background:var(--warm);border:1px solid var(--border);padding:32px;margin-bottom:24px;animation:fadeUp 0.3s ease;}
         @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         .db-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
@@ -220,8 +165,6 @@ export default function DashboardPage() {
         .db-form-cancel{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:12px 20px;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all 0.2s;}
         .db-form-cancel:hover{border-color:var(--navy);color:var(--navy);}
         .db-form-error{font-size:11px;color:#C0392B;margin-top:12px;}
-
-        /* NOM LIST */
         .db-nom-list{display:flex;flex-direction:column;gap:1px;background:var(--border);}
         .db-nom-item{background:#fff;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;}
         .db-nom-item:hover{background:var(--warm);}
@@ -229,18 +172,13 @@ export default function DashboardPage() {
         .db-nom-name{font-size:14px;font-weight:400;color:var(--navy);}
         .db-nom-email{font-size:11px;color:var(--muted);font-weight:300;}
         .db-nom-date{font-size:10px;color:var(--muted);font-weight:300;}
-
-        /* SUCCESS */
         .db-success{background:#F0FAF4;border-left:3px solid #2D6A4F;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:10px;font-size:13px;color:#2D6A4F;font-weight:300;}
-
-        /* UYARI */
         .db-warning{background:#FFFBF0;border-left:3px solid var(--gold);padding:16px 20px;margin-bottom:32px;display:flex;align-items:flex-start;gap:12px;}
         .db-warning-text{font-size:13px;color:#7A6020;font-weight:300;line-height:1.6;}
         .db-warning-title{font-size:13px;color:#5A4010;font-weight:500;margin-bottom:4px;}
       `}</style>
 
       <div className="db-root">
-        {/* NAV */}
         <nav className="db-nav">
           <a href="/dashboard" className="db-nav-logo">
             <img src="/LOGO_EPH.png" alt="EPH" />
@@ -253,26 +191,21 @@ export default function DashboardPage() {
             <Link href="/dashboard" className="db-nav-item active"><span className="db-nav-lbl">Ana Sayfa</span></Link>
             <Link href="/profil" className="db-nav-item"><span className="db-nav-lbl">Profilim</span></Link>
             <Link href="/stok" className="db-nav-item"><span className="db-nav-lbl">Stok</span></Link>
+            <Link href="/crm" className="db-nav-item"><span className="db-nav-lbl">CRM</span></Link>
             {user.role === "ADMIN" && <Link href="/admin" className="db-nav-item"><span className="db-nav-lbl">Admin</span></Link>}
           </div>
           <div className="db-nav-right">
             <div className="db-nav-user">
               <div className="db-nav-avatar">{user.firstName[0]}</div>
-              <span style={{ display: "none" }}>{user.firstName}</span>
             </div>
             <button className="db-nav-logout" onClick={() => { logout(); router.push("/giris"); }}>Çıkış</button>
           </div>
         </nav>
 
         <main className="db-main">
-
-          {/* HEADER */}
           <div className="db-header">
             <div>
-              <h1 className="db-greeting">
-                Hoş geldin,<br />
-                <em>{user.firstName} {user.lastName}</em>
-              </h1>
+              <h1 className="db-greeting">Hoş geldin,<br /><em>{user.firstName} {user.lastName}</em></h1>
               <p className="db-greeting-sub">{user.email}</p>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
@@ -286,7 +219,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* UYARI */}
           {!user.isApproved && (
             <div className="db-warning">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B8860B" strokeWidth="1.5" style={{ flexShrink: 0, marginTop: 2 }}>
@@ -299,7 +231,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* KARTLAR */}
           <div className="db-cards">
             <Link href="/profil" className="db-card">
               <div className="db-card-icon">
@@ -319,28 +250,36 @@ export default function DashboardPage() {
               <div className="db-card-desc">Proje ve daire yönetimi, gerçek zamanlı takip</div>
             </Link>
 
+            <Link href="/crm" className="db-card">
+              <div className="db-card-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <div className="db-card-num">03</div>
+              <div className="db-card-title">CRM Modülü</div>
+              <div className="db-card-desc">Müşteri takibi, pipeline ve lead yönetimi</div>
+            </Link>
+
             {user.role === "ADMIN" ? (
               <Link href="/admin" className="db-card">
                 <div className="db-card-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
                 </div>
-                <div className="db-card-num">03</div>
+                <div className="db-card-num">04</div>
                 <div className="db-card-title">Admin Paneli</div>
                 <div className="db-card-desc">Üye ve belge yönetimi</div>
               </Link>
             ) : (
-              <div className="db-card db-card-disabled">
+              <Link href="/crm" className="db-card">
                 <div className="db-card-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4CEC4" strokeWidth="1.5"><rect x="3" y="11" width="18" height="11" rx="1"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                 </div>
-                <div className="db-card-num" style={{ color: "#D4CEC4" }}>03</div>
-                <div className="db-card-title" style={{ color: "#D4CEC4" }}>CRM Modülü</div>
-                <div className="db-card-desc">Yakında geliyor...</div>
-              </div>
+                <div className="db-card-num">04</div>
+                <div className="db-card-title">Pipeline</div>
+                <div className="db-card-desc">Satış süreci ve lead takibi</div>
+              </Link>
             )}
           </div>
 
-          {/* REFERANS KODU */}
           {user.isApproved && user.role !== "ADMIN" && user.referralCode && (
             <div className="db-ref">
               <div className="db-ref-header">
@@ -348,9 +287,7 @@ export default function DashboardPage() {
                   <div className="db-ref-title">Referans Kodunuz</div>
                   <div className="db-ref-sub">Tanıdıklarınızı platforma davet edin</div>
                 </div>
-                <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 11, color: "var(--muted)", letterSpacing: 1 }}>
-                  Aktif
-                </div>
+                <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 11, color: "var(--muted)", letterSpacing: 1 }}>Aktif</div>
               </div>
               <div className="db-ref-grid">
                 <div className="db-ref-box">
@@ -379,7 +316,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* TAVSİYE ET */}
           {user.isApproved && user.role !== "ADMIN" && (
             <div className="db-nom">
               <div className="db-nom-header">
@@ -427,7 +363,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="db-field">
                     <label>Neden öneriyorsunuz? (isteğe bağlı)</label>
-                    <textarea className="db-textarea" rows={2} placeholder="Bu kişiyi tanıyorum, sektörde deneyimli bir profesyonel..." value={nomForm.note} onChange={e => setNomForm(f => ({ ...f, note: e.target.value }))} />
+                    <textarea className="db-textarea" rows={2} placeholder="Bu kişiyi tanıyorum, sektörde deneyimli..." value={nomForm.note} onChange={e => setNomForm(f => ({ ...f, note: e.target.value }))} />
                   </div>
                   {nomError && <div className="db-form-error">{nomError}</div>}
                   <div className="db-form-actions">
@@ -467,7 +403,6 @@ export default function DashboardPage() {
               )}
             </div>
           )}
-
         </main>
       </div>
     </>
