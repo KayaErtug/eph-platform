@@ -8,6 +8,8 @@ import Link from "next/link";
 interface Unit {
   id: string; type: string; floor?: number; number: string;
   roomCount?: string; area?: number; price: number; status: string; description?: string;
+  isVerified?: boolean; isOffMarket?: boolean;
+  tapuVerified?: boolean; photoVerified?: boolean; yetkiVerified?: boolean;
   project: { id: string; name: string; city: string; district: string; address: string; owner: { firstName: string; lastName: string } };
 }
 interface Project {
@@ -23,17 +25,17 @@ const STATUS_LABELS: Record<string, string> = {
   REZERVE: "Rezerve", SATILDI: "Satıldı", KIRALANDII: "Kiralandı", PASIF: "Pasif",
 };
 const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
-  SATILIK:       { color: "#2D6A4F", bg: "#F0FAF4" },
-  KIRALIK:       { color: "#1A4A7A", bg: "#EEF4FF" },
-  GUNLUK_KIRALIK:{ color: "#1A4A7A", bg: "#EEF4FF" },
-  DEVREN_SATILIK:{ color: "#5B2D8E", bg: "#F5F0FF" },
-  DEVREN_KIRALIK:{ color: "#5B2D8E", bg: "#F5F0FF" },
-  INSAAT_PROJESI:{ color: "#B8560B", bg: "#FFF5ED" },
-  KAT_KARSILIGI: { color: "#B8860B", bg: "#FFFBF0" },
-  REZERVE:       { color: "#B8860B", bg: "#FFFBF0" },
-  SATILDI:       { color: "#8A8A8A", bg: "#F5F5F5" },
-  KIRALANDII:    { color: "#8A8A8A", bg: "#F5F5F5" },
-  PASIF:         { color: "#8A8A8A", bg: "#F5F5F5" },
+  SATILIK:        { color: "#2D6A4F", bg: "#F0FAF4" },
+  KIRALIK:        { color: "#1A4A7A", bg: "#EEF4FF" },
+  GUNLUK_KIRALIK: { color: "#1A4A7A", bg: "#EEF4FF" },
+  DEVREN_SATILIK: { color: "#5B2D8E", bg: "#F5F0FF" },
+  DEVREN_KIRALIK: { color: "#5B2D8E", bg: "#F5F0FF" },
+  INSAAT_PROJESI: { color: "#B8560B", bg: "#FFF5ED" },
+  KAT_KARSILIGI:  { color: "#B8860B", bg: "#FFFBF0" },
+  REZERVE:        { color: "#B8860B", bg: "#FFFBF0" },
+  SATILDI:        { color: "#8A8A8A", bg: "#F5F5F5" },
+  KIRALANDII:     { color: "#8A8A8A", bg: "#F5F5F5" },
+  PASIF:          { color: "#8A8A8A", bg: "#F5F5F5" },
 };
 const TYPE_LABELS: Record<string, string> = {
   DAIRE: "Daire", VILLA: "Villa", REZIDANS: "Rezidans", MUSTAK_EV: "Müstakil Ev",
@@ -60,7 +62,6 @@ const CSS = `
 }
 body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 
-/* NAV */
 .st-nav{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 48px;position:sticky;top:0;z-index:100;}
 @media(max-width:768px){.st-nav{padding:0 20px;}}
 .st-logo{display:flex;align-items:center;gap:12px;text-decoration:none;}
@@ -72,23 +73,20 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-nav-item:hover{color:var(--navy);border-bottom-color:var(--gold);}
 .st-nav-item.active{color:var(--navy);border-bottom-color:var(--gold);}
 .st-nav-right{display:flex;align-items:center;gap:10px;}
-.st-logout{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:1px solid var(--border);padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;text-decoration:none;display:inline-block;}
+.st-logout{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:1px solid var(--border);padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
 .st-logout:hover{border-color:var(--navy);color:var(--navy);}
 
-/* MAIN */
 .st-main{max-width:1200px;margin:0 auto;padding:56px 48px 100px;animation:fadeUp 0.5s ease;}
 @media(max-width:768px){.st-main{padding:32px 20px;}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* HEADER */
 .st-header{margin-bottom:48px;padding-bottom:40px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;align-items:end;gap:24px;}
 @media(max-width:768px){.st-header{grid-template-columns:1fr;}}
 .st-title{font-family:var(--serif);font-size:clamp(36px,4vw,52px);font-weight:300;color:var(--navy);letter-spacing:-0.5px;line-height:1.1;}
 .st-title em{font-style:italic;color:var(--gold);}
 .st-sub{font-size:13px;color:var(--muted);margin-top:8px;font-weight:300;}
 
-/* STATS */
 .st-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:40px;}
 @media(max-width:768px){.st-stats{grid-template-columns:1fr 1fr;}}
 .st-stat{background:#fff;padding:24px;}
@@ -98,51 +96,50 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-stat-num.green{color:#2D6A4F;}
 .st-stat-num.blue{color:#1A4A7A;}
 
-/* TABS */
 .st-tabs{display:flex;gap:0;margin-bottom:32px;border-bottom:1px solid var(--border);}
 .st-tab{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;padding:12px 20px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;position:relative;bottom:-1px;}
 .st-tab:hover{color:var(--navy);}
 .st-tab.active{color:var(--navy);border-bottom-color:var(--gold);}
 
-/* FILTERS */
 .st-filters{display:flex;gap:12px;margin-bottom:28px;flex-wrap:wrap;align-items:flex-end;}
 .st-filter-wrap label{display:block;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
 .st-select{background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:8px 0;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;appearance:none;cursor:pointer;font-weight:300;min-width:180px;}
 .st-filter-input{background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:8px 0;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;font-weight:300;min-width:160px;}
 .st-filter-input::placeholder{color:#C0BAB0;}
-.st-filter-input:focus{border-bottom-color:var(--navy);}
-.st-select:focus{border-bottom-color:var(--navy);}
+.st-filter-input:focus,.st-select:focus{border-bottom-color:var(--navy);}
 
-/* PROJECT CARD */
 .st-project{background:#fff;border:1px solid var(--border);margin-bottom:16px;transition:border-color 0.3s;}
 .st-project:hover{border-color:var(--navy);}
 .st-project-header{padding:28px 32px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start;}
 .st-project-name{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--navy);margin-bottom:6px;}
 .st-project-loc{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-weight:300;margin-bottom:4px;}
-.st-project-owner{font-size:10px;color:#B8B2A8;font-weight:300;letter-spacing:0.5px;}
+.st-project-owner{font-size:10px;color:#B8B2A8;font-weight:300;}
 .st-project-meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
 .st-active-badge{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid;padding:4px 10px;}
 .st-unit-count{font-family:var(--serif);font-size:13px;color:var(--muted);font-style:italic;}
 
-/* UNITS GRID */
 .st-units-grid{padding:24px 32px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
-.st-unit-card{border:1px solid var(--border);padding:16px;transition:all 0.2s;cursor:default;}
+.st-unit-card{border:1px solid var(--border);padding:16px;transition:all 0.2s;}
 .st-unit-card:hover{border-color:var(--navy);background:var(--warm);}
 .st-unit-number{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
 .st-unit-type{font-family:var(--serif);font-size:16px;font-weight:400;color:var(--navy);margin-bottom:4px;}
-.st-unit-detail{font-size:10px;color:var(--muted);font-weight:300;margin-bottom:10px;}
+.st-unit-detail{font-size:10px;color:var(--muted);font-weight:300;margin-bottom:8px;}
 .st-unit-price{font-family:var(--serif);font-size:18px;font-weight:400;color:var(--gold);}
-.st-unit-status{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid;padding:3px 8px;display:inline-block;margin-bottom:10px;}
+.st-unit-status{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid;padding:3px 8px;display:inline-block;margin-bottom:8px;}
 
-/* ALL UNITS */
+/* DOĞRULAMA BADGELERİ */
+.st-badges{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
+.st-badge-verified{font-size:7px;letter-spacing:1px;text-transform:uppercase;border:1px solid #2D6A4F;color:#2D6A4F;background:#F0FAF4;padding:2px 7px;display:inline-flex;align-items:center;gap:3px;}
+.st-badge-offmarket{font-size:7px;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--navy);color:var(--navy);background:#EEF2FF;padding:2px 7px;display:inline-flex;align-items:center;gap:3px;}
+
 .st-all-units{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
 @media(max-width:768px){.st-all-units{grid-template-columns:1fr;}}
 .st-unit-big{background:#fff;border:1px solid var(--border);padding:24px;transition:border-color 0.3s;}
 .st-unit-big:hover{border-color:var(--navy);}
 .st-unit-big-project{font-family:var(--serif);font-size:18px;font-weight:400;color:var(--navy);margin-bottom:4px;}
-.st-unit-big-loc{font-size:11px;color:var(--muted);font-weight:300;margin-bottom:16px;}
-.st-unit-big-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);margin-bottom:16px;}
-.st-unit-big-cell{background:#fff;padding:12px;transition:background 0.2s;}
+.st-unit-big-loc{font-size:11px;color:var(--muted);font-weight:300;margin-bottom:12px;}
+.st-unit-big-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);margin-bottom:14px;}
+.st-unit-big-cell{background:#fff;padding:12px;}
 .st-unit-big-cell:hover{background:var(--warm);}
 .st-unit-big-cell-label{font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
 .st-unit-big-cell-val{font-size:13px;color:var(--navy);font-weight:400;}
@@ -150,11 +147,22 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-unit-big-room{font-size:11px;color:var(--muted);font-weight:300;}
 .st-unit-big-price{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--gold);}
 
-/* EMPTY */
 .st-empty{background:#fff;border:1px solid var(--border);padding:80px;text-align:center;}
 .st-empty-text{font-family:var(--serif);font-size:22px;font-style:italic;color:var(--muted);margin-bottom:6px;}
 .st-empty-sub{font-size:12px;color:#B8B2A8;font-weight:300;}
 `;
+
+function VerifiedBadges({ u }: { u: Unit }) {
+  if (!u.tapuVerified && !u.photoVerified && !u.yetkiVerified && !u.isOffMarket) return null;
+  return (
+    <div className="st-badges">
+      {u.tapuVerified && <span className="st-badge-verified">✓ Tapu</span>}
+      {u.photoVerified && <span className="st-badge-verified">✓ Fotoğraf</span>}
+      {u.yetkiVerified && <span className="st-badge-verified">✓ Yetki</span>}
+      {u.isOffMarket && <span className="st-badge-offmarket">⬤ Off-Market</span>}
+    </div>
+  );
+}
 
 export default function StokPage() {
   const { user, logout } = useAuthStore();
@@ -202,14 +210,12 @@ export default function StokPage() {
   const totalSatilik = units.filter(u => ["SATILIK","DEVREN_SATILIK","INSAAT_PROJESI","KAT_KARSILIGI"].includes(u.status)).length;
   const totalKiralik = units.filter(u => ["KIRALIK","GUNLUK_KIRALIK","DEVREN_KIRALIK"].includes(u.status)).length;
   const totalRezeve = units.filter(u => u.status === "REZERVE").length;
-
   const getStatusStyle = (s: string) => STATUS_COLORS[s] || { color: "#8A8A8A", bg: "#F5F5F5" };
 
   return (
     <>
       <style>{CSS}</style>
 
-      {/* NAV */}
       <nav className="st-nav">
         <a href="/dashboard" className="st-logo">
           <img src="/LOGO_EPH.png" alt="EPH" />
@@ -230,21 +236,16 @@ export default function StokPage() {
       </nav>
 
       <main className="st-main">
-
-        {/* HEADER */}
         <div className="st-header">
           <div>
             <h1 className="st-title">Stok<br /><em>Yönetimi</em></h1>
             <p className="st-sub">Proje ve daire portföyünüzü yönetin</p>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-            <div style={{ fontFamily: "var(--serif)", fontSize: 13, color: "var(--muted)", fontStyle: "italic" }}>
-              {projects.length} proje · {units.length} birim
-            </div>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 13, color: "var(--muted)", fontStyle: "italic" }}>
+            {projects.length} proje · {units.length} birim
           </div>
         </div>
 
-        {/* STATS */}
         <div className="st-stats">
           {[
             { label: "Toplam Proje", val: projects.length, cls: "" },
@@ -259,14 +260,9 @@ export default function StokPage() {
           ))}
         </div>
 
-        {/* TABS */}
         <div className="st-tabs">
-          <button className={`st-tab ${view === "projects" ? "active" : ""}`} onClick={() => setView("projects")}>
-            Projeler
-          </button>
-          <button className={`st-tab ${view === "units" ? "active" : ""}`} onClick={() => setView("units")}>
-            Tüm Birimler
-          </button>
+          <button className={`st-tab ${view==="projects"?"active":""}`} onClick={() => setView("projects")}>Projeler</button>
+          <button className={`st-tab ${view==="units"?"active":""}`} onClick={() => setView("units")}>Tüm Birimler</button>
         </div>
 
         {/* PROJELER */}
@@ -278,18 +274,14 @@ export default function StokPage() {
                 <div className="st-empty-sub">Portföyünüzü oluşturmaya başlayın</div>
               </div>
             ) : projects.map(p => {
-              const activeStyle = p.isActive
-                ? { color: "#2D6A4F", bg: "#F0FAF4" }
-                : { color: "#8A8A8A", bg: "#F5F5F5" };
+              const activeStyle = p.isActive ? { color: "#2D6A4F", bg: "#F0FAF4" } : { color: "#8A8A8A", bg: "#F5F5F5" };
               return (
                 <div key={p.id} className="st-project">
                   <div className="st-project-header">
                     <div>
                       <div className="st-project-name">{p.name}</div>
                       <div className="st-project-loc">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
-                        </svg>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                         {p.city} / {p.district} — {p.address}
                       </div>
                       <div className="st-project-owner">{p.owner.firstName} {p.owner.lastName}</div>
@@ -312,9 +304,8 @@ export default function StokPage() {
                               {STATUS_LABELS[u.status]}
                             </span>
                             <div className="st-unit-type">{TYPE_LABELS[u.type] || u.type}</div>
-                            <div className="st-unit-detail">
-                              {u.roomCount && `${u.roomCount} · `}{u.area ? `${u.area}m²` : ""}
-                            </div>
+                            <div className="st-unit-detail">{u.roomCount && `${u.roomCount} · `}{u.area ? `${u.area}m²` : ""}</div>
+                            <VerifiedBadges u={u} />
                             <div className="st-unit-price">{u.price.toLocaleString("tr-TR")} ₺</div>
                           </div>
                         );
@@ -359,17 +350,16 @@ export default function StokPage() {
                   const ss = getStatusStyle(u.status);
                   return (
                     <div key={u.id} className="st-unit-big">
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
                         <div>
                           <div className="st-unit-big-project">{u.project?.name}</div>
-                          <div className="st-unit-big-loc">
-                            {u.project?.city} / {u.project?.district}
-                          </div>
+                          <div className="st-unit-big-loc">{u.project?.city} / {u.project?.district}</div>
                         </div>
                         <span className="st-unit-status" style={{ borderColor: ss.color, color: ss.color, background: ss.bg, flexShrink: 0 }}>
                           {STATUS_LABELS[u.status]}
                         </span>
                       </div>
+                      <VerifiedBadges u={u} />
                       <div className="st-unit-big-grid">
                         <div className="st-unit-big-cell">
                           <div className="st-unit-big-cell-label">Tip</div>
@@ -395,7 +385,6 @@ export default function StokPage() {
             )}
           </div>
         )}
-
       </main>
     </>
   );
