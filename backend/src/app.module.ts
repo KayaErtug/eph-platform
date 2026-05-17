@@ -1,4 +1,3 @@
-import { CrmModule } from './crm/crm.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
@@ -13,10 +12,11 @@ import { UnitsModule } from './units/units.module';
 import { NominationsModule } from './nominations/nominations.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { LeadsModule } from './leads/leads.module';
+import { CrmModule } from './crm/crm.module';
+import { TrustModule } from './trust/trust.module';
 
 @Module({
   imports: [
-    CrmModule,
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     SupabaseModule,
@@ -30,6 +30,8 @@ import { LeadsModule } from './leads/leads.module';
     NominationsModule,
     ApplicationsModule,
     LeadsModule,
+    CrmModule,
+    TrustModule,
   ],
 })
 export class AppModule {}
