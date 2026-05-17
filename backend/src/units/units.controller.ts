@@ -14,11 +14,7 @@ export class UnitsController {
   @Post('project/:projectId')
   @UseGuards(RolesGuard)
   @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
-  create(
-    @CurrentUser() user: any,
-    @Param('projectId') projectId: string,
-    @Body() body: any,
-  ) {
+  create(@CurrentUser() user: any, @Param('projectId') projectId: string, @Body() body: any) {
     return this.unitsService.create(user.id, projectId, body);
   }
 
@@ -27,8 +23,12 @@ export class UnitsController {
     @Query('status') status?: UnitStatus,
     @Query('type') type?: UnitType,
     @Query('city') city?: string,
+    @Query('isOffMarket') isOffMarket?: string,
   ) {
-    return this.unitsService.findAll({ status, type, city });
+    return this.unitsService.findAll({
+      status, type, city,
+      isOffMarket: isOffMarket === 'true' ? true : isOffMarket === 'false' ? false : undefined,
+    });
   }
 
   @Get('project/:projectId')
@@ -40,14 +40,22 @@ export class UnitsController {
     return this.unitsService.findByProject(projectId, { status, type });
   }
 
+  @Patch(':id/verify')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  verify(@Param('id') id: string, @Body() body: {
+    tapuVerified?: boolean;
+    photoVerified?: boolean;
+    yetkiVerified?: boolean;
+    isOffMarket?: boolean;
+  }) {
+    return this.unitsService.verifyUnit(id, body);
+  }
+
   @Patch(':id/status')
   @UseGuards(RolesGuard)
   @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
-  updateStatus(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-    @Body('status') status: UnitStatus,
-  ) {
+  updateStatus(@Param('id') id: string, @CurrentUser() user: any, @Body('status') status: UnitStatus) {
     return this.unitsService.updateStatus(id, user.id, status);
   }
 
