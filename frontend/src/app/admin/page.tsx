@@ -36,6 +36,13 @@ interface Lead {
   profession?: string; city?: string; interest?: string;
   conversation?: string; source: string; createdAt: string;
 }
+interface StokUnit {
+  id: string; type: string; floor?: number; number: string;
+  roomCount?: string; area?: number; price: number; status: string;
+  isVerified: boolean; isOffMarket: boolean;
+  tapuVerified: boolean; photoVerified: boolean; yetkiVerified: boolean;
+  project: { id: string; name: string; city: string; district: string; owner: { firstName: string; lastName: string } };
+}
 
 const ROLE_LABELS: Record<string, string> = {
   EMLAKCI: "Emlakçı", MUTEAHHIT: "Müteahhit", INSAAT_FIRMASI: "İnşaat Firması", ADMIN: "Admin"
@@ -48,6 +55,16 @@ const STATUS_LABELS: Record<string, string> = {
   PENDING: "Bekliyor", APPROVED: "Onaylandı", REJECTED: "Reddedildi",
   INVITED: "Davet Gönderildi", REGISTERED: "Kayıt Oldu"
 };
+const UNIT_STATUS_LABELS: Record<string, string> = {
+  SATILIK: "Satılık", KIRALIK: "Kiralık", GUNLUK_KIRALIK: "Günlük Kiralık",
+  DEVREN_SATILIK: "Devren Satılık", DEVREN_KIRALIK: "Devren Kiralık",
+  INSAAT_PROJESI: "İnşaat Projesi", KAT_KARSILIGI: "Kat Karşılığı",
+  REZERVE: "Rezerve", SATILDI: "Satıldı", KIRALANDII: "Kiralandı", PASIF: "Pasif",
+};
+const TYPE_LABELS: Record<string, string> = {
+  DAIRE: "Daire", VILLA: "Villa", REZIDANS: "Rezidans", MUSTAK_EV: "Müstakil Ev",
+  ARSA: "Arsa", TARLA: "Tarla", OFIS_BURO: "Ofis/Büro", DUKKAN_MAGAZA: "Dükkan/Mağaza",
+};
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
@@ -59,7 +76,6 @@ const CSS = `
 }
 body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 
-/* NAV */
 .an-nav{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 48px;position:sticky;top:0;z-index:100;}
 @media(max-width:768px){.an-nav{padding:0 20px;}}
 .an-logo{display:flex;align-items:center;gap:12px;text-decoration:none;}
@@ -74,11 +90,9 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .an-logout{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:1px solid var(--border);padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
 .an-logout:hover{border-color:var(--navy);color:var(--navy);}
 
-/* MAIN */
 .an-main{padding:48px;max-width:1300px;margin:0 auto;}
 @media(max-width:768px){.an-main{padding:24px 20px;}}
 
-/* HEADER */
 .an-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:40px;padding-bottom:32px;border-bottom:1px solid var(--border);}
 @media(max-width:768px){.an-header{flex-direction:column;align-items:flex-start;gap:16px;}}
 .an-title{font-family:var(--serif);font-size:40px;font-weight:300;color:var(--navy);letter-spacing:-0.5px;line-height:1.1;}
@@ -90,7 +104,6 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .an-add-btn:hover{color:var(--navy);}
 .an-add-btn span{position:relative;z-index:1;}
 
-/* STATS */
 .an-stats{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);margin-bottom:40px;}
 @media(max-width:1100px){.an-stats{grid-template-columns:repeat(4,1fr);}}
 @media(max-width:600px){.an-stats{grid-template-columns:repeat(2,1fr);}}
@@ -101,41 +114,33 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .an-stat-num.green{color:#2D6A4F;}
 .an-stat-num.orange{color:#B8860B;}
 
-/* ROLES */
 .an-roles{background:#fff;border:1px solid var(--border);padding:20px 24px;margin-bottom:32px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
 .an-roles-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
 .an-role-tag{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid var(--border);padding:4px 12px;color:var(--navy);}
 
-/* TABS */
-.an-tabs{display:flex;gap:0;margin-bottom:32px;border-bottom:1px solid var(--border);}
-.an-tab{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;padding:12px 20px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;display:flex;align-items:center;gap:8px;position:relative;bottom:-1px;}
+.an-tabs{display:flex;gap:0;margin-bottom:32px;border-bottom:1px solid var(--border);overflow-x:auto;}
+.an-tab{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;padding:12px 20px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;display:flex;align-items:center;gap:8px;position:relative;bottom:-1px;white-space:nowrap;}
 .an-tab:hover{color:var(--navy);}
 .an-tab.active{color:var(--navy);border-bottom-color:var(--gold);}
 .an-tab-badge{font-size:8px;background:var(--gold);color:var(--navy);padding:2px 7px;font-weight:500;}
 
-/* FILTERS */
 .an-filters{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
 .an-filter{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:6px 14px;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all 0.2s;}
 .an-filter:hover{border-color:var(--navy);color:var(--navy);}
 .an-filter.active{border-color:var(--navy);background:var(--navy);color:var(--cream);}
 
-/* TABLE */
 .an-table{background:#fff;border:1px solid var(--border);}
-.an-table-head{display:grid;padding:14px 24px;background:var(--warm);border-bottom:1px solid var(--border);}
-.an-table-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
 .an-row{border-bottom:1px solid var(--border);padding:20px 24px;transition:background 0.2s;}
 .an-row:hover{background:var(--warm);}
 .an-row:last-child{border-bottom:none;}
 .an-empty{padding:60px 24px;text-align:center;font-family:var(--serif);font-size:18px;font-style:italic;color:var(--muted);}
 
-/* USER ROW */
 .an-user-info{display:flex;align-items:center;gap:14px;}
 .an-avatar{width:38px;height:38px;background:var(--navy);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:16px;color:var(--cream);font-weight:400;flex-shrink:0;}
 .an-user-name{font-size:14px;font-weight:400;color:var(--navy);}
 .an-user-email{font-size:11px;color:var(--muted);font-weight:300;}
 .an-user-phone{font-size:10px;color:#B8B2A8;font-weight:300;}
 
-/* STATUS BADGE */
 .an-badge{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid;padding:4px 10px;font-weight:500;}
 .an-badge-pending{border-color:#B8860B;color:#B8860B;background:#FFFBF0;}
 .an-badge-approved{border-color:#2D6A4F;color:#2D6A4F;background:#F0FAF4;}
@@ -143,7 +148,6 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .an-badge-invited{border-color:#1A4A7A;color:#1A4A7A;background:#EEF4FF;}
 .an-badge-registered{border-color:#5B2D8E;color:#5B2D8E;background:#F5F0FF;}
 
-/* ACTIONS */
 .an-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
 .an-btn{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:none;padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;font-weight:500;}
 .an-btn-approve{background:var(--green);color:#fff;}
@@ -158,7 +162,33 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .an-btn-ghost:hover{border-color:var(--navy)!important;color:var(--navy);}
 .an-btn:disabled{opacity:0.4;cursor:not-allowed;}
 
-/* MODAL */
+/* STOK */
+.an-stok-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;}
+.an-stok-card{background:#fff;border:1px solid var(--border);padding:20px;transition:border-color 0.2s;}
+.an-stok-card:hover{border-color:var(--navy);}
+.an-stok-project{font-family:var(--serif);font-size:16px;font-weight:400;color:var(--navy);margin-bottom:2px;}
+.an-stok-loc{font-size:10px;color:var(--muted);font-weight:300;margin-bottom:12px;}
+.an-stok-info{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.an-stok-info-cell{background:var(--warm);padding:8px 10px;}
+.an-stok-info-label{font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.an-stok-info-val{font-size:12px;color:var(--navy);font-weight:400;}
+.an-stok-price{font-family:var(--serif);font-size:18px;font-weight:400;color:var(--gold);margin-bottom:14px;}
+.an-stok-divider{height:1px;background:var(--border);margin-bottom:14px;}
+.an-stok-verify-title{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.an-stok-toggles{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+.an-stok-toggle{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--border);cursor:pointer;transition:all 0.2s;}
+.an-stok-toggle:hover{border-color:var(--navy);}
+.an-stok-toggle.on{border-color:#2D6A4F;background:#F0FAF4;}
+.an-stok-toggle-label{font-size:10px;color:var(--navy);font-weight:400;}
+.an-stok-toggle-status{font-size:8px;letter-spacing:1px;text-transform:uppercase;}
+.an-stok-toggle.on .an-stok-toggle-status{color:#2D6A4F;}
+.an-stok-toggle:not(.on) .an-stok-toggle-status{color:var(--muted);}
+.an-stok-offmarket{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--border);cursor:pointer;transition:all 0.2s;margin-top:4px;}
+.an-stok-offmarket:hover{border-color:var(--navy);}
+.an-stok-offmarket.on{border-color:var(--navy);background:#EEF2FF;}
+.an-stok-offmarket-label{font-size:10px;color:var(--navy);}
+.an-stok-offmarket.on .an-stok-offmarket-label{font-weight:500;}
+
 .an-overlay{position:fixed;inset:0;background:rgba(15,32,68,0.6);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn 0.2s ease;}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .an-modal{background:#fff;width:100%;max-width:460px;padding:40px;position:relative;animation:slideUp 0.3s ease;}
@@ -182,7 +212,6 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .an-modal-cancel:hover{border-color:var(--navy);color:var(--navy);}
 .an-modal-error{font-size:11px;color:var(--red);margin-top:8px;}
 
-/* LEAD */
 .an-lead-row{border-bottom:1px solid var(--border);padding:20px 24px;transition:background 0.2s;}
 .an-lead-row:hover{background:var(--warm);}
 .an-lead-conv{margin-top:12px;background:var(--warm);border:1px solid var(--border);padding:16px;max-height:200px;overflow-y:auto;}
@@ -206,13 +235,15 @@ export default function AdminPage() {
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [activeTab, setActiveTab] = useState<"users"|"documents"|"nominations"|"applications"|"leads">("users");
+  const [allUnits, setAllUnits] = useState<StokUnit[]>([]);
+  const [activeTab, setActiveTab] = useState<"users"|"documents"|"nominations"|"applications"|"leads"|"stock">("users");
   const [userFilter, setUserFilter] = useState("all");
   const [docFilter, setDocFilter] = useState("all");
   const [nomFilter, setNomFilter] = useState("all");
   const [appFilter, setAppFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string|null>(null);
+  const [verifyLoading, setVerifyLoading] = useState<string|null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [noteModal, setNoteModal] = useState<{type:"nomination"|"application";id:string}|null>(null);
   const [noteText, setNoteText] = useState("");
@@ -238,13 +269,15 @@ export default function AdminPage() {
 
   const fetchAll = async () => {
     try {
-      const [s,u,d,n,a,l] = await Promise.all([
+      const [s,u,d,n,a,l,st] = await Promise.all([
         api.get("/admin/stats"), api.get("/admin/users?filter=all"),
         api.get("/admin/documents?filter=all"), api.get("/admin/nominations?status=all"),
         api.get("/admin/applications?status=all"), api.get("/leads"),
+        api.get("/units"),
       ]);
       setStats(s.data); setUsers(u.data); setDocuments(d.data);
       setNominations(n.data); setApplications(a.data); setLeads(l.data);
+      setAllUnits(st.data);
     } finally { setLoading(false); }
   };
   const fetchStats = async () => { const r = await api.get("/admin/stats"); setStats(r.data); };
@@ -253,9 +286,25 @@ export default function AdminPage() {
   const fetchNominations = async (f="all") => { const r = await api.get(`/admin/nominations?status=${f}`); setNominations(r.data); };
   const fetchApplications = async (f="all") => { const r = await api.get(`/admin/applications?status=${f}`); setApplications(r.data); };
   const fetchLeads = async () => { const r = await api.get("/leads"); setLeads(r.data); };
+  const fetchUnits = async () => { const r = await api.get("/units"); setAllUnits(r.data); };
 
   const act = async (id:string, fn:()=>Promise<any>) => {
     setActionLoading(id); try { await fn(); } finally { setActionLoading(null); }
+  };
+
+  const handleVerify = async (id: string, field: string, current: boolean) => {
+    setVerifyLoading(id + field);
+    try {
+      const unit = allUnits.find(u => u.id === id);
+      if (!unit) return;
+      await api.patch(`/units/${id}/verify`, {
+        tapuVerified: field === "tapu" ? !current : unit.tapuVerified,
+        photoVerified: field === "photo" ? !current : unit.photoVerified,
+        yetkiVerified: field === "yetki" ? !current : unit.yetkiVerified,
+        isOffMarket: field === "offmarket" ? !current : unit.isOffMarket,
+      });
+      await fetchUnits();
+    } finally { setVerifyLoading(null); }
   };
 
   const getBadge = (status:string) => {
@@ -399,12 +448,10 @@ export default function AdminPage() {
       </nav>
 
       <main className="an-main">
-
-        {/* HEADER */}
         <div className="an-header">
           <div>
             <h1 className="an-title">Yönetim<br/><em>Paneli</em></h1>
-            <p className="an-sub">Üye, belge ve başvuru yönetimi</p>
+            <p className="an-sub">Üye, belge, başvuru ve stok yönetimi</p>
           </div>
           <button className="an-add-btn" onClick={()=>setCreateUserModal(true)}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{position:"relative",zIndex:1}}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -450,9 +497,10 @@ export default function AdminPage() {
             {key:"nominations",label:"Tavsiyeler",badge:stats?.pendingNominations},
             {key:"applications",label:"Başvurular",badge:stats?.pendingApplications},
             {key:"leads",label:"Lina Leads",badge:leads.length},
+            {key:"stock",label:"Stok Doğrulama",badge:null},
           ].map(t=>(
             <button key={t.key} className={`an-tab ${activeTab===t.key?"active":""}`}
-              onClick={()=>{setActiveTab(t.key as any); if(t.key==="leads") fetchLeads();}}>
+              onClick={()=>{setActiveTab(t.key as any); if(t.key==="leads") fetchLeads(); if(t.key==="stock") fetchUnits();}}>
               {t.label}
               {t.badge && t.badge > 0 && <span className="an-tab-badge">{t.badge}</span>}
             </button>
@@ -483,23 +531,17 @@ export default function AdminPage() {
                       <div className="an-actions">
                         <span className="an-role-tag" style={{fontSize:"8px"}}>{ROLE_LABELS[u.role]}</span>
                         {u.documents?.length>0 && <span style={{fontSize:10,color:"var(--muted)"}}>{u.documents.length} belge</span>}
-                        <span className={`an-badge ${u.isApproved?"an-badge-approved":"an-badge-pending"}`}>
-                          {u.isApproved?"Onaylı":"Bekliyor"}
-                        </span>
+                        <span className={`an-badge ${u.isApproved?"an-badge-approved":"an-badge-pending"}`}>{u.isApproved?"Onaylı":"Bekliyor"}</span>
                         {!u.isApproved ? (
                           <button className="an-btn an-btn-approve" disabled={actionLoading===u.id}
-                            onClick={()=>act(u.id,async()=>{await api.patch(`/admin/users/${u.id}/approve`);await Promise.all([fetchUsers(userFilter),fetchStats()]);})}> 
-                            {actionLoading===u.id?"...":"Onayla"}
-                          </button>
+                            onClick={()=>act(u.id,async()=>{await api.patch(`/admin/users/${u.id}/approve`);await Promise.all([fetchUsers(userFilter),fetchStats()]);})}>{actionLoading===u.id?"...":"Onayla"}</button>
                         ) : u.role!=="ADMIN" && (
                           <button className="an-btn an-btn-warn" disabled={actionLoading===u.id}
                             onClick={()=>{if(!confirm("Askıya alınacak."))return; act(u.id,async()=>{await api.patch(`/admin/users/${u.id}/suspend`);await Promise.all([fetchUsers(userFilter),fetchStats()]);});}}>
                             {actionLoading===u.id?"...":"Askıya Al"}
                           </button>
                         )}
-                        {u.role!=="ADMIN" && (
-                          <button className="an-btn an-btn-ghost" onClick={()=>{setRoleModal({id:u.id,currentRole:u.role});setNewRole(u.role);}}>Rol Değiştir</button>
-                        )}
+                        {u.role!=="ADMIN" && <button className="an-btn an-btn-ghost" onClick={()=>{setRoleModal({id:u.id,currentRole:u.role});setNewRole(u.role);}}>Rol Değiştir</button>}
                         {u.role!=="ADMIN" && (
                           <button className="an-btn an-btn-reject" disabled={actionLoading===u.id}
                             onClick={()=>{if(!confirm("Silinecek. Emin misiniz?"))return; act(u.id,async()=>{await api.delete(`/admin/users/${u.id}/reject`);await Promise.all([fetchUsers(userFilter),fetchStats()]);});}}>
@@ -664,9 +706,7 @@ export default function AdminPage() {
         {activeTab==="leads" && (
           <>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
-              <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <span style={{fontFamily:"var(--serif)",fontSize:14,color:"var(--muted)",fontStyle:"italic"}}>{leads.length} lead toplandı</span>
-              </div>
+              <span style={{fontFamily:"var(--serif)",fontSize:14,color:"var(--muted)",fontStyle:"italic"}}>{leads.length} lead toplandı</span>
               <button className="an-btn an-btn-ghost" onClick={fetchLeads}>Yenile</button>
             </div>
             <div className="an-table">
@@ -714,6 +754,73 @@ export default function AdminPage() {
                 ))
               }
             </div>
+          </>
+        )}
+
+        {/* STOK DOĞRULAMA */}
+        {activeTab==="stock" && (
+          <>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+              <span style={{fontFamily:"var(--serif)",fontSize:14,color:"var(--muted)",fontStyle:"italic"}}>{allUnits.length} birim · {allUnits.filter(u=>u.isVerified).length} doğrulanmış</span>
+              <button className="an-btn an-btn-ghost" onClick={fetchUnits}>Yenile</button>
+            </div>
+            {allUnits.length===0 ? (
+              <div className="an-table"><div className="an-empty">Birim bulunamadı.</div></div>
+            ) : (
+              <div className="an-stok-grid">
+                {allUnits.map(u=>(
+                  <div key={u.id} className="an-stok-card">
+                    <div className="an-stok-project">{u.project?.name}</div>
+                    <div className="an-stok-loc">{u.project?.city} / {u.project?.district} · {u.project?.owner?.firstName} {u.project?.owner?.lastName}</div>
+                    <div className="an-stok-info">
+                      <div className="an-stok-info-cell">
+                        <div className="an-stok-info-label">Tip</div>
+                        <div className="an-stok-info-val">{TYPE_LABELS[u.type] || u.type}</div>
+                      </div>
+                      <div className="an-stok-info-cell">
+                        <div className="an-stok-info-label">Durum</div>
+                        <div className="an-stok-info-val">{UNIT_STATUS_LABELS[u.status] || u.status}</div>
+                      </div>
+                      <div className="an-stok-info-cell">
+                        <div className="an-stok-info-label">No / Kat</div>
+                        <div className="an-stok-info-val">{u.number} / {u.floor ?? "—"}</div>
+                      </div>
+                      <div className="an-stok-info-cell">
+                        <div className="an-stok-info-label">Alan</div>
+                        <div className="an-stok-info-val">{u.area ? `${u.area}m²` : "—"}</div>
+                      </div>
+                    </div>
+                    <div className="an-stok-price">{u.price.toLocaleString("tr-TR")} ₺</div>
+                    <div className="an-stok-divider"/>
+                    <div className="an-stok-verify-title">Doğrulama Durumu</div>
+                    <div className="an-stok-toggles">
+                      {[
+                        {key:"tapu",label:"Tapu Doğrulandı",val:u.tapuVerified},
+                        {key:"photo",label:"Fotoğraf Doğrulandı",val:u.photoVerified},
+                        {key:"yetki",label:"Yetki Belgesi Doğrulandı",val:u.yetkiVerified},
+                      ].map(({key,label,val})=>(
+                        <div key={key} className={`an-stok-toggle ${val?"on":""}`}
+                          onClick={()=>{ if(verifyLoading) return; handleVerify(u.id, key, val); }}>
+                          <span className="an-stok-toggle-label">{label}</span>
+                          <span className="an-stok-toggle-status">
+                            {verifyLoading===u.id+key ? "..." : val ? "✓ Doğrulandı" : "Doğrulanmadı"}
+                          </span>
+                        </div>
+                      ))}
+                      <div className={`an-stok-offmarket ${u.isOffMarket?"on":""}`}
+                        onClick={()=>{ if(verifyLoading) return; handleVerify(u.id, "offmarket", u.isOffMarket); }}>
+                        <span className="an-stok-offmarket-label">
+                          {u.isOffMarket ? "⬤ Off-Market (Gizli)" : "Off-Market Yap"}
+                        </span>
+                        <span style={{fontSize:8,letterSpacing:1,textTransform:"uppercase",color:u.isOffMarket?"var(--navy)":"var(--muted)"}}>
+                          {verifyLoading===u.id+"offmarket" ? "..." : u.isOffMarket ? "Aktif" : "Kapalı"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
 
