@@ -84,12 +84,7 @@ export default function DashboardPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
-        :root{
-          --navy:#0F2044;--gold:#C9A84C;--cream:#F5F3EF;--warm:#FAFAF8;
-          --text:#1A1A2E;--muted:#8A8A8A;--border:#E2DDD5;
-          --serif:'Cormorant Garamond',Georgia,serif;
-          --sans:'DM Sans',system-ui,sans-serif;
-        }
+        :root{--navy:#0F2044;--gold:#C9A84C;--cream:#F5F3EF;--warm:#FAFAF8;--text:#1A1A2E;--muted:#8A8A8A;--border:#E2DDD5;--serif:'Cormorant Garamond',Georgia,serif;--sans:'DM Sans',system-ui,sans-serif;}
         body{font-family:var(--sans);background:var(--warm);color:var(--text);}
         .db-root{min-height:100vh;display:grid;grid-template-rows:auto 1fr;}
         .db-nav{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 48px;position:sticky;top:0;z-index:100;}
@@ -118,17 +113,17 @@ export default function DashboardPage() {
         .db-status{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;}
         .db-status-dot{width:6px;height:6px;border-radius:50%;}
         .db-role-tag{font-size:9px;letter-spacing:2px;text-transform:uppercase;border:1px solid var(--border);padding:5px 12px;color:var(--navy);font-weight:500;}
-        .db-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:48px;}
-        @media(max-width:1024px){.db-cards{grid-template-columns:1fr 1fr;}}
+        .db-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);margin-bottom:48px;}
+        @media(max-width:1200px){.db-cards{grid-template-columns:1fr 1fr 1fr;}}
         @media(max-width:768px){.db-cards{grid-template-columns:1fr;}}
-        .db-card{background:#fff;padding:36px 32px;display:flex;flex-direction:column;cursor:pointer;text-decoration:none;transition:background 0.3s;position:relative;overflow:hidden;}
+        .db-card{background:#fff;padding:32px 24px;display:flex;flex-direction:column;cursor:pointer;text-decoration:none;transition:background 0.3s;position:relative;overflow:hidden;}
         .db-card::before{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--gold);transform:scaleX(0);transform-origin:left;transition:transform 0.4s cubic-bezier(0.4,0,0.2,1);}
         .db-card:hover{background:var(--warm);}
         .db-card:hover::before{transform:scaleX(1);}
         .db-card-icon{width:40px;height:40px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin-bottom:24px;}
         .db-card-num{font-family:var(--serif);font-size:11px;color:var(--gold);letter-spacing:2px;margin-bottom:8px;}
-        .db-card-title{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--navy);margin-bottom:8px;}
-        .db-card-desc{font-size:12px;color:var(--muted);font-weight:300;line-height:1.6;}
+        .db-card-title{font-family:var(--serif);font-size:20px;font-weight:400;color:var(--navy);margin-bottom:8px;}
+        .db-card-desc{font-size:11px;color:var(--muted);font-weight:300;line-height:1.6;}
         .db-ref{background:#fff;border:1px solid var(--border);padding:36px;margin-bottom:32px;}
         .db-ref-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;}
         .db-ref-title{font-family:var(--serif);font-size:24px;font-weight:400;color:var(--navy);}
@@ -192,6 +187,7 @@ export default function DashboardPage() {
             <Link href="/profil" className="db-nav-item"><span className="db-nav-lbl">Profilim</span></Link>
             <Link href="/stok" className="db-nav-item"><span className="db-nav-lbl">Stok</span></Link>
             <Link href="/crm" className="db-nav-item"><span className="db-nav-lbl">CRM</span></Link>
+            <Link href="/market" className="db-nav-item"><span className="db-nav-lbl">Piyasa</span></Link>
             {user.role === "ADMIN" && <Link href="/admin" className="db-nav-item"><span className="db-nav-lbl">Admin</span></Link>}
           </div>
           <div className="db-nav-right">
@@ -238,7 +234,7 @@ export default function DashboardPage() {
               </div>
               <div className="db-card-num">01</div>
               <div className="db-card-title">Profilim</div>
-              <div className="db-card-desc">Bilgilerini güncelle, mesleki belgelerini yükle</div>
+              <div className="db-card-desc">Bilgilerini güncelle, belgelerini yükle</div>
             </Link>
 
             <Link href="/stok" className="db-card">
@@ -246,8 +242,8 @@ export default function DashboardPage() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5"><rect x="2" y="3" width="20" height="14" rx="1"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
               </div>
               <div className="db-card-num">02</div>
-              <div className="db-card-title">Stok Yönetimi</div>
-              <div className="db-card-desc">Proje ve daire yönetimi, gerçek zamanlı takip</div>
+              <div className="db-card-title">Stok</div>
+              <div className="db-card-desc">Proje ve daire yönetimi</div>
             </Link>
 
             <Link href="/crm" className="db-card">
@@ -255,8 +251,17 @@ export default function DashboardPage() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               </div>
               <div className="db-card-num">03</div>
-              <div className="db-card-title">CRM Modülü</div>
-              <div className="db-card-desc">Müşteri takibi, pipeline ve lead yönetimi</div>
+              <div className="db-card-title">CRM</div>
+              <div className="db-card-desc">Müşteri ve lead yönetimi</div>
+            </Link>
+
+            <Link href="/market" className="db-card">
+              <div className="db-card-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              </div>
+              <div className="db-card-num">04</div>
+              <div className="db-card-title">Piyasa Nabzı</div>
+              <div className="db-card-desc">Bölgesel fiyat trendleri</div>
             </Link>
 
             {user.role === "ADMIN" ? (
@@ -264,18 +269,18 @@ export default function DashboardPage() {
                 <div className="db-card-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
                 </div>
-                <div className="db-card-num">04</div>
-                <div className="db-card-title">Admin Paneli</div>
+                <div className="db-card-num">05</div>
+                <div className="db-card-title">Admin</div>
                 <div className="db-card-desc">Üye ve belge yönetimi</div>
               </Link>
             ) : (
-              <Link href="/crm" className="db-card">
+              <Link href="/profil" className="db-card">
                 <div className="db-card-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 </div>
-                <div className="db-card-num">04</div>
-                <div className="db-card-title">Pipeline</div>
-                <div className="db-card-desc">Satış süreci ve lead takibi</div>
+                <div className="db-card-num">05</div>
+                <div className="db-card-title">Güven Skoru</div>
+                <div className="db-card-desc">Profesyonel güven seviyeniz</div>
               </Link>
             )}
           </div>
