@@ -114,6 +114,9 @@ model User {
   projects         Project[]
   nominations      Nomination[]
   applications     Application[]
+  customers        Customer[]
+  activities       Activity[]
+  tasks            Task[]
 }
 
 model Invitation {

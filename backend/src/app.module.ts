@@ -1,3 +1,4 @@
+import { CrmModule } from './crm/crm.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
@@ -15,6 +16,7 @@ import { LeadsModule } from './leads/leads.module';
 
 @Module({
   imports: [
+    CrmModule,
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     SupabaseModule,
