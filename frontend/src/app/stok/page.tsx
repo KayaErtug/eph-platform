@@ -52,6 +52,8 @@ const STATUS_GROUPS = [
   { label: "Diğer", statuses: ["REZERVE","SATILDI","KIRALANDII","PASIF"] },
 ];
 
+const CITIES = ["Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya","Artvin","Aydın","Balıkesir","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari","Hatay","Isparta","İçel","İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir","Kocaeli","Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla","Muş","Nevşehir","Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas","Tekirdağ","Tokat","Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak","Aksaray","Bayburt","Karaman","Kırıkkale","Batman","Şırnak","Bartın","Ardahan","Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"];
+
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -80,12 +82,18 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 @media(max-width:768px){.st-main{padding:32px 20px;}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 
 .st-header{margin-bottom:48px;padding-bottom:40px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;align-items:end;gap:24px;}
 @media(max-width:768px){.st-header{grid-template-columns:1fr;}}
 .st-title{font-family:var(--serif);font-size:clamp(36px,4vw,52px);font-weight:300;color:var(--navy);letter-spacing:-0.5px;line-height:1.1;}
 .st-title em{font-style:italic;color:var(--gold);}
 .st-sub{font-size:13px;color:var(--muted);margin-top:8px;font-weight:300;}
+.st-add-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:12px 20px;cursor:pointer;font-family:var(--sans);transition:all 0.3s;position:relative;overflow:hidden;display:flex;align-items:center;gap:8px;}
+.st-add-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:var(--gold);transition:left 0.4s;}
+.st-add-btn:hover::before{left:0;}
+.st-add-btn:hover{color:var(--navy);}
+.st-add-btn span{position:relative;z-index:1;}
 
 .st-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:40px;}
 @media(max-width:768px){.st-stats{grid-template-columns:1fr 1fr;}}
@@ -127,10 +135,8 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-unit-price{font-family:var(--serif);font-size:18px;font-weight:400;color:var(--gold);}
 .st-unit-status{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid;padding:3px 8px;display:inline-block;margin-bottom:8px;}
 
-/* DOĞRULAMA BADGELERİ */
 .st-badges{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
 .st-badge-verified{font-size:7px;letter-spacing:1px;text-transform:uppercase;border:1px solid #2D6A4F;color:#2D6A4F;background:#F0FAF4;padding:2px 7px;display:inline-flex;align-items:center;gap:3px;}
-.st-badge-offmarket{font-size:7px;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--navy);color:var(--navy);background:#EEF2FF;padding:2px 7px;display:inline-flex;align-items:center;gap:3px;}
 
 .st-all-units{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
 @media(max-width:768px){.st-all-units{grid-template-columns:1fr;}}
@@ -150,16 +156,73 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-empty{background:#fff;border:1px solid var(--border);padding:80px;text-align:center;}
 .st-empty-text{font-family:var(--serif);font-size:22px;font-style:italic;color:var(--muted);margin-bottom:6px;}
 .st-empty-sub{font-size:12px;color:#B8B2A8;font-weight:300;}
+
+/* MODAL */
+.st-overlay{position:fixed;inset:0;background:rgba(15,32,68,0.6);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn 0.2s ease;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.st-modal{background:#fff;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;position:relative;animation:slideUp 0.3s ease;}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.st-modal-header{padding:32px 36px 24px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:1;}
+.st-modal-title{font-family:var(--serif);font-size:28px;font-weight:400;color:var(--navy);}
+.st-modal-sub{font-size:12px;color:var(--muted);margin-top:4px;font-weight:300;}
+.st-modal-divider{width:28px;height:2px;background:var(--gold);margin-top:12px;}
+.st-modal-close{position:absolute;top:20px;right:24px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:22px;}
+.st-modal-body{padding:28px 36px 36px;}
+.st-modal-section{margin-bottom:24px;}
+.st-modal-section-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.st-modal-section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+.st-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:500px){.st-form-grid{grid-template-columns:1fr;}}
+.st-field{margin-bottom:0;}
+.st-field label{display:block;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--navy);margin-bottom:10px;font-weight:500;}
+.st-input{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:10px 0;font-size:14px;color:var(--navy);font-family:var(--sans);outline:none;transition:border-color 0.3s;font-weight:300;}
+.st-input:focus{border-bottom-color:var(--navy);}
+.st-input::placeholder{color:#C0BAB0;}
+.st-fselect{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:10px 0;font-size:14px;color:var(--navy);font-family:var(--sans);outline:none;appearance:none;cursor:pointer;font-weight:300;}
+.st-fselect:focus{border-bottom-color:var(--navy);}
+
+/* AI BÖLÜMÜ */
+.st-ai-box{background:var(--navy);padding:20px 24px;margin-bottom:16px;}
+.st-ai-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.st-ai-title{font-size:11px;color:var(--gold);letter-spacing:1px;font-weight:500;display:flex;align-items:center;gap:8px;}
+.st-ai-btn{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:var(--gold);color:var(--navy);border:none;padding:8px 16px;cursor:pointer;font-family:var(--sans);font-weight:500;transition:all 0.2s;}
+.st-ai-btn:hover{background:#B8962A;}
+.st-ai-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.st-ai-desc{font-size:11px;color:rgba(245,243,239,0.5);font-weight:300;line-height:1.5;}
+.st-ai-loading{display:flex;align-items:center;gap:8px;margin-top:12px;}
+.st-ai-loading-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:bounce 1s ease infinite;}
+.st-ai-loading-dot:nth-child(2){animation-delay:0.15s;}
+.st-ai-loading-dot:nth-child(3){animation-delay:0.3s;}
+@keyframes bounce{0%,100%{transform:translateY(0);opacity:0.5}50%{transform:translateY(-4px);opacity:1}}
+.st-ai-result{margin-top:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(201,168,76,0.2);padding:14px;font-size:12px;color:rgba(245,243,239,0.8);line-height:1.7;font-weight:300;}
+.st-ai-use-btn{margin-top:10px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:transparent;border:1px solid rgba(201,168,76,0.4);color:var(--gold);padding:7px 16px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
+.st-ai-use-btn:hover{background:rgba(201,168,76,0.1);}
+
+.st-textarea{width:100%;background:var(--warm);border:1px solid var(--border);padding:12px;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;resize:vertical;font-weight:300;min-height:100px;}
+.st-textarea:focus{border-color:var(--navy);}
+
+.st-modal-footer{padding:20px 36px 28px;border-top:1px solid var(--border);display:flex;gap:12px;}
+.st-submit-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:14px 28px;cursor:pointer;font-family:var(--sans);transition:all 0.3s;position:relative;overflow:hidden;flex:1;}
+.st-submit-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:var(--gold);transition:left 0.4s;}
+.st-submit-btn:hover::before{left:0;}
+.st-submit-btn:hover{color:var(--navy);}
+.st-submit-btn span{position:relative;z-index:1;}
+.st-submit-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.st-submit-btn:disabled::before{display:none;}
+.st-cancel-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:14px 20px;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all 0.2s;}
+.st-cancel-btn:hover{border-color:var(--navy);color:var(--navy);}
+
+.st-form-error{font-size:11px;color:#C0392B;margin-top:8px;}
+.st-form-success{background:#F0FAF4;border-left:3px solid #2D6A4F;padding:14px 18px;margin-bottom:16px;font-size:12px;color:#2D6A4F;font-weight:300;}
 `;
 
 function VerifiedBadges({ u }: { u: Unit }) {
-  if (!u.tapuVerified && !u.photoVerified && !u.yetkiVerified && !u.isOffMarket) return null;
+  if (!u.tapuVerified && !u.photoVerified && !u.yetkiVerified) return null;
   return (
     <div className="st-badges">
       {u.tapuVerified && <span className="st-badge-verified">✓ Tapu</span>}
       {u.photoVerified && <span className="st-badge-verified">✓ Fotoğraf</span>}
       {u.yetkiVerified && <span className="st-badge-verified">✓ Yetki</span>}
-      {u.isOffMarket && <span className="st-badge-offmarket">⬤ Off-Market</span>}
     </div>
   );
 }
@@ -174,6 +237,22 @@ export default function StokPage() {
   const [view, setView] = useState<"projects"|"units">("projects");
   const [statusFilter, setStatusFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
+  const [showModal, setShowModal] = useState(false);
+
+  // FORM STATE
+  const [step, setStep] = useState<"project"|"unit">("project");
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [projectForm, setProjectForm] = useState({ name: "", city: "Denizli", district: "", address: "" });
+  const [unitForm, setUnitForm] = useState({ type: "DAIRE", floor: "", number: "", roomCount: "3+1", area: "", price: "", status: "SATILIK", description: "" });
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [formSuccess, setFormSuccess] = useState(false);
+
+  // AI STATE
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState("");
+
+  const canAddUnit = user?.role === "MUTEAHHIT" || user?.role === "INSAAT_FIRMASI" || user?.role === "ADMIN";
 
   useEffect(() => { setHydrated(true); }, []);
   useEffect(() => {
@@ -200,6 +279,71 @@ export default function StokPage() {
     setUnits(r.data);
   };
 
+  const generateAiDescription = async () => {
+    setAiLoading(true); setAiResult("");
+    try {
+      const prompt = `Bir emlak ilanı için kısa ve profesyonel Türkçe açıklama yaz. Bilgiler: Tip: ${TYPE_LABELS[unitForm.type] || unitForm.type}, Oda: ${unitForm.roomCount}, Alan: ${unitForm.area}m², Kat: ${unitForm.floor}, Durum: ${STATUS_LABELS[unitForm.status]}, Şehir: ${projectForm.city}, İlçe: ${projectForm.district}. Maksimum 3 cümle, samimi ve doğal bir dil kullan. Abartılı ifadelerden kaçın.`;
+
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 300,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      const data = await res.json();
+      const text = data.content?.[0]?.text || "";
+      setAiResult(text);
+    } catch {
+      setAiResult("Açıklama oluşturulamadı. Lütfen tekrar deneyin.");
+    } finally { setAiLoading(false); }
+  };
+
+  const handleSubmit = async () => {
+    setFormError(""); setFormLoading(true);
+    try {
+      let projectId = selectedProjectId;
+
+      if (!selectedProjectId) {
+        if (!projectForm.name || !projectForm.city || !projectForm.district || !projectForm.address) {
+          setFormError("Proje bilgilerini eksiksiz doldurun."); setFormLoading(false); return;
+        }
+        const pr = await api.post("/projects", projectForm);
+        projectId = pr.data.id;
+      }
+
+      if (!unitForm.number || !unitForm.area || !unitForm.price) {
+        setFormError("Birim numarası, alan ve fiyat zorunludur."); setFormLoading(false); return;
+      }
+
+      await api.post(`/units/project/${projectId}`, {
+        type: unitForm.type,
+        floor: unitForm.floor ? parseInt(unitForm.floor) : undefined,
+        number: unitForm.number,
+        roomCount: unitForm.roomCount || undefined,
+        area: parseFloat(unitForm.area),
+        price: parseFloat(unitForm.price),
+        status: unitForm.status,
+        description: unitForm.description || undefined,
+      });
+
+      setFormSuccess(true);
+      await fetchData();
+      setTimeout(() => {
+        setShowModal(false);
+        setFormSuccess(false);
+        setProjectForm({ name: "", city: "Denizli", district: "", address: "" });
+        setUnitForm({ type: "DAIRE", floor: "", number: "", roomCount: "3+1", area: "", price: "", status: "SATILIK", description: "" });
+        setSelectedProjectId("");
+        setAiResult("");
+      }, 1500);
+    } catch (e: any) {
+      setFormError(e?.response?.data?.message || "Bir hata oluştu.");
+    } finally { setFormLoading(false); }
+  };
+
   if (!hydrated || loading) return (
     <div style={{ minHeight: "100vh", background: "#FAFAF8", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <style>{CSS}</style>
@@ -211,10 +355,153 @@ export default function StokPage() {
   const totalKiralik = units.filter(u => ["KIRALIK","GUNLUK_KIRALIK","DEVREN_KIRALIK"].includes(u.status)).length;
   const totalRezeve = units.filter(u => u.status === "REZERVE").length;
   const getStatusStyle = (s: string) => STATUS_COLORS[s] || { color: "#8A8A8A", bg: "#F5F5F5" };
+  const myProjects = projects.filter(p => p.owner?.role === user?.role || user?.role === "ADMIN");
 
   return (
     <>
       <style>{CSS}</style>
+
+      {/* İLAN EKLEME MODAL */}
+      {showModal && (
+        <div className="st-overlay" onClick={() => setShowModal(false)}>
+          <div className="st-modal" onClick={e => e.stopPropagation()}>
+            <div className="st-modal-header">
+              <button className="st-modal-close" onClick={() => setShowModal(false)}>×</button>
+              <h2 className="st-modal-title">Yeni İlan Ekle</h2>
+              <p className="st-modal-sub">Bilgileri girin, AI size açıklama yazsın</p>
+              <div className="st-modal-divider" />
+            </div>
+
+            <div className="st-modal-body">
+              {formSuccess && <div className="st-form-success">✓ İlan başarıyla eklendi!</div>}
+
+              {/* PROJE SEÇİMİ */}
+              <div className="st-modal-section">
+                <div className="st-modal-section-title">Proje</div>
+                {myProjects.length > 0 && (
+                  <div className="st-field" style={{ marginBottom: 16 }}>
+                    <label>Mevcut Projeye Ekle (isteğe bağlı)</label>
+                    <select className="st-fselect" value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)}>
+                      <option value="">— Yeni Proje Oluştur —</option>
+                      {myProjects.map(p => <option key={p.id} value={p.id}>{p.name} ({p.city})</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {!selectedProjectId && (
+                  <div className="st-form-grid">
+                    <div className="st-field">
+                      <label>Proje / Site Adı *</label>
+                      <input className="st-input" placeholder="örn: Denizli Merkez" value={projectForm.name} onChange={e => setProjectForm(f => ({ ...f, name: e.target.value }))} />
+                    </div>
+                    <div className="st-field">
+                      <label>Şehir *</label>
+                      <select className="st-fselect" value={projectForm.city} onChange={e => setProjectForm(f => ({ ...f, city: e.target.value }))}>
+                        {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="st-field">
+                      <label>İlçe *</label>
+                      <input className="st-input" placeholder="örn: Merkezefendi" value={projectForm.district} onChange={e => setProjectForm(f => ({ ...f, district: e.target.value }))} />
+                    </div>
+                    <div className="st-field">
+                      <label>Adres *</label>
+                      <input className="st-input" placeholder="Mahalle, Cadde, No" value={projectForm.address} onChange={e => setProjectForm(f => ({ ...f, address: e.target.value }))} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* BİRİM BİLGİLERİ */}
+              <div className="st-modal-section">
+                <div className="st-modal-section-title">Mülk Bilgileri</div>
+                <div className="st-form-grid">
+                  <div className="st-field">
+                    <label>Mülk Tipi *</label>
+                    <select className="st-fselect" value={unitForm.type} onChange={e => setUnitForm(f => ({ ...f, type: e.target.value }))}>
+                      {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </div>
+                  <div className="st-field">
+                    <label>Durum *</label>
+                    <select className="st-fselect" value={unitForm.status} onChange={e => setUnitForm(f => ({ ...f, status: e.target.value }))}>
+                      {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </div>
+                  <div className="st-field">
+                    <label>Oda Sayısı</label>
+                    <select className="st-fselect" value={unitForm.roomCount} onChange={e => setUnitForm(f => ({ ...f, roomCount: e.target.value }))}>
+                      {["Stüdyo","1+0","1+1","2+1","3+1","4+1","5+1","5+2","6+1","6+2"].map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                  <div className="st-field">
+                    <label>Alan (m²) *</label>
+                    <input className="st-input" type="number" placeholder="120" value={unitForm.area} onChange={e => setUnitForm(f => ({ ...f, area: e.target.value }))} />
+                  </div>
+                  <div className="st-field">
+                    <label>Kat</label>
+                    <input className="st-input" type="number" placeholder="3" value={unitForm.floor} onChange={e => setUnitForm(f => ({ ...f, floor: e.target.value }))} />
+                  </div>
+                  <div className="st-field">
+                    <label>Daire / Birim No *</label>
+                    <input className="st-input" placeholder="301" value={unitForm.number} onChange={e => setUnitForm(f => ({ ...f, number: e.target.value }))} />
+                  </div>
+                  <div className="st-field" style={{ gridColumn: "span 2" }}>
+                    <label>Fiyat (₺) *</label>
+                    <input className="st-input" type="number" placeholder="2500000" value={unitForm.price} onChange={e => setUnitForm(f => ({ ...f, price: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+
+              {/* AI AÇIKLAMA */}
+              <div className="st-modal-section">
+                <div className="st-modal-section-title">AI Destekli Açıklama</div>
+                <div className="st-ai-box">
+                  <div className="st-ai-header">
+                    <div className="st-ai-title">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+                      Yapay Zeka Açıklama Yazar
+                    </div>
+                    <button className="st-ai-btn" onClick={generateAiDescription} disabled={aiLoading || !unitForm.area}>
+                      {aiLoading ? "Yazıyor..." : "Açıklama Oluştur"}
+                    </button>
+                  </div>
+                  <p className="st-ai-desc">Yukarıdaki bilgileri girdikten sonra butona basın — AI sizin için profesyonel ilan açıklaması yazsın.</p>
+                  {aiLoading && (
+                    <div className="st-ai-loading">
+                      <div className="st-ai-loading-dot" />
+                      <div className="st-ai-loading-dot" />
+                      <div className="st-ai-loading-dot" />
+                      <span style={{ fontSize: 11, color: "rgba(245,243,239,0.5)" }}>Açıklama yazılıyor...</span>
+                    </div>
+                  )}
+                  {aiResult && (
+                    <div>
+                      <div className="st-ai-result">{aiResult}</div>
+                      <button className="st-ai-use-btn" onClick={() => setUnitForm(f => ({ ...f, description: aiResult }))}>
+                        ✓ Bu açıklamayı kullan
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="st-field">
+                  <label>İlan Açıklaması (düzenleyebilirsiniz)</label>
+                  <textarea className="st-textarea" placeholder="Mülk hakkında kısa açıklama..." value={unitForm.description} onChange={e => setUnitForm(f => ({ ...f, description: e.target.value }))} />
+                </div>
+              </div>
+
+              {formError && <div className="st-form-error">{formError}</div>}
+            </div>
+
+            <div className="st-modal-footer">
+              <button className="st-submit-btn" onClick={handleSubmit} disabled={formLoading}>
+                <span>{formLoading ? "Kaydediliyor..." : "İlanı Kaydet"}</span>
+              </button>
+              <button className="st-cancel-btn" onClick={() => setShowModal(false)}>İptal</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="st-nav">
         <a href="/dashboard" className="st-logo">
@@ -241,8 +528,16 @@ export default function StokPage() {
             <h1 className="st-title">Stok<br /><em>Yönetimi</em></h1>
             <p className="st-sub">Proje ve daire portföyünüzü yönetin</p>
           </div>
-          <div style={{ fontFamily: "var(--serif)", fontSize: 13, color: "var(--muted)", fontStyle: "italic" }}>
-            {projects.length} proje · {units.length} birim
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
+            <div style={{ fontFamily: "var(--serif)", fontSize: 13, color: "var(--muted)", fontStyle: "italic" }}>
+              {projects.length} proje · {units.length} birim
+            </div>
+            {canAddUnit && (
+              <button className="st-add-btn" onClick={() => { setShowModal(true); setFormError(""); setAiResult(""); }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ position: "relative", zIndex: 1 }}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>İlan Ekle</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -265,13 +560,14 @@ export default function StokPage() {
           <button className={`st-tab ${view==="units"?"active":""}`} onClick={() => setView("units")}>Tüm Birimler</button>
         </div>
 
-        {/* PROJELER */}
         {view === "projects" && (
           <div>
             {projects.length === 0 ? (
               <div className="st-empty">
                 <div className="st-empty-text">Henüz proje eklenmemiş</div>
-                <div className="st-empty-sub">Portföyünüzü oluşturmaya başlayın</div>
+                <div className="st-empty-sub">
+                  {canAddUnit ? "Sağ üstteki "İlan Ekle" butonuna tıklayın" : "Portföyünüzü oluşturmaya başlayın"}
+                </div>
               </div>
             ) : projects.map(p => {
               const activeStyle = p.isActive ? { color: "#2D6A4F", bg: "#F0FAF4" } : { color: "#8A8A8A", bg: "#F5F5F5" };
@@ -318,7 +614,6 @@ export default function StokPage() {
           </div>
         )}
 
-        {/* TÜM BİRİMLER */}
         {view === "units" && (
           <div>
             <div className="st-filters">
