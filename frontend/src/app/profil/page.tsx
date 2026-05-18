@@ -237,6 +237,7 @@ export default function ProfilPage() {
           <Link href="/profil" className="pr-nav-item active">Profilim</Link>
           <Link href="/stok" className="pr-nav-item">Stok</Link>
           <Link href="/crm" className="pr-nav-item">CRM</Link>
+          <Link href="/market" className="pr-nav-item">Piyasa</Link>
           {user?.role === "ADMIN" && <Link href="/admin" className="pr-nav-item">Admin</Link>}
         </div>
         <button className="pr-logout" onClick={() => { logout(); router.push("/giris"); }}>Çıkış</button>

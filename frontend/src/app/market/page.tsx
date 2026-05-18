@@ -169,6 +169,7 @@ export default function MarketPage() {
         </a>
         <div className="mk-nav-links">
           <Link href="/dashboard" className="mk-nav-item">Ana Sayfa</Link>
+          <Link href="/profil" className="mk-nav-item">Profilim</Link>
           <Link href="/stok" className="mk-nav-item">Stok</Link>
           <Link href="/crm" className="mk-nav-item">CRM</Link>
           <Link href="/market" className="mk-nav-item active">Piyasa</Link>

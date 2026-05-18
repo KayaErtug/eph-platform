@@ -502,8 +502,10 @@ export default function CrmPage() {
         </a>
         <div className="crm-nav-links">
           <Link href="/dashboard" className="crm-nav-item">Ana Sayfa</Link>
+          <Link href="/profil" className="crm-nav-item">Profilim</Link>
           <Link href="/stok" className="crm-nav-item">Stok</Link>
           <Link href="/crm" className="crm-nav-item active">CRM</Link>
+          <Link href="/market" className="crm-nav-item">Piyasa</Link>
           {user?.role === "ADMIN" && <Link href="/admin" className="crm-nav-item">Admin</Link>}
         </div>
         <button className="crm-logout" onClick={() => { logout(); router.push("/giris"); }}>Çıkış</button>

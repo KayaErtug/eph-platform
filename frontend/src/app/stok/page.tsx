@@ -471,6 +471,8 @@ export default function StokPage() {
           <Link href="/dashboard" className="st-nav-item">Ana Sayfa</Link>
           <Link href="/profil" className="st-nav-item">Profilim</Link>
           <Link href="/stok" className="st-nav-item active">Stok</Link>
+          <Link href="/crm" className="st-nav-item">CRM</Link>
+          <Link href="/market" className="st-nav-item">Piyasa</Link>
           {user?.role === "ADMIN" && <Link href="/admin" className="st-nav-item">Admin</Link>}
         </div>
         <div className="st-nav-right">
