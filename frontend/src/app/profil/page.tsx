@@ -1,4 +1,5 @@
 "use client";
+import { useTheme, THEMES } from "../../components/ThemeProvider";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
@@ -142,6 +143,7 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 export default function ProfilPage() {
   const { user, setAuth, logout } = useAuthStore();
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [trustScore, setTrustScore] = useState<TrustScore | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -381,6 +383,30 @@ export default function ProfilPage() {
           {uploadError && <div className="pr-error" style={{ margin: "0 36px 24px" }}>{uploadError}</div>}
         </div>
 
+
+        {/* TEMA SEÇİCİ */}
+        <div className="pr-docs-card" style={{marginBottom:24}}>
+          <div className="pr-docs-header">
+            <div className="pr-docs-title">🎨 Görünüm Teması</div>
+          </div>
+          <div style={{padding:"24px 32px",display:"flex",gap:16,flexWrap:"wrap"}}>
+            {THEMES.map(t => (
+              <button key={t.id} onClick={() => setTheme(t.id)}
+                style={{
+                  display:"flex",flexDirection:"column",alignItems:"center",gap:8,
+                  padding:"16px 20px",borderRadius:8,cursor:"pointer",
+                  border: theme === t.id ? "2px solid var(--gold,#C9A84C)" : "2px solid var(--border,#E0DED8)",
+                  background: theme === t.id ? "var(--accent,#1A3C5E)" : "var(--surface,#fff)",
+                  color: theme === t.id ? "#fff" : "var(--text,#1A1A1A)",
+                  fontWeight: theme === t.id ? 700 : 400,
+                  transition:"all 0.2s",minWidth:90
+                }}>
+                <span style={{fontSize:28}}>{t.icon}</span>
+                <span style={{fontSize:12,letterSpacing:1}}>{t.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         {/* BELGELERİM */}
         <div className="pr-docs-card">
           <div className="pr-docs-header">

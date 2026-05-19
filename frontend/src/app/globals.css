@@ -24,3 +24,114 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ===================== EPH TEMALAR ===================== */
+
+/* KLASIK - Serif font, krem tonları */
+.eph-theme-klasik {
+  --bg: #F5F0E8;
+  --bg2: #EDE8DC;
+  --surface: #FFFDF7;
+  --border: #D4C9B0;
+  --text: #2C1A0E;
+  --text2: #6B5744;
+  --accent: #8B4513;
+  --accent2: #A0522D;
+  --gold: #8B4513;
+  --font-main: 'Playfair Display', Georgia, serif;
+  --font-body: 'Lora', Georgia, serif;
+  --radius: 2px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+/* MODERN - Sans-serif, beyaz/gri */
+.eph-theme-modern {
+  --bg: #F8F8F6;
+  --bg2: #EFEFED;
+  --surface: #FFFFFF;
+  --border: #E0DED8;
+  --text: #1A1A1A;
+  --text2: #6B6B6B;
+  --accent: #1A3C5E;
+  --accent2: #C9A84C;
+  --gold: #C9A84C;
+  --font-main: 'Inter', Arial, sans-serif;
+  --font-body: 'Inter', Arial, sans-serif;
+  --radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+/* FUTURISTIK - Mono font, koyu lacivert */
+.eph-theme-futuristik {
+  --bg: #0A0E1A;
+  --bg2: #111827;
+  --surface: #1A2235;
+  --border: #2A3A55;
+  --text: #E0F0FF;
+  --text2: #7A9BBF;
+  --accent: #00D4FF;
+  --accent2: #7B2FFF;
+  --gold: #00D4FF;
+  --font-main: 'Space Grotesk', monospace;
+  --font-body: 'Space Grotesk', monospace;
+  --radius: 0px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+/* KOYU - Sıcak koyu */
+.eph-theme-koyu {
+  --bg: #1C1C1E;
+  --bg2: #2C2C2E;
+  --surface: #3A3A3C;
+  --border: #48484A;
+  --text: #F2F2F7;
+  --text2: #AEAEB2;
+  --accent: #FFD60A;
+  --accent2: #FF9F0A;
+  --gold: #FFD60A;
+  --font-main: 'Inter', Arial, sans-serif;
+  --font-body: 'Inter', Arial, sans-serif;
+  --radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+/* NESELI - Renkli, yuvarlak */
+.eph-theme-neseli {
+  --bg: #FFF5FB;
+  --bg2: #FFE8F5;
+  --surface: #FFFFFF;
+  --border: #F0C0E0;
+  --text: #2D0A3A;
+  --text2: #8B4A7A;
+  --accent: #E91E8C;
+  --accent2: #7C3AED;
+  --gold: #E91E8C;
+  --font-main: 'Nunito', Arial, sans-serif;
+  --font-body: 'Nunito', Arial, sans-serif;
+  --radius: 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+/* Tema font override - tüm elementlere uygula */
+.eph-theme-klasik * { font-family: 'Lora', Georgia, serif !important; }
+.eph-theme-klasik h1, .eph-theme-klasik h2, .eph-theme-klasik h3,
+.eph-theme-klasik .title, .eph-theme-klasik [class*="title"],
+.eph-theme-klasik [class*="header"] { font-family: 'Playfair Display', Georgia, serif !important; }
+
+.eph-theme-modern * { font-family: 'Inter', Arial, sans-serif !important; }
+
+.eph-theme-futuristik * { font-family: 'Space Grotesk', monospace !important; }
+
+.eph-theme-koyu * { font-family: 'Inter', Arial, sans-serif !important; }
+
+.eph-theme-neseli * { font-family: 'Nunito', Arial, sans-serif !important; }
