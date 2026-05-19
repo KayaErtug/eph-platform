@@ -230,7 +230,16 @@ export default function AdminPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [allUnits, setAllUnits] = useState<StokUnit[]>([]);
   const [trustList, setTrustList] = useState<TrustEntry[]>([]);
-  const [activeTab, setActiveTab] = useState<"users"|"documents"|"nominations"|"applications"|"leads"|"stock"|"trust">("users");
+  const [visits, setVisits] = useState<any[]>([]);
+  const fetchVisits = async () => {
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/visits`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+    setVisits(Array.isArray(data) ? data : []);
+  };
+  const [activeTab, setActiveTab] = useState<"users"|"documents"|"nominations"|"applications"|"leads"|"stock"|"trust"|"visits">("users");
   const [userFilter, setUserFilter] = useState("all");
   const [docFilter, setDocFilter] = useState("all");
   const [nomFilter, setNomFilter] = useState("all");
@@ -490,9 +499,10 @@ export default function AdminPage() {
             {key:"leads",label:"Lina Leads",badge:leads.length},
             {key:"stock",label:"Stok Doğrulama",badge:null},
             {key:"trust",label:"Güven Skorları",badge:null},
+            {key:"visits",label:"Ziyaretler",badge:null},
           ].map(t=>(
             <button key={t.key} className={`an-tab ${activeTab===t.key?"active":""}`}
-              onClick={()=>{setActiveTab(t.key as any); if(t.key==="leads") fetchLeads(); if(t.key==="stock") fetchUnits(); if(t.key==="trust") fetchTrust();}}>
+              onClick={()=>{setActiveTab(t.key as any); if(t.key==="leads") fetchLeads(); if(t.key==="stock") fetchUnits(); if(t.key==="trust") fetchTrust(); if(t.key==="visits") fetchVisits();}}>
               {t.label}
               {t.badge && t.badge > 0 && <span className="an-tab-badge">{t.badge}</span>}
             </button>
@@ -820,6 +830,40 @@ export default function AdminPage() {
           </>
         )}
 
+
+        {activeTab==="visits" && (
+          <>
+            <div className="an-section-header">
+              <div><div className="an-section-title">Kullanıcı Ziyaretleri</div><div className="an-section-sub">Kim, ne zaman, hangi sayfayı ziyaret etti</div></div>
+              <button className="an-btn an-btn-ghost" onClick={fetchVisits}>Yenile</button>
+            </div>
+            <div className="an-table">
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr style={{borderBottom:"1px solid var(--border)"}}>
+                  <th style={{padding:"10px 16px",textAlign:"left",fontSize:9,letterSpacing:2,color:"var(--muted)"}}>KULLANICI</th>
+                  <th style={{padding:"10px 16px",textAlign:"left",fontSize:9,letterSpacing:2,color:"var(--muted)"}}>SAYFA</th>
+                  <th style={{padding:"10px 16px",textAlign:"left",fontSize:9,letterSpacing:2,color:"var(--muted)"}}>IP</th>
+                  <th style={{padding:"10px 16px",textAlign:"left",fontSize:9,letterSpacing:2,color:"var(--muted)"}}>TARİH</th>
+                </tr></thead>
+                <tbody>
+                  {visits.length===0 ? <tr><td colSpan={4}><div className="an-empty">Henüz ziyaret yok.</div></td></tr> :
+                    visits.map((v,i)=>(
+                      <tr key={v.id} style={{borderBottom:"1px solid var(--border)",background:i%2===0?"#fff":"#fafaf8"}}>
+                        <td style={{padding:"10px 16px"}}>
+                          <div style={{fontWeight:500,fontSize:13}}>{v.user ? `${v.user.firstName} ${v.user.lastName}` : "Misafir"}</div>
+                          <div style={{fontSize:11,color:"var(--muted)"}}>{v.user?.email}</div>
+                        </td>
+                        <td style={{padding:"10px 16px",fontSize:12,fontFamily:"monospace"}}>{v.page}</td>
+                        <td style={{padding:"10px 16px",fontSize:11,color:"var(--muted)"}}>{v.ip}</td>
+                        <td style={{padding:"10px 16px",fontSize:11,color:"var(--muted)"}}>{new Date(v.createdAt).toLocaleString("tr-TR")}</td>
+                      </tr>
+                    ))
+                  }
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </main>
     </>
   );
