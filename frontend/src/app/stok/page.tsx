@@ -1,4 +1,5 @@
 "use client";
+import LinaPanel from "../../components/LinaPanel";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
@@ -211,6 +212,7 @@ export default function StokPage() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [linaOpen, setLinaOpen] = useState(false);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
@@ -480,6 +482,7 @@ export default function StokPage() {
         </div>
       </nav>
 
+      <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
       <main className="st-main">
         <div className="st-header">
           <div>
@@ -632,6 +635,16 @@ export default function StokPage() {
           </div>
         )}
       </main>
+
+      <button onClick={() => setLinaOpen(true)} style={{
+        position:"fixed",bottom:32,right:32,zIndex:1000,
+        width:60,height:60,borderRadius:"50%",
+        background:"linear-gradient(135deg,#1A3C5E,#C9A84C)",
+        border:"none",cursor:"pointer",
+        display:"flex",alignItems:"center",justifyContent:"center",
+        boxShadow:"0 4px 20px rgba(0,0,0,0.3)",
+        fontSize:28
+      }} title="Lina AI ile stok ekle">🤖</button>
     </>
   );
 }
