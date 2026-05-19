@@ -245,3 +245,11 @@ table { width: 100%; overflow-x: auto; display: block; }
   0%, 100% { transform: scaleY(1); }
   50% { transform: scaleY(2); }
 }
+
+
+/* Mobilde üst nav gizle */
+@media (max-width: 768px) {
+  .st-nav { display: none !important; }
+  .crm-nav { display: none !important; }
+  .mk-nav { display: none !important; }
+}

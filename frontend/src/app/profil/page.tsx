@@ -43,7 +43,7 @@ const CSS = `
 :root{--navy:#0F2044;--gold:#C9A84C;--cream:#F5F3EF;--warm:#FAFAF8;--text:#1A1A2E;--muted:#8A8A8A;--border:#E2DDD5;--serif:'Cormorant Garamond',Georgia,serif;--sans:'DM Sans',system-ui,sans-serif;}
 body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .pr-nav{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 48px;position:sticky;top:0;z-index:100;}
-@media(max-width:768px){.pr-nav{padding:0 20px;}}
+@media(max-width:768px){.pr-nav{display:none!important;}}
 .pr-logo{display:flex;align-items:center;gap:12px;text-decoration:none;}
 .pr-logo img{width:34px;height:34px;object-fit:contain;}
 .pr-logo-text{font-family:var(--serif);font-size:18px;font-weight:500;color:var(--navy);}

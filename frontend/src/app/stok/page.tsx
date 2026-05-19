@@ -637,7 +637,7 @@ export default function StokPage() {
       </main>
 
       <button onClick={() => setLinaOpen(true)} style={{
-        position:"fixed",bottom:32,right:32,zIndex:1000,
+        position:"fixed",bottom:80,right:20,zIndex:1000,
         width:60,height:60,borderRadius:"50%",
         background:"linear-gradient(135deg,#1A3C5E,#C9A84C)",
         border:"none",cursor:"pointer",

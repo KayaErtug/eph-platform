@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { VisitTracker } from "../components/VisitTracker";
 import { ThemeProvider } from "../components/ThemeProvider";
+import { BottomNav } from "../components/BottomNav";
+import { PWARegister } from "../components/PWARegister";
 
 export const metadata: Metadata = {
   title: "EPH Platform — Emlak Portföy Havuzu",
@@ -27,7 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ThemeProvider>
           <VisitTracker />
+          <PWARegister />
           {children}
+          <BottomNav />
         </ThemeProvider>
       </body>
     </html>
