@@ -1,0 +1,32 @@
+{
+  "ARSA": {
+    "requiredFields": ["adaNo","parselNo","alan","imarDurumu","deedStatus","price","negotiable","authorityStatus"],
+    "forbiddenFields": ["roomCount","buildingAge","heating","dues","floor","totalFloors","grossArea","netArea"],
+    "loadLibs": ["arsa","imar","tapu"]
+  },
+  "TARLA": {
+    "requiredFields": ["adaNo","parselNo","alan","deedStatus","price","negotiable","authorityStatus"],
+    "forbiddenFields": ["roomCount","buildingAge","heating","dues","floor","totalFloors"],
+    "loadLibs": ["arsa","tapu"]
+  },
+  "DAIRE": {
+    "requiredFields": ["city","district","neighborhood","address","projectName","grossArea","netArea","roomCount","floor","totalFloors","buildingAge","deedStatus","price","negotiable","authorityStatus"],
+    "forbiddenFields": ["adaNo","parselNo","imarDurumu","emsal","gabari"],
+    "loadLibs": ["daire","tapu"]
+  },
+  "VILLA": {
+    "requiredFields": ["city","district","neighborhood","address","grossArea","netArea","roomCount","buildingAge","deedStatus","price","negotiable","authorityStatus"],
+    "forbiddenFields": ["adaNo","parselNo","imarDurumu"],
+    "loadLibs": ["villa","tapu"]
+  },
+  "OFIS": {
+    "requiredFields": ["city","district","neighborhood","address","grossArea","netArea","floor","deedStatus","price","negotiable","authorityStatus"],
+    "forbiddenFields": ["adaNo","parselNo","roomCount"],
+    "loadLibs": ["daire","tapu"]
+  },
+  "DUKKAN": {
+    "requiredFields": ["city","district","neighborhood","address","grossArea","netArea","floor","deedStatus","price","negotiable","authorityStatus"],
+    "forbiddenFields": ["adaNo","parselNo","roomCount","buildingAge"],
+    "loadLibs": ["daire","tapu"]
+  }
+}
