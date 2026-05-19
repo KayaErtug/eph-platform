@@ -135,3 +135,113 @@ body {
 .eph-theme-koyu * { font-family: 'Inter', Arial, sans-serif !important; }
 
 .eph-theme-neseli * { font-family: 'Nunito', Arial, sans-serif !important; }
+
+/* ===================== GLOBAL MOBİL DÜZENLEMELER ===================== */
+
+/* Viewport meta garantisi */
+* { box-sizing: border-box; }
+
+/* Tablo mobile scroll */
+table { width: 100%; overflow-x: auto; display: block; }
+
+/* Genel container */
+@media (max-width: 480px) {
+  /* Nav linkleri gizle */
+  .lp-nav-links, .db-nav-links .db-nav-lbl,
+  .st-nav-links, .mk-nav-links, .crm-nav-links { display: none !important; }
+
+  /* Hero grid tek kolon */
+  .lp-hero { grid-template-columns: 1fr !important; }
+  .lp-hero-right { display: none !important; }
+  .lp-hero-left { padding: 40px 20px !important; }
+
+  /* Section padding küçült */
+  .lp-section { padding: 48px 20px !important; }
+  .lp-how-grid { grid-template-columns: 1fr !important; }
+  .lp-features-grid { grid-template-columns: 1fr !important; }
+  .lp-kredi-grid { grid-template-columns: 1fr !important; }
+  .lp-testi-grid { grid-template-columns: 1fr !important; }
+  .lp-about { grid-template-columns: 1fr !important; }
+  .lp-cta { grid-template-columns: 1fr !important; padding: 48px 20px !important; }
+
+  /* Dashboard */
+  .db-main { padding: 20px 16px !important; }
+  .db-cards { grid-template-columns: 1fr !important; }
+  .db-ref-grid { grid-template-columns: 1fr !important; }
+  .db-form-grid { grid-template-columns: 1fr !important; }
+  .db-header { grid-template-columns: 1fr !important; }
+
+  /* Stok */
+  .st-main { padding: 20px 16px !important; }
+  .st-header { grid-template-columns: 1fr !important; }
+  .st-stats { grid-template-columns: 1fr 1fr !important; }
+  .st-all-units { grid-template-columns: 1fr !important; }
+  .st-form-grid { grid-template-columns: 1fr !important; }
+
+  /* Admin */
+  .an-main { padding: 20px 16px !important; }
+  .an-stats { grid-template-columns: 1fr 1fr !important; }
+  .an-tabs { overflow-x: auto; flex-wrap: nowrap !important; }
+  .an-tab { font-size: 8px !important; padding: 10px 12px !important; }
+  .an-table { overflow-x: auto; }
+  .an-table table { min-width: 600px; }
+
+  /* CRM */
+  .crm-main { padding: 20px 16px !important; }
+
+  /* Market */
+  .mk-main { padding: 20px 16px !important; }
+  .mk-kpi { grid-template-columns: 1fr 1fr !important; }
+  .mk-two-col { grid-template-columns: 1fr !important; }
+
+  /* Profil */
+  .pr-main { padding: 20px 16px !important; }
+
+  /* Genel buton ve input */
+  button { min-height: 44px; }
+  input, select, textarea { min-height: 44px; font-size: 16px !important; }
+
+  /* Lina panel */
+  .lina-panel { width: 100vw !important; }
+
+  /* Font boyutları */
+  h1 { font-size: clamp(24px, 6vw, 48px) !important; }
+  h2 { font-size: clamp(20px, 5vw, 36px) !important; }
+}
+
+/* Tablet */
+@media (max-width: 768px) {
+  input, select, textarea { font-size: 16px !important; }
+  button { min-height: 44px; }
+  .an-tabs { overflow-x: auto; }
+  .an-table { overflow-x: auto; }
+  .an-table table { min-width: 600px; }
+}
+
+/* Lina Panel Mobile Fix */
+@supports (-webkit-touch-callout: none) {
+  .lina-panel-container {
+    height: -webkit-fill-available !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .lina-input-area {
+    position: sticky !important;
+    bottom: 0 !important;
+    background: #fff !important;
+    padding-bottom: env(safe-area-inset-bottom, 16px) !important;
+  }
+}
+
+/* Ses kayıt pulse animasyonu */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.3); }
+}
+
+/* Lina ses dalgası animasyonu */
+@keyframes wave {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(2); }
+}

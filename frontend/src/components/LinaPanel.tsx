@@ -61,6 +61,9 @@ export default function LinaPanel({ open, onClose }: { open: boolean; onClose: (
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [transcribing, setTranscribing] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [summary, setSummary] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -71,6 +74,34 @@ export default function LinaPanel({ open, onClose }: { open: boolean; onClose: (
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+
+  const speakResponse = (text: string) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+
+    const doSpeak = () => {
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang = "tr-TR";
+      utt.rate = 1.05;
+      utt.pitch = 1.0;
+      utt.volume = 1.0;
+      const voices = window.speechSynthesis.getVoices();
+      const trVoice = voices.find(v => v.lang.startsWith("tr"));
+      if (trVoice) utt.voice = trVoice;
+      utt.onstart = () => setSpeaking(true);
+      utt.onend = () => setSpeaking(false);
+      utt.onerror = () => setSpeaking(false);
+      window.speechSynthesis.speak(utt);
+    };
+
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      doSpeak();
+    } else {
+      window.speechSynthesis.onvoiceschanged = () => { doSpeak(); };
+    }
+  };
 
   const sendMessage = async (text: string) => {
     if (!text.trim()) return;
@@ -92,6 +123,7 @@ export default function LinaPanel({ open, onClose }: { open: boolean; onClose: (
       const data = await res.json();
       const reply = data.reply || "Bir sorun oluştu.";
       setMessages(prev => [...prev, { role: "lina", text: reply }]);
+      speakResponse(reply);
 
       // JSON özet var mı kontrol et
       const jsonMatch = reply.match(/JSON_START([\s\S]*?)JSON_END/);
@@ -112,12 +144,17 @@ export default function LinaPanel({ open, onClose }: { open: boolean; onClose: (
     mr.ondataavailable = e => chunksRef.current.push(e.data);
     mr.onstop = async () => {
       stream.getTracks().forEach(track => track.stop());
+      setTranscribing(true);
       const blob = new Blob(chunksRef.current, { type: "audio/webm" });
       const fd = new FormData();
       fd.append("audio", blob, "ses.webm");
       const res = await fetch("/api/whisper", { method: "POST", body: fd });
       const data = await res.json();
-      if (data.text) sendMessage(data.text);
+      setTranscribing(false);
+      if (data.text) {
+        setTranscript(data.text);
+        setTimeout(() => { setTranscript(""); sendMessage(data.text); }, 1200);
+      }
     };
     mr.start();
     mediaRef.current = mr;
@@ -162,7 +199,7 @@ export default function LinaPanel({ open, onClose }: { open: boolean; onClose: (
     <>
       <div onClick={onClose} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:1001 }} />
       <div style={{
-        position:"fixed",top:0,right:0,height:"100vh",width:"min(420px, 100vw)",
+        position:"fixed",top:0,right:0,height:"100dvh",width:"min(420px, 100vw)",
         background:"#fff",zIndex:1002,display:"flex",flexDirection:"column",
         boxShadow:"-4px 0 30px rgba(0,0,0,0.2)"
       }}>
@@ -173,11 +210,22 @@ export default function LinaPanel({ open, onClose }: { open: boolean; onClose: (
             <div style={{ fontWeight:700,fontSize:16,color:"#1A3C5E" }}>Lina AI</div>
             <div style={{ fontSize:11,color:"#999" }}>Stok Asistanı</div>
           </div>
-          <button onClick={onClose} style={{ marginLeft:"auto",background:"none",border:"none",fontSize:22,cursor:"pointer",color:"#999" }}>×</button>
+          <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
+          {speaking && (
+            <div style={{display:"flex",alignItems:"center",gap:4,background:"#EEF8F0",padding:"4px 10px",borderRadius:20}}>
+              <div style={{display:"flex",gap:2,alignItems:"center"}}>
+                {[1,2,3,4].map(i => <div key={i} style={{width:3,background:"#2D6A4F",borderRadius:2,height:i%2===0?14:8,animation:"wave 0.8s ease-in-out infinite",animationDelay:`${i*0.15}s`}} />)}
+              </div>
+              <span style={{fontSize:10,color:"#2D6A4F",fontWeight:500}}>Lina konuşuyor</span>
+              <button onClick={()=>{window.speechSynthesis.cancel();setSpeaking(false);}} style={{background:"none",border:"none",cursor:"pointer",color:"#2D6A4F",fontSize:14,padding:0}}>⏹</button>
+            </div>
+          )}
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"#999"}}>×</button>
+        </div>
         </div>
 
         {/* Messages */}
-        <div style={{ flex:1,overflowY:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:12 }}>
+        <div style={{ flex:1,overflowY:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:12,WebkitOverflowScrolling:"touch" }}>
           {messages.map((m, i) => (
             <div key={i} style={{ display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start" }}>
               <div style={{
@@ -220,9 +268,33 @@ export default function LinaPanel({ open, onClose }: { open: boolean; onClose: (
           </div>
         )}
 
+        {/* Ses durumu göstergesi */}
+        {(recording || transcribing || transcript) && (
+          <div style={{ padding:"12px 20px", background: recording ? "#FFF0F0" : "#F0F7FF", borderTop:"1px solid #eee", display:"flex", alignItems:"center", gap:10 }}>
+            {recording && (
+              <>
+                <div style={{ width:10, height:10, borderRadius:"50%", background:"#FF4444", animation:"pulse 1s infinite" }} />
+                <span style={{ fontSize:12, color:"#FF4444", fontWeight:500 }}>Dinleniyor...</span>
+                <span style={{ fontSize:11, color:"#999", marginLeft:"auto" }}>Durdurmak için basın</span>
+              </>
+            )}
+            {transcribing && !recording && (
+              <>
+                <div style={{ width:10, height:10, borderRadius:"50%", background:"#1A3C5E" }} />
+                <span style={{ fontSize:12, color:"#1A3C5E" }}>Yazıya çevriliyor...</span>
+              </>
+            )}
+            {transcript && !transcribing && (
+              <>
+                <span style={{ fontSize:12, color:"#2D6A4F" }}>✓</span>
+                <span style={{ fontSize:12, color:"#1A1A1A", fontStyle:"italic" }}>{transcript}</span>
+              </>
+            )}
+          </div>
+        )}
         {/* Input */}
         {!summary && !saved && (
-          <div style={{ padding:"16px 20px",borderTop:"1px solid #eee",display:"flex",gap:8 }}>
+          <div style={{ padding:"16px 20px",paddingBottom:"max(16px, env(safe-area-inset-bottom))",borderTop:"1px solid #eee",display:"flex",gap:8,background:"#fff",position:"sticky",bottom:0,zIndex:10 }}>
             <input value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key==="Enter" && sendMessage(input)}
               placeholder="Mesaj yaz..." disabled={loading}
