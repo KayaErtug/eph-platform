@@ -658,7 +658,7 @@ export default function StokPage() {
                 {units.map(u => {
                   const ss = getStatusStyle(u.status);
                   return (
-                    <div key={u.id} className="st-unit-big" onClick={() => setSelectedUnit(u)}>
+                    <div key={u.id} className="st-unit-big" onClick={() => { console.log("Tıklandı:", u); setSelectedUnit(u); }}>
                       <div className="st-unit-big-img">
                         <span style={{fontSize:28,opacity:0.3}}>🏠</span>
                         <div className="st-unit-big-badge">{STATUS_LABELS[u.status]}</div>
