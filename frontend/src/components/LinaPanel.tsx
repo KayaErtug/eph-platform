@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
+import { useAuthStore } from "@/store/auth.store";
 
 type Message = { role: "user" | "lina"; text: string };
 
@@ -55,8 +56,10 @@ JSON_END
 Türkçe konuş, samimi ve profesyonel ol. Form hissi değil, danışman hissi ver.`;
 
 export default function LinaPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { user } = useAuthStore();
+  const userName = user?.firstName || "değerli kullanıcı";
   const [messages, setMessages] = useState<Message[]>([
-    { role: "lina", text: "Merhaba! Ben Lina 👋 Size profesyonel bir emlak ilanı hazırlayalım. Önce söyler misiniz — bu ilan satılık mı, kiralık mı, yoksa başka bir türde mi?" }
+    { role: "lina", text: `Merhaba ${userName} 🙂 Yeni bir ilan mı ekleyeceğiz?` }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -117,7 +120,8 @@ export default function LinaPanel({ open, onClose }: { open: boolean; onClose: (
         body: JSON.stringify({
           message: text,
           history: newMessages.map(m => ({ role: m.role === "lina" ? "assistant" : "user", content: m.text })),
-          system: LINA_SYSTEM
+          system: LINA_SYSTEM,
+          userName: user?.firstName || ""
         })
       });
       const data = await res.json();
@@ -128,7 +132,19 @@ export default function LinaPanel({ open, onClose }: { open: boolean; onClose: (
       // JSON özet var mı kontrol et
       const jsonMatch = reply.match(/JSON_START([\s\S]*?)JSON_END/);
       if (jsonMatch) {
-        try { setSummary(JSON.parse(jsonMatch[1].trim())); } catch {}
+        try {
+          const parsed = JSON.parse(jsonMatch[1].trim());
+          setSummary(parsed);
+          // JSON kodunu mesajdan temizle
+          const cleanReply = reply.replace(/JSON_START[\s\S]*?JSON_END/g, "").trim();
+          if (cleanReply) {
+            setMessages(prev => {
+              const msgs = [...prev];
+              msgs[msgs.length - 1] = { role: "lina", text: cleanReply };
+              return msgs;
+            });
+          }
+        } catch {}
       }
     } catch (err: any) {
       console.error("Lina hata:", err);
@@ -171,18 +187,13 @@ export default function LinaPanel({ open, onClose }: { open: boolean; onClose: (
     setSaving(true);
     const token = localStorage.getItem("token");
     try {
-      const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const projRes = await fetch(`${API}/projects`, {
+      const res = await fetch("/api/save-listing", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(summary.proje)
+        body: JSON.stringify({ proje: summary.proje, birim: summary.birim, ilan: summary.ilan })
       });
-      const proj = await projRes.json();
-      await fetch(`${API}/units`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ...summary.birim, projectId: proj.id })
-      });
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error || "Kayıt başarısız");
       setSaved(true);
     } catch (err: any) { console.error("Kayıt hatası:", err); alert("Kayıt hatası!"); }
     setSaving(false);
@@ -246,10 +257,16 @@ export default function LinaPanel({ open, onClose }: { open: boolean; onClose: (
         {/* Özet onay ekranı */}
         {summary && !saved && (
           <div style={{ padding:"16px 20px",borderTop:"1px solid #eee",background:"#FFFDF7" }}>
-            <div style={{ fontSize:12,fontWeight:700,color:"#1A3C5E",marginBottom:8 }}>📋 ÖZET — Onaylıyor musun?</div>
-            <div style={{ fontSize:11,color:"#555",marginBottom:12,lineHeight:1.8 }}>
-              <b>Proje:</b> {summary.proje?.name} / {summary.proje?.city} {summary.proje?.district}<br/>
-              <b>Birim:</b> {summary.birim?.type} No:{summary.birim?.number} Kat:{summary.birim?.floor} {summary.birim?.area}m² {summary.birim?.price?.toLocaleString("tr-TR")} TL
+            <div style={{ fontSize:12,fontWeight:700,color:"#1A3C5E",marginBottom:12 }}>📋 İlan Özeti</div>
+            <div style={{ fontSize:12,color:"#333",marginBottom:12,lineHeight:2,background:"#fff",borderRadius:8,padding:"12px" }}>
+              {summary.ilan?.title && <div><b>Başlık:</b> {summary.ilan.title}</div>}
+              <div><b>Tür:</b> {summary.ilan?.listingType} · {summary.ilan?.portfolioType}</div>
+              <div><b>Konum:</b> {summary.proje?.neighborhood} / {summary.proje?.district} / {summary.proje?.city}</div>
+              {summary.birim?.roomCount && <div><b>Oda:</b> {summary.birim.roomCount}</div>}
+              {summary.birim?.grossArea && <div><b>Alan:</b> {summary.birim.grossArea} m²</div>}
+              {summary.birim?.floor && <div><b>Kat:</b> {summary.birim.floor}</div>}
+              {summary.birim?.deedStatus && <div><b>Tapu:</b> {summary.birim.deedStatus}</div>}
+              <div><b>Fiyat:</b> {summary.ilan?.price?.toLocaleString("tr-TR")} TL {summary.ilan?.negotiable ? "· Pazarlıklı" : ""}</div>
             </div>
             <div style={{ display:"flex",gap:8 }}>
               <button onClick={saveStock} disabled={saving} style={{ flex:1,padding:"10px",background:"#1A3C5E",color:"#fff",border:"none",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:600 }}>

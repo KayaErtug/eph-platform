@@ -13,7 +13,7 @@ export class ProjectsController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
+  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
   create(@CurrentUser() user: any, @Body() body: {
     name: string;
     description?: string;
@@ -34,7 +34,7 @@ export class ProjectsController {
 
   @Get('my')
   @UseGuards(RolesGuard)
-  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
+  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
   myProjects(@CurrentUser() user: any) {
     return this.projectsService.myProjects(user.id);
   }
@@ -46,14 +46,14 @@ export class ProjectsController {
 
   @Patch(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
+  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
   update(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
     return this.projectsService.update(id, user.id, body);
   }
 
   @Delete(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
+  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
   remove(@Param('id') id: string, @CurrentUser() user: any) {
     return this.projectsService.remove(id, user.id);
   }
