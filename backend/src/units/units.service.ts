@@ -16,6 +16,22 @@ export class UnitsService {
     return this.prisma.unit.create({ data: { ...data, projectId } });
   }
 
+  async findOne(id: string) {
+    const unit = await this.prisma.unit.findUnique({
+      where: { id },
+      include: {
+        project: {
+          select: {
+            id: true, name: true, city: true, district: true, address: true,
+            owner: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+    });
+    if (!unit) throw new NotFoundException('Birim bulunamadi.');
+    return unit;
+  }
+
   async findByProject(projectId: string, filters?: { status?: UnitStatus; type?: UnitType }) {
     return this.prisma.unit.findMany({
       where: { projectId, status: filters?.status, type: filters?.type },
@@ -68,17 +84,11 @@ export class UnitsService {
   }) {
     const unit = await this.prisma.unit.findUnique({ where: { id } });
     if (!unit) throw new NotFoundException('Birim bulunamadi.');
-
     const isVerified = !!(data.tapuVerified || data.photoVerified || data.yetkiVerified);
     const verifiedAt = isVerified ? new Date() : null;
-
     return this.prisma.unit.update({
       where: { id },
-      data: {
-        ...data,
-        isVerified,
-        verifiedAt,
-      },
+      data: { ...data, isVerified, verifiedAt },
     });
   }
 

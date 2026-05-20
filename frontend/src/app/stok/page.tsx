@@ -109,8 +109,6 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-filter-input{background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:8px 0;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;font-weight:300;min-width:160px;}
 .st-filter-input::placeholder{color:#C0BAB0;}
 .st-filter-input:focus,.st-select:focus{border-bottom-color:var(--navy);}
-
-/* PROJE KARTI */
 .st-project{background:#fff;border:1px solid var(--border);margin-bottom:20px;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04);transition:all 0.3s;}
 .st-project:hover{border-color:#B8943F;box-shadow:0 8px 24px rgba(0,0,0,0.08);}
 .st-project-header{padding:20px 24px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;background:linear-gradient(135deg,#0D2137 0%,#1a3c5e 100%);}
@@ -120,8 +118,6 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-project-meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
 .st-active-badge{font-size:9px;letter-spacing:1px;text-transform:uppercase;border:1px solid;padding:5px 12px;border-radius:20px;font-weight:600;}
 .st-unit-count{font-size:12px;color:rgba(255,255,255,0.5);font-style:italic;}
-
-/* İLAN LİSTE KARTI */
 .st-units-list{padding:16px 20px 20px;display:flex;flex-direction:column;gap:10px;}
 .st-unit-card{display:flex;border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;background:#fff;transition:all 0.3s;min-height:90px;}
 .st-unit-card:hover{border-color:#B8943F;box-shadow:0 4px 16px rgba(0,0,0,0.08);transform:translateY(-1px);}
@@ -136,7 +132,6 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-unit-footer{display:flex;justify-content:space-between;align-items:center;}
 .st-unit-price-big{font-size:17px;font-weight:700;color:#0D2137;letter-spacing:-0.5px;}
 .st-unit-status{font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:20px;font-weight:600;border:1px solid;}
-
 .st-badges{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
 .st-badge-verified{font-size:7px;letter-spacing:1px;text-transform:uppercase;border:1px solid #2D6A4F;color:#2D6A4F;background:#F0FAF4;padding:2px 7px;display:inline-flex;align-items:center;gap:3px;}
 .st-all-units{display:flex;flex-direction:column;gap:10px;}
@@ -151,7 +146,6 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-unit-big-tag{font-size:9px;padding:2px 8px;border-radius:20px;background:#F5F3EF;color:#555;border:0.5px solid #E8E4DC;}
 .st-unit-big-footer{display:flex;align-items:center;justify-content:space-between;}
 .st-unit-big-price{font-size:18px;font-weight:700;color:#0D2137;}
-
 .st-empty{background:#fff;border:1px solid var(--border);border-radius:12px;padding:60px;text-align:center;}
 .st-empty-text{font-family:var(--serif);font-size:22px;font-style:italic;color:var(--muted);margin-bottom:6px;}
 .st-empty-sub{font-size:12px;color:#B8B2A8;font-weight:300;}
@@ -224,7 +218,6 @@ export default function StokPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [linaOpen, setLinaOpen] = useState(false);
-  const [selectedUnit, setSelectedUnit] = useState<any>(null);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
@@ -333,49 +326,6 @@ export default function StokPage() {
   return (
     <>
       <style>{CSS}</style>
-
-      {/* DETAY MODAL */}
-      {selectedUnit && (
-        <>
-          <div onClick={() => setSelectedUnit(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:2000}} />
-          <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:"min(500px,92vw)",background:"#fff",borderRadius:20,zIndex:2001,overflow:"hidden",boxShadow:"0 24px 60px rgba(0,0,0,0.25)"}}>
-            <div style={{background:"linear-gradient(135deg,#0D2137,#1a3c5e)",padding:"24px 28px"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                <div>
-                  <div style={{color:"#B8943F",fontSize:10,letterSpacing:2,marginBottom:6,textTransform:"uppercase"}}>{STATUS_LABELS[selectedUnit.status]}</div>
-                  <div style={{color:"#fff",fontSize:20,fontWeight:600}}>{TYPE_LABELS[selectedUnit.type] || selectedUnit.type}</div>
-                  <div style={{color:"rgba(255,255,255,0.5)",fontSize:12,marginTop:4}}>{selectedUnit.project?.name} · {selectedUnit.project?.city} / {selectedUnit.project?.district}</div>
-                </div>
-                <button onClick={() => setSelectedUnit(null)} style={{background:"rgba(255,255,255,0.1)",border:"none",color:"#fff",width:32,height:32,borderRadius:"50%",cursor:"pointer",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
-              </div>
-            </div>
-            <div style={{padding:"24px 28px"}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
-                {[
-                  {label:"Fiyat",val:`${selectedUnit.price?.toLocaleString("tr-TR")} TL`},
-                  {label:"Alan",val:selectedUnit.area ? `${selectedUnit.area} m²` : "—"},
-                  {label:"Oda Sayısı",val:selectedUnit.roomCount || "—"},
-                  {label:"Kat",val:selectedUnit.floor != null ? selectedUnit.floor : "—"},
-                  {label:"Daire No",val:selectedUnit.number || "—"},
-                  {label:"Şehir / İlçe",val:`${selectedUnit.project?.city || "—"} / ${selectedUnit.project?.district || "—"}`},
-                ].map(item => (
-                  <div key={item.label} style={{background:"#F5F3EF",borderRadius:10,padding:"12px 14px"}}>
-                    <div style={{fontSize:9,letterSpacing:2,color:"#8A8A8A",marginBottom:4,textTransform:"uppercase"}}>{item.label}</div>
-                    <div style={{fontSize:15,fontWeight:600,color:"#0D2137"}}>{item.val}</div>
-                  </div>
-                ))}
-              </div>
-              {selectedUnit.description && (
-                <div style={{background:"#F5F3EF",borderRadius:10,padding:"14px",marginBottom:20}}>
-                  <div style={{fontSize:9,letterSpacing:2,color:"#8A8A8A",marginBottom:6,textTransform:"uppercase"}}>Açıklama</div>
-                  <div style={{fontSize:13,color:"#333",lineHeight:1.6}}>{selectedUnit.description}</div>
-                </div>
-              )}
-              <button onClick={() => setSelectedUnit(null)} style={{width:"100%",padding:"13px",background:"#0D2137",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:13}}>Kapat</button>
-            </div>
-          </div>
-        </>
-      )}
 
       {showModal && (
         <div className="st-overlay" onClick={() => setShowModal(false)}>
@@ -597,7 +547,7 @@ export default function StokPage() {
                       {p.units.map(u => {
                         const ss = getStatusStyle(u.status);
                         return (
-                          <div key={u.id} className="st-unit-card" onClick={() => setSelectedUnit({...u, project: p})}>
+                          <div key={u.id} className="st-unit-card" onClick={() => router.push(`/stok/${u.id}`)}>
                             <div className="st-unit-img">
                               <div className="st-unit-img-icon">🏠</div>
                               <div className="st-unit-img-badge">{STATUS_LABELS[u.status]}</div>
@@ -658,7 +608,7 @@ export default function StokPage() {
                 {units.map(u => {
                   const ss = getStatusStyle(u.status);
                   return (
-                    <div key={u.id} className="st-unit-big" onClick={() => { console.log("Tıklandı:", u); setSelectedUnit(u); }}>
+                    <div key={u.id} className="st-unit-big" onClick={() => router.push(`/stok/${u.id}`)}>
                       <div className="st-unit-big-img">
                         <span style={{fontSize:28,opacity:0.3}}>🏠</span>
                         <div className="st-unit-big-badge">{STATUS_LABELS[u.status]}</div>

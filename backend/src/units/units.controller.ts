@@ -40,6 +40,11 @@ export class UnitsController {
     return this.unitsService.findByProject(projectId, { status, type });
   }
 
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.unitsService.findOne(id);
+  }
+
   @Patch(':id/verify')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
