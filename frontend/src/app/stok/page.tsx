@@ -119,9 +119,10 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-active-badge{font-size:9px;letter-spacing:1px;text-transform:uppercase;border:1px solid;padding:5px 12px;border-radius:20px;font-weight:600;}
 .st-unit-count{font-size:12px;color:rgba(255,255,255,0.5);font-style:italic;}
 .st-units-list{padding:16px 20px 20px;display:flex;flex-direction:column;gap:10px;}
-.st-unit-card{display:flex;border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;background:#fff;transition:all 0.3s;min-height:90px;}
-.st-unit-card:hover{border-color:#B8943F;box-shadow:0 4px 16px rgba(0,0,0,0.08);transform:translateY(-1px);}
-.st-unit-img{width:120px;min-width:120px;background:linear-gradient(135deg,#0D2137,#1a3c5e);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;flex-shrink:0;}
+.st-unit-card{display:flex;border:1px solid #E7E1D8;border-radius:14px;overflow:hidden;cursor:pointer;background:#fff;transition:all 0.2s ease;min-height:88px;position:relative;z-index:1;}
+.st-unit-card:hover{border-color:#C9A84C;box-shadow:0 2px 10px rgba(0,0,0,0.06);transform:none;}
+.st-unit-card *{pointer-events:none;}
+.st-unit-img{width:100px;min-width:100px;background:#F3F5F7;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;flex-shrink:0;}
 .st-unit-img-icon{font-size:28px;opacity:0.35;}
 .st-unit-img-badge{position:absolute;bottom:0;left:0;right:0;text-align:center;background:rgba(184,148,63,0.95);color:#fff;font-size:8px;letter-spacing:1px;padding:4px;font-weight:700;}
 .st-unit-body{flex:1;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;}
@@ -135,9 +136,10 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-badges{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
 .st-badge-verified{font-size:7px;letter-spacing:1px;text-transform:uppercase;border:1px solid #2D6A4F;color:#2D6A4F;background:#F0FAF4;padding:2px 7px;display:inline-flex;align-items:center;gap:3px;}
 .st-all-units{display:flex;flex-direction:column;gap:10px;}
-.st-unit-big{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:all 0.3s;display:flex;min-height:90px;}
-.st-unit-big:hover{border-color:#B8943F;box-shadow:0 4px 16px rgba(0,0,0,0.08);transform:translateY(-1px);}
-.st-unit-big-img{width:120px;min-width:120px;background:linear-gradient(135deg,#0D2137,#1a3c5e);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;flex-shrink:0;}
+.st-unit-big{background:#fff;border:1px solid #E7E1D8;border-radius:14px;overflow:hidden;cursor:pointer;transition:all 0.2s ease;display:flex;min-height:88px;position:relative;z-index:1;}
+.st-unit-big:hover{border-color:#C9A84C;box-shadow:0 2px 10px rgba(0,0,0,0.06);transform:none;}
+.st-unit-big *{pointer-events:none;}
+.st-unit-big-img{width:100px;min-width:100px;background:#F3F5F7;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;flex-shrink:0;}
 .st-unit-big-badge{position:absolute;bottom:0;left:0;right:0;text-align:center;background:rgba(184,148,63,0.95);color:#fff;font-size:8px;letter-spacing:1px;padding:4px;font-weight:700;}
 .st-unit-big-body{flex:1;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;}
 .st-unit-big-project{font-size:14px;font-weight:600;color:var(--navy);margin-bottom:3px;}
@@ -547,7 +549,7 @@ export default function StokPage() {
                       {p.units.map(u => {
                         const ss = getStatusStyle(u.status);
                         return (
-                          <div key={u.id} className="st-unit-card" onClick={() => router.push(`/stok/${u.id}`)}>
+                          <div key={u.id} className="st-unit-card" role="button" tabIndex={0} onClick={() => router.push(`/stok/${u.id}`)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(`/stok/${u.id}`); }}>
                             <div className="st-unit-img">
                               <div className="st-unit-img-icon">🏠</div>
                               <div className="st-unit-img-badge">{STATUS_LABELS[u.status]}</div>
@@ -608,7 +610,7 @@ export default function StokPage() {
                 {units.map(u => {
                   const ss = getStatusStyle(u.status);
                   return (
-                    <div key={u.id} className="st-unit-big" onClick={() => router.push(`/stok/${u.id}`)}>
+                    <div key={u.id} className="st-unit-big" role="button" tabIndex={0} onClick={() => router.push(`/stok/${u.id}`)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(`/stok/${u.id}`); }}>
                       <div className="st-unit-big-img">
                         <span style={{fontSize:28,opacity:0.3}}>🏠</span>
                         <div className="st-unit-big-badge">{STATUS_LABELS[u.status]}</div>
