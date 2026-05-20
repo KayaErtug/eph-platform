@@ -1,268 +1,249 @@
 "use client";
-
 import LinaPanel from "../../components/LinaPanel";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
 import api from "@/lib/api";
 import Link from "next/link";
 
 interface Unit {
-  id: string;
-  type: string;
-  floor?: number;
-  number: string;
-  roomCount?: string;
-  area?: number;
-  price: number;
-  status: string;
-  description?: string;
-  isVerified?: boolean;
-  isOffMarket?: boolean;
-  tapuVerified?: boolean;
-  photoVerified?: boolean;
-  yetkiVerified?: boolean;
+  id: string; type: string; floor?: number; number: string;
+  roomCount?: string; area?: number; price: number; status: string; description?: string;
+  isVerified?: boolean; isOffMarket?: boolean;
+  tapuVerified?: boolean; photoVerified?: boolean; yetkiVerified?: boolean;
   createdAt?: string;
-  project: {
-    id: string;
-    name: string;
-    city: string;
-    district: string;
-    address: string;
-    owner: { firstName: string; lastName: string };
-  };
+  project: { id: string; name: string; city: string; district: string; address: string; owner: { firstName: string; lastName: string } };
 }
-
 interface Project {
-  id: string;
-  name: string;
-  city: string;
-  district: string;
-  address: string;
-  isActive: boolean;
+  id: string; name: string; city: string; district: string; address: string; isActive: boolean;
   owner: { firstName: string; lastName: string; role: string };
-  units: Unit[];
-  _count: { units: number };
+  units: Unit[]; _count: { units: number };
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  SATILIK: "Satılık",
-  KIRALIK: "Kiralık",
-  GUNLUK_KIRALIK: "Günlük Kiralık",
-  DEVREN_SATILIK: "Devren Satılık",
-  DEVREN_KIRALIK: "Devren Kiralık",
-  INSAAT_PROJESI: "İnşaat Projesi",
-  KAT_KARSILIGI: "Kat Karşılığı",
-  REZERVE: "Rezerve",
-  SATILDI: "Satıldı",
-  KIRALANDII: "Kiralandı",
-  PASIF: "Pasif",
+  SATILIK: "Satılık", KIRALIK: "Kiralık", GUNLUK_KIRALIK: "Günlük Kiralık",
+  DEVREN_SATILIK: "Devren Satılık", DEVREN_KIRALIK: "Devren Kiralık",
+  INSAAT_PROJESI: "İnşaat Projesi", KAT_KARSILIGI: "Kat Karşılığı",
+  REZERVE: "Rezerve", SATILDI: "Satıldı", KIRALANDII: "Kiralandı", PASIF: "Pasif",
 };
-
-const STATUS_COLORS: Record<string, { color: string; bg: string; border: string }> = {
-  SATILIK: { color: "#0F7A4F", bg: "#ECFDF3", border: "#BCE7CE" },
-  KIRALIK: { color: "#175CD3", bg: "#EFF6FF", border: "#BFDBFE" },
-  GUNLUK_KIRALIK: { color: "#175CD3", bg: "#EFF6FF", border: "#BFDBFE" },
-  DEVREN_SATILIK: { color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE" },
-  DEVREN_KIRALIK: { color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE" },
-  INSAAT_PROJESI: { color: "#B45309", bg: "#FFF7ED", border: "#FED7AA" },
-  KAT_KARSILIGI: { color: "#B45309", bg: "#FFF7ED", border: "#FED7AA" },
-  REZERVE: { color: "#A16207", bg: "#FEFCE8", border: "#FDE68A" },
-  SATILDI: { color: "#667085", bg: "#F2F4F7", border: "#D0D5DD" },
-  KIRALANDII: { color: "#667085", bg: "#F2F4F7", border: "#D0D5DD" },
-  PASIF: { color: "#667085", bg: "#F2F4F7", border: "#D0D5DD" },
+const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
+  SATILIK:        { color: "#2D6A4F", bg: "#F0FAF4" },
+  KIRALIK:        { color: "#1A4A7A", bg: "#EEF4FF" },
+  GUNLUK_KIRALIK: { color: "#1A4A7A", bg: "#EEF4FF" },
+  DEVREN_SATILIK: { color: "#5B2D8E", bg: "#F5F0FF" },
+  DEVREN_KIRALIK: { color: "#5B2D8E", bg: "#F5F0FF" },
+  INSAAT_PROJESI: { color: "#B8560B", bg: "#FFF5ED" },
+  KAT_KARSILIGI:  { color: "#B8860B", bg: "#FFFBF0" },
+  REZERVE:        { color: "#B8860B", bg: "#FFFBF0" },
+  SATILDI:        { color: "#8A8A8A", bg: "#F5F5F5" },
+  KIRALANDII:     { color: "#8A8A8A", bg: "#F5F5F5" },
+  PASIF:          { color: "#8A8A8A", bg: "#F5F5F5" },
 };
-
 const TYPE_LABELS: Record<string, string> = {
-  DAIRE: "Daire",
-  VILLA: "Villa",
-  REZIDANS: "Rezidans",
-  MUSTAK_EV: "Müstakil Ev",
-  KOSK_YALI: "Köşk/Yalı",
-  CIFTLIK_EVI: "Çiftlik Evi",
-  PREFABRIK_EV: "Prefabrik Ev",
-  DUKKAN_MAGAZA: "Dükkan/Mağaza",
-  OFIS_BURO: "Ofis/Büro",
-  PLAZA_KATI: "Plaza Katı",
-  DEPO_ANTREPO: "Depo/Antrepo",
-  FABRIKA_ATOLYE: "Fabrika/Atölye",
-  OTEL_PANSIYON: "Otel/Pansiyon",
-  DUGUN_SALONU: "Düğün Salonu",
-  ARSA: "Arsa",
-  TARLA: "Tarla",
-  BAHCE: "Bahçe",
-  ZEYTINLIK: "Zeytinlik",
-  ADA: "Ada",
-  DEVRE_MULK: "Devre Mülk",
-  TURISTIK_TESIS: "Turistik Tesis",
+  DAIRE: "Daire", VILLA: "Villa", REZIDANS: "Rezidans", MUSTAK_EV: "Müstakil Ev",
+  KOSK_YALI: "Köşk/Yalı", CIFTLIK_EVI: "Çiftlik Evi", PREFABRIK_EV: "Prefabrik Ev",
+  DUKKAN_MAGAZA: "Dükkan/Mağaza", OFIS_BURO: "Ofis/Büro", PLAZA_KATI: "Plaza Katı",
+  DEPO_ANTREPO: "Depo/Antrepo", FABRIKA_ATOLYE: "Fabrika/Atölye",
+  OTEL_PANSIYON: "Otel/Pansiyon", DUGUN_SALONU: "Düğün Salonu",
+  ARSA: "Arsa", TARLA: "Tarla", BAHCE: "Bahçe", ZEYTINLIK: "Zeytinlik",
+  ADA: "Ada", DEVRE_MULK: "Devre Mülk", TURISTIK_TESIS: "Turistik Tesis",
 };
-
 const STATUS_GROUPS = [
-  { label: "Satış", statuses: ["SATILIK", "DEVREN_SATILIK", "INSAAT_PROJESI", "KAT_KARSILIGI"] },
-  { label: "Kiralık", statuses: ["KIRALIK", "GUNLUK_KIRALIK", "DEVREN_KIRALIK"] },
-  { label: "Diğer", statuses: ["REZERVE", "SATILDI", "KIRALANDII", "PASIF"] },
+  { label: "Satış", statuses: ["SATILIK","DEVREN_SATILIK","INSAAT_PROJESI","KAT_KARSILIGI"] },
+  { label: "Kiralık", statuses: ["KIRALIK","GUNLUK_KIRALIK","DEVREN_KIRALIK"] },
+  { label: "Diğer", statuses: ["REZERVE","SATILDI","KIRALANDII","PASIF"] },
 ];
-
 const CITIES = ["Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya","Artvin","Aydın","Balıkesir","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari","Hatay","Isparta","İçel","İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir","Kocaeli","Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla","Muş","Nevşehir","Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas","Tekirdağ","Tokat","Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak","Aksaray","Bayburt","Karaman","Kırıkkale","Batman","Şırnak","Bartın","Ardahan","Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"];
 
 const CSS = `
-*{box-sizing:border-box}
-body{margin:0;background:#f5f6f8;color:#111827;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-a{text-decoration:none;color:inherit}
-.stock-shell{min-height:100vh;background:radial-gradient(circle at top left,#fff7df 0,#f5f6f8 33%,#eef1f6 100%)}
-.stock-topbar{height:72px;background:rgba(255,255,255,.86);backdrop-filter:blur(18px);border-bottom:1px solid rgba(15,23,42,.08);display:flex;align-items:center;justify-content:space-between;padding:0 42px;position:sticky;top:0;z-index:50}
-.stock-brand{display:flex;align-items:center;gap:12px}
-.stock-brand img{width:38px;height:38px;object-fit:contain}
-.stock-brand-title{font-size:17px;font-weight:800;letter-spacing:-.03em;color:#111827}
-.stock-brand-sub{font-size:10px;text-transform:uppercase;letter-spacing:.18em;color:#b08a2e;margin-top:2px}
-.stock-nav{display:flex;align-items:center;gap:6px}
-.stock-nav a{font-size:12px;font-weight:700;color:#667085;padding:10px 14px;border-radius:999px;transition:.2s}
-.stock-nav a:hover,.stock-nav a.active{background:#111827;color:#fff}
-.stock-logout{border:1px solid #e5e7eb;background:#fff;border-radius:999px;padding:10px 16px;font-size:12px;font-weight:800;color:#475467;cursor:pointer}
-.stock-main{max-width:1320px;margin:0 auto;padding:38px 32px 110px}
-.stock-hero{display:grid;grid-template-columns:1.15fr .85fr;gap:24px;margin-bottom:24px}
-.stock-hero-card{background:linear-gradient(135deg,#111827 0%,#1f2937 52%,#3b2f17 100%);border:1px solid rgba(255,255,255,.15);border-radius:30px;padding:34px;box-shadow:0 24px 70px rgba(15,23,42,.18);overflow:hidden;position:relative;color:#fff}
-.stock-hero-card:before{content:"";position:absolute;right:-90px;top:-90px;width:260px;height:260px;border-radius:50%;background:rgba(201,168,76,.28);filter:blur(8px)}
-.stock-eyebrow{font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:#d6b35a;margin-bottom:14px}
-.stock-title{font-size:48px;line-height:.96;letter-spacing:-.06em;margin:0;font-weight:900;max-width:620px}
-.stock-title span{color:#f4d77a}
-.stock-sub{font-size:15px;line-height:1.7;color:rgba(255,255,255,.72);max-width:650px;margin:18px 0 0}
-.stock-hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
-.stock-primary,.stock-secondary{border:none;border-radius:16px;padding:14px 18px;font-weight:900;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
-.stock-primary{background:#f4d77a;color:#111827}
-.stock-secondary{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.16)}
-.stock-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.stock-kpi{background:rgba(255,255,255,.9);border:1px solid rgba(15,23,42,.08);border-radius:24px;padding:24px;box-shadow:0 14px 40px rgba(15,23,42,.08)}
-.stock-kpi-label{font-size:11px;text-transform:uppercase;letter-spacing:.16em;color:#98a2b3;font-weight:900}
-.stock-kpi-value{font-size:38px;font-weight:950;letter-spacing:-.06em;color:#111827;margin-top:8px}
-.stock-kpi-note{font-size:12px;color:#667085;margin-top:4px}
-.stock-panel{background:rgba(255,255,255,.92);border:1px solid rgba(15,23,42,.08);border-radius:28px;box-shadow:0 18px 55px rgba(15,23,42,.08);overflow:hidden}
-.stock-toolbar{padding:22px;display:flex;align-items:end;justify-content:space-between;gap:16px;border-bottom:1px solid #eef0f3;background:rgba(255,255,255,.7)}
-.stock-toolbar-left{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
-.stock-field label{display:block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#98a2b3;font-weight:900;margin-bottom:8px}
-.stock-input,.stock-select{height:42px;border:1px solid #e4e7ec;background:#fff;border-radius:14px;padding:0 14px;min-width:185px;color:#111827;outline:none;font-weight:700}
-.stock-input:focus,.stock-select:focus{border-color:#c9a84c;box-shadow:0 0 0 4px rgba(201,168,76,.13)}
-.stock-count-pill{background:#111827;color:#fff;border-radius:999px;padding:11px 15px;font-size:12px;font-weight:900;white-space:nowrap}
-.stock-table-wrap{overflow-x:auto}
-.stock-table{width:100%;border-collapse:separate;border-spacing:0}
-.stock-table thead th{position:sticky;top:72px;background:#fbfcfd;z-index:3;text-align:left;padding:14px 18px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#98a2b3;border-bottom:1px solid #e4e7ec;white-space:nowrap}
-.stock-row{display:table-row;transition:.18s}
-.stock-row:hover{background:#fffaf0}
-.stock-row td{padding:16px 18px;border-bottom:1px solid #eef0f3;vertical-align:middle}
-.stock-property{display:flex;align-items:center;gap:14px;min-width:320px}
-.stock-thumb{width:58px;height:58px;border-radius:18px;background:linear-gradient(135deg,#fff7df,#f2f4f7);border:1px solid #e8dcc0;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.65)}
-.stock-name{font-size:15px;font-weight:950;letter-spacing:-.02em;color:#111827;margin-bottom:5px}
-.stock-address{font-size:12px;color:#667085;line-height:1.35}
-.stock-meta{display:flex;gap:6px;flex-wrap:wrap}
-.stock-tag{display:inline-flex;align-items:center;border:1px solid #e4e7ec;border-radius:999px;background:#fff;padding:6px 9px;font-size:12px;color:#475467;font-weight:800;white-space:nowrap}
-.stock-price{font-size:16px;font-weight:950;color:#111827;white-space:nowrap}
-.stock-status{display:inline-flex;align-items:center;border-radius:999px;padding:7px 11px;font-size:11px;font-weight:950;white-space:nowrap;border:1px solid}
-.stock-owner{font-size:13px;font-weight:900;color:#344054;white-space:nowrap}
-.stock-date{font-size:12px;color:#667085;white-space:nowrap}
-.stock-open{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:14px;background:#111827;color:#fff;font-weight:950}
-.stock-empty{padding:70px 24px;text-align:center}
-.stock-empty-title{font-size:24px;font-weight:950;color:#111827;margin-bottom:8px}
-.stock-empty-sub{font-size:14px;color:#667085}
-.stock-modal-backdrop{position:fixed;inset:0;background:rgba(17,24,39,.58);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
-.stock-modal{width:100%;max-width:720px;max-height:90vh;overflow:auto;background:#fff;border-radius:28px;box-shadow:0 30px 90px rgba(0,0,0,.28)}
-.stock-modal-head{padding:24px 28px;border-bottom:1px solid #eef0f3;display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
-.stock-modal-title{font-size:26px;font-weight:950;letter-spacing:-.04em;margin:0}
-.stock-modal-sub{font-size:13px;color:#667085;margin-top:6px}
-.stock-close{width:40px;height:40px;border:none;border-radius:14px;background:#f2f4f7;cursor:pointer;font-size:22px;color:#475467}
-.stock-modal-body{padding:26px 28px}
-.stock-form-section{margin-bottom:24px}
-.stock-section-title{font-size:11px;font-weight:950;letter-spacing:.16em;color:#b08a2e;text-transform:uppercase;margin-bottom:14px}
-.stock-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.stock-form-field label{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#667085;font-weight:950;margin-bottom:8px}
-.stock-form-field input,.stock-form-field select,.stock-form-field textarea{width:100%;border:1px solid #e4e7ec;border-radius:14px;padding:12px 14px;outline:none;font:inherit;font-weight:700}
-.stock-form-field textarea{min-height:100px;resize:vertical}
-.stock-full{grid-column:1/-1}
-.stock-error{background:#fff1f3;border:1px solid #fecdd6;color:#b42318;border-radius:14px;padding:12px 14px;font-size:13px;font-weight:800}
-.stock-success{background:#ecfdf3;border:1px solid #bce7ce;color:#067647;border-radius:14px;padding:12px 14px;font-size:13px;font-weight:800}
-.stock-modal-foot{padding:20px 28px;border-top:1px solid #eef0f3;display:flex;gap:12px}
-.stock-save{flex:1;border:none;background:#111827;color:#fff;border-radius:16px;padding:14px 18px;font-size:13px;font-weight:950;cursor:pointer}
-.stock-cancel{border:1px solid #e4e7ec;background:#fff;color:#475467;border-radius:16px;padding:14px 18px;font-size:13px;font-weight:950;cursor:pointer}
-.stock-lina{position:fixed;right:22px;bottom:82px;z-index:80;width:62px;height:62px;border:none;border-radius:22px;background:linear-gradient(135deg,#111827,#d6b35a);box-shadow:0 18px 44px rgba(15,23,42,.32);font-size:28px;cursor:pointer}
-@media(max-width:900px){
-  .stock-topbar{display:none}
-  .stock-main{padding:22px 14px 100px}
-  .stock-hero{grid-template-columns:1fr}
-  .stock-title{font-size:38px}
-  .stock-kpi-grid{grid-template-columns:1fr 1fr}
-  .stock-toolbar{align-items:stretch;flex-direction:column}
-  .stock-toolbar-left{display:grid;grid-template-columns:1fr;gap:12px}
-  .stock-input,.stock-select{width:100%;min-width:0}
-  .stock-table thead{display:none}
-  .stock-table,.stock-table tbody,.stock-row,.stock-row td{display:block;width:100%}
-  .stock-row{border-bottom:1px solid #eef0f3;padding:14px}
-  .stock-row td{border:0;padding:8px 0}
-  .stock-property{min-width:0}
-  .stock-form-grid{grid-template-columns:1fr}
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --navy:#0F2044;--gold:#C9A84C;--cream:#F5F3EF;--warm:#FAFAF8;
+  --text:#1A1A2E;--muted:#8A8A8A;--border:#E2DDD5;
+  --serif:'Cormorant Garamond',Georgia,serif;--sans:'DM Sans',system-ui,sans-serif;
 }
+body{font-family:var(--sans);background:var(--warm);color:var(--text);}
+.st-nav{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 48px;position:sticky;top:0;z-index:100;}
+@media(max-width:768px){.st-nav{display:none;}}
+.st-logo{display:flex;align-items:center;gap:12px;text-decoration:none;}
+.st-logo img{width:34px;height:34px;object-fit:contain;}
+.st-logo-text{font-family:var(--serif);font-size:18px;font-weight:500;color:var(--navy);}
+.st-logo-sub{font-size:7px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);}
+.st-nav-links{display:flex;align-items:center;gap:4px;}
+.st-nav-item{padding:8px 14px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:all 0.2s;border-bottom:2px solid transparent;}
+.st-nav-item:hover{color:var(--navy);border-bottom-color:var(--gold);}
+.st-nav-item.active{color:var(--navy);border-bottom-color:var(--gold);}
+.st-nav-right{display:flex;align-items:center;gap:10px;}
+.st-logout{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:1px solid var(--border);padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
+.st-logout:hover{border-color:var(--navy);color:var(--navy);}
+.st-main{max-width:1200px;margin:0 auto;padding:56px 48px 100px;animation:fadeUp 0.5s ease;}
+@media(max-width:768px){.st-main{padding:24px 16px 100px;}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.st-header{margin-bottom:40px;padding-bottom:32px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;align-items:end;gap:24px;}
+@media(max-width:768px){.st-header{grid-template-columns:1fr;}}
+.st-title{font-family:var(--serif);font-size:clamp(32px,4vw,48px);font-weight:300;color:var(--navy);letter-spacing:-0.5px;line-height:1.1;}
+.st-title em{font-style:italic;color:var(--gold);}
+.st-sub{font-size:13px;color:var(--muted);margin-top:8px;font-weight:300;}
+.st-add-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:12px 20px;cursor:pointer;font-family:var(--sans);transition:all 0.3s;position:relative;overflow:hidden;display:flex;align-items:center;gap:8px;}
+.st-add-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:var(--gold);transition:left 0.4s;}
+.st-add-btn:hover::before{left:0;}
+.st-add-btn:hover{color:var(--navy);}
+.st-add-btn span{position:relative;z-index:1;}
+.st-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:40px;}
+@media(max-width:768px){.st-stats{grid-template-columns:1fr 1fr;}}
+.st-stat{background:#fff;padding:24px;}
+.st-stat-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.st-stat-num{font-family:var(--serif);font-size:36px;font-weight:300;color:var(--navy);line-height:1;}
+.st-stat-num.gold{color:var(--gold);}
+.st-stat-num.green{color:#2D6A4F;}
+.st-stat-num.blue{color:#1A4A7A;}
+.st-tabs{display:flex;gap:0;margin-bottom:32px;border-bottom:1px solid var(--border);}
+.st-tab{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;padding:12px 20px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;position:relative;bottom:-1px;}
+.st-tab:hover{color:var(--navy);}
+.st-tab.active{color:var(--navy);border-bottom-color:var(--gold);}
+.st-filters{display:flex;gap:12px;margin-bottom:28px;flex-wrap:wrap;align-items:flex-end;}
+.st-filter-wrap label{display:block;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.st-select{background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:8px 0;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;appearance:none;cursor:pointer;font-weight:300;min-width:180px;}
+.st-filter-input{background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:8px 0;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;font-weight:300;min-width:160px;}
+.st-filter-input::placeholder{color:#C0BAB0;}
+.st-filter-input:focus,.st-select:focus{border-bottom-color:var(--navy);}
+.st-project{background:#fff;border:1px solid var(--border);margin-bottom:20px;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04);transition:all 0.3s;}
+.st-project:hover{border-color:#B8943F;box-shadow:0 8px 24px rgba(0,0,0,0.08);}
+.st-project-header{padding:20px 24px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;background:linear-gradient(135deg,#0D2137 0%,#1a3c5e 100%);}
+.st-project-name{font-size:17px;font-weight:600;color:#fff;margin-bottom:4px;}
+.st-project-loc{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,0.55);font-weight:300;margin-bottom:2px;}
+.st-project-owner{font-size:10px;color:rgba(255,255,255,0.35);}
+.st-project-meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+.st-active-badge{font-size:9px;letter-spacing:1px;text-transform:uppercase;border:1px solid;padding:5px 12px;border-radius:20px;font-weight:600;}
+.st-unit-count{font-size:12px;color:rgba(255,255,255,0.5);font-style:italic;}
+.st-units-list{padding:16px 20px 20px;display:flex;flex-direction:column;gap:10px;}
+.st-unit-card{display:flex;border:1px solid #E7E1D8;border-radius:14px;overflow:hidden;cursor:pointer;background:#fff;transition:all 0.2s ease;min-height:88px;position:relative;z-index:1;}
+.st-unit-card:hover{border-color:#C9A84C;box-shadow:0 2px 10px rgba(0,0,0,0.06);transform:none;}
+.st-unit-card *{pointer-events:none;}
+.st-unit-img{width:100px;min-width:100px;background:#F3F5F7;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;flex-shrink:0;}
+.st-unit-img-icon{font-size:28px;opacity:0.35;}
+.st-unit-img-badge{position:absolute;bottom:0;left:0;right:0;text-align:center;background:rgba(184,148,63,0.95);color:#fff;font-size:8px;letter-spacing:1px;padding:4px;font-weight:700;}
+.st-unit-body{flex:1;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;}
+.st-unit-title{font-size:13px;font-weight:600;color:#0D2137;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.st-unit-loc{font-size:10px;color:#8E8E93;margin-bottom:8px;}
+.st-unit-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+.st-unit-tag{font-size:9px;padding:2px 8px;border-radius:20px;background:#F5F3EF;color:#555;border:0.5px solid #E8E4DC;}
+.st-unit-footer{display:flex;justify-content:space-between;align-items:center;}
+.st-unit-price-big{font-size:17px;font-weight:700;color:#0D2137;letter-spacing:-0.5px;}
+.st-unit-status{font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:20px;font-weight:600;border:1px solid;}
+.st-badges{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
+.st-badge-verified{font-size:7px;letter-spacing:1px;text-transform:uppercase;border:1px solid #2D6A4F;color:#2D6A4F;background:#F0FAF4;padding:2px 7px;display:inline-flex;align-items:center;gap:3px;}
+.st-all-units{display:flex;flex-direction:column;gap:10px;}
+.st-unit-big{background:#fff;border:1px solid #E7E1D8;border-radius:14px;overflow:hidden;cursor:pointer;transition:all 0.2s ease;display:flex;min-height:88px;position:relative;z-index:1;}
+.st-unit-big:hover{border-color:#C9A84C;box-shadow:0 2px 10px rgba(0,0,0,0.06);transform:none;}
+.st-unit-big *{pointer-events:none;}
+.st-unit-big-img{width:100px;min-width:100px;background:#F3F5F7;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;flex-shrink:0;}
+.st-unit-big-badge{position:absolute;bottom:0;left:0;right:0;text-align:center;background:rgba(184,148,63,0.95);color:#fff;font-size:8px;letter-spacing:1px;padding:4px;font-weight:700;}
+.st-unit-big-body{flex:1;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;}
+.st-unit-big-project{font-size:14px;font-weight:600;color:var(--navy);margin-bottom:3px;}
+.st-unit-big-loc{font-size:10px;color:var(--muted);margin-bottom:8px;}
+.st-unit-big-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+.st-unit-big-tag{font-size:9px;padding:2px 8px;border-radius:20px;background:#F5F3EF;color:#555;border:0.5px solid #E8E4DC;}
+.st-unit-big-footer{display:flex;align-items:center;justify-content:space-between;}
+.st-unit-big-price{font-size:18px;font-weight:700;color:#0D2137;}
+.st-empty{background:#fff;border:1px solid var(--border);border-radius:12px;padding:60px;text-align:center;}
+.st-empty-text{font-family:var(--serif);font-size:22px;font-style:italic;color:var(--muted);margin-bottom:6px;}
+.st-empty-sub{font-size:12px;color:#B8B2A8;font-weight:300;}
+.st-overlay{position:fixed;inset:0;background:rgba(15,32,68,0.6);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn 0.2s ease;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.st-modal{background:#fff;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;position:relative;animation:slideUp 0.3s ease;border-radius:16px;}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.st-modal-header{padding:28px 32px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:1;border-radius:16px 16px 0 0;}
+.st-modal-title{font-family:var(--serif);font-size:26px;font-weight:400;color:var(--navy);}
+.st-modal-sub{font-size:12px;color:var(--muted);margin-top:4px;font-weight:300;}
+.st-modal-divider{width:28px;height:2px;background:var(--gold);margin-top:12px;}
+.st-modal-close{position:absolute;top:20px;right:24px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:22px;}
+.st-modal-body{padding:24px 32px 32px;}
+.st-modal-section{margin-bottom:24px;}
+.st-modal-section-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.st-modal-section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+.st-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:500px){.st-form-grid{grid-template-columns:1fr;}}
+.st-field{margin-bottom:0;}
+.st-field label{display:block;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--navy);margin-bottom:10px;font-weight:500;}
+.st-input{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:10px 0;font-size:14px;color:var(--navy);font-family:var(--sans);outline:none;transition:border-color 0.3s;font-weight:300;}
+.st-input:focus{border-bottom-color:var(--navy);}
+.st-input::placeholder{color:#C0BAB0;}
+.st-fselect{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:10px 0;font-size:14px;color:var(--navy);font-family:var(--sans);outline:none;appearance:none;cursor:pointer;font-weight:300;}
+.st-fselect:focus{border-bottom-color:var(--navy);}
+.st-ai-box{background:var(--navy);padding:20px 24px;margin-bottom:16px;border-radius:8px;}
+.st-ai-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.st-ai-title{font-size:11px;color:var(--gold);letter-spacing:1px;font-weight:500;display:flex;align-items:center;gap:8px;}
+.st-ai-btn{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:var(--gold);color:var(--navy);border:none;padding:8px 16px;cursor:pointer;font-family:var(--sans);font-weight:500;transition:all 0.2s;border-radius:4px;}
+.st-ai-btn:hover{background:#B8962A;}
+.st-ai-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.st-ai-desc{font-size:11px;color:rgba(245,243,239,0.5);font-weight:300;line-height:1.5;}
+.st-ai-loading{display:flex;align-items:center;gap:8px;margin-top:12px;}
+.st-ai-loading-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:bounce 1s ease infinite;}
+.st-ai-loading-dot:nth-child(2){animation-delay:0.15s;}
+.st-ai-loading-dot:nth-child(3){animation-delay:0.3s;}
+@keyframes bounce{0%,100%{transform:translateY(0);opacity:0.5}50%{transform:translateY(-4px);opacity:1}}
+.st-ai-result{margin-top:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(201,168,76,0.2);padding:14px;font-size:12px;color:rgba(245,243,239,0.8);line-height:1.7;font-weight:300;border-radius:4px;}
+.st-ai-use-btn{margin-top:10px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:transparent;border:1px solid rgba(201,168,76,0.4);color:var(--gold);padding:7px 16px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;border-radius:4px;}
+.st-ai-use-btn:hover{background:rgba(201,168,76,0.1);}
+.st-textarea{width:100%;background:var(--warm);border:1px solid var(--border);padding:12px;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;resize:vertical;font-weight:300;min-height:100px;border-radius:4px;}
+.st-textarea:focus{border-color:var(--navy);}
+.st-modal-footer{padding:16px 32px 24px;border-top:1px solid var(--border);display:flex;gap:12px;}
+.st-submit-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:14px 28px;cursor:pointer;font-family:var(--sans);transition:all 0.3s;position:relative;overflow:hidden;flex:1;border-radius:8px;}
+.st-submit-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:var(--gold);transition:left 0.4s;}
+.st-submit-btn:hover::before{left:0;}
+.st-submit-btn:hover{color:var(--navy);}
+.st-submit-btn span{position:relative;z-index:1;}
+.st-submit-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.st-submit-btn:disabled::before{display:none;}
+.st-cancel-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:14px 20px;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all 0.2s;border-radius:8px;}
+.st-cancel-btn:hover{border-color:var(--navy);color:var(--navy);}
+.st-form-error{font-size:11px;color:#C0392B;margin-top:8px;}
+.st-form-success{background:#F0FAF4;border-left:3px solid #2D6A4F;padding:14px 18px;margin-bottom:16px;font-size:12px;color:#2D6A4F;font-weight:300;border-radius:4px;}
 `;
 
-function Spinner() {
+function VerifiedBadges({ u }: { u: Unit }) {
+  if (!u.tapuVerified && !u.photoVerified && !u.yetkiVerified) return null;
   return (
-    <div className="stock-shell" style={{ display: "grid", placeItems: "center" }}>
-      <style>{CSS}</style>
-      <div style={{ width: 36, height: 36, border: "3px solid #d6b35a", borderTopColor: "transparent", borderRadius: "50%", animation: "spin .8s linear infinite" }} />
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    <div className="st-badges">
+      {u.tapuVerified && <span className="st-badge-verified">✓ Tapu</span>}
+      {u.photoVerified && <span className="st-badge-verified">✓ Fotoğraf</span>}
+      {u.yetkiVerified && <span className="st-badge-verified">✓ Yetki</span>}
     </div>
   );
-}
-
-function statusStyle(status: string) {
-  return STATUS_COLORS[status] || { color: "#667085", bg: "#F2F4F7", border: "#D0D5DD" };
-}
-
-function formatMoney(value?: number) {
-  if (value == null) return "-";
-  return `${value.toLocaleString("tr-TR")} TL`;
-}
-
-function formatDate(value?: string) {
-  if (!value) return "-";
-  try {
-    return new Date(value).toLocaleDateString("tr-TR");
-  } catch {
-    return "-";
-  }
 }
 
 export default function StokPage() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
-
   const [projects, setProjects] = useState<Project[]>([]);
-  const [units, setUnits] = useState<Unit[]>([]);
-  const [hydrated, setHydrated] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [linaOpen, setLinaOpen] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
+  const [view, setView] = useState<"projects"|"units">("projects");
   const [statusFilter, setStatusFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
-  const [search, setSearch] = useState("");
-
+  const [showModal, setShowModal] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [projectForm, setProjectForm] = useState({ name: "", city: "Denizli", district: "", address: "" });
   const [unitForm, setUnitForm] = useState({ type: "DAIRE", floor: "", number: "", roomCount: "3+1", area: "", price: "", status: "SATILIK", description: "" });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState("");
 
   const canAddUnit = user?.role === "MUTEAHHIT" || user?.role === "INSAAT_FIRMASI" || user?.role === "ADMIN" || user?.role === "EMLAKCI";
 
-  useEffect(() => setHydrated(true), []);
-
+  useEffect(() => { setHydrated(true); }, []);
   useEffect(() => {
     if (!hydrated) return;
-    if (!user) {
-      router.push("/giris");
-      return;
-    }
+    if (!user) { router.push("/giris"); return; }
     fetchData();
   }, [hydrated, user]);
-
   useEffect(() => {
     if (!hydrated || !user) return;
     fetchUnits();
@@ -271,11 +252,8 @@ export default function StokPage() {
   const fetchData = async () => {
     try {
       const [p, u] = await Promise.all([api.get("/projects"), api.get("/units")]);
-      setProjects(p.data || []);
-      setUnits(u.data || []);
-    } finally {
-      setLoading(false);
-    }
+      setProjects(p.data); setUnits(u.data);
+    } finally { setLoading(false); }
   };
 
   const fetchUnits = async () => {
@@ -283,53 +261,34 @@ export default function StokPage() {
     if (statusFilter) params.append("status", statusFilter);
     if (cityFilter) params.append("city", cityFilter);
     const r = await api.get(`/units?${params.toString()}`);
-    setUnits(r.data || []);
+    setUnits(r.data);
   };
 
-  const filteredUnits = useMemo(() => {
-    const q = search.trim().toLocaleLowerCase("tr-TR");
-    if (!q) return units;
-    return units.filter((u) => {
-      const haystack = [
-        u.project?.name,
-        u.project?.city,
-        u.project?.district,
-        u.project?.address,
-        u.number,
-        TYPE_LABELS[u.type] || u.type,
-        STATUS_LABELS[u.status] || u.status,
-      ].join(" ").toLocaleLowerCase("tr-TR");
-      return haystack.includes(q);
-    });
-  }, [units, search]);
-
-  const totalSatilik = units.filter((u) => ["SATILIK", "DEVREN_SATILIK", "INSAAT_PROJESI", "KAT_KARSILIGI"].includes(u.status)).length;
-  const totalKiralik = units.filter((u) => ["KIRALIK", "GUNLUK_KIRALIK", "DEVREN_KIRALIK"].includes(u.status)).length;
-  const totalRezerve = units.filter((u) => u.status === "REZERVE").length;
-  const portfolioValue = units.reduce((sum, u) => sum + (Number(u.price) || 0), 0);
-  const myProjects = projects.filter((p) => p.owner?.role === user?.role || user?.role === "ADMIN");
+  const generateAiDescription = async () => {
+    setAiLoading(true); setAiResult("");
+    try {
+      const prompt = `Bir emlak ilani icin kisa ve profesyonel Turkce aciklama yaz. Bilgiler: Tip: ${TYPE_LABELS[unitForm.type] || unitForm.type}, Oda: ${unitForm.roomCount}, Alan: ${unitForm.area}m2, Kat: ${unitForm.floor}, Durum: ${STATUS_LABELS[unitForm.status]}, Sehir: ${projectForm.city}, Ilce: ${projectForm.district}. Maksimum 3 cumle.`;
+      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: prompt, history: [] }) });
+      const data = await res.json();
+      setAiResult(data.reply || "Aciklama olusturulamadi.");
+    } catch { setAiResult("Baglanti hatasi."); }
+    finally { setAiLoading(false); }
+  };
 
   const handleSubmit = async () => {
-    setFormError("");
-    setFormLoading(true);
+    setFormError(""); setFormLoading(true);
     try {
       let projectId = selectedProjectId;
       if (!selectedProjectId) {
         if (!projectForm.name || !projectForm.city || !projectForm.district || !projectForm.address) {
-          setFormError("Proje bilgilerini eksiksiz doldurun.");
-          setFormLoading(false);
-          return;
+          setFormError("Proje bilgilerini eksiksiz doldurun."); setFormLoading(false); return;
         }
         const pr = await api.post("/projects", projectForm);
         projectId = pr.data.id;
       }
-
       if (!unitForm.number || !unitForm.area || !unitForm.price) {
-        setFormError("Birim numarası, alan ve fiyat zorunludur.");
-        setFormLoading(false);
-        return;
+        setFormError("Birim numarasi, alan ve fiyat zorunludur."); setFormLoading(false); return;
       }
-
       await api.post(`/units/project/${projectId}`, {
         type: unitForm.type,
         floor: unitForm.floor ? parseInt(unitForm.floor) : undefined,
@@ -340,311 +299,359 @@ export default function StokPage() {
         status: unitForm.status,
         description: unitForm.description || undefined,
       });
-
       setFormSuccess(true);
       await fetchData();
-
       setTimeout(() => {
-        setShowModal(false);
-        setFormSuccess(false);
-        setSelectedProjectId("");
+        setShowModal(false); setFormSuccess(false);
         setProjectForm({ name: "", city: "Denizli", district: "", address: "" });
         setUnitForm({ type: "DAIRE", floor: "", number: "", roomCount: "3+1", area: "", price: "", status: "SATILIK", description: "" });
-      }, 900);
+        setSelectedProjectId(""); setAiResult("");
+      }, 1500);
     } catch (e: any) {
-      setFormError(e?.response?.data?.message || "Bir hata oluştu.");
-    } finally {
-      setFormLoading(false);
-    }
+      setFormError(e?.response?.data?.message || "Bir hata olustu.");
+    } finally { setFormLoading(false); }
   };
 
-  if (!hydrated || loading) return <Spinner />;
+  if (!hydrated || loading) return (
+    <div style={{ minHeight: "100vh", background: "#FAFAF8", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <style>{CSS}</style>
+      <div style={{ width: 32, height: 32, border: "2px solid #C9A84C", borderTop: "2px solid transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+    </div>
+  );
+
+  const totalSatilik = units.filter(u => ["SATILIK","DEVREN_SATILIK","INSAAT_PROJESI","KAT_KARSILIGI"].includes(u.status)).length;
+  const totalKiralik = units.filter(u => ["KIRALIK","GUNLUK_KIRALIK","DEVREN_KIRALIK"].includes(u.status)).length;
+  const totalRezeve = units.filter(u => u.status === "REZERVE").length;
+  const getStatusStyle = (s: string) => STATUS_COLORS[s] || { color: "#8A8A8A", bg: "#F5F5F5" };
+  const myProjects = projects.filter(p => p.owner?.role === user?.role || user?.role === "ADMIN");
 
   return (
-    <div className="stock-shell">
+    <>
       <style>{CSS}</style>
 
-      <header className="stock-topbar">
-        <Link href="/dashboard" className="stock-brand">
-          <img src="/LOGO_EPH.png" alt="EPH" />
-          <div>
-            <div className="stock-brand-title">EPH Platform</div>
-            <div className="stock-brand-sub">Portföy Havuzu</div>
-          </div>
-        </Link>
-
-        <nav className="stock-nav">
-          <Link href="/dashboard">Ana Sayfa</Link>
-          <Link href="/profil">Profilim</Link>
-          <Link href="/stok" className="active">Stok</Link>
-          <Link href="/crm">CRM</Link>
-          <Link href="/market">Piyasa</Link>
-          {user?.role === "ADMIN" && <Link href="/admin">Admin</Link>}
-        </nav>
-
-        <button className="stock-logout" onClick={() => { logout(); router.push("/giris"); }}>
-          Çıkış
-        </button>
-      </header>
-
-      <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
-
-      <main className="stock-main">
-        <section className="stock-hero">
-          <div className="stock-hero-card">
-            <div className="stock-eyebrow">Premium Stok Merkezi</div>
-            <h1 className="stock-title">
-              Portföyü tek ekranda <span>yönet.</span>
-            </h1>
-            <p className="stock-sub">
-              Proje, konum, fiyat, durum ve danışman bilgilerini CRM standardında hızlıca takip edin. Eski kart görünümü kaldırıldı; artık tüm ilan satırı tek parça tıklanabilir.
-            </p>
-            <div className="stock-hero-actions">
-              {canAddUnit && (
-                <button className="stock-primary" onClick={() => { setShowModal(true); setFormError(""); }}>
-                  + Yeni İlan Ekle
-                </button>
-              )}
-              <button className="stock-secondary" onClick={() => setLinaOpen(true)}>
-                🤖 Lina ile Ekle
-              </button>
-            </div>
-          </div>
-
-          <div className="stock-kpi-grid">
-            <div className="stock-kpi">
-              <div className="stock-kpi-label">Toplam Birim</div>
-              <div className="stock-kpi-value">{units.length}</div>
-              <div className="stock-kpi-note">{projects.length} proje içinde</div>
-            </div>
-            <div className="stock-kpi">
-              <div className="stock-kpi-label">Satış</div>
-              <div className="stock-kpi-value">{totalSatilik}</div>
-              <div className="stock-kpi-note">Aktif satış stoğu</div>
-            </div>
-            <div className="stock-kpi">
-              <div className="stock-kpi-label">Kiralık</div>
-              <div className="stock-kpi-value">{totalKiralik}</div>
-              <div className="stock-kpi-note">Kiralık portföy</div>
-            </div>
-            <div className="stock-kpi">
-              <div className="stock-kpi-label">Portföy Değeri</div>
-              <div className="stock-kpi-value" style={{ fontSize: 26 }}>{formatMoney(portfolioValue)}</div>
-              <div className="stock-kpi-note">{totalRezerve} rezerve</div>
-            </div>
-          </div>
-        </section>
-
-        <section className="stock-panel">
-          <div className="stock-toolbar">
-            <div className="stock-toolbar-left">
-              <div className="stock-field">
-                <label>Arama</label>
-                <input className="stock-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Proje, mahalle, no..." />
-              </div>
-
-              <div className="stock-field">
-                <label>Durum</label>
-                <select className="stock-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                  <option value="">Tüm Durumlar</option>
-                  {STATUS_GROUPS.map((g) => (
-                    <optgroup key={g.label} label={g.label}>
-                      {g.statuses.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-
-              <div className="stock-field">
-                <label>Şehir</label>
-                <input className="stock-input" value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} placeholder="Denizli" />
-              </div>
-            </div>
-
-            <div className="stock-count-pill">{filteredUnits.length} ilan listeleniyor</div>
-          </div>
-
-          {filteredUnits.length === 0 ? (
-            <div className="stock-empty">
-              <div className="stock-empty-title">İlan bulunamadı</div>
-              <div className="stock-empty-sub">Arama veya filtre kriterlerini değiştirip tekrar deneyin.</div>
-            </div>
-          ) : (
-            <div className="stock-table-wrap">
-              <table className="stock-table">
-                <thead>
-                  <tr>
-                    <th>İlan</th>
-                    <th>Özellikler</th>
-                    <th>Fiyat</th>
-                    <th>Durum</th>
-                    <th>Danışman</th>
-                    <th>Tarih</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUnits.map((u) => {
-                    const ss = statusStyle(u.status);
-                    return (
-                      <tr
-                        key={u.id}
-                        className="stock-row"
-                        onClick={() => router.push(`/stok/${u.id}`)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <td>
-                          <div className="stock-property">
-                            <div className="stock-thumb">🏠</div>
-                            <div>
-                              <div className="stock-name">{u.project?.name || "Proje"} · {TYPE_LABELS[u.type] || u.type}</div>
-                              <div className="stock-address">📍 {u.project?.city} / {u.project?.district}{u.project?.address ? ` — ${u.project.address}` : ""}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="stock-meta">
-                            {u.roomCount && <span className="stock-tag">{u.roomCount}</span>}
-                            {u.area && <span className="stock-tag">{u.area} m²</span>}
-                            {u.floor != null && <span className="stock-tag">Kat {u.floor}</span>}
-                            {u.number && <span className="stock-tag">No: {u.number}</span>}
-                            {u.tapuVerified && <span className="stock-tag">✓ Tapu</span>}
-                            {u.photoVerified && <span className="stock-tag">✓ Foto</span>}
-                            {u.yetkiVerified && <span className="stock-tag">✓ Yetki</span>}
-                          </div>
-                        </td>
-                        <td><div className="stock-price">{formatMoney(u.price)}</div></td>
-                        <td>
-                          <span className="stock-status" style={{ color: ss.color, background: ss.bg, borderColor: ss.border }}>
-                            {STATUS_LABELS[u.status] || u.status}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="stock-owner">
-                            {u.project?.owner?.firstName || "-"} {u.project?.owner?.lastName || ""}
-                          </div>
-                        </td>
-                        <td><div className="stock-date">{formatDate(u.createdAt)}</div></td>
-                        <td><span className="stock-open">›</span></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      </main>
-
       {showModal && (
-        <div className="stock-modal-backdrop" onClick={() => setShowModal(false)}>
-          <div className="stock-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="stock-modal-head">
-              <div>
-                <h2 className="stock-modal-title">Yeni İlan Ekle</h2>
-                <div className="stock-modal-sub">Proje ve mülk bilgilerini girin.</div>
-              </div>
-              <button className="stock-close" onClick={() => setShowModal(false)}>×</button>
+        <div className="st-overlay" onClick={() => setShowModal(false)}>
+          <div className="st-modal" onClick={e => e.stopPropagation()}>
+            <div className="st-modal-header">
+              <button className="st-modal-close" onClick={() => setShowModal(false)}>×</button>
+              <h2 className="st-modal-title">Yeni Ilan Ekle</h2>
+              <p className="st-modal-sub">Bilgileri girin, AI size aciklama yazsin</p>
+              <div className="st-modal-divider" />
             </div>
-
-            <div className="stock-modal-body">
-              {formSuccess && <div className="stock-success">İlan başarıyla eklendi.</div>}
-              {formError && <div className="stock-error">{formError}</div>}
-
-              <div className="stock-form-section">
-                <div className="stock-section-title">Proje</div>
-                <div className="stock-form-grid">
-                  {myProjects.length > 0 && (
-                    <div className="stock-form-field stock-full">
-                      <label>Mevcut Projeye Ekle</label>
-                      <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)}>
-                        <option value="">Yeni Proje Oluştur</option>
-                        {myProjects.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.city})</option>)}
+            <div className="st-modal-body">
+              {formSuccess && <div className="st-form-success">Ilan basariyla eklendi!</div>}
+              <div className="st-modal-section">
+                <div className="st-modal-section-title">Proje</div>
+                {myProjects.length > 0 && (
+                  <div className="st-field" style={{ marginBottom: 16 }}>
+                    <label>Mevcut Projeye Ekle</label>
+                    <select className="st-fselect" value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)}>
+                      <option value="">Yeni Proje Olustur</option>
+                      {myProjects.map(p => <option key={p.id} value={p.id}>{p.name} ({p.city})</option>)}
+                    </select>
+                  </div>
+                )}
+                {!selectedProjectId && (
+                  <div className="st-form-grid">
+                    <div className="st-field">
+                      <label>Proje Adi *</label>
+                      <input className="st-input" placeholder="Denizli Merkez" value={projectForm.name} onChange={e => setProjectForm(f => ({ ...f, name: e.target.value }))} />
+                    </div>
+                    <div className="st-field">
+                      <label>Sehir *</label>
+                      <select className="st-fselect" value={projectForm.city} onChange={e => setProjectForm(f => ({ ...f, city: e.target.value }))}>
+                        {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
-                  )}
-
-                  {!selectedProjectId && (
-                    <>
-                      <div className="stock-form-field">
-                        <label>Proje Adı *</label>
-                        <input value={projectForm.name} onChange={(e) => setProjectForm((f) => ({ ...f, name: e.target.value }))} />
-                      </div>
-                      <div className="stock-form-field">
-                        <label>Şehir *</label>
-                        <select value={projectForm.city} onChange={(e) => setProjectForm((f) => ({ ...f, city: e.target.value }))}>
-                          {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                      </div>
-                      <div className="stock-form-field">
-                        <label>İlçe *</label>
-                        <input value={projectForm.district} onChange={(e) => setProjectForm((f) => ({ ...f, district: e.target.value }))} />
-                      </div>
-                      <div className="stock-form-field">
-                        <label>Adres *</label>
-                        <input value={projectForm.address} onChange={(e) => setProjectForm((f) => ({ ...f, address: e.target.value }))} />
-                      </div>
-                    </>
-                  )}
-                </div>
+                    <div className="st-field">
+                      <label>Ilce *</label>
+                      <input className="st-input" placeholder="Merkezefendi" value={projectForm.district} onChange={e => setProjectForm(f => ({ ...f, district: e.target.value }))} />
+                    </div>
+                    <div className="st-field">
+                      <label>Adres *</label>
+                      <input className="st-input" placeholder="Mahalle, Cadde, No" value={projectForm.address} onChange={e => setProjectForm(f => ({ ...f, address: e.target.value }))} />
+                    </div>
+                  </div>
+                )}
               </div>
-
-              <div className="stock-form-section">
-                <div className="stock-section-title">Mülk Bilgileri</div>
-                <div className="stock-form-grid">
-                  <div className="stock-form-field">
-                    <label>Mülk Tipi *</label>
-                    <select value={unitForm.type} onChange={(e) => setUnitForm((f) => ({ ...f, type: e.target.value }))}>
+              <div className="st-modal-section">
+                <div className="st-modal-section-title">Mulk Bilgileri</div>
+                <div className="st-form-grid">
+                  <div className="st-field">
+                    <label>Mulk Tipi *</label>
+                    <select className="st-fselect" value={unitForm.type} onChange={e => setUnitForm(f => ({ ...f, type: e.target.value }))}>
                       {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                     </select>
                   </div>
-                  <div className="stock-form-field">
+                  <div className="st-field">
                     <label>Durum *</label>
-                    <select value={unitForm.status} onChange={(e) => setUnitForm((f) => ({ ...f, status: e.target.value }))}>
+                    <select className="st-fselect" value={unitForm.status} onChange={e => setUnitForm(f => ({ ...f, status: e.target.value }))}>
                       {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                     </select>
                   </div>
-                  <div className="stock-form-field">
-                    <label>Oda Sayısı</label>
-                    <select value={unitForm.roomCount} onChange={(e) => setUnitForm((f) => ({ ...f, roomCount: e.target.value }))}>
-                      {["Studio", "1+0", "1+1", "2+1", "3+1", "4+1", "5+1", "5+2", "6+1", "6+2"].map((r) => <option key={r} value={r}>{r}</option>)}
+                  <div className="st-field">
+                    <label>Oda Sayisi</label>
+                    <select className="st-fselect" value={unitForm.roomCount} onChange={e => setUnitForm(f => ({ ...f, roomCount: e.target.value }))}>
+                      {["Studio","1+0","1+1","2+1","3+1","4+1","5+1","5+2","6+1","6+2"].map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </div>
-                  <div className="stock-form-field">
-                    <label>Alan (m²) *</label>
-                    <input type="number" value={unitForm.area} onChange={(e) => setUnitForm((f) => ({ ...f, area: e.target.value }))} />
+                  <div className="st-field">
+                    <label>Alan (m2) *</label>
+                    <input className="st-input" type="number" placeholder="120" value={unitForm.area} onChange={e => setUnitForm(f => ({ ...f, area: e.target.value }))} />
                   </div>
-                  <div className="stock-form-field">
+                  <div className="st-field">
                     <label>Kat</label>
-                    <input type="number" value={unitForm.floor} onChange={(e) => setUnitForm((f) => ({ ...f, floor: e.target.value }))} />
+                    <input className="st-input" type="number" placeholder="3" value={unitForm.floor} onChange={e => setUnitForm(f => ({ ...f, floor: e.target.value }))} />
                   </div>
-                  <div className="stock-form-field">
+                  <div className="st-field">
                     <label>Daire No *</label>
-                    <input value={unitForm.number} onChange={(e) => setUnitForm((f) => ({ ...f, number: e.target.value }))} />
+                    <input className="st-input" placeholder="301" value={unitForm.number} onChange={e => setUnitForm(f => ({ ...f, number: e.target.value }))} />
                   </div>
-                  <div className="stock-form-field stock-full">
+                  <div className="st-field" style={{ gridColumn: "span 2" }}>
                     <label>Fiyat (TL) *</label>
-                    <input type="number" value={unitForm.price} onChange={(e) => setUnitForm((f) => ({ ...f, price: e.target.value }))} />
-                  </div>
-                  <div className="stock-form-field stock-full">
-                    <label>İlan Açıklaması</label>
-                    <textarea value={unitForm.description} onChange={(e) => setUnitForm((f) => ({ ...f, description: e.target.value }))} />
+                    <input className="st-input" type="number" placeholder="2500000" value={unitForm.price} onChange={e => setUnitForm(f => ({ ...f, price: e.target.value }))} />
                   </div>
                 </div>
               </div>
+              <div className="st-modal-section">
+                <div className="st-modal-section-title">AI Destekli Aciklama</div>
+                <div className="st-ai-box">
+                  <div className="st-ai-header">
+                    <div className="st-ai-title">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+                      Yapay Zeka Aciklama Yazar
+                    </div>
+                    <button className="st-ai-btn" onClick={generateAiDescription} disabled={aiLoading || !unitForm.area}>
+                      {aiLoading ? "Yaziliyor..." : "Aciklama Olustur"}
+                    </button>
+                  </div>
+                  <p className="st-ai-desc">Bilgileri girdikten sonra butona basin, AI sizin icin profesyonel aciklama yazsin.</p>
+                  {aiLoading && (
+                    <div className="st-ai-loading">
+                      <div className="st-ai-loading-dot" /><div className="st-ai-loading-dot" /><div className="st-ai-loading-dot" />
+                      <span style={{ fontSize: 11, color: "rgba(245,243,239,0.5)" }}>Aciklama yaziliyor...</span>
+                    </div>
+                  )}
+                  {aiResult && (
+                    <div>
+                      <div className="st-ai-result">{aiResult}</div>
+                      <button className="st-ai-use-btn" onClick={() => setUnitForm(f => ({ ...f, description: aiResult }))}>Bu aciklamayi kullan</button>
+                    </div>
+                  )}
+                </div>
+                <div className="st-field">
+                  <label>Ilan Aciklamasi</label>
+                  <textarea className="st-textarea" placeholder="Mulk hakkinda kisa aciklama..." value={unitForm.description} onChange={e => setUnitForm(f => ({ ...f, description: e.target.value }))} />
+                </div>
+              </div>
+              {formError && <div className="st-form-error">{formError}</div>}
             </div>
-
-            <div className="stock-modal-foot">
-              <button className="stock-save" onClick={handleSubmit} disabled={formLoading}>
-                {formLoading ? "Kaydediliyor..." : "İlanı Kaydet"}
+            <div className="st-modal-footer">
+              <button className="st-submit-btn" onClick={handleSubmit} disabled={formLoading}>
+                <span>{formLoading ? "Kaydediliyor..." : "Ilani Kaydet"}</span>
               </button>
-              <button className="stock-cancel" onClick={() => setShowModal(false)}>İptal</button>
+              <button className="st-cancel-btn" onClick={() => setShowModal(false)}>Iptal</button>
             </div>
           </div>
         </div>
       )}
 
-      <button className="stock-lina" onClick={() => setLinaOpen(true)} title="Lina AI ile stok ekle">🤖</button>
-    </div>
+      <nav className="st-nav">
+        <a href="/dashboard" className="st-logo">
+          <img src="/LOGO_EPH.png" alt="EPH" />
+          <div>
+            <div className="st-logo-text">EPH Platform</div>
+            <div className="st-logo-sub">Emlak Portfoy Havuzu</div>
+          </div>
+        </a>
+        <div className="st-nav-links">
+          <Link href="/dashboard" className="st-nav-item">Ana Sayfa</Link>
+          <Link href="/profil" className="st-nav-item">Profilim</Link>
+          <Link href="/stok" className="st-nav-item active">Stok</Link>
+          <Link href="/crm" className="st-nav-item">CRM</Link>
+          <Link href="/market" className="st-nav-item">Piyasa</Link>
+          {user?.role === "ADMIN" && <Link href="/admin" className="st-nav-item">Admin</Link>}
+        </div>
+        <div className="st-nav-right">
+          <button className="st-logout" onClick={() => { logout(); router.push("/giris"); }}>Cikis</button>
+        </div>
+      </nav>
+
+      <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
+
+      <main className="st-main">
+        <div className="st-header">
+          <div>
+            <h1 className="st-title">Stok<br /><em>Yonetimi</em></h1>
+            <p className="st-sub">Proje ve daire portfoyunuzu yonetin</p>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
+            <div style={{ fontSize: 13, color: "var(--muted)", fontStyle: "italic" }}>
+              {projects.length} proje · {units.length} birim
+            </div>
+            {canAddUnit && (
+              <button className="st-add-btn" onClick={() => { setShowModal(true); setFormError(""); setAiResult(""); }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ position: "relative", zIndex: 1 }}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Ilan Ekle</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="st-stats">
+          {[
+            { label: "Toplam Proje", val: projects.length, cls: "" },
+            { label: "Satis Ilanlari", val: totalSatilik, cls: "green" },
+            { label: "Kiralik Ilanlar", val: totalKiralik, cls: "blue" },
+            { label: "Rezerve", val: totalRezeve, cls: "gold" },
+          ].map(s => (
+            <div key={s.label} className="st-stat">
+              <div className="st-stat-label">{s.label}</div>
+              <div className={`st-stat-num ${s.cls}`}>{s.val}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="st-tabs">
+          <button className={`st-tab ${view==="projects"?"active":""}`} onClick={() => setView("projects")}>Projeler</button>
+          <button className={`st-tab ${view==="units"?"active":""}`} onClick={() => setView("units")}>Tum Birimler</button>
+        </div>
+
+        {view === "projects" && (
+          <div>
+            {projects.length === 0 ? (
+              <div className="st-empty">
+                <div className="st-empty-text">Henuz proje eklenmemis</div>
+                <div className="st-empty-sub">{canAddUnit ? "Sag ustteki Ilan Ekle butonuna tiklayin" : "Portfoyunuzu olusturmaya baslayin"}</div>
+              </div>
+            ) : projects.map(p => {
+              const activeStyle = p.isActive ? { color: "#2D6A4F", bg: "#F0FAF4" } : { color: "#8A8A8A", bg: "#F5F5F5" };
+              return (
+                <div key={p.id} className="st-project">
+                  <div className="st-project-header">
+                    <div>
+                      <div className="st-project-name">{p.name}</div>
+                      <div className="st-project-loc">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        {p.city} / {p.district} — {p.address}
+                      </div>
+                      <div className="st-project-owner">{p.owner.firstName} {p.owner.lastName}</div>
+                    </div>
+                    <div className="st-project-meta">
+                      <span className="st-active-badge" style={{ borderColor: activeStyle.color, color: activeStyle.color, background: activeStyle.bg }}>
+                        {p.isActive ? "Aktif" : "Pasif"}
+                      </span>
+                      <span className="st-unit-count">{p._count.units} birim</span>
+                    </div>
+                  </div>
+                  {p.units && p.units.length > 0 && (
+                    <div className="st-units-list">
+                      {p.units.map(u => {
+                        const ss = getStatusStyle(u.status);
+                        return (
+                          <div key={u.id} className="st-unit-card" role="button" tabIndex={0} onClick={() => router.push(`/stok/${u.id}`)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(`/stok/${u.id}`); }}>
+                            <div className="st-unit-img">
+                              <div className="st-unit-img-icon">🏠</div>
+                              <div className="st-unit-img-badge">{STATUS_LABELS[u.status]}</div>
+                            </div>
+                            <div className="st-unit-body">
+                              <div>
+                                <div className="st-unit-title">{p.name} · {TYPE_LABELS[u.type] || u.type}</div>
+                                <div className="st-unit-loc">📍 {p.city} / {p.district}{p.address ? ` — ${p.address}` : ""}</div>
+                              </div>
+                              <div className="st-unit-tags">
+                                {u.roomCount && <span className="st-unit-tag">{u.roomCount}</span>}
+                                {u.area && <span className="st-unit-tag">{u.area} m²</span>}
+                                {u.floor != null && <span className="st-unit-tag">Kat {u.floor}</span>}
+                                {u.number && <span className="st-unit-tag">No: {u.number}</span>}
+                              </div>
+                              <div className="st-unit-footer">
+                                <div className="st-unit-price-big">{u.price?.toLocaleString("tr-TR")} TL</div>
+                                <span className="st-unit-status" style={{borderColor:ss.color,color:ss.color,background:ss.bg}}>{STATUS_LABELS[u.status]}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {view === "units" && (
+          <div>
+            <div className="st-filters">
+              <div className="st-filter-wrap">
+                <label>Durum</label>
+                <select className="st-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                  <option value="">Tum Durumlar</option>
+                  {STATUS_GROUPS.map(g => (
+                    <optgroup key={g.label} label={g.label}>
+                      {g.statuses.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+              <div className="st-filter-wrap">
+                <label>Sehir</label>
+                <input className="st-filter-input" placeholder="Sehir ara..." value={cityFilter} onChange={e => setCityFilter(e.target.value)} />
+              </div>
+            </div>
+            {units.length === 0 ? (
+              <div className="st-empty">
+                <div className="st-empty-text">Birim bulunamadi</div>
+                <div className="st-empty-sub">Filtre kriterlerinizi degistirmeyi deneyin</div>
+              </div>
+            ) : (
+              <div className="st-all-units">
+                {units.map(u => {
+                  const ss = getStatusStyle(u.status);
+                  return (
+                    <div key={u.id} className="st-unit-big" role="button" tabIndex={0} onClick={() => router.push(`/stok/${u.id}`)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(`/stok/${u.id}`); }}>
+                      <div
+ 			 className="st-unit-big-img"
+ 			 onClick={() => router.push(`/stok/${u.id}`)}
+			>
+                        <span style={{fontSize:28,opacity:0.3}}>🏠</span>
+                        <div className="st-unit-big-badge">{STATUS_LABELS[u.status]}</div>
+                      </div>
+                      <div className="st-unit-big-body">
+                        <div>
+                          <div className="st-unit-big-project">{u.project?.name} · {TYPE_LABELS[u.type] || u.type}</div>
+                          <div className="st-unit-big-loc">📍 {u.project?.city} / {u.project?.district}</div>
+                        </div>
+                        <div className="st-unit-big-tags">
+                          {u.roomCount && <span className="st-unit-big-tag">{u.roomCount}</span>}
+                          {u.area && <span className="st-unit-big-tag">{u.area} m²</span>}
+                          {u.floor != null && <span className="st-unit-big-tag">Kat {u.floor}</span>}
+                          {u.number && <span className="st-unit-big-tag">No: {u.number}</span>}
+                        </div>
+                        <div className="st-unit-big-footer">
+                          <div className="st-unit-big-price">{u.price?.toLocaleString("tr-TR")} TL</div>
+                          <span className="st-unit-status" style={{borderColor:ss.color,color:ss.color,background:ss.bg,fontSize:"9px",padding:"3px 10px"}}>{STATUS_LABELS[u.status]}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      <button onClick={() => setLinaOpen(true)} style={{
+        position:"fixed",bottom:80,right:20,zIndex:1000,
+        width:60,height:60,borderRadius:"50%",
+        background:"linear-gradient(135deg,#1A3C5E,#C9A84C)",
+        border:"none",cursor:"pointer",
+        display:"flex",alignItems:"center",justifyContent:"center",
+        boxShadow:"0 4px 20px rgba(0,0,0,0.3)",
+        fontSize:28
+      }} title="Lina AI ile stok ekle">🤖</button>
+    </>
   );
 }
