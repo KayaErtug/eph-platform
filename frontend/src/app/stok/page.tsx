@@ -11,6 +11,7 @@ interface Unit {
   roomCount?: string; area?: number; price: number; status: string; description?: string;
   isVerified?: boolean; isOffMarket?: boolean;
   tapuVerified?: boolean; photoVerified?: boolean; yetkiVerified?: boolean;
+  createdAt?: string;
   project: { id: string; name: string; city: string; district: string; address: string; owner: { firstName: string; lastName: string } };
 }
 interface Project {
@@ -64,7 +65,7 @@ const CSS = `
 }
 body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-nav{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 48px;position:sticky;top:0;z-index:100;}
-@media(max-width:768px){.st-nav{padding:0 20px;}}
+@media(max-width:768px){.st-nav{display:none;}}
 .st-logo{display:flex;align-items:center;gap:12px;text-decoration:none;}
 .st-logo img{width:34px;height:34px;object-fit:contain;}
 .st-logo-text{font-family:var(--serif);font-size:18px;font-weight:500;color:var(--navy);}
@@ -77,12 +78,12 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-logout{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:1px solid var(--border);padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
 .st-logout:hover{border-color:var(--navy);color:var(--navy);}
 .st-main{max-width:1200px;margin:0 auto;padding:56px 48px 100px;animation:fadeUp 0.5s ease;}
-@media(max-width:768px){.st-main{padding:32px 20px;}}
+@media(max-width:768px){.st-main{padding:24px 16px 100px;}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
-.st-header{margin-bottom:48px;padding-bottom:40px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;align-items:end;gap:24px;}
+.st-header{margin-bottom:40px;padding-bottom:32px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;align-items:end;gap:24px;}
 @media(max-width:768px){.st-header{grid-template-columns:1fr;}}
-.st-title{font-family:var(--serif);font-size:clamp(36px,4vw,52px);font-weight:300;color:var(--navy);letter-spacing:-0.5px;line-height:1.1;}
+.st-title{font-family:var(--serif);font-size:clamp(32px,4vw,48px);font-weight:300;color:var(--navy);letter-spacing:-0.5px;line-height:1.1;}
 .st-title em{font-style:italic;color:var(--gold);}
 .st-sub{font-size:13px;color:var(--muted);margin-top:8px;font-weight:300;}
 .st-add-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:12px 20px;cursor:pointer;font-family:var(--sans);transition:all 0.3s;position:relative;overflow:hidden;display:flex;align-items:center;gap:8px;}
@@ -108,52 +109,62 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-filter-input{background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:8px 0;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;font-weight:300;min-width:160px;}
 .st-filter-input::placeholder{color:#C0BAB0;}
 .st-filter-input:focus,.st-select:focus{border-bottom-color:var(--navy);}
-.st-project{background:#fff;border:1px solid var(--border);margin-bottom:16px;transition:border-color 0.3s;}
-.st-project:hover{border-color:var(--navy);}
-.st-project-header{padding:28px 32px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start;}
-.st-project-name{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--navy);margin-bottom:6px;}
-.st-project-loc{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-weight:300;margin-bottom:4px;}
-.st-project-owner{font-size:10px;color:#B8B2A8;font-weight:300;}
+
+/* PROJE KARTI */
+.st-project{background:#fff;border:1px solid var(--border);margin-bottom:20px;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04);transition:all 0.3s;}
+.st-project:hover{border-color:#B8943F;box-shadow:0 8px 24px rgba(0,0,0,0.08);}
+.st-project-header{padding:20px 24px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;background:linear-gradient(135deg,#0D2137 0%,#1a3c5e 100%);}
+.st-project-name{font-size:17px;font-weight:600;color:#fff;margin-bottom:4px;}
+.st-project-loc{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,0.55);font-weight:300;margin-bottom:2px;}
+.st-project-owner{font-size:10px;color:rgba(255,255,255,0.35);}
 .st-project-meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
-.st-active-badge{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid;padding:4px 10px;}
-.st-unit-count{font-family:var(--serif);font-size:13px;color:var(--muted);font-style:italic;}
-.st-units-grid{padding:24px 32px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
-.st-unit-card{border:1px solid var(--border);padding:16px;transition:all 0.2s;}
-.st-unit-card:hover{border-color:var(--navy);background:var(--warm);}
-.st-unit-number{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
-.st-unit-type{font-family:var(--serif);font-size:16px;font-weight:400;color:var(--navy);margin-bottom:4px;}
-.st-unit-detail{font-size:10px;color:var(--muted);font-weight:300;margin-bottom:8px;}
-.st-unit-price{font-family:var(--serif);font-size:18px;font-weight:400;color:var(--gold);}
-.st-unit-status{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid;padding:3px 8px;display:inline-block;margin-bottom:8px;}
+.st-active-badge{font-size:9px;letter-spacing:1px;text-transform:uppercase;border:1px solid;padding:5px 12px;border-radius:20px;font-weight:600;}
+.st-unit-count{font-size:12px;color:rgba(255,255,255,0.5);font-style:italic;}
+
+/* İLAN LİSTE KARTI */
+.st-units-list{padding:16px 20px 20px;display:flex;flex-direction:column;gap:10px;}
+.st-unit-card{display:flex;border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;background:#fff;transition:all 0.3s;min-height:90px;}
+.st-unit-card:hover{border-color:#B8943F;box-shadow:0 4px 16px rgba(0,0,0,0.08);transform:translateY(-1px);}
+.st-unit-img{width:120px;min-width:120px;background:linear-gradient(135deg,#0D2137,#1a3c5e);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;flex-shrink:0;}
+.st-unit-img-icon{font-size:28px;opacity:0.35;}
+.st-unit-img-badge{position:absolute;bottom:0;left:0;right:0;text-align:center;background:rgba(184,148,63,0.95);color:#fff;font-size:8px;letter-spacing:1px;padding:4px;font-weight:700;}
+.st-unit-body{flex:1;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;}
+.st-unit-title{font-size:13px;font-weight:600;color:#0D2137;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.st-unit-loc{font-size:10px;color:#8E8E93;margin-bottom:8px;}
+.st-unit-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+.st-unit-tag{font-size:9px;padding:2px 8px;border-radius:20px;background:#F5F3EF;color:#555;border:0.5px solid #E8E4DC;}
+.st-unit-footer{display:flex;justify-content:space-between;align-items:center;}
+.st-unit-price-big{font-size:17px;font-weight:700;color:#0D2137;letter-spacing:-0.5px;}
+.st-unit-status{font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:20px;font-weight:600;border:1px solid;}
+
 .st-badges{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
 .st-badge-verified{font-size:7px;letter-spacing:1px;text-transform:uppercase;border:1px solid #2D6A4F;color:#2D6A4F;background:#F0FAF4;padding:2px 7px;display:inline-flex;align-items:center;gap:3px;}
-.st-all-units{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
-@media(max-width:768px){.st-all-units{grid-template-columns:1fr;}}
-.st-unit-big{background:#fff;border:1px solid var(--border);padding:24px;transition:border-color 0.3s;}
-.st-unit-big:hover{border-color:var(--navy);}
-.st-unit-big-project{font-family:var(--serif);font-size:18px;font-weight:400;color:var(--navy);margin-bottom:4px;}
-.st-unit-big-loc{font-size:11px;color:var(--muted);font-weight:300;margin-bottom:12px;}
-.st-unit-big-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);margin-bottom:14px;}
-.st-unit-big-cell{background:#fff;padding:12px;}
-.st-unit-big-cell:hover{background:var(--warm);}
-.st-unit-big-cell-label{font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
-.st-unit-big-cell-val{font-size:13px;color:var(--navy);font-weight:400;}
-.st-unit-big-footer{display:flex;align-items:center;justify-content:space-between;padding-top:14px;border-top:1px solid var(--border);}
-.st-unit-big-room{font-size:11px;color:var(--muted);font-weight:300;}
-.st-unit-big-price{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--gold);}
-.st-empty{background:#fff;border:1px solid var(--border);padding:80px;text-align:center;}
+.st-all-units{display:flex;flex-direction:column;gap:10px;}
+.st-unit-big{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:all 0.3s;display:flex;min-height:90px;}
+.st-unit-big:hover{border-color:#B8943F;box-shadow:0 4px 16px rgba(0,0,0,0.08);transform:translateY(-1px);}
+.st-unit-big-img{width:120px;min-width:120px;background:linear-gradient(135deg,#0D2137,#1a3c5e);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;flex-shrink:0;}
+.st-unit-big-badge{position:absolute;bottom:0;left:0;right:0;text-align:center;background:rgba(184,148,63,0.95);color:#fff;font-size:8px;letter-spacing:1px;padding:4px;font-weight:700;}
+.st-unit-big-body{flex:1;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;}
+.st-unit-big-project{font-size:14px;font-weight:600;color:var(--navy);margin-bottom:3px;}
+.st-unit-big-loc{font-size:10px;color:var(--muted);margin-bottom:8px;}
+.st-unit-big-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+.st-unit-big-tag{font-size:9px;padding:2px 8px;border-radius:20px;background:#F5F3EF;color:#555;border:0.5px solid #E8E4DC;}
+.st-unit-big-footer{display:flex;align-items:center;justify-content:space-between;}
+.st-unit-big-price{font-size:18px;font-weight:700;color:#0D2137;}
+
+.st-empty{background:#fff;border:1px solid var(--border);border-radius:12px;padding:60px;text-align:center;}
 .st-empty-text{font-family:var(--serif);font-size:22px;font-style:italic;color:var(--muted);margin-bottom:6px;}
 .st-empty-sub{font-size:12px;color:#B8B2A8;font-weight:300;}
 .st-overlay{position:fixed;inset:0;background:rgba(15,32,68,0.6);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn 0.2s ease;}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.st-modal{background:#fff;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;position:relative;animation:slideUp 0.3s ease;}
+.st-modal{background:#fff;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;position:relative;animation:slideUp 0.3s ease;border-radius:16px;}
 @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-.st-modal-header{padding:32px 36px 24px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:1;}
-.st-modal-title{font-family:var(--serif);font-size:28px;font-weight:400;color:var(--navy);}
+.st-modal-header{padding:28px 32px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:1;border-radius:16px 16px 0 0;}
+.st-modal-title{font-family:var(--serif);font-size:26px;font-weight:400;color:var(--navy);}
 .st-modal-sub{font-size:12px;color:var(--muted);margin-top:4px;font-weight:300;}
 .st-modal-divider{width:28px;height:2px;background:var(--gold);margin-top:12px;}
 .st-modal-close{position:absolute;top:20px;right:24px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:22px;}
-.st-modal-body{padding:28px 36px 36px;}
+.st-modal-body{padding:24px 32px 32px;}
 .st-modal-section{margin-bottom:24px;}
 .st-modal-section-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
 .st-modal-section-title::after{content:'';flex:1;height:1px;background:var(--border);}
@@ -166,10 +177,10 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-input::placeholder{color:#C0BAB0;}
 .st-fselect{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:10px 0;font-size:14px;color:var(--navy);font-family:var(--sans);outline:none;appearance:none;cursor:pointer;font-weight:300;}
 .st-fselect:focus{border-bottom-color:var(--navy);}
-.st-ai-box{background:var(--navy);padding:20px 24px;margin-bottom:16px;}
+.st-ai-box{background:var(--navy);padding:20px 24px;margin-bottom:16px;border-radius:8px;}
 .st-ai-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
 .st-ai-title{font-size:11px;color:var(--gold);letter-spacing:1px;font-weight:500;display:flex;align-items:center;gap:8px;}
-.st-ai-btn{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:var(--gold);color:var(--navy);border:none;padding:8px 16px;cursor:pointer;font-family:var(--sans);font-weight:500;transition:all 0.2s;}
+.st-ai-btn{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:var(--gold);color:var(--navy);border:none;padding:8px 16px;cursor:pointer;font-family:var(--sans);font-weight:500;transition:all 0.2s;border-radius:4px;}
 .st-ai-btn:hover{background:#B8962A;}
 .st-ai-btn:disabled{opacity:0.5;cursor:not-allowed;}
 .st-ai-desc{font-size:11px;color:rgba(245,243,239,0.5);font-weight:300;line-height:1.5;}
@@ -178,23 +189,23 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .st-ai-loading-dot:nth-child(2){animation-delay:0.15s;}
 .st-ai-loading-dot:nth-child(3){animation-delay:0.3s;}
 @keyframes bounce{0%,100%{transform:translateY(0);opacity:0.5}50%{transform:translateY(-4px);opacity:1}}
-.st-ai-result{margin-top:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(201,168,76,0.2);padding:14px;font-size:12px;color:rgba(245,243,239,0.8);line-height:1.7;font-weight:300;}
-.st-ai-use-btn{margin-top:10px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:transparent;border:1px solid rgba(201,168,76,0.4);color:var(--gold);padding:7px 16px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
+.st-ai-result{margin-top:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(201,168,76,0.2);padding:14px;font-size:12px;color:rgba(245,243,239,0.8);line-height:1.7;font-weight:300;border-radius:4px;}
+.st-ai-use-btn{margin-top:10px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:transparent;border:1px solid rgba(201,168,76,0.4);color:var(--gold);padding:7px 16px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;border-radius:4px;}
 .st-ai-use-btn:hover{background:rgba(201,168,76,0.1);}
-.st-textarea{width:100%;background:var(--warm);border:1px solid var(--border);padding:12px;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;resize:vertical;font-weight:300;min-height:100px;}
+.st-textarea{width:100%;background:var(--warm);border:1px solid var(--border);padding:12px;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;resize:vertical;font-weight:300;min-height:100px;border-radius:4px;}
 .st-textarea:focus{border-color:var(--navy);}
-.st-modal-footer{padding:20px 36px 28px;border-top:1px solid var(--border);display:flex;gap:12px;}
-.st-submit-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:14px 28px;cursor:pointer;font-family:var(--sans);transition:all 0.3s;position:relative;overflow:hidden;flex:1;}
+.st-modal-footer{padding:16px 32px 24px;border-top:1px solid var(--border);display:flex;gap:12px;}
+.st-submit-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:14px 28px;cursor:pointer;font-family:var(--sans);transition:all 0.3s;position:relative;overflow:hidden;flex:1;border-radius:8px;}
 .st-submit-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:var(--gold);transition:left 0.4s;}
 .st-submit-btn:hover::before{left:0;}
 .st-submit-btn:hover{color:var(--navy);}
 .st-submit-btn span{position:relative;z-index:1;}
 .st-submit-btn:disabled{opacity:0.4;cursor:not-allowed;}
 .st-submit-btn:disabled::before{display:none;}
-.st-cancel-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:14px 20px;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all 0.2s;}
+.st-cancel-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:14px 20px;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all 0.2s;border-radius:8px;}
 .st-cancel-btn:hover{border-color:var(--navy);color:var(--navy);}
 .st-form-error{font-size:11px;color:#C0392B;margin-top:8px;}
-.st-form-success{background:#F0FAF4;border-left:3px solid #2D6A4F;padding:14px 18px;margin-bottom:16px;font-size:12px;color:#2D6A4F;font-weight:300;}
+.st-form-success{background:#F0FAF4;border-left:3px solid #2D6A4F;padding:14px 18px;margin-bottom:16px;font-size:12px;color:#2D6A4F;font-weight:300;border-radius:4px;}
 `;
 
 function VerifiedBadges({ u }: { u: Unit }) {
@@ -213,6 +224,7 @@ export default function StokPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [linaOpen, setLinaOpen] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState<any>(null);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
@@ -229,7 +241,7 @@ export default function StokPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState("");
 
-  const canAddUnit = user?.role === "MUTEAHHIT" || user?.role === "INSAAT_FIRMASI" || user?.role === "ADMIN";
+  const canAddUnit = user?.role === "MUTEAHHIT" || user?.role === "INSAAT_FIRMASI" || user?.role === "ADMIN" || user?.role === "EMLAKCI";
 
   useEffect(() => { setHydrated(true); }, []);
   useEffect(() => {
@@ -258,22 +270,14 @@ export default function StokPage() {
   };
 
   const generateAiDescription = async () => {
-    setAiLoading(true);
-    setAiResult("");
+    setAiLoading(true); setAiResult("");
     try {
-      const prompt = `Bir emlak ilani icin kisa ve profesyonel Turkce aciklama yaz. Bilgiler: Tip: ${TYPE_LABELS[unitForm.type] || unitForm.type}, Oda: ${unitForm.roomCount}, Alan: ${unitForm.area}m2, Kat: ${unitForm.floor}, Durum: ${STATUS_LABELS[unitForm.status]}, Sehir: ${projectForm.city}, Ilce: ${projectForm.district}. Maksimum 3 cumle, samimi ve dogal bir dil kullan.`;
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: prompt, history: [] }),
-      });
+      const prompt = `Bir emlak ilani icin kisa ve profesyonel Turkce aciklama yaz. Bilgiler: Tip: ${TYPE_LABELS[unitForm.type] || unitForm.type}, Oda: ${unitForm.roomCount}, Alan: ${unitForm.area}m2, Kat: ${unitForm.floor}, Durum: ${STATUS_LABELS[unitForm.status]}, Sehir: ${projectForm.city}, Ilce: ${projectForm.district}. Maksimum 3 cumle.`;
+      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: prompt, history: [] }) });
       const data = await res.json();
       setAiResult(data.reply || "Aciklama olusturulamadi.");
-    } catch {
-      setAiResult("Baglanti hatasi. Lutfen tekrar deneyin.");
-    } finally {
-      setAiLoading(false);
-    }
+    } catch { setAiResult("Baglanti hatasi."); }
+    finally { setAiLoading(false); }
   };
 
   const handleSubmit = async () => {
@@ -330,11 +334,54 @@ export default function StokPage() {
     <>
       <style>{CSS}</style>
 
+      {/* DETAY MODAL */}
+      {selectedUnit && (
+        <>
+          <div onClick={() => setSelectedUnit(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:2000}} />
+          <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:"min(500px,92vw)",background:"#fff",borderRadius:20,zIndex:2001,overflow:"hidden",boxShadow:"0 24px 60px rgba(0,0,0,0.25)"}}>
+            <div style={{background:"linear-gradient(135deg,#0D2137,#1a3c5e)",padding:"24px 28px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div>
+                  <div style={{color:"#B8943F",fontSize:10,letterSpacing:2,marginBottom:6,textTransform:"uppercase"}}>{STATUS_LABELS[selectedUnit.status]}</div>
+                  <div style={{color:"#fff",fontSize:20,fontWeight:600}}>{TYPE_LABELS[selectedUnit.type] || selectedUnit.type}</div>
+                  <div style={{color:"rgba(255,255,255,0.5)",fontSize:12,marginTop:4}}>{selectedUnit.project?.name} · {selectedUnit.project?.city} / {selectedUnit.project?.district}</div>
+                </div>
+                <button onClick={() => setSelectedUnit(null)} style={{background:"rgba(255,255,255,0.1)",border:"none",color:"#fff",width:32,height:32,borderRadius:"50%",cursor:"pointer",fontSize:20,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+              </div>
+            </div>
+            <div style={{padding:"24px 28px"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
+                {[
+                  {label:"Fiyat",val:`${selectedUnit.price?.toLocaleString("tr-TR")} TL`},
+                  {label:"Alan",val:selectedUnit.area ? `${selectedUnit.area} m²` : "—"},
+                  {label:"Oda Sayısı",val:selectedUnit.roomCount || "—"},
+                  {label:"Kat",val:selectedUnit.floor != null ? selectedUnit.floor : "—"},
+                  {label:"Daire No",val:selectedUnit.number || "—"},
+                  {label:"Şehir / İlçe",val:`${selectedUnit.project?.city || "—"} / ${selectedUnit.project?.district || "—"}`},
+                ].map(item => (
+                  <div key={item.label} style={{background:"#F5F3EF",borderRadius:10,padding:"12px 14px"}}>
+                    <div style={{fontSize:9,letterSpacing:2,color:"#8A8A8A",marginBottom:4,textTransform:"uppercase"}}>{item.label}</div>
+                    <div style={{fontSize:15,fontWeight:600,color:"#0D2137"}}>{item.val}</div>
+                  </div>
+                ))}
+              </div>
+              {selectedUnit.description && (
+                <div style={{background:"#F5F3EF",borderRadius:10,padding:"14px",marginBottom:20}}>
+                  <div style={{fontSize:9,letterSpacing:2,color:"#8A8A8A",marginBottom:6,textTransform:"uppercase"}}>Açıklama</div>
+                  <div style={{fontSize:13,color:"#333",lineHeight:1.6}}>{selectedUnit.description}</div>
+                </div>
+              )}
+              <button onClick={() => setSelectedUnit(null)} style={{width:"100%",padding:"13px",background:"#0D2137",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:13}}>Kapat</button>
+            </div>
+          </div>
+        </>
+      )}
+
       {showModal && (
         <div className="st-overlay" onClick={() => setShowModal(false)}>
           <div className="st-modal" onClick={e => e.stopPropagation()}>
             <div className="st-modal-header">
-              <button className="st-modal-close" onClick={() => setShowModal(false)}>x</button>
+              <button className="st-modal-close" onClick={() => setShowModal(false)}>×</button>
               <h2 className="st-modal-title">Yeni Ilan Ekle</h2>
               <p className="st-modal-sub">Bilgileri girin, AI size aciklama yazsin</p>
               <div className="st-modal-divider" />
@@ -429,18 +476,14 @@ export default function StokPage() {
                   <p className="st-ai-desc">Bilgileri girdikten sonra butona basin, AI sizin icin profesyonel aciklama yazsin.</p>
                   {aiLoading && (
                     <div className="st-ai-loading">
-                      <div className="st-ai-loading-dot" />
-                      <div className="st-ai-loading-dot" />
-                      <div className="st-ai-loading-dot" />
+                      <div className="st-ai-loading-dot" /><div className="st-ai-loading-dot" /><div className="st-ai-loading-dot" />
                       <span style={{ fontSize: 11, color: "rgba(245,243,239,0.5)" }}>Aciklama yaziliyor...</span>
                     </div>
                   )}
                   {aiResult && (
                     <div>
                       <div className="st-ai-result">{aiResult}</div>
-                      <button className="st-ai-use-btn" onClick={() => setUnitForm(f => ({ ...f, description: aiResult }))}>
-                        Bu aciklamayi kullan
-                      </button>
+                      <button className="st-ai-use-btn" onClick={() => setUnitForm(f => ({ ...f, description: aiResult }))}>Bu aciklamayi kullan</button>
                     </div>
                   )}
                 </div>
@@ -483,6 +526,7 @@ export default function StokPage() {
       </nav>
 
       <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
+
       <main className="st-main">
         <div className="st-header">
           <div>
@@ -490,7 +534,7 @@ export default function StokPage() {
             <p className="st-sub">Proje ve daire portfoyunuzu yonetin</p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
-            <div style={{ fontFamily: "var(--serif)", fontSize: 13, color: "var(--muted)", fontStyle: "italic" }}>
+            <div style={{ fontSize: 13, color: "var(--muted)", fontStyle: "italic" }}>
               {projects.length} proje · {units.length} birim
             </div>
             {canAddUnit && (
@@ -549,17 +593,31 @@ export default function StokPage() {
                     </div>
                   </div>
                   {p.units && p.units.length > 0 && (
-                    <div className="st-units-grid">
+                    <div className="st-units-list">
                       {p.units.map(u => {
                         const ss = getStatusStyle(u.status);
                         return (
-                          <div key={u.id} className="st-unit-card">
-                            <div className="st-unit-number">No: {u.number}{u.floor ? ` · Kat ${u.floor}` : ""}</div>
-                            <span className="st-unit-status" style={{ borderColor: ss.color, color: ss.color, background: ss.bg }}>{STATUS_LABELS[u.status]}</span>
-                            <div className="st-unit-type">{TYPE_LABELS[u.type] || u.type}</div>
-                            <div className="st-unit-detail">{u.roomCount && `${u.roomCount} · `}{u.area ? `${u.area}m2` : ""}</div>
-                            <VerifiedBadges u={u} />
-                            <div className="st-unit-price">{u.price.toLocaleString("tr-TR")} TL</div>
+                          <div key={u.id} className="st-unit-card" onClick={() => setSelectedUnit({...u, project: p})}>
+                            <div className="st-unit-img">
+                              <div className="st-unit-img-icon">🏠</div>
+                              <div className="st-unit-img-badge">{STATUS_LABELS[u.status]}</div>
+                            </div>
+                            <div className="st-unit-body">
+                              <div>
+                                <div className="st-unit-title">{p.name} · {TYPE_LABELS[u.type] || u.type}</div>
+                                <div className="st-unit-loc">📍 {p.city} / {p.district}{p.address ? ` — ${p.address}` : ""}</div>
+                              </div>
+                              <div className="st-unit-tags">
+                                {u.roomCount && <span className="st-unit-tag">{u.roomCount}</span>}
+                                {u.area && <span className="st-unit-tag">{u.area} m²</span>}
+                                {u.floor != null && <span className="st-unit-tag">Kat {u.floor}</span>}
+                                {u.number && <span className="st-unit-tag">No: {u.number}</span>}
+                              </div>
+                              <div className="st-unit-footer">
+                                <div className="st-unit-price-big">{u.price?.toLocaleString("tr-TR")} TL</div>
+                                <span className="st-unit-status" style={{borderColor:ss.color,color:ss.color,background:ss.bg}}>{STATUS_LABELS[u.status]}</span>
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
@@ -600,32 +658,26 @@ export default function StokPage() {
                 {units.map(u => {
                   const ss = getStatusStyle(u.status);
                   return (
-                    <div key={u.id} className="st-unit-big">
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+                    <div key={u.id} className="st-unit-big" onClick={() => setSelectedUnit(u)}>
+                      <div className="st-unit-big-img">
+                        <span style={{fontSize:28,opacity:0.3}}>🏠</span>
+                        <div className="st-unit-big-badge">{STATUS_LABELS[u.status]}</div>
+                      </div>
+                      <div className="st-unit-big-body">
                         <div>
-                          <div className="st-unit-big-project">{u.project?.name}</div>
-                          <div className="st-unit-big-loc">{u.project?.city} / {u.project?.district}</div>
+                          <div className="st-unit-big-project">{u.project?.name} · {TYPE_LABELS[u.type] || u.type}</div>
+                          <div className="st-unit-big-loc">📍 {u.project?.city} / {u.project?.district}</div>
                         </div>
-                        <span className="st-unit-status" style={{ borderColor: ss.color, color: ss.color, background: ss.bg, flexShrink: 0 }}>{STATUS_LABELS[u.status]}</span>
-                      </div>
-                      <VerifiedBadges u={u} />
-                      <div className="st-unit-big-grid">
-                        <div className="st-unit-big-cell">
-                          <div className="st-unit-big-cell-label">Tip</div>
-                          <div className="st-unit-big-cell-val">{TYPE_LABELS[u.type] || u.type}</div>
+                        <div className="st-unit-big-tags">
+                          {u.roomCount && <span className="st-unit-big-tag">{u.roomCount}</span>}
+                          {u.area && <span className="st-unit-big-tag">{u.area} m²</span>}
+                          {u.floor != null && <span className="st-unit-big-tag">Kat {u.floor}</span>}
+                          {u.number && <span className="st-unit-big-tag">No: {u.number}</span>}
                         </div>
-                        <div className="st-unit-big-cell">
-                          <div className="st-unit-big-cell-label">No / Kat</div>
-                          <div className="st-unit-big-cell-val">{u.number} / {u.floor ?? "—"}</div>
+                        <div className="st-unit-big-footer">
+                          <div className="st-unit-big-price">{u.price?.toLocaleString("tr-TR")} TL</div>
+                          <span className="st-unit-status" style={{borderColor:ss.color,color:ss.color,background:ss.bg,fontSize:"9px",padding:"3px 10px"}}>{STATUS_LABELS[u.status]}</span>
                         </div>
-                        <div className="st-unit-big-cell">
-                          <div className="st-unit-big-cell-label">Alan</div>
-                          <div className="st-unit-big-cell-val">{u.area ? `${u.area}m2` : "—"}</div>
-                        </div>
-                      </div>
-                      <div className="st-unit-big-footer">
-                        <span className="st-unit-big-room">{u.roomCount || "—"}</span>
-                        <span className="st-unit-big-price">{u.price.toLocaleString("tr-TR")} TL</span>
                       </div>
                     </div>
                   );
