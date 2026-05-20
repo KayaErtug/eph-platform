@@ -36,14 +36,7 @@ export interface Project {
   _count: { units: number };
 }
 
-export interface ProjectForm {
-  name: string;
-  city: string;
-  district: string;
-  address: string;
-}
-
-export interface UnitForm {
+export interface UnitFormState {
   type: string;
   floor: string;
   number: string;
@@ -52,4 +45,11 @@ export interface UnitForm {
   price: string;
   status: string;
   description: string;
+}
+
+export interface ProjectFormState {
+  name: string;
+  city: string;
+  district: string;
+  address: string;
 }
