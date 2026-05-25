@@ -7,6 +7,263 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id                      String                    @id @default(uuid())
+  email                   String                    @unique
+  phone                   String                    @unique
+  passwordHash            String
+  firstName               String
+  lastName                String
+  role                    Role
+  isVerified              Boolean                   @default(false)
+  isApproved              Boolean                   @default(false)
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  nominationPoints        Int                       @default(0)
+  nominationQuota         Int                       @default(10)
+  referralCode            String?                   @unique
+  activities              Activity[]
+  applications            Application[]
+  ConversationParticipant ConversationParticipant[]
+  customers               Customer[]
+  documents               Document[]
+  Message                 Message[]
+  NetworkPost             NetworkPost[]
+  nominations             Nomination[]
+  projects                Project[]
+  tasks                   Task[]
+  visits                  UserVisit[]
+  pushSubscriptions       PushSubscription[]
+}
+
+model Invitation {
+  id        String           @id @default(uuid())
+  code      String           @unique
+  role      Role
+  status    InvitationStatus @default(PENDING)
+  maxUses   Int              @default(1)
+  usedCount Int              @default(0)
+  expiresAt DateTime
+  createdAt DateTime         @default(now())
+}
+
+model Document {
+  id        String         @id @default(uuid())
+  userId    String
+  type      DocumentType
+  status    DocumentStatus @default(PENDING)
+  fileUrl   String
+  fileName  String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  city        String
+  district    String
+  address     String
+  ownerId     String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  owner       User     @relation(fields: [ownerId], references: [id])
+  units       Unit[]
+}
+
+model Unit {
+  id            String     @id @default(uuid())
+  projectId     String
+  type          UnitType   @default(DAIRE)
+  floor         Int?
+  number        String
+  roomCount     String?
+  area          Float?
+  price         Float
+  status        UnitStatus @default(SATILIK)
+  description   String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  isOffMarket   Boolean    @default(false)
+  isVerified    Boolean    @default(false)
+  photoVerified Boolean    @default(false)
+  tapuVerified  Boolean    @default(false)
+  verifiedAt    DateTime?
+  yetkiVerified Boolean    @default(false)
+  project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Nomination {
+  id             String           @id @default(uuid())
+  nominatorId    String
+  candidateName  String
+  candidateEmail String
+  candidatePhone String
+  candidateRole  Role
+  note           String?
+  status         NominationStatus @default(PENDING)
+  adminNote      String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  nominator      User             @relation(fields: [nominatorId], references: [id], onDelete: Cascade)
+}
+
+model Application {
+  id             String            @id @default(uuid())
+  applicantName  String
+  applicantEmail String
+  applicantPhone String
+  requestedRole  Role
+  message        String?
+  referralCode   String?
+  referrerId     String?
+  status         ApplicationStatus @default(PENDING)
+  adminNote      String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  referrer       User?             @relation(fields: [referrerId], references: [id])
+}
+
+model Lead {
+  id           String   @id @default(uuid())
+  fullName     String?
+  phone        String?
+  email        String?
+  profession   String?
+  city         String?
+  interest     String?
+  conversation String?
+  source       String   @default("LINA")
+  createdAt    DateTime @default(now())
+}
+
+model Customer {
+  id              String         @id @default(uuid())
+  ownerId         String
+  firstName       String
+  lastName        String
+  phone           String?
+  email           String?
+  city            String?
+  profession      String?
+  company         String?
+  budget          Float?
+  interestedArea  String?
+  interestedType  String?
+  source          String?
+  status          CustomerStatus @default(YENI_LEAD)
+  tags            String[]
+  notes           String?
+  lastContactedAt DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  activities      Activity[]
+  owner           User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tasks           Task[]
+}
+
+model Activity {
+  id         String       @id @default(uuid())
+  customerId String
+  userId     String
+  type       ActivityType
+  note       String
+  createdAt  DateTime     @default(now())
+  customer   Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id         String     @id @default(uuid())
+  customerId String
+  userId     String
+  title      String
+  dueDate    DateTime?
+  status     TaskStatus @default(BEKLIYOR)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserVisit {
+  id        String   @id @default(uuid())
+  userId    String?
+  page      String
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Conversation {
+  id                      String                    @id
+  postId                  String?
+  title                   String
+  status                  ConversationStatus        @default(ACTIVE)
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
+  NetworkPost             NetworkPost?              @relation(fields: [postId], references: [id])
+  ConversationParticipant ConversationParticipant[]
+  Message                 Message[]
+}
+
+model ConversationParticipant {
+  id             String       @id
+  conversationId String
+  userId         String
+  createdAt      DateTime     @default(now())
+  lastReadAt     DateTime?
+  Conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  User           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String       @id
+  conversationId String
+  senderId       String
+  body           String
+  createdAt      DateTime     @default(now())
+  Conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  User           User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model NetworkPost {
+  id           String            @id
+  userId       String
+  type         String
+  title        String
+  description  String
+  city         String?
+  district     String?
+  neighborhood String?
+  budget       Float?
+  urgency      String?
+  visibility   NetworkVisibility @default(TUM_EPH)
+  tags         String[]
+  expiresAt    DateTime
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime
+  Conversation Conversation[]
+  User         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 enum Role {
   EMLAKCI
   MUTEAHHIT
@@ -26,13 +283,13 @@ enum DocumentType {
   YETKI_BELGESI
   TICARET_SICIL
   KIMLIK
+  DIGER
   MYK_BELGESI
   IMZA_SIRKULERI
   FAALIYET_BELGESI
   IS_BITIRME_BELGESI
   YAMBIS_BELGESI
   REFERANS_PROJE
-  DIGER
 }
 
 enum DocumentStatus {
@@ -43,16 +300,16 @@ enum DocumentStatus {
 
 enum UnitStatus {
   SATILIK
+  REZERVE
+  SATILDI
+  PASIF
   KIRALIK
   GUNLUK_KIRALIK
   DEVREN_SATILIK
   DEVREN_KIRALIK
   INSAAT_PROJESI
   KAT_KARSILIGI
-  REZERVE
-  SATILDI
   KIRALANDII
-  PASIF
 }
 
 enum UnitType {
@@ -95,135 +352,6 @@ enum ApplicationStatus {
   REGISTERED
 }
 
-model User {
-  id               String        @id @default(uuid())
-  email            String        @unique
-  phone            String        @unique
-  passwordHash     String
-  firstName        String
-  lastName         String
-  role             Role
-  isVerified       Boolean       @default(false)
-  isApproved       Boolean       @default(false)
-  nominationPoints Int           @default(0)
-  nominationQuota  Int           @default(10)
-  referralCode     String?       @unique
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  documents        Document[]
-  projects         Project[]
-  nominations      Nomination[]
-  applications     Application[]
-  customers        Customer[]
-  activities       Activity[]
-  tasks            Task[]
-  visits           UserVisit[]
-}
-
-model Invitation {
-  id        String           @id @default(uuid())
-  code      String           @unique
-  role      Role
-  status    InvitationStatus @default(PENDING)
-  maxUses   Int              @default(1)
-  usedCount Int              @default(0)
-  expiresAt DateTime
-  createdAt DateTime         @default(now())
-}
-
-model Document {
-  id        String         @id @default(uuid())
-  userId    String
-  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      DocumentType
-  status    DocumentStatus @default(PENDING)
-  fileUrl   String
-  fileName  String
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-}
-
-model Project {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  city        String
-  district    String
-  address     String
-  ownerId     String
-  owner       User     @relation(fields: [ownerId], references: [id])
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  units       Unit[]
-}
-
-model Unit {
-  id            String     @id @default(uuid())
-  projectId     String
-  project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  type          UnitType   @default(DAIRE)
-  floor         Int?
-  number        String
-  roomCount     String?
-  area          Float?
-  price         Float
-  status        UnitStatus @default(SATILIK)
-  description   String?
-  isVerified    Boolean    @default(false)
-  isOffMarket   Boolean    @default(false)
-  verifiedAt    DateTime?
-  tapuVerified  Boolean    @default(false)
-  photoVerified Boolean    @default(false)
-  yetkiVerified Boolean    @default(false)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-}
-
-model Nomination {
-  id             String           @id @default(uuid())
-  nominatorId    String
-  nominator      User             @relation(fields: [nominatorId], references: [id], onDelete: Cascade)
-  candidateName  String
-  candidateEmail String
-  candidatePhone String
-  candidateRole  Role
-  note           String?
-  status         NominationStatus @default(PENDING)
-  adminNote      String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-}
-
-model Application {
-  id             String            @id @default(uuid())
-  applicantName  String
-  applicantEmail String
-  applicantPhone String
-  requestedRole  Role
-  message        String?
-  referralCode   String?
-  referrerId     String?
-  referrer       User?             @relation(fields: [referrerId], references: [id], onDelete: SetNull)
-  status         ApplicationStatus @default(PENDING)
-  adminNote      String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-}
-
-model Lead {
-  id           String   @id @default(uuid())
-  fullName     String?
-  phone        String?
-  email        String?
-  profession   String?
-  city         String?
-  interest     String?
-  conversation String?
-  source       String   @default("LINA")
-  createdAt    DateTime @default(now())
-}
-
 enum CustomerStatus {
   YENI_LEAD
   ILK_GORUSME
@@ -251,60 +379,14 @@ enum TaskStatus {
   IPTAL
 }
 
-model Customer {
-  id              String         @id @default(uuid())
-  ownerId         String
-  owner           User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  firstName       String
-  lastName        String
-  phone           String?
-  email           String?
-  city            String?
-  profession      String?
-  company         String?
-  budget          Float?
-  interestedArea  String?
-  interestedType  String?
-  source          String?
-  status          CustomerStatus @default(YENI_LEAD)
-  tags            String[]
-  notes           String?
-  lastContactedAt DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  activities      Activity[]
-  tasks           Task[]
+enum ConversationStatus {
+  ACTIVE
+  ARCHIVED
 }
 
-model Activity {
-  id          String       @id @default(uuid())
-  customerId  String
-  customer    Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type        ActivityType
-  note        String
-  createdAt   DateTime     @default(now())
-}
-
-model Task {
-  id          String     @id @default(uuid())
-  customerId  String
-  customer    Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  dueDate     DateTime?
-  status      TaskStatus @default(BEKLIYOR)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-}
-model UserVisit {
-  id        String   @id @default(uuid())
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  page      String
-  ip        String?
-  userAgent String?
-  createdAt DateTime @default(now())
+enum NetworkVisibility {
+  TUM_EPH
+  SADECE_EMLAKCILAR
+  SADECE_MUTEAHHITLER
+  SADECE_BAGLANTILARIM
 }

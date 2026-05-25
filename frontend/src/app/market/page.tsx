@@ -61,7 +61,6 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .mk-live{display:flex;align-items:center;gap:8px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
 .mk-live-dot{width:6px;height:6px;border-radius:50%;background:#2D6A4F;animation:pulse 2s infinite;}
 
-/* KPI GRID */
 .mk-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:32px;}
 @media(max-width:1024px){.mk-kpi{grid-template-columns:1fr 1fr;}}
 @media(max-width:600px){.mk-kpi{grid-template-columns:1fr;}}
@@ -73,16 +72,13 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .mk-kpi-val.blue{color:#1A4A7A;}
 .mk-kpi-sub{font-size:11px;color:var(--muted);margin-top:8px;font-weight:300;}
 
-/* İKİ KOLON */
 .mk-two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
 @media(max-width:900px){.mk-two-col{grid-template-columns:1fr;}}
 
-/* PANEL */
 .mk-panel{background:#fff;border:1px solid var(--border);padding:28px 32px;}
 .mk-panel-title{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--navy);margin-bottom:4px;}
 .mk-panel-sub{font-size:11px;color:var(--muted);font-weight:300;margin-bottom:24px;}
 
-/* BÖLGE TABLOSU */
 .mk-district-table{width:100%;border-collapse:collapse;}
 .mk-district-table th{font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:0 0 12px;text-align:left;border-bottom:1px solid var(--border);}
 .mk-district-table th:not(:first-child){text-align:right;}
@@ -92,7 +88,6 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .mk-district-rank{font-size:9px;color:var(--muted);margin-right:8px;font-weight:300;}
 .mk-district-bar{height:3px;background:var(--gold);margin-top:4px;transition:width 0.8s ease;}
 
-/* BAR CHART */
 .mk-bar-item{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
 .mk-bar-label{font-size:11px;color:var(--navy);width:100px;flex-shrink:0;}
 .mk-bar-track{flex:1;height:4px;background:var(--border);position:relative;}
@@ -100,14 +95,12 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .mk-bar-fill.gold{background:var(--gold);}
 .mk-bar-val{font-size:11px;color:var(--muted);width:40px;text-align:right;flex-shrink:0;font-family:var(--serif);}
 
-/* FİYAT PANEL */
 .mk-price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);}
 .mk-price-cell{background:var(--warm);padding:20px;}
 .mk-price-cell-label{font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
 .mk-price-cell-val{font-family:var(--serif);font-size:24px;font-weight:300;color:var(--navy);}
 .mk-price-cell-sub{font-size:10px;color:var(--muted);margin-top:4px;}
 
-/* PLATFORM STATS */
 .mk-platform{background:var(--navy);padding:28px 32px;margin-bottom:16px;}
 .mk-platform-title{font-size:8px;letter-spacing:3px;text-transform:uppercase;color:rgba(245,243,239,0.5);margin-bottom:20px;}
 .mk-platform-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,0.05);}
@@ -167,15 +160,20 @@ export default function MarketPage() {
             <div className="mk-logo-sub">Emlak Portföy Havuzu</div>
           </div>
         </a>
+
         <div className="mk-nav-links">
           <Link href="/dashboard" className="mk-nav-item">Ana Sayfa</Link>
           <Link href="/profil" className="mk-nav-item">Profilim</Link>
           <Link href="/stok" className="mk-nav-item">Stok</Link>
           <Link href="/crm" className="mk-nav-item">CRM</Link>
+          <Link href="/network" className="mk-nav-item">Network</Link>
           <Link href="/market" className="mk-nav-item active">Piyasa</Link>
           {user?.role === "ADMIN" && <Link href="/admin" className="mk-nav-item">Admin</Link>}
         </div>
-        <button className="mk-logout" onClick={() => { logout(); router.push("/giris"); }}>Çıkış</button>
+
+        <button className="mk-logout" onClick={() => { logout(); router.push("/giris"); }}>
+          Çıkış
+        </button>
       </nav>
 
       <main className="mk-main">
@@ -190,7 +188,6 @@ export default function MarketPage() {
           </div>
         </div>
 
-        {/* KPI */}
         <div className="mk-kpi">
           {[
             { label: "Aktif Portföy", val: summary.totalActive.toLocaleString("tr-TR"), cls: "", sub: `${summary.totalUnits} toplam ilan` },
@@ -206,7 +203,6 @@ export default function MarketPage() {
           ))}
         </div>
 
-        {/* PLATFORM İSTATİSTİKLERİ */}
         <div className="mk-platform">
           <div className="mk-platform-title">Platform Genel Durumu</div>
           <div className="mk-platform-grid">
@@ -224,7 +220,6 @@ export default function MarketPage() {
           </div>
         </div>
 
-        {/* FİYAT ANALİZİ */}
         <div className="mk-panel" style={{ marginBottom: 16 }}>
           <div className="mk-panel-title">Fiyat Analizi</div>
           <div className="mk-panel-sub">Platform geneli ilan fiyat dağılımı</div>
@@ -248,7 +243,6 @@ export default function MarketPage() {
         </div>
 
         <div className="mk-two-col">
-          {/* EN AKTİF BÖLGELER */}
           <div className="mk-panel">
             <div className="mk-panel-title">En Aktif Bölgeler</div>
             <div className="mk-panel-sub">İlan yoğunluğuna göre sıralama</div>
@@ -283,7 +277,6 @@ export default function MarketPage() {
             )}
           </div>
 
-          {/* DURUM & TİP DAĞILIMI */}
           <div>
             <div className="mk-panel" style={{ marginBottom: 16 }}>
               <div className="mk-panel-title">Durum Dağılımı</div>
@@ -315,7 +308,6 @@ export default function MarketPage() {
           </div>
         </div>
 
-        {/* UYARI NOTU */}
         <div style={{ background: "#fff", border: "1px solid var(--border)", padding: "20px 28px", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5" style={{ flexShrink: 0, marginTop: 2 }}>
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>

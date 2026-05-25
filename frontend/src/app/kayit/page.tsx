@@ -1,28 +1,53 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+
+import { Suspense, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import {
+  Building2,
+  CheckCircle2,
+  KeyRound,
+  LockKeyhole,
+  Mail,
+  Phone,
+  ShieldCheck,
+  UserRound,
+  UsersRound,
+  XCircle,
+} from "lucide-react";
+
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { registerSchema, RegisterFormData } from "@/schemas/auth.schema";
 
 const ROLE_LABELS: Record<string, string> = {
-  EMLAKCI: "Emlakçı", MUTEAHHIT: "Müteahhit",
-  INSAAT_FIRMASI: "İnşaat Firması", ADMIN: "Admin",
+  EMLAKCI: "Emlakçı",
+  MUTEAHHIT: "Müteahhit",
+  INSAAT_FIRMASI: "İnşaat Firması",
+  ADMIN: "Admin",
 };
 
 function KayitForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setAuth = useAuthStore((s) => s.setAuth);
+
   const [detectedRole, setDetectedRole] = useState<string | null>(null);
-  const [codeStatus, setCodeStatus] = useState<"idle"|"checking"|"valid"|"invalid">("idle");
+  const [codeStatus, setCodeStatus] = useState<
+    "idle" | "checking" | "valid" | "invalid"
+  >("idle");
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<RegisterFormData>({
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   });
 
@@ -30,338 +55,718 @@ function KayitForm() {
 
   useEffect(() => {
     const code = searchParams.get("davet");
-    if (code) setValue("inviteCode", code);
+
+    if (code) {
+      setValue("inviteCode", code);
+    }
   }, [searchParams, setValue]);
 
   useEffect(() => {
     if (!inviteCode || inviteCode.length < 10) {
-      setDetectedRole(null); setCodeStatus("idle"); return;
+      setDetectedRole(null);
+      setCodeStatus("idle");
+      return;
     }
+
     const timer = setTimeout(async () => {
       setCodeStatus("checking");
+
       try {
         const res = await api.get(`/invitations/validate/${inviteCode}`);
-        setDetectedRole(res.data.role); setCodeStatus("valid");
+        setDetectedRole(res.data.role);
+        setCodeStatus("valid");
       } catch {
-        setDetectedRole(null); setCodeStatus("invalid");
+        setDetectedRole(null);
+        setCodeStatus("invalid");
       }
     }, 600);
+
     return () => clearTimeout(timer);
   }, [inviteCode]);
 
   const onSubmit = async (data: RegisterFormData) => {
-    setLoading(true); setServerError("");
+    setLoading(true);
+    setServerError("");
+
     try {
       const res = await api.post("/auth/register", data);
       setAuth(res.data.user, res.data.token);
       router.push("/dashboard");
     } catch (err: any) {
       setServerError(err.response?.data?.message || "Bir hata oluştu.");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0;}
-        :root{
-          --navy:#0F2044;--gold:#C9A84C;--cream:#F5F3EF;--warm:#FAFAF8;
-          --muted:#8A8A8A;--border:#E2DDD5;
-          --serif:'Cormorant Garamond',Georgia,serif;
-          --sans:'DM Sans',system-ui,sans-serif;
-        }
-        body{font-family:var(--sans);background:var(--warm);}
-
-        .kayit-root{min-height:100vh;display:grid;grid-template-columns:5fr 7fr;}
-        @media(max-width:900px){.kayit-root{grid-template-columns:1fr;}}
-
-        /* SOL */
-        .kayit-left{
-          background:var(--navy);padding:56px 52px;
-          display:flex;flex-direction:column;justify-content:space-between;
-          position:relative;overflow:hidden;
-        }
-        @media(max-width:900px){.kayit-left{display:none;}}
-
-        .kayit-left::after{
-          content:'';position:absolute;
-          bottom:-80px;right:-80px;
-          width:320px;height:320px;border-radius:50%;
-          background:radial-gradient(circle,rgba(201,168,76,0.1) 0%,transparent 70%);
-          pointer-events:none;
+        * {
+          box-sizing: border-box;
         }
 
-        .kayit-logo{display:flex;align-items:center;gap:12px;}
-        .kayit-logo img{width:38px;height:38px;object-fit:contain;}
-        .kayit-logo-text{font-family:var(--serif);font-size:20px;font-weight:500;color:var(--cream);}
-        .kayit-logo-sub{font-size:7px;letter-spacing:2.5px;text-transform:uppercase;color:rgba(201,168,76,0.7);}
-
-        .kayit-hero{position:relative;z-index:1;}
-        .kayit-badge{
-          display:inline-flex;align-items:center;gap:8px;
-          border:1px solid rgba(201,168,76,0.25);padding:6px 14px;
-          margin-bottom:28px;width:fit-content;
-        }
-        .kayit-badge-dot{width:5px;height:5px;border-radius:50%;background:var(--gold);animation:pulse 2s ease infinite;}
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-        .kayit-badge-text{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);}
-
-        .kayit-headline{
-          font-family:var(--serif);font-size:48px;font-weight:300;
-          line-height:1.05;color:var(--cream);letter-spacing:-0.5px;margin-bottom:24px;
-        }
-        .kayit-headline em{font-style:italic;color:var(--gold);}
-
-        .kayit-steps{display:flex;flex-direction:column;gap:0;margin-top:40px;}
-        .kayit-step{
-          display:flex;align-items:flex-start;gap:20px;
-          padding:20px 0;border-bottom:1px solid rgba(255,255,255,0.05);
-        }
-        .kayit-step:last-child{border-bottom:none;}
-        .kayit-step-num{
-          font-family:var(--serif);font-size:13px;color:var(--gold);
-          min-width:20px;margin-top:2px;font-weight:300;
-        }
-        .kayit-step-title{font-size:14px;color:var(--cream);font-weight:400;margin-bottom:4px;}
-        .kayit-step-desc{font-size:11px;color:rgba(245,243,239,0.4);font-weight:300;line-height:1.6;}
-
-        .kayit-footer-text{font-size:10px;color:rgba(245,243,239,0.15);letter-spacing:1px;}
-
-        /* SAĞ */
-        .kayit-right{
-          background:var(--warm);display:flex;align-items:center;
-          justify-content:center;padding:60px 80px;position:relative;
-        }
-        @media(max-width:768px){.kayit-right{padding:40px 24px;}}
-
-        .kayit-right::before{
-          content:'';position:absolute;top:0;left:0;right:0;height:3px;
-          background:linear-gradient(90deg,var(--gold),var(--navy));
+        body {
+          margin: 0;
+          background: #F5F7FA;
+          color: #111827;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
 
-        .kayit-form-wrap{width:100%;max-width:420px;animation:fadeUp 0.5s ease;}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-
-        .kayit-title{font-family:var(--serif);font-size:36px;font-weight:400;color:var(--navy);margin-bottom:6px;letter-spacing:-0.3px;}
-        .kayit-sub{font-size:13px;color:var(--muted);margin-bottom:12px;font-weight:300;}
-        .kayit-divider{width:36px;height:2px;background:var(--gold);margin-bottom:32px;}
-
-        .kayit-field{margin-bottom:20px;}
-        .kayit-label{display:block;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--navy);font-weight:500;margin-bottom:10px;}
-        .kayit-input-wrap{position:relative;}
-        .kayit-input{
-          width:100%;background:transparent;border:none;
-          border-bottom:1.5px solid var(--border);padding:10px 0;
-          font-size:14px;color:var(--navy);font-family:var(--sans);
-          outline:none;transition:border-color 0.3s;font-weight:300;
-        }
-        .kayit-input:focus{border-bottom-color:var(--navy);}
-        .kayit-input::placeholder{color:#C0BAB0;}
-        .kayit-input-line{
-          position:absolute;bottom:0;left:0;height:1.5px;width:0;
-          background:var(--gold);transition:width 0.4s cubic-bezier(0.4,0,0.2,1);
-        }
-        .kayit-input:focus~.kayit-input-line{width:100%;}
-        .kayit-input-status{position:absolute;right:0;top:50%;transform:translateY(-50%);}
-
-        .kayit-code-valid{
-          background:#F0FAF4;border-left:3px solid #2D6A4F;
-          padding:10px 14px;margin:8px 0;
-          font-size:12px;color:#2D6A4F;font-weight:300;
-          display:flex;align-items:center;gap:8px;
-        }
-        .kayit-code-invalid{
-          background:#FEF0EE;border-left:3px solid #C0392B;
-          padding:10px 14px;margin:8px 0;
-          font-size:12px;color:#C0392B;font-weight:300;
+        a {
+          color: inherit;
+          text-decoration: none;
         }
 
-        .kayit-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+        .register-page {
+          min-height: 100vh;
+          background: #F5F7FA;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+        }
 
-        .kayit-error{font-size:11px;color:#C0392B;margin-top:6px;}
-        .kayit-server-error{background:#FEF0EE;border-left:3px solid #C0392B;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#C0392B;font-weight:300;}
+        .register-shell {
+          width: 100%;
+          max-width: 1120px;
+          min-height: 680px;
+          display: grid;
+          grid-template-columns: .95fr 1.05fr;
+          overflow: hidden;
+          border: 1px solid #E2E8F0;
+          border-radius: 32px;
+          background: #FFFFFF;
+        }
 
-        .kayit-btn{
-          width:100%;background:var(--navy);color:var(--cream);border:none;
-          padding:16px;font-size:10px;letter-spacing:3px;text-transform:uppercase;
-          font-family:var(--sans);font-weight:500;cursor:pointer;margin-top:28px;
-          position:relative;overflow:hidden;transition:all 0.3s;
+        .register-info {
+          background: #0B1F44;
+          color: #FFFFFF;
+          padding: 42px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
         }
-        .kayit-btn::before{
-          content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;
-          background:var(--gold);transition:left 0.4s cubic-bezier(0.4,0,0.2,1);
-        }
-        .kayit-btn:hover::before{left:0;}
-        .kayit-btn:hover{color:var(--navy);}
-        .kayit-btn span{position:relative;z-index:1;}
-        .kayit-btn:disabled{opacity:0.4;cursor:not-allowed;}
-        .kayit-btn:disabled::before{display:none;}
 
-        .kayit-bottom{
-          margin-top:28px;text-align:center;
-          font-size:12px;color:var(--muted);font-weight:300;
+        .register-brand {
+          display: flex;
+          align-items: center;
+          gap: 12px;
         }
-        .kayit-bottom a{
-          color:var(--navy);text-decoration:none;font-weight:500;
-          border-bottom:1px solid var(--gold);padding-bottom:1px;transition:color 0.2s;
+
+        .register-brand img {
+          width: 42px;
+          height: 42px;
+          object-fit: contain;
+          border-radius: 12px;
+          background: #FFFFFF;
         }
-        .kayit-bottom a:hover{color:var(--gold);}
+
+        .register-brand-title {
+          font-size: 21px;
+          font-weight: 900;
+          letter-spacing: -0.03em;
+        }
+
+        .register-brand-sub {
+          margin-top: 2px;
+          font-size: 13px;
+          color: rgba(255,255,255,.62);
+        }
+
+        .register-copy {
+          max-width: 480px;
+        }
+
+        .register-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 18px;
+          border: 1px solid rgba(255,255,255,.18);
+          border-radius: 999px;
+          padding: 8px 12px;
+          color: rgba(255,255,255,.76);
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .register-copy h1 {
+          margin: 0;
+          font-size: 42px;
+          line-height: 1.05;
+          letter-spacing: -0.055em;
+          font-weight: 900;
+        }
+
+        .register-copy p {
+          margin: 18px 0 0;
+          color: rgba(255,255,255,.68);
+          font-size: 16px;
+          line-height: 1.65;
+        }
+
+        .register-steps {
+          display: grid;
+          gap: 12px;
+          margin-top: 30px;
+        }
+
+        .register-step {
+          display: flex;
+          gap: 12px;
+          border: 1px solid rgba(255,255,255,.13);
+          border-radius: 18px;
+          padding: 14px;
+          background: rgba(255,255,255,.05);
+        }
+
+        .register-step-icon {
+          width: 34px;
+          height: 34px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          border-radius: 13px;
+          background: rgba(255,255,255,.10);
+        }
+
+        .register-step strong {
+          display: block;
+          font-size: 14px;
+          font-weight: 850;
+        }
+
+        .register-step span {
+          display: block;
+          margin-top: 4px;
+          color: rgba(255,255,255,.58);
+          font-size: 13px;
+          line-height: 1.45;
+        }
+
+        .register-footer {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          color: rgba(255,255,255,.45);
+          font-size: 13px;
+        }
+
+        .register-form-side {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 42px;
+          background: #FAFBFC;
+        }
+
+        .register-form-card {
+          width: 100%;
+          max-width: 460px;
+        }
+
+        .register-mobile-logo {
+          display: none;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 26px;
+        }
+
+        .register-mobile-logo img {
+          width: 42px;
+          height: 42px;
+          object-fit: contain;
+        }
+
+        .register-title {
+          margin: 0;
+          color: #0B1F44;
+          font-size: 31px;
+          line-height: 1.1;
+          letter-spacing: -0.04em;
+          font-weight: 900;
+        }
+
+        .register-sub {
+          margin: 9px 0 26px;
+          color: #64748B;
+          font-size: 15px;
+          line-height: 1.55;
+        }
+
+        .register-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+
+        .register-field {
+          margin-bottom: 16px;
+        }
+
+        .register-field.full {
+          grid-column: 1 / -1;
+        }
+
+        .register-field label {
+          display: block;
+          margin-bottom: 8px;
+          color: #334155;
+          font-size: 13px;
+          font-weight: 800;
+        }
+
+        .register-input-wrap {
+          position: relative;
+        }
+
+        .register-input-icon {
+          position: absolute;
+          left: 14px;
+          top: 14px;
+          color: #64748B;
+        }
+
+        .register-input {
+          width: 100%;
+          height: 50px;
+          border: 1px solid #CBD5E1;
+          border-radius: 16px;
+          background: #FFFFFF;
+          padding: 0 14px 0 44px;
+          outline: none;
+          color: #111827;
+          font-size: 15px;
+          font-weight: 650;
+        }
+
+        .register-input:focus {
+          border-color: #1D4ED8;
+          box-shadow: 0 0 0 4px rgba(29,78,216,.10);
+        }
+
+        .register-input::placeholder {
+          color: #94A3B8;
+          font-weight: 500;
+        }
+
+        .register-code-status {
+          position: absolute;
+          right: 14px;
+          top: 14px;
+          color: #64748B;
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .register-message {
+          margin-top: 9px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          border-radius: 14px;
+          padding: 10px 12px;
+          font-size: 13px;
+          font-weight: 750;
+        }
+
+        .register-message.success {
+          background: #ECFDF3;
+          color: #047857;
+          border: 1px solid #BBF7D0;
+        }
+
+        .register-message.error {
+          background: #FFF1F2;
+          color: #BE123C;
+          border: 1px solid #FECDD3;
+        }
+
+        .register-error {
+          margin: 7px 0 0;
+          color: #BE123C;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .register-server-error {
+          margin: 4px 0 16px;
+          border: 1px solid #FECDD3;
+          border-radius: 16px;
+          background: #FFF1F2;
+          padding: 12px 14px;
+          color: #BE123C;
+          font-size: 13px;
+          font-weight: 750;
+        }
+
+        .register-submit {
+          width: 100%;
+          height: 52px;
+          margin-top: 8px;
+          border: none;
+          border-radius: 16px;
+          background: #1D4ED8;
+          color: #FFFFFF;
+          font-size: 15px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .register-submit:disabled {
+          opacity: .55;
+          cursor: not-allowed;
+        }
+
+        .register-bottom {
+          margin-top: 20px;
+          text-align: center;
+          color: #64748B;
+          font-size: 14px;
+        }
+
+        .register-bottom a {
+          color: #1D4ED8;
+          font-weight: 850;
+        }
+
+        .register-note {
+          margin-top: 24px;
+          display: flex;
+          gap: 10px;
+          border-top: 1px solid #E2E8F0;
+          padding-top: 18px;
+          color: #64748B;
+          font-size: 13px;
+          line-height: 1.55;
+        }
+
+        .register-note svg {
+          color: #1D4ED8;
+          flex-shrink: 0;
+          margin-top: 2px;
+        }
+
+        .register-loading {
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #FAFBFC;
+          color: #64748B;
+          font-weight: 800;
+        }
+
+        @media (max-width: 900px) {
+          .register-page {
+            display: block;
+            padding: 0;
+            background: #FAFBFC;
+          }
+
+          .register-shell {
+            min-height: 100vh;
+            display: block;
+            border: none;
+            border-radius: 0;
+          }
+
+          .register-info {
+            display: none;
+          }
+
+          .register-form-side {
+            min-height: 100vh;
+            align-items: flex-start;
+            padding: 34px 22px;
+          }
+
+          .register-mobile-logo {
+            display: flex;
+          }
+
+          .register-form-card {
+            max-width: none;
+          }
+
+          .register-title {
+            font-size: 30px;
+          }
+
+          .register-grid {
+            grid-template-columns: 1fr;
+            gap: 0;
+          }
+        }
       `}</style>
 
-      <div className="kayit-root">
-        {/* SOL */}
-        <div className="kayit-left">
-          <div className="kayit-logo">
-            <img src="/LOGO_EPH.png" alt="EPH" />
-            <div>
-              <div className="kayit-logo-text">EPH Platform</div>
-              <div className="kayit-logo-sub">Emlak Portföy Havuzu</div>
-            </div>
-          </div>
+      <main className="register-page">
+        <section className="register-shell">
+          <aside className="register-info">
+            <div className="register-brand">
+              <img src="/LOGO_EPH.png" alt="EPH" />
 
-          <div className="kayit-hero">
-            <div className="kayit-badge">
-              <div className="kayit-badge-dot" />
-              <span className="kayit-badge-text">Davet Kodu ile Kayıt</span>
+              <div>
+                <div className="register-brand-title">EPH Platform</div>
+                <div className="register-brand-sub">Emlak Portföy Havuzu</div>
+              </div>
             </div>
-            <h1 className="kayit-headline">
-              Platforma<br />
-              <em>Katılın</em>
-            </h1>
-            <div className="kayit-steps">
-              {[
-                { n: "01", title: "Davet Kodunuzu Girin", desc: "Mevcut bir üyeden aldığınız kodu girin, rolünüz otomatik atanır." },
-                { n: "02", title: "Bilgilerinizi Doldurun", desc: "Ad, soyad, e-posta ve şifrenizi kaydedin." },
-                { n: "03", title: "Admin Onayını Bekleyin", desc: "Belgelerinizi yükleyin ve hızlıca onay alın." },
-                { n: "04", title: "Platforma Erişin", desc: "Onaylanınca tüm özelliklere tam erişim sağlayın." },
-              ].map(s => (
-                <div key={s.n} className="kayit-step">
-                  <div className="kayit-step-num">{s.n}</div>
+
+            <div className="register-copy">
+              <div className="register-label">
+                <ShieldCheck size={17} />
+                Davet kodu ile güvenli kayıt
+              </div>
+
+              <h1>Profesyonel emlak ağına katılın.</h1>
+
+              <p>
+                Davet kodunuzu girin, bilgilerinizle hesabınızı oluşturun ve
+                EPH içerisindeki portföy yönetimine başlayın.
+              </p>
+
+              <div className="register-steps">
+                <div className="register-step">
+                  <div className="register-step-icon">
+                    <KeyRound size={19} />
+                  </div>
                   <div>
-                    <div className="kayit-step-title">{s.title}</div>
-                    <div className="kayit-step-desc">{s.desc}</div>
+                    <strong>Davet kodunu doğrulayın</strong>
+                    <span>Rolünüz kodunuza göre otomatik belirlenir.</span>
                   </div>
                 </div>
-              ))}
+
+                <div className="register-step">
+                  <div className="register-step-icon">
+                    <UserRound size={19} />
+                  </div>
+                  <div>
+                    <strong>Bilgilerinizi tamamlayın</strong>
+                    <span>İletişim ve hesap bilgilerinizi girin.</span>
+                  </div>
+                </div>
+
+                <div className="register-step">
+                  <div className="register-step-icon">
+                    <CheckCircle2 size={19} />
+                  </div>
+                  <div>
+                    <strong>Platforma giriş yapın</strong>
+                    <span>Onaylı kullanıcı olarak portföylerinizi yönetin.</span>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <p className="kayit-footer-text">© 2026 EPH Platform — Denizli, Türkiye</p>
-        </div>
+            <div className="register-footer">
+              <span>© 2026 EPH Platform</span>
+              <span>Denizli merkezli Türkiye ağı</span>
+            </div>
+          </aside>
 
-        {/* SAĞ */}
-        <div className="kayit-right">
-          <div className="kayit-form-wrap">
-            <h2 className="kayit-title">Hesap Oluştur</h2>
-            <p className="kayit-sub">Platforma katılmak için formu doldurun</p>
-            <div className="kayit-divider" />
+          <section className="register-form-side">
+            <div className="register-form-card">
+              <div className="register-mobile-logo">
+                <img src="/LOGO_EPH.png" alt="EPH" />
 
-            <form onSubmit={handleSubmit(onSubmit)}>
-              {/* DAVET KODU */}
-              <div className="kayit-field">
-                <label className="kayit-label">Davet Kodu *</label>
-                <div className="kayit-input-wrap">
-                  <input
-                    {...register("inviteCode")}
-                    placeholder="EMK-XXXX-XXXX"
-                    className="kayit-input"
-                    style={{ fontFamily: "monospace", letterSpacing: 2, textTransform: "uppercase" }}
-                  />
-                  <div className="kayit-input-line" />
-                  <div className="kayit-input-status">
-                    {codeStatus === "checking" && <span style={{ fontSize: 10, color: "var(--muted)" }}>kontrol...</span>}
-                    {codeStatus === "valid" && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>}
-                    {codeStatus === "invalid" && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C0392B" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>}
+                <div>
+                  <div className="register-brand-title" style={{ color: "#0B1F44" }}>
+                    EPH Platform
+                  </div>
+                  <div className="register-brand-sub" style={{ color: "#64748B" }}>
+                    Emlak Portföy Havuzu
                   </div>
                 </div>
-                {codeStatus === "valid" && detectedRole && (
-                  <div className="kayit-code-valid">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                    <strong>{ROLE_LABELS[detectedRole]}</strong> olarak kaydoluyorsunuz
+              </div>
+
+              <h2 className="register-title">Hesap oluşturun</h2>
+
+              <p className="register-sub">
+                Kayıt için geçerli davet kodu gereklidir.
+              </p>
+
+              <form onSubmit={handleSubmit(onSubmit)}>
+                <div className="register-field">
+                  <label>Davet kodu</label>
+
+                  <div className="register-input-wrap">
+                    <KeyRound className="register-input-icon" size={18} />
+
+                    <input
+                      {...register("inviteCode")}
+                      placeholder="EMK-XXXX-XXXX"
+                      className="register-input"
+                      style={{
+                        letterSpacing: 1.5,
+                        textTransform: "uppercase",
+                        paddingRight: 86,
+                      }}
+                    />
+
+                    <div className="register-code-status">
+                      {codeStatus === "checking" && "kontrol"}
+                      {codeStatus === "valid" && (
+                        <CheckCircle2 size={18} color="#047857" />
+                      )}
+                      {codeStatus === "invalid" && (
+                        <XCircle size={18} color="#BE123C" />
+                      )}
+                    </div>
                   </div>
+
+                  {codeStatus === "valid" && detectedRole && (
+                    <div className="register-message success">
+                      <CheckCircle2 size={17} />
+                      <span>
+                        {ROLE_LABELS[detectedRole]} olarak kaydoluyorsunuz.
+                      </span>
+                    </div>
+                  )}
+
+                  {codeStatus === "invalid" && (
+                    <div className="register-message error">
+                      <XCircle size={17} />
+                      <span>Geçersiz veya süresi dolmuş davet kodu.</span>
+                    </div>
+                  )}
+
+                  {errors.inviteCode && (
+                    <p className="register-error">{errors.inviteCode.message}</p>
+                  )}
+                </div>
+
+                <div className="register-grid">
+                  <div className="register-field">
+                    <label>Ad</label>
+
+                    <div className="register-input-wrap">
+                      <UserRound className="register-input-icon" size={18} />
+
+                      <input
+                        {...register("firstName")}
+                        placeholder="Ahmet"
+                        className="register-input"
+                      />
+                    </div>
+
+                    {errors.firstName && (
+                      <p className="register-error">{errors.firstName.message}</p>
+                    )}
+                  </div>
+
+                  <div className="register-field">
+                    <label>Soyad</label>
+
+                    <div className="register-input-wrap">
+                      <UserRound className="register-input-icon" size={18} />
+
+                      <input
+                        {...register("lastName")}
+                        placeholder="Yılmaz"
+                        className="register-input"
+                      />
+                    </div>
+
+                    {errors.lastName && (
+                      <p className="register-error">{errors.lastName.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="register-field">
+                  <label>E-posta adresi</label>
+
+                  <div className="register-input-wrap">
+                    <Mail className="register-input-icon" size={18} />
+
+                    <input
+                      {...register("email")}
+                      type="email"
+                      placeholder="ornek@email.com"
+                      className="register-input"
+                    />
+                  </div>
+
+                  {errors.email && (
+                    <p className="register-error">{errors.email.message}</p>
+                  )}
+                </div>
+
+                <div className="register-field">
+                  <label>Telefon</label>
+
+                  <div className="register-input-wrap">
+                    <Phone className="register-input-icon" size={18} />
+
+                    <input
+                      {...register("phone")}
+                      placeholder="+90 5__ ___ __ __"
+                      className="register-input"
+                    />
+                  </div>
+
+                  {errors.phone && (
+                    <p className="register-error">{errors.phone.message}</p>
+                  )}
+                </div>
+
+                <div className="register-field">
+                  <label>Şifre</label>
+
+                  <div className="register-input-wrap">
+                    <LockKeyhole className="register-input-icon" size={18} />
+
+                    <input
+                      {...register("password")}
+                      type="password"
+                      placeholder="En az 6 karakter"
+                      className="register-input"
+                    />
+                  </div>
+
+                  {errors.password && (
+                    <p className="register-error">{errors.password.message}</p>
+                  )}
+                </div>
+
+                {serverError && (
+                  <div className="register-server-error">{serverError}</div>
                 )}
-                {codeStatus === "invalid" && <div className="kayit-code-invalid">Geçersiz veya süresi dolmuş davet kodu.</div>}
+
+                <button
+                  type="submit"
+                  disabled={loading || codeStatus !== "valid"}
+                  className="register-submit"
+                >
+                  {loading ? "Kayıt yapılıyor..." : "Kayıt Ol"}
+                </button>
+              </form>
+
+              <div className="register-bottom">
+                Zaten hesabınız var mı? <Link href="/giris">Giriş yapın</Link>
               </div>
 
-              {/* AD SOYAD */}
-              <div className="kayit-grid">
-                <div className="kayit-field">
-                  <label className="kayit-label">Ad *</label>
-                  <div className="kayit-input-wrap">
-                    <input {...register("firstName")} placeholder="Ahmet" className="kayit-input" />
-                    <div className="kayit-input-line" />
-                  </div>
-                  {errors.firstName && <p className="kayit-error">{errors.firstName.message}</p>}
-                </div>
-                <div className="kayit-field">
-                  <label className="kayit-label">Soyad *</label>
-                  <div className="kayit-input-wrap">
-                    <input {...register("lastName")} placeholder="Yılmaz" className="kayit-input" />
-                    <div className="kayit-input-line" />
-                  </div>
-                  {errors.lastName && <p className="kayit-error">{errors.lastName.message}</p>}
-                </div>
+              <div className="register-note">
+                <ShieldCheck size={18} />
+
+                <p>
+                  EPH Platform yalnızca doğrulanmış emlak profesyonelleri,
+                  müteahhitler ve yetkili kullanıcılar için kullanılır.
+                </p>
               </div>
-
-              {/* EMAIL */}
-              <div className="kayit-field">
-                <label className="kayit-label">E-posta *</label>
-                <div className="kayit-input-wrap">
-                  <input {...register("email")} type="email" placeholder="ornek@email.com" className="kayit-input" />
-                  <div className="kayit-input-line" />
-                </div>
-                {errors.email && <p className="kayit-error">{errors.email.message}</p>}
-              </div>
-
-              {/* TELEFON */}
-              <div className="kayit-field">
-                <label className="kayit-label">Telefon *</label>
-                <div className="kayit-input-wrap">
-                  <input {...register("phone")} placeholder="+90 5__ ___ __ __" className="kayit-input" />
-                  <div className="kayit-input-line" />
-                </div>
-                {errors.phone && <p className="kayit-error">{errors.phone.message}</p>}
-              </div>
-
-              {/* ŞİFRE */}
-              <div className="kayit-field">
-                <label className="kayit-label">Şifre *</label>
-                <div className="kayit-input-wrap">
-                  <input {...register("password")} type="password" placeholder="En az 6 karakter" className="kayit-input" />
-                  <div className="kayit-input-line" />
-                </div>
-                {errors.password && <p className="kayit-error">{errors.password.message}</p>}
-              </div>
-
-              {serverError && <div className="kayit-server-error">{serverError}</div>}
-
-              <button
-                type="submit"
-                disabled={loading || codeStatus !== "valid"}
-                className="kayit-btn"
-              >
-                <span>{loading ? "Kayıt yapılıyor..." : "Kayıt Ol"}</span>
-              </button>
-            </form>
-
-            <div className="kayit-bottom">
-              Zaten hesabınız var mı? <Link href="/giris">Giriş yapın</Link>
             </div>
-          </div>
-        </div>
-      </div>
+          </section>
+        </section>
+      </main>
     </>
   );
 }
 
 export default function KayitPage() {
   return (
-    <Suspense fallback={
-      <div style={{ minHeight: "100vh", background: "#FAFAF8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 18, color: "#8A8A8A", fontStyle: "italic" }}>Yükleniyor...</div>
-      </div>
-    }>
+    <Suspense fallback={<div className="register-loading">Yükleniyor...</div>}>
       <KayitForm />
     </Suspense>
   );

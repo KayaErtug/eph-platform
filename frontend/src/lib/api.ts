@@ -1,27 +1,28 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
-  headers: { "Content-Type": "application/json" },
+  baseURL: "http://94.73.180.181:3001",
 });
 
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("token");
-    if (token) config.headers.Authorization = `Bearer ${token}`;
+    const authStorage = localStorage.getItem("auth-storage");
+
+    if (authStorage) {
+      try {
+        const parsed = JSON.parse(authStorage);
+        const token = parsed?.state?.token;
+
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      } catch {
+        localStorage.removeItem("auth-storage");
+      }
+    }
   }
+
   return config;
 });
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("token");
-      window.location.href = "/giris";
-    }
-    return Promise.reject(error);
-  }
-);
 
 export default api;

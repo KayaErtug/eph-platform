@@ -17,14 +17,14 @@ interface Customer {
 }
 
 const PIPELINE_STAGES = [
-  { key: "YENI_LEAD",            label: "Yeni Lead",            color: "#1A4A7A", bg: "#EEF4FF" },
-  { key: "ILK_GORUSME",          label: "İlk Görüşme",          color: "#5B2D8E", bg: "#F5F0FF" },
-  { key: "PORTFOLYO_GONDERILDI", label: "Portföy Gönderildi",   color: "#B8560B", bg: "#FFF5ED" },
-  { key: "YER_GOSTERIMI",        label: "Yer Gösterimi",        color: "#B8860B", bg: "#FFFBF0" },
-  { key: "TEKLIF_SURECI",        label: "Teklif Süreci",        color: "#0F2044", bg: "#E8EEFF" },
-  { key: "PAZARLIK",             label: "Pazarlık",             color: "#C9A84C", bg: "#FFFDF0" },
-  { key: "KAPANDI",              label: "Kapandı ✓",            color: "#2D6A4F", bg: "#F0FAF4" },
-  { key: "KAYBEDILDI",           label: "Kaybedildi",           color: "#8A8A8A", bg: "#F5F5F5" },
+  { key: "YENI_LEAD", label: "Yeni Lead", color: "#1A4A7A", bg: "#EEF4FF" },
+  { key: "ILK_GORUSME", label: "İlk Görüşme", color: "#5B2D8E", bg: "#F5F0FF" },
+  { key: "PORTFOLYO_GONDERILDI", label: "Portföy Gönderildi", color: "#B8560B", bg: "#FFF5ED" },
+  { key: "YER_GOSTERIMI", label: "Yer Gösterimi", color: "#B8860B", bg: "#FFFBF0" },
+  { key: "TEKLIF_SURECI", label: "Teklif Süreci", color: "#0F2044", bg: "#E8EEFF" },
+  { key: "PAZARLIK", label: "Pazarlık", color: "#C9A84C", bg: "#FFFDF0" },
+  { key: "KAPANDI", label: "Kapandı ✓", color: "#2D6A4F", bg: "#F0FAF4" },
+  { key: "KAYBEDILDI", label: "Kaybedildi", color: "#8A8A8A", bg: "#F5F5F5" },
 ];
 
 const ACTIVITY_TYPES = [
@@ -88,7 +88,6 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .crm-tab:hover{color:var(--navy);}
 .crm-tab.active{color:var(--navy);border-bottom-color:var(--gold);}
 
-/* PIPELINE */
 .crm-pipeline{display:flex;gap:12px;overflow-x:auto;padding-bottom:16px;}
 .crm-col{min-width:220px;flex-shrink:0;}
 .crm-col-header{padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;}
@@ -105,7 +104,6 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .crm-card-city{font-size:10px;color:var(--muted);}
 .crm-card-activity{font-size:9px;color:var(--muted);}
 
-/* LIST */
 .crm-list{background:#fff;border:1px solid var(--border);}
 .crm-list-row{border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;cursor:pointer;transition:background 0.2s;}
 .crm-list-row:hover{background:var(--warm);}
@@ -114,7 +112,6 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .crm-list-sub{font-size:11px;color:var(--muted);margin-top:2px;}
 .crm-list-status{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid;padding:3px 8px;}
 
-/* MODAL */
 .crm-overlay{position:fixed;inset:0;background:rgba(15,32,68,0.6);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn 0.2s ease;}
 .crm-modal{background:#fff;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;animation:slideUp 0.3s ease;position:relative;}
 .crm-modal-header{padding:28px 32px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:1;}
@@ -141,7 +138,6 @@ body{font-family:var(--sans);background:var(--warm);color:var(--text);}
 .crm-cancel{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:12px 18px;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all 0.2s;}
 .crm-cancel:hover{border-color:var(--navy);color:var(--navy);}
 
-/* DETAIL MODAL */
 .crm-detail-modal{background:#fff;width:100%;max-width:680px;max-height:92vh;overflow-y:auto;animation:slideUp 0.3s ease;position:relative;}
 .crm-detail-header{padding:28px 32px 20px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1;}
 .crm-detail-name{font-family:var(--serif);font-size:28px;font-weight:400;color:var(--navy);}
@@ -280,7 +276,6 @@ export default function CrmPage() {
     <>
       <style>{CSS}</style>
 
-      {/* MÜŞTERİ EKLE MODAL */}
       {showAddModal && (
         <div className="crm-overlay" onClick={() => setShowAddModal(false)}>
           <div className="crm-modal" onClick={e => e.stopPropagation()}>
@@ -375,7 +370,6 @@ export default function CrmPage() {
         </div>
       )}
 
-      {/* MÜŞTERİ DETAY MODAL */}
       {selectedCustomer && (
         <div className="crm-overlay" onClick={() => setSelectedCustomer(null)}>
           <div className="crm-detail-modal" onClick={e => e.stopPropagation()}>
@@ -427,7 +421,6 @@ export default function CrmPage() {
                 </div>
               )}
 
-              {/* AKTİVİTE */}
               <div style={{ marginBottom: 20 }}>
                 <div className="crm-modal-section-title" style={{ fontSize: 8, letterSpacing: "2px", textTransform: "uppercase", color: "var(--gold)", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
                   Aktivite Ekle
@@ -458,7 +451,6 @@ export default function CrmPage() {
                 </div>
               </div>
 
-              {/* GÖREVLER */}
               <div>
                 <div className="crm-modal-section-title" style={{ fontSize: 8, letterSpacing: "2px", textTransform: "uppercase", color: "var(--gold)", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
                   Görevler
@@ -491,7 +483,6 @@ export default function CrmPage() {
         </div>
       )}
 
-      {/* NAV */}
       <nav className="crm-nav">
         <a href="/dashboard" className="crm-logo">
           <img src="/LOGO_EPH.png" alt="EPH" />
@@ -505,6 +496,7 @@ export default function CrmPage() {
           <Link href="/profil" className="crm-nav-item">Profilim</Link>
           <Link href="/stok" className="crm-nav-item">Stok</Link>
           <Link href="/crm" className="crm-nav-item active">CRM</Link>
+          <Link href="/network" className="crm-nav-item">Network</Link>
           <Link href="/market" className="crm-nav-item">Piyasa</Link>
           {user?.role === "ADMIN" && <Link href="/admin" className="crm-nav-item">Admin</Link>}
         </div>
@@ -542,7 +534,6 @@ export default function CrmPage() {
           <button className={`crm-tab ${view==="list"?"active":""}`} onClick={() => setView("list")}>Liste</button>
         </div>
 
-        {/* PİPELİNE */}
         {view === "pipeline" && (
           <div className="crm-pipeline">
             {PIPELINE_STAGES.map(stage => {
@@ -565,9 +556,7 @@ export default function CrmPage() {
                       )}
                       <div className="crm-card-meta">
                         <span className="crm-card-city">{c.city || "—"}</span>
-                        <span className="crm-card-activity">
-                          {(c._count?.activities || 0)} aktivite
-                        </span>
+                        <span className="crm-card-activity">{(c._count?.activities || 0)} aktivite</span>
                       </div>
                     </div>
                   ))}
@@ -578,7 +567,6 @@ export default function CrmPage() {
           </div>
         )}
 
-        {/* LİSTE */}
         {view === "list" && (
           <div className="crm-list">
             {customers.length === 0 ? (

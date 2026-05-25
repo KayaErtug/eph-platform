@@ -16,6 +16,7 @@ import { CrmModule } from './crm/crm.module';
 import { TrustModule } from './trust/trust.module';
 import { MarketModule } from './market/market.module';
 import { VisitsModule } from './visits/visits.module';
+import { PushModule } from './push/push.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { VisitsModule } from './visits/visits.module';
     TrustModule,
     MarketModule,
     VisitsModule,
+    PushModule,
   ],
 })
 export class AppModule {}
