@@ -1,10 +1,28 @@
 "use client";
-import { useTheme, THEMES } from "../../components/ThemeProvider";
-import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/store/auth.store";
-import api from "@/lib/api";
+
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import api from "@/lib/api";
+import { useAuthStore } from "@/store/auth.store";
+import { THEMES, useTheme } from "../../components/ThemeProvider";
+import {
+  ArrowLeft,
+  BadgeCheck,
+  Building2,
+  CheckCircle2,
+  CircleUserRound,
+  FileText,
+  Home,
+  LogOut,
+  MessageCircle,
+  Palette,
+  ShieldCheck,
+  UploadCloud,
+  UsersRound,
+  WalletCards,
+  XCircle,
+} from "lucide-react";
 
 const DOC_TYPES = [
   { value: "VERGI_LEVHASI", label: "Vergi Levhası" },
@@ -15,153 +33,101 @@ const DOC_TYPES = [
 ];
 
 const DOC_STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  PENDING:  { label: "İncelemede", color: "#B8860B", bg: "#FFFBF0" },
-  APPROVED: { label: "Onaylandı",  color: "#2D6A4F", bg: "#F0FAF4" },
-  REJECTED: { label: "Reddedildi", color: "#C0392B", bg: "#FEF0EE" },
+  PENDING: { label: "İncelemede", color: "#B45309", bg: "#FFFBEB" },
+  APPROVED: { label: "Onaylandı", color: "#047857", bg: "#ECFDF5" },
+  REJECTED: { label: "Reddedildi", color: "#BE123C", bg: "#FFF1F2" },
 };
 
 const ROLE_LABELS: Record<string, string> = {
-  EMLAKCI: "Emlakçı", MUTEAHHIT: "Müteahhit",
-  INSAAT_FIRMASI: "İnşaat Firması", ADMIN: "Admin",
+  EMLAKCI: "Emlakçı",
+  MUTEAHHIT: "Müteahhit",
+  INSAAT_FIRMASI: "İnşaat Firması",
+  ADMIN: "Admin",
 };
 
 interface Profile {
-  id: string; firstName: string; lastName: string;
-  email: string; phone: string; role: string; isApproved: boolean;
-  documents: { id: string; type: string; status: string; fileUrl: string; fileName: string; createdAt: string }[];
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  role: string;
+  isApproved: boolean;
+  documents: {
+    id: string;
+    type: string;
+    status: string;
+    fileUrl: string;
+    fileName: string;
+    createdAt: string;
+  }[];
 }
 
 interface TrustScore {
-  score: number; badge: string; badgeColor: string;
-  breakdown: { documentScore: number; seniorityScore: number; portfolioScore: number; activityScore: number; profileScore: number; approvalScore: number };
-  details: { approvedDocs: number; totalDocs: number; daysSinceJoined: number; unitCount: number; customerCount: number; activityCount: number; profileComplete: boolean };
+  score: number;
+  badge: string;
+  badgeColor: string;
+  breakdown: {
+    documentScore: number;
+    seniorityScore: number;
+    portfolioScore: number;
+    activityScore: number;
+    profileScore: number;
+    approvalScore: number;
+  };
+  details: {
+    approvedDocs: number;
+    totalDocs: number;
+    daysSinceJoined: number;
+    unitCount: number;
+    customerCount: number;
+    activityCount: number;
+    profileComplete: boolean;
+  };
 }
 
-const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
-*{box-sizing:border-box;margin:0;padding:0;}
-:root{--navy:#0F2044;--gold:#C9A84C;--cream:#F5F3EF;--warm:#FAFAF8;--text:#1A1A2E;--muted:#8A8A8A;--border:#E2DDD5;--serif:'Cormorant Garamond',Georgia,serif;--sans:'DM Sans',system-ui,sans-serif;}
-body{font-family:var(--sans);background:var(--warm);color:var(--text);}
-.pr-nav{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 48px;position:sticky;top:0;z-index:100;}
-@media(max-width:768px){.pr-nav{display:none!important;}}
-.pr-logo{display:flex;align-items:center;gap:12px;text-decoration:none;}
-.pr-logo img{width:34px;height:34px;object-fit:contain;}
-.pr-logo-text{font-family:var(--serif);font-size:18px;font-weight:500;color:var(--navy);}
-.pr-logo-sub{font-size:7px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);}
-.pr-nav-links{display:flex;align-items:center;gap:4px;}
-.pr-nav-item{padding:8px 14px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:all 0.2s;border-bottom:2px solid transparent;}
-.pr-nav-item:hover{color:var(--navy);border-bottom-color:var(--gold);}
-.pr-nav-item.active{color:var(--navy);border-bottom-color:var(--gold);}
-.pr-logout{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:1px solid var(--border);padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
-.pr-logout:hover{border-color:var(--navy);color:var(--navy);}
-.pr-main{max-width:800px;margin:0 auto;padding:56px 48px 100px;animation:fadeUp 0.5s ease;}
-@media(max-width:768px){.pr-main{padding:32px 20px;}}
-.pr-header{margin-bottom:48px;padding-bottom:40px;border-bottom:1px solid var(--border);}
-.pr-title{font-family:var(--serif);font-size:clamp(36px,4vw,52px);font-weight:300;color:var(--navy);letter-spacing:-0.5px;line-height:1.1;}
-.pr-title em{font-style:italic;color:var(--gold);}
-.pr-sub{font-size:13px;color:var(--muted);margin-top:8px;font-weight:300;}
-.pr-card{background:#fff;border:1px solid var(--border);margin-bottom:24px;}
-.pr-card-header{padding:32px 36px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:20px;}
-@media(max-width:600px){.pr-card-header{flex-direction:column;align-items:flex-start;}}
-.pr-avatar{width:56px;height:56px;background:var(--navy);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:24px;color:var(--cream);font-weight:400;flex-shrink:0;}
-.pr-user-name{font-family:var(--serif);font-size:24px;font-weight:400;color:var(--navy);margin-bottom:4px;}
-.pr-user-email{font-size:12px;color:var(--muted);font-weight:300;}
-.pr-user-meta{display:flex;align-items:center;gap:12px;margin-top:8px;}
-.pr-role-tag{font-size:8px;letter-spacing:2px;text-transform:uppercase;border:1px solid var(--border);padding:4px 12px;color:var(--navy);}
-.pr-status{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:1px;text-transform:uppercase;}
-.pr-status-dot{width:5px;height:5px;border-radius:50%;}
-.pr-edit-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:8px 16px;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all 0.2s;flex-shrink:0;}
-.pr-edit-btn:hover{border-color:var(--navy);color:var(--navy);}
-.pr-edit-btn.active{border-color:var(--navy);background:var(--navy);color:var(--cream);}
-.pr-card-body{padding:32px 36px;}
-.pr-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
-@media(max-width:600px){.pr-grid{grid-template-columns:1fr;}}
-.pr-field{margin-bottom:0;}
-.pr-field label{display:block;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-weight:500;}
-.pr-field-value{font-size:14px;color:var(--navy);padding:10px 0;border-bottom:1.5px solid var(--border);font-weight:300;}
-.pr-field-value.muted{color:var(--muted);}
-.pr-input{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:10px 0;font-size:14px;color:var(--navy);font-family:var(--sans);outline:none;transition:border-color 0.3s;font-weight:300;}
-.pr-input:focus{border-bottom-color:var(--navy);}
-.pr-save-btn{margin-top:32px;width:100%;background:var(--navy);color:var(--cream);border:none;padding:14px;font-size:9px;letter-spacing:3px;text-transform:uppercase;font-family:var(--sans);cursor:pointer;transition:all 0.3s;position:relative;overflow:hidden;}
-.pr-save-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:var(--gold);transition:left 0.4s;}
-.pr-save-btn:hover::before{left:0;}
-.pr-save-btn:hover{color:var(--navy);}
-.pr-save-btn span{position:relative;z-index:1;}
-.pr-save-btn:disabled{opacity:0.4;cursor:not-allowed;}
-.pr-save-btn:disabled::before{display:none;}
-.pr-success{background:#F0FAF4;border-left:3px solid #2D6A4F;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:10px;font-size:12px;color:#2D6A4F;font-weight:300;}
-.pr-error{background:#FEF0EE;border-left:3px solid #C0392B;padding:14px 18px;margin-top:16px;font-size:12px;color:#C0392B;font-weight:300;}
-.pr-upload-card{background:#fff;border:1px solid var(--border);margin-bottom:24px;}
-.pr-upload-header{padding:24px 36px;border-bottom:1px solid var(--border);}
-.pr-upload-title{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--navy);margin-bottom:4px;}
-.pr-upload-sub{font-size:11px;color:var(--muted);font-weight:300;}
-.pr-upload-body{padding:24px 36px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;}
-.pr-select{background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:10px 0;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;appearance:none;cursor:pointer;font-weight:300;min-width:200px;}
-.pr-upload-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:12px 22px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;display:flex;align-items:center;gap:8px;white-space:nowrap;}
-.pr-upload-btn:hover{background:#1a3060;}
-.pr-docs-card{background:#fff;border:1px solid var(--border);margin-bottom:24px;}
-.pr-docs-header{padding:24px 36px;border-bottom:1px solid var(--border);}
-.pr-docs-title{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--navy);}
-.pr-docs-list{padding:0;}
-.pr-doc-item{padding:20px 36px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px;transition:background 0.2s;}
-.pr-doc-item:hover{background:var(--warm);}
-.pr-doc-item:last-child{border-bottom:none;}
-.pr-doc-icon{width:36px;height:36px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.pr-doc-name{font-size:13px;color:var(--navy);font-weight:400;margin-bottom:3px;}
-.pr-doc-file{font-size:10px;color:var(--muted);font-weight:300;}
-.pr-doc-status{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid;padding:4px 10px;font-weight:500;}
-.pr-doc-view{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--navy);text-decoration:none;border:1px solid var(--border);padding:6px 14px;transition:all 0.2s;}
-.pr-doc-view:hover{border-color:var(--navy);background:var(--navy);color:var(--cream);}
-.pr-docs-empty{padding:60px 36px;text-align:center;}
-.pr-docs-empty-text{font-family:var(--serif);font-size:18px;font-style:italic;color:var(--muted);margin-bottom:6px;}
-.pr-docs-empty-sub{font-size:12px;color:#B8B2A8;font-weight:300;}
-.trust-card{background:var(--navy);margin-bottom:24px;overflow:hidden;position:relative;}
-.trust-card::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(201,168,76,0.05);}
-.trust-header{padding:32px 36px 24px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;}
-.trust-title{font-size:8px;letter-spacing:3px;text-transform:uppercase;color:rgba(245,243,239,0.5);margin-bottom:8px;}
-.trust-badge{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--gold);}
-.trust-score-wrap{text-align:right;}
-.trust-score-num{font-family:var(--serif);font-size:56px;font-weight:300;color:#fff;line-height:1;}
-.trust-score-max{font-size:11px;color:rgba(245,243,239,0.4);margin-top:4px;}
-.trust-bar-wrap{padding:0 36px 28px;}
-.trust-bar-bg{height:3px;background:rgba(255,255,255,0.1);}
-.trust-bar-fill{height:3px;background:var(--gold);transition:width 1s ease;}
-.trust-breakdown{padding:0 36px 28px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(255,255,255,0.05);}
-.trust-item{background:rgba(255,255,255,0.02);padding:14px 16px;}
-.trust-item-label{font-size:7px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(245,243,239,0.4);margin-bottom:6px;}
-.trust-item-val{font-family:var(--serif);font-size:20px;font-weight:300;color:#fff;}
-.trust-item-max{font-size:9px;color:rgba(245,243,239,0.3);}
-.trust-details{padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:20px;flex-wrap:wrap;}
-.trust-detail-item{display:flex;align-items:center;gap:8px;font-size:11px;color:rgba(245,243,239,0.6);}
-.trust-detail-dot{width:5px;height:5px;border-radius:50%;background:var(--gold);flex-shrink:0;}
-.trust-tip{padding:16px 36px;background:rgba(201,168,76,0.08);border-top:1px solid rgba(201,168,76,0.15);}
-.trust-tip-text{font-size:11px;color:rgba(201,168,76,0.8);line-height:1.6;}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-`;
+function getTip(score: number) {
+  if (score < 20) return "Hesabınızı onaylayın ve belge yükleyerek skorunuzu artırın.";
+  if (score < 40) return "Mesleki belgelerinizi yükleyin ve portföy ekleyerek skorunuzu güçlendirin.";
+  if (score < 60) return "CRM’de müşteri takibi yaparak aktivite skorunuzu artırabilirsiniz.";
+  if (score < 80) return "Harika! Daha fazla onaylı belge ile Elite Network seviyesine yaklaşabilirsiniz.";
+  return "Tebrikler! Platformun en güvenilir üyeleri arasındasınız.";
+}
 
 export default function ProfilPage() {
   const { user, setAuth, logout } = useAuthStore();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+
   const [profile, setProfile] = useState<Profile | null>(null);
   const [trustScore, setTrustScore] = useState<TrustScore | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(true);
+
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState({ firstName: "", lastName: "", phone: "" });
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [selectedDocType, setSelectedDocType] = useState("VERGI_LEVHASI");
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setHydrated(true); }, []);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
   useEffect(() => {
     if (!hydrated) return;
-    if (!user) { router.push("/giris"); return; }
+
+    if (!user) {
+      router.push("/giris");
+      return;
+    }
+
     fetchAll();
   }, [hydrated, user]);
 
@@ -171,280 +137,620 @@ export default function ProfilPage() {
         api.get("/profile"),
         api.get("/trust/my"),
       ]);
+
       setProfile(profileRes.data);
-      setForm({ firstName: profileRes.data.firstName, lastName: profileRes.data.lastName, phone: profileRes.data.phone });
       setTrustScore(trustRes.data);
-    } finally { setLoading(false); }
-  };
 
-  const handleSave = async () => {
-    setSaveLoading(true); setSaveSuccess(false);
-    try {
-      const res = await api.patch("/profile", form);
-      setProfile(prev => prev ? { ...prev, ...res.data } : prev);
-      setAuth({ ...user!, ...res.data }, localStorage.getItem("token")!);
-      setEditMode(false); setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } finally { setSaveLoading(false); }
-  };
-
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadLoading(true); setUploadError(""); setUploadSuccess(false);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("type", selectedDocType);
-    try {
-      await api.post("/profile/documents", formData, { headers: { "Content-Type": "multipart/form-data" } });
-      setUploadSuccess(true);
-      setTimeout(() => setUploadSuccess(false), 3000);
-      fetchAll();
-    } catch (err: any) {
-      setUploadError(err.response?.data?.message || "Yükleme hatası.");
+      setForm({
+        firstName: profileRes.data.firstName || "",
+        lastName: profileRes.data.lastName || "",
+        phone: profileRes.data.phone || "",
+      });
+    } catch (error) {
+      console.error(error);
+      alert("Profil bilgileri yüklenemedi.");
     } finally {
-      setUploadLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setLoading(false);
     }
   };
 
-  const getTip = (score: number) => {
-    if (score < 20) return "Hesabınızı onaylayın ve belge yükleyerek skorunuzu artırın.";
-    if (score < 40) return "Mesleki belgelerinizi yükleyin ve portföy ekleyerek skorunuzu güçlendirin.";
-    if (score < 60) return "CRM'de müşteri takibi yaparak aktivite skorunuzu artırabilirsiniz.";
-    if (score < 80) return "Harika! Daha fazla onaylı belge ile Elite Network'e ulaşabilirsiniz.";
-    return "Tebrikler! Platform'un en güvenilir üyeleri arasındasınız.";
+  const handleSave = async () => {
+    setSaveLoading(true);
+    setSaveSuccess(false);
+
+    try {
+      const res = await api.patch("/profile", form);
+
+      setProfile((prev) => (prev ? { ...prev, ...res.data } : prev));
+
+      const authStorage = localStorage.getItem("auth-storage");
+      let token = "";
+
+      if (authStorage) {
+        try {
+          const parsed = JSON.parse(authStorage);
+          token = parsed?.state?.token || "";
+        } catch {
+          token = "";
+        }
+      }
+
+      if (user && token) {
+        setAuth({ ...user, ...res.data }, token);
+      }
+
+      setEditMode(false);
+      setSaveSuccess(true);
+
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error(error);
+      alert("Profil güncellenemedi.");
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
-  if (!hydrated || loading) return (
-    <div style={{ minHeight: "100vh", background: "#FAFAF8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <style>{CSS}</style>
-      <div style={{ width: 32, height: 32, border: "2px solid #C9A84C", borderTop: "2px solid transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-    </div>
-  );
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    setUploadLoading(true);
+    setUploadError("");
+    setUploadSuccess(false);
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("type", selectedDocType);
+
+    try {
+      await api.post("/profile/documents", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setUploadSuccess(true);
+      setTimeout(() => setUploadSuccess(false), 3000);
+
+      await fetchAll();
+    } catch (err: any) {
+      setUploadError(err?.response?.data?.message || "Yükleme hatası.");
+    } finally {
+      setUploadLoading(false);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    router.push("/giris");
+  };
+
+  if (!hydrated || loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#1D4ED8] border-t-transparent" />
+      </main>
+    );
+  }
+
+  const initials = `${profile?.firstName?.[0] || "E"}${profile?.lastName?.[0] || "P"}`;
+  const roleLabel = ROLE_LABELS[profile?.role || ""] || "EPH Üyesi";
+  const documents = profile?.documents || [];
 
   return (
-    <>
-      <style>{CSS}</style>
-      <nav className="pr-nav">
-        <a href="/dashboard" className="pr-logo">
-          <img src="/LOGO_EPH.png" alt="EPH" />
-          <div>
-            <div className="pr-logo-text">EPH Platform</div>
-            <div className="pr-logo-sub">Emlak Portföy Havuzu</div>
-          </div>
-        </a>
-        <div className="pr-nav-links">
-          <Link href="/dashboard" className="pr-nav-item">Ana Sayfa</Link>
-          <Link href="/profil" className="pr-nav-item active">Profilim</Link>
-          <Link href="/stok" className="pr-nav-item">Stok</Link>
-          <Link href="/crm" className="pr-nav-item">CRM</Link>
-          <Link href="/market" className="pr-nav-item">Piyasa</Link>
-          {user?.role === "ADMIN" && <Link href="/admin" className="pr-nav-item">Admin</Link>}
-        </div>
-        <button className="pr-logout" onClick={() => { logout(); router.push("/giris"); }}>Çıkış</button>
-      </nav>
+    <main className="min-h-screen bg-[#F4F7FB] text-[#111827]">
+      <section className="mx-auto min-h-screen max-w-6xl px-4 pb-28 pt-5">
+        <header className="mb-5 rounded-[32px] border border-slate-200 bg-white p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600"
+              >
+                <ArrowLeft size={20} />
+              </button>
 
-      <main className="pr-main">
-        <div className="pr-header">
-          <h1 className="pr-title">Profilim<br /><em style={{ fontSize: "0.7em" }}>Hesap Yönetimi</em></h1>
-          <p className="pr-sub">Kişisel bilgilerinizi güncelleyin ve belgelerinizi yönetin</p>
-        </div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
+                <CircleUserRound size={14} />
+                Hesap Yönetimi
+              </div>
+
+              <h1 className="mt-3 text-[31px] font-black tracking-tight text-[#0B1F44]">
+                Profilim
+              </h1>
+
+              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
+                Kişisel bilgilerini, belgelerini, güven skorunu ve görünüm tercihini
+                buradan yönet.
+              </p>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-xs font-black text-red-600"
+            >
+              Çıkış
+            </button>
+          </div>
+        </header>
 
         {saveSuccess && (
-          <div className="pr-success">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+          <div className="mb-5 rounded-[24px] border border-emerald-100 bg-emerald-50 p-4 text-sm font-black text-emerald-700">
             Profil başarıyla güncellendi.
           </div>
         )}
 
-        {/* GÜVEN SKORU */}
-        {trustScore && (
-          <div className="trust-card">
-            <div className="trust-header">
-              <div>
-                <div className="trust-title">Güven Skoru</div>
-                <div className="trust-badge">{trustScore.badge}</div>
-              </div>
-              <div className="trust-score-wrap">
-                <div className="trust-score-num">{trustScore.score}</div>
-                <div className="trust-score-max">/ 100</div>
-              </div>
-            </div>
-            <div className="trust-bar-wrap">
-              <div className="trust-bar-bg">
-                <div className="trust-bar-fill" style={{ width: `${trustScore.score}%` }} />
-              </div>
-            </div>
-            <div className="trust-breakdown">
-              {[
-                { label: "Belge", val: trustScore.breakdown.documentScore, max: 25 },
-                { label: "Kıdem", val: trustScore.breakdown.seniorityScore, max: 10 },
-                { label: "Portföy", val: trustScore.breakdown.portfolioScore, max: 15 },
-                { label: "Aktivite", val: trustScore.breakdown.activityScore, max: 10 },
-                { label: "Profil", val: trustScore.breakdown.profileScore, max: 10 },
-                { label: "Onay", val: trustScore.breakdown.approvalScore, max: 10 },
-              ].map(item => (
-                <div key={item.label} className="trust-item">
-                  <div className="trust-item-label">{item.label}</div>
-                  <div className="trust-item-val">{item.val}<span className="trust-item-max">/{item.max}</span></div>
+        <section className="grid grid-cols-1 gap-5 lg:grid-cols-[.95fr_1.05fr]">
+          <div className="space-y-5">
+            <section className="rounded-[32px] border border-slate-200 bg-white p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[24px] bg-[#0B1F44] text-[22px] font-black text-white">
+                  {initials}
                 </div>
-              ))}
-            </div>
-            <div className="trust-details">
-              <div className="trust-detail-item"><div className="trust-detail-dot" />{trustScore.details.approvedDocs} onaylı belge</div>
-              <div className="trust-detail-item"><div className="trust-detail-dot" />{trustScore.details.unitCount} portföy ilanı</div>
-              <div className="trust-detail-item"><div className="trust-detail-dot" />{trustScore.details.daysSinceJoined} gündür aktif</div>
-              <div className="trust-detail-item"><div className="trust-detail-dot" />{trustScore.details.customerCount} CRM müşterisi</div>
-            </div>
-            <div className="trust-tip">
-              <div className="trust-tip-text">💡 {getTip(trustScore.score)}</div>
-            </div>
-          </div>
-        )}
 
-        {/* PROFİL KARTI */}
-        <div className="pr-card">
-          <div className="pr-card-header">
-            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-              <div className="pr-avatar">{profile?.firstName[0]}{profile?.lastName[0]}</div>
-              <div>
-                <div className="pr-user-name">{profile?.firstName} {profile?.lastName}</div>
-                <div className="pr-user-email">{profile?.email}</div>
-                <div className="pr-user-meta">
-                  <span className="pr-role-tag">{ROLE_LABELS[profile?.role || ""]}</span>
-                  <div className="pr-status">
-                    <div className="pr-status-dot" style={{ background: profile?.isApproved ? "#2D6A4F" : "#B8860B" }} />
-                    <span style={{ color: profile?.isApproved ? "#2D6A4F" : "#B8860B" }}>
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate text-[24px] font-black tracking-tight text-[#0B1F44]">
+                    {profile?.firstName} {profile?.lastName}
+                  </h2>
+
+                  <p className="mt-1 truncate text-sm font-bold text-slate-500">
+                    {profile?.email}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-[#EEF4FF] px-3 py-2 text-xs font-black text-[#1D4ED8]">
+                      {roleLabel}
+                    </span>
+
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs font-black ${
+                        profile?.isApproved
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {profile?.isApproved ? (
+                        <CheckCircle2 size={14} />
+                      ) : (
+                        <XCircle size={14} />
+                      )}
                       {profile?.isApproved ? "Onaylı" : "Onay Bekliyor"}
                     </span>
                   </div>
                 </div>
               </div>
-            </div>
-            <button className={`pr-edit-btn ${editMode ? "active" : ""}`} onClick={() => setEditMode(!editMode)}>
-              {editMode ? "Vazgeç" : "Düzenle"}
-            </button>
-          </div>
-          <div className="pr-card-body">
-            <div className="pr-grid">
-              <div className="pr-field">
-                <label>Ad</label>
-                {editMode ? <input className="pr-input" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} /> : <div className="pr-field-value">{profile?.firstName}</div>}
-              </div>
-              <div className="pr-field">
-                <label>Soyad</label>
-                {editMode ? <input className="pr-input" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} /> : <div className="pr-field-value">{profile?.lastName}</div>}
-              </div>
-              <div className="pr-field">
-                <label>E-posta</label>
-                <div className="pr-field-value muted">{profile?.email}</div>
-              </div>
-              <div className="pr-field">
-                <label>Telefon</label>
-                {editMode ? <input className="pr-input" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /> : <div className="pr-field-value">{profile?.phone}</div>}
-              </div>
-            </div>
-            {editMode && (
-              <button className="pr-save-btn" onClick={handleSave} disabled={saveLoading}>
-                <span>{saveLoading ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}</span>
+
+              <button
+                onClick={() => setEditMode((value) => !value)}
+                className={`mt-5 flex h-12 w-full items-center justify-center rounded-2xl text-sm font-black ${
+                  editMode
+                    ? "border border-slate-200 bg-white text-slate-500"
+                    : "bg-[#1D4ED8] text-white"
+                }`}
+              >
+                {editMode ? "Vazgeç" : "Bilgileri Düzenle"}
               </button>
-            )}
-          </div>
-        </div>
+            </section>
 
-        {/* BELGE YÜKLEME */}
-        <div className="pr-upload-card">
-          <div className="pr-upload-header">
-            <div className="pr-upload-title">Belge Yükle</div>
-            <div className="pr-upload-sub">PDF, JPG veya PNG — Maksimum 50MB</div>
-          </div>
-          <div className="pr-upload-body">
-            <div>
-              <label style={{ fontSize: 8, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)", display: "block", marginBottom: 10 }}>Belge Türü</label>
-              <select className="pr-select" value={selectedDocType} onChange={e => setSelectedDocType(e.target.value)}>
-                {DOC_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </div>
-            <label className="pr-upload-btn" style={{ cursor: uploadLoading ? "not-allowed" : "pointer", opacity: uploadLoading ? 0.5 : 1 }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              {uploadLoading ? "Yükleniyor..." : "Dosya Seç"}
-              <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleUpload} disabled={uploadLoading} style={{ display: "none" }} />
-            </label>
-          </div>
-          {uploadSuccess && (
-            <div className="pr-success" style={{ margin: "0 36px 24px" }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
-              Belge başarıyla yüklendi.
-            </div>
-          )}
-          {uploadError && <div className="pr-error" style={{ margin: "0 36px 24px" }}>{uploadError}</div>}
-        </div>
-
-
-        {/* TEMA SEÇİCİ */}
-        <div className="pr-docs-card" style={{marginBottom:24}}>
-          <div className="pr-docs-header">
-            <div className="pr-docs-title">🎨 Görünüm Teması</div>
-          </div>
-          <div style={{padding:"24px 32px",display:"flex",gap:16,flexWrap:"wrap"}}>
-            {THEMES.map(t => (
-              <button key={t.id} onClick={() => setTheme(t.id)}
-                style={{
-                  display:"flex",flexDirection:"column",alignItems:"center",gap:8,
-                  padding:"16px 20px",borderRadius:8,cursor:"pointer",
-                  border: theme === t.id ? "2px solid var(--gold,#C9A84C)" : "2px solid var(--border,#E0DED8)",
-                  background: theme === t.id ? "var(--accent,#1A3C5E)" : "var(--surface,#fff)",
-                  color: theme === t.id ? "#fff" : "var(--text,#1A1A1A)",
-                  fontWeight: theme === t.id ? 700 : 400,
-                  transition:"all 0.2s",minWidth:90
-                }}>
-                <span style={{fontSize:28}}>{t.icon}</span>
-                <span style={{fontSize:12,letterSpacing:1}}>{t.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        {/* BELGELERİM */}
-        <div className="pr-docs-card">
-          <div className="pr-docs-header">
-            <div className="pr-docs-title">Belgelerim</div>
-          </div>
-          {!profile?.documents || profile.documents.length === 0 ? (
-            <div className="pr-docs-empty">
-              <div className="pr-docs-empty-text">Henüz belge yüklenmedi</div>
-              <div className="pr-docs-empty-sub">Onay sürecinizi hızlandırmak için belgelerinizi yükleyin</div>
-            </div>
-          ) : (
-            <div className="pr-docs-list">
-              {profile.documents.map(doc => {
-                const ds = DOC_STATUS[doc.status] || DOC_STATUS.PENDING;
-                return (
-                  <div key={doc.id} className="pr-doc-item">
-                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                      <div className="pr-doc-icon">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
-                        </svg>
+            {trustScore && (
+              <section className="overflow-hidden rounded-[32px] bg-[#0B1F44] text-white">
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-black text-blue-100">
+                        <ShieldCheck size={14} />
+                        Güven Skoru
                       </div>
-                      <div>
-                        <div className="pr-doc-name">{DOC_TYPES.find(t => t.value === doc.type)?.label}</div>
-                        <div className="pr-doc-file">{doc.fileName}</div>
-                      </div>
+
+                      <h2 className="mt-3 text-[24px] font-black tracking-tight">
+                        {trustScore.badge}
+                      </h2>
+
+                      <p className="mt-2 text-sm leading-6 text-blue-100/70">
+                        {getTip(trustScore.score)}
+                      </p>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <span className="pr-doc-status" style={{ borderColor: ds.color, color: ds.color, background: ds.bg }}>{ds.label}</span>
-                      <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="pr-doc-view">Görüntüle</a>
+
+                    <div className="text-right">
+                      <div className="text-[52px] font-black leading-none">
+                        {trustScore.score}
+                      </div>
+
+                      <div className="text-xs font-black text-blue-100/50">
+                        / 100
+                      </div>
                     </div>
                   </div>
+
+                  <div className="mt-5 h-3 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-[#60A5FA]"
+                      style={{ width: `${trustScore.score}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-px bg-white/10 sm:grid-cols-3">
+                  <TrustMini title="Belge" value={trustScore.breakdown.documentScore} max={25} />
+                  <TrustMini title="Kıdem" value={trustScore.breakdown.seniorityScore} max={10} />
+                  <TrustMini title="Portföy" value={trustScore.breakdown.portfolioScore} max={15} />
+                  <TrustMini title="Aktivite" value={trustScore.breakdown.activityScore} max={10} />
+                  <TrustMini title="Profil" value={trustScore.breakdown.profileScore} max={10} />
+                  <TrustMini title="Onay" value={trustScore.breakdown.approvalScore} max={10} />
+                </div>
+              </section>
+            )}
+          </div>
+
+          <div className="space-y-5">
+            <section className="rounded-[32px] border border-slate-200 bg-white p-5">
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
+                    <BadgeCheck size={14} />
+                    Profil Bilgileri
+                  </div>
+
+                  <h2 className="mt-3 text-[24px] font-black tracking-tight text-[#0B1F44]">
+                    Kişisel bilgiler
+                  </h2>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Ad">
+                  {editMode ? (
+                    <input
+                      className="premium-input"
+                      value={form.firstName}
+                      onChange={(event) =>
+                        setForm({ ...form, firstName: event.target.value })
+                      }
+                    />
+                  ) : (
+                    <ReadValue value={profile?.firstName} />
+                  )}
+                </Field>
+
+                <Field label="Soyad">
+                  {editMode ? (
+                    <input
+                      className="premium-input"
+                      value={form.lastName}
+                      onChange={(event) =>
+                        setForm({ ...form, lastName: event.target.value })
+                      }
+                    />
+                  ) : (
+                    <ReadValue value={profile?.lastName} />
+                  )}
+                </Field>
+
+                <Field label="E-posta">
+                  <ReadValue muted value={profile?.email} />
+                </Field>
+
+                <Field label="Telefon">
+                  {editMode ? (
+                    <input
+                      className="premium-input"
+                      value={form.phone}
+                      onChange={(event) =>
+                        setForm({ ...form, phone: event.target.value })
+                      }
+                    />
+                  ) : (
+                    <ReadValue value={profile?.phone} />
+                  )}
+                </Field>
+              </div>
+
+              {editMode && (
+                <button
+                  onClick={handleSave}
+                  disabled={saveLoading}
+                  className="mt-5 flex h-12 w-full items-center justify-center rounded-2xl bg-[#1D4ED8] text-sm font-black text-white disabled:opacity-50"
+                >
+                  {saveLoading ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
+                </button>
+              )}
+            </section>
+
+            <section className="rounded-[32px] border border-slate-200 bg-white p-5">
+              <div className="mb-5">
+                <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
+                  <UploadCloud size={14} />
+                  Belge Yükleme
+                </div>
+
+                <h2 className="mt-3 text-[24px] font-black tracking-tight text-[#0B1F44]">
+                  Mesleki belgeler
+                </h2>
+
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  PDF, JPG veya PNG yükleyebilirsin.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+                <select
+                  className="premium-input"
+                  value={selectedDocType}
+                  onChange={(event) => setSelectedDocType(event.target.value)}
+                >
+                  {DOC_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+
+                <label
+                  className={`flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#0B1F44] px-5 text-sm font-black text-white ${
+                    uploadLoading ? "opacity-50" : ""
+                  }`}
+                >
+                  <UploadCloud size={18} />
+                  {uploadLoading ? "Yükleniyor..." : "Dosya Seç"}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={handleUpload}
+                    disabled={uploadLoading}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {uploadSuccess && (
+                <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-black text-emerald-700">
+                  Belge başarıyla yüklendi.
+                </div>
+              )}
+
+              {uploadError && (
+                <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-black text-red-600">
+                  {uploadError}
+                </div>
+              )}
+            </section>
+          </div>
+        </section>
+
+        <section className="mt-5 rounded-[32px] border border-slate-200 bg-white p-5">
+          <div className="mb-5">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
+              <Palette size={14} />
+              Görünüm Teması
+            </div>
+
+            <h2 className="mt-3 text-[24px] font-black tracking-tight text-[#0B1F44]">
+              Tema seçimi
+            </h2>
+
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Platform görünümünü çalışma tarzına göre kişiselleştir.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {THEMES.map((item) => {
+              const active = theme === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setTheme(item.id)}
+                  className={`rounded-[24px] border p-4 text-center transition ${
+                    active
+                      ? "border-[#1D4ED8] bg-[#EEF4FF] text-[#1D4ED8]"
+                      : "border-slate-200 bg-[#F8FAFC] text-slate-600"
+                  }`}
+                >
+                  <div className="text-[28px]">{item.icon}</div>
+                  <div className="mt-2 text-xs font-black">{item.label}</div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="mt-5 rounded-[32px] border border-slate-200 bg-white p-5">
+          <div className="mb-5">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
+              <FileText size={14} />
+              Belgelerim
+            </div>
+
+            <h2 className="mt-3 text-[24px] font-black tracking-tight text-[#0B1F44]">
+              Yüklenen belgeler
+            </h2>
+          </div>
+
+          {documents.length === 0 ? (
+            <div className="rounded-[24px] border border-dashed border-slate-200 bg-[#F8FAFC] p-8 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#EEF4FF] text-[#1D4ED8]">
+                <FileText size={30} />
+              </div>
+
+              <h3 className="text-[18px] font-black text-[#0B1F44]">
+                Henüz belge yüklenmedi
+              </h3>
+
+              <p className="mt-2 text-sm font-semibold text-slate-500">
+                Onay sürecini hızlandırmak için belgelerini yükleyebilirsin.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {documents.map((doc) => {
+                const status = DOC_STATUS[doc.status] || DOC_STATUS.PENDING;
+
+                return (
+                  <article
+                    key={doc.id}
+                    className="flex flex-col gap-3 rounded-[24px] border border-slate-200 bg-[#F8FAFC] p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-[#1D4ED8]">
+                        <FileText size={21} />
+                      </div>
+
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-black text-[#0B1F44]">
+                          {DOC_TYPES.find((type) => type.value === doc.type)?.label ||
+                            doc.type}
+                        </h3>
+
+                        <p className="mt-1 truncate text-xs font-bold text-slate-400">
+                          {doc.fileName}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="rounded-full px-3 py-2 text-xs font-black"
+                        style={{ background: status.bg, color: status.color }}
+                      >
+                        {status.label}
+                      </span>
+
+                      <a
+                        href={doc.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600"
+                      >
+                        Görüntüle
+                      </a>
+                    </div>
+                  </article>
                 );
               })}
             </div>
           )}
+        </section>
+      </section>
+
+      <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 px-5 pb-6 pt-3 backdrop-blur">
+        <div className="mx-auto flex max-w-md items-center justify-between">
+          <BottomItem href="/dashboard" icon={<Home size={21} />} label="Ana Sayfa" />
+          <BottomItem href="/stok" icon={<Building2 size={21} />} label="İlanlar" />
+          <BottomItem href="/network" icon={<MessageCircle size={21} />} label="Network" />
+          <BottomItem href="/crm" icon={<UsersRound size={21} />} label="CRM" />
+          <BottomItem href="/market" icon={<WalletCards size={21} />} label="Piyasa" />
+          <BottomItem active href="/profil" icon={<CircleUserRound size={21} />} label="Profil" />
         </div>
-      </main>
-    </>
+      </nav>
+
+      <style jsx global>{`
+        .premium-input {
+          width: 100%;
+          border-radius: 18px;
+          border: 1px solid #e2e8f0;
+          background: #f8fafc;
+          padding: 12px 14px;
+          font-size: 14px;
+          font-weight: 700;
+          color: #0f172a;
+          outline: none;
+        }
+
+        .premium-input:focus {
+          border-color: #1d4ed8;
+          background: #ffffff;
+          box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.08);
+        }
+      `}</style>
+    </main>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label>
+      <span className="mb-2 block text-xs font-black text-slate-500">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function ReadValue({
+  value,
+  muted,
+}: {
+  value?: string;
+  muted?: boolean;
+}) {
+  return (
+    <div
+      className={`flex min-h-12 items-center rounded-[18px] border border-slate-200 bg-[#F8FAFC] px-4 text-sm font-black ${
+        muted ? "text-slate-400" : "text-[#0B1F44]"
+      }`}
+    >
+      {value || "—"}
+    </div>
+  );
+}
+
+function TrustMini({
+  title,
+  value,
+  max,
+}: {
+  title: string;
+  value: number;
+  max: number;
+}) {
+  return (
+    <div className="bg-white/5 p-4">
+      <p className="text-xs font-black uppercase tracking-wide text-blue-100/50">
+        {title}
+      </p>
+
+      <p className="mt-2 text-[22px] font-black text-white">
+        {value}
+        <span className="text-xs text-blue-100/40">/{max}</span>
+      </p>
+    </div>
+  );
+}
+
+function BottomItem({
+  icon,
+  label,
+  active,
+  href,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex w-16 flex-col items-center gap-1 ${
+        active ? "text-[#1D4ED8]" : "text-slate-500"
+      }`}
+    >
+      {icon}
+
+      <span className="text-[11px] font-bold">{label}</span>
+    </Link>
   );
 }
