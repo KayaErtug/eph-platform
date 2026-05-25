@@ -1,322 +1,639 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/store/auth.store";
-import api from "@/lib/api";
 import Link from "next/link";
+import api from "@/lib/api";
+import { useAuthStore } from "@/store/auth.store";
+import {
+  ArrowLeft,
+  BarChart3,
+  Building2,
+  CheckCircle2,
+  CircleUserRound,
+  Clock3,
+  Home,
+  LineChart,
+  LogOut,
+  MapPin,
+  MessageCircle,
+  PieChart,
+  TrendingUp,
+  UsersRound,
+  WalletCards,
+} from "lucide-react";
 
 interface MarketData {
   summary: {
-    totalActive: number; totalUnits: number; newUnits30: number; newUnits7: number;
-    closedUnits: number; closureRate: number; avgPrice: number; minPrice: number;
-    maxPrice: number; avgPricePerM2: number; totalUsers: number; totalProjects: number; totalCustomers: number;
+    totalActive: number;
+    totalUnits: number;
+    newUnits30: number;
+    newUnits7: number;
+    closedUnits: number;
+    closureRate: number;
+    avgPrice: number;
+    minPrice: number;
+    maxPrice: number;
+    avgPricePerM2: number;
+    totalUsers: number;
+    totalProjects: number;
+    totalCustomers: number;
   };
-  topDistricts: { district: string; city: string; count: number; avgPrice: number; avgPricePerM2: number }[];
+  topDistricts: {
+    district: string;
+    city: string;
+    count: number;
+    avgPrice: number;
+    avgPricePerM2: number;
+  }[];
   statusDistribution: Record<string, number>;
   typeDistribution: { type: string; count: number }[];
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  SATILIK: "Satılık", KIRALIK: "Kiralık", GUNLUK_KIRALIK: "Günlük Kiralık",
-  DEVREN_SATILIK: "Devren Satılık", DEVREN_KIRALIK: "Devren Kiralık",
-  INSAAT_PROJESI: "İnşaat Projesi", KAT_KARSILIGI: "Kat Karşılığı",
-  REZERVE: "Rezerve", SATILDI: "Satıldı", KIRALANDII: "Kiralandı",
+  SATILIK: "Satılık",
+  KIRALIK: "Kiralık",
+  GUNLUK_KIRALIK: "Günlük Kiralık",
+  DEVREN_SATILIK: "Devren Satılık",
+  DEVREN_KIRALIK: "Devren Kiralık",
+  INSAAT_PROJESI: "İnşaat Projesi",
+  KAT_KARSILIGI: "Kat Karşılığı",
+  REZERVE: "Rezerve",
+  SATILDI: "Satıldı",
+  KIRALANDII: "Kiralandı",
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  DAIRE: "Daire", VILLA: "Villa", REZIDANS: "Rezidans", MUSTAK_EV: "Müstakil Ev",
-  ARSA: "Arsa", TARLA: "Tarla", OFIS_BURO: "Ofis/Büro", DUKKAN_MAGAZA: "Dükkan/Mağaza",
-  DEPO_ANTREPO: "Depo/Antrepo", FABRIKA_ATOLYE: "Fabrika/Atölye",
+  DAIRE: "Daire",
+  VILLA: "Villa",
+  REZIDANS: "Rezidans",
+  MUSTAK_EV: "Müstakil Ev",
+  ARSA: "Arsa",
+  TARLA: "Tarla",
+  OFIS_BURO: "Ofis/Büro",
+  DUKKAN_MAGAZA: "Dükkan/Mağaza",
+  DEPO_ANTREPO: "Depo/Antrepo",
+  FABRIKA_ATOLYE: "Fabrika/Atölye",
 };
 
-const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
-*{box-sizing:border-box;margin:0;padding:0;}
-:root{--navy:#0F2044;--gold:#C9A84C;--cream:#F5F3EF;--warm:#FAFAF8;--text:#1A1A2E;--muted:#8A8A8A;--border:#E2DDD5;--serif:'Cormorant Garamond',Georgia,serif;--sans:'DM Sans',system-ui,sans-serif;}
-body{font-family:var(--sans);background:var(--warm);color:var(--text);}
-@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+function moneyShort(value?: number) {
+  if (!value) return "—";
 
-.mk-nav{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 48px;position:sticky;top:0;z-index:100;}
-@media(max-width:768px){.mk-nav{padding:0 20px;}}
-.mk-logo{display:flex;align-items:center;gap:12px;text-decoration:none;}
-.mk-logo img{width:34px;height:34px;object-fit:contain;}
-.mk-logo-text{font-family:var(--serif);font-size:18px;font-weight:500;color:var(--navy);}
-.mk-logo-sub{font-size:7px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);}
-.mk-nav-links{display:flex;align-items:center;gap:4px;}
-.mk-nav-item{padding:8px 14px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:all 0.2s;border-bottom:2px solid transparent;}
-.mk-nav-item:hover{color:var(--navy);border-bottom-color:var(--gold);}
-.mk-nav-item.active{color:var(--navy);border-bottom-color:var(--gold);}
-.mk-logout{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:1px solid var(--border);padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
-.mk-logout:hover{border-color:var(--navy);color:var(--navy);}
+  if (value >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}M ₺`;
+  }
 
-.mk-main{max-width:1300px;margin:0 auto;padding:48px 48px 100px;animation:fadeUp 0.5s ease;}
-@media(max-width:768px){.mk-main{padding:32px 20px;}}
+  return `${value.toLocaleString("tr-TR")} ₺`;
+}
 
-.mk-header{margin-bottom:48px;padding-bottom:40px;border-bottom:1px solid var(--border);display:flex;align-items:flex-end;justify-content:space-between;}
-.mk-title{font-family:var(--serif);font-size:clamp(36px,4vw,52px);font-weight:300;color:var(--navy);line-height:1.1;}
-.mk-title em{font-style:italic;color:var(--gold);}
-.mk-sub{font-size:13px;color:var(--muted);margin-top:8px;font-weight:300;}
-.mk-live{display:flex;align-items:center;gap:8px;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
-.mk-live-dot{width:6px;height:6px;border-radius:50%;background:#2D6A4F;animation:pulse 2s infinite;}
-
-.mk-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:32px;}
-@media(max-width:1024px){.mk-kpi{grid-template-columns:1fr 1fr;}}
-@media(max-width:600px){.mk-kpi{grid-template-columns:1fr;}}
-.mk-kpi-card{background:#fff;padding:28px 24px;}
-.mk-kpi-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
-.mk-kpi-val{font-family:var(--serif);font-size:36px;font-weight:300;color:var(--navy);line-height:1;}
-.mk-kpi-val.gold{color:var(--gold);}
-.mk-kpi-val.green{color:#2D6A4F;}
-.mk-kpi-val.blue{color:#1A4A7A;}
-.mk-kpi-sub{font-size:11px;color:var(--muted);margin-top:8px;font-weight:300;}
-
-.mk-two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
-@media(max-width:900px){.mk-two-col{grid-template-columns:1fr;}}
-
-.mk-panel{background:#fff;border:1px solid var(--border);padding:28px 32px;}
-.mk-panel-title{font-family:var(--serif);font-size:22px;font-weight:400;color:var(--navy);margin-bottom:4px;}
-.mk-panel-sub{font-size:11px;color:var(--muted);font-weight:300;margin-bottom:24px;}
-
-.mk-district-table{width:100%;border-collapse:collapse;}
-.mk-district-table th{font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:0 0 12px;text-align:left;border-bottom:1px solid var(--border);}
-.mk-district-table th:not(:first-child){text-align:right;}
-.mk-district-table td{padding:12px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--navy);}
-.mk-district-table td:not(:first-child){text-align:right;font-family:var(--serif);}
-.mk-district-table tr:last-child td{border-bottom:none;}
-.mk-district-rank{font-size:9px;color:var(--muted);margin-right:8px;font-weight:300;}
-.mk-district-bar{height:3px;background:var(--gold);margin-top:4px;transition:width 0.8s ease;}
-
-.mk-bar-item{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
-.mk-bar-label{font-size:11px;color:var(--navy);width:100px;flex-shrink:0;}
-.mk-bar-track{flex:1;height:4px;background:var(--border);position:relative;}
-.mk-bar-fill{height:4px;background:var(--navy);transition:width 0.8s ease;}
-.mk-bar-fill.gold{background:var(--gold);}
-.mk-bar-val{font-size:11px;color:var(--muted);width:40px;text-align:right;flex-shrink:0;font-family:var(--serif);}
-
-.mk-price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);}
-.mk-price-cell{background:var(--warm);padding:20px;}
-.mk-price-cell-label{font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
-.mk-price-cell-val{font-family:var(--serif);font-size:24px;font-weight:300;color:var(--navy);}
-.mk-price-cell-sub{font-size:10px;color:var(--muted);margin-top:4px;}
-
-.mk-platform{background:var(--navy);padding:28px 32px;margin-bottom:16px;}
-.mk-platform-title{font-size:8px;letter-spacing:3px;text-transform:uppercase;color:rgba(245,243,239,0.5);margin-bottom:20px;}
-.mk-platform-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,0.05);}
-@media(max-width:768px){.mk-platform-grid{grid-template-columns:1fr 1fr;}}
-.mk-platform-cell{background:rgba(255,255,255,0.02);padding:20px;}
-.mk-platform-cell-label{font-size:7px;letter-spacing:2px;text-transform:uppercase;color:rgba(245,243,239,0.4);margin-bottom:8px;}
-.mk-platform-cell-val{font-family:var(--serif);font-size:32px;font-weight:300;color:#fff;}
-.mk-platform-cell-val.gold{color:var(--gold);}
-`;
+function moneyFull(value?: number) {
+  if (!value) return "—";
+  return `${value.toLocaleString("tr-TR")} ₺`;
+}
 
 export default function MarketPage() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
+
   const [data, setData] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState<string>("");
+  const [lastUpdate, setLastUpdate] = useState("");
 
-  useEffect(() => { setHydrated(true); }, []);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
   useEffect(() => {
     if (!hydrated) return;
-    if (!user) { router.push("/giris"); return; }
+
+    if (!user) {
+      router.push("/giris");
+      return;
+    }
+
     fetchData();
   }, [hydrated, user]);
 
   const fetchData = async () => {
     try {
-      const r = await api.get("/market/pulse");
-      setData(r.data);
-      setLastUpdate(new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
-    } finally { setLoading(false); }
+      const response = await api.get("/market/pulse");
+
+      setData(response.data);
+      setLastUpdate(
+        new Date().toLocaleTimeString("tr-TR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      );
+    } catch (error) {
+      console.error(error);
+      alert("Piyasa verileri yüklenemedi.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (!hydrated || loading) return (
-    <div style={{ minHeight: "100vh", background: "#FAFAF8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <style>{CSS}</style>
-      <div style={{ width: 32, height: 32, border: "2px solid #C9A84C", borderTop: "2px solid transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-    </div>
-  );
+  const handleLogout = () => {
+    logout();
+    router.push("/giris");
+  };
 
-  if (!data) return null;
+  if (!hydrated || loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#1D4ED8] border-t-transparent" />
+      </main>
+    );
+  }
+
+  if (!data) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-4 text-center">
+        <div>
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#EEF4FF] text-[#1D4ED8]">
+            <LineChart size={30} />
+          </div>
+
+          <h1 className="text-[22px] font-black text-[#0B1F44]">
+            Piyasa verisi bulunamadı
+          </h1>
+
+          <p className="mt-2 text-sm font-semibold text-slate-500">
+            Veriler oluştuğunda bu ekran otomatik dolacak.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   const { summary, topDistricts, statusDistribution, typeDistribution } = data;
-  const maxDistrictCount = Math.max(...topDistricts.map(d => d.count), 1);
-  const maxTypeCount = Math.max(...typeDistribution.map(t => t.count), 1);
-  const totalStatus = Object.values(statusDistribution).reduce((a, b) => a + b, 0);
+
+  const maxDistrictCount = Math.max(...topDistricts.map((item) => item.count), 1);
+  const maxTypeCount = Math.max(...typeDistribution.map((item) => item.count), 1);
+  const totalStatus = Object.values(statusDistribution).reduce(
+    (sum, value) => sum + value,
+    0
+  );
 
   return (
-    <>
-      <style>{CSS}</style>
+    <main className="min-h-screen bg-[#F4F7FB] text-[#111827]">
+      <section className="mx-auto min-h-screen max-w-6xl px-4 pb-28 pt-5">
+        <header className="mb-5 rounded-[32px] border border-slate-200 bg-white p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600"
+              >
+                <ArrowLeft size={20} />
+              </button>
 
-      <nav className="mk-nav">
-        <a href="/dashboard" className="mk-logo">
-          <img src="/LOGO_EPH.png" alt="EPH" />
-          <div>
-            <div className="mk-logo-text">EPH Platform</div>
-            <div className="mk-logo-sub">Emlak Portföy Havuzu</div>
-          </div>
-        </a>
-
-        <div className="mk-nav-links">
-          <Link href="/dashboard" className="mk-nav-item">Ana Sayfa</Link>
-          <Link href="/profil" className="mk-nav-item">Profilim</Link>
-          <Link href="/stok" className="mk-nav-item">Stok</Link>
-          <Link href="/crm" className="mk-nav-item">CRM</Link>
-          <Link href="/network" className="mk-nav-item">Network</Link>
-          <Link href="/market" className="mk-nav-item active">Piyasa</Link>
-          {user?.role === "ADMIN" && <Link href="/admin" className="mk-nav-item">Admin</Link>}
-        </div>
-
-        <button className="mk-logout" onClick={() => { logout(); router.push("/giris"); }}>
-          Çıkış
-        </button>
-      </nav>
-
-      <main className="mk-main">
-        <div className="mk-header">
-          <div>
-            <h1 className="mk-title">Piyasa<br /><em>Nabzı</em></h1>
-            <p className="mk-sub">Platform içi gerçek zamanlı piyasa verileri</p>
-          </div>
-          <div className="mk-live">
-            <div className="mk-live-dot" />
-            Canlı veri · {lastUpdate}
-          </div>
-        </div>
-
-        <div className="mk-kpi">
-          {[
-            { label: "Aktif Portföy", val: summary.totalActive.toLocaleString("tr-TR"), cls: "", sub: `${summary.totalUnits} toplam ilan` },
-            { label: "Son 30 Gün Yeni İlan", val: summary.newUnits30.toLocaleString("tr-TR"), cls: "green", sub: `Son 7 gün: ${summary.newUnits7}` },
-            { label: "Ort. İlan Fiyatı", val: `${(summary.avgPrice / 1000000).toFixed(1)}M ₺`, cls: "gold", sub: `Min: ${(summary.minPrice / 1000000).toFixed(1)}M` },
-            { label: "Ort. m² Fiyatı", val: `${summary.avgPricePerM2.toLocaleString("tr-TR")} ₺`, cls: "blue", sub: "Tüm aktif ilanlar" },
-          ].map(k => (
-            <div key={k.label} className="mk-kpi-card">
-              <div className="mk-kpi-label">{k.label}</div>
-              <div className={`mk-kpi-val ${k.cls}`}>{k.val}</div>
-              <div className="mk-kpi-sub">{k.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mk-platform">
-          <div className="mk-platform-title">Platform Genel Durumu</div>
-          <div className="mk-platform-grid">
-            {[
-              { label: "Onaylı Üye", val: summary.totalUsers, cls: "" },
-              { label: "Aktif Proje", val: summary.totalProjects, cls: "" },
-              { label: "CRM Müşterisi", val: summary.totalCustomers, cls: "" },
-              { label: "Kapanma Oranı", val: `%${summary.closureRate}`, cls: "gold" },
-            ].map(s => (
-              <div key={s.label} className="mk-platform-cell">
-                <div className="mk-platform-cell-label">{s.label}</div>
-                <div className={`mk-platform-cell-val ${s.cls}`}>{s.val}</div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
+                <TrendingUp size={14} />
+                Canlı Piyasa Nabzı
               </div>
-            ))}
-          </div>
-        </div>
 
-        <div className="mk-panel" style={{ marginBottom: 16 }}>
-          <div className="mk-panel-title">Fiyat Analizi</div>
-          <div className="mk-panel-sub">Platform geneli ilan fiyat dağılımı</div>
-          <div className="mk-price-grid">
-            <div className="mk-price-cell">
-              <div className="mk-price-cell-label">Minimum Fiyat</div>
-              <div className="mk-price-cell-val">{(summary.minPrice / 1000000).toFixed(1)}M ₺</div>
-              <div className="mk-price-cell-sub">En düşük aktif ilan</div>
+              <h1 className="mt-3 text-[31px] font-black tracking-tight text-[#0B1F44]">
+                Piyasa Merkezi
+              </h1>
+
+              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
+                EPH Platform içindeki portföy, proje, fiyat ve bölge hareketlerini
+                tek ekrandan takip et.
+              </p>
             </div>
-            <div className="mk-price-cell">
-              <div className="mk-price-cell-label">Ortalama Fiyat</div>
-              <div className="mk-price-cell-val" style={{ color: "var(--gold)" }}>{(summary.avgPrice / 1000000).toFixed(1)}M ₺</div>
-              <div className="mk-price-cell-sub">Tüm aktif ilanlar</div>
+
+            <button
+              onClick={handleLogout}
+              className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-xs font-black text-red-600"
+            >
+              Çıkış
+            </button>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <div className="inline-flex items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-black text-emerald-700">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+              Canlı veri
             </div>
-            <div className="mk-price-cell">
-              <div className="mk-price-cell-label">Maksimum Fiyat</div>
-              <div className="mk-price-cell-val">{(summary.maxPrice / 1000000).toFixed(1)}M ₺</div>
-              <div className="mk-price-cell-sub">En yüksek aktif ilan</div>
+
+            <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-3 text-xs font-black text-slate-500">
+              <Clock3 size={15} />
+              Son güncelleme: {lastUpdate || "—"}
             </div>
           </div>
-        </div>
 
-        <div className="mk-two-col">
-          <div className="mk-panel">
-            <div className="mk-panel-title">En Aktif Bölgeler</div>
-            <div className="mk-panel-sub">İlan yoğunluğuna göre sıralama</div>
+          <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <KpiCard
+              title="Aktif Portföy"
+              value={summary.totalActive.toLocaleString("tr-TR")}
+              subtitle={`${summary.totalUnits} toplam ilan`}
+              icon={<Building2 size={19} />}
+            />
+
+            <KpiCard
+              title="Son 30 Gün"
+              value={summary.newUnits30.toLocaleString("tr-TR")}
+              subtitle={`Son 7 gün: ${summary.newUnits7}`}
+              icon={<TrendingUp size={19} />}
+            />
+
+            <KpiCard
+              title="Ort. İlan Fiyatı"
+              value={moneyShort(summary.avgPrice)}
+              subtitle={`Min: ${moneyShort(summary.minPrice)}`}
+              icon={<WalletCards size={19} />}
+            />
+
+            <KpiCard
+              title="Ort. m² Fiyatı"
+              value={moneyFull(summary.avgPricePerM2)}
+              subtitle="Aktif ilan ortalaması"
+              icon={<BarChart3 size={19} />}
+            />
+          </div>
+        </header>
+
+        <section className="mb-5 rounded-[32px] border border-slate-200 bg-[#0B1F44] p-5 text-white">
+          <div className="mb-4 flex items-center gap-2">
+            <PieChart size={18} className="text-blue-200" />
+
+            <h2 className="text-[18px] font-black tracking-tight">
+              Platform Genel Durumu
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <DarkStat title="Onaylı Üye" value={summary.totalUsers} />
+            <DarkStat title="Aktif Proje" value={summary.totalProjects} />
+            <DarkStat title="CRM Müşterisi" value={summary.totalCustomers} />
+            <DarkStat title="Kapanma Oranı" value={`%${summary.closureRate}`} />
+          </div>
+        </section>
+
+        <section className="mb-5 rounded-[32px] border border-slate-200 bg-white p-5">
+          <div className="mb-5">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
+              <WalletCards size={14} />
+              Fiyat Analizi
+            </div>
+
+            <h2 className="mt-3 text-[24px] font-black tracking-tight text-[#0B1F44]">
+              İlan fiyat dağılımı
+            </h2>
+
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Platform genelindeki aktif ilanların fiyat aralığı.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <PriceCard
+              title="Minimum Fiyat"
+              value={moneyShort(summary.minPrice)}
+              subtitle="En düşük aktif ilan"
+            />
+
+            <PriceCard
+              highlight
+              title="Ortalama Fiyat"
+              value={moneyShort(summary.avgPrice)}
+              subtitle="Tüm aktif ilanlar"
+            />
+
+            <PriceCard
+              title="Maksimum Fiyat"
+              value={moneyShort(summary.maxPrice)}
+              subtitle="En yüksek aktif ilan"
+            />
+          </div>
+        </section>
+
+        <section className="grid grid-cols-1 gap-5 lg:grid-cols-[1.05fr_.95fr]">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-5">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
+                  <MapPin size={14} />
+                  Bölgesel Nabız
+                </div>
+
+                <h2 className="mt-3 text-[24px] font-black tracking-tight text-[#0B1F44]">
+                  En aktif bölgeler
+                </h2>
+
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  İlan yoğunluğuna göre sıralama.
+                </p>
+              </div>
+            </div>
+
             {topDistricts.length === 0 ? (
-              <div style={{ fontSize: 13, color: "var(--muted)", fontStyle: "italic" }}>Henüz veri yok</div>
+              <EmptyState text="Henüz bölge verisi oluşmadı." />
             ) : (
-              <table className="mk-district-table">
-                <thead>
-                  <tr>
-                    <th>Bölge</th>
-                    <th>İlan</th>
-                    <th>Ort. Fiyat</th>
-                    <th>m² Fiyatı</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topDistricts.map((d, i) => (
-                    <tr key={d.district}>
-                      <td>
-                        <span className="mk-district-rank">#{i + 1}</span>
-                        {d.district}
-                        <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 300 }}>{d.city}</div>
-                        <div className="mk-district-bar" style={{ width: `${(d.count / maxDistrictCount) * 100}%` }} />
-                      </td>
-                      <td>{d.count}</td>
-                      <td>{(d.avgPrice / 1000000).toFixed(1)}M</td>
-                      <td>{d.avgPricePerM2.toLocaleString("tr-TR")}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="space-y-3">
+                {topDistricts.map((district, index) => (
+                  <div
+                    key={`${district.city}-${district.district}`}
+                    className="rounded-[24px] border border-slate-200 bg-[#F8FAFC] p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EEF4FF] text-xs font-black text-[#1D4ED8]">
+                            {index + 1}
+                          </span>
+
+                          <h3 className="text-[16px] font-black text-[#0B1F44]">
+                            {district.district}
+                          </h3>
+                        </div>
+
+                        <p className="mt-1 pl-9 text-xs font-bold text-slate-400">
+                          {district.city}
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <p className="text-[18px] font-black text-[#0B1F44]">
+                          {district.count}
+                        </p>
+
+                        <p className="text-xs font-bold text-slate-400">
+                          ilan
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200">
+                      <div
+                        className="h-full rounded-full bg-[#1D4ED8]"
+                        style={{
+                          width: `${(district.count / maxDistrictCount) * 100}%`,
+                        }}
+                      />
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <MiniInfo
+                        title="Ort. Fiyat"
+                        value={moneyShort(district.avgPrice)}
+                      />
+
+                      <MiniInfo
+                        title="m² Fiyatı"
+                        value={moneyFull(district.avgPricePerM2)}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
-          <div>
-            <div className="mk-panel" style={{ marginBottom: 16 }}>
-              <div className="mk-panel-title">Durum Dağılımı</div>
-              <div className="mk-panel-sub">İlan durumlarına göre dağılım</div>
-              {Object.entries(statusDistribution).map(([status, count]) => (
-                <div key={status} className="mk-bar-item">
-                  <div className="mk-bar-label">{STATUS_LABELS[status] || status}</div>
-                  <div className="mk-bar-track">
-                    <div className="mk-bar-fill" style={{ width: `${(count / totalStatus) * 100}%` }} />
-                  </div>
-                  <div className="mk-bar-val">{count}</div>
-                </div>
-              ))}
+          <div className="space-y-5">
+            <DistributionPanel
+              title="Durum Dağılımı"
+              subtitle="İlan durumlarına göre dağılım"
+              items={Object.entries(statusDistribution).map(([key, value]) => ({
+                label: STATUS_LABELS[key] || key,
+                value,
+                percent: totalStatus ? (value / totalStatus) * 100 : 0,
+              }))}
+            />
+
+            <DistributionPanel
+              gold
+              title="Mülk Tipi Dağılımı"
+              subtitle="En çok girilen mülk tipleri"
+              items={typeDistribution.map((item) => ({
+                label: TYPE_LABELS[item.type] || item.type,
+                value: item.count,
+                percent: maxTypeCount ? (item.count / maxTypeCount) * 100 : 0,
+              }))}
+            />
+          </div>
+        </section>
+
+        <section className="mt-5 rounded-[28px] border border-blue-100 bg-[#EEF4FF] p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#1D4ED8]">
+              <CheckCircle2 size={20} />
             </div>
 
-            <div className="mk-panel">
-              <div className="mk-panel-title">Mülk Tipi Dağılımı</div>
-              <div className="mk-panel-sub">En çok ilan girilen mülk tipleri</div>
-              {typeDistribution.map(t => (
-                <div key={t.type} className="mk-bar-item">
-                  <div className="mk-bar-label">{TYPE_LABELS[t.type] || t.type}</div>
-                  <div className="mk-bar-track">
-                    <div className="mk-bar-fill gold" style={{ width: `${(t.count / maxTypeCount) * 100}%` }} />
-                  </div>
-                  <div className="mk-bar-val">{t.count}</div>
-                </div>
-              ))}
+            <div>
+              <h3 className="text-[16px] font-black text-[#0B1F44]">
+                Veri kaynağı
+              </h3>
+
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                Bu veriler EPH Platform içindeki gerçek ilan hareketlerinden
+                otomatik hesaplanır. Platform büyüdükçe piyasa analizleri daha
+                güçlü hale gelir.
+              </p>
             </div>
           </div>
+        </section>
+      </section>
+
+      <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 px-5 pb-6 pt-3 backdrop-blur">
+        <div className="mx-auto flex max-w-md items-center justify-between">
+          <BottomItem href="/dashboard" icon={<Home size={21} />} label="Ana Sayfa" />
+          <BottomItem href="/stok" icon={<Building2 size={21} />} label="İlanlar" />
+          <BottomItem href="/network" icon={<MessageCircle size={21} />} label="Network" />
+          <BottomItem href="/crm" icon={<UsersRound size={21} />} label="CRM" />
+          <BottomItem active href="/market" icon={<WalletCards size={21} />} label="Piyasa" />
+          <BottomItem href="/profil" icon={<CircleUserRound size={21} />} label="Profil" />
+        </div>
+      </nav>
+    </main>
+  );
+}
+
+function KpiCard({
+  title,
+  value,
+  subtitle,
+  icon,
+}: {
+  title: string;
+  value: string;
+  subtitle: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[24px] border border-slate-200 bg-[#F8FAFC] p-4">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#1D4ED8]">
+        {icon}
+      </div>
+
+      <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+        {title}
+      </p>
+
+      <p className="mt-2 text-[24px] font-black text-[#0B1F44]">
+        {value}
+      </p>
+
+      <p className="mt-1 text-xs font-bold text-slate-400">
+        {subtitle}
+      </p>
+    </div>
+  );
+}
+
+function DarkStat({ title, value }: { title: string; value: number | string }) {
+  return (
+    <div className="rounded-[24px] bg-white/10 p-4">
+      <p className="text-xs font-black uppercase tracking-wide text-blue-100/70">
+        {title}
+      </p>
+
+      <p className="mt-2 text-[27px] font-black text-white">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function PriceCard({
+  title,
+  value,
+  subtitle,
+  highlight,
+}: {
+  title: string;
+  value: string;
+  subtitle: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-[24px] border p-4 ${
+        highlight
+          ? "border-blue-100 bg-[#EEF4FF]"
+          : "border-slate-200 bg-[#F8FAFC]"
+      }`}
+    >
+      <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+        {title}
+      </p>
+
+      <p className={`mt-3 text-[27px] font-black ${highlight ? "text-[#1D4ED8]" : "text-[#0B1F44]"}`}>
+        {value}
+      </p>
+
+      <p className="mt-1 text-xs font-bold text-slate-400">
+        {subtitle}
+      </p>
+    </div>
+  );
+}
+
+function MiniInfo({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white p-3">
+      <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">
+        {title}
+      </p>
+
+      <p className="mt-1 text-sm font-black text-[#0B1F44]">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function DistributionPanel({
+  title,
+  subtitle,
+  items,
+  gold,
+}: {
+  title: string;
+  subtitle: string;
+  items: { label: string; value: number; percent: number }[];
+  gold?: boolean;
+}) {
+  return (
+    <div className="rounded-[32px] border border-slate-200 bg-white p-5">
+      <div className="mb-5">
+        <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
+          <BarChart3 size={14} />
+          Dağılım
         </div>
 
-        <div style={{ background: "#fff", border: "1px solid var(--border)", padding: "20px 28px", display: "flex", alignItems: "flex-start", gap: 12 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5" style={{ flexShrink: 0, marginTop: 2 }}>
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.7 }}>
-            <strong style={{ color: "var(--navy)", fontWeight: 500 }}>Veri Kaynağı:</strong> Bu veriler EPH Platform içindeki gerçek ilan hareketlerinden otomatik hesaplanmaktadır. Platform büyüdükçe istatistikler daha anlamlı hale gelecektir.
-          </div>
+        <h2 className="mt-3 text-[24px] font-black tracking-tight text-[#0B1F44]">
+          {title}
+        </h2>
+
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          {subtitle}
+        </p>
+      </div>
+
+      {items.length === 0 ? (
+        <EmptyState text="Henüz dağılım verisi yok." />
+      ) : (
+        <div className="space-y-4">
+          {items.map((item) => (
+            <div key={item.label}>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-sm font-black text-[#0B1F44]">
+                  {item.label}
+                </span>
+
+                <span className="text-sm font-black text-slate-500">
+                  {item.value}
+                </span>
+              </div>
+
+              <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className={`h-full rounded-full ${
+                    gold ? "bg-amber-500" : "bg-[#1D4ED8]"
+                  }`}
+                  style={{ width: `${item.percent}%` }}
+                />
+              </div>
+            </div>
+          ))}
         </div>
-      </main>
-    </>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="rounded-[24px] border border-dashed border-slate-200 bg-[#F8FAFC] p-8 text-center text-sm font-bold text-slate-400">
+      {text}
+    </div>
+  );
+}
+
+function BottomItem({
+  icon,
+  label,
+  active,
+  href,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex w-16 flex-col items-center gap-1 ${
+        active ? "text-[#1D4ED8]" : "text-slate-500"
+      }`}
+    >
+      {icon}
+
+      <span className="text-[11px] font-bold">{label}</span>
+    </Link>
   );
 }
