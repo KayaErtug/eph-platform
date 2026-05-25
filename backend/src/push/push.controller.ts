@@ -14,8 +14,8 @@ export class PushController {
   subscribe(
     @Body()
     body: {
-      userId: string;
-      subscription: {
+      userId?: string;
+      subscription?: {
         endpoint: string;
         keys: {
           p256dh: string;
@@ -24,15 +24,18 @@ export class PushController {
       };
     },
   ) {
+    if (!body?.userId || !body?.subscription) {
+      return {
+        ok: false,
+        message: 'Kullanıcı veya bildirim aboneliği eksik.',
+      };
+    }
+
     return this.pushService.saveSubscription(body.userId, body.subscription);
   }
 
   @Post('test')
-  test(@Body() body: { userId: string }) {
-    return this.pushService.sendToUser(body.userId, {
-      title: 'EPH Platform',
-      body: 'Push bildirimi başarıyla çalışıyor.',
-      url: '/messages',
-    });
+  test(@Body() body?: { userId?: string }) {
+    return this.pushService.sendTest(body?.userId);
   }
 }

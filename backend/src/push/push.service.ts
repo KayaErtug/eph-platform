@@ -10,6 +10,12 @@ type BrowserPushSubscription = {
   };
 };
 
+type PushPayload = {
+  title: string;
+  body: string;
+  url?: string;
+};
+
 @Injectable()
 export class PushService {
   constructor(private readonly prisma: PrismaService) {
@@ -47,10 +53,50 @@ export class PushService {
     });
   }
 
-  async sendToUser(userId: string, payload: { title: string; body: string; url?: string }) {
+  async sendTest(userId?: string) {
+    let targetUserId = userId;
+
+    if (!targetUserId) {
+      const lastSubscription = await this.prisma.pushSubscription.findFirst({
+        orderBy: {
+          createdAt: 'desc',
+        },
+        select: {
+          userId: true,
+        },
+      });
+
+      targetUserId = lastSubscription?.userId;
+    }
+
+    if (!targetUserId) {
+      return {
+        ok: false,
+        message: 'Kayıtlı bildirim aboneliği bulunamadı.',
+      };
+    }
+
+    return this.sendToUser(targetUserId, {
+      title: 'EPH Platform',
+      body: 'Test bildirimi başarıyla gönderildi.',
+      url: '/messages',
+    });
+  }
+
+  async sendToUser(userId: string, payload: PushPayload) {
     const subscriptions = await this.prisma.pushSubscription.findMany({
       where: { userId },
     });
+
+    if (subscriptions.length === 0) {
+      return {
+        ok: false,
+        message: 'Bu kullanıcı için kayıtlı bildirim aboneliği yok.',
+      };
+    }
+
+    let successCount = 0;
+    let failCount = 0;
 
     await Promise.all(
       subscriptions.map(async (item) => {
@@ -65,12 +111,25 @@ export class PushService {
             },
             JSON.stringify(payload),
           );
-        } catch (error) {
-          console.error('Push gönderim hatası:', error);
+
+          successCount += 1;
+        } catch (error: any) {
+          failCount += 1;
+
+          console.error('Push gönderim hatası:', {
+            endpoint: item.endpoint,
+            statusCode: error?.statusCode,
+            body: error?.body,
+            message: error?.message,
+          });
         }
       }),
     );
 
-    return { ok: true };
+    return {
+      ok: successCount > 0,
+      successCount,
+      failCount,
+    };
   }
 }
