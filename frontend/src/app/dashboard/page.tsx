@@ -2,19 +2,22 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
+
 import {
   Bell,
   Building2,
   ChevronRight,
   CircleUserRound,
   Home,
+  LogOut,
   MapPin,
+  MessageCircle,
   Mic,
   Plus,
   UsersRound,
   WalletCards,
-  MessageCircle,
 } from 'lucide-react';
 
 function getGreeting() {
@@ -66,7 +69,10 @@ function getGreeting() {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuthStore();
+  const router = useRouter();
+
+  const { user, logout } = useAuthStore();
+
   const greeting = getGreeting();
 
   const firstName =
@@ -94,6 +100,17 @@ export default function DashboardPage() {
 
               <button className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#1D4ED8]">
                 <CircleUserRound size={24} />
+              </button>
+
+              <button
+                onClick={() => {
+                  logout();
+                  router.push('/giris');
+                }}
+                className="flex h-11 items-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 text-[13px] font-black text-red-600 transition hover:bg-red-100"
+              >
+                <LogOut size={16} />
+                Çıkış
               </button>
             </div>
           </div>
@@ -132,9 +149,24 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-4 gap-3">
             <QuickAction href="/stok" icon={<Plus size={20} />} label="İlan" />
-            <QuickAction href="/crm" icon={<UsersRound size={20} />} label="CRM" />
-            <QuickAction href="/network" icon={<MessageCircle size={20} />} label="Network" />
-            <QuickAction href="/market" icon={<WalletCards size={20} />} label="Piyasa" />
+
+            <QuickAction
+              href="/crm"
+              icon={<UsersRound size={20} />}
+              label="CRM"
+            />
+
+            <QuickAction
+              href="/network"
+              icon={<MessageCircle size={20} />}
+              label="Network"
+            />
+
+            <QuickAction
+              href="/market"
+              icon={<WalletCards size={20} />}
+              label="Piyasa"
+            />
           </div>
         </section>
 
@@ -231,11 +263,36 @@ export default function DashboardPage() {
 
       <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 px-5 pb-6 pt-3 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center justify-between">
-          <BottomItem active href="/dashboard" icon={<Home size={21} />} label="Ana Sayfa" />
-          <BottomItem href="/stok" icon={<Building2 size={21} />} label="İlanlar" />
-          <BottomItem href="/network" icon={<MessageCircle size={21} />} label="Network" />
-          <BottomItem href="/crm" icon={<UsersRound size={21} />} label="CRM" />
-          <BottomItem href="/profil" icon={<CircleUserRound size={21} />} label="Profil" />
+          <BottomItem
+            active
+            href="/dashboard"
+            icon={<Home size={21} />}
+            label="Ana Sayfa"
+          />
+
+          <BottomItem
+            href="/stok"
+            icon={<Building2 size={21} />}
+            label="İlanlar"
+          />
+
+          <BottomItem
+            href="/network"
+            icon={<MessageCircle size={21} />}
+            label="Network"
+          />
+
+          <BottomItem
+            href="/crm"
+            icon={<UsersRound size={21} />}
+            label="CRM"
+          />
+
+          <BottomItem
+            href="/profil"
+            icon={<CircleUserRound size={21} />}
+            label="Profil"
+          />
         </div>
       </nav>
     </main>
@@ -276,7 +333,10 @@ function QuickAction({
   href: string;
 }) {
   return (
-    <Link href={href} className="rounded-[22px] border border-slate-200 bg-white px-2 py-4">
+    <Link
+      href={href}
+      className="rounded-[22px] border border-slate-200 bg-white px-2 py-4"
+    >
       <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#1D4ED8]">
         {icon}
       </div>
