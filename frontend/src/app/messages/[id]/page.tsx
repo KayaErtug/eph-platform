@@ -61,9 +61,7 @@ export default function MessageDetailPage() {
   const scrollBottom = (delay = 320) => {
     setTimeout(() => {
       const el = listRef.current;
-
       if (!el) return;
-
       el.scrollTop = el.scrollHeight;
     }, delay);
   };
@@ -87,11 +85,9 @@ export default function MessageDetailPage() {
       }
 
       const res = await api.get(`/conversations/${conversationId}/messages`);
-
       setMessages(res.data || []);
 
       await markAsRead();
-
       scrollBottom(silent ? 120 : 320);
     } catch (error) {
       console.error(error);
@@ -148,9 +144,9 @@ export default function MessageDetailPage() {
   };
 
   return (
-    <main className="fixed inset-x-0 top-0 bottom-[86px] z-40 flex overflow-hidden bg-[#EAF1FF] md:inset-0">
-      <section className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden bg-[#EAF1FF] md:py-5">
-        <div className="flex h-full flex-col overflow-hidden bg-[#EAF1FF] md:rounded-[30px] md:border md:border-blue-100 md:bg-white md:shadow-2xl">
+    <main className="fixed inset-x-0 top-0 bottom-[86px] z-[9999] flex overflow-hidden bg-[#EAF1FF] md:inset-0">
+      <section className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden bg-[#EAF1FF] md:p-6">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#EAF1FF] md:rounded-[30px] md:border md:border-blue-100 md:bg-white md:shadow-2xl">
           <header className="shrink-0 bg-gradient-to-r from-[#1D4ED8] to-[#2563EB] px-3 py-3 text-white shadow-lg md:rounded-t-[30px] md:px-5 md:py-4">
             <div className="flex items-center gap-3">
               <button
@@ -165,7 +161,7 @@ export default function MessageDetailPage() {
               </div>
 
               <div className="min-w-0 flex-1 text-center">
-                <h1 className="truncate text-[17px] font-black leading-tight md:text-[20px]">
+                <h1 className="truncate text-[17px] font-black leading-tight md:text-[21px]">
                   EPH Mesajlaşma
                 </h1>
 
@@ -185,7 +181,7 @@ export default function MessageDetailPage() {
 
           <div
             ref={listRef}
-            className="min-h-0 flex-1 overflow-y-auto bg-[#EDF4FF] px-3 py-3 md:px-6 md:py-5"
+            className="min-h-0 flex-1 overflow-y-auto bg-[#EDF4FF] px-3 py-3 md:px-8 md:py-6"
           >
             {loading ? (
               <div className="flex h-full items-center justify-center">
@@ -212,7 +208,7 @@ export default function MessageDetailPage() {
                       }`}
                     >
                       <div
-                        className={`max-w-[84%] rounded-2xl px-3 py-2 shadow-sm md:max-w-[68%] md:px-4 md:py-3 ${
+                        className={`max-w-[84%] rounded-2xl px-3 py-2 shadow-sm md:max-w-[62%] md:px-4 md:py-3 ${
                           mine
                             ? "rounded-br-md bg-[#1D4ED8] text-white"
                             : "rounded-bl-md bg-white text-slate-800"
