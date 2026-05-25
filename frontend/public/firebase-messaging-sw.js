@@ -13,24 +13,35 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage((payload) => {
-  const title =
-    payload.notification?.title || "EPH Platform";
+messaging.onBackgroundMessage(async (payload) => {
+  const openedClients = await clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+
+  const visibleClient = openedClients.find((client) => {
+    return client.visibilityState === "visible";
+  });
+
+  if (visibleClient) {
+    openedClients.forEach((client) => {
+      client.postMessage({
+        type: "EPH_PUSH_MESSAGE",
+        payload,
+      });
+    });
+
+    return;
+  }
+
+  const title = payload.notification?.title || "EPH Platform";
 
   const options = {
-    body:
-      payload.notification?.body ||
-      "Yeni bildiriminiz var.",
-
+    body: payload.notification?.body || "Yeni bildiriminiz var.",
     icon: "/icons/icon-192x192.png",
-
     badge: "/icons/icon-192x192.png",
-
     data: payload.data || {},
   };
 
-  self.registration.showNotification(
-    title,
-    options
-  );
+  self.registration.showNotification(title, options);
 });
