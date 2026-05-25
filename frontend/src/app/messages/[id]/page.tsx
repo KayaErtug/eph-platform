@@ -54,15 +54,24 @@ export default function MessageDetailPage() {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
-  const scrollBottom = () => {
+  const scrollBottom = (delay = 320) => {
     setTimeout(() => {
-      bottomRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "end",
-      });
-    }, 100);
+      const el = listRef.current;
+
+      if (!el) return;
+
+      el.scrollTop = el.scrollHeight;
+    }, delay);
+  };
+
+  const isNearBottom = () => {
+    const el = listRef.current;
+
+    if (!el) return true;
+
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
   };
 
   const markAsRead = async () => {
@@ -79,17 +88,28 @@ export default function MessageDetailPage() {
 
   const fetchMessages = async (silent = false) => {
     try {
-      if (!silent) setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
+
+      const shouldKeepAtBottom = !silent || isNearBottom();
 
       const res = await api.get(`/conversations/${conversationId}/messages`);
-      setMessages(res.data || []);
+      const incomingMessages = res.data || [];
+
+      setMessages(incomingMessages);
 
       await markAsRead();
-      scrollBottom();
+
+      if (shouldKeepAtBottom) {
+        scrollBottom(silent ? 120 : 320);
+      }
     } catch (error) {
       console.error(error);
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -106,7 +126,7 @@ export default function MessageDetailPage() {
   }, [conversationId, user?.id]);
 
   useEffect(() => {
-    scrollBottom();
+    scrollBottom(320);
   }, [messages.length]);
 
   const sendMessage = async () => {
@@ -126,8 +146,10 @@ export default function MessageDetailPage() {
       });
 
       setMessage("");
+
       await fetchMessages(true);
-      scrollBottom();
+
+      scrollBottom(120);
     } catch (error) {
       console.error(error);
       alert("Mesaj gönderilemedi.");
@@ -137,13 +159,13 @@ export default function MessageDetailPage() {
   };
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#EAF1FF]">
-      <section className="mx-auto flex h-[calc(100dvh-104px)] max-w-5xl flex-col overflow-hidden bg-[#EAF1FF] md:h-screen">
+    <main className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[#EAF1FF]">
+      <section className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden bg-[#EAF1FF]">
         <header className="shrink-0 bg-gradient-to-r from-[#1D4ED8] to-[#2563EB] px-3 py-3 text-white shadow-lg">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/messages")}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 active:bg-white/20"
             >
               <ArrowLeft size={23} />
             </button>
@@ -152,10 +174,11 @@ export default function MessageDetailPage() {
               E
             </div>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 text-center">
               <h1 className="truncate text-[17px] font-black leading-tight">
                 EPH Mesajlaşma
               </h1>
+
               <p className="truncate text-[12px] font-medium text-blue-100">
                 Yeni mesajlar otomatik yenilenir
               </p>
@@ -163,14 +186,17 @@ export default function MessageDetailPage() {
 
             <button
               onClick={() => router.push("/messages")}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 active:bg-white/20"
             >
               <Inbox size={20} />
             </button>
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-[#EDF4FF] px-3 py-3">
+        <div
+          ref={listRef}
+          className="min-h-0 flex-1 overflow-y-auto bg-[#EDF4FF] px-3 py-3"
+        >
           {loading ? (
             <div className="flex h-full items-center justify-center">
               <div className="rounded-2xl bg-white px-5 py-3 text-sm font-bold text-slate-600 shadow-sm">
@@ -184,7 +210,7 @@ export default function MessageDetailPage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-2 pb-4">
+            <div className="space-y-2 pb-3">
               {messages.map((item) => {
                 const mine = item.sender.id === user?.id;
 
@@ -230,29 +256,43 @@ export default function MessageDetailPage() {
                   </div>
                 );
               })}
-
-              <div ref={bottomRef} />
             </div>
           )}
         </div>
 
-        <footer className="shrink-0 border-t border-blue-100 bg-[#F8FAFC] px-2 py-2">
+        <footer
+          className="shrink-0 border-t border-blue-100 bg-[#F8FAFC] px-2 pt-2"
+          style={{ paddingBottom: "calc(8px + env(safe-area-inset-bottom))" }}
+        >
           <div className="flex items-end gap-2">
             <div className="flex min-h-[50px] flex-1 items-end rounded-[26px] bg-white px-2 py-1 shadow-sm">
-              <button className="flex h-10 w-9 shrink-0 items-center justify-center text-slate-500">
+              <button
+                type="button"
+                className="flex h-10 w-9 shrink-0 items-center justify-center text-slate-500"
+              >
                 <Smile size={22} />
               </button>
 
               <textarea
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
-                onFocus={scrollBottom}
+                onFocus={() => scrollBottom(320)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    sendMessage();
+                  }
+                }}
                 rows={1}
                 placeholder="Mesaj"
-                className="max-h-[110px] min-h-[38px] flex-1 resize-none bg-transparent px-2 py-2 text-[16px] leading-[22px] text-slate-900 outline-none"
+                style={{ fontSize: "16px" }}
+                className="touch-manipulation max-h-[110px] min-h-[38px] flex-1 resize-none bg-transparent px-2 py-2 leading-[22px] text-slate-900 outline-none"
               />
 
-              <button className="flex h-10 w-9 shrink-0 items-center justify-center text-slate-500">
+              <button
+                type="button"
+                className="flex h-10 w-9 shrink-0 items-center justify-center text-slate-500"
+              >
                 <Paperclip size={21} />
               </button>
             </div>
