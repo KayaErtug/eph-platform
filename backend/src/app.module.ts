@@ -17,6 +17,7 @@ import { TrustModule } from './trust/trust.module';
 import { MarketModule } from './market/market.module';
 import { VisitsModule } from './visits/visits.module';
 import { PushModule } from './push/push.module';
+import { MessagesModule } from './messages/messages.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { PushModule } from './push/push.module';
     MarketModule,
     VisitsModule,
     PushModule,
+    MessagesModule,
   ],
 })
 export class AppModule {}
