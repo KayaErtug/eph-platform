@@ -1,7 +1,11 @@
 import axios from "axios";
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://emlakportfoyhavuzu.com/api";
+
 const api = axios.create({
-  baseURL: "http://94.73.180.181:3001",
+  baseURL: API_URL,
 });
 
 api.interceptors.request.use((config) => {
@@ -24,5 +28,18 @@ api.interceptors.request.use((config) => {
 
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (!error?.response) {
+      return Promise.reject(
+        new Error("Sunucu bağlantısı kurulamadı.")
+      );
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 export default api;
