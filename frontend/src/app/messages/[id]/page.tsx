@@ -12,6 +12,7 @@ import {
   Paperclip,
   SendHorizonal,
   Smile,
+  Volume2,
 } from "lucide-react";
 
 type Message = {
@@ -53,15 +54,53 @@ export default function MessageDetailPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
 
   const listRef = useRef<HTMLDivElement | null>(null);
+  const previousLastMessageIdRef = useRef<string | null>(null);
+  const firstLoadRef = useRef(true);
 
   const visibleMessages = messages.slice(-5);
+
+  const getSoundFile = () => {
+    return (
+      localStorage.getItem("ephNotificationSoundFile") ||
+      "/sounds/universfield-new-notification-043-493471.mp3"
+    );
+  };
+
+  const playCustomSound = () => {
+    const soundMode =
+      localStorage.getItem("ephNotificationSound") || "notification";
+
+    if (!soundEnabled) return;
+    if (soundMode === "off") return;
+
+    const audio = new Audio(getSoundFile());
+    audio.volume = 0.75;
+    audio.play().catch(() => {});
+  };
+
+  const enableSound = async () => {
+    try {
+      const audio = new Audio(getSoundFile());
+      audio.volume = 0.35;
+
+      await audio.play();
+
+      localStorage.setItem("ephSoundEnabled", "true");
+      setSoundEnabled(true);
+    } catch {
+      alert("iPhone sesi engelledi. Lütfen butona tekrar dokunun.");
+    }
+  };
 
   const scrollBottom = (delay = 320) => {
     setTimeout(() => {
       const el = listRef.current;
+
       if (!el) return;
+
       el.scrollTop = el.scrollHeight;
     }, delay);
   };
@@ -85,9 +124,28 @@ export default function MessageDetailPage() {
       }
 
       const res = await api.get(`/conversations/${conversationId}/messages`);
-      setMessages(res.data || []);
+      const incomingMessages: Message[] = res.data || [];
+
+      const lastMessage = incomingMessages[incomingMessages.length - 1];
+      const previousLastMessageId = previousLastMessageIdRef.current;
+
+      if (
+        !firstLoadRef.current &&
+        lastMessage &&
+        previousLastMessageId &&
+        lastMessage.id !== previousLastMessageId &&
+        lastMessage.sender.id !== user?.id
+      ) {
+        playCustomSound();
+      }
+
+      previousLastMessageIdRef.current = lastMessage?.id || null;
+      firstLoadRef.current = false;
+
+      setMessages(incomingMessages);
 
       await markAsRead();
+
       scrollBottom(silent ? 120 : 320);
     } catch (error) {
       console.error(error);
@@ -99,6 +157,10 @@ export default function MessageDetailPage() {
   };
 
   useEffect(() => {
+    setSoundEnabled(localStorage.getItem("ephSoundEnabled") === "true");
+  }, []);
+
+  useEffect(() => {
     if (!conversationId || !user?.id) return;
 
     fetchMessages();
@@ -108,7 +170,7 @@ export default function MessageDetailPage() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [conversationId, user?.id]);
+  }, [conversationId, user?.id, soundEnabled]);
 
   useEffect(() => {
     scrollBottom(320);
@@ -169,6 +231,16 @@ export default function MessageDetailPage() {
                   Yeni mesajlar otomatik yenilenir
                 </p>
               </div>
+
+              {!soundEnabled && (
+                <button
+                  onClick={enableSound}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 active:bg-white/20"
+                  title="Sesi Aç"
+                >
+                  <Volume2 size={20} />
+                </button>
+              )}
 
               <button
                 onClick={() => router.push("/messages")}
