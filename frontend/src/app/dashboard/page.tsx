@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { useAuthStore } from '@/store/auth.store';
 import {
   Bell,
   Building2,
@@ -16,7 +17,61 @@ import {
   MessageCircle,
 } from 'lucide-react';
 
+function getGreeting() {
+  const now = new Date();
+  const hour = now.getHours();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+
+  const isBayram =
+    (month === 3 && day >= 29 && day <= 31) ||
+    (month === 4 && day <= 2) ||
+    (month === 6 && day >= 5 && day <= 9);
+
+  if (isBayram) {
+    return {
+      title: 'İyi bayramlar',
+      subtitle:
+        'Sevdiklerinle birlikte huzurlu ve bereketli bir bayram geçirmeni dileriz.',
+    };
+  }
+
+  if (hour >= 5 && hour < 12) {
+    return {
+      title: 'Günaydın',
+      subtitle: 'Bugünkü portföy hareketlerin ve müşteri trafiğin hazır.',
+    };
+  }
+
+  if (hour >= 12 && hour < 17) {
+    return {
+      title: 'Tünaydın',
+      subtitle:
+        'Piyasadaki fırsatları ve aktif görüşmelerini takip etmeyi unutma.',
+    };
+  }
+
+  if (hour >= 17 && hour < 22) {
+    return {
+      title: 'İyi akşamlar',
+      subtitle:
+        'Günün performansını ve müşteri hareketlerini gözden geçirebilirsin.',
+    };
+  }
+
+  return {
+    title: 'İyi geceler',
+    subtitle: 'Yarınki fırsatlar için sistemin hazır durumda.',
+  };
+}
+
 export default function DashboardPage() {
+  const { user } = useAuthStore();
+  const greeting = getGreeting();
+
+  const firstName =
+    user?.firstName?.trim() || user?.email?.split('@')[0] || 'EPH Üyesi';
+
   return (
     <main className="min-h-screen bg-[#F4F6F9] text-[#111827]">
       <section className="mx-auto min-h-screen max-w-md bg-[#F8FAFC] px-5 pb-28 pt-6">
@@ -49,11 +104,11 @@ export default function DashboardPage() {
             </p>
 
             <h2 className="mt-2 text-[28px] font-black leading-none tracking-tight">
-              Merhaba Ahmet
+              {greeting.title} {firstName}
             </h2>
 
             <p className="mx-auto mt-3 max-w-[280px] text-[15px] leading-6 text-slate-500">
-              Portföylerin, müşterilerin ve piyasa hareketlerin güncel durumda.
+              {greeting.subtitle}
             </p>
           </div>
         </header>
