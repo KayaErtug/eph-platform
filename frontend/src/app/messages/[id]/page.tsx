@@ -56,22 +56,14 @@ export default function MessageDetailPage() {
 
   const listRef = useRef<HTMLDivElement | null>(null);
 
+  const visibleMessages = messages.slice(-5);
+
   const scrollBottom = (delay = 320) => {
     setTimeout(() => {
       const el = listRef.current;
-
       if (!el) return;
-
       el.scrollTop = el.scrollHeight;
     }, delay);
-  };
-
-  const isNearBottom = () => {
-    const el = listRef.current;
-
-    if (!el) return true;
-
-    return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
   };
 
   const markAsRead = async () => {
@@ -92,18 +84,11 @@ export default function MessageDetailPage() {
         setLoading(true);
       }
 
-      const shouldKeepAtBottom = !silent || isNearBottom();
-
       const res = await api.get(`/conversations/${conversationId}/messages`);
-      const incomingMessages = res.data || [];
-
-      setMessages(incomingMessages);
+      setMessages(res.data || []);
 
       await markAsRead();
-
-      if (shouldKeepAtBottom) {
-        scrollBottom(silent ? 120 : 320);
-      }
+      scrollBottom(silent ? 120 : 320);
     } catch (error) {
       console.error(error);
     } finally {
@@ -146,9 +131,7 @@ export default function MessageDetailPage() {
       });
 
       setMessage("");
-
       await fetchMessages(true);
-
       scrollBottom(120);
     } catch (error) {
       console.error(error);
@@ -159,7 +142,7 @@ export default function MessageDetailPage() {
   };
 
   return (
-    <main className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[#EAF1FF]">
+    <main className="fixed inset-x-0 top-0 bottom-[86px] z-40 flex overflow-hidden bg-[#EAF1FF] md:bottom-0">
       <section className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden bg-[#EAF1FF]">
         <header className="shrink-0 bg-gradient-to-r from-[#1D4ED8] to-[#2563EB] px-3 py-3 text-white shadow-lg">
           <div className="flex items-center gap-3">
@@ -211,7 +194,7 @@ export default function MessageDetailPage() {
             </div>
           ) : (
             <div className="space-y-2 pb-3">
-              {messages.map((item) => {
+              {visibleMessages.map((item) => {
                 const mine = item.sender.id === user?.id;
 
                 return (
