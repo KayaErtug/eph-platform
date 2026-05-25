@@ -63,9 +63,8 @@ export default function MessageDetailPage() {
   const [sending, setSending] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const messagesAreaRef = useRef<HTMLDivElement | null>(null);
 
-  const scrollBottom = (smooth = true) => {
+  const scrollBottom = (smooth = false) => {
     setTimeout(() => {
       bottomRef.current?.scrollIntoView({
         behavior: smooth ? "smooth" : "auto",
@@ -88,9 +87,7 @@ export default function MessageDetailPage() {
 
   const fetchMessages = async (silent = false) => {
     try {
-      if (!silent) {
-        setLoading(true);
-      }
+      if (!silent) setLoading(true);
 
       const res = await api.get(`/conversations/${conversationId}/messages`);
       const incomingMessages = res.data || [];
@@ -111,9 +108,7 @@ export default function MessageDetailPage() {
     } catch (error) {
       console.error(error);
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+      if (!silent) setLoading(false);
     }
   };
 
@@ -153,7 +148,7 @@ export default function MessageDetailPage() {
 
       await fetchMessages(true);
 
-      scrollBottom();
+      scrollBottom(true);
     } catch (error) {
       console.error(error);
       alert("Mesaj gönderilemedi.");
@@ -163,15 +158,15 @@ export default function MessageDetailPage() {
   };
 
   return (
-    <main className="h-[calc(100dvh-92px)] overflow-hidden bg-[#F4F7FB] md:h-screen">
-      <section className="mx-auto flex h-full max-w-5xl flex-col overflow-hidden px-3 pb-3 pt-3 md:px-4 md:pb-5 md:pt-5">
-        <header className="shrink-0 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm md:rounded-[28px] md:p-5">
-          <div className="flex items-center justify-between gap-3">
+    <main className="h-[calc(100dvh-112px)] overflow-hidden bg-[#F4F7FB] md:h-screen">
+      <section className="mx-auto flex h-full max-w-5xl flex-col overflow-hidden px-2 py-2 md:px-4 md:py-5">
+        <header className="shrink-0 rounded-[22px] border border-slate-200 bg-white p-3 shadow-sm md:rounded-[28px] md:p-5">
+          <div className="flex items-center justify-between gap-2">
             <button
               onClick={() => router.push("/network")}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600"
             >
-              <ArrowLeft size={20} />
+              <ArrowLeft size={19} />
             </button>
 
             <div className="min-w-0 flex-1 text-center">
@@ -180,18 +175,14 @@ export default function MessageDetailPage() {
                 Özel görüşme
               </div>
 
-              <h1 className="mt-1 truncate text-[21px] font-black tracking-tight text-[#0B1F44] md:text-[26px]">
+              <h1 className="mt-1 truncate text-[20px] font-black tracking-tight text-[#0B1F44] md:text-[26px]">
                 EPH Mesajlaşma
               </h1>
-
-              <p className="hidden text-sm text-slate-500 md:block">
-                Yeni mesajlar otomatik yenilenir.
-              </p>
             </div>
 
             <button
               onClick={() => router.push("/messages")}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#1D4ED8] text-white shadow-sm transition hover:scale-[1.02] md:w-auto md:px-4"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#1D4ED8] text-white md:w-auto md:px-4"
             >
               <Inbox size={18} />
               <span className="hidden text-sm font-black md:ml-2 md:inline">
@@ -201,11 +192,8 @@ export default function MessageDetailPage() {
           </div>
         </header>
 
-        <section className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm md:mt-4 md:rounded-[28px]">
-          <div
-            ref={messagesAreaRef}
-            className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-5 md:py-5"
-          >
+        <section className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm md:mt-4 md:rounded-[28px]">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 md:px-5 md:py-5">
             {loading ? (
               <div className="flex h-full items-center justify-center text-sm font-bold text-slate-500">
                 Mesajlar yükleniyor...
@@ -217,11 +205,11 @@ export default function MessageDetailPage() {
                 </div>
 
                 <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-                  Bu görüşmedeki ilk profesyonel mesajı sen gönderebilirsin.
+                  Bu görüşmedeki ilk mesajı sen gönderebilirsin.
                 </p>
               </div>
             ) : (
-              <div className="space-y-4 pb-3">
+              <div className="space-y-3 pb-3">
                 {messages.map((item) => {
                   const mine = item.sender.id === user?.id;
 
@@ -233,7 +221,7 @@ export default function MessageDetailPage() {
                       }`}
                     >
                       <div
-                        className={`max-w-[88%] rounded-[24px] px-4 py-3 shadow-sm md:max-w-[78%] ${
+                        className={`max-w-[96%] rounded-[22px] px-4 py-3 shadow-sm md:max-w-[78%] md:rounded-[24px] ${
                           mine
                             ? "bg-[#1D4ED8] text-white"
                             : "border border-slate-200 bg-[#F8FAFC] text-slate-700"
@@ -255,7 +243,7 @@ export default function MessageDetailPage() {
                           </span>
                         </div>
 
-                        <p className="whitespace-pre-wrap break-words text-sm leading-6">
+                        <p className="whitespace-pre-wrap break-words text-[15px] leading-6">
                           {item.body}
                         </p>
 
@@ -276,21 +264,21 @@ export default function MessageDetailPage() {
             )}
           </div>
 
-          <footer className="shrink-0 border-t border-slate-200 bg-white p-3 pb-[calc(12px+env(safe-area-inset-bottom))] md:p-4">
-            <div className="flex items-end gap-2 md:gap-3">
+          <footer className="shrink-0 border-t border-slate-200 bg-white p-2 pb-[calc(10px+env(safe-area-inset-bottom))] md:p-4">
+            <div className="flex items-end gap-2">
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onFocus={() => scrollBottom(false)}
                 placeholder="Mesajınızı yazın..."
                 rows={1}
-                className="max-h-[96px] min-h-[52px] flex-1 resize-none rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-3 text-sm font-semibold leading-6 outline-none transition focus:border-[#1D4ED8] md:min-h-[64px] md:p-4"
+                className="max-h-[90px] min-h-[54px] flex-1 resize-none rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-3 text-[15px] font-semibold leading-6 outline-none focus:border-[#1D4ED8]"
               />
 
               <button
                 disabled={sending || !message.trim()}
                 onClick={sendMessage}
-                className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl bg-[#1D4ED8] text-white transition hover:scale-[1.03] disabled:opacity-50 md:h-[64px] md:w-[64px]"
+                className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-2xl bg-[#1D4ED8] text-white disabled:opacity-50 md:h-[64px] md:w-[64px]"
               >
                 <SendHorizonal size={22} />
               </button>
