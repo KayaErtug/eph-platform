@@ -6,21 +6,17 @@ import { useAuthStore } from "@/store/auth.store";
 import api from "@/lib/api";
 
 import {
-  Bell,
   Building2,
   CheckCircle2,
   CircleUserRound,
-  Clock3,
   Flame,
   Inbox,
-  LockKeyhole,
   MessageCircle,
   Plus,
-  Search,
+ Search,
   Settings,
   ShieldCheck,
   Sparkles,
-  TimerReset,
   TrendingUp,
   UsersRound,
   Volume2,
@@ -75,34 +71,6 @@ const filters = [
   "Trend",
 ];
 
-const shareTypes = [
-  "Talep",
-  "Portföy",
-  "Ortak Satış",
-  "Arsa",
-  "Müteahhit Projesi",
-  "Yatırımcı Arıyor",
-];
-
-const validOptions = ["1 gün", "3 gün", "7 gün", "30 gün"];
-
-const urgencyOptions = [
-  "Normal",
-  "Sıcak Talep",
-  "Acil",
-  "Hazır Müşteri",
-];
-
-const visibilityOptions = [
-  { label: "Tüm EPH", value: "TUM_EPH" },
-  { label: "Sadece emlakçılar", value: "SADECE_EMLAKCILAR" },
-  {
-    label: "Sadece müteahhitler / inşaat firmaları",
-    value: "SADECE_MUTEAHHITLER",
-  },
-  { label: "Sadece bağlantılarım", value: "SADECE_BAGLANTILARIM" },
-];
-
 function relativeTime(value?: string) {
   if (!value) return "-";
 
@@ -117,36 +85,6 @@ function relativeTime(value?: string) {
   if (hour < 24) return `${hour} saat önce`;
 
   return `${day} gün önce`;
-}
-
-function formatDateTime(value?: string) {
-  if (!value) return "-";
-
-  const date = new Date(value);
-
-  return (
-    date.toLocaleDateString("tr-TR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }) +
-    " · " +
-    date.toLocaleTimeString("tr-TR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  );
-}
-
-function expiresAtFromValidFor(value: string) {
-  const date = new Date();
-
-  if (value === "1 gün") date.setDate(date.getDate() + 1);
-  else if (value === "3 gün") date.setDate(date.getDate() + 3);
-  else if (value === "7 gün") date.setDate(date.getDate() + 7);
-  else date.setDate(date.getDate() + 30);
-
-  return date.toISOString();
 }
 
 function formatMoney(value?: string | number | null) {
@@ -173,10 +111,12 @@ function roleLabel(role?: string) {
 
 export default function NetworkPage() {
   const router = useRouter();
+
   const { user, logout } = useAuthStore();
 
   const [posts, setPosts] = useState<NetworkPost[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [modalOpen, setModalOpen] = useState(false);
 
   const [conversationCount, setConversationCount] = useState(0);
@@ -201,6 +141,7 @@ export default function NetworkPage() {
     const soundFile = getSoundFile();
 
     if (!soundEnabled) return;
+
     if (soundValue === "off" || !soundFile) return;
 
     const audio = new Audio(soundFile);
@@ -228,6 +169,7 @@ export default function NetworkPage() {
 
   const handleLogout = () => {
     logout();
+
     router.push("/giris");
   };
 
@@ -264,6 +206,7 @@ export default function NetworkPage() {
       }
 
       firstUnreadCheckRef.current = false;
+
       lastUnreadRef.current = totalUnread;
 
       setUnreadCount(totalUnread);
@@ -291,48 +234,13 @@ export default function NetworkPage() {
     return () => clearInterval(interval);
   }, [user?.id, soundEnabled]);
 
-  const handleCreatePost = async (form: any) => {
-    if (!user?.id) return;
-
-    const customTags = form.tags
-      .split(",")
-      .map((tag: string) => tag.trim())
-      .filter(Boolean);
-
-    const locationTags = [
-      form.city,
-      form.district,
-      form.neighborhood,
-    ].filter(Boolean);
-
-    await api.post("/network/posts", {
-      userId: user.id,
-      type: form.type,
-      title: form.title,
-      description: form.desc,
-      city: form.city || null,
-      district: form.district || null,
-      neighborhood: form.neighborhood || null,
-      budget: form.budget
-        ? Number(form.budget.replace(/\D/g, ""))
-        : null,
-      urgency: form.urgency,
-      visibility: form.visibility,
-      tags: [...locationTags, ...customTags].slice(0, 8),
-      expiresAt: expiresAtFromValidFor(form.validFor),
-    });
-
-    await fetchPosts();
-
-    setModalOpen(false);
-  };
-
   const startConversation = async (post: NetworkPost) => {
     try {
       if (!user?.id) return;
 
       if (post.userId === user.id || post.user?.id === user.id) {
         alert("Bu paylaşım sana ait.");
+
         return;
       }
 
@@ -351,30 +259,30 @@ export default function NetworkPage() {
   return (
     <main className="min-h-screen bg-[#F3F6FB]">
       <div className="sticky top-0 z-40 border-b border-white/40 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-4 px-5 py-5 text-center lg:flex-row lg:justify-between lg:text-left">
+          <div className="flex flex-col items-center text-center lg:flex-row lg:gap-4 lg:text-left">
             <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-gradient-to-br from-[#2563EB] to-[#4F46E5] text-white shadow-xl">
               <UsersRound size={28} />
             </div>
 
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="mt-3 lg:mt-0">
+              <div className="flex items-center justify-center gap-2 lg:justify-start">
                 <h1 className="text-[28px] font-black text-[#0F172A]">
                   EPH Network
                 </h1>
 
                 <span className="rounded-full bg-[#DBEAFE] px-3 py-1 text-[11px] font-black text-[#1D4ED8]">
-                  PREMIUM
+                  EPH
                 </span>
               </div>
 
-              <p className="text-sm font-medium text-slate-500">
+              <p className="mt-2 text-sm font-medium text-slate-500">
                 Emlak profesyonellerine özel paylaşım ve iş birliği ağı
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             {!soundEnabled && (
               <button
                 onClick={enableSound}
@@ -420,17 +328,17 @@ export default function NetworkPage() {
       <section className="mx-auto grid max-w-7xl gap-5 px-5 py-6 lg:grid-cols-[280px_1fr_320px]">
         <aside className="space-y-5">
           <div className="overflow-hidden rounded-[30px] bg-gradient-to-br from-[#2563EB] to-[#4F46E5] p-5 text-white shadow-2xl">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col items-center text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/20 backdrop-blur">
                 <CircleUserRound size={34} />
               </div>
 
-              <div>
+              <div className="mt-3">
                 <h2 className="text-lg font-black">
                   {user?.firstName} {user?.lastName}
                 </h2>
 
-                <p className="text-sm text-blue-100">
+                <p className="mt-1 text-sm text-blue-100">
                   {roleLabel(user?.role)}
                 </p>
               </div>
@@ -450,7 +358,7 @@ export default function NetworkPage() {
           </div>
 
           <div className="rounded-[30px] border border-white bg-white p-5 shadow-sm">
-            <h3 className="mb-4 text-lg font-black text-[#0F172A]">
+            <h3 className="mb-4 text-center text-lg font-black text-[#0F172A]">
               Kategoriler
             </h3>
 
@@ -486,7 +394,7 @@ export default function NetworkPage() {
               />
             </div>
 
-            <div className="mb-5 flex gap-2 overflow-x-auto pb-2">
+            <div className="mb-5 flex justify-center gap-2 overflow-x-auto pb-2">
               {filters.map((filter, index) => (
                 <button
                   key={filter}
@@ -529,9 +437,11 @@ export default function NetworkPage() {
         </section>
 
         <aside className="space-y-5">
-          <div className="rounded-[30px] border border-white bg-white p-5 shadow-sm">
-            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-3xl bg-[#EEF2FF] text-[#4F46E5]">
-              <ShieldCheck size={28} />
+          <div className="rounded-[30px] border border-white bg-white p-5 text-center shadow-sm">
+            <div className="mb-3 flex justify-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-[#EEF2FF] text-[#4F46E5]">
+                <ShieldCheck size={28} />
+              </div>
             </div>
 
             <h2 className="text-xl font-black text-[#0F172A]">
@@ -544,7 +454,7 @@ export default function NetworkPage() {
           </div>
 
           <div className="rounded-[30px] border border-white bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-lg font-black text-[#0F172A]">
+            <h2 className="mb-4 text-center text-lg font-black text-[#0F172A]">
               Hızlı Erişim
             </h2>
 
@@ -577,7 +487,6 @@ export default function NetworkPage() {
       {modalOpen && (
         <CreatePostModal
           onClose={() => setModalOpen(false)}
-          onCreate={handleCreatePost}
         />
       )}
     </main>
@@ -606,58 +515,60 @@ function PremiumPostCard({
       <div className="h-2 bg-gradient-to-r from-[#2563EB] via-[#4F46E5] to-[#7C3AED]" />
 
       <div className="p-6">
-        <div className="mb-5 flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-[#2563EB] to-[#4F46E5] text-xl font-black text-white shadow-xl">
-              {authorName[0]}
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-[16px] font-black text-[#0F172A]">
-                  {authorName}
-                </h3>
-
-                <CheckCircle2
-                  size={18}
-                  className="text-[#2563EB]"
-                />
-              </div>
-
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                {roleLabel(post.user?.role)}
-              </p>
-
-              <p className="mt-1 text-xs font-bold text-slate-400">
-                {relativeTime(post.createdAt)}
-              </p>
-            </div>
+        <div className="mb-5 flex flex-col items-center justify-center text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-[#2563EB] to-[#4F46E5] text-xl font-black text-white shadow-xl">
+            {authorName[0]}
           </div>
 
-          <span className="rounded-full bg-[#FEF2F2] px-4 py-2 text-xs font-black text-[#DC2626]">
+          <div className="mt-4">
+            <div className="flex items-center justify-center gap-2">
+              <h3 className="text-[16px] font-black text-[#0F172A]">
+                {authorName}
+              </h3>
+
+              <CheckCircle2
+                size={18}
+                className="text-[#2563EB]"
+              />
+            </div>
+
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              {roleLabel(post.user?.role)}
+            </p>
+
+            <p className="mt-1 text-xs font-bold text-slate-400">
+              {relativeTime(post.createdAt)}
+            </p>
+          </div>
+
+          <span className="mt-4 rounded-full bg-[#FEF2F2] px-4 py-2 text-xs font-black text-[#DC2626]">
             🔥 {post.urgency || "Normal"}
           </span>
         </div>
 
-        <div className="mb-4 inline-flex rounded-full bg-[#EEF2FF] px-4 py-2 text-xs font-black text-[#4F46E5]">
-          {post.type}
+        <div className="mb-4 flex justify-center">
+          <div className="inline-flex rounded-full bg-[#EEF2FF] px-4 py-2 text-xs font-black text-[#4F46E5]">
+            {post.type}
+          </div>
         </div>
 
-        <h2 className="text-[26px] font-black leading-tight text-[#0F172A]">
+        <h2 className="text-center text-[26px] font-black leading-tight text-[#0F172A]">
           {post.title}
         </h2>
 
-        <p className="mt-4 text-[15px] leading-8 text-slate-600">
+        <p className="mt-4 text-center text-[15px] leading-8 text-slate-600">
           {post.description}
         </p>
 
         {post.budget && (
-          <div className="mt-5 inline-flex rounded-2xl bg-[#F8FAFC] px-4 py-3 text-sm font-black text-[#0F172A]">
-            💰 {formatMoney(post.budget)}
+          <div className="mt-5 flex justify-center">
+            <div className="inline-flex rounded-2xl bg-[#F8FAFC] px-4 py-3 text-sm font-black text-[#0F172A]">
+              💰 {formatMoney(post.budget)}
+            </div>
           </div>
         )}
 
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
           {post.tags.map((tag) => (
             <span
               key={tag}
@@ -668,7 +579,7 @@ function PremiumPostCard({
           ))}
         </div>
 
-        <div className="mt-6 grid grid-cols-3 gap-3">
+        <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
           <button
             onClick={
               isOwnPost ? undefined : onStartConversation
@@ -693,16 +604,6 @@ function PremiumPostCard({
             İlgileniyorum
           </button>
         </div>
-
-        <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-xs font-bold text-slate-400">
-          <span>
-            Yayın: {formatDateTime(post.createdAt)}
-          </span>
-
-          <span>
-            Bitiş: {formatDateTime(post.expiresAt)}
-          </span>
-        </div>
       </div>
     </article>
   );
@@ -710,33 +611,20 @@ function PremiumPostCard({
 
 function CreatePostModal({
   onClose,
-  onCreate,
-}: any) {
-  const [form, setForm] = useState({
-    type: "Talep",
-    title: "",
-    desc: "",
-    city: "Denizli",
-    district: "",
-    neighborhood: "",
-    budget: "",
-    urgency: "Sıcak Talep",
-    validFor: "1 gün",
-    visibility: "TUM_EPH",
-    tags: "",
-  });
-
+}: {
+  onClose: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur">
-      <div className="max-h-[95vh] w-full max-w-3xl overflow-auto rounded-[32px] bg-white">
-        <div className="flex items-center justify-between border-b border-slate-100 p-6">
-          <div>
+      <div className="w-full max-w-2xl rounded-[32px] bg-white p-6">
+        <div className="flex items-center justify-between">
+          <div className="text-center">
             <h2 className="text-[28px] font-black text-[#0F172A]">
               Yeni Paylaşım
             </h2>
 
-            <p className="mt-1 text-sm text-slate-500">
-              Premium network paylaşımı oluştur
+            <p className="mt-2 text-sm text-slate-500">
+              Ağ içerisinde paylaşım oluştur
             </p>
           </div>
 
@@ -745,33 +633,6 @@ function CreatePostModal({
             className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100"
           >
             <X size={20} />
-          </button>
-        </div>
-
-        <div className="grid gap-4 p-6">
-          <input
-            placeholder="Başlık"
-            value={form.title}
-            onChange={(e) =>
-              setForm({ ...form, title: e.target.value })
-            }
-            className="h-14 rounded-2xl border border-slate-200 px-5 font-bold outline-none"
-          />
-
-          <textarea
-            placeholder="Açıklama"
-            value={form.desc}
-            onChange={(e) =>
-              setForm({ ...form, desc: e.target.value })
-            }
-            className="min-h-[180px] rounded-2xl border border-slate-200 p-5 outline-none"
-          />
-
-          <button
-            onClick={() => onCreate(form)}
-            className="h-14 rounded-2xl bg-gradient-to-r from-[#2563EB] to-[#4F46E5] text-sm font-black text-white shadow-xl"
-          >
-            Paylaşımı Yayınla
           </button>
         </div>
       </div>
@@ -787,7 +648,7 @@ function MiniStat({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
+    <div className="rounded-2xl bg-white/10 p-4 text-center backdrop-blur">
       <p className="text-xs font-bold text-blue-100">
         {label}
       </p>
