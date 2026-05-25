@@ -33,6 +33,7 @@ type Conversation = {
   title: string;
   createdAt: string;
   updatedAt: string;
+  unreadCount?: number;
   post?: {
     id: string;
     title: string;
@@ -84,8 +85,9 @@ export default function MessagesInboxPage() {
     try {
       if (!user?.id) return;
 
-      const res = await api.get(`/conversations/my/${user.id}`);
-      setConversations(res.data || []);
+      const res = await api.get(`/conversations?userId=${user.id}`);
+
+      setConversations(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error(error);
       alert("Mesaj kutusu yüklenemedi.");
@@ -156,7 +158,7 @@ export default function MessagesInboxPage() {
                 );
 
                 const otherUser = otherParticipants[0]?.user;
-                const lastMessage = conversation.messages[0];
+                const lastMessage = conversation.messages?.[0];
 
                 const location = [
                   conversation.post?.city,
@@ -170,8 +172,14 @@ export default function MessagesInboxPage() {
                   <button
                     key={conversation.id}
                     onClick={() => router.push(`/messages/${conversation.id}`)}
-                    className="w-full rounded-[24px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1D4ED8] hover:bg-[#F8FAFC]"
+                    className="relative w-full rounded-[24px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1D4ED8] hover:bg-[#F8FAFC]"
                   >
+                    {conversation.unreadCount ? (
+                      <div className="absolute right-4 top-4 flex h-7 min-w-7 items-center justify-center rounded-full bg-red-500 px-2 text-xs font-black text-white">
+                        {conversation.unreadCount}
+                      </div>
+                    ) : null}
+
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex min-w-0 items-start gap-3">
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF4FF] font-black text-[#1D4ED8]">
