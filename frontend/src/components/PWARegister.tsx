@@ -26,13 +26,79 @@ export function PWARegister() {
     try {
       setBusy(true);
 
-      if (!("serviceWorker" in navigator)) return;
-      if (!("PushManager" in window)) return;
-      if (!("Notification" in window)) return;
-      if (!user?.id) return;
+      if (!user?.id) {
+        console.log("Push bekliyor: kullanıcı henüz yüklenmedi.");
+        return;
+      }
+
+      if (!("serviceWorker" in navigator)) {
+        console.log("Bu tarayıcı service worker desteklemiyor.");
+        return;
+      }
+
+      if (!("PushManager" in window)) {
+        console.log("Bu tarayıcı push notification desteklemiyor.");
+        return;
+      }
+
+      if (!("Notification" in window)) {
+        console.log("Bu tarayıcı notification desteklemiyor.");
+        return;
+      }
 
       await navigator.serviceWorker.register("/sw.js");
       const pushRegistration = await navigator.serviceWorker.register("/push-sw.js");
+
+      if (Notification.permission === "denied") {
+        setShowButton(true);
+        alert("Bildirim izni kapalı. Tarayıcı ayarlarından EPH için bildirim iznini açmalısınız.");
+        return;
+      }
+
+      if (Notification.permission === "default") {
+        setShowButton(true);
+        return;
+      }
+
+      const keyRes = await api.get("/push/public-key");
+      const publicKey = keyRes.data?.publicKey;
+
+      if (!publicKey) {
+        console.log("VAPID public key bulunamadı.");
+        setShowButton(true);
+        return;
+      }
+
+      let subscription = await pushRegistration.pushManager.getSubscription();
+
+      if (!subscription) {
+        subscription = await pushRegistration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+      }
+
+      await api.post("/push/subscribe", {
+        userId: user.id,
+        subscription,
+      });
+
+      console.log("Push aboneliği başarıyla kaydedildi.");
+      setShowButton(false);
+    } catch (error) {
+      console.error("PWA push kurulum hatası:", error);
+      setShowButton(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const requestPermissionAndSetup = async () => {
+    try {
+      if (!("Notification" in window)) {
+        alert("Bu tarayıcı bildirimleri desteklemiyor.");
+        return;
+      }
 
       if (Notification.permission === "denied") {
         alert("Bildirim izni kapalı. Tarayıcı ayarlarından EPH için bildirim iznini açmalısınız.");
@@ -41,43 +107,17 @@ export function PWARegister() {
 
       if (Notification.permission === "default") {
         const permission = await Notification.requestPermission();
-        if (permission !== "granted") return;
+
+        if (permission !== "granted") {
+          alert("Bildirim izni verilmedi.");
+          return;
+        }
       }
 
-      const currentSubscription = await pushRegistration.pushManager.getSubscription();
-
-      if (currentSubscription) {
-        await api.post("/push/subscribe", {
-          userId: user.id,
-          subscription: currentSubscription,
-        });
-
-        setShowButton(false);
-        return;
-      }
-
-      const keyRes = await api.get("/push/public-key");
-      const publicKey = keyRes.data?.publicKey;
-
-      if (!publicKey) return;
-
-      const newSubscription = await pushRegistration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
-
-      await api.post("/push/subscribe", {
-        userId: user.id,
-        subscription: newSubscription,
-      });
-
-      setShowButton(false);
-      alert("Bildirimler başarıyla etkinleştirildi.");
+      await setupPush();
     } catch (error) {
-      console.error("PWA push kurulum hatası:", error);
+      console.error("Bildirim izni hatası:", error);
       alert("Bildirim kurulumu tamamlanamadı.");
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -107,12 +147,12 @@ export function PWARegister() {
       return;
     }
 
-    if (Notification.permission !== "granted") {
-      setShowButton(true);
+    if (Notification.permission === "granted") {
+      setupPush();
       return;
     }
 
-    setupPush();
+    setShowButton(true);
   }, [user?.id]);
 
   if (!showButton) return null;
@@ -120,7 +160,7 @@ export function PWARegister() {
   return (
     <button
       type="button"
-      onClick={setupPush}
+      onClick={requestPermissionAndSetup}
       disabled={busy}
       className="fixed bottom-24 left-1/2 z-[9999] -translate-x-1/2 rounded-full bg-[#1D4ED8] px-5 py-3 text-sm font-black text-white shadow-xl transition hover:scale-[1.03] disabled:opacity-60"
     >
