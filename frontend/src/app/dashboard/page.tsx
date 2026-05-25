@@ -70,7 +70,6 @@ function getGreeting() {
 
 export default function DashboardPage() {
   const router = useRouter();
-
   const { user, logout } = useAuthStore();
 
   const greeting = getGreeting();
@@ -78,11 +77,16 @@ export default function DashboardPage() {
   const firstName =
     user?.firstName?.trim() || user?.email?.split('@')[0] || 'EPH Üyesi';
 
+  const handleLogout = () => {
+    logout();
+    router.push('/giris');
+  };
+
   return (
     <main className="min-h-screen bg-[#F4F6F9] text-[#111827]">
       <section className="mx-auto min-h-screen max-w-md bg-[#F8FAFC] px-5 pb-28 pt-6">
         <header>
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <h1 className="text-[28px] font-black tracking-tight text-[#0B1F44]">
                 EPH
@@ -98,22 +102,22 @@ export default function DashboardPage() {
                 <Bell size={19} />
               </button>
 
-              <button className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#1D4ED8]">
-                <CircleUserRound size={24} />
-              </button>
-
               <button
-                onClick={() => {
-                  logout();
-                  router.push('/giris');
-                }}
-                className="flex h-11 items-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 text-[13px] font-black text-red-600 transition hover:bg-red-100"
+                onClick={() => router.push('/profil')}
+                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#1D4ED8]"
               >
-                <LogOut size={16} />
-                Çıkış
+                <CircleUserRound size={24} />
               </button>
             </div>
           </div>
+
+          <button
+            onClick={handleLogout}
+            className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 text-[13px] font-black text-red-600 transition hover:bg-red-100"
+          >
+            <LogOut size={16} />
+            Güvenli Çıkış Yap
+          </button>
 
           <div className="mt-8 text-center">
             <p className="text-[13px] font-bold uppercase tracking-wide text-[#1D4ED8]">
