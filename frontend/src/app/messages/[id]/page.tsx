@@ -1,16 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useParams, useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Inbox,
-  LockKeyhole,
-  SendHorizonal,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, SendHorizonal } from "lucide-react";
 
 type Message = {
   id: string;
@@ -24,21 +18,11 @@ type Message = {
   };
 };
 
-function formatDateTime(value: string) {
-  const date = new Date(value);
-
-  return (
-    date.toLocaleDateString("tr-TR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }) +
-    " · " +
-    date.toLocaleTimeString("tr-TR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  );
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function roleLabel(role?: string) {
@@ -46,7 +30,6 @@ function roleLabel(role?: string) {
   if (role === "MUTEAHHIT") return "Müteahhit";
   if (role === "INSAAT_FIRMASI") return "İnşaat Firması";
   if (role === "ADMIN") return "EPH Admin";
-
   return "EPH Üyesi";
 }
 
@@ -62,16 +45,34 @@ export default function MessageDetailPage() {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
-  const scrollBottom = (smooth = false) => {
+  const scrollToBottom = () => {
     setTimeout(() => {
-      bottomRef.current?.scrollIntoView({
-        behavior: smooth ? "smooth" : "auto",
-        block: "end",
-      });
-    }, 80);
+      const el = listRef.current;
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+    }, 60);
   };
+
+  useEffect(() => {
+    const setHeight = () => {
+      const height = window.visualViewport?.height || window.innerHeight;
+      document.documentElement.style.setProperty("--eph-chat-height", `${height}px`);
+    };
+
+    setHeight();
+
+    window.visualViewport?.addEventListener("resize", setHeight);
+    window.visualViewport?.addEventListener("scroll", setHeight);
+    window.addEventListener("resize", setHeight);
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", setHeight);
+      window.visualViewport?.removeEventListener("scroll", setHeight);
+      window.removeEventListener("resize", setHeight);
+    };
+  }, []);
 
   const markAsRead = async () => {
     if (!user?.id || !conversationId) return;
@@ -92,19 +93,9 @@ export default function MessageDetailPage() {
       const res = await api.get(`/conversations/${conversationId}/messages`);
       const incomingMessages = res.data || [];
 
-      setMessages((prev) => {
-        const prevJson = JSON.stringify(prev);
-        const nextJson = JSON.stringify(incomingMessages);
-
-        if (prevJson !== nextJson) {
-          setTimeout(() => scrollBottom(false), 100);
-          return incomingMessages;
-        }
-
-        return prev;
-      });
-
+      setMessages(incomingMessages);
       await markAsRead();
+      scrollToBottom();
     } catch (error) {
       console.error(error);
     } finally {
@@ -125,7 +116,7 @@ export default function MessageDetailPage() {
   }, [conversationId, user?.id]);
 
   useEffect(() => {
-    scrollBottom(false);
+    scrollToBottom();
   }, [messages.length]);
 
   const sendMessage = async () => {
@@ -141,14 +132,12 @@ export default function MessageDetailPage() {
 
       await api.post(`/conversations/${conversationId}/messages`, {
         senderId: user.id,
-        body: message,
+        body: message.trim(),
       });
 
       setMessage("");
-
       await fetchMessages(true);
-
-      scrollBottom(true);
+      scrollToBottom();
     } catch (error) {
       console.error(error);
       alert("Mesaj gönderilemedi.");
@@ -158,133 +147,109 @@ export default function MessageDetailPage() {
   };
 
   return (
-    <main className="h-[calc(100dvh-112px)] overflow-hidden bg-[#F4F7FB] md:h-screen">
-      <section className="mx-auto flex h-full max-w-5xl flex-col overflow-hidden px-2 py-2 md:px-4 md:py-5">
-        <header className="shrink-0 rounded-[22px] border border-slate-200 bg-white p-3 shadow-sm md:rounded-[28px] md:p-5">
-          <div className="flex items-center justify-between gap-2">
-            <button
-              onClick={() => router.push("/network")}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600"
-            >
-              <ArrowLeft size={19} />
-            </button>
+    <main
+      className="fixed inset-0 z-[9999] overflow-hidden bg-[#ECE5DD]"
+      style={{ height: "var(--eph-chat-height, 100dvh)" } as CSSProperties}
+    >
+      <section className="flex h-full flex-col overflow-hidden">
+        <header className="flex h-[64px] shrink-0 items-center gap-3 bg-[#075E54] px-3 text-white shadow-md">
+          <button
+            onClick={() => router.push("/messages")}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full active:bg-white/10"
+          >
+            <ArrowLeft size={24} />
+          </button>
 
-            <div className="min-w-0 flex-1 text-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-[#EEF4FF] px-3 py-1 text-[11px] font-black text-[#1D4ED8]">
-                <LockKeyhole size={13} />
-                Özel görüşme
-              </div>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/20 text-base font-black">
+            E
+          </div>
 
-              <h1 className="mt-1 truncate text-[20px] font-black tracking-tight text-[#0B1F44] md:text-[26px]">
-                EPH Mesajlaşma
-              </h1>
-            </div>
-
-            <button
-              onClick={() => router.push("/messages")}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#1D4ED8] text-white md:w-auto md:px-4"
-            >
-              <Inbox size={18} />
-              <span className="hidden text-sm font-black md:ml-2 md:inline">
-                Mesaj Kutusu
-              </span>
-            </button>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-[16px] font-bold leading-tight">
+              EPH Mesajlaşma
+            </h1>
+            <p className="truncate text-[12px] font-medium text-white/80">
+              Yeni mesajlar otomatik yenilenir
+            </p>
           </div>
         </header>
 
-        <section className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm md:mt-4 md:rounded-[28px]">
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 md:px-5 md:py-5">
-            {loading ? (
-              <div className="flex h-full items-center justify-center text-sm font-bold text-slate-500">
-                Mesajlar yükleniyor...
+        <div
+          ref={listRef}
+          className="min-h-0 flex-1 overflow-y-auto px-3 py-3"
+        >
+          {loading ? (
+            <div className="flex h-full items-center justify-center text-sm font-bold text-slate-600">
+              Mesajlar yükleniyor...
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-center">
+              <div className="rounded-2xl bg-white/80 px-5 py-4 text-sm font-bold text-slate-600 shadow-sm">
+                Henüz mesaj yok.
               </div>
-            ) : messages.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center text-center">
-                <div className="text-[20px] font-black text-[#0B1F44]">
-                  Henüz mesaj yok
-                </div>
+            </div>
+          ) : (
+            <div className="space-y-2 pb-2">
+              {messages.map((item) => {
+                const mine = item.sender.id === user?.id;
 
-                <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-                  Bu görüşmedeki ilk mesajı sen gönderebilirsin.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3 pb-3">
-                {messages.map((item) => {
-                  const mine = item.sender.id === user?.id;
-
-                  return (
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                  >
                     <div
-                      key={item.id}
-                      className={`flex ${
-                        mine ? "justify-end" : "justify-start"
+                      className={`max-w-[82%] rounded-2xl px-3 py-2 shadow-sm ${
+                        mine
+                          ? "rounded-br-md bg-[#DCF8C6] text-[#111827]"
+                          : "rounded-bl-md bg-white text-[#111827]"
                       }`}
                     >
-                      <div
-                        className={`max-w-[96%] rounded-[22px] px-4 py-3 shadow-sm md:max-w-[78%] md:rounded-[24px] ${
-                          mine
-                            ? "bg-[#1D4ED8] text-white"
-                            : "border border-slate-200 bg-[#F8FAFC] text-slate-700"
-                        }`}
-                      >
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-black">
-                            {item.sender.firstName} {item.sender.lastName}
-                          </span>
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <span className="truncate text-[12px] font-bold text-slate-700">
+                          {item.sender.firstName} {item.sender.lastName}
+                        </span>
+                        <CheckCircle2 size={13} className="shrink-0 text-[#128C7E]" />
+                        <span className="shrink-0 text-[11px] font-semibold text-slate-400">
+                          {roleLabel(item.sender.role)}
+                        </span>
+                      </div>
 
-                          <CheckCircle2 size={14} />
+                      <p className="whitespace-pre-wrap break-words text-[15px] font-normal leading-[20px]">
+                        {item.body}
+                      </p>
 
-                          <span
-                            className={`text-[11px] font-bold ${
-                              mine ? "text-blue-100" : "text-slate-400"
-                            }`}
-                          >
-                            {roleLabel(item.sender.role)}
-                          </span>
-                        </div>
-
-                        <p className="whitespace-pre-wrap break-words text-[15px] leading-6">
-                          {item.body}
-                        </p>
-
-                        <div
-                          className={`mt-2 text-right text-[11px] font-bold ${
-                            mine ? "text-blue-100" : "text-slate-400"
-                          }`}
-                        >
-                          {formatDateTime(item.createdAt)}
-                        </div>
+                      <div className="mt-1 text-right text-[11px] font-semibold text-slate-400">
+                        {formatTime(item.createdAt)}
                       </div>
                     </div>
-                  );
-                })}
-
-                <div ref={bottomRef} />
-              </div>
-            )}
-          </div>
-
-          <footer className="shrink-0 border-t border-slate-200 bg-white p-2 pb-[calc(10px+env(safe-area-inset-bottom))] md:p-4">
-            <div className="flex items-end gap-2">
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onFocus={() => scrollBottom(false)}
-                placeholder="Mesajınızı yazın..."
-                rows={1}
-                className="max-h-[90px] min-h-[54px] flex-1 resize-none rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-3 text-[15px] font-semibold leading-6 outline-none focus:border-[#1D4ED8]"
-              />
-
-              <button
-                disabled={sending || !message.trim()}
-                onClick={sendMessage}
-                className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-2xl bg-[#1D4ED8] text-white disabled:opacity-50 md:h-[64px] md:w-[64px]"
-              >
-                <SendHorizonal size={22} />
-              </button>
+                  </div>
+                );
+              })}
             </div>
-          </footer>
-        </section>
+          )}
+        </div>
+
+        <footer className="shrink-0 bg-[#ECE5DD] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2">
+          <div className="flex items-end gap-2">
+            <textarea
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              onFocus={scrollToBottom}
+              rows={1}
+              placeholder="Mesaj"
+              className="max-h-[96px] min-h-[44px] flex-1 resize-none rounded-[22px] border-0 bg-white px-4 py-3 text-[15px] leading-[20px] text-slate-900 shadow-sm outline-none"
+            />
+
+            <button
+              disabled={sending || !message.trim()}
+              onClick={sendMessage}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#128C7E] text-white shadow-sm disabled:opacity-50"
+            >
+              <SendHorizonal size={21} />
+            </button>
+          </div>
+        </footer>
       </section>
     </main>
   );
