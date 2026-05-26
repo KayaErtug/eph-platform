@@ -191,28 +191,36 @@ export default function DashboardPage() {
 
           <div className="space-y-3">
             <ListingCard
-              title="Sümerpark Evleri"
-              type="3+1 Daire"
-              location="Merkezefendi / Denizli"
-              price="6.250.000 TL"
-              status="Aktif"
-            />
+ 	 	title="Gerzele'de Site İçerisinde 3+1 Daire"
+ 		 type="190 m² • Acil Satılık"
+ 		 location="Gerzele / Denizli"
+ 		 price="7.500.000 TL"
+ 		 status="Aktif"
+		/>
 
-            <ListingCard
-              title="Nova Residence"
-              type="2+1 Daire"
-              location="Pamukkale / Denizli"
-              price="4.750.000 TL"
-              status="Aktif"
-            />
+	    <ListingCard
+ 		 title="Çamlık Forum'a 2 Dakika 1+1 Apart"
+  		type="2. Kat • Balkonlu"
+  		location="Çamlık / Denizli"
+  		price="2.200.000 TL"
+  		status="Aktif"
+		/>
 
-            <ListingCard
-              title="Elite Konakları"
-              type="4+1 Daire"
-              location="Pamukkale / Denizli"
-              price="8.900.000 TL"
-              status="Pasif"
-            />
+	   <ListingCard
+ 		 title="Koşuyolu Üzeri 455 m² Villalık Arsa"
+ 		 type="%30 İmarlı • Köşe Başı"
+  		location="Koşuyolu / Denizli"
+  		price="11.000.000 TL"
+ 		 status="Aktif"
+		/>
+
+	    <ListingCard
+ 		 title="Kuşpınar Mahallesi 350 m² Arsa"
+  		type="6 Kat İmarlı • Çarşamba Pazarı"
+  		location="Kuşpınar / Denizli"
+  		price="20.000.000 TL"
+  		status="Aktif"
+		/>
           </div>
         </section>
 
