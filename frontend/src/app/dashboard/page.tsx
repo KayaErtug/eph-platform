@@ -7,15 +7,19 @@ import { useAuthStore } from '@/store/auth.store';
 
 import {
   Bell,
+  Bot,
   Building2,
   ChevronRight,
   CircleUserRound,
   Home,
+  LineChart,
   LogOut,
   MapPin,
   MessageCircle,
   Mic,
   Plus,
+  Sparkles,
+  TrendingUp,
   UsersRound,
   WalletCards,
 } from 'lucide-react';
@@ -83,12 +87,20 @@ export default function DashboardPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#F4F6F9] text-[#111827]">
-      <section className="mx-auto min-h-screen max-w-md bg-[#F8FAFC] px-5 pb-28 pt-6">
-        <header>
+    <main className="min-h-screen bg-[#07111F] text-[#111827]">
+      <section className="relative mx-auto min-h-screen max-w-md overflow-hidden bg-[#F8FAFC] px-5 pb-28 pt-6 shadow-2xl shadow-black/20">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#2563EB]/20 blur-3xl" />
+        <div className="pointer-events-none absolute -left-24 top-72 h-72 w-72 rounded-full bg-[#60A5FA]/20 blur-3xl" />
+
+        <header className="relative z-10">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-[28px] font-black tracking-tight text-[#0B1F44]">
+              <div className="inline-flex items-center gap-2 rounded-full bg-[#0B1F44] px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white">
+                <Sparkles size={12} />
+                Premium Panel
+              </div>
+
+              <h1 className="mt-3 text-[30px] font-black tracking-tight text-[#0B1F44]">
                 EPH
               </h1>
 
@@ -98,49 +110,79 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <button className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600">
+              <button className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm">
+                <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
                 <Bell size={19} />
               </button>
 
               <button
                 onClick={() => router.push('/profil')}
-                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#1D4ED8]"
+                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#1D4ED8] shadow-sm"
               >
                 <CircleUserRound size={24} />
               </button>
             </div>
           </div>
 
+          <div className="mt-6 overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0B1F44] via-[#123B7A] to-[#1D4ED8] p-5 text-white shadow-2xl shadow-[#1D4ED8]/25">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#93C5FD]">
+                  Günlük Özet
+                </p>
+
+                <h2 className="mt-3 text-[28px] font-black leading-tight tracking-tight">
+                  {greeting.title} {firstName}
+                </h2>
+
+                <p className="mt-3 max-w-[300px] text-[14px] leading-6 text-white/70">
+                  {greeting.subtitle}
+                </p>
+              </div>
+
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white backdrop-blur">
+                <TrendingUp size={26} />
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              <MiniHeroItem label="Aktif" value="128" />
+              <MiniHeroItem label="Talep" value="24" />
+              <MiniHeroItem label="Görüşme" value="42" />
+            </div>
+          </div>
+
           <button
             onClick={handleLogout}
-            className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 text-[13px] font-black text-red-600 transition hover:bg-red-100"
+            className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 text-[13px] font-black text-red-600 transition hover:bg-red-100"
           >
             <LogOut size={16} />
             Güvenli Çıkış Yap
           </button>
-
-          <div className="mt-8 text-center">
-            <p className="text-[13px] font-bold uppercase tracking-wide text-[#1D4ED8]">
-              Günlük Özet
-            </p>
-
-            <h2 className="mt-2 text-[28px] font-black leading-none tracking-tight">
-              {greeting.title} {firstName}
-            </h2>
-
-            <p className="mx-auto mt-3 max-w-[280px] text-[15px] leading-6 text-slate-500">
-              {greeting.subtitle}
-            </p>
-          </div>
         </header>
 
-        <section className="mt-7 grid grid-cols-3 gap-3">
-          <StatCard title="İlan" value="128" change="+12%" />
-          <StatCard title="Müşteri" value="86" change="+8%" />
-          <StatCard title="İşlem" value="42" change="+15%" />
+        <section className="relative z-10 mt-7 grid grid-cols-3 gap-3">
+          <StatCard
+            icon={<Building2 size={18} />}
+            title="İlan"
+            value="128"
+            change="+12%"
+          />
+          <StatCard
+            icon={<UsersRound size={18} />}
+            title="Müşteri"
+            value="86"
+            change="+8%"
+          />
+          <StatCard
+            icon={<LineChart size={18} />}
+            title="İşlem"
+            value="42"
+            change="+15%"
+          />
         </section>
 
-        <section className="mt-8">
+        <section className="relative z-10 mt-8">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-[18px] font-black tracking-tight">
               Hızlı İşlemler
@@ -174,7 +216,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="mt-8">
+        <section className="relative z-10 mt-8">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-[18px] font-black tracking-tight">
               Son İlanlar
@@ -228,33 +270,36 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="mt-8 rounded-[26px] border border-slate-200 bg-white p-5">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#1D4ED8]">
-              <Mic size={25} />
+        <section className="relative z-10 mt-8 overflow-hidden rounded-[30px] border border-[#1D4ED8]/10 bg-gradient-to-br from-[#0B1F44] to-[#1D4ED8] p-5 text-white shadow-xl shadow-[#1D4ED8]/20">
+          <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+
+          <div className="relative flex items-center gap-4">
+            <div className="flex h-15 w-15 items-center justify-center rounded-2xl bg-white/10 text-white backdrop-blur">
+              <Bot size={28} />
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-black uppercase tracking-wide text-[#1D4ED8]">
+              <p className="text-[12px] font-black uppercase tracking-[0.22em] text-[#BFDBFE]">
                 Lina AI
               </p>
 
-              <h3 className="mt-1 text-[19px] font-black tracking-tight">
+              <h3 className="mt-1 text-[21px] font-black tracking-tight">
                 Sesli ilan oluştur
               </h3>
 
-              <p className="mt-1 text-[14px] leading-5 text-slate-500">
-                İlan bilgilerini konuşarak hızlıca kayıt oluştur.
+              <p className="mt-1 text-[14px] leading-5 text-white/70">
+                İlan bilgilerini konuş, Lina düzenli portföy kaydına dönüştürsün.
               </p>
             </div>
           </div>
 
-          <button className="mt-5 flex h-12 w-full items-center justify-center rounded-2xl bg-[#1D4ED8] text-[14px] font-black text-white">
+          <button className="relative mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white text-[14px] font-black text-[#1D4ED8]">
+            <Mic size={18} />
             Lina’yı Başlat
           </button>
         </section>
 
-        <section className="mt-8 rounded-[26px] border border-slate-200 bg-white p-5">
+        <section className="relative z-10 mt-8 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-5 flex items-center justify-between">
             <h3 className="text-[18px] font-black tracking-tight">
               Piyasa Özeti
@@ -277,7 +322,7 @@ export default function DashboardPage() {
         </section>
       </section>
 
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 px-5 pb-6 pt-3 backdrop-blur">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white/95 px-5 pb-6 pt-3 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center justify-between">
           <BottomItem
             active
@@ -315,24 +360,43 @@ export default function DashboardPage() {
   );
 }
 
+function MiniHeroItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white/10 px-3 py-3 text-center backdrop-blur">
+      <p className="text-[18px] font-black leading-none">{value}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-white/55">
+        {label}
+      </p>
+    </div>
+  );
+}
+
 function StatCard({
+  icon,
   title,
   value,
   change,
 }: {
+  icon: ReactNode;
   title: string;
   value: string;
   change: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-4">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+    <div className="rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+      <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#1D4ED8]">
+        {icon}
+      </div>
+
+      <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">
         {title}
       </p>
 
-      <p className="mt-3 text-[28px] font-black leading-none">{value}</p>
+      <p className="mt-2 text-[28px] font-black leading-none">{value}</p>
 
-      <p className="mt-3 text-[12px] font-bold text-emerald-600">{change}</p>
+      <p className="mt-3 text-[12px] font-bold text-emerald-600">
+        {change} artış
+      </p>
     </div>
   );
 }
@@ -349,7 +413,7 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="rounded-[22px] border border-slate-200 bg-white px-2 py-4"
+      className="rounded-[24px] border border-slate-200 bg-white px-2 py-4 shadow-sm transition hover:-translate-y-1 hover:border-[#1D4ED8]/30 hover:shadow-lg"
     >
       <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#1D4ED8]">
         {icon}
@@ -378,13 +442,9 @@ function ListingCard({
   image: string;
 }) {
   return (
-    <article className="flex items-center gap-3 rounded-[24px] border border-slate-200 bg-white p-3">
-      <div className="h-[82px] w-[92px] shrink-0 overflow-hidden rounded-[18px] bg-[#E8EEF6]">
-        <img
-          src={image}
-          alt={title}
-          className="h-full w-full object-cover"
-        />
+    <article className="flex items-center gap-3 rounded-[26px] border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+      <div className="h-[88px] w-[98px] shrink-0 overflow-hidden rounded-[20px] bg-[#E8EEF6]">
+        <img src={image} alt={title} className="h-full w-full object-cover" />
       </div>
 
       <div className="min-w-0 flex-1">
@@ -401,7 +461,7 @@ function ListingCard({
           {location}
         </p>
 
-        <p className="mt-2 text-[17px] font-black">{price}</p>
+        <p className="mt-2 text-[17px] font-black text-[#0B1F44]">{price}</p>
       </div>
 
       <div className="flex flex-col items-end justify-between self-stretch py-1">
