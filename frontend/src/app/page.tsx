@@ -5,13 +5,13 @@ import { useState } from "react";
 import {
   ArrowRight,
   BadgeCheck,
-  BarChart3,
   Building2,
   CheckCircle2,
   Globe2,
   Handshake,
   LockKeyhole,
   MessageCircle,
+  Play,
   Radar,
   ShieldCheck,
   Sparkles,
@@ -79,6 +79,7 @@ type InfoModalType = "kesfet" | "kvkk" | "gizlilik" | "iletisim";
 
 export default function LandingPage() {
   const [showForm, setShowForm] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
   const [infoModal, setInfoModal] = useState<null | InfoModalType>(null);
 
   const [form, setForm] = useState({
@@ -211,17 +212,10 @@ export default function LandingPage() {
             <div className="flex items-center gap-3">
               <Link
                 href="/giris"
-                className="hidden rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-xs font-black md:flex"
+                className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-xs font-black transition hover:bg-white/10"
               >
                 Giriş Yap
               </Link>
-
-              <button
-                onClick={() => setShowForm(true)}
-                className="rounded-2xl bg-[#2563EB] px-5 py-3 text-xs font-black text-white transition hover:bg-[#1D4ED8]"
-              >
-                Üyelik Başvurusu
-              </button>
             </div>
           </div>
         </header>
@@ -276,6 +270,17 @@ export default function LandingPage() {
                     size={18}
                     className="transition group-hover:translate-x-1"
                   />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowVideo(true)}
+                  className="group flex items-center gap-2 rounded-2xl border border-[#60A5FA]/30 bg-white/5 px-7 py-4 text-sm font-black text-white transition hover:-translate-y-1 hover:bg-white/10"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#2563EB]">
+                    <Play size={14} fill="white" />
+                  </span>
+                  Tanıtım Videosunu İzle
                 </button>
 
                 <button
@@ -557,6 +562,45 @@ export default function LandingPage() {
           </div>
         </footer>
       </main>
+
+      {showVideo && (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl"
+          onClick={() => setShowVideo(false)}
+        >
+          <div
+            className="relative w-full max-w-5xl overflow-hidden rounded-[32px] border border-white/10 bg-[#07111F] p-3 shadow-2xl shadow-[#2563EB]/20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-4 px-3 pb-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.25em] text-[#60A5FA]">
+                  EPH Platform
+                </p>
+
+                <h3 className="mt-1 text-xl font-black text-white">
+                  Tanıtım Videosu
+                </h3>
+              </div>
+
+              <button
+                onClick={() => setShowVideo(false)}
+                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white transition hover:bg-white/10"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <video
+              src="/videos/eph.mp4"
+              controls
+              autoPlay
+              playsInline
+              className="aspect-video w-full rounded-[24px] bg-black object-contain"
+            />
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div
