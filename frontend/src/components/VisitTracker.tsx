@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
@@ -7,12 +8,21 @@ export function VisitTracker() {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) return;
+
+    if (!token || !pathname) {
+      return;
+    }
+
     fetch("/api/visit-log", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({ page: pathname }),
-    }).catch(() => {});
+    }).catch(() => {
+      // Ziyaret kaydı çalışmazsa kullanıcı deneyimini bozma.
+    });
   }, [pathname]);
 
   return null;

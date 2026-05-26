@@ -6,19 +6,26 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
 
 import {
+  ArrowUpRight,
   Bell,
   Bot,
   Building2,
+  CalendarCheck,
   ChevronRight,
   CircleUserRound,
+  ClipboardList,
+  Clock3,
+  Eye,
   Home,
   LineChart,
   LogOut,
   MapPin,
   MessageCircle,
   Mic,
+  PhoneCall,
   Plus,
   Sparkles,
+  Target,
   TrendingUp,
   UsersRound,
   WalletCards,
@@ -72,6 +79,54 @@ function getGreeting() {
   };
 }
 
+const todayTasks = [
+  {
+    icon: PhoneCall,
+    title: '3 müşteriye geri dönüş',
+    desc: 'CRM’de bekleyen görüşmeleri tamamla.',
+    time: 'Bugün',
+  },
+  {
+    icon: ClipboardList,
+    title: '2 portföy bilgisini güncelle',
+    desc: 'Fiyat ve açıklama kontrolü önerilir.',
+    time: 'Öncelikli',
+  },
+  {
+    icon: CalendarCheck,
+    title: '1 randevu hazırlığı',
+    desc: 'Kuşpınar arsa için notlarını gözden geçir.',
+    time: '15:30',
+  },
+];
+
+const liveActivities = [
+  {
+    icon: Eye,
+    title: 'Gerzele ilanı görüntülendi',
+    desc: 'Son 1 saatte 8 yeni görüntülenme aldı.',
+    time: 'Az önce',
+  },
+  {
+    icon: MessageCircle,
+    title: 'Network’te yeni talep',
+    desc: '3+1 daire arayan müşteri talebi paylaşıldı.',
+    time: '4 dk önce',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Piyasa hareketi',
+    desc: 'Merkezefendi konut m² ortalaması yükselişte.',
+    time: '12 dk önce',
+  },
+];
+
+const aiSuggestions = [
+  'Çamlık 1+1 apart ilanını bugün öne çıkar.',
+  'Koşuyolu arsa için yatırımcı notu hazırla.',
+  'Gerzele daire ilan metnini daha güçlü hale getir.',
+];
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
@@ -80,6 +135,8 @@ export default function DashboardPage() {
 
   const firstName =
     user?.firstName?.trim() || user?.email?.split('@')[0] || 'EPH Üyesi';
+
+  const userRole = user?.role || 'EPH Üyesi';
 
   const handleLogout = () => {
     logout();
@@ -91,6 +148,7 @@ export default function DashboardPage() {
       <section className="relative mx-auto min-h-screen max-w-md overflow-hidden bg-[#F8FAFC] px-5 pb-28 pt-6 shadow-2xl shadow-black/20">
         <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#2563EB]/20 blur-3xl" />
         <div className="pointer-events-none absolute -left-24 top-72 h-72 w-72 rounded-full bg-[#60A5FA]/20 blur-3xl" />
+        <div className="pointer-events-none absolute -right-24 bottom-80 h-72 w-72 rounded-full bg-[#C9A84C]/15 blur-3xl" />
 
         <header className="relative z-10">
           <div className="flex items-start justify-between gap-3">
@@ -117,11 +175,46 @@ export default function DashboardPage() {
 
               <button
                 onClick={() => router.push('/profil')}
-                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#1D4ED8] shadow-sm"
+                className="relative h-12 w-12 overflow-hidden rounded-2xl border-2 border-white bg-white shadow-lg shadow-[#1D4ED8]/20 ring-2 ring-[#1D4ED8]/20"
               >
-                <CircleUserRound size={24} />
+                <img
+                  src="/profile.jpg"
+                  alt="Profil"
+                  className="h-full w-full object-cover"
+                />
+
+                <span className="absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
               </button>
             </div>
+          </div>
+
+          <div className="mt-5 flex items-center gap-3 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl ring-2 ring-[#1D4ED8]/15">
+              <img
+                src="/profile.jpg"
+                alt="Profil"
+                className="h-full w-full object-cover"
+              />
+
+              <span className="absolute bottom-1 right-1 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[17px] font-black text-[#0B1F44]">
+                {firstName}
+              </p>
+
+              <p className="mt-0.5 truncate text-[12px] font-bold text-slate-500">
+                {userRole} • Çevrimiçi
+              </p>
+            </div>
+
+            <button
+              onClick={() => router.push('/profil')}
+              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#1D4ED8]"
+            >
+              <ArrowUpRight size={18} />
+            </button>
           </div>
 
           <div className="mt-6 overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0B1F44] via-[#123B7A] to-[#1D4ED8] p-5 text-white shadow-2xl shadow-[#1D4ED8]/25">
@@ -162,74 +255,56 @@ export default function DashboardPage() {
         </header>
 
         <section className="relative z-10 mt-7 grid grid-cols-3 gap-3">
-          <StatCard
-            icon={<Building2 size={18} />}
-            title="İlan"
-            value="128"
-            change="+12%"
-          />
-          <StatCard
-            icon={<UsersRound size={18} />}
-            title="Müşteri"
-            value="86"
-            change="+8%"
-          />
-          <StatCard
-            icon={<LineChart size={18} />}
-            title="İşlem"
-            value="42"
-            change="+15%"
-          />
+          <StatCard icon={<Building2 size={18} />} title="İlan" value="128" change="+12%" />
+          <StatCard icon={<UsersRound size={18} />} title="Müşteri" value="86" change="+8%" />
+          <StatCard icon={<LineChart size={18} />} title="İşlem" value="42" change="+15%" />
         </section>
 
         <section className="relative z-10 mt-8">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-[18px] font-black tracking-tight">
-              Hızlı İşlemler
-            </h3>
+          <SectionTitle title="Bugünkü İşlerim" action="Plan" href="/crm" />
 
-            <button className="text-[13px] font-bold text-[#1D4ED8]">
-              Düzenle
-            </button>
+          <div className="space-y-3">
+            {todayTasks.map((task) => (
+              <TaskCard
+                key={task.title}
+                icon={<task.icon size={18} />}
+                title={task.title}
+                desc={task.desc}
+                time={task.time}
+              />
+            ))}
           </div>
+        </section>
+
+        <section className="relative z-10 mt-8">
+          <SectionTitle title="Hızlı İşlemler" action="Düzenle" />
 
           <div className="grid grid-cols-4 gap-3">
             <QuickAction href="/stok" icon={<Plus size={20} />} label="İlan" />
-
-            <QuickAction
-              href="/crm"
-              icon={<UsersRound size={20} />}
-              label="CRM"
-            />
-
-            <QuickAction
-              href="/network"
-              icon={<MessageCircle size={20} />}
-              label="Network"
-            />
-
-            <QuickAction
-              href="/market"
-              icon={<WalletCards size={20} />}
-              label="Piyasa"
-            />
+            <QuickAction href="/crm" icon={<UsersRound size={20} />} label="CRM" />
+            <QuickAction href="/network" icon={<MessageCircle size={20} />} label="Network" />
+            <QuickAction href="/market" icon={<WalletCards size={20} />} label="Piyasa" />
           </div>
         </section>
 
         <section className="relative z-10 mt-8">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-[18px] font-black tracking-tight">
-              Son İlanlar
-            </h3>
+          <SectionTitle title="Canlı Aktivite" action="Tümü" href="/network" />
 
-            <Link
-              href="/stok"
-              className="flex items-center gap-1 text-[13px] font-bold text-[#1D4ED8]"
-            >
-              Tümü
-              <ChevronRight size={15} />
-            </Link>
+          <div className="space-y-3">
+            {liveActivities.map((activity) => (
+              <ActivityCard
+                key={activity.title}
+                icon={<activity.icon size={18} />}
+                title={activity.title}
+                desc={activity.desc}
+                time={activity.time}
+              />
+            ))}
           </div>
+        </section>
+
+        <section className="relative z-10 mt-8">
+          <SectionTitle title="Son İlanlar" action="Tümü" href="/stok" />
 
           <div className="space-y-3">
             <ListingCard
@@ -274,23 +349,35 @@ export default function DashboardPage() {
           <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
 
           <div className="relative flex items-center gap-4">
-            <div className="flex h-15 w-15 items-center justify-center rounded-2xl bg-white/10 text-white backdrop-blur">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-white backdrop-blur">
               <Bot size={28} />
             </div>
 
             <div className="min-w-0 flex-1">
               <p className="text-[12px] font-black uppercase tracking-[0.22em] text-[#BFDBFE]">
-                Lina AI
+                Lina AI Önerileri
               </p>
 
               <h3 className="mt-1 text-[21px] font-black tracking-tight">
-                Sesli ilan oluştur
+                Bugün için akıllı yönlendirme
               </h3>
 
               <p className="mt-1 text-[14px] leading-5 text-white/70">
-                İlan bilgilerini konuş, Lina düzenli portföy kaydına dönüştürsün.
+                Platform hareketlerine göre öne çıkan aksiyonlar.
               </p>
             </div>
+          </div>
+
+          <div className="relative mt-5 space-y-2">
+            {aiSuggestions.map((item) => (
+              <div
+                key={item}
+                className="flex items-start gap-2 rounded-2xl bg-white/10 px-3 py-3 text-[13px] font-semibold leading-5 text-white/80 backdrop-blur"
+              >
+                <Target size={16} className="mt-0.5 shrink-0 text-[#BFDBFE]" />
+                {item}
+              </div>
+            ))}
           </div>
 
           <button className="relative mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white text-[14px] font-black text-[#1D4ED8]">
@@ -300,21 +387,9 @@ export default function DashboardPage() {
         </section>
 
         <section className="relative z-10 mt-8 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5 flex items-center justify-between">
-            <h3 className="text-[18px] font-black tracking-tight">
-              Piyasa Özeti
-            </h3>
+          <SectionTitle title="Piyasa Özeti" action="Detay" href="/market" />
 
-            <Link
-              href="/market"
-              className="flex items-center gap-1 text-[13px] font-bold text-[#1D4ED8]"
-            >
-              Detay
-              <ChevronRight size={15} />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
+          <div className="mt-5 grid grid-cols-3 gap-3">
             <MarketMini title="Konut m²" value="33.750" change="+4.2%" />
             <MarketMini title="Kiralık" value="185" change="+3.1%" />
             <MarketMini title="Satış" value="320" change="+8.7%" />
@@ -324,39 +399,39 @@ export default function DashboardPage() {
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white/95 px-5 pb-6 pt-3 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center justify-between">
-          <BottomItem
-            active
-            href="/dashboard"
-            icon={<Home size={21} />}
-            label="Ana Sayfa"
-          />
-
-          <BottomItem
-            href="/stok"
-            icon={<Building2 size={21} />}
-            label="İlanlar"
-          />
-
-          <BottomItem
-            href="/network"
-            icon={<MessageCircle size={21} />}
-            label="Network"
-          />
-
-          <BottomItem
-            href="/crm"
-            icon={<UsersRound size={21} />}
-            label="CRM"
-          />
-
-          <BottomItem
-            href="/profil"
-            icon={<CircleUserRound size={21} />}
-            label="Profil"
-          />
+          <BottomItem active href="/dashboard" icon={<Home size={21} />} label="Ana Sayfa" />
+          <BottomItem href="/stok" icon={<Building2 size={21} />} label="İlanlar" />
+          <BottomItem href="/network" icon={<MessageCircle size={21} />} label="Network" />
+          <BottomItem href="/crm" icon={<UsersRound size={21} />} label="CRM" />
+          <BottomItem href="/profil" icon={<CircleUserRound size={21} />} label="Profil" />
         </div>
       </nav>
     </main>
+  );
+}
+
+function SectionTitle({
+  title,
+  action,
+  href,
+}: {
+  title: string;
+  action?: string;
+  href?: string;
+}) {
+  return (
+    <div className="mb-4 flex items-center justify-between">
+      <h3 className="text-[18px] font-black tracking-tight">{title}</h3>
+
+      {action && href ? (
+        <Link href={href} className="flex items-center gap-1 text-[13px] font-bold text-[#1D4ED8]">
+          {action}
+          <ChevronRight size={15} />
+        </Link>
+      ) : action ? (
+        <button className="text-[13px] font-bold text-[#1D4ED8]">{action}</button>
+      ) : null}
+    </div>
   );
 }
 
@@ -364,9 +439,7 @@ function MiniHeroItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-white/10 px-3 py-3 text-center backdrop-blur">
       <p className="text-[18px] font-black leading-none">{value}</p>
-      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-white/55">
-        {label}
-      </p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-white/55">{label}</p>
     </div>
   );
 }
@@ -388,16 +461,76 @@ function StatCard({
         {icon}
       </div>
 
-      <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-        {title}
-      </p>
-
+      <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">{title}</p>
       <p className="mt-2 text-[28px] font-black leading-none">{value}</p>
-
-      <p className="mt-3 text-[12px] font-bold text-emerald-600">
-        {change} artış
-      </p>
+      <p className="mt-3 text-[12px] font-bold text-emerald-600">{change} artış</p>
     </div>
+  );
+}
+
+function TaskCard({
+  icon,
+  title,
+  desc,
+  time,
+}: {
+  icon: ReactNode;
+  title: string;
+  desc: string;
+  time: string;
+}) {
+  return (
+    <article className="flex items-center gap-3 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#1D4ED8]">
+        {icon}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <h4 className="truncate text-[15px] font-black tracking-tight">{title}</h4>
+        <p className="mt-1 text-[12px] leading-5 text-slate-500">{desc}</p>
+      </div>
+
+      <span className="rounded-full bg-[#F8FAFC] px-3 py-1 text-[11px] font-black text-slate-500">
+        {time}
+      </span>
+    </article>
+  );
+}
+
+function ActivityCard({
+  icon,
+  title,
+  desc,
+  time,
+}: {
+  icon: ReactNode;
+  title: string;
+  desc: string;
+  time: string;
+}) {
+  return (
+    <article className="relative overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="absolute left-0 top-0 h-full w-1 bg-[#1D4ED8]" />
+
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#1D4ED8]">
+          {icon}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="truncate text-[15px] font-black tracking-tight">{title}</h4>
+
+            <div className="flex shrink-0 items-center gap-1 text-[11px] font-bold text-slate-400">
+              <Clock3 size={12} />
+              {time}
+            </div>
+          </div>
+
+          <p className="mt-1 text-[12px] leading-5 text-slate-500">{desc}</p>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -448,13 +581,8 @@ function ListingCard({
       </div>
 
       <div className="min-w-0 flex-1">
-        <h4 className="truncate text-[16px] font-black tracking-tight">
-          {title}
-        </h4>
-
-        <p className="mt-1 text-[13px] font-semibold text-slate-500">
-          {type}
-        </p>
+        <h4 className="truncate text-[16px] font-black tracking-tight">{title}</h4>
+        <p className="mt-1 text-[13px] font-semibold text-slate-500">{type}</p>
 
         <p className="mt-1 flex items-center gap-1 truncate text-[12px] text-slate-400">
           <MapPin size={12} />
@@ -492,12 +620,8 @@ function MarketMini({
 }) {
   return (
     <div className="rounded-2xl bg-[#F8FAFC] p-3">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
-        {title}
-      </p>
-
+      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{title}</p>
       <p className="mt-2 text-[19px] font-black">{value}</p>
-
       <p className="mt-2 text-[12px] font-bold text-emerald-600">{change}</p>
     </div>
   );
@@ -522,7 +646,6 @@ function BottomItem({
       }`}
     >
       {icon}
-
       <span className="text-[11px] font-bold">{label}</span>
     </Link>
   );
