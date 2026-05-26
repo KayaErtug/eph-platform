@@ -592,7 +592,8 @@ export default function LandingPage() {
             </div>
 
             <video
-              src="/videos/eph.mp4"
+              
+	      src="/eph.mp4"
               controls
               autoPlay
               playsInline
