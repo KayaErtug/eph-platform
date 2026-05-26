@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -92,6 +92,21 @@ export default function LandingPage() {
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    const alreadySeenVideo = sessionStorage.getItem("ephIntroVideoSeen");
+
+    if (alreadySeenVideo) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setShowVideo(true);
+      sessionStorage.setItem("ephIntroVideoSeen", "true");
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const scrollToSection = (sectionId: string) => {
     const section = document.getElementById(sectionId);
@@ -565,39 +580,37 @@ export default function LandingPage() {
 
       {showVideo && (
         <div
-          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl"
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/90 p-0 backdrop-blur-xl md:p-5"
           onClick={() => setShowVideo(false)}
         >
           <div
-            className="relative w-full max-w-5xl overflow-hidden rounded-[32px] border border-white/10 bg-[#07111F] p-3 shadow-2xl shadow-[#2563EB]/20"
+            className="relative flex h-screen w-full items-center justify-center overflow-hidden bg-black md:h-[92vh] md:max-w-[520px] md:rounded-[36px] md:border md:border-white/10 md:shadow-2xl md:shadow-[#2563EB]/20"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between gap-4 px-3 pb-3">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.25em] text-[#60A5FA]">
-                  EPH Platform
-                </p>
+            <button
+              onClick={() => setShowVideo(false)}
+              className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white backdrop-blur transition hover:bg-black/70"
+            >
+              <X size={20} />
+            </button>
 
-                <h3 className="mt-1 text-xl font-black text-white">
-                  Tanıtım Videosu
-                </h3>
-              </div>
+            <div className="pointer-events-none absolute left-0 right-0 top-0 z-10 bg-gradient-to-b from-black/70 to-transparent px-5 pb-16 pt-5">
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-[#60A5FA]">
+                EPH Platform
+              </p>
 
-              <button
-                onClick={() => setShowVideo(false)}
-                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white transition hover:bg-white/10"
-              >
-                <X size={20} />
-              </button>
+              <h3 className="mt-1 text-xl font-black text-white">
+                Tanıtım Videosu
+              </h3>
             </div>
 
             <video
-              
-	      src="/eph.mp4"
+              src="/eph.mp4"
               controls
               autoPlay
+              muted
               playsInline
-              className="aspect-video w-full rounded-[24px] bg-black object-contain"
+              className="h-full w-full bg-black object-cover"
             />
           </div>
         </div>
