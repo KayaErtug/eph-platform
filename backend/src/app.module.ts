@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+
 import { PrismaModule } from './prisma/prisma.module';
 import { InvitationsModule } from './invitations/invitations.module';
 import { AuthModule } from './auth/auth.module';
@@ -18,28 +19,37 @@ import { MarketModule } from './market/market.module';
 import { VisitsModule } from './visits/visits.module';
 import { PushModule } from './push/push.module';
 import { MessagesModule } from './messages/messages.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+
     PrismaModule,
     SupabaseModule,
+
     InvitationsModule,
     AuthModule,
     UsersModule,
     AdminModule,
     ProfileModule,
+
     ProjectsModule,
     UnitsModule,
+
     NominationsModule,
     ApplicationsModule,
     LeadsModule,
+
     CrmModule,
     TrustModule,
     MarketModule,
+
     VisitsModule,
     PushModule,
     MessagesModule,
+
+    DashboardModule,
   ],
 })
 export class AppModule {}

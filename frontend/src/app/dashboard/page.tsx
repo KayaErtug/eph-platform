@@ -1,8 +1,11 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import LinaPanel from '@/components/LinaPanel';
+import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 
 import {
@@ -18,6 +21,7 @@ import {
   Eye,
   Home,
   LineChart,
+  Loader2,
   LogOut,
   MapPin,
   MessageCircle,
@@ -30,6 +34,78 @@ import {
   UsersRound,
   WalletCards,
 } from 'lucide-react';
+
+type Project = {
+  id: string;
+  name: string;
+  city: string;
+  district: string;
+  address: string;
+};
+
+type Unit = {
+  id: string;
+  type: string;
+  floor?: number | null;
+  number: string;
+  roomCount?: string | null;
+  area?: number | null;
+  price: number;
+  status: string;
+  description?: string | null;
+  createdAt: string;
+  project?: Project | null;
+};
+
+type Customer = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone?: string | null;
+  city?: string | null;
+  budget?: number | null;
+  interestedArea?: string | null;
+  interestedType?: string | null;
+  status: string;
+  createdAt: string;
+};
+
+type Activity = {
+  id: string;
+  type: string;
+  note: string;
+  createdAt: string;
+  customer?: Customer | null;
+};
+
+type Task = {
+  id: string;
+  title: string;
+  dueDate?: string | null;
+  status: string;
+  createdAt: string;
+  customer?: Customer | null;
+};
+
+type DashboardSummary = {
+  stats: {
+    totalUnits: number;
+    totalCustomers: number;
+    totalVisits: number;
+    totalProjects: number;
+  };
+  latestUnits: Unit[];
+  latestCustomers: Customer[];
+  latestActivities: Activity[];
+  pendingTasks: Task[];
+};
+
+const fallbackListingImages = [
+  '/listings/gerzele-31.jpg',
+  '/listings/camlik-11.jpg',
+  '/listings/kosuyolu-arsa.jpg',
+  '/listings/kuspinar-arsa.jpg',
+];
 
 function getGreeting() {
   const now = new Date();
@@ -79,57 +155,61 @@ function getGreeting() {
   };
 }
 
-const todayTasks = [
-  {
-    icon: PhoneCall,
-    title: '3 müşteriye geri dönüş',
-    desc: 'CRM’de bekleyen görüşmeleri tamamla.',
-    time: 'Bugün',
-  },
-  {
-    icon: ClipboardList,
-    title: '2 portföy bilgisini güncelle',
-    desc: 'Fiyat ve açıklama kontrolü önerilir.',
-    time: 'Öncelikli',
-  },
-  {
-    icon: CalendarCheck,
-    title: '1 randevu hazırlığı',
-    desc: 'Kuşpınar arsa için notlarını gözden geçir.',
-    time: '15:30',
-  },
-];
+function money(value?: number | null) {
+  if (!value) return '—';
+  return `${value.toLocaleString('tr-TR')} TL`;
+}
 
-const liveActivities = [
-  {
-    icon: Eye,
-    title: 'Gerzele ilanı görüntülendi',
-    desc: 'Son 1 saatte 8 yeni görüntülenme aldı.',
-    time: 'Az önce',
-  },
-  {
-    icon: MessageCircle,
-    title: 'Network’te yeni talep',
-    desc: '3+1 daire arayan müşteri talebi paylaşıldı.',
-    time: '4 dk önce',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Piyasa hareketi',
-    desc: 'Merkezefendi konut m² ortalaması yükselişte.',
-    time: '12 dk önce',
-  },
-];
+function formatDate(value?: string | null) {
+  if (!value) return 'Tarih yok';
 
-const aiSuggestions = [
-  'Çamlık 1+1 apart ilanını bugün öne çıkar.',
-  'Koşuyolu arsa için yatırımcı notu hazırla.',
-  'Gerzele daire ilan metnini daha güçlü hale getir.',
-];
+  return new Date(value).toLocaleDateString('tr-TR', {
+    day: '2-digit',
+    month: 'short',
+  });
+}
+
+function formatTimeAgo(value?: string | null) {
+  if (!value) return 'Yeni';
+
+  const date = new Date(value);
+  const diff = Date.now() - date.getTime();
+  const minutes = Math.max(1, Math.floor(diff / 60000));
+
+  if (minutes < 60) return `${minutes} dk önce`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} saat önce`;
+
+  return formatDate(value);
+}
+
+function unitTitle(unit: Unit) {
+  return unit.project?.name || `${unit.roomCount || unit.type} Portföy`;
+}
+
+function unitType(unit: Unit) {
+  const parts = [
+    unit.roomCount,
+    unit.area ? `${unit.area} m²` : null,
+    unit.status,
+  ].filter(Boolean);
+
+  return parts.join(' • ') || unit.type;
+}
+
+function unitLocation(unit: Unit) {
+  return [unit.project?.district, unit.project?.city].filter(Boolean).join(' / ') || 'Konum yok';
+}
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
+
+  const [hydrated, setHydrated] = useState(false);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [linaOpen, setLinaOpen] = useState(false);
 
   const greeting = getGreeting();
 
@@ -138,13 +218,91 @@ export default function DashboardPage() {
 
   const userRole = user?.role || 'EPH Üyesi';
 
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+
+    if (!user) {
+      router.push('/giris');
+      return;
+    }
+
+    fetchSummary();
+  }, [hydrated, user]);
+
+  const fetchSummary = async () => {
+    setLoading(true);
+
+    try {
+      const res = await api.get('/dashboard/summary');
+      setSummary(res.data);
+    } catch (error) {
+      console.error(error);
+      setSummary(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     logout();
     router.push('/giris');
   };
 
+  const stats = summary?.stats || {
+    totalUnits: 0,
+    totalCustomers: 0,
+    totalVisits: 0,
+    totalProjects: 0,
+  };
+
+  const latestUnits = summary?.latestUnits || [];
+  const latestCustomers = summary?.latestCustomers || [];
+  const pendingTasks = summary?.pendingTasks || [];
+  const latestActivities = summary?.latestActivities || [];
+
+  const aiSuggestions = useMemo(() => {
+    const items: string[] = [];
+
+    if (latestUnits[0]) {
+      items.push(`${unitTitle(latestUnits[0])} portföyünü bugün kontrol et.`);
+    }
+
+    if (latestCustomers[0]) {
+      items.push(
+        `${latestCustomers[0].firstName} ${latestCustomers[0].lastName} için CRM takibini güncelle.`
+      );
+    }
+
+    if (stats.totalCustomers > 0) {
+      items.push(`${stats.totalCustomers} müşteri kaydını sıcak lead fırsatları için gözden geçir.`);
+    }
+
+    if (items.length === 0) {
+      items.push('Bugün ilk müşteri ve portföy kayıtlarını ekleyerek paneli başlat.');
+    }
+
+    return items.slice(0, 3);
+  }, [latestUnits, latestCustomers, stats.totalCustomers]);
+
+  if (!hydrated || loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#07111F]">
+        <div className="flex flex-col items-center gap-4 text-white">
+          <Loader2 className="animate-spin" size={34} />
+          <p className="text-sm font-black">Dashboard verileri yükleniyor...</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#07111F] text-[#111827]">
+      <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
+
       <section className="relative mx-auto min-h-screen max-w-md overflow-hidden bg-[#F8FAFC] px-5 pb-28 pt-6 shadow-2xl shadow-black/20">
         <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#2563EB]/20 blur-3xl" />
         <div className="pointer-events-none absolute -left-24 top-72 h-72 w-72 rounded-full bg-[#60A5FA]/20 blur-3xl" />
@@ -155,7 +313,7 @@ export default function DashboardPage() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full bg-[#0B1F44] px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-white">
                 <Sparkles size={12} />
-                Premium Panel
+                Canlı Panel
               </div>
 
               <h1 className="mt-3 text-[30px] font-black tracking-tight text-[#0B1F44]">
@@ -168,7 +326,10 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <button className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm">
+              <button
+                onClick={() => router.push('/messages')}
+                className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm"
+              >
                 <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
                 <Bell size={19} />
               </button>
@@ -239,9 +400,9 @@ export default function DashboardPage() {
             </div>
 
             <div className="mt-5 grid grid-cols-3 gap-2">
-              <MiniHeroItem label="Aktif" value="128" />
-              <MiniHeroItem label="Talep" value="24" />
-              <MiniHeroItem label="Görüşme" value="42" />
+              <MiniHeroItem label="İlan" value={String(stats.totalUnits)} />
+              <MiniHeroItem label="Müşteri" value={String(stats.totalCustomers)} />
+              <MiniHeroItem label="Ziyaret" value={String(stats.totalVisits)} />
             </div>
           </div>
 
@@ -255,29 +416,58 @@ export default function DashboardPage() {
         </header>
 
         <section className="relative z-10 mt-7 grid grid-cols-3 gap-3">
-          <StatCard icon={<Building2 size={18} />} title="İlan" value="128" change="+12%" />
-          <StatCard icon={<UsersRound size={18} />} title="Müşteri" value="86" change="+8%" />
-          <StatCard icon={<LineChart size={18} />} title="İşlem" value="42" change="+15%" />
+          <StatCard
+            icon={<Building2 size={18} />}
+            title="İlan"
+            value={String(stats.totalUnits)}
+            change="Gerçek"
+          />
+
+          <StatCard
+            icon={<UsersRound size={18} />}
+            title="Müşteri"
+            value={String(stats.totalCustomers)}
+            change="CRM"
+          />
+
+          <StatCard
+            icon={<LineChart size={18} />}
+            title="Proje"
+            value={String(stats.totalProjects)}
+            change="Aktif"
+          />
         </section>
 
         <section className="relative z-10 mt-8">
           <SectionTitle title="Bugünkü İşlerim" action="Plan" href="/crm" />
 
           <div className="space-y-3">
-            {todayTasks.map((task) => (
-              <TaskCard
-                key={task.title}
-                icon={<task.icon size={18} />}
-                title={task.title}
-                desc={task.desc}
-                time={task.time}
+            {pendingTasks.length > 0 ? (
+              pendingTasks.slice(0, 3).map((task) => (
+                <TaskCard
+                  key={task.id}
+                  icon={<ClipboardList size={18} />}
+                  title={task.title}
+                  desc={
+                    task.customer
+                      ? `${task.customer.firstName} ${task.customer.lastName} müşteri kaydı`
+                      : 'CRM görev kaydı'
+                  }
+                  time={task.dueDate ? formatDate(task.dueDate) : 'Bekliyor'}
+                />
+              ))
+            ) : (
+              <EmptyCard
+                icon={<CalendarCheck size={18} />}
+                title="Bekleyen görev yok"
+                desc="CRM içinde görev eklediğinde burada görünür."
               />
-            ))}
+            )}
           </div>
         </section>
 
         <section className="relative z-10 mt-8">
-          <SectionTitle title="Hızlı İşlemler" action="Düzenle" />
+          <SectionTitle title="Hızlı İşlemler" action="Profil" href="/profil" />
 
           <div className="grid grid-cols-4 gap-3">
             <QuickAction href="/stok" icon={<Plus size={20} />} label="İlan" />
@@ -288,18 +478,36 @@ export default function DashboardPage() {
         </section>
 
         <section className="relative z-10 mt-8">
-          <SectionTitle title="Canlı Aktivite" action="Tümü" href="/network" />
+          <SectionTitle title="Canlı Aktivite" action="Tümü" href="/crm" />
 
           <div className="space-y-3">
-            {liveActivities.map((activity) => (
-              <ActivityCard
-                key={activity.title}
-                icon={<activity.icon size={18} />}
-                title={activity.title}
-                desc={activity.desc}
-                time={activity.time}
+            {latestActivities.length > 0 ? (
+              latestActivities.slice(0, 3).map((activity) => (
+                <ActivityCard
+                  key={activity.id}
+                  icon={<Eye size={18} />}
+                  title={activity.customer ? `${activity.customer.firstName} ${activity.customer.lastName}` : activity.type}
+                  desc={activity.note}
+                  time={formatTimeAgo(activity.createdAt)}
+                />
+              ))
+            ) : latestCustomers.length > 0 ? (
+              latestCustomers.slice(0, 3).map((customer) => (
+                <ActivityCard
+                  key={customer.id}
+                  icon={<PhoneCall size={18} />}
+                  title={`${customer.firstName} ${customer.lastName}`}
+                  desc={`${customer.status} durumunda yeni CRM kaydı`}
+                  time={formatTimeAgo(customer.createdAt)}
+                />
+              ))
+            ) : (
+              <EmptyCard
+                icon={<MessageCircle size={18} />}
+                title="Henüz aktivite yok"
+                desc="CRM ve network hareketleri burada listelenecek."
               />
-            ))}
+            )}
           </div>
         </section>
 
@@ -307,41 +515,25 @@ export default function DashboardPage() {
           <SectionTitle title="Son İlanlar" action="Tümü" href="/stok" />
 
           <div className="space-y-3">
-            <ListingCard
-              title="Gerzele'de Site İçerisinde 3+1 Daire"
-              type="190 m² • Acil Satılık"
-              location="Gerzele / Denizli"
-              price="7.500.000 TL"
-              status="Aktif"
-              image="/listings/gerzele-31.jpg"
-            />
-
-            <ListingCard
-              title="Çamlık Forum'a 2 Dakika 1+1 Apart"
-              type="2. Kat • Balkonlu"
-              location="Çamlık / Denizli"
-              price="2.200.000 TL"
-              status="Aktif"
-              image="/listings/camlik-11.jpg"
-            />
-
-            <ListingCard
-              title="Koşuyolu Üzeri 455 m² Villalık Arsa"
-              type="%30 İmarlı • Köşe Başı"
-              location="Koşuyolu / Denizli"
-              price="11.000.000 TL"
-              status="Aktif"
-              image="/listings/kosuyolu-arsa.jpg"
-            />
-
-            <ListingCard
-              title="Kuşpınar Mahallesi 350 m² Arsa"
-              type="6 Kat İmarlı • Çarşamba Pazarı"
-              location="Kuşpınar / Denizli"
-              price="20.000.000 TL"
-              status="Aktif"
-              image="/listings/kuspinar-arsa.jpg"
-            />
+            {latestUnits.length > 0 ? (
+              latestUnits.slice(0, 4).map((unit, index) => (
+                <ListingCard
+                  key={unit.id}
+                  title={unitTitle(unit)}
+                  type={unitType(unit)}
+                  location={unitLocation(unit)}
+                  price={money(unit.price)}
+                  status={unit.status}
+                  image={fallbackListingImages[index % fallbackListingImages.length]}
+                />
+              ))
+            ) : (
+              <EmptyCard
+                icon={<Building2 size={18} />}
+                title="Henüz ilan yok"
+                desc="Stok sayfasından ilk portföyünü ekleyebilirsin."
+              />
+            )}
           </div>
         </section>
 
@@ -359,7 +551,7 @@ export default function DashboardPage() {
               </p>
 
               <h3 className="mt-1 text-[21px] font-black tracking-tight">
-                Bugün için akıllı yönlendirme
+                Gerçek veriye göre öneriler
               </h3>
 
               <p className="mt-1 text-[14px] leading-5 text-white/70">
@@ -380,7 +572,10 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <button className="relative mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white text-[14px] font-black text-[#1D4ED8]">
+          <button
+            onClick={() => setLinaOpen(true)}
+            className="relative mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white text-[14px] font-black text-[#1D4ED8]"
+          >
             <Mic size={18} />
             Lina’yı Başlat
           </button>
@@ -390,9 +585,9 @@ export default function DashboardPage() {
           <SectionTitle title="Piyasa Özeti" action="Detay" href="/market" />
 
           <div className="mt-5 grid grid-cols-3 gap-3">
-            <MarketMini title="Konut m²" value="33.750" change="+4.2%" />
-            <MarketMini title="Kiralık" value="185" change="+3.1%" />
-            <MarketMini title="Satış" value="320" change="+8.7%" />
+            <MarketMini title="İlan" value={String(stats.totalUnits)} change="Canlı" />
+            <MarketMini title="Müşteri" value={String(stats.totalCustomers)} change="CRM" />
+            <MarketMini title="Ziyaret" value={String(stats.totalVisits)} change="Takip" />
           </div>
         </section>
       </section>
@@ -428,8 +623,6 @@ function SectionTitle({
           {action}
           <ChevronRight size={15} />
         </Link>
-      ) : action ? (
-        <button className="text-[13px] font-bold text-[#1D4ED8]">{action}</button>
       ) : null}
     </div>
   );
@@ -463,7 +656,7 @@ function StatCard({
 
       <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">{title}</p>
       <p className="mt-2 text-[28px] font-black leading-none">{value}</p>
-      <p className="mt-3 text-[12px] font-bold text-emerald-600">{change} artış</p>
+      <p className="mt-3 text-[12px] font-bold text-emerald-600">{change}</p>
     </div>
   );
 }
@@ -534,6 +727,29 @@ function ActivityCard({
   );
 }
 
+function EmptyCard({
+  icon,
+  title,
+  desc,
+}: {
+  icon: ReactNode;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <article className="flex items-center gap-3 rounded-[24px] border border-dashed border-slate-300 bg-white/70 p-4">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#1D4ED8]">
+        {icon}
+      </div>
+
+      <div>
+        <h4 className="text-[15px] font-black tracking-tight text-[#0B1F44]">{title}</h4>
+        <p className="mt-1 text-[12px] leading-5 text-slate-500">{desc}</p>
+      </div>
+    </article>
+  );
+}
+
 function QuickAction({
   icon,
   label,
@@ -593,13 +809,7 @@ function ListingCard({
       </div>
 
       <div className="flex flex-col items-end justify-between self-stretch py-1">
-        <span
-          className={`rounded-full px-3 py-1 text-[11px] font-bold ${
-            status === 'Aktif'
-              ? 'bg-emerald-50 text-emerald-700'
-              : 'bg-slate-100 text-slate-600'
-          }`}
-        >
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">
           {status}
         </span>
 
