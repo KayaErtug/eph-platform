@@ -39,33 +39,39 @@ const stats = [
 const features = [
   {
     icon: LockKeyhole,
+    label: "Güvenlik",
     title: "Kapalı Devre Ağ",
-    desc: "Paylaşımlar yalnızca EPH üyeleri tarafından görüntülenir.",
+    desc: "Paylaşımlar yalnızca onaylı EPH üyeleri tarafından görüntülenir. Dışarıya sızdırılmaz.",
   },
   {
     icon: Users,
-    title: "Profesyonel Network",
-    desc: "Emlakçı, müteahhit ve inşaat firmaları aynı sistemde buluşur.",
+    label: "Network",
+    title: "Profesyonel Ağ",
+    desc: "Emlakçı, müteahhit ve inşaat firmaları tek çatı altında buluşur, birlikten kuvvet doğar.",
   },
   {
     icon: Building2,
+    label: "Portföy",
     title: "Portföy Havuzu",
-    desc: "Satılık, kiralık ve proje bazlı portföyler düzenli şekilde yönetilir.",
+    desc: "Satılık, kiralık ve proje bazlı tüm portföyler tek merkezden ve düzenli biçimde izlenir.",
   },
   {
     icon: ShieldCheck,
+    label: "Üyelik",
     title: "Güvenli Üyelik",
-    desc: "Başvurular admin onayı ve referans sistemiyle değerlendirilir.",
+    desc: "Her başvuru admin onayı ve referans sistemiyle değerlendirilir.",
   },
   {
     icon: Handshake,
+    label: "Satış",
     title: "İş Birliği",
-    desc: "Talep, portföy ve ortak satış süreçleri daha hızlı ilerler.",
+    desc: "Talep, portföy ve ortak satış süreçleri hızlanır. Komisyon paylaşımı şeffaf çalışır.",
   },
   {
     icon: Sparkles,
-    title: "Lina AI Desteği",
-    desc: "İlan metni, portföy girişi ve içerik üretiminde akıllı destek sağlar.",
+    label: "Yapay Zeka",
+    title: "Lina AI",
+    desc: "İlan metni, portföy girişi ve içerik üretiminde sesli ve yazılı akıllı destek sağlar.",
   },
 ];
 
@@ -400,33 +406,64 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="ozellikler" className="border-t border-white/10 bg-[#081423] px-5 py-24">
-          <div className="mx-auto max-w-7xl">
-            <div className="mx-auto max-w-3xl text-center">
+        <section
+          id="ozellikler"
+          className="relative overflow-hidden border-t border-white/10 bg-[#081423] px-5 py-24"
+        >
+          <div className="absolute left-0 top-0 h-96 w-96 rounded-full bg-[#2563EB]/10 blur-3xl" />
+          <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-[#60A5FA]/10 blur-3xl" />
+
+          <div className="relative mx-auto max-w-7xl">
+            <div className="mx-auto max-w-4xl text-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#2563EB]/20 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#60A5FA]">
                 <BadgeCheck size={14} />
-                Platform Özellikleri
+                Neler Var?
               </div>
 
               <h2 className="mt-6 text-4xl font-black leading-tight md:text-6xl">
-                Gayrimenkulde
-                <span className="block text-[#60A5FA]">Dijital İş Takibi</span>
+                EPH’de Sadece İlan Değil,
+                <span className="block bg-gradient-to-r from-[#60A5FA] via-white to-[#93C5FD] bg-clip-text text-transparent">
+                  Tam Bir İş Ekosistemi Var
+                </span>
               </h2>
+
+              <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-white/55 md:text-lg">
+                Güvenli üyelikten ortak satışa, portföy havuzundan Lina AI desteğine
+                kadar tüm süreçler sektör profesyonelleri için tek merkezde toplanır.
+              </p>
             </div>
 
             <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {features.map((item) => (
+              {features.map((item, index) => (
                 <div
                   key={item.title}
-                  className="rounded-[32px] border border-white/10 bg-white/5 p-7 text-center transition hover:-translate-y-1 hover:border-[#2563EB]/40"
+                  className="group relative overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.04] p-7 text-center backdrop-blur transition duration-300 hover:-translate-y-2 hover:border-[#60A5FA]/50 hover:bg-white/[0.07] hover:shadow-2xl hover:shadow-[#2563EB]/10"
                 >
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#2563EB]/10 text-[#60A5FA]">
-                    <item.icon size={30} />
+                  <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#2563EB]/10 blur-2xl transition group-hover:bg-[#60A5FA]/20" />
+
+                  <div className="relative flex items-center justify-between gap-4">
+                    <div className="rounded-full border border-[#60A5FA]/20 bg-[#2563EB]/10 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-[#93C5FD]">
+                      {item.label}
+                    </div>
+
+                    <div className="text-xs font-black text-white/20">
+                      0{index + 1}
+                    </div>
                   </div>
 
-                  <h3 className="mt-6 text-2xl font-black">{item.title}</h3>
+                  <div className="relative mx-auto mt-8 flex h-20 w-20 items-center justify-center rounded-3xl border border-[#60A5FA]/20 bg-[#2563EB]/10 text-[#60A5FA] transition group-hover:scale-110 group-hover:bg-[#2563EB]/20">
+                    <item.icon size={34} />
+                  </div>
 
-                  <p className="mt-3 text-sm leading-7 text-white/50">{item.desc}</p>
+                  <h3 className="relative mt-7 text-2xl font-black">{item.title}</h3>
+
+                  <p className="relative mt-4 min-h-[84px] text-sm leading-7 text-white/55">
+                    {item.desc}
+                  </p>
+
+                  <div className="relative mt-7 h-1 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full w-1/2 rounded-full bg-[#60A5FA] transition-all duration-500 group-hover:w-full" />
+                  </div>
                 </div>
               ))}
             </div>
