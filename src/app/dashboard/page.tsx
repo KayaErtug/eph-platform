@@ -216,5 +216,4 @@ function BottomItem({
       {icon}
       <span>{label}</span>
     </button>
-  );
-}
+  ); 

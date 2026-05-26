@@ -11,10 +11,14 @@ import {
   Globe2,
   Handshake,
   LockKeyhole,
+  MessageCircle,
+  Radar,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
   Users,
   X,
+  Zap,
 } from "lucide-react";
 
 const API_URL =
@@ -30,29 +34,6 @@ const stats = [
   ["344+", "Aktif Üye"],
   ["8.700+", "Portföy"],
   ["65+", "Başarılı Satış"],
-];
-
-const platformCards = [
-  {
-    icon: ShieldCheck,
-    title: "Doğrulanmış Üyeler",
-    desc: "Sisteme yalnızca onaylı sektör profesyonelleri erişebilir.",
-  },
-  {
-    icon: Handshake,
-    title: "Ortak Satış Sistemi",
-    desc: "Portföy, talep ve iş birliği süreçleri tek merkezde takip edilir.",
-  },
-  {
-    icon: BarChart3,
-    title: "Piyasa Takibi",
-    desc: "Sektördeki hareketleri ve fırsatları düzenli olarak takip edin.",
-  },
-  {
-    icon: Building2,
-    title: "Portföy Yönetimi",
-    desc: "İlan, proje ve portföy kayıtlarını daha düzenli yönetin.",
-  },
 ];
 
 const features = [
@@ -88,11 +69,11 @@ const features = [
   },
 ];
 
+type InfoModalType = "kesfet" | "kvkk" | "gizlilik" | "iletisim";
+
 export default function LandingPage() {
   const [showForm, setShowForm] = useState(false);
-  const [infoModal, setInfoModal] = useState<null | "kvkk" | "gizlilik" | "iletisim">(
-    null
-  );
+  const [infoModal, setInfoModal] = useState<null | InfoModalType>(null);
 
   const [form, setForm] = useState({
     ad: "",
@@ -104,6 +85,19 @@ export default function LandingPage() {
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const scrollToSection = (sectionId: string) => {
+    const section = document.getElementById(sectionId);
+
+    if (!section) {
+      return;
+    }
+
+    section.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
 
   const submitForm = async () => {
     if (!form.ad.trim() || !form.tel.trim() || !form.email.trim() || !form.meslek) {
@@ -175,20 +169,36 @@ export default function LandingPage() {
             </Link>
 
             <nav className="hidden items-center gap-8 md:flex">
-              <a href="#platform" className="text-sm font-bold text-white/70 transition hover:text-white">
-                Platform
-              </a>
-              <a href="#ozellikler" className="text-sm font-bold text-white/70 transition hover:text-white">
-                Özellikler
-              </a>
-              <a href="#basvuru" className="text-sm font-bold text-white/70 transition hover:text-white">
-                Başvuru
-              </a>
               <button
+                type="button"
+                onClick={() => setInfoModal("kesfet")}
+                className="text-sm font-bold text-white/70 transition hover:text-white"
+              >
+                Keşfet
+              </button>
+
+              <button
+                type="button"
+                onClick={() => scrollToSection("ozellikler")}
+                className="text-sm font-bold text-white/70 transition hover:text-white"
+              >
+                Neler Var?
+              </button>
+
+              <button
+                type="button"
+                onClick={() => scrollToSection("basvuru")}
+                className="text-sm font-bold text-white/70 transition hover:text-white"
+              >
+                Hemen Başvur
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setInfoModal("iletisim")}
                 className="text-sm font-bold text-white/70 transition hover:text-white"
               >
-                İletişim
+                Bizimle İletişime Geç
               </button>
             </nav>
 
@@ -211,48 +221,71 @@ export default function LandingPage() {
         </header>
 
         <section id="platform" className="relative overflow-hidden px-5 pb-24 pt-36">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.35),transparent_35%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.38),transparent_34%)]" />
+          <div className="absolute left-1/2 top-24 h-72 w-72 -translate-x-1/2 rounded-full bg-[#60A5FA]/10 blur-3xl" />
+          <div className="absolute bottom-0 left-0 h-80 w-80 rounded-full bg-[#2563EB]/15 blur-3xl" />
 
-          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-16 lg:grid-cols-2">
+          <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-16 lg:grid-cols-2">
             <div className="relative z-10 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#93C5FD]">
-                <Sparkles size={14} />
-                B2B Gayrimenkul İş Ağı
+              <div className="inline-flex animate-pulse items-center gap-2 rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#93C5FD]">
+                <Zap size={14} />
+                Sektörün Kapalı Devre Güç Ağı
               </div>
 
-              <h2 className="mt-7 text-5xl font-black leading-[1.05] tracking-tight md:text-7xl">
-                Emlakta
-                <span className="block text-[#60A5FA]">Daha Güçlü</span>
-                İş Birliği
+              <h2 className="mt-7 text-5xl font-black leading-[1.04] tracking-tight md:text-7xl">
+                Portföyün
+                <span className="block bg-gradient-to-r from-[#60A5FA] via-white to-[#93C5FD] bg-clip-text text-transparent">
+                  Daha Uzağa
+                </span>
+                Ulaşsın
               </h2>
 
-              <p className="mx-auto mt-7 max-w-xl text-lg leading-8 text-white/60 lg:mx-0">
-                Doğrulanmış emlakçılar, müteahhitler ve inşaat firmaları için
-                geliştirilen kapalı devre profesyonel paylaşım ağı.
+              <p className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-white/65 lg:mx-0">
+                EPH; emlakçıları, müteahhitleri ve inşaat firmalarını aynı
+                profesyonel ağda buluşturur. Portföyler görünür olur, talepler
+                hızlanır, ortak satış fırsatları tek merkezde takip edilir.
               </p>
+
+              <div className="mt-8 grid grid-cols-1 gap-3 text-sm font-bold text-white/70 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                  Anlık Talep Paylaşımı
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                  Ortak Satış Fırsatı
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                  Güvenli Network
+                </div>
+              </div>
 
               <div className="mt-10 flex flex-wrap justify-center gap-4 lg:justify-start">
                 <button
                   onClick={() => setShowForm(true)}
-                  className="flex items-center gap-2 rounded-2xl bg-[#2563EB] px-7 py-4 text-sm font-black transition hover:bg-[#1D4ED8]"
+                  className="group flex items-center gap-2 rounded-2xl bg-[#2563EB] px-7 py-4 text-sm font-black text-white shadow-lg shadow-[#2563EB]/25 transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
                 >
                   Hemen Başvur
-                  <ArrowRight size={18} />
+                  <ArrowRight
+                    size={18}
+                    className="transition group-hover:translate-x-1"
+                  />
                 </button>
 
-                <Link
-                  href="/giris"
-                  className="rounded-2xl border border-white/10 bg-white/5 px-7 py-4 text-sm font-black"
+                <button
+                  type="button"
+                  onClick={() => setInfoModal("kesfet")}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-7 py-4 text-sm font-black transition hover:-translate-y-1 hover:bg-white/10"
                 >
-                  Platforma Giriş
-                </Link>
+                  EPH’yi Keşfet
+                </button>
               </div>
 
               <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {stats.map(([value, label]) => (
                   <div
                     key={label}
-                    className="rounded-3xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur"
+                    className="rounded-3xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur transition hover:-translate-y-1 hover:border-[#60A5FA]/40"
                   >
                     <div className="text-3xl font-black text-[#60A5FA]">{value}</div>
 
@@ -264,53 +297,101 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="relative">
+            <div className="relative z-10">
               <div className="absolute -right-10 top-10 h-72 w-72 rounded-full bg-[#2563EB]/20 blur-3xl" />
 
-              <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-white/5 p-6 text-center backdrop-blur">
-                <div className="flex flex-col items-center justify-between gap-4 md:flex-row md:text-left">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-[0.25em] text-[#60A5FA]">
-                      CANLI PLATFORM
-                    </p>
+              <div className="relative mx-auto max-w-xl overflow-hidden rounded-[40px] border border-white/10 bg-white/5 p-6 text-center backdrop-blur">
+                <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(96,165,250,0.12),transparent)]" />
 
-                    <h3 className="mt-2 text-3xl font-black">EPH Network</h3>
+                <div className="relative rounded-[32px] border border-white/10 bg-[#07111F] p-6">
+                  <div className="flex flex-col items-center justify-between gap-4 md:flex-row md:text-left">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.25em] text-[#60A5FA]">
+                        CANLI İŞ AĞI
+                      </p>
+
+                      <h3 className="mt-2 text-3xl font-black">
+                        EPH Keşif Merkezi
+                      </h3>
+                    </div>
+
+                    <div className="flex h-14 w-14 animate-pulse items-center justify-center rounded-2xl bg-[#2563EB]">
+                      <Radar size={28} />
+                    </div>
                   </div>
 
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#2563EB]">
-                    <Globe2 size={28} />
-                  </div>
-                </div>
+                  <div className="relative mx-auto mt-10 flex h-80 w-full max-w-sm items-center justify-center">
+                    <div className="absolute h-72 w-72 animate-ping rounded-full border border-[#60A5FA]/20" />
+                    <div className="absolute h-56 w-56 rounded-full border border-[#60A5FA]/20" />
+                    <div className="absolute h-40 w-40 rounded-full border border-[#60A5FA]/20" />
 
-                <div className="mt-8 space-y-4">
-                  {platformCards.map((item) => (
-                    <div
-                      key={item.title}
-                      className="flex flex-col items-center gap-4 rounded-3xl border border-white/10 bg-[#0B1628] p-5 text-center md:flex-row md:text-left"
-                    >
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#2563EB]/20 text-[#60A5FA]">
-                        <item.icon size={26} />
+                    <div className="absolute left-2 top-10 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-left backdrop-blur">
+                      <div className="flex items-center gap-2 text-xs font-black text-[#93C5FD]">
+                        <Building2 size={15} />
+                        Yeni Portföy
                       </div>
 
-                      <div>
-                        <h4 className="text-lg font-black">{item.title}</h4>
+                      <p className="mt-1 text-[11px] text-white/50">
+                        Bölgesel fırsat yayında
+                      </p>
+                    </div>
 
-                        <p className="mt-1 text-sm leading-6 text-white/50">{item.desc}</p>
+                    <div className="absolute right-1 top-24 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-left backdrop-blur">
+                      <div className="flex items-center gap-2 text-xs font-black text-[#93C5FD]">
+                        <MessageCircle size={15} />
+                        Yeni Talep
+                      </div>
+
+                      <p className="mt-1 text-[11px] text-white/50">
+                        Alıcı talebi paylaşıldı
+                      </p>
+                    </div>
+
+                    <div className="absolute bottom-10 left-8 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-left backdrop-blur">
+                      <div className="flex items-center gap-2 text-xs font-black text-[#93C5FD]">
+                        <Handshake size={15} />
+                        Ortak Satış
+                      </div>
+
+                      <p className="mt-1 text-[11px] text-white/50">
+                        İş birliği başladı
+                      </p>
+                    </div>
+
+                    <div className="absolute bottom-16 right-5 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-left backdrop-blur">
+                      <div className="flex items-center gap-2 text-xs font-black text-[#93C5FD]">
+                        <TrendingUp size={15} />
+                        Hızlı Dönüş
+                      </div>
+
+                      <p className="mt-1 text-[11px] text-white/50">
+                        Fırsatlar takipte
+                      </p>
+                    </div>
+
+                    <div className="relative flex h-32 w-32 items-center justify-center rounded-full border border-[#60A5FA]/30 bg-[#2563EB]/20 shadow-2xl shadow-[#2563EB]/30">
+                      <div className="absolute h-24 w-24 rounded-full bg-[#2563EB]/30 blur-xl" />
+
+                      <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-[#2563EB]">
+                        <Globe2 size={38} />
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
 
-                <div className="mt-8 rounded-3xl border border-[#2563EB]/20 bg-[#2563EB]/10 p-5">
-                  <div className="flex flex-col items-center gap-3 text-center md:flex-row md:text-left">
-                    <CheckCircle2 size={22} className="text-[#60A5FA]" />
+                  <div className="mt-6 rounded-3xl border border-[#2563EB]/20 bg-[#2563EB]/10 p-5">
+                    <div className="flex flex-col items-center gap-3 text-center md:flex-row md:text-left">
+                      <CheckCircle2 size={22} className="text-[#60A5FA]" />
 
-                    <div>
-                      <p className="text-sm font-black">Güvenli Kapalı Devre Sistem</p>
+                      <div>
+                        <p className="text-sm font-black">
+                          Portföy + Talep + Network Tek Merkezde
+                        </p>
 
-                      <p className="mt-1 text-xs text-white/50">
-                        Referans sistemi ve admin onayı ile çalışır.
-                      </p>
+                        <p className="mt-1 text-xs text-white/50">
+                          Sektör profesyonelleri için daha hızlı, düzenli ve
+                          güvenli iş akışı.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -415,9 +496,26 @@ export default function LandingPage() {
             </div>
 
             <div className="flex gap-6 text-sm font-bold text-white/50">
-              <button onClick={() => setInfoModal("kvkk")}>KVKK</button>
-              <button onClick={() => setInfoModal("gizlilik")}>Gizlilik</button>
-              <button onClick={() => setInfoModal("iletisim")}>İletişim</button>
+              <button
+                onClick={() => setInfoModal("kvkk")}
+                className="transition hover:text-white"
+              >
+                KVKK
+              </button>
+
+              <button
+                onClick={() => setInfoModal("gizlilik")}
+                className="transition hover:text-white"
+              >
+                Gizlilik
+              </button>
+
+              <button
+                onClick={() => setInfoModal("iletisim")}
+                className="transition hover:text-white"
+              >
+                İletişim
+              </button>
             </div>
           </div>
         </footer>
@@ -545,23 +643,79 @@ function InfoModal({
   type,
   onClose,
 }: {
-  type: "kvkk" | "gizlilik" | "iletisim";
+  type: InfoModalType;
   onClose: () => void;
 }) {
   const content = {
+    kesfet: {
+      title: "EPH Platform’u Keşfet",
+      icon: Radar,
+      text: `EPH Platform, gayrimenkul sektöründe yalnızca ilan paylaşımı yapılan klasik bir sistem değildir.
+
+EPH; emlakçıları, müteahhitleri ve inşaat firmalarını aynı kapalı devre profesyonel ağda buluşturan yeni nesil bir iş birliği merkezidir.
+
+Bu sistemde portföyler daha görünür olur, müşteri talepleri daha hızlı yayılır, projeler daha geniş satış ağına ulaşır ve ortak satış fırsatları daha düzenli takip edilir.
+
+Emlakçı, elinde olmayan portföy yüzünden müşterisini kaybetmez.
+Müteahhit, projesini yalnızca birkaç kişiyle değil, daha geniş bir profesyonel ağla paylaşır.
+İnşaat firması, stok ve kampanya bilgisini daha hızlı duyurur.
+
+EPH; portföy, talep, mesajlaşma, CRM, network ve yapay zekâ destekli Lina asistanı aynı merkezde birleştirir.
+
+Kısacası EPH, gayrimenkul sektöründe daha hızlı iletişim, daha güçlü iş birliği ve daha düzenli satış takibi için geliştirilen profesyonel bir ekosistemdir.`,
+    },
+
     kvkk: {
-      title: "KVKK Bilgilendirmesi",
-      text: "EPH Platform’a iletilen başvuru bilgileri yalnızca üyelik değerlendirmesi ve iletişim amacıyla kullanılır.",
+      title: "KVKK Aydınlatma Metni",
+      icon: ShieldCheck,
+      text: `EPH Platform üzerinden iletilen kişisel veriler; üyelik başvurularının değerlendirilmesi, kullanıcı doğrulama süreçlerinin yürütülmesi, platform güvenliğinin sağlanması, iletişim faaliyetlerinin yönetilmesi, teknik destek hizmetlerinin sunulması ve platform içi iş süreçlerinin yürütülmesi amacıyla işlenmektedir.
+
+Bu kapsamda ad, soyad, telefon numarası, e-posta adresi, meslek bilgisi, referans kodu, portföy bilgileri, talep kayıtları, mesajlaşma içerikleri, işlem kayıtları ve platform kullanım verileri işlenebilir.
+
+Kişisel veriler; 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında hukuka ve dürüstlük kurallarına uygun şekilde, belirli ve meşru amaçlarla, işlendikleri amaçla bağlantılı ve ölçülü olarak korunur.
+
+EPH Platform; kullanıcı verilerinin yetkisiz erişime, kayba, kötüye kullanıma veya izinsiz paylaşıma karşı korunması için gerekli teknik ve idari güvenlik önlemlerini almayı taahhüt eder.
+
+Kişisel veriler, yasal zorunluluklar ve hizmetin gerektirdiği teknik süreçler dışında üçüncü kişilerle izinsiz paylaşılmaz.
+
+Kullanıcılar; kişisel verilerinin işlenip işlenmediğini öğrenme, işlenmişse bilgi talep etme, hatalı veya eksik verilerin düzeltilmesini isteme, gerekli şartların oluşması halinde silinmesini veya yok edilmesini talep etme haklarına sahiptir.
+
+KVKK kapsamındaki başvurular için bizimle info@emlakportfoyhavuzu.com adresi üzerinden iletişime geçebilirsiniz.`,
     },
+
     gizlilik: {
-      title: "Gizlilik",
-      text: "Platform içindeki paylaşımlar kapalı devre yapıdadır. Kullanıcı verileri üçüncü kişilerle izinsiz paylaşılmaz.",
+      title: "Gizlilik Politikası",
+      icon: LockKeyhole,
+      text: `EPH Platform; emlakçılar, müteahhitler ve inşaat firmaları için geliştirilmiş kapalı devre profesyonel bir gayrimenkul iş ağıdır.
+
+Platform içerisinde paylaşılan portföyler, talepler, mesajlar, kampanyalar, proje bilgileri, CRM kayıtları ve iş birliği süreçleri yalnızca yetkili kullanıcılar tarafından görüntülenebilir.
+
+Kullanıcı hesap bilgileri, iletişim verileri ve platform hareketleri güvenli sunucu altyapısında korunur. Sistem güvenliği, kötüye kullanımın önlenmesi ve hizmet kalitesinin artırılması amacıyla işlem kayıtları, oturum bilgileri ve teknik loglar tutulabilir.
+
+EPH Platform; kullanıcı verilerini satmaz, kiralamaz veya ticari amaçlarla üçüncü taraflara pazarlamaz.
+
+Kullanıcılar, kendi hesap güvenliklerinden sorumludur. Şifre bilgilerinin veya hesap erişim bilgilerinin üçüncü kişilerle paylaşılması halinde doğabilecek güvenlik risklerinden kullanıcı sorumludur.
+
+Platformda yer alan portföy, talep, proje, mesajlaşma ve ticari içeriklerin izinsiz kopyalanması, çoğaltılması, dışarı aktarılması veya platform dışı amaçlarla kullanılması yasaktır.
+
+EPH Platform, gizlilik ve güvenlik standartlarını geliştirmek amacıyla bu politikada zaman zaman güncelleme yapabilir.`,
     },
+
     iletisim: {
       title: "İletişim",
-      text: "EPH Platform ile iletişim kurmak için üyelik başvuru formunu doldurabilir veya giriş yaptıktan sonra platform içi iletişim kanallarını kullanabilirsiniz.",
+      icon: MessageCircle,
+      text: `EPH Platform ile iletişime geçmek için aşağıdaki e-posta adresini kullanabilirsiniz.
+
+E-posta:
+info@emlakportfoyhavuzu.com
+
+Üyelik başvuruları, teknik destek, iş birliği talepleri, KVKK başvuruları, gizlilik talepleri ve platform hakkındaki tüm sorularınız için bizimle iletişime geçebilirsiniz.
+
+Başvurular ve destek talepleri mümkün olan en kısa sürede değerlendirilir.`,
     },
   }[type];
+
+  const Icon = content.icon;
 
   return (
     <div
@@ -569,16 +723,18 @@ function InfoModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-[32px] border border-white/10 bg-[#081423] p-8 text-center text-white"
+        className="max-h-[88vh] w-full max-w-3xl overflow-auto rounded-[32px] border border-white/10 bg-[#081423] p-8 text-center text-white"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#2563EB]/20 text-[#60A5FA]">
-          <ShieldCheck size={28} />
+        <div className="mx-auto flex h-16 w-16 animate-pulse items-center justify-center rounded-2xl bg-[#2563EB]/20 text-[#60A5FA]">
+          <Icon size={30} />
         </div>
 
-        <h3 className="mt-5 text-2xl font-black">{content.title}</h3>
+        <h3 className="mt-5 text-3xl font-black">{content.title}</h3>
 
-        <p className="mt-4 text-sm leading-7 text-white/60">{content.text}</p>
+        <p className="mt-5 whitespace-pre-line text-center text-sm leading-8 text-white/65">
+          {content.text}
+        </p>
 
         <button
           onClick={onClose}
