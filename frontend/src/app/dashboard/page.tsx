@@ -191,36 +191,40 @@ export default function DashboardPage() {
 
           <div className="space-y-3">
             <ListingCard
- 	 	title="Gerzele'de Site İçerisinde 3+1 Daire"
- 		 type="190 m² • Acil Satılık"
- 		 location="Gerzele / Denizli"
- 		 price="7.500.000 TL"
- 		 status="Aktif"
-		/>
+              title="Gerzele'de Site İçerisinde 3+1 Daire"
+              type="190 m² • Acil Satılık"
+              location="Gerzele / Denizli"
+              price="7.500.000 TL"
+              status="Aktif"
+              image="/listings/gerzele-31.jpg"
+            />
 
-	    <ListingCard
- 		 title="Çamlık Forum'a 2 Dakika 1+1 Apart"
-  		type="2. Kat • Balkonlu"
-  		location="Çamlık / Denizli"
-  		price="2.200.000 TL"
-  		status="Aktif"
-		/>
+            <ListingCard
+              title="Çamlık Forum'a 2 Dakika 1+1 Apart"
+              type="2. Kat • Balkonlu"
+              location="Çamlık / Denizli"
+              price="2.200.000 TL"
+              status="Aktif"
+              image="/listings/camlik-11.jpg"
+            />
 
-	   <ListingCard
- 		 title="Koşuyolu Üzeri 455 m² Villalık Arsa"
- 		 type="%30 İmarlı • Köşe Başı"
-  		location="Koşuyolu / Denizli"
-  		price="11.000.000 TL"
- 		 status="Aktif"
-		/>
+            <ListingCard
+              title="Koşuyolu Üzeri 455 m² Villalık Arsa"
+              type="%30 İmarlı • Köşe Başı"
+              location="Koşuyolu / Denizli"
+              price="11.000.000 TL"
+              status="Aktif"
+              image="/listings/kosuyolu-arsa.jpg"
+            />
 
-	    <ListingCard
- 		 title="Kuşpınar Mahallesi 350 m² Arsa"
-  		type="6 Kat İmarlı • Çarşamba Pazarı"
-  		location="Kuşpınar / Denizli"
-  		price="20.000.000 TL"
-  		status="Aktif"
-		/>
+            <ListingCard
+              title="Kuşpınar Mahallesi 350 m² Arsa"
+              type="6 Kat İmarlı • Çarşamba Pazarı"
+              location="Kuşpınar / Denizli"
+              price="20.000.000 TL"
+              status="Aktif"
+              image="/listings/kuspinar-arsa.jpg"
+            />
           </div>
         </section>
 
@@ -328,9 +332,7 @@ function StatCard({
 
       <p className="mt-3 text-[28px] font-black leading-none">{value}</p>
 
-      <p className="mt-3 text-[12px] font-bold text-emerald-600">
-        {change}
-      </p>
+      <p className="mt-3 text-[12px] font-bold text-emerald-600">{change}</p>
     </div>
   );
 }
@@ -366,19 +368,23 @@ function ListingCard({
   location,
   price,
   status,
+  image,
 }: {
   title: string;
   type: string;
   location: string;
   price: string;
   status: string;
+  image: string;
 }) {
   return (
     <article className="flex items-center gap-3 rounded-[24px] border border-slate-200 bg-white p-3">
       <div className="h-[82px] w-[92px] shrink-0 overflow-hidden rounded-[18px] bg-[#E8EEF6]">
-        <div className="flex h-full items-end justify-center">
-          <div className="mb-2 h-12 w-14 rounded-t-md bg-white/70" />
-        </div>
+        <img
+          src={image}
+          alt={title}
+          className="h-full w-full object-cover"
+        />
       </div>
 
       <div className="min-w-0 flex-1">
@@ -432,9 +438,7 @@ function MarketMini({
 
       <p className="mt-2 text-[19px] font-black">{value}</p>
 
-      <p className="mt-2 text-[12px] font-bold text-emerald-600">
-        {change}
-      </p>
+      <p className="mt-2 text-[12px] font-bold text-emerald-600">{change}</p>
     </div>
   );
 }
