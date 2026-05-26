@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
+  Activity,
   ArrowRight,
   BadgeCheck,
+  BellRing,
   Building2,
   CheckCircle2,
+  Clock3,
   Globe2,
   Handshake,
   LockKeyhole,
@@ -72,6 +75,27 @@ const features = [
     label: "Yapay Zeka",
     title: "Lina AI",
     desc: "İlan metni, portföy girişi ve içerik üretiminde sesli ve yazılı akıllı destek sağlar.",
+  },
+];
+
+const liveActivities = [
+  {
+    icon: BellRing,
+    title: "Yeni Talep Paylaşıldı",
+    desc: "3+1 daire arayan müşteri talebi network’e düştü.",
+    time: "Az önce",
+  },
+  {
+    icon: Building2,
+    title: "Yeni Portföy Eklendi",
+    desc: "Denizli merkezde satılık portföy yayına alındı.",
+    time: "2 dk önce",
+  },
+  {
+    icon: Handshake,
+    title: "Ortak Satış Görüşmesi",
+    desc: "Emlakçı ve müteahhit arasında görüşme başladı.",
+    time: "5 dk önce",
   },
 ];
 
@@ -237,19 +261,20 @@ export default function LandingPage() {
 
         <section id="platform" className="relative overflow-hidden px-5 pb-24 pt-36">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.38),transparent_34%)]" />
-          <div className="absolute left-1/2 top-24 h-72 w-72 -translate-x-1/2 rounded-full bg-[#60A5FA]/10 blur-3xl" />
-          <div className="absolute bottom-0 left-0 h-80 w-80 rounded-full bg-[#2563EB]/15 blur-3xl" />
+          <div className="eph-premium-glow eph-glow left-1/2 top-24 h-72 w-72 -translate-x-1/2 bg-[#60A5FA]/10" />
+          <div className="eph-premium-glow bottom-0 left-0 h-80 w-80 bg-[#2563EB]/15" />
+          <div className="eph-premium-glow right-0 top-1/3 h-96 w-96 bg-[#C9A84C]/10" />
 
           <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-16 lg:grid-cols-2">
             <div className="relative z-10 text-center lg:text-left">
-              <div className="inline-flex animate-pulse items-center gap-2 rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#93C5FD]">
+              <div className="eph-premium-line inline-flex items-center gap-2 rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#93C5FD]">
                 <Zap size={14} />
                 Sektörün Kapalı Devre Güç Ağı
               </div>
 
               <h2 className="mt-7 text-5xl font-black leading-[1.04] tracking-tight md:text-7xl">
                 Portföyün
-                <span className="block bg-gradient-to-r from-[#60A5FA] via-white to-[#93C5FD] bg-clip-text text-transparent">
+                <span className="block bg-gradient-to-r from-[#60A5FA] via-white to-[#C9A84C] bg-clip-text text-transparent">
                   Daha Uzağa
                 </span>
                 Ulaşsın
@@ -262,15 +287,15 @@ export default function LandingPage() {
               </p>
 
               <div className="mt-8 grid grid-cols-1 gap-3 text-sm font-bold text-white/70 sm:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                <div className="eph-card-hover rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
                   Anlık Talep Paylaşımı
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                <div className="eph-card-hover rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
                   Ortak Satış Fırsatı
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                <div className="eph-card-hover rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
                   Güvenli Network
                 </div>
               </div>
@@ -311,7 +336,7 @@ export default function LandingPage() {
                 {stats.map(([value, label]) => (
                   <div
                     key={label}
-                    className="rounded-3xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur transition hover:-translate-y-1 hover:border-[#60A5FA]/40"
+                    className="eph-card-hover rounded-3xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur"
                   >
                     <div className="text-3xl font-black text-[#60A5FA]">{value}</div>
 
@@ -324,9 +349,9 @@ export default function LandingPage() {
             </div>
 
             <div className="relative z-10">
-              <div className="absolute -right-10 top-10 h-72 w-72 rounded-full bg-[#2563EB]/20 blur-3xl" />
+              <div className="eph-premium-glow -right-10 top-10 h-72 w-72 bg-[#2563EB]/20" />
 
-              <div className="relative mx-auto max-w-xl overflow-hidden rounded-[40px] border border-white/10 bg-white/5 p-6 text-center backdrop-blur">
+              <div className="eph-float relative mx-auto max-w-xl overflow-hidden rounded-[40px] border border-white/10 bg-white/5 p-6 text-center backdrop-blur">
                 <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(96,165,250,0.12),transparent)]" />
 
                 <div className="relative rounded-[32px] border border-white/10 bg-[#07111F] p-6">
@@ -426,12 +451,67 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <section className="relative overflow-hidden border-y border-white/10 bg-[#050C16] px-5 py-20">
+          <div className="eph-premium-glow left-10 top-10 h-80 w-80 bg-[#2563EB]/10" />
+          <div className="eph-premium-glow bottom-0 right-10 h-80 w-80 bg-[#C9A84C]/10" />
+
+          <div className="relative mx-auto max-w-7xl">
+            <div className="mx-auto max-w-4xl text-center">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#2563EB]/20 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#60A5FA]">
+                <Activity size={14} />
+                Canlı Network Akışı
+              </div>
+
+              <h2 className="mt-6 text-4xl font-black leading-tight md:text-5xl">
+                Platform İçinde İş Fırsatları
+                <span className="block bg-gradient-to-r from-[#60A5FA] via-white to-[#C9A84C] bg-clip-text text-transparent">
+                  Anlık Hareket Eder
+                </span>
+              </h2>
+
+              <p className="mx-auto mt-5 max-w-3xl text-base leading-8 text-white/55">
+                Portföy, talep, mesajlaşma ve ortak satış süreçleri tek akışta
+                izlenir. EPH, sektör profesyonellerine canlı ve düzenli bir iş
+                takip merkezi sunar.
+              </p>
+            </div>
+
+            <div className="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-3">
+              {liveActivities.map((item) => (
+                <div
+                  key={item.title}
+                  className="eph-card-hover relative overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.04] p-7 text-center backdrop-blur"
+                >
+                  <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#2563EB]/10 blur-2xl" />
+
+                  <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-[#60A5FA]/20 bg-[#2563EB]/10 text-[#60A5FA]">
+                    <item.icon size={28} />
+                  </div>
+
+                  <h3 className="relative mt-6 text-xl font-black">
+                    {item.title}
+                  </h3>
+
+                  <p className="relative mt-3 min-h-[56px] text-sm leading-7 text-white/55">
+                    {item.desc}
+                  </p>
+
+                  <div className="relative mt-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-white/45">
+                    <Clock3 size={14} />
+                    {item.time}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section
           id="ozellikler"
           className="relative overflow-hidden border-t border-white/10 bg-[#081423] px-5 py-24"
         >
-          <div className="absolute left-0 top-0 h-96 w-96 rounded-full bg-[#2563EB]/10 blur-3xl" />
-          <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-[#60A5FA]/10 blur-3xl" />
+          <div className="eph-premium-glow left-0 top-0 h-96 w-96 bg-[#2563EB]/10" />
+          <div className="eph-premium-glow bottom-0 right-0 h-96 w-96 bg-[#60A5FA]/10" />
 
           <div className="relative mx-auto max-w-7xl">
             <div className="mx-auto max-w-4xl text-center">
@@ -442,7 +522,7 @@ export default function LandingPage() {
 
               <h2 className="mt-6 text-4xl font-black leading-tight md:text-6xl">
                 EPH’de Sadece İlan Değil,
-                <span className="block bg-gradient-to-r from-[#60A5FA] via-white to-[#93C5FD] bg-clip-text text-transparent">
+                <span className="block bg-gradient-to-r from-[#60A5FA] via-white to-[#C9A84C] bg-clip-text text-transparent">
                   Tam Bir İş Ekosistemi Var
                 </span>
               </h2>
@@ -457,7 +537,7 @@ export default function LandingPage() {
               {features.map((item, index) => (
                 <div
                   key={item.title}
-                  className="group relative overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.04] p-7 text-center backdrop-blur transition duration-300 hover:-translate-y-2 hover:border-[#60A5FA]/50 hover:bg-white/[0.07] hover:shadow-2xl hover:shadow-[#2563EB]/10"
+                  className="eph-card-hover group relative overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.04] p-7 text-center backdrop-blur"
                 >
                   <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#2563EB]/10 blur-2xl transition group-hover:bg-[#60A5FA]/20" />
 
@@ -494,7 +574,7 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(37,99,235,0.25),transparent_35%)]" />
 
           <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[40px] border border-white/10 bg-[#0B1628] p-10 text-center md:p-16">
-            <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[#2563EB]/20 blur-3xl" />
+            <div className="eph-premium-glow -right-20 -top-20 h-72 w-72 bg-[#2563EB]/20" />
 
             <div className="relative z-10 mx-auto max-w-3xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#2563EB]/20 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#60A5FA]">
@@ -516,14 +596,14 @@ export default function LandingPage() {
               <div className="mt-10 flex flex-wrap justify-center gap-4">
                 <button
                   onClick={() => setShowForm(true)}
-                  className="rounded-2xl bg-[#2563EB] px-8 py-4 text-sm font-black"
+                  className="rounded-2xl bg-[#2563EB] px-8 py-4 text-sm font-black transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
                 >
                   Başvuru Oluştur
                 </button>
 
                 <Link
                   href="/giris"
-                  className="rounded-2xl border border-white/10 bg-white/5 px-8 py-4 text-sm font-black"
+                  className="rounded-2xl border border-white/10 bg-white/5 px-8 py-4 text-sm font-black transition hover:-translate-y-1 hover:bg-white/10"
                 >
                   Giriş Yap
                 </Link>

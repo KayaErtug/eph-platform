@@ -253,3 +253,104 @@ table { width: 100%; overflow-x: auto; display: block; }
   .crm-nav { display: none !important; }
   .mk-nav { display: none !important; }
 }
+
+
+
+
+
+/* ===================== EPH PREMIUM LANDING EFFECTS ===================== */
+
+@keyframes ephFloat {
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-12px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes ephGlow {
+  0% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+}
+
+@keyframes ephSweep {
+  0% {
+    transform: translateX(-140%);
+  }
+
+  100% {
+    transform: translateX(140%);
+  }
+}
+
+.eph-float {
+  animation: ephFloat 6s ease-in-out infinite;
+}
+
+.eph-glow {
+  animation: ephGlow 5s ease-in-out infinite;
+}
+
+.eph-card-hover {
+  transition:
+    transform 0.35s ease,
+    border-color 0.35s ease,
+    box-shadow 0.35s ease,
+    background 0.35s ease;
+}
+
+.eph-card-hover:hover {
+  transform: translateY(-8px);
+  border-color: rgba(96, 165, 250, 0.45);
+  box-shadow:
+    0 25px 50px rgba(37, 99, 235, 0.18),
+    0 0 40px rgba(96, 165, 250, 0.12);
+}
+
+.eph-premium-line {
+  position: relative;
+  overflow: hidden;
+}
+
+.eph-premium-line::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -140%;
+  width: 120%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255,255,255,0.18),
+    transparent
+  );
+  animation: ephSweep 5s linear infinite;
+}
+
+.eph-premium-glow {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  pointer-events: none;
+}
+
+
