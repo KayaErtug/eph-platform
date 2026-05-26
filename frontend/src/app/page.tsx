@@ -7,13 +7,17 @@ import {
   ArrowRight,
   BadgeCheck,
   BellRing,
+  Bot,
+  BriefcaseBusiness,
   Building2,
   CheckCircle2,
   Clock3,
   Globe2,
   Handshake,
+  LayoutDashboard,
   LockKeyhole,
   MessageCircle,
+  MonitorSmartphone,
   Play,
   Radar,
   ShieldCheck,
@@ -96,6 +100,39 @@ const liveActivities = [
     title: "Ortak Satış Görüşmesi",
     desc: "Emlakçı ve müteahhit arasında görüşme başladı.",
     time: "5 dk önce",
+  },
+];
+
+const showcaseItems = [
+  {
+    icon: LayoutDashboard,
+    title: "Dashboard",
+    desc: "Günlük özet, son ilanlar, hızlı işlemler ve piyasa bilgileri tek ekranda.",
+    image: "/showcase/dashboard.jpg",
+  },
+  {
+    icon: MessageCircle,
+    title: "Network",
+    desc: "Sektör profesyonelleri arasında talep, portföy ve iş birliği akışı.",
+    image: "/showcase/network.jpg",
+  },
+  {
+    icon: BriefcaseBusiness,
+    title: "CRM",
+    desc: "Müşteri görüşmeleri, günlük takipler ve iş planı kayıtları düzenli ilerler.",
+    image: "/showcase/crm.jpg",
+  },
+  {
+    icon: Building2,
+    title: "Portföy Yönetimi",
+    desc: "Stok, proje ve ilan yönetimi daha kontrollü şekilde takip edilir.",
+    image: "/showcase/stock.jpg",
+  },
+  {
+    icon: Bot,
+    title: "Lina AI",
+    desc: "Sesli ve yazılı destekle ilan oluşturma süreci hızlanır.",
+    image: "/showcase/lina.jpg",
   },
 ];
 
@@ -501,6 +538,77 @@ export default function LandingPage() {
                     {item.time}
                   </div>
                 </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="relative overflow-hidden bg-[#081423] px-5 py-24">
+          <div className="eph-premium-glow left-0 top-20 h-96 w-96 bg-[#2563EB]/10" />
+          <div className="eph-premium-glow bottom-0 right-0 h-96 w-96 bg-[#C9A84C]/10" />
+
+          <div className="relative mx-auto max-w-7xl">
+            <div className="mx-auto max-w-4xl text-center">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#2563EB]/20 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#60A5FA]">
+                <MonitorSmartphone size={14} />
+                Platformdan Görüntüler
+              </div>
+
+              <h2 className="mt-6 text-4xl font-black leading-tight md:text-6xl">
+                EPH Sadece Anlatılmaz,
+                <span className="block bg-gradient-to-r from-[#60A5FA] via-white to-[#C9A84C] bg-clip-text text-transparent">
+                  Kullanırken Hissedilir
+                </span>
+              </h2>
+
+              <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-white/55 md:text-lg">
+                Dashboard, network, CRM, portföy yönetimi ve Lina AI ekranlarıyla
+                sektör profesyonelleri için gerçek bir çalışma merkezi sunar.
+              </p>
+            </div>
+
+            <div className="mt-16 grid grid-cols-1 gap-7 md:grid-cols-2 xl:grid-cols-3">
+              {showcaseItems.map((item, index) => (
+                <article
+                  key={item.title}
+                  className={`eph-card-hover group relative overflow-hidden rounded-[36px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur ${
+                    index === 0 ? "xl:col-span-2" : ""
+                  }`}
+                >
+                  <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#2563EB]/20 blur-3xl transition group-hover:bg-[#60A5FA]/25" />
+
+                  <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#050C16]">
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      className="h-[260px] w-full object-cover transition duration-500 group-hover:scale-105 md:h-[320px]"
+                    />
+
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#050C16] via-[#050C16]/20 to-transparent" />
+
+                    <div className="absolute bottom-0 left-0 right-0 p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#60A5FA]/20 bg-[#2563EB]/30 text-[#93C5FD] backdrop-blur">
+                          <item.icon size={24} />
+                        </div>
+
+                        <div>
+                          <h3 className="text-2xl font-black text-white">
+                            {item.title}
+                          </h3>
+
+                          <p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-[#60A5FA]">
+                            EPH Modülü
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="mt-4 max-w-xl text-sm leading-7 text-white/65">
+                        {item.desc}
+                      </p>
+                    </div>
+                  </div>
+                </article>
               ))}
             </div>
           </div>
