@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/auth.store";
 
-const ITEMS = [
+const BASE_ITEMS = [
   {
     href: "/dashboard",
     svg: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
-    label: "Anasayfa",
+    label: "Ana Sayfa",
   },
   {
-    href: "/stok",
-    svg: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
-    label: "Stok",
+    href: "/network",
+    svg: "M17 8h2a2 2 0 012 2v8a2 2 0 01-2 2h-2m-4-12H7a2 2 0 00-2 2v8a2 2 0 002 2h6m0-12v12m0-12l4 4m-4-4l-4 4",
+    label: "Network",
   },
   {
     href: "/crm",
@@ -31,10 +32,25 @@ const ITEMS = [
   },
 ];
 
+const ADMIN_ITEM = {
+  href: "/admin",
+  svg: "M12 2l7 4v6c0 5-3 9-7 10-4-1-7-5-7-10V6l7-4zm0 6v5m0 4h.01",
+  label: "Admin",
+};
+
 export function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useAuthStore();
   const [isMobile, setIsMobile] = useState(false);
+
+  const items = useMemo(() => {
+    if (user?.role === "ADMIN") {
+      return [...BASE_ITEMS, ADMIN_ITEM];
+    }
+
+    return BASE_ITEMS;
+  }, [user?.role]);
 
   useEffect(() => {
     const updateDevice = () => {
@@ -42,7 +58,6 @@ export function BottomNav() {
     };
 
     updateDevice();
-
     window.addEventListener("resize", updateDevice);
 
     return () => {
@@ -68,15 +83,20 @@ export function BottomNav() {
         zIndex: 9999,
         background: "#fff",
         borderTop: "0.5px solid #E2DDD5",
-        height: 65,
+        minHeight: 65,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-around",
         paddingBottom: 4,
+        paddingLeft: 4,
+        paddingRight: 4,
       }}
     >
-      {ITEMS.map((item) => {
-        const active = pathname.startsWith(item.href);
+      {items.map((item) => {
+        const active =
+          item.href === "/dashboard"
+            ? pathname === "/dashboard"
+            : pathname.startsWith(item.href);
 
         return (
           <button
@@ -90,13 +110,14 @@ export function BottomNav() {
               border: "none",
               cursor: "pointer",
               background: "none",
-              padding: "4px 8px",
-              minWidth: 56,
+              padding: "4px 4px",
+              minWidth: user?.role === "ADMIN" ? 48 : 56,
+              flex: 1,
             }}
           >
             <svg
-              width="24"
-              height="24"
+              width="23"
+              height="23"
               viewBox="0 0 24 24"
               fill="none"
               stroke={active ? "#B8943F" : "#AEAEB2"}
@@ -109,11 +130,12 @@ export function BottomNav() {
 
             <span
               style={{
-                fontSize: 9,
-                letterSpacing: 0.5,
+                fontSize: user?.role === "ADMIN" ? 8 : 9,
+                letterSpacing: 0.3,
                 textTransform: "uppercase",
                 color: active ? "#B8943F" : "#AEAEB2",
                 fontWeight: active ? 700 : 400,
+                whiteSpace: "nowrap",
               }}
             >
               {item.label}
