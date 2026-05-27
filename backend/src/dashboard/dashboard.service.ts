@@ -1,11 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
-  async getSummary() {
+  async getSummary(userId: string, userRole: Role) {
+    const ownCustomerWhere = { ownerId: userId };
+    const ownTaskWhere = { userId, status: 'BEKLIYOR' as const };
+    const ownActivityWhere = { userId };
+
     const [
       totalUnits,
       totalCustomers,
@@ -16,12 +21,32 @@ export class DashboardService {
       latestActivities,
       pendingTasks,
     ] = await Promise.all([
-      this.prisma.unit.count(),
-      this.prisma.customer.count(),
-      this.prisma.userVisit.count(),
-      this.prisma.project.count(),
+      this.prisma.unit.count({
+        where: {
+          project: {
+            ownerId: userId,
+          },
+        },
+      }),
+
+      this.prisma.customer.count({
+        where: ownCustomerWhere,
+      }),
+
+      this.prisma.userVisit.count({
+        where: { userId },
+      }),
+
+      this.prisma.project.count({
+        where: { ownerId: userId },
+      }),
 
       this.prisma.unit.findMany({
+        where: {
+          project: {
+            ownerId: userId,
+          },
+        },
         orderBy: { createdAt: 'desc' },
         take: 4,
         include: {
@@ -30,11 +55,13 @@ export class DashboardService {
       }),
 
       this.prisma.customer.findMany({
+        where: ownCustomerWhere,
         orderBy: { createdAt: 'desc' },
         take: 5,
       }),
 
       this.prisma.activity.findMany({
+        where: ownActivityWhere,
         orderBy: { createdAt: 'desc' },
         take: 5,
         include: {
@@ -44,9 +71,7 @@ export class DashboardService {
       }),
 
       this.prisma.task.findMany({
-        where: {
-          status: 'BEKLIYOR',
-        },
+        where: ownTaskWhere,
         orderBy: { createdAt: 'desc' },
         take: 5,
         include: {
@@ -66,6 +91,11 @@ export class DashboardService {
       latestCustomers,
       latestActivities,
       pendingTasks,
+      securityScope: {
+        userId,
+        role: userRole,
+        mode: 'PRIVATE_USER_DASHBOARD',
+      },
     };
   }
 }
