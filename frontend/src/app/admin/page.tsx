@@ -1,870 +1,2026 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/store/auth.store";
-import api from "@/lib/api";
-import Link from "next/link";
 
-interface Stats {
-  totalUsers: number; pendingUsers: number; approvedUsers: number;
-  totalInvitations: number; pendingDocuments: number;
-  pendingNominations: number; pendingApplications: number;
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import api from "@/lib/api";
+import { useAuthStore } from "@/store/auth.store";
+import {
+  BadgeCheck,
+  BarChart3,
+  Building2,
+  CheckCircle2,
+  ClipboardCheck,
+  Crown,
+  Eye,
+  FileCheck2,
+  FileText,
+  Home,
+  Loader2,
+  LogOut,
+  MessageCircle,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  UserPlus,
+  UsersRound,
+  WalletCards,
+  XCircle,
+} from "lucide-react";
+
+type Stats = {
+  totalUsers: number;
+  pendingUsers: number;
+  approvedUsers: number;
+  totalInvitations: number;
+  pendingDocuments: number;
+  pendingNominations: number;
+  pendingApplications: number;
   byRole: { role: string; count: number }[];
-}
-interface User {
-  id: string; firstName: string; lastName: string; email: string;
-  phone: string; role: string; isApproved: boolean;
-  documents: { id: string; type: string; status: string; fileUrl: string; fileName: string }[];
-}
-interface Document {
-  id: string; type: string; status: string; fileUrl: string; fileName: string;
-  user?: { firstName: string; lastName: string; email: string; role: string };
-}
-interface Nomination {
-  id: string; candidateName: string; candidateEmail: string; candidatePhone: string;
-  candidateRole: string; note?: string; status: string; adminNote?: string;
-  createdAt: string; nominator: { firstName: string; lastName: string; email: string; role: string };
-}
-interface Application {
-  id: string; applicantName: string; applicantEmail: string; applicantPhone: string;
-  requestedRole: string; message?: string; referralCode?: string; status: string;
-  adminNote?: string; createdAt: string;
-  referrer?: { firstName: string; lastName: string; email: string; role: string };
-}
-interface Lead {
-  id: string; fullName?: string; phone?: string; email?: string;
-  profession?: string; city?: string; interest?: string;
-  conversation?: string; source: string; createdAt: string;
-}
-interface StokUnit {
-  id: string; type: string; floor?: number; number: string;
-  roomCount?: string; area?: number; price: number; status: string;
-  isVerified: boolean; isOffMarket: boolean;
-  tapuVerified: boolean; photoVerified: boolean; yetkiVerified: boolean;
-  project: { id: string; name: string; city: string; district: string; owner: { firstName: string; lastName: string } };
-}
-interface TrustEntry {
-  id: string; firstName: string; lastName: string; role: string;
-  score: number; badge: string; badgeColor: string;
-}
+};
+
+type AdminUser = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  profileImageUrl?: string | null;
+  role: string;
+  isApproved: boolean;
+  isVerified?: boolean;
+  nominationPoints?: number;
+  nominationQuota?: number;
+  referralCode?: string | null;
+  createdAt?: string;
+  documents: {
+    id: string;
+    type: string;
+    status: string;
+    fileUrl: string;
+    fileName: string;
+    createdAt?: string;
+  }[];
+};
+
+type DocumentItem = {
+  id: string;
+  type: string;
+  status: string;
+  fileUrl: string;
+  fileName: string;
+  createdAt?: string;
+  user?: {
+    id?: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    profileImageUrl?: string | null;
+    role: string;
+  };
+};
+
+type Nomination = {
+  id: string;
+  candidateName: string;
+  candidateEmail: string;
+  candidatePhone: string;
+  candidateRole: string;
+  note?: string | null;
+  status: string;
+  adminNote?: string | null;
+  createdAt: string;
+  nominator: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    profileImageUrl?: string | null;
+    role: string;
+  };
+};
+
+type Application = {
+  id: string;
+  applicantName: string;
+  applicantEmail: string;
+  applicantPhone: string;
+  requestedRole: string;
+  message?: string | null;
+  referralCode?: string | null;
+  status: string;
+  adminNote?: string | null;
+  createdAt: string;
+  referrer?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    profileImageUrl?: string | null;
+    role: string;
+  } | null;
+};
+
+type Lead = {
+  id: string;
+  fullName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  profession?: string | null;
+  city?: string | null;
+  interest?: string | null;
+  conversation?: string | null;
+  source: string;
+  createdAt: string;
+};
+
+type StokUnit = {
+  id: string;
+  type: string;
+  floor?: number | null;
+  number: string;
+  roomCount?: string | null;
+  area?: number | null;
+  price: number;
+  status: string;
+  isVerified: boolean;
+  isOffMarket: boolean;
+  tapuVerified: boolean;
+  photoVerified: boolean;
+  yetkiVerified: boolean;
+  project?: {
+    id: string;
+    name: string;
+    city: string;
+    district: string;
+    owner?: { firstName: string; lastName: string };
+  } | null;
+};
+
+type TrustEntry = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  profileImageUrl?: string | null;
+  role: string;
+  score: number;
+  badge: string;
+  badgeColor: string;
+};
+
+type Visit = {
+  id: string;
+  page: string;
+  ip?: string | null;
+  createdAt: string;
+  user?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    profileImageUrl?: string | null;
+  } | null;
+};
+
+type TabKey =
+  | "users"
+  | "documents"
+  | "nominations"
+  | "applications"
+  | "leads"
+  | "stock"
+  | "trust"
+  | "visits";
 
 const ROLE_LABELS: Record<string, string> = {
-  EMLAKCI: "Emlakçı", MUTEAHHIT: "Müteahhit", INSAAT_FIRMASI: "İnşaat Firması", ADMIN: "Admin"
-};
-const DOC_LABELS: Record<string, string> = {
-  VERGI_LEVHASI: "Vergi Levhası", YETKI_BELGESI: "Yetki Belgesi",
-  TICARET_SICIL: "Ticaret Sicil", KIMLIK: "Kimlik", DIGER: "Diğer"
-};
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: "Bekliyor", APPROVED: "Onaylandı", REJECTED: "Reddedildi",
-  INVITED: "Davet Gönderildi", REGISTERED: "Kayıt Oldu"
-};
-const UNIT_STATUS_LABELS: Record<string, string> = {
-  SATILIK: "Satılık", KIRALIK: "Kiralık", GUNLUK_KIRALIK: "Günlük Kiralık",
-  DEVREN_SATILIK: "Devren Satılık", DEVREN_KIRALIK: "Devren Kiralık",
-  INSAAT_PROJESI: "İnşaat Projesi", KAT_KARSILIGI: "Kat Karşılığı",
-  REZERVE: "Rezerve", SATILDI: "Satıldı", KIRALANDII: "Kiralandı", PASIF: "Pasif",
-};
-const TYPE_LABELS: Record<string, string> = {
-  DAIRE: "Daire", VILLA: "Villa", REZIDANS: "Rezidans", MUSTAK_EV: "Müstakil Ev",
-  ARSA: "Arsa", TARLA: "Tarla", OFIS_BURO: "Ofis/Büro", DUKKAN_MAGAZA: "Dükkan/Mağaza",
+  EMLAKCI: "Emlakçı",
+  MUTEAHHIT: "Müteahhit",
+  INSAAT_FIRMASI: "İnşaat Firması",
+  ADMIN: "Admin",
+  DENETCI_ADMIN: "Denetçi Admin",
 };
 
-const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
-*{box-sizing:border-box;margin:0;padding:0;}
-:root{--navy:#0F2044;--gold:#C9A84C;--cream:#F5F3EF;--warm:#FAFAF8;--text:#1A1A2E;--muted:#8A8A8A;--border:#E2DDD5;--red:#C0392B;--green:#2D6A4F;--serif:'Cormorant Garamond',Georgia,serif;--sans:'DM Sans',system-ui,sans-serif;}
-body{font-family:var(--sans);background:var(--warm);color:var(--text);}
-.an-nav{height:68px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 48px;position:sticky;top:0;z-index:100;}
-@media(max-width:768px){.an-nav{padding:0 20px;}}
-.an-logo{display:flex;align-items:center;gap:12px;text-decoration:none;}
-.an-logo img{width:34px;height:34px;object-fit:contain;}
-.an-logo-text{font-family:var(--serif);font-size:18px;font-weight:500;color:var(--navy);}
-.an-logo-sub{font-size:7px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);}
-.an-logo-badge{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.7);border:1px solid rgba(201,168,76,0.3);padding:3px 10px;margin-left:4px;}
-.an-nav-links{display:flex;align-items:center;gap:4px;}
-.an-nav-item{display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:all 0.2s;border-bottom:2px solid transparent;}
-.an-nav-item:hover{color:var(--navy);border-bottom-color:var(--gold);}
-.an-nav-item.active{color:var(--navy);border-bottom-color:var(--gold);}
-.an-logout{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:1px solid var(--border);padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
-.an-logout:hover{border-color:var(--navy);color:var(--navy);}
-.an-main{padding:48px;max-width:1300px;margin:0 auto;}
-@media(max-width:768px){.an-main{padding:24px 20px;}}
-.an-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:40px;padding-bottom:32px;border-bottom:1px solid var(--border);}
-@media(max-width:768px){.an-header{flex-direction:column;align-items:flex-start;gap:16px;}}
-.an-title{font-family:var(--serif);font-size:40px;font-weight:300;color:var(--navy);letter-spacing:-0.5px;line-height:1.1;}
-.an-title em{font-style:italic;color:var(--gold);}
-.an-sub{font-size:12px;color:var(--muted);margin-top:6px;font-weight:300;}
-.an-add-btn{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:12px 20px;cursor:pointer;font-family:var(--sans);transition:all 0.3s;position:relative;overflow:hidden;display:flex;align-items:center;gap:8px;}
-.an-add-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:var(--gold);transition:left 0.4s;}
-.an-add-btn:hover::before{left:0;}
-.an-add-btn:hover{color:var(--navy);}
-.an-add-btn span{position:relative;z-index:1;}
-.an-stats{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);margin-bottom:40px;}
-@media(max-width:1100px){.an-stats{grid-template-columns:repeat(4,1fr);}}
-@media(max-width:600px){.an-stats{grid-template-columns:repeat(2,1fr);}}
-.an-stat{background:#fff;padding:24px 20px;}
-.an-stat-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
-.an-stat-num{font-family:var(--serif);font-size:32px;font-weight:300;color:var(--navy);line-height:1;}
-.an-stat-num.gold{color:var(--gold);}
-.an-stat-num.green{color:#2D6A4F;}
-.an-stat-num.orange{color:#B8860B;}
-.an-roles{background:#fff;border:1px solid var(--border);padding:20px 24px;margin-bottom:32px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
-.an-roles-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
-.an-role-tag{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid var(--border);padding:4px 12px;color:var(--navy);}
-.an-tabs{display:flex;gap:0;margin-bottom:32px;border-bottom:1px solid var(--border);overflow-x:auto;}
-.an-tab{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;padding:12px 20px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;display:flex;align-items:center;gap:8px;position:relative;bottom:-1px;white-space:nowrap;}
-.an-tab:hover{color:var(--navy);}
-.an-tab.active{color:var(--navy);border-bottom-color:var(--gold);}
-.an-tab-badge{font-size:8px;background:var(--gold);color:var(--navy);padding:2px 7px;font-weight:500;}
-.an-filters{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
-.an-filter{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:6px 14px;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all 0.2s;}
-.an-filter:hover{border-color:var(--navy);color:var(--navy);}
-.an-filter.active{border-color:var(--navy);background:var(--navy);color:var(--cream);}
-.an-table{background:#fff;border:1px solid var(--border);}
-.an-row{border-bottom:1px solid var(--border);padding:20px 24px;transition:background 0.2s;}
-.an-row:hover{background:var(--warm);}
-.an-row:last-child{border-bottom:none;}
-.an-empty{padding:60px 24px;text-align:center;font-family:var(--serif);font-size:18px;font-style:italic;color:var(--muted);}
-.an-user-info{display:flex;align-items:center;gap:14px;}
-.an-avatar{width:38px;height:38px;background:var(--navy);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:16px;color:var(--cream);font-weight:400;flex-shrink:0;}
-.an-user-name{font-size:14px;font-weight:400;color:var(--navy);}
-.an-user-email{font-size:11px;color:var(--muted);font-weight:300;}
-.an-user-phone{font-size:10px;color:#B8B2A8;font-weight:300;}
-.an-badge{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:1px solid;padding:4px 10px;font-weight:500;}
-.an-badge-pending{border-color:#B8860B;color:#B8860B;background:#FFFBF0;}
-.an-badge-approved{border-color:#2D6A4F;color:#2D6A4F;background:#F0FAF4;}
-.an-badge-rejected{border-color:var(--red);color:var(--red);background:#FEF0EE;}
-.an-badge-invited{border-color:#1A4A7A;color:#1A4A7A;background:#EEF4FF;}
-.an-badge-registered{border-color:#5B2D8E;color:#5B2D8E;background:#F5F0FF;}
-.an-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
-.an-btn{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;border:none;padding:7px 14px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;font-weight:500;}
-.an-btn-approve{background:var(--green);color:#fff;}
-.an-btn-approve:hover{background:#1F4A35;}
-.an-btn-reject{background:transparent;border:1px solid var(--red)!important;color:var(--red);}
-.an-btn-reject:hover{background:var(--red);color:#fff;}
-.an-btn-warn{background:transparent;border:1px solid #B8860B!important;color:#B8860B;}
-.an-btn-warn:hover{background:#B8860B;color:#fff;}
-.an-btn-navy{background:var(--navy);color:var(--cream);}
-.an-btn-navy:hover{background:#1a3060;}
-.an-btn-ghost{background:transparent;border:1px solid var(--border)!important;color:var(--muted);}
-.an-btn-ghost:hover{border-color:var(--navy)!important;color:var(--navy);}
-.an-btn:disabled{opacity:0.4;cursor:not-allowed;}
-.an-stok-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;}
-.an-stok-card{background:#fff;border:1px solid var(--border);padding:20px;transition:border-color 0.2s;}
-.an-stok-card:hover{border-color:var(--navy);}
-.an-stok-project{font-family:var(--serif);font-size:16px;font-weight:400;color:var(--navy);margin-bottom:2px;}
-.an-stok-loc{font-size:10px;color:var(--muted);font-weight:300;margin-bottom:12px;}
-.an-stok-info{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
-.an-stok-info-cell{background:var(--warm);padding:8px 10px;}
-.an-stok-info-label{font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
-.an-stok-info-val{font-size:12px;color:var(--navy);font-weight:400;}
-.an-stok-price{font-family:var(--serif);font-size:18px;font-weight:400;color:var(--gold);margin-bottom:14px;}
-.an-stok-divider{height:1px;background:var(--border);margin-bottom:14px;}
-.an-stok-verify-title{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
-.an-stok-toggles{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
-.an-stok-toggle{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--border);cursor:pointer;transition:all 0.2s;}
-.an-stok-toggle:hover{border-color:var(--navy);}
-.an-stok-toggle.on{border-color:#2D6A4F;background:#F0FAF4;}
-.an-stok-toggle-label{font-size:10px;color:var(--navy);font-weight:400;}
-.an-stok-toggle-status{font-size:8px;letter-spacing:1px;text-transform:uppercase;}
-.an-stok-toggle.on .an-stok-toggle-status{color:#2D6A4F;}
-.an-stok-toggle:not(.on) .an-stok-toggle-status{color:var(--muted);}
-.an-stok-offmarket{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--border);cursor:pointer;transition:all 0.2s;margin-top:4px;}
-.an-stok-offmarket:hover{border-color:var(--navy);}
-.an-stok-offmarket.on{border-color:var(--navy);background:#EEF2FF;}
-.an-stok-offmarket-label{font-size:10px;color:var(--navy);}
-.an-stok-offmarket.on .an-stok-offmarket-label{font-weight:500;}
-.an-overlay{position:fixed;inset:0;background:rgba(15,32,68,0.6);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn 0.2s ease;}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.an-modal{background:#fff;width:100%;max-width:460px;padding:40px;position:relative;animation:slideUp 0.3s ease;}
-@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-.an-modal-title{font-family:var(--serif);font-size:28px;font-weight:400;color:var(--navy);margin-bottom:6px;}
-.an-modal-sub{font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:300;}
-.an-modal-divider{width:28px;height:2px;background:var(--gold);margin-bottom:28px;}
-.an-modal-close{position:absolute;top:16px;right:16px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;}
-.an-field{margin-bottom:18px;}
-.an-field label{display:block;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--navy);margin-bottom:10px;font-weight:500;}
-.an-input{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:10px 0;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;transition:border-color 0.3s;font-weight:300;}
-.an-input:focus{border-bottom-color:var(--navy);}
-.an-select{width:100%;background:transparent;border:none;border-bottom:1.5px solid var(--border);padding:10px 0;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;appearance:none;cursor:pointer;font-weight:300;}
-.an-textarea{width:100%;background:var(--warm);border:1px solid var(--border);padding:12px;font-size:13px;color:var(--navy);font-family:var(--sans);outline:none;resize:none;font-weight:300;}
-.an-textarea:focus{border-color:var(--navy);}
-.an-modal-actions{display:flex;gap:10px;margin-top:24px;}
-.an-modal-submit{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:var(--navy);color:var(--cream);border:none;padding:12px 24px;cursor:pointer;font-family:var(--sans);transition:all 0.2s;}
-.an-modal-submit:hover{background:#1a3060;}
-.an-modal-submit:disabled{opacity:0.4;cursor:not-allowed;}
-.an-modal-cancel{font-size:9px;letter-spacing:2px;text-transform:uppercase;background:none;border:1px solid var(--border);padding:12px 20px;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all 0.2s;}
-.an-modal-cancel:hover{border-color:var(--navy);color:var(--navy);}
-.an-modal-error{font-size:11px;color:var(--red);margin-top:8px;}
-.an-lead-row{border-bottom:1px solid var(--border);padding:20px 24px;transition:background 0.2s;}
-.an-lead-row:hover{background:var(--warm);}
-.an-lead-conv{margin-top:12px;background:var(--warm);border:1px solid var(--border);padding:16px;max-height:200px;overflow-y:auto;}
-.an-conv-msg{display:flex;margin-bottom:8px;}
-.an-conv-msg.user{justify-content:flex-end;}
-.an-conv-bubble{font-size:11px;padding:8px 12px;max-width:75%;line-height:1.5;}
-.an-conv-bubble.assistant{background:#fff;border:1px solid var(--border);color:var(--navy);}
-.an-conv-bubble.user{background:var(--navy);color:var(--cream);}
-.an-conv-toggle{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);background:none;border:none;cursor:pointer;font-family:var(--sans);margin-top:8px;transition:color 0.2s;}
-.an-conv-toggle:hover{color:var(--navy);}
-/* GÜVEN SKORU */
-.trust-leaderboard{background:#fff;border:1px solid var(--border);}
-.trust-lb-row{display:flex;align-items:center;padding:16px 24px;border-bottom:1px solid var(--border);gap:16px;transition:background 0.2s;}
-.trust-lb-row:hover{background:var(--warm);}
-.trust-lb-row:last-child{border-bottom:none;}
-.trust-lb-rank{font-family:var(--serif);font-size:24px;font-weight:300;color:var(--gold);width:36px;flex-shrink:0;}
-.trust-lb-bar-wrap{flex:1;height:4px;background:var(--border);}
-.trust-lb-bar{height:4px;background:var(--navy);transition:width 0.8s ease;}
-.trust-lb-score{font-family:var(--serif);font-size:20px;font-weight:300;color:var(--navy);width:48px;text-align:right;flex-shrink:0;}
-@keyframes spin{to{transform:rotate(360deg)}}
-`;
+const DOC_LABELS: Record<string, string> = {
+  VERGI_LEVHASI: "Vergi Levhası",
+  YETKI_BELGESI: "Yetki Belgesi",
+  TICARET_SICIL: "Ticaret Sicil",
+  KIMLIK: "Kimlik",
+  DIGER: "Diğer",
+  MYK_BELGESI: "MYK Belgesi",
+  IMZA_SIRKULERI: "İmza Sirküleri",
+  FAALIYET_BELGESI: "Faaliyet Belgesi",
+  IS_BITIRME_BELGESI: "İş Bitirme Belgesi",
+  YAMBIS_BELGESI: "YAMBİS Belgesi",
+  REFERANS_PROJE: "Referans Proje",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: "Bekliyor",
+  APPROVED: "Onaylandı",
+  REJECTED: "Reddedildi",
+  INVITED: "Davet Gönderildi",
+  REGISTERED: "Kayıt Oldu",
+  GORUSME_PLANLANDI: "Görüşme Planlandı",
+  EVRAK_BEKLENIYOR: "Evrak Bekleniyor",
+};
+
+const UNIT_STATUS_LABELS: Record<string, string> = {
+  SATILIK: "Satılık",
+  KIRALIK: "Kiralık",
+  GUNLUK_KIRALIK: "Günlük Kiralık",
+  DEVREN_SATILIK: "Devren Satılık",
+  DEVREN_KIRALIK: "Devren Kiralık",
+  INSAAT_PROJESI: "İnşaat Projesi",
+  KAT_KARSILIGI: "Kat Karşılığı",
+  REZERVE: "Rezerve",
+  SATILDI: "Satıldı",
+  KIRALANDII: "Kiralandı",
+  PASIF: "Pasif",
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  DAIRE: "Daire",
+  VILLA: "Villa",
+  REZIDANS: "Rezidans",
+  MUSTAK_EV: "Müstakil Ev",
+  ARSA: "Arsa",
+  TARLA: "Tarla",
+  OFIS_BURO: "Ofis/Büro",
+  DUKKAN_MAGAZA: "Dükkan/Mağaza",
+};
+
+function roleLabel(role?: string) {
+  return ROLE_LABELS[role || ""] || role || "EPH Üyesi";
+}
+
+function statusLabel(status?: string) {
+  return STATUS_LABELS[status || ""] || status || "Bekliyor";
+}
+
+function statusClass(status?: string) {
+  if (status === "APPROVED" || status === "REGISTERED") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+
+  if (status === "REJECTED") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+
+  if (status === "INVITED") {
+    return "border-blue-200 bg-blue-50 text-blue-700";
+  }
+
+  if (status === "GORUSME_PLANLANDI" || status === "EVRAK_BEKLENIYOR") {
+    return "border-purple-200 bg-purple-50 text-purple-700";
+  }
+
+  return "border-amber-200 bg-amber-50 text-amber-700";
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Tarih yok";
+  return new Date(value).toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function money(value?: number | null) {
+  if (!value) return "—";
+  return `${value.toLocaleString("tr-TR")} ₺`;
+}
+
+function getInitials(firstName?: string | null, lastName?: string | null) {
+  const first = firstName?.trim()?.[0] || "E";
+  const last = lastName?.trim()?.[0] || "P";
+  return `${first}${last}`.toUpperCase();
+}
+
+function Avatar({
+  firstName,
+  lastName,
+  imageUrl,
+  tone = "navy",
+}: {
+  firstName?: string | null;
+  lastName?: string | null;
+  imageUrl?: string | null;
+  tone?: "navy" | "warm" | "rose";
+}) {
+  const bg =
+    tone === "rose"
+      ? "from-[#3D1A1A] to-[#7F1D1D] text-rose-100"
+      : tone === "warm"
+        ? "from-[#F8FAFC] to-[#EEF2FF] text-[#0B1F44]"
+        : "from-[#0B1F44] to-[#1D4ED8] text-white";
+
+  return (
+    <div
+      className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[18px] border border-[#C9A84C]/25 bg-gradient-to-br ${bg} text-[16px] font-black shadow-lg shadow-slate-900/10`}
+    >
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt={`${firstName || "EPH"} ${lastName || "Üyesi"}`}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        getInitials(firstName, lastName)
+      )}
+    </div>
+  );
+}
+
+function Badge({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] ${className}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function PrimaryButton({
+  children,
+  onClick,
+  disabled,
+  danger,
+  ghost,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  ghost?: boolean;
+}) {
+  const cls = danger
+    ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+    : ghost
+      ? "border-slate-200 bg-white text-slate-600 hover:border-[#0B1F44] hover:text-[#0B1F44]"
+      : "border-[#0B1F44] bg-[#0B1F44] text-white hover:bg-[#123B7A]";
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`rounded-2xl border px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.14em] transition disabled:cursor-not-allowed disabled:opacity-50 ${cls}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SectionHeader({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#C9A84C]">
+          EPH Yönetim Merkezi
+        </p>
+        <h2 className="mt-2 text-[28px] font-black tracking-tight text-[#0B1F44]">
+          {title}
+        </h2>
+        <p className="mt-1 text-sm font-semibold text-slate-500">{subtitle}</p>
+      </div>
+      {action}
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
+
   const [stats, setStats] = useState<Stats | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [allUnits, setAllUnits] = useState<StokUnit[]>([]);
   const [trustList, setTrustList] = useState<TrustEntry[]>([]);
-  const [visits, setVisits] = useState<any[]>([]);
-  const fetchVisits = async () => {
-    const token = localStorage.getItem("token");
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/visits`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const data = await res.json();
-    setVisits(Array.isArray(data) ? data : []);
-  };
-  const [activeTab, setActiveTab] = useState<"users"|"documents"|"nominations"|"applications"|"leads"|"stock"|"trust"|"visits">("users");
+  const [visits, setVisits] = useState<Visit[]>([]);
+
+  const [activeTab, setActiveTab] = useState<TabKey>("users");
   const [userFilter, setUserFilter] = useState("all");
   const [docFilter, setDocFilter] = useState("all");
   const [nomFilter, setNomFilter] = useState("all");
   const [appFilter, setAppFilter] = useState("all");
+
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string|null>(null);
-  const [verifyLoading, setVerifyLoading] = useState<string|null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [noteModal, setNoteModal] = useState<{type:"nomination"|"application";id:string}|null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [verifyLoading, setVerifyLoading] = useState<string | null>(null);
+
+  const [noteModal, setNoteModal] = useState<{
+    type: "nomination" | "application";
+    id: string;
+  } | null>(null);
   const [noteText, setNoteText] = useState("");
-  const [expandedLead, setExpandedLead] = useState<string|null>(null);
-  const [roleModal, setRoleModal] = useState<{id:string;currentRole:string}|null>(null);
+  const [expandedLead, setExpandedLead] = useState<string | null>(null);
+
+  const [roleModal, setRoleModal] = useState<{
+    id: string;
+    currentRole: string;
+  } | null>(null);
   const [newRole, setNewRole] = useState("");
+
   const [createUserModal, setCreateUserModal] = useState(false);
-  const [createUserForm, setCreateUserForm] = useState({firstName:"",lastName:"",email:"",phone:"",password:"",role:"EMLAKCI"});
   const [createUserLoading, setCreateUserLoading] = useState(false);
   const [createUserError, setCreateUserError] = useState("");
+  const [createUserForm, setCreateUserForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    password: "",
+    role: "EMLAKCI",
+  });
 
-  useEffect(() => { setHydrated(true); }, []);
+  const tabs = useMemo(
+    () => [
+      { key: "users" as const, label: "Kullanıcılar", badge: null },
+      { key: "documents" as const, label: "Belgeler", badge: stats?.pendingDocuments },
+      { key: "nominations" as const, label: "Tavsiyeler", badge: stats?.pendingNominations },
+      { key: "applications" as const, label: "Başvurular", badge: stats?.pendingApplications },
+      { key: "leads" as const, label: "Lina Leads", badge: leads.length },
+      { key: "stock" as const, label: "Stok Doğrulama", badge: null },
+      { key: "trust" as const, label: "Güven Skorları", badge: null },
+      { key: "visits" as const, label: "Ziyaretler", badge: null },
+    ],
+    [stats, leads.length],
+  );
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
   useEffect(() => {
     if (!hydrated) return;
-    if (!user) { router.push("/giris"); return; }
-    if (user.role !== "ADMIN") { router.push("/dashboard"); return; }
+
+    if (!user) {
+      router.push("/giris");
+      return;
+    }
+
+    if (user.role !== "ADMIN") {
+      router.push("/dashboard");
+      return;
+    }
+
     fetchAll();
   }, [hydrated, user]);
-  useEffect(() => { if (hydrated && user) fetchUsers(userFilter); }, [userFilter]);
-  useEffect(() => { if (hydrated && user) fetchDocuments(docFilter); }, [docFilter]);
-  useEffect(() => { if (hydrated && user) fetchNominations(nomFilter); }, [nomFilter]);
-  useEffect(() => { if (hydrated && user) fetchApplications(appFilter); }, [appFilter]);
+
+  useEffect(() => {
+    if (hydrated && user) fetchUsers(userFilter);
+  }, [userFilter]);
+
+  useEffect(() => {
+    if (hydrated && user) fetchDocuments(docFilter);
+  }, [docFilter]);
+
+  useEffect(() => {
+    if (hydrated && user) fetchNominations(nomFilter);
+  }, [nomFilter]);
+
+  useEffect(() => {
+    if (hydrated && user) fetchApplications(appFilter);
+  }, [appFilter]);
 
   const fetchAll = async () => {
+    setLoading(true);
+
     try {
-      const [s,u,d,n,a,l,st] = await Promise.all([
-        api.get("/admin/stats"), api.get("/admin/users?filter=all"),
-        api.get("/admin/documents?filter=all"), api.get("/admin/nominations?status=all"),
-        api.get("/admin/applications?status=all"), api.get("/leads"),
+      const [s, u, d, n, a, l, st] = await Promise.all([
+        api.get("/admin/stats"),
+        api.get("/admin/users?filter=all"),
+        api.get("/admin/documents?filter=all"),
+        api.get("/admin/nominations?status=all"),
+        api.get("/admin/applications?status=all"),
+        api.get("/leads"),
         api.get("/units"),
       ]);
-      setStats(s.data); setUsers(u.data); setDocuments(d.data);
-      setNominations(n.data); setApplications(a.data); setLeads(l.data);
-      setAllUnits(st.data);
-    } finally { setLoading(false); }
-  };
-  const fetchStats = async () => { const r = await api.get("/admin/stats"); setStats(r.data); };
-  const fetchUsers = async (f="all") => { const r = await api.get(`/admin/users?filter=${f}`); setUsers(r.data); };
-  const fetchDocuments = async (f="all") => { const r = await api.get(`/admin/documents?filter=${f}`); setDocuments(r.data); };
-  const fetchNominations = async (f="all") => { const r = await api.get(`/admin/nominations?status=${f}`); setNominations(r.data); };
-  const fetchApplications = async (f="all") => { const r = await api.get(`/admin/applications?status=${f}`); setApplications(r.data); };
-  const fetchLeads = async () => { const r = await api.get("/leads"); setLeads(r.data); };
-  const fetchUnits = async () => { const r = await api.get("/units"); setAllUnits(r.data); };
-  const fetchTrust = async () => { const r = await api.get("/trust/leaderboard"); setTrustList(r.data); };
 
-  const act = async (id:string, fn:()=>Promise<any>) => {
-    setActionLoading(id); try { await fn(); } finally { setActionLoading(null); }
+      setStats(s.data);
+      setUsers(Array.isArray(u.data) ? u.data : []);
+      setDocuments(Array.isArray(d.data) ? d.data : []);
+      setNominations(Array.isArray(n.data) ? n.data : []);
+      setApplications(Array.isArray(a.data) ? a.data : []);
+      setLeads(Array.isArray(l.data) ? l.data : []);
+      setAllUnits(Array.isArray(st.data) ? st.data : []);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    const res = await api.get("/admin/stats");
+    setStats(res.data);
+  };
+
+  const fetchUsers = async (filter = "all") => {
+    const res = await api.get(`/admin/users?filter=${filter}`);
+    setUsers(Array.isArray(res.data) ? res.data : []);
+  };
+
+  const fetchDocuments = async (filter = "all") => {
+    const res = await api.get(`/admin/documents?filter=${filter}`);
+    setDocuments(Array.isArray(res.data) ? res.data : []);
+  };
+
+  const fetchNominations = async (filter = "all") => {
+    const res = await api.get(`/admin/nominations?status=${filter}`);
+    setNominations(Array.isArray(res.data) ? res.data : []);
+  };
+
+  const fetchApplications = async (filter = "all") => {
+    const res = await api.get(`/admin/applications?status=${filter}`);
+    setApplications(Array.isArray(res.data) ? res.data : []);
+  };
+
+  const fetchLeads = async () => {
+    const res = await api.get("/leads");
+    setLeads(Array.isArray(res.data) ? res.data : []);
+  };
+
+  const fetchUnits = async () => {
+    const res = await api.get("/units");
+    setAllUnits(Array.isArray(res.data) ? res.data : []);
+  };
+
+  const fetchTrust = async () => {
+    const res = await api.get("/trust/leaderboard");
+    setTrustList(Array.isArray(res.data) ? res.data : []);
+  };
+
+  const fetchVisits = async () => {
+    const res = await api.get("/visits");
+    setVisits(Array.isArray(res.data) ? res.data : []);
+  };
+
+  const act = async (id: string, fn: () => Promise<void>) => {
+    setActionLoading(id);
+
+    try {
+      await fn();
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    router.push("/giris");
+  };
+
+  const handleTab = (key: TabKey) => {
+    setActiveTab(key);
+    if (key === "leads") fetchLeads();
+    if (key === "stock") fetchUnits();
+    if (key === "trust") fetchTrust();
+    if (key === "visits") fetchVisits();
   };
 
   const handleVerify = async (id: string, field: string, current: boolean) => {
-    setVerifyLoading(id + field);
+    const unit = allUnits.find((item) => item.id === id);
+    if (!unit) return;
+
+    setVerifyLoading(`${id}-${field}`);
+
     try {
-      const unit = allUnits.find(u => u.id === id);
-      if (!unit) return;
       await api.patch(`/units/${id}/verify`, {
         tapuVerified: field === "tapu" ? !current : unit.tapuVerified,
         photoVerified: field === "photo" ? !current : unit.photoVerified,
         yetkiVerified: field === "yetki" ? !current : unit.yetkiVerified,
         isOffMarket: field === "offmarket" ? !current : unit.isOffMarket,
       });
+
       await fetchUnits();
-    } finally { setVerifyLoading(null); }
+    } finally {
+      setVerifyLoading(null);
+    }
   };
 
-  const getBadge = (status:string) => {
-    const map:Record<string,string> = {PENDING:"pending",APPROVED:"approved",REJECTED:"rejected",INVITED:"invited",REGISTERED:"registered"};
-    return `an-badge an-badge-${map[status]||"pending"}`;
+  const saveNote = async () => {
+    if (!noteModal) return;
+
+    await act(noteModal.id, async () => {
+      if (noteModal.type === "nomination") {
+        const current = nominations.find((item) => item.id === noteModal.id);
+        await api.patch(`/admin/nominations/${noteModal.id}/status`, {
+          status: current?.status,
+          adminNote: noteText,
+        });
+        await fetchNominations(nomFilter);
+      } else {
+        const current = applications.find((item) => item.id === noteModal.id);
+        await api.patch(`/admin/applications/${noteModal.id}/status`, {
+          status: current?.status,
+          adminNote: noteText,
+        });
+        await fetchApplications(appFilter);
+      }
+
+      setNoteModal(null);
+      setNoteText("");
+    });
   };
 
-  if (!hydrated || loading) return (
-    <div style={{minHeight:"100vh",background:"#FAFAF8",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <style>{CSS}</style>
-      <div style={{width:32,height:32,border:"2px solid #C9A84C",borderTop:"2px solid transparent",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
-    </div>
-  );
+  const createUser = async () => {
+    if (
+      !createUserForm.firstName ||
+      !createUserForm.lastName ||
+      !createUserForm.email ||
+      !createUserForm.phone ||
+      !createUserForm.password
+    ) {
+      setCreateUserError("Tüm alanlar zorunludur.");
+      return;
+    }
+
+    setCreateUserLoading(true);
+    setCreateUserError("");
+
+    try {
+      await api.post("/admin/users", createUserForm);
+      setCreateUserModal(false);
+      setCreateUserForm({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        password: "",
+        role: "EMLAKCI",
+      });
+      await Promise.all([fetchUsers(userFilter), fetchStats()]);
+    } catch (error: any) {
+      setCreateUserError(error?.response?.data?.message || "Bir hata oluştu.");
+    } finally {
+      setCreateUserLoading(false);
+    }
+  };
+
+  if (!hydrated || loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#FAFAF8]">
+        <div className="flex flex-col items-center gap-4 text-[#0B1F44]">
+          <Loader2 className="animate-spin" size={34} />
+          <p className="text-sm font-black">Admin paneli yükleniyor...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <>
-      <style>{CSS}</style>
-
+    <main className="min-h-screen bg-[#FAFAF8] text-[#111827]">
       {noteModal && (
-        <div className="an-overlay" onClick={()=>{setNoteModal(null);setNoteText("");}}>
-          <div className="an-modal" onClick={e=>e.stopPropagation()}>
-            <button className="an-modal-close" onClick={()=>{setNoteModal(null);setNoteText("");}}>×</button>
-            <h3 className="an-modal-title">Admin Notu</h3>
-            <p className="an-modal-sub">Bu not sadece admin panelinde görünür.</p>
-            <div className="an-modal-divider"/>
-            <textarea className="an-textarea" rows={4} value={noteText} onChange={e=>setNoteText(e.target.value)} placeholder="Notunuzu yazın..."/>
-            <div className="an-modal-actions">
-              <button className="an-modal-submit" disabled={actionLoading===noteModal.id} onClick={async()=>{
-                setActionLoading(noteModal.id);
-                try {
-                  if(noteModal.type==="nomination"){
-                    await api.patch(`/admin/nominations/${noteModal.id}/status`,{status:nominations.find(n=>n.id===noteModal.id)?.status,adminNote:noteText});
-                    await fetchNominations(nomFilter);
-                  } else {
-                    await api.patch(`/admin/applications/${noteModal.id}/status`,{status:applications.find(a=>a.id===noteModal.id)?.status,adminNote:noteText});
-                    await fetchApplications(appFilter);
-                  }
-                  setNoteModal(null); setNoteText("");
-                } finally { setActionLoading(null); }
-              }}>{actionLoading===noteModal.id?"...":"Kaydet"}</button>
-              <button className="an-modal-cancel" onClick={()=>{setNoteModal(null);setNoteText("");}}>İptal</button>
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-[#0B1F44]/70 p-5 backdrop-blur"
+          onClick={() => {
+            setNoteModal(null);
+            setNoteText("");
+          }}
+        >
+          <div
+            className="w-full max-w-lg rounded-[32px] bg-white p-7 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="text-[28px] font-black text-[#0B1F44]">Admin Notu</h3>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Bu not sadece admin panelinde görünür.
+            </p>
+
+            <textarea
+              className="mt-5 min-h-32 w-full rounded-[22px] border border-slate-200 bg-[#F8FAFC] p-4 text-sm font-semibold outline-none focus:border-[#0B1F44]"
+              value={noteText}
+              onChange={(event) => setNoteText(event.target.value)}
+              placeholder="Notunuzu yazın..."
+            />
+
+            <div className="mt-5 flex gap-3">
+              <PrimaryButton onClick={saveNote} disabled={actionLoading === noteModal.id}>
+                {actionLoading === noteModal.id ? "Kaydediliyor..." : "Kaydet"}
+              </PrimaryButton>
+              <PrimaryButton
+                ghost
+                onClick={() => {
+                  setNoteModal(null);
+                  setNoteText("");
+                }}
+              >
+                İptal
+              </PrimaryButton>
             </div>
           </div>
         </div>
       )}
 
       {roleModal && (
-        <div className="an-overlay" onClick={()=>{setRoleModal(null);setNewRole("");}}>
-          <div className="an-modal" onClick={e=>e.stopPropagation()}>
-            <button className="an-modal-close" onClick={()=>{setRoleModal(null);setNewRole("");}}>×</button>
-            <h3 className="an-modal-title">Rol Değiştir</h3>
-            <p className="an-modal-sub">Üyenin platformdaki rolünü güncelleyin.</p>
-            <div className="an-modal-divider"/>
-            <div className="an-field">
-              <label>Yeni Rol</label>
-              <select className="an-select" value={newRole} onChange={e=>setNewRole(e.target.value)}>
-                <option value="">Seçiniz</option>
-                <option value="EMLAKCI">Emlakçı</option>
-                <option value="MUTEAHHIT">Müteahhit</option>
-                <option value="INSAAT_FIRMASI">İnşaat Firması</option>
-              </select>
-            </div>
-            <div className="an-modal-actions">
-              <button className="an-modal-submit" disabled={!newRole||actionLoading===roleModal.id} onClick={async()=>{
-                await act(roleModal.id,async()=>{ await api.patch(`/admin/users/${roleModal.id}/role`,{role:newRole}); await fetchUsers(userFilter); setRoleModal(null); setNewRole(""); });
-              }}>{actionLoading===roleModal.id?"...":"Değiştir"}</button>
-              <button className="an-modal-cancel" onClick={()=>{setRoleModal(null);setNewRole("");}}>İptal</button>
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-[#0B1F44]/70 p-5 backdrop-blur"
+          onClick={() => {
+            setRoleModal(null);
+            setNewRole("");
+          }}
+        >
+          <div
+            className="w-full max-w-lg rounded-[32px] bg-white p-7 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="text-[28px] font-black text-[#0B1F44]">Rol Değiştir</h3>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Üyenin platformdaki rolünü güncelle.
+            </p>
+
+            <select
+              className="mt-5 h-12 w-full rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 text-sm font-black outline-none"
+              value={newRole}
+              onChange={(event) => setNewRole(event.target.value)}
+            >
+              <option value="">Seçiniz</option>
+              <option value="EMLAKCI">Emlakçı</option>
+              <option value="MUTEAHHIT">Müteahhit</option>
+              <option value="INSAAT_FIRMASI">İnşaat Firması</option>
+              <option value="DENETCI_ADMIN">Denetçi Admin</option>
+            </select>
+
+            <div className="mt-5 flex gap-3">
+              <PrimaryButton
+                disabled={!newRole || actionLoading === roleModal.id}
+                onClick={() =>
+                  act(roleModal.id, async () => {
+                    await api.patch(`/admin/users/${roleModal.id}/role`, { role: newRole });
+                    await fetchUsers(userFilter);
+                    setRoleModal(null);
+                    setNewRole("");
+                  })
+                }
+              >
+                {actionLoading === roleModal.id ? "Değiştiriliyor..." : "Değiştir"}
+              </PrimaryButton>
+              <PrimaryButton
+                ghost
+                onClick={() => {
+                  setRoleModal(null);
+                  setNewRole("");
+                }}
+              >
+                İptal
+              </PrimaryButton>
             </div>
           </div>
         </div>
       )}
 
       {createUserModal && (
-        <div className="an-overlay" onClick={()=>{setCreateUserModal(false);setCreateUserError("");}}>
-          <div className="an-modal" onClick={e=>e.stopPropagation()}>
-            <button className="an-modal-close" onClick={()=>{setCreateUserModal(false);setCreateUserError("");}}>×</button>
-            <h3 className="an-modal-title">Yeni Üye</h3>
-            <p className="an-modal-sub">Manuel olarak platforma üye ekleyin.</p>
-            <div className="an-modal-divider"/>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 20px"}}>
-              {[{ph:"Ad",k:"firstName"},{ph:"Soyad",k:"lastName"}].map(({ph,k})=>(
-                <div key={k} className="an-field">
-                  <label>{ph}</label>
-                  <input className="an-input" placeholder={ph} value={createUserForm[k as keyof typeof createUserForm]}
-                    onChange={e=>setCreateUserForm(f=>({...f,[k]:e.target.value}))}/>
-                </div>
-              ))}
-            </div>
-            {[{ph:"E-posta",k:"email",t:"email"},{ph:"Telefon",k:"phone",t:"tel"},{ph:"Şifre",k:"password",t:"password"}].map(({ph,k,t})=>(
-              <div key={k} className="an-field">
-                <label>{ph}</label>
-                <input className="an-input" type={t} placeholder={ph} value={createUserForm[k as keyof typeof createUserForm]}
-                  onChange={e=>setCreateUserForm(f=>({...f,[k]:e.target.value}))}/>
-              </div>
-            ))}
-            <div className="an-field">
-              <label>Rol</label>
-              <select className="an-select" value={createUserForm.role} onChange={e=>setCreateUserForm(f=>({...f,role:e.target.value}))}>
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-[#0B1F44]/70 p-5 backdrop-blur"
+          onClick={() => {
+            setCreateUserModal(false);
+            setCreateUserError("");
+          }}
+        >
+          <div
+            className="w-full max-w-xl rounded-[32px] bg-white p-7 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="text-[28px] font-black text-[#0B1F44]">Yeni Üye</h3>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Manuel olarak platforma üye ekle.
+            </p>
+
+            <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <input
+                className="premium-admin-input"
+                placeholder="Ad"
+                value={createUserForm.firstName}
+                onChange={(event) =>
+                  setCreateUserForm((form) => ({ ...form, firstName: event.target.value }))
+                }
+              />
+              <input
+                className="premium-admin-input"
+                placeholder="Soyad"
+                value={createUserForm.lastName}
+                onChange={(event) =>
+                  setCreateUserForm((form) => ({ ...form, lastName: event.target.value }))
+                }
+              />
+              <input
+                className="premium-admin-input"
+                placeholder="E-posta"
+                type="email"
+                value={createUserForm.email}
+                onChange={(event) =>
+                  setCreateUserForm((form) => ({ ...form, email: event.target.value }))
+                }
+              />
+              <input
+                className="premium-admin-input"
+                placeholder="Telefon"
+                value={createUserForm.phone}
+                onChange={(event) =>
+                  setCreateUserForm((form) => ({ ...form, phone: event.target.value }))
+                }
+              />
+              <input
+                className="premium-admin-input"
+                placeholder="Şifre"
+                type="password"
+                value={createUserForm.password}
+                onChange={(event) =>
+                  setCreateUserForm((form) => ({ ...form, password: event.target.value }))
+                }
+              />
+              <select
+                className="premium-admin-input"
+                value={createUserForm.role}
+                onChange={(event) =>
+                  setCreateUserForm((form) => ({ ...form, role: event.target.value }))
+                }
+              >
                 <option value="EMLAKCI">Emlakçı</option>
                 <option value="MUTEAHHIT">Müteahhit</option>
                 <option value="INSAAT_FIRMASI">İnşaat Firması</option>
                 <option value="ADMIN">Admin</option>
+                <option value="DENETCI_ADMIN">Denetçi Admin</option>
               </select>
             </div>
-            {createUserError && <p className="an-modal-error">{createUserError}</p>}
-            <div className="an-modal-actions">
-              <button className="an-modal-submit" disabled={createUserLoading} onClick={async()=>{
-                if(!createUserForm.firstName||!createUserForm.lastName||!createUserForm.email||!createUserForm.phone||!createUserForm.password){setCreateUserError("Tüm alanlar zorunludur.");return;}
-                setCreateUserLoading(true); setCreateUserError("");
-                try { await api.post("/admin/users",createUserForm); setCreateUserModal(false); setCreateUserForm({firstName:"",lastName:"",email:"",phone:"",password:"",role:"EMLAKCI"}); await Promise.all([fetchUsers(userFilter),fetchStats()]); }
-                catch(e:any){ setCreateUserError(e?.response?.data?.message||"Bir hata oluştu."); }
-                finally { setCreateUserLoading(false); }
-              }}>{createUserLoading?"Ekleniyor...":"Üye Ekle"}</button>
-              <button className="an-modal-cancel" onClick={()=>{setCreateUserModal(false);setCreateUserError("");}}>İptal</button>
+
+            {createUserError && (
+              <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-black text-red-600">
+                {createUserError}
+              </p>
+            )}
+
+            <div className="mt-5 flex gap-3">
+              <PrimaryButton onClick={createUser} disabled={createUserLoading}>
+                {createUserLoading ? "Ekleniyor..." : "Üye Ekle"}
+              </PrimaryButton>
+              <PrimaryButton ghost onClick={() => setCreateUserModal(false)}>
+                İptal
+              </PrimaryButton>
             </div>
           </div>
         </div>
       )}
 
-      <nav className="an-nav">
-        <div style={{display:"flex",alignItems:"center",gap:16}}>
-          <a href="/dashboard" className="an-logo">
-            <img src="/LOGO_EPH.png" alt="EPH"/>
+      <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+          <Link href="/dashboard" className="flex items-center gap-3 no-underline">
+            <img src="/LOGO_EPH.png" alt="EPH" className="h-10 w-10 rounded-2xl object-contain" />
             <div>
-              <div className="an-logo-text">EPH Platform</div>
-              <div className="an-logo-sub">Emlak Portföy Havuzu</div>
+              <p className="text-lg font-black text-[#0B1F44]">EPH Platform</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#C9A84C]">
+                Admin Merkezi
+              </p>
             </div>
-          </a>
-          <span className="an-logo-badge">Admin</span>
-        </div>
-        <div className="an-nav-links">
-          <Link href="/dashboard" className="an-nav-item">Ana Sayfa</Link>
-          <Link href="/profil" className="an-nav-item">Profilim</Link>
-          <Link href="/stok" className="an-nav-item">Stok</Link>
-          <Link href="/crm" className="an-nav-item">CRM</Link>
-          <Link href="/market" className="an-nav-item">Piyasa</Link>
-          <Link href="/admin" className="an-nav-item active">Admin</Link>
-        </div>
-        <button className="an-logout" onClick={()=>{logout();router.push("/giris");}}>Çıkış</button>
-      </nav>
+          </Link>
 
-      <main className="an-main">
-        <div className="an-header">
-          <div>
-            <h1 className="an-title">Yönetim<br/><em>Paneli</em></h1>
-            <p className="an-sub">Üye, belge, başvuru ve stok yönetimi</p>
-          </div>
-          <button className="an-add-btn" onClick={()=>setCreateUserModal(true)}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{position:"relative",zIndex:1}}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span>Yeni Üye Ekle</span>
-          </button>
-        </div>
-
-        {stats && (
-          <div className="an-stats">
+          <div className="hidden items-center gap-2 lg:flex">
             {[
-              {label:"Toplam Üye",val:stats.totalUsers,cls:""},
-              {label:"Onay Bekleyen",val:stats.pendingUsers,cls:"orange"},
-              {label:"Onaylanan",val:stats.approvedUsers,cls:"green"},
-              {label:"Davet Kodu",val:stats.totalInvitations,cls:"gold"},
-              {label:"Bekleyen Belge",val:stats.pendingDocuments,cls:"orange"},
-              {label:"Bekleyen Tavsiye",val:stats.pendingNominations,cls:"orange"},
-              {label:"Bekleyen Başvuru",val:stats.pendingApplications,cls:"orange"},
-            ].map(s=>(
-              <div key={s.label} className="an-stat">
-                <div className="an-stat-label">{s.label}</div>
-                <div className={`an-stat-num ${s.cls}`}>{s.val}</div>
-              </div>
+              ["/dashboard", "Ana Sayfa"],
+              ["/profil", "Profilim"],
+              ["/stok", "Stok"],
+              ["/crm", "CRM"],
+              ["/market", "Piyasa"],
+              ["/admin", "Admin"],
+            ].map(([href, label]) => (
+              <Link
+                key={href}
+                href={href}
+                className={`rounded-2xl px-4 py-2 text-xs font-black uppercase tracking-[0.16em] no-underline transition ${
+                  href === "/admin"
+                    ? "bg-[#0B1F44] text-white"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-[#0B1F44]"
+                }`}
+              >
+                {label}
+              </Link>
             ))}
           </div>
+
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-red-600"
+          >
+            <LogOut size={15} />
+            Çıkış
+          </button>
+        </div>
+      </nav>
+
+      <section className="mx-auto max-w-7xl px-5 py-8">
+        <header className="mb-8 overflow-hidden rounded-[36px] bg-gradient-to-br from-[#0B1F44] via-[#123B7A] to-[#1D4ED8] p-8 text-white shadow-2xl shadow-[#1D4ED8]/20">
+          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-blue-100">
+                <Crown size={16} />
+                Yönetim Paneli
+              </div>
+              <h1 className="mt-5 text-[42px] font-black leading-tight tracking-tight md:text-[56px]">
+                EPH Operasyon
+                <span className="block text-[#C9A84C]">Merkezi</span>
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-white/70">
+                Üye, belge, başvuru, stok, ziyaret ve güven skoru yönetimini tek merkezden takip et.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setCreateUserModal(true)}
+              className="inline-flex h-13 items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 text-sm font-black text-[#0B1F44] shadow-xl transition hover:scale-[1.02]"
+            >
+              <UserPlus size={18} />
+              Yeni Üye Ekle
+            </button>
+          </div>
+        </header>
+
+        {stats && (
+          <section className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+            <StatCard title="Toplam Üye" value={stats.totalUsers} icon={<UsersRound size={20} />} />
+            <StatCard title="Onay Bekleyen" value={stats.pendingUsers} icon={<ClipboardCheck size={20} />} warning />
+            <StatCard title="Onaylanan" value={stats.approvedUsers} icon={<BadgeCheck size={20} />} success />
+            <StatCard title="Davet Kodu" value={stats.totalInvitations} icon={<Sparkles size={20} />} gold />
+            <StatCard title="Bekleyen Belge" value={stats.pendingDocuments} icon={<FileText size={20} />} warning />
+            <StatCard title="Bekleyen Tavsiye" value={stats.pendingNominations} icon={<Star size={20} />} warning />
+            <StatCard title="Bekleyen Başvuru" value={stats.pendingApplications} icon={<MessageCircle size={20} />} warning />
+          </section>
         )}
 
         {stats && stats.byRole.length > 0 && (
-          <div className="an-roles">
-            <span className="an-roles-label">Rol Dağılımı</span>
-            {stats.byRole.map(r=>(
-              <span key={r.role} className="an-role-tag">{ROLE_LABELS[r.role]}: {r.count}</span>
+          <section className="mb-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="mb-3 text-xs font-black uppercase tracking-[0.22em] text-slate-400">
+              Rol Dağılımı
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {stats.byRole.map((item) => (
+                <Badge key={item.role} className="border-slate-200 bg-[#F8FAFC] text-[#0B1F44]">
+                  {roleLabel(item.role)}: {item.count}
+                </Badge>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className="mb-7 overflow-x-auto border-b border-slate-200">
+          <div className="flex min-w-max gap-2">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => handleTab(tab.key)}
+                className={`relative rounded-t-2xl px-5 py-4 text-xs font-black uppercase tracking-[0.18em] transition ${
+                  activeTab === tab.key
+                    ? "bg-white text-[#0B1F44] shadow-sm"
+                    : "text-slate-500 hover:bg-white/70 hover:text-[#0B1F44]"
+                }`}
+              >
+                {tab.label}
+                {!!tab.badge && tab.badge > 0 && (
+                  <span className="ml-2 rounded-full bg-[#C9A84C] px-2 py-0.5 text-[10px] text-[#0B1F44]">
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
             ))}
           </div>
+        </section>
+
+        {activeTab === "users" && (
+          <UsersTab
+            users={users}
+            userFilter={userFilter}
+            setUserFilter={setUserFilter}
+            actionLoading={actionLoading}
+            act={act}
+            fetchUsers={() => fetchUsers(userFilter)}
+            fetchStats={fetchStats}
+            setRoleModal={setRoleModal}
+            setNewRole={setNewRole}
+          />
         )}
 
-        <div className="an-tabs">
-          {[
-            {key:"users",label:"Kullanıcılar",badge:null},
-            {key:"documents",label:"Belgeler",badge:stats?.pendingDocuments},
-            {key:"nominations",label:"Tavsiyeler",badge:stats?.pendingNominations},
-            {key:"applications",label:"Başvurular",badge:stats?.pendingApplications},
-            {key:"leads",label:"Lina Leads",badge:leads.length},
-            {key:"stock",label:"Stok Doğrulama",badge:null},
-            {key:"trust",label:"Güven Skorları",badge:null},
-            {key:"visits",label:"Ziyaretler",badge:null},
-          ].map(t=>(
-            <button key={t.key} className={`an-tab ${activeTab===t.key?"active":""}`}
-              onClick={()=>{setActiveTab(t.key as any); if(t.key==="leads") fetchLeads(); if(t.key==="stock") fetchUnits(); if(t.key==="trust") fetchTrust(); if(t.key==="visits") fetchVisits();}}>
-              {t.label}
-              {t.badge && t.badge > 0 && <span className="an-tab-badge">{t.badge}</span>}
-            </button>
+        {activeTab === "documents" && (
+          <DocumentsTab
+            documents={documents}
+            docFilter={docFilter}
+            setDocFilter={setDocFilter}
+            actionLoading={actionLoading}
+            act={act}
+            fetchDocuments={() => fetchDocuments(docFilter)}
+            fetchStats={fetchStats}
+          />
+        )}
+
+        {activeTab === "nominations" && (
+          <NominationsTab
+            nominations={nominations}
+            nomFilter={nomFilter}
+            setNomFilter={setNomFilter}
+            actionLoading={actionLoading}
+            act={act}
+            fetchNominations={() => fetchNominations(nomFilter)}
+            fetchStats={fetchStats}
+            setNoteModal={setNoteModal}
+            setNoteText={setNoteText}
+          />
+        )}
+
+        {activeTab === "applications" && (
+          <ApplicationsTab
+            applications={applications}
+            appFilter={appFilter}
+            setAppFilter={setAppFilter}
+            actionLoading={actionLoading}
+            act={act}
+            fetchApplications={() => fetchApplications(appFilter)}
+            fetchStats={fetchStats}
+            setNoteModal={setNoteModal}
+            setNoteText={setNoteText}
+          />
+        )}
+
+        {activeTab === "leads" && (
+          <LeadsTab
+            leads={leads}
+            fetchLeads={fetchLeads}
+            expandedLead={expandedLead}
+            setExpandedLead={setExpandedLead}
+          />
+        )}
+
+        {activeTab === "stock" && (
+          <StockTab
+            units={allUnits}
+            fetchUnits={fetchUnits}
+            verifyLoading={verifyLoading}
+            handleVerify={handleVerify}
+          />
+        )}
+
+        {activeTab === "trust" && <TrustTab trustList={trustList} fetchTrust={fetchTrust} />}
+
+        {activeTab === "visits" && <VisitsTab visits={visits} fetchVisits={fetchVisits} />}
+      </section>
+
+      <style jsx global>{`
+        .premium-admin-input {
+          width: 100%;
+          height: 48px;
+          border-radius: 18px;
+          border: 1px solid #e2e8f0;
+          background: #f8fafc;
+          padding: 0 14px;
+          font-size: 14px;
+          font-weight: 700;
+          color: #0b1f44;
+          outline: none;
+        }
+
+        .premium-admin-input:focus {
+          border-color: #1d4ed8;
+          background: #ffffff;
+          box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.08);
+        }
+      `}</style>
+    </main>
+  );
+}
+
+function StatCard({
+  title,
+  value,
+  icon,
+  warning,
+  success,
+  gold,
+}: {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+  warning?: boolean;
+  success?: boolean;
+  gold?: boolean;
+}) {
+  const color = warning
+    ? "text-amber-600 bg-amber-50"
+    : success
+      ? "text-emerald-600 bg-emerald-50"
+      : gold
+        ? "text-[#C9A84C] bg-[#FFF8E1]"
+        : "text-[#1D4ED8] bg-[#EEF4FF]";
+
+  return (
+    <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+      <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ${color}`}>
+        {icon}
+      </div>
+      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+        {title}
+      </p>
+      <p className="mt-2 text-[32px] font-black leading-none text-[#0B1F44]">{value}</p>
+    </div>
+  );
+}
+
+function FilterBar({
+  items,
+  value,
+  onChange,
+}: {
+  items: [string, string][];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="mb-5 flex flex-wrap gap-2">
+      {items.map(([key, label]) => (
+        <button
+          key={key}
+          onClick={() => onChange(key)}
+          className={`rounded-2xl border px-4 py-2 text-xs font-black uppercase tracking-[0.16em] transition ${
+            value === key
+              ? "border-[#0B1F44] bg-[#0B1F44] text-white"
+              : "border-slate-200 bg-white text-slate-500 hover:border-[#0B1F44] hover:text-[#0B1F44]"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="rounded-[30px] border border-dashed border-slate-300 bg-white/70 p-12 text-center">
+      <p className="text-lg font-black text-slate-500">{text}</p>
+    </div>
+  );
+}
+
+function UsersTab({
+  users,
+  userFilter,
+  setUserFilter,
+  actionLoading,
+  act,
+  fetchUsers,
+  fetchStats,
+  setRoleModal,
+  setNewRole,
+}: {
+  users: AdminUser[];
+  userFilter: string;
+  setUserFilter: (value: string) => void;
+  actionLoading: string | null;
+  act: (id: string, fn: () => Promise<void>) => Promise<void>;
+  fetchUsers: () => Promise<void>;
+  fetchStats: () => Promise<void>;
+  setRoleModal: (value: { id: string; currentRole: string } | null) => void;
+  setNewRole: (value: string) => void;
+}) {
+  return (
+    <section>
+      <SectionHeader
+        title="Kullanıcılar"
+        subtitle="Platform üyelerini, onay durumlarını ve rollerini yönet."
+      />
+      <FilterBar
+        value={userFilter}
+        onChange={setUserFilter}
+        items={[
+          ["all", "Tümü"],
+          ["pending", "Bekleyen"],
+          ["approved", "Onaylanan"],
+        ]}
+      />
+
+      {users.length === 0 ? (
+        <EmptyState text="Kullanıcı bulunamadı." />
+      ) : (
+        <div className="space-y-3">
+          {users.map((item) => (
+            <article
+              key={item.id}
+              className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+            >
+              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+                <div className="flex min-w-0 items-center gap-4">
+                  <Avatar
+                    firstName={item.firstName}
+                    lastName={item.lastName}
+                    imageUrl={item.profileImageUrl}
+                  />
+                  <div className="min-w-0">
+                    <h3 className="truncate text-lg font-black text-[#0B1F44]">
+                      {item.firstName} {item.lastName}
+                    </h3>
+                    <p className="truncate text-sm font-semibold text-slate-500">{item.email}</p>
+                    <p className="mt-1 text-xs font-bold text-slate-400">{item.phone}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="border-slate-200 bg-[#F8FAFC] text-[#0B1F44]">
+                    {roleLabel(item.role)}
+                  </Badge>
+                  {item.documents?.length > 0 && (
+                    <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+                      {item.documents.length} Belge
+                    </Badge>
+                  )}
+                  <Badge
+                    className={
+                      item.isApproved
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-amber-200 bg-amber-50 text-amber-700"
+                    }
+                  >
+                    {item.isApproved ? "Onaylı" : "Bekliyor"}
+                  </Badge>
+
+                  {!item.isApproved ? (
+                    <PrimaryButton
+                      disabled={actionLoading === item.id}
+                      onClick={() =>
+                        act(item.id, async () => {
+                          await api.patch(`/admin/users/${item.id}/approve`);
+                          await Promise.all([fetchUsers(), fetchStats()]);
+                        })
+                      }
+                    >
+                      {actionLoading === item.id ? "..." : "Onayla"}
+                    </PrimaryButton>
+                  ) : (
+                    item.role !== "ADMIN" && (
+                      <PrimaryButton
+                        ghost
+                        disabled={actionLoading === item.id}
+                        onClick={() => {
+                          if (!confirm("Kullanıcı askıya alınacak. Emin misiniz?")) return;
+                          act(item.id, async () => {
+                            await api.patch(`/admin/users/${item.id}/suspend`);
+                            await Promise.all([fetchUsers(), fetchStats()]);
+                          });
+                        }}
+                      >
+                        Askıya Al
+                      </PrimaryButton>
+                    )
+                  )}
+
+                  {item.role !== "ADMIN" && (
+                    <PrimaryButton
+                      ghost
+                      onClick={() => {
+                        setRoleModal({ id: item.id, currentRole: item.role });
+                        setNewRole(item.role);
+                      }}
+                    >
+                      Rol Değiştir
+                    </PrimaryButton>
+                  )}
+
+                  {item.role !== "ADMIN" && (
+                    <PrimaryButton
+                      danger
+                      disabled={actionLoading === item.id}
+                      onClick={() => {
+                        if (!confirm("Kullanıcı silinecek. Emin misiniz?")) return;
+                        act(item.id, async () => {
+                          await api.delete(`/admin/users/${item.id}/reject`);
+                          await Promise.all([fetchUsers(), fetchStats()]);
+                        });
+                      }}
+                    >
+                      Sil
+                    </PrimaryButton>
+                  )}
+                </div>
+              </div>
+            </article>
           ))}
         </div>
+      )}
+    </section>
+  );
+}
 
-        {activeTab==="users" && (
-          <>
-            <div className="an-filters">
-              {[["all","Tümü"],["pending","Bekleyen"],["approved","Onaylanan"]].map(([f,l])=>(
-                <button key={f} className={`an-filter ${userFilter===f?"active":""}`} onClick={()=>setUserFilter(f)}>{l}</button>
-              ))}
-            </div>
-            <div className="an-table">
-              {users.length===0 ? <div className="an-empty">Kullanıcı bulunamadı.</div> :
-                users.map(u=>(
-                  <div key={u.id} className="an-row">
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
-                      <div className="an-user-info">
-                        <div className="an-avatar">{u.firstName[0]}{u.lastName[0]}</div>
-                        <div>
-                          <div className="an-user-name">{u.firstName} {u.lastName}</div>
-                          <div className="an-user-email">{u.email}</div>
-                          <div className="an-user-phone">{u.phone}</div>
-                        </div>
-                      </div>
-                      <div className="an-actions">
-                        <span className="an-role-tag" style={{fontSize:"8px"}}>{ROLE_LABELS[u.role]}</span>
-                        {u.documents?.length>0 && <span style={{fontSize:10,color:"var(--muted)"}}>{u.documents.length} belge</span>}
-                        <span className={`an-badge ${u.isApproved?"an-badge-approved":"an-badge-pending"}`}>{u.isApproved?"Onaylı":"Bekliyor"}</span>
-                        {!u.isApproved ? (
-                          <button className="an-btn an-btn-approve" disabled={actionLoading===u.id}
-                            onClick={()=>act(u.id,async()=>{await api.patch(`/admin/users/${u.id}/approve`);await Promise.all([fetchUsers(userFilter),fetchStats()]);})}>{actionLoading===u.id?"...":"Onayla"}</button>
-                        ) : u.role!=="ADMIN" && (
-                          <button className="an-btn an-btn-warn" disabled={actionLoading===u.id}
-                            onClick={()=>{if(!confirm("Askıya alınacak."))return; act(u.id,async()=>{await api.patch(`/admin/users/${u.id}/suspend`);await Promise.all([fetchUsers(userFilter),fetchStats()]);});}}>
-                            {actionLoading===u.id?"...":"Askıya Al"}
-                          </button>
-                        )}
-                        {u.role!=="ADMIN" && <button className="an-btn an-btn-ghost" onClick={()=>{setRoleModal({id:u.id,currentRole:u.role});setNewRole(u.role);}}>Rol Değiştir</button>}
-                        {u.role!=="ADMIN" && (
-                          <button className="an-btn an-btn-reject" disabled={actionLoading===u.id}
-                            onClick={()=>{if(!confirm("Silinecek. Emin misiniz?"))return; act(u.id,async()=>{await api.delete(`/admin/users/${u.id}/reject`);await Promise.all([fetchUsers(userFilter),fetchStats()]);});}}>
-                            {actionLoading===u.id?"...":"Sil"}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-          </>
-        )}
+function DocumentsTab({
+  documents,
+  docFilter,
+  setDocFilter,
+  actionLoading,
+  act,
+  fetchDocuments,
+  fetchStats,
+}: {
+  documents: DocumentItem[];
+  docFilter: string;
+  setDocFilter: (value: string) => void;
+  actionLoading: string | null;
+  act: (id: string, fn: () => Promise<void>) => Promise<void>;
+  fetchDocuments: () => Promise<void>;
+  fetchStats: () => Promise<void>;
+}) {
+  return (
+    <section>
+      <SectionHeader title="Belgeler" subtitle="Mesleki belgeleri incele, onayla veya reddet." />
+      <FilterBar
+        value={docFilter}
+        onChange={setDocFilter}
+        items={[
+          ["all", "Tümü"],
+          ["pending", "Bekleyen"],
+          ["approved", "Onaylanan"],
+          ["rejected", "Reddedilen"],
+        ]}
+      />
 
-        {activeTab==="documents" && (
-          <>
-            <div className="an-filters">
-              {[["all","Tümü"],["pending","Bekleyen"],["approved","Onaylanan"],["rejected","Reddedilen"]].map(([f,l])=>(
-                <button key={f} className={`an-filter ${docFilter===f?"active":""}`} onClick={()=>setDocFilter(f)}>{l}</button>
-              ))}
-            </div>
-            <div className="an-table">
-              {documents.length===0 ? <div className="an-empty">Belge bulunamadı.</div> :
-                documents.map(doc=>(
-                  <div key={doc.id} className="an-row">
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
-                      <div className="an-user-info">
-                        <div className="an-avatar" style={{background:"var(--warm)",border:"1px solid var(--border)"}}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                        </div>
-                        <div>
-                          <div className="an-user-name">{DOC_LABELS[doc.type]??doc.type}</div>
-                          <div className="an-user-email">{doc.fileName}</div>
-                          {doc.user && <div className="an-user-phone">{doc.user.firstName} {doc.user.lastName} · {ROLE_LABELS[doc.user.role]}</div>}
-                        </div>
-                      </div>
-                      <div className="an-actions">
-                        <span className={getBadge(doc.status)}>{STATUS_LABELS[doc.status]}</span>
-                        <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="an-btn an-btn-ghost" style={{textDecoration:"none",display:"inline-block"}}>Görüntüle</a>
-                        {doc.status==="PENDING" && (
-                          <>
-                            <button className="an-btn an-btn-approve" disabled={actionLoading===doc.id}
-                              onClick={()=>act(doc.id,async()=>{await api.patch(`/admin/documents/${doc.id}/approve`);await Promise.all([fetchDocuments(docFilter),fetchStats()]);})}>{actionLoading===doc.id?"...":"Onayla"}</button>
-                            <button className="an-btn an-btn-reject" disabled={actionLoading===doc.id}
-                              onClick={()=>act(doc.id,async()=>{await api.patch(`/admin/documents/${doc.id}/reject`);await Promise.all([fetchDocuments(docFilter),fetchStats()]);})}>{actionLoading===doc.id?"...":"Reddet"}</button>
-                          </>
-                        )}
-                      </div>
+      {documents.length === 0 ? (
+        <EmptyState text="Belge bulunamadı." />
+      ) : (
+        <div className="space-y-3">
+          {documents.map((item) => (
+            <article key={item.id} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+                <div className="flex min-w-0 items-center gap-4">
+                  {item.user ? (
+                    <Avatar
+                      firstName={item.user.firstName}
+                      lastName={item.user.lastName}
+                      imageUrl={item.user.profileImageUrl}
+                      tone="warm"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#EEF4FF] text-[#1D4ED8]">
+                      <FileText size={22} />
                     </div>
+                  )}
+                  <div className="min-w-0">
+                    <h3 className="truncate text-lg font-black text-[#0B1F44]">
+                      {DOC_LABELS[item.type] || item.type}
+                    </h3>
+                    <p className="truncate text-sm font-semibold text-slate-500">{item.fileName}</p>
+                    {item.user && (
+                      <p className="mt-1 text-xs font-bold text-slate-400">
+                        {item.user.firstName} {item.user.lastName} · {roleLabel(item.user.role)}
+                      </p>
+                    )}
                   </div>
-                ))
-              }
-            </div>
-          </>
-        )}
+                </div>
 
-        {activeTab==="nominations" && (
-          <>
-            <div className="an-filters">
-              {[["all","Tümü"],["PENDING","Bekliyor"],["APPROVED","Onaylandı"],["REJECTED","Reddedildi"],["INVITED","Davet Gönderildi"],["REGISTERED","Kayıt Oldu"]].map(([f,l])=>(
-                <button key={f} className={`an-filter ${nomFilter===f?"active":""}`} onClick={()=>setNomFilter(f)}>{l}</button>
-              ))}
-            </div>
-            <div className="an-table">
-              {nominations.length===0 ? <div className="an-empty">Tavsiye bulunamadı.</div> :
-                nominations.map(nom=>(
-                  <div key={nom.id} className="an-row">
-                    <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
-                      <div className="an-user-info" style={{alignItems:"flex-start"}}>
-                        <div className="an-avatar">{nom.candidateName[0]}</div>
-                        <div>
-                          <div className="an-user-name">{nom.candidateName}</div>
-                          <div className="an-user-email">{nom.candidateEmail} · {nom.candidatePhone}</div>
-                          <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap"}}>
-                            <span className="an-role-tag" style={{fontSize:"8px"}}>{ROLE_LABELS[nom.candidateRole]}</span>
-                            <span className={getBadge(nom.status)}>{STATUS_LABELS[nom.status]}</span>
-                          </div>
-                          {nom.note && <div style={{fontSize:11,color:"var(--muted)",fontStyle:"italic",marginTop:8}}>"{nom.note}"</div>}
-                          {nom.adminNote && <div style={{fontSize:10,color:"#B8860B",marginTop:4}}>📝 {nom.adminNote}</div>}
-                          <div style={{fontSize:10,color:"#B8B2A8",marginTop:6}}>Öneren: {nom.nominator.firstName} {nom.nominator.lastName} · {new Date(nom.createdAt).toLocaleDateString("tr-TR")}</div>
-                        </div>
-                      </div>
-                      <div className="an-actions">
-                        <button className="an-btn an-btn-ghost" onClick={()=>{setNoteModal({type:"nomination",id:nom.id});setNoteText(nom.adminNote||"");}}>Not</button>
-                        {nom.status==="PENDING" && (
-                          <>
-                            <button className="an-btn an-btn-approve" disabled={actionLoading===nom.id}
-                              onClick={()=>act(nom.id,async()=>{await api.patch(`/admin/nominations/${nom.id}/status`,{status:"APPROVED"});await Promise.all([fetchNominations(nomFilter),fetchStats()]);})}>{actionLoading===nom.id?"...":"Onayla"}</button>
-                            <button className="an-btn an-btn-reject" disabled={actionLoading===nom.id}
-                              onClick={()=>act(nom.id,async()=>{await api.patch(`/admin/nominations/${nom.id}/status`,{status:"REJECTED"});await Promise.all([fetchNominations(nomFilter),fetchStats()]);})}>{actionLoading===nom.id?"...":"Reddet"}</button>
-                          </>
-                        )}
-                        {nom.status==="APPROVED" && (
-                          <button className="an-btn an-btn-navy" disabled={actionLoading===nom.id}
-                            onClick={()=>act(nom.id,async()=>{await api.patch(`/admin/nominations/${nom.id}/status`,{status:"INVITED"});await Promise.all([fetchNominations(nomFilter),fetchStats()]);})}>{actionLoading===nom.id?"...":"Davet Gönderildi"}</button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-          </>
-        )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className={statusClass(item.status)}>{statusLabel(item.status)}</Badge>
+                  <a
+                    href={item.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 no-underline transition hover:border-[#0B1F44] hover:text-[#0B1F44]"
+                  >
+                    Görüntüle
+                  </a>
+                  {item.status === "PENDING" && (
+                    <>
+                      <PrimaryButton
+                        disabled={actionLoading === item.id}
+                        onClick={() =>
+                          act(item.id, async () => {
+                            await api.patch(`/admin/documents/${item.id}/approve`);
+                            await Promise.all([fetchDocuments(), fetchStats()]);
+                          })
+                        }
+                      >
+                        Onayla
+                      </PrimaryButton>
+                      <PrimaryButton
+                        danger
+                        disabled={actionLoading === item.id}
+                        onClick={() =>
+                          act(item.id, async () => {
+                            await api.patch(`/admin/documents/${item.id}/reject`);
+                            await Promise.all([fetchDocuments(), fetchStats()]);
+                          })
+                        }
+                      >
+                        Reddet
+                      </PrimaryButton>
+                    </>
+                  )}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
-        {activeTab==="applications" && (
-          <>
-            <div className="an-filters">
-              {[["all","Tümü"],["PENDING","Bekliyor"],["APPROVED","Onaylandı"],["REJECTED","Reddedildi"],["INVITED","Davet Gönderildi"],["REGISTERED","Kayıt Oldu"]].map(([f,l])=>(
-                <button key={f} className={`an-filter ${appFilter===f?"active":""}`} onClick={()=>setAppFilter(f)}>{l}</button>
-              ))}
-            </div>
-            <div className="an-table">
-              {applications.length===0 ? <div className="an-empty">Başvuru bulunamadı.</div> :
-                applications.map(app=>(
-                  <div key={app.id} className="an-row">
-                    <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
-                      <div className="an-user-info" style={{alignItems:"flex-start"}}>
-                        <div className="an-avatar" style={{background:"#3D1A1A",color:"#F5A0A0"}}>{app.applicantName[0]}</div>
-                        <div>
-                          <div className="an-user-name">{app.applicantName}</div>
-                          <div className="an-user-email">{app.applicantEmail} · {app.applicantPhone}</div>
-                          <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap"}}>
-                            <span className="an-role-tag" style={{fontSize:"8px"}}>{ROLE_LABELS[app.requestedRole]}</span>
-                            <span className={getBadge(app.status)}>{STATUS_LABELS[app.status]}</span>
-                            {app.referrer && <span style={{fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:"#2D6A4F",border:"1px solid #2D6A4F",padding:"4px 10px"}}>Referanslı</span>}
-                          </div>
-                          {app.message && <div style={{fontSize:11,color:"var(--muted)",fontStyle:"italic",marginTop:8}}>"{app.message}"</div>}
-                          {app.adminNote && <div style={{fontSize:10,color:"#B8860B",marginTop:4}}>📝 {app.adminNote}</div>}
-                          {app.referrer && <div style={{fontSize:10,color:"#B8B2A8",marginTop:4}}>Referans: {app.referrer.firstName} {app.referrer.lastName}</div>}
-                          <div style={{fontSize:10,color:"#B8B2A8",marginTop:4}}>{new Date(app.createdAt).toLocaleDateString("tr-TR")}</div>
-                        </div>
-                      </div>
-                      <div className="an-actions">
-                        <button className="an-btn an-btn-ghost" onClick={()=>{setNoteModal({type:"application",id:app.id});setNoteText(app.adminNote||"");}}>Not</button>
-                        {app.status==="PENDING" && (
-                          <>
-                            <button className="an-btn an-btn-approve" disabled={actionLoading===app.id}
-                              onClick={()=>act(app.id,async()=>{await api.patch(`/admin/applications/${app.id}/status`,{status:"APPROVED"});await Promise.all([fetchApplications(appFilter),fetchStats()]);})}>{actionLoading===app.id?"...":"Onayla"}</button>
-                            <button className="an-btn an-btn-reject" disabled={actionLoading===app.id}
-                              onClick={()=>act(app.id,async()=>{await api.patch(`/admin/applications/${app.id}/status`,{status:"REJECTED"});await Promise.all([fetchApplications(appFilter),fetchStats()]);})}>{actionLoading===app.id?"...":"Reddet"}</button>
-                          </>
-                        )}
-                        {app.status==="APPROVED" && (
-                          <button className="an-btn an-btn-navy" disabled={actionLoading===app.id}
-                            onClick={()=>act(app.id,async()=>{await api.patch(`/admin/applications/${app.id}/status`,{status:"INVITED"});await Promise.all([fetchApplications(appFilter),fetchStats()]);})}>{actionLoading===app.id?"...":"Davet Gönderildi"}</button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-          </>
-        )}
+function NominationsTab({
+  nominations,
+  nomFilter,
+  setNomFilter,
+  actionLoading,
+  act,
+  fetchNominations,
+  fetchStats,
+  setNoteModal,
+  setNoteText,
+}: {
+  nominations: Nomination[];
+  nomFilter: string;
+  setNomFilter: (value: string) => void;
+  actionLoading: string | null;
+  act: (id: string, fn: () => Promise<void>) => Promise<void>;
+  fetchNominations: () => Promise<void>;
+  fetchStats: () => Promise<void>;
+  setNoteModal: (value: { type: "nomination" | "application"; id: string } | null) => void;
+  setNoteText: (value: string) => void;
+}) {
+  return (
+    <section>
+      <SectionHeader title="Tavsiyeler" subtitle="Üye tavsiyelerini değerlendir ve süreci yönet." />
+      <FilterBar
+        value={nomFilter}
+        onChange={setNomFilter}
+        items={[
+          ["all", "Tümü"],
+          ["PENDING", "Bekliyor"],
+          ["APPROVED", "Onaylandı"],
+          ["REJECTED", "Reddedildi"],
+          ["INVITED", "Davet Gönderildi"],
+          ["REGISTERED", "Kayıt Oldu"],
+        ]}
+      />
 
-        {activeTab==="leads" && (
-          <>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
-              <span style={{fontFamily:"var(--serif)",fontSize:14,color:"var(--muted)",fontStyle:"italic"}}>{leads.length} lead toplandı</span>
-              <button className="an-btn an-btn-ghost" onClick={fetchLeads}>Yenile</button>
-            </div>
-            <div className="an-table">
-              {leads.length===0 ? <div className="an-empty">Henüz Lina'dan lead gelmedi.</div> :
-                leads.map(lead=>(
-                  <div key={lead.id} className="an-lead-row">
-                    <div style={{display:"flex",alignItems:"flex-start",gap:14}}>
-                      <div className="an-avatar" style={{background:"#3D0A1E",color:"#F5A0B8",flexShrink:0}}>
-                        {lead.fullName?lead.fullName[0].toUpperCase():"?"}
-                      </div>
-                      <div style={{flex:1}}>
-                        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                          <span className="an-user-name">{lead.fullName||"İsimsiz"}</span>
-                          <span style={{fontSize:8,letterSpacing:1.5,textTransform:"uppercase",border:"1px solid #F5A0B8",color:"#C0394F",padding:"3px 8px"}}>Lina</span>
-                        </div>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"4px 24px"}}>
-                          {lead.phone && <span className="an-user-email">📞 {lead.phone}</span>}
-                          {lead.email && <span className="an-user-email">✉️ {lead.email}</span>}
-                          {lead.profession && <span className="an-user-email">💼 {lead.profession}</span>}
-                          {lead.city && <span className="an-user-email">📍 {lead.city}</span>}
-                          {lead.interest && <span className="an-user-email" style={{gridColumn:"span 2"}}>🎯 {lead.interest}</span>}
-                        </div>
-                        <div style={{fontSize:10,color:"#B8B2A8",marginTop:8}}>
-                          {new Date(lead.createdAt).toLocaleDateString("tr-TR")} · {new Date(lead.createdAt).toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"})}
-                        </div>
-                        {lead.conversation && (
-                          <>
-                            <button className="an-conv-toggle" onClick={()=>setExpandedLead(expandedLead===lead.id?null:lead.id)}>
-                              {expandedLead===lead.id?"▲ Konuşmayı Gizle":"▼ Konuşmayı Gör"}
-                            </button>
-                            {expandedLead===lead.id && (
-                              <div className="an-lead-conv">
-                                {(()=>{try{const msgs=JSON.parse(lead.conversation);return msgs.map((m:{role:string;content:string},i:number)=>(
-                                  <div key={i} className={`an-conv-msg ${m.role}`}>
-                                    <div className={`an-conv-bubble ${m.role}`}>{m.content}</div>
-                                  </div>
-                                ));}catch{return <p style={{fontSize:11,color:"var(--muted)"}}>{lead.conversation}</p>;}})()}
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
+      {nominations.length === 0 ? (
+        <EmptyState text="Tavsiye bulunamadı." />
+      ) : (
+        <div className="space-y-3">
+          {nominations.map((item) => (
+            <article key={item.id} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+                <div className="flex min-w-0 items-start gap-4">
+                  <Avatar
+                    firstName={item.nominator?.firstName || item.candidateName}
+                    lastName={item.nominator?.lastName || ""}
+                    imageUrl={item.nominator?.profileImageUrl}
+                  />
+                  <div className="min-w-0">
+                    <h3 className="truncate text-lg font-black text-[#0B1F44]">{item.candidateName}</h3>
+                    <p className="truncate text-sm font-semibold text-slate-500">
+                      {item.candidateEmail} · {item.candidatePhone}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Badge className="border-slate-200 bg-[#F8FAFC] text-[#0B1F44]">
+                        {roleLabel(item.candidateRole)}
+                      </Badge>
+                      <Badge className={statusClass(item.status)}>{statusLabel(item.status)}</Badge>
                     </div>
+                    {item.note && (
+                      <p className="mt-3 rounded-2xl bg-[#F8FAFC] p-3 text-sm font-semibold italic text-slate-500">
+                        “{item.note}”
+                      </p>
+                    )}
+                    {item.adminNote && (
+                      <p className="mt-2 text-sm font-black text-[#B8860B]">📝 {item.adminNote}</p>
+                    )}
+                    <p className="mt-2 text-xs font-bold text-slate-400">
+                      Öneren: {item.nominator.firstName} {item.nominator.lastName} · {formatDate(item.createdAt)}
+                    </p>
                   </div>
-                ))
-              }
-            </div>
-          </>
-        )}
+                </div>
 
-        {activeTab==="stock" && (
-          <>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
-              <span style={{fontFamily:"var(--serif)",fontSize:14,color:"var(--muted)",fontStyle:"italic"}}>{allUnits.length} birim · {allUnits.filter(u=>u.isVerified).length} doğrulanmış</span>
-              <button className="an-btn an-btn-ghost" onClick={fetchUnits}>Yenile</button>
-            </div>
-            {allUnits.length===0 ? (
-              <div className="an-table"><div className="an-empty">Birim bulunamadı.</div></div>
-            ) : (
-              <div className="an-stok-grid">
-                {allUnits.map(u=>(
-                  <div key={u.id} className="an-stok-card">
-                    <div className="an-stok-project">{u.project?.name}</div>
-                    <div className="an-stok-loc">{u.project?.city} / {u.project?.district} · {u.project?.owner?.firstName} {u.project?.owner?.lastName}</div>
-                    <div className="an-stok-info">
-                      <div className="an-stok-info-cell"><div className="an-stok-info-label">Tip</div><div className="an-stok-info-val">{TYPE_LABELS[u.type]||u.type}</div></div>
-                      <div className="an-stok-info-cell"><div className="an-stok-info-label">Durum</div><div className="an-stok-info-val">{UNIT_STATUS_LABELS[u.status]||u.status}</div></div>
-                      <div className="an-stok-info-cell"><div className="an-stok-info-label">No / Kat</div><div className="an-stok-info-val">{u.number} / {u.floor??"—"}</div></div>
-                      <div className="an-stok-info-cell"><div className="an-stok-info-label">Alan</div><div className="an-stok-info-val">{u.area?`${u.area}m²`:"—"}</div></div>
+                <div className="flex flex-wrap gap-2">
+                  <PrimaryButton
+                    ghost
+                    onClick={() => {
+                      setNoteModal({ type: "nomination", id: item.id });
+                      setNoteText(item.adminNote || "");
+                    }}
+                  >
+                    Not
+                  </PrimaryButton>
+                  {item.status === "PENDING" && (
+                    <>
+                      <PrimaryButton
+                        disabled={actionLoading === item.id}
+                        onClick={() =>
+                          act(item.id, async () => {
+                            await api.patch(`/admin/nominations/${item.id}/status`, { status: "APPROVED" });
+                            await Promise.all([fetchNominations(), fetchStats()]);
+                          })
+                        }
+                      >
+                        Onayla
+                      </PrimaryButton>
+                      <PrimaryButton
+                        danger
+                        disabled={actionLoading === item.id}
+                        onClick={() =>
+                          act(item.id, async () => {
+                            await api.patch(`/admin/nominations/${item.id}/status`, { status: "REJECTED" });
+                            await Promise.all([fetchNominations(), fetchStats()]);
+                          })
+                        }
+                      >
+                        Reddet
+                      </PrimaryButton>
+                    </>
+                  )}
+                  {item.status === "APPROVED" && (
+                    <PrimaryButton
+                      disabled={actionLoading === item.id}
+                      onClick={() =>
+                        act(item.id, async () => {
+                          await api.patch(`/admin/nominations/${item.id}/status`, { status: "INVITED" });
+                          await Promise.all([fetchNominations(), fetchStats()]);
+                        })
+                      }
+                    >
+                      Davet Gönderildi
+                    </PrimaryButton>
+                  )}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ApplicationsTab({
+  applications,
+  appFilter,
+  setAppFilter,
+  actionLoading,
+  act,
+  fetchApplications,
+  fetchStats,
+  setNoteModal,
+  setNoteText,
+}: {
+  applications: Application[];
+  appFilter: string;
+  setAppFilter: (value: string) => void;
+  actionLoading: string | null;
+  act: (id: string, fn: () => Promise<void>) => Promise<void>;
+  fetchApplications: () => Promise<void>;
+  fetchStats: () => Promise<void>;
+  setNoteModal: (value: { type: "nomination" | "application"; id: string } | null) => void;
+  setNoteText: (value: string) => void;
+}) {
+  return (
+    <section>
+      <SectionHeader title="Başvurular" subtitle="Yeni üyelik başvurularını değerlendir ve davet sürecini yönet." />
+      <FilterBar
+        value={appFilter}
+        onChange={setAppFilter}
+        items={[
+          ["all", "Tümü"],
+          ["PENDING", "Bekliyor"],
+          ["APPROVED", "Onaylandı"],
+          ["REJECTED", "Reddedildi"],
+          ["INVITED", "Davet Gönderildi"],
+          ["REGISTERED", "Kayıt Oldu"],
+          ["GORUSME_PLANLANDI", "Görüşme Planlandı"],
+          ["EVRAK_BEKLENIYOR", "Evrak Bekleniyor"],
+        ]}
+      />
+
+      {applications.length === 0 ? (
+        <EmptyState text="Başvuru bulunamadı." />
+      ) : (
+        <div className="space-y-3">
+          {applications.map((item) => (
+            <article key={item.id} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+                <div className="flex min-w-0 items-start gap-4">
+                  <Avatar firstName={item.applicantName} lastName="" tone="rose" />
+                  <div className="min-w-0">
+                    <h3 className="truncate text-lg font-black text-[#0B1F44]">{item.applicantName}</h3>
+                    <p className="truncate text-sm font-semibold text-slate-500">
+                      {item.applicantEmail} · {item.applicantPhone}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Badge className="border-slate-200 bg-[#F8FAFC] text-[#0B1F44]">
+                        {roleLabel(item.requestedRole)}
+                      </Badge>
+                      <Badge className={statusClass(item.status)}>{statusLabel(item.status)}</Badge>
+                      {item.referrer && (
+                        <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                          Referanslı
+                        </Badge>
+                      )}
                     </div>
-                    <div className="an-stok-price">{u.price.toLocaleString("tr-TR")} ₺</div>
-                    <div className="an-stok-divider"/>
-                    <div className="an-stok-verify-title">Doğrulama Durumu</div>
-                    <div className="an-stok-toggles">
-                      {[
-                        {key:"tapu",label:"Tapu Doğrulandı",val:u.tapuVerified},
-                        {key:"photo",label:"Fotoğraf Doğrulandı",val:u.photoVerified},
-                        {key:"yetki",label:"Yetki Belgesi Doğrulandı",val:u.yetkiVerified},
-                      ].map(({key,label,val})=>(
-                        <div key={key} className={`an-stok-toggle ${val?"on":""}`} onClick={()=>{if(verifyLoading)return;handleVerify(u.id,key,val);}}>
-                          <span className="an-stok-toggle-label">{label}</span>
-                          <span className="an-stok-toggle-status">{verifyLoading===u.id+key?"...":val?"✓ Doğrulandı":"Doğrulanmadı"}</span>
-                        </div>
-                      ))}
-                      <div className={`an-stok-offmarket ${u.isOffMarket?"on":""}`} onClick={()=>{if(verifyLoading)return;handleVerify(u.id,"offmarket",u.isOffMarket);}}>
-                        <span className="an-stok-offmarket-label">{u.isOffMarket?"⬤ Off-Market (Gizli)":"Off-Market Yap"}</span>
-                        <span style={{fontSize:8,letterSpacing:1,textTransform:"uppercase",color:u.isOffMarket?"var(--navy)":"var(--muted)"}}>{verifyLoading===u.id+"offmarket"?"...":u.isOffMarket?"Aktif":"Kapalı"}</span>
+                    {item.message && (
+                      <p className="mt-3 rounded-2xl bg-[#F8FAFC] p-3 text-sm font-semibold italic text-slate-500">
+                        “{item.message}”
+                      </p>
+                    )}
+                    {item.adminNote && (
+                      <p className="mt-2 text-sm font-black text-[#B8860B]">📝 {item.adminNote}</p>
+                    )}
+                    {item.referrer && (
+                      <div className="mt-3 flex items-center gap-2 rounded-2xl bg-emerald-50 p-2">
+                        <Avatar
+                          firstName={item.referrer.firstName}
+                          lastName={item.referrer.lastName}
+                          imageUrl={item.referrer.profileImageUrl}
+                        />
+                        <p className="text-xs font-black text-emerald-700">
+                          Referans: {item.referrer.firstName} {item.referrer.lastName}
+                        </p>
                       </div>
-                    </div>
+                    )}
+                    <p className="mt-2 text-xs font-bold text-slate-400">{formatDate(item.createdAt)}</p>
                   </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <PrimaryButton
+                    ghost
+                    onClick={() => {
+                      setNoteModal({ type: "application", id: item.id });
+                      setNoteText(item.adminNote || "");
+                    }}
+                  >
+                    Not
+                  </PrimaryButton>
+                  {item.status === "PENDING" && (
+                    <>
+                      <PrimaryButton
+                        disabled={actionLoading === item.id}
+                        onClick={() =>
+                          act(item.id, async () => {
+                            await api.patch(`/admin/applications/${item.id}/status`, { status: "APPROVED" });
+                            await Promise.all([fetchApplications(), fetchStats()]);
+                          })
+                        }
+                      >
+                        Onayla
+                      </PrimaryButton>
+                      <PrimaryButton
+                        danger
+                        disabled={actionLoading === item.id}
+                        onClick={() =>
+                          act(item.id, async () => {
+                            await api.patch(`/admin/applications/${item.id}/status`, { status: "REJECTED" });
+                            await Promise.all([fetchApplications(), fetchStats()]);
+                          })
+                        }
+                      >
+                        Reddet
+                      </PrimaryButton>
+                      <PrimaryButton
+                        ghost
+                        disabled={actionLoading === item.id}
+                        onClick={() =>
+                          act(item.id, async () => {
+                            await api.patch(`/admin/applications/${item.id}/status`, { status: "GORUSME_PLANLANDI" });
+                            await Promise.all([fetchApplications(), fetchStats()]);
+                          })
+                        }
+                      >
+                        Görüşme
+                      </PrimaryButton>
+                      <PrimaryButton
+                        ghost
+                        disabled={actionLoading === item.id}
+                        onClick={() =>
+                          act(item.id, async () => {
+                            await api.patch(`/admin/applications/${item.id}/status`, { status: "EVRAK_BEKLENIYOR" });
+                            await Promise.all([fetchApplications(), fetchStats()]);
+                          })
+                        }
+                      >
+                        Evrak
+                      </PrimaryButton>
+                    </>
+                  )}
+                  {item.status === "APPROVED" && (
+                    <PrimaryButton
+                      disabled={actionLoading === item.id}
+                      onClick={() =>
+                        act(item.id, async () => {
+                          await api.patch(`/admin/applications/${item.id}/status`, { status: "INVITED" });
+                          await Promise.all([fetchApplications(), fetchStats()]);
+                        })
+                      }
+                    >
+                      Davet Gönderildi
+                    </PrimaryButton>
+                  )}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function LeadsTab({
+  leads,
+  fetchLeads,
+  expandedLead,
+  setExpandedLead,
+}: {
+  leads: Lead[];
+  fetchLeads: () => Promise<void>;
+  expandedLead: string | null;
+  setExpandedLead: (value: string | null) => void;
+}) {
+  return (
+    <section>
+      <SectionHeader
+        title="Lina Leads"
+        subtitle="Lina AI üzerinden gelen aday ve görüşmeleri takip et."
+        action={
+          <PrimaryButton ghost onClick={fetchLeads}>
+            <span className="inline-flex items-center gap-2">
+              <RefreshCw size={14} /> Yenile
+            </span>
+          </PrimaryButton>
+        }
+      />
+
+      {leads.length === 0 ? (
+        <EmptyState text="Henüz Lina'dan lead gelmedi." />
+      ) : (
+        <div className="space-y-3">
+          {leads.map((item) => (
+            <article key={item.id} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start gap-4">
+                <Avatar firstName={item.fullName || "?"} lastName="" tone="rose" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-black text-[#0B1F44]">{item.fullName || "İsimsiz"}</h3>
+                    <Badge className="border-rose-200 bg-rose-50 text-rose-700">Lina</Badge>
+                  </div>
+                  <div className="mt-2 grid gap-2 text-sm font-semibold text-slate-500 md:grid-cols-2">
+                    {item.phone && <span>📞 {item.phone}</span>}
+                    {item.email && <span>✉️ {item.email}</span>}
+                    {item.profession && <span>💼 {item.profession}</span>}
+                    {item.city && <span>📍 {item.city}</span>}
+                    {item.interest && <span className="md:col-span-2">🎯 {item.interest}</span>}
+                  </div>
+                  <p className="mt-2 text-xs font-bold text-slate-400">{formatDate(item.createdAt)}</p>
+
+                  {item.conversation && (
+                    <>
+                      <button
+                        onClick={() => setExpandedLead(expandedLead === item.id ? null : item.id)}
+                        className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-[#C9A84C]"
+                      >
+                        {expandedLead === item.id ? "Konuşmayı Gizle" : "Konuşmayı Gör"}
+                      </button>
+                      {expandedLead === item.id && (
+                        <div className="mt-3 max-h-80 overflow-y-auto rounded-[24px] border border-slate-200 bg-[#F8FAFC] p-4">
+                          <LeadConversation conversation={item.conversation} />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function LeadConversation({ conversation }: { conversation: string }) {
+  try {
+    const messages = JSON.parse(conversation) as { role: string; content: string }[];
+
+    return (
+      <div className="space-y-2">
+        {messages.map((message, index) => (
+          <div
+            key={`${message.role}-${index}`}
+            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+          >
+            <div
+              className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm font-semibold leading-6 ${
+                message.role === "user"
+                  ? "bg-[#0B1F44] text-white"
+                  : "border border-slate-200 bg-white text-slate-600"
+              }`}
+            >
+              {message.content}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  } catch {
+    return <p className="text-sm font-semibold text-slate-500">{conversation}</p>;
+  }
+}
+
+function StockTab({
+  units,
+  fetchUnits,
+  verifyLoading,
+  handleVerify,
+}: {
+  units: StokUnit[];
+  fetchUnits: () => Promise<void>;
+  verifyLoading: string | null;
+  handleVerify: (id: string, field: string, current: boolean) => Promise<void>;
+}) {
+  return (
+    <section>
+      <SectionHeader
+        title="Stok Doğrulama"
+        subtitle={`${units.length} birim · ${units.filter((item) => item.isVerified).length} doğrulanmış`}
+        action={
+          <PrimaryButton ghost onClick={fetchUnits}>
+            <span className="inline-flex items-center gap-2">
+              <RefreshCw size={14} /> Yenile
+            </span>
+          </PrimaryButton>
+        }
+      />
+
+      {units.length === 0 ? (
+        <EmptyState text="Birim bulunamadı." />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {units.map((item) => (
+            <article key={item.id} className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-black text-[#0B1F44]">{item.project?.name || "Proje"}</h3>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    {item.project?.city} / {item.project?.district} · {item.project?.owner?.firstName} {item.project?.owner?.lastName}
+                  </p>
+                </div>
+                <Badge className={item.isOffMarket ? "border-blue-200 bg-blue-50 text-blue-700" : statusClass(item.status)}>
+                  {item.isOffMarket ? "Off-Market" : UNIT_STATUS_LABELS[item.status] || item.status}
+                </Badge>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+                <MiniCell label="Tip" value={TYPE_LABELS[item.type] || item.type} />
+                <MiniCell label="No / Kat" value={`${item.number} / ${item.floor ?? "—"}`} />
+                <MiniCell label="Alan" value={item.area ? `${item.area} m²` : "—"} />
+                <MiniCell label="Fiyat" value={money(item.price)} />
+              </div>
+
+              <div className="mt-5 grid gap-2">
+                {[
+                  ["tapu", "Tapu Doğrulandı", item.tapuVerified],
+                  ["photo", "Fotoğraf Doğrulandı", item.photoVerified],
+                  ["yetki", "Yetki Belgesi Doğrulandı", item.yetkiVerified],
+                  ["offmarket", item.isOffMarket ? "Off-Market Aktif" : "Off-Market Yap", item.isOffMarket],
+                ].map(([key, label, value]) => (
+                  <button
+                    key={String(key)}
+                    onClick={() => handleVerify(item.id, String(key), Boolean(value))}
+                    disabled={!!verifyLoading}
+                    className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-black transition disabled:opacity-50 ${
+                      value
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-slate-200 bg-[#F8FAFC] text-slate-600 hover:border-[#0B1F44]"
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <span>{verifyLoading === `${item.id}-${key}` ? "..." : value ? "✓ Aktif" : "Kapalı"}</span>
+                  </button>
                 ))}
               </div>
-            )}
-          </>
-        )}
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
-        {activeTab==="trust" && (
-          <>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
-              <span style={{fontFamily:"var(--serif)",fontSize:14,color:"var(--muted)",fontStyle:"italic"}}>{trustList.length} üye sıralandı</span>
-              <button className="an-btn an-btn-ghost" onClick={fetchTrust}>Yenile</button>
-            </div>
-            <div className="trust-leaderboard">
-              {trustList.length===0 ? <div className="an-empty">Henüz veri yok.</div> :
-                trustList.map((t,i)=>(
-                  <div key={t.id} className="trust-lb-row">
-                    <div className="trust-lb-rank">#{i+1}</div>
-                    <div className="an-avatar">{t.firstName[0]}{t.lastName[0]}</div>
-                    <div style={{flex:1}}>
-                      <div className="an-user-name">{t.firstName} {t.lastName}</div>
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
-                        <span className="an-role-tag" style={{fontSize:"8px"}}>{ROLE_LABELS[t.role]}</span>
-                        <span style={{fontSize:9,letterSpacing:1.5,textTransform:"uppercase",color:t.badgeColor,fontWeight:500}}>{t.badge}</span>
-                      </div>
-                      <div className="trust-lb-bar-wrap" style={{marginTop:8}}>
-                        <div className="trust-lb-bar" style={{width:`${t.score}%`,background:t.badgeColor}}/>
-                      </div>
-                    </div>
-                    <div className="trust-lb-score">{t.score}</div>
+function MiniCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-[#F8FAFC] p-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
+      <p className="mt-1 text-sm font-black text-[#0B1F44]">{value}</p>
+    </div>
+  );
+}
+
+function TrustTab({ trustList, fetchTrust }: { trustList: TrustEntry[]; fetchTrust: () => Promise<void> }) {
+  return (
+    <section>
+      <SectionHeader
+        title="Güven Skorları"
+        subtitle={`${trustList.length} üye sıralandı`}
+        action={
+          <PrimaryButton ghost onClick={fetchTrust}>
+            <span className="inline-flex items-center gap-2">
+              <RefreshCw size={14} /> Yenile
+            </span>
+          </PrimaryButton>
+        }
+      />
+
+      {trustList.length === 0 ? (
+        <EmptyState text="Henüz güven skoru verisi yok." />
+      ) : (
+        <div className="space-y-3">
+          {trustList.map((item, index) => (
+            <article key={item.id} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="w-12 text-center text-[24px] font-black text-[#C9A84C]">#{index + 1}</div>
+                <Avatar firstName={item.firstName} lastName={item.lastName} imageUrl={item.profileImageUrl} />
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-lg font-black text-[#0B1F44]">
+                    {item.firstName} {item.lastName}
+                  </h3>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge className="border-slate-200 bg-[#F8FAFC] text-[#0B1F44]">
+                      {roleLabel(item.role)}
+                    </Badge>
+                    <Badge className="border-blue-200 bg-blue-50 text-blue-700">{item.badge}</Badge>
                   </div>
-                ))
-              }
-            </div>
-          </>
-        )}
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${item.score}%`, background: item.badgeColor || "#1D4ED8" }}
+                    />
+                  </div>
+                </div>
+                <div className="text-[30px] font-black text-[#0B1F44]">{item.score}</div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
+function VisitsTab({ visits, fetchVisits }: { visits: Visit[]; fetchVisits: () => Promise<void> }) {
+  return (
+    <section>
+      <SectionHeader
+        title="Ziyaretler"
+        subtitle="Kim, ne zaman, hangi sayfayı ziyaret etti?"
+        action={
+          <PrimaryButton ghost onClick={fetchVisits}>
+            <span className="inline-flex items-center gap-2">
+              <RefreshCw size={14} /> Yenile
+            </span>
+          </PrimaryButton>
+        }
+      />
 
-        {activeTab==="visits" && (
-          <>
-            <div className="an-section-header">
-              <div><div className="an-section-title">Kullanıcı Ziyaretleri</div><div className="an-section-sub">Kim, ne zaman, hangi sayfayı ziyaret etti</div></div>
-              <button className="an-btn an-btn-ghost" onClick={fetchVisits}>Yenile</button>
+      {visits.length === 0 ? (
+        <EmptyState text="Henüz ziyaret yok." />
+      ) : (
+        <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-sm">
+          {visits.map((item) => (
+            <div key={item.id} className="flex flex-col gap-3 border-b border-slate-100 p-4 last:border-b-0 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar
+                  firstName={item.user?.firstName || "Misafir"}
+                  lastName={item.user?.lastName || ""}
+                  imageUrl={item.user?.profileImageUrl}
+                  tone="warm"
+                />
+                <div>
+                  <p className="text-sm font-black text-[#0B1F44]">
+                    {item.user ? `${item.user.firstName} ${item.user.lastName}` : "Misafir"}
+                  </p>
+                  <p className="text-xs font-bold text-slate-400">{item.user?.email || "Oturumsuz ziyaret"}</p>
+                </div>
+              </div>
+              <div className="grid gap-2 text-xs font-bold text-slate-500 md:grid-cols-3 md:text-right">
+                <span className="font-mono">{item.page}</span>
+                <span>{item.ip || "IP yok"}</span>
+                <span>{formatDate(item.createdAt)}</span>
+              </div>
             </div>
-            <div className="an-table">
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead><tr style={{borderBottom:"1px solid var(--border)"}}>
-                  <th style={{padding:"10px 16px",textAlign:"left",fontSize:9,letterSpacing:2,color:"var(--muted)"}}>KULLANICI</th>
-                  <th style={{padding:"10px 16px",textAlign:"left",fontSize:9,letterSpacing:2,color:"var(--muted)"}}>SAYFA</th>
-                  <th style={{padding:"10px 16px",textAlign:"left",fontSize:9,letterSpacing:2,color:"var(--muted)"}}>IP</th>
-                  <th style={{padding:"10px 16px",textAlign:"left",fontSize:9,letterSpacing:2,color:"var(--muted)"}}>TARİH</th>
-                </tr></thead>
-                <tbody>
-                  {visits.length===0 ? <tr><td colSpan={4}><div className="an-empty">Henüz ziyaret yok.</div></td></tr> :
-                    visits.map((v,i)=>(
-                      <tr key={v.id} style={{borderBottom:"1px solid var(--border)",background:i%2===0?"#fff":"#fafaf8"}}>
-                        <td style={{padding:"10px 16px"}}>
-                          <div style={{fontWeight:500,fontSize:13}}>{v.user ? `${v.user.firstName} ${v.user.lastName}` : "Misafir"}</div>
-                          <div style={{fontSize:11,color:"var(--muted)"}}>{v.user?.email}</div>
-                        </td>
-                        <td style={{padding:"10px 16px",fontSize:12,fontFamily:"monospace"}}>{v.page}</td>
-                        <td style={{padding:"10px 16px",fontSize:11,color:"var(--muted)"}}>{v.ip}</td>
-                        <td style={{padding:"10px 16px",fontSize:11,color:"var(--muted)"}}>{new Date(v.createdAt).toLocaleString("tr-TR")}</td>
-                      </tr>
-                    ))
-                  }
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </main>
-    </>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
