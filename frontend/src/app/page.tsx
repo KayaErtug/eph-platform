@@ -160,6 +160,8 @@ export default function LandingPage() {
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [submittedApplicantName, setSubmittedApplicantName] = useState("");
+  const [submittedApplicationNumber, setSubmittedApplicationNumber] = useState("");
 
   const allLegalAccepted =
     legalAccepted.constitution &&
@@ -228,6 +230,13 @@ export default function LandingPage() {
         throw new Error();
       }
 
+      const data = await res.json().catch(() => null);
+      const applicationId = data?.id
+        ? String(data.id).slice(0, 8).toUpperCase()
+        : String(Date.now()).slice(-6);
+
+      setSubmittedApplicantName(form.ad.trim());
+      setSubmittedApplicationNumber(`EPH-${new Date().getFullYear()}-${applicationId}`);
       setSuccess(true);
       setForm({
         ad: "",
@@ -252,6 +261,8 @@ export default function LandingPage() {
   const closeApplicationForm = () => {
     setShowForm(false);
     setSuccess(false);
+    setSubmittedApplicantName("");
+    setSubmittedApplicationNumber("");
   };
 
   return (
@@ -851,13 +862,16 @@ export default function LandingPage() {
 
       {showForm && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-5 backdrop-blur"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-5 backdrop-blur-2xl"
           onClick={closeApplicationForm}
         >
           <div
-            className="max-h-[92vh] w-full max-w-xl overflow-auto rounded-[36px] border border-white/10 bg-[#081423] p-8 text-center text-white"
+            className="relative max-h-[92vh] w-full max-w-xl overflow-auto rounded-[40px] border border-[#60A5FA]/20 bg-[#081423]/95 p-8 text-center text-white shadow-2xl shadow-[#2563EB]/25"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#2563EB]/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-[#C9A84C]/10 blur-3xl" />
+            <div className="relative z-10">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 text-center">
                 <div className="inline-flex items-center gap-2 rounded-full border border-[#2563EB]/20 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#60A5FA]">
@@ -881,18 +895,51 @@ export default function LandingPage() {
             </div>
 
             {success ? (
-              <div className="mt-8 rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-6">
-                <p className="text-lg font-black text-emerald-400">
-                  Başvurunuz başarıyla alındı.
+              <div className="mt-8 overflow-hidden rounded-[34px] border border-emerald-400/25 bg-gradient-to-br from-emerald-500/15 via-[#0B1628] to-[#07111F] p-6 shadow-2xl shadow-emerald-500/10">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[28px] border border-emerald-300/30 bg-emerald-400/15 text-emerald-300 shadow-xl shadow-emerald-500/20">
+                  <CheckCircle2 size={42} />
+                </div>
+
+                <p className="mt-6 text-xs font-black uppercase tracking-[0.24em] text-emerald-300">
+                  Başvuru Alındı
                 </p>
 
-                <p className="mt-2 text-sm text-white/60">
-                  Ekibimiz en kısa sürede sizinle iletişime geçecek.
+                <h4 className="mt-3 text-[28px] font-black leading-tight text-white">
+                  Sayın {submittedApplicantName || "EPH Üyesi"},
+                </h4>
+
+                <p className="mt-3 text-xl font-black leading-8 text-emerald-300">
+                  Başvurunuz başarıyla alınmıştır.
                 </p>
+
+                <p className="mx-auto mt-4 max-w-md text-sm font-semibold leading-7 text-white/65">
+                  EPH Platform değerlendirme ekibi başvurunuzu incelemeye başlamıştır.
+                  Başvuru durumunuz tarafınıza e-posta veya telefon yoluyla bildirilecektir.
+                </p>
+
+                <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35">
+                      Başvuru Numarası
+                    </p>
+                    <p className="mt-2 text-sm font-black text-white">
+                      {submittedApplicationNumber || "EPH-2026"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35">
+                      Durum
+                    </p>
+                    <p className="mt-2 text-sm font-black text-[#60A5FA]">
+                      İnceleme Bekliyor
+                    </p>
+                  </div>
+                </div>
 
                 <button
                   onClick={closeApplicationForm}
-                  className="mt-6 rounded-2xl bg-[#2563EB] px-6 py-3 text-sm font-black text-white"
+                  className="mt-7 w-full rounded-2xl bg-[#2563EB] px-6 py-4 text-sm font-black text-white shadow-lg shadow-[#2563EB]/25 transition hover:bg-[#1D4ED8]"
                 >
                   Tamam
                 </button>
@@ -1003,6 +1050,7 @@ export default function LandingPage() {
                 </button>
               </>
             )}
+          </div>
           </div>
         </div>
       )}
