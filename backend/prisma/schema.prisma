@@ -17,6 +17,7 @@ model User {
   role                    Role
   isVerified              Boolean                   @default(false)
   isApproved              Boolean                   @default(false)
+  adminVisible            Boolean                   @default(true)
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime                  @updatedAt
   nominationPoints        Int                       @default(0)
@@ -24,6 +25,9 @@ model User {
   referralCode            String?                   @unique
   activities              Activity[]
   applications            Application[]
+  reviewedApplications    Application[]             @relation("ApplicationReviewer")
+  auditLogs               AuditLog[]                @relation("AuditActor")
+  activitiesAudited       AuditLog[]                @relation("AuditTargetUser")
   ConversationParticipant ConversationParticipant[]
   customers               Customer[]
   documents               Document[]
@@ -112,19 +116,34 @@ model Nomination {
 }
 
 model Application {
-  id             String            @id @default(uuid())
-  applicantName  String
-  applicantEmail String
-  applicantPhone String
-  requestedRole  Role
-  message        String?
-  referralCode   String?
-  referrerId     String?
-  status         ApplicationStatus @default(PENDING)
-  adminNote      String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  referrer       User?             @relation(fields: [referrerId], references: [id])
+  id                    String            @id @default(uuid())
+  applicantName         String
+  applicantEmail        String
+  applicantPhone        String
+  requestedRole         Role
+  message               String?
+  referralCode          String?
+  referrerId            String?
+  status                ApplicationStatus @default(PENDING)
+  adminNote             String?
+  profession            String?
+  city                  String?
+  ipAddress             String?
+  userAgent             String?
+  isVip                 Boolean           @default(false)
+  isRisky               Boolean           @default(false)
+  riskNote              String?
+  platformAccepted      Boolean           @default(false)
+  kvkkAccepted          Boolean           @default(false)
+  privacyAccepted       Boolean           @default(false)
+  userAgreementAccepted Boolean           @default(false)
+  legalAcceptedAt       DateTime?
+  reviewedAt            DateTime?
+  reviewedById          String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  referrer              User?             @relation(fields: [referrerId], references: [id])
+  reviewedBy            User?             @relation("ApplicationReviewer", fields: [reviewedById], references: [id])
 }
 
 model Lead {
@@ -216,7 +235,7 @@ model ConversationParticipant {
   conversationId String
   userId         String
   createdAt      DateTime     @default(now())
-  lastReadAt     DateTime?
+  lastReadAt      DateTime?
   Conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   User           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -264,11 +283,28 @@ model PushSubscription {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model AuditLog {
+  id           String      @id @default(uuid())
+  actorId      String?
+  targetUserId String?
+  action       AuditAction
+  entityType   String
+  entityId     String?
+  description  String?
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime    @default(now())
+  actor        User?       @relation("AuditActor", fields: [actorId], references: [id])
+  targetUser   User?       @relation("AuditTargetUser", fields: [targetUserId], references: [id])
+}
+
 enum Role {
   EMLAKCI
   MUTEAHHIT
   INSAAT_FIRMASI
   ADMIN
+  DENETCI_ADMIN
 }
 
 enum InvitationStatus {
@@ -350,6 +386,8 @@ enum ApplicationStatus {
   REJECTED
   INVITED
   REGISTERED
+  GORUSME_PLANLANDI
+  EVRAK_BEKLENIYOR
 }
 
 enum CustomerStatus {
@@ -389,4 +427,22 @@ enum NetworkVisibility {
   SADECE_EMLAKCILAR
   SADECE_MUTEAHHITLER
   SADECE_BAGLANTILARIM
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  VIEW_USER
+  VIEW_APPLICATION
+  APPROVE_APPLICATION
+  REJECT_APPLICATION
+  UPDATE_APPLICATION_STATUS
+  UPDATE_APPLICATION_NOTE
+  UPDATE_USER_ROLE
+  UPDATE_USER_PACKAGE
+  SUSPEND_USER
+  VIEW_AUDIT_LOG
+  VIEW_SENSITIVE_DATA_ATTEMPT
+  SYSTEM_SECURITY_ACTION
+  TECHNICAL_SUPPORT_ACCESS
 }
