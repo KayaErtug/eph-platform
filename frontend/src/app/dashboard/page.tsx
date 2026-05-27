@@ -87,6 +87,11 @@ type Task = {
   customer?: Customer | null;
 };
 
+type Conversation = {
+  id: string;
+  unreadCount?: number;
+};
+
 type DashboardSummary = {
   stats: {
     totalUnits: number;
@@ -199,7 +204,10 @@ function unitType(unit: Unit) {
 }
 
 function unitLocation(unit: Unit) {
-  return [unit.project?.district, unit.project?.city].filter(Boolean).join(' / ') || 'Konum yok';
+  return (
+    [unit.project?.district, unit.project?.city].filter(Boolean).join(' / ') ||
+    'Konum yok'
+  );
 }
 
 export default function DashboardPage() {
@@ -210,6 +218,7 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [linaOpen, setLinaOpen] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   const greeting = getGreeting();
 
@@ -230,18 +239,36 @@ export default function DashboardPage() {
       return;
     }
 
-    fetchSummary();
+    fetchDashboardData();
   }, [hydrated, user]);
 
-  const fetchSummary = async () => {
+  const fetchDashboardData = async () => {
     setLoading(true);
 
     try {
-      const res = await api.get('/dashboard/summary');
-      setSummary(res.data);
+      const [summaryRes, conversationsRes] = await Promise.all([
+        api.get('/dashboard/summary'),
+        user?.id
+          ? api.get(`/conversations?userId=${user.id}`)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      setSummary(summaryRes.data);
+
+      const conversations = Array.isArray(conversationsRes.data)
+        ? (conversationsRes.data as Conversation[])
+        : [];
+
+      const unreadTotal = conversations.reduce(
+        (sum, item) => sum + (item.unreadCount || 0),
+        0
+      );
+
+      setUnreadMessages(unreadTotal);
     } catch (error) {
       console.error(error);
       setSummary(null);
+      setUnreadMessages(0);
     } finally {
       setLoading(false);
     }
@@ -277,8 +304,8 @@ export default function DashboardPage() {
       );
     }
 
-    if (stats.totalCustomers > 0) {
-      items.push(`${stats.totalCustomers} müşteri kaydını sıcak lead fırsatları için gözden geçir.`);
+    if (unreadMessages > 0) {
+      items.push(`${unreadMessages} okunmamış mesaj için hızlı dönüş yap.`);
     }
 
     if (items.length === 0) {
@@ -286,7 +313,7 @@ export default function DashboardPage() {
     }
 
     return items.slice(0, 3);
-  }, [latestUnits, latestCustomers, stats.totalCustomers]);
+  }, [latestUnits, latestCustomers, unreadMessages]);
 
   if (!hydrated || loading) {
     return (
@@ -330,7 +357,12 @@ export default function DashboardPage() {
                 onClick={() => router.push('/messages')}
                 className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm"
               >
-                <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+                {unreadMessages > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-black text-white ring-2 ring-white">
+                    {unreadMessages > 99 ? '99+' : unreadMessages}
+                  </span>
+                )}
+
                 <Bell size={19} />
               </button>
 
@@ -366,7 +398,7 @@ export default function DashboardPage() {
               </p>
 
               <p className="mt-0.5 truncate text-[12px] font-bold text-slate-500">
-                {userRole} • Çevrimiçi
+                {userRole} • {unreadMessages > 0 ? `${unreadMessages} yeni mesaj` : 'Çevrimiçi'}
               </p>
             </div>
 
@@ -402,7 +434,7 @@ export default function DashboardPage() {
             <div className="mt-5 grid grid-cols-3 gap-2">
               <MiniHeroItem label="İlan" value={String(stats.totalUnits)} />
               <MiniHeroItem label="Müşteri" value={String(stats.totalCustomers)} />
-              <MiniHeroItem label="Ziyaret" value={String(stats.totalVisits)} />
+              <MiniHeroItem label="Mesaj" value={String(unreadMessages)} />
             </div>
           </div>
 
@@ -431,10 +463,10 @@ export default function DashboardPage() {
           />
 
           <StatCard
-            icon={<LineChart size={18} />}
-            title="Proje"
-            value={String(stats.totalProjects)}
-            change="Aktif"
+            icon={<MessageCircle size={18} />}
+            title="Mesaj"
+            value={String(unreadMessages)}
+            change={unreadMessages > 0 ? 'Yeni' : 'Temiz'}
           />
         </section>
 
