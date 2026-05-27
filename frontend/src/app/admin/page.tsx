@@ -1,35 +1,43 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import api from "@/lib/api";
-import { useAuthStore } from "@/store/auth.store";
 import {
-  BadgeCheck,
+  ArrowLeft,
   BarChart3,
-  Building2,
-  CheckCircle2,
-  ClipboardCheck,
+  Bell,
+  Check,
   Crown,
   Eye,
-  FileCheck2,
   FileText,
-  Home,
-  Loader2,
-  LogOut,
-  MessageCircle,
+  Mail,
+  PackageCheck,
+  Plus,
   RefreshCw,
   ShieldCheck,
   Sparkles,
-  Star,
-  UserPlus,
+  Trash2,
+  UserCheck,
+  UserCog,
   UsersRound,
-  WalletCards,
-  XCircle,
+  X,
 } from "lucide-react";
+import api from "@/lib/api";
+import { useAuthStore } from "@/store/auth.store";
 
-type Stats = {
+type TabKey =
+  | "overview"
+  | "users"
+  | "applications"
+  | "documents"
+  | "nominations"
+  | "leads"
+  | "stock"
+  | "trust"
+  | "visits";
+
+interface Stats {
   totalUsers: number;
   pendingUsers: number;
   approvedUsers: number;
@@ -38,9 +46,9 @@ type Stats = {
   pendingNominations: number;
   pendingApplications: number;
   byRole: { role: string; count: number }[];
-};
+}
 
-type AdminUser = {
+interface UserItem {
   id: string;
   firstName: string;
   lastName: string;
@@ -49,22 +57,10 @@ type AdminUser = {
   profileImageUrl?: string | null;
   role: string;
   isApproved: boolean;
-  isVerified?: boolean;
-  nominationPoints?: number;
-  nominationQuota?: number;
-  referralCode?: string | null;
-  createdAt?: string;
-  documents: {
-    id: string;
-    type: string;
-    status: string;
-    fileUrl: string;
-    fileName: string;
-    createdAt?: string;
-  }[];
-};
+  documents?: { id: string; type: string; status: string; fileUrl: string; fileName: string }[];
+}
 
-type DocumentItem = {
+interface DocumentItem {
   id: string;
   type: string;
   status: string;
@@ -72,24 +68,23 @@ type DocumentItem = {
   fileName: string;
   createdAt?: string;
   user?: {
-    id?: string;
     firstName: string;
     lastName: string;
     email: string;
     profileImageUrl?: string | null;
     role: string;
   };
-};
+}
 
-type Nomination = {
+interface NominationItem {
   id: string;
   candidateName: string;
   candidateEmail: string;
   candidatePhone: string;
   candidateRole: string;
-  note?: string | null;
+  note?: string;
   status: string;
-  adminNote?: string | null;
+  adminNote?: string;
   createdAt: string;
   nominator: {
     firstName: string;
@@ -98,18 +93,18 @@ type Nomination = {
     profileImageUrl?: string | null;
     role: string;
   };
-};
+}
 
-type Application = {
+interface ApplicationItem {
   id: string;
   applicantName: string;
   applicantEmail: string;
   applicantPhone: string;
   requestedRole: string;
-  message?: string | null;
-  referralCode?: string | null;
+  message?: string;
+  referralCode?: string;
   status: string;
-  adminNote?: string | null;
+  adminNote?: string;
   createdAt: string;
   referrer?: {
     firstName: string;
@@ -117,29 +112,29 @@ type Application = {
     email: string;
     profileImageUrl?: string | null;
     role: string;
-  } | null;
-};
+  };
+}
 
-type Lead = {
+interface LeadItem {
   id: string;
-  fullName?: string | null;
-  phone?: string | null;
-  email?: string | null;
-  profession?: string | null;
-  city?: string | null;
-  interest?: string | null;
-  conversation?: string | null;
+  fullName?: string;
+  phone?: string;
+  email?: string;
+  profession?: string;
+  city?: string;
+  interest?: string;
+  conversation?: string;
   source: string;
   createdAt: string;
-};
+}
 
-type StokUnit = {
+interface UnitItem {
   id: string;
   type: string;
-  floor?: number | null;
+  floor?: number;
   number: string;
-  roomCount?: string | null;
-  area?: number | null;
+  roomCount?: string;
+  area?: number;
   price: number;
   status: string;
   isVerified: boolean;
@@ -147,16 +142,16 @@ type StokUnit = {
   tapuVerified: boolean;
   photoVerified: boolean;
   yetkiVerified: boolean;
-  project?: {
+  project: {
     id: string;
     name: string;
     city: string;
     district: string;
-    owner?: { firstName: string; lastName: string };
-  } | null;
-};
+    owner: { firstName: string; lastName: string };
+  };
+}
 
-type TrustEntry = {
+interface TrustItem {
   id: string;
   firstName: string;
   lastName: string;
@@ -165,30 +160,7 @@ type TrustEntry = {
   score: number;
   badge: string;
   badgeColor: string;
-};
-
-type Visit = {
-  id: string;
-  page: string;
-  ip?: string | null;
-  createdAt: string;
-  user?: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    profileImageUrl?: string | null;
-  } | null;
-};
-
-type TabKey =
-  | "users"
-  | "documents"
-  | "nominations"
-  | "applications"
-  | "leads"
-  | "stock"
-  | "trust"
-  | "visits";
+}
 
 const ROLE_LABELS: Record<string, string> = {
   EMLAKCI: "Emlakçı",
@@ -196,6 +168,16 @@ const ROLE_LABELS: Record<string, string> = {
   INSAAT_FIRMASI: "İnşaat Firması",
   ADMIN: "Admin",
   DENETCI_ADMIN: "Denetçi Admin",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: "Bekliyor",
+  APPROVED: "Onaylandı",
+  REJECTED: "Reddedildi",
+  INVITED: "Davet Gönderildi",
+  REGISTERED: "Kayıt Oldu",
+  GORUSME_PLANLANDI: "Görüşme Planlandı",
+  EVRAK_BEKLENIYOR: "Evrak Bekleniyor",
 };
 
 const DOC_LABELS: Record<string, string> = {
@@ -210,16 +192,6 @@ const DOC_LABELS: Record<string, string> = {
   IS_BITIRME_BELGESI: "İş Bitirme Belgesi",
   YAMBIS_BELGESI: "YAMBİS Belgesi",
   REFERANS_PROJE: "Referans Proje",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: "Bekliyor",
-  APPROVED: "Onaylandı",
-  REJECTED: "Reddedildi",
-  INVITED: "Davet Gönderildi",
-  REGISTERED: "Kayıt Oldu",
-  GORUSME_PLANLANDI: "Görüşme Planlandı",
-  EVRAK_BEKLENIYOR: "Evrak Bekleniyor",
 };
 
 const UNIT_STATUS_LABELS: Record<string, string> = {
@@ -247,36 +219,8 @@ const TYPE_LABELS: Record<string, string> = {
   DUKKAN_MAGAZA: "Dükkan/Mağaza",
 };
 
-function roleLabel(role?: string) {
-  return ROLE_LABELS[role || ""] || role || "EPH Üyesi";
-}
-
-function statusLabel(status?: string) {
-  return STATUS_LABELS[status || ""] || status || "Bekliyor";
-}
-
-function statusClass(status?: string) {
-  if (status === "APPROVED" || status === "REGISTERED") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-
-  if (status === "REJECTED") {
-    return "border-red-200 bg-red-50 text-red-700";
-  }
-
-  if (status === "INVITED") {
-    return "border-blue-200 bg-blue-50 text-blue-700";
-  }
-
-  if (status === "GORUSME_PLANLANDI" || status === "EVRAK_BEKLENIYOR") {
-    return "border-purple-200 bg-purple-50 text-purple-700";
-  }
-
-  return "border-amber-200 bg-amber-50 text-amber-700";
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "Tarih yok";
+function fmt(value?: string) {
+  if (!value) return "—";
   return new Date(value).toLocaleString("tr-TR", {
     day: "2-digit",
     month: "short",
@@ -286,113 +230,141 @@ function formatDate(value?: string | null) {
   });
 }
 
-function money(value?: number | null) {
-  if (!value) return "—";
-  return `${value.toLocaleString("tr-TR")} ₺`;
+function initials(firstName?: string, lastName?: string) {
+  return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase() || "EP";
 }
 
-function getInitials(firstName?: string | null, lastName?: string | null) {
-  const first = firstName?.trim()?.[0] || "E";
-  const last = lastName?.trim()?.[0] || "P";
-  return `${first}${last}`.toUpperCase();
+function roleClass(role: string) {
+  if (role === "ADMIN" || role === "DENETCI_ADMIN") return "border-[#D7B56D]/50 bg-[#FFF8E7] text-[#8A671F]";
+  if (role === "MUTEAHHIT" || role === "INSAAT_FIRMASI") return "border-indigo-200 bg-indigo-50 text-indigo-700";
+  return "border-slate-200 bg-slate-50 text-slate-600";
+}
+
+function statusClass(status: string) {
+  if (status === "APPROVED" || status === "REGISTERED") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (status === "REJECTED") return "border-rose-200 bg-rose-50 text-rose-700";
+  if (status === "INVITED") return "border-blue-200 bg-blue-50 text-blue-700";
+  if (status === "GORUSME_PLANLANDI") return "border-purple-200 bg-purple-50 text-purple-700";
+  return "border-amber-200 bg-amber-50 text-amber-700";
 }
 
 function Avatar({
   firstName,
   lastName,
   imageUrl,
-  tone = "navy",
+  big = false,
 }: {
-  firstName?: string | null;
-  lastName?: string | null;
+  firstName?: string;
+  lastName?: string;
   imageUrl?: string | null;
-  tone?: "navy" | "warm" | "rose";
+  big?: boolean;
 }) {
-  const bg =
-    tone === "rose"
-      ? "from-[#3D1A1A] to-[#7F1D1D] text-rose-100"
-      : tone === "warm"
-        ? "from-[#F8FAFC] to-[#EEF2FF] text-[#0B1F44]"
-        : "from-[#0B1F44] to-[#1D4ED8] text-white";
-
   return (
-    <div
-      className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[18px] border border-[#C9A84C]/25 bg-gradient-to-br ${bg} text-[16px] font-black shadow-lg shadow-slate-900/10`}
-    >
+    <div className={`${big ? "h-16 w-16 text-xl" : "h-12 w-12 text-base"} shrink-0 overflow-hidden rounded-2xl border border-white/80 bg-gradient-to-br from-[#0D2137] to-[#1B3D63] shadow-lg`}>
       {imageUrl ? (
-        <img
-          src={imageUrl}
-          alt={`${firstName || "EPH"} ${lastName || "Üyesi"}`}
-          className="h-full w-full object-cover"
-        />
+        <img src={imageUrl} alt={`${firstName || ""} ${lastName || ""}`} className="h-full w-full object-cover" />
       ) : (
-        getInitials(firstName, lastName)
+        <div className="flex h-full w-full items-center justify-center font-black text-[#F7DFA3]">
+          {initials(firstName, lastName)}
+        </div>
       )}
     </div>
   );
 }
 
-function Badge({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] ${className}`}
-    >
-      {children}
-    </span>
-  );
+function Pill({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black ${className}`}>{children}</span>;
 }
 
-function PrimaryButton({
+function Button({
   children,
   onClick,
   disabled,
-  danger,
-  ghost,
+  variant = "navy",
+  icon,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
-  danger?: boolean;
-  ghost?: boolean;
+  variant?: "navy" | "gold" | "ghost" | "danger" | "success";
+  icon?: ReactNode;
 }) {
-  const cls = danger
-    ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-    : ghost
-      ? "border-slate-200 bg-white text-slate-600 hover:border-[#0B1F44] hover:text-[#0B1F44]"
-      : "border-[#0B1F44] bg-[#0B1F44] text-white hover:bg-[#123B7A]";
-
+  const classes =
+    variant === "gold"
+      ? "bg-[#D7B56D] text-[#0D2137] hover:bg-[#c9a556]"
+      : variant === "ghost"
+        ? "border border-slate-200 bg-white text-slate-600 hover:border-[#0D2137] hover:text-[#0D2137]"
+        : variant === "danger"
+          ? "border border-rose-200 bg-white text-rose-600 hover:bg-rose-50"
+          : variant === "success"
+            ? "bg-emerald-600 text-white hover:bg-emerald-700"
+            : "bg-[#0D2137] text-white hover:bg-[#163657]";
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`rounded-2xl border px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.14em] transition disabled:cursor-not-allowed disabled:opacity-50 ${cls}`}
-    >
+    <button onClick={onClick} disabled={disabled} className={`inline-flex h-10 items-center justify-center gap-2 rounded-2xl px-4 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${classes}`}>
+      {icon}
       {children}
     </button>
   );
 }
 
-function SectionHeader({
-  title,
-  subtitle,
-  action,
-}: {
-  title: string;
-  subtitle: string;
-  action?: React.ReactNode;
-}) {
+function SectionTitle({ title, desc, action }: { title: string; desc?: string; action?: ReactNode }) {
   return (
-    <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+    <div className="mb-5 flex flex-col items-center justify-between gap-4 text-center lg:flex-row lg:text-left">
       <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#C9A84C]">
-          EPH Yönetim Merkezi
-        </p>
-        <h2 className="mt-2 text-[28px] font-black tracking-tight text-[#0B1F44]">
-          {title}
-        </h2>
-        <p className="mt-1 text-sm font-semibold text-slate-500">{subtitle}</p>
+        <h2 className="font-serif text-3xl font-semibold tracking-tight text-[#0D2137]">{title}</h2>
+        {desc && <p className="mt-1 text-sm font-medium text-slate-500">{desc}</p>}
       </div>
       {action}
+    </div>
+  );
+}
+
+function Empty({ children }: { children: ReactNode }) {
+  return <div className="rounded-[32px] border border-dashed border-slate-200 bg-white/70 p-12 text-center font-serif text-xl italic text-slate-400">{children}</div>;
+}
+
+function FilterBar({ value, setValue, items }: { value: string; setValue: (v: string) => void; items: { value: string; label: string }[] }) {
+  return (
+    <div className="mb-5 flex flex-wrap justify-center gap-2 lg:justify-start">
+      {items.map((item) => (
+        <button
+          key={item.value}
+          onClick={() => setValue(item.value)}
+          className={`rounded-full border px-4 py-2 text-xs font-black transition ${
+            value === item.value ? "border-[#0D2137] bg-[#0D2137] text-white" : "border-white bg-white/75 text-slate-500 hover:text-[#0D2137]"
+          }`}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Modal({ title, desc, children, onClose }: { title: string; desc?: string; children: ReactNode; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0D2137]/70 p-4 backdrop-blur-md" onClick={onClose}>
+      <section className="w-full max-w-xl rounded-[32px] border border-white/80 bg-[#F8F3EA] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="font-serif text-3xl font-semibold text-[#0D2137]">{title}</h3>
+            {desc && <p className="mt-1 text-sm font-semibold text-slate-500">{desc}</p>}
+          </div>
+          <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-500">
+            <X size={18} />
+          </button>
+        </div>
+        {children}
+      </section>
+    </div>
+  );
+}
+
+function Input({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
+  return (
+    <div>
+      <label className="mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-500">{label}</label>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="h-12 w-full rounded-3xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-[#D7B56D]" />
     </div>
   );
 }
@@ -401,105 +373,71 @@ export default function AdminPage() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
 
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [nominations, setNominations] = useState<Nomination[]>([]);
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [allUnits, setAllUnits] = useState<StokUnit[]>([]);
-  const [trustList, setTrustList] = useState<TrustEntry[]>([]);
-  const [visits, setVisits] = useState<Visit[]>([]);
+  const [hydrated, setHydrated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [verifyLoading, setVerifyLoading] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<TabKey>("users");
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [users, setUsers] = useState<UserItem[]>([]);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [nominations, setNominations] = useState<NominationItem[]>([]);
+  const [applications, setApplications] = useState<ApplicationItem[]>([]);
+  const [leads, setLeads] = useState<LeadItem[]>([]);
+  const [units, setUnits] = useState<UnitItem[]>([]);
+  const [trust, setTrust] = useState<TrustItem[]>([]);
+  const [visits, setVisits] = useState<any[]>([]);
+
+  const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [userFilter, setUserFilter] = useState("all");
   const [docFilter, setDocFilter] = useState("all");
   const [nomFilter, setNomFilter] = useState("all");
   const [appFilter, setAppFilter] = useState("all");
 
-  const [loading, setLoading] = useState(true);
-  const [hydrated, setHydrated] = useState(false);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [verifyLoading, setVerifyLoading] = useState<string | null>(null);
-
-  const [noteModal, setNoteModal] = useState<{
-    type: "nomination" | "application";
-    id: string;
-  } | null>(null);
+  const [noteModal, setNoteModal] = useState<{ type: "nomination" | "application"; id: string } | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [roleModal, setRoleModal] = useState<{ id: string; role: string } | null>(null);
+  const [newRole, setNewRole] = useState("");
+  const [createUserModal, setCreateUserModal] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({ firstName: "", lastName: "", email: "", phone: "", password: "", role: "EMLAKCI" });
+  const [now, setNow] = useState(new Date());
+  const [createUserError, setCreateUserError] = useState("");
+  const [createUserLoading, setCreateUserLoading] = useState(false);
   const [expandedLead, setExpandedLead] = useState<string | null>(null);
 
-  const [roleModal, setRoleModal] = useState<{
-    id: string;
-    currentRole: string;
-  } | null>(null);
-  const [newRole, setNewRole] = useState("");
-
-  const [createUserModal, setCreateUserModal] = useState(false);
-  const [createUserLoading, setCreateUserLoading] = useState(false);
-  const [createUserError, setCreateUserError] = useState("");
-  const [createUserForm, setCreateUserForm] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    password: "",
-    role: "EMLAKCI",
-  });
-
-  const tabs = useMemo(
-    () => [
-      { key: "users" as const, label: "Kullanıcılar", badge: null },
-      { key: "documents" as const, label: "Belgeler", badge: stats?.pendingDocuments },
-      { key: "nominations" as const, label: "Tavsiyeler", badge: stats?.pendingNominations },
-      { key: "applications" as const, label: "Başvurular", badge: stats?.pendingApplications },
-      { key: "leads" as const, label: "Lina Leads", badge: leads.length },
-      { key: "stock" as const, label: "Stok Doğrulama", badge: null },
-      { key: "trust" as const, label: "Güven Skorları", badge: null },
-      { key: "visits" as const, label: "Ziyaretler", badge: null },
-    ],
-    [stats, leads.length],
-  );
-
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  useEffect(() => setHydrated(true), []);
 
   useEffect(() => {
     if (!hydrated) return;
-
     if (!user) {
       router.push("/giris");
       return;
     }
-
     if (user.role !== "ADMIN") {
       router.push("/dashboard");
       return;
     }
-
     fetchAll();
   }, [hydrated, user]);
 
   useEffect(() => {
-    if (hydrated && user) fetchUsers(userFilter);
+    if (hydrated && user?.role === "ADMIN") fetchUsers(userFilter);
   }, [userFilter]);
 
   useEffect(() => {
-    if (hydrated && user) fetchDocuments(docFilter);
+    if (hydrated && user?.role === "ADMIN") fetchDocuments(docFilter);
   }, [docFilter]);
 
   useEffect(() => {
-    if (hydrated && user) fetchNominations(nomFilter);
+    if (hydrated && user?.role === "ADMIN") fetchNominations(nomFilter);
   }, [nomFilter]);
 
   useEffect(() => {
-    if (hydrated && user) fetchApplications(appFilter);
+    if (hydrated && user?.role === "ADMIN") fetchApplications(appFilter);
   }, [appFilter]);
 
   const fetchAll = async () => {
     setLoading(true);
-
     try {
       const [s, u, d, n, a, l, st] = await Promise.all([
         api.get("/admin/stats"),
@@ -510,67 +448,38 @@ export default function AdminPage() {
         api.get("/leads"),
         api.get("/units"),
       ]);
-
       setStats(s.data);
-      setUsers(Array.isArray(u.data) ? u.data : []);
-      setDocuments(Array.isArray(d.data) ? d.data : []);
-      setNominations(Array.isArray(n.data) ? n.data : []);
-      setApplications(Array.isArray(a.data) ? a.data : []);
-      setLeads(Array.isArray(l.data) ? l.data : []);
-      setAllUnits(Array.isArray(st.data) ? st.data : []);
+      setUsers(u.data || []);
+      setDocuments(d.data || []);
+      setNominations(n.data || []);
+      setApplications(a.data || []);
+      setLeads(l.data || []);
+      setUnits(st.data || []);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchStats = async () => {
-    const res = await api.get("/admin/stats");
-    setStats(res.data);
-  };
-
-  const fetchUsers = async (filter = "all") => {
-    const res = await api.get(`/admin/users?filter=${filter}`);
-    setUsers(Array.isArray(res.data) ? res.data : []);
-  };
-
-  const fetchDocuments = async (filter = "all") => {
-    const res = await api.get(`/admin/documents?filter=${filter}`);
-    setDocuments(Array.isArray(res.data) ? res.data : []);
-  };
-
-  const fetchNominations = async (filter = "all") => {
-    const res = await api.get(`/admin/nominations?status=${filter}`);
-    setNominations(Array.isArray(res.data) ? res.data : []);
-  };
-
-  const fetchApplications = async (filter = "all") => {
-    const res = await api.get(`/admin/applications?status=${filter}`);
-    setApplications(Array.isArray(res.data) ? res.data : []);
-  };
-
-  const fetchLeads = async () => {
-    const res = await api.get("/leads");
-    setLeads(Array.isArray(res.data) ? res.data : []);
-  };
-
-  const fetchUnits = async () => {
-    const res = await api.get("/units");
-    setAllUnits(Array.isArray(res.data) ? res.data : []);
-  };
-
-  const fetchTrust = async () => {
-    const res = await api.get("/trust/leaderboard");
-    setTrustList(Array.isArray(res.data) ? res.data : []);
-  };
+  const fetchStats = async () => setStats((await api.get("/admin/stats")).data);
+  const fetchUsers = async (f = "all") => setUsers((await api.get(`/admin/users?filter=${f}`)).data || []);
+  const fetchDocuments = async (f = "all") => setDocuments((await api.get(`/admin/documents?filter=${f}`)).data || []);
+  const fetchNominations = async (f = "all") => setNominations((await api.get(`/admin/nominations?status=${f}`)).data || []);
+  const fetchApplications = async (f = "all") => setApplications((await api.get(`/admin/applications?status=${f}`)).data || []);
+  const fetchLeads = async () => setLeads((await api.get("/leads")).data || []);
+  const fetchUnits = async () => setUnits((await api.get("/units")).data || []);
+  const fetchTrust = async () => setTrust((await api.get("/trust/leaderboard")).data || []);
 
   const fetchVisits = async () => {
-    const res = await api.get("/visits");
-    setVisits(Array.isArray(res.data) ? res.data : []);
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/visits`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    setVisits(Array.isArray(data) ? data : []);
   };
 
-  const act = async (id: string, fn: () => Promise<void>) => {
+  const act = async (id: string, fn: () => Promise<any>) => {
     setActionLoading(id);
-
     try {
       await fn();
     } finally {
@@ -578,1338 +487,772 @@ export default function AdminPage() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    router.push("/giris");
+  const refreshCurrentTab = async () => {
+    if (activeTab === "overview") await fetchAll();
+    if (activeTab === "users") await fetchUsers(userFilter);
+    if (activeTab === "applications") await fetchApplications(appFilter);
+    if (activeTab === "documents") await fetchDocuments(docFilter);
+    if (activeTab === "nominations") await fetchNominations(nomFilter);
+    if (activeTab === "leads") await fetchLeads();
+    if (activeTab === "stock") await fetchUnits();
+    if (activeTab === "trust") await fetchTrust();
+    if (activeTab === "visits") await fetchVisits();
+    await fetchStats();
   };
 
-  const handleTab = (key: TabKey) => {
-    setActiveTab(key);
-    if (key === "leads") fetchLeads();
-    if (key === "stock") fetchUnits();
-    if (key === "trust") fetchTrust();
-    if (key === "visits") fetchVisits();
+  const updateApplication = async (id: string, status: string, adminNote?: string) => {
+    await api.patch(`/admin/applications/${id}/status`, { status, adminNote });
+    await Promise.all([fetchApplications(appFilter), fetchStats()]);
+  };
+
+  const updateNomination = async (id: string, status: string, adminNote?: string) => {
+    await api.patch(`/admin/nominations/${id}/status`, { status, adminNote });
+    await Promise.all([fetchNominations(nomFilter), fetchStats()]);
   };
 
   const handleVerify = async (id: string, field: string, current: boolean) => {
-    const unit = allUnits.find((item) => item.id === id);
-    if (!unit) return;
-
-    setVerifyLoading(`${id}-${field}`);
-
+    setVerifyLoading(id + field);
     try {
+      const unit = units.find((item) => item.id === id);
+      if (!unit) return;
       await api.patch(`/units/${id}/verify`, {
         tapuVerified: field === "tapu" ? !current : unit.tapuVerified,
         photoVerified: field === "photo" ? !current : unit.photoVerified,
         yetkiVerified: field === "yetki" ? !current : unit.yetkiVerified,
         isOffMarket: field === "offmarket" ? !current : unit.isOffMarket,
       });
-
       await fetchUnits();
     } finally {
       setVerifyLoading(null);
     }
   };
 
-  const saveNote = async () => {
-    if (!noteModal) return;
-
-    await act(noteModal.id, async () => {
-      if (noteModal.type === "nomination") {
-        const current = nominations.find((item) => item.id === noteModal.id);
-        await api.patch(`/admin/nominations/${noteModal.id}/status`, {
-          status: current?.status,
-          adminNote: noteText,
-        });
-        await fetchNominations(nomFilter);
-      } else {
-        const current = applications.find((item) => item.id === noteModal.id);
-        await api.patch(`/admin/applications/${noteModal.id}/status`, {
-          status: current?.status,
-          adminNote: noteText,
-        });
-        await fetchApplications(appFilter);
-      }
-
-      setNoteModal(null);
-      setNoteText("");
-    });
-  };
-
-  const createUser = async () => {
-    if (
-      !createUserForm.firstName ||
-      !createUserForm.lastName ||
-      !createUserForm.email ||
-      !createUserForm.phone ||
-      !createUserForm.password
-    ) {
-      setCreateUserError("Tüm alanlar zorunludur.");
-      return;
-    }
-
-    setCreateUserLoading(true);
-    setCreateUserError("");
-
-    try {
-      await api.post("/admin/users", createUserForm);
-      setCreateUserModal(false);
-      setCreateUserForm({
-        firstName: "",
-        lastName: "",
-        email: "",
-        phone: "",
-        password: "",
-        role: "EMLAKCI",
-      });
-      await Promise.all([fetchUsers(userFilter), fetchStats()]);
-    } catch (error: any) {
-      setCreateUserError(error?.response?.data?.message || "Bir hata oluştu.");
-    } finally {
-      setCreateUserLoading(false);
-    }
-  };
+  const tabs: { key: TabKey; label: string; icon: ReactNode; badge?: number | null; onEnter?: () => void }[] = [
+    { key: "overview", label: "Özet", icon: <Crown size={17} /> },
+    { key: "users", label: "Kullanıcılar", icon: <UsersRound size={17} />, badge: stats?.pendingUsers },
+    { key: "applications", label: "Başvurular", icon: <Mail size={17} />, badge: stats?.pendingApplications },
+    { key: "documents", label: "Belgeler", icon: <FileText size={17} />, badge: stats?.pendingDocuments },
+    { key: "nominations", label: "Tavsiyeler", icon: <UserCheck size={17} />, badge: stats?.pendingNominations },
+    { key: "leads", label: "Lina Leads", icon: <Sparkles size={17} />, badge: leads.length, onEnter: fetchLeads },
+    { key: "stock", label: "Stok", icon: <PackageCheck size={17} />, onEnter: fetchUnits },
+    { key: "trust", label: "Güven", icon: <ShieldCheck size={17} />, onEnter: fetchTrust },
+    { key: "visits", label: "Ziyaretler", icon: <BarChart3 size={17} />, onEnter: fetchVisits },
+  ];
 
   if (!hydrated || loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#FAFAF8]">
-        <div className="flex flex-col items-center gap-4 text-[#0B1F44]">
-          <Loader2 className="animate-spin" size={34} />
-          <p className="text-sm font-black">Admin paneli yükleniyor...</p>
+      <main className="flex min-h-screen items-center justify-center bg-[#F5F1E8]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 animate-spin rounded-full border-2 border-[#D7B56D] border-t-transparent" />
+          <p className="text-sm font-black tracking-[0.25em] text-[#0D2137]">EPH ADMIN</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#FAFAF8] text-[#111827]">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#0B1F44_0%,#07111F_42%,#020617_100%)] text-[#0D2137]">
       {noteModal && (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-[#0B1F44]/70 p-5 backdrop-blur"
-          onClick={() => {
+        <Modal
+          title="Admin Notu"
+          desc="Bu not sadece yönetim panelinde görünür."
+          onClose={() => {
             setNoteModal(null);
             setNoteText("");
           }}
         >
-          <div
-            className="w-full max-w-lg rounded-[32px] bg-white p-7 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h3 className="text-[28px] font-black text-[#0B1F44]">Admin Notu</h3>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
-              Bu not sadece admin panelinde görünür.
-            </p>
-
-            <textarea
-              className="mt-5 min-h-32 w-full rounded-[22px] border border-slate-200 bg-[#F8FAFC] p-4 text-sm font-semibold outline-none focus:border-[#0B1F44]"
-              value={noteText}
-              onChange={(event) => setNoteText(event.target.value)}
-              placeholder="Notunuzu yazın..."
-            />
-
-            <div className="mt-5 flex gap-3">
-              <PrimaryButton onClick={saveNote} disabled={actionLoading === noteModal.id}>
-                {actionLoading === noteModal.id ? "Kaydediliyor..." : "Kaydet"}
-              </PrimaryButton>
-              <PrimaryButton
-                ghost
-                onClick={() => {
+          <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={5} placeholder="Notunuzu yazın..." className="w-full resize-none rounded-3xl border border-slate-200 bg-white/80 p-4 text-sm font-semibold outline-none focus:border-[#D7B56D]" />
+          <div className="mt-5 flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => { setNoteModal(null); setNoteText(""); }}>Vazgeç</Button>
+            <Button
+              disabled={actionLoading === noteModal.id}
+              icon={<Check size={15} />}
+              onClick={() =>
+                act(noteModal.id, async () => {
+                  if (noteModal.type === "application") {
+                    const current = applications.find((item) => item.id === noteModal.id);
+                    await updateApplication(noteModal.id, current?.status || "PENDING", noteText);
+                  } else {
+                    const current = nominations.find((item) => item.id === noteModal.id);
+                    await updateNomination(noteModal.id, current?.status || "PENDING", noteText);
+                  }
                   setNoteModal(null);
                   setNoteText("");
-                }}
-              >
-                İptal
-              </PrimaryButton>
-            </div>
+                })
+              }
+            >
+              Kaydet
+            </Button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {roleModal && (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-[#0B1F44]/70 p-5 backdrop-blur"
-          onClick={() => {
-            setRoleModal(null);
-            setNewRole("");
-          }}
-        >
-          <div
-            className="w-full max-w-lg rounded-[32px] bg-white p-7 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h3 className="text-[28px] font-black text-[#0B1F44]">Rol Değiştir</h3>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
-              Üyenin platformdaki rolünü güncelle.
-            </p>
-
-            <select
-              className="mt-5 h-12 w-full rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 text-sm font-black outline-none"
-              value={newRole}
-              onChange={(event) => setNewRole(event.target.value)}
-            >
-              <option value="">Seçiniz</option>
-              <option value="EMLAKCI">Emlakçı</option>
-              <option value="MUTEAHHIT">Müteahhit</option>
-              <option value="INSAAT_FIRMASI">İnşaat Firması</option>
-              <option value="DENETCI_ADMIN">Denetçi Admin</option>
-            </select>
-
-            <div className="mt-5 flex gap-3">
-              <PrimaryButton
-                disabled={!newRole || actionLoading === roleModal.id}
-                onClick={() =>
-                  act(roleModal.id, async () => {
-                    await api.patch(`/admin/users/${roleModal.id}/role`, { role: newRole });
-                    await fetchUsers(userFilter);
-                    setRoleModal(null);
-                    setNewRole("");
-                  })
-                }
-              >
-                {actionLoading === roleModal.id ? "Değiştiriliyor..." : "Değiştir"}
-              </PrimaryButton>
-              <PrimaryButton
-                ghost
-                onClick={() => {
+        <Modal title="Rol Değiştir" desc="Kullanıcının platform rolünü güncelle." onClose={() => { setRoleModal(null); setNewRole(""); }}>
+          <label className="mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-500">Yeni Rol</label>
+          <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="h-12 w-full rounded-3xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-[#D7B56D]">
+            <option value="">Seçiniz</option>
+            <option value="EMLAKCI">Emlakçı</option>
+            <option value="MUTEAHHIT">Müteahhit</option>
+            <option value="INSAAT_FIRMASI">İnşaat Firması</option>
+          </select>
+          <div className="mt-5 flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => { setRoleModal(null); setNewRole(""); }}>Vazgeç</Button>
+            <Button
+              disabled={!newRole || actionLoading === roleModal.id}
+              icon={<UserCog size={15} />}
+              onClick={() =>
+                act(roleModal.id, async () => {
+                  await api.patch(`/admin/users/${roleModal.id}/role`, { role: newRole });
+                  await Promise.all([fetchUsers(userFilter), fetchStats()]);
                   setRoleModal(null);
                   setNewRole("");
-                }}
-              >
-                İptal
-              </PrimaryButton>
-            </div>
+                })
+              }
+            >
+              Güncelle
+            </Button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {createUserModal && (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-[#0B1F44]/70 p-5 backdrop-blur"
-          onClick={() => {
-            setCreateUserModal(false);
-            setCreateUserError("");
-          }}
-        >
-          <div
-            className="w-full max-w-xl rounded-[32px] bg-white p-7 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h3 className="text-[28px] font-black text-[#0B1F44]">Yeni Üye</h3>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
-              Manuel olarak platforma üye ekle.
-            </p>
-
-            <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <input
-                className="premium-admin-input"
-                placeholder="Ad"
-                value={createUserForm.firstName}
-                onChange={(event) =>
-                  setCreateUserForm((form) => ({ ...form, firstName: event.target.value }))
-                }
-              />
-              <input
-                className="premium-admin-input"
-                placeholder="Soyad"
-                value={createUserForm.lastName}
-                onChange={(event) =>
-                  setCreateUserForm((form) => ({ ...form, lastName: event.target.value }))
-                }
-              />
-              <input
-                className="premium-admin-input"
-                placeholder="E-posta"
-                type="email"
-                value={createUserForm.email}
-                onChange={(event) =>
-                  setCreateUserForm((form) => ({ ...form, email: event.target.value }))
-                }
-              />
-              <input
-                className="premium-admin-input"
-                placeholder="Telefon"
-                value={createUserForm.phone}
-                onChange={(event) =>
-                  setCreateUserForm((form) => ({ ...form, phone: event.target.value }))
-                }
-              />
-              <input
-                className="premium-admin-input"
-                placeholder="Şifre"
-                type="password"
-                value={createUserForm.password}
-                onChange={(event) =>
-                  setCreateUserForm((form) => ({ ...form, password: event.target.value }))
-                }
-              />
-              <select
-                className="premium-admin-input"
-                value={createUserForm.role}
-                onChange={(event) =>
-                  setCreateUserForm((form) => ({ ...form, role: event.target.value }))
-                }
-              >
+        <Modal title="Yeni Üye Ekle" desc="Manuel olarak onaylı kullanıcı oluştur." onClose={() => { setCreateUserModal(false); setCreateUserError(""); }}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input label="Ad" value={createUserForm.firstName} onChange={(v) => setCreateUserForm((c) => ({ ...c, firstName: v }))} />
+            <Input label="Soyad" value={createUserForm.lastName} onChange={(v) => setCreateUserForm((c) => ({ ...c, lastName: v }))} />
+          </div>
+          <div className="mt-4 grid gap-4">
+            <Input label="E-posta" type="email" value={createUserForm.email} onChange={(v) => setCreateUserForm((c) => ({ ...c, email: v }))} />
+            <Input label="Telefon" value={createUserForm.phone} onChange={(v) => setCreateUserForm((c) => ({ ...c, phone: v }))} />
+            <Input label="Şifre" type="password" value={createUserForm.password} onChange={(v) => setCreateUserForm((c) => ({ ...c, password: v }))} />
+            <div>
+              <label className="mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-500">Rol</label>
+              <select value={createUserForm.role} onChange={(e) => setCreateUserForm((c) => ({ ...c, role: e.target.value }))} className="h-12 w-full rounded-3xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-[#D7B56D]">
                 <option value="EMLAKCI">Emlakçı</option>
                 <option value="MUTEAHHIT">Müteahhit</option>
                 <option value="INSAAT_FIRMASI">İnşaat Firması</option>
                 <option value="ADMIN">Admin</option>
-                <option value="DENETCI_ADMIN">Denetçi Admin</option>
               </select>
             </div>
-
-            {createUserError && (
-              <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-black text-red-600">
-                {createUserError}
-              </p>
-            )}
-
-            <div className="mt-5 flex gap-3">
-              <PrimaryButton onClick={createUser} disabled={createUserLoading}>
-                {createUserLoading ? "Ekleniyor..." : "Üye Ekle"}
-              </PrimaryButton>
-              <PrimaryButton ghost onClick={() => setCreateUserModal(false)}>
-                İptal
-              </PrimaryButton>
-            </div>
           </div>
-        </div>
+          {createUserError && <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700">{createUserError}</p>}
+          <div className="mt-5 flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => { setCreateUserModal(false); setCreateUserError(""); }}>Vazgeç</Button>
+            <Button
+              disabled={createUserLoading}
+              icon={<Plus size={15} />}
+              onClick={async () => {
+                if (!createUserForm.firstName || !createUserForm.lastName || !createUserForm.email || !createUserForm.phone || !createUserForm.password) {
+                  setCreateUserError("Tüm alanlar zorunludur.");
+                  return;
+                }
+                setCreateUserLoading(true);
+                setCreateUserError("");
+                try {
+                  await api.post("/admin/users", createUserForm);
+                  setCreateUserModal(false);
+                  setCreateUserForm({ firstName: "", lastName: "", email: "", phone: "", password: "", role: "EMLAKCI" });
+                  await Promise.all([fetchUsers(userFilter), fetchStats()]);
+                } catch (error: any) {
+                  setCreateUserError(error?.response?.data?.message || "Bir hata oluştu.");
+                } finally {
+                  setCreateUserLoading(false);
+                }
+              }}
+            >
+              Üye Ekle
+            </Button>
+          </div>
+        </Modal>
       )}
 
-      <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-          <Link href="/dashboard" className="flex items-center gap-3 no-underline">
-            <img src="/LOGO_EPH.png" alt="EPH" className="h-10 w-10 rounded-2xl object-contain" />
-            <div>
-              <p className="text-lg font-black text-[#0B1F44]">EPH Platform</p>
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#C9A84C]">
-                Admin Merkezi
-              </p>
-            </div>
-          </Link>
+      <header className="sticky top-0 z-40 border-b border-cyan-300/15 bg-[#050B1A]/90 backdrop-blur-2xl">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center justify-between gap-4">
+            <button
+              onClick={() => router.back()}
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/25 bg-white/5 text-cyan-100 shadow-lg shadow-cyan-500/10 transition hover:border-[#D7B56D]/60 hover:text-[#F7DFA3]"
+              title="Geri Dön"
+            >
+              <ArrowLeft size={19} />
+            </button>
+            <Link href="/dashboard" className="flex items-center gap-3">
+              <div className="relative">
+                <div className="absolute inset-0 rounded-2xl bg-cyan-400/30 blur-xl" />
+                <img src="/LOGO_EPH.png" alt="EPH" className="relative h-11 w-11 object-contain" />
+              </div>
+              <div>
+                <p className="font-serif text-xl font-semibold text-white">EPH Platform</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#D7B56D]">Command Center</p>
+              </div>
+            </Link>
+          </div>
 
-          <div className="hidden items-center gap-2 lg:flex">
+          <nav className="flex flex-wrap items-center justify-center gap-2">
             {[
-              ["/dashboard", "Ana Sayfa"],
-              ["/profil", "Profilim"],
-              ["/stok", "Stok"],
-              ["/crm", "CRM"],
-              ["/market", "Piyasa"],
-              ["/admin", "Admin"],
-            ].map(([href, label]) => (
+              { href: "/dashboard", label: "Ana Sayfa" },
+              { href: "/network", label: "Network" },
+              { href: "/stok", label: "Stok" },
+              { href: "/crm", label: "CRM" },
+              { href: "/market", label: "Piyasa" },
+              { href: "/profil", label: "Profil" },
+            ].map((item) => (
               <Link
-                key={href}
-                href={href}
-                className={`rounded-2xl px-4 py-2 text-xs font-black uppercase tracking-[0.16em] no-underline transition ${
-                  href === "/admin"
-                    ? "bg-[#0B1F44] text-white"
-                    : "text-slate-500 hover:bg-slate-100 hover:text-[#0B1F44]"
-                }`}
+                key={item.href}
+                href={item.href}
+                className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-slate-300 shadow-sm transition hover:border-cyan-300/30 hover:bg-cyan-300/10 hover:text-white"
               >
-                {label}
+                {item.label}
               </Link>
             ))}
-          </div>
-
-          <button
-            onClick={handleLogout}
-            className="inline-flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-red-600"
-          >
-            <LogOut size={15} />
-            Çıkış
-          </button>
+            <button
+              onClick={() => { logout(); router.push("/giris"); }}
+              className="rounded-full border border-rose-400/25 bg-rose-500/10 px-4 py-2 text-xs font-black text-rose-200 shadow-sm transition hover:bg-rose-500/20"
+            >
+              Çıkış
+            </button>
+          </nav>
         </div>
-      </nav>
+      </header>
 
       <section className="mx-auto max-w-7xl px-5 py-8">
-        <header className="mb-8 overflow-hidden rounded-[36px] bg-gradient-to-br from-[#0B1F44] via-[#123B7A] to-[#1D4ED8] p-8 text-white shadow-2xl shadow-[#1D4ED8]/20">
-          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-blue-100">
-                <Crown size={16} />
-                Yönetim Paneli
+        <div className="relative overflow-hidden rounded-[42px] border border-cyan-300/20 bg-[#061126] shadow-2xl shadow-cyan-950/40">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(34,211,238,0.26),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(215,181,109,0.22),transparent_26%),radial-gradient(circle_at_50%_95%,rgba(29,78,216,0.30),transparent_38%)]" />
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/70 to-transparent" />
+          <div className="absolute left-8 top-8 h-28 w-28 rounded-full border border-cyan-300/10" />
+          <div className="absolute bottom-8 right-8 h-40 w-40 rounded-full border border-[#D7B56D]/10" />
+
+          <div className="relative z-10 grid gap-6 p-6 text-white lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
+            <div className="rounded-[34px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-xl">
+              <div className="mb-6 flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-cyan-100">
+                  <Crown size={16} />
+                  EPH Cockpit
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" />
+                  Sistem Aktif
+                </span>
               </div>
-              <h1 className="mt-5 text-[42px] font-black leading-tight tracking-tight md:text-[56px]">
-                EPH Operasyon
-                <span className="block text-[#C9A84C]">Merkezi</span>
+
+              <h1 className="font-serif text-4xl font-semibold leading-tight md:text-6xl">
+                Uzay Gemisi
+                <span className="block bg-gradient-to-r from-[#F7DFA3] via-cyan-100 to-white bg-clip-text text-transparent">
+                  Yönetim Kokpiti
+                </span>
               </h1>
-              <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-white/70">
-                Üye, belge, başvuru, stok, ziyaret ve güven skoru yönetimini tek merkezden takip et.
+              <p className="mt-4 max-w-2xl text-sm font-medium leading-7 text-slate-300">
+                Üye kabulü, belge doğrulama, başvuru denetimi, stok güvenliği ve platform trafiği tek komuta ekranında izlenir.
               </p>
+
+              <div className="mt-7 grid gap-3 sm:grid-cols-3">
+                <CockpitMini title="Görev Modu" value="Güvenli" icon={<ShieldCheck size={18} />} />
+                <CockpitMini title="Canlı Saat" value={now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} icon={<Bell size={18} />} />
+                <CockpitMini title="Tarih" value={now.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })} icon={<Sparkles size={18} />} />
+              </div>
+
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <Button variant="gold" icon={<Plus size={15} />} onClick={() => setCreateUserModal(true)}>Yeni Üye Ekle</Button>
+                <Button variant="ghost" icon={<RefreshCw size={15} />} onClick={refreshCurrentTab}>Verileri Yenile</Button>
+              </div>
             </div>
 
-            <button
-              onClick={() => setCreateUserModal(true)}
-              className="inline-flex h-13 items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 text-sm font-black text-[#0B1F44] shadow-xl transition hover:scale-[1.02]"
-            >
-              <UserPlus size={18} />
-              Yeni Üye Ekle
-            </button>
+            <div className="grid gap-4">
+              <div className="rounded-[34px] border border-white/10 bg-black/20 p-5 backdrop-blur-xl">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/80">Operasyon Radarı</p>
+                    <h2 className="mt-2 text-2xl font-black text-white">Öncelikli Sinyaller</h2>
+                  </div>
+                  <div className="flex h-14 w-14 items-center justify-center rounded-[22px] border border-[#D7B56D]/25 bg-[#D7B56D]/10 text-[#F7DFA3]">
+                    <BarChart3 size={25} />
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-3">
+                  <CockpitSignal label="Bekleyen Başvuru" value={stats?.pendingApplications || 0} tone="gold" />
+                  <CockpitSignal label="Bekleyen Belge" value={stats?.pendingDocuments || 0} tone="cyan" />
+                  <CockpitSignal label="Onay Bekleyen Üye" value={stats?.pendingUsers || 0} tone="rose" />
+                </div>
+              </div>
+
+              <div className="rounded-[34px] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#D7B56D]">Komuta Notu</p>
+                <p className="mt-3 text-sm font-semibold leading-7 text-slate-300">
+                  Özel müşteri ve görev verileri kullanıcı bazlı izole edilir. Admin paneli operasyonu yönetir; mahrem veriler yetki kuralına göre korunur.
+                </p>
+              </div>
+            </div>
           </div>
-        </header>
+        </div>
 
         {stats && (
-          <section className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
-            <StatCard title="Toplam Üye" value={stats.totalUsers} icon={<UsersRound size={20} />} />
-            <StatCard title="Onay Bekleyen" value={stats.pendingUsers} icon={<ClipboardCheck size={20} />} warning />
-            <StatCard title="Onaylanan" value={stats.approvedUsers} icon={<BadgeCheck size={20} />} success />
-            <StatCard title="Davet Kodu" value={stats.totalInvitations} icon={<Sparkles size={20} />} gold />
-            <StatCard title="Bekleyen Belge" value={stats.pendingDocuments} icon={<FileText size={20} />} warning />
-            <StatCard title="Bekleyen Tavsiye" value={stats.pendingNominations} icon={<Star size={20} />} warning />
-            <StatCard title="Bekleyen Başvuru" value={stats.pendingApplications} icon={<MessageCircle size={20} />} warning />
-          </section>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+            <Metric title="Toplam Üye" value={stats.totalUsers} icon={<UsersRound size={20} />} />
+            <Metric title="Bekleyen Üye" value={stats.pendingUsers} icon={<Bell size={20} />} tone="amber" />
+            <Metric title="Onaylanan" value={stats.approvedUsers} icon={<UserCheck size={20} />} tone="green" />
+            <Metric title="Davet Kodu" value={stats.totalInvitations} icon={<Mail size={20} />} tone="gold" />
+            <Metric title="Bekleyen Belge" value={stats.pendingDocuments} icon={<FileText size={20} />} tone="amber" />
+            <Metric title="Tavsiyeler" value={stats.pendingNominations} icon={<UserCheck size={20} />} tone="amber" />
+            <Metric title="Başvurular" value={stats.pendingApplications} icon={<BarChart3 size={20} />} tone="amber" />
+          </div>
         )}
 
         {stats && stats.byRole.length > 0 && (
-          <section className="mb-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="mb-3 text-xs font-black uppercase tracking-[0.22em] text-slate-400">
-              Rol Dağılımı
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {stats.byRole.map((item) => (
-                <Badge key={item.role} className="border-slate-200 bg-[#F8FAFC] text-[#0B1F44]">
-                  {roleLabel(item.role)}: {item.count}
-                </Badge>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section className="mb-7 overflow-x-auto border-b border-slate-200">
-          <div className="flex min-w-max gap-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => handleTab(tab.key)}
-                className={`relative rounded-t-2xl px-5 py-4 text-xs font-black uppercase tracking-[0.18em] transition ${
-                  activeTab === tab.key
-                    ? "bg-white text-[#0B1F44] shadow-sm"
-                    : "text-slate-500 hover:bg-white/70 hover:text-[#0B1F44]"
-                }`}
-              >
-                {tab.label}
-                {!!tab.badge && tab.badge > 0 && (
-                  <span className="ml-2 rounded-full bg-[#C9A84C] px-2 py-0.5 text-[10px] text-[#0B1F44]">
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 rounded-[28px] border border-white/70 bg-white/75 p-4 shadow-sm">
+            <span className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Rol Dağılımı</span>
+            {stats.byRole.map((item) => (
+              <Pill key={item.role} className={roleClass(item.role)}>{ROLE_LABELS[item.role] || item.role}: {item.count}</Pill>
             ))}
           </div>
-        </section>
-
-        {activeTab === "users" && (
-          <UsersTab
-            users={users}
-            userFilter={userFilter}
-            setUserFilter={setUserFilter}
-            actionLoading={actionLoading}
-            act={act}
-            fetchUsers={() => fetchUsers(userFilter)}
-            fetchStats={fetchStats}
-            setRoleModal={setRoleModal}
-            setNewRole={setNewRole}
-          />
         )}
 
-        {activeTab === "documents" && (
-          <DocumentsTab
-            documents={documents}
-            docFilter={docFilter}
-            setDocFilter={setDocFilter}
-            actionLoading={actionLoading}
-            act={act}
-            fetchDocuments={() => fetchDocuments(docFilter)}
-            fetchStats={fetchStats}
-          />
-        )}
+        <div className="mt-6 flex gap-2 overflow-x-auto rounded-[28px] border border-white/70 bg-white/70 p-2 shadow-sm">
+          {tabs.map((tab) => {
+            const active = activeTab === tab.key;
+            const badge = tab.badge || 0;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => { setActiveTab(tab.key); tab.onEnter?.(); }}
+                className={`relative flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-xs font-black transition-all ${active ? "bg-[#0D2137] text-white shadow-lg shadow-slate-300" : "text-slate-500 hover:bg-white hover:text-[#0D2137]"}`}
+              >
+                {tab.icon}
+                {tab.label}
+                {badge > 0 && <span className="ml-1 rounded-full bg-[#D7B56D] px-2 py-0.5 text-[10px] text-[#0D2137]">{badge}</span>}
+              </button>
+            );
+          })}
+        </div>
 
-        {activeTab === "nominations" && (
-          <NominationsTab
-            nominations={nominations}
-            nomFilter={nomFilter}
-            setNomFilter={setNomFilter}
-            actionLoading={actionLoading}
-            act={act}
-            fetchNominations={() => fetchNominations(nomFilter)}
-            fetchStats={fetchStats}
-            setNoteModal={setNoteModal}
-            setNoteText={setNoteText}
-          />
-        )}
+        <div className="mt-7">
+          {activeTab === "overview" && (
+            <Overview users={users} applications={applications} documents={documents} setActiveTab={setActiveTab} />
+          )}
 
-        {activeTab === "applications" && (
-          <ApplicationsTab
-            applications={applications}
-            appFilter={appFilter}
-            setAppFilter={setAppFilter}
-            actionLoading={actionLoading}
-            act={act}
-            fetchApplications={() => fetchApplications(appFilter)}
-            fetchStats={fetchStats}
-            setNoteModal={setNoteModal}
-            setNoteText={setNoteText}
-          />
-        )}
+          {activeTab === "users" && (
+            <UsersTab
+              users={users}
+              filter={userFilter}
+              setFilter={setUserFilter}
+              actionLoading={actionLoading}
+              onApprove={(id) => act(id, async () => { await api.patch(`/admin/users/${id}/approve`); await Promise.all([fetchUsers(userFilter), fetchStats()]); })}
+              onSuspend={(id) => act(id, async () => { await api.patch(`/admin/users/${id}/suspend`); await Promise.all([fetchUsers(userFilter), fetchStats()]); })}
+              onDelete={(id) => act(id, async () => { await api.delete(`/admin/users/${id}/reject`); await Promise.all([fetchUsers(userFilter), fetchStats()]); })}
+              onRole={(item) => { setRoleModal({ id: item.id, role: item.role }); setNewRole(item.role); }}
+            />
+          )}
 
-        {activeTab === "leads" && (
-          <LeadsTab
-            leads={leads}
-            fetchLeads={fetchLeads}
-            expandedLead={expandedLead}
-            setExpandedLead={setExpandedLead}
-          />
-        )}
+          {activeTab === "applications" && (
+            <ApplicationsTab
+              applications={applications}
+              filter={appFilter}
+              setFilter={setAppFilter}
+              actionLoading={actionLoading}
+              onNote={(item) => { setNoteModal({ type: "application", id: item.id }); setNoteText(item.adminNote || ""); }}
+              onStatus={(id, status) => act(id, () => updateApplication(id, status))}
+            />
+          )}
 
-        {activeTab === "stock" && (
-          <StockTab
-            units={allUnits}
-            fetchUnits={fetchUnits}
-            verifyLoading={verifyLoading}
-            handleVerify={handleVerify}
-          />
-        )}
+          {activeTab === "documents" && (
+            <DocumentsTab
+              documents={documents}
+              filter={docFilter}
+              setFilter={setDocFilter}
+              actionLoading={actionLoading}
+              onApprove={(id) => act(id, async () => { await api.patch(`/admin/documents/${id}/approve`); await Promise.all([fetchDocuments(docFilter), fetchStats()]); })}
+              onReject={(id) => act(id, async () => { await api.patch(`/admin/documents/${id}/reject`); await Promise.all([fetchDocuments(docFilter), fetchStats()]); })}
+            />
+          )}
 
-        {activeTab === "trust" && <TrustTab trustList={trustList} fetchTrust={fetchTrust} />}
+          {activeTab === "nominations" && (
+            <NominationsTab
+              nominations={nominations}
+              filter={nomFilter}
+              setFilter={setNomFilter}
+              actionLoading={actionLoading}
+              onNote={(item) => { setNoteModal({ type: "nomination", id: item.id }); setNoteText(item.adminNote || ""); }}
+              onStatus={(id, status) => act(id, () => updateNomination(id, status))}
+            />
+          )}
 
-        {activeTab === "visits" && <VisitsTab visits={visits} fetchVisits={fetchVisits} />}
+          {activeTab === "leads" && (
+            <LeadsTab leads={leads} expandedLead={expandedLead} setExpandedLead={setExpandedLead} onRefresh={fetchLeads} />
+          )}
+
+          {activeTab === "stock" && (
+            <StockTab units={units} verifyLoading={verifyLoading} handleVerify={handleVerify} onRefresh={fetchUnits} />
+          )}
+
+          {activeTab === "trust" && <TrustTab trust={trust} onRefresh={fetchTrust} />}
+
+          {activeTab === "visits" && <VisitsTab visits={visits} onRefresh={fetchVisits} />}
+        </div>
       </section>
-
-      <style jsx global>{`
-        .premium-admin-input {
-          width: 100%;
-          height: 48px;
-          border-radius: 18px;
-          border: 1px solid #e2e8f0;
-          background: #f8fafc;
-          padding: 0 14px;
-          font-size: 14px;
-          font-weight: 700;
-          color: #0b1f44;
-          outline: none;
-        }
-
-        .premium-admin-input:focus {
-          border-color: #1d4ed8;
-          background: #ffffff;
-          box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.08);
-        }
-      `}</style>
     </main>
   );
 }
 
-function StatCard({
-  title,
-  value,
-  icon,
-  warning,
-  success,
-  gold,
-}: {
-  title: string;
-  value: number;
-  icon: React.ReactNode;
-  warning?: boolean;
-  success?: boolean;
-  gold?: boolean;
-}) {
-  const color = warning
-    ? "text-amber-600 bg-amber-50"
-    : success
-      ? "text-emerald-600 bg-emerald-50"
-      : gold
-        ? "text-[#C9A84C] bg-[#FFF8E1]"
-        : "text-[#1D4ED8] bg-[#EEF4FF]";
 
+function CockpitMini({ title, value, icon }: { title: string; value: string; icon: ReactNode }) {
   return (
-    <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
-      <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ${color}`}>
+    <div className="rounded-[24px] border border-cyan-300/15 bg-white/[0.07] p-4 backdrop-blur">
+      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-2xl bg-cyan-300/10 text-cyan-100">
         {icon}
       </div>
-      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-        {title}
-      </p>
-      <p className="mt-2 text-[32px] font-black leading-none text-[#0B1F44]">{value}</p>
+      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">{title}</p>
+      <p className="mt-1 text-lg font-black text-white">{value}</p>
     </div>
   );
 }
 
-function FilterBar({
-  items,
-  value,
-  onChange,
-}: {
-  items: [string, string][];
-  value: string;
-  onChange: (value: string) => void;
-}) {
+function CockpitSignal({ label, value, tone }: { label: string; value: number; tone: "gold" | "cyan" | "rose" }) {
+  const toneClass =
+    tone === "gold"
+      ? "from-[#D7B56D] to-amber-300 text-[#0D2137]"
+      : tone === "rose"
+        ? "from-rose-400 to-red-500 text-white"
+        : "from-cyan-300 to-blue-400 text-[#061126]";
+
   return (
-    <div className="mb-5 flex flex-wrap gap-2">
-      {items.map(([key, label]) => (
-        <button
-          key={key}
-          onClick={() => onChange(key)}
-          className={`rounded-2xl border px-4 py-2 text-xs font-black uppercase tracking-[0.16em] transition ${
-            value === key
-              ? "border-[#0B1F44] bg-[#0B1F44] text-white"
-              : "border-slate-200 bg-white text-slate-500 hover:border-[#0B1F44] hover:text-[#0B1F44]"
-          }`}
-        >
-          {label}
-        </button>
-      ))}
+    <div className="flex items-center justify-between rounded-[22px] border border-white/10 bg-white/[0.06] p-4">
+      <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-300">{label}</span>
+      <span className={`rounded-2xl bg-gradient-to-r px-4 py-2 text-lg font-black ${toneClass}`}>{value}</span>
     </div>
   );
 }
 
-function EmptyState({ text }: { text: string }) {
+function Metric({ title, value, icon, tone = "navy" }: { title: string; value: number; icon: ReactNode; tone?: "navy" | "gold" | "green" | "amber" }) {
+  const toneClass = tone === "gold" ? "bg-[#FFF8E7] text-[#8A671F]" : tone === "green" ? "bg-emerald-50 text-emerald-700" : tone === "amber" ? "bg-amber-50 text-amber-700" : "bg-[#EEF4FF] text-[#0D2137]";
   return (
-    <div className="rounded-[30px] border border-dashed border-slate-300 bg-white/70 p-12 text-center">
-      <p className="text-lg font-black text-slate-500">{text}</p>
+    <div className="rounded-[28px] border border-white/70 bg-white/80 p-5 shadow-sm">
+      <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ${toneClass}`}>{icon}</div>
+      <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">{title}</p>
+      <p className="mt-2 font-serif text-4xl font-semibold text-[#0D2137]">{value}</p>
     </div>
   );
 }
 
-function UsersTab({
-  users,
-  userFilter,
-  setUserFilter,
-  actionLoading,
-  act,
-  fetchUsers,
-  fetchStats,
-  setRoleModal,
-  setNewRole,
-}: {
-  users: AdminUser[];
-  userFilter: string;
-  setUserFilter: (value: string) => void;
-  actionLoading: string | null;
-  act: (id: string, fn: () => Promise<void>) => Promise<void>;
-  fetchUsers: () => Promise<void>;
-  fetchStats: () => Promise<void>;
-  setRoleModal: (value: { id: string; currentRole: string } | null) => void;
-  setNewRole: (value: string) => void;
-}) {
+function Overview({ users, applications, documents, setActiveTab }: { users: UserItem[]; applications: ApplicationItem[]; documents: DocumentItem[]; setActiveTab: (tab: TabKey) => void }) {
+  const cards = [
+    { title: "Bekleyen Üye", value: users.filter((u) => !u.isApproved).length, tab: "users" as TabKey, icon: <UsersRound size={22} /> },
+    { title: "Bekleyen Başvuru", value: applications.filter((a) => a.status === "PENDING").length, tab: "applications" as TabKey, icon: <Mail size={22} /> },
+    { title: "Belge İncelemesi", value: documents.filter((d) => d.status === "PENDING").length, tab: "documents" as TabKey, icon: <FileText size={22} /> },
+  ];
+
   return (
-    <section>
-      <SectionHeader
-        title="Kullanıcılar"
-        subtitle="Platform üyelerini, onay durumlarını ve rollerini yönet."
-      />
-      <FilterBar
-        value={userFilter}
-        onChange={setUserFilter}
-        items={[
-          ["all", "Tümü"],
-          ["pending", "Bekleyen"],
-          ["approved", "Onaylanan"],
-        ]}
-      />
-
-      {users.length === 0 ? (
-        <EmptyState text="Kullanıcı bulunamadı." />
-      ) : (
-        <div className="space-y-3">
-          {users.map((item) => (
-            <article
-              key={item.id}
-              className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
-            >
-              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                <div className="flex min-w-0 items-center gap-4">
-                  <Avatar
-                    firstName={item.firstName}
-                    lastName={item.lastName}
-                    imageUrl={item.profileImageUrl}
-                  />
-                  <div className="min-w-0">
-                    <h3 className="truncate text-lg font-black text-[#0B1F44]">
-                      {item.firstName} {item.lastName}
-                    </h3>
-                    <p className="truncate text-sm font-semibold text-slate-500">{item.email}</p>
-                    <p className="mt-1 text-xs font-bold text-slate-400">{item.phone}</p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="border-slate-200 bg-[#F8FAFC] text-[#0B1F44]">
-                    {roleLabel(item.role)}
-                  </Badge>
-                  {item.documents?.length > 0 && (
-                    <Badge className="border-blue-200 bg-blue-50 text-blue-700">
-                      {item.documents.length} Belge
-                    </Badge>
-                  )}
-                  <Badge
-                    className={
-                      item.isApproved
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                        : "border-amber-200 bg-amber-50 text-amber-700"
-                    }
-                  >
-                    {item.isApproved ? "Onaylı" : "Bekliyor"}
-                  </Badge>
-
-                  {!item.isApproved ? (
-                    <PrimaryButton
-                      disabled={actionLoading === item.id}
-                      onClick={() =>
-                        act(item.id, async () => {
-                          await api.patch(`/admin/users/${item.id}/approve`);
-                          await Promise.all([fetchUsers(), fetchStats()]);
-                        })
-                      }
-                    >
-                      {actionLoading === item.id ? "..." : "Onayla"}
-                    </PrimaryButton>
-                  ) : (
-                    item.role !== "ADMIN" && (
-                      <PrimaryButton
-                        ghost
-                        disabled={actionLoading === item.id}
-                        onClick={() => {
-                          if (!confirm("Kullanıcı askıya alınacak. Emin misiniz?")) return;
-                          act(item.id, async () => {
-                            await api.patch(`/admin/users/${item.id}/suspend`);
-                            await Promise.all([fetchUsers(), fetchStats()]);
-                          });
-                        }}
-                      >
-                        Askıya Al
-                      </PrimaryButton>
-                    )
-                  )}
-
-                  {item.role !== "ADMIN" && (
-                    <PrimaryButton
-                      ghost
-                      onClick={() => {
-                        setRoleModal({ id: item.id, currentRole: item.role });
-                        setNewRole(item.role);
-                      }}
-                    >
-                      Rol Değiştir
-                    </PrimaryButton>
-                  )}
-
-                  {item.role !== "ADMIN" && (
-                    <PrimaryButton
-                      danger
-                      disabled={actionLoading === item.id}
-                      onClick={() => {
-                        if (!confirm("Kullanıcı silinecek. Emin misiniz?")) return;
-                        act(item.id, async () => {
-                          await api.delete(`/admin/users/${item.id}/reject`);
-                          await Promise.all([fetchUsers(), fetchStats()]);
-                        });
-                      }}
-                    >
-                      Sil
-                    </PrimaryButton>
-                  )}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function DocumentsTab({
-  documents,
-  docFilter,
-  setDocFilter,
-  actionLoading,
-  act,
-  fetchDocuments,
-  fetchStats,
-}: {
-  documents: DocumentItem[];
-  docFilter: string;
-  setDocFilter: (value: string) => void;
-  actionLoading: string | null;
-  act: (id: string, fn: () => Promise<void>) => Promise<void>;
-  fetchDocuments: () => Promise<void>;
-  fetchStats: () => Promise<void>;
-}) {
-  return (
-    <section>
-      <SectionHeader title="Belgeler" subtitle="Mesleki belgeleri incele, onayla veya reddet." />
-      <FilterBar
-        value={docFilter}
-        onChange={setDocFilter}
-        items={[
-          ["all", "Tümü"],
-          ["pending", "Bekleyen"],
-          ["approved", "Onaylanan"],
-          ["rejected", "Reddedilen"],
-        ]}
-      />
-
-      {documents.length === 0 ? (
-        <EmptyState text="Belge bulunamadı." />
-      ) : (
-        <div className="space-y-3">
-          {documents.map((item) => (
-            <article key={item.id} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                <div className="flex min-w-0 items-center gap-4">
-                  {item.user ? (
-                    <Avatar
-                      firstName={item.user.firstName}
-                      lastName={item.user.lastName}
-                      imageUrl={item.user.profileImageUrl}
-                      tone="warm"
-                    />
-                  ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#EEF4FF] text-[#1D4ED8]">
-                      <FileText size={22} />
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <h3 className="truncate text-lg font-black text-[#0B1F44]">
-                      {DOC_LABELS[item.type] || item.type}
-                    </h3>
-                    <p className="truncate text-sm font-semibold text-slate-500">{item.fileName}</p>
-                    {item.user && (
-                      <p className="mt-1 text-xs font-bold text-slate-400">
-                        {item.user.firstName} {item.user.lastName} · {roleLabel(item.user.role)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className={statusClass(item.status)}>{statusLabel(item.status)}</Badge>
-                  <a
-                    href={item.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 no-underline transition hover:border-[#0B1F44] hover:text-[#0B1F44]"
-                  >
-                    Görüntüle
-                  </a>
-                  {item.status === "PENDING" && (
-                    <>
-                      <PrimaryButton
-                        disabled={actionLoading === item.id}
-                        onClick={() =>
-                          act(item.id, async () => {
-                            await api.patch(`/admin/documents/${item.id}/approve`);
-                            await Promise.all([fetchDocuments(), fetchStats()]);
-                          })
-                        }
-                      >
-                        Onayla
-                      </PrimaryButton>
-                      <PrimaryButton
-                        danger
-                        disabled={actionLoading === item.id}
-                        onClick={() =>
-                          act(item.id, async () => {
-                            await api.patch(`/admin/documents/${item.id}/reject`);
-                            await Promise.all([fetchDocuments(), fetchStats()]);
-                          })
-                        }
-                      >
-                        Reddet
-                      </PrimaryButton>
-                    </>
-                  )}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function NominationsTab({
-  nominations,
-  nomFilter,
-  setNomFilter,
-  actionLoading,
-  act,
-  fetchNominations,
-  fetchStats,
-  setNoteModal,
-  setNoteText,
-}: {
-  nominations: Nomination[];
-  nomFilter: string;
-  setNomFilter: (value: string) => void;
-  actionLoading: string | null;
-  act: (id: string, fn: () => Promise<void>) => Promise<void>;
-  fetchNominations: () => Promise<void>;
-  fetchStats: () => Promise<void>;
-  setNoteModal: (value: { type: "nomination" | "application"; id: string } | null) => void;
-  setNoteText: (value: string) => void;
-}) {
-  return (
-    <section>
-      <SectionHeader title="Tavsiyeler" subtitle="Üye tavsiyelerini değerlendir ve süreci yönet." />
-      <FilterBar
-        value={nomFilter}
-        onChange={setNomFilter}
-        items={[
-          ["all", "Tümü"],
-          ["PENDING", "Bekliyor"],
-          ["APPROVED", "Onaylandı"],
-          ["REJECTED", "Reddedildi"],
-          ["INVITED", "Davet Gönderildi"],
-          ["REGISTERED", "Kayıt Oldu"],
-        ]}
-      />
-
-      {nominations.length === 0 ? (
-        <EmptyState text="Tavsiye bulunamadı." />
-      ) : (
-        <div className="space-y-3">
-          {nominations.map((item) => (
-            <article key={item.id} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-                <div className="flex min-w-0 items-start gap-4">
-                  <Avatar
-                    firstName={item.nominator?.firstName || item.candidateName}
-                    lastName={item.nominator?.lastName || ""}
-                    imageUrl={item.nominator?.profileImageUrl}
-                  />
-                  <div className="min-w-0">
-                    <h3 className="truncate text-lg font-black text-[#0B1F44]">{item.candidateName}</h3>
-                    <p className="truncate text-sm font-semibold text-slate-500">
-                      {item.candidateEmail} · {item.candidatePhone}
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge className="border-slate-200 bg-[#F8FAFC] text-[#0B1F44]">
-                        {roleLabel(item.candidateRole)}
-                      </Badge>
-                      <Badge className={statusClass(item.status)}>{statusLabel(item.status)}</Badge>
-                    </div>
-                    {item.note && (
-                      <p className="mt-3 rounded-2xl bg-[#F8FAFC] p-3 text-sm font-semibold italic text-slate-500">
-                        “{item.note}”
-                      </p>
-                    )}
-                    {item.adminNote && (
-                      <p className="mt-2 text-sm font-black text-[#B8860B]">📝 {item.adminNote}</p>
-                    )}
-                    <p className="mt-2 text-xs font-bold text-slate-400">
-                      Öneren: {item.nominator.firstName} {item.nominator.lastName} · {formatDate(item.createdAt)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <PrimaryButton
-                    ghost
-                    onClick={() => {
-                      setNoteModal({ type: "nomination", id: item.id });
-                      setNoteText(item.adminNote || "");
-                    }}
-                  >
-                    Not
-                  </PrimaryButton>
-                  {item.status === "PENDING" && (
-                    <>
-                      <PrimaryButton
-                        disabled={actionLoading === item.id}
-                        onClick={() =>
-                          act(item.id, async () => {
-                            await api.patch(`/admin/nominations/${item.id}/status`, { status: "APPROVED" });
-                            await Promise.all([fetchNominations(), fetchStats()]);
-                          })
-                        }
-                      >
-                        Onayla
-                      </PrimaryButton>
-                      <PrimaryButton
-                        danger
-                        disabled={actionLoading === item.id}
-                        onClick={() =>
-                          act(item.id, async () => {
-                            await api.patch(`/admin/nominations/${item.id}/status`, { status: "REJECTED" });
-                            await Promise.all([fetchNominations(), fetchStats()]);
-                          })
-                        }
-                      >
-                        Reddet
-                      </PrimaryButton>
-                    </>
-                  )}
-                  {item.status === "APPROVED" && (
-                    <PrimaryButton
-                      disabled={actionLoading === item.id}
-                      onClick={() =>
-                        act(item.id, async () => {
-                          await api.patch(`/admin/nominations/${item.id}/status`, { status: "INVITED" });
-                          await Promise.all([fetchNominations(), fetchStats()]);
-                        })
-                      }
-                    >
-                      Davet Gönderildi
-                    </PrimaryButton>
-                  )}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function ApplicationsTab({
-  applications,
-  appFilter,
-  setAppFilter,
-  actionLoading,
-  act,
-  fetchApplications,
-  fetchStats,
-  setNoteModal,
-  setNoteText,
-}: {
-  applications: Application[];
-  appFilter: string;
-  setAppFilter: (value: string) => void;
-  actionLoading: string | null;
-  act: (id: string, fn: () => Promise<void>) => Promise<void>;
-  fetchApplications: () => Promise<void>;
-  fetchStats: () => Promise<void>;
-  setNoteModal: (value: { type: "nomination" | "application"; id: string } | null) => void;
-  setNoteText: (value: string) => void;
-}) {
-  return (
-    <section>
-      <SectionHeader title="Başvurular" subtitle="Yeni üyelik başvurularını değerlendir ve davet sürecini yönet." />
-      <FilterBar
-        value={appFilter}
-        onChange={setAppFilter}
-        items={[
-          ["all", "Tümü"],
-          ["PENDING", "Bekliyor"],
-          ["APPROVED", "Onaylandı"],
-          ["REJECTED", "Reddedildi"],
-          ["INVITED", "Davet Gönderildi"],
-          ["REGISTERED", "Kayıt Oldu"],
-          ["GORUSME_PLANLANDI", "Görüşme Planlandı"],
-          ["EVRAK_BEKLENIYOR", "Evrak Bekleniyor"],
-        ]}
-      />
-
-      {applications.length === 0 ? (
-        <EmptyState text="Başvuru bulunamadı." />
-      ) : (
-        <div className="space-y-3">
-          {applications.map((item) => (
-            <article key={item.id} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-                <div className="flex min-w-0 items-start gap-4">
-                  <Avatar firstName={item.applicantName} lastName="" tone="rose" />
-                  <div className="min-w-0">
-                    <h3 className="truncate text-lg font-black text-[#0B1F44]">{item.applicantName}</h3>
-                    <p className="truncate text-sm font-semibold text-slate-500">
-                      {item.applicantEmail} · {item.applicantPhone}
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge className="border-slate-200 bg-[#F8FAFC] text-[#0B1F44]">
-                        {roleLabel(item.requestedRole)}
-                      </Badge>
-                      <Badge className={statusClass(item.status)}>{statusLabel(item.status)}</Badge>
-                      {item.referrer && (
-                        <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
-                          Referanslı
-                        </Badge>
-                      )}
-                    </div>
-                    {item.message && (
-                      <p className="mt-3 rounded-2xl bg-[#F8FAFC] p-3 text-sm font-semibold italic text-slate-500">
-                        “{item.message}”
-                      </p>
-                    )}
-                    {item.adminNote && (
-                      <p className="mt-2 text-sm font-black text-[#B8860B]">📝 {item.adminNote}</p>
-                    )}
-                    {item.referrer && (
-                      <div className="mt-3 flex items-center gap-2 rounded-2xl bg-emerald-50 p-2">
-                        <Avatar
-                          firstName={item.referrer.firstName}
-                          lastName={item.referrer.lastName}
-                          imageUrl={item.referrer.profileImageUrl}
-                        />
-                        <p className="text-xs font-black text-emerald-700">
-                          Referans: {item.referrer.firstName} {item.referrer.lastName}
-                        </p>
-                      </div>
-                    )}
-                    <p className="mt-2 text-xs font-bold text-slate-400">{formatDate(item.createdAt)}</p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <PrimaryButton
-                    ghost
-                    onClick={() => {
-                      setNoteModal({ type: "application", id: item.id });
-                      setNoteText(item.adminNote || "");
-                    }}
-                  >
-                    Not
-                  </PrimaryButton>
-                  {item.status === "PENDING" && (
-                    <>
-                      <PrimaryButton
-                        disabled={actionLoading === item.id}
-                        onClick={() =>
-                          act(item.id, async () => {
-                            await api.patch(`/admin/applications/${item.id}/status`, { status: "APPROVED" });
-                            await Promise.all([fetchApplications(), fetchStats()]);
-                          })
-                        }
-                      >
-                        Onayla
-                      </PrimaryButton>
-                      <PrimaryButton
-                        danger
-                        disabled={actionLoading === item.id}
-                        onClick={() =>
-                          act(item.id, async () => {
-                            await api.patch(`/admin/applications/${item.id}/status`, { status: "REJECTED" });
-                            await Promise.all([fetchApplications(), fetchStats()]);
-                          })
-                        }
-                      >
-                        Reddet
-                      </PrimaryButton>
-                      <PrimaryButton
-                        ghost
-                        disabled={actionLoading === item.id}
-                        onClick={() =>
-                          act(item.id, async () => {
-                            await api.patch(`/admin/applications/${item.id}/status`, { status: "GORUSME_PLANLANDI" });
-                            await Promise.all([fetchApplications(), fetchStats()]);
-                          })
-                        }
-                      >
-                        Görüşme
-                      </PrimaryButton>
-                      <PrimaryButton
-                        ghost
-                        disabled={actionLoading === item.id}
-                        onClick={() =>
-                          act(item.id, async () => {
-                            await api.patch(`/admin/applications/${item.id}/status`, { status: "EVRAK_BEKLENIYOR" });
-                            await Promise.all([fetchApplications(), fetchStats()]);
-                          })
-                        }
-                      >
-                        Evrak
-                      </PrimaryButton>
-                    </>
-                  )}
-                  {item.status === "APPROVED" && (
-                    <PrimaryButton
-                      disabled={actionLoading === item.id}
-                      onClick={() =>
-                        act(item.id, async () => {
-                          await api.patch(`/admin/applications/${item.id}/status`, { status: "INVITED" });
-                          await Promise.all([fetchApplications(), fetchStats()]);
-                        })
-                      }
-                    >
-                      Davet Gönderildi
-                    </PrimaryButton>
-                  )}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function LeadsTab({
-  leads,
-  fetchLeads,
-  expandedLead,
-  setExpandedLead,
-}: {
-  leads: Lead[];
-  fetchLeads: () => Promise<void>;
-  expandedLead: string | null;
-  setExpandedLead: (value: string | null) => void;
-}) {
-  return (
-    <section>
-      <SectionHeader
-        title="Lina Leads"
-        subtitle="Lina AI üzerinden gelen aday ve görüşmeleri takip et."
-        action={
-          <PrimaryButton ghost onClick={fetchLeads}>
-            <span className="inline-flex items-center gap-2">
-              <RefreshCw size={14} /> Yenile
-            </span>
-          </PrimaryButton>
-        }
-      />
-
-      {leads.length === 0 ? (
-        <EmptyState text="Henüz Lina'dan lead gelmedi." />
-      ) : (
-        <div className="space-y-3">
-          {leads.map((item) => (
-            <article key={item.id} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start gap-4">
-                <Avatar firstName={item.fullName || "?"} lastName="" tone="rose" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-lg font-black text-[#0B1F44]">{item.fullName || "İsimsiz"}</h3>
-                    <Badge className="border-rose-200 bg-rose-50 text-rose-700">Lina</Badge>
-                  </div>
-                  <div className="mt-2 grid gap-2 text-sm font-semibold text-slate-500 md:grid-cols-2">
-                    {item.phone && <span>📞 {item.phone}</span>}
-                    {item.email && <span>✉️ {item.email}</span>}
-                    {item.profession && <span>💼 {item.profession}</span>}
-                    {item.city && <span>📍 {item.city}</span>}
-                    {item.interest && <span className="md:col-span-2">🎯 {item.interest}</span>}
-                  </div>
-                  <p className="mt-2 text-xs font-bold text-slate-400">{formatDate(item.createdAt)}</p>
-
-                  {item.conversation && (
-                    <>
-                      <button
-                        onClick={() => setExpandedLead(expandedLead === item.id ? null : item.id)}
-                        className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-[#C9A84C]"
-                      >
-                        {expandedLead === item.id ? "Konuşmayı Gizle" : "Konuşmayı Gör"}
-                      </button>
-                      {expandedLead === item.id && (
-                        <div className="mt-3 max-h-80 overflow-y-auto rounded-[24px] border border-slate-200 bg-[#F8FAFC] p-4">
-                          <LeadConversation conversation={item.conversation} />
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function LeadConversation({ conversation }: { conversation: string }) {
-  try {
-    const messages = JSON.parse(conversation) as { role: string; content: string }[];
-
-    return (
-      <div className="space-y-2">
-        {messages.map((message, index) => (
-          <div
-            key={`${message.role}-${index}`}
-            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm font-semibold leading-6 ${
-                message.role === "user"
-                  ? "bg-[#0B1F44] text-white"
-                  : "border border-slate-200 bg-white text-slate-600"
-              }`}
-            >
-              {message.content}
-            </div>
-          </div>
+    <div className="space-y-6">
+      <SectionTitle title="Operasyon Özeti" desc="Öncelikli yönetim işleri ve son hareketler." />
+      <div className="grid gap-4 md:grid-cols-3">
+        {cards.map((card) => (
+          <button key={card.title} onClick={() => setActiveTab(card.tab)} className="rounded-[32px] border border-white/70 bg-white/80 p-6 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0D2137] text-[#F7DFA3]">{card.icon}</div>
+            <p className="font-serif text-5xl font-semibold text-[#0D2137]">{card.value}</p>
+            <h3 className="mt-3 text-sm font-black text-[#0D2137]">{card.title}</h3>
+          </button>
         ))}
       </div>
-    );
-  } catch {
-    return <p className="text-sm font-semibold text-slate-500">{conversation}</p>;
-  }
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="rounded-[32px] border border-white/70 bg-white/80 p-6 shadow-sm">
+          <SectionTitle title="Son Kullanıcılar" />
+          <div className="space-y-3">
+            {users.slice(0, 5).map((u) => (
+              <PersonLine key={u.id} firstName={u.firstName} lastName={u.lastName} imageUrl={u.profileImageUrl} sub={u.email} right={<Pill className={u.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{u.isApproved ? "Onaylı" : "Bekliyor"}</Pill>} />
+            ))}
+          </div>
+        </div>
+        <div className="rounded-[32px] border border-white/70 bg-white/80 p-6 shadow-sm">
+          <SectionTitle title="Son Başvurular" />
+          <div className="space-y-3">
+            {applications.slice(0, 5).map((a) => (
+              <div key={a.id} className="rounded-3xl border border-slate-100 bg-[#F8F3EA] p-4">
+                <p className="font-black text-[#0D2137]">{a.applicantName}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">{a.applicantEmail}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Pill className={roleClass(a.requestedRole)}>{ROLE_LABELS[a.requestedRole] || a.requestedRole}</Pill>
+                  <Pill className={statusClass(a.status)}>{STATUS_LABELS[a.status] || a.status}</Pill>
+                </div>
+              </div>
+            ))}
+            {applications.length === 0 && <Empty>Başvuru yok.</Empty>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function StockTab({
-  units,
-  fetchUnits,
-  verifyLoading,
-  handleVerify,
-}: {
-  units: StokUnit[];
-  fetchUnits: () => Promise<void>;
-  verifyLoading: string | null;
-  handleVerify: (id: string, field: string, current: boolean) => Promise<void>;
-}) {
+function PersonLine({ firstName, lastName, imageUrl, sub, right }: { firstName?: string; lastName?: string; imageUrl?: string | null; sub?: string; right?: ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 rounded-3xl border border-slate-100 bg-white p-4">
+      <Avatar firstName={firstName} lastName={lastName} imageUrl={imageUrl} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-black text-[#0D2137]">{firstName} {lastName}</p>
+        {sub && <p className="truncate text-xs font-semibold text-slate-500">{sub}</p>}
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function UsersTab({ users, filter, setFilter, actionLoading, onApprove, onSuspend, onDelete, onRole }: { users: UserItem[]; filter: string; setFilter: (v: string) => void; actionLoading: string | null; onApprove: (id: string) => void; onSuspend: (id: string) => void; onDelete: (id: string) => void; onRole: (u: UserItem) => void }) {
   return (
     <section>
-      <SectionHeader
-        title="Stok Doğrulama"
-        subtitle={`${units.length} birim · ${units.filter((item) => item.isVerified).length} doğrulanmış`}
-        action={
-          <PrimaryButton ghost onClick={fetchUnits}>
-            <span className="inline-flex items-center gap-2">
-              <RefreshCw size={14} /> Yenile
-            </span>
-          </PrimaryButton>
-        }
-      />
-
-      {units.length === 0 ? (
-        <EmptyState text="Birim bulunamadı." />
-      ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {units.map((item) => (
-            <article key={item.id} className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-xl font-black text-[#0B1F44]">{item.project?.name || "Proje"}</h3>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
-                    {item.project?.city} / {item.project?.district} · {item.project?.owner?.firstName} {item.project?.owner?.lastName}
-                  </p>
+      <SectionTitle title="Kullanıcı Yönetimi" desc="Üyelik durumları, roller ve doğrulama süreçleri." />
+      <FilterBar value={filter} setValue={setFilter} items={[{ label: "Tümü", value: "all" }, { label: "Bekleyen", value: "pending" }, { label: "Onaylanan", value: "approved" }]} />
+      {users.length === 0 ? <Empty>Kullanıcı bulunamadı.</Empty> : (
+        <div className="grid gap-4">
+          {users.map((u) => (
+            <div key={u.id} className="rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-sm">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-4">
+                  <Avatar firstName={u.firstName} lastName={u.lastName} imageUrl={u.profileImageUrl} big />
+                  <div>
+                    <h3 className="text-lg font-black text-[#0D2137]">{u.firstName} {u.lastName}</h3>
+                    <p className="text-sm font-semibold text-slate-500">{u.email}</p>
+                    <p className="text-xs font-semibold text-slate-400">{u.phone}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Pill className={roleClass(u.role)}>{ROLE_LABELS[u.role] || u.role}</Pill>
+                      <Pill className={u.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{u.isApproved ? "Onaylı" : "Bekliyor"}</Pill>
+                      {(u.documents?.length || 0) > 0 && <Pill className="border-slate-200 bg-slate-50 text-slate-600">{u.documents?.length} belge</Pill>}
+                    </div>
+                  </div>
                 </div>
-                <Badge className={item.isOffMarket ? "border-blue-200 bg-blue-50 text-blue-700" : statusClass(item.status)}>
-                  {item.isOffMarket ? "Off-Market" : UNIT_STATUS_LABELS[item.status] || item.status}
-                </Badge>
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  {!u.isApproved && <Button variant="success" disabled={actionLoading === u.id} icon={<Check size={15} />} onClick={() => onApprove(u.id)}>Onayla</Button>}
+                  {u.role !== "ADMIN" && (
+                    <>
+                      {u.isApproved && <Button variant="gold" disabled={actionLoading === u.id} onClick={() => { if (confirm("Kullanıcı askıya alınacak. Emin misiniz?")) onSuspend(u.id); }}>Askıya Al</Button>}
+                      <Button variant="ghost" icon={<UserCog size={15} />} onClick={() => onRole(u)}>Rol Değiştir</Button>
+                      <Button variant="danger" disabled={actionLoading === u.id} icon={<Trash2 size={15} />} onClick={() => { if (confirm("Kullanıcı silinecek. Emin misiniz?")) onDelete(u.id); }}>Sil</Button>
+                    </>
+                  )}
+                </div>
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
-              <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-                <MiniCell label="Tip" value={TYPE_LABELS[item.type] || item.type} />
-                <MiniCell label="No / Kat" value={`${item.number} / ${item.floor ?? "—"}`} />
-                <MiniCell label="Alan" value={item.area ? `${item.area} m²` : "—"} />
-                <MiniCell label="Fiyat" value={money(item.price)} />
+function ApplicationsTab({ applications, filter, setFilter, actionLoading, onNote, onStatus }: { applications: ApplicationItem[]; filter: string; setFilter: (v: string) => void; actionLoading: string | null; onNote: (a: ApplicationItem) => void; onStatus: (id: string, status: string) => void }) {
+  return (
+    <section>
+      <SectionTitle title="Başvuru Yönetimi" desc="Aday başvurularını değerlendir, davet sürecini yönet." />
+      <FilterBar value={filter} setValue={setFilter} items={[{ label: "Tümü", value: "all" }, { label: "Bekliyor", value: "PENDING" }, { label: "Onaylandı", value: "APPROVED" }, { label: "Reddedildi", value: "REJECTED" }, { label: "Davet", value: "INVITED" }, { label: "Kayıt Oldu", value: "REGISTERED" }]} />
+      {applications.length === 0 ? <Empty>Başvuru bulunamadı.</Empty> : (
+        <div className="grid gap-4">
+          {applications.map((a) => (
+            <div key={a.id} className="rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-sm">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex gap-4">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#3D1A1A] text-xl font-black text-[#F7B4B4]">{a.applicantName?.[0] || "A"}</div>
+                  <div>
+                    <h3 className="text-lg font-black text-[#0D2137]">{a.applicantName}</h3>
+                    <p className="text-sm font-semibold text-slate-500">{a.applicantEmail} · {a.applicantPhone}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-400">{fmt(a.createdAt)}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Pill className={roleClass(a.requestedRole)}>{ROLE_LABELS[a.requestedRole] || a.requestedRole}</Pill>
+                      <Pill className={statusClass(a.status)}>{STATUS_LABELS[a.status] || a.status}</Pill>
+                      {a.referrer && <Pill className="border-emerald-200 bg-emerald-50 text-emerald-700">Referanslı</Pill>}
+                    </div>
+                    {a.message && <p className="mt-4 max-w-3xl rounded-3xl bg-[#F8F3EA] p-4 text-sm font-medium leading-7 text-slate-600">{a.message}</p>}
+                    {a.adminNote && <p className="mt-3 text-sm font-black text-[#B8943F]">📝 {a.adminNote}</p>}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <Button variant="ghost" icon={<FileText size={15} />} onClick={() => onNote(a)}>Not</Button>
+                  {a.status === "PENDING" && (
+                    <>
+                      <Button variant="success" disabled={actionLoading === a.id} icon={<Check size={15} />} onClick={() => onStatus(a.id, "APPROVED")}>Onayla</Button>
+                      <Button variant="danger" disabled={actionLoading === a.id} icon={<X size={15} />} onClick={() => onStatus(a.id, "REJECTED")}>Reddet</Button>
+                    </>
+                  )}
+                  {a.status === "APPROVED" && <Button disabled={actionLoading === a.id} icon={<Mail size={15} />} onClick={() => onStatus(a.id, "INVITED")}>Davet Gönder</Button>}
+                </div>
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
-              <div className="mt-5 grid gap-2">
+function DocumentsTab({ documents, filter, setFilter, actionLoading, onApprove, onReject }: { documents: DocumentItem[]; filter: string; setFilter: (v: string) => void; actionLoading: string | null; onApprove: (id: string) => void; onReject: (id: string) => void }) {
+  return (
+    <section>
+      <SectionTitle title="Belge İnceleme" desc="Yüklenen belgeleri görüntüle, onayla veya reddet." />
+      <FilterBar value={filter} setValue={setFilter} items={[{ label: "Tümü", value: "all" }, { label: "Bekleyen", value: "pending" }, { label: "Onaylanan", value: "approved" }, { label: "Reddedilen", value: "rejected" }]} />
+      {documents.length === 0 ? <Empty>Belge bulunamadı.</Empty> : (
+        <div className="grid gap-4">
+          {documents.map((d) => (
+            <div key={d.id} className="rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-sm">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-4">
+                  <Avatar firstName={d.user?.firstName} lastName={d.user?.lastName} imageUrl={d.user?.profileImageUrl} big />
+                  <div>
+                    <h3 className="text-lg font-black text-[#0D2137]">{DOC_LABELS[d.type] || d.type}</h3>
+                    <p className="text-sm font-semibold text-slate-500">{d.fileName}</p>
+                    <p className="text-xs font-semibold text-slate-400">{d.user ? `${d.user.firstName} ${d.user.lastName} · ${ROLE_LABELS[d.user.role] || d.user.role}` : "Kullanıcı yok"}</p>
+                    <div className="mt-3"><Pill className={statusClass(d.status)}>{STATUS_LABELS[d.status] || d.status}</Pill></div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <a href={d.fileUrl} target="_blank" rel="noreferrer"><Button variant="ghost" icon={<Eye size={15} />}>Görüntüle</Button></a>
+                  {d.status === "PENDING" && (
+                    <>
+                      <Button variant="success" disabled={actionLoading === d.id} icon={<Check size={15} />} onClick={() => onApprove(d.id)}>Onayla</Button>
+                      <Button variant="danger" disabled={actionLoading === d.id} icon={<X size={15} />} onClick={() => onReject(d.id)}>Reddet</Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function NominationsTab({ nominations, filter, setFilter, actionLoading, onNote, onStatus }: { nominations: NominationItem[]; filter: string; setFilter: (v: string) => void; actionLoading: string | null; onNote: (n: NominationItem) => void; onStatus: (id: string, status: string) => void }) {
+  return (
+    <section>
+      <SectionTitle title="Tavsiye Yönetimi" desc="Üyeler tarafından önerilen adayları yönet." />
+      <FilterBar value={filter} setValue={setFilter} items={[{ label: "Tümü", value: "all" }, { label: "Bekliyor", value: "PENDING" }, { label: "Onaylandı", value: "APPROVED" }, { label: "Reddedildi", value: "REJECTED" }, { label: "Davet", value: "INVITED" }, { label: "Kayıt Oldu", value: "REGISTERED" }]} />
+      {nominations.length === 0 ? <Empty>Tavsiye bulunamadı.</Empty> : (
+        <div className="grid gap-4">
+          {nominations.map((n) => (
+            <div key={n.id} className="rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-sm">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex gap-4">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#0D2137] text-xl font-black text-[#F7DFA3]">{n.candidateName?.[0] || "A"}</div>
+                  <div>
+                    <h3 className="text-lg font-black text-[#0D2137]">{n.candidateName}</h3>
+                    <p className="text-sm font-semibold text-slate-500">{n.candidateEmail} · {n.candidatePhone}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-400">Öneren: {n.nominator.firstName} {n.nominator.lastName} · {fmt(n.createdAt)}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Pill className={roleClass(n.candidateRole)}>{ROLE_LABELS[n.candidateRole] || n.candidateRole}</Pill>
+                      <Pill className={statusClass(n.status)}>{STATUS_LABELS[n.status] || n.status}</Pill>
+                    </div>
+                    {n.note && <p className="mt-4 max-w-3xl rounded-3xl bg-[#F8F3EA] p-4 text-sm font-medium leading-7 text-slate-600">{n.note}</p>}
+                    {n.adminNote && <p className="mt-3 text-sm font-black text-[#B8943F]">📝 {n.adminNote}</p>}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <Button variant="ghost" icon={<FileText size={15} />} onClick={() => onNote(n)}>Not</Button>
+                  {n.status === "PENDING" && (
+                    <>
+                      <Button variant="success" disabled={actionLoading === n.id} icon={<Check size={15} />} onClick={() => onStatus(n.id, "APPROVED")}>Onayla</Button>
+                      <Button variant="danger" disabled={actionLoading === n.id} icon={<X size={15} />} onClick={() => onStatus(n.id, "REJECTED")}>Reddet</Button>
+                    </>
+                  )}
+                  {n.status === "APPROVED" && <Button disabled={actionLoading === n.id} icon={<Mail size={15} />} onClick={() => onStatus(n.id, "INVITED")}>Davet Gönder</Button>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function LeadsTab({ leads, expandedLead, setExpandedLead, onRefresh }: { leads: LeadItem[]; expandedLead: string | null; setExpandedLead: (id: string | null) => void; onRefresh: () => void }) {
+  return (
+    <section>
+      <SectionTitle title="Lina Leads" desc={`${leads.length} aday kaydı toplandı.`} action={<Button variant="ghost" icon={<RefreshCw size={15} />} onClick={onRefresh}>Yenile</Button>} />
+      {leads.length === 0 ? <Empty>Henüz Lina lead kaydı yok.</Empty> : (
+        <div className="grid gap-4">
+          {leads.map((l) => (
+            <div key={l.id} className="rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-sm">
+              <div className="flex items-start gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#3D0A1E] text-lg font-black text-[#F7B4CF]">{l.fullName?.[0]?.toUpperCase() || "?"}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-black text-[#0D2137]">{l.fullName || "İsimsiz Lead"}</h3>
+                    <Pill className="border-pink-200 bg-pink-50 text-pink-700">Lina</Pill>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-sm font-semibold text-slate-500 md:grid-cols-2">
+                    {l.phone && <span>📞 {l.phone}</span>}
+                    {l.email && <span>✉️ {l.email}</span>}
+                    {l.profession && <span>💼 {l.profession}</span>}
+                    {l.city && <span>📍 {l.city}</span>}
+                    {l.interest && <span className="md:col-span-2">🎯 {l.interest}</span>}
+                  </div>
+                  <p className="mt-3 text-xs font-semibold text-slate-400">{fmt(l.createdAt)}</p>
+                  {l.conversation && (
+                    <>
+                      <button onClick={() => setExpandedLead(expandedLead === l.id ? null : l.id)} className="mt-4 rounded-full border border-[#D7B56D]/40 bg-[#FFF8E7] px-4 py-2 text-xs font-black text-[#8A671F]">
+                        {expandedLead === l.id ? "Konuşmayı Gizle" : "Konuşmayı Gör"}
+                      </button>
+                      {expandedLead === l.id && <ConversationBox conversation={l.conversation} />}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ConversationBox({ conversation }: { conversation: string }) {
+  return (
+    <div className="mt-4 max-h-72 overflow-auto rounded-3xl border border-slate-100 bg-[#F8F3EA] p-4">
+      {(() => {
+        try {
+          const messages = JSON.parse(conversation || "[]");
+          return messages.map((m: { role: string; content: string }, i: number) => (
+            <div key={i} className={`mb-3 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[80%] rounded-3xl px-4 py-3 text-sm font-semibold leading-6 ${m.role === "user" ? "bg-[#0D2137] text-white" : "bg-white text-slate-600"}`}>{m.content}</div>
+            </div>
+          ));
+        } catch {
+          return <p className="text-sm font-semibold text-slate-600">{conversation}</p>;
+        }
+      })()}
+    </div>
+  );
+}
+
+function StockTab({ units, verifyLoading, handleVerify, onRefresh }: { units: UnitItem[]; verifyLoading: string | null; handleVerify: (id: string, field: string, current: boolean) => void; onRefresh: () => void }) {
+  return (
+    <section>
+      <SectionTitle title="Stok Doğrulama" desc={`${units.length} birim · ${units.filter((u) => u.isVerified).length} doğrulanmış`} action={<Button variant="ghost" icon={<RefreshCw size={15} />} onClick={onRefresh}>Yenile</Button>} />
+      {units.length === 0 ? <Empty>Birim bulunamadı.</Empty> : (
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {units.map((u) => (
+            <div key={u.id} className="rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-sm">
+              <h3 className="font-serif text-2xl font-semibold text-[#0D2137]">{u.project?.name}</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-500">{u.project?.city} / {u.project?.district} · {u.project?.owner?.firstName} {u.project?.owner?.lastName}</p>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <StockInfo label="Tip" value={TYPE_LABELS[u.type] || u.type} />
+                <StockInfo label="Durum" value={UNIT_STATUS_LABELS[u.status] || u.status} />
+                <StockInfo label="No / Kat" value={`${u.number} / ${u.floor ?? "—"}`} />
+                <StockInfo label="Alan" value={u.area ? `${u.area} m²` : "—"} />
+              </div>
+              <div className="mt-4 rounded-3xl bg-[#FFF8E7] p-4 font-serif text-2xl font-semibold text-[#8A671F]">{u.price.toLocaleString("tr-TR")} ₺</div>
+              <div className="mt-4 space-y-2">
                 {[
-                  ["tapu", "Tapu Doğrulandı", item.tapuVerified],
-                  ["photo", "Fotoğraf Doğrulandı", item.photoVerified],
-                  ["yetki", "Yetki Belgesi Doğrulandı", item.yetkiVerified],
-                  ["offmarket", item.isOffMarket ? "Off-Market Aktif" : "Off-Market Yap", item.isOffMarket],
-                ].map(([key, label, value]) => (
-                  <button
-                    key={String(key)}
-                    onClick={() => handleVerify(item.id, String(key), Boolean(value))}
-                    disabled={!!verifyLoading}
-                    className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-black transition disabled:opacity-50 ${
-                      value
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                        : "border-slate-200 bg-[#F8FAFC] text-slate-600 hover:border-[#0B1F44]"
-                    }`}
-                  >
-                    <span>{label}</span>
-                    <span>{verifyLoading === `${item.id}-${key}` ? "..." : value ? "✓ Aktif" : "Kapalı"}</span>
+                  { key: "tapu", label: "Tapu Doğrulandı", value: u.tapuVerified },
+                  { key: "photo", label: "Fotoğraf Doğrulandı", value: u.photoVerified },
+                  { key: "yetki", label: "Yetki Belgesi Doğrulandı", value: u.yetkiVerified },
+                  { key: "offmarket", label: "Off-Market", value: u.isOffMarket },
+                ].map((item) => (
+                  <button key={item.key} onClick={() => { if (!verifyLoading) handleVerify(u.id, item.key, item.value); }} className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-sm font-black ${item.value ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`}>
+                    {item.label}
+                    <span>{verifyLoading === u.id + item.key ? "..." : item.value ? "✓ Aktif" : "Kapalı"}</span>
                   </button>
                 ))}
               </div>
-            </article>
+            </div>
           ))}
         </div>
       )}
@@ -1917,59 +1260,37 @@ function StockTab({
   );
 }
 
-function MiniCell({ label, value }: { label: string; value: string }) {
+function StockInfo({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-[#F8FAFC] p-3">
-      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
-      <p className="mt-1 text-sm font-black text-[#0B1F44]">{value}</p>
+    <div className="rounded-3xl bg-[#F8F3EA] p-4">
+      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">{label}</p>
+      <p className="mt-1 text-sm font-black text-[#0D2137]">{value}</p>
     </div>
   );
 }
 
-function TrustTab({ trustList, fetchTrust }: { trustList: TrustEntry[]; fetchTrust: () => Promise<void> }) {
+function TrustTab({ trust, onRefresh }: { trust: TrustItem[]; onRefresh: () => void }) {
   return (
     <section>
-      <SectionHeader
-        title="Güven Skorları"
-        subtitle={`${trustList.length} üye sıralandı`}
-        action={
-          <PrimaryButton ghost onClick={fetchTrust}>
-            <span className="inline-flex items-center gap-2">
-              <RefreshCw size={14} /> Yenile
-            </span>
-          </PrimaryButton>
-        }
-      />
-
-      {trustList.length === 0 ? (
-        <EmptyState text="Henüz güven skoru verisi yok." />
-      ) : (
-        <div className="space-y-3">
-          {trustList.map((item, index) => (
-            <article key={item.id} className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="w-12 text-center text-[24px] font-black text-[#C9A84C]">#{index + 1}</div>
-                <Avatar firstName={item.firstName} lastName={item.lastName} imageUrl={item.profileImageUrl} />
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-lg font-black text-[#0B1F44]">
-                    {item.firstName} {item.lastName}
-                  </h3>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <Badge className="border-slate-200 bg-[#F8FAFC] text-[#0B1F44]">
-                      {roleLabel(item.role)}
-                    </Badge>
-                    <Badge className="border-blue-200 bg-blue-50 text-blue-700">{item.badge}</Badge>
-                  </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${item.score}%`, background: item.badgeColor || "#1D4ED8" }}
-                    />
-                  </div>
+      <SectionTitle title="Güven Skorları" desc={`${trust.length} üye sıralandı.`} action={<Button variant="ghost" icon={<RefreshCw size={15} />} onClick={onRefresh}>Yenile</Button>} />
+      {trust.length === 0 ? <Empty>Henüz güven skoru verisi yok.</Empty> : (
+        <div className="rounded-[32px] border border-white/70 bg-white/80 p-4 shadow-sm">
+          {trust.map((t, i) => (
+            <div key={t.id} className="flex items-center gap-4 border-b border-slate-100 p-4 last:border-b-0">
+              <div className="font-serif text-3xl font-semibold text-[#D7B56D]">#{i + 1}</div>
+              <Avatar firstName={t.firstName} lastName={t.lastName} imageUrl={t.profileImageUrl} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-black text-[#0D2137]">{t.firstName} {t.lastName}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Pill className={roleClass(t.role)}>{ROLE_LABELS[t.role] || t.role}</Pill>
+                  <span className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: t.badgeColor }}>{t.badge}</span>
                 </div>
-                <div className="text-[30px] font-black text-[#0B1F44]">{item.score}</div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full" style={{ width: `${t.score}%`, background: t.badgeColor }} />
+                </div>
               </div>
-            </article>
+              <div className="font-serif text-3xl font-semibold text-[#0D2137]">{t.score}</div>
+            </div>
           ))}
         </div>
       )}
@@ -1977,48 +1298,34 @@ function TrustTab({ trustList, fetchTrust }: { trustList: TrustEntry[]; fetchTru
   );
 }
 
-function VisitsTab({ visits, fetchVisits }: { visits: Visit[]; fetchVisits: () => Promise<void> }) {
+function VisitsTab({ visits, onRefresh }: { visits: any[]; onRefresh: () => void }) {
   return (
     <section>
-      <SectionHeader
-        title="Ziyaretler"
-        subtitle="Kim, ne zaman, hangi sayfayı ziyaret etti?"
-        action={
-          <PrimaryButton ghost onClick={fetchVisits}>
-            <span className="inline-flex items-center gap-2">
-              <RefreshCw size={14} /> Yenile
-            </span>
-          </PrimaryButton>
-        }
-      />
-
-      {visits.length === 0 ? (
-        <EmptyState text="Henüz ziyaret yok." />
-      ) : (
-        <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-sm">
-          {visits.map((item) => (
-            <div key={item.id} className="flex flex-col gap-3 border-b border-slate-100 p-4 last:border-b-0 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar
-                  firstName={item.user?.firstName || "Misafir"}
-                  lastName={item.user?.lastName || ""}
-                  imageUrl={item.user?.profileImageUrl}
-                  tone="warm"
-                />
-                <div>
-                  <p className="text-sm font-black text-[#0B1F44]">
-                    {item.user ? `${item.user.firstName} ${item.user.lastName}` : "Misafir"}
-                  </p>
-                  <p className="text-xs font-bold text-slate-400">{item.user?.email || "Oturumsuz ziyaret"}</p>
-                </div>
-              </div>
-              <div className="grid gap-2 text-xs font-bold text-slate-500 md:grid-cols-3 md:text-right">
-                <span className="font-mono">{item.page}</span>
-                <span>{item.ip || "IP yok"}</span>
-                <span>{formatDate(item.createdAt)}</span>
-              </div>
-            </div>
-          ))}
+      <SectionTitle title="Kullanıcı Ziyaretleri" desc="Kim, ne zaman, hangi sayfayı ziyaret etti." action={<Button variant="ghost" icon={<RefreshCw size={15} />} onClick={onRefresh}>Yenile</Button>} />
+      {visits.length === 0 ? <Empty>Henüz ziyaret yok.</Empty> : (
+        <div className="overflow-hidden rounded-[32px] border border-white/70 bg-white/80 shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 bg-[#0D2137] text-left text-white">
+                  <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.2em]">Kullanıcı</th>
+                  <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.2em]">Sayfa</th>
+                  <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.2em]">IP</th>
+                  <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.2em]">Tarih</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visits.map((v) => (
+                  <tr key={v.id} className="border-b border-slate-100 last:border-b-0">
+                    <td className="px-5 py-4"><p className="font-black text-[#0D2137]">{v.user ? `${v.user.firstName} ${v.user.lastName}` : "Misafir"}</p><p className="text-xs font-semibold text-slate-500">{v.user?.email}</p></td>
+                    <td className="px-5 py-4 font-mono text-xs font-bold text-slate-600">{v.page}</td>
+                    <td className="px-5 py-4 text-xs font-semibold text-slate-500">{v.ip}</td>
+                    <td className="px-5 py-4 text-xs font-semibold text-slate-500">{fmt(v.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </section>
