@@ -7,13 +7,19 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
+  Param,
+  Res,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { Response } from 'express';
 import { ProfileService } from './profile.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { DocumentType } from '@prisma/client';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Controller('profile')
 @UseGuards(JwtAuthGuard)
@@ -33,11 +39,28 @@ export class ProfileController {
     return this.profileService.updateProfile(user.id, body);
   }
 
+  @Get('avatar-file/:fileName')
+  getAvatarFile(@Param('fileName') fileName: string, @Res() res: Response) {
+    const safeFileName = path.basename(fileName);
+    const filePath = path.resolve(
+      process.cwd(),
+      'public',
+      'profile-images',
+      safeFileName,
+    );
+
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('Profil fotoğrafı bulunamadı.');
+    }
+
+    return res.sendFile(filePath);
+  }
+
   @Post('avatar')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 3 * 1024 * 1024 },
+      limits: { fileSize: 1024 * 1024 },
     }),
   )
   uploadAvatar(

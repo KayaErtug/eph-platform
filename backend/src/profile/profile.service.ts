@@ -72,8 +72,8 @@ export class ProfileService {
       throw new BadRequestException('Sadece JPG, PNG veya WEBP yüklenebilir.');
     }
 
-    if (file.size > 3 * 1024 * 1024) {
-      throw new BadRequestException('Profil fotoğrafı 3MB den büyük olamaz.');
+    if (file.size > 1024 * 1024) {
+      throw new BadRequestException('Profil fotoğrafı 1MB den büyük olamaz.');
     }
 
     const safeExt =
@@ -87,19 +87,15 @@ export class ProfileService {
 
     const uploadDir = path.resolve(
       process.cwd(),
-      '..',
-      'frontend',
       'public',
       'profile-images',
     );
 
     await fs.mkdir(uploadDir, { recursive: true });
 
-    const fullPath = path.join(uploadDir, fileName);
+    await fs.writeFile(path.join(uploadDir, fileName), file.buffer);
 
-    await fs.writeFile(fullPath, file.buffer);
-
-    const profileImageUrl = `/profile-images/${fileName}`;
+    const profileImageUrl = `/api/profile/avatar-file/${fileName}`;
 
     return this.prisma.user.update({
       where: { id: userId },
