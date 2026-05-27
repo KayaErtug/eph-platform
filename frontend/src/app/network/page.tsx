@@ -8,6 +8,7 @@ import api from "@/lib/api";
 import { firebaseVapidKey, getFirebaseMessaging } from "@/lib/firebase";
 
 import {
+  ArrowLeft,
   Building2,
   CheckCircle2,
   CircleUserRound,
@@ -286,6 +287,15 @@ export default function NetworkPage() {
     }
   };
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    router.push("/dashboard");
+  };
+
   const handleLogout = () => {
     logout();
     router.push("/giris");
@@ -418,6 +428,14 @@ export default function NetworkPage() {
       <div className="sticky top-0 z-40 border-b border-white/40 bg-white/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-4 px-5 py-5 text-center lg:flex-row lg:justify-between">
           <div className="flex flex-col items-center text-center lg:flex-row lg:gap-4">
+            <button
+              onClick={handleBack}
+              className="mb-3 flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm transition-all hover:bg-slate-50 lg:mb-0"
+            >
+              <ArrowLeft size={18} />
+              Geri Dön
+            </button>
+
             <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-gradient-to-br from-[#2563EB] to-[#4F46E5] text-white shadow-xl">
               <UsersRound size={28} />
             </div>
