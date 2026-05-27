@@ -2,6 +2,8 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { DocumentType } from '@prisma/client';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 @Injectable()
 export class ProfileService {
@@ -61,30 +63,43 @@ export class ProfileService {
 
   async uploadAvatar(userId: string, file: Express.Multer.File) {
     if (!file) {
-      throw new BadRequestException('Profil fotografi secilmedi.');
+      throw new BadRequestException('Profil fotoğrafı seçilmedi.');
     }
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
     if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException('Sadece JPG, PNG veya WEBP yuklenebilir.');
+      throw new BadRequestException('Sadece JPG, PNG veya WEBP yüklenebilir.');
     }
 
     if (file.size > 3 * 1024 * 1024) {
-      throw new BadRequestException('Profil fotografi 3MB den buyuk olamaz.');
+      throw new BadRequestException('Profil fotoğrafı 3MB den büyük olamaz.');
     }
 
-    const ext = file.originalname.split('.').pop() || 'jpg';
-    const path = `${userId}/avatar_${Date.now()}.${ext}`;
+    const safeExt =
+      file.mimetype === 'image/png'
+        ? 'png'
+        : file.mimetype === 'image/webp'
+          ? 'webp'
+          : 'jpg';
 
-    await this.supabase.uploadFile(
+    const fileName = `${userId}_${Date.now()}.${safeExt}`;
+
+    const uploadDir = path.resolve(
+      process.cwd(),
+      '..',
+      'frontend',
+      'public',
       'profile-images',
-      path,
-      file.buffer,
-      file.mimetype,
     );
 
-    const profileImageUrl = this.supabase.getPublicUrl('profile-images', path);
+    await fs.mkdir(uploadDir, { recursive: true });
+
+    const fullPath = path.join(uploadDir, fileName);
+
+    await fs.writeFile(fullPath, file.buffer);
+
+    const profileImageUrl = `/profile-images/${fileName}`;
 
     return this.prisma.user.update({
       where: { id: userId },
@@ -108,32 +123,32 @@ export class ProfileService {
     file: Express.Multer.File,
   ) {
     if (!file) {
-      throw new BadRequestException('Dosya secilmedi.');
+      throw new BadRequestException('Dosya seçilmedi.');
     }
 
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
 
     if (!allowedTypes.includes(file.mimetype)) {
       throw new BadRequestException(
-        'Sadece PDF, JPG ve PNG dosyalari yuklenebilir.',
+        'Sadece PDF, JPG ve PNG dosyaları yüklenebilir.',
       );
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      throw new BadRequestException('Dosya boyutu 5MB den buyuk olamaz.');
+      throw new BadRequestException('Dosya boyutu 5MB den büyük olamaz.');
     }
 
     const ext = file.originalname.split('.').pop();
-    const path = `${userId}/${type}_${Date.now()}.${ext}`;
+    const filePath = `${userId}/${type}_${Date.now()}.${ext}`;
 
     await this.supabase.uploadFile(
       'documents',
-      path,
+      filePath,
       file.buffer,
       file.mimetype,
     );
 
-    const fileUrl = this.supabase.getPublicUrl('documents', path);
+    const fileUrl = this.supabase.getPublicUrl('documents', filePath);
 
     const existing = await this.prisma.document.findFirst({
       where: { userId, type },
