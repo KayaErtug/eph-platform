@@ -20,7 +20,6 @@ import {
   Clock3,
   Eye,
   Home,
-  LineChart,
   Loader2,
   LogOut,
   MapPin,
@@ -236,6 +235,68 @@ function unitLocation(unit: Unit) {
   );
 }
 
+function getProfileImageUrl(user: unknown) {
+  const profileUser = user as
+    | {
+        profilePhotoUrl?: string | null;
+        profileImageUrl?: string | null;
+        avatarUrl?: string | null;
+        photoUrl?: string | null;
+        imageUrl?: string | null;
+      }
+    | null
+    | undefined;
+
+  return (
+    profileUser?.profilePhotoUrl ||
+    profileUser?.profileImageUrl ||
+    profileUser?.avatarUrl ||
+    profileUser?.photoUrl ||
+    profileUser?.imageUrl ||
+    ''
+  );
+}
+
+function getProfileInitials(firstName?: string | null, lastName?: string | null, email?: string | null) {
+  const first = firstName?.trim()?.[0] || '';
+  const last = lastName?.trim()?.[0] || '';
+
+  if (first || last) {
+    return `${first}${last}`.toLocaleUpperCase('tr-TR');
+  }
+
+  return (email?.trim()?.[0] || 'E').toLocaleUpperCase('tr-TR');
+}
+
+function UserAvatar({
+  imageUrl,
+  initials,
+  size = 'md',
+}: {
+  imageUrl?: string;
+  initials: string;
+  size?: 'sm' | 'md';
+}) {
+  const sizeClass = size === 'sm' ? 'h-12 w-12 rounded-2xl' : 'h-14 w-14 rounded-2xl';
+  const textClass = size === 'sm' ? 'text-[15px]' : 'text-[17px]';
+
+  return (
+    <div
+      className={`relative ${sizeClass} shrink-0 overflow-hidden border-2 border-white bg-gradient-to-br from-[#0B1F44] via-[#1D4ED8] to-[#60A5FA] shadow-lg shadow-[#1D4ED8]/20 ring-2 ring-[#1D4ED8]/20`}
+    >
+      {imageUrl ? (
+        <img src={imageUrl} alt="Profil" className="h-full w-full object-cover" />
+      ) : (
+        <div className={`flex h-full w-full items-center justify-center font-black text-white ${textClass}`}>
+          {initials}
+        </div>
+      )}
+
+      <span className="absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
@@ -251,6 +312,9 @@ export default function DashboardPage() {
   const firstName =
     user?.firstName?.trim() || user?.email?.split('@')[0] || 'EPH Üyesi';
 
+  const lastName = (user as { lastName?: string | null } | null | undefined)?.lastName || '';
+  const profileImageUrl = getProfileImageUrl(user);
+  const profileInitials = getProfileInitials(firstName, lastName, user?.email);
   const userRole = user?.role || 'EPH Üyesi';
 
   useEffect(() => {
@@ -404,29 +468,15 @@ export default function DashboardPage() {
 
               <button
                 onClick={() => router.push('/profil')}
-                className="relative h-12 w-12 overflow-hidden rounded-2xl border-2 border-white bg-white shadow-lg shadow-[#1D4ED8]/20 ring-2 ring-[#1D4ED8]/20"
+                className="relative"
               >
-                <img
-                  src="/profile.jpg"
-                  alt="Profil"
-                  className="h-full w-full object-cover"
-                />
-
-                <span className="absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
+                <UserAvatar imageUrl={profileImageUrl} initials={profileInitials} size="sm" />
               </button>
             </div>
           </div>
 
           <div className="mt-5 flex items-center gap-3 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl ring-2 ring-[#1D4ED8]/15">
-              <img
-                src="/profile.jpg"
-                alt="Profil"
-                className="h-full w-full object-cover"
-              />
-
-              <span className="absolute bottom-1 right-1 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
-            </div>
+            <UserAvatar imageUrl={profileImageUrl} initials={profileInitials} size="md" />
 
             <div className="min-w-0 flex-1">
               <p className="truncate text-[17px] font-black text-[#0B1F44]">
