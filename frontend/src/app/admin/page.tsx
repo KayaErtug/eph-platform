@@ -1,20 +1,30 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Activity,
   ArrowLeft,
-  BarChart3,
   Bell,
   Check,
+  ChevronRight,
   Crown,
+  Database,
   Eye,
   FileText,
+  Fingerprint,
+  Gauge,
+  Globe2,
+  LockKeyhole,
+  LogOut,
   Mail,
-  PackageCheck,
+  Network,
+  Orbit,
   Plus,
+  Radar,
   RefreshCw,
+  Satellite,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -22,6 +32,7 @@ import {
   UserCog,
   UsersRound,
   X,
+  Zap,
 } from "lucide-react";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
@@ -235,17 +246,22 @@ function initials(firstName?: string, lastName?: string) {
 }
 
 function roleClass(role: string) {
-  if (role === "ADMIN" || role === "DENETCI_ADMIN") return "border-[#D7B56D]/50 bg-[#FFF8E7] text-[#8A671F]";
-  if (role === "MUTEAHHIT" || role === "INSAAT_FIRMASI") return "border-indigo-200 bg-indigo-50 text-indigo-700";
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  if (role === "ADMIN" || role === "DENETCI_ADMIN") return "border-amber-300/30 bg-amber-300/10 text-amber-100";
+  if (role === "MUTEAHHIT" || role === "INSAAT_FIRMASI") return "border-indigo-300/30 bg-indigo-400/10 text-indigo-100";
+  return "border-cyan-300/20 bg-cyan-300/10 text-cyan-100";
 }
 
 function statusClass(status: string) {
-  if (status === "APPROVED" || status === "REGISTERED") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (status === "REJECTED") return "border-rose-200 bg-rose-50 text-rose-700";
-  if (status === "INVITED") return "border-blue-200 bg-blue-50 text-blue-700";
-  if (status === "GORUSME_PLANLANDI") return "border-purple-200 bg-purple-50 text-purple-700";
-  return "border-amber-200 bg-amber-50 text-amber-700";
+  if (status === "APPROVED" || status === "REGISTERED") return "border-emerald-300/30 bg-emerald-400/10 text-emerald-100";
+  if (status === "REJECTED") return "border-rose-300/30 bg-rose-500/10 text-rose-100";
+  if (status === "INVITED") return "border-blue-300/30 bg-blue-400/10 text-blue-100";
+  if (status === "GORUSME_PLANLANDI") return "border-purple-300/30 bg-purple-400/10 text-purple-100";
+  return "border-amber-300/30 bg-amber-400/10 text-amber-100";
+}
+
+function money(value?: number) {
+  if (!value) return "—";
+  return `${value.toLocaleString("tr-TR")} ₺`;
 }
 
 function Avatar({
@@ -260,11 +276,11 @@ function Avatar({
   big?: boolean;
 }) {
   return (
-    <div className={`${big ? "h-16 w-16 text-xl" : "h-12 w-12 text-base"} shrink-0 overflow-hidden rounded-2xl border border-white/80 bg-gradient-to-br from-[#0D2137] to-[#1B3D63] shadow-lg`}>
+    <div className={`${big ? "h-16 w-16 text-xl" : "h-12 w-12 text-base"} shrink-0 overflow-hidden rounded-2xl border border-cyan-300/25 bg-gradient-to-br from-cyan-400/20 to-blue-600/20 shadow-lg shadow-cyan-500/10`}>
       {imageUrl ? (
         <img src={imageUrl} alt={`${firstName || ""} ${lastName || ""}`} className="h-full w-full object-cover" />
       ) : (
-        <div className="flex h-full w-full items-center justify-center font-black text-[#F7DFA3]">
+        <div className="flex h-full w-full items-center justify-center font-black text-cyan-100">
           {initials(firstName, lastName)}
         </div>
       )}
@@ -273,34 +289,42 @@ function Avatar({
 }
 
 function Pill({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black ${className}`}>{children}</span>;
+  return (
+    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${className}`}>
+      {children}
+    </span>
+  );
 }
 
 function Button({
   children,
   onClick,
   disabled,
-  variant = "navy",
+  variant = "cyber",
   icon,
 }: {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
-  variant?: "navy" | "gold" | "ghost" | "danger" | "success";
+  variant?: "cyber" | "gold" | "ghost" | "danger" | "success";
   icon?: ReactNode;
 }) {
   const classes =
     variant === "gold"
-      ? "bg-[#D7B56D] text-[#0D2137] hover:bg-[#c9a556]"
+      ? "border-amber-300/40 bg-amber-300 text-slate-950 hover:bg-amber-200"
       : variant === "ghost"
-        ? "border border-slate-200 bg-white text-slate-600 hover:border-[#0D2137] hover:text-[#0D2137]"
+        ? "border-cyan-300/20 bg-white/5 text-slate-200 hover:border-cyan-300/50 hover:bg-cyan-300/10"
         : variant === "danger"
-          ? "border border-rose-200 bg-white text-rose-600 hover:bg-rose-50"
+          ? "border-rose-300/30 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20"
           : variant === "success"
-            ? "bg-emerald-600 text-white hover:bg-emerald-700"
-            : "bg-[#0D2137] text-white hover:bg-[#163657]";
+            ? "border-emerald-300/30 bg-emerald-400/15 text-emerald-100 hover:bg-emerald-400/25"
+            : "border-cyan-300/35 bg-cyan-400/15 text-cyan-50 hover:bg-cyan-400/25";
   return (
-    <button onClick={onClick} disabled={disabled} className={`inline-flex h-10 items-center justify-center gap-2 rounded-2xl px-4 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${classes}`}>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex h-10 items-center justify-center gap-2 rounded-2xl border px-4 text-xs font-black uppercase tracking-[0.16em] transition disabled:cursor-not-allowed disabled:opacity-50 ${classes}`}
+    >
       {icon}
       {children}
     </button>
@@ -311,8 +335,9 @@ function SectionTitle({ title, desc, action }: { title: string; desc?: string; a
   return (
     <div className="mb-5 flex flex-col items-center justify-between gap-4 text-center lg:flex-row lg:text-left">
       <div>
-        <h2 className="font-serif text-3xl font-semibold tracking-tight text-[#0D2137]">{title}</h2>
-        {desc && <p className="mt-1 text-sm font-medium text-slate-500">{desc}</p>}
+        <p className="text-[10px] font-black uppercase tracking-[0.26em] text-cyan-200/60">EPH Command Layer</p>
+        <h2 className="mt-2 text-3xl font-black tracking-tight text-white">{title}</h2>
+        {desc && <p className="mt-2 text-sm font-semibold text-slate-400">{desc}</p>}
       </div>
       {action}
     </div>
@@ -320,7 +345,11 @@ function SectionTitle({ title, desc, action }: { title: string; desc?: string; a
 }
 
 function Empty({ children }: { children: ReactNode }) {
-  return <div className="rounded-[32px] border border-dashed border-slate-200 bg-white/70 p-12 text-center font-serif text-xl italic text-slate-400">{children}</div>;
+  return (
+    <div className="rounded-[32px] border border-cyan-300/15 bg-white/[0.04] p-12 text-center text-lg font-black text-slate-400 shadow-2xl shadow-cyan-950/20">
+      {children}
+    </div>
+  );
 }
 
 function FilterBar({ value, setValue, items }: { value: string; setValue: (v: string) => void; items: { value: string; label: string }[] }) {
@@ -330,8 +359,8 @@ function FilterBar({ value, setValue, items }: { value: string; setValue: (v: st
         <button
           key={item.value}
           onClick={() => setValue(item.value)}
-          className={`rounded-full border px-4 py-2 text-xs font-black transition ${
-            value === item.value ? "border-[#0D2137] bg-[#0D2137] text-white" : "border-white bg-white/75 text-slate-500 hover:text-[#0D2137]"
+          className={`rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.16em] transition ${
+            value === item.value ? "border-cyan-300/50 bg-cyan-300/20 text-cyan-50" : "border-white/10 bg-white/5 text-slate-400 hover:border-cyan-300/30 hover:text-white"
           }`}
         >
           {item.label}
@@ -343,14 +372,14 @@ function FilterBar({ value, setValue, items }: { value: string; setValue: (v: st
 
 function Modal({ title, desc, children, onClose }: { title: string; desc?: string; children: ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0D2137]/70 p-4 backdrop-blur-md" onClick={onClose}>
-      <section className="w-full max-w-xl rounded-[32px] border border-white/80 bg-[#F8F3EA] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" onClick={onClose}>
+      <section className="w-full max-w-xl rounded-[32px] border border-cyan-300/20 bg-[#071326] p-6 text-white shadow-2xl shadow-cyan-950/40" onClick={(e) => e.stopPropagation()}>
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h3 className="font-serif text-3xl font-semibold text-[#0D2137]">{title}</h3>
-            {desc && <p className="mt-1 text-sm font-semibold text-slate-500">{desc}</p>}
+            <h3 className="text-3xl font-black text-white">{title}</h3>
+            {desc && <p className="mt-1 text-sm font-semibold text-slate-400">{desc}</p>}
           </div>
-          <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-500">
+          <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300">
             <X size={18} />
           </button>
         </div>
@@ -363,8 +392,13 @@ function Modal({ title, desc, children, onClose }: { title: string; desc?: strin
 function Input({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
   return (
     <div>
-      <label className="mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-500">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="h-12 w-full rounded-3xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-[#D7B56D]" />
+      <label className="mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-400">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-12 w-full rounded-3xl border border-cyan-300/15 bg-white/5 px-4 text-sm font-black text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/50"
+      />
     </div>
   );
 }
@@ -406,6 +440,11 @@ export default function AdminPage() {
   const [expandedLead, setExpandedLead] = useState<string | null>(null);
 
   useEffect(() => setHydrated(true), []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -527,31 +566,50 @@ export default function AdminPage() {
     }
   };
 
+  const missionSignals = [
+    { label: "Bekleyen Başvuru", value: stats?.pendingApplications || 0, icon: <Mail size={18} />, tone: "amber" },
+    { label: "Belge İncelemesi", value: stats?.pendingDocuments || 0, icon: <FileText size={18} />, tone: "cyan" },
+    { label: "Üye Onayı", value: stats?.pendingUsers || 0, icon: <UserCheck size={18} />, tone: "rose" },
+    { label: "Lina Lead", value: leads.length, icon: <Sparkles size={18} />, tone: "violet" },
+  ];
+
   const tabs: { key: TabKey; label: string; icon: ReactNode; badge?: number | null; onEnter?: () => void }[] = [
-    { key: "overview", label: "Özet", icon: <Crown size={17} /> },
-    { key: "users", label: "Kullanıcılar", icon: <UsersRound size={17} />, badge: stats?.pendingUsers },
+    { key: "overview", label: "Core", icon: <Orbit size={17} /> },
+    { key: "users", label: "Üyeler", icon: <UsersRound size={17} />, badge: stats?.pendingUsers },
     { key: "applications", label: "Başvurular", icon: <Mail size={17} />, badge: stats?.pendingApplications },
     { key: "documents", label: "Belgeler", icon: <FileText size={17} />, badge: stats?.pendingDocuments },
     { key: "nominations", label: "Tavsiyeler", icon: <UserCheck size={17} />, badge: stats?.pendingNominations },
-    { key: "leads", label: "Lina Leads", icon: <Sparkles size={17} />, badge: leads.length, onEnter: fetchLeads },
-    { key: "stock", label: "Stok", icon: <PackageCheck size={17} />, onEnter: fetchUnits },
-    { key: "trust", label: "Güven", icon: <ShieldCheck size={17} />, onEnter: fetchTrust },
-    { key: "visits", label: "Ziyaretler", icon: <BarChart3 size={17} />, onEnter: fetchVisits },
+    { key: "leads", label: "Lina", icon: <Sparkles size={17} />, badge: leads.length, onEnter: fetchLeads },
+    { key: "stock", label: "Stok", icon: <Database size={17} />, onEnter: fetchUnits },
+    { key: "trust", label: "Skorlar", icon: <Gauge size={17} />, onEnter: fetchTrust },
+    { key: "visits", label: "Trafik", icon: <Activity size={17} />, onEnter: fetchVisits },
   ];
 
   if (!hydrated || loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F5F1E8]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-12 w-12 animate-spin rounded-full border-2 border-[#D7B56D] border-t-transparent" />
-          <p className="text-sm font-black tracking-[0.25em] text-[#0D2137]">EPH ADMIN</p>
+      <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#020617] text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.18),transparent_35%)]" />
+        <div className="relative flex flex-col items-center gap-5">
+          <div className="relative h-24 w-24">
+            <div className="absolute inset-0 animate-ping rounded-full border border-cyan-300/40" />
+            <div className="absolute inset-4 animate-spin rounded-full border-2 border-cyan-300 border-t-transparent" />
+            <div className="absolute inset-8 rounded-full bg-cyan-300 shadow-2xl shadow-cyan-300/40" />
+          </div>
+          <p className="text-xs font-black uppercase tracking-[0.38em] text-cyan-100">EPH Command Core Loading</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#0B1F44_0%,#07111F_42%,#020617_100%)] text-[#0D2137]">
+    <main className="relative min-h-screen overflow-hidden bg-[#020617] text-white">
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.04)_1px,transparent_1px)] bg-[size:42px_42px]" />
+        <div className="absolute -left-32 top-10 h-96 w-96 rounded-full bg-cyan-500/20 blur-3xl" />
+        <div className="absolute -right-40 top-36 h-[500px] w-[500px] rounded-full bg-blue-700/20 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-amber-400/10 blur-3xl" />
+      </div>
+
       {noteModal && (
         <Modal
           title="Admin Notu"
@@ -561,7 +619,7 @@ export default function AdminPage() {
             setNoteText("");
           }}
         >
-          <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={5} placeholder="Notunuzu yazın..." className="w-full resize-none rounded-3xl border border-slate-200 bg-white/80 p-4 text-sm font-semibold outline-none focus:border-[#D7B56D]" />
+          <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={5} placeholder="Notunuzu yazın..." className="w-full resize-none rounded-3xl border border-cyan-300/15 bg-white/5 p-4 text-sm font-semibold text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/50" />
           <div className="mt-5 flex justify-end gap-3">
             <Button variant="ghost" onClick={() => { setNoteModal(null); setNoteText(""); }}>Vazgeç</Button>
             <Button
@@ -589,8 +647,8 @@ export default function AdminPage() {
 
       {roleModal && (
         <Modal title="Rol Değiştir" desc="Kullanıcının platform rolünü güncelle." onClose={() => { setRoleModal(null); setNewRole(""); }}>
-          <label className="mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-500">Yeni Rol</label>
-          <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="h-12 w-full rounded-3xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-[#D7B56D]">
+          <label className="mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-400">Yeni Rol</label>
+          <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="h-12 w-full rounded-3xl border border-cyan-300/15 bg-[#071326] px-4 text-sm font-black text-white outline-none focus:border-cyan-300/50">
             <option value="">Seçiniz</option>
             <option value="EMLAKCI">Emlakçı</option>
             <option value="MUTEAHHIT">Müteahhit</option>
@@ -627,8 +685,8 @@ export default function AdminPage() {
             <Input label="Telefon" value={createUserForm.phone} onChange={(v) => setCreateUserForm((c) => ({ ...c, phone: v }))} />
             <Input label="Şifre" type="password" value={createUserForm.password} onChange={(v) => setCreateUserForm((c) => ({ ...c, password: v }))} />
             <div>
-              <label className="mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-500">Rol</label>
-              <select value={createUserForm.role} onChange={(e) => setCreateUserForm((c) => ({ ...c, role: e.target.value }))} className="h-12 w-full rounded-3xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-[#D7B56D]">
+              <label className="mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-400">Rol</label>
+              <select value={createUserForm.role} onChange={(e) => setCreateUserForm((c) => ({ ...c, role: e.target.value }))} className="h-12 w-full rounded-3xl border border-cyan-300/15 bg-[#071326] px-4 text-sm font-black text-white outline-none focus:border-cyan-300/50">
                 <option value="EMLAKCI">Emlakçı</option>
                 <option value="MUTEAHHIT">Müteahhit</option>
                 <option value="INSAAT_FIRMASI">İnşaat Firması</option>
@@ -636,7 +694,7 @@ export default function AdminPage() {
               </select>
             </div>
           </div>
-          {createUserError && <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700">{createUserError}</p>}
+          {createUserError && <p className="mt-4 rounded-2xl border border-rose-300/30 bg-rose-500/10 p-3 text-sm font-bold text-rose-100">{createUserError}</p>}
           <div className="mt-5 flex justify-end gap-3">
             <Button variant="ghost" onClick={() => { setCreateUserModal(false); setCreateUserError(""); }}>Vazgeç</Button>
             <Button
@@ -667,24 +725,24 @@ export default function AdminPage() {
         </Modal>
       )}
 
-      <header className="sticky top-0 z-40 border-b border-cyan-300/15 bg-[#050B1A]/90 backdrop-blur-2xl">
+      <header className="sticky top-0 z-40 border-b border-cyan-300/15 bg-[#020617]/85 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center justify-between gap-4">
             <button
               onClick={() => router.back()}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/25 bg-white/5 text-cyan-100 shadow-lg shadow-cyan-500/10 transition hover:border-[#D7B56D]/60 hover:text-[#F7DFA3]"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/5 text-cyan-100 shadow-lg shadow-cyan-500/10 transition hover:border-amber-300/60 hover:text-amber-100"
               title="Geri Dön"
             >
               <ArrowLeft size={19} />
             </button>
-            <Link href="/dashboard" className="flex items-center gap-3">
+            <Link href="/admin" className="flex items-center gap-3">
               <div className="relative">
                 <div className="absolute inset-0 rounded-2xl bg-cyan-400/30 blur-xl" />
                 <img src="/LOGO_EPH.png" alt="EPH" className="relative h-11 w-11 object-contain" />
               </div>
               <div>
-                <p className="font-serif text-xl font-semibold text-white">EPH Platform</p>
-                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#D7B56D]">Command Center</p>
+                <p className="text-xl font-black text-white">EPH CORE</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.34em] text-cyan-200">Admin Command Center</p>
               </div>
             </Link>
           </div>
@@ -708,107 +766,101 @@ export default function AdminPage() {
             ))}
             <button
               onClick={() => { logout(); router.push("/giris"); }}
-              className="rounded-full border border-rose-400/25 bg-rose-500/10 px-4 py-2 text-xs font-black text-rose-200 shadow-sm transition hover:bg-rose-500/20"
+              className="inline-flex items-center gap-2 rounded-full border border-rose-400/25 bg-rose-500/10 px-4 py-2 text-xs font-black text-rose-200 shadow-sm transition hover:bg-rose-500/20"
             >
+              <LogOut size={14} />
               Çıkış
             </button>
           </nav>
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-5 py-8">
-        <div className="relative overflow-hidden rounded-[42px] border border-cyan-300/20 bg-[#061126] shadow-2xl shadow-cyan-950/40">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(34,211,238,0.26),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(215,181,109,0.22),transparent_26%),radial-gradient(circle_at_50%_95%,rgba(29,78,216,0.30),transparent_38%)]" />
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/70 to-transparent" />
-          <div className="absolute left-8 top-8 h-28 w-28 rounded-full border border-cyan-300/10" />
-          <div className="absolute bottom-8 right-8 h-40 w-40 rounded-full border border-[#D7B56D]/10" />
-
-          <div className="relative z-10 grid gap-6 p-6 text-white lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
-            <div className="rounded-[34px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-xl">
-              <div className="mb-6 flex flex-wrap items-center gap-3">
+      <section className="relative z-10 mx-auto max-w-7xl px-5 py-8">
+        <div className="grid gap-5 lg:grid-cols-[1.35fr_0.65fr]">
+          <div className="relative overflow-hidden rounded-[42px] border border-cyan-300/20 bg-[#061126]/90 p-6 shadow-2xl shadow-cyan-950/40 lg:p-8">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_12%,rgba(34,211,238,0.28),transparent_28%),radial-gradient(circle_at_90%_22%,rgba(245,158,11,0.18),transparent_25%),linear-gradient(135deg,rgba(255,255,255,0.06),transparent_45%)]" />
+            <div className="absolute right-8 top-8 hidden h-52 w-52 rounded-full border border-cyan-300/15 lg:block">
+              <div className="absolute inset-8 rounded-full border border-cyan-300/10" />
+              <div className="absolute inset-16 rounded-full border border-amber-300/15" />
+              <div className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300 shadow-2xl shadow-cyan-300" />
+            </div>
+            <div className="relative z-10">
+              <div className="flex flex-wrap items-center gap-3">
                 <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-cyan-100">
                   <Crown size={16} />
-                  EPH Cockpit
+                  Super Admin Layer
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">
                   <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" />
                   Sistem Aktif
                 </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-amber-100">
+                  <LockKeyhole size={15} />
+                  Privacy Guard
+                </span>
               </div>
 
-              <h1 className="font-serif text-4xl font-semibold leading-tight md:text-6xl">
-                Uzay Gemisi
-                <span className="block bg-gradient-to-r from-[#F7DFA3] via-cyan-100 to-white bg-clip-text text-transparent">
-                  Yönetim Kokpiti
+              <h1 className="mt-7 max-w-4xl text-5xl font-black leading-[0.95] tracking-[-0.05em] md:text-7xl">
+                EPH
+                <span className="block bg-gradient-to-r from-cyan-200 via-white to-amber-200 bg-clip-text text-transparent">
+                  Mission Control
                 </span>
               </h1>
-              <p className="mt-4 max-w-2xl text-sm font-medium leading-7 text-slate-300">
-                Üye kabulü, belge doğrulama, başvuru denetimi, stok güvenliği ve platform trafiği tek komuta ekranında izlenir.
+
+              <p className="mt-6 max-w-2xl text-sm font-semibold leading-7 text-slate-300">
+                Burası kullanıcı alanı değil; platformun operasyon, güvenlik, başvuru ve denetim katmanıdır. Admin hesabı oyun kurucudur, oyuncu değildir.
               </p>
 
-              <div className="mt-7 grid gap-3 sm:grid-cols-3">
-                <CockpitMini title="Görev Modu" value="Güvenli" icon={<ShieldCheck size={18} />} />
-                <CockpitMini title="Canlı Saat" value={now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} icon={<Bell size={18} />} />
-                <CockpitMini title="Tarih" value={now.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })} icon={<Sparkles size={18} />} />
+              <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                <CockpitMini title="Canlı Saat" value={now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} icon={<Satellite size={18} />} />
+                <CockpitMini title="Çekirdek" value="Online" icon={<Zap size={18} />} />
+                <CockpitMini title="Mahremiyet" value="Kilitli" icon={<Fingerprint size={18} />} />
               </div>
 
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Button variant="gold" icon={<Plus size={15} />} onClick={() => setCreateUserModal(true)}>Yeni Üye Ekle</Button>
                 <Button variant="ghost" icon={<RefreshCw size={15} />} onClick={refreshCurrentTab}>Verileri Yenile</Button>
               </div>
             </div>
+          </div>
 
-            <div className="grid gap-4">
-              <div className="rounded-[34px] border border-white/10 bg-black/20 p-5 backdrop-blur-xl">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/80">Operasyon Radarı</p>
-                    <h2 className="mt-2 text-2xl font-black text-white">Öncelikli Sinyaller</h2>
-                  </div>
-                  <div className="flex h-14 w-14 items-center justify-center rounded-[22px] border border-[#D7B56D]/25 bg-[#D7B56D]/10 text-[#F7DFA3]">
-                    <BarChart3 size={25} />
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-3">
-                  <CockpitSignal label="Bekleyen Başvuru" value={stats?.pendingApplications || 0} tone="gold" />
-                  <CockpitSignal label="Bekleyen Belge" value={stats?.pendingDocuments || 0} tone="cyan" />
-                  <CockpitSignal label="Onay Bekleyen Üye" value={stats?.pendingUsers || 0} tone="rose" />
-                </div>
+          <div className="grid gap-5">
+            <HoloPanel title="Operasyon Radarı" icon={<Radar size={22} />}>
+              <div className="grid gap-3">
+                {missionSignals.map((item) => (
+                  <CockpitSignal key={item.label} label={item.label} value={item.value} icon={item.icon} tone={item.tone} />
+                ))}
               </div>
+            </HoloPanel>
 
-              <div className="rounded-[34px] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl">
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#D7B56D]">Komuta Notu</p>
-                <p className="mt-3 text-sm font-semibold leading-7 text-slate-300">
-                  Özel müşteri ve görev verileri kullanıcı bazlı izole edilir. Admin paneli operasyonu yönetir; mahrem veriler yetki kuralına göre korunur.
-                </p>
+            <HoloPanel title="Güvenlik Protokolü" icon={<ShieldCheck size={22} />}>
+              <div className="space-y-3">
+                <SecurityLine label="Dashboard veri izolasyonu" value="Aktif" />
+                <SecurityLine label="CRM mahremiyet filtresi" value="Aktif" />
+                <SecurityLine label="Avatar public image endpoint" value="Aktif" />
+                <SecurityLine label="Admin operasyon modu" value="Ayrı katman" />
               </div>
-            </div>
+            </HoloPanel>
           </div>
         </div>
 
-        {stats && (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-            <Metric title="Toplam Üye" value={stats.totalUsers} icon={<UsersRound size={20} />} />
-            <Metric title="Bekleyen Üye" value={stats.pendingUsers} icon={<Bell size={20} />} tone="amber" />
-            <Metric title="Onaylanan" value={stats.approvedUsers} icon={<UserCheck size={20} />} tone="green" />
-            <Metric title="Davet Kodu" value={stats.totalInvitations} icon={<Mail size={20} />} tone="gold" />
-            <Metric title="Bekleyen Belge" value={stats.pendingDocuments} icon={<FileText size={20} />} tone="amber" />
-            <Metric title="Tavsiyeler" value={stats.pendingNominations} icon={<UserCheck size={20} />} tone="amber" />
-            <Metric title="Başvurular" value={stats.pendingApplications} icon={<BarChart3 size={20} />} tone="amber" />
-          </div>
-        )}
+        <div className="mt-6 grid gap-4 md:grid-cols-4">
+          <CommandMetric title="Toplam Üye" value={stats?.totalUsers || 0} icon={<UsersRound size={20} />} />
+          <CommandMetric title="Onaylanan Üye" value={stats?.approvedUsers || 0} icon={<UserCheck size={20} />} />
+          <CommandMetric title="Davet Kodu" value={stats?.totalInvitations || 0} icon={<Mail size={20} />} />
+          <CommandMetric title="Platform Modu" value="CORE" icon={<Globe2 size={20} />} textValue />
+        </div>
 
         {stats && stats.byRole.length > 0 && (
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 rounded-[28px] border border-white/70 bg-white/75 p-4 shadow-sm">
-            <span className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Rol Dağılımı</span>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 rounded-[28px] border border-cyan-300/15 bg-white/[0.04] p-4 shadow-2xl shadow-cyan-950/20">
+            <span className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">Rol Dağılımı</span>
             {stats.byRole.map((item) => (
               <Pill key={item.role} className={roleClass(item.role)}>{ROLE_LABELS[item.role] || item.role}: {item.count}</Pill>
             ))}
           </div>
         )}
 
-        <div className="mt-6 flex gap-2 overflow-x-auto rounded-[28px] border border-white/70 bg-white/70 p-2 shadow-sm">
+        <div className="mt-6 flex gap-2 overflow-x-auto rounded-[28px] border border-cyan-300/15 bg-white/[0.04] p-2 shadow-2xl shadow-cyan-950/20">
           {tabs.map((tab) => {
             const active = activeTab === tab.key;
             const badge = tab.badge || 0;
@@ -816,11 +868,11 @@ export default function AdminPage() {
               <button
                 key={tab.key}
                 onClick={() => { setActiveTab(tab.key); tab.onEnter?.(); }}
-                className={`relative flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-xs font-black transition-all ${active ? "bg-[#0D2137] text-white shadow-lg shadow-slate-300" : "text-slate-500 hover:bg-white hover:text-[#0D2137]"}`}
+                className={`relative flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-[0.14em] transition-all ${active ? "bg-cyan-300/15 text-cyan-50 shadow-lg shadow-cyan-900/30 ring-1 ring-cyan-300/25" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}
               >
                 {tab.icon}
                 {tab.label}
-                {badge > 0 && <span className="ml-1 rounded-full bg-[#D7B56D] px-2 py-0.5 text-[10px] text-[#0D2137]">{badge}</span>}
+                {badge > 0 && <span className="ml-1 rounded-full bg-amber-300 px-2 py-0.5 text-[10px] text-slate-950">{badge}</span>}
               </button>
             );
           })}
@@ -894,6 +946,22 @@ export default function AdminPage() {
   );
 }
 
+function HoloPanel({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+  return (
+    <section className="rounded-[34px] border border-cyan-300/15 bg-white/[0.045] p-5 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl">
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/50">Live Module</p>
+          <h2 className="mt-1 text-xl font-black text-white">{title}</h2>
+        </div>
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
+          {icon}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
 
 function CockpitMini({ title, value, icon }: { title: string; value: string; icon: ReactNode }) {
   return (
@@ -901,74 +969,89 @@ function CockpitMini({ title, value, icon }: { title: string; value: string; ico
       <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-2xl bg-cyan-300/10 text-cyan-100">
         {icon}
       </div>
-      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">{title}</p>
+      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">{title}</p>
       <p className="mt-1 text-lg font-black text-white">{value}</p>
     </div>
   );
 }
 
-function CockpitSignal({ label, value, tone }: { label: string; value: number; tone: "gold" | "cyan" | "rose" }) {
-  const toneClass =
-    tone === "gold"
-      ? "from-[#D7B56D] to-amber-300 text-[#0D2137]"
+function CockpitSignal({ label, value, icon, tone }: { label: string; value: number; icon: ReactNode; tone: string }) {
+  const colors =
+    tone === "amber"
+      ? "border-amber-300/25 bg-amber-400/10 text-amber-100"
       : tone === "rose"
-        ? "from-rose-400 to-red-500 text-white"
-        : "from-cyan-300 to-blue-400 text-[#061126]";
+        ? "border-rose-300/25 bg-rose-500/10 text-rose-100"
+        : tone === "violet"
+          ? "border-violet-300/25 bg-violet-500/10 text-violet-100"
+          : "border-cyan-300/25 bg-cyan-400/10 text-cyan-100";
 
   return (
-    <div className="flex items-center justify-between rounded-[22px] border border-white/10 bg-white/[0.06] p-4">
-      <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-300">{label}</span>
-      <span className={`rounded-2xl bg-gradient-to-r px-4 py-2 text-lg font-black ${toneClass}`}>{value}</span>
+    <div className={`flex items-center justify-between rounded-[22px] border p-4 ${colors}`}>
+      <div className="flex items-center gap-3">
+        {icon}
+        <span className="text-xs font-black uppercase tracking-[0.14em]">{label}</span>
+      </div>
+      <span className="text-2xl font-black">{value}</span>
     </div>
   );
 }
 
-function Metric({ title, value, icon, tone = "navy" }: { title: string; value: number; icon: ReactNode; tone?: "navy" | "gold" | "green" | "amber" }) {
-  const toneClass = tone === "gold" ? "bg-[#FFF8E7] text-[#8A671F]" : tone === "green" ? "bg-emerald-50 text-emerald-700" : tone === "amber" ? "bg-amber-50 text-amber-700" : "bg-[#EEF4FF] text-[#0D2137]";
+function SecurityLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[28px] border border-white/70 bg-white/80 p-5 shadow-sm">
-      <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ${toneClass}`}>{icon}</div>
-      <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">{title}</p>
-      <p className="mt-2 font-serif text-4xl font-semibold text-[#0D2137]">{value}</p>
+    <div className="flex items-center justify-between rounded-2xl border border-cyan-300/10 bg-white/[0.045] px-4 py-3">
+      <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">{label}</span>
+      <span className="text-xs font-black text-emerald-200">{value}</span>
+    </div>
+  );
+}
+
+function CommandMetric({ title, value, icon, textValue }: { title: string; value: number | string; icon: ReactNode; textValue?: boolean }) {
+  return (
+    <div className="rounded-[28px] border border-cyan-300/15 bg-white/[0.045] p-5 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl">
+      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">{icon}</div>
+      <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">{title}</p>
+      <p className={`mt-2 font-black text-white ${textValue ? "text-3xl" : "text-4xl"}`}>{value}</p>
     </div>
   );
 }
 
 function Overview({ users, applications, documents, setActiveTab }: { users: UserItem[]; applications: ApplicationItem[]; documents: DocumentItem[]; setActiveTab: (tab: TabKey) => void }) {
   const cards = [
-    { title: "Bekleyen Üye", value: users.filter((u) => !u.isApproved).length, tab: "users" as TabKey, icon: <UsersRound size={22} /> },
-    { title: "Bekleyen Başvuru", value: applications.filter((a) => a.status === "PENDING").length, tab: "applications" as TabKey, icon: <Mail size={22} /> },
-    { title: "Belge İncelemesi", value: documents.filter((d) => d.status === "PENDING").length, tab: "documents" as TabKey, icon: <FileText size={22} /> },
+    { title: "Üye Onayı", value: users.filter((u) => !u.isApproved).length, tab: "users" as TabKey, icon: <UsersRound size={22} /> },
+    { title: "Başvuru Hattı", value: applications.filter((a) => a.status === "PENDING").length, tab: "applications" as TabKey, icon: <Mail size={22} /> },
+    { title: "Belge Kapısı", value: documents.filter((d) => d.status === "PENDING").length, tab: "documents" as TabKey, icon: <FileText size={22} /> },
   ];
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Operasyon Özeti" desc="Öncelikli yönetim işleri ve son hareketler." />
+      <SectionTitle title="Core Operasyon Özeti" desc="Kullanıcı değil, platform seviyesinde yönetim ekranı." />
       <div className="grid gap-4 md:grid-cols-3">
         {cards.map((card) => (
-          <button key={card.title} onClick={() => setActiveTab(card.tab)} className="rounded-[32px] border border-white/70 bg-white/80 p-6 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0D2137] text-[#F7DFA3]">{card.icon}</div>
-            <p className="font-serif text-5xl font-semibold text-[#0D2137]">{card.value}</p>
-            <h3 className="mt-3 text-sm font-black text-[#0D2137]">{card.title}</h3>
+          <button key={card.title} onClick={() => setActiveTab(card.tab)} className="group rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-6 text-left shadow-2xl shadow-cyan-950/20 transition hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-cyan-300/10">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">{card.icon}</div>
+            <p className="text-5xl font-black text-white">{card.value}</p>
+            <h3 className="mt-3 text-sm font-black uppercase tracking-[0.18em] text-slate-400">{card.title}</h3>
+            <div className="mt-5 flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-cyan-200">
+              Aç <ChevronRight size={15} />
+            </div>
           </button>
         ))}
       </div>
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="rounded-[32px] border border-white/70 bg-white/80 p-6 shadow-sm">
-          <SectionTitle title="Son Kullanıcılar" />
+
+      <div className="rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-6 shadow-2xl shadow-cyan-950/20">
+        <SectionTitle title="Son Sinyaller" desc="Son kullanıcı ve başvuru hareketleri." />
+        <div className="grid gap-5 lg:grid-cols-2">
           <div className="space-y-3">
             {users.slice(0, 5).map((u) => (
               <PersonLine key={u.id} firstName={u.firstName} lastName={u.lastName} imageUrl={u.profileImageUrl} sub={u.email} right={<Pill className={u.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{u.isApproved ? "Onaylı" : "Bekliyor"}</Pill>} />
             ))}
+            {users.length === 0 && <Empty>Kullanıcı yok.</Empty>}
           </div>
-        </div>
-        <div className="rounded-[32px] border border-white/70 bg-white/80 p-6 shadow-sm">
-          <SectionTitle title="Son Başvurular" />
           <div className="space-y-3">
             {applications.slice(0, 5).map((a) => (
-              <div key={a.id} className="rounded-3xl border border-slate-100 bg-[#F8F3EA] p-4">
-                <p className="font-black text-[#0D2137]">{a.applicantName}</p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">{a.applicantEmail}</p>
+              <div key={a.id} className="rounded-3xl border border-cyan-300/10 bg-white/[0.04] p-4">
+                <p className="font-black text-white">{a.applicantName}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-400">{a.applicantEmail}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Pill className={roleClass(a.requestedRole)}>{ROLE_LABELS[a.requestedRole] || a.requestedRole}</Pill>
                   <Pill className={statusClass(a.status)}>{STATUS_LABELS[a.status] || a.status}</Pill>
@@ -985,11 +1068,11 @@ function Overview({ users, applications, documents, setActiveTab }: { users: Use
 
 function PersonLine({ firstName, lastName, imageUrl, sub, right }: { firstName?: string; lastName?: string; imageUrl?: string | null; sub?: string; right?: ReactNode }) {
   return (
-    <div className="flex items-center gap-3 rounded-3xl border border-slate-100 bg-white p-4">
+    <div className="flex items-center gap-3 rounded-3xl border border-cyan-300/10 bg-white/[0.04] p-4">
       <Avatar firstName={firstName} lastName={lastName} imageUrl={imageUrl} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-black text-[#0D2137]">{firstName} {lastName}</p>
-        {sub && <p className="truncate text-xs font-semibold text-slate-500">{sub}</p>}
+        <p className="truncate text-sm font-black text-white">{firstName} {lastName}</p>
+        {sub && <p className="truncate text-xs font-semibold text-slate-400">{sub}</p>}
       </div>
       {right}
     </div>
@@ -999,23 +1082,23 @@ function PersonLine({ firstName, lastName, imageUrl, sub, right }: { firstName?:
 function UsersTab({ users, filter, setFilter, actionLoading, onApprove, onSuspend, onDelete, onRole }: { users: UserItem[]; filter: string; setFilter: (v: string) => void; actionLoading: string | null; onApprove: (id: string) => void; onSuspend: (id: string) => void; onDelete: (id: string) => void; onRole: (u: UserItem) => void }) {
   return (
     <section>
-      <SectionTitle title="Kullanıcı Yönetimi" desc="Üyelik durumları, roller ve doğrulama süreçleri." />
+      <SectionTitle title="Üye Kontrol Kulesi" desc="Üyelik durumları, roller ve doğrulama süreçleri." />
       <FilterBar value={filter} setValue={setFilter} items={[{ label: "Tümü", value: "all" }, { label: "Bekleyen", value: "pending" }, { label: "Onaylanan", value: "approved" }]} />
       {users.length === 0 ? <Empty>Kullanıcı bulunamadı.</Empty> : (
         <div className="grid gap-4">
           {users.map((u) => (
-            <div key={u.id} className="rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-sm">
+            <div key={u.id} className="rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-5 shadow-2xl shadow-cyan-950/20">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-4">
                   <Avatar firstName={u.firstName} lastName={u.lastName} imageUrl={u.profileImageUrl} big />
                   <div>
-                    <h3 className="text-lg font-black text-[#0D2137]">{u.firstName} {u.lastName}</h3>
-                    <p className="text-sm font-semibold text-slate-500">{u.email}</p>
-                    <p className="text-xs font-semibold text-slate-400">{u.phone}</p>
+                    <h3 className="text-lg font-black text-white">{u.firstName} {u.lastName}</h3>
+                    <p className="text-sm font-semibold text-slate-400">{u.email}</p>
+                    <p className="text-xs font-semibold text-slate-500">{u.phone}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Pill className={roleClass(u.role)}>{ROLE_LABELS[u.role] || u.role}</Pill>
                       <Pill className={u.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{u.isApproved ? "Onaylı" : "Bekliyor"}</Pill>
-                      {(u.documents?.length || 0) > 0 && <Pill className="border-slate-200 bg-slate-50 text-slate-600">{u.documents?.length} belge</Pill>}
+                      {(u.documents?.length || 0) > 0 && <Pill className="border-slate-300/20 bg-white/5 text-slate-300">{u.documents?.length} belge</Pill>}
                     </div>
                   </div>
                 </div>
@@ -1041,26 +1124,26 @@ function UsersTab({ users, filter, setFilter, actionLoading, onApprove, onSuspen
 function ApplicationsTab({ applications, filter, setFilter, actionLoading, onNote, onStatus }: { applications: ApplicationItem[]; filter: string; setFilter: (v: string) => void; actionLoading: string | null; onNote: (a: ApplicationItem) => void; onStatus: (id: string, status: string) => void }) {
   return (
     <section>
-      <SectionTitle title="Başvuru Yönetimi" desc="Aday başvurularını değerlendir, davet sürecini yönet." />
+      <SectionTitle title="Başvuru Hattı" desc="Aday başvurularını değerlendir, davet sürecini yönet." />
       <FilterBar value={filter} setValue={setFilter} items={[{ label: "Tümü", value: "all" }, { label: "Bekliyor", value: "PENDING" }, { label: "Onaylandı", value: "APPROVED" }, { label: "Reddedildi", value: "REJECTED" }, { label: "Davet", value: "INVITED" }, { label: "Kayıt Oldu", value: "REGISTERED" }]} />
       {applications.length === 0 ? <Empty>Başvuru bulunamadı.</Empty> : (
         <div className="grid gap-4">
           {applications.map((a) => (
-            <div key={a.id} className="rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-sm">
+            <div key={a.id} className="rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-5 shadow-2xl shadow-cyan-950/20">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex gap-4">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#3D1A1A] text-xl font-black text-[#F7B4B4]">{a.applicantName?.[0] || "A"}</div>
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-rose-300/20 bg-rose-500/10 text-xl font-black text-rose-100">{a.applicantName?.[0] || "A"}</div>
                   <div>
-                    <h3 className="text-lg font-black text-[#0D2137]">{a.applicantName}</h3>
-                    <p className="text-sm font-semibold text-slate-500">{a.applicantEmail} · {a.applicantPhone}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-400">{fmt(a.createdAt)}</p>
+                    <h3 className="text-lg font-black text-white">{a.applicantName}</h3>
+                    <p className="text-sm font-semibold text-slate-400">{a.applicantEmail} · {a.applicantPhone}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{fmt(a.createdAt)}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Pill className={roleClass(a.requestedRole)}>{ROLE_LABELS[a.requestedRole] || a.requestedRole}</Pill>
                       <Pill className={statusClass(a.status)}>{STATUS_LABELS[a.status] || a.status}</Pill>
-                      {a.referrer && <Pill className="border-emerald-200 bg-emerald-50 text-emerald-700">Referanslı</Pill>}
+                      {a.referrer && <Pill className="border-emerald-300/30 bg-emerald-400/10 text-emerald-100">Referanslı</Pill>}
                     </div>
-                    {a.message && <p className="mt-4 max-w-3xl rounded-3xl bg-[#F8F3EA] p-4 text-sm font-medium leading-7 text-slate-600">{a.message}</p>}
-                    {a.adminNote && <p className="mt-3 text-sm font-black text-[#B8943F]">📝 {a.adminNote}</p>}
+                    {a.message && <p className="mt-4 max-w-3xl rounded-3xl border border-cyan-300/10 bg-white/[0.04] p-4 text-sm font-medium leading-7 text-slate-300">{a.message}</p>}
+                    {a.adminNote && <p className="mt-3 text-sm font-black text-amber-200">📝 {a.adminNote}</p>}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -1085,19 +1168,19 @@ function ApplicationsTab({ applications, filter, setFilter, actionLoading, onNot
 function DocumentsTab({ documents, filter, setFilter, actionLoading, onApprove, onReject }: { documents: DocumentItem[]; filter: string; setFilter: (v: string) => void; actionLoading: string | null; onApprove: (id: string) => void; onReject: (id: string) => void }) {
   return (
     <section>
-      <SectionTitle title="Belge İnceleme" desc="Yüklenen belgeleri görüntüle, onayla veya reddet." />
+      <SectionTitle title="Belge Kapısı" desc="Yüklenen belgeleri görüntüle, onayla veya reddet." />
       <FilterBar value={filter} setValue={setFilter} items={[{ label: "Tümü", value: "all" }, { label: "Bekleyen", value: "pending" }, { label: "Onaylanan", value: "approved" }, { label: "Reddedilen", value: "rejected" }]} />
       {documents.length === 0 ? <Empty>Belge bulunamadı.</Empty> : (
         <div className="grid gap-4">
           {documents.map((d) => (
-            <div key={d.id} className="rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-sm">
+            <div key={d.id} className="rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-5 shadow-2xl shadow-cyan-950/20">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-4">
                   <Avatar firstName={d.user?.firstName} lastName={d.user?.lastName} imageUrl={d.user?.profileImageUrl} big />
                   <div>
-                    <h3 className="text-lg font-black text-[#0D2137]">{DOC_LABELS[d.type] || d.type}</h3>
-                    <p className="text-sm font-semibold text-slate-500">{d.fileName}</p>
-                    <p className="text-xs font-semibold text-slate-400">{d.user ? `${d.user.firstName} ${d.user.lastName} · ${ROLE_LABELS[d.user.role] || d.user.role}` : "Kullanıcı yok"}</p>
+                    <h3 className="text-lg font-black text-white">{DOC_LABELS[d.type] || d.type}</h3>
+                    <p className="text-sm font-semibold text-slate-400">{d.fileName}</p>
+                    <p className="text-xs font-semibold text-slate-500">{d.user ? `${d.user.firstName} ${d.user.lastName} · ${ROLE_LABELS[d.user.role] || d.user.role}` : "Kullanıcı yok"}</p>
                     <div className="mt-3"><Pill className={statusClass(d.status)}>{STATUS_LABELS[d.status] || d.status}</Pill></div>
                   </div>
                 </div>
@@ -1122,25 +1205,25 @@ function DocumentsTab({ documents, filter, setFilter, actionLoading, onApprove, 
 function NominationsTab({ nominations, filter, setFilter, actionLoading, onNote, onStatus }: { nominations: NominationItem[]; filter: string; setFilter: (v: string) => void; actionLoading: string | null; onNote: (n: NominationItem) => void; onStatus: (id: string, status: string) => void }) {
   return (
     <section>
-      <SectionTitle title="Tavsiye Yönetimi" desc="Üyeler tarafından önerilen adayları yönet." />
+      <SectionTitle title="Tavsiye Kanalı" desc="Üyeler tarafından önerilen adayları yönet." />
       <FilterBar value={filter} setValue={setFilter} items={[{ label: "Tümü", value: "all" }, { label: "Bekliyor", value: "PENDING" }, { label: "Onaylandı", value: "APPROVED" }, { label: "Reddedildi", value: "REJECTED" }, { label: "Davet", value: "INVITED" }, { label: "Kayıt Oldu", value: "REGISTERED" }]} />
       {nominations.length === 0 ? <Empty>Tavsiye bulunamadı.</Empty> : (
         <div className="grid gap-4">
           {nominations.map((n) => (
-            <div key={n.id} className="rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-sm">
+            <div key={n.id} className="rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-5 shadow-2xl shadow-cyan-950/20">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex gap-4">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#0D2137] text-xl font-black text-[#F7DFA3]">{n.candidateName?.[0] || "A"}</div>
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-xl font-black text-cyan-100">{n.candidateName?.[0] || "A"}</div>
                   <div>
-                    <h3 className="text-lg font-black text-[#0D2137]">{n.candidateName}</h3>
-                    <p className="text-sm font-semibold text-slate-500">{n.candidateEmail} · {n.candidatePhone}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-400">Öneren: {n.nominator.firstName} {n.nominator.lastName} · {fmt(n.createdAt)}</p>
+                    <h3 className="text-lg font-black text-white">{n.candidateName}</h3>
+                    <p className="text-sm font-semibold text-slate-400">{n.candidateEmail} · {n.candidatePhone}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">Öneren: {n.nominator.firstName} {n.nominator.lastName} · {fmt(n.createdAt)}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Pill className={roleClass(n.candidateRole)}>{ROLE_LABELS[n.candidateRole] || n.candidateRole}</Pill>
                       <Pill className={statusClass(n.status)}>{STATUS_LABELS[n.status] || n.status}</Pill>
                     </div>
-                    {n.note && <p className="mt-4 max-w-3xl rounded-3xl bg-[#F8F3EA] p-4 text-sm font-medium leading-7 text-slate-600">{n.note}</p>}
-                    {n.adminNote && <p className="mt-3 text-sm font-black text-[#B8943F]">📝 {n.adminNote}</p>}
+                    {n.note && <p className="mt-4 max-w-3xl rounded-3xl border border-cyan-300/10 bg-white/[0.04] p-4 text-sm font-medium leading-7 text-slate-300">{n.note}</p>}
+                    {n.adminNote && <p className="mt-3 text-sm font-black text-amber-200">📝 {n.adminNote}</p>}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -1165,29 +1248,29 @@ function NominationsTab({ nominations, filter, setFilter, actionLoading, onNote,
 function LeadsTab({ leads, expandedLead, setExpandedLead, onRefresh }: { leads: LeadItem[]; expandedLead: string | null; setExpandedLead: (id: string | null) => void; onRefresh: () => void }) {
   return (
     <section>
-      <SectionTitle title="Lina Leads" desc={`${leads.length} aday kaydı toplandı.`} action={<Button variant="ghost" icon={<RefreshCw size={15} />} onClick={onRefresh}>Yenile</Button>} />
+      <SectionTitle title="Lina Intelligence" desc={`${leads.length} aday kaydı toplandı.`} action={<Button variant="ghost" icon={<RefreshCw size={15} />} onClick={onRefresh}>Yenile</Button>} />
       {leads.length === 0 ? <Empty>Henüz Lina lead kaydı yok.</Empty> : (
         <div className="grid gap-4">
           {leads.map((l) => (
-            <div key={l.id} className="rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-sm">
+            <div key={l.id} className="rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-5 shadow-2xl shadow-cyan-950/20">
               <div className="flex items-start gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#3D0A1E] text-lg font-black text-[#F7B4CF]">{l.fullName?.[0]?.toUpperCase() || "?"}</div>
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-pink-300/20 bg-pink-500/10 text-lg font-black text-pink-100">{l.fullName?.[0]?.toUpperCase() || "?"}</div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-lg font-black text-[#0D2137]">{l.fullName || "İsimsiz Lead"}</h3>
-                    <Pill className="border-pink-200 bg-pink-50 text-pink-700">Lina</Pill>
+                    <h3 className="text-lg font-black text-white">{l.fullName || "İsimsiz Lead"}</h3>
+                    <Pill className="border-pink-300/30 bg-pink-500/10 text-pink-100">Lina</Pill>
                   </div>
-                  <div className="mt-3 grid gap-2 text-sm font-semibold text-slate-500 md:grid-cols-2">
+                  <div className="mt-3 grid gap-2 text-sm font-semibold text-slate-400 md:grid-cols-2">
                     {l.phone && <span>📞 {l.phone}</span>}
                     {l.email && <span>✉️ {l.email}</span>}
                     {l.profession && <span>💼 {l.profession}</span>}
                     {l.city && <span>📍 {l.city}</span>}
                     {l.interest && <span className="md:col-span-2">🎯 {l.interest}</span>}
                   </div>
-                  <p className="mt-3 text-xs font-semibold text-slate-400">{fmt(l.createdAt)}</p>
+                  <p className="mt-3 text-xs font-semibold text-slate-500">{fmt(l.createdAt)}</p>
                   {l.conversation && (
                     <>
-                      <button onClick={() => setExpandedLead(expandedLead === l.id ? null : l.id)} className="mt-4 rounded-full border border-[#D7B56D]/40 bg-[#FFF8E7] px-4 py-2 text-xs font-black text-[#8A671F]">
+                      <button onClick={() => setExpandedLead(expandedLead === l.id ? null : l.id)} className="mt-4 rounded-full border border-amber-300/30 bg-amber-300/10 px-4 py-2 text-xs font-black text-amber-100">
                         {expandedLead === l.id ? "Konuşmayı Gizle" : "Konuşmayı Gör"}
                       </button>
                       {expandedLead === l.id && <ConversationBox conversation={l.conversation} />}
@@ -1205,17 +1288,17 @@ function LeadsTab({ leads, expandedLead, setExpandedLead, onRefresh }: { leads: 
 
 function ConversationBox({ conversation }: { conversation: string }) {
   return (
-    <div className="mt-4 max-h-72 overflow-auto rounded-3xl border border-slate-100 bg-[#F8F3EA] p-4">
+    <div className="mt-4 max-h-72 overflow-auto rounded-3xl border border-cyan-300/10 bg-black/20 p-4">
       {(() => {
         try {
           const messages = JSON.parse(conversation || "[]");
           return messages.map((m: { role: string; content: string }, i: number) => (
             <div key={i} className={`mb-3 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[80%] rounded-3xl px-4 py-3 text-sm font-semibold leading-6 ${m.role === "user" ? "bg-[#0D2137] text-white" : "bg-white text-slate-600"}`}>{m.content}</div>
+              <div className={`max-w-[80%] rounded-3xl px-4 py-3 text-sm font-semibold leading-6 ${m.role === "user" ? "bg-cyan-300/15 text-cyan-50" : "bg-white/10 text-slate-200"}`}>{m.content}</div>
             </div>
           ));
         } catch {
-          return <p className="text-sm font-semibold text-slate-600">{conversation}</p>;
+          return <p className="text-sm font-semibold text-slate-300">{conversation}</p>;
         }
       })()}
     </div>
@@ -1225,20 +1308,20 @@ function ConversationBox({ conversation }: { conversation: string }) {
 function StockTab({ units, verifyLoading, handleVerify, onRefresh }: { units: UnitItem[]; verifyLoading: string | null; handleVerify: (id: string, field: string, current: boolean) => void; onRefresh: () => void }) {
   return (
     <section>
-      <SectionTitle title="Stok Doğrulama" desc={`${units.length} birim · ${units.filter((u) => u.isVerified).length} doğrulanmış`} action={<Button variant="ghost" icon={<RefreshCw size={15} />} onClick={onRefresh}>Yenile</Button>} />
+      <SectionTitle title="Stok Güvenlik Izgarası" desc={`${units.length} birim · ${units.filter((u) => u.isVerified).length} doğrulanmış`} action={<Button variant="ghost" icon={<RefreshCw size={15} />} onClick={onRefresh}>Yenile</Button>} />
       {units.length === 0 ? <Empty>Birim bulunamadı.</Empty> : (
         <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {units.map((u) => (
-            <div key={u.id} className="rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-sm">
-              <h3 className="font-serif text-2xl font-semibold text-[#0D2137]">{u.project?.name}</h3>
-              <p className="mt-1 text-sm font-semibold text-slate-500">{u.project?.city} / {u.project?.district} · {u.project?.owner?.firstName} {u.project?.owner?.lastName}</p>
+            <div key={u.id} className="rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-5 shadow-2xl shadow-cyan-950/20">
+              <h3 className="text-2xl font-black text-white">{u.project?.name}</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-400">{u.project?.city} / {u.project?.district} · {u.project?.owner?.firstName} {u.project?.owner?.lastName}</p>
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <StockInfo label="Tip" value={TYPE_LABELS[u.type] || u.type} />
                 <StockInfo label="Durum" value={UNIT_STATUS_LABELS[u.status] || u.status} />
                 <StockInfo label="No / Kat" value={`${u.number} / ${u.floor ?? "—"}`} />
                 <StockInfo label="Alan" value={u.area ? `${u.area} m²` : "—"} />
               </div>
-              <div className="mt-4 rounded-3xl bg-[#FFF8E7] p-4 font-serif text-2xl font-semibold text-[#8A671F]">{u.price.toLocaleString("tr-TR")} ₺</div>
+              <div className="mt-4 rounded-3xl border border-amber-300/20 bg-amber-300/10 p-4 text-2xl font-black text-amber-100">{money(u.price)}</div>
               <div className="mt-4 space-y-2">
                 {[
                   { key: "tapu", label: "Tapu Doğrulandı", value: u.tapuVerified },
@@ -1246,7 +1329,7 @@ function StockTab({ units, verifyLoading, handleVerify, onRefresh }: { units: Un
                   { key: "yetki", label: "Yetki Belgesi Doğrulandı", value: u.yetkiVerified },
                   { key: "offmarket", label: "Off-Market", value: u.isOffMarket },
                 ].map((item) => (
-                  <button key={item.key} onClick={() => { if (!verifyLoading) handleVerify(u.id, item.key, item.value); }} className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-sm font-black ${item.value ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`}>
+                  <button key={item.key} onClick={() => { if (!verifyLoading) handleVerify(u.id, item.key, item.value); }} className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-sm font-black ${item.value ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-100" : "border-cyan-300/10 bg-white/[0.04] text-slate-400"}`}>
                     {item.label}
                     <span>{verifyLoading === u.id + item.key ? "..." : item.value ? "✓ Aktif" : "Kapalı"}</span>
                   </button>
@@ -1262,9 +1345,9 @@ function StockTab({ units, verifyLoading, handleVerify, onRefresh }: { units: Un
 
 function StockInfo({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-3xl bg-[#F8F3EA] p-4">
-      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">{label}</p>
-      <p className="mt-1 text-sm font-black text-[#0D2137]">{value}</p>
+    <div className="rounded-3xl border border-cyan-300/10 bg-white/[0.04] p-4">
+      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-black text-white">{value}</p>
     </div>
   );
 }
@@ -1272,24 +1355,24 @@ function StockInfo({ label, value }: { label: string; value: string }) {
 function TrustTab({ trust, onRefresh }: { trust: TrustItem[]; onRefresh: () => void }) {
   return (
     <section>
-      <SectionTitle title="Güven Skorları" desc={`${trust.length} üye sıralandı.`} action={<Button variant="ghost" icon={<RefreshCw size={15} />} onClick={onRefresh}>Yenile</Button>} />
+      <SectionTitle title="Üye Güven Skoru İzleme" desc="Bu alan admin skoru değildir; üyelerin platform güven göstergeleridir." action={<Button variant="ghost" icon={<RefreshCw size={15} />} onClick={onRefresh}>Yenile</Button>} />
       {trust.length === 0 ? <Empty>Henüz güven skoru verisi yok.</Empty> : (
-        <div className="rounded-[32px] border border-white/70 bg-white/80 p-4 shadow-sm">
+        <div className="rounded-[32px] border border-cyan-300/15 bg-white/[0.045] p-4 shadow-2xl shadow-cyan-950/20">
           {trust.map((t, i) => (
-            <div key={t.id} className="flex items-center gap-4 border-b border-slate-100 p-4 last:border-b-0">
-              <div className="font-serif text-3xl font-semibold text-[#D7B56D]">#{i + 1}</div>
+            <div key={t.id} className="flex items-center gap-4 border-b border-cyan-300/10 p-4 last:border-b-0">
+              <div className="text-3xl font-black text-amber-200">#{i + 1}</div>
               <Avatar firstName={t.firstName} lastName={t.lastName} imageUrl={t.profileImageUrl} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-black text-[#0D2137]">{t.firstName} {t.lastName}</p>
+                <p className="truncate text-sm font-black text-white">{t.firstName} {t.lastName}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Pill className={roleClass(t.role)}>{ROLE_LABELS[t.role] || t.role}</Pill>
                   <span className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: t.badgeColor }}>{t.badge}</span>
                 </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
                   <div className="h-full rounded-full" style={{ width: `${t.score}%`, background: t.badgeColor }} />
                 </div>
               </div>
-              <div className="font-serif text-3xl font-semibold text-[#0D2137]">{t.score}</div>
+              <div className="text-3xl font-black text-white">{t.score}</div>
             </div>
           ))}
         </div>
@@ -1301,13 +1384,13 @@ function TrustTab({ trust, onRefresh }: { trust: TrustItem[]; onRefresh: () => v
 function VisitsTab({ visits, onRefresh }: { visits: any[]; onRefresh: () => void }) {
   return (
     <section>
-      <SectionTitle title="Kullanıcı Ziyaretleri" desc="Kim, ne zaman, hangi sayfayı ziyaret etti." action={<Button variant="ghost" icon={<RefreshCw size={15} />} onClick={onRefresh}>Yenile</Button>} />
+      <SectionTitle title="Canlı Trafik İzleme" desc="Kim, ne zaman, hangi sayfayı ziyaret etti." action={<Button variant="ghost" icon={<RefreshCw size={15} />} onClick={onRefresh}>Yenile</Button>} />
       {visits.length === 0 ? <Empty>Henüz ziyaret yok.</Empty> : (
-        <div className="overflow-hidden rounded-[32px] border border-white/70 bg-white/80 shadow-sm">
+        <div className="overflow-hidden rounded-[32px] border border-cyan-300/15 bg-white/[0.045] shadow-2xl shadow-cyan-950/20">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] border-collapse">
               <thead>
-                <tr className="border-b border-slate-100 bg-[#0D2137] text-left text-white">
+                <tr className="border-b border-cyan-300/10 bg-cyan-300/10 text-left text-cyan-50">
                   <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.2em]">Kullanıcı</th>
                   <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.2em]">Sayfa</th>
                   <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.2em]">IP</th>
@@ -1316,11 +1399,11 @@ function VisitsTab({ visits, onRefresh }: { visits: any[]; onRefresh: () => void
               </thead>
               <tbody>
                 {visits.map((v) => (
-                  <tr key={v.id} className="border-b border-slate-100 last:border-b-0">
-                    <td className="px-5 py-4"><p className="font-black text-[#0D2137]">{v.user ? `${v.user.firstName} ${v.user.lastName}` : "Misafir"}</p><p className="text-xs font-semibold text-slate-500">{v.user?.email}</p></td>
-                    <td className="px-5 py-4 font-mono text-xs font-bold text-slate-600">{v.page}</td>
-                    <td className="px-5 py-4 text-xs font-semibold text-slate-500">{v.ip}</td>
-                    <td className="px-5 py-4 text-xs font-semibold text-slate-500">{fmt(v.createdAt)}</td>
+                  <tr key={v.id} className="border-b border-cyan-300/10 last:border-b-0">
+                    <td className="px-5 py-4"><p className="font-black text-white">{v.user ? `${v.user.firstName} ${v.user.lastName}` : "Misafir"}</p><p className="text-xs font-semibold text-slate-400">{v.user?.email}</p></td>
+                    <td className="px-5 py-4 font-mono text-xs font-bold text-slate-300">{v.page}</td>
+                    <td className="px-5 py-4 text-xs font-semibold text-slate-400">{v.ip}</td>
+                    <td className="px-5 py-4 text-xs font-semibold text-slate-400">{fmt(v.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
