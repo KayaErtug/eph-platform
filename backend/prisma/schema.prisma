@@ -14,6 +14,7 @@ model User {
   passwordHash            String
   firstName               String
   lastName                String
+  profileImageUrl         String?
   role                    Role
   isVerified              Boolean                   @default(false)
   isApproved              Boolean                   @default(false)
@@ -235,7 +236,7 @@ model ConversationParticipant {
   conversationId String
   userId         String
   createdAt      DateTime     @default(now())
-  lastReadAt      DateTime?
+  lastReadAt     DateTime?
   Conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   User           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 

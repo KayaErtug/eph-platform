@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   BadgeCheck,
   Building2,
+  Camera,
   CheckCircle2,
   CircleUserRound,
   FileText,
@@ -43,6 +44,7 @@ const ROLE_LABELS: Record<string, string> = {
   MUTEAHHIT: "Müteahhit",
   INSAAT_FIRMASI: "İnşaat Firması",
   ADMIN: "Admin",
+  DENETCI_ADMIN: "Denetçi Admin",
 };
 
 interface Profile {
@@ -51,6 +53,7 @@ interface Profile {
   lastName: string;
   email: string;
   phone: string;
+  profileImageUrl?: string | null;
   role: string;
   isApproved: boolean;
   documents: {
@@ -94,6 +97,12 @@ function getTip(score: number) {
   return "Tebrikler! Platformun en güvenilir üyeleri arasındasınız.";
 }
 
+function getInitials(firstName?: string, lastName?: string) {
+  const first = firstName?.trim()?.[0] || "E";
+  const last = lastName?.trim()?.[0] || "P";
+  return `${first}${last}`.toUpperCase();
+}
+
 export default function ProfilPage() {
   const { user, setAuth, logout } = useAuthStore();
   const router = useRouter();
@@ -109,11 +118,16 @@ export default function ProfilPage() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  const [avatarLoading, setAvatarLoading] = useState(false);
+  const [avatarSuccess, setAvatarSuccess] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [selectedDocType, setSelectedDocType] = useState("VERGI_LEVHASI");
 
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -154,30 +168,34 @@ export default function ProfilPage() {
     }
   };
 
+  const syncAuthUser = (nextProfile: Profile) => {
+    const authStorage = localStorage.getItem("auth-storage");
+    let token = "";
+
+    if (authStorage) {
+      try {
+        const parsed = JSON.parse(authStorage);
+        token = parsed?.state?.token || "";
+      } catch {
+        token = "";
+      }
+    }
+
+    if (user && token) {
+      setAuth({ ...user, ...nextProfile }, token);
+    }
+  };
+
   const handleSave = async () => {
     setSaveLoading(true);
     setSaveSuccess(false);
 
     try {
       const res = await api.patch("/profile", form);
+      const nextProfile = profile ? { ...profile, ...res.data } : res.data;
 
-      setProfile((prev) => (prev ? { ...prev, ...res.data } : prev));
-
-      const authStorage = localStorage.getItem("auth-storage");
-      let token = "";
-
-      if (authStorage) {
-        try {
-          const parsed = JSON.parse(authStorage);
-          token = parsed?.state?.token || "";
-        } catch {
-          token = "";
-        }
-      }
-
-      if (user && token) {
-        setAuth({ ...user, ...res.data }, token);
-      }
+      setProfile(nextProfile);
+      syncAuthUser(nextProfile);
 
       setEditMode(false);
       setSaveSuccess(true);
@@ -188,6 +206,40 @@ export default function ProfilPage() {
       alert("Profil güncellenemedi.");
     } finally {
       setSaveLoading(false);
+    }
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    setAvatarLoading(true);
+    setAvatarError("");
+    setAvatarSuccess(false);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await api.post("/profile/avatar", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      const nextProfile = profile ? { ...profile, ...res.data } : res.data;
+      setProfile(nextProfile);
+      syncAuthUser(nextProfile);
+
+      setAvatarSuccess(true);
+      setTimeout(() => setAvatarSuccess(false), 3000);
+    } catch (err: any) {
+      setAvatarError(err?.response?.data?.message || "Profil fotoğrafı yüklenemedi.");
+    } finally {
+      setAvatarLoading(false);
+
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = "";
+      }
     }
   };
 
@@ -237,7 +289,7 @@ export default function ProfilPage() {
     );
   }
 
-  const initials = `${profile?.firstName?.[0] || "E"}${profile?.lastName?.[0] || "P"}`;
+  const initials = getInitials(profile?.firstName, profile?.lastName);
   const roleLabel = ROLE_LABELS[profile?.role || ""] || "EPH Üyesi";
   const documents = profile?.documents || [];
 
@@ -264,8 +316,7 @@ export default function ProfilPage() {
               </h1>
 
               <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                Kişisel bilgilerini, belgelerini, güven skorunu ve görünüm tercihini
-                buradan yönet.
+                Kişisel bilgilerini, profil fotoğrafını, belgelerini, güven skorunu ve görünüm tercihini buradan yönet.
               </p>
             </div>
 
@@ -284,12 +335,46 @@ export default function ProfilPage() {
           </div>
         )}
 
+        {avatarSuccess && (
+          <div className="mb-5 rounded-[24px] border border-emerald-100 bg-emerald-50 p-4 text-sm font-black text-emerald-700">
+            Profil fotoğrafı başarıyla güncellendi.
+          </div>
+        )}
+
+        {avatarError && (
+          <div className="mb-5 rounded-[24px] border border-red-100 bg-red-50 p-4 text-sm font-black text-red-600">
+            {avatarError}
+          </div>
+        )}
+
         <section className="grid grid-cols-1 gap-5 lg:grid-cols-[.95fr_1.05fr]">
           <div className="space-y-5">
             <section className="rounded-[32px] border border-slate-200 bg-white p-5">
               <div className="flex items-start gap-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[24px] bg-[#0B1F44] text-[22px] font-black text-white">
-                  {initials}
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B1F44] to-[#1D4ED8] text-white shadow-xl shadow-[#1D4ED8]/20 ring-4 ring-[#EEF4FF]">
+                  {profile?.profileImageUrl ? (
+                    <img
+                      src={profile.profileImageUrl}
+                      alt="Profil fotoğrafı"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-[24px] font-black tracking-tight">
+                      {initials}
+                    </div>
+                  )}
+
+                  <label className="absolute bottom-1 right-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl border-2 border-white bg-[#1D4ED8] text-white shadow-lg">
+                    <Camera size={15} />
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp"
+                      onChange={handleAvatarUpload}
+                      disabled={avatarLoading}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -321,6 +406,16 @@ export default function ProfilPage() {
                       {profile?.isApproved ? "Onaylı" : "Onay Bekliyor"}
                     </span>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={avatarLoading}
+                    className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-[#0B1F44] px-4 text-xs font-black text-white disabled:opacity-50"
+                  >
+                    <UploadCloud size={16} />
+                    {avatarLoading ? "Yükleniyor..." : "Profil Fotoğrafı Yükle"}
+                  </button>
                 </div>
               </div>
 
