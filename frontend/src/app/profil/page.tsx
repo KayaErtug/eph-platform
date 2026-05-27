@@ -212,11 +212,34 @@ export default function ProfilPage() {
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
-    if (!file) return;
-
-    setAvatarLoading(true);
     setAvatarError("");
     setAvatarSuccess(false);
+
+    if (!file) return;
+
+    if (file.size > 1024 * 1024) {
+      setAvatarError("Profil fotoğrafı 1 MB'den büyük olamaz. Lütfen daha küçük bir fotoğraf seçin.");
+
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = "";
+      }
+
+      return;
+    }
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      setAvatarError("Sadece JPG, PNG veya WEBP formatında fotoğraf yükleyebilirsin.");
+
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = "";
+      }
+
+      return;
+    }
+
+    setAvatarLoading(true);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -227,13 +250,17 @@ export default function ProfilPage() {
       });
 
       const nextProfile = profile ? { ...profile, ...res.data } : res.data;
+
       setProfile(nextProfile);
       syncAuthUser(nextProfile);
 
       setAvatarSuccess(true);
       setTimeout(() => setAvatarSuccess(false), 3000);
     } catch (err: any) {
-      setAvatarError(err?.response?.data?.message || "Profil fotoğrafı yüklenemedi.");
+      setAvatarError(
+        err?.response?.data?.message ||
+          "Profil fotoğrafı yüklenemedi. Lütfen tekrar deneyin."
+      );
     } finally {
       setAvatarLoading(false);
 
@@ -350,8 +377,8 @@ export default function ProfilPage() {
         <section className="grid grid-cols-1 gap-5 lg:grid-cols-[.95fr_1.05fr]">
           <div className="space-y-5">
             <section className="rounded-[32px] border border-slate-200 bg-white p-5">
-              <div className="flex items-start gap-4">
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0B1F44] to-[#1D4ED8] text-white shadow-xl shadow-[#1D4ED8]/20 ring-4 ring-[#EEF4FF]">
+              <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:text-left">
+                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-[30px] bg-gradient-to-br from-[#0B1F44] via-[#1D4ED8] to-[#60A5FA] text-white shadow-xl shadow-[#1D4ED8]/20">
                   {profile?.profileImageUrl ? (
                     <img
                       src={profile.profileImageUrl}
@@ -359,22 +386,14 @@ export default function ProfilPage() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-[24px] font-black tracking-tight">
+                    <div className="flex h-full w-full items-center justify-center text-[30px] font-black">
                       {initials}
                     </div>
                   )}
 
-                  <label className="absolute bottom-1 right-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl border-2 border-white bg-[#1D4ED8] text-white shadow-lg">
-                    <Camera size={15} />
-                    <input
-                      ref={avatarInputRef}
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.webp"
-                      onChange={handleAvatarUpload}
-                      disabled={avatarLoading}
-                      className="hidden"
-                    />
-                  </label>
+                  <div className="absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-500">
+                    <CheckCircle2 size={12} className="text-white" />
+                  </div>
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -386,7 +405,7 @@ export default function ProfilPage() {
                     {profile?.email}
                   </p>
 
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
                     <span className="rounded-full bg-[#EEF4FF] px-3 py-2 text-xs font-black text-[#1D4ED8]">
                       {roleLabel}
                     </span>
@@ -407,15 +426,30 @@ export default function ProfilPage() {
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => avatarInputRef.current?.click()}
-                    disabled={avatarLoading}
-                    className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-[#0B1F44] px-4 text-xs font-black text-white disabled:opacity-50"
-                  >
-                    <UploadCloud size={16} />
-                    {avatarLoading ? "Yükleniyor..." : "Profil Fotoğrafı Yükle"}
-                  </button>
+                  <div className="mt-4">
+                    <label
+                      className={`inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl px-5 text-sm font-black text-white transition ${
+                        avatarLoading
+                          ? "bg-slate-400"
+                          : "bg-[#0B1F44] hover:bg-[#1D4ED8]"
+                      }`}
+                    >
+                      <Camera size={18} />
+                      {avatarLoading ? "Yükleniyor..." : "Profil Fotoğrafı Yükle"}
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.webp"
+                        onChange={handleAvatarUpload}
+                        disabled={avatarLoading}
+                        className="hidden"
+                      />
+                    </label>
+
+                    <p className="mt-2 text-xs font-bold text-slate-400">
+                      JPG, PNG veya WEBP. Maksimum dosya boyutu: 1 MB.
+                    </p>
+                  </div>
                 </div>
               </div>
 
