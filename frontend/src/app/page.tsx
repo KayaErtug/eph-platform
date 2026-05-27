@@ -151,8 +151,21 @@ export default function LandingPage() {
     kod: "",
   });
 
+  const [legalAccepted, setLegalAccepted] = useState({
+    constitution: false,
+    kvkk: false,
+    privacy: false,
+    agreement: false,
+  });
+
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const allLegalAccepted =
+    legalAccepted.constitution &&
+    legalAccepted.kvkk &&
+    legalAccepted.privacy &&
+    legalAccepted.agreement;
 
   useEffect(() => {
     const alreadySeenVideo = sessionStorage.getItem("ephIntroVideoSeen");
@@ -188,6 +201,11 @@ export default function LandingPage() {
       return;
     }
 
+    if (!allLegalAccepted) {
+      alert("Başvuru gönderebilmek için hukuki onay kutularını işaretlemelisiniz.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -217,6 +235,12 @@ export default function LandingPage() {
         email: "",
         meslek: "",
         kod: "",
+      });
+      setLegalAccepted({
+        constitution: false,
+        kvkk: false,
+        privacy: false,
+        agreement: false,
       });
     } catch {
       alert("Başvuru gönderilemedi. Lütfen tekrar deneyin.");
@@ -923,10 +947,57 @@ export default function LandingPage() {
                   />
                 </div>
 
+                <div className="mt-6 rounded-3xl border border-white/10 bg-white/[0.03] p-5 text-left">
+                  <p className="mb-4 text-center text-xs font-black uppercase tracking-[0.2em] text-[#60A5FA]">
+                    Hukuki Onaylar
+                  </p>
+
+                  <div className="space-y-3">
+                    <LegalCheckbox
+                      checked={legalAccepted.constitution}
+                      onChange={(checked) =>
+                        setLegalAccepted((prev) => ({
+                          ...prev,
+                          constitution: checked,
+                        }))
+                      }
+                      href="/platform-anayasasi"
+                      label="Platform Anayasasını okudum ve kabul ediyorum."
+                    />
+
+                    <LegalCheckbox
+                      checked={legalAccepted.kvkk}
+                      onChange={(checked) =>
+                        setLegalAccepted((prev) => ({ ...prev, kvkk: checked }))
+                      }
+                      href="/kvkk"
+                      label="KVKK Aydınlatma Metnini okudum."
+                    />
+
+                    <LegalCheckbox
+                      checked={legalAccepted.privacy}
+                      onChange={(checked) =>
+                        setLegalAccepted((prev) => ({ ...prev, privacy: checked }))
+                      }
+                      href="/gizlilik-politikasi"
+                      label="Gizlilik Politikasını okudum ve kabul ediyorum."
+                    />
+
+                    <LegalCheckbox
+                      checked={legalAccepted.agreement}
+                      onChange={(checked) =>
+                        setLegalAccepted((prev) => ({ ...prev, agreement: checked }))
+                      }
+                      href="/kullanici-sozlesmesi"
+                      label="Kullanıcı Sözleşmesini okudum ve kabul ediyorum."
+                    />
+                  </div>
+                </div>
+
                 <button
                   onClick={submitForm}
-                  disabled={loading}
-                  className="mt-8 flex h-14 w-full items-center justify-center rounded-2xl bg-[#2563EB] text-sm font-black transition hover:bg-[#1D4ED8] disabled:opacity-50"
+                  disabled={loading || !allLegalAccepted}
+                  className="mt-8 flex h-14 w-full items-center justify-center rounded-2xl bg-[#2563EB] text-sm font-black transition hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {loading ? "Gönderiliyor..." : "Başvuruyu Gönder"}
                 </button>
@@ -1048,6 +1119,41 @@ Başvurular ve destek talepleri mümkün olan en kısa sürede değerlendirilir.
         </button>
       </div>
     </div>
+  );
+}
+
+function LegalCheckbox({
+  checked,
+  onChange,
+  href,
+  label,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  href: string;
+  label: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm font-semibold leading-6 text-white/70 transition hover:bg-white/[0.06]">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="mt-1 h-4 w-4 shrink-0 accent-[#2563EB]"
+      />
+
+      <span>
+        {label}{" "}
+        <Link
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-black text-[#60A5FA] underline-offset-4 hover:underline"
+        >
+          Metni aç
+        </Link>
+      </span>
+    </label>
   );
 }
 
