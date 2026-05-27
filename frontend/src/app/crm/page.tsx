@@ -95,6 +95,29 @@ function stageInfo(status: string) {
   return PIPELINE_STAGES.find((item) => item.key === status) || PIPELINE_STAGES[0];
 }
 
+function formatDateTime(value?: string) {
+  if (!value) return "Tarih yok";
+
+  const date = new Date(value);
+
+  return `${date.toLocaleDateString("tr-TR")} · ${date.toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+}
+
+function isTaskSoon(value?: string) {
+  if (!value) return false;
+
+  const dueDate = new Date(value);
+  const now = new Date();
+
+  const diffMs = dueDate.getTime() - now.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  return diffHours <= 1 && diffHours > 0;
+}
+
 export default function CrmPage() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
@@ -228,11 +251,15 @@ export default function CrmPage() {
     setTaskLoading(true);
 
     try {
-      await api.post(`/crm/customers/${selectedCustomer.id}/tasks`, taskForm);
+      await api.post(`/crm/customers/${selectedCustomer.id}/tasks`, {
+        title: taskForm.title,
+        dueDate: taskForm.dueDate || undefined,
+      });
 
       const res = await api.get(`/crm/customers/${selectedCustomer.id}`);
       setSelectedCustomer(res.data);
       setTaskForm({ title: "", dueDate: "" });
+      await fetchAll();
     } finally {
       setTaskLoading(false);
     }
@@ -245,6 +272,8 @@ export default function CrmPage() {
       const res = await api.get(`/crm/customers/${selectedCustomer.id}`);
       setSelectedCustomer(res.data);
     }
+
+    await fetchAll();
   };
 
   const openCustomer = async (id: string) => {
@@ -1017,11 +1046,7 @@ function CustomerDetailModal({
                     </p>
 
                     <p className="mt-2 text-xs font-bold text-slate-400">
-                      {new Date(activity.createdAt).toLocaleDateString("tr-TR")} ·{" "}
-                      {new Date(activity.createdAt).toLocaleTimeString("tr-TR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatDateTime(activity.createdAt)}
                     </p>
                   </div>
                 ))
@@ -1034,7 +1059,7 @@ function CustomerDetailModal({
           </FormSection>
 
           <FormSection title="Görevler">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_160px_auto]">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_220px_auto]">
               <input
                 className="premium-input"
                 placeholder="Görev ekle..."
@@ -1046,7 +1071,7 @@ function CustomerDetailModal({
 
               <input
                 className="premium-input"
-                type="date"
+                type="datetime-local"
                 value={taskForm.dueDate}
                 onChange={(event) =>
                   setTaskForm((form) => ({ ...form, dueDate: event.target.value }))
@@ -1064,35 +1089,55 @@ function CustomerDetailModal({
 
             <div className="mt-3 space-y-2">
               {customer.tasks?.length ? (
-                customer.tasks.map((task) => (
-                  <button
-                    key={task.id}
-                    onClick={() => task.status !== "TAMAMLANDI" && onTaskDone(task.id)}
-                    className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 text-left"
-                  >
-                    <div>
-                      <p
-                        className={`text-sm font-black ${
-                          task.status === "TAMAMLANDI"
-                            ? "text-slate-400 line-through"
-                            : "text-[#0B1F44]"
-                        }`}
-                      >
-                        {task.title}
-                      </p>
+                customer.tasks.map((task) => {
+                  const soon = isTaskSoon(task.dueDate);
 
-                      {task.dueDate && (
-                        <p className="mt-1 text-xs font-bold text-slate-400">
-                          {new Date(task.dueDate).toLocaleDateString("tr-TR")}
+                  return (
+                    <button
+                      key={task.id}
+                      onClick={() => task.status !== "TAMAMLANDI" && onTaskDone(task.id)}
+                      className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left ${
+                        soon
+                          ? "border-red-200 bg-red-50"
+                          : "border-slate-200 bg-white"
+                      }`}
+                    >
+                      <div>
+                        <p
+                          className={`text-sm font-black ${
+                            task.status === "TAMAMLANDI"
+                              ? "text-slate-400 line-through"
+                              : "text-[#0B1F44]"
+                          }`}
+                        >
+                          {task.title}
                         </p>
-                      )}
-                    </div>
 
-                    {task.status === "TAMAMLANDI" && (
-                      <CheckCircle2 size={20} className="text-emerald-600" />
-                    )}
-                  </button>
-                ))
+                        {task.dueDate && (
+                          <div className="mt-2">
+                            <p
+                              className={`text-xs font-black ${
+                                soon ? "text-red-600" : "text-slate-400"
+                              }`}
+                            >
+                              {formatDateTime(task.dueDate)}
+                            </p>
+
+                            {soon && (
+                              <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-[10px] font-black text-red-600">
+                                ⏰ Göreve 1 saatten az kaldı
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {task.status === "TAMAMLANDI" && (
+                        <CheckCircle2 size={20} className="text-emerald-600" />
+                      )}
+                    </button>
+                  );
+                })
               ) : (
                 <div className="rounded-2xl bg-[#F8FAFC] p-4 text-sm font-bold text-slate-400">
                   Henüz görev yok
