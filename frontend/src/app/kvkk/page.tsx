@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, FileShield } from "lucide-react";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
 
 const sections = [
   {
@@ -120,7 +120,7 @@ export default function KvkkPage() {
 
           <div className="flex items-start gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10">
-              <FileShield size={30} />
+              <ShieldCheck size={30} />
             </div>
 
             <div>
