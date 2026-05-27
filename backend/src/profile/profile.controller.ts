@@ -22,26 +22,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 @Controller('profile')
-@UseGuards(JwtAuthGuard)
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
-
-  @Get()
-  getProfile(@CurrentUser() user: any) {
-    return this.profileService.getProfile(user.id);
-  }
-
-  @Patch()
-  updateProfile(
-    @CurrentUser() user: any,
-    @Body() body: { firstName?: string; lastName?: string; phone?: string },
-  ) {
-    return this.profileService.updateProfile(user.id, body);
-  }
 
   @Get('avatar-file/:fileName')
   getAvatarFile(@Param('fileName') fileName: string, @Res() res: Response) {
     const safeFileName = path.basename(fileName);
+
     const filePath = path.resolve(
       process.cwd(),
       'public',
@@ -56,7 +43,23 @@ export class ProfileController {
     return res.sendFile(filePath);
   }
 
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  getProfile(@CurrentUser() user: any) {
+    return this.profileService.getProfile(user.id);
+  }
+
+  @Patch()
+  @UseGuards(JwtAuthGuard)
+  updateProfile(
+    @CurrentUser() user: any,
+    @Body() body: { firstName?: string; lastName?: string; phone?: string },
+  ) {
+    return this.profileService.updateProfile(user.id, body);
+  }
+
   @Post('avatar')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -71,6 +74,7 @@ export class ProfileController {
   }
 
   @Post('documents')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
