@@ -174,6 +174,20 @@ function formatDate(value?: string | null) {
   });
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) return 'Bekliyor';
+
+  const date = new Date(value);
+
+  return `${date.toLocaleDateString('tr-TR')} · ${date.toLocaleTimeString(
+    'tr-TR',
+    {
+      hour: '2-digit',
+      minute: '2-digit',
+    }
+  )}`;
+}
+
 function formatTimeAgo(value?: string | null) {
   if (!value) return 'Yeni';
 
@@ -187,6 +201,18 @@ function formatTimeAgo(value?: string | null) {
   if (hours < 24) return `${hours} saat önce`;
 
   return formatDate(value);
+}
+
+function isTaskSoon(value?: string | null) {
+  if (!value) return false;
+
+  const dueDate = new Date(value);
+  const now = new Date();
+
+  const diffMs = dueDate.getTime() - now.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  return diffHours <= 1 && diffHours > 0;
 }
 
 function unitTitle(unit: Unit) {
@@ -291,8 +317,16 @@ export default function DashboardPage() {
   const pendingTasks = summary?.pendingTasks || [];
   const latestActivities = summary?.latestActivities || [];
 
+  const soonTaskCount = pendingTasks.filter((task) =>
+    isTaskSoon(task.dueDate)
+  ).length;
+
   const aiSuggestions = useMemo(() => {
     const items: string[] = [];
+
+    if (soonTaskCount > 0) {
+      items.push(`${soonTaskCount} göreve 1 saatten az kaldı. Öncelik ver.`);
+    }
 
     if (latestUnits[0]) {
       items.push(`${unitTitle(latestUnits[0])} portföyünü bugün kontrol et.`);
@@ -309,11 +343,13 @@ export default function DashboardPage() {
     }
 
     if (items.length === 0) {
-      items.push('Bugün ilk müşteri ve portföy kayıtlarını ekleyerek paneli başlat.');
+      items.push(
+        'Bugün ilk müşteri ve portföy kayıtlarını ekleyerek paneli başlat.'
+      );
     }
 
     return items.slice(0, 3);
-  }, [latestUnits, latestCustomers, unreadMessages]);
+  }, [latestUnits, latestCustomers, unreadMessages, soonTaskCount]);
 
   if (!hydrated || loading) {
     return (
@@ -398,7 +434,10 @@ export default function DashboardPage() {
               </p>
 
               <p className="mt-0.5 truncate text-[12px] font-bold text-slate-500">
-                {userRole} • {unreadMessages > 0 ? `${unreadMessages} yeni mesaj` : 'Çevrimiçi'}
+                {userRole} •{' '}
+                {unreadMessages > 0
+                  ? `${unreadMessages} yeni mesaj`
+                  : 'Çevrimiçi'}
               </p>
             </div>
 
@@ -433,7 +472,10 @@ export default function DashboardPage() {
 
             <div className="mt-5 grid grid-cols-3 gap-2">
               <MiniHeroItem label="İlan" value={String(stats.totalUnits)} />
-              <MiniHeroItem label="Müşteri" value={String(stats.totalCustomers)} />
+              <MiniHeroItem
+                label="Müşteri"
+                value={String(stats.totalCustomers)}
+              />
               <MiniHeroItem label="Mesaj" value={String(unreadMessages)} />
             </div>
           </div>
@@ -485,7 +527,7 @@ export default function DashboardPage() {
                       ? `${task.customer.firstName} ${task.customer.lastName} müşteri kaydı`
                       : 'CRM görev kaydı'
                   }
-                  time={task.dueDate ? formatDate(task.dueDate) : 'Bekliyor'}
+                  dueDate={task.dueDate}
                 />
               ))
             ) : (
@@ -503,9 +545,21 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-4 gap-3">
             <QuickAction href="/stok" icon={<Plus size={20} />} label="İlan" />
-            <QuickAction href="/crm" icon={<UsersRound size={20} />} label="CRM" />
-            <QuickAction href="/network" icon={<MessageCircle size={20} />} label="Network" />
-            <QuickAction href="/market" icon={<WalletCards size={20} />} label="Piyasa" />
+            <QuickAction
+              href="/crm"
+              icon={<UsersRound size={20} />}
+              label="CRM"
+            />
+            <QuickAction
+              href="/network"
+              icon={<MessageCircle size={20} />}
+              label="Network"
+            />
+            <QuickAction
+              href="/market"
+              icon={<WalletCards size={20} />}
+              label="Piyasa"
+            />
           </div>
         </section>
 
@@ -518,7 +572,11 @@ export default function DashboardPage() {
                 <ActivityCard
                   key={activity.id}
                   icon={<Eye size={18} />}
-                  title={activity.customer ? `${activity.customer.firstName} ${activity.customer.lastName}` : activity.type}
+                  title={
+                    activity.customer
+                      ? `${activity.customer.firstName} ${activity.customer.lastName}`
+                      : activity.type
+                  }
                   desc={activity.note}
                   time={formatTimeAgo(activity.createdAt)}
                 />
@@ -617,20 +675,53 @@ export default function DashboardPage() {
           <SectionTitle title="Piyasa Özeti" action="Detay" href="/market" />
 
           <div className="mt-5 grid grid-cols-3 gap-3">
-            <MarketMini title="İlan" value={String(stats.totalUnits)} change="Canlı" />
-            <MarketMini title="Müşteri" value={String(stats.totalCustomers)} change="CRM" />
-            <MarketMini title="Ziyaret" value={String(stats.totalVisits)} change="Takip" />
+            <MarketMini
+              title="İlan"
+              value={String(stats.totalUnits)}
+              change="Canlı"
+            />
+            <MarketMini
+              title="Müşteri"
+              value={String(stats.totalCustomers)}
+              change="CRM"
+            />
+            <MarketMini
+              title="Ziyaret"
+              value={String(stats.totalVisits)}
+              change="Takip"
+            />
           </div>
         </section>
       </section>
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white/95 px-5 pb-6 pt-3 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center justify-between">
-          <BottomItem active href="/dashboard" icon={<Home size={21} />} label="Ana Sayfa" />
-          <BottomItem href="/stok" icon={<Building2 size={21} />} label="İlanlar" />
-          <BottomItem href="/network" icon={<MessageCircle size={21} />} label="Network" />
-          <BottomItem href="/crm" icon={<UsersRound size={21} />} label="CRM" />
-          <BottomItem href="/profil" icon={<CircleUserRound size={21} />} label="Profil" />
+          <BottomItem
+            active
+            href="/dashboard"
+            icon={<Home size={21} />}
+            label="Ana Sayfa"
+          />
+          <BottomItem
+            href="/stok"
+            icon={<Building2 size={21} />}
+            label="İlanlar"
+          />
+          <BottomItem
+            href="/network"
+            icon={<MessageCircle size={21} />}
+            label="Network"
+          />
+          <BottomItem
+            href="/crm"
+            icon={<UsersRound size={21} />}
+            label="CRM"
+          />
+          <BottomItem
+            href="/profil"
+            icon={<CircleUserRound size={21} />}
+            label="Profil"
+          />
         </div>
       </nav>
     </main>
@@ -651,7 +742,10 @@ function SectionTitle({
       <h3 className="text-[18px] font-black tracking-tight">{title}</h3>
 
       {action && href ? (
-        <Link href={href} className="flex items-center gap-1 text-[13px] font-bold text-[#1D4ED8]">
+        <Link
+          href={href}
+          className="flex items-center gap-1 text-[13px] font-bold text-[#1D4ED8]"
+        >
           {action}
           <ChevronRight size={15} />
         </Link>
@@ -664,7 +758,9 @@ function MiniHeroItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-white/10 px-3 py-3 text-center backdrop-blur">
       <p className="text-[18px] font-black leading-none">{value}</p>
-      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-white/55">{label}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-white/55">
+        {label}
+      </p>
     </div>
   );
 }
@@ -686,7 +782,9 @@ function StatCard({
         {icon}
       </div>
 
-      <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+        {title}
+      </p>
       <p className="mt-2 text-[28px] font-black leading-none">{value}</p>
       <p className="mt-3 text-[12px] font-bold text-emerald-600">{change}</p>
     </div>
@@ -697,26 +795,49 @@ function TaskCard({
   icon,
   title,
   desc,
-  time,
+  dueDate,
 }: {
   icon: ReactNode;
   title: string;
   desc: string;
-  time: string;
+  dueDate?: string | null;
 }) {
+  const soon = isTaskSoon(dueDate);
+
   return (
-    <article className="flex items-center gap-3 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#1D4ED8]">
+    <article
+      className={`flex items-center gap-3 rounded-[24px] border p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+        soon ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white'
+      }`}
+    >
+      <div
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+          soon ? 'bg-red-100 text-red-600' : 'bg-[#EEF4FF] text-[#1D4ED8]'
+        }`}
+      >
         {icon}
       </div>
 
       <div className="min-w-0 flex-1">
-        <h4 className="truncate text-[15px] font-black tracking-tight">{title}</h4>
+        <h4 className="truncate text-[15px] font-black tracking-tight">
+          {title}
+        </h4>
+
         <p className="mt-1 text-[12px] leading-5 text-slate-500">{desc}</p>
+
+        {soon && (
+          <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-[10px] font-black text-red-600">
+            ⏰ Göreve 1 saatten az kaldı
+          </div>
+        )}
       </div>
 
-      <span className="rounded-full bg-[#F8FAFC] px-3 py-1 text-[11px] font-black text-slate-500">
-        {time}
+      <span
+        className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-black ${
+          soon ? 'bg-red-100 text-red-600' : 'bg-[#F8FAFC] text-slate-500'
+        }`}
+      >
+        {formatDateTime(dueDate)}
       </span>
     </article>
   );
@@ -744,7 +865,9 @@ function ActivityCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <h4 className="truncate text-[15px] font-black tracking-tight">{title}</h4>
+            <h4 className="truncate text-[15px] font-black tracking-tight">
+              {title}
+            </h4>
 
             <div className="flex shrink-0 items-center gap-1 text-[11px] font-bold text-slate-400">
               <Clock3 size={12} />
@@ -775,7 +898,9 @@ function EmptyCard({
       </div>
 
       <div>
-        <h4 className="text-[15px] font-black tracking-tight text-[#0B1F44]">{title}</h4>
+        <h4 className="text-[15px] font-black tracking-tight text-[#0B1F44]">
+          {title}
+        </h4>
         <p className="mt-1 text-[12px] leading-5 text-slate-500">{desc}</p>
       </div>
     </article>
@@ -829,7 +954,9 @@ function ListingCard({
       </div>
 
       <div className="min-w-0 flex-1">
-        <h4 className="truncate text-[16px] font-black tracking-tight">{title}</h4>
+        <h4 className="truncate text-[16px] font-black tracking-tight">
+          {title}
+        </h4>
         <p className="mt-1 text-[13px] font-semibold text-slate-500">{type}</p>
 
         <p className="mt-1 flex items-center gap-1 truncate text-[12px] text-slate-400">
@@ -862,7 +989,9 @@ function MarketMini({
 }) {
   return (
     <div className="rounded-2xl bg-[#F8FAFC] p-3">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+        {title}
+      </p>
       <p className="mt-2 text-[19px] font-black">{value}</p>
       <p className="mt-2 text-[12px] font-bold text-emerald-600">{change}</p>
     </div>
