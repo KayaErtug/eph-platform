@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Activity,
   ArrowRight,
@@ -236,20 +236,21 @@ export default function LandingPage() {
                 Sektörün Kapalı Devre İş Ağı
               </div>
 
-                <h2 className="mt-7 text-4xl font-black leading-[1.08] tracking-tight text-[#172033] md:text-7xl">
- 		 Gayrimenkul danışmanları,
- 		 <span className="block text-[#2563EB]">
-  		  emlak ofisleri, inşaat firmaları
- 		</span>
-		  ve müteahhitleri aynı kapalı devre profesyonel ağda buluşturan yeni nesil iş platformu.
-		</h2>
+              <h2 className="mt-7 text-4xl font-black leading-[1.08] tracking-tight text-[#172033] md:text-7xl">
+                Gayrimenkul danışmanları,
+                <span className="block text-[#2563EB]">
+                  emlak ofisleri, inşaat firmaları
+                </span>
+                ve müteahhitleri aynı kapalı devre profesyonel ağda buluşturan
+                yeni nesil iş platformu.
+              </h2>
 
-		<p className="mx-auto mt-8 max-w-3xl text-lg leading-9 text-[#5B6B82] lg:mx-0">
- 		 EPH Platform sayesinde gayrimenkul danışmanları ve emlak ofisleri,
- 		 potansiyel müşterilere daha hızlı, daha doğru ve daha geniş portföy
- 		 seçenekleri sunar. Bu sayede iş süreçleri hızlanır ve satış
- 		 fırsatları güçlenir.
-		</p>
+              <p className="mx-auto mt-8 max-w-3xl text-lg leading-9 text-[#5B6B82] lg:mx-0">
+                EPH Platform sayesinde gayrimenkul danışmanları ve emlak
+                ofisleri, potansiyel müşterilere daha hızlı, daha doğru ve daha
+                geniş portföy seçenekleri sunar. Bu sayede iş süreçleri
+                hızlanır ve satış fırsatları güçlenir.
+              </p>
 
               <div className="mt-8 grid grid-cols-1 gap-3 text-sm font-bold text-[#334155] sm:grid-cols-3">
                 <div className="rounded-2xl border border-[#DDE7F3] bg-white px-4 py-3 shadow-sm">
@@ -414,7 +415,6 @@ export default function LandingPage() {
               icon={Activity}
               badge="Canlı Network Akışı"
               title="Platform İçinde İş Fırsatları"
-              
               desc="Portföy, talep, mesajlaşma ve ortak satış süreçleri tek akışta izlenir. EPH, sektör profesyonellerine canlı ve düzenli bir iş takip merkezi sunar."
             />
 
@@ -537,7 +537,6 @@ export default function LandingPage() {
             <SectionHeader
               icon={BadgeCheck}
               badge="Neler Var?"
-              
               highlight="EPH'de Tam Bir İş Ekosistemi Var"
               desc="Güvenli üyelikten ortak satışa, portföy havuzundan Lina desteğine kadar tüm süreçler sektör profesyonelleri için tek merkezde toplanır."
             />
@@ -765,8 +764,8 @@ function SectionHeader({
 }: {
   icon: typeof Activity;
   badge: string;
-  title: string;
-  highlight: string;
+  title?: string;
+  highlight?: string;
   desc: string;
 }) {
   return (
@@ -776,10 +775,15 @@ function SectionHeader({
         {badge}
       </div>
 
-      <h2 className="mt-6 text-4xl font-black leading-tight text-[#172033] md:text-6xl">
-        {title}
-        <span className="block text-[#2563EB]">{highlight}</span>
-      </h2>
+      {(title || highlight) && (
+        <h2 className="mt-6 text-4xl font-black leading-tight text-[#172033] md:text-6xl">
+          {title && <>{title}</>}
+
+          {highlight && (
+            <span className="block text-[#2563EB]">{highlight}</span>
+          )}
+        </h2>
+      )}
 
       <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-[#64748B] md:text-lg">
         {desc}
@@ -1061,10 +1065,14 @@ function ChatBubble({
   children,
 }: {
   side: "left" | "right";
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div className={`mb-3 flex ${side === "right" ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`mb-3 flex ${
+        side === "right" ? "justify-end" : "justify-start"
+      }`}
+    >
       <div
         className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm font-semibold leading-6 ${
           side === "right"
