@@ -121,7 +121,12 @@ export default function AdminReferralsPage() {
     setError("");
     setSuccess("");
 
-    if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.phone.trim()) {
+    if (
+      !form.firstName.trim() ||
+      !form.lastName.trim() ||
+      !form.email.trim() ||
+      !form.phone.trim()
+    ) {
       setError("Ad, soyad, e-posta ve telefon zorunludur.");
       return;
     }
@@ -172,12 +177,12 @@ export default function AdminReferralsPage() {
 
   const activeCandidates = useMemo(
     () => candidates.filter((item) => item.isActive && !item.usedAt).length,
-    [candidates]
+    [candidates],
   );
 
   const usedCandidates = useMemo(
     () => candidates.filter((item) => Boolean(item.usedAt)).length,
-    [candidates]
+    [candidates],
   );
 
   if (!hydrated || loading) {
@@ -206,30 +211,47 @@ export default function AdminReferralsPage() {
             <Link href="/admin" className="flex items-center gap-3 no-underline">
               <div className="relative">
                 <div className="absolute inset-0 rounded-2xl bg-cyan-400/30 blur-xl" />
-                <img src="/LOGO_EPH.png" alt="EPH" className="relative h-11 w-11 object-contain" />
+                <img
+                  src="/LOGO_EPH.png"
+                  alt="EPH"
+                  className="relative h-11 w-11 object-contain"
+                />
               </div>
 
               <div>
                 <div className="font-serif text-xl font-semibold text-white">
                   EPH Referans Kodları
                 </div>
+
                 <div className="text-[10px] font-black uppercase tracking-[0.28em] text-[#C9A84C]">
-                  Admin VIP Onboarding
+                  Admin Özel Davet Sistemi
                 </div>
               </div>
             </Link>
           </div>
 
           <nav className="flex flex-wrap items-center justify-center gap-2">
-            <Link href="/dashboard" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-slate-300 no-underline transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-white">
-              Mission
+            <Link
+              href="/dashboard"
+              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-slate-300 no-underline transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-white"
+            >
+              Ana Merkez
             </Link>
-            <Link href="/admin" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-slate-300 no-underline transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-white">
+
+            <Link
+              href="/admin"
+              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-slate-300 no-underline transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-white"
+            >
               Admin
             </Link>
-            <Link href="/admin/referrals" className="rounded-full border border-[#C9A84C]/30 bg-[#C9A84C]/10 px-4 py-2 text-xs font-black text-[#F7DFA3] no-underline">
+
+            <Link
+              href="/admin/referrals"
+              className="rounded-full border border-[#C9A84C]/30 bg-[#C9A84C]/10 px-4 py-2 text-xs font-black text-[#F7DFA3] no-underline"
+            >
               Referans Kodları
             </Link>
+
             <button
               onClick={() => {
                 logout();
@@ -252,7 +274,7 @@ export default function AdminReferralsPage() {
               <div className="mb-6 flex flex-wrap items-center gap-3">
                 <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.22em] text-cyan-100">
                   <KeyRound size={14} />
-                  Referral Control
+                  Referans Yönetimi
                 </span>
 
                 <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-100">
@@ -270,13 +292,13 @@ export default function AdminReferralsPage() {
 
               <p className="mt-4 max-w-2xl text-sm font-medium leading-7 text-slate-300">
                 Admin buradan mevcut üyelerin kişisel referans kodlarını görür,
-                VIP adaylar için özel referans kodu oluşturur ve referanslı kayıt
-                akışını yönetir.
+                özel davetli adaylar için referans kodu oluşturur ve referanslı
+                kayıt akışını yönetir.
               </p>
 
               <div className="mt-7 grid gap-3 sm:grid-cols-3">
                 <MetricCard title="Üye Ref Kodları" value={users.length} />
-                <MetricCard title="Aktif VIP Kod" value={activeCandidates} />
+                <MetricCard title="Aktif Özel Kod" value={activeCandidates} />
                 <MetricCard title="Kullanılmış Kod" value={usedCandidates} />
               </div>
             </div>
@@ -285,8 +307,9 @@ export default function AdminReferralsPage() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/80">
-                    Yeni VIP Aday
+                    Yeni Özel Davetli
                   </p>
+
                   <h2 className="mt-2 text-2xl font-black text-white">
                     Referans Kodu Oluştur
                   </h2>
@@ -298,10 +321,29 @@ export default function AdminReferralsPage() {
               </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <Input label="Ad" value={form.firstName} onChange={(value) => setForm({ ...form, firstName: value })} />
-                <Input label="Soyad" value={form.lastName} onChange={(value) => setForm({ ...form, lastName: value })} />
-                <Input label="E-posta" value={form.email} onChange={(value) => setForm({ ...form, email: value })} />
-                <Input label="Telefon" value={form.phone} onChange={(value) => setForm({ ...form, phone: value })} />
+                <Input
+                  label="Ad"
+                  value={form.firstName}
+                  onChange={(value) => setForm({ ...form, firstName: value })}
+                />
+
+                <Input
+                  label="Soyad"
+                  value={form.lastName}
+                  onChange={(value) => setForm({ ...form, lastName: value })}
+                />
+
+                <Input
+                  label="E-posta"
+                  value={form.email}
+                  onChange={(value) => setForm({ ...form, email: value })}
+                />
+
+                <Input
+                  label="Telefon"
+                  value={form.phone}
+                  onChange={(value) => setForm({ ...form, phone: value })}
+                />
 
                 <label className="sm:col-span-2">
                   <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
@@ -310,7 +352,9 @@ export default function AdminReferralsPage() {
 
                   <select
                     value={form.role}
-                    onChange={(event) => setForm({ ...form, role: event.target.value as Role })}
+                    onChange={(event) =>
+                      setForm({ ...form, role: event.target.value as Role })
+                    }
                     className="h-12 w-full rounded-2xl border border-cyan-300/15 bg-[#08172D] px-4 text-sm font-bold text-white outline-none focus:border-cyan-300/40"
                   >
                     <option value="EMLAKCI">Gayrimenkul Danışmanı</option>
@@ -337,7 +381,11 @@ export default function AdminReferralsPage() {
                 disabled={creating}
                 className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#C9A84C] px-5 text-sm font-black text-[#061126] shadow-xl shadow-[#C9A84C]/20 transition hover:scale-[1.02] disabled:opacity-50"
               >
-                {creating ? <RefreshCw className="animate-spin" size={17} /> : <Plus size={17} />}
+                {creating ? (
+                  <RefreshCw className="animate-spin" size={17} />
+                ) : (
+                  <Plus size={17} />
+                )}
                 {creating ? "Oluşturuluyor..." : "Referans Kodu Oluştur"}
               </button>
             </div>
@@ -345,9 +393,12 @@ export default function AdminReferralsPage() {
         </section>
 
         <section className="mt-6 grid gap-6 xl:grid-cols-2">
-          <Panel title="VIP Aday Referans Kodları" subtitle="Admin tarafından özel olarak oluşturulan kodlar.">
+          <Panel
+            title="Özel Davetli Referans Kodları"
+            subtitle="Admin tarafından özel olarak oluşturulan referans kodları."
+          >
             {candidates.length === 0 ? (
-              <EmptyState text="Henüz VIP aday referans kodu oluşturulmadı." />
+              <EmptyState text="Henüz özel davetli referans kodu oluşturulmadı." />
             ) : (
               <div className="grid gap-3">
                 {candidates.map((item) => (
@@ -363,7 +414,10 @@ export default function AdminReferralsPage() {
             )}
           </Panel>
 
-          <Panel title="Üye Kişisel Ref Kodları" subtitle="Platform üyelerinin kendi kişisel ref kodları.">
+          <Panel
+            title="Üye Kişisel Ref Kodları"
+            subtitle="Platform üyelerinin kendi kişisel referans kodları."
+          >
             {users.length === 0 ? (
               <EmptyState text="Kayıtlı kullanıcı bulunamadı." />
             ) : (
@@ -391,6 +445,7 @@ function MetricCard({ title, value }: { title: string; value: number }) {
       <p className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">
         {title}
       </p>
+
       <p className="mt-2 text-3xl font-black text-white">{value}</p>
     </div>
   );
@@ -433,11 +488,13 @@ function Panel({
     <section className="rounded-[34px] border border-cyan-300/15 bg-[#061126]/85 p-5 shadow-2xl shadow-cyan-950/30 backdrop-blur-xl">
       <div className="mb-5">
         <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#C9A84C]">
-          Referral Grid
+          Referans Listesi
         </p>
+
         <h2 className="mt-2 font-serif text-3xl font-semibold text-white">
           {title}
         </h2>
+
         <p className="mt-2 text-sm font-semibold leading-6 text-slate-400">
           {subtitle}
         </p>
