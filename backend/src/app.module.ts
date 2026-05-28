@@ -20,6 +20,7 @@ import { VisitsModule } from './visits/visits.module';
 import { PushModule } from './push/push.module';
 import { MessagesModule } from './messages/messages.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ReferralModule } from './referral/referral.module';
 
 @Module({
   imports: [
@@ -50,6 +51,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     MessagesModule,
 
     DashboardModule,
+
+    ReferralModule,
   ],
 })
 export class AppModule {}
