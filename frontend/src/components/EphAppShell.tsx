@@ -77,21 +77,23 @@ export default function EphAppShell({
           </button>
 
           <div className="flex-1 text-center">
-            <h1 className="text-lg font-black text-[#172033] md:text-2xl">
+            <h1 className="text-center text-lg font-black text-[#172033] md:text-2xl">
               {title}
             </h1>
           </div>
 
-          <Link
-            href="/profil"
-            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] text-[#172033] transition hover:bg-white"
-          >
-            <UserCircle2 size={20} />
-          </Link>
+          <div className="flex justify-end">
+            <Link
+              href="/profil"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] text-[#172033] transition hover:bg-white"
+            >
+              <UserCircle2 size={20} />
+            </Link>
+          </div>
         </div>
 
         <nav className="hidden border-t border-[#EEF2F7] md:block">
-          <div className="mx-auto flex max-w-7xl items-center justify-center gap-3 px-6 py-4">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-3 px-6 py-4">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href;
@@ -100,14 +102,14 @@ export default function EphAppShell({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black transition ${
+                  className={`flex min-w-[140px] flex-col items-center justify-center gap-2 rounded-2xl px-5 py-4 text-center text-sm font-black transition ${
                     active
                       ? "bg-[#2563EB] text-white shadow-lg shadow-[#2563EB]/20"
                       : "border border-[#DDE7F3] bg-white text-[#172033] hover:bg-[#EFF6FF]"
                   }`}
                 >
-                  <Icon size={18} />
-                  <span>{item.label}</span>
+                  <Icon size={20} />
+                  <span className="text-center">{item.label}</span>
                 </Link>
               );
             })}
@@ -115,8 +117,10 @@ export default function EphAppShell({
         </nav>
       </header>
 
-      <section className="mx-auto w-full max-w-7xl px-4 py-6 pb-28 md:px-6">
-        {children}
+      <section className="mx-auto flex w-full max-w-7xl flex-col items-center px-4 py-6 pb-28 text-center md:px-6">
+        <div className="w-full">
+          {children}
+        </div>
       </section>
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#DDE7F3] bg-white/98 backdrop-blur-xl md:hidden">
@@ -129,12 +133,14 @@ export default function EphAppShell({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center gap-1 px-2 py-3 text-[11px] font-black transition ${
+                className={`flex flex-col items-center justify-center gap-1 px-2 py-3 text-center text-[11px] font-black transition ${
                   active ? "text-[#2563EB]" : "text-[#64748B]"
                 }`}
               >
                 <Icon size={20} />
-                <span className="text-center">{item.label}</span>
+                <span className="text-center leading-tight">
+                  {item.label}
+                </span>
               </Link>
             );
           })}
