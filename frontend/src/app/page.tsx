@@ -462,6 +462,8 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <LinaTechnologyShowcase />
+
         <section className="relative overflow-hidden bg-[#F8FAFC] px-5 py-24">
           <div className="absolute left-0 top-20 h-96 w-96 rounded-full bg-[#DBEAFE]/70 blur-3xl" />
           <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-[#FFEDD5]/70 blur-3xl" />
@@ -780,6 +782,322 @@ function SectionHeader({
       <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-[#64748B] md:text-lg">
         {desc}
       </p>
+    </div>
+  );
+}
+
+function LinaTechnologyShowcase() {
+  const [activeDemo, setActiveDemo] = useState<"voice" | "whatsapp" | "copy">(
+    "voice",
+  );
+
+  return (
+    <section className="relative overflow-hidden bg-[#08111F] px-5 py-24 text-white">
+      <div className="absolute left-[-120px] top-[-120px] h-80 w-80 rounded-full bg-[#C9A84C]/20 blur-3xl" />
+      <div className="absolute bottom-[-140px] right-[-120px] h-96 w-96 rounded-full bg-[#2563EB]/20 blur-3xl" />
+      <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(rgba(255,255,255,.35)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.35)_1px,transparent_1px)] [background-size:42px_42px]" />
+
+      <div className="relative mx-auto max-w-7xl">
+        <div className="mx-auto max-w-4xl text-center">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#C9A84C]/30 bg-[#C9A84C]/10 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-[#F7DFA3]">
+            <Bot size={14} />
+            Lina Teknoloji Vitrini
+          </div>
+
+          <h2 className="mt-6 text-4xl font-black leading-tight md:text-6xl">
+            Lina yalnızca yardımcı değil,
+            <span className="block text-[#F7DFA3]">
+              operasyonel iş ortağıdır.
+            </span>
+          </h2>
+
+          <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-slate-300 md:text-lg">
+            Sesli ilan girişi, WhatsApp üzerinden güncelleme ve profesyonel
+            metin üretimiyle EPH, klasik bir portföy havuzundan daha fazlasını
+            sunar.
+          </p>
+        </div>
+
+        <div className="mt-10 flex flex-wrap justify-center gap-3">
+          <button
+            onClick={() => setActiveDemo("voice")}
+            className={`rounded-2xl px-5 py-3 text-sm font-black transition ${
+              activeDemo === "voice"
+                ? "bg-[#C9A84C] text-[#08111F]"
+                : "border border-white/10 bg-white/5 text-slate-200"
+            }`}
+          >
+            Lina ile Konuş
+          </button>
+
+          <button
+            onClick={() => setActiveDemo("whatsapp")}
+            className={`rounded-2xl px-5 py-3 text-sm font-black transition ${
+              activeDemo === "whatsapp"
+                ? "bg-[#C9A84C] text-[#08111F]"
+                : "border border-white/10 bg-white/5 text-slate-200"
+            }`}
+          >
+            WhatsApp Güncelleme
+          </button>
+
+          <button
+            onClick={() => setActiveDemo("copy")}
+            className={`rounded-2xl px-5 py-3 text-sm font-black transition ${
+              activeDemo === "copy"
+                ? "bg-[#C9A84C] text-[#08111F]"
+                : "border border-white/10 bg-white/5 text-slate-200"
+            }`}
+          >
+            Sihirli Metin
+          </button>
+        </div>
+
+        <div className="mt-12 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="rounded-[36px] border border-[#C9A84C]/20 bg-white/[0.06] p-6 text-center backdrop-blur-xl">
+            {activeDemo === "voice" && <VoiceDemo />}
+            {activeDemo === "whatsapp" && <WhatsappDemo />}
+            {activeDemo === "copy" && <CopyDemo />}
+          </div>
+
+          <div className="rounded-[36px] border border-white/10 bg-white/[0.05] p-6 backdrop-blur-xl">
+            <div className="flex flex-col items-center justify-between gap-4 text-center md:flex-row md:text-left">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.25em] text-[#F7DFA3]">
+                  Lina Çıktısı
+                </p>
+
+                <h3 className="mt-2 text-3xl font-black">
+                  Otomatik İlan Kartı
+                </h3>
+              </div>
+
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C9A84C] text-[#08111F]">
+                <Sparkles size={26} />
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-[30px] border border-[#C9A84C]/20 bg-[#0D1828] p-5">
+              <div className="overflow-hidden rounded-[24px] border border-white/10 bg-white p-5 text-[#172033]">
+                <div className="flex flex-col items-center justify-between gap-3 text-center md:flex-row md:text-left">
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-[0.18em] text-[#2563EB]">
+                      Yeni Portföy
+                    </div>
+
+                    <h4 className="mt-2 text-2xl font-black">
+                      Merkezefendi’de 3+1 Site İçi Daire
+                    </h4>
+                  </div>
+
+                  <div className="rounded-2xl bg-[#ECFDF5] px-4 py-2 text-sm font-black text-[#0F766E]">
+                    Hazırlandı
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <LinaField label="Konum" value="Denizli / Merkezefendi" />
+                  <LinaField label="Oda" value="3+1" />
+                  <LinaField label="Tip" value="Site içi daire" />
+                </div>
+
+                <p className="mt-5 text-center text-sm leading-7 text-[#64748B] md:text-left">
+                  Lina, verilen kısa portföy bilgisini düzenli ilan kartına
+                  dönüştürür. Konum, oda sayısı, açıklama ve paylaşım dili
+                  otomatik hazırlanır.
+                </p>
+
+                <div className="mt-5 flex flex-wrap justify-center gap-2 md:justify-start">
+                  <span className="rounded-full bg-[#EFF6FF] px-3 py-2 text-xs font-black text-[#2563EB]">
+                    #Merkezefendi
+                  </span>
+
+                  <span className="rounded-full bg-[#FFF7ED] px-3 py-2 text-xs font-black text-[#EA580C]">
+                    #3+1
+                  </span>
+
+                  <span className="rounded-full bg-[#F5F3FF] px-3 py-2 text-xs font-black text-[#7C3AED]">
+                    #LinaHazırladı
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <LinaCapability
+                title="İlan Oluşturur"
+                desc="Kısa bilgiyi düzenli portföye çevirir."
+              />
+
+              <LinaCapability
+                title="Güncelleme Yapar"
+                desc="Fiyat, durum ve not bilgilerini işler."
+              />
+
+              <LinaCapability
+                title="Metin Yazar"
+                desc="İlan ve sosyal medya açıklaması üretir."
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function VoiceDemo() {
+  return (
+    <div>
+      <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[28px] border border-[#C9A84C]/30 bg-[#C9A84C]/10 text-[#F7DFA3]">
+        <Bot size={36} />
+      </div>
+
+      <h3 className="mt-5 text-3xl font-black">Lina ile Konuş</h3>
+
+      <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-slate-300">
+        “Merkezefendi’de 3+1, lüks site içinde, geniş balkonlu daire.”
+      </p>
+
+      <div className="mt-7 rounded-[28px] border border-[#C9A84C]/20 bg-black/20 p-5">
+        <div className="text-xs font-black uppercase tracking-[0.25em] text-[#F7DFA3]">
+          Dinliyorum...
+        </div>
+
+        <div className="mt-5 flex h-16 items-center justify-center gap-1">
+          {[24, 38, 52, 34, 60, 44, 28, 56, 40, 30, 50, 36].map(
+            (height, index) => (
+              <span
+                key={index}
+                className="w-2 rounded-full bg-[#C9A84C]"
+                style={{
+                  height: `${height}px`,
+                  opacity: 0.35 + (index % 4) * 0.15,
+                }}
+              />
+            ),
+          )}
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm font-bold text-emerald-100">
+        Ses komutu portföy kartına dönüştürülüyor.
+      </div>
+    </div>
+  );
+}
+
+function WhatsappDemo() {
+  return (
+    <div>
+      <div className="mx-auto max-w-sm rounded-[38px] border border-[#C9A84C]/30 bg-[#111827] p-4 shadow-2xl shadow-black/30">
+        <div className="rounded-[30px] bg-[#ECE5DD] p-4 text-left">
+          <div className="mb-4 text-center text-xs font-black text-[#075E54]">
+            WhatsApp · Lina
+          </div>
+
+          <ChatBubble side="right">
+            Lina, Denizli projesindeki 5 numaralı dairenin fiyatını 4.5 milyona
+            güncelle.
+          </ChatBubble>
+
+          <ChatBubble side="left">
+            Anlaşıldı. Güncelleme yapıldı ve ilgili ağa bildirim hazırlandı. ✅
+          </ChatBubble>
+
+          <ChatBubble side="right">Portföy notuna “güncel fiyat” ekle.</ChatBubble>
+
+          <ChatBubble side="left">
+            Not eklendi. İlan kartı güncel bilgilerle yenilendi.
+          </ChatBubble>
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-3xl border border-[#C9A84C]/20 bg-[#C9A84C]/10 p-4 text-sm font-bold text-[#F7DFA3]">
+        WhatsApp simülasyonu: fiyat ve portföy notu güncellendi.
+      </div>
+    </div>
+  );
+}
+
+function CopyDemo() {
+  return (
+    <div>
+      <div className="grid gap-4">
+        <div className="rounded-[26px] border border-white/10 bg-white/[0.05] p-5">
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">
+            Önce
+          </p>
+
+          <p className="mt-3 text-lg font-black text-white">
+            2+1, 100m², site içi, balkonlu
+          </p>
+        </div>
+
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#C9A84C] text-[#08111F]">
+          <Sparkles size={22} />
+        </div>
+
+        <div className="rounded-[26px] border border-[#C9A84C]/25 bg-[#C9A84C]/10 p-5">
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-[#F7DFA3]">
+            Lina Sonrası
+          </p>
+
+          <p className="mt-3 text-base font-semibold leading-8 text-slate-100">
+            Modern site yaşamı, ferah kullanım alanı ve balkon avantajını bir
+            araya getiren bu 2+1 daire; konforlu yaşam arayanlar için güçlü bir
+            fırsat sunar.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatBubble({
+  side,
+  children,
+}: {
+  side: "left" | "right";
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`mb-3 flex ${side === "right" ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm font-semibold leading-6 ${
+          side === "right"
+            ? "bg-[#DCF8C6] text-[#172033]"
+            : "bg-white text-[#172033]"
+        }`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function LinaField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-4 text-center">
+      <div className="text-xs font-black uppercase tracking-[0.16em] text-[#94A3B8]">
+        {label}
+      </div>
+
+      <div className="mt-2 text-sm font-black text-[#172033]">{value}</div>
+    </div>
+  );
+}
+
+function LinaCapability({ title, desc }: { title: string; desc: string }) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/[0.05] p-4 text-center">
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C9A84C]/15 text-[#F7DFA3]">
+        <CheckCircle2 size={20} />
+      </div>
+
+      <h4 className="mt-3 text-sm font-black text-white">{title}</h4>
+
+      <p className="mt-2 text-xs leading-5 text-slate-400">{desc}</p>
     </div>
   );
 }
