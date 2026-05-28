@@ -236,18 +236,30 @@ export default function LandingPage() {
                 Sektörün Kapalı Devre İş Ağı
               </div>
 
-              <h2 className="mt-7 text-5xl font-black leading-[1.04] tracking-tight text-[#172033] md:text-7xl">
-                Portföyün
-                <span className="block text-[#2563EB]">Daha Doğru</span>
-                Kişilere Ulaşsın
-              </h2>
+              <h2 className="mt-7 text-4xl font-black leading-[1.06] tracking-tight text-[#172033] md:text-7xl">
+  İş Birliği,
+  <span className="block text-[#2563EB]">
+    Teknoloji ve Sonuç Odaklı
+  </span>
+  Kapalı Devre Ekosistem
+</h2>
 
-              <p className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-[#5B6B82] lg:mx-0">
-                EPH; gayrimenkul danışmanlarını, müteahhitleri ve inşaat
-                firmalarını aynı profesyonel ağda buluşturur. Portföyler
-                görünür olur, talepler hızlanır, ortak satış fırsatları tek
-                merkezde takip edilir.
-              </p>
+<p className="mx-auto mt-7 max-w-3xl text-lg leading-9 text-[#5B6B82] lg:mx-0">
+  Gayrimenkulün üretici ve satış gücünü yapay zeka ile tek merkezde
+  birleştiren seçkin iş ağı.
+
+  <span className="mt-4 block">
+    EPH Platform; gayrimenkul danışmanlarını, müteahhitleri,
+    yatırımcıları ve proje geliştiricileri aynı profesyonel ekosistem
+    içerisinde buluşturur.
+  </span>
+
+  <span className="mt-4 block">
+    Portföy yönetimi, canlı network, CRM süreçleri, ortak satış sistemi
+    ve Lina yapay zeka desteği sayesinde iş akışı daha hızlı, daha
+    düzenli ve daha verimli hale gelir.
+  </span>
+</p>
 
               <div className="mt-8 grid grid-cols-1 gap-3 text-sm font-bold text-[#334155] sm:grid-cols-3">
                 <div className="rounded-2xl border border-[#DDE7F3] bg-white px-4 py-3 shadow-sm">
