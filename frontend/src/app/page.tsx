@@ -28,15 +28,6 @@ import {
   Zap,
 } from "lucide-react";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://emlakportfoyhavuzu.com/api";
-
-const ROLE_MAP: Record<string, string> = {
-  Emlakçı: "EMLAKCI",
-  Müteahhit: "MUTEAHHIT",
-  "İnşaat Firması": "INSAAT_FIRMASI",
-};
-
 const stats = [
   ["344+", "Aktif Üye"],
   ["8.700+", "Portföy"],
@@ -139,35 +130,8 @@ const showcaseItems = [
 type InfoModalType = "kesfet" | "kvkk" | "gizlilik" | "iletisim";
 
 export default function LandingPage() {
-  const [showForm, setShowForm] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const [infoModal, setInfoModal] = useState<null | InfoModalType>(null);
-
-  const [form, setForm] = useState({
-    ad: "",
-    tel: "",
-    email: "",
-    meslek: "",
-    kod: "",
-  });
-
-  const [legalAccepted, setLegalAccepted] = useState({
-    constitution: false,
-    kvkk: false,
-    privacy: false,
-    agreement: false,
-  });
-
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [submittedApplicantName, setSubmittedApplicantName] = useState("");
-  const [submittedApplicationNumber, setSubmittedApplicationNumber] = useState("");
-
-  const allLegalAccepted =
-    legalAccepted.constitution &&
-    legalAccepted.kvkk &&
-    legalAccepted.privacy &&
-    legalAccepted.agreement;
 
   useEffect(() => {
     const alreadySeenVideo = sessionStorage.getItem("ephIntroVideoSeen");
@@ -197,74 +161,6 @@ export default function LandingPage() {
     });
   };
 
-  const submitForm = async () => {
-    if (!form.ad.trim() || !form.tel.trim() || !form.email.trim() || !form.meslek) {
-      alert("Lütfen zorunlu alanları doldurun.");
-      return;
-    }
-
-    if (!allLegalAccepted) {
-      alert("Başvuru gönderebilmek için hukuki onay kutularını işaretlemelisiniz.");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const res = await fetch(`${API_URL}/applications`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          applicantName: form.ad,
-          applicantPhone: form.tel,
-          applicantEmail: form.email,
-          requestedRole: ROLE_MAP[form.meslek] || "EMLAKCI",
-          referralCode: form.kod || undefined,
-          message: "",
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error();
-      }
-
-      const data = await res.json().catch(() => null);
-      const applicationId = data?.id
-        ? String(data.id).slice(0, 8).toUpperCase()
-        : String(Date.now()).slice(-6);
-
-      setSubmittedApplicantName(form.ad.trim());
-      setSubmittedApplicationNumber(`EPH-${new Date().getFullYear()}-${applicationId}`);
-      setSuccess(true);
-      setForm({
-        ad: "",
-        tel: "",
-        email: "",
-        meslek: "",
-        kod: "",
-      });
-      setLegalAccepted({
-        constitution: false,
-        kvkk: false,
-        privacy: false,
-        agreement: false,
-      });
-    } catch {
-      alert("Başvuru gönderilemedi. Lütfen tekrar deneyin.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const closeApplicationForm = () => {
-    setShowForm(false);
-    setSuccess(false);
-    setSubmittedApplicantName("");
-    setSubmittedApplicationNumber("");
-  };
-
   return (
     <>
       <main className="min-h-screen overflow-hidden bg-[#06111F] text-white">
@@ -278,7 +174,9 @@ export default function LandingPage() {
               />
 
               <div>
-                <h1 className="text-lg font-black tracking-tight">EPH Platform</h1>
+                <h1 className="text-lg font-black tracking-tight">
+                  EPH Platform
+                </h1>
 
                 <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-[#60A5FA]">
                   Emlak Portföy Havuzu
@@ -305,14 +203,6 @@ export default function LandingPage() {
 
               <button
                 type="button"
-                onClick={() => scrollToSection("basvuru")}
-                className="text-sm font-bold text-white/70 transition hover:text-white"
-              >
-                Hemen Başvur
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setInfoModal("iletisim")}
                 className="text-sm font-bold text-white/70 transition hover:text-white"
               >
@@ -331,7 +221,10 @@ export default function LandingPage() {
           </div>
         </header>
 
-        <section id="platform" className="relative overflow-hidden px-5 pb-24 pt-36">
+        <section
+          id="platform"
+          className="relative overflow-hidden px-5 pb-24 pt-36"
+        >
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.38),transparent_34%)]" />
           <div className="eph-premium-glow eph-glow left-1/2 top-24 h-72 w-72 -translate-x-1/2 bg-[#60A5FA]/10" />
           <div className="eph-premium-glow bottom-0 left-0 h-80 w-80 bg-[#2563EB]/15" />
@@ -373,16 +266,16 @@ export default function LandingPage() {
               </div>
 
               <div className="mt-10 flex flex-wrap justify-center gap-4 lg:justify-start">
-                <button
-                  onClick={() => setShowForm(true)}
+                <Link
+                  href="/kayit"
                   className="group flex items-center gap-2 rounded-2xl bg-[#2563EB] px-7 py-4 text-sm font-black text-white shadow-lg shadow-[#2563EB]/25 transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
                 >
-                  Hemen Başvur
+                  Üyelik Başvurusu Yap
                   <ArrowRight
                     size={18}
                     className="transition group-hover:translate-x-1"
                   />
-                </button>
+                </Link>
 
                 <button
                   type="button"
@@ -410,7 +303,9 @@ export default function LandingPage() {
                     key={label}
                     className="eph-card-hover rounded-3xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur"
                   >
-                    <div className="text-3xl font-black text-[#60A5FA]">{value}</div>
+                    <div className="text-3xl font-black text-[#60A5FA]">
+                      {value}
+                    </div>
 
                     <div className="mt-2 text-xs font-bold uppercase tracking-widest text-white/40">
                       {label}
@@ -597,8 +492,9 @@ export default function LandingPage() {
               </h2>
 
               <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-white/55 md:text-lg">
-                Dashboard, network, CRM, portföy yönetimi ve Lina AI ekranlarıyla
-                sektör profesyonelleri için gerçek bir çalışma merkezi sunar.
+                Dashboard, network, CRM, portföy yönetimi ve Lina AI
+                ekranlarıyla sektör profesyonelleri için gerçek bir çalışma
+                merkezi sunar.
               </p>
             </div>
 
@@ -671,8 +567,9 @@ export default function LandingPage() {
               </h2>
 
               <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-white/55 md:text-lg">
-                Güvenli üyelikten ortak satışa, portföy havuzundan Lina AI desteğine
-                kadar tüm süreçler sektör profesyonelleri için tek merkezde toplanır.
+                Güvenli üyelikten ortak satışa, portföy havuzundan Lina AI
+                desteğine kadar tüm süreçler sektör profesyonelleri için tek
+                merkezde toplanır.
               </p>
             </div>
 
@@ -698,7 +595,9 @@ export default function LandingPage() {
                     <item.icon size={34} />
                   </div>
 
-                  <h3 className="relative mt-7 text-2xl font-black">{item.title}</h3>
+                  <h3 className="relative mt-7 text-2xl font-black">
+                    {item.title}
+                  </h3>
 
                   <p className="relative mt-4 min-h-[84px] text-sm leading-7 text-white/55">
                     {item.desc}
@@ -728,21 +627,22 @@ export default function LandingPage() {
               <h2 className="mt-6 text-4xl font-black leading-tight md:text-6xl">
                 EPH Platform’a
                 <span className="block text-[#60A5FA]">Katılmak İçin</span>
-                Başvuru Oluştur
+                Tek Bir Adım Yeter
               </h2>
 
               <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-white/60">
-                Başvurular admin onayı ile değerlendirilir. Onaylanan kullanıcılar
-                platformdaki kapalı devre iş ağına erişebilir.
+                Başvurunuzu tek kayıt ekranından oluşturun. Referans kodunuz
+                varsa bilgileriniz otomatik gelir; yoksa başvurunuz admin
+                değerlendirmesine alınır.
               </p>
 
               <div className="mt-10 flex flex-wrap justify-center gap-4">
-                <button
-                  onClick={() => setShowForm(true)}
+                <Link
+                  href="/kayit"
                   className="rounded-2xl bg-[#2563EB] px-8 py-4 text-sm font-black transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
                 >
-                  Başvuru Oluştur
-                </button>
+                  Üyelik Başvurusu Yap
+                </Link>
 
                 <Link
                   href="/giris"
@@ -783,10 +683,7 @@ export default function LandingPage() {
                 Platform Anayasası
               </Link>
 
-              <Link
-                href="/kvkk"
-                className="transition hover:text-white"
-              >
+              <Link href="/kvkk" className="transition hover:text-white">
                 KVKK
               </Link>
 
@@ -856,201 +753,6 @@ export default function LandingPage() {
               playsInline
               className="h-full w-full bg-black object-cover"
             />
-          </div>
-        </div>
-      )}
-
-      {showForm && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-5 backdrop-blur-2xl"
-          onClick={closeApplicationForm}
-        >
-          <div
-            className="relative max-h-[92vh] w-full max-w-xl overflow-auto rounded-[40px] border border-[#60A5FA]/20 bg-[#081423]/95 p-8 text-center text-white shadow-2xl shadow-[#2563EB]/25"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#2563EB]/20 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-[#C9A84C]/10 blur-3xl" />
-            <div className="relative z-10">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 text-center">
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#2563EB]/20 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#60A5FA]">
-                  <BadgeCheck size={14} />
-                  Üyelik Başvurusu
-                </div>
-
-                <h3 className="mt-5 text-3xl font-black">Üyelik Başvurusu</h3>
-
-                <p className="mt-2 text-sm text-white/50">
-                  Bilgilerinizi bırakın, sizinle iletişime geçelim.
-                </p>
-              </div>
-
-              <button
-                onClick={closeApplicationForm}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-xl"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {success ? (
-              <div className="mt-8 overflow-hidden rounded-[34px] border border-emerald-400/25 bg-gradient-to-br from-emerald-500/15 via-[#0B1628] to-[#07111F] p-6 shadow-2xl shadow-emerald-500/10">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[28px] border border-emerald-300/30 bg-emerald-400/15 text-emerald-300 shadow-xl shadow-emerald-500/20">
-                  <CheckCircle2 size={42} />
-                </div>
-
-                <p className="mt-6 text-xs font-black uppercase tracking-[0.24em] text-emerald-300">
-                  Başvuru Alındı
-                </p>
-
-                <h4 className="mt-3 text-[28px] font-black leading-tight text-white">
-                  Sayın {submittedApplicantName || "EPH Üyesi"},
-                </h4>
-
-                <p className="mt-3 text-xl font-black leading-8 text-emerald-300">
-                  Başvurunuz başarıyla alınmıştır.
-                </p>
-
-                <p className="mx-auto mt-4 max-w-md text-sm font-semibold leading-7 text-white/65">
-                  EPH Platform değerlendirme ekibi başvurunuzu incelemeye başlamıştır.
-                  Başvuru durumunuz tarafınıza e-posta veya telefon yoluyla bildirilecektir.
-                </p>
-
-                <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35">
-                      Başvuru Numarası
-                    </p>
-                    <p className="mt-2 text-sm font-black text-white">
-                      {submittedApplicationNumber || "EPH-2026"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35">
-                      Durum
-                    </p>
-                    <p className="mt-2 text-sm font-black text-[#60A5FA]">
-                      İnceleme Bekliyor
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={closeApplicationForm}
-                  className="mt-7 w-full rounded-2xl bg-[#2563EB] px-6 py-4 text-sm font-black text-white shadow-lg shadow-[#2563EB]/25 transition hover:bg-[#1D4ED8]"
-                >
-                  Tamam
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="mt-8 grid grid-cols-1 gap-5">
-                  <Input
-                    label="Ad Soyad"
-                    value={form.ad}
-                    onChange={(v) => setForm({ ...form, ad: v })}
-                  />
-
-                  <Input
-                    label="Telefon"
-                    value={form.tel}
-                    onChange={(v) => setForm({ ...form, tel: v })}
-                  />
-
-                  <Input
-                    label="E-posta"
-                    value={form.email}
-                    onChange={(v) => setForm({ ...form, email: v })}
-                  />
-
-                  <div>
-                    <label className="mb-2 block text-center text-xs font-black uppercase tracking-[0.2em] text-white/40">
-                      Meslek
-                    </label>
-
-                    <select
-                      value={form.meslek}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          meslek: e.target.value,
-                        })
-                      }
-                      className="h-14 w-full rounded-2xl border border-white/10 bg-[#0B1628] px-5 text-center text-sm font-bold text-white outline-none"
-                    >
-                      <option value="">Seçiniz</option>
-                      <option>Emlakçı</option>
-                      <option>Müteahhit</option>
-                      <option>İnşaat Firması</option>
-                    </select>
-                  </div>
-
-                  <Input
-                    label="Referans Kodu (Opsiyonel)"
-                    value={form.kod}
-                    onChange={(v) => setForm({ ...form, kod: v })}
-                  />
-                </div>
-
-                <div className="mt-6 rounded-3xl border border-white/10 bg-white/[0.03] p-5 text-left">
-                  <p className="mb-4 text-center text-xs font-black uppercase tracking-[0.2em] text-[#60A5FA]">
-                    Hukuki Onaylar
-                  </p>
-
-                  <div className="space-y-3">
-                    <LegalCheckbox
-                      checked={legalAccepted.constitution}
-                      onChange={(checked) =>
-                        setLegalAccepted((prev) => ({
-                          ...prev,
-                          constitution: checked,
-                        }))
-                      }
-                      href="/platform-anayasasi"
-                      label="Platform Anayasasını okudum ve kabul ediyorum."
-                    />
-
-                    <LegalCheckbox
-                      checked={legalAccepted.kvkk}
-                      onChange={(checked) =>
-                        setLegalAccepted((prev) => ({ ...prev, kvkk: checked }))
-                      }
-                      href="/kvkk"
-                      label="KVKK Aydınlatma Metnini okudum."
-                    />
-
-                    <LegalCheckbox
-                      checked={legalAccepted.privacy}
-                      onChange={(checked) =>
-                        setLegalAccepted((prev) => ({ ...prev, privacy: checked }))
-                      }
-                      href="/gizlilik-politikasi"
-                      label="Gizlilik Politikasını okudum ve kabul ediyorum."
-                    />
-
-                    <LegalCheckbox
-                      checked={legalAccepted.agreement}
-                      onChange={(checked) =>
-                        setLegalAccepted((prev) => ({ ...prev, agreement: checked }))
-                      }
-                      href="/kullanici-sozlesmesi"
-                      label="Kullanıcı Sözleşmesini okudum ve kabul ediyorum."
-                    />
-                  </div>
-                </div>
-
-                <button
-                  onClick={submitForm}
-                  disabled={loading || !allLegalAccepted}
-                  className="mt-8 flex h-14 w-full items-center justify-center rounded-2xl bg-[#2563EB] text-sm font-black transition hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {loading ? "Gönderiliyor..." : "Başvuruyu Gönder"}
-                </button>
-              </>
-            )}
-          </div>
           </div>
         </div>
       )}
@@ -1167,41 +869,6 @@ Başvurular ve destek talepleri mümkün olan en kısa sürede değerlendirilir.
         </button>
       </div>
     </div>
-  );
-}
-
-function LegalCheckbox({
-  checked,
-  onChange,
-  href,
-  label,
-}: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  href: string;
-  label: string;
-}) {
-  return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm font-semibold leading-6 text-white/70 transition hover:bg-white/[0.06]">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="mt-1 h-4 w-4 shrink-0 accent-[#2563EB]"
-      />
-
-      <span>
-        {label}{" "}
-        <Link
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-black text-[#60A5FA] underline-offset-4 hover:underline"
-        >
-          Metni aç
-        </Link>
-      </span>
-    </label>
   );
 }
 
