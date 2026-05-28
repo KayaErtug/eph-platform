@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { MailService } from "../mail.service";
+import { Role } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 
 @Injectable()
@@ -17,6 +18,43 @@ export class AdminService {
     return `EMK-${part(4)}-${part(4)}`;
   }
 
+  private generateReferralCode(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "EPH-";
+
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    return code;
+  }
+
+  private async generateUniqueReferralCode(): Promise<string> {
+    let code = this.generateReferralCode();
+
+    let existingUser = await this.prisma.user.findFirst({
+      where: { referralCode: code },
+    });
+
+    let existingCandidate = await this.prisma.referralCandidate.findFirst({
+      where: { referralCode: code },
+    });
+
+    while (existingUser || existingCandidate) {
+      code = this.generateReferralCode();
+
+      existingUser = await this.prisma.user.findFirst({
+        where: { referralCode: code },
+      });
+
+      existingCandidate = await this.prisma.referralCandidate.findFirst({
+        where: { referralCode: code },
+      });
+    }
+
+    return code;
+  }
+
   async getStats() {
     const totalUsers = await this.prisma.user.count();
     const pendingUsers = await this.prisma.user.count({ where: { isApproved: false } });
@@ -25,6 +63,10 @@ export class AdminService {
     const pendingDocuments = await this.prisma.document.count({ where: { status: "PENDING" } });
     const pendingNominations = await this.prisma.nomination.count({ where: { status: "PENDING" } });
     const pendingApplications = await this.prisma.application.count({ where: { status: "PENDING" } });
+    const totalReferralCandidates = await this.prisma.referralCandidate.count();
+    const activeReferralCandidates = await this.prisma.referralCandidate.count({
+      where: { isActive: true },
+    });
 
     const byRole = await this.prisma.user.groupBy({
       by: ["role"],
@@ -39,6 +81,8 @@ export class AdminService {
       pendingDocuments,
       pendingNominations,
       pendingApplications,
+      totalReferralCandidates,
+      activeReferralCandidates,
       byRole: byRole.map((r) => ({ role: r.role, count: r._count.role })),
     };
   }
@@ -195,6 +239,7 @@ export class AdminService {
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);
+    const referralCode = await this.generateUniqueReferralCode();
 
     return this.prisma.user.create({
       data: {
@@ -206,6 +251,7 @@ export class AdminService {
         role: data.role as any,
         isApproved: true,
         isVerified: true,
+        referralCode,
       },
       select: {
         id: true,
@@ -215,7 +261,91 @@ export class AdminService {
         profileImageUrl: true,
         role: true,
         isApproved: true,
+        referralCode: true,
       },
+    });
+  }
+
+  async getReferralCodes() {
+    const users = await this.prisma.user.findMany({
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        role: true,
+        isApproved: true,
+        referralCode: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const candidates = await this.prisma.referralCandidate.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+
+    return {
+      users,
+      candidates,
+    };
+  }
+
+  async createReferralCandidate(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    role: Role;
+  }) {
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email: data.email }, { phone: data.phone }],
+      },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException("Bu e-posta veya telefonla kayıtlı kullanıcı var.");
+    }
+
+    const existingCandidate = await this.prisma.referralCandidate.findFirst({
+      where: {
+        OR: [{ email: data.email }, { phone: data.phone }],
+      },
+    });
+
+    if (existingCandidate) {
+      throw new BadRequestException("Bu kişi için daha önce referans kodu oluşturulmuş.");
+    }
+
+    const referralCode = await this.generateUniqueReferralCode();
+
+    return this.prisma.referralCandidate.create({
+      data: {
+        referralCode,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+        role: data.role,
+        isActive: true,
+      },
+    });
+  }
+
+  async deactivateReferralCandidate(id: string) {
+    const candidate = await this.prisma.referralCandidate.findUnique({
+      where: { id },
+    });
+
+    if (!candidate) {
+      throw new NotFoundException("Referans kaydı bulunamadı.");
+    }
+
+    return this.prisma.referralCandidate.update({
+      where: { id },
+      data: { isActive: false },
     });
   }
 
