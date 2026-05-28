@@ -14,18 +14,13 @@
   --eph-text-soft: #5b6b82;
   --eph-muted: #7b8aa0;
 
-  --eph-primary: #2563eb;
-  --eph-primary-soft: #dbeafe;
-  --eph-secondary: #14b8a6;
-  --eph-secondary-soft: #ccfbf1;
-  --eph-orange: #f97316;
-  --eph-orange-soft: #ffedd5;
-  --eph-purple: #8b5cf6;
-  --eph-purple-soft: #ede9fe;
-  --eph-green: #22c55e;
-  --eph-green-soft: #dcfce7;
-  --eph-red: #ef4444;
-  --eph-red-soft: #fee2e2;
+  --role-primary: #2563eb;
+  --role-primary-dark: #1d4ed8;
+  --role-primary-soft: #dbeafe;
+  --role-secondary: #14b8a6;
+  --role-secondary-soft: #ccfbf1;
+  --role-accent: #f97316;
+  --role-accent-soft: #ffedd5;
 
   --eph-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
   --eph-shadow-soft: 0 10px 25px rgba(15, 23, 42, 0.06);
@@ -55,9 +50,9 @@ html {
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 34%),
-    radial-gradient(circle at top right, rgba(20, 184, 166, 0.08), transparent 30%),
-    linear-gradient(180deg, #ffffff 0%, #f8fafc 42%, #eef6ff 100%);
+    radial-gradient(circle at top left, color-mix(in srgb, var(--role-primary) 9%, transparent), transparent 34%),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--role-secondary) 9%, transparent), transparent 30%),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 45%, #eef6ff 100%);
   color: var(--eph-text);
   font-family: Arial, Helvetica, sans-serif;
   min-height: 100vh;
@@ -81,27 +76,74 @@ textarea {
   background: #ffffff;
 }
 
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+table {
+  width: 100%;
+}
+
 ::selection {
-  background: rgba(37, 99, 235, 0.18);
+  background: color-mix(in srgb, var(--role-primary) 18%, transparent);
   color: #0f172a;
 }
 
-/* ===================== EPH BEYAZ CRM TEMA SİSTEMİ ===================== */
+/* ===================== ROL BAZLI BEYAZ CRM TEMA ===================== */
 
+/* Varsayılan / EMLAKÇI */
+.eph-role-emlakci,
+.eph-theme-emlakci,
+body {
+  --role-primary: #2563eb;
+  --role-primary-dark: #1d4ed8;
+  --role-primary-soft: #dbeafe;
+  --role-secondary: #14b8a6;
+  --role-secondary-soft: #ccfbf1;
+  --role-accent: #f97316;
+  --role-accent-soft: #ffedd5;
+}
+
+/* MÜTEAHHİT */
+.eph-role-muteahhit,
+.eph-theme-muteahhit {
+  --role-primary: #f97316;
+  --role-primary-dark: #ea580c;
+  --role-primary-soft: #ffedd5;
+  --role-secondary: #1e3a8a;
+  --role-secondary-soft: #dbeafe;
+  --role-accent: #0f766e;
+  --role-accent-soft: #ccfbf1;
+}
+
+/* ADMİN */
+.eph-role-admin,
+.eph-theme-admin {
+  --role-primary: #7c3aed;
+  --role-primary-dark: #6d28d9;
+  --role-primary-soft: #ede9fe;
+  --role-secondary: #475569;
+  --role-secondary-soft: #e2e8f0;
+  --role-accent: #2563eb;
+  --role-accent-soft: #dbeafe;
+}
+
+/* Eski tema class'ları artık beyaz CRM çizgisine bağlanıyor */
 .eph-theme-klasik,
 .eph-theme-modern,
 .eph-theme-futuristik,
 .eph-theme-koyu,
 .eph-theme-neseli {
-  --bg: #f8fafc;
-  --bg2: #eef6ff;
-  --surface: #ffffff;
-  --border: #dbe7f3;
-  --text: #172033;
-  --text2: #5b6b82;
-  --accent: #2563eb;
-  --accent2: #14b8a6;
-  --gold: #f97316;
+  --bg: var(--eph-bg);
+  --bg2: var(--eph-bg-soft);
+  --surface: var(--eph-surface);
+  --border: var(--eph-border);
+  --text: var(--eph-text);
+  --text2: var(--eph-text-soft);
+  --accent: var(--role-primary);
+  --accent2: var(--role-secondary);
+  --gold: var(--role-accent);
   --font-main: Arial, Helvetica, sans-serif;
   --font-body: Arial, Helvetica, sans-serif;
   --radius: 18px;
@@ -119,22 +161,129 @@ textarea {
   font-family: Arial, Helvetica, sans-serif !important;
 }
 
-/* Genel kart dili */
+/* ===================== YENİ ORTAK TASARIM SINIFLARI ===================== */
+
+.eph-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--role-primary) 9%, transparent), transparent 34%),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--role-secondary) 9%, transparent), transparent 30%),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 45%, #eef6ff 100%);
+  color: var(--eph-text);
+}
+
+.eph-shell {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 20px;
+}
+
+.eph-panel,
 .eph-card,
 [class*="card"],
 [class*="Card"] {
   border-radius: var(--eph-radius);
 }
 
-/* Linkler */
-a {
-  color: inherit;
-  text-decoration: none;
+.eph-panel,
+.eph-card {
+  border: 1px solid var(--eph-border);
+  background: var(--eph-surface);
+  box-shadow: var(--eph-shadow-soft);
 }
 
-/* Tablo mobile scroll */
-table {
-  width: 100%;
+.eph-title {
+  color: var(--eph-text);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.eph-subtitle {
+  color: var(--eph-text-soft);
+  line-height: 1.7;
+}
+
+.eph-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--role-primary) 22%, #ffffff);
+  background: var(--role-primary-soft);
+  color: var(--role-primary);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.eph-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--role-primary);
+  color: #ffffff;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 900;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--role-primary) 22%, transparent);
+  transition: transform 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
+}
+
+.eph-btn-primary:hover {
+  transform: translateY(-2px);
+  background: var(--role-primary-dark);
+}
+
+.eph-btn-soft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid var(--eph-border);
+  border-radius: 16px;
+  background: #ffffff;
+  color: var(--eph-text);
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 900;
+  box-shadow: var(--eph-shadow-soft);
+  transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+}
+
+.eph-btn-soft:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--role-primary) 28%, #ffffff);
+  background: var(--role-primary-soft);
+}
+
+.eph-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: var(--role-primary-soft);
+  color: var(--role-primary);
+}
+
+.eph-soft-bg {
+  background: var(--role-primary-soft);
+  color: var(--role-primary);
+}
+
+.eph-secondary-bg {
+  background: var(--role-secondary-soft);
+  color: var(--role-secondary);
+}
+
+.eph-accent-bg {
+  background: var(--role-accent-soft);
+  color: var(--role-accent);
 }
 
 /* ===================== DOĞAL CRM ETKİLERİ ===================== */
@@ -198,7 +347,7 @@ table {
 
 .eph-card-hover:hover {
   transform: translateY(-4px);
-  border-color: rgba(37, 99, 235, 0.25);
+  border-color: color-mix(in srgb, var(--role-primary) 25%, #ffffff);
   box-shadow: var(--eph-shadow);
 }
 
@@ -217,7 +366,7 @@ table {
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(37, 99, 235, 0.08),
+    color-mix(in srgb, var(--role-primary) 8%, transparent),
     transparent
   );
   animation: ephSweep 6s linear infinite;
