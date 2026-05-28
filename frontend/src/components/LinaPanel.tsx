@@ -78,7 +78,7 @@ export default function LinaPanel({ open, onClose }: LinaPanelProps) {
       stopCurrentAudio();
       setSpeaking(true);
 
-      const res = await fetch("/api/lina-voice", {
+      const res = await fetch("/lina-voice", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
