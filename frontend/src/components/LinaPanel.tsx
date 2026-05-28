@@ -1,114 +1,128 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+
+import { useEffect, useRef, useState } from "react";
+import {
+  Bot,
+  CheckCircle2,
+  Loader2,
+  Mic,
+  MicOff,
+  Send,
+  Sparkles,
+  Volume2,
+  X,
+} from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 
-type Message = { role: "user" | "lina"; text: string };
+type Message = {
+  role: "user" | "lina";
+  text: string;
+};
 
-const LINA_SYSTEM = `Sen Lina'sın — EPH'nin AI emlak danışmanı asistanısın. Kullanıcıdan yeni emlak ilanı bilgilerini doğal sohbet yoluyla topluyorsun.
+type LinaPanelProps = {
+  open: boolean;
+  onClose: () => void;
+};
 
-KONUŞMA KURALLARI:
-- Her mesajda sadece 1-2 soru sor, asla form gibi peşpeşe sorma.
-- İnsan gibi konuş: "Harika! Peki bu daire hangi ilçede?" tarzında.
-- Cevap alınca kısa onay ver, sonra devam et.
-- Bir sorunun net cevabını almadan bir sonrakine geçme.
-
-GÜVENLİK KURALLARI:
-- ASLA kullanıcıdan almadığın bilgileri uydurma.
-- Manzara, metro, sosyal alan, site özellikleri kullanıcı söylemediyse YAZMA.
-- Eksik bilgi varsa varsayım yapma, sor.
-- Zorunlu alanlar tamamlanmadan JSON üretme.
-
-MÜKERRER KONTROL:
-- Kullanıcı proje adını söyleyince şunu sor: "Bu proje sistemde kayıtlı olabilir — mevcut projeye yeni bağımsız bölüm mü ekliyorsunuz, yoksa yeni proje mi açıyoruz?"
-
-ZORUNLU BİLGİLER (sırayla topla):
-1. İlan tipi: Satılık / Kiralık / Günlük Kiralık / Devren / Proje / Arsa
-2. Portföy türü: Daire / Villa / Arsa / Dükkan / Ofis / Depo / Residence / Diğer
-3. Proje veya bina adı
-4. Şehir → İlçe → Mahalle → Açık adres (sırayla sor)
-5. Brüt m² ve Net m²
-6. Oda sayısı (1+1, 2+1 vb.) — konut değilse atla
-7. Bulunduğu kat ve binanın toplam kat sayısı
-8. Bina yaşı
-9. Tapu durumu: Kat Mülkiyeti / Kat İrtifakı / Hisseli / Müstakil
-10. Fiyat (TL) — pazarlığa açık mı?
-11. Yetki durumu: Yetkili / Paylaşımlı / Yetki yok
-
-EK BİLGİLER (kısaca sor):
-- Kullanım durumu: Boş / Kiracılı / Mülk sahibi oturuyor
-- Isıtma tipi (Kombi / Merkezi / Yerden / Klima)
-- Aidat (varsa)
-- Krediye uygun mu?
-- Takas var mı?
-- Cephe (Güney/Kuzey/Doğu/Batı)
-
-SONUNDA (sadece verilen bilgilere dayanarak) üret:
-- Profesyonel ilan başlığı
-- SEO uyumlu ilan açıklaması
-- Etiketler (sadece gerçek bilgilere dayalı, uydurma)
-- İhtiyatlı fiyat yorumu
-
-Tüm zorunlu bilgiler tamamlanınca şu formatta özet ver:
-JSON_START
-{"proje":{"name":"...","city":"...","district":"...","neighborhood":"...","address":"..."},"birim":{"type":"...","number":"...","floor":0,"totalFloors":0,"grossArea":0,"netArea":0,"roomCount":"...","buildingAge":0,"heating":"...","deedStatus":"...","usageStatus":"...","creditEligible":true,"swap":false,"dues":0,"price":0,"negotiable":true,"listingType":"...","title":"...","description":"...","tags":"..."}}
-JSON_END
-
-Türkçe konuş, samimi ve profesyonel ol. Form hissi değil, danışman hissi ver.`;
-
-export default function LinaPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function LinaPanel({ open, onClose }: LinaPanelProps) {
   const { user } = useAuthStore();
-  const userName = user?.firstName || "değerli kullanıcı";
+
+  const userName = user?.firstName || "Profesyonel";
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const mediaRef = useRef<MediaRecorder | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const [messages, setMessages] = useState<Message[]>([
-    { role: "lina", text: `Merhaba ${userName} 🙂 Yeni bir ilan mı ekleyeceğiz?` }
+    {
+      role: "lina",
+      text: `Merhaba ${userName}. Ben Lina. Size profesyonel bir emlak ilanı hazırlamak için buradayım. İlan satılık mı, kiralık mı, yoksa proje bilgisi mi gireceğiz?`,
+    },
   ]);
+
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [transcript, setTranscript] = useState("");
-  const [transcribing, setTranscribing] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const [summary, setSummary] = useState<any>(null);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const mediaRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [recording, setRecording] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+    if (!open) return;
 
+    window.setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  }, [messages, loading, open]);
 
-  const speakResponse = (text: string) => {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-
-    const doSpeak = () => {
-      const utt = new SpeechSynthesisUtterance(text);
-      utt.lang = "tr-TR";
-      utt.rate = 1.05;
-      utt.pitch = 1.0;
-      utt.volume = 1.0;
-      const voices = window.speechSynthesis.getVoices();
-      const trVoice = voices.find(v => v.lang.startsWith("tr"));
-      if (trVoice) utt.voice = trVoice;
-      utt.onstart = () => setSpeaking(true);
-      utt.onend = () => setSpeaking(false);
-      utt.onerror = () => setSpeaking(false);
-      window.speechSynthesis.speak(utt);
+  useEffect(() => {
+    return () => {
+      stopCurrentAudio();
+      stopRecording();
     };
+  }, []);
 
-    const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) {
-      doSpeak();
-    } else {
-      window.speechSynthesis.onvoiceschanged = () => { doSpeak(); };
+  if (!open) return null;
+
+  const stopCurrentAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+
+    setSpeaking(false);
+  };
+
+  const speakWithElevenLabs = async (text: string) => {
+    try {
+      setVoiceError("");
+      stopCurrentAudio();
+      setSpeaking(true);
+
+      const res = await fetch("/api/lina-voice", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!res.ok) {
+        setSpeaking(false);
+        setVoiceError("Lina sesi şu anda üretilemedi.");
+        return;
+      }
+
+      const blob = await res.blob();
+      const audioUrl = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl);
+
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        setSpeaking(false);
+      };
+
+      audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl);
+        setSpeaking(false);
+        setVoiceError("Ses oynatılırken hata oluştu.");
+      };
+
+      await audio.play();
+    } catch {
+      setSpeaking(false);
+      setVoiceError("Tarayıcı sesi başlatamadı. Tekrar deneyin.");
     }
   };
 
-  const sendMessage = async (text: string) => {
-    if (!text.trim()) return;
+  const sendMessage = async (textFromVoice?: string) => {
+    const text = (textFromVoice || input).trim();
+
+    if (!text || loading) return;
+
     const newMessages: Message[] = [...messages, { role: "user", text }];
+
     setMessages(newMessages);
     setInput("");
     setLoading(true);
@@ -116,219 +130,312 @@ export default function LinaPanel({ open, onClose }: { open: boolean; onClose: (
     try {
       const res = await fetch("/api/lina-stok", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           message: text,
-          history: newMessages.map(m => ({ role: m.role === "lina" ? "assistant" : "user", content: m.text })),
-          system: LINA_SYSTEM,
-          userName: user?.firstName || ""
-        })
+          history: newMessages.map((messageItem) => ({
+            role: messageItem.role === "lina" ? "assistant" : "user",
+            content: messageItem.text,
+          })),
+        }),
       });
-      const data = await res.json();
-      const reply = data.reply || "Bir sorun oluştu.";
-      setMessages(prev => [...prev, { role: "lina", text: reply }]);
-      speakResponse(reply);
 
-      // JSON özet var mı kontrol et
-      const jsonMatch = reply.match(/JSON_START([\s\S]*?)JSON_END/);
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[1].trim());
-          setSummary(parsed);
-          // JSON kodunu mesajdan temizle
-          const cleanReply = reply.replace(/JSON_START[\s\S]*?JSON_END/g, "").trim();
-          if (cleanReply) {
-            setMessages(prev => {
-              const msgs = [...prev];
-              msgs[msgs.length - 1] = { role: "lina", text: cleanReply };
-              return msgs;
-            });
-          }
-        } catch {}
-      }
-    } catch (err: any) {
-      console.error("Lina hata:", err);
-      setMessages(prev => [...prev, { role: "lina", text: "Bağlantı hatası oluştu." }]);
+      const data = await res.json();
+
+      const reply =
+        data?.reply ||
+        "Bu bilgiyi aldım. İlanı daha doğru hazırlamam için konum, oda sayısı, metrekare ve fiyat bilgisini de paylaşabilir misiniz?";
+
+      setMessages((prev) => [...prev, { role: "lina", text: reply }]);
+
+      await speakWithElevenLabs(reply);
+    } catch {
+      const fallback =
+        "Bağlantı sırasında bir sorun oluştu. Lütfen biraz sonra tekrar deneyin.";
+
+      setMessages((prev) => [...prev, { role: "lina", text: fallback }]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mr = new MediaRecorder(stream);
-    chunksRef.current = [];
-    mr.ondataavailable = e => chunksRef.current.push(e.data);
-    mr.onstop = async () => {
-      stream.getTracks().forEach(track => track.stop());
-      setTranscribing(true);
-      const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-      const fd = new FormData();
-      fd.append("audio", blob, "ses.webm");
-      const res = await fetch("/api/whisper", { method: "POST", body: fd });
-      const data = await res.json();
-      setTranscribing(false);
-      if (data.text) {
-        setTranscript(data.text);
-        setTimeout(() => { setTranscript(""); sendMessage(data.text); }, 1200);
+    try {
+      setVoiceError("");
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setVoiceError("Bu cihaz ses kaydını desteklemiyor.");
+        return;
       }
-    };
-    mr.start();
-    mediaRef.current = mr;
-    setRecording(true);
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: BlobPart[] = [];
+
+      mediaRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        chunks.push(event.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+
+        const audioBlob = new Blob(chunks, { type: "audio/webm" });
+        const formData = new FormData();
+
+        formData.append("audio", audioBlob, "audio.webm");
+
+        try {
+          setLoading(true);
+
+          const res = await fetch("/api/whisper", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await res.json();
+          const text = data?.text?.trim();
+
+          if (text) {
+            await sendMessage(text);
+          } else {
+            setVoiceError("Ses anlaşılamadı. Lütfen tekrar deneyin.");
+          }
+        } catch {
+          setVoiceError("Ses metne dönüştürülemedi.");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      recorder.start();
+      setRecording(true);
+    } catch {
+      setVoiceError("Mikrofon izni alınamadı.");
+    }
   };
 
   const stopRecording = () => {
-    mediaRef.current?.stop();
+    if (mediaRef.current && mediaRef.current.state !== "inactive") {
+      mediaRef.current.stop();
+    }
+
     setRecording(false);
   };
 
-  const saveStock = async () => {
-    if (!summary) return;
-    setSaving(true);
-    const token = localStorage.getItem("token");
-    try {
-      const res = await fetch("/api/save-listing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ proje: summary.proje, birim: summary.birim, ilan: summary.ilan })
-      });
-      const result = await res.json();
-      if (!result.success) throw new Error(result.error || "Kayıt başarısız");
-      setSaved(true);
-    } catch (err: any) { console.error("Kayıt hatası:", err); alert("Kayıt hatası!"); }
-    setSaving(false);
-  };
+  const resetConversation = () => {
+    stopCurrentAudio();
 
-  const reset = () => {
-    setMessages([{ role: "lina", text: "Merhaba! Ben Lina 👋 Size profesyonel bir emlak ilanı hazırlayalım. Önce söyler misiniz — bu ilan satılık mı, kiralık mı, yoksa başka bir türde mi?" }]);
-    setSummary(null); setSaved(false); setInput("");
-  };
+    setMessages([
+      {
+        role: "lina",
+        text: `Merhaba ${userName}. Ben Lina. Size profesyonel bir emlak ilanı hazırlamak için buradayım. İlan satılık mı, kiralık mı, yoksa proje bilgisi mi gireceğiz?`,
+      },
+    ]);
 
-  if (!open) return null;
+    setInput("");
+    setVoiceError("");
+  };
 
   return (
-    <>
-      <div onClick={onClose} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:1001 }} />
-      <div style={{
-        position:"fixed",top:0,right:0,bottom:0,width:"min(420px, 100vw)",height:"100dvh",paddingBottom:"65px",
-        background:"#fff",zIndex:1002,display:"flex",flexDirection:"column",
-        boxShadow:"-4px 0 30px rgba(0,0,0,0.2)"
-      }}>
-        {/* Header */}
-        <div style={{ padding:"20px 24px",borderBottom:"1px solid #eee",display:"flex",alignItems:"center",gap:12 }}>
-          <div style={{ width:40,height:40,borderRadius:"50%",background:"linear-gradient(135deg,#1A3C5E,#C9A84C)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20 }}>🤖</div>
-          <div>
-            <div style={{ fontWeight:700,fontSize:16,color:"#1A3C5E" }}>Lina AI</div>
-            <div style={{ fontSize:11,color:"#999" }}>Stok Asistanı</div>
-          </div>
-          <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8}}>
-          {speaking && (
-            <div style={{display:"flex",alignItems:"center",gap:4,background:"#EEF8F0",padding:"4px 10px",borderRadius:20}}>
-              <div style={{display:"flex",gap:2,alignItems:"center"}}>
-                {[1,2,3,4].map(i => <div key={i} style={{width:3,background:"#2D6A4F",borderRadius:2,height:i%2===0?14:8,animation:"wave 0.8s ease-in-out infinite",animationDelay:`${i*0.15}s`}} />)}
+    <div className="fixed inset-0 z-[140] flex items-end justify-center bg-[#0F172A]/60 p-0 backdrop-blur-md md:items-center md:p-5">
+      <div className="flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-[34px] border border-[#DDE7F3] bg-white shadow-2xl md:h-[82vh] md:rounded-[36px]">
+        <header className="border-b border-[#DDE7F3] bg-[#F8FAFC] px-5 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-[#08111F] text-[#F7DFA3] shadow-lg">
+                <Sparkles size={25} />
+
+                <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-[#14B8A6]">
+                  <CheckCircle2 size={12} className="text-white" />
+                </span>
               </div>
-              <span style={{fontSize:10,color:"#2D6A4F",fontWeight:500}}>Lina konuşuyor</span>
-              <button onClick={()=>{window.speechSynthesis.cancel();setSpeaking(false);}} style={{background:"none",border:"none",cursor:"pointer",color:"#2D6A4F",fontSize:14,padding:0}}>⏹</button>
-            </div>
-          )}
-          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"#999"}}>×</button>
-        </div>
-        </div>
 
-        {/* Messages */}
-        <div style={{ flex:1,overflowY:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:12,WebkitOverflowScrolling:"touch" }}>
-          {messages.map((m, i) => (
-            <div key={i} style={{ display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start" }}>
-              <div style={{
-                maxWidth:"80%",padding:"10px 14px",borderRadius:12,fontSize:13,lineHeight:1.5,
-                background:m.role==="user"?"#1A3C5E":"#F5F3EF",
-                color:m.role==="user"?"#fff":"#1A1A1A"
-              }}>{m.text}</div>
-            </div>
-          ))}
-          {loading && (
-            <div style={{ display:"flex",gap:4,padding:"10px 14px",background:"#F5F3EF",borderRadius:12,width:"fit-content" }}>
-              {[0,1,2].map(i => <div key={i} style={{ width:6,height:6,borderRadius:"50%",background:"#C9A84C",animation:`bounce 1s ${i*0.2}s infinite` }} />)}
-            </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
+              <div className="min-w-0 text-center md:text-left">
+                <h2 className="truncate text-xl font-black text-[#172033]">
+                  Lina
+                </h2>
 
-        {/* Özet onay ekranı */}
-        {summary && !saved && (
-          <div style={{ padding:"16px 20px",borderTop:"1px solid #eee",background:"#FFFDF7" }}>
-            <div style={{ fontSize:12,fontWeight:700,color:"#1A3C5E",marginBottom:12 }}>📋 İlan Özeti</div>
-            <div style={{ fontSize:12,color:"#333",marginBottom:12,lineHeight:2,background:"#fff",borderRadius:8,padding:"12px" }}>
-              {summary.ilan?.title && <div><b>Başlık:</b> {summary.ilan.title}</div>}
-              <div><b>Tür:</b> {summary.ilan?.listingType} · {summary.ilan?.portfolioType}</div>
-              <div><b>Konum:</b> {summary.proje?.neighborhood} / {summary.proje?.district} / {summary.proje?.city}</div>
-              {summary.birim?.roomCount && <div><b>Oda:</b> {summary.birim.roomCount}</div>}
-              {summary.birim?.grossArea && <div><b>Alan:</b> {summary.birim.grossArea} m²</div>}
-              {summary.birim?.floor && <div><b>Kat:</b> {summary.birim.floor}</div>}
-              {summary.birim?.deedStatus && <div><b>Tapu:</b> {summary.birim.deedStatus}</div>}
-              <div><b>Fiyat:</b> {summary.ilan?.price?.toLocaleString("tr-TR")} TL {summary.ilan?.negotiable ? "· Pazarlıklı" : ""}</div>
+                <p className="text-xs font-bold text-[#64748B]">
+                  EPH Yapay Zeka Asistanı
+                </p>
+              </div>
             </div>
-            <div style={{ display:"flex",gap:8 }}>
-              <button onClick={saveStock} disabled={saving} style={{ flex:1,padding:"10px",background:"#1A3C5E",color:"#fff",border:"none",borderRadius:6,cursor:"pointer",fontSize:13,fontWeight:600 }}>
-                {saving ? "Kaydediliyor..." : "✅ Onayla ve Kaydet"}
+
+            <div className="flex items-center gap-2">
+              {speaking && (
+                <button
+                  type="button"
+                  onClick={stopCurrentAudio}
+                  className="flex h-10 items-center gap-2 rounded-2xl border border-[#F7DFA3]/40 bg-[#FFF7ED] px-4 text-xs font-black text-[#B45309]"
+                >
+                  <Volume2 size={15} />
+                  Sesi Durdur
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#172033]"
+              >
+                <X size={20} />
               </button>
-              <button onClick={reset} style={{ padding:"10px 16px",background:"#eee",border:"none",borderRadius:6,cursor:"pointer",fontSize:13 }}>İptal</button>
             </div>
           </div>
-        )}
+        </header>
 
-        {saved && (
-          <div style={{ padding:"20px",borderTop:"1px solid #eee",textAlign:"center" }}>
-            <div style={{ fontSize:32,marginBottom:8 }}>🎉</div>
-            <div style={{ fontWeight:700,color:"#2D6A4F",marginBottom:12 }}>Stok başarıyla kaydedildi!</div>
-            <button onClick={reset} style={{ padding:"10px 24px",background:"#1A3C5E",color:"#fff",border:"none",borderRadius:6,cursor:"pointer" }}>Yeni Stok Ekle</button>
-          </div>
-        )}
+        <section className="grid flex-1 overflow-hidden md:grid-cols-[330px_1fr]">
+          <aside className="hidden border-r border-[#DDE7F3] bg-[#F8FAFC] p-5 text-center md:block">
+            <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-sm">
+              <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[34px] bg-[#08111F] text-[#F7DFA3] shadow-xl">
+                <Bot size={46} />
+              </div>
 
-        {/* Ses durumu göstergesi */}
-        {(recording || transcribing || transcript) && (
-          <div style={{ padding:"12px 20px", background: recording ? "#FFF0F0" : "#F0F7FF", borderTop:"1px solid #eee", display:"flex", alignItems:"center", gap:10 }}>
-            {recording && (
-              <>
-                <div style={{ width:10, height:10, borderRadius:"50%", background:"#FF4444", animation:"pulse 1s infinite" }} />
-                <span style={{ fontSize:12, color:"#FF4444", fontWeight:500 }}>Dinleniyor...</span>
-                <span style={{ fontSize:11, color:"#999", marginLeft:"auto" }}>Durdurmak için basın</span>
-              </>
+              <h3 className="mt-5 text-2xl font-black text-[#172033]">
+                Lina AI
+              </h3>
+
+              <p className="mt-3 text-sm leading-7 text-[#64748B]">
+                Portföy bilgilerini toplar, ilan açıklaması hazırlar ve stok
+                giriş sürecini hızlandırır.
+              </p>
+
+              <div className="mt-5 grid gap-3">
+                <InfoBadge title="Sesli Komut" />
+                <InfoBadge title="İlan Metni" />
+                <InfoBadge title="Portföy Analizi" />
+              </div>
+            </div>
+
+            {voiceError && (
+              <div className="mt-4 rounded-3xl border border-red-100 bg-red-50 p-4 text-sm font-bold text-red-600">
+                {voiceError}
+              </div>
             )}
-            {transcribing && !recording && (
-              <>
-                <div style={{ width:10, height:10, borderRadius:"50%", background:"#1A3C5E" }} />
-                <span style={{ fontSize:12, color:"#1A3C5E" }}>Yazıya çevriliyor...</span>
-              </>
-            )}
-            {transcript && !transcribing && (
-              <>
-                <span style={{ fontSize:12, color:"#2D6A4F" }}>✓</span>
-                <span style={{ fontSize:12, color:"#1A1A1A", fontStyle:"italic" }}>{transcript}</span>
-              </>
-            )}
-          </div>
-        )}
-        {/* Input */}
-        {!summary && !saved && (
-          <div style={{ padding:"16px 20px",paddingBottom:"max(16px, env(safe-area-inset-bottom))",borderTop:"1px solid #eee",display:"flex",gap:8,background:"#fff",position:"sticky",bottom:0,zIndex:10 }}>
-            <input value={input} onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key==="Enter" && sendMessage(input)}
-              placeholder="Mesaj yaz..." disabled={loading}
-              style={{ flex:1,padding:"10px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:13,outline:"none" }} />
-            <button onClick={recording ? stopRecording : startRecording}
-              style={{ padding:"10px 12px",borderRadius:8,border:"none",cursor:"pointer",fontSize:18,
-                background:recording?"#ff4444":"#F5F3EF" }}>
-              {recording ? "⏹" : "🎤"}
-            </button>
-            <button onClick={() => sendMessage(input)} disabled={loading || !input.trim()}
-              style={{ padding:"10px 16px",background:"#1A3C5E",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600 }}>
-              Gönder
-            </button>
-          </div>
-        )}
+          </aside>
+
+          <main className="flex min-h-0 flex-col">
+            <div className="flex-1 overflow-y-auto bg-white p-4 md:p-6">
+              <div className="mx-auto flex max-w-3xl flex-col gap-4">
+                {messages.map((messageItem, index) => {
+                  const isLina = messageItem.role === "lina";
+
+                  return (
+                    <div
+                      key={`${messageItem.role}-${index}`}
+                      className={`flex ${
+                        isLina ? "justify-start" : "justify-end"
+                      }`}
+                    >
+                      <div
+                        className={`max-w-[88%] rounded-[26px] px-5 py-4 text-sm leading-7 shadow-sm md:max-w-[76%] ${
+                          isLina
+                            ? "border border-[#DDE7F3] bg-[#F8FAFC] text-[#172033]"
+                            : "bg-[#2563EB] text-white"
+                        }`}
+                      >
+                        <p className="whitespace-pre-line text-center md:text-left">
+                          {messageItem.text}
+                        </p>
+
+                        {isLina && (
+                          <button
+                            type="button"
+                            onClick={() => speakWithElevenLabs(messageItem.text)}
+                            className="mt-3 inline-flex items-center justify-center gap-2 rounded-2xl border border-[#DDE7F3] bg-white px-4 py-2 text-xs font-black text-[#172033]"
+                          >
+                            <Volume2 size={14} />
+                            Dinle
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {loading && (
+                  <div className="flex justify-start">
+                    <div className="inline-flex items-center gap-2 rounded-3xl border border-[#DDE7F3] bg-[#F8FAFC] px-5 py-4 text-sm font-black text-[#64748B]">
+                      <Loader2 size={18} className="animate-spin" />
+                      Lina düşünüyor...
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
+
+            <div className="border-t border-[#DDE7F3] bg-[#F8FAFC] p-4">
+              {voiceError && (
+                <div className="mb-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-center text-xs font-black text-red-600 md:hidden">
+                  {voiceError}
+                </div>
+              )}
+
+              <div className="mx-auto flex max-w-3xl flex-col gap-3">
+                <textarea
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  placeholder="İlan bilgisini yazın veya mikrofona basıp anlatın..."
+                  className="min-h-[88px] w-full resize-none rounded-3xl border border-[#DDE7F3] bg-white px-5 py-4 text-center text-sm font-semibold text-[#172033] outline-none ring-0 placeholder:text-[#94A3B8] focus:border-[#2563EB]"
+                />
+
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={recording ? stopRecording : startRecording}
+                    disabled={loading}
+                    className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white transition disabled:opacity-60 ${
+                      recording ? "bg-red-600" : "bg-[#0F766E]"
+                    }`}
+                  >
+                    {recording ? <MicOff size={18} /> : <Mic size={18} />}
+                    {recording ? "Durdur" : "Konuş"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => sendMessage()}
+                    disabled={loading || !input.trim()}
+                    className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#2563EB] px-4 py-3 text-sm font-black text-white transition disabled:opacity-60"
+                  >
+                    <Send size={18} />
+                    Gönder
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetConversation}
+                    disabled={loading}
+                    className="flex min-h-12 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white px-4 py-3 text-sm font-black text-[#172033] transition disabled:opacity-60"
+                  >
+                    Sıfırla
+                  </button>
+                </div>
+              </div>
+            </div>
+          </main>
+        </section>
       </div>
-      <style>{`@keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }`}</style>
-    </>
+    </div>
+  );
+}
+
+function InfoBadge({ title }: { title: string }) {
+  return (
+    <div className="rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] px-4 py-3 text-center text-sm font-black text-[#172033]">
+      {title}
+    </div>
   );
 }
