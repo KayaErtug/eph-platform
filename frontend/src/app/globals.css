@@ -556,3 +556,86 @@ body {
     transform: scaleY(2);
   }
 }
+
+/* =========================================================
+   EPH GLOBAL CENTER SYSTEM
+========================================================= */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+label,
+small,
+strong,
+a,
+button,
+input,
+textarea,
+select {
+  text-align: center;
+}
+
+button,
+a {
+  justify-content: center;
+}
+
+input,
+textarea,
+select {
+  text-align: center;
+}
+
+section,
+article,
+header,
+footer,
+main,
+nav,
+div {
+  box-sizing: border-box;
+}
+
+/* =========================================================
+   MOBILE CENTER ALIGN
+========================================================= */
+
+@media (max-width: 768px) {
+  * {
+    text-align: center !important;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  span,
+  label,
+  small,
+  strong,
+  a,
+  button {
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  .flex,
+  .grid {
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  input,
+  textarea,
+  select {
+    text-align: center !important;
+  }
+}
