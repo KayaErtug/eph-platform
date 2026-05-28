@@ -1,264 +1,143 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #172033;
+
+  --eph-bg: #f8fafc;
+  --eph-bg-soft: #eef6ff;
+  --eph-surface: #ffffff;
+  --eph-surface-soft: #f9fbff;
+  --eph-border: #dbe7f3;
+
+  --eph-text: #172033;
+  --eph-text-soft: #5b6b82;
+  --eph-muted: #7b8aa0;
+
+  --eph-primary: #2563eb;
+  --eph-primary-soft: #dbeafe;
+  --eph-secondary: #14b8a6;
+  --eph-secondary-soft: #ccfbf1;
+  --eph-orange: #f97316;
+  --eph-orange-soft: #ffedd5;
+  --eph-purple: #8b5cf6;
+  --eph-purple-soft: #ede9fe;
+  --eph-green: #22c55e;
+  --eph-green-soft: #dcfce7;
+  --eph-red: #ef4444;
+  --eph-red-soft: #fee2e2;
+
+  --eph-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  --eph-shadow-soft: 0 10px 25px rgba(15, 23, 42, 0.06);
+  --eph-radius: 18px;
+
+  --font-main: Arial, Helvetica, sans-serif;
+  --font-body: Arial, Helvetica, sans-serif;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-main);
+  --font-mono: Consolas, Monaco, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--eph-bg);
+  color: var(--eph-text);
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 34%),
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.08), transparent 30%),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 42%, #eef6ff 100%);
+  color: var(--eph-text);
   font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
 }
 
-/* ===================== EPH TEMALAR ===================== */
-
-/* KLASIK - Serif font, krem tonları */
-.eph-theme-klasik {
-  --bg: #F5F0E8;
-  --bg2: #EDE8DC;
-  --surface: #FFFDF7;
-  --border: #D4C9B0;
-  --text: #2C1A0E;
-  --text2: #6B5744;
-  --accent: #8B4513;
-  --accent2: #A0522D;
-  --gold: #8B4513;
-  --font-main: 'Playfair Display', Georgia, serif;
-  --font-body: 'Lora', Georgia, serif;
-  --radius: 2px;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-body);
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
-/* MODERN - Sans-serif, beyaz/gri */
-.eph-theme-modern {
-  --bg: #F8F8F6;
-  --bg2: #EFEFED;
-  --surface: #FFFFFF;
-  --border: #E0DED8;
-  --text: #1A1A1A;
-  --text2: #6B6B6B;
-  --accent: #1A3C5E;
-  --accent2: #C9A84C;
-  --gold: #C9A84C;
-  --font-main: 'Inter', Arial, sans-serif;
-  --font-body: 'Inter', Arial, sans-serif;
-  --radius: 6px;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-body);
+button {
+  cursor: pointer;
 }
 
-/* FUTURISTIK - Mono font, koyu lacivert */
-.eph-theme-futuristik {
-  --bg: #0A0E1A;
-  --bg2: #111827;
-  --surface: #1A2235;
-  --border: #2A3A55;
-  --text: #E0F0FF;
-  --text2: #7A9BBF;
-  --accent: #00D4FF;
-  --accent2: #7B2FFF;
-  --gold: #00D4FF;
-  --font-main: 'Space Grotesk', monospace;
-  --font-body: 'Space Grotesk', monospace;
-  --radius: 0px;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-body);
+input,
+select,
+textarea {
+  color: var(--eph-text);
+  background: #ffffff;
 }
 
-/* KOYU - Sıcak koyu */
-.eph-theme-koyu {
-  --bg: #1C1C1E;
-  --bg2: #2C2C2E;
-  --surface: #3A3A3C;
-  --border: #48484A;
-  --text: #F2F2F7;
-  --text2: #AEAEB2;
-  --accent: #FFD60A;
-  --accent2: #FF9F0A;
-  --gold: #FFD60A;
-  --font-main: 'Inter', Arial, sans-serif;
-  --font-body: 'Inter', Arial, sans-serif;
-  --radius: 10px;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-body);
+::selection {
+  background: rgba(37, 99, 235, 0.18);
+  color: #0f172a;
 }
 
-/* NESELI - Renkli, yuvarlak */
+/* ===================== EPH BEYAZ CRM TEMA SİSTEMİ ===================== */
+
+.eph-theme-klasik,
+.eph-theme-modern,
+.eph-theme-futuristik,
+.eph-theme-koyu,
 .eph-theme-neseli {
-  --bg: #FFF5FB;
-  --bg2: #FFE8F5;
-  --surface: #FFFFFF;
-  --border: #F0C0E0;
-  --text: #2D0A3A;
-  --text2: #8B4A7A;
-  --accent: #E91E8C;
-  --accent2: #7C3AED;
-  --gold: #E91E8C;
-  --font-main: 'Nunito', Arial, sans-serif;
-  --font-body: 'Nunito', Arial, sans-serif;
-  --radius: 16px;
+  --bg: #f8fafc;
+  --bg2: #eef6ff;
+  --surface: #ffffff;
+  --border: #dbe7f3;
+  --text: #172033;
+  --text2: #5b6b82;
+  --accent: #2563eb;
+  --accent2: #14b8a6;
+  --gold: #f97316;
+  --font-main: Arial, Helvetica, sans-serif;
+  --font-body: Arial, Helvetica, sans-serif;
+  --radius: 18px;
+
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
 }
 
-/* Tema font override - tüm elementlere uygula */
-.eph-theme-klasik * { font-family: 'Lora', Georgia, serif !important; }
-.eph-theme-klasik h1, .eph-theme-klasik h2, .eph-theme-klasik h3,
-.eph-theme-klasik .title, .eph-theme-klasik [class*="title"],
-.eph-theme-klasik [class*="header"] { font-family: 'Playfair Display', Georgia, serif !important; }
+.eph-theme-klasik *,
+.eph-theme-modern *,
+.eph-theme-futuristik *,
+.eph-theme-koyu *,
+.eph-theme-neseli * {
+  font-family: Arial, Helvetica, sans-serif !important;
+}
 
-.eph-theme-modern * { font-family: 'Inter', Arial, sans-serif !important; }
+/* Genel kart dili */
+.eph-card,
+[class*="card"],
+[class*="Card"] {
+  border-radius: var(--eph-radius);
+}
 
-.eph-theme-futuristik * { font-family: 'Space Grotesk', monospace !important; }
-
-.eph-theme-koyu * { font-family: 'Inter', Arial, sans-serif !important; }
-
-.eph-theme-neseli * { font-family: 'Nunito', Arial, sans-serif !important; }
-
-/* ===================== GLOBAL MOBİL DÜZENLEMELER ===================== */
-
-/* Viewport meta garantisi */
-* { box-sizing: border-box; }
+/* Linkler */
+a {
+  color: inherit;
+  text-decoration: none;
+}
 
 /* Tablo mobile scroll */
-table { width: 100%; overflow-x: auto; display: block; }
-
-/* Genel container */
-@media (max-width: 480px) {
-  /* Nav linkleri gizle */
-  .lp-nav-links, .db-nav-links .db-nav-lbl,
-  .st-nav-links, .mk-nav-links, .crm-nav-links { display: none !important; }
-
-  /* Hero grid tek kolon */
-  .lp-hero { grid-template-columns: 1fr !important; }
-  .lp-hero-right { display: none !important; }
-  .lp-hero-left { padding: 40px 20px !important; }
-
-  /* Section padding küçült */
-  .lp-section { padding: 48px 20px !important; }
-  .lp-how-grid { grid-template-columns: 1fr !important; }
-  .lp-features-grid { grid-template-columns: 1fr !important; }
-  .lp-kredi-grid { grid-template-columns: 1fr !important; }
-  .lp-testi-grid { grid-template-columns: 1fr !important; }
-  .lp-about { grid-template-columns: 1fr !important; }
-  .lp-cta { grid-template-columns: 1fr !important; padding: 48px 20px !important; }
-
-  /* Dashboard */
-  .db-main { padding: 20px 16px !important; }
-  .db-cards { grid-template-columns: 1fr !important; }
-  .db-ref-grid { grid-template-columns: 1fr !important; }
-  .db-form-grid { grid-template-columns: 1fr !important; }
-  .db-header { grid-template-columns: 1fr !important; }
-
-  /* Stok */
-  .st-main { padding: 20px 16px !important; }
-  .st-header { grid-template-columns: 1fr !important; }
-  .st-stats { grid-template-columns: 1fr 1fr !important; }
-  .st-all-units { grid-template-columns: 1fr !important; }
-  .st-form-grid { grid-template-columns: 1fr !important; }
-
-  /* Admin */
-  .an-main { padding: 20px 16px !important; }
-  .an-stats { grid-template-columns: 1fr 1fr !important; }
-  .an-tabs { overflow-x: auto; flex-wrap: nowrap !important; }
-  .an-tab { font-size: 8px !important; padding: 10px 12px !important; }
-  .an-table { overflow-x: auto; }
-  .an-table table { min-width: 600px; }
-
-  /* CRM */
-  .crm-main { padding: 20px 16px !important; }
-
-  /* Market */
-  .mk-main { padding: 20px 16px !important; }
-  .mk-kpi { grid-template-columns: 1fr 1fr !important; }
-  .mk-two-col { grid-template-columns: 1fr !important; }
-
-  /* Profil */
-  .pr-main { padding: 20px 16px !important; }
-
-  /* Genel buton ve input */
-  button { min-height: 44px; }
-  input, select, textarea { min-height: 44px; font-size: 16px !important; }
-
-  /* Lina panel */
-  .lina-panel { width: 100vw !important; }
-
-  /* Font boyutları */
-  h1 { font-size: clamp(24px, 6vw, 48px) !important; }
-  h2 { font-size: clamp(20px, 5vw, 36px) !important; }
+table {
+  width: 100%;
 }
 
-/* Tablet */
-@media (max-width: 768px) {
-  input, select, textarea { font-size: 16px !important; }
-  button { min-height: 44px; }
-  .an-tabs { overflow-x: auto; }
-  .an-table { overflow-x: auto; }
-  .an-table table { min-width: 600px; }
-}
-
-/* Lina Panel Mobile Fix */
-@supports (-webkit-touch-callout: none) {
-  .lina-panel-container {
-    height: -webkit-fill-available !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .lina-input-area {
-    position: sticky !important;
-    bottom: 0 !important;
-    background: #fff !important;
-    padding-bottom: env(safe-area-inset-bottom, 16px) !important;
-  }
-}
-
-/* Ses kayıt pulse animasyonu */
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(1.3); }
-}
-
-/* Lina ses dalgası animasyonu */
-@keyframes wave {
-  0%, 100% { transform: scaleY(1); }
-  50% { transform: scaleY(2); }
-}
-
-
-/* Mobilde üst nav gizle */
-@media (max-width: 768px) {
-  .st-nav { display: none !important; }
-  .crm-nav { display: none !important; }
-  .mk-nav { display: none !important; }
-}
-
-
-
-
-
-/* ===================== EPH PREMIUM LANDING EFFECTS ===================== */
+/* ===================== DOĞAL CRM ETKİLERİ ===================== */
 
 @keyframes ephFloat {
   0% {
@@ -266,7 +145,7 @@ table { width: 100%; overflow-x: auto; display: block; }
   }
 
   50% {
-    transform: translateY(-12px);
+    transform: translateY(-6px);
   }
 
   100% {
@@ -276,17 +155,17 @@ table { width: 100%; overflow-x: auto; display: block; }
 
 @keyframes ephGlow {
   0% {
-    opacity: 0.4;
+    opacity: 0.45;
     transform: scale(1);
   }
 
   50% {
-    opacity: 1;
-    transform: scale(1.08);
+    opacity: 0.75;
+    transform: scale(1.04);
   }
 
   100% {
-    opacity: 0.4;
+    opacity: 0.45;
     transform: scale(1);
   }
 }
@@ -302,27 +181,25 @@ table { width: 100%; overflow-x: auto; display: block; }
 }
 
 .eph-float {
-  animation: ephFloat 6s ease-in-out infinite;
+  animation: ephFloat 7s ease-in-out infinite;
 }
 
 .eph-glow {
-  animation: ephGlow 5s ease-in-out infinite;
+  animation: ephGlow 6s ease-in-out infinite;
 }
 
 .eph-card-hover {
   transition:
-    transform 0.35s ease,
-    border-color 0.35s ease,
-    box-shadow 0.35s ease,
-    background 0.35s ease;
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    background 0.25s ease;
 }
 
 .eph-card-hover:hover {
-  transform: translateY(-8px);
-  border-color: rgba(96, 165, 250, 0.45);
-  box-shadow:
-    0 25px 50px rgba(37, 99, 235, 0.18),
-    0 0 40px rgba(96, 165, 250, 0.12);
+  transform: translateY(-4px);
+  border-color: rgba(37, 99, 235, 0.25);
+  box-shadow: var(--eph-shadow);
 }
 
 .eph-premium-line {
@@ -340,17 +217,193 @@ table { width: 100%; overflow-x: auto; display: block; }
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255,255,255,0.18),
+    rgba(37, 99, 235, 0.08),
     transparent
   );
-  animation: ephSweep 5s linear infinite;
+  animation: ephSweep 6s linear infinite;
 }
 
 .eph-premium-glow {
   position: absolute;
   border-radius: 9999px;
-  filter: blur(80px);
+  filter: blur(70px);
   pointer-events: none;
+  opacity: 0.35;
 }
 
+/* ===================== GLOBAL MOBİL DÜZENLEMELER ===================== */
 
+@media (max-width: 480px) {
+  .lp-nav-links,
+  .db-nav-links .db-nav-lbl,
+  .st-nav-links,
+  .mk-nav-links,
+  .crm-nav-links {
+    display: none !important;
+  }
+
+  .lp-hero {
+    grid-template-columns: 1fr !important;
+  }
+
+  .lp-hero-right {
+    display: none !important;
+  }
+
+  .lp-hero-left {
+    padding: 40px 20px !important;
+  }
+
+  .lp-section {
+    padding: 48px 20px !important;
+  }
+
+  .lp-how-grid,
+  .lp-features-grid,
+  .lp-kredi-grid,
+  .lp-testi-grid,
+  .lp-about,
+  .lp-cta {
+    grid-template-columns: 1fr !important;
+  }
+
+  .lp-cta {
+    padding: 48px 20px !important;
+  }
+
+  .db-main,
+  .st-main,
+  .an-main,
+  .crm-main,
+  .mk-main,
+  .pr-main {
+    padding: 20px 16px !important;
+  }
+
+  .db-cards,
+  .db-ref-grid,
+  .db-form-grid,
+  .db-header,
+  .st-header,
+  .st-all-units,
+  .st-form-grid,
+  .mk-two-col {
+    grid-template-columns: 1fr !important;
+  }
+
+  .st-stats,
+  .an-stats,
+  .mk-kpi {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .an-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+  }
+
+  .an-tab {
+    font-size: 10px !important;
+    padding: 10px 12px !important;
+  }
+
+  .an-table {
+    overflow-x: auto;
+  }
+
+  .an-table table {
+    min-width: 600px;
+  }
+
+  button {
+    min-height: 44px;
+  }
+
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+    font-size: 16px !important;
+  }
+
+  .lina-panel {
+    width: 100vw !important;
+  }
+
+  h1 {
+    font-size: clamp(24px, 6vw, 48px) !important;
+  }
+
+  h2 {
+    font-size: clamp(20px, 5vw, 36px) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  button {
+    min-height: 44px;
+  }
+
+  .an-tabs,
+  .an-table {
+    overflow-x: auto;
+  }
+
+  .an-table table {
+    min-width: 600px;
+  }
+
+  .st-nav,
+  .crm-nav,
+  .mk-nav {
+    display: none !important;
+  }
+}
+
+/* Lina Panel Mobile Fix */
+@supports (-webkit-touch-callout: none) {
+  .lina-panel-container {
+    height: -webkit-fill-available !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .lina-input-area {
+    position: sticky !important;
+    bottom: 0 !important;
+    background: #ffffff !important;
+    padding-bottom: env(safe-area-inset-bottom, 16px) !important;
+  }
+}
+
+/* Ses kayıt pulse animasyonu */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(1.3);
+  }
+}
+
+/* Lina ses dalgası animasyonu */
+@keyframes wave {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+
+  50% {
+    transform: scaleY(2);
+  }
+}
