@@ -38,7 +38,7 @@ const features = [
   {
     icon: LockKeyhole,
     label: "Güvenlik",
-    title: "Kapalı Devre Ağ",
+    title: "Kapalı Devre",
     desc: "Paylaşımlar yalnızca onaylı EPH üyeleri tarafından görüntülenir. Dışarıya sızdırılmaz.",
   },
   {
@@ -414,7 +414,7 @@ export default function LandingPage() {
               icon={Activity}
               badge="Canlı Network Akışı"
               title="Platform İçinde İş Fırsatları"
-              highlight="Anlık Hareket Eder"
+              
               desc="Portföy, talep, mesajlaşma ve ortak satış süreçleri tek akışta izlenir. EPH, sektör profesyonellerine canlı ve düzenli bir iş takip merkezi sunar."
             />
 
@@ -537,8 +537,8 @@ export default function LandingPage() {
             <SectionHeader
               icon={BadgeCheck}
               badge="Neler Var?"
-              title="EPH’de Sadece İlan Değil,"
-              highlight="Tam Bir İş Ekosistemi Var"
+              
+              highlight="EPH'de Tam Bir İş Ekosistemi Var"
               desc="Güvenli üyelikten ortak satışa, portföy havuzundan Lina desteğine kadar tüm süreçler sektör profesyonelleri için tek merkezde toplanır."
             />
 
@@ -617,7 +617,7 @@ export default function LandingPage() {
               <h2 className="mt-6 text-4xl font-black leading-tight text-[#172033] md:text-6xl">
                 EPH Platform’a
                 <span className="block text-[#2563EB]">Katılmak İçin</span>
-                Tek Bir Adım Yeter
+                Tek Bir Adım Yeterli
               </h2>
 
               <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-[#64748B]">
@@ -807,9 +807,9 @@ function LinaTechnologyShowcase() {
           </div>
 
           <h2 className="mt-6 text-4xl font-black leading-tight md:text-6xl">
-            Lina yalnızca yardımcı değil,
+            Lina hem asistanınız,
             <span className="block text-[#F7DFA3]">
-              operasyonel iş ortağıdır.
+              hem de operasyonel iş ortağınızdır.
             </span>
           </h2>
 
