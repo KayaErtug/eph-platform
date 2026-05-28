@@ -24,73 +24,70 @@ export class AuthService {
     private prisma: PrismaService,
   ) {}
 
-  generateReferralCode(firstName: string, lastName: string) {
-    const random = Math.floor(
-      1000 + Math.random() * 9000,
-    );
+  generateReferralCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = 'EPH-';
 
-    return `${firstName}-${lastName}-${random}`
-      .toUpperCase()
-      .replace(/\s+/g, '');
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    return code;
+  }
+
+  async generateUniqueReferralCode() {
+    let code = this.generateReferralCode();
+
+    let existing = await this.prisma.user.findFirst({
+      where: { referralCode: code },
+    });
+
+    while (existing) {
+      code = this.generateReferralCode();
+
+      existing = await this.prisma.user.findFirst({
+        where: { referralCode: code },
+      });
+    }
+
+    return code;
   }
 
   async register(dto: RegisterDto) {
-    const existing = await this.usersService.findByEmail(
-      dto.email,
-    );
+    const existing = await this.usersService.findByEmail(dto.email);
 
     if (existing) {
-      throw new BadRequestException(
-        'Bu email zaten kayıtlı.',
-      );
+      throw new BadRequestException('Bu email zaten kayıtlı.');
     }
 
     let role: any = 'EMLAKCI';
-
     let isApproved = false;
 
-    if (
-      dto.inviteCode &&
-      dto.inviteCode.trim() !== ''
-    ) {
-      const referral =
-        await this.prisma.referralCandidate.findFirst({
-          where: {
-            referralCode:
-              dto.inviteCode.toUpperCase(),
-            isActive: true,
-          },
-        });
+    if (dto.inviteCode && dto.inviteCode.trim() !== '') {
+      const referral = await this.prisma.referralCandidate.findFirst({
+        where: {
+          referralCode: dto.inviteCode.toUpperCase(),
+          isActive: true,
+        },
+      });
 
       if (!referral) {
-        throw new BadRequestException(
-          'Referans kodu bulunamadı.',
-        );
+        throw new BadRequestException('Referans kodu bulunamadı.');
       }
 
       role = referral.role;
-
       isApproved = true;
 
       await this.prisma.referralCandidate.update({
-        where: {
-          id: referral.id,
-        },
+        where: { id: referral.id },
         data: {
           usedAt: new Date(),
         },
       });
     }
 
-    const passwordHash = await bcrypt.hash(
-      dto.password,
-      10,
-    );
-
-    const referralCode = this.generateReferralCode(
-      dto.firstName,
-      dto.lastName,
-    );
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const referralCode = await this.generateUniqueReferralCode();
 
     const user = await this.usersService.create({
       firstName: dto.firstName,
@@ -124,10 +121,7 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        role:
-          user.role === 'EMLAKCI'
-            ? 'Gayrimenkul Danışmanı'
-            : user.role,
+        role: user.role,
         isApproved: user.isApproved,
         referralCode: user.referralCode,
         nominationPoints: user.nominationPoints,
@@ -137,14 +131,10 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.usersService.findByEmail(
-      dto.email,
-    );
+    const user = await this.usersService.findByEmail(dto.email);
 
     if (!user) {
-      throw new UnauthorizedException(
-        'Email veya şifre hatalı.',
-      );
+      throw new UnauthorizedException('Email veya şifre hatalı.');
     }
 
     if (!user.isApproved) {
@@ -153,15 +143,10 @@ export class AuthService {
       );
     }
 
-    const isMatch = await bcrypt.compare(
-      dto.password,
-      user.passwordHash,
-    );
+    const isMatch = await bcrypt.compare(dto.password, user.passwordHash);
 
     if (!isMatch) {
-      throw new UnauthorizedException(
-        'Email veya şifre hatalı.',
-      );
+      throw new UnauthorizedException('Email veya şifre hatalı.');
     }
 
     const token = this.jwtService.sign({
@@ -177,10 +162,7 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        role:
-          user.role === 'EMLAKCI'
-            ? 'Gayrimenkul Danışmanı'
-            : user.role,
+        role: user.role,
         isApproved: user.isApproved,
         referralCode: user.referralCode,
         nominationPoints: user.nominationPoints,
