@@ -1,134 +1,28 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import api from "@/lib/api";
-import { useAuthStore } from "@/store/auth.store";
-import { THEMES, useTheme } from "../../components/ThemeProvider";
 import {
-  ArrowLeft,
-  BadgeCheck,
-  Building2,
-  Camera,
-  CheckCircle2,
-  CircleUserRound,
-  FileText,
-  Home,
+  Shield,
+  Cpu,
+  Radar,
+  Lock,
   LogOut,
-  MessageCircle,
-  Palette,
-  ShieldCheck,
-  UploadCloud,
-  UsersRound,
-  WalletCards,
-  XCircle,
+  ArrowLeft,
+  Activity,
+  Database,
+  Globe,
+  Sparkles,
 } from "lucide-react";
 
-const DOC_TYPES = [
-  { value: "VERGI_LEVHASI", label: "Vergi Levhası" },
-  { value: "YETKI_BELGESI", label: "Yetki Belgesi" },
-  { value: "TICARET_SICIL", label: "Ticaret Sicil" },
-  { value: "KIMLIK", label: "Kimlik" },
-  { value: "DIGER", label: "Diğer" },
-];
-
-const DOC_STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  PENDING: { label: "İncelemede", color: "#B45309", bg: "#FFFBEB" },
-  APPROVED: { label: "Onaylandı", color: "#047857", bg: "#ECFDF5" },
-  REJECTED: { label: "Reddedildi", color: "#BE123C", bg: "#FFF1F2" },
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  EMLAKCI: "Emlakçı",
-  MUTEAHHIT: "Müteahhit",
-  INSAAT_FIRMASI: "İnşaat Firması",
-  ADMIN: "Admin",
-  DENETCI_ADMIN: "Denetçi Admin",
-};
-
-interface Profile {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  profileImageUrl?: string | null;
-  role: string;
-  isApproved: boolean;
-  documents: {
-    id: string;
-    type: string;
-    status: string;
-    fileUrl: string;
-    fileName: string;
-    createdAt: string;
-  }[];
-}
-
-interface TrustScore {
-  score: number;
-  badge: string;
-  badgeColor: string;
-  breakdown: {
-    documentScore: number;
-    seniorityScore: number;
-    portfolioScore: number;
-    activityScore: number;
-    profileScore: number;
-    approvalScore: number;
-  };
-  details: {
-    approvedDocs: number;
-    totalDocs: number;
-    daysSinceJoined: number;
-    unitCount: number;
-    customerCount: number;
-    activityCount: number;
-    profileComplete: boolean;
-  };
-}
-
-function getTip(score: number) {
-  if (score < 20) return "Hesabınızı onaylayın ve belge yükleyerek skorunuzu artırın.";
-  if (score < 40) return "Mesleki belgelerinizi yükleyin ve portföy ekleyerek skorunuzu güçlendirin.";
-  if (score < 60) return "CRM’de müşteri takibi yaparak aktivite skorunuzu artırabilirsiniz.";
-  if (score < 80) return "Harika! Daha fazla onaylı belge ile Elite Network seviyesine yaklaşabilirsiniz.";
-  return "Tebrikler! Platformun en güvenilir üyeleri arasındasınız.";
-}
-
-function getInitials(firstName?: string, lastName?: string) {
-  const first = firstName?.trim()?.[0] || "E";
-  const last = lastName?.trim()?.[0] || "P";
-  return `${first}${last}`.toUpperCase();
-}
+import { useAuthStore } from "@/store/auth.store";
 
 export default function ProfilPage() {
-  const { user, setAuth, logout } = useAuthStore();
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
+  const { user, logout } = useAuthStore();
 
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [trustScore, setTrustScore] = useState<TrustScore | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const [editMode, setEditMode] = useState(false);
-  const [form, setForm] = useState({ firstName: "", lastName: "", phone: "" });
-  const [saveLoading, setSaveLoading] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-
-  const [avatarLoading, setAvatarLoading] = useState(false);
-  const [avatarSuccess, setAvatarSuccess] = useState(false);
-  const [avatarError, setAvatarError] = useState("");
-
-  const [uploadLoading, setUploadLoading] = useState(false);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [uploadError, setUploadError] = useState("");
-  const [selectedDocType, setSelectedDocType] = useState("VERGI_LEVHASI");
-
-  const avatarInputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setHydrated(true);
@@ -139,747 +33,303 @@ export default function ProfilPage() {
 
     if (!user) {
       router.push("/giris");
-      return;
     }
+  }, [hydrated, user, router]);
 
-    fetchAll();
-  }, [hydrated, user]);
-
-  const fetchAll = async () => {
-    try {
-      const [profileRes, trustRes] = await Promise.all([
-        api.get("/profile"),
-        api.get("/trust/my"),
-      ]);
-
-      setProfile(profileRes.data);
-      setTrustScore(trustRes.data);
-
-      setForm({
-        firstName: profileRes.data.firstName || "",
-        lastName: profileRes.data.lastName || "",
-        phone: profileRes.data.phone || "",
-      });
-    } catch (error) {
-      console.error(error);
-      alert("Profil bilgileri yüklenemedi.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const syncAuthUser = (nextProfile: Profile) => {
-    const authStorage = localStorage.getItem("auth-storage");
-    let token = "";
-
-    if (authStorage) {
-      try {
-        const parsed = JSON.parse(authStorage);
-        token = parsed?.state?.token || "";
-      } catch {
-        token = "";
-      }
-    }
-
-    if (user && token) {
-      setAuth({ ...user, ...nextProfile }, token);
-    }
-  };
-
-  const handleSave = async () => {
-    setSaveLoading(true);
-    setSaveSuccess(false);
-
-    try {
-      const res = await api.patch("/profile", form);
-      const nextProfile = profile ? { ...profile, ...res.data } : res.data;
-
-      setProfile(nextProfile);
-      syncAuthUser(nextProfile);
-
-      setEditMode(false);
-      setSaveSuccess(true);
-
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (error) {
-      console.error(error);
-      alert("Profil güncellenemedi.");
-    } finally {
-      setSaveLoading(false);
-    }
-  };
-
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    setAvatarError("");
-    setAvatarSuccess(false);
-
-    if (!file) return;
-
-    if (file.size > 1024 * 1024) {
-      setAvatarError("Profil fotoğrafı 1 MB'den büyük olamaz. Lütfen daha küçük bir fotoğraf seçin.");
-
-      if (avatarInputRef.current) {
-        avatarInputRef.current.value = "";
-      }
-
-      return;
-    }
-
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-
-    if (!allowedTypes.includes(file.type)) {
-      setAvatarError("Sadece JPG, PNG veya WEBP formatında fotoğraf yükleyebilirsin.");
-
-      if (avatarInputRef.current) {
-        avatarInputRef.current.value = "";
-      }
-
-      return;
-    }
-
-    setAvatarLoading(true);
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const res = await api.post("/profile/avatar", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      const nextProfile = profile ? { ...profile, ...res.data } : res.data;
-
-      setProfile(nextProfile);
-      syncAuthUser(nextProfile);
-
-      setAvatarSuccess(true);
-      setTimeout(() => setAvatarSuccess(false), 3000);
-    } catch (err: any) {
-      setAvatarError(
-        err?.response?.data?.message ||
-          "Profil fotoğrafı yüklenemedi. Lütfen tekrar deneyin."
-      );
-    } finally {
-      setAvatarLoading(false);
-
-      if (avatarInputRef.current) {
-        avatarInputRef.current.value = "";
-      }
-    }
-  };
-
-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    if (!file) return;
-
-    setUploadLoading(true);
-    setUploadError("");
-    setUploadSuccess(false);
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("type", selectedDocType);
-
-    try {
-      await api.post("/profile/documents", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      setUploadSuccess(true);
-      setTimeout(() => setUploadSuccess(false), 3000);
-
-      await fetchAll();
-    } catch (err: any) {
-      setUploadError(err?.response?.data?.message || "Yükleme hatası.");
-    } finally {
-      setUploadLoading(false);
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-    router.push("/giris");
-  };
-
-  if (!hydrated || loading) {
+  if (!hydrated || !user) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB]">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#1D4ED8] border-t-transparent" />
+      <main className="flex min-h-screen items-center justify-center bg-[#020617]">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
       </main>
     );
   }
 
-  const initials = getInitials(profile?.firstName, profile?.lastName);
-  const roleLabel = ROLE_LABELS[profile?.role || ""] || "EPH Üyesi";
-  const documents = profile?.documents || [];
+  const isAdmin = user.role === "ADMIN";
+
+  if (!isAdmin) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] p-10">
+        <div className="rounded-[32px] border border-slate-200 bg-white p-10 text-center shadow-xl">
+          <h1 className="text-3xl font-black text-[#0B1F44]">
+            Profil Sistemi
+          </h1>
+
+          <p className="mt-4 text-slate-500">
+            Normal kullanıcı profil sistemi geçici olarak bakımda.
+          </p>
+
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="mt-6 rounded-2xl bg-[#1D4ED8] px-6 py-3 text-sm font-black text-white"
+          >
+            Dashboard'a Dön
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-[#F4F7FB] text-[#111827]">
-      <section className="mx-auto min-h-screen max-w-6xl px-4 pb-28 pt-5">
-        <header className="mb-5 rounded-[32px] border border-slate-200 bg-white p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <button
-                onClick={() => router.push("/dashboard")}
-                className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600"
-              >
-                <ArrowLeft size={20} />
-              </button>
+    <main className="min-h-screen overflow-hidden bg-[#020617] text-white">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.18),transparent_30%),radial-gradient(circle_at_center,rgba(201,168,76,0.12),transparent_45%)]" />
 
-              <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
-                <CircleUserRound size={14} />
-                Hesap Yönetimi
+      <div className="pointer-events-none fixed inset-0 opacity-[0.06] [background-image:linear-gradient(rgba(255,255,255,.35)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.35)_1px,transparent_1px)] [background-size:44px_44px]" />
+
+      <header className="sticky top-0 z-50 border-b border-cyan-400/10 bg-[#020617]/85 backdrop-blur-2xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-400/20 bg-white/5 text-cyan-100"
+            >
+              <ArrowLeft size={18} />
+            </button>
+
+            <div>
+              <div className="text-2xl font-black tracking-tight">
+                EPH Identity Core
               </div>
 
-              <h1 className="mt-3 text-[31px] font-black tracking-tight text-[#0B1F44]">
-                Profilim
+              <div className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan-300">
+                Admin Mission Layer
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              logout();
+              router.push("/giris");
+            }}
+            className="flex items-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-xs font-black text-red-200"
+          >
+            <LogOut size={16} />
+            Çıkış
+          </button>
+        </div>
+      </header>
+
+      <section className="relative z-10 mx-auto max-w-7xl px-5 py-8 pb-24">
+        <section className="overflow-hidden rounded-[42px] border border-cyan-400/10 bg-[#061126]/90 p-8 shadow-2xl shadow-cyan-950/40">
+          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.22em] text-cyan-100">
+                <Shield size={14} />
+                System Commander
+              </div>
+
+              <h1 className="mt-5 text-5xl font-black leading-tight tracking-tight md:text-7xl">
+                Identity
+                <span className="block bg-gradient-to-r from-cyan-200 via-white to-[#F7DFA3] bg-clip-text text-transparent">
+                  Core
+                </span>
               </h1>
 
-              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                Kişisel bilgilerini, profil fotoğrafını, belgelerini, güven skorunu ve görünüm tercihini buradan yönet.
+              <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-300">
+                Bu alan standart kullanıcı profili değildir. Sistem yönetimi,
+                güvenlik katmanları, AI operasyon erişimleri ve yönetici
+                otoriteleri bu merkezden kontrol edilir.
               </p>
+
+              <div className="mt-8 flex flex-wrap gap-3">
+                <button className="rounded-2xl bg-[#C9A84C] px-6 py-4 text-sm font-black text-[#061126]">
+                  AI Security Grid
+                </button>
+
+                <button className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-6 py-4 text-sm font-black text-cyan-100">
+                  Mission Access
+                </button>
+              </div>
             </div>
 
-            <button
-              onClick={handleLogout}
-              className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-xs font-black text-red-600"
-            >
-              Çıkış
-            </button>
-          </div>
-        </header>
+            <div className="grid gap-4">
+              <GlassCard
+                icon={<Cpu size={22} />}
+                title="AI Core"
+                value="ONLINE"
+                color="cyan"
+              />
 
-        {saveSuccess && (
-          <div className="mb-5 rounded-[24px] border border-emerald-100 bg-emerald-50 p-4 text-sm font-black text-emerald-700">
-            Profil başarıyla güncellendi.
-          </div>
-        )}
+              <GlassCard
+                icon={<Radar size={22} />}
+                title="Network Radar"
+                value="ACTIVE"
+                color="gold"
+              />
 
-        {avatarSuccess && (
-          <div className="mb-5 rounded-[24px] border border-emerald-100 bg-emerald-50 p-4 text-sm font-black text-emerald-700">
-            Profil fotoğrafı başarıyla güncellendi.
-          </div>
-        )}
-
-        {avatarError && (
-          <div className="mb-5 rounded-[24px] border border-red-100 bg-red-50 p-4 text-sm font-black text-red-600">
-            {avatarError}
-          </div>
-        )}
-
-        <section className="grid grid-cols-1 gap-5 lg:grid-cols-[.95fr_1.05fr]">
-          <div className="space-y-5">
-            <section className="rounded-[32px] border border-slate-200 bg-white p-5">
-              <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:text-left">
-                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-[30px] bg-gradient-to-br from-[#0B1F44] via-[#1D4ED8] to-[#60A5FA] text-white shadow-xl shadow-[#1D4ED8]/20">
-                  {profile?.profileImageUrl ? (
-                    <img
-                      src={profile.profileImageUrl}
-                      alt="Profil fotoğrafı"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-[30px] font-black">
-                      {initials}
-                    </div>
-                  )}
-
-                  <div className="absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-500">
-                    <CheckCircle2 size={12} className="text-white" />
-                  </div>
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-[24px] font-black tracking-tight text-[#0B1F44]">
-                    {profile?.firstName} {profile?.lastName}
-                  </h2>
-
-                  <p className="mt-1 truncate text-sm font-bold text-slate-500">
-                    {profile?.email}
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
-                    <span className="rounded-full bg-[#EEF4FF] px-3 py-2 text-xs font-black text-[#1D4ED8]">
-                      {roleLabel}
-                    </span>
-
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs font-black ${
-                        profile?.isApproved
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-amber-50 text-amber-700"
-                      }`}
-                    >
-                      {profile?.isApproved ? (
-                        <CheckCircle2 size={14} />
-                      ) : (
-                        <XCircle size={14} />
-                      )}
-                      {profile?.isApproved ? "Onaylı" : "Onay Bekliyor"}
-                    </span>
-                  </div>
-
-                  <div className="mt-4">
-                    <label
-                      className={`inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl px-5 text-sm font-black text-white transition ${
-                        avatarLoading
-                          ? "bg-slate-400"
-                          : "bg-[#0B1F44] hover:bg-[#1D4ED8]"
-                      }`}
-                    >
-                      <Camera size={18} />
-                      {avatarLoading ? "Yükleniyor..." : "Profil Fotoğrafı Yükle"}
-                      <input
-                        ref={avatarInputRef}
-                        type="file"
-                        accept=".jpg,.jpeg,.png,.webp"
-                        onChange={handleAvatarUpload}
-                        disabled={avatarLoading}
-                        className="hidden"
-                      />
-                    </label>
-
-                    <p className="mt-2 text-xs font-bold text-slate-400">
-                      JPG, PNG veya WEBP. Maksimum dosya boyutu: 1 MB.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setEditMode((value) => !value)}
-                className={`mt-5 flex h-12 w-full items-center justify-center rounded-2xl text-sm font-black ${
-                  editMode
-                    ? "border border-slate-200 bg-white text-slate-500"
-                    : "bg-[#1D4ED8] text-white"
-                }`}
-              >
-                {editMode ? "Vazgeç" : "Bilgileri Düzenle"}
-              </button>
-            </section>
-
-            {trustScore && (
-              <section className="overflow-hidden rounded-[32px] bg-[#0B1F44] text-white">
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-black text-blue-100">
-                        <ShieldCheck size={14} />
-                        Güven Skoru
-                      </div>
-
-                      <h2 className="mt-3 text-[24px] font-black tracking-tight">
-                        {trustScore.badge}
-                      </h2>
-
-                      <p className="mt-2 text-sm leading-6 text-blue-100/70">
-                        {getTip(trustScore.score)}
-                      </p>
-                    </div>
-
-                    <div className="text-right">
-                      <div className="text-[52px] font-black leading-none">
-                        {trustScore.score}
-                      </div>
-
-                      <div className="text-xs font-black text-blue-100/50">
-                        / 100
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 h-3 overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-[#60A5FA]"
-                      style={{ width: `${trustScore.score}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-px bg-white/10 sm:grid-cols-3">
-                  <TrustMini title="Belge" value={trustScore.breakdown.documentScore} max={25} />
-                  <TrustMini title="Kıdem" value={trustScore.breakdown.seniorityScore} max={10} />
-                  <TrustMini title="Portföy" value={trustScore.breakdown.portfolioScore} max={15} />
-                  <TrustMini title="Aktivite" value={trustScore.breakdown.activityScore} max={10} />
-                  <TrustMini title="Profil" value={trustScore.breakdown.profileScore} max={10} />
-                  <TrustMini title="Onay" value={trustScore.breakdown.approvalScore} max={10} />
-                </div>
-              </section>
-            )}
-          </div>
-
-          <div className="space-y-5">
-            <section className="rounded-[32px] border border-slate-200 bg-white p-5">
-              <div className="mb-5 flex items-center justify-between gap-3">
-                <div>
-                  <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
-                    <BadgeCheck size={14} />
-                    Profil Bilgileri
-                  </div>
-
-                  <h2 className="mt-3 text-[24px] font-black tracking-tight text-[#0B1F44]">
-                    Kişisel bilgiler
-                  </h2>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Ad">
-                  {editMode ? (
-                    <input
-                      className="premium-input"
-                      value={form.firstName}
-                      onChange={(event) =>
-                        setForm({ ...form, firstName: event.target.value })
-                      }
-                    />
-                  ) : (
-                    <ReadValue value={profile?.firstName} />
-                  )}
-                </Field>
-
-                <Field label="Soyad">
-                  {editMode ? (
-                    <input
-                      className="premium-input"
-                      value={form.lastName}
-                      onChange={(event) =>
-                        setForm({ ...form, lastName: event.target.value })
-                      }
-                    />
-                  ) : (
-                    <ReadValue value={profile?.lastName} />
-                  )}
-                </Field>
-
-                <Field label="E-posta">
-                  <ReadValue muted value={profile?.email} />
-                </Field>
-
-                <Field label="Telefon">
-                  {editMode ? (
-                    <input
-                      className="premium-input"
-                      value={form.phone}
-                      onChange={(event) =>
-                        setForm({ ...form, phone: event.target.value })
-                      }
-                    />
-                  ) : (
-                    <ReadValue value={profile?.phone} />
-                  )}
-                </Field>
-              </div>
-
-              {editMode && (
-                <button
-                  onClick={handleSave}
-                  disabled={saveLoading}
-                  className="mt-5 flex h-12 w-full items-center justify-center rounded-2xl bg-[#1D4ED8] text-sm font-black text-white disabled:opacity-50"
-                >
-                  {saveLoading ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
-                </button>
-              )}
-            </section>
-
-            <section className="rounded-[32px] border border-slate-200 bg-white p-5">
-              <div className="mb-5">
-                <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
-                  <UploadCloud size={14} />
-                  Belge Yükleme
-                </div>
-
-                <h2 className="mt-3 text-[24px] font-black tracking-tight text-[#0B1F44]">
-                  Mesleki belgeler
-                </h2>
-
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  PDF, JPG veya PNG yükleyebilirsin.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
-                <select
-                  className="premium-input"
-                  value={selectedDocType}
-                  onChange={(event) => setSelectedDocType(event.target.value)}
-                >
-                  {DOC_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-
-                <label
-                  className={`flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#0B1F44] px-5 text-sm font-black text-white ${
-                    uploadLoading ? "opacity-50" : ""
-                  }`}
-                >
-                  <UploadCloud size={18} />
-                  {uploadLoading ? "Yükleniyor..." : "Dosya Seç"}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={handleUpload}
-                    disabled={uploadLoading}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-
-              {uploadSuccess && (
-                <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-black text-emerald-700">
-                  Belge başarıyla yüklendi.
-                </div>
-              )}
-
-              {uploadError && (
-                <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-black text-red-600">
-                  {uploadError}
-                </div>
-              )}
-            </section>
+              <GlassCard
+                icon={<Lock size={22} />}
+                title="Security Layer"
+                value="PROTECTED"
+                color="green"
+              />
+            </div>
           </div>
         </section>
 
-        <section className="mt-5 rounded-[32px] border border-slate-200 bg-white p-5">
-          <div className="mb-5">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
-              <Palette size={14} />
-              Görünüm Teması
-            </div>
+        <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            icon={<Activity size={20} />}
+            title="Realtime Operations"
+            value="247"
+          />
 
-            <h2 className="mt-3 text-[24px] font-black tracking-tight text-[#0B1F44]">
-              Tema seçimi
-            </h2>
+          <MetricCard
+            icon={<Database size={20} />}
+            title="Data Streams"
+            value="1.2TB"
+          />
 
-            <p className="mt-1 text-sm font-semibold text-slate-500">
-              Platform görünümünü çalışma tarzına göre kişiselleştir.
-            </p>
-          </div>
+          <MetricCard
+            icon={<Globe size={20} />}
+            title="Network Signals"
+            value="89"
+          />
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            {THEMES.map((item) => {
-              const active = theme === item.id;
-
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setTheme(item.id)}
-                  className={`rounded-[24px] border p-4 text-center transition ${
-                    active
-                      ? "border-[#1D4ED8] bg-[#EEF4FF] text-[#1D4ED8]"
-                      : "border-slate-200 bg-[#F8FAFC] text-slate-600"
-                  }`}
-                >
-                  <div className="text-[28px]">{item.icon}</div>
-                  <div className="mt-2 text-xs font-black">{item.label}</div>
-                </button>
-              );
-            })}
-          </div>
+          <MetricCard
+            icon={<Sparkles size={20} />}
+            title="AI Monitoring"
+            value="ACTIVE"
+          />
         </section>
 
-        <section className="mt-5 rounded-[32px] border border-slate-200 bg-white p-5">
-          <div className="mb-5">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
-              <FileText size={14} />
-              Belgelerim
-            </div>
-
-            <h2 className="mt-3 text-[24px] font-black tracking-tight text-[#0B1F44]">
-              Yüklenen belgeler
-            </h2>
-          </div>
-
-          {documents.length === 0 ? (
-            <div className="rounded-[24px] border border-dashed border-slate-200 bg-[#F8FAFC] p-8 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#EEF4FF] text-[#1D4ED8]">
-                <FileText size={30} />
+        <section className="mt-6 rounded-[36px] border border-cyan-400/10 bg-[#061126]/80 p-6 backdrop-blur-xl">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan-300">
+                Mission Navigation
               </div>
 
-              <h3 className="text-[18px] font-black text-[#0B1F44]">
-                Henüz belge yüklenmedi
-              </h3>
-
-              <p className="mt-2 text-sm font-semibold text-slate-500">
-                Onay sürecini hızlandırmak için belgelerini yükleyebilirsin.
-              </p>
+              <h2 className="mt-2 text-3xl font-black">
+                Admin Command Routes
+              </h2>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {documents.map((doc) => {
-                const status = DOC_STATUS[doc.status] || DOC_STATUS.PENDING;
+          </div>
 
-                return (
-                  <article
-                    key={doc.id}
-                    className="flex flex-col gap-3 rounded-[24px] border border-slate-200 bg-[#F8FAFC] p-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-[#1D4ED8]">
-                        <FileText size={21} />
-                      </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <NavCard
+              href="/admin"
+              title="Admin Center"
+              desc="Kullanıcı yönetimi ve sistem kontrolü"
+            />
 
-                      <div className="min-w-0">
-                        <h3 className="truncate text-sm font-black text-[#0B1F44]">
-                          {DOC_TYPES.find((type) => type.value === doc.type)?.label ||
-                            doc.type}
-                        </h3>
+            <NavCard
+              href="/network"
+              title="Network Grid"
+              desc="Canlı network operasyon merkezi"
+            />
 
-                        <p className="mt-1 truncate text-xs font-bold text-slate-400">
-                          {doc.fileName}
-                        </p>
-                      </div>
-                    </div>
+            <NavCard
+              href="/crm"
+              title="CRM Intelligence"
+              desc="Müşteri istihbarat sistemi"
+            />
 
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="rounded-full px-3 py-2 text-xs font-black"
-                        style={{ background: status.bg, color: status.color }}
-                      >
-                        {status.label}
-                      </span>
+            <NavCard
+              href="/stok"
+              title="Inventory Core"
+              desc="Portföy ve stok radar sistemi"
+            />
 
-                      <a
-                        href={doc.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600"
-                      >
-                        Görüntüle
-                      </a>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
+            <NavCard
+              href="/market"
+              title="Market Intelligence"
+              desc="Piyasa analiz ve AI takip sistemi"
+            />
+
+            <NavCard
+              href="/dashboard"
+              title="Mission Control"
+              desc="Ana komuta merkezi"
+            />
+          </div>
         </section>
       </section>
-
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 px-5 pb-6 pt-3 backdrop-blur">
-        <div className="mx-auto flex max-w-md items-center justify-between">
-          <BottomItem href="/dashboard" icon={<Home size={21} />} label="Ana Sayfa" />
-          <BottomItem href="/stok" icon={<Building2 size={21} />} label="İlanlar" />
-          <BottomItem href="/network" icon={<MessageCircle size={21} />} label="Network" />
-          <BottomItem href="/crm" icon={<UsersRound size={21} />} label="CRM" />
-          <BottomItem href="/market" icon={<WalletCards size={21} />} label="Piyasa" />
-          <BottomItem active href="/profil" icon={<CircleUserRound size={21} />} label="Profil" />
-        </div>
-      </nav>
-
-      <style jsx global>{`
-        .premium-input {
-          width: 100%;
-          border-radius: 18px;
-          border: 1px solid #e2e8f0;
-          background: #f8fafc;
-          padding: 12px 14px;
-          font-size: 14px;
-          font-weight: 700;
-          color: #0f172a;
-          outline: none;
-        }
-
-        .premium-input:focus {
-          border-color: #1d4ed8;
-          background: #ffffff;
-          box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.08);
-        }
-      `}</style>
     </main>
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label>
-      <span className="mb-2 block text-xs font-black text-slate-500">
-        {label}
-      </span>
-      {children}
-    </label>
-  );
-}
-
-function ReadValue({
-  value,
-  muted,
-}: {
-  value?: string;
-  muted?: boolean;
-}) {
-  return (
-    <div
-      className={`flex min-h-12 items-center rounded-[18px] border border-slate-200 bg-[#F8FAFC] px-4 text-sm font-black ${
-        muted ? "text-slate-400" : "text-[#0B1F44]"
-      }`}
-    >
-      {value || "—"}
-    </div>
-  );
-}
-
-function TrustMini({
+function GlassCard({
+  icon,
   title,
   value,
-  max,
+  color,
 }: {
+  icon: React.ReactNode;
   title: string;
-  value: number;
-  max: number;
+  value: string;
+  color: string;
 }) {
-  return (
-    <div className="bg-white/5 p-4">
-      <p className="text-xs font-black uppercase tracking-wide text-blue-100/50">
-        {title}
-      </p>
+  const styles: Record<string, string> = {
+    cyan: "border-cyan-400/20 bg-cyan-400/10 text-cyan-100",
+    gold: "border-[#C9A84C]/20 bg-[#C9A84C]/10 text-[#F7DFA3]",
+    green: "border-emerald-400/20 bg-emerald-400/10 text-emerald-100",
+  };
 
-      <p className="mt-2 text-[22px] font-black text-white">
-        {value}
-        <span className="text-xs text-blue-100/40">/{max}</span>
-      </p>
+  return (
+    <div
+      className={`rounded-[30px] border p-5 backdrop-blur-xl ${styles[color]}`}
+    >
+      <div className="flex items-center justify-between">
+        {icon}
+
+        <span className="text-xs font-black uppercase tracking-[0.2em] opacity-70">
+          {title}
+        </span>
+      </div>
+
+      <div className="mt-5 text-3xl font-black">{value}</div>
     </div>
   );
 }
 
-function BottomItem({
+function MetricCard({
   icon,
-  label,
-  active,
-  href,
+  title,
+  value,
 }: {
   icon: React.ReactNode;
-  label: string;
-  active?: boolean;
+  title: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[30px] border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl">
+      <div className="flex items-center justify-between text-cyan-200">
+        {icon}
+
+        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+          LIVE
+        </span>
+      </div>
+
+      <div className="mt-5 text-4xl font-black">{value}</div>
+
+      <div className="mt-2 text-sm font-bold text-slate-400">{title}</div>
+    </div>
+  );
+}
+
+function NavCard({
+  href,
+  title,
+  desc,
+}: {
   href: string;
+  title: string;
+  desc: string;
 }) {
   return (
     <Link
       href={href}
-      className={`flex w-16 flex-col items-center gap-1 ${
-        active ? "text-[#1D4ED8]" : "text-slate-500"
-      }`}
+      className="group rounded-[30px] border border-cyan-400/10 bg-white/[0.04] p-5 no-underline transition hover:-translate-y-1 hover:border-cyan-400/30 hover:bg-white/[0.07]"
     >
-      {icon}
+      <div className="text-xl font-black text-white">{title}</div>
 
-      <span className="text-[11px] font-bold">{label}</span>
+      <div className="mt-3 text-sm leading-6 text-slate-400">{desc}</div>
+
+      <div className="mt-5 text-xs font-black uppercase tracking-[0.2em] text-cyan-300">
+        OPEN MODULE →
+      </div>
     </Link>
   );
 }
