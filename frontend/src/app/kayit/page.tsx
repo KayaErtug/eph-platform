@@ -420,7 +420,7 @@ function KayitForm() {
 
                     <input
                       {...register("inviteCode")}
-                      placeholder="UMAY-2026-KAYA"
+                      placeholder="EPH-7KQ9M2XA"
                       className="input"
                     />
                   </div>
