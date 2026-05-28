@@ -45,13 +45,13 @@ const features = [
     icon: Users,
     label: "Network",
     title: "Profesyonel Ağ",
-    desc: "Emlakçı, müteahhit ve inşaat firmaları tek çatı altında buluşur, birlikten kuvvet doğar.",
+    desc: "Gayrimenkul danışmanları, müteahhitler ve inşaat firmaları tek çatı altında buluşur.",
   },
   {
     icon: Building2,
     label: "Portföy",
     title: "Portföy Havuzu",
-    desc: "Satılık, kiralık ve proje bazlı tüm portföyler tek merkezden ve düzenli biçimde izlenir.",
+    desc: "Satılık, kiralık ve proje bazlı portföyler tek merkezden düzenli biçimde izlenir.",
   },
   {
     icon: ShieldCheck,
@@ -63,13 +63,13 @@ const features = [
     icon: Handshake,
     label: "Satış",
     title: "İş Birliği",
-    desc: "Talep, portföy ve ortak satış süreçleri hızlanır. Komisyon paylaşımı şeffaf çalışır.",
+    desc: "Talep, portföy ve ortak satış süreçleri daha şeffaf ve takip edilebilir hale gelir.",
   },
   {
     icon: Sparkles,
-    label: "Yapay Zeka",
-    title: "Lina AI",
-    desc: "İlan metni, portföy girişi ve içerik üretiminde sesli ve yazılı akıllı destek sağlar.",
+    label: "Lina",
+    title: "Akıllı Asistan",
+    desc: "İlan metni, portföy girişi ve içerik üretiminde sesli ve yazılı destek sağlar.",
   },
 ];
 
@@ -89,7 +89,7 @@ const liveActivities = [
   {
     icon: Handshake,
     title: "Ortak Satış Görüşmesi",
-    desc: "Emlakçı ve müteahhit arasında görüşme başladı.",
+    desc: "Gayrimenkul danışmanı ve müteahhit arasında görüşme başladı.",
     time: "5 dk önce",
   },
 ];
@@ -121,7 +121,7 @@ const showcaseItems = [
   },
   {
     icon: Bot,
-    title: "Lina AI",
+    title: "Lina Asistan",
     desc: "Sesli ve yazılı destekle ilan oluşturma süreci hızlanır.",
     image: "/showcase/lina.jpg",
   },
@@ -163,22 +163,22 @@ export default function LandingPage() {
 
   return (
     <>
-      <main className="min-h-screen overflow-hidden bg-[#06111F] text-white">
-        <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-[#06111F]/90 backdrop-blur">
+      <main className="min-h-screen overflow-hidden bg-[#F8FAFC] text-[#172033]">
+        <header className="fixed left-0 right-0 top-0 z-50 border-b border-[#DDE7F3] bg-white/92 backdrop-blur-xl">
           <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5">
             <Link href="/" className="flex items-center gap-3">
               <img
                 src="/LOGO_EPH.png"
                 alt="EPH"
-                className="h-11 w-11 rounded-2xl object-contain"
+                className="h-11 w-11 rounded-2xl object-contain shadow-sm"
               />
 
               <div>
-                <h1 className="text-lg font-black tracking-tight">
+                <h1 className="text-lg font-black tracking-tight text-[#172033]">
                   EPH Platform
                 </h1>
 
-                <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-[#60A5FA]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-[#2563EB]">
                   Emlak Portföy Havuzu
                 </p>
               </div>
@@ -188,7 +188,7 @@ export default function LandingPage() {
               <button
                 type="button"
                 onClick={() => setInfoModal("kesfet")}
-                className="text-sm font-bold text-white/70 transition hover:text-white"
+                className="text-sm font-bold text-[#64748B] transition hover:text-[#2563EB]"
               >
                 Keşfet
               </button>
@@ -196,7 +196,7 @@ export default function LandingPage() {
               <button
                 type="button"
                 onClick={() => scrollToSection("ozellikler")}
-                className="text-sm font-bold text-white/70 transition hover:text-white"
+                className="text-sm font-bold text-[#64748B] transition hover:text-[#2563EB]"
               >
                 Neler Var?
               </button>
@@ -204,7 +204,7 @@ export default function LandingPage() {
               <button
                 type="button"
                 onClick={() => setInfoModal("iletisim")}
-                className="text-sm font-bold text-white/70 transition hover:text-white"
+                className="text-sm font-bold text-[#64748B] transition hover:text-[#2563EB]"
               >
                 Bizimle İletişime Geç
               </button>
@@ -213,7 +213,7 @@ export default function LandingPage() {
             <div className="flex items-center gap-3">
               <Link
                 href="/giris"
-                className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-xs font-black transition hover:bg-white/10"
+                className="rounded-2xl border border-[#DDE7F3] bg-white px-5 py-3 text-xs font-black text-[#172033] shadow-sm transition hover:border-[#2563EB]/30 hover:bg-[#EFF6FF]"
               >
                 Giriş Yap
               </Link>
@@ -225,42 +225,40 @@ export default function LandingPage() {
           id="platform"
           className="relative overflow-hidden px-5 pb-24 pt-36"
         >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.38),transparent_34%)]" />
-          <div className="eph-premium-glow eph-glow left-1/2 top-24 h-72 w-72 -translate-x-1/2 bg-[#60A5FA]/10" />
-          <div className="eph-premium-glow bottom-0 left-0 h-80 w-80 bg-[#2563EB]/15" />
-          <div className="eph-premium-glow right-0 top-1/3 h-96 w-96 bg-[#C9A84C]/10" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.12),transparent_32%),radial-gradient(circle_at_top_right,rgba(20,184,166,0.13),transparent_30%)]" />
+          <div className="absolute left-10 top-28 h-28 w-28 rounded-full bg-[#DBEAFE] blur-3xl" />
+          <div className="absolute bottom-12 right-10 h-40 w-40 rounded-full bg-[#CCFBF1] blur-3xl" />
 
-          <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-16 lg:grid-cols-2">
-            <div className="relative z-10 text-center lg:text-left">
-              <div className="eph-premium-line inline-flex items-center gap-2 rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#93C5FD]">
+          <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-16 lg:grid-cols-2">
+            <div className="text-center lg:text-left">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#BFDBFE] bg-white px-4 py-2 text-xs font-black text-[#2563EB] shadow-sm">
                 <Zap size={14} />
-                Sektörün Kapalı Devre Güç Ağı
+                Sektörün Kapalı Devre İş Ağı
               </div>
 
-              <h2 className="mt-7 text-5xl font-black leading-[1.04] tracking-tight md:text-7xl">
+              <h2 className="mt-7 text-5xl font-black leading-[1.04] tracking-tight text-[#172033] md:text-7xl">
                 Portföyün
-                <span className="block bg-gradient-to-r from-[#60A5FA] via-white to-[#C9A84C] bg-clip-text text-transparent">
-                  Daha Uzağa
-                </span>
-                Ulaşsın
+                <span className="block text-[#2563EB]">Daha Doğru</span>
+                Kişilere Ulaşsın
               </h2>
 
-              <p className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-white/65 lg:mx-0">
-                EPH; emlakçıları, müteahhitleri ve inşaat firmalarını aynı
-                profesyonel ağda buluşturur. Portföyler görünür olur, talepler
-                hızlanır, ortak satış fırsatları tek merkezde takip edilir.
+              <p className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-[#5B6B82] lg:mx-0">
+                EPH; gayrimenkul danışmanlarını, müteahhitleri ve inşaat
+                firmalarını aynı profesyonel ağda buluşturur. Portföyler
+                görünür olur, talepler hızlanır, ortak satış fırsatları tek
+                merkezde takip edilir.
               </p>
 
-              <div className="mt-8 grid grid-cols-1 gap-3 text-sm font-bold text-white/70 sm:grid-cols-3">
-                <div className="eph-card-hover rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+              <div className="mt-8 grid grid-cols-1 gap-3 text-sm font-bold text-[#334155] sm:grid-cols-3">
+                <div className="rounded-2xl border border-[#DDE7F3] bg-white px-4 py-3 shadow-sm">
                   Anlık Talep Paylaşımı
                 </div>
 
-                <div className="eph-card-hover rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                <div className="rounded-2xl border border-[#DDE7F3] bg-white px-4 py-3 shadow-sm">
                   Ortak Satış Fırsatı
                 </div>
 
-                <div className="eph-card-hover rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                <div className="rounded-2xl border border-[#DDE7F3] bg-white px-4 py-3 shadow-sm">
                   Güvenli Network
                 </div>
               </div>
@@ -268,7 +266,7 @@ export default function LandingPage() {
               <div className="mt-10 flex flex-wrap justify-center gap-4 lg:justify-start">
                 <Link
                   href="/kayit"
-                  className="group flex items-center gap-2 rounded-2xl bg-[#2563EB] px-7 py-4 text-sm font-black text-white shadow-lg shadow-[#2563EB]/25 transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
+                  className="group flex items-center gap-2 rounded-2xl bg-[#2563EB] px-7 py-4 text-sm font-black text-white shadow-lg shadow-[#2563EB]/20 transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
                 >
                   Üyelik Başvurusu Yap
                   <ArrowRight
@@ -280,9 +278,9 @@ export default function LandingPage() {
                 <button
                   type="button"
                   onClick={() => setShowVideo(true)}
-                  className="group flex items-center gap-2 rounded-2xl border border-[#60A5FA]/30 bg-white/5 px-7 py-4 text-sm font-black text-white transition hover:-translate-y-1 hover:bg-white/10"
+                  className="group flex items-center gap-2 rounded-2xl border border-[#DDE7F3] bg-white px-7 py-4 text-sm font-black text-[#172033] shadow-sm transition hover:-translate-y-1 hover:border-[#2563EB]/30 hover:bg-[#EFF6FF]"
                 >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#2563EB]">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#14B8A6] text-white">
                     <Play size={14} fill="white" />
                   </span>
                   Tanıtım Videosunu İzle
@@ -291,7 +289,7 @@ export default function LandingPage() {
                 <button
                   type="button"
                   onClick={() => setInfoModal("kesfet")}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-7 py-4 text-sm font-black transition hover:-translate-y-1 hover:bg-white/10"
+                  className="rounded-2xl border border-[#DDE7F3] bg-white px-7 py-4 text-sm font-black text-[#172033] shadow-sm transition hover:-translate-y-1 hover:border-[#F97316]/30 hover:bg-[#FFF7ED]"
                 >
                   EPH’yi Keşfet
                 </button>
@@ -301,13 +299,13 @@ export default function LandingPage() {
                 {stats.map(([value, label]) => (
                   <div
                     key={label}
-                    className="eph-card-hover rounded-3xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur"
+                    className="rounded-3xl border border-[#DDE7F3] bg-white p-5 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
                   >
-                    <div className="text-3xl font-black text-[#60A5FA]">
+                    <div className="text-3xl font-black text-[#2563EB]">
                       {value}
                     </div>
 
-                    <div className="mt-2 text-xs font-bold uppercase tracking-widest text-white/40">
+                    <div className="mt-2 text-xs font-bold uppercase tracking-widest text-[#64748B]">
                       {label}
                     </div>
                   </div>
@@ -315,97 +313,84 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="relative z-10">
-              <div className="eph-premium-glow -right-10 top-10 h-72 w-72 bg-[#2563EB]/20" />
+            <div className="relative">
+              <div className="relative mx-auto max-w-xl overflow-hidden rounded-[34px] border border-[#DDE7F3] bg-white p-6 text-center shadow-xl shadow-slate-200/70">
+                <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#DBEAFE] blur-3xl" />
+                <div className="absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-[#CCFBF1] blur-3xl" />
 
-              <div className="eph-float relative mx-auto max-w-xl overflow-hidden rounded-[40px] border border-white/10 bg-white/5 p-6 text-center backdrop-blur">
-                <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(96,165,250,0.12),transparent)]" />
-
-                <div className="relative rounded-[32px] border border-white/10 bg-[#07111F] p-6">
+                <div className="relative rounded-[28px] border border-[#DDE7F3] bg-[#F8FAFC] p-6">
                   <div className="flex flex-col items-center justify-between gap-4 md:flex-row md:text-left">
                     <div>
-                      <p className="text-xs font-black uppercase tracking-[0.25em] text-[#60A5FA]">
+                      <p className="text-xs font-black uppercase tracking-[0.25em] text-[#2563EB]">
                         CANLI İŞ AĞI
                       </p>
 
-                      <h3 className="mt-2 text-3xl font-black">
+                      <h3 className="mt-2 text-3xl font-black text-[#172033]">
                         EPH Keşif Merkezi
                       </h3>
                     </div>
 
-                    <div className="flex h-14 w-14 animate-pulse items-center justify-center rounded-2xl bg-[#2563EB]">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#2563EB] text-white shadow-lg shadow-[#2563EB]/20">
                       <Radar size={28} />
                     </div>
                   </div>
 
                   <div className="relative mx-auto mt-10 flex h-80 w-full max-w-sm items-center justify-center">
-                    <div className="absolute h-72 w-72 animate-ping rounded-full border border-[#60A5FA]/20" />
-                    <div className="absolute h-56 w-56 rounded-full border border-[#60A5FA]/20" />
-                    <div className="absolute h-40 w-40 rounded-full border border-[#60A5FA]/20" />
+                    <div className="absolute h-72 w-72 rounded-full border border-[#BFDBFE]" />
+                    <div className="absolute h-56 w-56 rounded-full border border-[#99F6E4]" />
+                    <div className="absolute h-40 w-40 rounded-full border border-[#FED7AA]" />
 
-                    <div className="absolute left-2 top-10 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-left backdrop-blur">
-                      <div className="flex items-center gap-2 text-xs font-black text-[#93C5FD]">
-                        <Building2 size={15} />
-                        Yeni Portföy
-                      </div>
+                    <MiniBubble
+                      className="left-2 top-10"
+                      icon={Building2}
+                      title="Yeni Portföy"
+                      desc="Bölgesel fırsat yayında"
+                      color="blue"
+                    />
 
-                      <p className="mt-1 text-[11px] text-white/50">
-                        Bölgesel fırsat yayında
-                      </p>
-                    </div>
+                    <MiniBubble
+                      className="right-1 top-24"
+                      icon={MessageCircle}
+                      title="Yeni Talep"
+                      desc="Alıcı talebi paylaşıldı"
+                      color="teal"
+                    />
 
-                    <div className="absolute right-1 top-24 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-left backdrop-blur">
-                      <div className="flex items-center gap-2 text-xs font-black text-[#93C5FD]">
-                        <MessageCircle size={15} />
-                        Yeni Talep
-                      </div>
+                    <MiniBubble
+                      className="bottom-10 left-8"
+                      icon={Handshake}
+                      title="Ortak Satış"
+                      desc="İş birliği başladı"
+                      color="orange"
+                    />
 
-                      <p className="mt-1 text-[11px] text-white/50">
-                        Alıcı talebi paylaşıldı
-                      </p>
-                    </div>
+                    <MiniBubble
+                      className="bottom-16 right-5"
+                      icon={TrendingUp}
+                      title="Hızlı Dönüş"
+                      desc="Fırsatlar takipte"
+                      color="purple"
+                    />
 
-                    <div className="absolute bottom-10 left-8 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-left backdrop-blur">
-                      <div className="flex items-center gap-2 text-xs font-black text-[#93C5FD]">
-                        <Handshake size={15} />
-                        Ortak Satış
-                      </div>
+                    <div className="relative flex h-32 w-32 items-center justify-center rounded-full border border-[#BFDBFE] bg-white shadow-2xl shadow-blue-100">
+                      <div className="absolute h-24 w-24 rounded-full bg-[#DBEAFE] blur-xl" />
 
-                      <p className="mt-1 text-[11px] text-white/50">
-                        İş birliği başladı
-                      </p>
-                    </div>
-
-                    <div className="absolute bottom-16 right-5 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-left backdrop-blur">
-                      <div className="flex items-center gap-2 text-xs font-black text-[#93C5FD]">
-                        <TrendingUp size={15} />
-                        Hızlı Dönüş
-                      </div>
-
-                      <p className="mt-1 text-[11px] text-white/50">
-                        Fırsatlar takipte
-                      </p>
-                    </div>
-
-                    <div className="relative flex h-32 w-32 items-center justify-center rounded-full border border-[#60A5FA]/30 bg-[#2563EB]/20 shadow-2xl shadow-[#2563EB]/30">
-                      <div className="absolute h-24 w-24 rounded-full bg-[#2563EB]/30 blur-xl" />
-
-                      <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-[#2563EB]">
+                      <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-[#2563EB] text-white">
                         <Globe2 size={38} />
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-6 rounded-3xl border border-[#2563EB]/20 bg-[#2563EB]/10 p-5">
+                  <div className="mt-6 rounded-3xl border border-[#BFDBFE] bg-white p-5 shadow-sm">
                     <div className="flex flex-col items-center gap-3 text-center md:flex-row md:text-left">
-                      <CheckCircle2 size={22} className="text-[#60A5FA]" />
+                      <CheckCircle2 size={22} className="text-[#14B8A6]" />
 
                       <div>
-                        <p className="text-sm font-black">
+                        <p className="text-sm font-black text-[#172033]">
                           Portföy + Talep + Network Tek Merkezde
                         </p>
 
-                        <p className="mt-1 text-xs text-white/50">
+                        <p className="mt-1 text-xs text-[#64748B]">
                           Sektör profesyonelleri için daha hızlı, düzenli ve
                           güvenli iş akışı.
                         </p>
@@ -418,52 +403,56 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="relative overflow-hidden border-y border-white/10 bg-[#050C16] px-5 py-20">
-          <div className="eph-premium-glow left-10 top-10 h-80 w-80 bg-[#2563EB]/10" />
-          <div className="eph-premium-glow bottom-0 right-10 h-80 w-80 bg-[#C9A84C]/10" />
+        <section className="relative overflow-hidden border-y border-[#DDE7F3] bg-white px-5 py-20">
+          <div className="absolute left-10 top-10 h-56 w-56 rounded-full bg-[#EFF6FF] blur-3xl" />
+          <div className="absolute bottom-0 right-10 h-56 w-56 rounded-full bg-[#ECFDF5] blur-3xl" />
 
           <div className="relative mx-auto max-w-7xl">
-            <div className="mx-auto max-w-4xl text-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#2563EB]/20 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#60A5FA]">
-                <Activity size={14} />
-                Canlı Network Akışı
-              </div>
-
-              <h2 className="mt-6 text-4xl font-black leading-tight md:text-5xl">
-                Platform İçinde İş Fırsatları
-                <span className="block bg-gradient-to-r from-[#60A5FA] via-white to-[#C9A84C] bg-clip-text text-transparent">
-                  Anlık Hareket Eder
-                </span>
-              </h2>
-
-              <p className="mx-auto mt-5 max-w-3xl text-base leading-8 text-white/55">
-                Portföy, talep, mesajlaşma ve ortak satış süreçleri tek akışta
-                izlenir. EPH, sektör profesyonellerine canlı ve düzenli bir iş
-                takip merkezi sunar.
-              </p>
-            </div>
+            <SectionHeader
+              icon={Activity}
+              badge="Canlı Network Akışı"
+              title="Platform İçinde İş Fırsatları"
+              highlight="Anlık Hareket Eder"
+              desc="Portföy, talep, mesajlaşma ve ortak satış süreçleri tek akışta izlenir. EPH, sektör profesyonellerine canlı ve düzenli bir iş takip merkezi sunar."
+            />
 
             <div className="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-3">
-              {liveActivities.map((item) => (
+              {liveActivities.map((item, index) => (
                 <div
                   key={item.title}
-                  className="eph-card-hover relative overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.04] p-7 text-center backdrop-blur"
+                  className="relative overflow-hidden rounded-[32px] border border-[#DDE7F3] bg-white p-7 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
                 >
-                  <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#2563EB]/10 blur-2xl" />
+                  <div
+                    className={`absolute -right-10 -top-10 h-32 w-32 rounded-full blur-2xl ${
+                      index === 0
+                        ? "bg-[#DBEAFE]"
+                        : index === 1
+                          ? "bg-[#CCFBF1]"
+                          : "bg-[#FFEDD5]"
+                    }`}
+                  />
 
-                  <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-[#60A5FA]/20 bg-[#2563EB]/10 text-[#60A5FA]">
+                  <div
+                    className={`relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl ${
+                      index === 0
+                        ? "bg-[#DBEAFE] text-[#2563EB]"
+                        : index === 1
+                          ? "bg-[#CCFBF1] text-[#0F766E]"
+                          : "bg-[#FFEDD5] text-[#EA580C]"
+                    }`}
+                  >
                     <item.icon size={28} />
                   </div>
 
-                  <h3 className="relative mt-6 text-xl font-black">
+                  <h3 className="relative mt-6 text-xl font-black text-[#172033]">
                     {item.title}
                   </h3>
 
-                  <p className="relative mt-3 min-h-[56px] text-sm leading-7 text-white/55">
+                  <p className="relative mt-3 min-h-[56px] text-sm leading-7 text-[#64748B]">
                     {item.desc}
                   </p>
 
-                  <div className="relative mt-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-white/45">
+                  <div className="relative mt-6 inline-flex items-center gap-2 rounded-full border border-[#DDE7F3] bg-[#F8FAFC] px-4 py-2 text-xs font-black text-[#64748B]">
                     <Clock3 size={14} />
                     {item.time}
                   </div>
@@ -473,68 +462,56 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="relative overflow-hidden bg-[#081423] px-5 py-24">
-          <div className="eph-premium-glow left-0 top-20 h-96 w-96 bg-[#2563EB]/10" />
-          <div className="eph-premium-glow bottom-0 right-0 h-96 w-96 bg-[#C9A84C]/10" />
+        <section className="relative overflow-hidden bg-[#F8FAFC] px-5 py-24">
+          <div className="absolute left-0 top-20 h-96 w-96 rounded-full bg-[#DBEAFE]/70 blur-3xl" />
+          <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-[#FFEDD5]/70 blur-3xl" />
 
           <div className="relative mx-auto max-w-7xl">
-            <div className="mx-auto max-w-4xl text-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#2563EB]/20 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#60A5FA]">
-                <MonitorSmartphone size={14} />
-                Platformdan Görüntüler
-              </div>
-
-              <h2 className="mt-6 text-4xl font-black leading-tight md:text-6xl">
-                EPH Sadece Anlatılmaz,
-                <span className="block bg-gradient-to-r from-[#60A5FA] via-white to-[#C9A84C] bg-clip-text text-transparent">
-                  Kullanırken Hissedilir
-                </span>
-              </h2>
-
-              <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-white/55 md:text-lg">
-                Dashboard, network, CRM, portföy yönetimi ve Lina AI
-                ekranlarıyla sektör profesyonelleri için gerçek bir çalışma
-                merkezi sunar.
-              </p>
-            </div>
+            <SectionHeader
+              icon={MonitorSmartphone}
+              badge="Platformdan Görüntüler"
+              title="EPH Sadece Anlatılmaz,"
+              highlight="Kullanırken Hissedilir"
+              desc="Dashboard, network, CRM, portföy yönetimi ve Lina ekranlarıyla sektör profesyonelleri için gerçek bir çalışma merkezi sunar."
+            />
 
             <div className="mt-16 grid grid-cols-1 gap-7 md:grid-cols-2 xl:grid-cols-3">
               {showcaseItems.map((item, index) => (
                 <article
                   key={item.title}
-                  className={`eph-card-hover group relative overflow-hidden rounded-[36px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur ${
+                  className={`group relative overflow-hidden rounded-[34px] border border-[#DDE7F3] bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-xl ${
                     index === 0 ? "xl:col-span-2" : ""
                   }`}
                 >
-                  <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#2563EB]/20 blur-3xl transition group-hover:bg-[#60A5FA]/25" />
+                  <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#DBEAFE] blur-3xl transition group-hover:bg-[#BFDBFE]" />
 
-                  <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#050C16]">
+                  <div className="relative overflow-hidden rounded-[28px] border border-[#DDE7F3] bg-[#F8FAFC]">
                     <img
                       src={item.image}
                       alt={item.title}
                       className="h-[260px] w-full object-cover transition duration-500 group-hover:scale-105 md:h-[320px]"
                     />
 
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#050C16] via-[#050C16]/20 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-white via-white/55 to-transparent" />
 
                     <div className="absolute bottom-0 left-0 right-0 p-6">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#60A5FA]/20 bg-[#2563EB]/30 text-[#93C5FD] backdrop-blur">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#DBEAFE] text-[#2563EB] shadow-sm">
                           <item.icon size={24} />
                         </div>
 
                         <div>
-                          <h3 className="text-2xl font-black text-white">
+                          <h3 className="text-2xl font-black text-[#172033]">
                             {item.title}
                           </h3>
 
-                          <p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-[#60A5FA]">
+                          <p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-[#2563EB]">
                             EPH Modülü
                           </p>
                         </div>
                       </div>
 
-                      <p className="mt-4 max-w-xl text-sm leading-7 text-white/65">
+                      <p className="mt-4 max-w-xl text-sm leading-7 text-[#64748B]">
                         {item.desc}
                       </p>
                     </div>
@@ -547,64 +524,72 @@ export default function LandingPage() {
 
         <section
           id="ozellikler"
-          className="relative overflow-hidden border-t border-white/10 bg-[#081423] px-5 py-24"
+          className="relative overflow-hidden border-t border-[#DDE7F3] bg-white px-5 py-24"
         >
-          <div className="eph-premium-glow left-0 top-0 h-96 w-96 bg-[#2563EB]/10" />
-          <div className="eph-premium-glow bottom-0 right-0 h-96 w-96 bg-[#60A5FA]/10" />
+          <div className="absolute left-0 top-0 h-96 w-96 rounded-full bg-[#EFF6FF] blur-3xl" />
+          <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-[#ECFDF5] blur-3xl" />
 
           <div className="relative mx-auto max-w-7xl">
-            <div className="mx-auto max-w-4xl text-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#2563EB]/20 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#60A5FA]">
-                <BadgeCheck size={14} />
-                Neler Var?
-              </div>
-
-              <h2 className="mt-6 text-4xl font-black leading-tight md:text-6xl">
-                EPH’de Sadece İlan Değil,
-                <span className="block bg-gradient-to-r from-[#60A5FA] via-white to-[#C9A84C] bg-clip-text text-transparent">
-                  Tam Bir İş Ekosistemi Var
-                </span>
-              </h2>
-
-              <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-white/55 md:text-lg">
-                Güvenli üyelikten ortak satışa, portföy havuzundan Lina AI
-                desteğine kadar tüm süreçler sektör profesyonelleri için tek
-                merkezde toplanır.
-              </p>
-            </div>
+            <SectionHeader
+              icon={BadgeCheck}
+              badge="Neler Var?"
+              title="EPH’de Sadece İlan Değil,"
+              highlight="Tam Bir İş Ekosistemi Var"
+              desc="Güvenli üyelikten ortak satışa, portföy havuzundan Lina desteğine kadar tüm süreçler sektör profesyonelleri için tek merkezde toplanır."
+            />
 
             <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
               {features.map((item, index) => (
                 <div
                   key={item.title}
-                  className="eph-card-hover group relative overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.04] p-7 text-center backdrop-blur"
+                  className="group relative overflow-hidden rounded-[34px] border border-[#DDE7F3] bg-white p-7 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
                 >
-                  <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#2563EB]/10 blur-2xl transition group-hover:bg-[#60A5FA]/20" />
+                  <div
+                    className={`absolute -right-10 -top-10 h-32 w-32 rounded-full blur-2xl ${
+                      index % 4 === 0
+                        ? "bg-[#DBEAFE]"
+                        : index % 4 === 1
+                          ? "bg-[#CCFBF1]"
+                          : index % 4 === 2
+                            ? "bg-[#FFEDD5]"
+                            : "bg-[#EDE9FE]"
+                    }`}
+                  />
 
                   <div className="relative flex items-center justify-between gap-4">
-                    <div className="rounded-full border border-[#60A5FA]/20 bg-[#2563EB]/10 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-[#93C5FD]">
+                    <div className="rounded-full border border-[#DDE7F3] bg-[#F8FAFC] px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-[#2563EB]">
                       {item.label}
                     </div>
 
-                    <div className="text-xs font-black text-white/20">
+                    <div className="text-xs font-black text-[#CBD5E1]">
                       0{index + 1}
                     </div>
                   </div>
 
-                  <div className="relative mx-auto mt-8 flex h-20 w-20 items-center justify-center rounded-3xl border border-[#60A5FA]/20 bg-[#2563EB]/10 text-[#60A5FA] transition group-hover:scale-110 group-hover:bg-[#2563EB]/20">
+                  <div
+                    className={`relative mx-auto mt-8 flex h-20 w-20 items-center justify-center rounded-3xl transition group-hover:scale-110 ${
+                      index % 4 === 0
+                        ? "bg-[#DBEAFE] text-[#2563EB]"
+                        : index % 4 === 1
+                          ? "bg-[#CCFBF1] text-[#0F766E]"
+                          : index % 4 === 2
+                            ? "bg-[#FFEDD5] text-[#EA580C]"
+                            : "bg-[#EDE9FE] text-[#7C3AED]"
+                    }`}
+                  >
                     <item.icon size={34} />
                   </div>
 
-                  <h3 className="relative mt-7 text-2xl font-black">
+                  <h3 className="relative mt-7 text-2xl font-black text-[#172033]">
                     {item.title}
                   </h3>
 
-                  <p className="relative mt-4 min-h-[84px] text-sm leading-7 text-white/55">
+                  <p className="relative mt-4 min-h-[84px] text-sm leading-7 text-[#64748B]">
                     {item.desc}
                   </p>
 
-                  <div className="relative mt-7 h-1 overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full w-1/2 rounded-full bg-[#60A5FA] transition-all duration-500 group-hover:w-full" />
+                  <div className="relative mt-7 h-1 overflow-hidden rounded-full bg-[#E2E8F0]">
+                    <div className="h-full w-1/2 rounded-full bg-[#2563EB] transition-all duration-500 group-hover:w-full" />
                   </div>
                 </div>
               ))}
@@ -613,24 +598,25 @@ export default function LandingPage() {
         </section>
 
         <section id="basvuru" className="relative overflow-hidden px-5 py-28">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(37,99,235,0.25),transparent_35%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(37,99,235,0.10),transparent_35%)]" />
 
-          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[40px] border border-white/10 bg-[#0B1628] p-10 text-center md:p-16">
-            <div className="eph-premium-glow -right-20 -top-20 h-72 w-72 bg-[#2563EB]/20" />
+          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[40px] border border-[#DDE7F3] bg-white p-10 text-center shadow-xl shadow-slate-200/70 md:p-16">
+            <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[#DBEAFE] blur-3xl" />
+            <div className="absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-[#CCFBF1] blur-3xl" />
 
             <div className="relative z-10 mx-auto max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#2563EB]/20 bg-[#2563EB]/10 px-4 py-2 text-xs font-black text-[#60A5FA]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-2 text-xs font-black text-[#2563EB]">
                 <Sparkles size={14} />
                 Üyelik Başvurusu
               </div>
 
-              <h2 className="mt-6 text-4xl font-black leading-tight md:text-6xl">
+              <h2 className="mt-6 text-4xl font-black leading-tight text-[#172033] md:text-6xl">
                 EPH Platform’a
-                <span className="block text-[#60A5FA]">Katılmak İçin</span>
+                <span className="block text-[#2563EB]">Katılmak İçin</span>
                 Tek Bir Adım Yeter
               </h2>
 
-              <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-white/60">
+              <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-[#64748B]">
                 Başvurunuzu tek kayıt ekranından oluşturun. Referans kodunuz
                 varsa bilgileriniz otomatik gelir; yoksa başvurunuz admin
                 değerlendirmesine alınır.
@@ -639,14 +625,14 @@ export default function LandingPage() {
               <div className="mt-10 flex flex-wrap justify-center gap-4">
                 <Link
                   href="/kayit"
-                  className="rounded-2xl bg-[#2563EB] px-8 py-4 text-sm font-black transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
+                  className="rounded-2xl bg-[#2563EB] px-8 py-4 text-sm font-black text-white shadow-lg shadow-[#2563EB]/20 transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
                 >
                   Üyelik Başvurusu Yap
                 </Link>
 
                 <Link
                   href="/giris"
-                  className="rounded-2xl border border-white/10 bg-white/5 px-8 py-4 text-sm font-black transition hover:-translate-y-1 hover:bg-white/10"
+                  className="rounded-2xl border border-[#DDE7F3] bg-white px-8 py-4 text-sm font-black text-[#172033] shadow-sm transition hover:-translate-y-1 hover:bg-[#EFF6FF]"
                 >
                   Giriş Yap
                 </Link>
@@ -655,62 +641,64 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <footer className="border-t border-white/10 bg-[#050C16] px-5 py-10">
+        <footer className="border-t border-[#DDE7F3] bg-white px-5 py-10">
           <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 md:flex-row">
             <div className="flex items-center gap-3">
               <img
                 src="/LOGO_EPH.png"
                 alt="EPH"
-                className="h-10 w-10 rounded-2xl object-contain"
+                className="h-10 w-10 rounded-2xl object-contain shadow-sm"
               />
 
               <div>
-                <p className="text-lg font-black">EPH Platform</p>
+                <p className="text-lg font-black text-[#172033]">
+                  EPH Platform
+                </p>
 
-                <p className="text-xs text-white/40">Emlak Portföy Havuzu</p>
+                <p className="text-xs text-[#64748B]">Emlak Portföy Havuzu</p>
               </div>
             </div>
 
-            <div className="text-center text-sm text-white/30">
+            <div className="text-center text-sm text-[#64748B]">
               © 2026 EPH Platform — Tüm hakları saklıdır.
             </div>
 
-            <div className="flex flex-wrap justify-center gap-6 text-center text-sm font-bold text-white/50">
+            <div className="flex flex-wrap justify-center gap-6 text-center text-sm font-bold text-[#64748B]">
               <Link
                 href="/platform-anayasasi"
-                className="transition hover:text-white"
+                className="transition hover:text-[#2563EB]"
               >
                 Platform Anayasası
               </Link>
 
-              <Link href="/kvkk" className="transition hover:text-white">
+              <Link href="/kvkk" className="transition hover:text-[#2563EB]">
                 KVKK
               </Link>
 
               <Link
                 href="/gizlilik-politikasi"
-                className="transition hover:text-white"
+                className="transition hover:text-[#2563EB]"
               >
                 Gizlilik Politikası
               </Link>
 
               <Link
                 href="/kullanici-sozlesmesi"
-                className="transition hover:text-white"
+                className="transition hover:text-[#2563EB]"
               >
                 Kullanıcı Sözleşmesi
               </Link>
 
               <Link
                 href="/cerez-politikasi"
-                className="transition hover:text-white"
+                className="transition hover:text-[#2563EB]"
               >
                 Çerez Politikası
               </Link>
 
               <button
                 onClick={() => setInfoModal("iletisim")}
-                className="transition hover:text-white"
+                className="transition hover:text-[#2563EB]"
               >
                 İletişim
               </button>
@@ -764,6 +752,72 @@ export default function LandingPage() {
   );
 }
 
+function SectionHeader({
+  icon: Icon,
+  badge,
+  title,
+  highlight,
+  desc,
+}: {
+  icon: typeof Activity;
+  badge: string;
+  title: string;
+  highlight: string;
+  desc: string;
+}) {
+  return (
+    <div className="mx-auto max-w-4xl text-center">
+      <div className="inline-flex items-center gap-2 rounded-full border border-[#BFDBFE] bg-white px-4 py-2 text-xs font-black text-[#2563EB] shadow-sm">
+        <Icon size={14} />
+        {badge}
+      </div>
+
+      <h2 className="mt-6 text-4xl font-black leading-tight text-[#172033] md:text-6xl">
+        {title}
+        <span className="block text-[#2563EB]">{highlight}</span>
+      </h2>
+
+      <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-[#64748B] md:text-lg">
+        {desc}
+      </p>
+    </div>
+  );
+}
+
+function MiniBubble({
+  className,
+  icon: Icon,
+  title,
+  desc,
+  color,
+}: {
+  className: string;
+  icon: typeof Building2;
+  title: string;
+  desc: string;
+  color: "blue" | "teal" | "orange" | "purple";
+}) {
+  const colorClass = {
+    blue: "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE]",
+    teal: "bg-[#ECFDF5] text-[#0F766E] border-[#99F6E4]",
+    orange: "bg-[#FFF7ED] text-[#EA580C] border-[#FED7AA]",
+    purple: "bg-[#F5F3FF] text-[#7C3AED] border-[#DDD6FE]",
+  }[color];
+
+  return (
+    <div
+      className={`absolute rounded-2xl border bg-white px-4 py-3 text-left shadow-sm ${colorClass} ${className}`}
+    >
+      <div className="flex items-center gap-2 text-xs font-black">
+        <Icon size={15} />
+        {title}
+      </div>
+
+      <p className="mt-1 text-[11px] text-[#64748B]">{desc}</p>
+    </div>
+  );
+}
+
 function InfoModal({
   type,
   onClose,
@@ -777,15 +831,15 @@ function InfoModal({
       icon: Radar,
       text: `EPH Platform, gayrimenkul sektöründe yalnızca ilan paylaşımı yapılan klasik bir sistem değildir.
 
-EPH; emlakçıları, müteahhitleri ve inşaat firmalarını aynı kapalı devre profesyonel ağda buluşturan yeni nesil bir iş birliği merkezidir.
+EPH; gayrimenkul danışmanlarını, müteahhitleri ve inşaat firmalarını aynı kapalı devre profesyonel ağda buluşturan yeni nesil bir iş birliği merkezidir.
 
 Bu sistemde portföyler daha görünür olur, müşteri talepleri daha hızlı yayılır, projeler daha geniş satış ağına ulaşır ve ortak satış fırsatları daha düzenli takip edilir.
 
-Emlakçı, elinde olmayan portföy yüzünden müşterisini kaybetmez.
+Gayrimenkul danışmanı, elinde olmayan portföy yüzünden müşterisini kaybetmez.
 Müteahhit, projesini yalnızca birkaç kişiyle değil, daha geniş bir profesyonel ağla paylaşır.
 İnşaat firması, stok ve kampanya bilgisini daha hızlı duyurur.
 
-EPH; portföy, talep, mesajlaşma, CRM, network ve yapay zekâ destekli Lina asistanı aynı merkezde birleştirir.
+EPH; portföy, talep, mesajlaşma, CRM, network ve Lina asistanını aynı merkezde birleştirir.
 
 Kısacası EPH, gayrimenkul sektöründe daha hızlı iletişim, daha güçlü iş birliği ve daha düzenli satış takibi için geliştirilen profesyonel bir ekosistemdir.`,
     },
@@ -811,7 +865,7 @@ KVKK kapsamındaki başvurular için bizimle info@emlakportfoyhavuzu.com adresi 
     gizlilik: {
       title: "Gizlilik Politikası",
       icon: LockKeyhole,
-      text: `EPH Platform; emlakçılar, müteahhitler ve inşaat firmaları için geliştirilmiş kapalı devre profesyonel bir gayrimenkul iş ağıdır.
+      text: `EPH Platform; gayrimenkul danışmanları, müteahhitler ve inşaat firmaları için geliştirilmiş kapalı devre profesyonel bir gayrimenkul iş ağıdır.
 
 Platform içerisinde paylaşılan portföyler, talepler, mesajlar, kampanyalar, proje bilgileri, CRM kayıtları ve iş birliği süreçleri yalnızca yetkili kullanıcılar tarafından görüntülenebilir.
 
@@ -844,54 +898,30 @@ Başvurular ve destek talepleri mümkün olan en kısa sürede değerlendirilir.
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-5 backdrop-blur"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-[#0F172A]/55 p-5 backdrop-blur"
       onClick={onClose}
     >
       <div
-        className="max-h-[88vh] w-full max-w-3xl overflow-auto rounded-[32px] border border-white/10 bg-[#081423] p-8 text-center text-white"
+        className="max-h-[88vh] w-full max-w-3xl overflow-auto rounded-[32px] border border-[#DDE7F3] bg-white p-8 text-center text-[#172033] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto flex h-16 w-16 animate-pulse items-center justify-center rounded-2xl bg-[#2563EB]/20 text-[#60A5FA]">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#2563EB]">
           <Icon size={30} />
         </div>
 
         <h3 className="mt-5 text-3xl font-black">{content.title}</h3>
 
-        <p className="mt-5 whitespace-pre-line text-center text-sm leading-8 text-white/65">
+        <p className="mt-5 whitespace-pre-line text-center text-sm leading-8 text-[#64748B]">
           {content.text}
         </p>
 
         <button
           onClick={onClose}
-          className="mt-7 rounded-2xl bg-[#2563EB] px-7 py-3 text-sm font-black text-white"
+          className="mt-7 rounded-2xl bg-[#2563EB] px-7 py-3 text-sm font-black text-white shadow-lg shadow-[#2563EB]/20"
         >
           Kapat
         </button>
       </div>
-    </div>
-  );
-}
-
-function Input({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div>
-      <label className="mb-2 block text-center text-xs font-black uppercase tracking-[0.2em] text-white/40">
-        {label}
-      </label>
-
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-14 w-full rounded-2xl border border-white/10 bg-white/5 px-5 text-center text-sm font-bold text-white outline-none transition placeholder:text-white/30 focus:border-[#2563EB]"
-      />
     </div>
   );
 }
