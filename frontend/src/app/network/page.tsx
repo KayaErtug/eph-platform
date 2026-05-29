@@ -9,7 +9,6 @@ import api from "@/lib/api";
 import { firebaseVapidKey, getFirebaseMessaging } from "@/lib/firebase";
 import {
   BarChart3,
-  Bell,
   Building2,
   CheckCircle2,
   CircleUserRound,
@@ -17,7 +16,6 @@ import {
   Inbox,
   MessageCircle,
   Plus,
-  Radar,
   Search,
   Settings,
   ShieldCheck,
@@ -73,6 +71,17 @@ type CreatePostForm = {
   tags: string;
 };
 
+type RoleTheme = {
+  primary: string;
+  secondary: string;
+  soft: string;
+  border: string;
+  text: string;
+  gradient: string;
+  label: string;
+  emoji: string;
+};
+
 const categories = [
   "Tüm Akış",
   "Satılık Talepleri",
@@ -106,6 +115,73 @@ const visibilityOptions = [
   },
   { label: "Sadece bağlantılarım", value: "SADECE_BAGLANTILARIM" },
 ];
+
+function normalizeRole(role?: string | null) {
+  return String(role || "")
+    .toLocaleUpperCase("tr-TR")
+    .trim();
+}
+
+function getRoleTheme(role?: string | null): RoleTheme {
+  const normalizedRole = normalizeRole(role);
+
+  if (
+    normalizedRole === "INSAAT_FIRMASI" ||
+    normalizedRole === "İNŞAAT_FİRMASI"
+  ) {
+    return {
+      primary: "#C9A84C",
+      secondary: "#0B1F44",
+      soft: "#FFFBEB",
+      border: "#FDE68A",
+      text: "#0B1F44",
+      gradient: "from-[#0B1F44] via-[#172554] to-[#C9A84C]",
+      label: "İnşaat Firması",
+      emoji: "🏢",
+    };
+  }
+
+  if (
+    normalizedRole === "MUTEAHHIT" ||
+    normalizedRole === "MÜTEAHHİT" ||
+    normalizedRole === "MÜTAHHİT"
+  ) {
+    return {
+      primary: "#EA580C",
+      secondary: "#FDBA74",
+      soft: "#FFF7ED",
+      border: "#FED7AA",
+      text: "#9A3412",
+      gradient: "from-orange-700 via-orange-600 to-amber-500",
+      label: "Müteahhit",
+      emoji: "🏗️",
+    };
+  }
+
+  if (normalizedRole === "ADMIN" || normalizedRole === "DENETCI_ADMIN") {
+    return {
+      primary: "#0F172A",
+      secondary: "#38BDF8",
+      soft: "#F8FAFC",
+      border: "#CBD5E1",
+      text: "#0F172A",
+      gradient: "from-slate-950 via-slate-900 to-blue-950",
+      label: "EPH Admin",
+      emoji: "🛡️",
+    };
+  }
+
+  return {
+    primary: "#2563EB",
+    secondary: "#4F46E5",
+    soft: "#EFF6FF",
+    border: "#BFDBFE",
+    text: "#1D4ED8",
+    gradient: "from-[#2563EB] via-[#4F46E5] to-[#7C3AED]",
+    label: "Emlakçı",
+    emoji: "🏠",
+  };
+}
 
 function getPostUser(post: NetworkPost) {
   return post.user || post.User;
@@ -168,13 +244,7 @@ function formatMoney(value?: string | number | null) {
 }
 
 function roleLabel(role?: string) {
-  if (role === "EMLAKCI") return "Doğrulanmış Emlakçı";
-  if (role === "MUTEAHHIT") return "Müteahhit";
-  if (role === "INSAAT_FIRMASI") return "İnşaat Firması";
-  if (role === "ADMIN") return "EPH Admin";
-  if (role === "DENETCI_ADMIN") return "Denetçi Admin";
-
-  return "EPH Üyesi";
+  return getRoleTheme(role).label;
 }
 
 function isHotPost(post: NetworkPost) {
@@ -193,6 +263,7 @@ function isHotPost(post: NetworkPost) {
 export default function NetworkPage() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const currentUserTheme = getRoleTheme(user?.role);
 
   const [posts, setPosts] = useState<NetworkPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -441,10 +512,12 @@ export default function NetworkPage() {
     <EphAppShell title="Pazaryeri">
       <section className="mx-auto grid max-w-7xl gap-5 text-center lg:grid-cols-[280px_1fr_320px]">
         <aside className="space-y-5">
-          <div className="overflow-hidden rounded-[30px] bg-gradient-to-br from-[#2563EB] to-[#4F46E5] p-5 text-white shadow-2xl">
+          <div
+            className={`overflow-hidden rounded-[30px] bg-gradient-to-br ${currentUserTheme.gradient} p-5 text-white shadow-2xl`}
+          >
             <div className="flex flex-col items-center text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/20 backdrop-blur">
-                <CircleUserRound size={34} />
+              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/20 text-3xl backdrop-blur">
+                {currentUserTheme.emoji}
               </div>
 
               <div className="mt-3">
@@ -452,7 +525,7 @@ export default function NetworkPage() {
                   {user?.firstName} {user?.lastName}
                 </h2>
 
-                <p className="mt-1 text-sm text-blue-100">
+                <p className="mt-1 text-sm text-white/80">
                   {roleLabel(user?.role)}
                 </p>
               </div>
@@ -473,11 +546,17 @@ export default function NetworkPage() {
               {categories.map((category, index) => (
                 <button
                   key={category}
-                  className={`flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-center text-sm font-black transition-all ${
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-center text-sm font-black transition-all"
+                  style={
                     index === 0
-                      ? "bg-[#2563EB] text-white"
-                      : "text-slate-600 hover:bg-slate-100"
-                  }`}
+                      ? {
+                          backgroundColor: currentUserTheme.primary,
+                          color: "#FFFFFF",
+                        }
+                      : {
+                          color: "#475569",
+                        }
+                  }
                 >
                   {category}
                   {index === 0 && <Sparkles size={16} />}
@@ -502,11 +581,19 @@ export default function NetworkPage() {
               {filters.map((filter, index) => (
                 <button
                   key={filter}
-                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-black ${
+                  className="shrink-0 rounded-full px-4 py-2 text-xs font-black"
+                  style={
                     index === 0
-                      ? "bg-[#2563EB] text-white"
-                      : "border border-slate-200 bg-white text-slate-600"
-                  }`}
+                      ? {
+                          backgroundColor: currentUserTheme.primary,
+                          color: "#FFFFFF",
+                        }
+                      : {
+                          border: "1px solid #E2E8F0",
+                          backgroundColor: "#FFFFFF",
+                          color: "#475569",
+                        }
+                  }
                 >
                   {filter}
                 </button>
@@ -515,7 +602,7 @@ export default function NetworkPage() {
 
             <button
               onClick={() => setModalOpen(true)}
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2563EB] to-[#4F46E5] text-sm font-black text-white shadow-xl"
+              className={`flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r ${currentUserTheme.gradient} text-sm font-black text-white shadow-xl`}
             >
               <Plus size={20} />
               Yeni Paylaşım Oluştur
@@ -551,7 +638,13 @@ export default function NetworkPage() {
         <aside className="space-y-5">
           <div className="rounded-[30px] border border-white bg-white p-5 text-center shadow-sm">
             <div className="mb-3 flex justify-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-[#EEF2FF] text-[#4F46E5]">
+              <div
+                className="flex h-14 w-14 items-center justify-center rounded-3xl"
+                style={{
+                  backgroundColor: currentUserTheme.soft,
+                  color: currentUserTheme.primary,
+                }}
+              >
                 <ShieldCheck size={28} />
               </div>
             </div>
@@ -571,17 +664,27 @@ export default function NetworkPage() {
             </h2>
 
             <div className="space-y-3">
-              <QuickLink icon={<Flame size={18} />} label="Sıcak Talepler" />
+              <QuickLink
+                icon={<Flame size={18} />}
+                label="Sıcak Talepler"
+                theme={currentUserTheme}
+              />
               <QuickLink
                 icon={<TrendingUp size={18} />}
                 label="Trend Paylaşımlar"
+                theme={currentUserTheme}
               />
               <QuickLink
                 icon={<MessageCircle size={18} />}
                 label="Mesajlar"
+                theme={currentUserTheme}
                 onClick={() => router.push("/messages")}
               />
-              <QuickLink icon={<Building2 size={18} />} label="Portföy Eşleştir" />
+              <QuickLink
+                icon={<Building2 size={18} />}
+                label="Portföy Eşleştir"
+                theme={currentUserTheme}
+              />
             </div>
           </div>
 
@@ -595,7 +698,8 @@ export default function NetworkPage() {
                 <button
                   onClick={enablePushNotifications}
                   disabled={pushLoading}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#0F172A] px-4 text-sm font-black text-white disabled:opacity-60"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black text-white disabled:opacity-60"
+                  style={{ backgroundColor: currentUserTheme.primary }}
                 >
                   <Volume2 size={18} />
                   {pushLoading ? "Açılıyor..." : "Bildirimleri Aç"}
@@ -614,7 +718,8 @@ export default function NetworkPage() {
 
               <button
                 onClick={() => router.push("/messages")}
-                className="relative flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#1D4ED8] px-4 text-sm font-black text-white shadow-lg"
+                className="relative flex h-11 w-full items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black text-white shadow-lg"
+                style={{ backgroundColor: currentUserTheme.primary }}
               >
                 <Inbox size={18} />
                 Mesajlar
@@ -627,7 +732,11 @@ export default function NetworkPage() {
 
               <button
                 onClick={() => router.push("/notification-settings")}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-black text-slate-700"
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border bg-white text-sm font-black"
+                style={{
+                  borderColor: currentUserTheme.border,
+                  color: currentUserTheme.text,
+                }}
               >
                 <Settings size={18} />
                 Ayarlar
@@ -641,6 +750,7 @@ export default function NetworkPage() {
         <CreatePostModal
           onClose={() => setModalOpen(false)}
           onCreate={handleCreatePost}
+          theme={currentUserTheme}
         />
       )}
     </EphAppShell>
@@ -675,6 +785,7 @@ function AdminNetworkCommandGrid({
   onRefresh: () => void;
 }) {
   const hotPosts = posts.filter(isHotPost);
+  const adminTheme = getRoleTheme("ADMIN");
 
   const todayCount = posts.filter(
     (post) =>
@@ -685,7 +796,7 @@ function AdminNetworkCommandGrid({
   return (
     <EphAppShell title="Pazaryeri">
       <section className="mx-auto max-w-7xl text-center">
-        <div className="relative overflow-hidden rounded-[42px] border border-cyan-300/20 bg-[#061126] p-7 text-white shadow-2xl shadow-cyan-950/40">
+        <div className={`relative overflow-hidden rounded-[42px] bg-gradient-to-br ${adminTheme.gradient} p-7 text-white shadow-2xl`}>
           <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
             <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-cyan-100">
               Pazaryeri Admin Görünümü
@@ -735,8 +846,8 @@ function AdminNetworkCommandGrid({
 
         <div className="mt-6 grid gap-5 lg:grid-cols-[320px_1fr]">
           <aside className="space-y-5">
-            <div className="rounded-[34px] border border-white/10 bg-[#061126] p-5 shadow-xl shadow-cyan-950/20">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#C9A84C]">
+            <div className="rounded-[34px] border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-500">
                 Grid Filtreleri
               </p>
 
@@ -744,11 +855,20 @@ function AdminNetworkCommandGrid({
                 {categories.map((category, index) => (
                   <button
                     key={category}
-                    className={`flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-center text-sm font-black transition ${
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-center text-sm font-black transition"
+                    style={
                       index === 0
-                        ? "border-cyan-300/25 bg-cyan-300/10 text-cyan-100"
-                        : "border-white/10 bg-white/[0.04] text-slate-300 hover:border-cyan-300/20 hover:text-white"
-                    }`}
+                        ? {
+                            borderColor: adminTheme.border,
+                            backgroundColor: adminTheme.primary,
+                            color: "#FFFFFF",
+                          }
+                        : {
+                            borderColor: "#E2E8F0",
+                            backgroundColor: "#FFFFFF",
+                            color: "#475569",
+                          }
+                    }
                   >
                     {category}
                     {index === 0 && <Sparkles size={16} />}
@@ -757,8 +877,8 @@ function AdminNetworkCommandGrid({
               </div>
             </div>
 
-            <div className="rounded-[34px] border border-white/10 bg-[#061126] p-5 text-white">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/80">
+            <div className="rounded-[34px] border border-slate-200 bg-white p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-500">
                 Bildirim Kontrolü
               </p>
 
@@ -767,7 +887,8 @@ function AdminNetworkCommandGrid({
                   <button
                     onClick={onEnablePush}
                     disabled={pushLoading}
-                    className="w-full rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-cyan-100 disabled:opacity-60"
+                    className="w-full rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-white disabled:opacity-60"
+                    style={{ backgroundColor: adminTheme.primary }}
                   >
                     {pushLoading ? "Açılıyor" : "Bildirimleri Aç"}
                   </button>
@@ -776,7 +897,7 @@ function AdminNetworkCommandGrid({
                 {!soundEnabled && (
                   <button
                     onClick={onEnableSound}
-                    className="w-full rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-emerald-100"
+                    className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-emerald-700"
                   >
                     Sesi Aç
                   </button>
@@ -784,7 +905,12 @@ function AdminNetworkCommandGrid({
 
                 <button
                   onClick={onOpenSettings}
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-slate-300"
+                  className="w-full rounded-2xl border px-4 py-3 text-xs font-black uppercase tracking-[0.14em]"
+                  style={{
+                    borderColor: adminTheme.border,
+                    color: adminTheme.text,
+                    backgroundColor: adminTheme.soft,
+                  }}
                 >
                   Bildirim Ayarları
                 </button>
@@ -854,88 +980,22 @@ function AdminNetworkMetric({
 
 function AdminNetworkPostCard({ post }: { post: NetworkPost }) {
   const postUser = getPostUser(post);
-
   const authorName = postUser
     ? `${postUser.firstName} ${postUser.lastName}`
     : "EPH Üyesi";
+  const theme = getRoleTheme(postUser?.role);
 
   return (
-    <article className="overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-sm">
-      <div className="h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
+    <article
+      className="overflow-hidden rounded-[34px] border bg-white shadow-sm"
+      style={{ borderColor: theme.border }}
+    >
+      <div className={`h-2 bg-gradient-to-r ${theme.gradient}`} />
 
       <div className="p-6">
-        <div className="flex flex-col items-center gap-5 text-center md:flex-row md:items-start md:justify-between md:text-left">
-          <div className="flex flex-col items-center gap-4 md:flex-row">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] bg-cyan-50 text-xl font-black text-cyan-700">
-              {authorName[0]}
-            </div>
+        <PostHeader post={post} authorName={authorName} theme={theme} />
 
-            <div>
-              <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
-                <h3 className="text-lg font-black text-slate-900">
-                  {authorName}
-                </h3>
-
-                <CheckCircle2 size={18} className="text-cyan-500" />
-
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-600">
-                  {roleLabel(postUser?.role)}
-                </span>
-              </div>
-
-              <p className="mt-1 text-xs font-bold text-slate-500">
-                {relativeTime(post.createdAt)}
-              </p>
-            </div>
-          </div>
-
-          <span className="rounded-full bg-rose-50 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-rose-600">
-            {post.urgency || "Normal"}
-          </span>
-        </div>
-
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-          <span className="rounded-full bg-amber-50 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-amber-700">
-            {post.type}
-          </span>
-
-          {post.city && (
-            <span className="rounded-full bg-cyan-50 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-cyan-700">
-              {post.city}
-              {post.district ? ` / ${post.district}` : ""}
-            </span>
-          )}
-        </div>
-
-        <h2 className="mt-5 text-center text-[28px] font-black leading-tight text-slate-900">
-          {post.title}
-        </h2>
-
-        <p className="mt-4 text-center text-[15px] font-semibold leading-8 text-slate-600">
-          {post.description}
-        </p>
-
-        <div className="mt-5 flex flex-wrap justify-center gap-2">
-          {post.budget && (
-            <span className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">
-              {formatMoney(post.budget)}
-            </span>
-          )}
-
-          {post.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600"
-            >
-              #{tag}
-            </span>
-          ))}
-        </div>
-
-        <div className="mt-5 grid gap-2 border-t border-slate-100 pt-4 text-center text-xs font-bold text-slate-400 md:grid-cols-2">
-          <span>Yayın: {formatDateTime(post.createdAt)}</span>
-          <span>Bitiş: {formatDateTime(post.expiresAt)}</span>
-        </div>
+        <PostBody post={post} theme={theme} />
       </div>
     </article>
   );
@@ -951,98 +1011,64 @@ function PremiumPostCard({
   onStartConversation: () => void;
 }) {
   const postUser = getPostUser(post);
-
   const authorName = postUser
     ? `${postUser.firstName} ${postUser.lastName}`
     : "EPH Üyesi";
 
+  const theme = getRoleTheme(postUser?.role);
   const ownerId = post.userId || postUser?.id;
   const isOwnPost = ownerId === currentUserId;
 
   return (
-    <article className="group overflow-hidden rounded-[32px] border border-white bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-2xl">
-      <div className="h-2 bg-gradient-to-r from-[#2563EB] via-[#4F46E5] to-[#7C3AED]" />
+    <article
+      className="group overflow-hidden rounded-[32px] border bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-2xl"
+      style={{
+        borderColor: theme.border,
+        boxShadow: `0 18px 40px ${theme.primary}12`,
+      }}
+    >
+      <div className={`h-2 bg-gradient-to-r ${theme.gradient}`} />
 
       <div className="p-6">
-        <div className="mb-5 flex flex-col items-center justify-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-[#2563EB] to-[#4F46E5] text-xl font-black text-white shadow-xl">
-            {authorName[0]}
-          </div>
+        <PostHeader post={post} authorName={authorName} theme={theme} />
 
-          <div className="mt-4">
-            <div className="flex items-center justify-center gap-2">
-              <h3 className="text-[16px] font-black text-[#0F172A]">
-                {authorName}
-              </h3>
-
-              <CheckCircle2 size={18} className="text-[#2563EB]" />
-            </div>
-
-            <p className="mt-1 text-sm font-semibold text-slate-500">
-              {roleLabel(postUser?.role)}
-            </p>
-
-            <p className="mt-1 text-xs font-bold text-slate-400">
-              {relativeTime(post.createdAt)}
-            </p>
-          </div>
-
-          <span className="mt-4 rounded-full bg-[#FEF2F2] px-4 py-2 text-xs font-black text-[#DC2626]">
-            🔥 {post.urgency || "Normal"}
-          </span>
-        </div>
-
-        <div className="mb-4 flex justify-center">
-          <div className="inline-flex rounded-full bg-[#EEF2FF] px-4 py-2 text-xs font-black text-[#4F46E5]">
-            {post.type}
-          </div>
-        </div>
-
-        <h2 className="text-center text-[26px] font-black leading-tight text-[#0F172A]">
-          {post.title}
-        </h2>
-
-        <p className="mt-4 text-center text-[15px] leading-8 text-slate-600">
-          {post.description}
-        </p>
-
-        {post.budget && (
-          <div className="mt-5 flex justify-center">
-            <div className="inline-flex rounded-2xl bg-[#F8FAFC] px-4 py-3 text-sm font-black text-[#0F172A]">
-              💰 {formatMoney(post.budget)}
-            </div>
-          </div>
-        )}
-
-        <div className="mt-5 flex flex-wrap justify-center gap-2">
-          {post.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full bg-[#F1F5F9] px-3 py-2 text-xs font-bold text-slate-600"
-            >
-              #{tag}
-            </span>
-          ))}
-        </div>
+        <PostBody post={post} theme={theme} />
 
         <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
           <button
             onClick={isOwnPost ? undefined : onStartConversation}
             disabled={isOwnPost}
-            className={`rounded-2xl py-3 text-sm font-black transition-all ${
+            className="rounded-2xl py-3 text-sm font-black transition-all"
+            style={
               isOwnPost
-                ? "bg-slate-100 text-slate-400"
-                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-            }`}
+                ? {
+                    backgroundColor: "#F1F5F9",
+                    color: "#94A3B8",
+                  }
+                : {
+                    border: `1px solid ${theme.border}`,
+                    backgroundColor: theme.soft,
+                    color: theme.text,
+                  }
+            }
           >
             {isOwnPost ? "Kendi Paylaşımın" : "Görüşme Başlat"}
           </button>
 
-          <button className="rounded-2xl border border-slate-200 bg-white py-3 text-sm font-black text-slate-700 hover:bg-slate-50">
+          <button
+            className="rounded-2xl border py-3 text-sm font-black"
+            style={{
+              borderColor: theme.border,
+              backgroundColor: "#FFFFFF",
+              color: theme.text,
+            }}
+          >
             Portföy Öner
           </button>
 
-          <button className="rounded-2xl bg-gradient-to-r from-[#2563EB] to-[#4F46E5] py-3 text-sm font-black text-white shadow-lg">
+          <button
+            className={`rounded-2xl bg-gradient-to-r ${theme.gradient} py-3 text-sm font-black text-white shadow-lg`}
+          >
             İlgileniyorum
           </button>
         </div>
@@ -1056,12 +1082,128 @@ function PremiumPostCard({
   );
 }
 
+function PostHeader({
+  post,
+  authorName,
+  theme,
+}: {
+  post: NetworkPost;
+  authorName: string;
+  theme: RoleTheme;
+}) {
+  const postUser = getPostUser(post);
+
+  return (
+    <div className="mb-5 flex flex-col items-center justify-center text-center">
+      <div
+        className="flex h-16 w-16 items-center justify-center rounded-3xl text-3xl font-black shadow-xl"
+        style={{
+          backgroundColor: theme.soft,
+          color: theme.primary,
+          border: `1px solid ${theme.border}`,
+        }}
+      >
+        {theme.emoji}
+      </div>
+
+      <div className="mt-4">
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <h3 className="text-[16px] font-black text-[#0F172A]">
+            {authorName}
+          </h3>
+
+          <CheckCircle2 size={18} style={{ color: theme.primary }} />
+        </div>
+
+        <p className="mt-2 inline-flex rounded-full px-4 py-1.5 text-xs font-black" style={{ backgroundColor: theme.soft, color: theme.text }}>
+          {roleLabel(postUser?.role)}
+        </p>
+
+        <p className="mt-2 text-xs font-bold text-slate-400">
+          {relativeTime(post.createdAt)}
+        </p>
+      </div>
+
+      <span
+        className="mt-4 rounded-full px-4 py-2 text-xs font-black"
+        style={{
+          backgroundColor: isHotPost(post) ? "#FEF2F2" : theme.soft,
+          color: isHotPost(post) ? "#DC2626" : theme.text,
+        }}
+      >
+        🔥 {post.urgency || "Normal"}
+      </span>
+    </div>
+  );
+}
+
+function PostBody({ post, theme }: { post: NetworkPost; theme: RoleTheme }) {
+  return (
+    <>
+      <div className="mb-4 flex justify-center">
+        <div
+          className="inline-flex rounded-full px-4 py-2 text-xs font-black"
+          style={{ backgroundColor: theme.soft, color: theme.text }}
+        >
+          {post.type}
+        </div>
+      </div>
+
+      <h2
+        className="text-center text-[26px] font-black leading-tight"
+        style={{ color: theme.text }}
+      >
+        {post.title}
+      </h2>
+
+      <p className="mt-4 text-center text-[15px] leading-8 text-slate-600">
+        {post.description}
+      </p>
+
+      {post.budget && (
+        <div className="mt-5 flex justify-center">
+          <div
+            className="inline-flex rounded-2xl px-4 py-3 text-sm font-black"
+            style={{ backgroundColor: theme.soft, color: theme.text }}
+          >
+            💰 {formatMoney(post.budget)}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        {post.city && (
+          <span
+            className="rounded-full px-3 py-2 text-xs font-black"
+            style={{ backgroundColor: theme.soft, color: theme.text }}
+          >
+            {post.city}
+            {post.district ? ` / ${post.district}` : ""}
+          </span>
+        )}
+
+        {post.tags.map((tag) => (
+          <span
+            key={tag}
+            className="rounded-full px-3 py-2 text-xs font-bold"
+            style={{ backgroundColor: "#F1F5F9", color: "#475569" }}
+          >
+            #{tag}
+          </span>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function CreatePostModal({
   onClose,
   onCreate,
+  theme,
 }: {
   onClose: () => void;
   onCreate: (form: CreatePostForm) => void;
+  theme: RoleTheme;
 }) {
   const [form, setForm] = useState<CreatePostForm>({
     type: "Talep",
@@ -1091,7 +1233,7 @@ function CreatePostModal({
       <section className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-[32px] bg-white">
         <header className="flex items-start justify-between gap-4 border-b border-slate-100 p-6">
           <div className="flex-1 text-center">
-            <h2 className="text-[28px] font-black text-[#0F172A]">
+            <h2 className="text-[28px] font-black" style={{ color: theme.text }}>
               Yeni Paylaşım
             </h2>
 
@@ -1102,7 +1244,8 @@ function CreatePostModal({
 
           <button
             onClick={onClose}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+            style={{ backgroundColor: theme.soft, color: theme.text }}
           >
             <X size={20} />
           </button>
@@ -1115,7 +1258,7 @@ function CreatePostModal({
               onChange={(event) =>
                 setForm((current) => ({ ...current, type: event.target.value }))
               }
-              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none focus:border-[#2563EB]"
+              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
             >
               {shareTypes.map((type) => (
                 <option key={type}>{type}</option>
@@ -1129,7 +1272,7 @@ function CreatePostModal({
               onChange={(event) =>
                 setForm((current) => ({ ...current, title: event.target.value }))
               }
-              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none focus:border-[#2563EB]"
+              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
               placeholder="Örn: Akkonak’ta 3+1 satılık daire aranıyor"
             />
           </NetworkField>
@@ -1140,7 +1283,7 @@ function CreatePostModal({
               onChange={(event) =>
                 setForm((current) => ({ ...current, desc: event.target.value }))
               }
-              className="min-h-28 w-full resize-y rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm font-semibold leading-6 outline-none focus:border-[#2563EB]"
+              className="min-h-28 w-full resize-y rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm font-semibold leading-6 outline-none"
               placeholder="Talep, portföy veya iş birliği detaylarını yazın..."
             />
           </NetworkField>
@@ -1152,7 +1295,7 @@ function CreatePostModal({
                 onChange={(event) =>
                   setForm((current) => ({ ...current, city: event.target.value }))
                 }
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none focus:border-[#2563EB]"
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
                 placeholder="Denizli"
               />
             </NetworkField>
@@ -1166,7 +1309,7 @@ function CreatePostModal({
                     district: event.target.value,
                   }))
                 }
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none focus:border-[#2563EB]"
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
                 placeholder="Merkezefendi"
               />
             </NetworkField>
@@ -1180,7 +1323,7 @@ function CreatePostModal({
                     neighborhood: event.target.value,
                   }))
                 }
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none focus:border-[#2563EB]"
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
                 placeholder="Akkonak"
               />
             </NetworkField>
@@ -1196,7 +1339,7 @@ function CreatePostModal({
                     budget: event.target.value,
                   }))
                 }
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none focus:border-[#2563EB]"
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
                 placeholder="Örn: 15000000"
               />
             </NetworkField>
@@ -1210,7 +1353,7 @@ function CreatePostModal({
                     urgency: event.target.value,
                   }))
                 }
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none focus:border-[#2563EB]"
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
               >
                 {urgencyOptions.map((option) => (
                   <option key={option}>{option}</option>
@@ -1229,7 +1372,7 @@ function CreatePostModal({
                     validFor: event.target.value,
                   }))
                 }
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none focus:border-[#2563EB]"
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
               >
                 {validOptions.map((option) => (
                   <option key={option}>{option}</option>
@@ -1246,7 +1389,7 @@ function CreatePostModal({
                     visibility: event.target.value,
                   }))
                 }
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none focus:border-[#2563EB]"
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
               >
                 {visibilityOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -1263,7 +1406,7 @@ function CreatePostModal({
               onChange={(event) =>
                 setForm((current) => ({ ...current, tags: event.target.value }))
               }
-              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none focus:border-[#2563EB]"
+              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
               placeholder="arsa, satılık, hazır müşteri"
             />
           </NetworkField>
@@ -1279,7 +1422,7 @@ function CreatePostModal({
 
           <button
             onClick={handleSubmit}
-            className="h-12 rounded-2xl bg-gradient-to-r from-[#2563EB] to-[#4F46E5] px-5 text-sm font-black text-white shadow-xl"
+            className={`h-12 rounded-2xl bg-gradient-to-r ${theme.gradient} px-5 text-sm font-black text-white shadow-xl`}
           >
             Paylaşımı Yayınla
           </button>
@@ -1310,7 +1453,7 @@ function NetworkField({
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-white/10 p-4 text-center backdrop-blur">
-      <p className="text-xs font-bold text-blue-100">{label}</p>
+      <p className="text-xs font-bold text-white/75">{label}</p>
       <p className="mt-1 text-2xl font-black">{value}</p>
     </div>
   );
@@ -1319,18 +1462,25 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 function QuickLink({
   icon,
   label,
+  theme,
   onClick,
 }: {
   icon: ReactNode;
   label: string;
+  theme: RoleTheme;
   onClick?: () => void;
 }) {
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-[#F8FAFC] px-4 py-4 text-center text-sm font-black text-slate-700 transition-all hover:bg-slate-100"
+      className="flex w-full items-center justify-center gap-3 rounded-2xl border px-4 py-4 text-center text-sm font-black transition-all hover:bg-slate-100"
+      style={{
+        borderColor: theme.border,
+        backgroundColor: theme.soft,
+        color: theme.text,
+      }}
     >
-      <span className="text-[#4F46E5]">{icon}</span>
+      <span style={{ color: theme.primary }}>{icon}</span>
       {label}
     </button>
   );
