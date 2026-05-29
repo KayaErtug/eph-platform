@@ -20,11 +20,14 @@ type Message = {
 };
 
 type LinaPanelProps = {
-  open: boolean;
-  onClose: () => void;
+  open?: boolean;
+  onClose?: () => void;
 };
 
-export default function LinaPanel({ open, onClose }: LinaPanelProps) {
+export default function LinaPanel({
+  open = true,
+  onClose = () => {},
+}: LinaPanelProps) {
   const { user } = useAuthStore();
 
   const userName = user?.firstName || "Profesyonel";
@@ -45,6 +48,24 @@ export default function LinaPanel({ open, onClose }: LinaPanelProps) {
   const [recording, setRecording] = useState(false);
   const [voiceError, setVoiceError] = useState("");
 
+  const stopCurrentAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+
+    setSpeaking(false);
+  };
+
+  const stopRecording = () => {
+    if (mediaRef.current && mediaRef.current.state !== "inactive") {
+      mediaRef.current.stop();
+    }
+
+    setRecording(false);
+  };
+
   useEffect(() => {
     if (!open) return;
 
@@ -61,16 +82,6 @@ export default function LinaPanel({ open, onClose }: LinaPanelProps) {
   }, []);
 
   if (!open) return null;
-
-  const stopCurrentAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current = null;
-    }
-
-    setSpeaking(false);
-  };
 
   const speakWithElevenLabs = async (text: string) => {
     try {
@@ -218,14 +229,6 @@ export default function LinaPanel({ open, onClose }: LinaPanelProps) {
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRef.current && mediaRef.current.state !== "inactive") {
-      mediaRef.current.stop();
-    }
-
-    setRecording(false);
-  };
-
   const resetConversation = () => {
     stopCurrentAudio();
 
@@ -345,7 +348,9 @@ export default function LinaPanel({ open, onClose }: LinaPanelProps) {
                         {isLina && (
                           <button
                             type="button"
-                            onClick={() => speakWithElevenLabs(messageItem.text)}
+                            onClick={() =>
+                              speakWithElevenLabs(messageItem.text)
+                            }
                             className="mt-3 inline-flex items-center justify-center gap-2 rounded-2xl border border-[#DDE7F3] bg-white px-4 py-2 text-xs font-black text-[#172033]"
                           >
                             <Volume2 size={14} />

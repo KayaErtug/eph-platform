@@ -21,6 +21,7 @@ import { PushModule } from './push/push.module';
 import { MessagesModule } from './messages/messages.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReferralModule } from './referral/referral.module';
+import { NetworkModule } from './network/network.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { ReferralModule } from './referral/referral.module';
     VisitsModule,
     PushModule,
     MessagesModule,
+    NetworkModule,
 
     DashboardModule,
 
