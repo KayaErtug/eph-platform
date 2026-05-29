@@ -59,6 +59,125 @@ type RoleTheme = {
   emoji: string;
 };
 
+type MarketplaceActionSet = {
+  primary: string;
+  secondary: string;
+  tertiary: string;
+  note: string;
+};
+
+function getRoleGroup(role?: string | null) {
+  const normalizedRole = normalizeRole(role);
+
+  if (
+    normalizedRole === "INSAAT_FIRMASI" ||
+    normalizedRole === "İNŞAAT_FİRMASI"
+  ) {
+    return "construction";
+  }
+
+  if (
+    normalizedRole === "MUTEAHHIT" ||
+    normalizedRole === "MÜTEAHHİT" ||
+    normalizedRole === "MÜTAHHİT"
+  ) {
+    return "contractor";
+  }
+
+  if (normalizedRole === "ADMIN" || normalizedRole === "DENETCI_ADMIN") {
+    return "admin";
+  }
+
+  return "realtor";
+}
+
+function getMarketplaceActions(
+  viewerRole?: string | null,
+  ownerRole?: string | null,
+): MarketplaceActionSet {
+  const viewer = getRoleGroup(viewerRole);
+  const owner = getRoleGroup(ownerRole);
+
+  if (viewer === "realtor" && owner === "contractor") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Portföy Sun",
+      tertiary: "Uygun Müşterim Var",
+      note: "Bu müteahhit talebi için portföyünü veya hazır müşterini sunabilirsin.",
+    };
+  }
+
+  if (viewer === "realtor" && owner === "construction") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Satış Ağına Katıl",
+      tertiary: "Müşteri Havuzu Sun",
+      note: "Bu inşaat firmasıyla proje satışı veya müşteri yönlendirme için bağlantı kurabilirsin.",
+    };
+  }
+
+  if ((viewer === "contractor" || viewer === "construction") && owner === "realtor") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Proje Teklif Et",
+      tertiary: "İş Birliği Kur",
+      note: "Bu emlakçıyla proje, portföy veya satış ortaklığı için görüşme başlatabilirsin.",
+    };
+  }
+
+  if (viewer === "contractor" && owner === "construction") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Taşeronluk Teklif Et",
+      tertiary: "Proje İş Birliği",
+      note: "İnşaat firmasıyla proje, uygulama veya çözüm ortaklığı için bağlantı kurabilirsin.",
+    };
+  }
+
+  if (viewer === "construction" && owner === "contractor") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Proje Daveti Gönder",
+      tertiary: "Çözüm Ortaklığı Kur",
+      note: "Bu müteahhitle proje, ekip veya saha iş birliği için görüşme başlatabilirsin.",
+    };
+  }
+
+  if (viewer === owner && owner === "realtor") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Portföy Paylaş",
+      tertiary: "Müşteri Eşleştir",
+      note: "Meslektaşınla portföy veya müşteri eşleştirmesi için iletişime geçebilirsin.",
+    };
+  }
+
+  if (viewer === owner && owner === "contractor") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Proje Karşılaştır",
+      tertiary: "Ortak Çalışma",
+      note: "Müteahhitler arası proje, ekip veya saha iş birliği için görüşme başlatabilirsin.",
+    };
+  }
+
+  if (viewer === owner && owner === "construction") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Proje Ortaklığı",
+      tertiary: "Kurumsal Görüşme",
+      note: "İnşaat firmaları arası kurumsal iş birliği için bağlantı kurabilirsin.",
+    };
+  }
+
+  return {
+    primary: "Mesaj Gönder",
+    secondary: "Çözüm Sun",
+    tertiary: "İş Birliği Teklif Et",
+    note: "Bu paylaşım için profesyonel bir görüşme başlatabilirsin.",
+  };
+}
+
 function normalizeRole(role?: string | null) {
   return String(role || "")
     .toLocaleUpperCase("tr-TR")
@@ -188,6 +307,10 @@ export default function NetworkDetailPage() {
 
   const postUser = getPostUser(post);
   const theme = useMemo(() => getRoleTheme(postUser?.role), [postUser?.role]);
+  const actions = useMemo(
+    () => getMarketplaceActions(user?.role, postUser?.role),
+    [user?.role, postUser?.role],
+  );
   const isOwnPost = Boolean(user?.id && post?.userId === user.id);
 
   useEffect(() => {
@@ -426,37 +549,50 @@ export default function NetworkDetailPage() {
                 {theme.label}
               </p>
 
-              <div className="mt-5 grid gap-3">
-                <button
-                  onClick={startConversation}
-                  disabled={isOwnPost || startingConversation}
-                  className="flex h-13 items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-black text-white disabled:opacity-50"
-                  style={{ backgroundColor: theme.primary }}
-                >
-                  <MessageCircle size={18} />
+              <div
+                className="mt-5 rounded-[24px] border p-4 text-center"
+                style={{
+                  borderColor: theme.border,
+                  backgroundColor: theme.soft,
+                }}
+              >
+                <p className="text-xs font-black leading-5" style={{ color: theme.text }}>
                   {isOwnPost
-                    ? "Kendi Paylaşımın"
-                    : startingConversation
-                      ? "Açılıyor..."
-                      : "Görüşme Başlat"}
-                </button>
+                    ? "Bu paylaşım sana ait. Gelen dönüşleri mesajlar bölümünden takip edebilirsin."
+                    : actions.note}
+                </p>
 
-                <button
-                  className="rounded-2xl border px-5 py-4 text-sm font-black"
-                  style={{
-                    borderColor: theme.border,
-                    backgroundColor: theme.soft,
-                    color: theme.text,
-                  }}
-                >
-                  Portföy Öner
-                </button>
+                <div className="mt-4 grid gap-3">
+                  <button
+                    onClick={startConversation}
+                    disabled={isOwnPost || startingConversation}
+                    className="flex h-13 items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-black text-white disabled:opacity-50"
+                    style={{ backgroundColor: theme.primary }}
+                  >
+                    <MessageCircle size={18} />
+                    {isOwnPost
+                      ? "Kendi Paylaşımın"
+                      : startingConversation
+                        ? "Açılıyor..."
+                        : actions.primary}
+                  </button>
 
-                <button
-                  className={`rounded-2xl bg-gradient-to-r ${theme.gradient} px-5 py-4 text-sm font-black text-white`}
-                >
-                  İlgileniyorum
-                </button>
+                  <button
+                    className="rounded-2xl border bg-white px-5 py-4 text-sm font-black"
+                    style={{
+                      borderColor: theme.border,
+                      color: theme.text,
+                    }}
+                  >
+                    {actions.secondary}
+                  </button>
+
+                  <button
+                    className={`rounded-2xl bg-gradient-to-r ${theme.gradient} px-5 py-4 text-sm font-black text-white`}
+                  >
+                    {actions.tertiary}
+                  </button>
+                </div>
               </div>
             </div>
 

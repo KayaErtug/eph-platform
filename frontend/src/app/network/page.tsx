@@ -82,6 +82,125 @@ type RoleTheme = {
   emoji: string;
 };
 
+type MarketplaceActionSet = {
+  primary: string;
+  secondary: string;
+  tertiary: string;
+  note: string;
+};
+
+function getRoleGroup(role?: string | null) {
+  const normalizedRole = normalizeRole(role);
+
+  if (
+    normalizedRole === "INSAAT_FIRMASI" ||
+    normalizedRole === "İNŞAAT_FİRMASI"
+  ) {
+    return "construction";
+  }
+
+  if (
+    normalizedRole === "MUTEAHHIT" ||
+    normalizedRole === "MÜTEAHHİT" ||
+    normalizedRole === "MÜTAHHİT"
+  ) {
+    return "contractor";
+  }
+
+  if (normalizedRole === "ADMIN" || normalizedRole === "DENETCI_ADMIN") {
+    return "admin";
+  }
+
+  return "realtor";
+}
+
+function getMarketplaceActions(
+  viewerRole?: string | null,
+  ownerRole?: string | null,
+): MarketplaceActionSet {
+  const viewer = getRoleGroup(viewerRole);
+  const owner = getRoleGroup(ownerRole);
+
+  if (viewer === "realtor" && owner === "contractor") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Portföy Sun",
+      tertiary: "Uygun Müşterim Var",
+      note: "Bu müteahhit talebi için portföyünü veya hazır müşterini sunabilirsin.",
+    };
+  }
+
+  if (viewer === "realtor" && owner === "construction") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Satış Ağına Katıl",
+      tertiary: "Müşteri Havuzu Sun",
+      note: "Bu inşaat firmasıyla proje satışı veya müşteri yönlendirme için bağlantı kurabilirsin.",
+    };
+  }
+
+  if ((viewer === "contractor" || viewer === "construction") && owner === "realtor") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Proje Teklif Et",
+      tertiary: "İş Birliği Kur",
+      note: "Bu emlakçıyla proje, portföy veya satış ortaklığı için görüşme başlatabilirsin.",
+    };
+  }
+
+  if (viewer === "contractor" && owner === "construction") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Taşeronluk Teklif Et",
+      tertiary: "Proje İş Birliği",
+      note: "İnşaat firmasıyla proje, uygulama veya çözüm ortaklığı için bağlantı kurabilirsin.",
+    };
+  }
+
+  if (viewer === "construction" && owner === "contractor") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Proje Daveti Gönder",
+      tertiary: "Çözüm Ortaklığı Kur",
+      note: "Bu müteahhitle proje, ekip veya saha iş birliği için görüşme başlatabilirsin.",
+    };
+  }
+
+  if (viewer === owner && owner === "realtor") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Portföy Paylaş",
+      tertiary: "Müşteri Eşleştir",
+      note: "Meslektaşınla portföy veya müşteri eşleştirmesi için iletişime geçebilirsin.",
+    };
+  }
+
+  if (viewer === owner && owner === "contractor") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Proje Karşılaştır",
+      tertiary: "Ortak Çalışma",
+      note: "Müteahhitler arası proje, ekip veya saha iş birliği için görüşme başlatabilirsin.",
+    };
+  }
+
+  if (viewer === owner && owner === "construction") {
+    return {
+      primary: "Mesaj Gönder",
+      secondary: "Proje Ortaklığı",
+      tertiary: "Kurumsal Görüşme",
+      note: "İnşaat firmaları arası kurumsal iş birliği için bağlantı kurabilirsin.",
+    };
+  }
+
+  return {
+    primary: "Mesaj Gönder",
+    secondary: "Çözüm Sun",
+    tertiary: "İş Birliği Teklif Et",
+    note: "Bu paylaşım için profesyonel bir görüşme başlatabilirsin.",
+  };
+}
+
 const categories = [
   "Tüm Akış",
   "Satılık Talepleri",
@@ -629,6 +748,7 @@ export default function NetworkPage() {
                 key={post.id}
                 post={post}
                 currentUserId={user?.id}
+                currentUserRole={user?.role}
                 onOpenDetail={() => router.push(`/network/${post.id}`)}
                 onStartConversation={() => startConversation(post)}
               />
@@ -1005,11 +1125,13 @@ function AdminNetworkPostCard({ post }: { post: NetworkPost }) {
 function PremiumPostCard({
   post,
   currentUserId,
+  currentUserRole,
   onOpenDetail,
   onStartConversation,
 }: {
   post: NetworkPost;
   currentUserId?: string;
+  currentUserRole?: string | null;
   onOpenDetail: () => void;
   onStartConversation: () => void;
 }) {
@@ -1021,6 +1143,7 @@ function PremiumPostCard({
   const theme = getRoleTheme(postUser?.role);
   const ownerId = post.userId || postUser?.id;
   const isOwnPost = ownerId === currentUserId;
+  const actions = getMarketplaceActions(currentUserRole, postUser?.role);
 
   return (
     <article
@@ -1038,51 +1161,64 @@ function PremiumPostCard({
 
         <PostBody post={post} theme={theme} />
 
-        <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
+        <div
+          className="mt-6 rounded-[24px] border p-4 text-center"
+          style={{
+            borderColor: theme.border,
+            backgroundColor: theme.soft,
+          }}
+        >
+          <p className="text-xs font-black leading-5" style={{ color: theme.text }}>
+            {isOwnPost
+              ? "Bu paylaşım sana ait. Detay sayfasından yayını takip edebilirsin."
+              : actions.note}
+          </p>
 
-              if (!isOwnPost) {
-                onStartConversation();
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+
+                if (!isOwnPost) {
+                  onStartConversation();
+                }
+              }}
+              disabled={isOwnPost}
+              className="rounded-2xl py-3 text-sm font-black transition-all"
+              style={
+                isOwnPost
+                  ? {
+                      backgroundColor: "#F1F5F9",
+                      color: "#94A3B8",
+                    }
+                  : {
+                      backgroundColor: theme.primary,
+                      color: "#FFFFFF",
+                    }
               }
-            }}
-            disabled={isOwnPost}
-            className="rounded-2xl py-3 text-sm font-black transition-all"
-            style={
-              isOwnPost
-                ? {
-                    backgroundColor: "#F1F5F9",
-                    color: "#94A3B8",
-                  }
-                : {
-                    border: `1px solid ${theme.border}`,
-                    backgroundColor: theme.soft,
-                    color: theme.text,
-                  }
-            }
-          >
-            {isOwnPost ? "Kendi Paylaşımın" : "Görüşme Başlat"}
-          </button>
+            >
+              {isOwnPost ? "Kendi Paylaşımın" : actions.primary}
+            </button>
 
-          <button
-            onClick={(event) => event.stopPropagation()}
-            className="rounded-2xl border py-3 text-sm font-black"
-            style={{
-              borderColor: theme.border,
-              backgroundColor: "#FFFFFF",
-              color: theme.text,
-            }}
-          >
-            Portföy Öner
-          </button>
+            <button
+              onClick={(event) => event.stopPropagation()}
+              className="rounded-2xl border py-3 text-sm font-black"
+              style={{
+                borderColor: theme.border,
+                backgroundColor: "#FFFFFF",
+                color: theme.text,
+              }}
+            >
+              {actions.secondary}
+            </button>
 
-          <button
-            onClick={(event) => event.stopPropagation()}
-            className={`rounded-2xl bg-gradient-to-r ${theme.gradient} py-3 text-sm font-black text-white shadow-lg`}
-          >
-            İlgileniyorum
-          </button>
+            <button
+              onClick={(event) => event.stopPropagation()}
+              className={`rounded-2xl bg-gradient-to-r ${theme.gradient} py-3 text-sm font-black text-white shadow-lg`}
+            >
+              {actions.tertiary}
+            </button>
+          </div>
         </div>
 
         <div className="mt-5 grid gap-2 border-t border-slate-100 pt-4 text-center text-xs font-bold text-slate-400 md:grid-cols-2">
