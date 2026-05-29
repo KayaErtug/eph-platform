@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -47,6 +47,33 @@ export class NetworkService {
     });
   }
 
+  async findOne(id: string) {
+    const post = await this.prisma.networkPost.findFirst({
+      where: {
+        id,
+        isActive: true,
+      },
+      include: {
+        User: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Pazaryeri paylaşımı bulunamadı.');
+    }
+
+    return post;
+  }
+
   async create(dto: CreateNetworkPostDto) {
     return this.prisma.networkPost.create({
       data: {
@@ -62,7 +89,9 @@ export class NetworkService {
         urgency: dto.urgency || 'Normal',
         visibility: (dto.visibility as any) || 'TUM_EPH',
         tags: dto.tags || [],
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: dto.expiresAt
+          ? new Date(dto.expiresAt)
+          : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         isActive: true,
         updatedAt: new Date(),
       },

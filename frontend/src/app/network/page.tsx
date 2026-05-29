@@ -629,6 +629,7 @@ export default function NetworkPage() {
                 key={post.id}
                 post={post}
                 currentUserId={user?.id}
+                onOpenDetail={() => router.push(`/network/${post.id}`)}
                 onStartConversation={() => startConversation(post)}
               />
             ))
@@ -1004,10 +1005,12 @@ function AdminNetworkPostCard({ post }: { post: NetworkPost }) {
 function PremiumPostCard({
   post,
   currentUserId,
+  onOpenDetail,
   onStartConversation,
 }: {
   post: NetworkPost;
   currentUserId?: string;
+  onOpenDetail: () => void;
   onStartConversation: () => void;
 }) {
   const postUser = getPostUser(post);
@@ -1021,7 +1024,8 @@ function PremiumPostCard({
 
   return (
     <article
-      className="group overflow-hidden rounded-[32px] border bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-2xl"
+      onClick={onOpenDetail}
+      className="group cursor-pointer overflow-hidden rounded-[32px] border bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-2xl"
       style={{
         borderColor: theme.border,
         boxShadow: `0 18px 40px ${theme.primary}12`,
@@ -1036,7 +1040,13 @@ function PremiumPostCard({
 
         <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
           <button
-            onClick={isOwnPost ? undefined : onStartConversation}
+            onClick={(event) => {
+              event.stopPropagation();
+
+              if (!isOwnPost) {
+                onStartConversation();
+              }
+            }}
             disabled={isOwnPost}
             className="rounded-2xl py-3 text-sm font-black transition-all"
             style={
@@ -1056,6 +1066,7 @@ function PremiumPostCard({
           </button>
 
           <button
+            onClick={(event) => event.stopPropagation()}
             className="rounded-2xl border py-3 text-sm font-black"
             style={{
               borderColor: theme.border,
@@ -1067,6 +1078,7 @@ function PremiumPostCard({
           </button>
 
           <button
+            onClick={(event) => event.stopPropagation()}
             className={`rounded-2xl bg-gradient-to-r ${theme.gradient} py-3 text-sm font-black text-white shadow-lg`}
           >
             İlgileniyorum
