@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,6 +24,9 @@ import EphAppShell from "@/components/EphAppShell";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 
+type RoleType = "realtor" | "contractor" | "construction" | "admin";
+type ToneType = "blue" | "orange" | "amber" | "slate";
+
 type Conversation = {
   id: string;
   unreadCount?: number;
@@ -44,12 +48,10 @@ type DashboardSummary = {
 };
 
 function normalizeRole(role?: string | null) {
-  return String(role || "")
-    .toLocaleUpperCase("tr-TR")
-    .trim();
+  return String(role || "").toLocaleUpperCase("tr-TR").trim();
 }
 
-function getRoleType(role?: string | null) {
+function getRoleType(role?: string | null): RoleType {
   const normalizedRole = normalizeRole(role);
 
   if (
@@ -84,8 +86,8 @@ function getGreeting() {
   return "İyi geceler";
 }
 
-function RoleBadge({ roleType }: { roleType: string }) {
-  const config = {
+function RoleBadge({ roleType }: { roleType: RoleType }) {
+  const config: Record<RoleType, { label: string; className: string }> = {
     realtor: {
       label: "Emlakçı Paneli",
       className: "bg-blue-50 text-blue-700 border-blue-100",
@@ -102,13 +104,13 @@ function RoleBadge({ roleType }: { roleType: string }) {
       label: "Admin Paneli",
       className: "bg-slate-900 text-white border-slate-700",
     },
-  }[roleType];
+  };
 
   return (
     <div
-      className={`mx-auto inline-flex rounded-full border px-4 py-2 text-xs font-black ${config.className}`}
+      className={`mx-auto inline-flex rounded-full border px-4 py-2 text-xs font-black ${config[roleType].className}`}
     >
-      {config.label}
+      {config[roleType].label}
     </div>
   );
 }
@@ -120,23 +122,23 @@ function StatCard({
   description,
   tone,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
   value: string;
   description: string;
-  tone: "blue" | "orange" | "amber" | "slate";
+  tone: ToneType;
 }) {
-  const toneClass = {
+  const toneClass: Record<ToneType, string> = {
     blue: "bg-blue-50 text-blue-700",
     orange: "bg-orange-50 text-orange-700",
     amber: "bg-amber-50 text-amber-700",
     slate: "bg-slate-100 text-slate-700",
-  }[tone];
+  };
 
   return (
     <div className="rounded-[26px] border border-slate-200 bg-white p-5 text-center shadow-sm">
       <div
-        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl ${toneClass}`}
+        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl ${toneClass[tone]}`}
       >
         {icon}
       </div>
@@ -161,16 +163,16 @@ function QuickAction({
   tone,
 }: {
   href: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
-  tone: "blue" | "orange" | "amber" | "slate";
+  tone: ToneType;
 }) {
-  const toneClass = {
+  const toneClass: Record<ToneType, string> = {
     blue: "bg-blue-600 shadow-blue-600/20",
     orange: "bg-orange-600 shadow-orange-600/20",
     amber: "bg-[#C9A84C] shadow-[#C9A84C]/20",
     slate: "bg-slate-900 shadow-slate-900/20",
-  }[tone];
+  };
 
   return (
     <Link
@@ -178,7 +180,7 @@ function QuickAction({
       className="rounded-[24px] border border-slate-200 bg-white p-4 text-center shadow-sm transition hover:-translate-y-1"
     >
       <div
-        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg ${toneClass}`}
+        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg ${toneClass[tone]}`}
       >
         {icon}
       </div>
@@ -263,7 +265,7 @@ export default function DashboardPage() {
     if (roleType === "construction") {
       return {
         title: "Ana Sayfa",
-        tone: "amber" as const,
+        tone: "amber" as ToneType,
         heroClass:
           "from-[#0B1F44] via-[#172554] to-[#C9A84C] shadow-[#C9A84C]/20",
         subtitle:
@@ -310,7 +312,7 @@ export default function DashboardPage() {
     if (roleType === "contractor") {
       return {
         title: "Ana Sayfa",
-        tone: "orange" as const,
+        tone: "orange" as ToneType,
         heroClass:
           "from-orange-700 via-orange-600 to-amber-500 shadow-orange-600/20",
         subtitle:
@@ -357,7 +359,7 @@ export default function DashboardPage() {
     if (roleType === "admin") {
       return {
         title: "Admin",
-        tone: "slate" as const,
+        tone: "slate" as ToneType,
         heroClass:
           "from-slate-950 via-slate-900 to-blue-950 shadow-slate-900/20",
         subtitle:
@@ -392,14 +394,18 @@ export default function DashboardPage() {
           { label: "Admin", href: "/admin", icon: <CheckSquare size={21} /> },
           { label: "Stok", href: "/stok", icon: <Building2 size={21} /> },
           { label: "Pazaryeri", href: "/network", icon: <Store size={21} /> },
-          { label: "Mesajlar", href: "/messages", icon: <MessageCircle size={21} /> },
+          {
+            label: "Mesajlar",
+            href: "/messages",
+            icon: <MessageCircle size={21} />,
+          },
         ],
       };
     }
 
     return {
       title: "Ana Sayfa",
-      tone: "blue" as const,
+      tone: "blue" as ToneType,
       heroClass: "from-[#0B1F44] via-[#123B7A] to-[#2563EB] shadow-blue-600/20",
       subtitle:
         "İlanlarını, müşterilerini, görevlerini ve pazaryeri fırsatlarını takip et.",
@@ -538,9 +544,7 @@ export default function DashboardPage() {
               <Bot size={24} />
             </div>
 
-            <h3 className="mt-4 text-xl font-black text-slate-900">
-              Lina AI
-            </h3>
+            <h3 className="mt-4 text-xl font-black text-slate-900">Lina AI</h3>
 
             <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
               İlan, proje, müşteri ve pazaryeri işlemlerinde Lina’dan destek al.
