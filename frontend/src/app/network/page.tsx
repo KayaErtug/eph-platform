@@ -3,18 +3,17 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { getToken } from "firebase/messaging";
+import EphAppShell from "@/components/EphAppShell";
 import { useAuthStore } from "@/store/auth.store";
 import api from "@/lib/api";
 import { firebaseVapidKey, getFirebaseMessaging } from "@/lib/firebase";
 import {
-  ArrowLeft,
   BarChart3,
   Bell,
   Building2,
   CheckCircle2,
   CircleUserRound,
   Flame,
-  Home,
   Inbox,
   MessageCircle,
   Plus,
@@ -40,6 +39,7 @@ type NetworkPost = {
   id: string;
   userId?: string;
   user?: NetworkUser;
+  User?: NetworkUser;
   urgency: string | null;
   type: string;
   title: string;
@@ -106,6 +106,10 @@ const visibilityOptions = [
   },
   { label: "Sadece bağlantılarım", value: "SADECE_BAGLANTILARIM" },
 ];
+
+function getPostUser(post: NetworkPost) {
+  return post.user || post.User;
+}
 
 function relativeTime(value?: string) {
   if (!value) return "-";
@@ -188,7 +192,7 @@ function isHotPost(post: NetworkPost) {
 
 export default function NetworkPage() {
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
 
   const [posts, setPosts] = useState<NetworkPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -278,7 +282,7 @@ export default function NetworkPage() {
       localStorage.setItem("ephPushEnabled", "true");
       setPushEnabled(true);
 
-      alert("Bildirimler açıldı. Bir sonraki adımda bunu mesaj sistemine bağlayacağız.");
+      alert("Bildirimler açıldı.");
     } catch (error) {
       console.error(error);
       alert("Bildirim izni alınamadı. Tarayıcı ayarlarını kontrol edin.");
@@ -287,19 +291,12 @@ export default function NetworkPage() {
     }
   };
 
-  const handleBack = () => {
-    router.push("/dashboard");
-  };
-
-  const handleLogout = () => {
-    logout();
-    router.push("/giris");
-  };
-
   const fetchPosts = async () => {
     try {
       const res = await api.get("/network/posts");
       setPosts(res.data || []);
+    } catch {
+      setPosts([]);
     } finally {
       setLoading(false);
     }
@@ -309,7 +306,7 @@ export default function NetworkPage() {
     if (!user?.id) return;
 
     try {
-      const res = await api.get(`/conversations/my/${user.id}`);
+      const res = await api.get(`/conversations?userId=${user.id}`);
       const conversations: Conversation[] = res.data || [];
       const totalUnread = conversations.reduce(
         (total, item) => total + (item.unreadCount || 0),
@@ -393,15 +390,24 @@ export default function NetworkPage() {
         return;
       }
 
-      if (post.userId === user.id || post.user?.id === user.id) {
+      const postUser = getPostUser(post);
+      const participantId = post.userId || postUser?.id;
+
+      if (!participantId) {
+        alert("Paylaşım sahibi bulunamadı.");
+        return;
+      }
+
+      if (participantId === user.id) {
         alert("Bu paylaşım sana ait.");
         return;
       }
 
       const res = await api.post("/conversations/start", {
-        senderId: user.id,
+        creatorId: user.id,
+        participantId,
         postId: post.id,
-        message: `${post.title} paylaşımı için görüşme başlatıldı.`,
+        title: post.title,
       });
 
       await fetchConversationStats();
@@ -422,8 +428,6 @@ export default function NetworkPage() {
         pushEnabled={pushEnabled}
         pushLoading={pushLoading}
         soundEnabled={soundEnabled}
-        onBack={handleBack}
-        onLogout={handleLogout}
         onOpenMessages={() => router.push("/messages")}
         onOpenSettings={() => router.push("/notification-settings")}
         onEnablePush={enablePushNotifications}
@@ -434,92 +438,8 @@ export default function NetworkPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F3F6FB] pb-24">
-      <div className="sticky top-0 z-40 border-b border-white/40 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-4 px-5 py-5 text-center lg:flex-row lg:justify-between">
-          <div className="flex flex-col items-center text-center lg:flex-row lg:gap-4">
-            <button
-              onClick={handleBack}
-              className="mb-3 flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm transition-all hover:bg-slate-50 lg:mb-0"
-            >
-              <ArrowLeft size={18} />
-              Geri Dön
-            </button>
-
-            <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-gradient-to-br from-[#2563EB] to-[#4F46E5] text-white shadow-xl">
-              <UsersRound size={28} />
-            </div>
-
-            <div className="mt-3 lg:mt-0">
-              <div className="flex items-center justify-center gap-2">
-                <h1 className="text-[28px] font-black text-[#0F172A]">
-                  EPH Network
-                </h1>
-
-                <span className="rounded-full bg-[#DBEAFE] px-3 py-1 text-[11px] font-black text-[#1D4ED8]">
-                  EPH
-                </span>
-              </div>
-
-              <p className="mt-2 text-center text-sm font-medium text-slate-500">
-                Emlak profesyonellerine özel paylaşım ve iş birliği ağı
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {!pushEnabled && (
-              <button
-                onClick={enablePushNotifications}
-                disabled={pushLoading}
-                className="flex h-11 items-center gap-2 rounded-2xl bg-[#0F172A] px-4 text-sm font-black text-white disabled:opacity-60"
-              >
-                <Volume2 size={18} />
-                {pushLoading ? "Açılıyor..." : "Bildirimleri Aç"}
-              </button>
-            )}
-
-            {!soundEnabled && (
-              <button
-                onClick={enableSound}
-                className="flex h-11 items-center gap-2 rounded-2xl bg-emerald-500 px-4 text-sm font-black text-white"
-              >
-                <Volume2 size={18} />
-                Sesi Aç
-              </button>
-            )}
-
-            <button
-              onClick={() => router.push("/messages")}
-              className="relative flex h-11 items-center gap-2 rounded-2xl bg-[#1D4ED8] px-4 text-sm font-black text-white shadow-lg"
-            >
-              <Inbox size={18} />
-              Mesajlar
-              {unreadCount > 0 && (
-                <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-600 px-2 text-xs font-black text-white">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => router.push("/notification-settings")}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white"
-            >
-              <Settings size={18} />
-            </button>
-
-            <button
-              onClick={handleLogout}
-              className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700"
-            >
-              Çıkış
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <section className="mx-auto grid max-w-7xl gap-5 px-5 py-6 text-center lg:grid-cols-[280px_1fr_320px]">
+    <EphAppShell title="Pazaryeri">
+      <section className="mx-auto grid max-w-7xl gap-5 text-center lg:grid-cols-[280px_1fr_320px]">
         <aside className="space-y-5">
           <div className="overflow-hidden rounded-[30px] bg-gradient-to-br from-[#2563EB] to-[#4F46E5] p-5 text-white shadow-2xl">
             <div className="flex flex-col items-center text-center">
@@ -604,7 +524,7 @@ export default function NetworkPage() {
 
           {loading ? (
             <div className="rounded-[30px] bg-white p-10 text-center font-bold text-slate-500">
-              Network yükleniyor...
+              Pazaryeri yükleniyor...
             </div>
           ) : posts.length === 0 ? (
             <div className="rounded-[30px] bg-white p-10 text-center">
@@ -664,6 +584,56 @@ export default function NetworkPage() {
               <QuickLink icon={<Building2 size={18} />} label="Portföy Eşleştir" />
             </div>
           </div>
+
+          <div className="rounded-[30px] border border-white bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-center text-lg font-black text-[#0F172A]">
+              Bildirimler
+            </h2>
+
+            <div className="space-y-3">
+              {!pushEnabled && (
+                <button
+                  onClick={enablePushNotifications}
+                  disabled={pushLoading}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#0F172A] px-4 text-sm font-black text-white disabled:opacity-60"
+                >
+                  <Volume2 size={18} />
+                  {pushLoading ? "Açılıyor..." : "Bildirimleri Aç"}
+                </button>
+              )}
+
+              {!soundEnabled && (
+                <button
+                  onClick={enableSound}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 text-sm font-black text-white"
+                >
+                  <Volume2 size={18} />
+                  Sesi Aç
+                </button>
+              )}
+
+              <button
+                onClick={() => router.push("/messages")}
+                className="relative flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#1D4ED8] px-4 text-sm font-black text-white shadow-lg"
+              >
+                <Inbox size={18} />
+                Mesajlar
+                {unreadCount > 0 && (
+                  <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-600 px-2 text-xs font-black text-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => router.push("/notification-settings")}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-black text-slate-700"
+              >
+                <Settings size={18} />
+                Ayarlar
+              </button>
+            </div>
+          </div>
         </aside>
       </section>
 
@@ -673,9 +643,7 @@ export default function NetworkPage() {
           onCreate={handleCreatePost}
         />
       )}
-
-      <MobileBottomNav router={router} />
-    </main>
+    </EphAppShell>
   );
 }
 
@@ -687,8 +655,6 @@ function AdminNetworkCommandGrid({
   pushEnabled,
   pushLoading,
   soundEnabled,
-  onBack,
-  onLogout,
   onOpenMessages,
   onOpenSettings,
   onEnablePush,
@@ -702,8 +668,6 @@ function AdminNetworkCommandGrid({
   pushEnabled: boolean;
   pushLoading: boolean;
   soundEnabled: boolean;
-  onBack: () => void;
-  onLogout: () => void;
   onOpenMessages: () => void;
   onOpenSettings: () => void;
   onEnablePush: () => void;
@@ -718,220 +682,60 @@ function AdminNetworkCommandGrid({
       new Date(post.createdAt).toDateString() === new Date().toDateString(),
   ).length;
 
-  const cityCount = posts.reduce<Record<string, number>>((acc, post) => {
-    const key = post.city || "Belirsiz";
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
-
-  const topCities = Object.entries(cityCount)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
-
   return (
-    <main className="min-h-screen overflow-hidden bg-[#020617] pb-24 text-white">
-      <div className="pointer-events-none fixed inset-0 opacity-80">
-        <div className="absolute left-[-180px] top-[-160px] h-[420px] w-[420px] rounded-full bg-cyan-500/20 blur-[110px]" />
-        <div className="absolute right-[-160px] top-[120px] h-[420px] w-[420px] rounded-full bg-blue-600/25 blur-[120px]" />
-        <div className="absolute bottom-[-190px] left-[30%] h-[460px] w-[460px] rounded-full bg-[#C9A84C]/15 blur-[130px]" />
-      </div>
+    <EphAppShell title="Pazaryeri">
+      <section className="mx-auto max-w-7xl text-center">
+        <div className="relative overflow-hidden rounded-[42px] border border-cyan-300/20 bg-[#061126] p-7 text-white shadow-2xl shadow-cyan-950/40">
+          <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
+            <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-cyan-100">
+              Pazaryeri Admin Görünümü
+            </span>
 
-      <header className="sticky top-0 z-40 border-b border-cyan-300/15 bg-[#020617]/85 backdrop-blur-2xl">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 text-center lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col items-center justify-center gap-3 lg:flex-row lg:text-left">
-            <button
-              onClick={onBack}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/20 bg-white/5 text-cyan-100 transition hover:border-[#C9A84C]/60 hover:text-[#F7DFA3]"
-              title="Geri Dön"
-            >
-              <ArrowLeft size={19} />
-            </button>
-
-            <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[0_0_35px_rgba(34,211,238,0.22)]">
-              <Radar size={25} />
-
-              <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-300 shadow-[0_0_20px_rgba(110,231,183,0.9)]" />
-            </div>
-
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.32em] text-[#C9A84C]">
-                EPH Network
-              </p>
-
-              <h1 className="text-xl font-black tracking-tight text-white">
-                Command Grid
-              </h1>
-            </div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" />
+              Ağ Aktif
+            </span>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {!pushEnabled && (
-              <button
-                onClick={onEnablePush}
-                disabled={pushLoading}
-                className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-cyan-100 disabled:opacity-60"
-              >
-                {pushLoading ? "Açılıyor" : "Bildirimleri Aç"}
-              </button>
-            )}
+          <h1 className="text-[42px] font-black leading-tight tracking-tight md:text-[64px]">
+            EPH Pazaryeri
+            <span className="block bg-gradient-to-r from-[#F7DFA3] via-cyan-100 to-white bg-clip-text text-transparent">
+              Komuta Ekranı
+            </span>
+          </h1>
 
-            {!soundEnabled && (
-              <button
-                onClick={onEnableSound}
-                className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-emerald-100"
-              >
-                Sesi Aç
-              </button>
-            )}
+          <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-300">
+            Platformdaki talepler, portföy hareketleri ve mesajlaşma trafiği tek
+            ekrandan izlenir.
+          </p>
+
+          <div className="mt-7 grid gap-3 sm:grid-cols-4">
+            <AdminNetworkMetric label="Toplam Akış" value={posts.length} tone="cyan" />
+            <AdminNetworkMetric label="Sıcak Sinyal" value={hotPosts.length} tone="gold" />
+            <AdminNetworkMetric label="Bugün" value={todayCount} tone="blue" />
+            <AdminNetworkMetric label="Mesaj Odası" value={conversationCount} tone="emerald" />
+          </div>
+
+          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+            <button
+              onClick={onRefresh}
+              className="rounded-2xl bg-[#C9A84C] px-5 py-4 text-sm font-black uppercase tracking-[0.16em] text-[#061126]"
+            >
+              Verileri Yenile
+            </button>
 
             <button
               onClick={onOpenMessages}
-              className="relative rounded-2xl border border-blue-300/20 bg-blue-500/15 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-blue-100"
+              className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-5 py-4 text-sm font-black uppercase tracking-[0.16em] text-cyan-100"
             >
-              Mesajlar
-              {unreadCount > 0 && (
-                <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-2 text-[10px] font-black text-white">
-                  {unreadCount}
-                </span>
-              )}
+              Mesaj Trafiği
             </button>
-
-            <button
-              onClick={onOpenSettings}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300"
-            >
-              <Settings size={18} />
-            </button>
-
-            <button
-              onClick={onLogout}
-              className="rounded-2xl border border-rose-400/25 bg-rose-500/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-rose-200"
-            >
-              Çıkış
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <section className="relative z-10 mx-auto max-w-7xl px-5 py-8 text-center">
-        <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="relative overflow-hidden rounded-[42px] border border-cyan-300/20 bg-[#061126]/90 p-7 shadow-2xl shadow-cyan-950/40">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(34,211,238,0.24),transparent_28%),radial-gradient(circle_at_88%_10%,rgba(201,168,76,0.18),transparent_24%),radial-gradient(circle_at_55%_95%,rgba(59,130,246,0.26),transparent_36%)]" />
-
-            <div className="relative z-10">
-              <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
-                <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-cyan-100">
-                  Network Mission Control
-                </span>
-
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" />
-                  Ağ Aktif
-                </span>
-              </div>
-
-              <h2 className="text-[42px] font-black leading-tight tracking-tight md:text-[64px]">
-                EPH Ağ
-                <span className="block bg-gradient-to-r from-[#F7DFA3] via-cyan-100 to-white bg-clip-text text-transparent">
-                  Komuta Izgarası
-                </span>
-              </h2>
-
-              <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-300">
-                Platformdaki talepler, portföy hareketleri, sıcak sinyaller ve
-                mesajlaşma trafiği admin seviyesinde tek ekrandan izlenir.
-              </p>
-
-              <div className="mt-7 grid gap-3 sm:grid-cols-4">
-                <AdminNetworkMetric label="Toplam Akış" value={posts.length} tone="cyan" />
-                <AdminNetworkMetric label="Sıcak Sinyal" value={hotPosts.length} tone="gold" />
-                <AdminNetworkMetric label="Bugün" value={todayCount} tone="blue" />
-                <AdminNetworkMetric label="Mesaj Odası" value={conversationCount} tone="emerald" />
-              </div>
-
-              <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
-                <button
-                  onClick={onRefresh}
-                  className="rounded-2xl bg-[#C9A84C] px-5 py-4 text-sm font-black uppercase tracking-[0.16em] text-[#061126] shadow-[0_0_35px_rgba(201,168,76,0.25)] transition hover:scale-[1.01]"
-                >
-                  Verileri Yenile
-                </button>
-
-                <button
-                  onClick={onOpenMessages}
-                  className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-5 py-4 text-sm font-black uppercase tracking-[0.16em] text-cyan-100"
-                >
-                  Mesaj Trafiği
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-5">
-            <div className="rounded-[34px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-xl">
-              <div className="flex flex-col items-center justify-between gap-4 lg:flex-row lg:text-left">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#C9A84C]">
-                    AI Network Radar
-                  </p>
-
-                  <h3 className="mt-2 text-2xl font-black text-white">
-                    Öncelikli Sinyaller
-                  </h3>
-                </div>
-
-                <div className="flex h-14 w-14 items-center justify-center rounded-[22px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
-                  <BarChart3 size={25} />
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                <SignalLine label="Sıcak / Acil talepler" value={hotPosts.length} />
-                <SignalLine label="Bugünkü paylaşımlar" value={todayCount} />
-                <SignalLine label="Okunmamış mesajlar" value={unreadCount} />
-              </div>
-            </div>
-
-            <div className="rounded-[34px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-xl">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/80">
-                Bölgesel Yoğunluk
-              </p>
-
-              <div className="mt-4 space-y-3">
-                {topCities.length === 0 ? (
-                  <p className="text-sm font-semibold text-slate-400">
-                    Henüz bölgesel veri yok.
-                  </p>
-                ) : (
-                  topCities.map(([city, count]) => (
-                    <div key={city}>
-                      <div className="mb-1 flex items-center justify-between text-xs font-black uppercase tracking-[0.14em] text-slate-300">
-                        <span>{city}</span>
-                        <span>{count}</span>
-                      </div>
-
-                      <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-blue-500"
-                          style={{
-                            width: `${Math.max(
-                              12,
-                              (count / Math.max(posts.length, 1)) * 100,
-                            )}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
           </div>
         </div>
 
         <div className="mt-6 grid gap-5 lg:grid-cols-[320px_1fr]">
           <aside className="space-y-5">
-            <div className="rounded-[34px] border border-cyan-300/15 bg-[#061126]/80 p-5 shadow-xl shadow-cyan-950/20">
+            <div className="rounded-[34px] border border-white/10 bg-[#061126] p-5 shadow-xl shadow-cyan-950/20">
               <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#C9A84C]">
                 Grid Filtreleri
               </p>
@@ -953,57 +757,54 @@ function AdminNetworkCommandGrid({
               </div>
             </div>
 
-            <div className="rounded-[34px] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl">
+            <div className="rounded-[34px] border border-white/10 bg-[#061126] p-5 text-white">
               <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/80">
-                Admin Protokolü
+                Bildirim Kontrolü
               </p>
 
-              <p className="mt-3 text-sm font-semibold leading-7 text-slate-300">
-                Network akışı operasyonel olarak izlenir. Özel CRM notları,
-                görevler ve müşteri mahremiyeti kullanıcı bazlı izole kalır.
-              </p>
+              <div className="mt-4 space-y-3">
+                {!pushEnabled && (
+                  <button
+                    onClick={onEnablePush}
+                    disabled={pushLoading}
+                    className="w-full rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-cyan-100 disabled:opacity-60"
+                  >
+                    {pushLoading ? "Açılıyor" : "Bildirimleri Aç"}
+                  </button>
+                )}
+
+                {!soundEnabled && (
+                  <button
+                    onClick={onEnableSound}
+                    className="w-full rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-emerald-100"
+                  >
+                    Sesi Aç
+                  </button>
+                )}
+
+                <button
+                  onClick={onOpenSettings}
+                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-slate-300"
+                >
+                  Bildirim Ayarları
+                </button>
+              </div>
             </div>
           </aside>
 
           <section className="space-y-5">
-            <div className="rounded-[34px] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl">
-              <div className="mb-4 flex items-center gap-3 rounded-2xl border border-cyan-300/10 bg-black/20 px-4 py-4">
-                <Search size={18} className="text-cyan-200" />
-
-                <input
-                  className="w-full bg-transparent text-center text-sm font-semibold text-white outline-none placeholder:text-center placeholder:text-slate-500"
-                  placeholder="Network akışında talep, portföy, bölge veya kullanıcı ara..."
-                />
-              </div>
-
-              <div className="flex justify-center gap-2 overflow-x-auto pb-1">
-                {filters.map((filter, index) => (
-                  <button
-                    key={filter}
-                    className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.12em] ${
-                      index === 0
-                        ? "border-[#C9A84C]/40 bg-[#C9A84C]/15 text-[#F7DFA3]"
-                        : "border-white/10 bg-white/[0.04] text-slate-300"
-                    }`}
-                  >
-                    {filter}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {loading ? (
-              <div className="rounded-[34px] border border-white/10 bg-white/[0.06] p-10 text-center text-sm font-black uppercase tracking-[0.2em] text-slate-300">
-                Network verileri yükleniyor...
+              <div className="rounded-[34px] border border-slate-200 bg-white p-10 text-center text-sm font-black text-slate-500">
+                Pazaryeri verileri yükleniyor...
               </div>
             ) : posts.length === 0 ? (
-              <div className="rounded-[34px] border border-white/10 bg-white/[0.06] p-10 text-center">
-                <div className="text-lg font-black text-white">
+              <div className="rounded-[34px] border border-slate-200 bg-white p-10 text-center">
+                <div className="text-lg font-black text-slate-900">
                   Henüz paylaşım yok
                 </div>
 
-                <p className="mt-2 text-sm text-slate-400">
-                  Network grid boş durumda.
+                <p className="mt-2 text-sm text-slate-500">
+                  Pazaryeri akışı boş durumda.
                 </p>
               </div>
             ) : (
@@ -1014,7 +815,7 @@ function AdminNetworkCommandGrid({
           </section>
         </div>
       </section>
-    </main>
+    </EphAppShell>
   );
 }
 
@@ -1051,43 +852,34 @@ function AdminNetworkMetric({
   );
 }
 
-function SignalLine({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex items-center justify-between rounded-[22px] border border-white/10 bg-white/[0.05] px-4 py-3">
-      <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-300">
-        {label}
-      </span>
-
-      <span className="rounded-2xl bg-[#C9A84C] px-3 py-1 text-sm font-black text-[#061126]">
-        {value}
-      </span>
-    </div>
-  );
-}
-
 function AdminNetworkPostCard({ post }: { post: NetworkPost }) {
-  const authorName = post.user
-    ? `${post.user.firstName} ${post.user.lastName}`
+  const postUser = getPostUser(post);
+
+  const authorName = postUser
+    ? `${postUser.firstName} ${postUser.lastName}`
     : "EPH Üyesi";
 
   return (
-    <article className="overflow-hidden rounded-[34px] border border-cyan-300/15 bg-[#061126]/80 shadow-xl shadow-cyan-950/20 backdrop-blur-xl">
+    <article className="overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-sm">
       <div className="h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
 
       <div className="p-6">
         <div className="flex flex-col items-center gap-5 text-center md:flex-row md:items-start md:justify-between md:text-left">
           <div className="flex flex-col items-center gap-4 md:flex-row">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] border border-cyan-300/25 bg-cyan-300/10 text-xl font-black text-cyan-100">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] bg-cyan-50 text-xl font-black text-cyan-700">
               {authorName[0]}
             </div>
 
             <div>
               <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
-                <h3 className="text-lg font-black text-white">{authorName}</h3>
-                <CheckCircle2 size={18} className="text-cyan-300" />
+                <h3 className="text-lg font-black text-slate-900">
+                  {authorName}
+                </h3>
 
-                <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300">
-                  {roleLabel(post.user?.role)}
+                <CheckCircle2 size={18} className="text-cyan-500" />
+
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-600">
+                  {roleLabel(postUser?.role)}
                 </span>
               </div>
 
@@ -1097,35 +889,35 @@ function AdminNetworkPostCard({ post }: { post: NetworkPost }) {
             </div>
           </div>
 
-          <span className="rounded-full border border-rose-300/20 bg-rose-400/10 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-rose-100">
+          <span className="rounded-full bg-rose-50 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-rose-600">
             {post.urgency || "Normal"}
           </span>
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-          <span className="rounded-full border border-[#C9A84C]/30 bg-[#C9A84C]/10 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-[#F7DFA3]">
+          <span className="rounded-full bg-amber-50 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-amber-700">
             {post.type}
           </span>
 
           {post.city && (
-            <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-cyan-100">
+            <span className="rounded-full bg-cyan-50 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-cyan-700">
               {post.city}
               {post.district ? ` / ${post.district}` : ""}
             </span>
           )}
         </div>
 
-        <h2 className="mt-5 text-center text-[28px] font-black leading-tight text-white">
+        <h2 className="mt-5 text-center text-[28px] font-black leading-tight text-slate-900">
           {post.title}
         </h2>
 
-        <p className="mt-4 text-center text-[15px] font-semibold leading-8 text-slate-300">
+        <p className="mt-4 text-center text-[15px] font-semibold leading-8 text-slate-600">
           {post.description}
         </p>
 
         <div className="mt-5 flex flex-wrap justify-center gap-2">
           {post.budget && (
-            <span className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm font-black text-emerald-100">
+            <span className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">
               {formatMoney(post.budget)}
             </span>
           )}
@@ -1133,14 +925,14 @@ function AdminNetworkPostCard({ post }: { post: NetworkPost }) {
           {post.tags.map((tag) => (
             <span
               key={tag}
-              className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-2 text-xs font-bold text-slate-300"
+              className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600"
             >
               #{tag}
             </span>
           ))}
         </div>
 
-        <div className="mt-5 grid gap-2 border-t border-white/10 pt-4 text-center text-xs font-bold text-slate-500 md:grid-cols-2">
+        <div className="mt-5 grid gap-2 border-t border-slate-100 pt-4 text-center text-xs font-bold text-slate-400 md:grid-cols-2">
           <span>Yayın: {formatDateTime(post.createdAt)}</span>
           <span>Bitiş: {formatDateTime(post.expiresAt)}</span>
         </div>
@@ -1158,11 +950,14 @@ function PremiumPostCard({
   currentUserId?: string;
   onStartConversation: () => void;
 }) {
-  const authorName = post.user
-    ? `${post.user.firstName} ${post.user.lastName}`
+  const postUser = getPostUser(post);
+
+  const authorName = postUser
+    ? `${postUser.firstName} ${postUser.lastName}`
     : "EPH Üyesi";
 
-  const isOwnPost = post.userId === currentUserId || post.user?.id === currentUserId;
+  const ownerId = post.userId || postUser?.id;
+  const isOwnPost = ownerId === currentUserId;
 
   return (
     <article className="group overflow-hidden rounded-[32px] border border-white bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-2xl">
@@ -1184,7 +979,7 @@ function PremiumPostCard({
             </div>
 
             <p className="mt-1 text-sm font-semibold text-slate-500">
-              {roleLabel(post.user?.role)}
+              {roleLabel(postUser?.role)}
             </p>
 
             <p className="mt-1 text-xs font-bold text-slate-400">
@@ -1292,7 +1087,7 @@ function CreatePostModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur">
+    <div className="fixed inset-0 z-[12000] flex items-center justify-center bg-black/50 p-4 backdrop-blur">
       <section className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-[32px] bg-white">
         <header className="flex items-start justify-between gap-4 border-b border-slate-100 p-6">
           <div className="flex-1 text-center">
@@ -1538,50 +1333,5 @@ function QuickLink({
       <span className="text-[#4F46E5]">{icon}</span>
       {label}
     </button>
-  );
-}
-
-function MobileBottomNav({ router }: { router: { push: (path: string) => void } }) {
-  return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#DDE7F3] bg-white/95 backdrop-blur-xl lg:hidden">
-      <div className="grid grid-cols-5">
-        <button
-          onClick={() => router.push("/dashboard")}
-          className="flex flex-col items-center justify-center gap-1 py-3 text-[#64748B]"
-        >
-          <Home size={20} />
-          <span className="text-[11px] font-black">Ana Sayfa</span>
-        </button>
-
-        <button
-          onClick={() => router.push("/stok")}
-          className="flex flex-col items-center justify-center gap-1 py-3 text-[#64748B]"
-        >
-          <Building2 size={20} />
-          <span className="text-[11px] font-black">İlanlar</span>
-        </button>
-
-        <button className="flex flex-col items-center justify-center gap-1 py-3 text-[#2563EB]">
-          <UsersRound size={20} />
-          <span className="text-[11px] font-black">Network</span>
-        </button>
-
-        <button
-          onClick={() => router.push("/crm")}
-          className="flex flex-col items-center justify-center gap-1 py-3 text-[#64748B]"
-        >
-          <UsersRound size={20} />
-          <span className="text-[11px] font-black">CRM</span>
-        </button>
-
-        <button
-          onClick={() => router.push("/profil")}
-          className="flex flex-col items-center justify-center gap-1 py-3 text-[#64748B]"
-        >
-          <CircleUserRound size={20} />
-          <span className="text-[11px] font-black">Profil</span>
-        </button>
-      </div>
-    </div>
   );
 }
