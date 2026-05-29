@@ -1,4 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function readEnvValue(key: string) {
+  const fromProcess = process.env[key];
+
+  if (fromProcess && fromProcess.trim().length > 0) {
+    return fromProcess.trim();
+  }
+
+  try {
+    const envPath = path.join(process.cwd(), ".env.local");
+    const envFile = fs.readFileSync(envPath, "utf8");
+
+    const line = envFile
+      .split("\n")
+      .map((item) => item.trim())
+      .find((item) => item.startsWith(`${key}=`));
+
+    if (!line) {
+      return "";
+    }
+
+    return line.replace(`${key}=`, "").trim().replace(/^["']|["']$/g, "");
+  } catch {
+    return "";
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,8 +40,9 @@ export async function POST(req: NextRequest) {
         ? text.trim()
         : "Merhaba, ben Lina. Size nasıl yardımcı olabilirim?";
 
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    const voiceId = process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM";
+    const apiKey = readEnvValue("ELEVENLABS_API_KEY");
+    const voiceId =
+      readEnvValue("ELEVENLABS_VOICE_ID") || "21m00Tcm4TlvDq8ikWAM";
 
     if (!apiKey) {
       return NextResponse.json(
