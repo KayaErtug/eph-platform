@@ -201,6 +201,163 @@ function getMarketplaceActions(
   };
 }
 
+
+function createPresetMessage(actionTitle: string, postTitle?: string) {
+  if (actionTitle === "Uygun Müşterim Var") {
+    return `Merhaba,
+
+"${postTitle || "paylaşımınız"}" için uygun müşterilerim bulunuyor.
+
+Detayları paylaşabilirim.`;
+  }
+
+  if (actionTitle === "Talebe Çözüm Sun") {
+    return `Merhaba,
+
+"${postTitle || "paylaşımınız"}" için uygun bir çözümüm olduğunu düşünüyorum.
+
+Detayları görüşebiliriz.`;
+  }
+
+  if (actionTitle === "Proje Teklif Et") {
+    return `Merhaba,
+
+Portföyünüze uygun olabileceğini düşündüğüm bir projem bulunuyor.
+
+Görüşebilir miyiz?`;
+  }
+
+  if (actionTitle === "İş Birliği Kur") {
+    return `Merhaba,
+
+Bu paylaşımınız için iş birliği fırsatlarını değerlendirmek isterim.
+
+Uygun olduğunuzda görüşebilir miyiz?`;
+  }
+
+  if (actionTitle === "Proje İş Birliği") {
+    return `Merhaba,
+
+Bu proje için iş birliği fırsatlarını değerlendirmek isterim.
+
+Uygun olduğunuzda görüşebilir miyiz?`;
+  }
+
+  if (actionTitle === "Kurumsal Görüşme Talep Et") {
+    return `Merhaba,
+
+Bu paylaşımınız hakkında kurumsal bir görüşme yapmak isterim.
+
+Uygun olduğunuzda detayları paylaşabilir misiniz?`;
+  }
+
+  if (actionTitle === "Satış Ağına Katıl") {
+    return `Merhaba,
+
+Projenizin satış ağına katılmak ve müşteri yönlendirmek isterim.
+
+Detayları görüşebilir miyiz?`;
+  }
+
+  if (actionTitle === "Müşteri Havuzu Sun") {
+    return `Merhaba,
+
+Bu proje için uygun müşteri havuzum olduğunu düşünüyorum.
+
+Detayları paylaşabilirim.`;
+  }
+
+  if (actionTitle === "Proje Görüşmesi Başlat") {
+    return `Merhaba,
+
+Bu paylaşımınızla ilgili proje görüşmesi başlatmak isterim.
+
+Uygun olduğunuzda görüşebilir miyiz?`;
+  }
+
+  if (actionTitle === "Çözüm Ortaklığı Kur") {
+    return `Merhaba,
+
+Bu paylaşımınız için çözüm ortaklığı fırsatlarını değerlendirmek isterim.
+
+Detayları görüşebiliriz.`;
+  }
+
+  if (actionTitle === "Portföy Paylaş") {
+    return `Merhaba,
+
+Bu paylaşımınızla ilgili portföy paylaşımı yapmak isterim.
+
+Detayları görüşebilir miyiz?`;
+  }
+
+  if (actionTitle === "Müşteri Eşleştir") {
+    return `Merhaba,
+
+Bu paylaşımınız için uygun müşteri eşleştirmesi yapabileceğimi düşünüyorum.
+
+Detayları paylaşabilirim.`;
+  }
+
+  if (actionTitle === "Proje Karşılaştır") {
+    return `Merhaba,
+
+Bu paylaşımınızla ilgili proje karşılaştırması yapmak isterim.
+
+Detayları görüşebilir miyiz?`;
+  }
+
+  if (actionTitle === "Ortak Çalışma") {
+    return `Merhaba,
+
+Bu paylaşımınız için ortak çalışma fırsatlarını değerlendirmek isterim.
+
+Uygun olduğunuzda görüşebilir miyiz?`;
+  }
+
+  if (actionTitle === "Proje Ortaklığı") {
+    return `Merhaba,
+
+Bu paylaşımınız için proje ortaklığı fırsatlarını değerlendirmek isterim.
+
+Detayları görüşebiliriz.`;
+  }
+
+  if (actionTitle === "Kurumsal Görüşme") {
+    return `Merhaba,
+
+Bu paylaşımınız hakkında kurumsal bir görüşme yapmak isterim.
+
+Uygun olduğunuzda görüşebilir miyiz?`;
+  }
+
+  if (actionTitle === "Çözüm Sun") {
+    return `Merhaba,
+
+Bu paylaşımınız için uygun bir çözüm sunabileceğimi düşünüyorum.
+
+Detayları paylaşabilirim.`;
+  }
+
+  if (actionTitle === "İş Birliği Teklif Et") {
+    return `Merhaba,
+
+Bu paylaşımınız için iş birliği teklif etmek isterim.
+
+Detayları görüşebilir miyiz?`;
+  }
+
+  return `Merhaba,
+
+Bu paylaşımınız hakkında görüşmek isterim.
+
+Uygun olduğunuzda detayları paylaşabilir misiniz?`;
+}
+
+function normalizeActionTitle(actionTitle: string) {
+  return actionTitle.toLocaleUpperCase("tr-TR");
+}
+
 const categories = [
   "Tüm Akış",
   "Satılık Talepleri",
@@ -572,7 +729,11 @@ export default function NetworkPage() {
     setModalOpen(false);
   };
 
-  const startConversation = async (post: NetworkPost) => {
+  const startConversation = async (
+    post: NetworkPost,
+    actionTitle: string,
+    presetMessage: string,
+  ) => {
     try {
       if (!user?.id) {
         alert("Lütfen tekrar giriş yapın.");
@@ -597,12 +758,17 @@ export default function NetworkPage() {
         creatorId: user.id,
         participantId,
         postId: post.id,
-        title: post.title,
+        title: normalizeActionTitle(actionTitle),
       });
 
       await fetchConversationStats();
 
-      router.push(`/messages/${res.data.id}`);
+      const search = new URLSearchParams({
+        title: normalizeActionTitle(actionTitle),
+        draft: presetMessage,
+      });
+
+      router.push(`/messages/${res.data.id}?${search.toString()}`);
     } catch {
       alert("Görüşme başlatılamadı.");
     }
@@ -750,7 +916,9 @@ export default function NetworkPage() {
                 currentUserId={user?.id}
                 currentUserRole={user?.role}
                 onOpenDetail={() => router.push(`/network/${post.id}`)}
-                onStartConversation={() => startConversation(post)}
+                onStartConversation={(actionTitle, presetMessage) =>
+                  startConversation(post, actionTitle, presetMessage)
+                }
               />
             ))
           )}
@@ -1133,7 +1301,7 @@ function PremiumPostCard({
   currentUserId?: string;
   currentUserRole?: string | null;
   onOpenDetail: () => void;
-  onStartConversation: () => void;
+  onStartConversation: (actionTitle: string, presetMessage: string) => void;
 }) {
   const postUser = getPostUser(post);
   const authorName = postUser
@@ -1180,7 +1348,10 @@ function PremiumPostCard({
                 event.stopPropagation();
 
                 if (!isOwnPost) {
-                  onStartConversation();
+                  onStartConversation(
+                    actions.primary,
+                    createPresetMessage(actions.primary, post.title),
+                  );
                 }
               }}
               disabled={isOwnPost}
@@ -1201,7 +1372,16 @@ function PremiumPostCard({
             </button>
 
             <button
-              onClick={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+
+                if (!isOwnPost) {
+                  onStartConversation(
+                    actions.secondary,
+                    createPresetMessage(actions.secondary, post.title),
+                  );
+                }
+              }}
               className="rounded-2xl border py-3 text-sm font-black"
               style={{
                 borderColor: theme.border,
@@ -1213,7 +1393,16 @@ function PremiumPostCard({
             </button>
 
             <button
-              onClick={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+
+                if (!isOwnPost) {
+                  onStartConversation(
+                    actions.tertiary,
+                    createPresetMessage(actions.tertiary, post.title),
+                  );
+                }
+              }}
               disabled={isOwnPost}
               className={`rounded-2xl bg-gradient-to-r ${theme.gradient} py-3 text-sm font-black text-white shadow-lg disabled:opacity-50`}
             >

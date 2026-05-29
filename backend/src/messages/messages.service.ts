@@ -97,6 +97,50 @@ export class MessagesService {
     );
   }
 
+  async getConversation(conversationId: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: {
+        id: conversationId,
+      },
+      include: {
+        NetworkPost: true,
+        ConversationParticipant: {
+          include: {
+            User: true,
+          },
+        },
+      },
+    });
+
+    if (!conversation) {
+      return {
+        ok: false,
+        message: 'Görüşme bulunamadı.',
+      };
+    }
+
+    return {
+      id: conversation.id,
+      title: conversation.title,
+      status: conversation.status,
+      postId: conversation.postId,
+      post: conversation.NetworkPost,
+      participants: conversation.ConversationParticipant.map((item) => ({
+        id: item.id,
+        userId: item.userId,
+        user: {
+          id: item.User.id,
+          firstName: item.User.firstName,
+          lastName: item.User.lastName,
+          email: item.User.email,
+          role: item.User.role,
+        },
+      })),
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+    };
+  }
+
   async startConversation(body: {
     postId?: string;
     title?: string;
@@ -110,9 +154,12 @@ export class MessagesService {
       };
     }
 
+    const title = body.title?.trim() || 'EPH GÖRÜŞMESİ';
+
     const existing = await this.prisma.conversation.findFirst({
       where: {
         postId: body.postId || null,
+        title,
         ConversationParticipant: {
           every: {
             userId: {
@@ -134,7 +181,7 @@ export class MessagesService {
       data: {
         id: randomUUID(),
         postId: body.postId || null,
-        title: body.title || 'EPH Görüşmesi',
+        title,
         updatedAt: new Date(),
         ConversationParticipant: {
           create: [

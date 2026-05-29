@@ -23,6 +23,11 @@ export class MessagesController {
     return this.messagesService.startConversation(body);
   }
 
+  @Get(':id')
+  getConversation(@Param('id') id: string) {
+    return this.messagesService.getConversation(id);
+  }
+
   @Get(':id/messages')
   getMessages(@Param('id') id: string) {
     return this.messagesService.getMessages(id);

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import {
   ArrowLeft,
   CheckCheck,
   Inbox,
+  LockKeyhole,
   Mic,
   Paperclip,
   SendHorizonal,
@@ -25,6 +26,16 @@ type Message = {
     lastName: string;
     role: string;
   };
+};
+
+type ConversationDetail = {
+  id: string;
+  title: string;
+  postId?: string | null;
+  post?: {
+    id: string;
+    title: string;
+  } | null;
 };
 
 function formatTime(value: string) {
@@ -46,10 +57,15 @@ function roleLabel(role?: string) {
 export default function MessageDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuthStore();
 
   const conversationId = String(params.id);
 
+  const draftTitle = searchParams.get("title") || "";
+  const draftBody = searchParams.get("draft") || "";
+
+  const [conversation, setConversation] = useState<ConversationDetail | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -59,8 +75,10 @@ export default function MessageDetailPage() {
   const listRef = useRef<HTMLDivElement | null>(null);
   const previousLastMessageIdRef = useRef<string | null>(null);
   const firstLoadRef = useRef(true);
+  const draftAppliedRef = useRef(false);
 
   const visibleMessages = messages.slice(-5);
+  const lockedTitle = conversation?.title || draftTitle || "EPH GÖRÜŞMESİ";
 
   const getSoundFile = () => {
     return (
@@ -117,6 +135,15 @@ export default function MessageDetailPage() {
     }
   };
 
+  const fetchConversation = async () => {
+    try {
+      const res = await api.get(`/conversations/${conversationId}`);
+      setConversation(res.data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const fetchMessages = async (silent = false) => {
     try {
       if (!silent) {
@@ -163,6 +190,7 @@ export default function MessageDetailPage() {
   useEffect(() => {
     if (!conversationId || !user?.id) return;
 
+    fetchConversation();
     fetchMessages();
 
     const interval = setInterval(() => {
@@ -171,6 +199,16 @@ export default function MessageDetailPage() {
 
     return () => clearInterval(interval);
   }, [conversationId, user?.id, soundEnabled]);
+
+  useEffect(() => {
+    if (draftAppliedRef.current) return;
+    if (!draftBody.trim()) return;
+    if (message.trim()) return;
+
+    setMessage(draftBody);
+    draftAppliedRef.current = true;
+    scrollBottom(320);
+  }, [draftBody, message]);
 
   useEffect(() => {
     scrollBottom(320);
@@ -189,7 +227,7 @@ export default function MessageDetailPage() {
 
       await api.post(`/conversations/${conversationId}/messages`, {
         senderId: user.id,
-        body: message.trim(),
+        body: `[${lockedTitle}]\n\n${message.trim()}`,
       });
 
       setMessage("");
@@ -223,12 +261,17 @@ export default function MessageDetailPage() {
               </div>
 
               <div className="min-w-0 flex-1 text-center">
+                <div className="mx-auto mb-1 inline-flex max-w-full items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-[10px] font-black text-white">
+                  <LockKeyhole size={12} />
+                  <span className="truncate">{lockedTitle}</span>
+                </div>
+
                 <h1 className="truncate text-[17px] font-black leading-tight md:text-[21px]">
                   EPH Mesajlaşma
                 </h1>
 
                 <p className="truncate text-[12px] font-medium text-blue-100 md:text-[13px]">
-                  Yeni mesajlar otomatik yenilenir
+                  Mesaj başlığı sabittir, mesaj metnini düzenleyebilirsin.
                 </p>
               </div>
 
@@ -326,6 +369,13 @@ export default function MessageDetailPage() {
               paddingBottom: "calc(8px + env(safe-area-inset-bottom))",
             }}
           >
+            <div className="mb-2 rounded-2xl border border-blue-100 bg-white px-4 py-3 text-center shadow-sm">
+              <div className="flex items-center justify-center gap-2 text-xs font-black text-blue-700">
+                <LockKeyhole size={14} />
+                Konu: {lockedTitle}
+              </div>
+            </div>
+
             <div className="flex items-end gap-2 md:gap-3">
               <div className="flex min-h-[50px] flex-1 items-end rounded-[26px] bg-white px-2 py-1 shadow-sm md:min-h-[58px] md:px-3 md:py-2">
                 <button
