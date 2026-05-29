@@ -124,9 +124,9 @@ function getMarketplaceActions(
   if (viewer === "realtor" && owner === "contractor") {
     return {
       primary: "Mesaj Gönder",
-      secondary: "Portföy Sun",
-      tertiary: "Uygun Müşterim Var",
-      note: "Bu müteahhit talebi için portföyünü veya hazır müşterini sunabilirsin.",
+      secondary: "Uygun Müşterim Var",
+      tertiary: "Talebe Çözüm Sun",
+      note: "Bu müteahhit talebi için hazır müşterin veya çözümün varsa görüşme başlatabilirsin.",
     };
   }
 
@@ -151,18 +151,18 @@ function getMarketplaceActions(
   if (viewer === "contractor" && owner === "construction") {
     return {
       primary: "Mesaj Gönder",
-      secondary: "Taşeronluk Teklif Et",
-      tertiary: "Proje İş Birliği",
-      note: "İnşaat firmasıyla proje, uygulama veya çözüm ortaklığı için bağlantı kurabilirsin.",
+      secondary: "Proje İş Birliği",
+      tertiary: "Kurumsal Görüşme Talep Et",
+      note: "İnşaat firmasıyla proje, satış veya çözüm ortaklığı için profesyonel görüşme başlatabilirsin.",
     };
   }
 
   if (viewer === "construction" && owner === "contractor") {
     return {
       primary: "Mesaj Gönder",
-      secondary: "Proje Daveti Gönder",
+      secondary: "Proje Görüşmesi Başlat",
       tertiary: "Çözüm Ortaklığı Kur",
-      note: "Bu müteahhitle proje, ekip veya saha iş birliği için görüşme başlatabilirsin.",
+      note: "Bu müteahhitle proje, saha veya çözüm ortaklığı için görüşme başlatabilirsin.",
     };
   }
 
@@ -1170,7 +1170,7 @@ function PremiumPostCard({
         >
           <p className="text-xs font-black leading-5" style={{ color: theme.text }}>
             {isOwnPost
-              ? "Bu paylaşım sana ait. Detay sayfasından yayını takip edebilirsin."
+              ? "Bu paylaşım sana ait. Detay sayfasından yayını takip edebilir veya güncelleyebilirsin."
               : actions.note}
           </p>
 
@@ -1209,14 +1209,15 @@ function PremiumPostCard({
                 color: theme.text,
               }}
             >
-              {actions.secondary}
+              {isOwnPost ? "Güncelle" : actions.secondary}
             </button>
 
             <button
               onClick={(event) => event.stopPropagation()}
-              className={`rounded-2xl bg-gradient-to-r ${theme.gradient} py-3 text-sm font-black text-white shadow-lg`}
+              disabled={isOwnPost}
+              className={`rounded-2xl bg-gradient-to-r ${theme.gradient} py-3 text-sm font-black text-white shadow-lg disabled:opacity-50`}
             >
-              {actions.tertiary}
+              {isOwnPost ? "Yayını Takip Et" : actions.tertiary}
             </button>
           </div>
         </div>

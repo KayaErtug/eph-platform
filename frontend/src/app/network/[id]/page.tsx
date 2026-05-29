@@ -101,9 +101,9 @@ function getMarketplaceActions(
   if (viewer === "realtor" && owner === "contractor") {
     return {
       primary: "Mesaj Gönder",
-      secondary: "Portföy Sun",
-      tertiary: "Uygun Müşterim Var",
-      note: "Bu müteahhit talebi için portföyünü veya hazır müşterini sunabilirsin.",
+      secondary: "Uygun Müşterim Var",
+      tertiary: "Talebe Çözüm Sun",
+      note: "Bu müteahhit talebi için hazır müşterin veya çözümün varsa görüşme başlatabilirsin.",
     };
   }
 
@@ -128,18 +128,18 @@ function getMarketplaceActions(
   if (viewer === "contractor" && owner === "construction") {
     return {
       primary: "Mesaj Gönder",
-      secondary: "Taşeronluk Teklif Et",
-      tertiary: "Proje İş Birliği",
-      note: "İnşaat firmasıyla proje, uygulama veya çözüm ortaklığı için bağlantı kurabilirsin.",
+      secondary: "Proje İş Birliği",
+      tertiary: "Kurumsal Görüşme Talep Et",
+      note: "İnşaat firmasıyla proje, satış veya çözüm ortaklığı için profesyonel görüşme başlatabilirsin.",
     };
   }
 
   if (viewer === "construction" && owner === "contractor") {
     return {
       primary: "Mesaj Gönder",
-      secondary: "Proje Daveti Gönder",
+      secondary: "Proje Görüşmesi Başlat",
       tertiary: "Çözüm Ortaklığı Kur",
-      note: "Bu müteahhitle proje, ekip veya saha iş birliği için görüşme başlatabilirsin.",
+      note: "Bu müteahhitle proje, saha veya çözüm ortaklığı için görüşme başlatabilirsin.",
     };
   }
 
@@ -558,7 +558,7 @@ export default function NetworkDetailPage() {
               >
                 <p className="text-xs font-black leading-5" style={{ color: theme.text }}>
                   {isOwnPost
-                    ? "Bu paylaşım sana ait. Gelen dönüşleri mesajlar bölümünden takip edebilirsin."
+                    ? "Bu paylaşım sana ait. Gelen dönüşleri takip edebilir veya paylaşımı güncelleyebilirsin."
                     : actions.note}
                 </p>
 
@@ -584,13 +584,14 @@ export default function NetworkDetailPage() {
                       color: theme.text,
                     }}
                   >
-                    {actions.secondary}
+                    {isOwnPost ? "Güncelle" : actions.secondary}
                   </button>
 
                   <button
-                    className={`rounded-2xl bg-gradient-to-r ${theme.gradient} px-5 py-4 text-sm font-black text-white`}
+                    disabled={isOwnPost}
+                    className={`rounded-2xl bg-gradient-to-r ${theme.gradient} px-5 py-4 text-sm font-black text-white disabled:opacity-50`}
                   >
-                    {actions.tertiary}
+                    {isOwnPost ? "Yayını Takip Et" : actions.tertiary}
                   </button>
                 </div>
               </div>
