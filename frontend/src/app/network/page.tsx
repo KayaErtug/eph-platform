@@ -1494,12 +1494,15 @@ function PremiumPostCard({
               onClick={(event) => {
                 event.stopPropagation();
 
-                if (!isOwnPost) {
-                  onStartConversation(
-                    actions.secondary,
-                    createPresetMessage(actions.secondary, post.title),
-                  );
+                if (isOwnPost) {
+                  onOpenDetail();
+                  return;
                 }
+
+                onStartConversation(
+                  actions.secondary,
+                  createPresetMessage(actions.secondary, post.title),
+                );
               }}
               className="rounded-2xl border py-3 text-sm font-black"
               style={{
