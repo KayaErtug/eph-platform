@@ -46,6 +46,7 @@ type NetworkPost = {
   tags: string[];
   expiresAt?: string;
   createdAt?: string;
+  updatedAt?: string;
 };
 
 type EditPostForm = {
@@ -60,6 +61,24 @@ type EditPostForm = {
   visibility: string;
   tags: string;
   validFor: string;
+};
+
+type NetworkPostUpdateLog = {
+  id: string;
+  summary: string;
+  changes: {
+    field: string;
+    label: string;
+    oldValue: unknown;
+    newValue: unknown;
+  }[];
+  createdAt: string;
+  user?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+  };
 };
 
 type NetworkPostStats = {
@@ -535,6 +554,7 @@ export default function NetworkDetailPage() {
 
   const [post, setPost] = useState<NetworkPost | null>(null);
   const [stats, setStats] = useState<NetworkPostStats | null>(null);
+  const [updateLogs, setUpdateLogs] = useState<NetworkPostUpdateLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [startingConversation, setStartingConversation] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -553,6 +573,7 @@ export default function NetworkDetailPage() {
 
     fetchPost();
     fetchStats();
+    fetchUpdateLogs();
   }, [id]);
 
   const fetchPost = async () => {
@@ -576,6 +597,17 @@ export default function NetworkDetailPage() {
       setStats(res.data);
     } catch {
       setStats(null);
+    }
+  };
+
+  const fetchUpdateLogs = async () => {
+    if (!id) return;
+
+    try {
+      const res = await api.get(`/network/posts/${id}/update-logs`);
+      setUpdateLogs(res.data || []);
+    } catch {
+      setUpdateLogs([]);
     }
   };
 
@@ -650,6 +682,7 @@ export default function NetworkDetailPage() {
 
       await fetchPost();
       await fetchStats();
+      await fetchUpdateLogs();
       setEditOpen(false);
     } catch {
       alert("Paylaşım güncellenemedi.");
@@ -1008,13 +1041,70 @@ export default function NetworkDetailPage() {
               </div>
             )}
 
+            <div
+              className="rounded-[32px] border bg-white p-6 text-center shadow-sm"
+              style={{ borderColor: theme.border }}
+            >
+              <h3 className="text-xl font-black text-slate-900">
+                Güncelleme Geçmişi
+              </h3>
+
+              <p className="mt-2 text-sm font-semibold text-slate-500">
+                Bu paylaşımda yapılan önemli değişiklikler burada görünür.
+              </p>
+
+              <div className="mt-5 space-y-3">
+                {updateLogs.length > 0 ? (
+                  updateLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="rounded-2xl border px-4 py-4 text-left"
+                      style={{
+                        borderColor: theme.border,
+                        backgroundColor: theme.soft,
+                      }}
+                    >
+                      <div className="text-sm font-black" style={{ color: theme.text }}>
+                        {log.summary}
+                      </div>
+
+                      <div className="mt-1 text-[11px] font-bold text-slate-500">
+                        {formatDateTime(log.createdAt)}
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        {log.changes.map((change) => (
+                          <div
+                            key={`${log.id}-${change.field}`}
+                            className="rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-600"
+                          >
+                            <span className="font-black text-slate-900">
+                              {change.label}:
+                            </span>{" "}
+                            {displayLogValue(change.oldValue)} → {displayLogValue(change.newValue)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-500">
+                    Bu paylaşımda henüz kayıtlı güncelleme yok.
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div className="rounded-[32px] border border-slate-200 bg-white p-6 text-center shadow-sm">
               <h3 className="text-xl font-black text-slate-900">
                 Tarih Bilgisi
               </h3>
 
               <div className="mt-4 space-y-3 text-sm font-semibold text-slate-600">
-                <p>Yayın: {formatDateTime(post.createdAt)}</p>
+                <p>İlan tarihi: {formatDateTime(post.createdAt)}</p>
+                {!isSameCreatedUpdated(post.createdAt, (post as any).updatedAt) && (
+                  <p>Güncelleme: {formatDateTime((post as any).updatedAt)}</p>
+                )}
                 <p>Bitiş: {formatDateTime(post.expiresAt)}</p>
               </div>
             </div>
@@ -1035,6 +1125,26 @@ export default function NetworkDetailPage() {
   );
 }
 
+
+
+function displayLogValue(value: unknown) {
+  if (value == null || value === '') return 'Boş';
+  if (Array.isArray(value)) return value.join(', ') || 'Boş';
+
+  const text = String(value);
+
+  if (/^\d{4}-\d{2}-\d{2}T/.test(text)) {
+    return formatDateTime(text);
+  }
+
+  return text;
+}
+
+function isSameCreatedUpdated(createdAt?: string, updatedAt?: string) {
+  if (!createdAt || !updatedAt) return true;
+
+  return Math.abs(new Date(updatedAt).getTime() - new Date(createdAt).getTime()) < 2000;
+}
 
 function validForFromExpiresAt(value?: string) {
   if (!value) return "7 gün";

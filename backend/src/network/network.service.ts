@@ -32,6 +32,41 @@ type UpdateNetworkPostDto = {
   expiresAt?: string;
 };
 
+
+type NetworkPostChangeItem = {
+  field: string;
+  label: string;
+  oldValue: unknown;
+  newValue: unknown;
+};
+
+function normalizeValue(value: unknown) {
+  if (value == null) return '';
+  if (Array.isArray(value)) return value.join(',');
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+}
+
+function valuesChanged(oldValue: unknown, newValue: unknown) {
+  return normalizeValue(oldValue) !== normalizeValue(newValue);
+}
+
+function summarizeChanges(changes: NetworkPostChangeItem[]) {
+  const labels = changes.map((change) => change.label);
+
+  if (labels.includes('Bütçe')) return 'Bu ilanda fiyat değişti.';
+  if (labels.includes('Açıklama')) return 'Bu ilanda açıklama değişti.';
+  if (
+    labels.includes('İl') ||
+    labels.includes('İlçe') ||
+    labels.includes('Mahalle')
+  ) {
+    return 'Bu ilanda lokasyon değişti.';
+  }
+
+  return `Bu ilanda ${labels.join(', ')} değişti.`;
+}
+
 @Injectable()
 export class NetworkService {
   constructor(private readonly prisma: PrismaService) {}
@@ -199,6 +234,35 @@ export class NetworkService {
     };
   }
 
+  async getUpdateLogs(id: string) {
+    const logs = await this.prisma.networkPostUpdateLog.findMany({
+      where: {
+        postId: id,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return logs.map((log) => ({
+      id: log.id,
+      summary: log.summary,
+      changes: log.changes,
+      createdAt: log.createdAt,
+      user: log.user,
+    }));
+  }
+
   async update(id: string, dto: UpdateNetworkPostDto) {
     const existing = await this.prisma.networkPost.findFirst({
       where: {
@@ -215,22 +279,59 @@ export class NetworkService {
       throw new NotFoundException('Bu paylaşımı güncelleme yetkiniz yok.');
     }
 
-    return this.prisma.networkPost.update({
+    const nextData = {
+      type: dto.type ?? existing.type,
+      title: dto.title ?? existing.title,
+      description: dto.description ?? existing.description,
+      city: dto.city ?? existing.city,
+      district: dto.district ?? existing.district,
+      neighborhood: dto.neighborhood ?? existing.neighborhood,
+      budget: dto.budget ?? existing.budget,
+      urgency: dto.urgency ?? existing.urgency,
+      visibility: (dto.visibility as any) ?? existing.visibility,
+      tags: dto.tags ?? existing.tags,
+      expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : existing.expiresAt,
+    };
+
+    const changes: NetworkPostChangeItem[] = [];
+
+    const watchedFields: Array<{
+      field: keyof typeof nextData;
+      label: string;
+    }> = [
+      { field: 'type', label: 'Paylaşım tipi' },
+      { field: 'title', label: 'Başlık' },
+      { field: 'description', label: 'Açıklama' },
+      { field: 'city', label: 'İl' },
+      { field: 'district', label: 'İlçe' },
+      { field: 'neighborhood', label: 'Mahalle' },
+      { field: 'budget', label: 'Bütçe' },
+      { field: 'urgency', label: 'Aciliyet' },
+      { field: 'visibility', label: 'Görünürlük' },
+      { field: 'tags', label: 'Etiketler' },
+      { field: 'expiresAt', label: 'Geçerlilik tarihi' },
+    ];
+
+    watchedFields.forEach((item) => {
+      const oldValue = existing[item.field as keyof typeof existing];
+      const newValue = nextData[item.field];
+
+      if (valuesChanged(oldValue, newValue)) {
+        changes.push({
+          field: item.field,
+          label: item.label,
+          oldValue,
+          newValue,
+        });
+      }
+    });
+
+    const updatedPost = await this.prisma.networkPost.update({
       where: {
         id,
       },
       data: {
-        type: dto.type ?? existing.type,
-        title: dto.title ?? existing.title,
-        description: dto.description ?? existing.description,
-        city: dto.city ?? existing.city,
-        district: dto.district ?? existing.district,
-        neighborhood: dto.neighborhood ?? existing.neighborhood,
-        budget: dto.budget ?? existing.budget,
-        urgency: dto.urgency ?? existing.urgency,
-        visibility: (dto.visibility as any) ?? existing.visibility,
-        tags: dto.tags ?? existing.tags,
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : existing.expiresAt,
+        ...nextData,
         updatedAt: new Date(),
       },
       include: {
@@ -244,6 +345,19 @@ export class NetworkService {
         },
       },
     });
+
+    if (changes.length > 0) {
+      await this.prisma.networkPostUpdateLog.create({
+        data: {
+          postId: id,
+          userId: dto.userId,
+          summary: summarizeChanges(changes),
+          changes,
+        },
+      });
+    }
+
+    return updatedPost;
   }
 
   async create(dto: CreateNetworkPostDto) {

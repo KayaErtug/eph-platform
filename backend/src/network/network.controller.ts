@@ -15,6 +15,11 @@ export class NetworkController {
     return this.networkService.getPostStats(id);
   }
 
+  @Get('posts/:id/update-logs')
+  getUpdateLogs(@Param('id') id: string) {
+    return this.networkService.getUpdateLogs(id);
+  }
+
   @Get('posts/:id')
   findOne(@Param('id') id: string) {
     return this.networkService.findOne(id);

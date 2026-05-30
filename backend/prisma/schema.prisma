@@ -34,6 +34,7 @@ model User {
   documents               Document[]
   Message                 Message[]
   NetworkPost             NetworkPost[]
+  NetworkPostUpdateLog    NetworkPostUpdateLog[]
   nominations             Nomination[]
   projects                Project[]
   tasks                   Task[]
@@ -268,24 +269,36 @@ model Message {
 }
 
 model NetworkPost {
-  id           String            @id
-  userId       String
-  type         String
-  title        String
-  description  String
-  city         String?
-  district     String?
-  neighborhood String?
-  budget       Float?
-  urgency      String?
-  visibility   NetworkVisibility @default(TUM_EPH)
-  tags         String[]
-  expiresAt    DateTime
-  isActive     Boolean           @default(true)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime
-  Conversation Conversation[]
-  User         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String                 @id
+  userId               String
+  type                 String
+  title                String
+  description          String
+  city                 String?
+  district             String?
+  neighborhood         String?
+  budget               Float?
+  urgency              String?
+  visibility           NetworkVisibility      @default(TUM_EPH)
+  tags                 String[]
+  expiresAt            DateTime
+  isActive             Boolean                @default(true)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime
+  Conversation         Conversation[]
+  updateLogs           NetworkPostUpdateLog[]
+  User                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NetworkPostUpdateLog {
+  id        String      @id @default(uuid())
+  postId    String
+  userId    String
+  summary   String
+  changes   Json
+  createdAt DateTime    @default(now())
+  post      NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model PushSubscription {
