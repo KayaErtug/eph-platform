@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { UnitsService } from './units.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -13,9 +23,13 @@ export class UnitsController {
 
   @Post('project/:projectId')
   @UseGuards(RolesGuard)
-  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
-  create(@CurrentUser() user: any, @Param('projectId') projectId: string, @Body() body: any) {
-    return this.unitsService.create(user.id, projectId, body);
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
+  create(
+    @CurrentUser() user: any,
+    @Param('projectId') projectId: string,
+    @Body() body: any,
+  ) {
+    return this.unitsService.create(user, projectId, body);
   }
 
   @Get()
@@ -26,8 +40,15 @@ export class UnitsController {
     @Query('isOffMarket') isOffMarket?: string,
   ) {
     return this.unitsService.findAll({
-      status, type, city,
-      isOffMarket: isOffMarket === 'true' ? true : isOffMarket === 'false' ? false : undefined,
+      status,
+      type,
+      city,
+      isOffMarket:
+        isOffMarket === 'true'
+          ? true
+          : isOffMarket === 'false'
+            ? false
+            : undefined,
     });
   }
 
@@ -48,33 +69,41 @@ export class UnitsController {
   @Patch(':id/verify')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
-  verify(@Param('id') id: string, @Body() body: {
-    tapuVerified?: boolean;
-    photoVerified?: boolean;
-    yetkiVerified?: boolean;
-    isOffMarket?: boolean;
-  }) {
+  verify(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      tapuVerified?: boolean;
+      photoVerified?: boolean;
+      yetkiVerified?: boolean;
+      isOffMarket?: boolean;
+    },
+  ) {
     return this.unitsService.verifyUnit(id, body);
   }
 
   @Patch(':id/status')
   @UseGuards(RolesGuard)
-  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
-  updateStatus(@Param('id') id: string, @CurrentUser() user: any, @Body('status') status: UnitStatus) {
-    return this.unitsService.updateStatus(id, user.id, status);
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
+  updateStatus(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body('status') status: UnitStatus,
+  ) {
+    return this.unitsService.updateStatus(id, user, status);
   }
 
   @Patch(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
   update(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
-    return this.unitsService.update(id, user.id, body);
+    return this.unitsService.update(id, user, body);
   }
 
   @Delete(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
   remove(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.unitsService.remove(id, user.id);
+    return this.unitsService.remove(id, user);
   }
 }
