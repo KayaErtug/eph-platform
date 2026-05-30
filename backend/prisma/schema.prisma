@@ -8,22 +8,30 @@ datasource db {
 }
 
 model User {
-  id                      String                    @id @default(uuid())
-  email                   String                    @unique
-  phone                   String                    @unique
-  passwordHash            String
-  firstName               String
-  lastName                String
-  profileImageUrl         String?
-  role                    Role
-  isVerified              Boolean                   @default(false)
-  isApproved              Boolean                   @default(false)
-  adminVisible            Boolean                   @default(true)
-  createdAt               DateTime                  @default(now())
-  updatedAt               DateTime                  @updatedAt
-  nominationPoints        Int                       @default(0)
-  nominationQuota         Int                       @default(10)
-  referralCode            String?                   @unique
+  id              String  @id @default(uuid())
+  email           String  @unique
+  phone           String  @unique
+  passwordHash    String
+  firstName       String
+  lastName        String
+  profileImageUrl String?
+  role            Role
+  isVerified      Boolean @default(false)
+  isApproved      Boolean @default(false)
+  adminVisible    Boolean @default(true)
+
+  memberCode  String?   @unique
+  memberSince DateTime?
+  trustScore  Int       @default(70)
+  riskLevel   RiskLevel @default(DUSUK)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  nominationPoints Int     @default(0)
+  nominationQuota  Int     @default(10)
+  referralCode     String? @unique
+
   activities              Activity[]
   applications            Application[]
   reviewedApplications    Application[]             @relation("ApplicationReviewer")
@@ -43,6 +51,27 @@ model User {
   tasks                   Task[]
   visits                  UserVisit[]
   pushSubscriptions       PushSubscription[]
+
+  superAdminProfile    SUPER_ADMIN?
+  reportsCreated       Report[]               @relation("ReportReporter")
+  reportsResolved      Report[]               @relation("ReportResolver")
+  restrictions         UserRestriction[]      @relation("RestrictedUser")
+  restrictionsCreated  UserRestriction[]      @relation("RestrictionCreator")
+  adminActionLogs      AdminActionLog[]       @relation("AdminActionActor")
+  adminActionTargets   AdminActionLog[]       @relation("AdminActionTarget")
+  announcementsCreated PlatformAnnouncement[] @relation("AnnouncementCreator")
+}
+
+model SUPER_ADMIN {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  title       String   @default("Süper Admin")
+  isActive    Boolean  @default(true)
+  permissions String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Invitation {
@@ -57,17 +86,17 @@ model Invitation {
 }
 
 model ReferralCandidate {
-  id           String   @id @default(uuid())
-  referralCode String  @unique
+  id           String    @id @default(uuid())
+  referralCode String    @unique
   firstName    String
   lastName     String
-  email        String   @unique
-  phone        String   @unique
+  email        String    @unique
+  phone        String    @unique
   role         Role
-  isActive     Boolean  @default(true)
+  isActive     Boolean   @default(true)
   usedAt       DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 model Document {
@@ -79,7 +108,8 @@ model Document {
   fileName  String
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
-  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Project {
@@ -93,8 +123,9 @@ model Project {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  owner       User     @relation(fields: [ownerId], references: [id])
-  units       Unit[]
+
+  owner User   @relation(fields: [ownerId], references: [id])
+  units Unit[]
 }
 
 model Unit {
@@ -116,7 +147,92 @@ model Unit {
   tapuVerified  Boolean    @default(false)
   verifiedAt    DateTime?
   yetkiVerified Boolean    @default(false)
-  project       Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Report {
+  id             String       @id @default(uuid())
+  reporterId     String
+  targetUserId   String?
+  entityType     String
+  entityId       String?
+  reason         String
+  description    String?
+  status         ReportStatus @default(ACIK)
+  resolvedById   String?
+  resolvedAt     DateTime?
+  resolutionNote String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  reporter   User  @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedBy User? @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([reporterId])
+  @@index([targetUserId])
+  @@index([status])
+}
+
+model UserRestriction {
+  id          String          @id @default(uuid())
+  userId      String
+  createdById String
+  type        RestrictionType
+  reason      String
+  isActive    Boolean         @default(true)
+  startsAt    DateTime        @default(now())
+  endsAt      DateTime?
+  liftedAt    DateTime?
+  liftedNote  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  user      User @relation("RestrictedUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User @relation("RestrictionCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
+}
+
+model AdminActionLog {
+  id           String   @id @default(uuid())
+  actorId      String?
+  targetUserId String?
+  action       String
+  entityType   String
+  entityId     String?
+  description  String?
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  actor      User? @relation("AdminActionActor", fields: [actorId], references: [id], onDelete: SetNull)
+  targetUser User? @relation("AdminActionTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([targetUserId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model PlatformAnnouncement {
+  id          String               @id @default(uuid())
+  createdById String
+  title       String
+  content     String
+  audience    AnnouncementAudience @default(TUM_UYELER)
+  isActive    Boolean              @default(true)
+  startsAt    DateTime             @default(now())
+  endsAt      DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  createdBy User @relation("AnnouncementCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([isActive])
+  @@index([audience])
 }
 
 model Nomination {
@@ -131,7 +247,8 @@ model Nomination {
   adminNote      String?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
-  nominator      User             @relation(fields: [nominatorId], references: [id], onDelete: Cascade)
+
+  nominator User @relation(fields: [nominatorId], references: [id], onDelete: Cascade)
 }
 
 model Application {
@@ -161,8 +278,9 @@ model Application {
   reviewedById          String?
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
-  referrer              User?             @relation(fields: [referrerId], references: [id])
-  reviewedBy            User?             @relation("ApplicationReviewer", fields: [reviewedById], references: [id])
+
+  referrer   User? @relation(fields: [referrerId], references: [id])
+  reviewedBy User? @relation("ApplicationReviewer", fields: [reviewedById], references: [id])
 }
 
 model Lead {
@@ -198,9 +316,10 @@ model Customer {
   lastContactedAt DateTime?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  activities      Activity[]
-  owner           User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  tasks           Task[]
+
+  activities Activity[]
+  owner      User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tasks      Task[]
 }
 
 model Activity {
@@ -210,8 +329,9 @@ model Activity {
   type       ActivityType
   note       String
   createdAt  DateTime     @default(now())
-  customer   Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Task {
@@ -223,8 +343,9 @@ model Task {
   status     TaskStatus @default(BEKLIYOR)
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
-  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UserVisit {
@@ -234,96 +355,104 @@ model UserVisit {
   ip        String?
   userAgent String?
   createdAt DateTime @default(now())
-  user      User?    @relation(fields: [userId], references: [id])
+
+  user User? @relation(fields: [userId], references: [id])
 }
 
 model Conversation {
-  id                      String                    @id
-  postId                  String?
-  title                   String
-  status                  ConversationStatus        @default(ACTIVE)
-  createdAt               DateTime                  @default(now())
-  updatedAt               DateTime
+  id        String             @id
+  postId    String?
+  title     String
+  status    ConversationStatus @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime
+
   NetworkPost             NetworkPost?              @relation(fields: [postId], references: [id])
   ConversationParticipant ConversationParticipant[]
   Message                 Message[]
 }
 
 model ConversationParticipant {
-  id             String       @id
+  id             String    @id
   conversationId String
   userId         String
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime  @default(now())
   lastReadAt     DateTime?
-  Conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  User           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  Conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  User         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, userId])
 }
 
 model Message {
-  id             String       @id
+  id             String   @id
   conversationId String
   senderId       String
   body           String
-  createdAt      DateTime     @default(now())
-  Conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  User           User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  Conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  User         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
 }
 
 model NetworkPost {
-  id                   String                 @id
-  userId               String
-  type                 String
-  title                String
-  description          String
-  city                 String?
-  district             String?
-  neighborhood         String?
-  budget               Float?
-  urgency              String?
-  visibility           NetworkVisibility      @default(TUM_EPH)
-  tags                 String[]
-  expiresAt            DateTime
-  isActive             Boolean                @default(true)
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime
-  Conversation         Conversation[]
-  updateLogs           NetworkPostUpdateLog[]
-  followers            NetworkPostFollower[]
-  views                NetworkPostView[]
-  User                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String            @id
+  userId       String
+  type         String
+  title        String
+  description  String
+  city         String?
+  district     String?
+  neighborhood String?
+  budget       Float?
+  urgency      String?
+  visibility   NetworkVisibility @default(TUM_EPH)
+  tags         String[]
+  expiresAt    DateTime
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime
+
+  Conversation Conversation[]
+  updateLogs   NetworkPostUpdateLog[]
+  followers    NetworkPostFollower[]
+  views        NetworkPostView[]
+  User         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model NetworkPostUpdateLog {
-  id        String      @id @default(uuid())
+  id        String   @id @default(uuid())
   postId    String
   userId    String
   summary   String
   changes   Json
-  createdAt DateTime    @default(now())
-  post      NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  post NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model NetworkPostFollower {
-  id        String      @id @default(uuid())
+  id        String   @id @default(uuid())
   postId    String
   userId    String
-  createdAt DateTime    @default(now())
-  post      NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  post NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
 }
 
 model NetworkPostView {
-  id        String      @id @default(uuid())
+  id        String   @id @default(uuid())
   postId    String
   userId    String?
-  createdAt DateTime    @default(now())
-  post      NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  post NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([postId])
   @@index([userId])
@@ -338,7 +467,8 @@ model NetworkNotification {
   message   String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([isRead])
@@ -352,7 +482,8 @@ model PushSubscription {
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
@@ -367,8 +498,9 @@ model AuditLog {
   ipAddress    String?
   userAgent    String?
   createdAt    DateTime    @default(now())
-  actor        User?       @relation("AuditActor", fields: [actorId], references: [id])
-  targetUser   User?       @relation("AuditTargetUser", fields: [targetUserId], references: [id])
+
+  actor      User? @relation("AuditActor", fields: [actorId], references: [id])
+  targetUser User? @relation("AuditTargetUser", fields: [targetUserId], references: [id])
 }
 
 enum Role {
@@ -376,7 +508,38 @@ enum Role {
   MUTEAHHIT
   INSAAT_FIRMASI
   ADMIN
-  DENETCI_ADMIN
+  SUPER_ADMIN
+}
+
+enum RiskLevel {
+  DUSUK
+  ORTA
+  YUKSEK
+  KRITIK
+}
+
+enum ReportStatus {
+  ACIK
+  INCELENIYOR
+  COZULDU
+  REDDEDILDI
+}
+
+enum RestrictionType {
+  GIRIS_ENGELI
+  PAYLASIM_ENGELI
+  MESAJ_ENGELI
+  ILAN_ENGELI
+  GECICI_ASKI
+  KALICI_ASKI
+}
+
+enum AnnouncementAudience {
+  TUM_UYELER
+  EMLAKCILAR
+  MUTEAHHITLER
+  INSAAT_FIRMALARI
+  ADMINLER
 }
 
 enum InvitationStatus {
