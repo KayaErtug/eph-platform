@@ -35,6 +35,7 @@ model User {
   Message                 Message[]
   NetworkPost             NetworkPost[]
   NetworkPostUpdateLog    NetworkPostUpdateLog[]
+  NetworkPostFollower     NetworkPostFollower[]
   nominations             Nomination[]
   projects                Project[]
   tasks                   Task[]
@@ -287,6 +288,7 @@ model NetworkPost {
   updatedAt            DateTime
   Conversation         Conversation[]
   updateLogs           NetworkPostUpdateLog[]
+  followers            NetworkPostFollower[]
   User                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -299,6 +301,17 @@ model NetworkPostUpdateLog {
   createdAt DateTime    @default(now())
   post      NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NetworkPostFollower {
+  id        String      @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime    @default(now())
+  post      NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
 }
 
 model PushSubscription {

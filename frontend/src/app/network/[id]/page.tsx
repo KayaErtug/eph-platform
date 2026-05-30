@@ -11,6 +11,7 @@ import {
   MapPin,
   MessageCircle,
   Sparkles,
+  Star,
   Tag,
   UsersRound,
   WalletCards,
@@ -85,6 +86,7 @@ type NetworkPostStats = {
   postId: string;
   postTitle: string;
   total: number;
+  followerCount?: number;
   byTitle: {
     title: string;
     count: number;
@@ -106,6 +108,12 @@ type NetworkPostStats = {
       };
     } | null;
   }[];
+};
+
+type NetworkPostFollowStatus = {
+  postId: string;
+  isFollowing: boolean;
+  followerCount: number;
 };
 
 type RoleTheme = {
@@ -496,6 +504,15 @@ function formatMoney(value?: string | number | null) {
   return `${numeric.toLocaleString("tr-TR")} TL`;
 }
 
+function visibilityLabel(value?: string) {
+  if (value === "TUM_EPH") return "Tüm EPH Üyeleri";
+  if (value === "SADECE_EMLAKCILAR") return "Sadece Emlakçılar";
+  if (value === "SADECE_MUTEAHHITLER") return "Müteahhit ve İnşaat Firmaları";
+  if (value === "SADECE_BAGLANTILARIM") return "Bağlantılarım";
+
+  return value || "Tüm EPH Üyeleri";
+}
+
 function relativeTime(value?: string) {
   if (!value) return "-";
 
@@ -555,10 +572,12 @@ export default function NetworkDetailPage() {
   const [post, setPost] = useState<NetworkPost | null>(null);
   const [stats, setStats] = useState<NetworkPostStats | null>(null);
   const [updateLogs, setUpdateLogs] = useState<NetworkPostUpdateLog[]>([]);
+  const [followStatus, setFollowStatus] = useState<NetworkPostFollowStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [startingConversation, setStartingConversation] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   const postUser = getPostUser(post);
   const theme = useMemo(() => getRoleTheme(postUser?.role), [postUser?.role]);
@@ -574,7 +593,8 @@ export default function NetworkDetailPage() {
     fetchPost();
     fetchStats();
     fetchUpdateLogs();
-  }, [id]);
+    fetchFollowStatus();
+  }, [id, user?.id]);
 
   const fetchPost = async () => {
     setLoading(true);
@@ -608,6 +628,18 @@ export default function NetworkDetailPage() {
       setUpdateLogs(res.data || []);
     } catch {
       setUpdateLogs([]);
+    }
+  };
+
+  const fetchFollowStatus = async () => {
+    if (!id) return;
+
+    try {
+      const query = user?.id ? `?userId=${user.id}` : "";
+      const res = await api.get(`/network/posts/${id}/follow-status${query}`);
+      setFollowStatus(res.data);
+    } catch {
+      setFollowStatus(null);
     }
   };
 
@@ -648,6 +680,45 @@ export default function NetworkDetailPage() {
     }
   };
 
+  const toggleFollow = async () => {
+    if (!post || !user?.id) {
+      alert("Lütfen tekrar giriş yapın.");
+      router.push("/giris");
+      return;
+    }
+
+    if (isOwnPost) {
+      alert("Kendi paylaşımınızı takip etmenize gerek yok.");
+      return;
+    }
+
+    try {
+      setFollowLoading(true);
+
+      if (followStatus?.isFollowing) {
+        const res = await api.delete(`/network/posts/${post.id}/follow`, {
+          data: {
+            userId: user.id,
+          },
+        });
+
+        setFollowStatus(res.data);
+      } else {
+        const res = await api.post(`/network/posts/${post.id}/follow`, {
+          userId: user.id,
+        });
+
+        setFollowStatus(res.data);
+      }
+
+      await fetchStats();
+    } catch {
+      alert("Takip işlemi yapılamadı.");
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
   const updatePost = async (form: EditPostForm) => {
     if (!post || !user?.id) return;
 
@@ -683,6 +754,7 @@ export default function NetworkDetailPage() {
       await fetchPost();
       await fetchStats();
       await fetchUpdateLogs();
+      await fetchFollowStatus();
       setEditOpen(false);
     } catch {
       alert("Paylaşım güncellenemedi.");
@@ -764,11 +836,12 @@ export default function NetworkDetailPage() {
               </div>
             </div>
 
-            <div className="mt-7 grid gap-3 md:grid-cols-4">
+            <div className="mt-7 grid gap-3 md:grid-cols-5">
               <DetailHeroStat icon={<UsersRound size={20} />} label="Paylaşan" value={authorName} />
               <DetailHeroStat icon={<Tag size={20} />} label="Tip" value={post.type} />
               <DetailHeroStat icon={<WalletCards size={20} />} label="Bütçe" value={formatMoney(post.budget)} />
               <DetailHeroStat icon={<Clock size={20} />} label="Yayın" value={relativeTime(post.createdAt)} />
+              <DetailHeroStat icon={<Star size={20} />} label="Takipçi" value={String(followStatus?.followerCount ?? stats?.followerCount ?? 0)} />
             </div>
           </div>
         </section>
@@ -816,7 +889,7 @@ export default function NetworkDetailPage() {
               <DetailInfoCard
                 icon={<Building2 size={22} />}
                 label="Görünürlük"
-                value={post.visibility || "TUM_EPH"}
+                value={visibilityLabel(post.visibility)}
                 theme={theme}
               />
             </div>
@@ -875,6 +948,60 @@ export default function NetworkDetailPage() {
               >
                 {theme.label}
               </p>
+
+              <div
+                className="mt-5 rounded-[24px] border p-4 text-center"
+                style={{
+                  borderColor: theme.border,
+                  backgroundColor: "#FFFFFF",
+                }}
+              >
+                <div
+                  className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl"
+                  style={{
+                    backgroundColor: theme.soft,
+                    color: theme.primary,
+                  }}
+                >
+                  <Star size={22} />
+                </div>
+
+                <p className="text-sm font-black text-slate-900">
+                  {followStatus?.followerCount || 0} kişi takip ediyor
+                </p>
+
+                <p className="mt-1 text-xs font-semibold text-slate-500">
+                  Takibe alan üyeler güncellemeleri daha kolay takip eder.
+                </p>
+
+                {!isOwnPost && (
+                  <button
+                    onClick={toggleFollow}
+                    disabled={followLoading}
+                    className={`mt-4 w-full rounded-2xl px-5 py-4 text-sm font-black transition disabled:opacity-60 ${
+                      followStatus?.isFollowing
+                        ? "border bg-white"
+                        : "text-white"
+                    }`}
+                    style={
+                      followStatus?.isFollowing
+                        ? {
+                            borderColor: theme.border,
+                            color: theme.text,
+                          }
+                        : {
+                            backgroundColor: theme.primary,
+                          }
+                    }
+                  >
+                    {followLoading
+                      ? "İşleniyor..."
+                      : followStatus?.isFollowing
+                        ? "Takip Ediliyor ⭐"
+                        : "Takibe Al ⭐"}
+                  </button>
+                )}
+              </div>
 
               <div
                 className="mt-5 rounded-[24px] border p-4 text-center"

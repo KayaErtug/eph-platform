@@ -200,10 +200,17 @@ export class NetworkService {
       }))
       .sort((a, b) => b.count - a.count);
 
+    const followerCount = await this.prisma.networkPostFollower.count({
+      where: {
+        postId: id,
+      },
+    });
+
     return {
       postId: post.id,
       postTitle: post.title,
       total: conversations.length,
+      followerCount,
       byTitle,
       latest: conversations.slice(0, 8).map((conversation) => {
         const lastMessage = conversation.Message[0];
@@ -271,6 +278,156 @@ export class NetworkService {
         user: log.user,
       };
     });
+  }
+
+
+  async getFollowStatus(id: string, userId?: string) {
+    const post = await this.prisma.networkPost.findFirst({
+      where: {
+        id,
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Pazaryeri paylaşımı bulunamadı.');
+    }
+
+    const followerCount = await this.prisma.networkPostFollower.count({
+      where: {
+        postId: id,
+      },
+    });
+
+    if (!userId) {
+      return {
+        postId: id,
+        isFollowing: false,
+        followerCount,
+      };
+    }
+
+    const existing = await this.prisma.networkPostFollower.findUnique({
+      where: {
+        postId_userId: {
+          postId: id,
+          userId,
+        },
+      },
+    });
+
+    return {
+      postId: id,
+      isFollowing: Boolean(existing),
+      followerCount,
+    };
+  }
+
+  async followPost(id: string, userId: string) {
+    if (!userId) {
+      return {
+        ok: false,
+        message: 'Takip işlemi için kullanıcı bilgisi eksik.',
+      };
+    }
+
+    const post = await this.prisma.networkPost.findFirst({
+      where: {
+        id,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        userId: true,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Pazaryeri paylaşımı bulunamadı.');
+    }
+
+    if (post.userId === userId) {
+      return {
+        ok: false,
+        message: 'Kendi paylaşımınızı takip etmenize gerek yok.',
+      };
+    }
+
+    await this.prisma.networkPostFollower.upsert({
+      where: {
+        postId_userId: {
+          postId: id,
+          userId,
+        },
+      },
+      update: {},
+      create: {
+        postId: id,
+        userId,
+      },
+    });
+
+    return this.getFollowStatus(id, userId);
+  }
+
+  async unfollowPost(id: string, userId: string) {
+    if (!userId) {
+      return {
+        ok: false,
+        message: 'Takipten çıkmak için kullanıcı bilgisi eksik.',
+      };
+    }
+
+    await this.prisma.networkPostFollower.deleteMany({
+      where: {
+        postId: id,
+        userId,
+      },
+    });
+
+    return this.getFollowStatus(id, userId);
+  }
+
+  async getFollowedPosts(userId: string) {
+    if (!userId) return [];
+
+    const follows = await this.prisma.networkPostFollower.findMany({
+      where: {
+        userId,
+        post: {
+          isActive: true,
+          expiresAt: {
+            gt: new Date(),
+          },
+        },
+      },
+      include: {
+        post: {
+          include: {
+            User: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return follows.map((follow) => ({
+      id: follow.id,
+      followedAt: follow.createdAt,
+      post: follow.post,
+    }));
   }
 
   async update(id: string, dto: UpdateNetworkPostDto) {
