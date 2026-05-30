@@ -68,6 +68,49 @@ function summarizeChanges(changes: NetworkPostChangeItem[]) {
   return `Bu ilanda ${labels.join(', ')} değişti.`;
 }
 
+function formatNotificationValue(value: unknown) {
+  if (value == null || value === '') return 'Boş';
+  if (Array.isArray(value)) return value.join(', ') || 'Boş';
+
+  if (value instanceof Date) {
+    return value.toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+
+  if (typeof value === 'number') {
+    return `${value.toLocaleString('tr-TR')} TL`;
+  }
+
+  const text = String(value);
+
+  if (/^\d{4}-\d{2}-\d{2}T/.test(text)) {
+    return new Date(text).toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+
+  return text;
+}
+
+function buildNotificationMessage(changes: NetworkPostChangeItem[]) {
+  const important = changes.slice(0, 4);
+
+  if (important.length === 0) {
+    return 'Takip ettiğiniz ilanda güncelleme yapıldı.';
+  }
+
+  const lines = important.map((change) => {
+    return `${change.label}: ${formatNotificationValue(change.oldValue)} → ${formatNotificationValue(change.newValue)}`;
+  });
+
+  return `Takip ettiğiniz ilanda güncelleme yapıldı.\n\n${lines.join('\n')}`;
+}
+
 @Injectable()
 export class NetworkService {
   constructor(private readonly prisma: PrismaService) {}
@@ -430,6 +473,102 @@ export class NetworkService {
     }));
   }
 
+
+  async getNotifications(userId: string) {
+    if (!userId) {
+      return {
+        unreadCount: 0,
+        items: [],
+      };
+    }
+
+    const [unreadCount, items] = await Promise.all([
+      this.prisma.networkNotification.count({
+        where: {
+          userId,
+          isRead: false,
+        },
+      }),
+      this.prisma.networkNotification.findMany({
+        where: {
+          userId,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 12,
+      }),
+    ]);
+
+    return {
+      unreadCount,
+      items,
+    };
+  }
+
+  async markNotificationsAsRead(userId: string) {
+    if (!userId) {
+      return {
+        ok: false,
+        unreadCount: 0,
+      };
+    }
+
+    await this.prisma.networkNotification.updateMany({
+      where: {
+        userId,
+        isRead: false,
+      },
+      data: {
+        isRead: true,
+      },
+    });
+
+    return {
+      ok: true,
+      unreadCount: 0,
+    };
+  }
+
+  private async createUpdateNotifications(
+    postId: string,
+    ownerId: string,
+    postTitle: string,
+    changes: NetworkPostChangeItem[],
+  ) {
+    if (changes.length === 0) return;
+
+    const followers = await this.prisma.networkPostFollower.findMany({
+      where: {
+        postId,
+        userId: {
+          not: ownerId,
+        },
+      },
+      select: {
+        userId: true,
+      },
+    });
+
+    if (followers.length === 0) return;
+
+    const uniqueUserIds = Array.from(
+      new Set(followers.map((follower) => follower.userId)),
+    );
+
+    const summary = summarizeChanges(changes);
+    const message = buildNotificationMessage(changes);
+
+    await this.prisma.networkNotification.createMany({
+      data: uniqueUserIds.map((userId) => ({
+        userId,
+        postId,
+        title: `${postTitle} güncellendi`,
+        message: `${summary}\n\n${message}`,
+      })),
+    });
+  }
+
   async update(id: string, dto: UpdateNetworkPostDto) {
     const existing = await this.prisma.networkPost.findFirst({
       where: {
@@ -529,6 +668,13 @@ export class NetworkService {
           } as Prisma.InputJsonValue,
         },
       });
+
+      await this.createUpdateNotifications(
+        id,
+        dto.userId,
+        updatedPost.title,
+        changes,
+      );
     }
 
     return updatedPost;

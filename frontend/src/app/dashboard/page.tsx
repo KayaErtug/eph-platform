@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Bell,
   Bot,
   BriefcaseBusiness,
   Building2,
@@ -30,6 +31,21 @@ type ToneType = "blue" | "orange" | "amber" | "slate";
 type Conversation = {
   id: string;
   unreadCount?: number;
+};
+
+type NetworkNotification = {
+  id: string;
+  userId: string;
+  postId?: string | null;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+};
+
+type NetworkNotificationResponse = {
+  unreadCount: number;
+  items: NetworkNotification[];
 };
 
 type DashboardSummary = {
@@ -199,6 +215,8 @@ export default function DashboardPage() {
   const [hydrated, setHydrated] = useState(false);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [networkNotifications, setNetworkNotifications] =
+    useState<NetworkNotificationResponse>({ unreadCount: 0, items: [] });
   const [loading, setLoading] = useState(true);
 
   const roleType = getRoleType(user?.role);
@@ -225,11 +243,14 @@ export default function DashboardPage() {
     setLoading(true);
 
     try {
-      const [summaryRes, conversationsRes] = await Promise.all([
+      const [summaryRes, conversationsRes, notificationsRes] = await Promise.all([
         api.get("/dashboard/summary"),
         user?.id
           ? api.get(`/conversations?userId=${user.id}`)
           : Promise.resolve({ data: [] }),
+        user?.id
+          ? api.get(`/network/notifications?userId=${user.id}`)
+          : Promise.resolve({ data: { unreadCount: 0, items: [] } }),
       ]);
 
       setSummary(summaryRes.data);
@@ -244,12 +265,35 @@ export default function DashboardPage() {
       );
 
       setUnreadMessages(unreadTotal);
+      setNetworkNotifications(
+        notificationsRes.data || { unreadCount: 0, items: [] },
+      );
     } catch {
       setSummary(null);
       setUnreadMessages(0);
+      setNetworkNotifications({ unreadCount: 0, items: [] });
     } finally {
       setLoading(false);
     }
+  };
+
+  const markNetworkNotificationsRead = async () => {
+    if (!user?.id || networkNotifications.unreadCount === 0) return;
+
+    try {
+      await api.post("/network/notifications/read", {
+        userId: user.id,
+      });
+
+      setNetworkNotifications((current) => ({
+        ...current,
+        unreadCount: 0,
+        items: current.items.map((item) => ({
+          ...item,
+          isRead: true,
+        })),
+      }));
+    } catch {}
   };
 
   const stats = summary?.stats || {
@@ -515,6 +559,64 @@ export default function DashboardPage() {
               />
             ))}
           </div>
+        </section>
+
+        <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+            <Bell size={24} />
+          </div>
+
+          <h2 className="mt-4 text-2xl font-black text-slate-900">
+            Bildirimlerim
+          </h2>
+
+          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+            Takip ettiğin pazaryeri paylaşımlarındaki güncellemeler burada görünür.
+          </p>
+
+          <div className="mt-5 grid gap-3">
+            {networkNotifications.items.length > 0 ? (
+              networkNotifications.items.slice(0, 4).map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    markNetworkNotificationsRead();
+                    if (item.postId) router.push(`/network/${item.postId}`);
+                  }}
+                  className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-center transition hover:bg-white"
+                >
+                  <div className="flex flex-col items-center justify-center gap-2 md:flex-row">
+                    {!item.isRead && (
+                      <span className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-black text-white">
+                        YENİ
+                      </span>
+                    )}
+
+                    <span className="text-sm font-black text-slate-900">
+                      {item.title}
+                    </span>
+                  </div>
+
+                  <p className="mx-auto mt-2 max-w-3xl whitespace-pre-line text-xs font-semibold leading-6 text-slate-500">
+                    {item.message}
+                  </p>
+                </button>
+              ))
+            ) : (
+              <div className="rounded-2xl bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500">
+                Henüz bildirimin yok. Takip ettiğin ilanlar güncellendiğinde burada görünür.
+              </div>
+            )}
+          </div>
+
+          {networkNotifications.unreadCount > 0 && (
+            <button
+              onClick={markNetworkNotificationsRead}
+              className="mt-5 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white"
+            >
+              {networkNotifications.unreadCount} bildirimi okundu yap
+            </button>
+          )}
         </section>
 
         <section className="mt-6 grid gap-4 md:grid-cols-2">
