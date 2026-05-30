@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -353,8 +354,13 @@ export class NetworkService {
           userId: dto.userId,
           summary: summarizeChanges(changes),
           changes: {
-            items: changes,
-          },
+            items: changes.map((change) => ({
+              field: change.field,
+              label: change.label,
+              oldValue: change.oldValue,
+              newValue: change.newValue,
+            })),
+          } as Prisma.InputJsonValue,
         },
       });
     }
