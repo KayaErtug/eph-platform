@@ -216,6 +216,23 @@ export default function StokPage() {
     }
   };
 
+  const handleAdminVerify = async (
+    unitId: string,
+    payload: {
+      tapuVerified?: boolean;
+      photoVerified?: boolean;
+      yetkiVerified?: boolean;
+      isOffMarket?: boolean;
+    },
+  ) => {
+    try {
+      await api.patch(`/units/${unitId}/verify`, payload);
+      await fetchData();
+    } catch (e: any) {
+      alert(e?.response?.data?.message || "Doğrulama işlemi yapılamadı.");
+    }
+  };
+
   if (!hydrated || loading) {
     return (
       <div
@@ -267,6 +284,7 @@ export default function StokPage() {
             setShowModal(true);
           }}
           onLina={() => setLinaOpen(true)}
+          onVerify={handleAdminVerify}
         />
         <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
         <StokCreateModal
@@ -412,6 +430,7 @@ function AdminInventoryCommandCenter({
   onLogout,
   onAdd,
   onLina,
+  onVerify,
 }: {
   units: Unit[];
   allUnits: Unit[];
@@ -426,6 +445,15 @@ function AdminInventoryCommandCenter({
   onLogout: () => void;
   onAdd: () => void;
   onLina: () => void;
+  onVerify: (
+    unitId: string,
+    payload: {
+      tapuVerified?: boolean;
+      photoVerified?: boolean;
+      yetkiVerified?: boolean;
+      isOffMarket?: boolean;
+    },
+  ) => void;
 }) {
   const totalValue = allUnits.reduce((sum, unit) => sum + (Number(unit.price) || 0), 0);
   const verifiedUnits = allUnits.filter((unit) => unit.isVerified).length;
@@ -541,7 +569,9 @@ function AdminInventoryCommandCenter({
           </div>
 
           <div className="mt-5 grid gap-4 xl:grid-cols-2">
-            {units.length === 0 ? <div className="rounded-[28px] border border-dashed border-cyan-300/20 bg-white/[0.04] p-10 text-center text-sm font-bold text-slate-400 xl:col-span-2">Portföy kaydı bulunamadı.</div> : units.slice(0, 24).map((unit) => <AdminUnitCard key={unit.id} unit={unit} />)}
+            {units.length === 0 ? <div className="rounded-[28px] border border-dashed border-cyan-300/20 bg-white/[0.04] p-10 text-center text-sm font-bold text-slate-400 xl:col-span-2">Portföy kaydı bulunamadı.</div> : units.slice(0, 24).map((unit) => (
+                <AdminUnitCard key={unit.id} unit={unit} onVerify={onVerify} />
+              ))}
           </div>
         </section>
       </section>
@@ -564,29 +594,163 @@ function AdminMetric({ label, value, note, tone }: { label: string; value: numbe
   return <div className={`rounded-[30px] border p-5 shadow-xl shadow-black/20 ${colors[tone] || colors.cyan}`}><p className="text-[10px] font-black uppercase tracking-[0.22em] opacity-75">{label}</p><p className="mt-3 font-serif text-5xl font-semibold">{value}</p><p className="mt-3 text-xs font-bold opacity-70">{note}</p></div>;
 }
 
-function AdminUnitCard({ unit }: { unit: Unit }) {
+function AdminUnitCard({
+  unit,
+  onVerify,
+}: {
+  unit: Unit;
+  onVerify: (
+    unitId: string,
+    payload: {
+      tapuVerified?: boolean;
+      photoVerified?: boolean;
+      yetkiVerified?: boolean;
+      isOffMarket?: boolean;
+    },
+  ) => void;
+}) {
   const verified = unit.isVerified || (unit.tapuVerified && unit.photoVerified && unit.yetkiVerified);
   const price = Number(unit.price || 0);
+
   return (
     <article className="group relative overflow-hidden rounded-[30px] border border-cyan-300/15 bg-white/[0.06] p-5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-white/[0.09]">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/70 to-transparent opacity-0 transition group-hover:opacity-100" />
+
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100">{unit.status || "Durum Yok"}</span>
-            {unit.isOffMarket && <span className="rounded-full border border-[#C9A84C]/25 bg-[#C9A84C]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#F7DFA3]">Off-Market</span>}
-            <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${verified ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100" : "border-rose-300/25 bg-rose-400/10 text-rose-100"}`}>{verified ? "Doğrulandı" : "Kontrol"}</span>
+            <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100">
+              {unit.status || "Durum Yok"}
+            </span>
+
+            {unit.isOffMarket && (
+              <span className="rounded-full border border-[#C9A84C]/25 bg-[#C9A84C]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#F7DFA3]">
+                Off-Market
+              </span>
+            )}
+
+            <span
+              className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${
+                verified
+                  ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
+                  : "border-rose-300/25 bg-rose-400/10 text-rose-100"
+              }`}
+            >
+              {verified ? "Doğrulandı" : "Kontrol"}
+            </span>
           </div>
-          <h3 className="mt-4 font-serif text-2xl font-semibold text-white">{unit.project?.name || "EPH Portföy"}</h3>
-          <p className="mt-1 text-sm font-semibold text-slate-400">{[unit.project?.district, unit.project?.city].filter(Boolean).join(" / ") || "Konum yok"} · No {unit.number || "—"}</p>
+
+          <h3 className="mt-4 font-serif text-2xl font-semibold text-white">
+            {unit.project?.name || "EPH Portföy"}
+          </h3>
+
+          <p className="mt-1 text-sm font-semibold text-slate-400">
+            {[unit.project?.district, unit.project?.city].filter(Boolean).join(" / ") || "Konum yok"} · No {unit.number || "—"}
+          </p>
         </div>
-        <div className="rounded-[22px] border border-[#C9A84C]/20 bg-[#C9A84C]/10 px-5 py-4 text-right"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#F7DFA3]/70">Değer</p><p className="mt-1 font-serif text-2xl font-semibold text-[#F7DFA3]">{price ? `${price.toLocaleString("tr-TR")} ₺` : "—"}</p></div>
+
+        <div className="rounded-[22px] border border-[#C9A84C]/20 bg-[#C9A84C]/10 px-5 py-4 text-right">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#F7DFA3]/70">
+            Değer
+          </p>
+          <p className="mt-1 font-serif text-2xl font-semibold text-[#F7DFA3]">
+            {price ? `${price.toLocaleString("tr-TR")} ₺` : "—"}
+          </p>
+        </div>
       </div>
-      <div className="mt-5 grid gap-3 sm:grid-cols-4"><AdminUnitMini label="Tip" value={unit.type || "—"} /><AdminUnitMini label="Oda" value={unit.roomCount || "—"} /><AdminUnitMini label="Alan" value={unit.area ? `${unit.area} m²` : "—"} /><AdminUnitMini label="Kat" value={unit.floor != null ? String(unit.floor) : "—"} /></div>
-      <div className="mt-5 grid gap-2 sm:grid-cols-3"><AdminCheck label="Tapu" active={Boolean(unit.tapuVerified)} /><AdminCheck label="Fotoğraf" active={Boolean(unit.photoVerified)} /><AdminCheck label="Yetki" active={Boolean(unit.yetkiVerified)} /></div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-4">
+        <AdminUnitMini label="Tip" value={unit.type || "—"} />
+        <AdminUnitMini label="Oda" value={unit.roomCount || "—"} />
+        <AdminUnitMini label="Alan" value={unit.area ? `${unit.area} m²` : "—"} />
+        <AdminUnitMini label="Kat" value={unit.floor != null ? String(unit.floor) : "—"} />
+      </div>
+
+      <div className="mt-5 grid gap-2 sm:grid-cols-3">
+        <AdminCheck label="Tapu" active={Boolean(unit.tapuVerified)} />
+        <AdminCheck label="Fotoğraf" active={Boolean(unit.photoVerified)} />
+        <AdminCheck label="Yetki" active={Boolean(unit.yetkiVerified)} />
+      </div>
+
+      <div className="mt-5 rounded-[24px] border border-white/10 bg-black/20 p-4">
+        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#C9A84C]">
+          Admin Doğrulama
+        </p>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <button
+            onClick={() =>
+              onVerify(unit.id, {
+                tapuVerified: !unit.tapuVerified,
+                photoVerified: unit.photoVerified,
+                yetkiVerified: unit.yetkiVerified,
+                isOffMarket: unit.isOffMarket,
+              })
+            }
+            className={`rounded-2xl border px-4 py-3 text-xs font-black transition ${
+              unit.tapuVerified
+                ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
+                : "border-white/10 bg-white/[0.06] text-slate-300 hover:border-emerald-300/30 hover:text-emerald-100"
+            }`}
+          >
+            {unit.tapuVerified ? "Tapu Onaylı" : "Tapu Onayla"}
+          </button>
+
+          <button
+            onClick={() =>
+              onVerify(unit.id, {
+                tapuVerified: unit.tapuVerified,
+                photoVerified: !unit.photoVerified,
+                yetkiVerified: unit.yetkiVerified,
+                isOffMarket: unit.isOffMarket,
+              })
+            }
+            className={`rounded-2xl border px-4 py-3 text-xs font-black transition ${
+              unit.photoVerified
+                ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
+                : "border-white/10 bg-white/[0.06] text-slate-300 hover:border-emerald-300/30 hover:text-emerald-100"
+            }`}
+          >
+            {unit.photoVerified ? "Fotoğraf Onaylı" : "Fotoğraf Onayla"}
+          </button>
+
+          <button
+            onClick={() =>
+              onVerify(unit.id, {
+                tapuVerified: unit.tapuVerified,
+                photoVerified: unit.photoVerified,
+                yetkiVerified: !unit.yetkiVerified,
+                isOffMarket: unit.isOffMarket,
+              })
+            }
+            className={`rounded-2xl border px-4 py-3 text-xs font-black transition ${
+              unit.yetkiVerified
+                ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
+                : "border-white/10 bg-white/[0.06] text-slate-300 hover:border-emerald-300/30 hover:text-emerald-100"
+            }`}
+          >
+            {unit.yetkiVerified ? "Yetki Onaylı" : "Yetki Onayla"}
+          </button>
+
+          <button
+            onClick={() =>
+              onVerify(unit.id, {
+                tapuVerified: true,
+                photoVerified: true,
+                yetkiVerified: true,
+                isOffMarket: unit.isOffMarket,
+              })
+            }
+            className="rounded-2xl border border-[#C9A84C]/25 bg-[#C9A84C] px-4 py-3 text-xs font-black text-[#061126] transition hover:scale-[1.02]"
+          >
+            Tümünü Doğrula
+          </button>
+        </div>
+      </div>
     </article>
   );
 }
+
 
 function AdminUnitMini({ label, value }: { label: string; value: string }) {
   return <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-3"><p className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">{label}</p><p className="mt-1 text-sm font-black text-slate-100">{value}</p></div>;
