@@ -48,6 +48,20 @@ type NetworkPost = {
   createdAt?: string;
 };
 
+type EditPostForm = {
+  type: string;
+  title: string;
+  description: string;
+  city: string;
+  district: string;
+  neighborhood: string;
+  budget: string;
+  urgency: string;
+  visibility: string;
+  tags: string;
+  validFor: string;
+};
+
 type NetworkPostStats = {
   postId: string;
   postTitle: string;
@@ -478,6 +492,40 @@ function relativeTime(value?: string) {
   return `${day} gün önce`;
 }
 
+
+const shareTypes = [
+  "Talep",
+  "Portföy",
+  "Ortak Satış",
+  "Arsa",
+  "Müteahhit Projesi",
+  "Yatırımcı Arıyor",
+];
+
+const validOptions = ["1 gün", "3 gün", "7 gün", "30 gün"];
+const urgencyOptions = ["Normal", "Sıcak Talep", "Acil", "Hazır Müşteri"];
+
+const visibilityOptions = [
+  { label: "Tüm EPH", value: "TUM_EPH" },
+  { label: "Sadece emlakçılar", value: "SADECE_EMLAKCILAR" },
+  {
+    label: "Sadece müteahhitler / inşaat firmaları",
+    value: "SADECE_MUTEAHHITLER",
+  },
+  { label: "Sadece bağlantılarım", value: "SADECE_BAGLANTILARIM" },
+];
+
+function expiresAtFromValidFor(value: string) {
+  const date = new Date();
+
+  if (value === "1 gün") date.setDate(date.getDate() + 1);
+  else if (value === "3 gün") date.setDate(date.getDate() + 3);
+  else if (value === "7 gün") date.setDate(date.getDate() + 7);
+  else date.setDate(date.getDate() + 30);
+
+  return date.toISOString();
+}
+
 export default function NetworkDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -489,6 +537,8 @@ export default function NetworkDetailPage() {
   const [stats, setStats] = useState<NetworkPostStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [startingConversation, setStartingConversation] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const postUser = getPostUser(post);
   const theme = useMemo(() => getRoleTheme(postUser?.role), [postUser?.role]);
@@ -563,6 +613,48 @@ export default function NetworkDetailPage() {
       alert("Görüşme başlatılamadı.");
     } finally {
       setStartingConversation(false);
+    }
+  };
+
+  const updatePost = async (form: EditPostForm) => {
+    if (!post || !user?.id) return;
+
+    try {
+      setSavingEdit(true);
+
+      const customTags = form.tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+
+      const locationTags = [
+        form.city,
+        form.district,
+        form.neighborhood,
+      ].filter(Boolean);
+
+      await api.patch(`/network/posts/${post.id}`, {
+        userId: user.id,
+        type: form.type,
+        title: form.title,
+        description: form.description,
+        city: form.city || null,
+        district: form.district || null,
+        neighborhood: form.neighborhood || null,
+        budget: form.budget ? Number(form.budget.replace(/\D/g, "")) : null,
+        urgency: form.urgency,
+        visibility: form.visibility,
+        tags: [...locationTags, ...customTags].slice(0, 8),
+        expiresAt: expiresAtFromValidFor(form.validFor),
+      });
+
+      await fetchPost();
+      await fetchStats();
+      setEditOpen(false);
+    } catch {
+      alert("Paylaşım güncellenemedi.");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -786,12 +878,15 @@ export default function NetworkDetailPage() {
 
                   <button
                     onClick={() => {
-                      if (!isOwnPost) {
-                        startConversation(
-                          actions.secondary,
-                          createPresetMessage(actions.secondary, post.title),
-                        );
+                      if (isOwnPost) {
+                        setEditOpen(true);
+                        return;
                       }
+
+                      startConversation(
+                        actions.secondary,
+                        createPresetMessage(actions.secondary, post.title),
+                      );
                     }}
                     className="rounded-2xl border bg-white px-5 py-4 text-sm font-black"
                     style={{
@@ -925,10 +1020,281 @@ export default function NetworkDetailPage() {
             </div>
           </aside>
         </section>
+
+        {editOpen && (
+          <EditPostModal
+            post={post}
+            theme={theme}
+            saving={savingEdit}
+            onClose={() => setEditOpen(false)}
+            onSave={updatePost}
+          />
+        )}
       </div>
     </EphAppShell>
   );
 }
+
+
+function validForFromExpiresAt(value?: string) {
+  if (!value) return "7 gün";
+
+  const diff = new Date(value).getTime() - Date.now();
+  const day = Math.max(1, Math.ceil(diff / (24 * 60 * 60 * 1000)));
+
+  if (day <= 1) return "1 gün";
+  if (day <= 3) return "3 gün";
+  if (day <= 7) return "7 gün";
+
+  return "30 gün";
+}
+
+function EditPostModal({
+  post,
+  theme,
+  saving,
+  onClose,
+  onSave,
+}: {
+  post: NetworkPost;
+  theme: RoleTheme;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (form: EditPostForm) => void;
+}) {
+  const [form, setForm] = useState<EditPostForm>({
+    type: post.type || "Talep",
+    title: post.title || "",
+    description: post.description || "",
+    city: post.city || "",
+    district: post.district || "",
+    neighborhood: post.neighborhood || "",
+    budget: post.budget ? String(post.budget) : "",
+    urgency: post.urgency || "Normal",
+    visibility: post.visibility || "TUM_EPH",
+    tags: (post.tags || []).join(", "),
+    validFor: validForFromExpiresAt(post.expiresAt),
+  });
+
+  const handleSubmit = () => {
+    if (!form.title.trim() || !form.description.trim()) {
+      alert("Başlık ve açıklama zorunludur.");
+      return;
+    }
+
+    onSave(form);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[13000] flex items-center justify-center bg-black/50 p-4 backdrop-blur">
+      <section className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-[32px] bg-white shadow-2xl">
+        <header className="border-b border-slate-100 p-6 text-center">
+          <h2 className="text-2xl font-black" style={{ color: theme.text }}>
+            Paylaşımı Güncelle
+          </h2>
+
+          <p className="mt-2 text-sm font-semibold text-slate-500">
+            Güncel bilgiler, paylaşımı görüntüleyen tüm üyelerde görünür.
+          </p>
+        </header>
+
+        <div className="grid gap-4 p-6">
+          <EditField label="Paylaşım tipi">
+            <select
+              value={form.type}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, type: event.target.value }))
+              }
+              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+            >
+              {shareTypes.map((type) => (
+                <option key={type}>{type}</option>
+              ))}
+            </select>
+          </EditField>
+
+          <EditField label="Başlık">
+            <input
+              value={form.title}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, title: event.target.value }))
+              }
+              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+            />
+          </EditField>
+
+          <EditField label="Açıklama">
+            <textarea
+              value={form.description}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  description: event.target.value,
+                }))
+              }
+              className="min-h-28 w-full resize-y rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm font-semibold leading-6 outline-none"
+            />
+          </EditField>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <EditField label="İl">
+              <input
+                value={form.city}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, city: event.target.value }))
+                }
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+              />
+            </EditField>
+
+            <EditField label="İlçe">
+              <input
+                value={form.district}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    district: event.target.value,
+                  }))
+                }
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+              />
+            </EditField>
+
+            <EditField label="Mahalle">
+              <input
+                value={form.neighborhood}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    neighborhood: event.target.value,
+                  }))
+                }
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+              />
+            </EditField>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <EditField label="Bütçe / Değer">
+              <input
+                value={form.budget}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    budget: event.target.value,
+                  }))
+                }
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+              />
+            </EditField>
+
+            <EditField label="Aciliyet">
+              <select
+                value={form.urgency}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    urgency: event.target.value,
+                  }))
+                }
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+              >
+                {urgencyOptions.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
+            </EditField>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <EditField label="Geçerlilik süresi">
+              <select
+                value={form.validFor}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    validFor: event.target.value,
+                  }))
+                }
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+              >
+                {validOptions.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
+            </EditField>
+
+            <EditField label="Görünürlük">
+              <select
+                value={form.visibility}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    visibility: event.target.value,
+                  }))
+                }
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+              >
+                {visibilityOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </EditField>
+          </div>
+
+          <EditField label="Etiketler">
+            <input
+              value={form.tags}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, tags: event.target.value }))
+              }
+              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+            />
+          </EditField>
+        </div>
+
+        <footer className="flex flex-col gap-3 border-t border-slate-100 p-6 md:flex-row md:justify-end">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 disabled:opacity-60"
+          >
+            Vazgeç
+          </button>
+
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className={`h-12 rounded-2xl bg-gradient-to-r ${theme.gradient} px-5 text-sm font-black text-white shadow-xl disabled:opacity-60`}
+          >
+            {saving ? "Kaydediliyor..." : "Güncellemeyi Kaydet"}
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+function EditField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-2 block text-center text-sm font-black text-slate-700">
+        {label}
+      </label>
+
+      {children}
+    </div>
+  );
+}
+
 
 function DetailHeroStat({
   icon,

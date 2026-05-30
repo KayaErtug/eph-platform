@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { NetworkService } from './network.service';
 
 @Controller('network')
@@ -18,6 +18,11 @@ export class NetworkController {
   @Get('posts/:id')
   findOne(@Param('id') id: string) {
     return this.networkService.findOne(id);
+  }
+
+  @Patch('posts/:id')
+  update(@Param('id') id: string, @Body() body: any) {
+    return this.networkService.update(id, body);
   }
 
   @Post('posts')
