@@ -48,6 +48,24 @@ type NetworkNotificationResponse = {
   items: NetworkNotification[];
 };
 
+type FeaturedNetworkPost = {
+  id: string;
+  title: string;
+  type: string;
+  city?: string | null;
+  district?: string | null;
+  budget?: number | null;
+  score: number;
+  viewCount: number;
+  followerCount: number;
+  requestCount: number;
+  user?: {
+    firstName: string;
+    lastName: string;
+    role: string;
+  };
+};
+
 type DashboardSummary = {
   stats?: {
     totalUnits?: number;
@@ -217,6 +235,7 @@ export default function DashboardPage() {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [networkNotifications, setNetworkNotifications] =
     useState<NetworkNotificationResponse>({ unreadCount: 0, items: [] });
+  const [featuredPosts, setFeaturedPosts] = useState<FeaturedNetworkPost[]>([]);
   const [loading, setLoading] = useState(true);
 
   const roleType = getRoleType(user?.role);
@@ -243,7 +262,7 @@ export default function DashboardPage() {
     setLoading(true);
 
     try {
-      const [summaryRes, conversationsRes, notificationsRes] = await Promise.all([
+      const [summaryRes, conversationsRes, notificationsRes, featuredRes] = await Promise.all([
         api.get("/dashboard/summary"),
         user?.id
           ? api.get(`/conversations?userId=${user.id}`)
@@ -251,6 +270,7 @@ export default function DashboardPage() {
         user?.id
           ? api.get(`/network/notifications?userId=${user.id}`)
           : Promise.resolve({ data: { unreadCount: 0, items: [] } }),
+        api.get("/network/posts/featured"),
       ]);
 
       setSummary(summaryRes.data);
@@ -268,10 +288,12 @@ export default function DashboardPage() {
       setNetworkNotifications(
         notificationsRes.data || { unreadCount: 0, items: [] },
       );
+      setFeaturedPosts(Array.isArray(featuredRes.data) ? featuredRes.data : []);
     } catch {
       setSummary(null);
       setUnreadMessages(0);
       setNetworkNotifications({ unreadCount: 0, items: [] });
+      setFeaturedPosts([]);
     } finally {
       setLoading(false);
     }
@@ -558,6 +580,78 @@ export default function DashboardPage() {
                 tone={pageConfig.tone}
               />
             ))}
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+            <TrendingUp size={24} />
+          </div>
+
+          <h2 className="mt-4 text-2xl font-black text-slate-900">
+            Öne Çıkan Pazaryeri İlanları
+          </h2>
+
+          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+            Görüntülenme, takip ve gelen talep verilerine göre en hareketli paylaşımlar.
+          </p>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            {featuredPosts.length > 0 ? (
+              featuredPosts.slice(0, 6).map((post) => (
+                <button
+                  key={post.id}
+                  onClick={() => router.push(`/network/${post.id}`)}
+                  className="rounded-[24px] border border-slate-100 bg-slate-50 p-4 text-center transition hover:bg-white"
+                >
+                  <div className="text-[11px] font-black uppercase tracking-wide text-slate-400">
+                    {post.type}
+                  </div>
+
+                  <h3 className="mt-2 line-clamp-2 text-sm font-black text-slate-900">
+                    {post.title}
+                  </h3>
+
+                  <p className="mt-2 text-xs font-semibold text-slate-500">
+                    {[post.city, post.district].filter(Boolean).join(" / ") ||
+                      "Lokasyon belirtilmedi"}
+                  </p>
+
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-2xl bg-white px-2 py-2">
+                      <div className="text-sm font-black text-slate-900">
+                        {post.viewCount}
+                      </div>
+                      <div className="text-[9px] font-black uppercase text-slate-400">
+                        Görüntü
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-white px-2 py-2">
+                      <div className="text-sm font-black text-slate-900">
+                        {post.followerCount}
+                      </div>
+                      <div className="text-[9px] font-black uppercase text-slate-400">
+                        Takip
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-white px-2 py-2">
+                      <div className="text-sm font-black text-slate-900">
+                        {post.requestCount}
+                      </div>
+                      <div className="text-[9px] font-black uppercase text-slate-400">
+                        Talep
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="rounded-2xl bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500 md:col-span-3">
+                Öne çıkan ilan verisi oluşması için pazaryerinde biraz etkileşim gerekiyor.
+              </div>
+            )}
           </div>
         </section>
 

@@ -15,6 +15,11 @@ export class NetworkController {
     return this.networkService.getFollowedPosts(userId);
   }
 
+  @Get('posts/featured')
+  getFeaturedPosts() {
+    return this.networkService.getFeaturedPosts();
+  }
+
   @Get('notifications')
   getNotifications(@Query('userId') userId: string) {
     return this.networkService.getNotifications(userId);
@@ -54,6 +59,11 @@ export class NetworkController {
   @Get('posts/:id/follow-status')
   getFollowStatus(@Param('id') id: string, @Query('userId') userId?: string) {
     return this.networkService.getFollowStatus(id, userId);
+  }
+
+  @Get('posts/:id/followers')
+  getPostFollowers(@Param('id') id: string) {
+    return this.networkService.getPostFollowers(id);
   }
 
   @Post('posts/:id/follow')

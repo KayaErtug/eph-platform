@@ -1,41 +1,44 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Building2,
-  CalendarDays,
-  CheckCircle2,
-  Clock,
-  Eye,
-  MapPin,
-  MessageCircle,
-  Sparkles,
-  Star,
-  Tag,
-  UsersRound,
-  WalletCards,
-} from "lucide-react";
-
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { getToken } from "firebase/messaging";
 import EphAppShell from "@/components/EphAppShell";
-import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
+import api from "@/lib/api";
+import { firebaseVapidKey, getFirebaseMessaging } from "@/lib/firebase";
+import {
+  BarChart3,
+  Building2,
+  CheckCircle2,
+  CircleUserRound,
+  Flame,
+  Inbox,
+  MessageCircle,
+  Plus,
+  Search,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  UsersRound,
+  Volume2,
+  X,
+} from "lucide-react";
 
 type NetworkUser = {
   id: string;
   firstName: string;
   lastName: string;
-  email?: string;
-  phone?: string | null;
   role: string;
 };
 
 type NetworkPost = {
   id: string;
-  userId: string;
-  User?: NetworkUser;
+  userId?: string;
   user?: NetworkUser;
+  User?: NetworkUser;
+  urgency: string | null;
   type: string;
   title: string;
   description?: string;
@@ -43,80 +46,29 @@ type NetworkPost = {
   district?: string | null;
   neighborhood?: string | null;
   budget?: number | null;
-  urgency?: string | null;
   visibility?: string;
   tags: string[];
   expiresAt?: string;
   createdAt?: string;
-  updatedAt?: string;
 };
 
-type EditPostForm = {
+type Conversation = {
+  id: string;
+  unreadCount?: number;
+};
+
+type CreatePostForm = {
   type: string;
   title: string;
-  description: string;
+  desc: string;
   city: string;
   district: string;
   neighborhood: string;
   budget: string;
   urgency: string;
+  validFor: string;
   visibility: string;
   tags: string;
-  validFor: string;
-};
-
-type NetworkPostUpdateLog = {
-  id: string;
-  summary: string;
-  changes: {
-    field: string;
-    label: string;
-    oldValue: unknown;
-    newValue: unknown;
-  }[];
-  createdAt: string;
-  user?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    role: string;
-  };
-};
-
-type NetworkPostStats = {
-  postId: string;
-  postTitle: string;
-  total: number;
-  followerCount?: number;
-  viewCount?: number;
-  uniqueViewerCount?: number;
-  byTitle: {
-    title: string;
-    count: number;
-  }[];
-  latest: {
-    id: string;
-    title: string;
-    updatedAt: string;
-    participants: string[];
-    lastMessage?: {
-      id: string;
-      body: string;
-      createdAt: string;
-      sender: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        role: string;
-      };
-    } | null;
-  }[];
-};
-
-type NetworkPostFollowStatus = {
-  postId: string;
-  isFollowing: boolean;
-  followerCount: number;
 };
 
 type RoleTheme = {
@@ -406,6 +358,40 @@ function normalizeActionTitle(actionTitle: string) {
   return actionTitle.toLocaleUpperCase("tr-TR");
 }
 
+const categories = [
+  "Tüm Akış",
+  "Satılık Talepleri",
+  "Kiralık Talepleri",
+  "Portföy Paylaşımı",
+  "Ortak Satış",
+  "Müteahhit & Proje",
+  "Arsa & Kat Karşılığı",
+];
+
+const filters = ["En Yeni", "Sıcak Talepler", "Hazır Müşteri", "Bugün", "Trend"];
+
+const shareTypes = [
+  "Talep",
+  "Portföy",
+  "Ortak Satış",
+  "Arsa",
+  "Müteahhit Projesi",
+  "Yatırımcı Arıyor",
+];
+
+const validOptions = ["1 gün", "3 gün", "7 gün", "30 gün"];
+const urgencyOptions = ["Normal", "Sıcak Talep", "Acil", "Hazır Müşteri"];
+
+const visibilityOptions = [
+  { label: "Tüm EPH", value: "TUM_EPH" },
+  { label: "Sadece emlakçılar", value: "SADECE_EMLAKCILAR" },
+  {
+    label: "Sadece müteahhitler / inşaat firmaları",
+    value: "SADECE_MUTEAHHITLER",
+  },
+  { label: "Sadece bağlantılarım", value: "SADECE_BAGLANTILARIM" },
+];
+
 function normalizeRole(role?: string | null) {
   return String(role || "")
     .toLocaleUpperCase("tr-TR")
@@ -473,8 +459,23 @@ function getRoleTheme(role?: string | null): RoleTheme {
   };
 }
 
-function getPostUser(post?: NetworkPost | null) {
-  return post?.User || post?.user;
+function getPostUser(post: NetworkPost) {
+  return post.user || post.User;
+}
+
+function relativeTime(value?: string) {
+  if (!value) return "-";
+
+  const diff = Date.now() - new Date(value).getTime();
+  const minute = Math.floor(diff / 60000);
+  const hour = Math.floor(minute / 60);
+  const day = Math.floor(hour / 24);
+
+  if (minute < 1) return "Az önce";
+  if (minute < 60) return `${minute} dk önce`;
+  if (hour < 24) return `${hour} saat önce`;
+
+  return `${day} gün önce`;
 }
 
 function formatDateTime(value?: string) {
@@ -496,64 +497,6 @@ function formatDateTime(value?: string) {
   );
 }
 
-function formatMoney(value?: string | number | null) {
-  if (value == null || value === "") return "Belirtilmedi";
-
-  const numeric =
-    typeof value === "number" ? value : Number(String(value).replace(/\D/g, ""));
-
-  if (!numeric) return String(value);
-
-  return `${numeric.toLocaleString("tr-TR")} TL`;
-}
-
-function visibilityLabel(value?: string) {
-  if (value === "TUM_EPH") return "Tüm EPH Üyeleri";
-  if (value === "SADECE_EMLAKCILAR") return "Sadece Emlakçılar";
-  if (value === "SADECE_MUTEAHHITLER") return "Müteahhit ve İnşaat Firmaları";
-  if (value === "SADECE_BAGLANTILARIM") return "Bağlantılarım";
-
-  return value || "Tüm EPH Üyeleri";
-}
-
-function relativeTime(value?: string) {
-  if (!value) return "-";
-
-  const diff = Date.now() - new Date(value).getTime();
-  const minute = Math.floor(diff / 60000);
-  const hour = Math.floor(minute / 60);
-  const day = Math.floor(hour / 24);
-
-  if (minute < 1) return "Az önce";
-  if (minute < 60) return `${minute} dk önce`;
-  if (hour < 24) return `${hour} saat önce`;
-
-  return `${day} gün önce`;
-}
-
-
-const shareTypes = [
-  "Talep",
-  "Portföy",
-  "Ortak Satış",
-  "Arsa",
-  "Müteahhit Projesi",
-  "Yatırımcı Arıyor",
-];
-
-const validOptions = ["1 gün", "3 gün", "7 gün", "30 gün"];
-const urgencyOptions = ["Normal", "Sıcak Talep", "Acil", "Hazır Müşteri"];
-
-const visibilityOptions = [
-  { label: "Tüm EPH", value: "TUM_EPH" },
-  { label: "Sadece emlakçılar", value: "SADECE_EMLAKCILAR" },
-  {
-    label: "Sadece müteahhitler / inşaat firmaları",
-    value: "SADECE_MUTEAHHITLER",
-  },
-  { label: "Sadece bağlantılarım", value: "SADECE_BAGLANTILARIM" },
-];
-
 function expiresAtFromValidFor(value: string) {
   const date = new Date();
 
@@ -565,123 +508,260 @@ function expiresAtFromValidFor(value: string) {
   return date.toISOString();
 }
 
-export default function NetworkDetailPage() {
-  const router = useRouter();
-  const params = useParams();
-  const { user } = useAuthStore();
+function formatMoney(value?: string | number | null) {
+  if (value == null || value === "") return "";
 
-  const id = String(params?.id || "");
+  const numeric =
+    typeof value === "number" ? value : Number(String(value).replace(/\D/g, ""));
 
-  const [post, setPost] = useState<NetworkPost | null>(null);
-  const [stats, setStats] = useState<NetworkPostStats | null>(null);
-  const [updateLogs, setUpdateLogs] = useState<NetworkPostUpdateLog[]>([]);
-  const [followStatus, setFollowStatus] = useState<NetworkPostFollowStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [startingConversation, setStartingConversation] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [savingEdit, setSavingEdit] = useState(false);
-  const [followLoading, setFollowLoading] = useState(false);
+  if (!numeric) return String(value);
 
-  const postUser = getPostUser(post);
-  const theme = useMemo(() => getRoleTheme(postUser?.role), [postUser?.role]);
-  const actions = useMemo(
-    () => getMarketplaceActions(user?.role, postUser?.role),
-    [user?.role, postUser?.role],
+  return `${numeric.toLocaleString("tr-TR")} TL`;
+}
+
+function roleLabel(role?: string) {
+  return getRoleTheme(role).label;
+}
+
+function isHotPost(post: NetworkPost) {
+  const value = `${post.urgency || ""} ${post.title || ""}`.toLocaleLowerCase(
+    "tr-TR",
   );
-  const isOwnPost = Boolean(user?.id && post?.userId === user.id);
 
-  useEffect(() => {
-    if (!id) return;
+  return (
+    value.includes("sıcak") ||
+    value.includes("sicak") ||
+    value.includes("acil") ||
+    value.includes("hazır")
+  );
+}
 
-    fetchPost();
-    fetchStats();
-    fetchUpdateLogs();
-    fetchFollowStatus();
-    recordPostView();
-  }, [id, user?.id]);
+export default function NetworkPage() {
+  const router = useRouter();
+  const { user } = useAuthStore();
+  const currentUserTheme = getRoleTheme(user?.role);
 
-  const fetchPost = async () => {
-    setLoading(true);
+  const [posts, setPosts] = useState<NetworkPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [conversationCount, setConversationCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
 
+  const lastUnreadRef = useRef(0);
+  const firstUnreadCheckRef = useRef(true);
+
+  const getSoundFile = () =>
+    localStorage.getItem("ephNotificationSoundFile") ||
+    "/sounds/universfield-new-notification-043-493471.mp3";
+
+  const playNotificationSound = () => {
+    const soundValue =
+      localStorage.getItem("ephNotificationSound") || "notification";
+    const soundFile = getSoundFile();
+
+    if (!soundEnabled) return;
+    if (soundValue === "off" || !soundFile) return;
+
+    const audio = new Audio(soundFile);
+    audio.volume = 0.6;
+    audio.play().catch(() => {});
+  };
+
+  const enableSound = async () => {
     try {
-      const res = await api.get(`/network/posts/${id}`);
-      setPost(res.data);
+      const audio = new Audio(getSoundFile());
+      audio.volume = 0.35;
+      await audio.play();
+
+      localStorage.setItem("ephSoundEnabled", "true");
+      setSoundEnabled(true);
     } catch {
-      setPost(null);
+      alert("Tarayıcı sesi engelledi. Lütfen tekrar deneyin.");
+    }
+  };
+
+  const enablePushNotifications = async () => {
+    try {
+      setPushLoading(true);
+
+      if (!("Notification" in window)) {
+        alert("Bu tarayıcı bildirimleri desteklemiyor.");
+        return;
+      }
+
+      if (!("serviceWorker" in navigator)) {
+        alert("Bu tarayıcı service worker desteklemiyor.");
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+
+      if (permission !== "granted") {
+        alert("Bildirim izni verilmedi.");
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.register(
+        "/firebase-messaging-sw.js",
+      );
+
+      const messaging = await getFirebaseMessaging();
+
+      if (!messaging) {
+        alert("Bu cihazda Firebase bildirimleri desteklenmiyor.");
+        return;
+      }
+
+      const token = await getToken(messaging, {
+        vapidKey: firebaseVapidKey,
+        serviceWorkerRegistration: registration,
+      });
+
+      if (!token) {
+        alert("Bildirim tokeni alınamadı.");
+        return;
+      }
+
+      localStorage.setItem("ephFirebaseToken", token);
+      localStorage.setItem("ephPushEnabled", "true");
+      setPushEnabled(true);
+
+      alert("Bildirimler açıldı.");
+    } catch (error) {
+      console.error(error);
+      alert("Bildirim izni alınamadı. Tarayıcı ayarlarını kontrol edin.");
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  const fetchPosts = async () => {
+    try {
+      const res = await api.get("/network/posts");
+      setPosts(res.data || []);
+    } catch {
+      setPosts([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchStats = async () => {
-    if (!id) return;
+  const fetchConversationStats = async () => {
+    if (!user?.id) return;
 
     try {
-      const res = await api.get(`/network/posts/${id}/stats`);
-      setStats(res.data);
+      const res = await api.get(`/conversations?userId=${user.id}`);
+      const conversations: Conversation[] = res.data || [];
+      const totalUnread = conversations.reduce(
+        (total, item) => total + (item.unreadCount || 0),
+        0,
+      );
+
+      setConversationCount(conversations.length);
+
+      if (!firstUnreadCheckRef.current && totalUnread > lastUnreadRef.current) {
+        playNotificationSound();
+      }
+
+      firstUnreadCheckRef.current = false;
+      lastUnreadRef.current = totalUnread;
+      setUnreadCount(totalUnread);
     } catch {
-      setStats(null);
+      setConversationCount(0);
+      setUnreadCount(0);
     }
   };
 
-  const recordPostView = async () => {
-    if (!id) return;
+  useEffect(() => {
+    setSoundEnabled(localStorage.getItem("ephSoundEnabled") === "true");
+    setPushEnabled(localStorage.getItem("ephPushEnabled") === "true");
+    fetchPosts();
+  }, []);
 
-    try {
-      await api.post(`/network/posts/${id}/view`, {
-        userId: user?.id,
-      });
+  useEffect(() => {
+    if (!user?.id) return;
 
-      await fetchStats();
-    } catch {}
-  };
+    firstUnreadCheckRef.current = true;
+    lastUnreadRef.current = 0;
 
-  const fetchUpdateLogs = async () => {
-    if (!id) return;
+    fetchConversationStats();
 
-    try {
-      const res = await api.get(`/network/posts/${id}/update-logs`);
-      setUpdateLogs(res.data || []);
-    } catch {
-      setUpdateLogs([]);
-    }
-  };
+    const interval = setInterval(fetchConversationStats, 5000);
 
-  const fetchFollowStatus = async () => {
-    if (!id) return;
+    return () => clearInterval(interval);
+  }, [user?.id, soundEnabled]);
 
-    try {
-      const query = user?.id ? `?userId=${user.id}` : "";
-      const res = await api.get(`/network/posts/${id}/follow-status${query}`);
-      setFollowStatus(res.data);
-    } catch {
-      setFollowStatus(null);
-    }
-  };
-
-  const startConversation = async (actionTitle: string, presetMessage: string) => {
-    if (!post) return;
-
+  const handleCreatePost = async (form: CreatePostForm) => {
     if (!user?.id) {
-      alert("Lütfen tekrar giriş yapın.");
+      alert("Oturum bulunamadı. Lütfen tekrar giriş yapın.");
       router.push("/giris");
       return;
     }
 
-    if (isOwnPost) {
-      alert("Bu paylaşım sana ait.");
-      return;
-    }
+    const customTags = form.tags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
 
+    const locationTags = [form.city, form.district, form.neighborhood].filter(
+      Boolean,
+    );
+
+    await api.post("/network/posts", {
+      userId: user.id,
+      type: form.type,
+      title: form.title,
+      description: form.desc,
+      city: form.city || null,
+      district: form.district || null,
+      neighborhood: form.neighborhood || null,
+      budget: form.budget ? Number(form.budget.replace(/\D/g, "")) : null,
+      urgency: form.urgency,
+      visibility: form.visibility,
+      tags: [...locationTags, ...customTags].slice(0, 8),
+      expiresAt: expiresAtFromValidFor(form.validFor),
+    });
+
+    await fetchPosts();
+    setModalOpen(false);
+  };
+
+  const startConversation = async (
+    post: NetworkPost,
+    actionTitle: string,
+    presetMessage: string,
+  ) => {
     try {
-      setStartingConversation(true);
+      if (!user?.id) {
+        alert("Lütfen tekrar giriş yapın.");
+        router.push("/giris");
+        return;
+      }
+
+      const postUser = getPostUser(post);
+      const participantId = post.userId || postUser?.id;
+
+      if (!participantId) {
+        alert("Paylaşım sahibi bulunamadı.");
+        return;
+      }
+
+      if (participantId === user.id) {
+        alert("Bu paylaşım sana ait.");
+        return;
+      }
 
       const res = await api.post("/conversations/start", {
         creatorId: user.id,
-        participantId: post.userId,
+        participantId,
         postId: post.id,
         title: normalizeActionTitle(actionTitle),
       });
+
+      await fetchConversationStats();
 
       const search = new URLSearchParams({
         title: normalizeActionTitle(actionTitle),
@@ -691,714 +771,828 @@ export default function NetworkDetailPage() {
       router.push(`/messages/${res.data.id}?${search.toString()}`);
     } catch {
       alert("Görüşme başlatılamadı.");
-    } finally {
-      setStartingConversation(false);
     }
   };
 
-  const toggleFollow = async () => {
-    if (!post || !user?.id) {
-      alert("Lütfen tekrar giriş yapın.");
-      router.push("/giris");
-      return;
-    }
-
-    if (isOwnPost) {
-      alert("Kendi paylaşımınızı takip etmenize gerek yok.");
-      return;
-    }
-
-    try {
-      setFollowLoading(true);
-
-      if (followStatus?.isFollowing) {
-        const res = await api.delete(`/network/posts/${post.id}/follow`, {
-          data: {
-            userId: user.id,
-          },
-        });
-
-        setFollowStatus(res.data);
-      } else {
-        const res = await api.post(`/network/posts/${post.id}/follow`, {
-          userId: user.id,
-        });
-
-        setFollowStatus(res.data);
-      }
-
-      await fetchStats();
-    } catch {
-      alert("Takip işlemi yapılamadı.");
-    } finally {
-      setFollowLoading(false);
-    }
-  };
-
-  const updatePost = async (form: EditPostForm) => {
-    if (!post || !user?.id) return;
-
-    try {
-      setSavingEdit(true);
-
-      const customTags = form.tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean);
-
-      const locationTags = [
-        form.city,
-        form.district,
-        form.neighborhood,
-      ].filter(Boolean);
-
-      await api.patch(`/network/posts/${post.id}`, {
-        userId: user.id,
-        type: form.type,
-        title: form.title,
-        description: form.description,
-        city: form.city || null,
-        district: form.district || null,
-        neighborhood: form.neighborhood || null,
-        budget: form.budget ? Number(form.budget.replace(/\D/g, "")) : null,
-        urgency: form.urgency,
-        visibility: form.visibility,
-        tags: [...locationTags, ...customTags].slice(0, 8),
-        expiresAt: expiresAtFromValidFor(form.validFor),
-      });
-
-      await fetchPost();
-      await fetchStats();
-      await fetchUpdateLogs();
-      await fetchFollowStatus();
-      setEditOpen(false);
-    } catch {
-      alert("Paylaşım güncellenemedi.");
-    } finally {
-      setSavingEdit(false);
-    }
-  };
-
-  if (loading) {
+  if (user?.role === "ADMIN") {
     return (
-      <EphAppShell title="Pazaryeri Detayı">
-        <div className="mx-auto max-w-4xl rounded-[32px] bg-white p-10 text-center text-sm font-black text-slate-500">
-          Paylaşım yükleniyor...
-        </div>
-      </EphAppShell>
+      <AdminNetworkCommandGrid
+        posts={posts}
+        loading={loading}
+        conversationCount={conversationCount}
+        unreadCount={unreadCount}
+        pushEnabled={pushEnabled}
+        pushLoading={pushLoading}
+        soundEnabled={soundEnabled}
+        onOpenMessages={() => router.push("/messages")}
+        onOpenSettings={() => router.push("/notification-settings")}
+        onEnablePush={enablePushNotifications}
+        onEnableSound={enableSound}
+        onRefresh={fetchPosts}
+      />
     );
   }
-
-  if (!post) {
-    return (
-      <EphAppShell title="Pazaryeri Detayı">
-        <div className="mx-auto max-w-4xl rounded-[32px] bg-white p-10 text-center">
-          <h1 className="text-2xl font-black text-slate-900">
-            Paylaşım bulunamadı
-          </h1>
-
-          <p className="mt-3 text-sm font-semibold text-slate-500">
-            Bu paylaşım kaldırılmış veya süresi dolmuş olabilir.
-          </p>
-
-          <button
-            onClick={() => router.push("/network")}
-            className="mt-5 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white"
-          >
-            Pazaryerine Dön
-          </button>
-        </div>
-      </EphAppShell>
-    );
-  }
-
-  const authorName = postUser
-    ? `${postUser.firstName} ${postUser.lastName}`
-    : "EPH Üyesi";
 
   return (
-    <EphAppShell title="Pazaryeri Detayı">
-      <div className="mx-auto w-full max-w-6xl">
-        <button
-          onClick={() => router.push("/network")}
-          className="mb-4 inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm"
-        >
-          <ArrowLeft size={18} />
-          Pazaryerine Dön
-        </button>
-
-        <section
-          className={`overflow-hidden rounded-[38px] bg-gradient-to-br ${theme.gradient} text-white shadow-2xl`}
-        >
-          <div className="p-7 md:p-9">
-            <div className="flex flex-col items-center justify-center gap-4 text-center">
-              <div className="flex h-20 w-20 items-center justify-center rounded-[30px] bg-white/15 text-4xl backdrop-blur">
-                {theme.emoji}
+    <EphAppShell title="Pazaryeri">
+      <section className="mx-auto grid max-w-7xl gap-5 text-center lg:grid-cols-[280px_1fr_320px]">
+        <aside className="space-y-5">
+          <div
+            className={`overflow-hidden rounded-[30px] bg-gradient-to-br ${currentUserTheme.gradient} p-5 text-white shadow-2xl`}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/20 text-3xl backdrop-blur">
+                {currentUserTheme.emoji}
               </div>
 
-              <div>
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-black text-white backdrop-blur">
-                  <CheckCircle2 size={16} />
-                  {theme.label}
-                </div>
+              <div className="mt-3">
+                <h2 className="text-lg font-black">
+                  {user?.firstName} {user?.lastName}
+                </h2>
 
-                <h1 className="max-w-4xl text-3xl font-black leading-tight tracking-tight md:text-5xl">
-                  {post.title}
-                </h1>
-
-                <p className="mx-auto mt-4 max-w-3xl text-sm font-semibold leading-7 text-white/80 md:text-base">
-                  {post.description}
+                <p className="mt-1 text-sm text-white/80">
+                  {roleLabel(user?.role)}
                 </p>
               </div>
             </div>
 
-            <div className="mt-7 grid gap-3 md:grid-cols-6">
-              <DetailHeroStat icon={<UsersRound size={20} />} label="Paylaşan" value={authorName} />
-              <DetailHeroStat icon={<Tag size={20} />} label="Tip" value={post.type} />
-              <DetailHeroStat icon={<WalletCards size={20} />} label="Bütçe" value={formatMoney(post.budget)} />
-              <DetailHeroStat icon={<Clock size={20} />} label="Yayın" value={relativeTime(post.createdAt)} />
-              <DetailHeroStat icon={<Star size={20} />} label="Takipçi" value={String(followStatus?.followerCount ?? stats?.followerCount ?? 0)} />
-              <DetailHeroStat icon={<Eye size={20} />} label="Görüntülenme" value={String(stats?.viewCount ?? 0)} />
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <MiniStat label="Paylaşım" value={String(posts.length)} />
+              <MiniStat label="Mesaj" value={String(conversationCount)} />
             </div>
           </div>
-        </section>
 
-        <section className="mt-6 grid gap-5 lg:grid-cols-[1fr_340px]">
-          <main className="space-y-5">
-            <div className="rounded-[32px] border border-slate-200 bg-white p-6 text-center shadow-sm">
-              <h2 className="text-2xl font-black text-slate-900">
-                Paylaşım Detayları
-              </h2>
+          <div className="rounded-[30px] border border-white bg-white p-5 shadow-sm">
+            <h3 className="mb-4 text-center text-lg font-black text-[#0F172A]">
+              Kategoriler
+            </h3>
 
-              <p className="mx-auto mt-3 max-w-3xl whitespace-pre-line text-[15px] font-semibold leading-8 text-slate-600">
-                {post.description}
+            <div className="space-y-2">
+              {categories.map((category, index) => (
+                <button
+                  key={category}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-center text-sm font-black transition-all"
+                  style={
+                    index === 0
+                      ? {
+                          backgroundColor: currentUserTheme.primary,
+                          color: "#FFFFFF",
+                        }
+                      : {
+                          color: "#475569",
+                        }
+                  }
+                >
+                  {category}
+                  {index === 0 && <Sparkles size={16} />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <section className="space-y-5">
+          <div className="rounded-[32px] border border-white bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-3 rounded-2xl bg-[#F8FAFC] px-4 py-4">
+              <Search size={18} className="text-slate-400" />
+
+              <input
+                className="w-full bg-transparent text-center text-sm font-semibold outline-none placeholder:text-center"
+                placeholder="Talep, portföy, bölge veya kullanıcı ara..."
+              />
+            </div>
+
+            <div className="mb-5 flex justify-center gap-2 overflow-x-auto pb-2">
+              {filters.map((filter, index) => (
+                <button
+                  key={filter}
+                  className="shrink-0 rounded-full px-4 py-2 text-xs font-black"
+                  style={
+                    index === 0
+                      ? {
+                          backgroundColor: currentUserTheme.primary,
+                          color: "#FFFFFF",
+                        }
+                      : {
+                          border: "1px solid #E2E8F0",
+                          backgroundColor: "#FFFFFF",
+                          color: "#475569",
+                        }
+                  }
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setModalOpen(true)}
+              className={`flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r ${currentUserTheme.gradient} text-sm font-black text-white shadow-xl`}
+            >
+              <Plus size={20} />
+              Yeni Paylaşım Oluştur
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="rounded-[30px] bg-white p-10 text-center font-bold text-slate-500">
+              Pazaryeri yükleniyor...
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="rounded-[30px] bg-white p-10 text-center">
+              <div className="text-lg font-black text-[#0F172A]">
+                Henüz paylaşım yok
+              </div>
+
+              <p className="mt-2 text-sm text-slate-500">
+                İlk talebi veya portföy fırsatını sen paylaşabilirsin.
               </p>
             </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <DetailInfoCard
-                icon={<MapPin size={22} />}
-                label="Lokasyon"
-                value={[
-                  post.city,
-                  post.district,
-                  post.neighborhood,
-                ]
-                  .filter(Boolean)
-                  .join(" / ") || "Belirtilmedi"}
-                theme={theme}
+          ) : (
+            posts.map((post) => (
+              <PremiumPostCard
+                key={post.id}
+                post={post}
+                currentUserId={user?.id}
+                currentUserRole={user?.role}
+                onOpenDetail={() => router.push(`/network/${post.id}`)}
+                onStartConversation={(actionTitle, presetMessage) =>
+                  startConversation(post, actionTitle, presetMessage)
+                }
               />
+            ))
+          )}
+        </section>
 
-              <DetailInfoCard
-                icon={<CalendarDays size={22} />}
-                label="Geçerlilik"
-                value={formatDateTime(post.expiresAt)}
-                theme={theme}
-              />
-
-              <DetailInfoCard
-                icon={<Sparkles size={22} />}
-                label="Aciliyet"
-                value={post.urgency || "Normal"}
-                theme={theme}
-              />
-
-              <DetailInfoCard
-                icon={<Building2 size={22} />}
-                label="Görünürlük"
-                value={visibilityLabel(post.visibility)}
-                theme={theme}
-              />
+        <aside className="space-y-5">
+          <div className="rounded-[30px] border border-white bg-white p-5 text-center shadow-sm">
+            <div className="mb-3 flex justify-center">
+              <div
+                className="flex h-14 w-14 items-center justify-center rounded-3xl"
+                style={{
+                  backgroundColor: currentUserTheme.soft,
+                  color: currentUserTheme.primary,
+                }}
+              >
+                <ShieldCheck size={28} />
+              </div>
             </div>
 
-            <div className="rounded-[32px] border border-slate-200 bg-white p-6 text-center shadow-sm">
-              <h2 className="text-2xl font-black text-slate-900">Etiketler</h2>
+            <h2 className="text-xl font-black text-[#0F172A]">
+              Güvenli Profesyonel Ağ
+            </h2>
 
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
-                {post.tags.length > 0 ? (
-                  post.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full px-4 py-2 text-xs font-black"
-                      style={{
-                        backgroundColor: theme.soft,
-                        color: theme.text,
-                      }}
-                    >
-                      #{tag}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-sm font-semibold text-slate-500">
-                    Etiket eklenmemiş.
+            <p className="mt-3 text-sm leading-7 text-slate-500">
+              Paylaşımlar yalnızca EPH üyelerine görünür.
+            </p>
+          </div>
+
+          <div className="rounded-[30px] border border-white bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-center text-lg font-black text-[#0F172A]">
+              Hızlı Erişim
+            </h2>
+
+            <div className="space-y-3">
+              <QuickLink
+                icon={<Flame size={18} />}
+                label="Sıcak Talepler"
+                theme={currentUserTheme}
+              />
+              <QuickLink
+                icon={<TrendingUp size={18} />}
+                label="Trend Paylaşımlar"
+                theme={currentUserTheme}
+              />
+              <QuickLink
+                icon={<MessageCircle size={18} />}
+                label="Mesajlar"
+                theme={currentUserTheme}
+                onClick={() => router.push("/messages")}
+              />
+              <QuickLink
+                icon={<Building2 size={18} />}
+                label="Portföy Eşleştir"
+                theme={currentUserTheme}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-[30px] border border-white bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-center text-lg font-black text-[#0F172A]">
+              Bildirimler
+            </h2>
+
+            <div className="space-y-3">
+              {!pushEnabled && (
+                <button
+                  onClick={enablePushNotifications}
+                  disabled={pushLoading}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black text-white disabled:opacity-60"
+                  style={{ backgroundColor: currentUserTheme.primary }}
+                >
+                  <Volume2 size={18} />
+                  {pushLoading ? "Açılıyor..." : "Bildirimleri Aç"}
+                </button>
+              )}
+
+              {!soundEnabled && (
+                <button
+                  onClick={enableSound}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 text-sm font-black text-white"
+                >
+                  <Volume2 size={18} />
+                  Sesi Aç
+                </button>
+              )}
+
+              <button
+                onClick={() => router.push("/messages")}
+                className="relative flex h-11 w-full items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black text-white shadow-lg"
+                style={{ backgroundColor: currentUserTheme.primary }}
+              >
+                <Inbox size={18} />
+                Mesajlar
+                {unreadCount > 0 && (
+                  <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-600 px-2 text-xs font-black text-white">
+                    {unreadCount}
                   </span>
                 )}
-              </div>
-            </div>
-          </main>
+              </button>
 
-          <aside className="space-y-5">
-            <div
-              className="rounded-[32px] border bg-white p-6 text-center shadow-sm"
-              style={{ borderColor: theme.border }}
-            >
-              <div
-                className="mx-auto flex h-20 w-20 items-center justify-center rounded-[30px] text-4xl"
+              <button
+                onClick={() => router.push("/notification-settings")}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border bg-white text-sm font-black"
                 style={{
-                  backgroundColor: theme.soft,
-                  color: theme.primary,
+                  borderColor: currentUserTheme.border,
+                  color: currentUserTheme.text,
                 }}
               >
-                {theme.emoji}
-              </div>
-
-              <h3 className="mt-4 text-xl font-black text-slate-900">
-                {authorName}
-              </h3>
-
-              <p
-                className="mx-auto mt-2 inline-flex rounded-full px-4 py-2 text-xs font-black"
-                style={{
-                  backgroundColor: theme.soft,
-                  color: theme.text,
-                }}
-              >
-                {theme.label}
-              </p>
-
-              <div
-                className="mt-5 rounded-[24px] border p-4 text-center"
-                style={{
-                  borderColor: theme.border,
-                  backgroundColor: "#FFFFFF",
-                }}
-              >
-                <div
-                  className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl"
-                  style={{
-                    backgroundColor: theme.soft,
-                    color: theme.primary,
-                  }}
-                >
-                  <Star size={22} />
-                </div>
-
-                <p className="text-sm font-black text-slate-900">
-                  {followStatus?.followerCount || 0} kişi takip ediyor
-                </p>
-
-                <p className="mt-1 text-xs font-semibold text-slate-500">
-                  Takibe alan üyeler güncellemeleri daha kolay takip eder.
-                </p>
-
-                {!isOwnPost && (
-                  <button
-                    onClick={toggleFollow}
-                    disabled={followLoading}
-                    className={`mt-4 w-full rounded-2xl px-5 py-4 text-sm font-black transition disabled:opacity-60 ${
-                      followStatus?.isFollowing
-                        ? "border bg-white"
-                        : "text-white"
-                    }`}
-                    style={
-                      followStatus?.isFollowing
-                        ? {
-                            borderColor: theme.border,
-                            color: theme.text,
-                          }
-                        : {
-                            backgroundColor: theme.primary,
-                          }
-                    }
-                  >
-                    {followLoading
-                      ? "İşleniyor..."
-                      : followStatus?.isFollowing
-                        ? "Takip Ediliyor ⭐"
-                        : "Takibe Al ⭐"}
-                  </button>
-                )}
-              </div>
-
-              <div
-                className="mt-5 rounded-[24px] border p-4 text-center"
-                style={{
-                  borderColor: theme.border,
-                  backgroundColor: theme.soft,
-                }}
-              >
-                <p className="text-xs font-black leading-5" style={{ color: theme.text }}>
-                  {isOwnPost
-                    ? "Bu paylaşım sana ait. Gelen dönüşleri takip edebilir veya paylaşımı güncelleyebilirsin."
-                    : actions.note}
-                </p>
-
-                <div className="mt-4 grid gap-3">
-                  <button
-                    onClick={() =>
-                      startConversation(
-                        actions.primary,
-                        createPresetMessage(actions.primary, post.title),
-                      )
-                    }
-                    disabled={isOwnPost || startingConversation}
-                    className="flex h-13 items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-black text-white disabled:opacity-50"
-                    style={{ backgroundColor: theme.primary }}
-                  >
-                    <MessageCircle size={18} />
-                    {isOwnPost
-                      ? "Kendi Paylaşımın"
-                      : startingConversation
-                        ? "Açılıyor..."
-                        : actions.primary}
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      if (isOwnPost) {
-                        setEditOpen(true);
-                        return;
-                      }
-
-                      startConversation(
-                        actions.secondary,
-                        createPresetMessage(actions.secondary, post.title),
-                      );
-                    }}
-                    className="rounded-2xl border bg-white px-5 py-4 text-sm font-black"
-                    style={{
-                      borderColor: theme.border,
-                      color: theme.text,
-                    }}
-                  >
-                    {isOwnPost ? "Güncelle" : actions.secondary}
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      if (isOwnPost) {
-                        document
-                          .getElementById("gelen-talepler")
-                          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                        return;
-                      }
-
-                      startConversation(
-                        actions.tertiary,
-                        createPresetMessage(actions.tertiary, post.title),
-                      );
-                    }}
-                    className={`rounded-2xl bg-gradient-to-r ${theme.gradient} px-5 py-4 text-sm font-black text-white`}
-                  >
-                    {isOwnPost ? "Gelen Talepler" : actions.tertiary}
-                  </button>
-                </div>
-              </div>
+                <Settings size={18} />
+                Ayarlar
+              </button>
             </div>
+          </div>
+        </aside>
+      </section>
 
-            {isOwnPost && (
-              <div
-                className="rounded-[32px] border bg-white p-6 text-center shadow-sm"
-                style={{ borderColor: theme.border }}
-              >
-                <h3 className="text-xl font-black text-slate-900">
-                  İlan İstatistikleri
-                </h3>
-
-                <p className="mt-2 text-sm font-semibold text-slate-500">
-                  Paylaşımının pazaryeri içindeki performansı.
-                </p>
-
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <MiniInsightCard
-                    icon={<Eye size={20} />}
-                    label="Görüntülenme"
-                    value={String(stats?.viewCount ?? 0)}
-                    theme={theme}
-                  />
-
-                  <MiniInsightCard
-                    icon={<UsersRound size={20} />}
-                    label="Tekil Üye"
-                    value={String(stats?.uniqueViewerCount ?? 0)}
-                    theme={theme}
-                  />
-
-                  <MiniInsightCard
-                    icon={<Star size={20} />}
-                    label="Takip Eden"
-                    value={String(followStatus?.followerCount ?? stats?.followerCount ?? 0)}
-                    theme={theme}
-                  />
-
-                  <MiniInsightCard
-                    icon={<MessageCircle size={20} />}
-                    label="Gelen Talep"
-                    value={String(stats?.total ?? 0)}
-                    theme={theme}
-                  />
-                </div>
-              </div>
-            )}
-
-            {isOwnPost && (
-              <div
-                id="gelen-talepler"
-                className="rounded-[32px] border bg-white p-6 text-center shadow-sm"
-                style={{ borderColor: theme.border }}
-              >
-                <h3 className="text-xl font-black text-slate-900">
-                  Gelen Talepler
-                </h3>
-
-                <p className="mt-2 text-sm font-semibold text-slate-500">
-                  Bu paylaşım üzerinden açılan profesyonel görüşmeler.
-                </p>
-
-                <div
-                  className="mx-auto mt-5 inline-flex rounded-3xl px-6 py-4 text-3xl font-black"
-                  style={{
-                    backgroundColor: theme.soft,
-                    color: theme.text,
-                  }}
-                >
-                  {stats?.total || 0}
-                </div>
-
-                <p className="mt-2 text-xs font-black uppercase tracking-wide text-slate-400">
-                  Toplam İlgi
-                </p>
-
-                <div className="mt-5 space-y-3">
-                  {stats?.byTitle && stats.byTitle.length > 0 ? (
-                    stats.byTitle.map((item) => (
-                      <div
-                        key={item.title}
-                        className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left"
-                        style={{
-                          borderColor: theme.border,
-                          backgroundColor: theme.soft,
-                        }}
-                      >
-                        <span
-                          className="text-xs font-black"
-                          style={{ color: theme.text }}
-                        >
-                          {item.title}
-                        </span>
-
-                        <span
-                          className="rounded-full px-3 py-1 text-xs font-black text-white"
-                          style={{ backgroundColor: theme.primary }}
-                        >
-                          {item.count}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-500">
-                      Bu paylaşıma henüz dönüş gelmedi.
-                    </p>
-                  )}
-                </div>
-
-                {stats?.latest && stats.latest.length > 0 && (
-                  <div className="mt-6 border-t border-slate-100 pt-5">
-                    <h4 className="text-sm font-black text-slate-900">
-                      Son Görüşmeler
-                    </h4>
-
-                    <div className="mt-3 space-y-2">
-                      {stats.latest.slice(0, 4).map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => router.push(`/messages/${item.id}`)}
-                          className="w-full rounded-2xl border border-slate-100 bg-white px-4 py-3 text-left transition hover:bg-slate-50"
-                        >
-                          <div className="text-xs font-black text-slate-900">
-                            {item.title}
-                          </div>
-
-                          <div className="mt-1 truncate text-[11px] font-semibold text-slate-500">
-                            {item.participants.join(" · ")}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div
-              className="rounded-[32px] border bg-white p-6 text-center shadow-sm"
-              style={{ borderColor: theme.border }}
-            >
-              <h3 className="text-xl font-black text-slate-900">
-                Güncelleme Geçmişi
-              </h3>
-
-              <p className="mt-2 text-sm font-semibold text-slate-500">
-                Bu paylaşımda yapılan önemli değişiklikler burada görünür.
-              </p>
-
-              <div className="mt-5 space-y-3">
-                {updateLogs.length > 0 ? (
-                  updateLogs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="rounded-2xl border px-4 py-4 text-left"
-                      style={{
-                        borderColor: theme.border,
-                        backgroundColor: theme.soft,
-                      }}
-                    >
-                      <div className="text-sm font-black" style={{ color: theme.text }}>
-                        {log.summary}
-                      </div>
-
-                      <div className="mt-1 text-[11px] font-bold text-slate-500">
-                        {formatDateTime(log.createdAt)}
-                      </div>
-
-                      <div className="mt-3 space-y-2">
-                        {log.changes.map((change) => (
-                          <div
-                            key={`${log.id}-${change.field}`}
-                            className="rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-600"
-                          >
-                            <span className="font-black text-slate-900">
-                              {change.label}:
-                            </span>{" "}
-                            {displayLogValue(change.oldValue)} → {displayLogValue(change.newValue)}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-500">
-                    Bu paylaşımda henüz kayıtlı güncelleme yok.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-[32px] border border-slate-200 bg-white p-6 text-center shadow-sm">
-              <h3 className="text-xl font-black text-slate-900">
-                Tarih Bilgisi
-              </h3>
-
-              <div className="mt-4 space-y-3 text-sm font-semibold text-slate-600">
-                <p>İlan tarihi: {formatDateTime(post.createdAt)}</p>
-                {!isSameCreatedUpdated(post.createdAt, (post as any).updatedAt) && (
-                  <p>Güncelleme: {formatDateTime((post as any).updatedAt)}</p>
-                )}
-                <p>Bitiş: {formatDateTime(post.expiresAt)}</p>
-              </div>
-            </div>
-          </aside>
-        </section>
-
-        {editOpen && (
-          <EditPostModal
-            post={post}
-            theme={theme}
-            saving={savingEdit}
-            onClose={() => setEditOpen(false)}
-            onSave={updatePost}
-          />
-        )}
-      </div>
+      {modalOpen && (
+        <CreatePostModal
+          onClose={() => setModalOpen(false)}
+          onCreate={handleCreatePost}
+          theme={currentUserTheme}
+        />
+      )}
     </EphAppShell>
   );
 }
 
+function AdminNetworkCommandGrid({
+  posts,
+  loading,
+  conversationCount,
+  unreadCount,
+  pushEnabled,
+  pushLoading,
+  soundEnabled,
+  onOpenMessages,
+  onOpenSettings,
+  onEnablePush,
+  onEnableSound,
+  onRefresh,
+}: {
+  posts: NetworkPost[];
+  loading: boolean;
+  conversationCount: number;
+  unreadCount: number;
+  pushEnabled: boolean;
+  pushLoading: boolean;
+  soundEnabled: boolean;
+  onOpenMessages: () => void;
+  onOpenSettings: () => void;
+  onEnablePush: () => void;
+  onEnableSound: () => void;
+  onRefresh: () => void;
+}) {
+  const hotPosts = posts.filter(isHotPost);
+  const adminTheme = getRoleTheme("ADMIN");
 
+  const todayCount = posts.filter(
+    (post) =>
+      post.createdAt &&
+      new Date(post.createdAt).toDateString() === new Date().toDateString(),
+  ).length;
 
-function displayLogValue(value: unknown) {
-  if (value == null || value === '') return 'Boş';
-  if (Array.isArray(value)) return value.join(', ') || 'Boş';
+  return (
+    <EphAppShell title="Pazaryeri">
+      <section className="mx-auto max-w-7xl text-center">
+        <div className={`relative overflow-hidden rounded-[42px] bg-gradient-to-br ${adminTheme.gradient} p-7 text-white shadow-2xl`}>
+          <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
+            <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-cyan-100">
+              Pazaryeri Admin Görünümü
+            </span>
 
-  const text = String(value);
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" />
+              Ağ Aktif
+            </span>
+          </div>
 
-  if (/^\d{4}-\d{2}-\d{2}T/.test(text)) {
-    return formatDateTime(text);
-  }
+          <h1 className="text-[42px] font-black leading-tight tracking-tight md:text-[64px]">
+            EPH Pazaryeri
+            <span className="block bg-gradient-to-r from-[#F7DFA3] via-cyan-100 to-white bg-clip-text text-transparent">
+              Komuta Ekranı
+            </span>
+          </h1>
 
-  return text;
+          <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-300">
+            Platformdaki talepler, portföy hareketleri ve mesajlaşma trafiği tek
+            ekrandan izlenir.
+          </p>
+
+          <div className="mt-7 grid gap-3 sm:grid-cols-4">
+            <AdminNetworkMetric label="Toplam Akış" value={posts.length} tone="cyan" />
+            <AdminNetworkMetric label="Sıcak Sinyal" value={hotPosts.length} tone="gold" />
+            <AdminNetworkMetric label="Bugün" value={todayCount} tone="blue" />
+            <AdminNetworkMetric label="Mesaj Odası" value={conversationCount} tone="emerald" />
+          </div>
+
+          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+            <button
+              onClick={onRefresh}
+              className="rounded-2xl bg-[#C9A84C] px-5 py-4 text-sm font-black uppercase tracking-[0.16em] text-[#061126]"
+            >
+              Verileri Yenile
+            </button>
+
+            <button
+              onClick={onOpenMessages}
+              className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-5 py-4 text-sm font-black uppercase tracking-[0.16em] text-cyan-100"
+            >
+              Mesaj Trafiği
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-5 lg:grid-cols-[320px_1fr]">
+          <aside className="space-y-5">
+            <div className="rounded-[34px] border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-500">
+                Grid Filtreleri
+              </p>
+
+              <div className="mt-4 space-y-2">
+                {categories.map((category, index) => (
+                  <button
+                    key={category}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-center text-sm font-black transition"
+                    style={
+                      index === 0
+                        ? {
+                            borderColor: adminTheme.border,
+                            backgroundColor: adminTheme.primary,
+                            color: "#FFFFFF",
+                          }
+                        : {
+                            borderColor: "#E2E8F0",
+                            backgroundColor: "#FFFFFF",
+                            color: "#475569",
+                          }
+                    }
+                  >
+                    {category}
+                    {index === 0 && <Sparkles size={16} />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[34px] border border-slate-200 bg-white p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-500">
+                Bildirim Kontrolü
+              </p>
+
+              <div className="mt-4 space-y-3">
+                {!pushEnabled && (
+                  <button
+                    onClick={onEnablePush}
+                    disabled={pushLoading}
+                    className="w-full rounded-2xl px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-white disabled:opacity-60"
+                    style={{ backgroundColor: adminTheme.primary }}
+                  >
+                    {pushLoading ? "Açılıyor" : "Bildirimleri Aç"}
+                  </button>
+                )}
+
+                {!soundEnabled && (
+                  <button
+                    onClick={onEnableSound}
+                    className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-emerald-700"
+                  >
+                    Sesi Aç
+                  </button>
+                )}
+
+                <button
+                  onClick={onOpenSettings}
+                  className="w-full rounded-2xl border px-4 py-3 text-xs font-black uppercase tracking-[0.14em]"
+                  style={{
+                    borderColor: adminTheme.border,
+                    color: adminTheme.text,
+                    backgroundColor: adminTheme.soft,
+                  }}
+                >
+                  Bildirim Ayarları
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          <section className="space-y-5">
+            {loading ? (
+              <div className="rounded-[34px] border border-slate-200 bg-white p-10 text-center text-sm font-black text-slate-500">
+                Pazaryeri verileri yükleniyor...
+              </div>
+            ) : posts.length === 0 ? (
+              <div className="rounded-[34px] border border-slate-200 bg-white p-10 text-center">
+                <div className="text-lg font-black text-slate-900">
+                  Henüz paylaşım yok
+                </div>
+
+                <p className="mt-2 text-sm text-slate-500">
+                  Pazaryeri akışı boş durumda.
+                </p>
+              </div>
+            ) : (
+              posts.map((post) => (
+                <AdminNetworkPostCard key={post.id} post={post} />
+              ))
+            )}
+          </section>
+        </div>
+      </section>
+    </EphAppShell>
+  );
 }
 
-function isSameCreatedUpdated(createdAt?: string, updatedAt?: string) {
-  if (!createdAt || !updatedAt) return true;
+function AdminNetworkMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "cyan" | "gold" | "blue" | "emerald";
+}) {
+  const cls =
+    tone === "gold"
+      ? "from-[#C9A84C] to-amber-300 text-[#061126]"
+      : tone === "emerald"
+        ? "from-emerald-300 to-teal-400 text-[#061126]"
+        : tone === "blue"
+          ? "from-blue-300 to-indigo-500 text-white"
+          : "from-cyan-300 to-blue-400 text-[#061126]";
 
-  return Math.abs(new Date(updatedAt).getTime() - new Date(createdAt).getTime()) < 2000;
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">
+        {label}
+      </p>
+
+      <p
+        className={`mt-3 inline-flex rounded-2xl bg-gradient-to-r px-4 py-2 text-2xl font-black ${cls}`}
+      >
+        {value}
+      </p>
+    </div>
+  );
 }
 
-function validForFromExpiresAt(value?: string) {
-  if (!value) return "7 gün";
+function AdminNetworkPostCard({ post }: { post: NetworkPost }) {
+  const postUser = getPostUser(post);
+  const authorName = postUser
+    ? `${postUser.firstName} ${postUser.lastName}`
+    : "EPH Üyesi";
+  const theme = getRoleTheme(postUser?.role);
 
-  const diff = new Date(value).getTime() - Date.now();
-  const day = Math.max(1, Math.ceil(diff / (24 * 60 * 60 * 1000)));
+  return (
+    <article
+      className="overflow-hidden rounded-[34px] border bg-white shadow-sm"
+      style={{ borderColor: theme.border }}
+    >
+      <div className={`h-2 bg-gradient-to-r ${theme.gradient}`} />
 
-  if (day <= 1) return "1 gün";
-  if (day <= 3) return "3 gün";
-  if (day <= 7) return "7 gün";
+      <div className="p-6">
+        <PostHeader post={post} authorName={authorName} theme={theme} />
 
-  return "30 gün";
+        <PostBody post={post} theme={theme} />
+      </div>
+    </article>
+  );
 }
 
-function EditPostModal({
+function PremiumPostCard({
   post,
-  theme,
-  saving,
-  onClose,
-  onSave,
+  currentUserId,
+  currentUserRole,
+  onOpenDetail,
+  onStartConversation,
 }: {
   post: NetworkPost;
-  theme: RoleTheme;
-  saving: boolean;
-  onClose: () => void;
-  onSave: (form: EditPostForm) => void;
+  currentUserId?: string;
+  currentUserRole?: string | null;
+  onOpenDetail: () => void;
+  onStartConversation: (actionTitle: string, presetMessage: string) => void;
 }) {
-  const [form, setForm] = useState<EditPostForm>({
-    type: post.type || "Talep",
-    title: post.title || "",
-    description: post.description || "",
-    city: post.city || "",
-    district: post.district || "",
-    neighborhood: post.neighborhood || "",
-    budget: post.budget ? String(post.budget) : "",
-    urgency: post.urgency || "Normal",
-    visibility: post.visibility || "TUM_EPH",
-    tags: (post.tags || []).join(", "),
-    validFor: validForFromExpiresAt(post.expiresAt),
+  const postUser = getPostUser(post);
+  const authorName = postUser
+    ? `${postUser.firstName} ${postUser.lastName}`
+    : "EPH Üyesi";
+
+  const theme = getRoleTheme(postUser?.role);
+  const ownerId = post.userId || postUser?.id;
+  const isOwnPost = ownerId === currentUserId;
+  const actions = getMarketplaceActions(currentUserRole, postUser?.role);
+
+  return (
+    <article
+      onClick={onOpenDetail}
+      className="group cursor-pointer overflow-hidden rounded-[32px] border bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-2xl"
+      style={{
+        borderColor: theme.border,
+        boxShadow: `0 18px 40px ${theme.primary}12`,
+      }}
+    >
+      <div className={`h-2 bg-gradient-to-r ${theme.gradient}`} />
+
+      <div className="p-6">
+        <PostHeader post={post} authorName={authorName} theme={theme} />
+
+        <PostBody post={post} theme={theme} />
+
+        <div
+          className="mt-6 rounded-[24px] border p-4 text-center"
+          style={{
+            borderColor: theme.border,
+            backgroundColor: theme.soft,
+          }}
+        >
+          <p className="text-xs font-black leading-5" style={{ color: theme.text }}>
+            {isOwnPost
+              ? "Bu paylaşım sana ait. Detay sayfasından yayını takip edebilir veya güncelleyebilirsin."
+              : actions.note}
+          </p>
+
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+
+                if (!isOwnPost) {
+                  onStartConversation(
+                    actions.primary,
+                    createPresetMessage(actions.primary, post.title),
+                  );
+                }
+              }}
+              disabled={isOwnPost}
+              className="rounded-2xl py-3 text-sm font-black transition-all"
+              style={
+                isOwnPost
+                  ? {
+                      backgroundColor: "#F1F5F9",
+                      color: "#94A3B8",
+                    }
+                  : {
+                      backgroundColor: theme.primary,
+                      color: "#FFFFFF",
+                    }
+              }
+            >
+              {isOwnPost ? "Kendi Paylaşımın" : actions.primary}
+            </button>
+
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+
+                if (!isOwnPost) {
+                  onStartConversation(
+                    actions.secondary,
+                    createPresetMessage(actions.secondary, post.title),
+                  );
+                }
+              }}
+              className="rounded-2xl border py-3 text-sm font-black"
+              style={{
+                borderColor: theme.border,
+                backgroundColor: "#FFFFFF",
+                color: theme.text,
+              }}
+            >
+              {isOwnPost ? "Güncelle" : actions.secondary}
+            </button>
+
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+
+                if (isOwnPost) {
+                  onOpenDetail();
+                  return;
+                }
+
+                onStartConversation(
+                  actions.tertiary,
+                  createPresetMessage(actions.tertiary, post.title),
+                );
+              }}
+              className={`rounded-2xl bg-gradient-to-r ${theme.gradient} py-3 text-sm font-black text-white shadow-lg`}
+            >
+              {isOwnPost ? "Gelen Talepler" : actions.tertiary}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-2 border-t border-slate-100 pt-4 text-center text-xs font-bold text-slate-400 md:grid-cols-2">
+          <span>Yayın: {formatDateTime(post.createdAt)}</span>
+          <span>Bitiş: {formatDateTime(post.expiresAt)}</span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function PostHeader({
+  post,
+  authorName,
+  theme,
+}: {
+  post: NetworkPost;
+  authorName: string;
+  theme: RoleTheme;
+}) {
+  const postUser = getPostUser(post);
+
+  return (
+    <div className="mb-5 flex flex-col items-center justify-center text-center">
+      <div
+        className="flex h-16 w-16 items-center justify-center rounded-3xl text-3xl font-black shadow-xl"
+        style={{
+          backgroundColor: theme.soft,
+          color: theme.primary,
+          border: `1px solid ${theme.border}`,
+        }}
+      >
+        {theme.emoji}
+      </div>
+
+      <div className="mt-4">
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <h3 className="text-[16px] font-black text-[#0F172A]">
+            {authorName}
+          </h3>
+
+          <CheckCircle2 size={18} style={{ color: theme.primary }} />
+        </div>
+
+        <p className="mt-2 inline-flex rounded-full px-4 py-1.5 text-xs font-black" style={{ backgroundColor: theme.soft, color: theme.text }}>
+          {roleLabel(postUser?.role)}
+        </p>
+
+        <p className="mt-2 text-xs font-bold text-slate-400">
+          {relativeTime(post.createdAt)}
+        </p>
+      </div>
+
+      <span
+        className="mt-4 rounded-full px-4 py-2 text-xs font-black"
+        style={{
+          backgroundColor: isHotPost(post) ? "#FEF2F2" : theme.soft,
+          color: isHotPost(post) ? "#DC2626" : theme.text,
+        }}
+      >
+        🔥 {post.urgency || "Normal"}
+      </span>
+    </div>
+  );
+}
+
+function PostBody({ post, theme }: { post: NetworkPost; theme: RoleTheme }) {
+  return (
+    <>
+      <div className="mb-4 flex justify-center">
+        <div
+          className="inline-flex rounded-full px-4 py-2 text-xs font-black"
+          style={{ backgroundColor: theme.soft, color: theme.text }}
+        >
+          {post.type}
+        </div>
+      </div>
+
+      <h2
+        className="text-center text-[26px] font-black leading-tight"
+        style={{ color: theme.text }}
+      >
+        {post.title}
+      </h2>
+
+      <p className="mt-4 text-center text-[15px] leading-8 text-slate-600">
+        {post.description}
+      </p>
+
+      {post.budget && (
+        <div className="mt-5 flex justify-center">
+          <div
+            className="inline-flex rounded-2xl px-4 py-3 text-sm font-black"
+            style={{ backgroundColor: theme.soft, color: theme.text }}
+          >
+            💰 {formatMoney(post.budget)}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        {post.city && (
+          <span
+            className="rounded-full px-3 py-2 text-xs font-black"
+            style={{ backgroundColor: theme.soft, color: theme.text }}
+          >
+            {post.city}
+            {post.district ? ` / ${post.district}` : ""}
+          </span>
+        )}
+
+        {post.tags.map((tag) => (
+          <span
+            key={tag}
+            className="rounded-full px-3 py-2 text-xs font-bold"
+            style={{ backgroundColor: "#F1F5F9", color: "#475569" }}
+          >
+            #{tag}
+          </span>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function CreatePostModal({
+  onClose,
+  onCreate,
+  theme,
+}: {
+  onClose: () => void;
+  onCreate: (form: CreatePostForm) => void;
+  theme: RoleTheme;
+}) {
+  const [form, setForm] = useState<CreatePostForm>({
+    type: "Talep",
+    title: "",
+    desc: "",
+    city: "Denizli",
+    district: "",
+    neighborhood: "",
+    budget: "",
+    urgency: "Sıcak Talep",
+    validFor: "1 gün",
+    visibility: "TUM_EPH",
+    tags: "",
   });
 
   const handleSubmit = () => {
-    if (!form.title.trim() || !form.description.trim()) {
+    if (!form.title.trim() || !form.desc.trim()) {
       alert("Başlık ve açıklama zorunludur.");
       return;
     }
 
-    onSave(form);
+    onCreate(form);
   };
 
   return (
-    <div className="fixed inset-0 z-[13000] flex items-center justify-center bg-black/50 p-4 backdrop-blur">
-      <section className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-[32px] bg-white shadow-2xl">
-        <header className="border-b border-slate-100 p-6 text-center">
-          <h2 className="text-2xl font-black" style={{ color: theme.text }}>
-            Paylaşımı Güncelle
-          </h2>
+    <div className="fixed inset-0 z-[12000] flex items-center justify-center bg-black/50 p-4 backdrop-blur">
+      <section className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-[32px] bg-white">
+        <header className="flex items-start justify-between gap-4 border-b border-slate-100 p-6">
+          <div className="flex-1 text-center">
+            <h2 className="text-[28px] font-black" style={{ color: theme.text }}>
+              Yeni Paylaşım
+            </h2>
 
-          <p className="mt-2 text-sm font-semibold text-slate-500">
-            Güncel bilgiler, paylaşımı görüntüleyen tüm üyelerde görünür.
-          </p>
+            <p className="mt-2 text-sm text-slate-500">
+              Ağ içerisinde paylaşım oluştur
+            </p>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+            style={{ backgroundColor: theme.soft, color: theme.text }}
+          >
+            <X size={20} />
+          </button>
         </header>
 
         <div className="grid gap-4 p-6">
-          <EditField label="Paylaşım tipi">
+          <NetworkField label="Paylaşım tipi">
             <select
               value={form.type}
               onChange={(event) =>
@@ -1410,43 +1604,43 @@ function EditPostModal({
                 <option key={type}>{type}</option>
               ))}
             </select>
-          </EditField>
+          </NetworkField>
 
-          <EditField label="Başlık">
+          <NetworkField label="Başlık">
             <input
               value={form.title}
               onChange={(event) =>
                 setForm((current) => ({ ...current, title: event.target.value }))
               }
               className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+              placeholder="Örn: Akkonak’ta 3+1 satılık daire aranıyor"
             />
-          </EditField>
+          </NetworkField>
 
-          <EditField label="Açıklama">
+          <NetworkField label="Açıklama">
             <textarea
-              value={form.description}
+              value={form.desc}
               onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  description: event.target.value,
-                }))
+                setForm((current) => ({ ...current, desc: event.target.value }))
               }
               className="min-h-28 w-full resize-y rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm font-semibold leading-6 outline-none"
+              placeholder="Talep, portföy veya iş birliği detaylarını yazın..."
             />
-          </EditField>
+          </NetworkField>
 
           <div className="grid gap-4 md:grid-cols-3">
-            <EditField label="İl">
+            <NetworkField label="İl">
               <input
                 value={form.city}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, city: event.target.value }))
                 }
                 className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+                placeholder="Denizli"
               />
-            </EditField>
+            </NetworkField>
 
-            <EditField label="İlçe">
+            <NetworkField label="İlçe">
               <input
                 value={form.district}
                 onChange={(event) =>
@@ -1456,10 +1650,11 @@ function EditPostModal({
                   }))
                 }
                 className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+                placeholder="Merkezefendi"
               />
-            </EditField>
+            </NetworkField>
 
-            <EditField label="Mahalle">
+            <NetworkField label="Mahalle">
               <input
                 value={form.neighborhood}
                 onChange={(event) =>
@@ -1469,12 +1664,13 @@ function EditPostModal({
                   }))
                 }
                 className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+                placeholder="Akkonak"
               />
-            </EditField>
+            </NetworkField>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <EditField label="Bütçe / Değer">
+            <NetworkField label="Bütçe / Değer">
               <input
                 value={form.budget}
                 onChange={(event) =>
@@ -1484,10 +1680,11 @@ function EditPostModal({
                   }))
                 }
                 className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+                placeholder="Örn: 15000000"
               />
-            </EditField>
+            </NetworkField>
 
-            <EditField label="Aciliyet">
+            <NetworkField label="Aciliyet">
               <select
                 value={form.urgency}
                 onChange={(event) =>
@@ -1502,11 +1699,11 @@ function EditPostModal({
                   <option key={option}>{option}</option>
                 ))}
               </select>
-            </EditField>
+            </NetworkField>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <EditField label="Geçerlilik süresi">
+            <NetworkField label="Geçerlilik süresi">
               <select
                 value={form.validFor}
                 onChange={(event) =>
@@ -1521,9 +1718,9 @@ function EditPostModal({
                   <option key={option}>{option}</option>
                 ))}
               </select>
-            </EditField>
+            </NetworkField>
 
-            <EditField label="Görünürlük">
+            <NetworkField label="Görünürlük">
               <select
                 value={form.visibility}
                 onChange={(event) =>
@@ -1540,35 +1737,34 @@ function EditPostModal({
                   </option>
                 ))}
               </select>
-            </EditField>
+            </NetworkField>
           </div>
 
-          <EditField label="Etiketler">
+          <NetworkField label="Etiketler">
             <input
               value={form.tags}
               onChange={(event) =>
                 setForm((current) => ({ ...current, tags: event.target.value }))
               }
               className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
+              placeholder="arsa, satılık, hazır müşteri"
             />
-          </EditField>
+          </NetworkField>
         </div>
 
         <footer className="flex flex-col gap-3 border-t border-slate-100 p-6 md:flex-row md:justify-end">
           <button
             onClick={onClose}
-            disabled={saving}
-            className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 disabled:opacity-60"
+            className="h-12 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700"
           >
             Vazgeç
           </button>
 
           <button
             onClick={handleSubmit}
-            disabled={saving}
-            className={`h-12 rounded-2xl bg-gradient-to-r ${theme.gradient} px-5 text-sm font-black text-white shadow-xl disabled:opacity-60`}
+            className={`h-12 rounded-2xl bg-gradient-to-r ${theme.gradient} px-5 text-sm font-black text-white shadow-xl`}
           >
-            {saving ? "Kaydediliyor..." : "Güncellemeyi Kaydet"}
+            Paylaşımı Yayınla
           </button>
         </footer>
       </section>
@@ -1576,12 +1772,12 @@ function EditPostModal({
   );
 }
 
-function EditField({
+function NetworkField({
   label,
   children,
 }: {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div>
@@ -1594,102 +1790,38 @@ function EditField({
   );
 }
 
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white/10 p-4 text-center backdrop-blur">
+      <p className="text-xs font-bold text-white/75">{label}</p>
+      <p className="mt-1 text-2xl font-black">{value}</p>
+    </div>
+  );
+}
 
-function MiniInsightCard({
+function QuickLink({
   icon,
   label,
-  value,
   theme,
+  onClick,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
-  value: string;
   theme: RoleTheme;
+  onClick?: () => void;
 }) {
   return (
-    <div
-      className="rounded-2xl border p-4 text-center"
+    <button
+      onClick={onClick}
+      className="flex w-full items-center justify-center gap-3 rounded-2xl border px-4 py-4 text-center text-sm font-black transition-all hover:bg-slate-100"
       style={{
         borderColor: theme.border,
         backgroundColor: theme.soft,
+        color: theme.text,
       }}
     >
-      <div
-        className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl"
-        style={{
-          backgroundColor: "#FFFFFF",
-          color: theme.primary,
-        }}
-      >
-        {icon}
-      </div>
-
-      <p className="mt-3 text-[10px] font-black uppercase tracking-wide text-slate-400">
-        {label}
-      </p>
-
-      <p className="mt-1 text-2xl font-black" style={{ color: theme.text }}>
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function DetailHeroStat({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-[24px] bg-white/12 p-4 text-center backdrop-blur">
-      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-white">
-        {icon}
-      </div>
-
-      <p className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-white/60">
-        {label}
-      </p>
-
-      <p className="mt-2 text-sm font-black text-white">{value}</p>
-    </div>
-  );
-}
-
-function DetailInfoCard({
-  icon,
-  label,
-  value,
-  theme,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  theme: RoleTheme;
-}) {
-  return (
-    <div
-      className="rounded-[28px] border bg-white p-5 text-center shadow-sm"
-      style={{ borderColor: theme.border }}
-    >
-      <div
-        className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl"
-        style={{
-          backgroundColor: theme.soft,
-          color: theme.primary,
-        }}
-      >
-        {icon}
-      </div>
-
-      <p className="mt-4 text-xs font-black uppercase tracking-wide text-slate-400">
-        {label}
-      </p>
-
-      <p className="mt-2 text-lg font-black text-slate-900">{value}</p>
-    </div>
+      <span style={{ color: theme.primary }}>{icon}</span>
+      {label}
+    </button>
   );
 }

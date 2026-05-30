@@ -682,6 +682,103 @@ export class NetworkService {
     );
   }
 
+
+  async getPostFollowers(id: string) {
+    const post = await this.prisma.networkPost.findFirst({
+      where: {
+        id,
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Pazaryeri paylaşımı bulunamadı.');
+    }
+
+    const followers = await this.prisma.networkPostFollower.findMany({
+      where: {
+        postId: id,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return followers.map((follow) => ({
+      id: follow.id,
+      followedAt: follow.createdAt,
+      user: follow.user,
+    }));
+  }
+
+  async getFeaturedPosts() {
+    const now = new Date();
+
+    const posts = await this.prisma.networkPost.findMany({
+      where: {
+        isActive: true,
+        expiresAt: {
+          gt: now,
+        },
+      },
+      include: {
+        User: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+        _count: {
+          select: {
+            followers: true,
+            Conversation: true,
+            views: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 50,
+    });
+
+    return posts
+      .map((post) => ({
+        id: post.id,
+        title: post.title,
+        type: post.type,
+        city: post.city,
+        district: post.district,
+        budget: post.budget,
+        createdAt: post.createdAt,
+        user: post.User,
+        score:
+          post._count.views +
+          post._count.followers * 5 +
+          post._count.Conversation * 8,
+        viewCount: post._count.views,
+        followerCount: post._count.followers,
+        requestCount: post._count.Conversation,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6);
+  }
+
   async update(id: string, dto: UpdateNetworkPostDto) {
     const existing = await this.prisma.networkPost.findFirst({
       where: {
