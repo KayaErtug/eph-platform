@@ -1396,17 +1396,19 @@ function PremiumPostCard({
               onClick={(event) => {
                 event.stopPropagation();
 
-                if (!isOwnPost) {
-                  onStartConversation(
-                    actions.tertiary,
-                    createPresetMessage(actions.tertiary, post.title),
-                  );
+                if (isOwnPost) {
+                  onOpenDetail();
+                  return;
                 }
+
+                onStartConversation(
+                  actions.tertiary,
+                  createPresetMessage(actions.tertiary, post.title),
+                );
               }}
-              disabled={isOwnPost}
-              className={`rounded-2xl bg-gradient-to-r ${theme.gradient} py-3 text-sm font-black text-white shadow-lg disabled:opacity-50`}
+              className={`rounded-2xl bg-gradient-to-r ${theme.gradient} py-3 text-sm font-black text-white shadow-lg`}
             >
-              {isOwnPost ? "Yayını Takip Et" : actions.tertiary}
+              {isOwnPost ? "Gelen Talepler" : actions.tertiary}
             </button>
           </div>
         </div>

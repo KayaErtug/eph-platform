@@ -48,6 +48,33 @@ type NetworkPost = {
   createdAt?: string;
 };
 
+type NetworkPostStats = {
+  postId: string;
+  postTitle: string;
+  total: number;
+  byTitle: {
+    title: string;
+    count: number;
+  }[];
+  latest: {
+    id: string;
+    title: string;
+    updatedAt: string;
+    participants: string[];
+    lastMessage?: {
+      id: string;
+      body: string;
+      createdAt: string;
+      sender: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        role: string;
+      };
+    } | null;
+  }[];
+};
+
 type RoleTheme = {
   primary: string;
   secondary: string;
@@ -459,6 +486,7 @@ export default function NetworkDetailPage() {
   const id = String(params?.id || "");
 
   const [post, setPost] = useState<NetworkPost | null>(null);
+  const [stats, setStats] = useState<NetworkPostStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [startingConversation, setStartingConversation] = useState(false);
 
@@ -474,6 +502,7 @@ export default function NetworkDetailPage() {
     if (!id) return;
 
     fetchPost();
+    fetchStats();
   }, [id]);
 
   const fetchPost = async () => {
@@ -486,6 +515,17 @@ export default function NetworkDetailPage() {
       setPost(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    if (!id) return;
+
+    try {
+      const res = await api.get(`/network/posts/${id}/stats`);
+      setStats(res.data);
+    } catch {
+      setStats(null);
     }
   };
 
@@ -764,21 +804,114 @@ export default function NetworkDetailPage() {
 
                   <button
                     onClick={() => {
-                      if (!isOwnPost) {
-                        startConversation(
-                          actions.tertiary,
-                          createPresetMessage(actions.tertiary, post.title),
-                        );
+                      if (isOwnPost) {
+                        document
+                          .getElementById("gelen-talepler")
+                          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        return;
                       }
+
+                      startConversation(
+                        actions.tertiary,
+                        createPresetMessage(actions.tertiary, post.title),
+                      );
                     }}
-                    disabled={isOwnPost}
-                    className={`rounded-2xl bg-gradient-to-r ${theme.gradient} px-5 py-4 text-sm font-black text-white disabled:opacity-50`}
+                    className={`rounded-2xl bg-gradient-to-r ${theme.gradient} px-5 py-4 text-sm font-black text-white`}
                   >
-                    {isOwnPost ? "Yayını Takip Et" : actions.tertiary}
+                    {isOwnPost ? "Gelen Talepler" : actions.tertiary}
                   </button>
                 </div>
               </div>
             </div>
+
+            {isOwnPost && (
+              <div
+                id="gelen-talepler"
+                className="rounded-[32px] border bg-white p-6 text-center shadow-sm"
+                style={{ borderColor: theme.border }}
+              >
+                <h3 className="text-xl font-black text-slate-900">
+                  Gelen Talepler
+                </h3>
+
+                <p className="mt-2 text-sm font-semibold text-slate-500">
+                  Bu paylaşım üzerinden açılan profesyonel görüşmeler.
+                </p>
+
+                <div
+                  className="mx-auto mt-5 inline-flex rounded-3xl px-6 py-4 text-3xl font-black"
+                  style={{
+                    backgroundColor: theme.soft,
+                    color: theme.text,
+                  }}
+                >
+                  {stats?.total || 0}
+                </div>
+
+                <p className="mt-2 text-xs font-black uppercase tracking-wide text-slate-400">
+                  Toplam İlgi
+                </p>
+
+                <div className="mt-5 space-y-3">
+                  {stats?.byTitle && stats.byTitle.length > 0 ? (
+                    stats.byTitle.map((item) => (
+                      <div
+                        key={item.title}
+                        className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left"
+                        style={{
+                          borderColor: theme.border,
+                          backgroundColor: theme.soft,
+                        }}
+                      >
+                        <span
+                          className="text-xs font-black"
+                          style={{ color: theme.text }}
+                        >
+                          {item.title}
+                        </span>
+
+                        <span
+                          className="rounded-full px-3 py-1 text-xs font-black text-white"
+                          style={{ backgroundColor: theme.primary }}
+                        >
+                          {item.count}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-500">
+                      Bu paylaşıma henüz dönüş gelmedi.
+                    </p>
+                  )}
+                </div>
+
+                {stats?.latest && stats.latest.length > 0 && (
+                  <div className="mt-6 border-t border-slate-100 pt-5">
+                    <h4 className="text-sm font-black text-slate-900">
+                      Son Görüşmeler
+                    </h4>
+
+                    <div className="mt-3 space-y-2">
+                      {stats.latest.slice(0, 4).map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => router.push(`/messages/${item.id}`)}
+                          className="w-full rounded-2xl border border-slate-100 bg-white px-4 py-3 text-left transition hover:bg-slate-50"
+                        >
+                          <div className="text-xs font-black text-slate-900">
+                            {item.title}
+                          </div>
+
+                          <div className="mt-1 truncate text-[11px] font-semibold text-slate-500">
+                            {item.participants.join(" · ")}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="rounded-[32px] border border-slate-200 bg-white p-6 text-center shadow-sm">
               <h3 className="text-xl font-black text-slate-900">

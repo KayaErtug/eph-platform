@@ -74,6 +74,116 @@ export class NetworkService {
     return post;
   }
 
+  async getPostStats(id: string) {
+    const post = await this.prisma.networkPost.findFirst({
+      where: {
+        id,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        title: true,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Pazaryeri paylaşımı bulunamadı.');
+    }
+
+    const conversations = await this.prisma.conversation.findMany({
+      where: {
+        postId: id,
+      },
+      select: {
+        id: true,
+        title: true,
+        updatedAt: true,
+        ConversationParticipant: {
+          select: {
+            User: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+        },
+        Message: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1,
+          select: {
+            id: true,
+            body: true,
+            createdAt: true,
+            User: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+
+    const byTitleMap = new Map<string, number>();
+
+    conversations.forEach((conversation) => {
+      const title = conversation.title || 'EPH GÖRÜŞMESİ';
+      byTitleMap.set(title, (byTitleMap.get(title) || 0) + 1);
+    });
+
+    const byTitle = Array.from(byTitleMap.entries())
+      .map(([title, count]) => ({
+        title,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return {
+      postId: post.id,
+      postTitle: post.title,
+      total: conversations.length,
+      byTitle,
+      latest: conversations.slice(0, 8).map((conversation) => {
+        const lastMessage = conversation.Message[0];
+        const participantNames = conversation.ConversationParticipant.map(
+          (participant) =>
+            `${participant.User.firstName} ${participant.User.lastName}`,
+        );
+
+        return {
+          id: conversation.id,
+          title: conversation.title,
+          updatedAt: conversation.updatedAt,
+          participants: participantNames,
+          lastMessage: lastMessage
+            ? {
+                id: lastMessage.id,
+                body: lastMessage.body,
+                createdAt: lastMessage.createdAt,
+                sender: {
+                  id: lastMessage.User.id,
+                  firstName: lastMessage.User.firstName,
+                  lastName: lastMessage.User.lastName,
+                  role: lastMessage.User.role,
+                },
+              }
+            : null,
+        };
+      }),
+    };
+  }
+
   async create(dto: CreateNetworkPostDto) {
     return this.prisma.networkPost.create({
       data: {

@@ -10,6 +10,11 @@ export class NetworkController {
     return this.networkService.findAll();
   }
 
+  @Get('posts/:id/stats')
+  getPostStats(@Param('id') id: string) {
+    return this.networkService.getPostStats(id);
+  }
+
   @Get('posts/:id')
   findOne(@Param('id') id: string) {
     return this.networkService.findOne(id);
