@@ -255,13 +255,22 @@ export class NetworkService {
       },
     });
 
-    return logs.map((log) => ({
-      id: log.id,
-      summary: log.summary,
-      changes: log.changes,
-      createdAt: log.createdAt,
-      user: log.user,
-    }));
+    return logs.map((log) => {
+      const rawChanges = log.changes as any;
+      const normalizedChanges = Array.isArray(rawChanges)
+        ? rawChanges
+        : Array.isArray(rawChanges?.items)
+          ? rawChanges.items
+          : [];
+
+      return {
+        id: log.id,
+        summary: log.summary,
+        changes: normalizedChanges,
+        createdAt: log.createdAt,
+        user: log.user,
+      };
+    });
   }
 
   async update(id: string, dto: UpdateNetworkPostDto) {
