@@ -17,6 +17,7 @@ import {
   Loader2,
   MessageCircle,
   Plus,
+  ShieldCheck,
   Store,
   TrendingUp,
   UsersRound,
@@ -27,7 +28,7 @@ import EphAppShell from "@/components/EphAppShell";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 
-type RoleType = "realtor" | "contractor" | "construction" | "admin";
+type RoleType = "realtor" | "contractor" | "construction" | "admin" | "superadmin";
 type ToneType = "blue" | "orange" | "amber" | "slate";
 
 type Conversation = {
@@ -67,8 +68,6 @@ type FeaturedNetworkPost = {
     role: string;
   };
 };
-
-
 
 type CrmDashboardCustomer = {
   id: string;
@@ -137,6 +136,10 @@ function normalizeRole(role?: string | null) {
 function getRoleType(role?: string | null): RoleType {
   const normalizedRole = normalizeRole(role);
 
+  if (normalizedRole === "SUPER_ADMIN") {
+    return "superadmin";
+  }
+
   if (
     normalizedRole === "INSAAT_FIRMASI" ||
     normalizedRole === "İNŞAAT_FİRMASI"
@@ -152,7 +155,7 @@ function getRoleType(role?: string | null): RoleType {
     return "contractor";
   }
 
-  if (normalizedRole === "ADMIN" || normalizedRole === "DENETCI_ADMIN") {
+  if (normalizedRole === "ADMIN") {
     return "admin";
   }
 
@@ -186,6 +189,10 @@ function RoleBadge({ roleType }: { roleType: RoleType }) {
     admin: {
       label: "Admin Paneli",
       className: "bg-slate-900 text-white border-slate-700",
+    },
+    superadmin: {
+      label: "Süper Admin Paneli",
+      className: "bg-slate-950 text-white border-slate-800",
     },
   };
 
@@ -238,7 +245,6 @@ function StatCard({
     </div>
   );
 }
-
 
 function CrmTaskSummaryCard({
   icon,
@@ -390,7 +396,6 @@ function QuickAction({
   );
 }
 
-
 function startOfToday() {
   const date = new Date();
   date.setHours(0, 0, 0, 0);
@@ -406,10 +411,13 @@ function endOfToday() {
 function formatTaskTime(value?: string | null) {
   if (!value) return "Saat yok";
   const date = new Date(value);
-  return `${date.toLocaleDateString("tr-TR")} · ${date.toLocaleTimeString("tr-TR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
+  return `${date.toLocaleDateString("tr-TR")} · ${date.toLocaleTimeString(
+    "tr-TR",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+    },
+  )}`;
 }
 
 function flattenCustomerTasks(customers: CrmDashboardCustomer[]) {
@@ -425,8 +433,12 @@ function flattenCustomerTasks(customers: CrmDashboardCustomer[]) {
         })),
     )
     .sort((a, b) => {
-      const aTime = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
-      const bTime = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+      const aTime = a.dueDate
+        ? new Date(a.dueDate).getTime()
+        : Number.MAX_SAFE_INTEGER;
+      const bTime = b.dueDate
+        ? new Date(b.dueDate).getTime()
+        : Number.MAX_SAFE_INTEGER;
       return aTime - bTime;
     });
 }
@@ -466,10 +478,13 @@ function formatActivityTime(value?: string | null) {
 
   const date = new Date(value);
 
-  return `${date.toLocaleDateString("tr-TR")} · ${date.toLocaleTimeString("tr-TR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
+  return `${date.toLocaleDateString("tr-TR")} · ${date.toLocaleTimeString(
+    "tr-TR",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+    },
+  )}`;
 }
 
 function isThisWeek(value?: string | null) {
@@ -488,7 +503,6 @@ function isThisWeek(value?: string | null) {
 
   return date >= weekStart && date <= weekEnd;
 }
-
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -527,7 +541,13 @@ export default function DashboardPage() {
     setLoading(true);
 
     try {
-      const [summaryRes, conversationsRes, notificationsRes, featuredRes, crmCustomersRes] = await Promise.all([
+      const [
+        summaryRes,
+        conversationsRes,
+        notificationsRes,
+        featuredRes,
+        crmCustomersRes,
+      ] = await Promise.all([
         api.get("/dashboard/summary"),
         user?.id
           ? api.get(`/conversations?userId=${user.id}`)
@@ -598,7 +618,10 @@ export default function DashboardPage() {
   };
 
   const pendingTaskCount = summary?.pendingTasks?.length || 0;
-  const crmTasks = useMemo(() => flattenCustomerTasks(crmCustomers), [crmCustomers]);
+  const crmTasks = useMemo(
+    () => flattenCustomerTasks(crmCustomers),
+    [crmCustomers],
+  );
 
   const todayStart = startOfToday();
   const todayEnd = endOfToday();
@@ -635,8 +658,66 @@ export default function DashboardPage() {
 
   const latestActivities = crmActivities.slice(0, 5);
 
-
   const pageConfig = useMemo(() => {
+    if (roleType === "superadmin") {
+      return {
+        title: "Süper Admin",
+        tone: "slate" as ToneType,
+        heroClass:
+          "from-slate-950 via-slate-900 to-indigo-950 shadow-slate-900/20",
+        subtitle:
+          "Kullanıcılar, yetkiler, denetim kayıtları ve platform omurgası için ana yönetim ekranı.",
+        stats: [
+          {
+            title: "Kullanıcılar",
+            value: String(stats.totalCustomers || 0),
+            description: "Platformdaki kayıtlı üye ve bağlantı verileri",
+            icon: <UsersRound size={22} />,
+          },
+          {
+            title: "Stok",
+            value: String(stats.totalUnits || 0),
+            description: "Sistemdeki toplam ilan ve bağımsız bölüm kayıtları",
+            icon: <Building2 size={22} />,
+          },
+          {
+            title: "Ziyaret",
+            value: String(stats.totalVisits || 0),
+            description: "Platform trafiği ve kullanıcı hareketleri",
+            icon: <TrendingUp size={22} />,
+          },
+          {
+            title: "Mesajlar",
+            value: String(unreadMessages),
+            description: "Okunmamış görüşme ve mesaj akışı",
+            icon: <MessageCircle size={22} />,
+          },
+        ],
+        actions: [
+          {
+            label: "Yönetim Merkezi",
+            href: "/admin",
+            icon: <ShieldCheck size={21} />,
+          },
+          {
+            label: "Başvurular",
+            href: "/admin",
+            icon: <CheckSquare size={21} />,
+          },
+          {
+            label: "Stok Denetimi",
+            href: "/stok",
+            icon: <Building2 size={21} />,
+          },
+          {
+            label: "Mesajlar",
+            href: "/messages",
+            icon: <MessageCircle size={21} />,
+          },
+        ],
+      };
+    }
+
     if (roleType === "construction") {
       return {
         title: "Ana Sayfa",
@@ -867,8 +948,6 @@ export default function DashboardPage() {
             />
           ))}
         </section>
-
-
 
         <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
