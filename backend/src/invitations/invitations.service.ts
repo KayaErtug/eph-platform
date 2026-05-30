@@ -13,7 +13,7 @@ export class InvitationsService {
       MUTEAHHIT: 'MUH',
       INSAAT_FIRMASI: 'INS',
       ADMIN: 'ADM',
-      DENETCI_ADMIN: 'DNA',
+      SUPER_ADMIN: 'SUP',
     };
 
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
