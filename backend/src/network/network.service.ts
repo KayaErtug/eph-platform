@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from '../push/push.service';
 
 type CreateNetworkPostDto = {
   userId: string;
@@ -113,7 +114,10 @@ function buildNotificationMessage(changes: NetworkPostChangeItem[]) {
 
 @Injectable()
 export class NetworkService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pushService: PushService,
+  ) {}
 
   async findAll() {
     const now = new Date();
@@ -598,6 +602,36 @@ export class NetworkService {
     };
   }
 
+  private buildPushBody(changes: NetworkPostChangeItem[]) {
+    const labels = changes.map((change) => change.label);
+
+    if (labels.includes('Bütçe')) {
+      const budgetChange = changes.find((change) => change.label === 'Bütçe');
+
+      if (budgetChange) {
+        return `Takip ettiğiniz ilanda fiyat değişti: ${formatNotificationValue(
+          budgetChange.oldValue,
+        )} → ${formatNotificationValue(budgetChange.newValue)}`;
+      }
+
+      return 'Takip ettiğiniz ilanda fiyat değişti.';
+    }
+
+    if (
+      labels.includes('İl') ||
+      labels.includes('İlçe') ||
+      labels.includes('Mahalle')
+    ) {
+      return 'Takip ettiğiniz ilanda lokasyon değişti.';
+    }
+
+    if (labels.includes('Açıklama')) {
+      return 'Takip ettiğiniz ilanda açıklama değişti.';
+    }
+
+    return 'Takip ettiğiniz ilanda güncelleme yapıldı.';
+  }
+
   private async createUpdateNotifications(
     postId: string,
     ownerId: string,
@@ -626,6 +660,7 @@ export class NetworkService {
 
     const summary = summarizeChanges(changes);
     const message = buildNotificationMessage(changes);
+    const pushBody = this.buildPushBody(changes);
 
     await this.prisma.networkNotification.createMany({
       data: uniqueUserIds.map((userId) => ({
@@ -635,6 +670,16 @@ export class NetworkService {
         message: `${summary}\n\n${message}`,
       })),
     });
+
+    await Promise.allSettled(
+      uniqueUserIds.map((userId) =>
+        this.pushService.sendToUser(userId, {
+          title: 'EPH Pazaryeri',
+          body: pushBody,
+          url: `/network/${postId}`,
+        }),
+      ),
+    );
   }
 
   async update(id: string, dto: UpdateNetworkPostDto) {
