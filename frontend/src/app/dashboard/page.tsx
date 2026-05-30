@@ -12,6 +12,7 @@ import {
   CalendarCheck,
   CheckSquare,
   Clock3,
+  FileText,
   Home,
   Loader2,
   MessageCircle,
@@ -76,12 +77,32 @@ type CrmDashboardCustomer = {
   phone?: string | null;
   city?: string | null;
   status: string;
+  activities?: Array<{
+    id: string;
+    type: string;
+    note: string;
+    createdAt: string;
+  }>;
   tasks?: Array<{
     id: string;
     title: string;
     dueDate?: string | null;
     status: string;
   }>;
+  _count?: {
+    activities?: number;
+    tasks?: number;
+  };
+};
+
+type DashboardActivityItem = {
+  id: string;
+  type: string;
+  note: string;
+  createdAt: string;
+  customerId: string;
+  customerName: string;
+  customerPhone?: string | null;
 };
 
 type DashboardTaskItem = {
@@ -274,6 +295,65 @@ function DashboardTaskRow({ task }: { task: DashboardTaskItem }) {
   );
 }
 
+function CrmActivitySummaryCard({
+  icon,
+  title,
+  value,
+  description,
+  tone,
+}: {
+  icon: ReactNode;
+  title: string;
+  value: string;
+  description: string;
+  tone: "blue" | "green" | "slate";
+}) {
+  const toneClass = {
+    blue: "bg-blue-50 text-blue-700 border-blue-100",
+    green: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    slate: "bg-slate-100 text-slate-700 border-slate-200",
+  }[tone];
+
+  return (
+    <div className="rounded-[24px] border border-slate-200 bg-white p-4 text-center shadow-sm">
+      <div
+        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border ${toneClass}`}
+      >
+        {icon}
+      </div>
+      <p className="mt-3 text-[11px] font-black uppercase tracking-wide text-slate-400">
+        {title}
+      </p>
+      <p className="mt-2 text-3xl font-black text-slate-900">{value}</p>
+      <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function DashboardActivityRow({ activity }: { activity: DashboardActivityItem }) {
+  return (
+    <Link
+      href="/crm"
+      className="block rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-center transition hover:bg-white"
+    >
+      <div className="text-[11px] font-black uppercase tracking-wide text-blue-700">
+        {activityTypeLabel(activity.type)}
+      </div>
+      <div className="mt-1 text-sm font-black text-slate-900">
+        {activity.customerName}
+      </div>
+      <div className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500">
+        {activity.note}
+      </div>
+      <div className="mt-2 text-[11px] font-black text-slate-400">
+        {formatActivityTime(activity.createdAt)}
+      </div>
+    </Link>
+  );
+}
+
 function QuickAction({
   href,
   icon,
@@ -350,6 +430,65 @@ function flattenCustomerTasks(customers: CrmDashboardCustomer[]) {
       return aTime - bTime;
     });
 }
+
+function flattenCustomerActivities(customers: CrmDashboardCustomer[]) {
+  return customers
+    .flatMap((customer) =>
+      (customer.activities || []).map((activity) => ({
+        ...activity,
+        customerId: customer.id,
+        customerName: `${customer.firstName} ${customer.lastName}`.trim(),
+        customerPhone: customer.phone,
+      })),
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+}
+
+function activityTypeLabel(type?: string) {
+  const labels: Record<string, string> = {
+    TELEFON: "Telefon",
+    WHATSAPP: "WhatsApp",
+    EMAIL: "E-posta",
+    YER_GOSTERIMI: "Yer Gösterimi",
+    TEKLIF: "Teklif",
+    NOT: "Not",
+    DIGER: "Diğer",
+  };
+
+  return labels[String(type || "")] || "Aktivite";
+}
+
+function formatActivityTime(value?: string | null) {
+  if (!value) return "Tarih yok";
+
+  const date = new Date(value);
+
+  return `${date.toLocaleDateString("tr-TR")} · ${date.toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+}
+
+function isThisWeek(value?: string | null) {
+  if (!value) return false;
+
+  const date = new Date(value);
+  const now = new Date();
+  const day = now.getDay() || 7;
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - day + 1);
+  weekStart.setHours(0, 0, 0, 0);
+
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
+
+  return date >= weekStart && date <= weekEnd;
+}
+
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -479,6 +618,22 @@ export default function DashboardPage() {
     if (!task.dueDate) return false;
     return new Date(task.dueDate).getTime() > todayEnd.getTime();
   });
+
+  const crmActivities = useMemo(
+    () => flattenCustomerActivities(crmCustomers),
+    [crmCustomers],
+  );
+
+  const totalCrmActivityCount = crmCustomers.reduce(
+    (sum, customer) => sum + (customer._count?.activities || 0),
+    0,
+  );
+
+  const thisWeekActivities = crmActivities.filter((activity) =>
+    isThisWeek(activity.createdAt),
+  );
+
+  const latestActivities = crmActivities.slice(0, 5);
 
 
   const pageConfig = useMemo(() => {
@@ -804,6 +959,66 @@ export default function DashboardPage() {
             className="mt-5 inline-flex rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white"
           >
             CRM Görevlerini Aç
+          </Link>
+        </section>
+
+        <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+            <FileText size={24} />
+          </div>
+
+          <h2 className="mt-4 text-2xl font-black text-slate-900">
+            CRM Aktivite Özeti
+          </h2>
+
+          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+            Müşteri görüşmeleri, notlar ve saha hareketlerini tek ekrandan izle.
+          </p>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <CrmActivitySummaryCard
+              icon={<UsersRound size={22} />}
+              title="Toplam Müşteri"
+              value={String(crmCustomers.length)}
+              description="CRM içinde kayıtlı müşteri sayısı"
+              tone="blue"
+            />
+            <CrmActivitySummaryCard
+              icon={<FileText size={22} />}
+              title="Toplam Aktivite"
+              value={String(totalCrmActivityCount)}
+              description="Tüm müşteri kayıtlarındaki aktivite sayısı"
+              tone="green"
+            />
+            <CrmActivitySummaryCard
+              icon={<TrendingUp size={22} />}
+              title="Bu Hafta Aktivite"
+              value={String(thisWeekActivities.length)}
+              description="Bu hafta işlenen son müşteri aktiviteleri"
+              tone="slate"
+            />
+          </div>
+
+          <div className="mt-5 rounded-[24px] border border-slate-100 bg-white p-4">
+            <h3 className="text-sm font-black text-slate-900">Son Aktiviteler</h3>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {latestActivities.length > 0 ? (
+                latestActivities.map((activity) => (
+                  <DashboardActivityRow key={activity.id} activity={activity} />
+                ))
+              ) : (
+                <div className="rounded-2xl bg-slate-50 px-4 py-5 text-xs font-semibold text-slate-500 md:col-span-2">
+                  Henüz CRM aktivitesi yok. Müşteri detayından telefon, WhatsApp, not veya yer gösterimi ekleyebilirsin.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Link
+            href="/crm"
+            className="mt-5 inline-flex rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white"
+          >
+            CRM Aktivitelerini Aç
           </Link>
         </section>
 
