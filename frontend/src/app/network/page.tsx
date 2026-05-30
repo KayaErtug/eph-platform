@@ -20,6 +20,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Star,
   TrendingUp,
   UsersRound,
   Volume2,
@@ -50,6 +51,12 @@ type NetworkPost = {
   tags: string[];
   expiresAt?: string;
   createdAt?: string;
+};
+
+type FollowedPost = {
+  id: string;
+  followedAt: string;
+  post: NetworkPost;
 };
 
 type Conversation = {
@@ -542,7 +549,10 @@ export default function NetworkPage() {
   const currentUserTheme = getRoleTheme(user?.role);
 
   const [posts, setPosts] = useState<NetworkPost[]>([]);
+  const [followedPosts, setFollowedPosts] = useState<FollowedPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [followedLoading, setFollowedLoading] = useState(false);
+  const [showFollowedOnly, setShowFollowedOnly] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [conversationCount, setConversationCount] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -649,6 +659,24 @@ export default function NetworkPage() {
     }
   };
 
+  const fetchFollowedPosts = async () => {
+    if (!user?.id) {
+      setFollowedPosts([]);
+      return;
+    }
+
+    try {
+      setFollowedLoading(true);
+
+      const res = await api.get(`/network/posts/followed?userId=${user.id}`);
+      setFollowedPosts(res.data || []);
+    } catch {
+      setFollowedPosts([]);
+    } finally {
+      setFollowedLoading(false);
+    }
+  };
+
   const fetchConversationStats = async () => {
     if (!user?.id) return;
 
@@ -683,6 +711,8 @@ export default function NetworkPage() {
 
   useEffect(() => {
     if (!user?.id) return;
+
+    fetchFollowedPosts();
 
     firstUnreadCheckRef.current = true;
     lastUnreadRef.current = 0;
@@ -726,6 +756,7 @@ export default function NetworkPage() {
     });
 
     await fetchPosts();
+    await fetchFollowedPosts();
     setModalOpen(false);
   };
 
@@ -774,6 +805,10 @@ export default function NetworkPage() {
     }
   };
 
+  const displayPosts = showFollowedOnly
+    ? followedPosts.map((item) => item.post)
+    : posts;
+
   if (user?.role === "ADMIN") {
     return (
       <AdminNetworkCommandGrid
@@ -816,8 +851,9 @@ export default function NetworkPage() {
               </div>
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="mt-5 grid grid-cols-3 gap-3">
               <MiniStat label="Paylaşım" value={String(posts.length)} />
+              <MiniStat label="Takip" value={String(followedPosts.length)} />
               <MiniStat label="Mesaj" value={String(conversationCount)} />
             </div>
           </div>
@@ -885,6 +921,68 @@ export default function NetworkPage() {
               ))}
             </div>
 
+            <div className="mb-4 grid gap-3 md:grid-cols-2">
+              <button
+                onClick={() => setShowFollowedOnly(false)}
+                className="flex h-13 items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition"
+                style={
+                  !showFollowedOnly
+                    ? {
+                        borderColor: currentUserTheme.primary,
+                        backgroundColor: currentUserTheme.primary,
+                        color: "#FFFFFF",
+                      }
+                    : {
+                        borderColor: currentUserTheme.border,
+                        backgroundColor: "#FFFFFF",
+                        color: currentUserTheme.text,
+                      }
+                }
+              >
+                <Sparkles size={18} />
+                Tüm Akış
+              </button>
+
+              <button
+                onClick={() => setShowFollowedOnly(true)}
+                className="relative flex h-13 items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition"
+                style={
+                  showFollowedOnly
+                    ? {
+                        borderColor: currentUserTheme.primary,
+                        backgroundColor: currentUserTheme.primary,
+                        color: "#FFFFFF",
+                      }
+                    : {
+                        borderColor: currentUserTheme.border,
+                        backgroundColor: "#FFFFFF",
+                        color: currentUserTheme.text,
+                      }
+                }
+              >
+                <Star size={18} />
+                Takip Ettiklerim
+                {followedPosts.length > 0 && (
+                  <span
+                    className="ml-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-black"
+                    style={
+                      showFollowedOnly
+                        ? {
+                            backgroundColor: "#FFFFFF",
+                            color: currentUserTheme.primary,
+                          }
+                        : {
+                            backgroundColor: currentUserTheme.soft,
+                            color: currentUserTheme.text,
+                          }
+                    }
+                  >
+                    {followedPosts.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
             <button
               onClick={() => setModalOpen(true)}
               className={`flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r ${currentUserTheme.gradient} text-sm font-black text-white shadow-xl`}
@@ -894,22 +992,42 @@ export default function NetworkPage() {
             </button>
           </div>
 
-          {loading ? (
+          {loading || (showFollowedOnly && followedLoading) ? (
             <div className="rounded-[30px] bg-white p-10 text-center font-bold text-slate-500">
-              Pazaryeri yükleniyor...
+              {showFollowedOnly
+                ? "Takip ettiğin paylaşımlar yükleniyor..."
+                : "Pazaryeri yükleniyor..."}
             </div>
-          ) : posts.length === 0 ? (
+          ) : displayPosts.length === 0 ? (
             <div className="rounded-[30px] bg-white p-10 text-center">
-              <div className="text-lg font-black text-[#0F172A]">
-                Henüz paylaşım yok
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-500">
+                {showFollowedOnly ? <Star size={28} /> : <Plus size={28} />}
               </div>
 
-              <p className="mt-2 text-sm text-slate-500">
-                İlk talebi veya portföy fırsatını sen paylaşabilirsin.
+              <div className="text-lg font-black text-[#0F172A]">
+                {showFollowedOnly
+                  ? "Henüz takip ettiğin paylaşım yok"
+                  : "Henüz paylaşım yok"}
+              </div>
+
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                {showFollowedOnly
+                  ? "İlgini çeken ilanların detayına girip Takibe Al butonuna basınca burada görünür."
+                  : "İlk talebi veya portföy fırsatını sen paylaşabilirsin."}
               </p>
+
+              {showFollowedOnly && (
+                <button
+                  onClick={() => setShowFollowedOnly(false)}
+                  className="mt-5 rounded-2xl px-5 py-3 text-sm font-black text-white"
+                  style={{ backgroundColor: currentUserTheme.primary }}
+                >
+                  Tüm Akışa Dön
+                </button>
+              )}
             </div>
           ) : (
-            posts.map((post) => (
+            displayPosts.map((post) => (
               <PremiumPostCard
                 key={post.id}
                 post={post}
@@ -970,9 +1088,10 @@ export default function NetworkPage() {
                 onClick={() => router.push("/messages")}
               />
               <QuickLink
-                icon={<Building2 size={18} />}
-                label="Portföy Eşleştir"
+                icon={<Star size={18} />}
+                label={`Takip Ettiklerim (${followedPosts.length})`}
                 theme={currentUserTheme}
+                onClick={() => setShowFollowedOnly(true)}
               />
             </div>
           </div>
