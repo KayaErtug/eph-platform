@@ -29,9 +29,9 @@ export default function StokCreateModal({
       <div className="stock-modal-v2" onClick={(e) => e.stopPropagation()}>
         <div className="stock-modal-v2-head">
           <div>
-            <div className="stock-section-kicker">New Listing</div>
+            <div className="stock-section-kicker">Yeni İlan</div>
             <h2>Yeni İlan Ekle</h2>
-            <p>Portföy kaydını hızlıca oluştur.</p>
+            <p>Gayrimenkul portföy kaydını hızlıca oluştur.</p>
           </div>
           <button onClick={onClose}>×</button>
         </div>
