@@ -130,9 +130,11 @@ export default function StokPage() {
     });
   }, [units, search]);
 
-  const myProjects = projects.filter(
-    (project) => project.owner?.role === user?.role || user?.role === "ADMIN"
-  );
+  const myProjects = user?.role === "ADMIN" ? projects : [];
+
+  // Not: Emlakçı/Müteahhit kendi projesini yeni kayıt olarak açabilir.
+  // Rol bazlı proje filtreleme, aynı role sahip başka kullanıcının projesini seçtirip
+  // /units/project/:id endpointinde 403 Forbidden hatasına yol açıyordu.
 
   const resetForm = () => {
     setSelectedProjectId("");
@@ -429,7 +431,7 @@ function AdminInventoryCommandCenter({
   const verifiedUnits = allUnits.filter((unit) => unit.isVerified).length;
   const offMarketUnits = allUnits.filter((unit) => unit.isOffMarket).length;
   const unverifiedUnits = allUnits.filter((unit) => !unit.isVerified).length;
-  const hotUnits = allUnits.filter((unit) => ["SATILIK", "KIRALIK", "INSAAT_PROJESI"].includes(unit.status)).length;
+  const hotUnits = allUnits.filter((unit) => ["SATILIK", "KIRALIK", "ON_SATIS", "PROJE_ASAMASI", "YAKINDA_SATISTA", "INSAAT_PROJESI", "HEMEN_TESLIM"].includes(unit.status)).length;
 
   const cityCounts = allUnits.reduce<Record<string, number>>((acc, unit) => {
     const city = unit.project?.city || "Bilinmeyen";
@@ -532,7 +534,7 @@ function AdminInventoryCommandCenter({
             <div className="flex flex-col gap-2 lg:flex-row">
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Proje, şehir, no veya durum ara..." className="h-12 min-w-[260px] rounded-2xl border border-cyan-300/15 bg-white/10 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-12 rounded-2xl border border-cyan-300/15 bg-[#08172D] px-4 text-sm font-bold text-white outline-none focus:border-cyan-300/40">
-                <option value="">Tüm Durumlar</option><option value="SATILIK">Satılık</option><option value="KIRALIK">Kiralık</option><option value="INSAAT_PROJESI">İnşaat Projesi</option><option value="SATILDI">Satıldı</option><option value="PASIF">Pasif</option>
+                <option value="">Tüm Durumlar</option><option value="SATILIK">Satılık</option><option value="KIRALIK">Kiralık</option><option value="ON_SATIS">Ön Satış</option><option value="PROJE_ASAMASI">Proje Aşaması</option><option value="YAKINDA_SATISTA">Yakında Satışta</option><option value="INSAAT_HALINDE">İnşaat Halinde</option><option value="HEMEN_TESLIM">Hemen Teslim</option><option value="INSAAT_PROJESI">İnşaat Projesi</option><option value="SATILDI">Satıldı</option><option value="PASIF">Pasif</option>
               </select>
               <input value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} placeholder="Şehir filtrele" className="h-12 rounded-2xl border border-cyan-300/15 bg-white/10 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
             </div>

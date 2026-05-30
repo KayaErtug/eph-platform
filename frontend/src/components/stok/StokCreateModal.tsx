@@ -1,4 +1,4 @@
-import { CITIES, STATUS_LABELS, TYPE_LABELS } from "./stokConstants";
+import { CITIES, ROOM_COUNT_OPTIONS, STATUS_LABELS, TYPE_LABELS } from "./stokConstants";
 import type { Project, ProjectFormState, UnitFormState } from "./stokTypes";
 
 interface Props {
@@ -65,7 +65,7 @@ export default function StokCreateModal({
             <div className="stock-form-grid">
               <label className="stock-form-field"><span>Mülk Tipi *</span><select value={unitForm.type} onChange={(e) => setUnitForm((f) => ({ ...f, type: e.target.value }))}>{Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
               <label className="stock-form-field"><span>Durum *</span><select value={unitForm.status} onChange={(e) => setUnitForm((f) => ({ ...f, status: e.target.value }))}>{Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-              <label className="stock-form-field"><span>Oda</span><select value={unitForm.roomCount} onChange={(e) => setUnitForm((f) => ({ ...f, roomCount: e.target.value }))}>{["Studio","1+0","1+1","2+1","3+1","4+1","5+1","5+2","6+1","6+2"].map((r) => <option key={r} value={r}>{r}</option>)}</select></label>
+              <label className="stock-form-field"><span>Oda / Plan Tipi</span><input list="room-count-options" value={unitForm.roomCount} onChange={(e) => setUnitForm((f) => ({ ...f, roomCount: e.target.value }))} placeholder="Örn: 3+1, 2,5+1, 10+4, Loft" /><datalist id="room-count-options">{ROOM_COUNT_OPTIONS.map((r) => <option key={r} value={r} />)}</datalist></label>
               <label className="stock-form-field"><span>Alan (m²) *</span><input type="number" value={unitForm.area} onChange={(e) => setUnitForm((f) => ({ ...f, area: e.target.value }))} /></label>
               <label className="stock-form-field"><span>Kat</span><input type="number" value={unitForm.floor} onChange={(e) => setUnitForm((f) => ({ ...f, floor: e.target.value }))} /></label>
               <label className="stock-form-field"><span>Daire No *</span><input value={unitForm.number} onChange={(e) => setUnitForm((f) => ({ ...f, number: e.target.value }))} /></label>
