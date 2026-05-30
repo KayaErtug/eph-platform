@@ -36,7 +36,8 @@ model User {
   NetworkPost             NetworkPost[]
   NetworkPostUpdateLog    NetworkPostUpdateLog[]
   NetworkPostFollower     NetworkPostFollower[]
-  NetworkNotification   NetworkNotification[]
+  NetworkPostView         NetworkPostView[]
+  NetworkNotification     NetworkNotification[]
   nominations             Nomination[]
   projects                Project[]
   tasks                   Task[]
@@ -290,6 +291,7 @@ model NetworkPost {
   Conversation         Conversation[]
   updateLogs           NetworkPostUpdateLog[]
   followers            NetworkPostFollower[]
+  views                NetworkPostView[]
   User                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -313,6 +315,19 @@ model NetworkPostFollower {
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
+}
+
+model NetworkPostView {
+  id        String      @id @default(uuid())
+  postId    String
+  userId    String?
+  createdAt DateTime    @default(now())
+  post      NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([postId])
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model NetworkNotification {

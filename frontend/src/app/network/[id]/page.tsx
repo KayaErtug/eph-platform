@@ -8,6 +8,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  Eye,
   MapPin,
   MessageCircle,
   Sparkles,
@@ -87,6 +88,8 @@ type NetworkPostStats = {
   postTitle: string;
   total: number;
   followerCount?: number;
+  viewCount?: number;
+  uniqueViewerCount?: number;
   byTitle: {
     title: string;
     count: number;
@@ -594,6 +597,7 @@ export default function NetworkDetailPage() {
     fetchStats();
     fetchUpdateLogs();
     fetchFollowStatus();
+    recordPostView();
   }, [id, user?.id]);
 
   const fetchPost = async () => {
@@ -618,6 +622,18 @@ export default function NetworkDetailPage() {
     } catch {
       setStats(null);
     }
+  };
+
+  const recordPostView = async () => {
+    if (!id) return;
+
+    try {
+      await api.post(`/network/posts/${id}/view`, {
+        userId: user?.id,
+      });
+
+      await fetchStats();
+    } catch {}
   };
 
   const fetchUpdateLogs = async () => {
@@ -836,12 +852,13 @@ export default function NetworkDetailPage() {
               </div>
             </div>
 
-            <div className="mt-7 grid gap-3 md:grid-cols-5">
+            <div className="mt-7 grid gap-3 md:grid-cols-6">
               <DetailHeroStat icon={<UsersRound size={20} />} label="Paylaşan" value={authorName} />
               <DetailHeroStat icon={<Tag size={20} />} label="Tip" value={post.type} />
               <DetailHeroStat icon={<WalletCards size={20} />} label="Bütçe" value={formatMoney(post.budget)} />
               <DetailHeroStat icon={<Clock size={20} />} label="Yayın" value={relativeTime(post.createdAt)} />
               <DetailHeroStat icon={<Star size={20} />} label="Takipçi" value={String(followStatus?.followerCount ?? stats?.followerCount ?? 0)} />
+              <DetailHeroStat icon={<Eye size={20} />} label="Görüntülenme" value={String(stats?.viewCount ?? 0)} />
             </div>
           </div>
         </section>
@@ -1078,6 +1095,51 @@ export default function NetworkDetailPage() {
                 </div>
               </div>
             </div>
+
+            {isOwnPost && (
+              <div
+                className="rounded-[32px] border bg-white p-6 text-center shadow-sm"
+                style={{ borderColor: theme.border }}
+              >
+                <h3 className="text-xl font-black text-slate-900">
+                  İlan İstatistikleri
+                </h3>
+
+                <p className="mt-2 text-sm font-semibold text-slate-500">
+                  Paylaşımının pazaryeri içindeki performansı.
+                </p>
+
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <MiniInsightCard
+                    icon={<Eye size={20} />}
+                    label="Görüntülenme"
+                    value={String(stats?.viewCount ?? 0)}
+                    theme={theme}
+                  />
+
+                  <MiniInsightCard
+                    icon={<UsersRound size={20} />}
+                    label="Tekil Üye"
+                    value={String(stats?.uniqueViewerCount ?? 0)}
+                    theme={theme}
+                  />
+
+                  <MiniInsightCard
+                    icon={<Star size={20} />}
+                    label="Takip Eden"
+                    value={String(followStatus?.followerCount ?? stats?.followerCount ?? 0)}
+                    theme={theme}
+                  />
+
+                  <MiniInsightCard
+                    icon={<MessageCircle size={20} />}
+                    label="Gelen Talep"
+                    value={String(stats?.total ?? 0)}
+                    theme={theme}
+                  />
+                </div>
+              </div>
+            )}
 
             {isOwnPost && (
               <div
@@ -1532,6 +1594,46 @@ function EditField({
   );
 }
 
+
+function MiniInsightCard({
+  icon,
+  label,
+  value,
+  theme,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  theme: RoleTheme;
+}) {
+  return (
+    <div
+      className="rounded-2xl border p-4 text-center"
+      style={{
+        borderColor: theme.border,
+        backgroundColor: theme.soft,
+      }}
+    >
+      <div
+        className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl"
+        style={{
+          backgroundColor: "#FFFFFF",
+          color: theme.primary,
+        }}
+      >
+        {icon}
+      </div>
+
+      <p className="mt-3 text-[10px] font-black uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+
+      <p className="mt-1 text-2xl font-black" style={{ color: theme.text }}>
+        {value}
+      </p>
+    </div>
+  );
+}
 
 function DetailHeroStat({
   icon,

@@ -243,17 +243,37 @@ export class NetworkService {
       }))
       .sort((a, b) => b.count - a.count);
 
-    const followerCount = await this.prisma.networkPostFollower.count({
-      where: {
-        postId: id,
-      },
-    });
+    const [followerCount, viewCount, uniqueViewerCount] = await Promise.all([
+      this.prisma.networkPostFollower.count({
+        where: {
+          postId: id,
+        },
+      }),
+      this.prisma.networkPostView.count({
+        where: {
+          postId: id,
+        },
+      }),
+      this.prisma.networkPostView
+        .groupBy({
+          by: ['userId'],
+          where: {
+            postId: id,
+            userId: {
+              not: null,
+            },
+          },
+        })
+        .then((items) => items.length),
+    ]);
 
     return {
       postId: post.id,
       postTitle: post.title,
       total: conversations.length,
       followerCount,
+      viewCount,
+      uniqueViewerCount,
       byTitle,
       latest: conversations.slice(0, 8).map((conversation) => {
         const lastMessage = conversation.Message[0];
@@ -282,6 +302,54 @@ export class NetworkService {
             : null,
         };
       }),
+    };
+  }
+
+  async recordPostView(id: string, userId?: string) {
+    const post = await this.prisma.networkPost.findFirst({
+      where: {
+        id,
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Pazaryeri paylaşımı bulunamadı.');
+    }
+
+    await this.prisma.networkPostView.create({
+      data: {
+        postId: id,
+        userId: userId || null,
+      },
+    });
+
+    const [viewCount, uniqueViewerCount] = await Promise.all([
+      this.prisma.networkPostView.count({
+        where: {
+          postId: id,
+        },
+      }),
+      this.prisma.networkPostView
+        .groupBy({
+          by: ['userId'],
+          where: {
+            postId: id,
+            userId: {
+              not: null,
+            },
+          },
+        })
+        .then((items) => items.length),
+    ]);
+
+    return {
+      postId: id,
+      viewCount,
+      uniqueViewerCount,
     };
   }
 
