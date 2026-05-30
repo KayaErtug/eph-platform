@@ -66,6 +66,33 @@ type FeaturedNetworkPost = {
   };
 };
 
+
+
+type CrmDashboardCustomer = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone?: string | null;
+  city?: string | null;
+  status: string;
+  tasks?: Array<{
+    id: string;
+    title: string;
+    dueDate?: string | null;
+    status: string;
+  }>;
+};
+
+type DashboardTaskItem = {
+  id: string;
+  title: string;
+  dueDate?: string | null;
+  status: string;
+  customerId: string;
+  customerName: string;
+  customerPhone?: string | null;
+};
+
 type DashboardSummary = {
   stats?: {
     totalUnits?: number;
@@ -190,6 +217,62 @@ function StatCard({
   );
 }
 
+
+function CrmTaskSummaryCard({
+  icon,
+  title,
+  value,
+  description,
+  tone,
+}: {
+  icon: ReactNode;
+  title: string;
+  value: string;
+  description: string;
+  tone: "blue" | "red" | "amber";
+}) {
+  const toneClass = {
+    blue: "bg-blue-50 text-blue-700 border-blue-100",
+    red: "bg-red-50 text-red-700 border-red-100",
+    amber: "bg-amber-50 text-amber-700 border-amber-100",
+  }[tone];
+
+  return (
+    <div className="rounded-[24px] border border-slate-200 bg-white p-4 text-center shadow-sm">
+      <div
+        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border ${toneClass}`}
+      >
+        {icon}
+      </div>
+      <p className="mt-3 text-[11px] font-black uppercase tracking-wide text-slate-400">
+        {title}
+      </p>
+      <p className="mt-2 text-3xl font-black text-slate-900">{value}</p>
+      <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function DashboardTaskRow({ task }: { task: DashboardTaskItem }) {
+  return (
+    <Link
+      href="/crm"
+      className="block rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-center transition hover:bg-white"
+    >
+      <div className="text-sm font-black text-slate-900">{task.title}</div>
+      <div className="mt-1 text-xs font-semibold text-slate-500">
+        {task.customerName}
+        {task.customerPhone ? ` · ${task.customerPhone}` : ""}
+      </div>
+      <div className="mt-2 text-[11px] font-black text-blue-700">
+        {formatTaskTime(task.dueDate)}
+      </div>
+    </Link>
+  );
+}
+
 function QuickAction({
   href,
   icon,
@@ -226,6 +309,47 @@ function QuickAction({
   );
 }
 
+
+function startOfToday() {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function endOfToday() {
+  const date = new Date();
+  date.setHours(23, 59, 59, 999);
+  return date;
+}
+
+function formatTaskTime(value?: string | null) {
+  if (!value) return "Saat yok";
+  const date = new Date(value);
+  return `${date.toLocaleDateString("tr-TR")} · ${date.toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+}
+
+function flattenCustomerTasks(customers: CrmDashboardCustomer[]) {
+  return customers
+    .flatMap((customer) =>
+      (customer.tasks || [])
+        .filter((task) => task.status === "BEKLIYOR")
+        .map((task) => ({
+          ...task,
+          customerId: customer.id,
+          customerName: `${customer.firstName} ${customer.lastName}`.trim(),
+          customerPhone: customer.phone,
+        })),
+    )
+    .sort((a, b) => {
+      const aTime = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+      const bTime = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+      return aTime - bTime;
+    });
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -236,6 +360,7 @@ export default function DashboardPage() {
   const [networkNotifications, setNetworkNotifications] =
     useState<NetworkNotificationResponse>({ unreadCount: 0, items: [] });
   const [featuredPosts, setFeaturedPosts] = useState<FeaturedNetworkPost[]>([]);
+  const [crmCustomers, setCrmCustomers] = useState<CrmDashboardCustomer[]>([]);
   const [loading, setLoading] = useState(true);
 
   const roleType = getRoleType(user?.role);
@@ -262,7 +387,7 @@ export default function DashboardPage() {
     setLoading(true);
 
     try {
-      const [summaryRes, conversationsRes, notificationsRes, featuredRes] = await Promise.all([
+      const [summaryRes, conversationsRes, notificationsRes, featuredRes, crmCustomersRes] = await Promise.all([
         api.get("/dashboard/summary"),
         user?.id
           ? api.get(`/conversations?userId=${user.id}`)
@@ -271,6 +396,7 @@ export default function DashboardPage() {
           ? api.get(`/network/notifications?userId=${user.id}`)
           : Promise.resolve({ data: { unreadCount: 0, items: [] } }),
         api.get("/network/posts/featured"),
+        api.get("/crm/customers"),
       ]);
 
       setSummary(summaryRes.data);
@@ -289,11 +415,17 @@ export default function DashboardPage() {
         notificationsRes.data || { unreadCount: 0, items: [] },
       );
       setFeaturedPosts(Array.isArray(featuredRes.data) ? featuredRes.data : []);
+      setCrmCustomers(
+        Array.isArray(crmCustomersRes.data)
+          ? (crmCustomersRes.data as CrmDashboardCustomer[])
+          : [],
+      );
     } catch {
       setSummary(null);
       setUnreadMessages(0);
       setNetworkNotifications({ unreadCount: 0, items: [] });
       setFeaturedPosts([]);
+      setCrmCustomers([]);
     } finally {
       setLoading(false);
     }
@@ -326,6 +458,27 @@ export default function DashboardPage() {
   };
 
   const pendingTaskCount = summary?.pendingTasks?.length || 0;
+  const crmTasks = useMemo(() => flattenCustomerTasks(crmCustomers), [crmCustomers]);
+
+  const todayStart = startOfToday();
+  const todayEnd = endOfToday();
+
+  const overdueTasks = crmTasks.filter((task) => {
+    if (!task.dueDate) return false;
+    return new Date(task.dueDate).getTime() < todayStart.getTime();
+  });
+
+  const todayTasks = crmTasks.filter((task) => {
+    if (!task.dueDate) return false;
+    const dueDate = new Date(task.dueDate);
+    return dueDate >= todayStart && dueDate <= todayEnd;
+  });
+
+  const upcomingTasks = crmTasks.filter((task) => {
+    if (!task.dueDate) return false;
+    return new Date(task.dueDate).getTime() > todayEnd.getTime();
+  });
+
 
   const pageConfig = useMemo(() => {
     if (roleType === "construction") {
@@ -559,6 +712,100 @@ export default function DashboardPage() {
           ))}
         </section>
 
+
+
+        <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+            <CalendarCheck size={24} />
+          </div>
+
+          <h2 className="mt-4 text-2xl font-black text-slate-900">
+            CRM Görev Alarm Merkezi
+          </h2>
+
+          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+            Bugünkü, geciken ve yaklaşan müşteri görevlerini tek ekrandan takip et.
+          </p>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <CrmTaskSummaryCard
+              icon={<CalendarCheck size={22} />}
+              title="Bugünkü Görev"
+              value={String(todayTasks.length)}
+              description="Bugün tamamlanması gereken CRM işleri"
+              tone="blue"
+            />
+            <CrmTaskSummaryCard
+              icon={<Clock3 size={22} />}
+              title="Geciken Görev"
+              value={String(overdueTasks.length)}
+              description="Tarihi geçmiş ve tamamlanmamış işler"
+              tone="red"
+            />
+            <CrmTaskSummaryCard
+              icon={<CheckSquare size={22} />}
+              title="Yaklaşan Görev"
+              value={String(upcomingTasks.length)}
+              description="Bugünden sonraki planlı müşteri işleri"
+              tone="amber"
+            />
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <div className="rounded-[24px] border border-slate-100 bg-white p-4">
+              <h3 className="text-sm font-black text-slate-900">Bugünkü İşlerim</h3>
+              <div className="mt-3 space-y-2">
+                {todayTasks.length > 0 ? (
+                  todayTasks.slice(0, 3).map((task) => (
+                    <DashboardTaskRow key={task.id} task={task} />
+                  ))
+                ) : (
+                  <div className="rounded-2xl bg-slate-50 px-4 py-4 text-xs font-semibold text-slate-500">
+                    Bugün için planlı görev yok.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-red-100 bg-red-50/50 p-4">
+              <h3 className="text-sm font-black text-red-700">Geciken Görevler</h3>
+              <div className="mt-3 space-y-2">
+                {overdueTasks.length > 0 ? (
+                  overdueTasks.slice(0, 3).map((task) => (
+                    <DashboardTaskRow key={task.id} task={task} />
+                  ))
+                ) : (
+                  <div className="rounded-2xl bg-white px-4 py-4 text-xs font-semibold text-slate-500">
+                    Geciken görev yok.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-amber-100 bg-amber-50/50 p-4">
+              <h3 className="text-sm font-black text-amber-700">Yaklaşan Görevler</h3>
+              <div className="mt-3 space-y-2">
+                {upcomingTasks.length > 0 ? (
+                  upcomingTasks.slice(0, 3).map((task) => (
+                    <DashboardTaskRow key={task.id} task={task} />
+                  ))
+                ) : (
+                  <div className="rounded-2xl bg-white px-4 py-4 text-xs font-semibold text-slate-500">
+                    Yaklaşan görev yok.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <Link
+            href="/crm"
+            className="mt-5 inline-flex rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white"
+          >
+            CRM Görevlerini Aç
+          </Link>
+        </section>
+
         <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm md:p-6">
           <div className="text-center">
             <h2 className="text-2xl font-black text-slate-900">
@@ -720,11 +967,11 @@ export default function DashboardPage() {
             </div>
 
             <h3 className="mt-4 text-xl font-black text-slate-900">
-              Bugünkü İşler
+              CRM Merkezi
             </h3>
 
             <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-              Bekleyen görev sayısı: {pendingTaskCount}
+              Müşteri kayıtları, görevler ve satış aşamalarını yönet.
             </p>
 
             <Link
