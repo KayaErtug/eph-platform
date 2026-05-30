@@ -352,7 +352,9 @@ export class NetworkService {
           postId: id,
           userId: dto.userId,
           summary: summarizeChanges(changes),
-          changes,
+          changes: {
+            items: changes,
+          },
         },
       });
     }
