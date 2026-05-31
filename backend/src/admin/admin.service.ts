@@ -87,6 +87,153 @@ export class AdminService {
     };
   }
 
+
+  async getTrafficSummary() {
+    const now = new Date();
+
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const startOfWeek = new Date(now);
+    const day = startOfWeek.getDay();
+    const diffToMonday = day === 0 ? 6 : day - 1;
+    startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const onlineSince = new Date(now.getTime() - 5 * 60 * 1000);
+    const awaySince = new Date(now.getTime() - 20 * 60 * 1000);
+
+    const [
+      totalVisits,
+      todayVisits,
+      weekVisits,
+      monthVisits,
+      totalUsers,
+      onlineUsers,
+      awayUsers,
+      lastVisits,
+      topPages,
+      topUserGroups,
+    ] = await Promise.all([
+      this.prisma.userVisit.count(),
+      this.prisma.userVisit.count({ where: { createdAt: { gte: startOfToday } } }),
+      this.prisma.userVisit.count({ where: { createdAt: { gte: startOfWeek } } }),
+      this.prisma.userVisit.count({ where: { createdAt: { gte: startOfMonth } } }),
+      this.prisma.user.count(),
+      this.prisma.userVisit.findMany({
+        where: {
+          userId: { not: null },
+          createdAt: { gte: onlineSince },
+        },
+        distinct: ["userId"],
+        select: { userId: true },
+      }),
+      this.prisma.userVisit.findMany({
+        where: {
+          userId: { not: null },
+          createdAt: {
+            gte: awaySince,
+            lt: onlineSince,
+          },
+        },
+        distinct: ["userId"],
+        select: { userId: true },
+      }),
+      this.prisma.userVisit.findMany({
+        take: 30,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          page: true,
+          ip: true,
+          userAgent: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              role: true,
+              city: true,
+              district: true,
+              cityPlateCode: true,
+              memberCode: true,
+              profileImageUrl: true,
+            },
+          },
+        },
+      }),
+      this.prisma.userVisit.groupBy({
+        by: ["page"],
+        _count: { page: true },
+        orderBy: { _count: { page: "desc" } },
+        take: 10,
+      }),
+      this.prisma.userVisit.groupBy({
+        by: ["userId"],
+        where: { userId: { not: null } },
+        _count: { userId: true },
+        _max: { createdAt: true },
+        orderBy: { _count: { userId: "desc" } },
+        take: 10,
+      }),
+    ]);
+
+    const topUserIds = topUserGroups
+      .map((item) => item.userId)
+      .filter((id): id is string => Boolean(id));
+
+    const topUsers = topUserIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: topUserIds } },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+            city: true,
+            district: true,
+            cityPlateCode: true,
+            memberCode: true,
+            profileImageUrl: true,
+          },
+        })
+      : [];
+
+    const topUsersMap = new Map(topUsers.map((user) => [user.id, user]));
+
+    const onlineCount = onlineUsers.length;
+    const awayCount = awayUsers.filter((item) => !onlineUsers.some((online) => online.userId === item.userId)).length;
+    const offlineCount = Math.max(totalUsers - onlineCount - awayCount, 0);
+
+    return {
+      counts: {
+        totalVisits,
+        todayVisits,
+        weekVisits,
+        monthVisits,
+        totalUsers,
+        onlineCount,
+        awayCount,
+        offlineCount,
+      },
+      lastVisits,
+      topPages: topPages.map((item) => ({
+        page: item.page,
+        count: item._count.page,
+      })),
+      topUsers: topUserGroups.map((item) => ({
+        user: item.userId ? topUsersMap.get(item.userId) || null : null,
+        count: item._count.userId,
+        lastSeenAt: item._max.createdAt,
+      })),
+    };
+  }
+
   async getUsers(filter?: "pending" | "approved" | "all") {
     const where =
       filter === "pending"

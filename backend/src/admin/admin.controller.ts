@@ -31,6 +31,11 @@ export class AdminController {
     return this.adminService.getUsers(filter || "all");
   }
 
+  @Get("traffic-summary")
+  getTrafficSummary() {
+    return this.adminService.getTrafficSummary();
+  }
+
   @Patch("users/:id/approve")
   approveUser(@Param("id") id: string) {
     return this.adminService.approveUser(id);
