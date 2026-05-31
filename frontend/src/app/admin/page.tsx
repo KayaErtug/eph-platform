@@ -367,7 +367,7 @@ export default function AdminPage() {
           <div className="px-4 py-5 pb-24 lg:px-8 lg:py-8">
             {activeTab === "overview" && <OverviewTab stats={stats} users={usersWithPresence} applications={applications} documents={documents} leads={leads} units={units} setActiveTab={setActiveTab} />}
             {activeTab === "users" && <UsersTab users={filteredUsers} allUsers={usersWithPresence} search={userSearch} setSearch={setUserSearch} roleFilter={roleFilter} setRoleFilter={setRoleFilter} cityFilter={cityFilter} setCityFilter={setCityFilter} cityOptions={cityOptions} actionLoading={actionLoading} onCreate={() => setCreateUserModal(true)} onApprove={(id) => act(id, async () => { await api.patch(`/admin/users/${id}/approve`); await Promise.all([fetchUsers(), fetchStats()]); })} onSuspend={(id) => act(id, async () => { await api.patch(`/admin/users/${id}/suspend`); await Promise.all([fetchUsers(), fetchStats()]); })} onDelete={(id) => act(id, async () => { await api.delete(`/admin/users/${id}/reject`); await Promise.all([fetchUsers(), fetchStats()]); })} onRole={(item) => { setRoleModal({ id: item.id, role: item.role }); setNewRole(item.role); }} />}
-            {activeTab === "traffic" && <TrafficTab rows={trafficRows} trafficFilter={trafficFilter} setTrafficFilter={setTrafficFilter} onRefresh={fetchVisits} />}
+            {activeTab === "traffic" && <TrafficTab rows={trafficRows} visits={visits} trafficFilter={trafficFilter} setTrafficFilter={setTrafficFilter} onRefresh={fetchVisits} />}
             {activeTab === "messages" && <SystemMessagesTab />}
             {activeTab === "applications" && <ApplicationsTab applications={applications} actionLoading={actionLoading} refresh={async () => { await Promise.all([fetchApplications(), fetchStats()]); }} act={act} />}
             {activeTab === "documents" && <DocumentsTab documents={documents} actionLoading={actionLoading} refresh={async () => { await Promise.all([fetchDocuments(), fetchStats()]); }} act={act} />}
@@ -478,7 +478,76 @@ function LiveWatchPanel({ rows, onRefresh }: { rows: { user: UserItem; visit?: V
   );
 }
 
-function TrafficTab({ rows, trafficFilter, setTrafficFilter, onRefresh }: { rows: { user: UserItem; visit?: VisitItem; presence: any }[]; trafficFilter: string; setTrafficFilter: (v: string) => void; onRefresh: () => void }) {
+
+function LiveMovementFeed({ visits }: { visits: VisitItem[] }) {
+  const recentVisits = visits
+    .filter((visit) => visit.createdAt && (visit.user?.id || visit.userId))
+    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+    .slice(0, 12);
+
+  return (
+    <div className="mb-5 rounded-[32px] border border-slate-200 bg-white p-4 shadow-sm lg:p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-rose-600">Süper Admin Radar</p>
+          <h3 className="mt-1 text-2xl font-black tracking-tight text-slate-950">Canlı Hareket Akışı</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-500">Platformdaki son kullanıcı hareketlerini zaman sırasına göre gösterir.</p>
+        </div>
+        <Pill className="border-slate-200 bg-slate-50 text-slate-700">Son {recentVisits.length} hareket</Pill>
+      </div>
+
+      {recentVisits.length === 0 ? (
+        <div className="mt-4 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+          <p className="text-sm font-black text-slate-700">Henüz hareket akışı yok.</p>
+          <p className="mt-1 text-xs font-semibold text-slate-500">Kullanıcılar sayfa gezdikçe radar burada dolacak.</p>
+        </div>
+      ) : (
+        <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200">
+          <div className="divide-y divide-slate-200">
+            {recentVisits.map((visit, index) => {
+              const presence = presenceFromDate(visit.createdAt);
+              const visitUser = visit.user;
+              const name = fullName(visitUser);
+              const email = visitUser?.email || "E-posta yok";
+
+              return (
+                <div key={visit.id || `${visit.userId || "visit"}-${visit.createdAt}-${index}`} className="grid gap-3 bg-white p-4 transition hover:bg-slate-50 lg:grid-cols-[160px_1fr_1fr_auto] lg:items-center">
+                  <div>
+                    <p className="text-xs font-black text-slate-950">{timeAgo(visit.createdAt)}</p>
+                    <p className="mt-1 text-[11px] font-bold text-slate-400">{fmt(visit.createdAt)}</p>
+                  </div>
+
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="relative">
+                      <Avatar firstName={visitUser?.firstName} lastName={visitUser?.lastName} imageUrl={undefined} size="sm" />
+                      <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${presence.dot}`} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-slate-950">{name}</p>
+                      <p className="truncate text-xs font-bold text-slate-500">{email}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Sayfa</p>
+                    <p className="mt-1 truncate text-sm font-black text-slate-950">{visit.page || "—"}</p>
+                  </div>
+
+                  <div className="flex justify-start lg:justify-end">
+                    <Pill className={presence.badge}>{presenceText(presence.label)}</Pill>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function TrafficTab({ rows, visits, trafficFilter, setTrafficFilter, onRefresh }: { rows: { user: UserItem; visit?: VisitItem; presence: any }[]; visits: VisitItem[]; trafficFilter: string; setTrafficFilter: (v: string) => void; onRefresh: () => void }) {
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       onRefresh();
@@ -496,6 +565,7 @@ function TrafficTab({ rows, trafficFilter, setTrafficFilter, onRefresh }: { rows
       />
 
       <LiveWatchPanel rows={rows} onRefresh={onRefresh} />
+      <LiveMovementFeed visits={visits} />
 
       <div className="mb-4 grid grid-cols-2 gap-2 sm:flex">
         {[
