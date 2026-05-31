@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
@@ -15,6 +15,20 @@ import {
   Smile,
   Volume2,
 } from "lucide-react";
+
+type PresenceStatus = "online" | "away" | "offline";
+
+type PresenceUser = {
+  id: string;
+  fullName?: string | null;
+  status: PresenceStatus;
+};
+
+type PresenceResponse = {
+  online: PresenceUser[];
+  away: PresenceUser[];
+  offline: PresenceUser[];
+};
 
 type Message = {
   id: string;
@@ -54,6 +68,18 @@ function roleLabel(role?: string) {
   return "EPH Üyesi";
 }
 
+function presenceLabel(status?: PresenceStatus) {
+  if (status === "online") return "Online";
+  if (status === "away") return "Uzakta";
+  return "Çevrimdışı";
+}
+
+function presenceDotClass(status?: PresenceStatus) {
+  if (status === "online") return "bg-emerald-400";
+  if (status === "away") return "bg-amber-300";
+  return "bg-slate-300";
+}
+
 export default function MessageDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -67,6 +93,11 @@ export default function MessageDetailPage() {
 
   const [conversation, setConversation] = useState<ConversationDetail | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [presence, setPresence] = useState<PresenceResponse>({
+    online: [],
+    away: [],
+    offline: [],
+  });
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -79,6 +110,25 @@ export default function MessageDetailPage() {
 
   const visibleMessages = messages.slice(-5);
   const lockedTitle = conversation?.title || draftTitle || "EPH GÖRÜŞMESİ";
+
+  const presenceMap = useMemo(() => {
+    const map = new Map<string, PresenceUser>();
+
+    [...presence.online, ...presence.away, ...presence.offline].forEach(
+      (presenceUser) => {
+        map.set(presenceUser.id, presenceUser);
+      }
+    );
+
+    return map;
+  }, [presence]);
+
+  const otherSender = useMemo(() => {
+    return messages.find((item) => item.sender.id !== user?.id)?.sender || null;
+  }, [messages, user?.id]);
+
+  const otherPresence = otherSender ? presenceMap.get(otherSender.id) : null;
+  const otherPresenceStatus = otherPresence?.status || "offline";
 
   const getSoundFile = () => {
     return (
@@ -129,6 +179,20 @@ export default function MessageDetailPage() {
     try {
       await api.post(`/conversations/${conversationId}/read`, {
         userId: user.id,
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const fetchPresence = async () => {
+    try {
+      const res = await api.get("/visits/presence");
+
+      setPresence({
+        online: Array.isArray(res.data?.online) ? res.data.online : [],
+        away: Array.isArray(res.data?.away) ? res.data.away : [],
+        offline: Array.isArray(res.data?.offline) ? res.data.offline : [],
       });
     } catch (error) {
       console.error(error);
@@ -192,9 +256,11 @@ export default function MessageDetailPage() {
 
     fetchConversation();
     fetchMessages();
+    fetchPresence();
 
     const interval = setInterval(() => {
       fetchMessages(true);
+      fetchPresence();
     }, 5000);
 
     return () => clearInterval(interval);
@@ -256,8 +322,13 @@ export default function MessageDetailPage() {
                 <ArrowLeft size={23} />
               </button>
 
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg font-black">
-                E
+              <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg font-black">
+                {otherSender?.firstName?.[0] || "E"}
+                <span
+                  className={`absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white ${presenceDotClass(
+                    otherPresenceStatus
+                  )}`}
+                />
               </div>
 
               <div className="min-w-0 flex-1 text-center">
@@ -267,11 +338,13 @@ export default function MessageDetailPage() {
                 </div>
 
                 <h1 className="truncate text-[17px] font-black leading-tight md:text-[21px]">
-                  EPH Mesajlaşma
+                  {otherSender
+                    ? `${otherSender.firstName} ${otherSender.lastName}`
+                    : "EPH Mesajlaşma"}
                 </h1>
 
-                <p className="truncate text-[12px] font-medium text-blue-100 md:text-[13px]">
-                  Mesaj başlığı sabittir, mesaj metnini düzenleyebilirsin.
+                <p className="truncate text-[12px] font-black text-blue-100 md:text-[13px]">
+                  {presenceLabel(otherPresenceStatus)}
                 </p>
               </div>
 
@@ -314,6 +387,8 @@ export default function MessageDetailPage() {
               <div className="space-y-2 pb-3 md:space-y-3">
                 {visibleMessages.map((item) => {
                   const mine = item.sender.id === user?.id;
+                  const senderPresence =
+                    presenceMap.get(item.sender.id)?.status || "offline";
 
                   return (
                     <div
@@ -332,6 +407,19 @@ export default function MessageDetailPage() {
                         <div className="mb-1 flex flex-wrap items-center gap-1.5">
                           <span className="text-[12px] font-black md:text-[13px]">
                             {item.sender.firstName} {item.sender.lastName}
+                          </span>
+
+                          <span
+                            className={`inline-flex items-center gap-1 text-[11px] font-black ${
+                              mine ? "text-blue-100" : "text-slate-400"
+                            }`}
+                          >
+                            <span
+                              className={`h-2 w-2 rounded-full ${presenceDotClass(
+                                senderPresence
+                              )}`}
+                            />
+                            {presenceLabel(senderPresence)}
                           </span>
 
                           <span
