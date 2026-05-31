@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { VisitsService } from './visits.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -21,14 +29,17 @@ export class VisitsController {
 
   @Get('presence')
   @UseGuards(JwtAuthGuard)
-  async getPresence() {
-    return this.visitsService.getPresence();
+  async getPresence(@Req() req: any) {
+    return this.visitsService.getPresence(req.user?.id);
   }
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  async getVisits(@Query('page') page?: string, @Query('userId') userId?: string) {
+  async getVisits(
+    @Query('page') page?: string,
+    @Query('userId') userId?: string,
+  ) {
     return this.visitsService.getVisits(page, userId);
   }
 }

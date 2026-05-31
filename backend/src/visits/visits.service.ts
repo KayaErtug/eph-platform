@@ -7,7 +7,12 @@ type PresenceStatus = 'online' | 'away' | 'offline';
 export class VisitsService {
   constructor(private prisma: PrismaService) {}
 
-  async logVisit(data: { userId?: string; page: string; ip?: string; userAgent?: string }) {
+  async logVisit(data: {
+    userId?: string;
+    page: string;
+    ip?: string;
+    userAgent?: string;
+  }) {
     return this.prisma.userVisit.create({ data });
   }
 
@@ -19,15 +24,44 @@ export class VisitsService {
       },
       include: {
         user: {
-          select: { id: true, firstName: true, lastName: true, email: true, role: true },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: {
+        createdAt: 'desc',
+      },
       take: 500,
     });
   }
 
-  async getPresence() {
+  private calculatePresence(lastSeenAt: Date | null) {
+    const now = Date.now();
+
+    const diffMinutes = lastSeenAt
+      ? Math.floor((now - new Date(lastSeenAt).getTime()) / 60000)
+      : null;
+
+    let status: PresenceStatus = 'offline';
+
+    if (diffMinutes !== null && diffMinutes <= 5) {
+      status = 'online';
+    } else if (diffMinutes !== null && diffMinutes <= 20) {
+      status = 'away';
+    }
+
+    return {
+      status,
+      minutesAgo: diffMinutes,
+    };
+  }
+
+  async getPresence(currentUserId?: string) {
     const users = await this.prisma.user.findMany({
       select: {
         id: true,
@@ -37,19 +71,20 @@ export class VisitsService {
         role: true,
         profileImageUrl: true,
         visits: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: {
+            createdAt: 'desc',
+          },
           take: 1,
           select: {
-            id: true,
             page: true,
             createdAt: true,
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
-
-    const now = Date.now();
 
     const result: Record<PresenceStatus, any[]> = {
       online: [],
@@ -57,34 +92,42 @@ export class VisitsService {
       offline: [],
     };
 
+    let currentUser: any = null;
+
     for (const user of users) {
       const lastVisit = user.visits[0] || null;
       const lastSeenAt = lastVisit?.createdAt || null;
-      const diffMinutes = lastSeenAt ? Math.floor((now - new Date(lastSeenAt).getTime()) / 60000) : null;
 
-      let status: PresenceStatus = 'offline';
+      const presence = this.calculatePresence(lastSeenAt);
 
-      if (diffMinutes !== null && diffMinutes <= 5) {
-        status = 'online';
-      } else if (diffMinutes !== null && diffMinutes > 5 && diffMinutes <= 20) {
-        status = 'away';
-      }
-
-      result[status].push({
+      const payload = {
         id: user.id,
         firstName: user.firstName,
         lastName: user.lastName,
-        fullName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+        fullName:
+          `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
+          user.email,
         email: user.email,
         role: user.role,
         profileImageUrl: user.profileImageUrl,
-        status,
+        status: presence.status,
         lastSeenAt,
         lastPage: lastVisit?.page || null,
-        minutesAgo: diffMinutes,
-      });
+        minutesAgo: presence.minutesAgo,
+      };
+
+      result[presence.status].push(payload);
+
+      if (currentUserId && user.id === currentUserId) {
+        currentUser = payload;
+      }
     }
 
-    return result;
+    return {
+      currentUser,
+      online: result.online,
+      away: result.away,
+      offline: result.offline,
+    };
   }
 }
