@@ -139,6 +139,17 @@ type TrafficSummary = {
   topUsers: TopMemberItem[];
 };
 
+type PresenceKey = "online" | "away" | "offline";
+
+type PresenceInfo = {
+  key: PresenceKey;
+  label: string;
+  emoji: string;
+  dot: string;
+  badge: string;
+  soft: string;
+};
+
 const ROLE_LABELS: Record<string, string> = {
   EMLAKCI: "Emlakçı",
   MUTEAHHIT: "Müteahhit",
@@ -218,12 +229,46 @@ function statusClass(status: string) {
   return "border-amber-200 bg-amber-50 text-amber-800";
 }
 
-function presenceFromDate(value?: string | null) {
-  if (!value) return { label: "Offline", dot: "bg-slate-300", badge: "border-slate-200 bg-slate-50 text-slate-700" };
-  const diff = Date.now() - new Date(value).getTime();
-  if (diff < 1000 * 60 * 5) return { label: "Online", dot: "bg-emerald-500", badge: "border-emerald-200 bg-emerald-50 text-emerald-800" };
-  if (diff < 1000 * 60 * 20) return { label: "Away", dot: "bg-amber-500", badge: "border-amber-200 bg-amber-50 text-amber-800" };
-  return { label: "Offline", dot: "bg-slate-300", badge: "border-slate-200 bg-slate-50 text-slate-700" };
+function presenceFromDate(value?: string | null): PresenceInfo {
+  const offline: PresenceInfo = {
+    key: "offline",
+    label: "Çevrimdışı",
+    emoji: "⚫",
+    dot: "bg-slate-400",
+    badge: "border-slate-200 bg-slate-50 text-slate-700",
+    soft: "bg-slate-100 text-slate-700",
+  };
+
+  if (!value) return offline;
+
+  const time = new Date(value).getTime();
+  if (Number.isNaN(time)) return offline;
+
+  const diff = Date.now() - time;
+
+  if (diff < 1000 * 60 * 5) {
+    return {
+      key: "online",
+      label: "Online",
+      emoji: "🟢",
+      dot: "bg-emerald-500",
+      badge: "border-emerald-200 bg-emerald-50 text-emerald-800",
+      soft: "bg-emerald-100 text-emerald-800",
+    };
+  }
+
+  if (diff < 1000 * 60 * 20) {
+    return {
+      key: "away",
+      label: "Uzakta",
+      emoji: "🟡",
+      dot: "bg-amber-500",
+      badge: "border-amber-200 bg-amber-50 text-amber-800",
+      soft: "bg-amber-100 text-amber-800",
+    };
+  }
+
+  return offline;
 }
 
 
@@ -269,7 +314,7 @@ function normalizeTrafficSummary(data: any): TrafficSummary {
             city: source?.city || item?.city || null,
             district: source?.district || item?.district || null,
             count: numberFromAny(item, ["count", "visits", "total", "value"]),
-            lastSeen: item?.lastSeen || item?.lastVisitAt || item?.lastActivityAt || item?.createdAt || null,
+            lastSeen: item?.lastSeenAt || item?.lastSeen || item?.lastVisitAt || item?.lastActivityAt || item?.createdAt || null,
           };
         }).filter((item: TopMemberItem) => item.count > 0).slice(0, 8)
       : [],
@@ -292,6 +337,15 @@ function Avatar({ firstName, lastName, imageUrl, size = "md" }: { firstName?: st
 
 function Pill({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-black ${className}`}>{children}</span>;
+}
+
+function PresenceBadge({ presence, compact = false }: { presence: PresenceInfo; compact?: boolean }) {
+  return (
+    <span className={`inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-black ${presence.badge}`}>
+      <span aria-hidden="true">{presence.emoji}</span>
+      {!compact && <span>{presence.label}</span>}
+    </span>
+  );
 }
 
 function PrimaryButton({ children, onClick, disabled, tone = "dark", icon }: { children: ReactNode; onClick?: () => void; disabled?: boolean; tone?: "dark" | "light" | "danger" | "success"; icon?: ReactNode }) {
@@ -422,9 +476,9 @@ export default function AdminPage() {
   }, [usersWithPresence, userSearch, roleFilter, cityFilter]);
   const trafficRows = useMemo(() => {
     const rows = usersWithPresence.map((u) => ({ user: u, visit: u.lastVisit, presence: u.presence }));
-    if (trafficFilter === "online") return rows.filter((r) => r.presence.label === "Online");
-    if (trafficFilter === "away") return rows.filter((r) => r.presence.label === "Away");
-    if (trafficFilter === "offline") return rows.filter((r) => r.presence.label === "Offline");
+    if (trafficFilter === "online") return rows.filter((r) => r.presence.key === "online");
+    if (trafficFilter === "away") return rows.filter((r) => r.presence.key === "away");
+    if (trafficFilter === "offline") return rows.filter((r) => r.presence.key === "offline");
     return rows;
   }, [usersWithPresence, trafficFilter]);
 
@@ -474,24 +528,24 @@ export default function AdminPage() {
 function AdminBrand() { return <Link href="/admin" className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 p-2"><img src="/LOGO_EPH.png" alt="EPH" className="h-full w-full object-contain" /></div><div><p className="text-lg font-black tracking-tight text-slate-950">EPH Admin</p><p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Yönetim Merkezi</p></div></Link>; }
 function NavButton({ item, active, onClick }: { item: { key: TabKey; label: string; icon: ReactNode; badge?: number }; active: boolean; onClick: () => void }) { return <button onClick={onClick} className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-black transition ${active ? "bg-slate-950 text-white shadow-lg shadow-slate-200" : "text-slate-600 hover:bg-slate-100"}`}><span className="flex items-center gap-3">{item.icon}{item.label}</span>{(item.badge || 0) > 0 && <span className={`rounded-full px-2 py-0.5 text-[10px] ${active ? "bg-white text-slate-950" : "bg-rose-100 text-rose-700"}`}>{item.badge}</span>}</button>; }
 function QuickLine({ title, value, icon }: { title: string; value: number; icon: ReactNode }) { return <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-700">{icon}</div><p className="text-sm font-black text-slate-700">{title}</p></div><p className="text-2xl font-black text-slate-950">{value}</p></div>; }
-function MemberMini({ user }: { user: UserItem & { presence?: any } }) { const presence = user.presence || presenceFromDate(null); return <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="relative"><Avatar firstName={user.firstName} lastName={user.lastName} imageUrl={user.profileImageUrl} /><span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${presence.dot}`} /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-slate-950">{fullName(user)}</p><p className="truncate text-xs font-bold text-slate-500">{user.memberCode || "Üye No bekleniyor"}</p></div><Pill className={roleClass(user.role)}>{roleLabel(user.role)}</Pill></div>; }
+function MemberMini({ user }: { user: UserItem & { presence?: PresenceInfo } }) { const presence = user.presence || presenceFromDate(null); return <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="relative"><Avatar firstName={user.firstName} lastName={user.lastName} imageUrl={user.profileImageUrl} /><span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${presence.dot}`} /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-slate-950">{fullName(user)}</p><p className="truncate text-xs font-bold text-slate-500">{user.memberCode || "Üye No bekleniyor"}</p></div><div className="flex flex-wrap justify-end gap-2"><PresenceBadge presence={presence} /><Pill className={roleClass(user.role)}>{roleLabel(user.role)}</Pill></div></div>; }
 function InfoLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) { return <div className="flex items-center justify-between gap-3"><span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</span><span className={`text-right text-xs ${strong ? "font-black text-slate-950" : "font-bold text-slate-600"}`}>{value}</span></div>; }
 
 function OverviewTab({ stats, users, trafficSummary, applications, documents, leads, units, setActiveTab }: { stats: Stats | null; users: (UserItem & { presence: any })[]; trafficSummary: TrafficSummary | null; applications: ApplicationItem[]; documents: DocumentItem[]; leads: LeadItem[]; units: UnitItem[]; setActiveTab: (tab: TabKey) => void }) {
-  const onlineCount = trafficSummary?.onlineUsers ?? users.filter((u) => u.presence.label === "Online").length;
-  const awayCount = trafficSummary?.awayUsers ?? users.filter((u) => u.presence.label === "Away").length;
-  const offlineCount = trafficSummary?.offlineUsers ?? users.filter((u) => u.presence.label === "Offline").length;
-  return <div className="space-y-5"><div className="rounded-[32px] bg-slate-950 p-5 text-white shadow-sm lg:p-8"><p className="text-xs font-black uppercase tracking-[0.24em] text-sky-300">Komuta Merkezi</p><h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Platformu cebinden yönet.</h2><p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-300">Üye yönetimi, canlı trafik, başvurular ve kurumsal mesajlar tek merkezde toplandı.</p><div className="mt-6 flex flex-wrap gap-2"><PrimaryButton tone="light" icon={<UsersRound size={16} />} onClick={() => setActiveTab("users")}>Üyelere Git</PrimaryButton><PrimaryButton tone="light" icon={<Activity size={16} />} onClick={() => setActiveTab("traffic")}>Canlı Trafik</PrimaryButton><Link href="/admin/system-messages"><PrimaryButton tone="light" icon={<MessageSquareText size={16} />}>Kurumsal Mesaj</PrimaryButton></Link></div></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><StatCard title="Bugünkü Ziyaret" value={trafficSummary?.todayVisits ?? 0} icon={<Eye size={20} />} desc="Trafik merkezi" /><StatCard title="Bu Hafta" value={trafficSummary?.weekVisits ?? 0} icon={<Activity size={20} />} desc="Toplam ziyaret" /><StatCard title="Bu Ay" value={trafficSummary?.monthVisits ?? 0} icon={<Globe2 size={20} />} desc="Aylık hareket" /><StatCard title="Online Üye" value={onlineCount} icon={<Wifi size={20} />} desc="Son 5 dakika" /></div><div className="grid gap-3 sm:grid-cols-3"><StatCard title="Online" value={onlineCount} icon={<Wifi size={20} />} desc="Aktif kullanıcı" /><StatCard title="Away" value={awayCount} icon={<Timer size={20} />} desc="Kısa süre pasif" /><StatCard title="Offline" value={offlineCount} icon={<UsersRound size={20} />} desc="Çevrimdışı" /></div><div className="grid gap-5 xl:grid-cols-2"><div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><SectionHeader title="Son Üyeler" desc="Üye no ve şehir bilgileriyle birlikte." action={<button onClick={() => setActiveTab("users")} className="text-sm font-black text-sky-700">Tümünü Gör</button>} /><div className="space-y-3">{users.slice(0, 5).map((u) => <MemberMini key={u.id} user={u} />)}{users.length === 0 && <Empty>Üye yok.</Empty>}</div></div><div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><SectionHeader title="Bekleyen İşler" desc="Başvuru ve belge kontrol listesi." /><div className="space-y-3"><QuickLine title="Bekleyen başvurular" value={applications.filter((a) => a.status === "PENDING").length} icon={<Mail size={18} />} /><QuickLine title="Bekleyen belgeler" value={documents.filter((d) => d.status === "PENDING").length} icon={<FileText size={18} />} /><QuickLine title="Lina aday kayıtları" value={leads.length} icon={<Sparkles size={18} />} /></div></div></div></div>;
+  const onlineCount = trafficSummary?.onlineUsers ?? users.filter((u) => u.presence.key === "online").length;
+  const awayCount = trafficSummary?.awayUsers ?? users.filter((u) => u.presence.key === "away").length;
+  const offlineCount = trafficSummary?.offlineUsers ?? users.filter((u) => u.presence.key === "offline").length;
+  return <div className="space-y-5"><div className="rounded-[32px] bg-slate-950 p-5 text-white shadow-sm lg:p-8"><p className="text-xs font-black uppercase tracking-[0.24em] text-sky-300">Komuta Merkezi</p><h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Platformu cebinden yönet.</h2><p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-300">Üye yönetimi, canlı trafik, başvurular ve kurumsal mesajlar tek merkezde toplandı.</p><div className="mt-6 flex flex-wrap gap-2"><PrimaryButton tone="light" icon={<UsersRound size={16} />} onClick={() => setActiveTab("users")}>Üyelere Git</PrimaryButton><PrimaryButton tone="light" icon={<Activity size={16} />} onClick={() => setActiveTab("traffic")}>Canlı Trafik</PrimaryButton><Link href="/admin/system-messages"><PrimaryButton tone="light" icon={<MessageSquareText size={16} />}>Kurumsal Mesaj</PrimaryButton></Link></div></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><StatCard title="Bugünkü Ziyaret" value={trafficSummary?.todayVisits ?? 0} icon={<Eye size={20} />} desc="Trafik merkezi" /><StatCard title="Bu Hafta" value={trafficSummary?.weekVisits ?? 0} icon={<Activity size={20} />} desc="Toplam ziyaret" /><StatCard title="Bu Ay" value={trafficSummary?.monthVisits ?? 0} icon={<Globe2 size={20} />} desc="Aylık hareket" /><StatCard title="Online Üye" value={onlineCount} icon={<Wifi size={20} />} desc="Son 5 dakika" /></div><div className="grid gap-3 sm:grid-cols-3"><StatCard title="Online" value={onlineCount} icon={<Wifi size={20} />} desc="Aktif kullanıcı" /><StatCard title="Uzakta" value={awayCount} icon={<Timer size={20} />} desc="Kısa süre pasif" /><StatCard title="Offline" value={offlineCount} icon={<UsersRound size={20} />} desc="Çevrimdışı" /></div><div className="grid gap-5 xl:grid-cols-2"><div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><SectionHeader title="Son Üyeler" desc="Üye no ve şehir bilgileriyle birlikte." action={<button onClick={() => setActiveTab("users")} className="text-sm font-black text-sky-700">Tümünü Gör</button>} /><div className="space-y-3">{users.slice(0, 5).map((u) => <MemberMini key={u.id} user={u} />)}{users.length === 0 && <Empty>Üye yok.</Empty>}</div></div><div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><SectionHeader title="Bekleyen İşler" desc="Başvuru ve belge kontrol listesi." /><div className="space-y-3"><QuickLine title="Bekleyen başvurular" value={applications.filter((a) => a.status === "PENDING").length} icon={<Mail size={18} />} /><QuickLine title="Bekleyen belgeler" value={documents.filter((d) => d.status === "PENDING").length} icon={<FileText size={18} />} /><QuickLine title="Lina aday kayıtları" value={leads.length} icon={<Sparkles size={18} />} /></div></div></div></div>;
 }
 
 function UsersTab({ users, allUsers, search, setSearch, roleFilter, setRoleFilter, cityFilter, setCityFilter, cityOptions, actionLoading, onCreate, onApprove, onSuspend, onDelete, onRole }: { users: (UserItem & { lastVisit?: VisitItem; presence: any })[]; allUsers: (UserItem & { lastVisit?: VisitItem; presence: any })[]; search: string; setSearch: (v: string) => void; roleFilter: string; setRoleFilter: (v: string) => void; cityFilter: string; setCityFilter: (v: string) => void; cityOptions: string[]; actionLoading: string | null; onCreate: () => void; onApprove: (id: string) => void; onSuspend: (id: string) => void; onDelete: (id: string) => void; onRole: (u: UserItem) => void }) {
-  return <section><SectionHeader title="Üyeler" desc={`${users.length} kayıt gösteriliyor. Toplam ${allUsers.length} üye.`} action={<PrimaryButton icon={<Plus size={16} />} onClick={onCreate}>Yeni Üye</PrimaryButton>} /><div className="mb-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]"><div className="relative"><Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ad, e-posta, şehir veya üye no ara..." className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-bold outline-none focus:border-sky-400" /></div><select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Şehirler</option>{cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}</select><select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Roller</option><option value="EMLAKCI">Emlakçı</option><option value="MUTEAHHIT">Müteahhit</option><option value="INSAAT_FIRMASI">İnşaat Firması</option><option value="ADMIN">Admin</option><option value="SUPER_ADMIN">Süper Admin</option></select></div>{users.length === 0 ? <Empty>Kullanıcı bulunamadı.</Empty> : <div className="space-y-3">{users.map((u) => <div key={u.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_auto] lg:items-center"><div className="flex items-start gap-3"><div className="relative"><Avatar firstName={u.firstName} lastName={u.lastName} imageUrl={u.profileImageUrl} size="lg" /><span className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-white ${u.presence.dot}`} /></div><div className="min-w-0"><h3 className="truncate text-lg font-black text-slate-950">{u.firstName} {u.lastName}</h3><p className="truncate text-sm font-bold text-slate-500">{u.email}</p><p className="text-xs font-bold text-slate-400">{u.phone || "Telefon yok"}</p><div className="mt-2 flex flex-wrap gap-2"><Pill className={roleClass(u.role)}>{roleLabel(u.role)}</Pill><Pill className={u.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{u.isApproved ? "Onaylı" : "Bekliyor"}</Pill><Pill className={u.presence.badge}>{u.presence.label}</Pill></div></div></div><div className="grid gap-2 rounded-2xl bg-slate-50 p-3"><InfoLine label="Üye No" value={u.memberCode || "Atanmadı"} strong /><InfoLine label="Konum" value={`${u.city || "Şehir yok"}${u.district ? ` / ${u.district}` : ""}`} /><InfoLine label="Bölge Kodu" value={u.cityPlateCode ? `TR ${u.cityPlateCode}` : "—"} /><InfoLine label="Son Aktivite" value={fmt(u.lastVisit?.createdAt)} /></div><div className="flex flex-wrap gap-2 lg:justify-end">{!u.isApproved && <PrimaryButton tone="success" disabled={actionLoading === u.id} icon={<Check size={15} />} onClick={() => onApprove(u.id)}>Onayla</PrimaryButton>}{u.role !== "ADMIN" && u.role !== "SUPER_ADMIN" && <>{u.isApproved && <PrimaryButton tone="light" disabled={actionLoading === u.id} onClick={() => { if (confirm("Kullanıcı askıya alınacak. Emin misiniz?")) onSuspend(u.id); }}>Askıya Al</PrimaryButton>}<PrimaryButton tone="light" icon={<UserCog size={15} />} onClick={() => onRole(u)}>Rol</PrimaryButton><PrimaryButton tone="danger" disabled={actionLoading === u.id} icon={<Trash2 size={15} />} onClick={() => { if (confirm("Kullanıcı silinecek. Emin misiniz?")) onDelete(u.id); }}>Sil</PrimaryButton></>}{(u.role === "ADMIN" || u.role === "SUPER_ADMIN") && <PrimaryButton tone="light" icon={<ShieldCheck size={15} />}>Yetkili</PrimaryButton>}</div></div></div>)}</div>}</section>;
+  return <section><SectionHeader title="Üyeler" desc={`${users.length} kayıt gösteriliyor. Toplam ${allUsers.length} üye.`} action={<PrimaryButton icon={<Plus size={16} />} onClick={onCreate}>Yeni Üye</PrimaryButton>} /><div className="mb-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]"><div className="relative"><Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ad, e-posta, şehir veya üye no ara..." className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-bold outline-none focus:border-sky-400" /></div><select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Şehirler</option>{cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}</select><select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Roller</option><option value="EMLAKCI">Emlakçı</option><option value="MUTEAHHIT">Müteahhit</option><option value="INSAAT_FIRMASI">İnşaat Firması</option><option value="ADMIN">Admin</option><option value="SUPER_ADMIN">Süper Admin</option></select></div>{users.length === 0 ? <Empty>Kullanıcı bulunamadı.</Empty> : <div className="space-y-3">{users.map((u) => <div key={u.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_auto] lg:items-center"><div className="flex items-start gap-3"><div className="relative"><Avatar firstName={u.firstName} lastName={u.lastName} imageUrl={u.profileImageUrl} size="lg" /><span className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-white ${u.presence.dot}`} /></div><div className="min-w-0"><h3 className="truncate text-lg font-black text-slate-950">{u.firstName} {u.lastName}</h3><p className="truncate text-sm font-bold text-slate-500">{u.email}</p><p className="text-xs font-bold text-slate-400">{u.phone || "Telefon yok"}</p><div className="mt-2 flex flex-wrap gap-2"><Pill className={roleClass(u.role)}>{roleLabel(u.role)}</Pill><Pill className={u.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{u.isApproved ? "Onaylı" : "Bekliyor"}</Pill><PresenceBadge presence={u.presence} /></div></div></div><div className="grid gap-2 rounded-2xl bg-slate-50 p-3"><InfoLine label="Üye No" value={u.memberCode || "Atanmadı"} strong /><InfoLine label="Konum" value={`${u.city || "Şehir yok"}${u.district ? ` / ${u.district}` : ""}`} /><InfoLine label="Bölge Kodu" value={u.cityPlateCode ? `TR ${u.cityPlateCode}` : "—"} /><InfoLine label="Son Aktivite" value={fmt(u.lastVisit?.createdAt)} /></div><div className="flex flex-wrap gap-2 lg:justify-end">{!u.isApproved && <PrimaryButton tone="success" disabled={actionLoading === u.id} icon={<Check size={15} />} onClick={() => onApprove(u.id)}>Onayla</PrimaryButton>}{u.role !== "ADMIN" && u.role !== "SUPER_ADMIN" && <>{u.isApproved && <PrimaryButton tone="light" disabled={actionLoading === u.id} onClick={() => { if (confirm("Kullanıcı askıya alınacak. Emin misiniz?")) onSuspend(u.id); }}>Askıya Al</PrimaryButton>}<PrimaryButton tone="light" icon={<UserCog size={15} />} onClick={() => onRole(u)}>Rol</PrimaryButton><PrimaryButton tone="danger" disabled={actionLoading === u.id} icon={<Trash2 size={15} />} onClick={() => { if (confirm("Kullanıcı silinecek. Emin misiniz?")) onDelete(u.id); }}>Sil</PrimaryButton></>}{(u.role === "ADMIN" || u.role === "SUPER_ADMIN") && <PrimaryButton tone="light" icon={<ShieldCheck size={15} />}>Yetkili</PrimaryButton>}</div></div></div>)}</div>}</section>;
 }
 
 function TrafficTab({ rows, trafficSummary, trafficFilter, setTrafficFilter, onRefresh }: { rows: { user: UserItem; visit?: VisitItem; presence: any }[]; trafficSummary: TrafficSummary | null; trafficFilter: string; setTrafficFilter: (v: string) => void; onRefresh: () => void }) {
-  const onlineCount = trafficSummary?.onlineUsers ?? rows.filter((r) => r.presence.label === "Online").length;
-  const awayCount = trafficSummary?.awayUsers ?? rows.filter((r) => r.presence.label === "Away").length;
-  const offlineCount = trafficSummary?.offlineUsers ?? rows.filter((r) => r.presence.label === "Offline").length;
+  const onlineCount = trafficSummary?.onlineUsers ?? rows.filter((r) => r.presence.key === "online").length;
+  const awayCount = trafficSummary?.awayUsers ?? rows.filter((r) => r.presence.key === "away").length;
+  const offlineCount = trafficSummary?.offlineUsers ?? rows.filter((r) => r.presence.key === "offline").length;
 
   return <section className="space-y-5"><SectionHeader title="Admin Trafik Merkezi" desc="Yeni trafik API'sinden gelen ziyaret, durum ve aktiflik verileri." action={<PrimaryButton tone="light" icon={<RefreshCw size={16} />} onClick={onRefresh}>Yenile</PrimaryButton>} />
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -499,7 +553,7 @@ function TrafficTab({ rows, trafficSummary, trafficFilter, setTrafficFilter, onR
       <StatCard title="Bu Hafta" value={trafficSummary?.weekVisits ?? 0} icon={<Activity size={20} />} desc="Haftalık trafik" />
       <StatCard title="Bu Ay" value={trafficSummary?.monthVisits ?? 0} icon={<Globe2 size={20} />} desc="Aylık trafik" />
       <StatCard title="Online" value={onlineCount} icon={<Wifi size={20} />} desc="Son 5 dakika" />
-      <StatCard title="Away" value={awayCount} icon={<Timer size={20} />} desc="5-20 dakika arası" />
+      <StatCard title="Uzakta" value={awayCount} icon={<Timer size={20} />} desc="5-20 dakika arası" />
       <StatCard title="Offline" value={offlineCount} icon={<UsersRound size={20} />} desc="20 dakika üstü" />
     </div>
 
@@ -511,14 +565,14 @@ function TrafficTab({ rows, trafficSummary, trafficFilter, setTrafficFilter, onR
 
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
         <SectionHeader title="En Aktif Üyeler" desc="Üye bazlı ziyaret yoğunluğu." />
-        {trafficSummary?.topUsers?.length ? <div className="space-y-3">{trafficSummary.topUsers.map((item, index) => <div key={`${item.userId || item.id || item.email || index}`} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3"><Avatar firstName={item.firstName} lastName={item.lastName} imageUrl={item.profileImageUrl} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-slate-950">{fullName(item)}</p><p className="truncate text-xs font-bold text-slate-500">{item.email || item.memberCode || "Üye bilgisi bekleniyor"}</p><p className="text-xs font-bold text-slate-400">Son aktivite: {fmt(item.lastSeen)}</p></div><div className="text-right"><Pill className={roleClass(item.role || "")}>{roleLabel(item.role)}</Pill><p className="mt-2 text-sm font-black text-slate-950">{item.count} ziyaret</p></div></div>)}</div> : <Empty>Henüz aktif üye özeti yok.</Empty>}
+        {trafficSummary?.topUsers?.length ? <div className="space-y-3">{trafficSummary.topUsers.map((item, index) => { const presence = presenceFromDate(item.lastSeen); return <div key={`${item.userId || item.id || item.email || index}`} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="relative"><Avatar firstName={item.firstName} lastName={item.lastName} imageUrl={item.profileImageUrl} /><span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${presence.dot}`} /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-slate-950">{fullName(item)}</p><p className="truncate text-xs font-bold text-slate-500">{item.email || item.memberCode || "Üye bilgisi bekleniyor"}</p><p className="text-xs font-bold text-slate-400">Son aktivite: {fmt(item.lastSeen)}</p></div><div className="flex flex-col items-end gap-2 text-right"><PresenceBadge presence={presence} /><Pill className={roleClass(item.role || "")}>{roleLabel(item.role)}</Pill><p className="text-sm font-black text-slate-950">{item.count} ziyaret</p></div></div>; })}</div> : <Empty>Henüz aktif üye özeti yok.</Empty>}
       </div>
     </div>
 
     <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
       <SectionHeader title="Kullanıcı Durumları" desc="Eski /visits verisiyle son aktif üyeler listesi. Filtreler burada çalışmaya devam eder." />
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:flex">{[{ value: "all", label: "Tümü" }, { value: "online", label: "Online" }, { value: "away", label: "Away" }, { value: "offline", label: "Offline" }].map((item) => <button key={item.value} onClick={() => setTrafficFilter(item.value)} className={`rounded-2xl border px-4 py-3 text-xs font-black ${trafficFilter === item.value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-600"}`}>{item.label}</button>)}</div>
-      {rows.length === 0 ? <Empty>Trafik verisi bulunamadı.</Empty> : <div className="space-y-3">{rows.map(({ user, visit, presence }) => <div key={user.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-center"><div className="flex items-center gap-3"><div className="relative"><Avatar firstName={user.firstName} lastName={user.lastName} imageUrl={user.profileImageUrl} /><span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${presence.dot}`} /></div><div className="min-w-0"><p className="truncate text-sm font-black text-slate-950">{fullName(user)}</p><p className="truncate text-xs font-bold text-slate-500">{user.email}</p></div></div><div className="grid gap-1 text-xs font-bold text-slate-600"><p>Son Sayfa: <span className="font-black text-slate-950">{visit?.page || "—"}</span></p><p>Son Aktivite: <span className="font-black text-slate-950">{fmt(visit?.createdAt)}</span></p></div><div className="flex justify-start lg:justify-end"><Pill className={presence.badge}>{presence.label}</Pill></div></div></div>)}</div>}
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:flex">{[{ value: "all", label: "Tümü" }, { value: "online", label: "🟢 Online" }, { value: "away", label: "🟡 Uzakta" }, { value: "offline", label: "⚫ Çevrimdışı" }].map((item) => <button key={item.value} onClick={() => setTrafficFilter(item.value)} className={`rounded-2xl border px-4 py-3 text-xs font-black ${trafficFilter === item.value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-600"}`}>{item.label}</button>)}</div>
+      {rows.length === 0 ? <Empty>Trafik verisi bulunamadı.</Empty> : <div className="space-y-3">{rows.map(({ user, visit, presence }) => <div key={user.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-center"><div className="flex items-center gap-3"><div className="relative"><Avatar firstName={user.firstName} lastName={user.lastName} imageUrl={user.profileImageUrl} /><span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${presence.dot}`} /></div><div className="min-w-0"><p className="truncate text-sm font-black text-slate-950">{fullName(user)}</p><p className="truncate text-xs font-bold text-slate-500">{user.email}</p></div></div><div className="grid gap-1 text-xs font-bold text-slate-600"><p>Son Sayfa: <span className="font-black text-slate-950">{visit?.page || "—"}</span></p><p>Son Aktivite: <span className="font-black text-slate-950">{fmt(visit?.createdAt)}</span></p></div><div className="flex justify-start lg:justify-end"><PresenceBadge presence={presence} /></div></div></div>)}</div>}
     </div>
   </section>;
 }
