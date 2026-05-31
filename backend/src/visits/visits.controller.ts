@@ -19,6 +19,12 @@ export class VisitsController {
     });
   }
 
+  @Get('presence')
+  @UseGuards(JwtAuthGuard)
+  async getPresence() {
+    return this.visitsService.getPresence();
+  }
+
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
