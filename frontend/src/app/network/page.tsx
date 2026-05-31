@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { getToken } from "firebase/messaging";
 import EphAppShell from "@/components/EphAppShell";
@@ -32,6 +32,28 @@ type NetworkUser = {
   firstName: string;
   lastName: string;
   role: string;
+};
+
+type PresenceStatus = "online" | "away" | "offline";
+
+type PresenceUser = {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  fullName?: string | null;
+  email?: string | null;
+  role?: string | null;
+  profileImageUrl?: string | null;
+  status: PresenceStatus;
+  lastSeenAt?: string | null;
+  lastPage?: string | null;
+  minutesAgo?: number | null;
+};
+
+type PresenceResponse = {
+  online: PresenceUser[];
+  away: PresenceUser[];
+  offline: PresenceUser[];
 };
 
 type NetworkPost = {
@@ -146,7 +168,10 @@ function getMarketplaceActions(
     };
   }
 
-  if ((viewer === "contractor" || viewer === "construction") && owner === "realtor") {
+  if (
+    (viewer === "contractor" || viewer === "construction") &&
+    owner === "realtor"
+  ) {
     return {
       primary: "Mesaj Gönder",
       secondary: "Proje Teklif Et",
@@ -207,7 +232,6 @@ function getMarketplaceActions(
     note: "Bu paylaşım için profesyonel bir görüşme başlatabilirsin.",
   };
 }
-
 
 function createPresetMessage(actionTitle: string, postTitle?: string) {
   if (actionTitle === "Uygun Müşterim Var") {
@@ -375,7 +399,13 @@ const categories = [
   "Arsa & Kat Karşılığı",
 ];
 
-const filters = ["En Yeni", "Sıcak Talepler", "Hazır Müşteri", "Bugün", "Trend"];
+const filters = [
+  "En Yeni",
+  "Sıcak Talepler",
+  "Hazır Müşteri",
+  "Bugün",
+  "Trend",
+];
 
 const shareTypes = [
   "Talep",
@@ -519,7 +549,9 @@ function formatMoney(value?: string | number | null) {
   if (value == null || value === "") return "";
 
   const numeric =
-    typeof value === "number" ? value : Number(String(value).replace(/\D/g, ""));
+    typeof value === "number"
+      ? value
+      : Number(String(value).replace(/\D/g, ""));
 
   if (!numeric) return String(value);
 
@@ -528,6 +560,42 @@ function formatMoney(value?: string | number | null) {
 
 function roleLabel(role?: string) {
   return getRoleTheme(role).label;
+}
+
+function presenceLabel(status?: PresenceStatus) {
+  if (status === "online") return "Online";
+  if (status === "away") return "Uzakta";
+  return "Çevrimdışı";
+}
+
+function presenceDotClass(status?: PresenceStatus) {
+  if (status === "online") return "bg-emerald-500";
+  if (status === "away") return "bg-amber-400";
+  return "bg-slate-400";
+}
+
+function presenceBadgeStyle(status: PresenceStatus, theme: RoleTheme) {
+  if (status === "online") {
+    return {
+      backgroundColor: "#ECFDF5",
+      color: "#047857",
+      borderColor: "#A7F3D0",
+    };
+  }
+
+  if (status === "away") {
+    return {
+      backgroundColor: "#FFFBEB",
+      color: "#B45309",
+      borderColor: "#FDE68A",
+    };
+  }
+
+  return {
+    backgroundColor: theme.soft,
+    color: "#64748B",
+    borderColor: theme.border,
+  };
 }
 
 function isHotPost(post: NetworkPost) {
@@ -559,9 +627,26 @@ export default function NetworkPage() {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
+  const [presence, setPresence] = useState<PresenceResponse>({
+    online: [],
+    away: [],
+    offline: [],
+  });
 
   const lastUnreadRef = useRef(0);
   const firstUnreadCheckRef = useRef(true);
+
+  const presenceMap = useMemo(() => {
+    const map = new Map<string, PresenceUser>();
+
+    [...presence.online, ...presence.away, ...presence.offline].forEach(
+      (presenceUser) => {
+        map.set(presenceUser.id, presenceUser);
+      },
+    );
+
+    return map;
+  }, [presence]);
 
   const getSoundFile = () =>
     localStorage.getItem("ephNotificationSoundFile") ||
@@ -659,6 +744,20 @@ export default function NetworkPage() {
     }
   };
 
+  const fetchPresence = async () => {
+    try {
+      const res = await api.get("/visits/presence");
+
+      setPresence({
+        online: Array.isArray(res.data?.online) ? res.data.online : [],
+        away: Array.isArray(res.data?.away) ? res.data.away : [],
+        offline: Array.isArray(res.data?.offline) ? res.data.offline : [],
+      });
+    } catch {
+      setPresence({ online: [], away: [], offline: [] });
+    }
+  };
+
   const fetchFollowedPosts = async () => {
     if (!user?.id) {
       setFollowedPosts([]);
@@ -707,6 +806,7 @@ export default function NetworkPage() {
     setSoundEnabled(localStorage.getItem("ephSoundEnabled") === "true");
     setPushEnabled(localStorage.getItem("ephPushEnabled") === "true");
     fetchPosts();
+    fetchPresence();
   }, []);
 
   useEffect(() => {
@@ -719,9 +819,13 @@ export default function NetworkPage() {
 
     fetchConversationStats();
 
-    const interval = setInterval(fetchConversationStats, 5000);
+    const statsInterval = setInterval(fetchConversationStats, 5000);
+    const presenceInterval = setInterval(fetchPresence, 30000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(statsInterval);
+      clearInterval(presenceInterval);
+    };
   }, [user?.id, soundEnabled]);
 
   const handleCreatePost = async (form: CreatePostForm) => {
@@ -824,6 +928,7 @@ export default function NetworkPage() {
         onEnablePush={enablePushNotifications}
         onEnableSound={enableSound}
         onRefresh={fetchPosts}
+        presenceMap={presenceMap}
       />
     );
   }
@@ -1037,6 +1142,7 @@ export default function NetworkPage() {
                 onStartConversation={(actionTitle, presetMessage) =>
                   startConversation(post, actionTitle, presetMessage)
                 }
+                presenceMap={presenceMap}
               />
             ))
           )}
@@ -1178,6 +1284,7 @@ function AdminNetworkCommandGrid({
   onEnablePush,
   onEnableSound,
   onRefresh,
+  presenceMap,
 }: {
   posts: NetworkPost[];
   loading: boolean;
@@ -1191,6 +1298,7 @@ function AdminNetworkCommandGrid({
   onEnablePush: () => void;
   onEnableSound: () => void;
   onRefresh: () => void;
+  presenceMap: Map<string, PresenceUser>;
 }) {
   const hotPosts = posts.filter(isHotPost);
   const adminTheme = getRoleTheme("ADMIN");
@@ -1204,7 +1312,9 @@ function AdminNetworkCommandGrid({
   return (
     <EphAppShell title="Pazaryeri">
       <section className="mx-auto max-w-7xl text-center">
-        <div className={`relative overflow-hidden rounded-[42px] bg-gradient-to-br ${adminTheme.gradient} p-7 text-white shadow-2xl`}>
+        <div
+          className={`relative overflow-hidden rounded-[42px] bg-gradient-to-br ${adminTheme.gradient} p-7 text-white shadow-2xl`}
+        >
           <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
             <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-cyan-100">
               Pazaryeri Admin Görünümü
@@ -1229,10 +1339,22 @@ function AdminNetworkCommandGrid({
           </p>
 
           <div className="mt-7 grid gap-3 sm:grid-cols-4">
-            <AdminNetworkMetric label="Toplam Akış" value={posts.length} tone="cyan" />
-            <AdminNetworkMetric label="Sıcak Sinyal" value={hotPosts.length} tone="gold" />
+            <AdminNetworkMetric
+              label="Toplam Akış"
+              value={posts.length}
+              tone="cyan"
+            />
+            <AdminNetworkMetric
+              label="Sıcak Sinyal"
+              value={hotPosts.length}
+              tone="gold"
+            />
             <AdminNetworkMetric label="Bugün" value={todayCount} tone="blue" />
-            <AdminNetworkMetric label="Mesaj Odası" value={conversationCount} tone="emerald" />
+            <AdminNetworkMetric
+              label="Mesaj Odası"
+              value={conversationCount}
+              tone="emerald"
+            />
           </div>
 
           <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
@@ -1343,7 +1465,11 @@ function AdminNetworkCommandGrid({
               </div>
             ) : (
               posts.map((post) => (
-                <AdminNetworkPostCard key={post.id} post={post} />
+                <AdminNetworkPostCard
+                  key={post.id}
+                  post={post}
+                  presenceMap={presenceMap}
+                />
               ))
             )}
           </section>
@@ -1386,12 +1512,21 @@ function AdminNetworkMetric({
   );
 }
 
-function AdminNetworkPostCard({ post }: { post: NetworkPost }) {
+function AdminNetworkPostCard({
+  post,
+  presenceMap,
+}: {
+  post: NetworkPost;
+  presenceMap: Map<string, PresenceUser>;
+}) {
   const postUser = getPostUser(post);
   const authorName = postUser
     ? `${postUser.firstName} ${postUser.lastName}`
     : "EPH Üyesi";
   const theme = getRoleTheme(postUser?.role);
+  const presenceStatus = postUser?.id
+    ? presenceMap.get(postUser.id)?.status || "offline"
+    : "offline";
 
   return (
     <article
@@ -1401,7 +1536,12 @@ function AdminNetworkPostCard({ post }: { post: NetworkPost }) {
       <div className={`h-2 bg-gradient-to-r ${theme.gradient}`} />
 
       <div className="p-6">
-        <PostHeader post={post} authorName={authorName} theme={theme} />
+        <PostHeader
+          post={post}
+          authorName={authorName}
+          theme={theme}
+          presenceStatus={presenceStatus}
+        />
 
         <PostBody post={post} theme={theme} />
       </div>
@@ -1415,12 +1555,14 @@ function PremiumPostCard({
   currentUserRole,
   onOpenDetail,
   onStartConversation,
+  presenceMap,
 }: {
   post: NetworkPost;
   currentUserId?: string;
   currentUserRole?: string | null;
   onOpenDetail: () => void;
   onStartConversation: (actionTitle: string, presetMessage: string) => void;
+  presenceMap: Map<string, PresenceUser>;
 }) {
   const postUser = getPostUser(post);
   const authorName = postUser
@@ -1428,6 +1570,9 @@ function PremiumPostCard({
     : "EPH Üyesi";
 
   const theme = getRoleTheme(postUser?.role);
+  const presenceStatus = postUser?.id
+    ? presenceMap.get(postUser.id)?.status || "offline"
+    : "offline";
   const ownerId = post.userId || postUser?.id;
   const isOwnPost = ownerId === currentUserId;
   const actions = getMarketplaceActions(currentUserRole, postUser?.role);
@@ -1444,7 +1589,12 @@ function PremiumPostCard({
       <div className={`h-2 bg-gradient-to-r ${theme.gradient}`} />
 
       <div className="p-6">
-        <PostHeader post={post} authorName={authorName} theme={theme} />
+        <PostHeader
+          post={post}
+          authorName={authorName}
+          theme={theme}
+          presenceStatus={presenceStatus}
+        />
 
         <PostBody post={post} theme={theme} />
 
@@ -1455,7 +1605,10 @@ function PremiumPostCard({
             backgroundColor: theme.soft,
           }}
         >
-          <p className="text-xs font-black leading-5" style={{ color: theme.text }}>
+          <p
+            className="text-xs font-black leading-5"
+            style={{ color: theme.text }}
+          >
             {isOwnPost
               ? "Bu paylaşım sana ait. Detay sayfasından yayını takip edebilir veya güncelleyebilirsin."
               : actions.note}
@@ -1548,24 +1701,34 @@ function PostHeader({
   post,
   authorName,
   theme,
+  presenceStatus,
 }: {
   post: NetworkPost;
   authorName: string;
   theme: RoleTheme;
+  presenceStatus: PresenceStatus;
 }) {
   const postUser = getPostUser(post);
 
   return (
     <div className="mb-5 flex flex-col items-center justify-center text-center">
-      <div
-        className="flex h-16 w-16 items-center justify-center rounded-3xl text-3xl font-black shadow-xl"
-        style={{
-          backgroundColor: theme.soft,
-          color: theme.primary,
-          border: `1px solid ${theme.border}`,
-        }}
-      >
-        {theme.emoji}
+      <div className="relative">
+        <div
+          className="flex h-16 w-16 items-center justify-center rounded-3xl text-3xl font-black shadow-xl"
+          style={{
+            backgroundColor: theme.soft,
+            color: theme.primary,
+            border: `1px solid ${theme.border}`,
+          }}
+        >
+          {theme.emoji}
+        </div>
+
+        <span
+          className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-[3px] border-white ${presenceDotClass(
+            presenceStatus,
+          )}`}
+        />
       </div>
 
       <div className="mt-4">
@@ -1577,9 +1740,24 @@ function PostHeader({
           <CheckCircle2 size={18} style={{ color: theme.primary }} />
         </div>
 
-        <p className="mt-2 inline-flex rounded-full px-4 py-1.5 text-xs font-black" style={{ backgroundColor: theme.soft, color: theme.text }}>
-          {roleLabel(postUser?.role)}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+          <p
+            className="inline-flex rounded-full px-4 py-1.5 text-xs font-black"
+            style={{ backgroundColor: theme.soft, color: theme.text }}
+          >
+            {roleLabel(postUser?.role)}
+          </p>
+
+          <p
+            className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-black"
+            style={presenceBadgeStyle(presenceStatus, theme)}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${presenceDotClass(presenceStatus)}`}
+            />
+            {presenceLabel(presenceStatus)}
+          </p>
+        </div>
 
         <p className="mt-2 text-xs font-bold text-slate-400">
           {relativeTime(post.createdAt)}
@@ -1695,7 +1873,10 @@ function CreatePostModal({
       <section className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-[32px] bg-white">
         <header className="flex items-start justify-between gap-4 border-b border-slate-100 p-6">
           <div className="flex-1 text-center">
-            <h2 className="text-[28px] font-black" style={{ color: theme.text }}>
+            <h2
+              className="text-[28px] font-black"
+              style={{ color: theme.text }}
+            >
               Yeni Paylaşım
             </h2>
 
@@ -1732,7 +1913,10 @@ function CreatePostModal({
             <input
               value={form.title}
               onChange={(event) =>
-                setForm((current) => ({ ...current, title: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
               }
               className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
               placeholder="Örn: Akkonak’ta 3+1 satılık daire aranıyor"
@@ -1755,7 +1939,10 @@ function CreatePostModal({
               <input
                 value={form.city}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, city: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    city: event.target.value,
+                  }))
                 }
                 className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-bold outline-none"
                 placeholder="Denizli"
@@ -1947,4 +2134,3 @@ function QuickLink({
     </button>
   );
 }
-
