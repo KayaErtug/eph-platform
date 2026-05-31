@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -114,7 +114,7 @@ function getRoleGroup(role?: string | null) {
     return "contractor";
   }
 
-  if (normalizedRole === "ADMIN" || normalizedRole === "DENETCI_ADMIN") {
+  if (normalizedRole === "ADMIN" || normalizedRole === "SUPER_ADMIN") {
     return "admin";
   }
 
@@ -441,7 +441,7 @@ function getRoleTheme(role?: string | null): RoleTheme {
     };
   }
 
-  if (normalizedRole === "ADMIN" || normalizedRole === "DENETCI_ADMIN") {
+  if (normalizedRole === "ADMIN" || normalizedRole === "SUPER_ADMIN") {
     return {
       primary: "#0F172A",
       secondary: "#38BDF8",
@@ -809,7 +809,7 @@ export default function NetworkPage() {
     ? followedPosts.map((item) => item.post)
     : posts;
 
-  if (user?.role === "ADMIN") {
+  if (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") {
     return (
       <AdminNetworkCommandGrid
         posts={posts}
@@ -1947,3 +1947,4 @@ function QuickLink({
     </button>
   );
 }
+

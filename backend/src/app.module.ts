@@ -22,6 +22,7 @@ import { MessagesModule } from './messages/messages.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReferralModule } from './referral/referral.module';
 import { NetworkModule } from './network/network.module';
+import { SystemMessagesModule } from './system-messages/system-messages.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { NetworkModule } from './network/network.module';
     PushModule,
     MessagesModule,
     NetworkModule,
+    SystemMessagesModule,
 
     DashboardModule,
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -25,7 +25,7 @@ type Role =
   | "MUTEAHHIT"
   | "INSAAT_FIRMASI"
   | "ADMIN"
-  | "DENETCI_ADMIN";
+  | "SUPER_ADMIN";
 
 type ReferralUser = {
   id: string;
@@ -57,7 +57,7 @@ const ROLE_LABELS: Record<Role, string> = {
   MUTEAHHIT: "Müteahhit",
   INSAAT_FIRMASI: "İnşaat Firması",
   ADMIN: "Admin",
-  DENETCI_ADMIN: "Denetçi Admin",
+  SUPER_ADMIN: "Süper Admin",
 };
 
 const EMPTY_FORM = {
@@ -94,7 +94,7 @@ export default function AdminReferralsPage() {
       return;
     }
 
-    if (user.role !== "ADMIN") {
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
       router.push("/dashboard");
       return;
     }

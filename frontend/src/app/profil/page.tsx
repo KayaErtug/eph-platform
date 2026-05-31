@@ -8,7 +8,6 @@ import {
   BadgeCheck,
   Bell,
   Building2,
-  CalendarDays,
   CheckCircle2,
   ClipboardList,
   Crown,
@@ -28,12 +27,20 @@ import {
 
 import { useAuthStore } from "@/store/auth.store";
 
-type UserRole = "ADMIN" | "EMLAKCI" | "MUTEAHHIT" | string;
+type UserRole =
+  | "SUPER_ADMIN"
+  | "ADMIN"
+  | "EMLAKCI"
+  | "MUTEAHHIT"
+  | "INSAAT_FIRMASI"
+  | string;
 
 type SafeUser = {
   id?: string;
   name?: string;
   fullName?: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
   phone?: string;
   role?: UserRole;
@@ -45,9 +52,35 @@ type SafeUser = {
   companyName?: string;
   officeName?: string;
   title?: string;
+  memberCode?: string;
+  memberSince?: string;
+  trustScore?: number;
+  riskLevel?: string;
 };
 
 const roleContent = {
+  SUPER_ADMIN: {
+    className: "eph-role-super-admin",
+    label: "Süper Admin",
+    title: "EPH Platform Yönetim Merkezi",
+    badge: "EPH Kurucu Profili",
+    primaryText: "text-[#14B8A6]",
+    softBg: "bg-[#F0FDFA]",
+    iconBg: "bg-[#14B8A6] text-white",
+    border: "border-[#99F6E4]",
+    heroGradient: "from-[#0F172A] via-[#134E4A] to-[#14B8A6]",
+  },
+  ADMIN: {
+    className: "eph-role-admin",
+    label: "Admin",
+    title: "Sistem yönetim panelin hazır.",
+    badge: "Yönetim Profili",
+    primaryText: "text-[#0F172A]",
+    softBg: "bg-[#F8FAFC]",
+    iconBg: "bg-[#E2E8F0] text-[#0F172A]",
+    border: "border-[#CBD5E1]",
+    heroGradient: "from-[#0F172A] via-[#1E293B] to-[#334155]",
+  },
   EMLAKCI: {
     className: "eph-role-emlakci",
     label: "Gayrimenkul Danışmanı",
@@ -56,6 +89,8 @@ const roleContent = {
     primaryText: "text-[#2563EB]",
     softBg: "bg-[#EFF6FF]",
     iconBg: "bg-[#DBEAFE] text-[#2563EB]",
+    border: "border-[#BFDBFE]",
+    heroGradient: "from-[#1D4ED8] via-[#2563EB] to-[#38BDF8]",
   },
   MUTEAHHIT: {
     className: "eph-role-muteahhit",
@@ -65,17 +100,53 @@ const roleContent = {
     primaryText: "text-[#F97316]",
     softBg: "bg-[#FFF7ED]",
     iconBg: "bg-[#FFEDD5] text-[#EA580C]",
+    border: "border-[#FED7AA]",
+    heroGradient: "from-[#9A3412] via-[#EA580C] to-[#FDBA74]",
   },
-  ADMIN: {
-    className: "eph-role-admin",
-    label: "Admin",
-    title: "Sistem yönetim panelin hazır.",
-    badge: "Mor / Gri Yönetim Profili",
-    primaryText: "text-[#7C3AED]",
-    softBg: "bg-[#F5F3FF]",
-    iconBg: "bg-[#EDE9FE] text-[#7C3AED]",
+  INSAAT_FIRMASI: {
+    className: "eph-role-insaat",
+    label: "İnşaat Firması",
+    title: "Proje, stok ve satış takibin hazır.",
+    badge: "Kurumsal İnşaat Profili",
+    primaryText: "text-[#B45309]",
+    softBg: "bg-[#FFFBEB]",
+    iconBg: "bg-[#FEF3C7] text-[#B45309]",
+    border: "border-[#FDE68A]",
+    heroGradient: "from-[#78350F] via-[#B45309] to-[#FBBF24]",
   },
 };
+
+function normalizeRole(role?: string | null) {
+  return String(role || "").toLocaleUpperCase("tr-TR").trim();
+}
+
+function getTheme(role?: string | null) {
+  const normalizedRole = normalizeRole(role);
+
+  if (normalizedRole === "SUPER_ADMIN") return roleContent.SUPER_ADMIN;
+  if (normalizedRole === "ADMIN") return roleContent.ADMIN;
+
+  if (
+    normalizedRole === "MUTEAHHIT" ||
+    normalizedRole === "MÜTEAHHİT" ||
+    normalizedRole === "MÜTAHHİT"
+  ) {
+    return roleContent.MUTEAHHIT;
+  }
+
+  if (
+    normalizedRole === "INSAAT_FIRMASI" ||
+    normalizedRole === "İNŞAAT_FİRMASI"
+  ) {
+    return roleContent.INSAAT_FIRMASI;
+  }
+
+  return roleContent.EMLAKCI;
+}
+
+function isSuperAdmin(role?: string | null) {
+  return normalizeRole(role) === "SUPER_ADMIN";
+}
 
 export default function ProfilPage() {
   const router = useRouter();
@@ -95,19 +166,19 @@ export default function ProfilPage() {
   }, [hydrated, router, user]);
 
   const safeUser = user as SafeUser | null;
-
-  const userRole = String(safeUser?.role || "EMLAKCI").toUpperCase();
-  const theme =
-    userRole === "ADMIN"
-      ? roleContent.ADMIN
-      : userRole === "MUTEAHHIT" || userRole === "MÜTEAHHİT"
-        ? roleContent.MUTEAHHIT
-        : roleContent.EMLAKCI;
+  const userRole = normalizeRole(safeUser?.role || "EMLAKCI");
+  const theme = getTheme(userRole);
+  const superAdmin = isSuperAdmin(userRole);
 
   const displayName = useMemo(() => {
+    const fullNameFromParts = `${safeUser?.firstName || ""} ${
+      safeUser?.lastName || ""
+    }`.trim();
+
     return (
       safeUser?.fullName ||
       safeUser?.name ||
+      fullNameFromParts ||
       safeUser?.companyName ||
       safeUser?.officeName ||
       "EPH Kullanıcısı"
@@ -115,17 +186,22 @@ export default function ProfilPage() {
   }, [safeUser]);
 
   const initials = useMemo(() => {
-    return displayName
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join("")
-      .toUpperCase();
+    return (
+      displayName
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase() || "EPH"
+    );
   }, [displayName]);
 
   const packageName =
-    safeUser?.packageType || safeUser?.plan || safeUser?.membershipType || "Standart";
+    safeUser?.packageType ||
+    safeUser?.plan ||
+    safeUser?.membershipType ||
+    (superAdmin ? "Kurucu Erişimi" : "Standart");
 
   const referralCode =
     safeUser?.referralCode || safeUser?.referenceCode || "Henüz tanımlı değil";
@@ -133,7 +209,7 @@ export default function ProfilPage() {
   if (!hydrated || !safeUser) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F8FAFC]">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#2563EB] border-t-transparent" />
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#14B8A6] border-t-transparent" />
       </main>
     );
   }
@@ -171,10 +247,50 @@ export default function ProfilPage() {
       </header>
 
       <section className="mx-auto max-w-7xl px-5 py-8">
+        {superAdmin && (
+          <section
+            className={`mb-6 overflow-hidden rounded-[34px] bg-gradient-to-br ${theme.heroGradient} p-6 text-center text-white shadow-2xl md:p-8`}
+          >
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-4 py-2 text-xs font-black backdrop-blur">
+              <Crown size={15} />
+              EPH Kurucu Alanı
+            </div>
+
+            <h2 className="mt-5 text-4xl font-black tracking-tight md:text-6xl">
+              Hoşgeldin Mustafa Abi
+            </h2>
+
+            <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-white/80 md:text-base">
+              EPH Platform Yönetim Merkezi. Bugün platformda neler oluyor,
+              birlikte bakalım.
+            </p>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <FounderMiniCard
+                icon={<ShieldCheck size={20} />}
+                label="Rol"
+                value="Süper Admin"
+              />
+              <FounderMiniCard
+                icon={<Crown size={20} />}
+                label="Yetki"
+                value="Kurucu Erişimi"
+              />
+              <FounderMiniCard
+                icon={<Sparkles size={20} />}
+                label="Tema"
+                value="Turkuaz Yönetim"
+              />
+            </div>
+          </section>
+        )}
+
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <section className="eph-card overflow-hidden p-6 text-center md:p-8">
-            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#DDE7F3] bg-white px-4 py-2 text-xs font-black text-[#64748B] shadow-sm">
-              <BadgeCheck size={14} className={theme.primaryText} />
+            <div
+              className={`mx-auto inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-xs font-black shadow-sm ${theme.border} ${theme.primaryText}`}
+            >
+              <BadgeCheck size={14} />
               {theme.badge}
             </div>
 
@@ -182,7 +298,7 @@ export default function ProfilPage() {
               <div
                 className={`flex h-24 w-24 items-center justify-center rounded-[32px] text-3xl font-black shadow-sm ${theme.iconBg}`}
               >
-                {initials || "EPH"}
+                {superAdmin ? <Crown size={42} /> : initials}
               </div>
 
               <div>
@@ -190,8 +306,8 @@ export default function ProfilPage() {
                   {displayName}
                 </h2>
 
-                <p className="mt-3 text-base font-bold text-[#64748B]">
-                  {theme.label}
+                <p className={`mt-3 text-base font-black ${theme.primaryText}`}>
+                  {superAdmin ? "Kurucu · Süper Admin" : theme.label}
                 </p>
 
                 <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-[#64748B]">
@@ -202,9 +318,24 @@ export default function ProfilPage() {
             </div>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              <SmallStat icon={<CheckCircle2 size={18} />} label="Durum" value="Aktif" />
-              <SmallStat icon={<Crown size={18} />} label="Üyelik" value={packageName} />
-              <SmallStat icon={<ShieldCheck size={18} />} label="Rol" value={theme.label} />
+              <SmallStat
+                icon={<CheckCircle2 size={18} />}
+                label="Durum"
+                value="Aktif"
+                color={superAdmin ? "#14B8A6" : undefined}
+              />
+              <SmallStat
+                icon={<Crown size={18} />}
+                label="Üyelik"
+                value={packageName}
+                color={superAdmin ? "#14B8A6" : undefined}
+              />
+              <SmallStat
+                icon={<ShieldCheck size={18} />}
+                label="Rol"
+                value={superAdmin ? "Süper Admin" : theme.label}
+                color={superAdmin ? "#14B8A6" : undefined}
+              />
             </div>
           </section>
 
@@ -213,24 +344,34 @@ export default function ProfilPage() {
               icon={<Mail size={20} />}
               label="E-posta"
               value={safeUser.email || "E-posta bilgisi yok"}
+              color={superAdmin ? "#14B8A6" : undefined}
             />
 
             <InfoCard
               icon={<Phone size={20} />}
               label="Telefon"
               value={safeUser.phone || "Telefon bilgisi yok"}
+              color={superAdmin ? "#14B8A6" : undefined}
             />
 
             <InfoCard
               icon={<KeyRound size={20} />}
               label="Referans Kodu"
               value={referralCode}
+              color={superAdmin ? "#14B8A6" : undefined}
             />
 
             <InfoCard
               icon={<Building2 size={20} />}
               label="Firma / Ofis"
-              value={safeUser.companyName || safeUser.officeName || "Firma bilgisi yok"}
+              value={
+                superAdmin
+                  ? "EPH Platform"
+                  : safeUser.companyName ||
+                    safeUser.officeName ||
+                    "Firma bilgisi yok"
+              }
+              color={superAdmin ? "#14B8A6" : undefined}
             />
           </section>
         </div>
@@ -241,33 +382,55 @@ export default function ProfilPage() {
             icon={<Home size={22} />}
             title="Dashboard"
             desc="Ana kontrol ekranına dön"
+            color={superAdmin ? "#14B8A6" : undefined}
           />
 
           <ActionCard
-            href="/stok"
-            icon={<Building2 size={22} />}
-            title="İlanlar"
-            desc="Portföy ve stok yönetimi"
+            href={superAdmin ? "/admin" : "/stok"}
+            icon={superAdmin ? <ShieldCheck size={22} /> : <Building2 size={22} />}
+            title={superAdmin ? "Yönetim Merkezi" : "İlanlar"}
+            desc={
+              superAdmin
+                ? "Kullanıcı ve platform yönetimi"
+                : "Portföy ve stok yönetimi"
+            }
+            color={superAdmin ? "#14B8A6" : undefined}
           />
 
           <ActionCard
-            href="/crm"
-            icon={<Users size={22} />}
-            title="CRM"
-            desc="Müşteri ve görev takibi"
+            href={superAdmin ? "/admin/referrals" : "/crm"}
+            icon={superAdmin ? <Users size={22} /> : <Users size={22} />}
+            title={superAdmin ? "Referans Kodları" : "CRM"}
+            desc={
+              superAdmin
+                ? "Özel davet ve referans yönetimi"
+                : "Müşteri ve görev takibi"
+            }
+            color={superAdmin ? "#14B8A6" : undefined}
           />
 
           <ActionCard
             href="/network"
             icon={<MessageCircle size={22} />}
-            title="Network"
-            desc="Talep ve iş birliği akışı"
+            title={superAdmin ? "Network Denetimi" : "Network"}
+            desc={
+              superAdmin
+                ? "Talep ve paylaşım akışını izle"
+                : "Talep ve iş birliği akışı"
+            }
+            color={superAdmin ? "#14B8A6" : undefined}
           />
         </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="eph-card p-6 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#2563EB]">
+            <div
+              className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl"
+              style={{
+                backgroundColor: superAdmin ? "#F0FDFA" : "#EFF6FF",
+                color: superAdmin ? "#14B8A6" : "#2563EB",
+              }}
+            >
               <WalletCards size={24} />
             </div>
 
@@ -281,7 +444,9 @@ export default function ProfilPage() {
             </p>
 
             <div className="mt-5 rounded-3xl border border-[#DDE7F3] bg-[#F8FAFC] p-5">
-              <div className="text-sm font-bold text-[#64748B]">Mevcut Paket</div>
+              <div className="text-sm font-bold text-[#64748B]">
+                Mevcut Paket
+              </div>
               <div className={`mt-2 text-3xl font-black ${theme.primaryText}`}>
                 {packageName}
               </div>
@@ -289,7 +454,13 @@ export default function ProfilPage() {
           </div>
 
           <div className="eph-card p-6 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#ECFDF5] text-[#0F766E]">
+            <div
+              className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl"
+              style={{
+                backgroundColor: superAdmin ? "#ECFEFF" : "#ECFDF5",
+                color: superAdmin ? "#0F766E" : "#0F766E",
+              }}
+            >
               <ClipboardList size={24} />
             </div>
 
@@ -299,31 +470,47 @@ export default function ProfilPage() {
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <DetailRow label="Kullanıcı ID" value={safeUser.id || "Yok"} />
-              <DetailRow label="Rol" value={theme.label} />
-              <DetailRow label="Unvan" value={safeUser.title || "Tanımlı değil"} />
+              <DetailRow
+                label="Rol"
+                value={superAdmin ? "Süper Admin" : theme.label}
+              />
+              <DetailRow
+                label="Unvan"
+                value={
+                  superAdmin
+                    ? "EPH Kurucusu"
+                    : safeUser.title || "Tanımlı değil"
+                }
+              />
               <DetailRow label="Referans" value={referralCode} />
             </div>
           </div>
         </section>
 
-        {userRole === "ADMIN" && (
+        {(userRole === "ADMIN" || userRole === "SUPER_ADMIN") && (
           <section className="mt-6 eph-card p-6 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F5F3FF] text-[#7C3AED]">
+            <div
+              className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl"
+              style={{
+                backgroundColor: superAdmin ? "#F0FDFA" : "#F5F3FF",
+                color: superAdmin ? "#14B8A6" : "#7C3AED",
+              }}
+            >
               <Settings size={24} />
             </div>
 
             <h3 className="mt-4 text-2xl font-black text-[#172033]">
-              Admin Hızlı Erişim
+              {superAdmin ? "Süper Admin Hızlı Erişim" : "Admin Hızlı Erişim"}
             </h3>
 
             <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-[#64748B]">
               Kullanıcı yönetimi, referans kodları ve sistem kontrolleri için
-              admin modüllerine hızlıca geçebilirsin.
+              yönetim modüllerine hızlıca geçebilirsin.
             </p>
 
             <div className="mt-5 flex flex-wrap justify-center gap-3">
               <Link href="/admin" className="eph-btn-primary">
-                Admin Paneli
+                Yönetim Merkezi
               </Link>
 
               <Link href="/admin/referrals" className="eph-btn-soft">
@@ -369,7 +556,7 @@ export default function ProfilPage() {
   );
 }
 
-function SmallStat({
+function FounderMiniCard({
   icon,
   label,
   value,
@@ -379,8 +566,37 @@ function SmallStat({
   value: string;
 }) {
   return (
+    <div className="rounded-3xl border border-white/15 bg-white/10 p-4 text-center backdrop-blur">
+      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-white">
+        {icon}
+      </div>
+
+      <div className="mt-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/60">
+        {label}
+      </div>
+
+      <div className="mt-1 text-lg font-black text-white">{value}</div>
+    </div>
+  );
+}
+
+function SmallStat({
+  icon,
+  label,
+  value,
+  color = "#2563EB",
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  color?: string;
+}) {
+  return (
     <div className="rounded-3xl border border-[#DDE7F3] bg-[#F8FAFC] p-4 text-center">
-      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#2563EB] shadow-sm">
+      <div
+        className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-sm"
+        style={{ color }}
+      >
         {icon}
       </div>
 
@@ -397,14 +613,19 @@ function InfoCard({
   icon,
   label,
   value,
+  color = "#2563EB",
 }: {
   icon: ReactNode;
   label: string;
   value: string;
+  color?: string;
 }) {
   return (
     <div className="eph-card flex flex-col items-center gap-3 p-5 text-center sm:flex-row sm:text-left">
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#2563EB]">
+      <div
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EFF6FF]"
+        style={{ color }}
+      >
         {icon}
       </div>
 
@@ -426,15 +647,23 @@ function ActionCard({
   icon,
   title,
   desc,
+  color = "#2563EB",
 }: {
   href: string;
   icon: ReactNode;
   title: string;
   desc: string;
+  color?: string;
 }) {
   return (
-    <Link href={href} className="eph-card group p-5 text-center transition hover:-translate-y-1 hover:shadow-xl">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#2563EB] transition group-hover:scale-105">
+    <Link
+      href={href}
+      className="eph-card group p-5 text-center transition hover:-translate-y-1 hover:shadow-xl"
+    >
+      <div
+        className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EFF6FF] transition group-hover:scale-105"
+        style={{ color }}
+      >
         {icon}
       </div>
 

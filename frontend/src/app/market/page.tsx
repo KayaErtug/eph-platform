@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -324,7 +324,7 @@ export default function MarketPage() {
     );
   }
 
-  if (user?.role === "ADMIN") {
+  if (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") {
     return (
       <AdminMarketIntelligenceCenter
         units={units}
@@ -528,7 +528,7 @@ export default function MarketPage() {
           <BottomItem href="/network" icon={<MessageCircle size={21} />} label="Network" />
           <BottomItem href="/crm" icon={<UsersRound size={21} />} label="CRM" />
           <BottomItem active href="/market" icon={<WalletCards size={21} />} label="Piyasa" />
-          {user?.role === "ADMIN" && (
+          {(user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") && (
             <BottomItem href="/admin" icon={<Crown size={21} />} label="Admin" />
           )}
         </div>
@@ -1046,3 +1046,4 @@ function AdminCheck({ label, active }: { label: string; active: boolean }) {
     </div>
   );
 }
+

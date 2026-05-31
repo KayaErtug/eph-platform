@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -69,6 +69,8 @@ function roleLabel(role?: string) {
   if (role === "EMLAKCI") return "Emlakçı";
   if (role === "MUTEAHHIT") return "Müteahhit";
   if (role === "INSAAT_FIRMASI") return "İnşaat Firması";
+  if (role === "SUPER_ADMIN") return "EPH Süper Admin";
+  if (role === "SUPER_ADMIN") return "EPH Süper Admin";
   if (role === "ADMIN") return "EPH Admin";
 
   return "EPH Üyesi";

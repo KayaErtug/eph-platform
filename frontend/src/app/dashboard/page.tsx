@@ -5,21 +5,28 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Activity,
   Bell,
   Bot,
   BriefcaseBusiness,
   Building2,
   CalendarCheck,
+  CheckCircle2,
   CheckSquare,
   Clock3,
+  Crown,
+  Database,
   FileText,
   Home,
   Loader2,
   MessageCircle,
   Plus,
+  Radio,
   ShieldCheck,
+  Sparkles,
   Store,
   TrendingUp,
+  UserCheck,
   UsersRound,
   WalletCards,
 } from "lucide-react";
@@ -29,7 +36,7 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 
 type RoleType = "realtor" | "contractor" | "construction" | "admin" | "superadmin";
-type ToneType = "blue" | "orange" | "amber" | "slate";
+type ToneType = "blue" | "orange" | "amber" | "slate" | "teal";
 
 type Conversation = {
   id: string;
@@ -94,26 +101,6 @@ type CrmDashboardCustomer = {
   };
 };
 
-type DashboardActivityItem = {
-  id: string;
-  type: string;
-  note: string;
-  createdAt: string;
-  customerId: string;
-  customerName: string;
-  customerPhone?: string | null;
-};
-
-type DashboardTaskItem = {
-  id: string;
-  title: string;
-  dueDate?: string | null;
-  status: string;
-  customerId: string;
-  customerName: string;
-  customerPhone?: string | null;
-};
-
 type DashboardSummary = {
   stats?: {
     totalUnits?: number;
@@ -129,6 +116,35 @@ type DashboardSummary = {
   }>;
 };
 
+type AdminStats = {
+  totalUsers?: number;
+  pendingUsers?: number;
+  approvedUsers?: number;
+  totalInvitations?: number;
+  pendingDocuments?: number;
+  pendingNominations?: number;
+  pendingApplications?: number;
+  byRole?: { role: string; count: number }[];
+};
+
+type ApplicationItem = {
+  id: string;
+  applicantName: string;
+  applicantEmail: string;
+  requestedRole: string;
+  status: string;
+  createdAt: string;
+};
+
+type UserItem = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  isApproved: boolean;
+};
+
 function normalizeRole(role?: string | null) {
   return String(role || "").toLocaleUpperCase("tr-TR").trim();
 }
@@ -136,9 +152,7 @@ function normalizeRole(role?: string | null) {
 function getRoleType(role?: string | null): RoleType {
   const normalizedRole = normalizeRole(role);
 
-  if (normalizedRole === "SUPER_ADMIN") {
-    return "superadmin";
-  }
+  if (normalizedRole === "SUPER_ADMIN") return "superadmin";
 
   if (
     normalizedRole === "INSAAT_FIRMASI" ||
@@ -155,245 +169,41 @@ function getRoleType(role?: string | null): RoleType {
     return "contractor";
   }
 
-  if (normalizedRole === "ADMIN") {
-    return "admin";
-  }
+  if (normalizedRole === "ADMIN") return "admin";
 
   return "realtor";
 }
 
-function getGreeting() {
-  const hour = new Date().getHours();
+function roleLabel(role?: string | null) {
+  const normalizedRole = normalizeRole(role);
 
-  if (hour >= 5 && hour < 12) return "Günaydın";
-  if (hour >= 12 && hour < 17) return "Tünaydın";
-  if (hour >= 17 && hour < 22) return "İyi akşamlar";
-
-  return "İyi geceler";
+  if (normalizedRole === "SUPER_ADMIN") return "Süper Admin";
+  if (normalizedRole === "ADMIN") return "Admin";
+  if (normalizedRole === "MUTEAHHIT") return "Müteahhit";
+  if (normalizedRole === "INSAAT_FIRMASI") return "İnşaat Firması";
+  return "Emlakçı";
 }
 
-function RoleBadge({ roleType }: { roleType: RoleType }) {
-  const config: Record<RoleType, { label: string; className: string }> = {
-    realtor: {
-      label: "Emlakçı Paneli",
-      className: "bg-blue-50 text-blue-700 border-blue-100",
-    },
-    contractor: {
-      label: "Müteahhit Paneli",
-      className: "bg-orange-50 text-orange-700 border-orange-100",
-    },
-    construction: {
-      label: "İnşaat Firması Paneli",
-      className: "bg-amber-50 text-amber-700 border-amber-100",
-    },
-    admin: {
-      label: "Admin Paneli",
-      className: "bg-slate-900 text-white border-slate-700",
-    },
-    superadmin: {
-      label: "Süper Admin Paneli",
-      className: "bg-slate-950 text-white border-slate-800",
-    },
+function statusLabel(status?: string | null) {
+  const map: Record<string, string> = {
+    PENDING: "Bekliyor",
+    APPROVED: "Onaylandı",
+    REJECTED: "Reddedildi",
+    INVITED: "Davet Gönderildi",
+    REGISTERED: "Kayıt Oldu",
   };
 
-  return (
-    <div
-      className={`mx-auto inline-flex rounded-full border px-4 py-2 text-xs font-black ${config[roleType].className}`}
-    >
-      {config[roleType].label}
-    </div>
-  );
+  return map[String(status || "")] || String(status || "Durum yok");
 }
 
-function StatCard({
-  icon,
-  title,
-  value,
-  description,
-  tone,
-}: {
-  icon: ReactNode;
-  title: string;
-  value: string;
-  description: string;
-  tone: ToneType;
-}) {
-  const toneClass: Record<ToneType, string> = {
-    blue: "bg-blue-50 text-blue-700",
-    orange: "bg-orange-50 text-orange-700",
-    amber: "bg-amber-50 text-amber-700",
-    slate: "bg-slate-100 text-slate-700",
-  };
+function shortDate(value?: string | null) {
+  if (!value) return "Tarih yok";
 
-  return (
-    <div className="rounded-[26px] border border-slate-200 bg-white p-5 text-center shadow-sm">
-      <div
-        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl ${toneClass[tone]}`}
-      >
-        {icon}
-      </div>
-
-      <p className="mt-4 text-[12px] font-black uppercase tracking-wide text-slate-400">
-        {title}
-      </p>
-
-      <p className="mt-2 text-3xl font-black text-slate-900">{value}</p>
-
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-        {description}
-      </p>
-    </div>
-  );
-}
-
-function CrmTaskSummaryCard({
-  icon,
-  title,
-  value,
-  description,
-  tone,
-}: {
-  icon: ReactNode;
-  title: string;
-  value: string;
-  description: string;
-  tone: "blue" | "red" | "amber";
-}) {
-  const toneClass = {
-    blue: "bg-blue-50 text-blue-700 border-blue-100",
-    red: "bg-red-50 text-red-700 border-red-100",
-    amber: "bg-amber-50 text-amber-700 border-amber-100",
-  }[tone];
-
-  return (
-    <div className="rounded-[24px] border border-slate-200 bg-white p-4 text-center shadow-sm">
-      <div
-        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border ${toneClass}`}
-      >
-        {icon}
-      </div>
-      <p className="mt-3 text-[11px] font-black uppercase tracking-wide text-slate-400">
-        {title}
-      </p>
-      <p className="mt-2 text-3xl font-black text-slate-900">{value}</p>
-      <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
-        {description}
-      </p>
-    </div>
-  );
-}
-
-function DashboardTaskRow({ task }: { task: DashboardTaskItem }) {
-  return (
-    <Link
-      href="/crm"
-      className="block rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-center transition hover:bg-white"
-    >
-      <div className="text-sm font-black text-slate-900">{task.title}</div>
-      <div className="mt-1 text-xs font-semibold text-slate-500">
-        {task.customerName}
-        {task.customerPhone ? ` · ${task.customerPhone}` : ""}
-      </div>
-      <div className="mt-2 text-[11px] font-black text-blue-700">
-        {formatTaskTime(task.dueDate)}
-      </div>
-    </Link>
-  );
-}
-
-function CrmActivitySummaryCard({
-  icon,
-  title,
-  value,
-  description,
-  tone,
-}: {
-  icon: ReactNode;
-  title: string;
-  value: string;
-  description: string;
-  tone: "blue" | "green" | "slate";
-}) {
-  const toneClass = {
-    blue: "bg-blue-50 text-blue-700 border-blue-100",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-100",
-    slate: "bg-slate-100 text-slate-700 border-slate-200",
-  }[tone];
-
-  return (
-    <div className="rounded-[24px] border border-slate-200 bg-white p-4 text-center shadow-sm">
-      <div
-        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border ${toneClass}`}
-      >
-        {icon}
-      </div>
-      <p className="mt-3 text-[11px] font-black uppercase tracking-wide text-slate-400">
-        {title}
-      </p>
-      <p className="mt-2 text-3xl font-black text-slate-900">{value}</p>
-      <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
-        {description}
-      </p>
-    </div>
-  );
-}
-
-function DashboardActivityRow({ activity }: { activity: DashboardActivityItem }) {
-  return (
-    <Link
-      href="/crm"
-      className="block rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-center transition hover:bg-white"
-    >
-      <div className="text-[11px] font-black uppercase tracking-wide text-blue-700">
-        {activityTypeLabel(activity.type)}
-      </div>
-      <div className="mt-1 text-sm font-black text-slate-900">
-        {activity.customerName}
-      </div>
-      <div className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500">
-        {activity.note}
-      </div>
-      <div className="mt-2 text-[11px] font-black text-slate-400">
-        {formatActivityTime(activity.createdAt)}
-      </div>
-    </Link>
-  );
-}
-
-function QuickAction({
-  href,
-  icon,
-  label,
-  tone,
-}: {
-  href: string;
-  icon: ReactNode;
-  label: string;
-  tone: ToneType;
-}) {
-  const toneClass: Record<ToneType, string> = {
-    blue: "bg-blue-600 shadow-blue-600/20",
-    orange: "bg-orange-600 shadow-orange-600/20",
-    amber: "bg-[#C9A84C] shadow-[#C9A84C]/20",
-    slate: "bg-slate-900 shadow-slate-900/20",
-  };
-
-  return (
-    <Link
-      href={href}
-      className="rounded-[24px] border border-slate-200 bg-white p-4 text-center shadow-sm transition hover:-translate-y-1"
-    >
-      <div
-        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg ${toneClass[tone]}`}
-      >
-        {icon}
-      </div>
-
-      <span className="mt-3 block text-sm font-black text-slate-800">
-        {label}
-      </span>
-    </Link>
-  );
+  return new Date(value).toLocaleDateString("tr-TR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function startOfToday() {
@@ -410,7 +220,9 @@ function endOfToday() {
 
 function formatTaskTime(value?: string | null) {
   if (!value) return "Saat yok";
+
   const date = new Date(value);
+
   return `${date.toLocaleDateString("tr-TR")} · ${date.toLocaleTimeString(
     "tr-TR",
     {
@@ -443,65 +255,619 @@ function flattenCustomerTasks(customers: CrmDashboardCustomer[]) {
     });
 }
 
-function flattenCustomerActivities(customers: CrmDashboardCustomer[]) {
-  return customers
-    .flatMap((customer) =>
-      (customer.activities || []).map((activity) => ({
-        ...activity,
-        customerId: customer.id,
-        customerName: `${customer.firstName} ${customer.lastName}`.trim(),
-        customerPhone: customer.phone,
-      })),
-    )
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-}
-
-function activityTypeLabel(type?: string) {
-  const labels: Record<string, string> = {
-    TELEFON: "Telefon",
-    WHATSAPP: "WhatsApp",
-    EMAIL: "E-posta",
-    YER_GOSTERIMI: "Yer Gösterimi",
-    TEKLIF: "Teklif",
-    NOT: "Not",
-    DIGER: "Diğer",
+function StatCard({
+  icon,
+  title,
+  value,
+  description,
+  tone,
+}: {
+  icon: ReactNode;
+  title: string;
+  value: string;
+  description: string;
+  tone: ToneType;
+}) {
+  const toneClass: Record<ToneType, string> = {
+    blue: "bg-blue-50 text-blue-700",
+    orange: "bg-orange-50 text-orange-700",
+    amber: "bg-amber-50 text-amber-700",
+    slate: "bg-slate-100 text-slate-700",
+    teal: "bg-teal-50 text-teal-700",
   };
 
-  return labels[String(type || "")] || "Aktivite";
+  return (
+    <div className="rounded-[26px] border border-slate-200 bg-white p-5 text-center shadow-sm">
+      <div
+        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl ${toneClass[tone]}`}
+      >
+        {icon}
+      </div>
+
+      <p className="mt-4 text-[12px] font-black uppercase tracking-wide text-slate-400">
+        {title}
+      </p>
+
+      <p className="mt-2 text-3xl font-black text-slate-900">{value}</p>
+
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+        {description}
+      </p>
+    </div>
+  );
 }
 
-function formatActivityTime(value?: string | null) {
-  if (!value) return "Tarih yok";
+function SuperAdminMetric({
+  icon,
+  label,
+  value,
+  note,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <div className="rounded-[28px] border border-teal-100 bg-white p-5 text-center shadow-sm">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-teal-600">
+        {icon}
+      </div>
 
-  const date = new Date(value);
+      <p className="mt-4 text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </p>
 
-  return `${date.toLocaleDateString("tr-TR")} · ${date.toLocaleTimeString(
-    "tr-TR",
-    {
-      hour: "2-digit",
-      minute: "2-digit",
-    },
-  )}`;
+      <p className="mt-2 text-4xl font-black text-slate-950">{value}</p>
+
+      <p className="mx-auto mt-2 max-w-xs text-xs font-semibold leading-5 text-slate-500">
+        {note}
+      </p>
+    </div>
+  );
 }
 
-function isThisWeek(value?: string | null) {
-  if (!value) return false;
+function SuperAdminAction({
+  href,
+  icon,
+  title,
+  desc,
+}: {
+  href: string;
+  icon: ReactNode;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-[28px] border border-slate-200 bg-white p-5 text-center shadow-sm transition hover:-translate-y-1 hover:border-teal-200 hover:shadow-xl"
+    >
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0F172A] text-white shadow-lg shadow-slate-900/15 transition group-hover:bg-[#14B8A6]">
+        {icon}
+      </div>
 
-  const date = new Date(value);
-  const now = new Date();
-  const day = now.getDay() || 7;
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - day + 1);
-  weekStart.setHours(0, 0, 0, 0);
+      <h3 className="mt-4 text-lg font-black text-slate-950">{title}</h3>
 
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
-  weekEnd.setHours(23, 59, 59, 999);
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+        {desc}
+      </p>
+    </Link>
+  );
+}
 
-  return date >= weekStart && date <= weekEnd;
+function SignalLine({
+  icon,
+  title,
+  value,
+  tone = "teal",
+}: {
+  icon: ReactNode;
+  title: string;
+  value: string;
+  tone?: "teal" | "blue" | "amber" | "slate";
+}) {
+  const toneClass = {
+    teal: "bg-teal-50 text-teal-700 border-teal-100",
+    blue: "bg-blue-50 text-blue-700 border-blue-100",
+    amber: "bg-amber-50 text-amber-700 border-amber-100",
+    slate: "bg-slate-100 text-slate-700 border-slate-200",
+  }[tone];
+
+  return (
+    <div className={`rounded-2xl border px-4 py-4 text-center ${toneClass}`}>
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-white/80">
+        {icon}
+      </div>
+
+      <p className="mt-3 text-xs font-black uppercase tracking-[0.16em]">
+        {title}
+      </p>
+
+      <p className="mt-1 text-sm font-black">{value}</p>
+    </div>
+  );
+}
+
+function QuickAction({
+  href,
+  icon,
+  label,
+  tone,
+}: {
+  href: string;
+  icon: ReactNode;
+  label: string;
+  tone: ToneType;
+}) {
+  const toneClass: Record<ToneType, string> = {
+    blue: "bg-blue-600 shadow-blue-600/20",
+    orange: "bg-orange-600 shadow-orange-600/20",
+    amber: "bg-[#C9A84C] shadow-[#C9A84C]/20",
+    slate: "bg-slate-900 shadow-slate-900/20",
+    teal: "bg-teal-600 shadow-teal-600/20",
+  };
+
+  return (
+    <Link
+      href={href}
+      className="rounded-[24px] border border-slate-200 bg-white p-4 text-center shadow-sm transition hover:-translate-y-1"
+    >
+      <div
+        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg ${toneClass[tone]}`}
+      >
+        {icon}
+      </div>
+
+      <span className="mt-3 block text-sm font-black text-slate-800">
+        {label}
+      </span>
+    </Link>
+  );
+}
+
+function DashboardTaskRow({
+  task,
+}: {
+  task: {
+    id: string;
+    title: string;
+    dueDate?: string | null;
+    customerName: string;
+    customerPhone?: string | null;
+  };
+}) {
+  return (
+    <Link
+      href="/crm"
+      className="block rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-center transition hover:bg-white"
+    >
+      <div className="text-sm font-black text-slate-900">{task.title}</div>
+      <div className="mt-1 text-xs font-semibold text-slate-500">
+        {task.customerName}
+        {task.customerPhone ? ` · ${task.customerPhone}` : ""}
+      </div>
+      <div className="mt-2 text-[11px] font-black text-blue-700">
+        {formatTaskTime(task.dueDate)}
+      </div>
+    </Link>
+  );
+}
+
+function SuperAdminDashboard({
+  adminStats,
+  summary,
+  unreadMessages,
+  featuredPosts,
+  applications,
+  users,
+  networkNotifications,
+  onReadNotifications,
+}: {
+  adminStats: AdminStats | null;
+  summary: DashboardSummary | null;
+  unreadMessages: number;
+  featuredPosts: FeaturedNetworkPost[];
+  applications: ApplicationItem[];
+  users: UserItem[];
+  networkNotifications: NetworkNotificationResponse;
+  onReadNotifications: () => void;
+}) {
+  const stats = summary?.stats || {};
+  const byRole = adminStats?.byRole || [];
+
+  const roleCount = (role: string) =>
+    byRole.find((item) => item.role === role)?.count || 0;
+
+  const totalUsers = adminStats?.totalUsers || 0;
+  const approvedUsers = adminStats?.approvedUsers || 0;
+  const pendingUsers = adminStats?.pendingUsers || 0;
+  const pendingApplications = adminStats?.pendingApplications || 0;
+  const pendingDocuments = adminStats?.pendingDocuments || 0;
+  const pendingNominations = adminStats?.pendingNominations || 0;
+  const totalInvitations = adminStats?.totalInvitations || 0;
+  const totalUnits = stats.totalUnits || 0;
+  const totalVisits = stats.totalVisits || 0;
+  const hotPosts = featuredPosts.filter(
+    (post) => post.viewCount + post.followerCount + post.requestCount > 0,
+  );
+
+  return (
+    <EphAppShell title="EPH Yönetim Merkezi">
+      <div className="mx-auto w-full max-w-6xl">
+        <section className="overflow-hidden rounded-[36px] bg-gradient-to-br from-[#0F172A] via-[#134E4A] to-[#14B8A6] p-6 text-center text-white shadow-2xl md:p-9">
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-4 py-2 text-xs font-black backdrop-blur">
+            <Crown size={15} />
+            EPH Kurucu Alanı
+          </div>
+
+          <h1 className="mt-5 text-4xl font-black tracking-tight md:text-6xl">
+            Hoşgeldin Mustafa Abi
+          </h1>
+
+          <p className="mx-auto mt-4 max-w-3xl text-sm font-semibold leading-7 text-white/80 md:text-base">
+            EPH Platform Komuta Merkezi. Kullanıcılar, başvurular, ilanlar,
+            trafik ve denetim sinyalleri tek ekranda.
+          </p>
+
+          <div className="mt-7 grid gap-3 md:grid-cols-4">
+            <div className="rounded-3xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/60">
+                Sistem
+              </p>
+              <p className="mt-1 text-xl font-black">Online</p>
+            </div>
+
+            <div className="rounded-3xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/60">
+                Yetki
+              </p>
+              <p className="mt-1 text-xl font-black">Kurucu Erişimi</p>
+            </div>
+
+            <div className="rounded-3xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/60">
+                Bugünkü Odak
+              </p>
+              <p className="mt-1 text-xl font-black">Operasyon</p>
+            </div>
+
+            <div className="rounded-3xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/60">
+                Tema
+              </p>
+              <p className="mt-1 text-xl font-black">Turkuaz Yönetim</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <SuperAdminMetric
+            icon={<UsersRound size={22} />}
+            label="Toplam Üye"
+            value={String(totalUsers)}
+            note="Platforma kayıtlı tüm kullanıcılar"
+          />
+          <SuperAdminMetric
+            icon={<UserCheck size={22} />}
+            label="Onaylı Üye"
+            value={String(approvedUsers)}
+            note="Aktif olarak platformu kullanabilen üyeler"
+          />
+          <SuperAdminMetric
+            icon={<CheckSquare size={22} />}
+            label="Bekleyen Onay"
+            value={String(pendingUsers + pendingApplications)}
+            note="Üye ve başvuru tarafında bekleyen işlemler"
+          />
+          <SuperAdminMetric
+            icon={<TrendingUp size={22} />}
+            label="Ziyaret"
+            value={String(totalVisits)}
+            note="Platform trafik ve hareketlilik göstergesi"
+          />
+        </section>
+
+        <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <SuperAdminMetric
+            icon={<Building2 size={22} />}
+            label="Aktif Stok"
+            value={String(totalUnits)}
+            note="Sistemdeki ilan ve bağımsız bölüm kayıtları"
+          />
+          <SuperAdminMetric
+            icon={<FileText size={22} />}
+            label="Belge"
+            value={String(pendingDocuments)}
+            note="İnceleme bekleyen belge kayıtları"
+          />
+          <SuperAdminMetric
+            icon={<MessageCircle size={22} />}
+            label="Mesaj"
+            value={String(unreadMessages)}
+            note="Okunmamış görüşme ve mesaj akışı"
+          />
+          <SuperAdminMetric
+            icon={<Sparkles size={22} />}
+            label="Davet"
+            value={String(totalInvitations)}
+            note="Referans ve davet kodu hareketleri"
+          />
+        </section>
+
+        <section className="mt-6 rounded-[32px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 text-teal-600">
+            <Radio size={24} />
+          </div>
+
+          <h2 className="mt-4 text-2xl font-black text-slate-950">
+            Platform Canlı Sinyalleri
+          </h2>
+
+          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+            Sistemin bugünkü operasyon durumunu hızlıca oku.
+          </p>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-4">
+            <SignalLine
+              icon={<CheckSquare size={20} />}
+              title="Başvuru"
+              value={`${pendingApplications} bekliyor`}
+              tone="teal"
+            />
+            <SignalLine
+              icon={<FileText size={20} />}
+              title="Belge"
+              value={`${pendingDocuments} inceleme`}
+              tone="blue"
+            />
+            <SignalLine
+              icon={<UserCheck size={20} />}
+              title="Tavsiye"
+              value={`${pendingNominations} aday`}
+              tone="amber"
+            />
+            <SignalLine
+              icon={<Activity size={20} />}
+              title="Sıcak Akış"
+              value={`${hotPosts.length} paylaşım`}
+              tone="slate"
+            />
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-[32px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-white">
+            <ShieldCheck size={24} />
+          </div>
+
+          <h2 className="mt-4 text-2xl font-black text-slate-950">
+            Kurucu Hızlı Erişim
+          </h2>
+
+          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+            EPH omurgasının ana yönetim kapıları burada.
+          </p>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <SuperAdminAction
+              href="/admin"
+              icon={<ShieldCheck size={22} />}
+              title="Yönetim Merkezi"
+              desc="Kullanıcı, başvuru, belge ve stok yönetimi"
+            />
+            <SuperAdminAction
+              href="/admin/referrals"
+              icon={<UsersRound size={22} />}
+              title="Referans Kodları"
+              desc="Özel davet ve referans akışını yönet"
+            />
+            <SuperAdminAction
+              href="/network"
+              icon={<Store size={22} />}
+              title="Network Denetimi"
+              desc="Talep, paylaşım ve pazaryeri sinyallerini izle"
+            />
+            <SuperAdminAction
+              href="/stok"
+              icon={<Building2 size={22} />}
+              title="İlan Denetimi"
+              desc="Stok, doğrulama ve off-market kayıtlarını kontrol et"
+            />
+            <SuperAdminAction
+              href="/messages"
+              icon={<MessageCircle size={22} />}
+              title="Mesaj İnceleme"
+              desc="Görüşme trafiğini denetim amacıyla takip et"
+            />
+            <SuperAdminAction
+              href="/profil"
+              icon={<Crown size={22} />}
+              title="Kurucu Profili"
+              desc="Hesap, rol ve kurucu erişimini görüntüle"
+            />
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 text-teal-600">
+              <UsersRound size={24} />
+            </div>
+
+            <h2 className="mt-4 text-2xl font-black text-slate-950">
+              Rol Dağılımı
+            </h2>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <SignalLine
+                icon={<UsersRound size={18} />}
+                title="Emlakçı"
+                value={`${roleCount("EMLAKCI")} üye`}
+                tone="blue"
+              />
+              <SignalLine
+                icon={<BriefcaseBusiness size={18} />}
+                title="Müteahhit"
+                value={`${roleCount("MUTEAHHIT")} üye`}
+                tone="amber"
+              />
+              <SignalLine
+                icon={<Building2 size={18} />}
+                title="İnşaat Firması"
+                value={`${roleCount("INSAAT_FIRMASI")} üye`}
+                tone="slate"
+              />
+              <SignalLine
+                icon={<Crown size={18} />}
+                title="Yönetim"
+                value={`${roleCount("ADMIN") + roleCount("SUPER_ADMIN")} hesap`}
+                tone="teal"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+              <Bell size={24} />
+            </div>
+
+            <h2 className="mt-4 text-2xl font-black text-slate-950">
+              Bildirim ve Uyarılar
+            </h2>
+
+            <div className="mt-5 grid gap-3">
+              {networkNotifications.items.length > 0 ? (
+                networkNotifications.items.slice(0, 4).map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={onReadNotifications}
+                    className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-center transition hover:bg-white"
+                  >
+                    <div className="flex flex-col items-center justify-center gap-2 md:flex-row">
+                      {!item.isRead && (
+                        <span className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-black text-white">
+                          YENİ
+                        </span>
+                      )}
+
+                      <span className="text-sm font-black text-slate-900">
+                        {item.title}
+                      </span>
+                    </div>
+
+                    <p className="mx-auto mt-2 max-w-3xl whitespace-pre-line text-xs font-semibold leading-6 text-slate-500">
+                      {item.message}
+                    </p>
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-2xl bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500">
+                  Şu anda kritik bildirim yok.
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+              <CheckCircle2 size={24} />
+            </div>
+
+            <h2 className="mt-4 text-2xl font-black text-slate-950">
+              Bekleyen Başvurular
+            </h2>
+
+            <div className="mt-5 grid gap-3">
+              {applications.length > 0 ? (
+                applications.slice(0, 5).map((application) => (
+                  <Link
+                    href="/admin"
+                    key={application.id}
+                    className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-center transition hover:bg-white"
+                  >
+                    <p className="text-sm font-black text-slate-950">
+                      {application.applicantName}
+                    </p>
+
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      {application.applicantEmail}
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap justify-center gap-2">
+                      <span className="rounded-full bg-teal-50 px-3 py-1 text-[11px] font-black text-teal-700">
+                        {roleLabel(application.requestedRole)}
+                      </span>
+
+                      <span className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-black text-amber-700">
+                        {statusLabel(application.status)}
+                      </span>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="rounded-2xl bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500">
+                  Bekleyen başvuru yok.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+              <Database size={24} />
+            </div>
+
+            <h2 className="mt-4 text-2xl font-black text-slate-950">
+              Son Üye Hareketleri
+            </h2>
+
+            <div className="mt-5 grid gap-3">
+              {users.length > 0 ? (
+                users.slice(0, 5).map((item) => (
+                  <Link
+                    href="/admin"
+                    key={item.id}
+                    className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-center transition hover:bg-white"
+                  >
+                    <p className="text-sm font-black text-slate-950">
+                      {item.firstName} {item.lastName}
+                    </p>
+
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      {item.email}
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap justify-center gap-2">
+                      <span className="rounded-full bg-teal-50 px-3 py-1 text-[11px] font-black text-teal-700">
+                        {roleLabel(item.role)}
+                      </span>
+
+                      <span
+                        className={`rounded-full px-3 py-1 text-[11px] font-black ${
+                          item.isApproved
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {item.isApproved ? "Onaylı" : "Bekliyor"}
+                      </span>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="rounded-2xl bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500">
+                  Üye hareketi bulunamadı.
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      </div>
+    </EphAppShell>
+  );
 }
 
 export default function DashboardPage() {
@@ -510,6 +876,9 @@ export default function DashboardPage() {
 
   const [hydrated, setHydrated] = useState(false);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
+  const [applications, setApplications] = useState<ApplicationItem[]>([]);
+  const [users, setUsers] = useState<UserItem[]>([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [networkNotifications, setNetworkNotifications] =
     useState<NetworkNotificationResponse>({ unreadCount: 0, items: [] });
@@ -547,7 +916,10 @@ export default function DashboardPage() {
         notificationsRes,
         featuredRes,
         crmCustomersRes,
-      ] = await Promise.all([
+        adminStatsRes,
+        applicationsRes,
+        usersRes,
+      ] = await Promise.allSettled([
         api.get("/dashboard/summary"),
         user?.id
           ? api.get(`/conversations?userId=${user.id}`)
@@ -557,35 +929,83 @@ export default function DashboardPage() {
           : Promise.resolve({ data: { unreadCount: 0, items: [] } }),
         api.get("/network/posts/featured"),
         api.get("/crm/customers"),
+        api.get("/admin/stats"),
+        api.get("/admin/applications?status=PENDING"),
+        api.get("/admin/users?filter=all"),
       ]);
 
-      setSummary(summaryRes.data);
+      if (summaryRes.status === "fulfilled") {
+        setSummary(summaryRes.value.data);
+      } else {
+        setSummary(null);
+      }
 
-      const conversations = Array.isArray(conversationsRes.data)
-        ? (conversationsRes.data as Conversation[])
-        : [];
+      if (conversationsRes.status === "fulfilled") {
+        const conversations = Array.isArray(conversationsRes.value.data)
+          ? (conversationsRes.value.data as Conversation[])
+          : [];
 
-      const unreadTotal = conversations.reduce(
-        (sum, item) => sum + (item.unreadCount || 0),
-        0,
-      );
+        const unreadTotal = conversations.reduce(
+          (sum, item) => sum + (item.unreadCount || 0),
+          0,
+        );
 
-      setUnreadMessages(unreadTotal);
-      setNetworkNotifications(
-        notificationsRes.data || { unreadCount: 0, items: [] },
-      );
-      setFeaturedPosts(Array.isArray(featuredRes.data) ? featuredRes.data : []);
-      setCrmCustomers(
-        Array.isArray(crmCustomersRes.data)
-          ? (crmCustomersRes.data as CrmDashboardCustomer[])
-          : [],
-      );
-    } catch {
-      setSummary(null);
-      setUnreadMessages(0);
-      setNetworkNotifications({ unreadCount: 0, items: [] });
-      setFeaturedPosts([]);
-      setCrmCustomers([]);
+        setUnreadMessages(unreadTotal);
+      } else {
+        setUnreadMessages(0);
+      }
+
+      if (notificationsRes.status === "fulfilled") {
+        setNetworkNotifications(
+          notificationsRes.value.data || { unreadCount: 0, items: [] },
+        );
+      } else {
+        setNetworkNotifications({ unreadCount: 0, items: [] });
+      }
+
+      if (featuredRes.status === "fulfilled") {
+        setFeaturedPosts(
+          Array.isArray(featuredRes.value.data) ? featuredRes.value.data : [],
+        );
+      } else {
+        setFeaturedPosts([]);
+      }
+
+      if (crmCustomersRes.status === "fulfilled") {
+        setCrmCustomers(
+          Array.isArray(crmCustomersRes.value.data)
+            ? (crmCustomersRes.value.data as CrmDashboardCustomer[])
+            : [],
+        );
+      } else {
+        setCrmCustomers([]);
+      }
+
+      if (adminStatsRes.status === "fulfilled") {
+        setAdminStats(adminStatsRes.value.data || null);
+      } else {
+        setAdminStats(null);
+      }
+
+      if (applicationsRes.status === "fulfilled") {
+        setApplications(
+          Array.isArray(applicationsRes.value.data)
+            ? (applicationsRes.value.data as ApplicationItem[])
+            : [],
+        );
+      } else {
+        setApplications([]);
+      }
+
+      if (usersRes.status === "fulfilled") {
+        setUsers(
+          Array.isArray(usersRes.value.data)
+            ? (usersRes.value.data as UserItem[])
+            : [],
+        );
+      } else {
+        setUsers([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -618,6 +1038,7 @@ export default function DashboardPage() {
   };
 
   const pendingTaskCount = summary?.pendingTasks?.length || 0;
+
   const crmTasks = useMemo(
     () => flattenCustomerTasks(crmCustomers),
     [crmCustomers],
@@ -642,82 +1063,7 @@ export default function DashboardPage() {
     return new Date(task.dueDate).getTime() > todayEnd.getTime();
   });
 
-  const crmActivities = useMemo(
-    () => flattenCustomerActivities(crmCustomers),
-    [crmCustomers],
-  );
-
-  const totalCrmActivityCount = crmCustomers.reduce(
-    (sum, customer) => sum + (customer._count?.activities || 0),
-    0,
-  );
-
-  const thisWeekActivities = crmActivities.filter((activity) =>
-    isThisWeek(activity.createdAt),
-  );
-
-  const latestActivities = crmActivities.slice(0, 5);
-
   const pageConfig = useMemo(() => {
-    if (roleType === "superadmin") {
-      return {
-        title: "Süper Admin",
-        tone: "slate" as ToneType,
-        heroClass:
-          "from-slate-950 via-slate-900 to-indigo-950 shadow-slate-900/20",
-        subtitle:
-          "Kullanıcılar, yetkiler, denetim kayıtları ve platform omurgası için ana yönetim ekranı.",
-        stats: [
-          {
-            title: "Kullanıcılar",
-            value: String(stats.totalCustomers || 0),
-            description: "Platformdaki kayıtlı üye ve bağlantı verileri",
-            icon: <UsersRound size={22} />,
-          },
-          {
-            title: "Stok",
-            value: String(stats.totalUnits || 0),
-            description: "Sistemdeki toplam ilan ve bağımsız bölüm kayıtları",
-            icon: <Building2 size={22} />,
-          },
-          {
-            title: "Ziyaret",
-            value: String(stats.totalVisits || 0),
-            description: "Platform trafiği ve kullanıcı hareketleri",
-            icon: <TrendingUp size={22} />,
-          },
-          {
-            title: "Mesajlar",
-            value: String(unreadMessages),
-            description: "Okunmamış görüşme ve mesaj akışı",
-            icon: <MessageCircle size={22} />,
-          },
-        ],
-        actions: [
-          {
-            label: "Yönetim Merkezi",
-            href: "/admin",
-            icon: <ShieldCheck size={21} />,
-          },
-          {
-            label: "Başvurular",
-            href: "/admin",
-            icon: <CheckSquare size={21} />,
-          },
-          {
-            label: "Stok Denetimi",
-            href: "/stok",
-            icon: <Building2 size={21} />,
-          },
-          {
-            label: "Mesajlar",
-            href: "/messages",
-            icon: <MessageCircle size={21} />,
-          },
-        ],
-      };
-    }
-
     if (roleType === "construction") {
       return {
         title: "Ana Sayfa",
@@ -915,16 +1261,33 @@ export default function DashboardPage() {
     );
   }
 
+  if (roleType === "superadmin") {
+    return (
+      <SuperAdminDashboard
+        adminStats={adminStats}
+        summary={summary}
+        unreadMessages={unreadMessages}
+        featuredPosts={featuredPosts}
+        applications={applications}
+        users={users}
+        networkNotifications={networkNotifications}
+        onReadNotifications={markNetworkNotificationsRead}
+      />
+    );
+  }
+
   return (
     <EphAppShell title={pageConfig.title}>
       <div className="mx-auto w-full max-w-6xl">
         <section
           className={`overflow-hidden rounded-[32px] bg-gradient-to-br ${pageConfig.heroClass} p-6 text-center text-white shadow-2xl md:p-8`}
         >
-          <RoleBadge roleType={roleType} />
+          <div className="mx-auto inline-flex rounded-full border border-white/20 bg-white/15 px-4 py-2 text-xs font-black text-white backdrop-blur">
+            {roleLabel(user?.role)} Paneli
+          </div>
 
           <h1 className="mt-5 text-3xl font-black tracking-tight md:text-5xl">
-            {getGreeting()} {firstName}
+            {firstName}
           </h1>
 
           <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-white/75 md:text-base">
@@ -963,26 +1326,26 @@ export default function DashboardPage() {
           </p>
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
-            <CrmTaskSummaryCard
+            <StatCard
               icon={<CalendarCheck size={22} />}
               title="Bugünkü Görev"
               value={String(todayTasks.length)}
               description="Bugün tamamlanması gereken CRM işleri"
               tone="blue"
             />
-            <CrmTaskSummaryCard
+            <StatCard
               icon={<Clock3 size={22} />}
               title="Geciken Görev"
               value={String(overdueTasks.length)}
               description="Tarihi geçmiş ve tamamlanmamış işler"
-              tone="red"
+              tone="amber"
             />
-            <CrmTaskSummaryCard
+            <StatCard
               icon={<CheckSquare size={22} />}
               title="Yaklaşan Görev"
               value={String(upcomingTasks.length)}
               description="Bugünden sonraki planlı müşteri işleri"
-              tone="amber"
+              tone="slate"
             />
           </div>
 
@@ -1032,73 +1395,6 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-
-          <Link
-            href="/crm"
-            className="mt-5 inline-flex rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white"
-          >
-            CRM Görevlerini Aç
-          </Link>
-        </section>
-
-        <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-            <FileText size={24} />
-          </div>
-
-          <h2 className="mt-4 text-2xl font-black text-slate-900">
-            CRM Aktivite Özeti
-          </h2>
-
-          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
-            Müşteri görüşmeleri, notlar ve saha hareketlerini tek ekrandan izle.
-          </p>
-
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            <CrmActivitySummaryCard
-              icon={<UsersRound size={22} />}
-              title="Toplam Müşteri"
-              value={String(crmCustomers.length)}
-              description="CRM içinde kayıtlı müşteri sayısı"
-              tone="blue"
-            />
-            <CrmActivitySummaryCard
-              icon={<FileText size={22} />}
-              title="Toplam Aktivite"
-              value={String(totalCrmActivityCount)}
-              description="Tüm müşteri kayıtlarındaki aktivite sayısı"
-              tone="green"
-            />
-            <CrmActivitySummaryCard
-              icon={<TrendingUp size={22} />}
-              title="Bu Hafta Aktivite"
-              value={String(thisWeekActivities.length)}
-              description="Bu hafta işlenen son müşteri aktiviteleri"
-              tone="slate"
-            />
-          </div>
-
-          <div className="mt-5 rounded-[24px] border border-slate-100 bg-white p-4">
-            <h3 className="text-sm font-black text-slate-900">Son Aktiviteler</h3>
-            <div className="mt-3 grid gap-2 md:grid-cols-2">
-              {latestActivities.length > 0 ? (
-                latestActivities.map((activity) => (
-                  <DashboardActivityRow key={activity.id} activity={activity} />
-                ))
-              ) : (
-                <div className="rounded-2xl bg-slate-50 px-4 py-5 text-xs font-semibold text-slate-500 md:col-span-2">
-                  Henüz CRM aktivitesi yok. Müşteri detayından telefon, WhatsApp, not veya yer gösterimi ekleyebilirsin.
-                </div>
-              )}
-            </div>
-          </div>
-
-          <Link
-            href="/crm"
-            className="mt-5 inline-flex rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white"
-          >
-            CRM Aktivitelerini Aç
-          </Link>
         </section>
 
         <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm md:p-6">
@@ -1122,178 +1418,6 @@ export default function DashboardPage() {
                 tone={pageConfig.tone}
               />
             ))}
-          </div>
-        </section>
-
-        <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-            <TrendingUp size={24} />
-          </div>
-
-          <h2 className="mt-4 text-2xl font-black text-slate-900">
-            Öne Çıkan Pazaryeri İlanları
-          </h2>
-
-          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
-            Görüntülenme, takip ve gelen talep verilerine göre en hareketli paylaşımlar.
-          </p>
-
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            {featuredPosts.length > 0 ? (
-              featuredPosts.slice(0, 6).map((post) => (
-                <button
-                  key={post.id}
-                  onClick={() => router.push(`/network/${post.id}`)}
-                  className="rounded-[24px] border border-slate-100 bg-slate-50 p-4 text-center transition hover:bg-white"
-                >
-                  <div className="text-[11px] font-black uppercase tracking-wide text-slate-400">
-                    {post.type}
-                  </div>
-
-                  <h3 className="mt-2 line-clamp-2 text-sm font-black text-slate-900">
-                    {post.title}
-                  </h3>
-
-                  <p className="mt-2 text-xs font-semibold text-slate-500">
-                    {[post.city, post.district].filter(Boolean).join(" / ") ||
-                      "Lokasyon belirtilmedi"}
-                  </p>
-
-                  <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                    <div className="rounded-2xl bg-white px-2 py-2">
-                      <div className="text-sm font-black text-slate-900">
-                        {post.viewCount}
-                      </div>
-                      <div className="text-[9px] font-black uppercase text-slate-400">
-                        Görüntü
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-white px-2 py-2">
-                      <div className="text-sm font-black text-slate-900">
-                        {post.followerCount}
-                      </div>
-                      <div className="text-[9px] font-black uppercase text-slate-400">
-                        Takip
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-white px-2 py-2">
-                      <div className="text-sm font-black text-slate-900">
-                        {post.requestCount}
-                      </div>
-                      <div className="text-[9px] font-black uppercase text-slate-400">
-                        Talep
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              ))
-            ) : (
-              <div className="rounded-2xl bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500 md:col-span-3">
-                Öne çıkan ilan verisi oluşması için pazaryerinde biraz etkileşim gerekiyor.
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
-            <Bell size={24} />
-          </div>
-
-          <h2 className="mt-4 text-2xl font-black text-slate-900">
-            Bildirimlerim
-          </h2>
-
-          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
-            Takip ettiğin pazaryeri paylaşımlarındaki güncellemeler burada görünür.
-          </p>
-
-          <div className="mt-5 grid gap-3">
-            {networkNotifications.items.length > 0 ? (
-              networkNotifications.items.slice(0, 4).map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    markNetworkNotificationsRead();
-                    if (item.postId) router.push(`/network/${item.postId}`);
-                  }}
-                  className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-center transition hover:bg-white"
-                >
-                  <div className="flex flex-col items-center justify-center gap-2 md:flex-row">
-                    {!item.isRead && (
-                      <span className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-black text-white">
-                        YENİ
-                      </span>
-                    )}
-
-                    <span className="text-sm font-black text-slate-900">
-                      {item.title}
-                    </span>
-                  </div>
-
-                  <p className="mx-auto mt-2 max-w-3xl whitespace-pre-line text-xs font-semibold leading-6 text-slate-500">
-                    {item.message}
-                  </p>
-                </button>
-              ))
-            ) : (
-              <div className="rounded-2xl bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500">
-                Henüz bildirimin yok. Takip ettiğin ilanlar güncellendiğinde burada görünür.
-              </div>
-            )}
-          </div>
-
-          {networkNotifications.unreadCount > 0 && (
-            <button
-              onClick={markNetworkNotificationsRead}
-              className="mt-5 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white"
-            >
-              {networkNotifications.unreadCount} bildirimi okundu yap
-            </button>
-          )}
-        </section>
-
-        <section className="mt-6 grid gap-4 md:grid-cols-2">
-          <div className="rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
-              <CalendarCheck size={24} />
-            </div>
-
-            <h3 className="mt-4 text-xl font-black text-slate-900">
-              CRM Merkezi
-            </h3>
-
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-              Müşteri kayıtları, görevler ve satış aşamalarını yönet.
-            </p>
-
-            <Link
-              href="/crm"
-              className="mt-4 inline-flex rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white"
-            >
-              Görevleri Aç
-            </Link>
-          </div>
-
-          <div className="rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
-              <Bot size={24} />
-            </div>
-
-            <h3 className="mt-4 text-xl font-black text-slate-900">Lina AI</h3>
-
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-              İlan, proje, müşteri ve pazaryeri işlemlerinde Lina’dan destek al.
-            </p>
-
-            <Link
-              href="/lina"
-              className="mt-4 inline-flex rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white"
-            >
-              Lina’yı Aç
-            </Link>
           </div>
         </section>
       </div>

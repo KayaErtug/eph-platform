@@ -60,6 +60,8 @@ model User {
   adminActionLogs      AdminActionLog[]       @relation("AdminActionActor")
   adminActionTargets   AdminActionLog[]       @relation("AdminActionTarget")
   announcementsCreated PlatformAnnouncement[] @relation("AnnouncementCreator")
+  systemMessagesSent   SystemMessage[]        @relation("SystemMessageSender")
+  systemMessagesInbox  SystemMessage[]        @relation("SystemMessageTargetUser")
 }
 
 model SUPER_ADMIN {
@@ -233,6 +235,34 @@ model PlatformAnnouncement {
 
   @@index([isActive])
   @@index([audience])
+}
+
+model SystemMessage {
+  id                String                  @id @default(uuid())
+  senderId          String
+  visibleSenderName String                  @default("EPH Admin")
+  targetType        SystemMessageTargetType
+  targetUserId      String?
+  targetRole        Role?
+  category          SystemMessageCategory
+  customCategory    String?
+  title             String
+  body              String
+  isRead            Boolean                 @default(false)
+  readAt            DateTime?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  sender     User  @relation("SystemMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  targetUser User? @relation("SystemMessageTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  @@index([senderId])
+  @@index([targetUserId])
+  @@index([targetRole])
+  @@index([targetType])
+  @@index([category])
+  @@index([isRead])
+  @@index([createdAt])
 }
 
 model Nomination {
@@ -540,6 +570,36 @@ enum AnnouncementAudience {
   MUTEAHHITLER
   INSAAT_FIRMALARI
   ADMINLER
+}
+
+enum SystemMessageTargetType {
+  TEK_KULLANICI
+  TUM_KULLANICILAR
+  EMLAKCILAR
+  MUTEAHHITLER
+  INSAAT_FIRMALARI
+  ADMINLER
+  SUPER_ADMINLER
+  OZEL_GRUP
+}
+
+enum SystemMessageCategory {
+  BILGILENDIRME
+  SIKAYET_YANITI
+  ONERI_YANITI
+  UYARI
+  DUYURU
+  HESAP_ISLEMI
+  ILAN_ISLEMI
+  UYELIK_PAKET_ISLEMI
+  EVRAK_DOGRULAMA_ISLEMI
+  NETWORK_ISLEMI
+  GUVENLIK_BILDIRIMI
+  BAKIM_TEKNIK_BILGILENDIRME
+  ODEME_FATURA_BILGILENDIRMESI
+  KURAL_IHLALI_BILDIRIMI
+  DESTEK_YANITI
+  DIGER
 }
 
 enum InvitationStatus {
