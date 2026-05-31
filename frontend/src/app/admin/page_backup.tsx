@@ -67,10 +67,6 @@ interface UserItem {
   phone: string;
   profileImageUrl?: string | null;
   role: string;
-  city?: string;
-  district?: string;
-  cityPlateCode?: string;
-  memberCode?: string;
   isApproved: boolean;
   documents?: { id: string; type: string; status: string; fileUrl: string; fileName: string }[];
 }
@@ -1100,13 +1096,6 @@ function UsersTab({ users, filter, setFilter, actionLoading, onApprove, onSuspen
                     <h3 className="text-lg font-black text-white">{u.firstName} {u.lastName}</h3>
                     <p className="text-sm font-semibold text-slate-400">{u.email}</p>
                     <p className="text-xs font-semibold text-slate-500">{u.phone}</p>
-                    {u.memberCode && <p className="text-xs font-bold text-cyan-300">Üye No: {u.memberCode}</p>}
-                    {(u.city || u.district) && (
-                      <p className="text-xs font-semibold text-slate-300">
-                        📍 {u.city || "-"} {u.district ? `/ ${u.district}` : ""}
-                        {u.cityPlateCode ? ` • Plaka: ${u.cityPlateCode}` : ""}
-                      </p>
-                    )}
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Pill className={roleClass(u.role)}>{ROLE_LABELS[u.role] || u.role}</Pill>
                       <Pill className={u.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{u.isApproved ? "Onaylı" : "Bekliyor"}</Pill>
