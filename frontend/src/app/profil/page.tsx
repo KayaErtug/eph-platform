@@ -25,6 +25,7 @@ import {
   WalletCards,
 } from "lucide-react";
 
+import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 
 type UserRole =
@@ -56,6 +57,29 @@ type SafeUser = {
   memberSince?: string;
   trustScore?: number;
   riskLevel?: string;
+};
+
+type PresenceStatus = "online" | "away" | "offline";
+
+type PresenceUser = {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  fullName?: string | null;
+  email?: string | null;
+  role?: string | null;
+  profileImageUrl?: string | null;
+  status: PresenceStatus;
+  lastSeenAt?: string | null;
+  lastPage?: string | null;
+  minutesAgo?: number | null;
+};
+
+type PresenceResponse = {
+  currentUser?: PresenceUser | null;
+  online: PresenceUser[];
+  away: PresenceUser[];
+  offline: PresenceUser[];
 };
 
 const roleContent = {
@@ -117,7 +141,9 @@ const roleContent = {
 };
 
 function normalizeRole(role?: string | null) {
-  return String(role || "").toLocaleUpperCase("tr-TR").trim();
+  return String(role || "")
+    .toLocaleUpperCase("tr-TR")
+    .trim();
 }
 
 function getTheme(role?: string | null) {
@@ -148,10 +174,48 @@ function isSuperAdmin(role?: string | null) {
   return normalizeRole(role) === "SUPER_ADMIN";
 }
 
+function presenceLabel(status?: PresenceStatus) {
+  if (status === "online") return "Online";
+  if (status === "away") return "Uzakta";
+  return "Çevrimdışı";
+}
+
+function presenceDotClass(status?: PresenceStatus) {
+  if (status === "online") return "bg-emerald-500";
+  if (status === "away") return "bg-amber-400";
+  return "bg-slate-400";
+}
+
+function presenceBadgeClass(status?: PresenceStatus) {
+  if (status === "online")
+    return "border-emerald-100 bg-emerald-50 text-emerald-700";
+  if (status === "away") return "border-amber-100 bg-amber-50 text-amber-700";
+  return "border-slate-200 bg-slate-50 text-slate-500";
+}
+
+function formatLastSeen(minutesAgo?: number | null) {
+  if (minutesAgo === null || minutesAgo === undefined)
+    return "Son görülme bilgisi yok";
+  if (minutesAgo < 1) return "Az önce aktifti";
+  if (minutesAgo < 60) return `Son görülme: ${minutesAgo} dk önce`;
+
+  const hours = Math.floor(minutesAgo / 60);
+  if (hours < 24) return `Son görülme: ${hours} saat önce`;
+
+  const days = Math.floor(hours / 24);
+  return `Son görülme: ${days} gün önce`;
+}
+
 export default function ProfilPage() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const [hydrated, setHydrated] = useState(false);
+  const [presence, setPresence] = useState<PresenceResponse>({
+    currentUser: null,
+    online: [],
+    away: [],
+    offline: [],
+  });
 
   useEffect(() => {
     setHydrated(true);
@@ -164,6 +228,31 @@ export default function ProfilPage() {
       router.push("/giris");
     }
   }, [hydrated, router, user]);
+
+  useEffect(() => {
+    if (!hydrated || !user) return;
+
+    const fetchPresence = async () => {
+      try {
+        const res = await api.get("/visits/presence");
+
+        setPresence({
+          currentUser: res.data?.currentUser || null,
+          online: Array.isArray(res.data?.online) ? res.data.online : [],
+          away: Array.isArray(res.data?.away) ? res.data.away : [],
+          offline: Array.isArray(res.data?.offline) ? res.data.offline : [],
+        });
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchPresence();
+
+    const interval = setInterval(fetchPresence, 30000);
+
+    return () => clearInterval(interval);
+  }, [hydrated, user]);
 
   const safeUser = user as SafeUser | null;
   const userRole = normalizeRole(safeUser?.role || "EMLAKCI");
@@ -205,6 +294,15 @@ export default function ProfilPage() {
 
   const referralCode =
     safeUser?.referralCode || safeUser?.referenceCode || "Henüz tanımlı değil";
+
+  const currentPresence =
+    presence.currentUser ||
+    [...presence.online, ...presence.away, ...presence.offline].find(
+      (item) => item.id === safeUser?.id,
+    ) ||
+    null;
+
+  const currentPresenceStatus = currentPresence?.status || "offline";
 
   if (!hydrated || !safeUser) {
     return (
@@ -295,10 +393,18 @@ export default function ProfilPage() {
             </div>
 
             <div className="mt-7 flex flex-col items-center gap-5">
-              <div
-                className={`flex h-24 w-24 items-center justify-center rounded-[32px] text-3xl font-black shadow-sm ${theme.iconBg}`}
-              >
-                {superAdmin ? <Crown size={42} /> : initials}
+              <div className="relative">
+                <div
+                  className={`flex h-24 w-24 items-center justify-center rounded-[32px] text-3xl font-black shadow-sm ${theme.iconBg}`}
+                >
+                  {superAdmin ? <Crown size={42} /> : initials}
+                </div>
+
+                <span
+                  className={`absolute -bottom-1 -right-1 h-6 w-6 rounded-full border-4 border-white ${presenceDotClass(
+                    currentPresenceStatus,
+                  )}`}
+                />
               </div>
 
               <div>
@@ -308,6 +414,23 @@ export default function ProfilPage() {
 
                 <p className={`mt-3 text-base font-black ${theme.primaryText}`}>
                   {superAdmin ? "Kurucu · Süper Admin" : theme.label}
+                </p>
+
+                <div
+                  className={`mx-auto mt-4 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black ${presenceBadgeClass(
+                    currentPresenceStatus,
+                  )}`}
+                >
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full ${presenceDotClass(
+                      currentPresenceStatus,
+                    )}`}
+                  />
+                  {presenceLabel(currentPresenceStatus)}
+                </div>
+
+                <p className="mt-2 text-xs font-bold text-[#64748B]">
+                  {formatLastSeen(currentPresence?.minutesAgo)}
                 </p>
 
                 <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-[#64748B]">
@@ -321,7 +444,7 @@ export default function ProfilPage() {
               <SmallStat
                 icon={<CheckCircle2 size={18} />}
                 label="Durum"
-                value="Aktif"
+                value={presenceLabel(currentPresenceStatus)}
                 color={superAdmin ? "#14B8A6" : undefined}
               />
               <SmallStat
@@ -340,6 +463,21 @@ export default function ProfilPage() {
           </section>
 
           <section className="grid gap-4">
+            <InfoCard
+              icon={<CheckCircle2 size={20} />}
+              label="Anlık Durum"
+              value={`${presenceLabel(currentPresenceStatus)} · ${formatLastSeen(
+                currentPresence?.minutesAgo,
+              )}`}
+              color={
+                currentPresenceStatus === "online"
+                  ? "#10B981"
+                  : currentPresenceStatus === "away"
+                    ? "#F59E0B"
+                    : "#64748B"
+              }
+            />
+
             <InfoCard
               icon={<Mail size={20} />}
               label="E-posta"
@@ -387,7 +525,9 @@ export default function ProfilPage() {
 
           <ActionCard
             href={superAdmin ? "/admin" : "/stok"}
-            icon={superAdmin ? <ShieldCheck size={22} /> : <Building2 size={22} />}
+            icon={
+              superAdmin ? <ShieldCheck size={22} /> : <Building2 size={22} />
+            }
             title={superAdmin ? "Yönetim Merkezi" : "İlanlar"}
             desc={
               superAdmin
@@ -483,6 +623,10 @@ export default function ProfilPage() {
                 }
               />
               <DetailRow label="Referans" value={referralCode} />
+              <DetailRow
+                label="Son Sayfa"
+                value={currentPresence?.lastPage || "Bilgi yok"}
+              />
             </div>
           </div>
         </section>
