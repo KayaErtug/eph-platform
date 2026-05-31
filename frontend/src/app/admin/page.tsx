@@ -749,12 +749,13 @@ export default function AdminPage() {
 
           <nav className="flex flex-wrap items-center justify-center gap-2">
             {[
-              { href: "/dashboard", label: "Ana Sayfa" },
-              { href: "/network", label: "Network" },
-              { href: "/stok", label: "Stok" },
-              { href: "/crm", label: "CRM" },
-              { href: "/market", label: "Piyasa" },
-              { href: "/profil", label: "Profil" },
+                { href: "/dashboard", label: "Ana Sayfa" },
+		{ href: "/network", label: "Network" },
+		{ href: "/stok", label: "Stok" },
+		{ href: "/crm", label: "CRM" },
+		{ href: "/market", label: "Piyasa" },
+		{ href: "/admin/system-messages", label: "Kurumsal İletişim" },
+		{ href: "/profil", label: "Profil" },
             ].map((item) => (
               <Link
                 key={item.href}
