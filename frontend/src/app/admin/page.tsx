@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -178,7 +178,7 @@ const ROLE_LABELS: Record<string, string> = {
   MUTEAHHIT: "Müteahhit",
   INSAAT_FIRMASI: "İnşaat Firması",
   ADMIN: "Admin",
-  DENETCI_ADMIN: "Denetçi Admin",
+  SUPER_ADMIN: "Süper Admin",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -246,7 +246,7 @@ function initials(firstName?: string, lastName?: string) {
 }
 
 function roleClass(role: string) {
-  if (role === "ADMIN" || role === "DENETCI_ADMIN") return "border-amber-300/30 bg-amber-300/10 text-amber-100";
+  if (role === "ADMIN" || role === "SUPER_ADMIN") return "border-amber-300/30 bg-amber-300/10 text-amber-100";
   if (role === "MUTEAHHIT" || role === "INSAAT_FIRMASI") return "border-indigo-300/30 bg-indigo-400/10 text-indigo-100";
   return "border-cyan-300/20 bg-cyan-300/10 text-cyan-100";
 }
@@ -452,7 +452,7 @@ export default function AdminPage() {
       router.push("/giris");
       return;
     }
-    if (user.role !== "ADMIN") {
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
       router.push("/dashboard");
       return;
     }
@@ -460,19 +460,19 @@ export default function AdminPage() {
   }, [hydrated, user]);
 
   useEffect(() => {
-    if (hydrated && user?.role === "ADMIN") fetchUsers(userFilter);
+    if (hydrated && (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN")) fetchUsers(userFilter);
   }, [userFilter]);
 
   useEffect(() => {
-    if (hydrated && user?.role === "ADMIN") fetchDocuments(docFilter);
+    if (hydrated && (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN")) fetchDocuments(docFilter);
   }, [docFilter]);
 
   useEffect(() => {
-    if (hydrated && user?.role === "ADMIN") fetchNominations(nomFilter);
+    if (hydrated && (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN")) fetchNominations(nomFilter);
   }, [nomFilter]);
 
   useEffect(() => {
-    if (hydrated && user?.role === "ADMIN") fetchApplications(appFilter);
+    if (hydrated && (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN")) fetchApplications(appFilter);
   }, [appFilter]);
 
   const fetchAll = async () => {
@@ -1104,7 +1104,7 @@ function UsersTab({ users, filter, setFilter, actionLoading, onApprove, onSuspen
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
                   {!u.isApproved && <Button variant="success" disabled={actionLoading === u.id} icon={<Check size={15} />} onClick={() => onApprove(u.id)}>Onayla</Button>}
-                  {u.role !== "ADMIN" && (
+                  {u.role !== "ADMIN" && u.role !== "SUPER_ADMIN" && (
                     <>
                       {u.isApproved && <Button variant="gold" disabled={actionLoading === u.id} onClick={() => { if (confirm("Kullanıcı askıya alınacak. Emin misiniz?")) onSuspend(u.id); }}>Askıya Al</Button>}
                       <Button variant="ghost" icon={<UserCog size={15} />} onClick={() => onRole(u)}>Rol Değiştir</Button>
@@ -1414,3 +1414,4 @@ function VisitsTab({ visits, onRefresh }: { visits: any[]; onRefresh: () => void
     </section>
   );
 }
+
