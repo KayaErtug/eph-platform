@@ -30,7 +30,7 @@ import {
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 
-type TabKey = "overview" | "users" | "traffic" | "messages" | "applications" | "documents" | "leads" | "stock" | "trust";
+type TabKey = "overview" | "users" | "traffic" | "radar" | "messages" | "applications" | "documents" | "leads" | "stock" | "trust";
 
 type Stats = {
   totalUsers: number;
@@ -303,6 +303,7 @@ export default function AdminPage() {
     if (activeTab === "overview") await fetchAll();
     if (activeTab === "users") await fetchUsers();
     if (activeTab === "traffic") await fetchVisits();
+    if (activeTab === "radar") await fetchVisits();
     if (activeTab === "applications") await fetchApplications();
     if (activeTab === "documents") await fetchDocuments();
     if (activeTab === "leads") await fetchLeads();
@@ -343,6 +344,7 @@ export default function AdminPage() {
     { key: "overview", label: "Özet", icon: <LayoutDashboard size={18} /> },
     { key: "users", label: "Üyeler", icon: <UsersRound size={18} />, badge: stats?.pendingUsers || 0 },
     { key: "traffic", label: "Canlı Trafik", icon: <Activity size={18} /> },
+    { key: "radar", label: "Radar Merkezi", icon: <Eye size={18} /> },
     { key: "messages", label: "Kurumsal Mesajlar", icon: <MessageSquareText size={18} /> },
     { key: "applications", label: "Başvurular", icon: <Mail size={18} />, badge: stats?.pendingApplications || 0 },
     { key: "documents", label: "Belgeler", icon: <FileText size={18} />, badge: stats?.pendingDocuments || 0 },
@@ -367,7 +369,8 @@ export default function AdminPage() {
           <div className="px-4 py-5 pb-24 lg:px-8 lg:py-8">
             {activeTab === "overview" && <OverviewTab stats={stats} users={usersWithPresence} applications={applications} documents={documents} leads={leads} units={units} setActiveTab={setActiveTab} />}
             {activeTab === "users" && <UsersTab users={filteredUsers} allUsers={usersWithPresence} search={userSearch} setSearch={setUserSearch} roleFilter={roleFilter} setRoleFilter={setRoleFilter} cityFilter={cityFilter} setCityFilter={setCityFilter} cityOptions={cityOptions} actionLoading={actionLoading} onCreate={() => setCreateUserModal(true)} onApprove={(id) => act(id, async () => { await api.patch(`/admin/users/${id}/approve`); await Promise.all([fetchUsers(), fetchStats()]); })} onSuspend={(id) => act(id, async () => { await api.patch(`/admin/users/${id}/suspend`); await Promise.all([fetchUsers(), fetchStats()]); })} onDelete={(id) => act(id, async () => { await api.delete(`/admin/users/${id}/reject`); await Promise.all([fetchUsers(), fetchStats()]); })} onRole={(item) => { setRoleModal({ id: item.id, role: item.role }); setNewRole(item.role); }} />}
-            {activeTab === "traffic" && <TrafficTab rows={trafficRows} visits={visits} trafficFilter={trafficFilter} setTrafficFilter={setTrafficFilter} onRefresh={fetchVisits} />}
+            {activeTab === "traffic" && <TrafficTab rows={trafficRows} trafficFilter={trafficFilter} setTrafficFilter={setTrafficFilter} onRefresh={fetchVisits} />}
+            {activeTab === "radar" && <RadarTab rows={usersWithPresence.map((u) => ({ user: u, visit: u.lastVisit, presence: u.presence }))} visits={visits} onRefresh={fetchVisits} />}
             {activeTab === "messages" && <SystemMessagesTab />}
             {activeTab === "applications" && <ApplicationsTab applications={applications} actionLoading={actionLoading} refresh={async () => { await Promise.all([fetchApplications(), fetchStats()]); }} act={act} />}
             {activeTab === "documents" && <DocumentsTab documents={documents} actionLoading={actionLoading} refresh={async () => { await Promise.all([fetchDocuments(), fetchStats()]); }} act={act} />}
@@ -417,13 +420,38 @@ function timeAgo(value?: string | null) {
   return `${diffDays} gün önce`;
 }
 
+function pageLabel(page?: string | null) {
+  if (!page) return "Bilinmeyen Sayfa";
+
+  if (page === "/") return "Ana Sayfa";
+  if (page === "/dashboard") return "Dashboard";
+  if (page === "/network") return "EPH Network";
+  if (page.startsWith("/network/")) return "Network Detayı";
+  if (page === "/messages") return "Mesajlar";
+  if (page.startsWith("/messages/")) return "Mesaj Detayı";
+  if (page === "/stok") return "Portföyler";
+  if (page.startsWith("/stok/")) return "Portföy Detayı";
+  if (page === "/crm") return "CRM";
+  if (page === "/market") return "Market";
+  if (page === "/profil") return "Profil";
+  if (page === "/admin") return "Admin Paneli";
+  if (page.startsWith("/admin/")) return "Admin Detayı";
+  if (page === "/lina") return "Lina AI";
+  if (page === "/notification-settings") return "Bildirim Ayarları";
+  if (page === "/kayit") return "Kayıt";
+  if (page === "/giris") return "Giriş";
+
+  return page;
+}
+
 function LiveWatchPanel({ rows, onRefresh }: { rows: { user: UserItem; visit?: VisitItem; presence: any }[]; onRefresh: () => void }) {
-  const liveRows = rows
+  const memberRows = rows.filter((row) => row.user.role !== "ADMIN" && row.user.role !== "SUPER_ADMIN");
+  const liveRows = memberRows
     .filter((row) => row.presence.label === "Online" || row.presence.label === "Away")
     .sort((a, b) => new Date(b.visit?.createdAt || 0).getTime() - new Date(a.visit?.createdAt || 0).getTime());
 
-  const onlineCount = rows.filter((row) => row.presence.label === "Online").length;
-  const awayCount = rows.filter((row) => row.presence.label === "Away").length;
+  const onlineCount = memberRows.filter((row) => row.presence.label === "Online").length;
+  const awayCount = memberRows.filter((row) => row.presence.label === "Away").length;
 
   return (
     <div className="mb-5 rounded-[32px] border border-slate-200 bg-white p-4 shadow-sm lg:p-5">
@@ -465,7 +493,7 @@ function LiveWatchPanel({ rows, onRefresh }: { rows: { user: UserItem; visit?: V
                   <p className="truncate text-xs font-bold text-slate-500">{user.email}</p>
                   <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Şu an</p>
-                    <p className="mt-1 truncate text-sm font-black text-slate-950">{visit?.page || "—"}</p>
+                    <p className="mt-1 truncate text-sm font-black text-slate-950">{pageLabel(visit?.page)}</p>
                     <p className="mt-1 text-xs font-bold text-slate-500">{timeAgo(visit?.createdAt)} · {fmt(visit?.createdAt)}</p>
                   </div>
                 </div>
@@ -482,6 +510,7 @@ function LiveWatchPanel({ rows, onRefresh }: { rows: { user: UserItem; visit?: V
 function LiveMovementFeed({ visits }: { visits: VisitItem[] }) {
   const recentVisits = visits
     .filter((visit) => visit.createdAt && (visit.user?.id || visit.userId))
+    .filter((visit) => visit.user?.role !== "ADMIN" && visit.user?.role !== "SUPER_ADMIN")
     .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
     .slice(0, 12);
 
@@ -530,7 +559,7 @@ function LiveMovementFeed({ visits }: { visits: VisitItem[] }) {
 
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Sayfa</p>
-                    <p className="mt-1 truncate text-sm font-black text-slate-950">{visit.page || "—"}</p>
+                    <p className="mt-1 truncate text-sm font-black text-slate-950">{pageLabel(visit.page)}</p>
                   </div>
 
                   <div className="flex justify-start lg:justify-end">
@@ -547,7 +576,31 @@ function LiveMovementFeed({ visits }: { visits: VisitItem[] }) {
 }
 
 
-function TrafficTab({ rows, visits, trafficFilter, setTrafficFilter, onRefresh }: { rows: { user: UserItem; visit?: VisitItem; presence: any }[]; visits: VisitItem[]; trafficFilter: string; setTrafficFilter: (v: string) => void; onRefresh: () => void }) {
+
+function RadarTab({ rows, visits, onRefresh }: { rows: { user: UserItem; visit?: VisitItem; presence: any }[]; visits: VisitItem[]; onRefresh: () => void }) {
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      onRefresh();
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [onRefresh]);
+
+  return (
+    <section>
+      <SectionHeader
+        title="Radar Merkezi"
+        desc="Canlı izleme ve son hareket akışı burada tutulur. Süper Admin kayıtları bu ekranda gizlenir."
+        action={<PrimaryButton tone="light" icon={<RefreshCw size={16} />} onClick={onRefresh}>Yenile</PrimaryButton>}
+      />
+
+      <LiveWatchPanel rows={rows} onRefresh={onRefresh} />
+      <LiveMovementFeed visits={visits} />
+    </section>
+  );
+}
+
+function TrafficTab({ rows, trafficFilter, setTrafficFilter, onRefresh }: { rows: { user: UserItem; visit?: VisitItem; presence: any }[]; trafficFilter: string; setTrafficFilter: (v: string) => void; onRefresh: () => void }) {
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       onRefresh();
@@ -564,8 +617,11 @@ function TrafficTab({ rows, visits, trafficFilter, setTrafficFilter, onRefresh }
         action={<PrimaryButton tone="light" icon={<RefreshCw size={16} />} onClick={onRefresh}>Yenile</PrimaryButton>}
       />
 
-      <LiveWatchPanel rows={rows} onRefresh={onRefresh} />
-      <LiveMovementFeed visits={visits} />
+      <div className="mb-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <StatCard title="Online" value={rows.filter((row) => row.presence.label === "Online").length} icon={<Activity size={20} />} desc="Son 5 dakika" />
+        <StatCard title="Uzakta" value={rows.filter((row) => row.presence.label === "Away").length} icon={<Eye size={20} />} desc="5-20 dakika" />
+        <StatCard title="Çevrimdışı" value={rows.filter((row) => row.presence.label === "Offline").length} icon={<UsersRound size={20} />} desc="20+ dakika" />
+      </div>
 
       <div className="mb-4 grid grid-cols-2 gap-2 sm:flex">
         {[
@@ -604,7 +660,7 @@ function TrafficTab({ rows, visits, trafficFilter, setTrafficFilter, onRefresh }
                   </div>
                 </div>
                 <div className="grid gap-1 text-xs font-bold text-slate-600">
-                  <p>Son Sayfa: <span className="font-black text-slate-950">{visit?.page || "—"}</span></p>
+                  <p>Son Sayfa: <span className="font-black text-slate-950">{pageLabel(visit?.page)}</span></p>
                   <p>Son Aktivite: <span className="font-black text-slate-950">{fmt(visit?.createdAt)}</span></p>
                 </div>
                 <div className="flex justify-start lg:justify-end">
