@@ -237,16 +237,17 @@ function numberFromAny(source: any, keys: string[], fallback = 0) {
 }
 
 function normalizeTrafficSummary(data: any): TrafficSummary {
+  const counts = data?.counts || data?.summary || data?.metrics || data || {};
   const rawTopPages = data?.topPages || data?.mostVisitedPages || data?.activePages || data?.pages || [];
   const rawTopUsers = data?.topUsers || data?.topMembers || data?.activeUsers || data?.activeMembers || data?.members || [];
 
   return {
-    todayVisits: numberFromAny(data, ["todayVisits", "today", "dailyVisits", "visitsToday", "todayCount"]),
-    weekVisits: numberFromAny(data, ["weekVisits", "thisWeek", "weeklyVisits", "visitsThisWeek", "weekCount"]),
-    monthVisits: numberFromAny(data, ["monthVisits", "thisMonth", "monthlyVisits", "visitsThisMonth", "monthCount"]),
-    onlineUsers: numberFromAny(data, ["onlineUsers", "online", "onlineCount"]),
-    awayUsers: numberFromAny(data, ["awayUsers", "away", "awayCount", "idleUsers", "idleCount"]),
-    offlineUsers: numberFromAny(data, ["offlineUsers", "offline", "offlineCount"]),
+    todayVisits: numberFromAny(counts, ["todayVisits", "today", "dailyVisits", "visitsToday", "todayCount"]),
+    weekVisits: numberFromAny(counts, ["weekVisits", "thisWeek", "weeklyVisits", "visitsThisWeek", "weekCount"]),
+    monthVisits: numberFromAny(counts, ["monthVisits", "thisMonth", "monthlyVisits", "visitsThisMonth", "monthCount"]),
+    onlineUsers: numberFromAny(counts, ["onlineUsers", "online", "onlineCount"]),
+    awayUsers: numberFromAny(counts, ["awayUsers", "away", "awayCount", "idleUsers", "idleCount"]),
+    offlineUsers: numberFromAny(counts, ["offlineUsers", "offline", "offlineCount"]),
     topPages: Array.isArray(rawTopPages)
       ? rawTopPages.map((item: any) => ({
           page: item?.page || item?.path || item?.url || item?.name || "Bilinmeyen sayfa",
@@ -276,10 +277,15 @@ function normalizeTrafficSummary(data: any): TrafficSummary {
 }
 
 function Avatar({ firstName, lastName, imageUrl, size = "md" }: { firstName?: string; lastName?: string; imageUrl?: string | null; size?: "sm" | "md" | "lg" }) {
+  const [imageFailed, setImageFailed] = useState(false);
   const sizeClass = size === "lg" ? "h-14 w-14 text-lg" : size === "sm" ? "h-10 w-10 text-sm" : "h-12 w-12 text-base";
+  const safeImageUrl = imageUrl && !imageFailed ? imageUrl : null;
+
+  useEffect(() => setImageFailed(false), [imageUrl]);
+
   return (
     <div className={`${sizeClass} shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-sky-100 to-indigo-100 shadow-sm`}>
-      {imageUrl ? <img src={imageUrl} alt={`${firstName || ""} ${lastName || ""}`} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center font-black text-slate-700">{initials(firstName, lastName)}</div>}
+      {safeImageUrl ? <img src={safeImageUrl} alt={`${firstName || ""} ${lastName || ""}`} className="h-full w-full object-cover" onError={() => setImageFailed(true)} /> : <div className="flex h-full w-full items-center justify-center font-black text-slate-700">{initials(firstName, lastName)}</div>}
     </div>
   );
 }
