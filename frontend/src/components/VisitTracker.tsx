@@ -6,6 +6,31 @@ import { usePathname } from "next/navigation";
 const HEARTBEAT_INTERVAL_MS = 60 * 1000;
 const MIN_LOG_GAP_MS = 20 * 1000;
 
+function getAuthToken(): string | null {
+  const authStorage = localStorage.getItem("auth-storage");
+
+  if (authStorage) {
+    try {
+      const parsed = JSON.parse(authStorage);
+      const token = parsed?.state?.token;
+
+      if (typeof token === "string" && token.length > 0) {
+        return token;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  const legacyToken = localStorage.getItem("token");
+
+  if (legacyToken && legacyToken.length > 0) {
+    return legacyToken;
+  }
+
+  return null;
+}
+
 export function VisitTracker() {
   const pathname = usePathname();
   const lastSentAtRef = useRef<number>(0);
@@ -19,7 +44,7 @@ export function VisitTracker() {
     if (!pathname) return;
 
     const sendVisitLog = (force = false) => {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const currentPath = pathnameRef.current;
 
       if (!token || !currentPath) return;
