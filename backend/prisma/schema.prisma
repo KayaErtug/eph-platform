@@ -25,6 +25,10 @@ model User {
   trustScore  Int       @default(70)
   riskLevel   RiskLevel @default(DUSUK)
 
+  city          String?
+  district      String?
+  cityPlateCode String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -244,14 +248,22 @@ model SystemMessage {
   targetType        SystemMessageTargetType
   targetUserId      String?
   targetRole        Role?
-  category          SystemMessageCategory
-  customCategory    String?
-  title             String
-  body              String
-  isRead            Boolean                 @default(false)
-  readAt            DateTime?
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
+
+  targetCities         String[]
+  targetCityPlateCodes String[]
+  targetRoles          String[]
+
+  recipientCount Int @default(0)
+
+  category SystemMessageCategory
+
+  customCategory String?
+  title          String
+  body           String
+  isRead         Boolean   @default(false)
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   sender     User  @relation("SystemMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   targetUser User? @relation("SystemMessageTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
@@ -574,12 +586,20 @@ enum AnnouncementAudience {
 
 enum SystemMessageTargetType {
   TEK_KULLANICI
+  COKLU_KULLANICI
+
   TUM_KULLANICILAR
+
   EMLAKCILAR
   MUTEAHHITLER
   INSAAT_FIRMALARI
+
   ADMINLER
   SUPER_ADMINLER
+
+  SEHIRLER
+  SEHIRLER_VE_ROLLER
+
   OZEL_GRUP
 }
 
