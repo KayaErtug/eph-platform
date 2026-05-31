@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
@@ -11,6 +11,28 @@ import {
   LockKeyhole,
   MessageCircle,
 } from "lucide-react";
+
+type PresenceStatus = "online" | "away" | "offline";
+
+type PresenceUser = {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  fullName?: string | null;
+  email?: string | null;
+  role?: string | null;
+  profileImageUrl?: string | null;
+  status: PresenceStatus;
+  lastSeenAt?: string | null;
+  lastPage?: string | null;
+  minutesAgo?: number | null;
+};
+
+type PresenceResponse = {
+  online: PresenceUser[];
+  away: PresenceUser[];
+  offline: PresenceUser[];
+};
 
 type Participant = {
   id: string;
@@ -70,10 +92,33 @@ function roleLabel(role?: string) {
   if (role === "MUTEAHHIT") return "Müteahhit";
   if (role === "INSAAT_FIRMASI") return "İnşaat Firması";
   if (role === "SUPER_ADMIN") return "EPH Süper Admin";
-  if (role === "SUPER_ADMIN") return "EPH Süper Admin";
   if (role === "ADMIN") return "EPH Admin";
 
   return "EPH Üyesi";
+}
+
+function presenceLabel(status?: PresenceStatus) {
+  if (status === "online") return "Online";
+  if (status === "away") return "Uzakta";
+  return "Çevrimdışı";
+}
+
+function presenceDotClass(status?: PresenceStatus) {
+  if (status === "online") return "bg-emerald-500";
+  if (status === "away") return "bg-amber-400";
+  return "bg-slate-400";
+}
+
+function presenceBadgeClass(status?: PresenceStatus) {
+  if (status === "online") {
+    return "border-emerald-100 bg-emerald-50 text-emerald-700";
+  }
+
+  if (status === "away") {
+    return "border-amber-100 bg-amber-50 text-amber-700";
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-500";
 }
 
 export default function MessagesInboxPage() {
@@ -81,15 +126,49 @@ export default function MessagesInboxPage() {
   const { user } = useAuthStore();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [presence, setPresence] = useState<PresenceResponse>({
+    online: [],
+    away: [],
+    offline: [],
+  });
   const [loading, setLoading] = useState(true);
+
+  const presenceMap = useMemo(() => {
+    const map = new Map<string, PresenceUser>();
+
+    [...presence.online, ...presence.away, ...presence.offline].forEach(
+      (presenceUser) => {
+        map.set(presenceUser.id, presenceUser);
+      }
+    );
+
+    return map;
+  }, [presence]);
 
   const fetchConversations = async () => {
     try {
       if (!user?.id) return;
 
-      const res = await api.get(`/conversations?userId=${user.id}`);
+      const [conversationsRes, presenceRes] = await Promise.all([
+        api.get(`/conversations?userId=${user.id}`),
+        api.get("/visits/presence"),
+      ]);
 
-      setConversations(Array.isArray(res.data) ? res.data : []);
+      setConversations(
+        Array.isArray(conversationsRes.data) ? conversationsRes.data : []
+      );
+
+      setPresence({
+        online: Array.isArray(presenceRes.data?.online)
+          ? presenceRes.data.online
+          : [],
+        away: Array.isArray(presenceRes.data?.away)
+          ? presenceRes.data.away
+          : [],
+        offline: Array.isArray(presenceRes.data?.offline)
+          ? presenceRes.data.offline
+          : [],
+      });
     } catch (error) {
       console.error(error);
       alert("Mesaj kutusu yüklenemedi.");
@@ -100,6 +179,12 @@ export default function MessagesInboxPage() {
 
   useEffect(() => {
     fetchConversations();
+
+    const interval = setInterval(() => {
+      fetchConversations();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [user?.id]);
 
   return (
@@ -160,6 +245,10 @@ export default function MessagesInboxPage() {
                 );
 
                 const otherUser = otherParticipants[0]?.user;
+                const otherPresence = otherUser
+                  ? presenceMap.get(otherUser.id)
+                  : undefined;
+                const presenceStatus = otherPresence?.status || "offline";
                 const lastMessage = conversation.messages?.[0];
 
                 const location = [
@@ -184,8 +273,14 @@ export default function MessagesInboxPage() {
 
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF4FF] font-black text-[#1D4ED8]">
+                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF4FF] font-black text-[#1D4ED8]">
                           {otherUser?.firstName?.[0] || "E"}
+
+                          <span
+                            className={`absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white ${presenceDotClass(
+                              presenceStatus
+                            )}`}
+                          />
                         </div>
 
                         <div className="min-w-0">
@@ -193,6 +288,19 @@ export default function MessagesInboxPage() {
                             <h2 className="truncate text-[16px] font-black text-[#0B1F44]">
                               {conversation.title}
                             </h2>
+
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-black ${presenceBadgeClass(
+                                presenceStatus
+                              )}`}
+                            >
+                              <span
+                                className={`h-2 w-2 rounded-full ${presenceDotClass(
+                                  presenceStatus
+                                )}`}
+                              />
+                              {presenceLabel(presenceStatus)}
+                            </span>
 
                             <span className="inline-flex items-center gap-1 rounded-full bg-[#F1F5F9] px-2 py-1 text-[11px] font-black text-slate-500">
                               <CheckCircle2 size={13} />
