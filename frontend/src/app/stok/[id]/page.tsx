@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   BadgeCheck,
+  BarChart3,
   Building2,
   CalendarDays,
   CheckCircle2,
@@ -19,14 +20,21 @@ import {
   Sparkles,
   Star,
   TrendingUp,
+  Trophy,
   UsersRound,
   WalletCards,
 } from "lucide-react";
 
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
-import { STATUS_COLORS, STATUS_LABELS, TYPE_LABELS } from "@/components/stok/stokConstants";
+import {
+  STATUS_COLORS,
+  STATUS_LABELS,
+  TYPE_LABELS,
+} from "@/components/stok/stokConstants";
 import type { Unit } from "@/components/stok/stokTypes";
+import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
+import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
 
 type DetailUnit = Unit & {
   createdAt?: string;
@@ -58,10 +66,10 @@ function formatDate(value?: string) {
 function statusStyle(status?: string) {
   return (
     STATUS_COLORS[status || ""] || {
-      color: "#344054",
-      bg: "#F2F4F7",
-      border: "#D0D5DD",
-      dot: "#667085",
+      color: "#1557D6",
+      bg: "#EFF6FF",
+      border: "#DBEAFE",
+      dot: "#1557D6",
     }
   );
 }
@@ -75,11 +83,51 @@ function typeLabel(type?: string) {
 }
 
 function unitTitle(unit?: DetailUnit | null) {
-  if (!unit) return "Stok Detayı";
+  if (!unit) return "Portföy Detayı";
   const projectName = unit.project?.name || "EPH Portföy";
   const room = unit.roomCount ? `${unit.roomCount} ` : "";
   const type = typeLabel(unit.type);
   return `${projectName} · ${room}${type}`;
+}
+
+function isUnitVerified(unit?: DetailUnit | null) {
+  return Boolean(
+    unit?.isVerified ||
+      (unit?.tapuVerified && unit?.photoVerified && unit?.yetkiVerified),
+  );
+}
+
+function calculatePortfolioScore(unit?: DetailUnit | null) {
+  if (!unit) return 0;
+
+  let score = 0;
+
+  if (unit.project?.name) score += 15;
+  if (unit.project?.city && unit.project?.district) score += 15;
+  if (unit.price) score += 12;
+  if (unit.area) score += 10;
+  if (unit.roomCount) score += 10;
+  if (unit.description) score += 10;
+  if (unit.tapuVerified) score += 8;
+  if (unit.photoVerified) score += 8;
+  if (unit.yetkiVerified || unit.isVerified) score += 12;
+
+  return Math.min(score || 72, 100);
+}
+
+function getPortfolioScoreLabel(score: number) {
+  if (score >= 90) return "Pekiyi";
+  if (score >= 80) return "Çok İyi";
+  if (score >= 70) return "İyi";
+  if (score >= 60) return "Geliştirilebilir";
+  return "Eksik";
+}
+
+function getPortfolioNo(unit: DetailUnit) {
+  const raw = String(unit.id || "EPH").replace(/[^a-zA-Z0-9]/g, "");
+  return `EPH-${raw.slice(0, 4).toLocaleUpperCase("tr-TR") || "PORT"}-${raw
+    .slice(-4)
+    .toLocaleUpperCase("tr-TR") || "0001"}`;
 }
 
 export default function StokDetailPage() {
@@ -91,6 +139,8 @@ export default function StokDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isFollowing, setIsFollowing] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
 
   const unitId = params?.id;
 
@@ -111,7 +161,7 @@ export default function StokDetailPage() {
       const response = await api.get(`/units/${unitId}`);
       setUnit(response.data);
     } catch (err: any) {
-      setError(err?.response?.data?.message || "İlan detayı yüklenemedi.");
+      setError(err?.response?.data?.message || "Portföy detayı yüklenemedi.");
     } finally {
       setLoading(false);
     }
@@ -131,18 +181,114 @@ export default function StokDetailPage() {
     return `${Math.round(price / area).toLocaleString("tr-TR")} ₺/m²`;
   }, [unit]);
 
+  const portfolioScore = useMemo(() => calculatePortfolioScore(unit), [unit]);
+  const portfolioScoreLabel = useMemo(
+    () => getPortfolioScoreLabel(portfolioScore),
+    [portfolioScore],
+  );
+
+  const ownerName = [
+    unit?.project?.owner?.firstName,
+    unit?.project?.owner?.lastName,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   const verificationItems = [
-    { label: "Tapu", active: Boolean(unit?.tapuVerified), description: "Tapu evrakı kontrol durumu" },
-    { label: "Fotoğraf", active: Boolean(unit?.photoVerified), description: "Görsel doğrulama durumu" },
-    { label: "Yetki", active: Boolean(unit?.yetkiVerified), description: "Portföy yetki kontrolü" },
+    {
+      label: "Tapu",
+      active: Boolean(unit?.tapuVerified),
+      description: "Tapu evrakı kontrol durumu",
+    },
+    {
+      label: "Fotoğraf",
+      active: Boolean(unit?.photoVerified),
+      description: "Görsel doğrulama durumu",
+    },
+    {
+      label: "Yetki",
+      active: Boolean(unit?.yetkiVerified || unit?.isVerified),
+      description: "Portföy yetki kontrolü",
+    },
   ];
+
+  const linaAdvice = useMemo(() => {
+    if (!unit) return "Portföy bilgisi bekleniyor.";
+    if (!unit.description) {
+      return "Açıklama alanı eksik. Lina ile güçlü bir açıklama hazırlanırsa karne puanı yükselir.";
+    }
+    if (!unit.yetkiVerified && !unit.isVerified) {
+      return "Yetki bilgisi eksik. Yetki durumu tamamlanırsa paylaşım kartında güven rozeti daha güçlü görünür.";
+    }
+    if (!unit.project?.city || !unit.project?.district) {
+      return "Konum bilgisi eksik. İl ve ilçe bilgisi tamamlandığında kart paylaşımı daha profesyonel görünür.";
+    }
+    return "Bu portföy paylaşım kartı, Instagram hikâye ve PDF broşür için hazır görünüyor.";
+  }, [unit]);
+
+  const getPortfolioShareData = (item: DetailUnit): PortfolioShareData => {
+    const price = Number(item.price || 0);
+    const location =
+      [item.project?.district, item.project?.city].filter(Boolean).join(" / ") ||
+      "Konum bilgisi yok";
+
+    return {
+      id: item.id,
+      title: item.project?.name || "EPH Portföy",
+      location,
+      price: price ? `${price.toLocaleString("tr-TR")} TL` : "Fiyat bilgisi yok",
+      roomCount: item.roomCount || "—",
+      area: item.area ? `${item.area} m²` : "—",
+      floor: item.floor != null ? `${item.floor}. Kat` : "—",
+      authorization:
+        item.yetkiVerified || item.isVerified ? "Yetkili" : "Kontrol",
+      coverImage: "/showcase/stock.jpg",
+      consultantName:
+        [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+        ownerName ||
+        "EPH Üyesi",
+      consultantPhone: "Telefon bilgisi",
+      portfolioNo: getPortfolioNo(item),
+      score: portfolioScore,
+      scoreLabel: portfolioScoreLabel,
+      shortDescription:
+        item.description ||
+        "Yetkili portföy statüsünde, paylaşım için hazır profesyonel gayrimenkul kaydı.",
+      longDescription:
+        item.description ||
+        "Bu portföy EPH Portföy Merkezi üzerinden hazırlanmıştır. Konum, fiyat, oda sayısı, alan bilgisi ve yetki durumu tek kart üzerinde paylaşılabilir formatta sunulur.",
+      features: [
+        {
+          icon: "security",
+          label:
+            item.yetkiVerified || item.isVerified
+              ? "Yetkili Portföy"
+              : "Yetki Kontrol",
+        },
+        { icon: "smart", label: "Lina Kartı" },
+        { icon: "car", label: "Portföy Kaydı" },
+        {
+          icon: "pool",
+          label: statusLabel(item.status),
+        },
+      ],
+    };
+  };
+
+  const handleOpenShareModal = () => {
+    if (!unit) return;
+    setShareData(getPortfolioShareData(unit));
+    setShareOpen(true);
+  };
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] text-[#0B1F44]">
+      <main className="flex min-h-screen items-center justify-center bg-[#F7FBFF] text-[#06194A]">
         <div className="text-center">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-          <p className="mt-4 text-xs font-black uppercase tracking-[0.26em] text-slate-500">İlan detayı yükleniyor</p>
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#1557D6] border-t-transparent" />
+          <p className="mt-4 text-xs font-black uppercase tracking-[0.26em] text-[#64748B]">
+            Portföy detayı yükleniyor
+          </p>
         </div>
       </main>
     );
@@ -150,15 +296,20 @@ export default function StokDetailPage() {
 
   if (error || !unit) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] px-4 text-[#0B1F44]">
-        <section className="w-full max-w-lg rounded-[32px] border border-slate-200 bg-white p-6 text-center shadow-sm">
+      <main className="flex min-h-screen items-center justify-center bg-[#F7FBFF] px-4 text-[#06194A]">
+        <section className="w-full max-w-lg rounded-[32px] border border-[#DDE7F3] bg-white p-6 text-center shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600">
             <FileText size={26} />
           </div>
-          <h1 className="mt-4 text-2xl font-black">İlan bulunamadı</h1>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">{error || "Bu ilana ait detay bilgisi alınamadı."}</p>
-          <button onClick={() => router.push("/stok")} className="mt-5 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white">
-            Stok Sayfasına Dön
+          <h1 className="mt-4 text-2xl font-black">Portföy bulunamadı</h1>
+          <p className="mt-2 text-sm font-semibold leading-6 text-[#64748B]">
+            {error || "Bu portföye ait detay bilgisi alınamadı."}
+          </p>
+          <button
+            onClick={() => router.push("/stok")}
+            className="mt-5 rounded-2xl bg-[#1557D6] px-5 py-3 text-sm font-black text-white"
+          >
+            Portföy Merkezine Dön
           </button>
         </section>
       </main>
@@ -166,172 +317,549 @@ export default function StokDetailPage() {
   }
 
   const style = statusStyle(unit.status);
-  const ownerName = [unit.project?.owner?.firstName, unit.project?.owner?.lastName].filter(Boolean).join(" ");
+  const verified = isUnitVerified(unit);
 
   return (
-    <main className="min-h-screen bg-[#F4F7FB] pb-28 text-[#111827]">
+    <main className="min-h-screen bg-[#F7FBFF] pb-28 text-[#27364F]">
       <section className="mx-auto max-w-7xl px-4 py-5">
-        <header className="mb-5 flex flex-col gap-4 rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-          <div className="text-center lg:text-left">
-            <button onClick={() => router.push("/stok")} className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 lg:mx-0" aria-label="Stok sayfasına dön">
-              <ArrowLeft size={20} />
-            </button>
-            <div className="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-black" style={{ color: style.color, background: style.bg, borderColor: style.border }}>
-              <span className="h-2 w-2 rounded-full" style={{ background: style.dot }} />
-              {statusLabel(unit.status)}
-            </div>
-            <h1 className="mt-4 text-[29px] font-black tracking-tight text-[#0B1F44] md:text-[42px]">{unitTitle(unit)}</h1>
-            <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500 lg:mx-0">
-              {[unit.project?.district, unit.project?.city, unit.project?.address].filter(Boolean).join(" / ") || "Konum bilgisi yok"}
-            </p>
-          </div>
+        <header className="mb-5 overflow-hidden rounded-[36px] border border-[#DDE7F3] bg-white p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] lg:p-7">
+          <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-stretch">
+            <div className="relative overflow-hidden rounded-[30px] bg-[#06194A] p-5 text-white lg:p-7">
+              <div
+                className="absolute inset-0 bg-cover bg-center opacity-30"
+                style={{ backgroundImage: "url('/showcase/stock.jpg')" }}
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(6,25,74,0.95),rgba(21,87,214,0.58)_52%,rgba(6,25,74,0.82)),radial-gradient(circle_at_18%_16%,rgba(255,255,255,0.22),transparent_28%)]" />
 
-          <div className="grid grid-cols-2 gap-2 sm:flex lg:justify-end">
-            <button onClick={toggleFollow} className={`flex h-12 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black ${isFollowing ? "bg-amber-100 text-amber-700" : "border border-slate-200 bg-white text-slate-600"}`}>
-              <Star size={18} fill={isFollowing ? "currentColor" : "none"} />
-              {isFollowing ? "Takipte" : "Takibe Al"}
-            </button>
-            <Link href="/network" className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#1D4ED8] px-4 text-sm font-black text-white">
-              <Share2 size={18} /> Paylaş
-            </Link>
-            <Link href="/crm" className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700">
-              <UsersRound size={18} /> CRM
-            </Link>
-            <Link href="/messages" className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700">
-              <MessageCircle size={18} /> Mesaj
-            </Link>
+              <div className="relative z-10">
+                <button
+                  onClick={() => router.push("/stok")}
+                  className="mb-5 flex h-12 w-12 items-center justify-center rounded-[20px] border border-white/18 bg-white/12 text-white backdrop-blur transition hover:bg-white/20"
+                  aria-label="Portföy merkezine dön"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <div
+                    className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black"
+                    style={{
+                      color: style.color,
+                      background: style.bg,
+                      borderColor: style.border,
+                    }}
+                  >
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ background: style.dot }}
+                    />
+                    {statusLabel(unit.status)}
+                  </div>
+
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/12 px-4 py-2 text-xs font-black text-white backdrop-blur">
+                    <ShieldCheck size={15} />
+                    {verified ? "Yetkili Portföy" : "Yetki Kontrol"}
+                  </span>
+                </div>
+
+                <p className="mt-6 text-xs font-black uppercase tracking-[0.24em] text-white/72">
+                  🏘️ Portföy Detayı
+                </p>
+
+                <h1 className="mt-3 max-w-3xl text-4xl font-black leading-tight tracking-[-0.055em] md:text-6xl">
+                  {unitTitle(unit)}
+                </h1>
+
+                <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-white/78">
+                  {[unit.project?.district, unit.project?.city, unit.project?.address]
+                    .filter(Boolean)
+                    .join(" / ") || "Konum bilgisi yok"}
+                </p>
+
+                <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
+                  <button
+                    onClick={handleOpenShareModal}
+                    className="inline-flex h-13 min-h-[52px] items-center justify-center gap-2 rounded-[22px] bg-white px-5 py-4 text-sm font-black text-[#1557D6] shadow-[0_18px_38px_rgba(255,255,255,0.16)] transition hover:scale-[1.01]"
+                  >
+                    <Share2 size={18} />
+                    Kart Hazırla
+                  </button>
+
+                  <button
+                    onClick={toggleFollow}
+                    className={`inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[22px] px-5 py-4 text-sm font-black transition ${
+                      isFollowing
+                        ? "bg-amber-100 text-amber-800"
+                        : "border border-white/18 bg-white/12 text-white backdrop-blur hover:bg-white/18"
+                    }`}
+                  >
+                    <Star size={18} fill={isFollowing ? "currentColor" : "none"} />
+                    {isFollowing ? "Takipte" : "Takibe Al"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              <ReportCard
+                icon={<Trophy size={22} />}
+                title="Portföy Karnesi"
+                value={`${portfolioScore}/100`}
+                label={portfolioScoreLabel}
+                progress={portfolioScore}
+              />
+
+              <section className="rounded-[30px] border border-[#DDE7F3] bg-[#F7FBFF] p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
+                      Lina Analizi
+                    </p>
+                    <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+                      Paylaşım hazırlığı
+                    </h2>
+                  </div>
+
+                  <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-white text-[#1557D6]">
+                    <Sparkles size={22} />
+                  </div>
+                </div>
+
+                <p className="mt-4 text-sm font-bold leading-7 text-[#475569]">
+                  {linaAdvice}
+                </p>
+              </section>
+            </div>
           </div>
         </header>
 
         <section className="grid gap-5 lg:grid-cols-[1.4fr_0.9fr]">
           <div className="space-y-5">
-            <section className="overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-sm">
-              <div className="relative flex min-h-[310px] items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-6 text-center text-white">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,.35),transparent_32%),radial-gradient(circle_at_80%_10%,rgba(245,158,11,.20),transparent_28%)]" />
+            <section className="overflow-hidden rounded-[34px] border border-[#DDE7F3] bg-white shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+              <div className="relative flex min-h-[330px] items-center justify-center bg-[#06194A] p-6 text-center text-white">
+                <div
+                  className="absolute inset-0 bg-cover bg-center opacity-42"
+                  style={{ backgroundImage: "url('/showcase/stock.jpg')" }}
+                />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,25,74,0.18),rgba(6,25,74,0.88)),radial-gradient(circle_at_20%_20%,rgba(59,130,246,.35),transparent_32%)]" />
                 <div className="relative">
-                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[28px] bg-white/10 backdrop-blur">
+                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[28px] bg-white/14 backdrop-blur">
                     <Building2 size={42} />
                   </div>
-                  <h2 className="mt-5 text-3xl font-black">{unit.project?.name || "EPH Portföy"}</h2>
-                  <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-white/70">
-                    Fotoğraf modülü eklenene kadar bu alan profesyonel ilan vitrini olarak çalışır.
+                  <h2 className="mt-5 text-3xl font-black">
+                    {unit.project?.name || "EPH Portföy"}
+                  </h2>
+                  <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-white/74">
+                    Kapak görseli modülü bağlanana kadar bu alan profesyonel portföy vitrini olarak çalışır.
                   </p>
                 </div>
               </div>
 
               <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-                <MetricCard icon={<WalletCards size={22} />} label="Fiyat" value={formatMoney(unit.price)} tone="blue" />
-                <MetricCard icon={<Home size={22} />} label="Oda / Plan" value={unit.roomCount || "—"} tone="green" />
-                <MetricCard icon={<Sparkles size={22} />} label="Alan" value={unit.area ? `${unit.area} m²` : "—"} tone="amber" />
-                <MetricCard icon={<TrendingUp size={22} />} label="m² Değeri" value={calculatedSquareMeterPrice} tone="slate" />
+                <MetricCard
+                  icon={<WalletCards size={22} />}
+                  label="Fiyat"
+                  value={formatMoney(unit.price)}
+                  tone="blue"
+                />
+                <MetricCard
+                  icon={<Home size={22} />}
+                  label="Oda / Plan"
+                  value={unit.roomCount || "—"}
+                  tone="green"
+                />
+                <MetricCard
+                  icon={<Sparkles size={22} />}
+                  label="Alan"
+                  value={unit.area ? `${unit.area} m²` : "—"}
+                  tone="amber"
+                />
+                <MetricCard
+                  icon={<TrendingUp size={22} />}
+                  label="m² Değeri"
+                  value={calculatedSquareMeterPrice}
+                  tone="slate"
+                />
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
-              <SectionTitle icon={<FileText size={21} />} title="İlan Açıklaması" description="Portföy hakkında girilen açıklama ve iç notlar" />
-              <div className="mt-4 rounded-[24px] bg-[#F8FAFC] p-5 text-center text-sm font-semibold leading-7 text-slate-600">
-                {unit.description || "Bu ilan için henüz açıklama girilmemiş. Açıklama alanı; manzara, cephe, kullanım durumu, teslim bilgisi ve özel portföy notları için kullanılabilir."}
+            <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+              <SectionTitle
+                icon={<FileText size={21} />}
+                title="Portföy Açıklaması"
+                description="Detaylı açıklama, paylaşım kartı ve PDF broşürde kullanılacak ana metindir"
+              />
+              <div className="mt-4 rounded-[24px] bg-[#F7FBFF] p-5 text-center text-sm font-semibold leading-7 text-[#475569]">
+                {unit.description ||
+                  "Bu portföy için henüz açıklama girilmemiş. Açıklama alanı; manzara, cephe, kullanım durumu, teslim bilgisi ve özel portföy notları için kullanılabilir."}
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
-              <SectionTitle icon={<ShieldCheck size={21} />} title="Doğrulama ve Güven" description="Tapu, fotoğraf ve yetki kontrolleri" />
+            <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+              <SectionTitle
+                icon={<ShieldCheck size={21} />}
+                title="Doğrulama ve Güven"
+                description="Tapu, fotoğraf ve yetki kontrolleri"
+              />
               <div className="mt-4 grid gap-3 md:grid-cols-3">
-                {verificationItems.map((item) => <VerificationCard key={item.label} {...item} />)}
+                {verificationItems.map((item) => (
+                  <VerificationCard key={item.label} {...item} />
+                ))}
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
-              <SectionTitle icon={<CalendarDays size={21} />} title="İlan Geçmişi" description="Bu alan ilan operasyon kayıtları için hazırlandı" />
+            <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+              <SectionTitle
+                icon={<CalendarDays size={21} />}
+                title="Portföy Geçmişi"
+                description="Portföy operasyon kayıtları"
+              />
               <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <TimelineCard title="İlan oluşturuldu" description="Portföy stok sistemine eklendi." date={formatDate(unit.createdAt)} />
-                <TimelineCard title="Son güncelleme" description="İlan bilgileri son kez işlendi." date={formatDate(unit.updatedAt || unit.createdAt)} />
+                <TimelineCard
+                  title="Portföy oluşturuldu"
+                  description="Kayıt portföy sistemine eklendi."
+                  date={formatDate(unit.createdAt)}
+                />
+                <TimelineCard
+                  title="Son güncelleme"
+                  description="Portföy bilgileri son kez işlendi."
+                  date={formatDate(unit.updatedAt || unit.createdAt)}
+                />
               </div>
             </section>
           </div>
 
           <aside className="space-y-5">
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700"><Building2 size={25} /></div>
-              <h2 className="mt-4 text-xl font-black text-[#0B1F44]">Proje Bilgileri</h2>
+            <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
+                <Building2 size={25} />
+              </div>
+              <h2 className="mt-4 text-xl font-black text-[#06194A]">
+                Portföy Bilgileri
+              </h2>
               <div className="mt-4 space-y-3 text-left">
-                <InfoRow label="Proje" value={unit.project?.name || "—"} />
+                <InfoRow label="Portföy" value={unit.project?.name || "—"} />
                 <InfoRow label="Şehir" value={unit.project?.city || "—"} />
                 <InfoRow label="İlçe" value={unit.project?.district || "—"} />
                 <InfoRow label="Adres" value={unit.project?.address || "—"} />
                 <InfoRow label="Bağımsız Bölüm No" value={unit.number || "—"} />
-                <InfoRow label="Kat" value={unit.floor != null ? String(unit.floor) : "—"} />
+                <InfoRow
+                  label="Kat"
+                  value={unit.floor != null ? String(unit.floor) : "—"}
+                />
                 <InfoRow label="Mülk Tipi" value={typeLabel(unit.type)} />
+                <InfoRow label="Portföy No" value={getPortfolioNo(unit)} />
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700"><CircleUserRound size={25} /></div>
-              <h2 className="mt-4 text-xl font-black text-[#0B1F44]">Portföy Sahibi</h2>
-              <p className="mt-2 text-sm font-semibold text-slate-500">{ownerName || "Kullanıcı bilgisi yok"}</p>
-              {unit.project?.owner?.role && <span className="mt-3 inline-flex rounded-full bg-[#F8FAFC] px-3 py-2 text-xs font-black text-slate-500">{unit.project.owner.role}</span>}
+            <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                <CircleUserRound size={25} />
+              </div>
+              <h2 className="mt-4 text-xl font-black text-[#06194A]">
+                Portföy Sahibi
+              </h2>
+              <p className="mt-2 text-sm font-semibold text-[#64748B]">
+                {ownerName || "Kullanıcı bilgisi yok"}
+              </p>
+              {unit.project?.owner?.role && (
+                <span className="mt-3 inline-flex rounded-full bg-[#F7FBFF] px-3 py-2 text-xs font-black text-[#64748B]">
+                  {unit.project.owner.role}
+                </span>
+              )}
               <div className="mt-4 grid gap-2">
-                <Link href="/messages" className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-slate-900 text-sm font-black text-white"><MessageCircle size={18} /> Mesaj Gönder</Link>
-                <Link href="/network" className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-black text-slate-700"><Share2 size={18} /> Network’te Paylaş</Link>
+                <Link
+                  href="/messages"
+                  className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#06194A] text-sm font-black text-white"
+                >
+                  <MessageCircle size={18} /> Mesaj Gönder
+                </Link>
+                <button
+                  onClick={handleOpenShareModal}
+                  className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-[#DDE7F3] bg-white text-sm font-black text-[#1557D6]"
+                >
+                  <Share2 size={18} /> Kart Hazırla
+                </button>
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-700"><Star size={25} /></div>
-              <h2 className="mt-4 text-xl font-black text-[#0B1F44]">Takip Bilgisi</h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+            <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+                <Star size={25} />
+              </div>
+              <h2 className="mt-4 text-xl font-black text-[#06194A]">
+                Takip Bilgisi
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#64748B]">
                 Bu ilk sürümde takip bilgisi cihaz bazlı tutulur. Backend takip listesi eklendiğinde burada takip eden kullanıcılar görünecek.
               </p>
-              <button onClick={toggleFollow} className={`mt-4 h-12 w-full rounded-2xl text-sm font-black ${isFollowing ? "bg-amber-100 text-amber-700" : "bg-[#0B1F44] text-white"}`}>
-                {isFollowing ? "Takipten Çıkar" : "İlanı Takibe Al"}
+              <button
+                onClick={toggleFollow}
+                className={`mt-4 h-12 w-full rounded-2xl text-sm font-black ${
+                  isFollowing
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-[#1557D6] text-white"
+                }`}
+              >
+                {isFollowing ? "Takipten Çıkar" : "Portföyü Takibe Al"}
               </button>
             </section>
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm">
-              <SectionTitle centered icon={<Phone size={21} />} title="Hızlı Aksiyon" description="Bu ilanı iş akışına bağla" />
+            <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+              <SectionTitle
+                centered
+                icon={<Phone size={21} />}
+                title="Hızlı Aksiyon"
+                description="Bu portföyü iş akışına bağla"
+              />
               <div className="mt-4 grid gap-2">
-                <Link href="/crm" className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white">CRM’e Müşteri Ekle</Link>
-                <Link href="/network" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700">Portföy Talebi Oluştur</Link>
+                <Link
+                  href="/crm"
+                  className="rounded-2xl bg-[#1557D6] px-4 py-3 text-sm font-black text-white"
+                >
+                  CRM’e Müşteri Ekle
+                </Link>
+                <Link
+                  href="/network"
+                  className="rounded-2xl border border-[#DDE7F3] bg-white px-4 py-3 text-sm font-black text-[#475569]"
+                >
+                  Forumda Talep Oluştur
+                </Link>
               </div>
             </section>
           </aside>
         </section>
       </section>
 
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 px-5 pb-6 pt-3 backdrop-blur">
+      <PortfolioShareModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        data={shareData}
+      />
+
+      <nav className="fixed bottom-0 left-0 right-0 border-t border-[#DDE7F3] bg-white/95 px-5 pb-6 pt-3 backdrop-blur">
         <div className="mx-auto flex max-w-md items-center justify-between">
           <BottomItem href="/dashboard" icon={<Home size={21} />} label="Ana Sayfa" />
-          <BottomItem active href="/stok" icon={<Building2 size={21} />} label="Stok" />
-          <BottomItem href="/network" icon={<MessageCircle size={21} />} label="Network" />
+          <BottomItem active href="/stok" icon={<Building2 size={21} />} label="Portföy" />
           <BottomItem href="/crm" icon={<UsersRound size={21} />} label="CRM" />
-          <BottomItem href="/profil" icon={<CircleUserRound size={21} />} label="Profil" />
+          <BottomItem href="/network" icon={<MessageCircle size={21} />} label="Forum" />
+          <BottomItem href="/lina" icon={<Sparkles size={21} />} label="Yapay Zeka" />
         </div>
       </nav>
     </main>
   );
 }
 
-function MetricCard({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone: "blue" | "green" | "amber" | "slate" }) {
-  const styles = { blue: "bg-blue-50 text-blue-700", green: "bg-emerald-50 text-emerald-700", amber: "bg-amber-50 text-amber-700", slate: "bg-slate-100 text-slate-700" };
-  return <div className="rounded-[24px] border border-slate-200 bg-white p-4 text-center"><div className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl ${styles[tone]}`}>{icon}</div><p className="mt-3 text-[10px] font-black uppercase tracking-wide text-slate-400">{label}</p><p className="mt-2 text-base font-black text-[#0B1F44]">{value}</p></div>;
+function ReportCard({
+  icon,
+  title,
+  value,
+  label,
+  progress,
+}: {
+  icon: ReactNode;
+  title: string;
+  value: string;
+  label: string;
+  progress: number;
+}) {
+  return (
+    <section className="rounded-[30px] border border-[#DDE7F3] bg-[#F7FBFF] p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
+            {title}
+          </p>
+          <h2 className="mt-2 text-4xl font-black tracking-[-0.06em] text-[#06194A]">
+            {value}
+          </h2>
+        </div>
+
+        <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-white text-[#1557D6]">
+          {icon}
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-4">
+        <span className="rounded-full bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-[#1557D6]">
+          {label}
+        </span>
+        <span className="text-sm font-black text-[#64748B]">
+          {Math.round(progress)}%
+        </span>
+      </div>
+
+      <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#DBEAFE]">
+        <div
+          className="h-full rounded-full bg-[#1557D6]"
+          style={{ width: `${Math.max(0, Math.min(progress, 100))}%` }}
+        />
+      </div>
+    </section>
+  );
 }
 
-function SectionTitle({ icon, title, description, centered }: { icon: ReactNode; title: string; description: string; centered?: boolean }) {
-  return <div className={centered ? "text-center" : "text-center md:text-left"}><div className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 ${centered ? "" : "md:mx-0"}`}>{icon}</div><h2 className="text-xl font-black text-[#0B1F44]">{title}</h2><p className="mt-1 text-sm font-semibold leading-6 text-slate-500">{description}</p></div>;
+function MetricCard({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  tone: "blue" | "green" | "amber" | "slate";
+}) {
+  const styles = {
+    blue: "bg-[#EFF6FF] text-[#1557D6]",
+    green: "bg-emerald-50 text-emerald-700",
+    amber: "bg-amber-50 text-amber-700",
+    slate: "bg-slate-100 text-slate-700",
+  };
+
+  return (
+    <div className="rounded-[24px] border border-[#DDE7F3] bg-white p-4 text-center">
+      <div
+        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl ${styles[tone]}`}
+      >
+        {icon}
+      </div>
+      <p className="mt-3 text-[10px] font-black uppercase tracking-wide text-[#64748B]">
+        {label}
+      </p>
+      <p className="mt-2 text-base font-black text-[#06194A]">{value}</p>
+    </div>
+  );
 }
 
-function VerificationCard({ label, active, description }: { label: string; active: boolean; description: string }) {
-  return <div className={`rounded-[24px] border p-4 text-center ${active ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-[#F8FAFC]"}`}><div className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl ${active ? "bg-white text-emerald-700" : "bg-white text-slate-400"}`}>{active ? <CheckCircle2 size={24} /> : <BadgeCheck size={24} />}</div><h3 className={`mt-3 text-sm font-black ${active ? "text-emerald-800" : "text-slate-600"}`}>{label}</h3><p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{description}</p><p className={`mt-3 text-[10px] font-black uppercase tracking-wide ${active ? "text-emerald-700" : "text-slate-400"}`}>{active ? "Doğrulandı" : "Bekliyor"}</p></div>;
+function SectionTitle({
+  icon,
+  title,
+  description,
+  centered,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  centered?: boolean;
+}) {
+  return (
+    <div className={centered ? "text-center" : "text-center md:text-left"}>
+      <div
+        className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6] ${
+          centered ? "" : "md:mx-0"
+        }`}
+      >
+        {icon}
+      </div>
+      <h2 className="text-xl font-black text-[#06194A]">{title}</h2>
+      <p className="mt-1 text-sm font-semibold leading-6 text-[#64748B]">
+        {description}
+      </p>
+    </div>
+  );
 }
 
-function TimelineCard({ title, description, date }: { title: string; description: string; date: string }) {
-  return <div className="rounded-[24px] border border-slate-200 bg-[#F8FAFC] p-4 text-center md:text-left"><p className="text-[11px] font-black uppercase tracking-wide text-blue-700">{date}</p><h3 className="mt-2 text-sm font-black text-[#0B1F44]">{title}</h3><p className="mt-1 text-xs font-semibold leading-5 text-slate-500">{description}</p></div>;
+function VerificationCard({
+  label,
+  active,
+  description,
+}: {
+  label: string;
+  active: boolean;
+  description: string;
+}) {
+  return (
+    <div
+      className={`rounded-[24px] border p-4 text-center ${
+        active
+          ? "border-emerald-200 bg-emerald-50"
+          : "border-[#DDE7F3] bg-[#F7FBFF]"
+      }`}
+    >
+      <div
+        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl ${
+          active ? "bg-white text-emerald-700" : "bg-white text-[#64748B]"
+        }`}
+      >
+        {active ? <CheckCircle2 size={24} /> : <BadgeCheck size={24} />}
+      </div>
+      <h3
+        className={`mt-3 text-sm font-black ${
+          active ? "text-emerald-800" : "text-[#475569]"
+        }`}
+      >
+        {label}
+      </h3>
+      <p className="mt-2 text-xs font-semibold leading-5 text-[#64748B]">
+        {description}
+      </p>
+      <p
+        className={`mt-3 text-[10px] font-black uppercase tracking-wide ${
+          active ? "text-emerald-700" : "text-[#64748B]"
+        }`}
+      >
+        {active ? "Doğrulandı" : "Bekliyor"}
+      </p>
+    </div>
+  );
+}
+
+function TimelineCard({
+  title,
+  description,
+  date,
+}: {
+  title: string;
+  description: string;
+  date: string;
+}) {
+  return (
+    <div className="rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center md:text-left">
+      <p className="text-[11px] font-black uppercase tracking-wide text-[#1557D6]">
+        {date}
+      </p>
+      <h3 className="mt-2 text-sm font-black text-[#06194A]">{title}</h3>
+      <p className="mt-1 text-xs font-semibold leading-5 text-[#64748B]">
+        {description}
+      </p>
+    </div>
+  );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
-  return <div className="flex items-start justify-between gap-3 rounded-2xl bg-[#F8FAFC] px-4 py-3"><span className="text-xs font-black uppercase tracking-wide text-slate-400">{label}</span><span className="text-right text-sm font-black text-[#0B1F44]">{value}</span></div>;
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-2xl bg-[#F7FBFF] px-4 py-3">
+      <span className="text-xs font-black uppercase tracking-wide text-[#64748B]">
+        {label}
+      </span>
+      <span className="text-right text-sm font-black text-[#06194A]">
+        {value}
+      </span>
+    </div>
+  );
 }
 
-function BottomItem({ icon, label, active, href }: { icon: ReactNode; label: string; active?: boolean; href: string }) {
-  return <Link href={href} className={`flex w-16 flex-col items-center gap-1 ${active ? "text-[#1D4ED8]" : "text-slate-500"}`}>{icon}<span className="text-[11px] font-bold">{label}</span></Link>;
+function BottomItem({
+  icon,
+  label,
+  active,
+  href,
+}: {
+  icon: ReactNode;
+  label: string;
+  active?: boolean;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex w-16 flex-col items-center gap-1 ${
+        active ? "text-[#1557D6]" : "text-[#64748B]"
+      }`}
+    >
+      {icon}
+      <span className="text-[11px] font-bold">{label}</span>
+    </Link>
+  );
 }
