@@ -12,30 +12,22 @@ type NavItem = {
 
 const SVG = {
   home: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
-  listings:
+  portfolio:
     "M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6M9 10h.01M15 10h.01",
-  customers:
-    "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
-  marketplace:
-    "M4 7h16M4 7l1.4 13h13.2L20 7M7 7l2-4h6l2 4M9 12h6",
-  lina:
+  crm:
+    "M9 5h6M9 9h6M9 13h3M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z",
+  forum:
+    "M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4v8zM8 9h8M8 13h5",
+  ai:
     "M12 3c1.657 0 3 1.343 3 3v1h1a3 3 0 013 3v4a3 3 0 01-3 3h-1v1a3 3 0 01-6 0v-1H8a3 3 0 01-3-3v-4a3 3 0 013-3h1V6c0-1.657 1.343-3 3-3zM9 12h.01M15 12h.01M10 15h4",
 };
 
-const REALTOR_ITEMS: NavItem[] = [
+const MENU_ITEMS: NavItem[] = [
   { href: "/dashboard", svg: SVG.home, label: "Ana Sayfa" },
-  { href: "/stok", svg: SVG.listings, label: "İlanlarım" },
-  { href: "/crm", svg: SVG.customers, label: "Müşterilerim" },
-  { href: "/network", svg: SVG.marketplace, label: "Pazaryeri" },
-  { href: "/lina", svg: SVG.lina, label: "Lina" },
-];
-
-const CONTRACTOR_ITEMS: NavItem[] = [
-  { href: "/dashboard", svg: SVG.home, label: "Ana Sayfa" },
-  { href: "/stok", svg: SVG.listings, label: "Projelerim" },
-  { href: "/crm", svg: SVG.customers, label: "İş Ortaklarım" },
-  { href: "/network", svg: SVG.marketplace, label: "Pazaryeri" },
-  { href: "/lina", svg: SVG.lina, label: "Lina" },
+  { href: "/stok", svg: SVG.portfolio, label: "Portföy" },
+  { href: "/crm", svg: SVG.crm, label: "CRM" },
+  { href: "/network", svg: SVG.forum, label: "Forum" },
+  { href: "/lina", svg: SVG.ai, label: "Yapay Zeka" },
 ];
 
 function normalizeRole(role?: string | null) {
@@ -62,13 +54,15 @@ function getRoleTheme(role?: string | null) {
       active: "#EA580C",
       passive: "#9CA3AF",
       dot: "#EA580C",
+      soft: "#FFF7ED",
     };
   }
 
   return {
-    active: "#2563EB",
+    active: "#1557D6",
     passive: "#9CA3AF",
-    dot: "#2563EB",
+    dot: "#1557D6",
+    soft: "#EFF6FF",
   };
 }
 
@@ -81,12 +75,8 @@ export function BottomNav() {
   const theme = getRoleTheme(user?.role);
 
   const items = useMemo(() => {
-    if (isContractorRole(user?.role)) {
-      return CONTRACTOR_ITEMS;
-    }
-
-    return REALTOR_ITEMS;
-  }, [user?.role]);
+    return MENU_ITEMS;
+  }, []);
 
   useEffect(() => {
     const updateDevice = () => {
@@ -118,15 +108,16 @@ export function BottomNav() {
         right: 0,
         zIndex: 9999,
         background: "#FFFFFF",
-        borderTop: "1px solid #E5E7EB",
-        minHeight: 68,
+        borderTop: "1px solid #DDE7F3",
+        minHeight: 72,
         display: "grid",
         gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
         alignItems: "center",
-        paddingBottom: "max(6px, env(safe-area-inset-bottom))",
-        paddingLeft: 4,
-        paddingRight: 4,
-        boxShadow: "0 -12px 30px rgba(15, 23, 42, 0.08)",
+        paddingBottom: "max(7px, env(safe-area-inset-bottom))",
+        paddingTop: 6,
+        paddingLeft: 5,
+        paddingRight: 5,
+        boxShadow: "0 -14px 34px rgba(15, 23, 42, 0.10)",
       }}
     >
       {items.map((item) => {
@@ -143,15 +134,18 @@ export function BottomNav() {
             style={{
               display: "flex",
               minWidth: 0,
+              minHeight: 58,
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
               gap: 3,
               border: "none",
               cursor: "pointer",
-              background: "transparent",
-              padding: "6px 2px",
+              background: active ? theme.soft : "transparent",
+              borderRadius: 18,
+              padding: "7px 2px",
               WebkitTapHighlightColor: "transparent",
+              transition: "all 0.2s ease",
             }}
           >
             <svg
@@ -173,11 +167,11 @@ export function BottomNav() {
                 width: "100%",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
-                fontSize: 10,
+                fontSize: item.label === "Yapay Zeka" ? 9.4 : 10,
                 lineHeight: "12px",
-                letterSpacing: 0.1,
+                letterSpacing: 0.05,
                 color: active ? theme.active : theme.passive,
-                fontWeight: active ? 800 : 600,
+                fontWeight: active ? 900 : 700,
                 whiteSpace: "nowrap",
                 textAlign: "center",
               }}
