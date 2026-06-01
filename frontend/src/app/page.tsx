@@ -1,205 +1,256 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
-  BadgeCheck,
   BellRing,
   Bot,
-  BriefcaseBusiness,
   Building2,
   CheckCircle2,
-  Home,
-  LayoutDashboard,
   LockKeyhole,
   MessageCircle,
+  Network,
+  Play,
   ShieldCheck,
+  Sparkles,
   UsersRound,
+  X,
 } from "lucide-react";
 
-const liveItems = [
-  "Karahasanlı bölgesinde satılık 2+1 daire aranıyor · müşteri hazır · komisyon paylaşımlı",
-  "Selçuk Bey’de 1160 m² kat karşılığı arsa · Bodrum + 5 Kat · %45 pazarlıklı",
-  "Doktor müşterim için Bölge Hastanesi yakınında 2+1 kiralık daire aranıyor · acil",
-  "Çakmak’ta 1400 m² kat karşılığı arsa · Bodrum + 3 Kat · %35",
-];
-
-const trustBoxes = [
-  { icon: BadgeCheck, title: "Onaylı Üyeler" },
-  { icon: ShieldCheck, title: "Referanslı Sistem" },
-  { icon: LockKeyhole, title: "Kapalı Network" },
-];
-
-const modules = [
+const processCards = [
   {
     icon: Building2,
     title: "Portföy Havuzu",
-    desc: "Portföylerinizi paylaşın, doğru alıcı ve yatırımcıya hızlıca ulaştırın.",
+    text: "Portföylerinizi paylaşın, doğru alıcı ve yatırımcıya hızlıca ulaşın.",
   },
   {
-    icon: BellRing,
+    icon: ArrowRight,
     title: "Talep Akışı",
-    desc: "Alıcı, kiracı, satıcı ve yatırımcı talepleri doğru profesyonellere ulaşır.",
+    text: "Alıcı, kiracı, satıcı ve yatırımcı talepleri doğru profesyonellere ulaşır.",
   },
   {
-    icon: BriefcaseBusiness,
+    icon: UsersRound,
     title: "CRM Takibi",
-    desc: "Müşteri ve ilan süreçlerinizi takip edin, hiçbir fırsatı kaçırmayın.",
+    text: "Müşteri ve ilan süreçlerinizi takip edin, hiçbir fırsatı kaçırmayın.",
   },
   {
     icon: MessageCircle,
     title: "Mesajlaşma",
-    desc: "Üyelerle güvenli ve hızlı iletişim kurun, tüm konuşmalar kayıt altında kalsın.",
+    text: "Üyelerle güvenli ve hızlı iletişim kurun, tüm görüşmeleri kayıt altında tutun.",
   },
   {
     icon: Bot,
     title: "Lina AI Asistan",
-    desc: "Akıllı asistanınız Lina, süreçlerinizi kolaylaştırır, zaman kazandırır.",
+    text: "Lina, süreçlerinizi kolaylaştırır ve işlerinizi hızlandırır.",
   },
 ];
 
 const screens = [
   {
     image: "/showcase/dashboard.jpg",
-    icon: LayoutDashboard,
+    icon: Building2,
     title: "Dashboard",
-    desc: "Genel görünüm ve performans takibi",
+    text: "Genel görünüm ve performans takibi",
   },
   {
     image: "/showcase/crm.jpg",
-    icon: BriefcaseBusiness,
+    icon: UsersRound,
     title: "CRM",
-    desc: "Müşteri ve fırsat yönetimi",
+    text: "Müşteri ve fırsat yönetimi",
   },
   {
     image: "/showcase/stock.jpg",
     icon: Building2,
     title: "Stok",
-    desc: "Portföylerinizi ekleyin ve yönetin",
+    text: "Portföylerinizi ekleyin ve yönetin",
   },
   {
     image: "/showcase/network.jpg",
-    icon: UsersRound,
+    icon: Network,
     title: "Network",
-    desc: "Doğru iş ortaklarıyla güçlü bağlantılar kurun",
+    text: "Doğru iş ortaklarıyla bağlantılar kurun",
   },
   {
     image: "/showcase/lina.jpg",
-    icon: Bot,
+    icon: Sparkles,
     title: "Lina AI",
-    desc: "Akıllı asistanınız Lina ile hızlı çözümler",
+    text: "Akıllı asistanınız Lina ile hızlı çözümler",
+  },
+];
+
+const liveItems = [
+  {
+    dot: "bg-emerald-500",
+    text: "Karahanlı bölgesinde satılık 2+1 daire aranıyor · müşteri hazır · komisyon paylaşımlı",
+    time: "2 dk önce",
+  },
+  {
+    dot: "bg-amber-500",
+    text: "Selçuk Bey'de 1160 m² kat karşılığı arsa · Bodrum + 5 Kat · %45 Kat Karşılığı",
+    time: "7 dk önce",
+  },
+  {
+    dot: "bg-blue-600",
+    text: "Doktor müşterim için; Bölge Hastanesi'ne yakın 2+1 kiralık daire arıyorum · acil",
+    time: "11 dk önce",
+  },
+  {
+    dot: "bg-violet-600",
+    text: "Çakmak'ta 1400 m² kat karşılığı arsa · Bodrum + 3 Kat · %40 Kat Karşılığı",
+    time: "18 dk önce",
   },
 ];
 
 export default function LandingPage() {
-  return (
-    <main className="min-h-screen bg-[#F8FAFC] text-[#071332]">
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
-        <div className="mx-auto flex min-h-20 max-w-7xl items-center justify-between gap-3 px-4 py-3">
-          <Link href="/" className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
-              <img
-                src="/LOGO_EPH.png"
-                alt="EPH Platform"
-                className="h-8 w-8 object-contain"
-              />
-            </div>
+  const [showVideo, setShowVideo] = useState(false);
 
+  useEffect(() => {
+    const seen = sessionStorage.getItem("ephIntroVideoSeen");
+
+    if (seen) return;
+
+    const timer = window.setTimeout(() => {
+      setShowVideo(true);
+      sessionStorage.setItem("ephIntroVideoSeen", "true");
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return (
+    <main className="min-h-screen bg-white text-[#071332]">
+      <header className="sticky top-0 z-50 border-b border-[#E2E8F0] bg-white/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <Link href="/" className="flex min-w-0 items-center gap-3">
+            <img
+              src="/LOGO_EPH.png"
+              alt="EPH Platform"
+              className="h-10 w-10 shrink-0 rounded-xl border border-[#E2E8F0] bg-white object-contain p-1 shadow-sm"
+            />
             <div className="min-w-0">
-              <div className="truncate text-base font-black leading-tight sm:text-lg">
+              <p className="truncate text-sm font-black leading-tight text-[#071332] sm:text-base">
                 EPH Platform
-              </div>
-              <div className="truncate text-[9px] font-black uppercase tracking-[0.18em] text-blue-600 sm:text-[10px] sm:tracking-[0.28em]">
+              </p>
+              <p className="truncate text-[9px] font-black uppercase tracking-[0.24em] text-[#2563EB] sm:text-[10px]">
                 Emlak Portföy Havuzu
-              </div>
+              </p>
             </div>
           </Link>
 
+          <nav className="hidden items-center gap-8 text-sm font-black text-[#172554] lg:flex">
+            <a href="#kesfet" className="transition hover:text-[#2563EB]">
+              Keşfet
+            </a>
+            <a href="#moduller" className="transition hover:text-[#2563EB]">
+              Modüller
+            </a>
+            <a href="#guven" className="transition hover:text-[#2563EB]">
+              Güven
+            </a>
+            <a href="#hakkimizda" className="transition hover:text-[#2563EB]">
+              Hakkımızda
+            </a>
+          </nav>
+
           <Link
             href="/giris"
-            className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 px-4 text-xs font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700"
+            className="flex h-11 shrink-0 items-center justify-center rounded-full border border-[#E2E8F0] bg-white px-5 text-xs font-black text-[#071332] shadow-sm transition hover:border-[#2563EB] hover:text-[#2563EB] sm:text-sm"
           >
-            Giriş
+            Giriş Yap
           </Link>
         </div>
       </header>
 
-      <section id="kesfet" className="mx-auto max-w-7xl px-4 pb-12 pt-10">
-        <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-          <div className="text-center">
-            <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 ring-1 ring-blue-100">
-              <CheckCircle2 size={15} />
+      <section id="kesfet" className="relative overflow-hidden bg-[#FBFCFF]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.10),transparent_34%),radial-gradient(circle_at_top_right,rgba(37,99,235,0.06),transparent_28%)]" />
+
+        <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1fr_0.95fr] lg:items-center lg:px-8 lg:py-16">
+          <div className="text-center lg:text-left">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#DBEAFE] bg-white px-4 py-2 text-xs font-black text-[#2563EB] shadow-sm">
+              <ShieldCheck size={16} />
               Onaylı profesyonel ağ
             </div>
 
-            <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-black leading-[1.08] tracking-tight md:text-6xl">
-              Gayrimenkul profesyonelleri için kapalı devre
-              <span className="block text-blue-600">
+            <h1 className="mx-auto mt-6 max-w-3xl text-center text-[40px] font-black leading-[1.08] tracking-[-0.04em] text-[#071332] sm:text-6xl lg:mx-0 lg:text-left">
+              Emlak profesyonelleri için kapalı devre
+              <span className="block text-[#2563EB]">
                 portföy, talep ve iş birliği ağı.
               </span>
             </h1>
 
-            <p className="mx-auto mt-5 max-w-2xl text-base font-semibold leading-8 text-slate-600 md:text-lg">
-              EPH; gayrimenkul danışmanlarını, müteahhitleri ve inşaat
-              firmalarını kontrollü bir iş ağı içinde buluşturur. Portföyler,
-              talepler, CRM ve mesajlaşma tek merkezde toplanır.
+            <p className="mx-auto mt-5 max-w-2xl text-center text-base font-semibold leading-8 text-[#475569] sm:text-lg lg:mx-0 lg:text-left">
+              EPH; gayrimenkul danışmanları, müteahhitler ve inşaat firmalarını
+              kontrollü bir iş ağı içinde buluşturur. Portföyler, talepler, CRM
+              ve mesajlaşma tek merkezde toplanır.
             </p>
 
-            <div id="guven" className="mx-auto mt-7 grid max-w-3xl gap-4 sm:grid-cols-3">
-              {trustBoxes.map((item) => (
-                <div
-                  key={item.title}
-                  className="flex min-h-[116px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-                    <item.icon size={24} />
-                  </div>
-                  <div className="mt-3 text-sm font-black text-slate-800">
-                    {item.title}
-                  </div>
-                </div>
-              ))}
+            <div className="mt-8 grid grid-cols-3 gap-3">
+              <div className="rounded-3xl border border-[#E2E8F0] bg-white p-4 text-center shadow-sm">
+                <UsersRound className="mx-auto text-[#2563EB]" size={28} />
+                <p className="mt-3 text-xs font-black text-[#071332]">
+                  Onaylı üyeler
+                </p>
+              </div>
+              <div className="rounded-3xl border border-[#E2E8F0] bg-white p-4 text-center shadow-sm">
+                <ShieldCheck className="mx-auto text-[#2563EB]" size={28} />
+                <p className="mt-3 text-xs font-black text-[#071332]">
+                  Referanslı sistem
+                </p>
+              </div>
+              <div className="rounded-3xl border border-[#E2E8F0] bg-white p-4 text-center shadow-sm">
+                <LockKeyhole className="mx-auto text-[#2563EB]" size={28} />
+                <p className="mt-3 text-xs font-black text-[#071332]">
+                  Kapalı network
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm">
-            <div className="flex flex-col items-center justify-center gap-3">
+          <div className="rounded-[30px] border border-[#E2E8F0] bg-white p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">
+                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#2563EB]">
                   Canlı İş Merkezi
-                </div>
-                <h2 className="mt-2 text-2xl font-black">EPH Kontrol Paneli</h2>
+                </p>
+                <h2 className="mt-2 text-2xl font-black text-[#071332]">
+                  EPH Kontrol Paneli
+                </h2>
               </div>
-
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
-                <Home size={24} />
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2563EB] text-white shadow-lg shadow-blue-600/20">
+                <BellRing size={22} />
               </div>
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-3">
-              <Metric value="8.700+" label="Portföy" />
-              <Metric value="344+" label="Aktif Üye" />
+              <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 text-center">
+                <p className="text-2xl font-black text-[#071332]">8.700+</p>
+                <p className="mt-1 text-sm font-semibold text-[#64748B]">
+                  Portföy
+                </p>
+              </div>
+              <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 text-center">
+                <p className="text-2xl font-black text-[#071332]">344+</p>
+                <p className="mt-1 text-sm font-semibold text-[#64748B]">
+                  Aktif Üye
+                </p>
+              </div>
             </div>
 
-            <div className="mt-5 space-y-3">
-              {liveItems.map((item, index) => (
+            <div className="mt-4 grid gap-3">
+              {liveItems.map((item) => (
                 <div
-                  key={item}
-                  className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-[#F8FAFC] p-4 text-left"
+                  key={item.text}
+                  className="grid grid-cols-[auto_1fr_auto] items-start gap-3 rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-sm"
                 >
                   <span
-                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                      index === 0
-                        ? "bg-emerald-500"
-                        : index === 1
-                          ? "bg-orange-500"
-                          : index === 2
-                            ? "bg-blue-500"
-                            : "bg-purple-500"
-                    }`}
+                    className={`mt-1 h-2.5 w-2.5 rounded-full ${item.dot}`}
                   />
-                  <p className="text-sm font-bold leading-6 text-slate-700">
-                    {item}
+                  <p className="text-left text-xs font-bold leading-5 text-[#334155] sm:text-sm">
+                    {item.text}
+                  </p>
+                  <p className="whitespace-nowrap text-xs font-semibold text-[#64748B]">
+                    {item.time}
                   </p>
                 </div>
               ))}
@@ -207,181 +258,185 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className="mt-8 flex justify-center">
+        <div className="relative mx-auto max-w-7xl px-4 pb-12 text-center sm:px-6 lg:px-8">
           <Link
             href="/kayit"
-            className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl bg-blue-600 px-7 text-center text-sm font-black text-white shadow-xl shadow-blue-600/25 transition hover:-translate-y-1 hover:bg-blue-700 sm:px-9"
+            className="mx-auto inline-flex min-h-[60px] w-full max-w-[430px] items-center justify-center gap-3 rounded-2xl bg-[#2563EB] px-7 text-base font-black text-white shadow-xl shadow-blue-600/25 transition hover:bg-[#1D4ED8]"
           >
-            EPH&apos;ye Katılmak İçin Başvur
-            <ArrowRight size={18} />
+            <UsersRound size={22} />
+            EPH’ye Katılmak İçin Başvur
+            <ArrowRight size={21} />
           </Link>
         </div>
       </section>
 
-      <section id="moduller" className="mx-auto max-w-7xl px-4 py-10">
-        <SectionTitle
-          eyebrow="EPH NE İŞE YARAR?"
-          title="Tüm iş süreçlerinizi tek platformda yönetin"
-        />
+      <section id="moduller" className="bg-white px-4 py-14 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl text-center">
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-[#2563EB]">
+            EPH ne işe yarar?
+          </p>
+          <h2 className="mx-auto mt-3 max-w-3xl text-3xl font-black tracking-tight text-[#071332] sm:text-4xl">
+            Tüm iş süreçlerinizi tek platformda yönetin
+          </h2>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-          {modules.map((item) => (
-            <ModuleCard key={item.title} {...item} />
-          ))}
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {processCards.map((item) => (
+              <article
+                key={item.title}
+                className="rounded-[24px] border border-[#E2E8F0] bg-white p-6 text-center shadow-sm"
+              >
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#EFF6FF] text-[#2563EB]">
+                  <item.icon size={27} />
+                </div>
+                <h3 className="mt-5 text-base font-black text-[#071332]">
+                  {item.title}
+                </h3>
+                <p className="mt-3 text-sm font-semibold leading-6 text-[#475569]">
+                  {item.text}
+                </p>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-10">
-        <SectionTitle
-          eyebrow="PLATFORM EKRANLARI"
-          title="EPH’yi yakından tanıyın"
-        />
+      <section className="bg-white px-4 pb-14 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl text-center">
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-[#2563EB]">
+            Platform Ekranları
+          </p>
+          <h2 className="mx-auto mt-3 max-w-3xl text-3xl font-black tracking-tight text-[#071332] sm:text-4xl">
+            EPH’yi yakından tanıyın
+          </h2>
 
-        <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-5">
-          {screens.map((item) => (
-            <ScreenCard key={item.title} {...item} />
-          ))}
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {screens.map((item) => (
+              <article
+                key={item.title}
+                className="overflow-hidden rounded-[24px] border border-[#E2E8F0] bg-white text-center shadow-sm"
+              >
+                <div className="h-32 overflow-hidden bg-[#F8FAFC]">
+                  <img
+                    src={item.image}
+                    alt={item.title}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div className="p-5">
+                  <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-[#EFF6FF] text-[#2563EB]">
+                    <item.icon size={18} />
+                  </div>
+                  <h3 className="mt-3 text-base font-black text-[#071332]">
+                    {item.title}
+                  </h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#475569]">
+                    {item.text}
+                  </p>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section id="basvuru" className="mx-auto max-w-7xl px-4 py-10">
-        <div className="rounded-[30px] border border-blue-100 bg-blue-50/40 p-7 text-center shadow-sm md:p-10">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 text-blue-700">
-            <UsersRound size={36} />
+      <section id="guven" className="bg-white px-4 pb-14 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl rounded-[28px] border border-[#BFDBFE] bg-[#F8FBFF] p-7 text-center shadow-sm sm:p-10">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#DBEAFE] text-[#2563EB]">
+            <UsersRound size={40} />
           </div>
 
-          <h2 className="mx-auto mt-5 max-w-3xl text-3xl font-black tracking-tight md:text-4xl">
+          <h2 className="mx-auto mt-5 max-w-3xl text-3xl font-black text-[#071332] sm:text-4xl">
             Kapalı devre gayrimenkul iş ağına dahil olun.
           </h2>
 
-          <p className="mx-auto mt-4 max-w-2xl text-base font-semibold leading-8 text-slate-600">
+          <p className="mx-auto mt-4 max-w-2xl text-base font-semibold leading-7 text-[#475569]">
             EPH’ye katılmak için başvurunuzu oluşturun. Başvurular admin
             kontrolünden geçer. Onaylanan kullanıcılar kapalı devre iş ağına
             dahil olur.
           </p>
 
-          <div className="mt-7 flex justify-center">
-            <Link
-              href="/kayit"
-              className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl bg-blue-600 px-8 text-center text-sm font-black text-white shadow-xl shadow-blue-600/25 transition hover:-translate-y-1 hover:bg-blue-700"
-            >
-              Üyelik Başvurusu Yap
-              <ArrowRight size={18} />
-            </Link>
-          </div>
+          <Link
+            href="/kayit"
+            className="mx-auto mt-7 inline-flex min-h-[56px] w-full max-w-[380px] items-center justify-center gap-3 rounded-2xl bg-[#2563EB] px-6 text-base font-black text-white shadow-xl shadow-blue-600/20 transition hover:bg-[#1D4ED8]"
+          >
+            <UsersRound size={21} />
+            Üyelik Başvurusu Yap
+            <ArrowRight size={20} />
+          </Link>
         </div>
       </section>
 
-      <footer className="border-t border-slate-200 bg-white px-4 py-8">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-5 text-center">
-          <Link href="/" className="flex items-center justify-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
-              <img
-                src="/LOGO_EPH.png"
-                alt="EPH Platform"
-                className="h-7 w-7 object-contain"
-              />
-            </div>
-
-            <div className="text-left">
-              <div className="text-sm font-black">EPH Platform</div>
-              <div className="text-[9px] font-black uppercase tracking-[0.22em] text-blue-600">
+      <footer
+        id="hakkimizda"
+        className="border-t border-[#E2E8F0] bg-white px-4 py-6 sm:px-6 lg:px-8"
+      >
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-5 text-center lg:flex-row lg:text-left">
+          <Link href="/" className="flex items-center gap-3">
+            <img
+              src="/LOGO_EPH.png"
+              alt="EPH Platform"
+              className="h-9 w-9 rounded-xl border border-[#E2E8F0] bg-white object-contain p-1"
+            />
+            <div>
+              <p className="text-sm font-black text-[#071332]">
+                EPH Platform
+              </p>
+              <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#2563EB]">
                 Emlak Portföy Havuzu
-              </div>
+              </p>
             </div>
           </Link>
 
-          <div className="flex flex-wrap justify-center gap-5 text-xs font-black text-slate-600">
+          <div className="flex flex-wrap items-center justify-center gap-5 text-xs font-black text-[#334155]">
+            <Link href="/platform-anayasasi">Hakkımızda</Link>
             <Link href="/kullanici-sozlesmesi">Kullanım Şartları</Link>
             <Link href="/gizlilik-politikasi">Gizlilik Politikası</Link>
             <Link href="/kvkk">KVKK</Link>
-            <Link href="/platform-anayasasi">Platform Anayasası</Link>
+            <Link href="/iletisim">İletişim</Link>
           </div>
 
-          <p className="text-xs font-semibold text-slate-500">
+          <p className="text-xs font-semibold text-[#64748B]">
             © 2026 EPH Platform. Tüm hakları saklıdır.
           </p>
         </div>
       </footer>
-    </main>
-  );
-}
 
-function Metric({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center">
-      <div className="text-2xl font-black text-slate-950">{value}</div>
-      <div className="mt-1 text-xs font-semibold text-slate-500">{label}</div>
-    </div>
-  );
-}
+      {showVideo ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-0 backdrop-blur-xl md:p-5"
+          onClick={() => setShowVideo(false)}
+        >
+          <div
+            className="relative flex h-screen w-full items-center justify-center overflow-hidden bg-black md:h-[92vh] md:max-w-[520px] md:rounded-[32px]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowVideo(false)}
+              className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white"
+            >
+              <X size={20} />
+            </button>
 
-function ModuleCard({
-  icon: Icon,
-  title,
-  desc,
-}: {
-  icon: typeof Building2;
-  title: string;
-  desc: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-700">
-        <Icon size={25} />
-      </div>
-      <h3 className="mt-5 text-base font-black">{title}</h3>
-      <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-        {desc}
-      </p>
-    </div>
-  );
-}
-
-function ScreenCard({
-  image,
-  icon: Icon,
-  title,
-  desc,
-}: {
-  image: string;
-  icon: typeof Building2;
-  title: string;
-  desc: string;
-}) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white text-center shadow-sm">
-      <img src={image} alt={title} className="h-28 w-full object-cover" />
-
-      <div className="p-5">
-        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-          <Icon size={20} />
+            <video
+              src="/eph.mp4"
+              controls
+              autoPlay
+              muted
+              playsInline
+              className="h-full w-full bg-black object-cover"
+            />
+          </div>
         </div>
+      ) : null}
 
-        <h3 className="mt-3 text-base font-black">{title}</h3>
-        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-          {desc}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function SectionTitle({
-  eyebrow,
-  title,
-}: {
-  eyebrow: string;
-  title: string;
-}) {
-  return (
-    <div className="text-center">
-      <p className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">
-        {eyebrow}
-      </p>
-      <h2 className="mx-auto mt-3 max-w-4xl text-3xl font-black tracking-tight md:text-4xl">
-        {title}
-      </h2>
-    </div>
+      <button
+        type="button"
+        onClick={() => setShowVideo(true)}
+        className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-xl shadow-blue-600/30"
+        aria-label="Tanıtım videosunu aç"
+      >
+        <Play size={22} fill="white" />
+      </button>
+    </main>
   );
 }
