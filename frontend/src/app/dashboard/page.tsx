@@ -12,7 +12,7 @@ import {
   Building2,
   CalendarCheck,
   CheckCircle2,
-  Crown,
+  ChevronRight,
   Home,
   Loader2,
   Menu,
@@ -22,7 +22,6 @@ import {
   ShieldCheck,
   Sparkles,
   Store,
-  TrendingUp,
   UserCheck,
   UsersRound,
   X,
@@ -112,12 +111,6 @@ type DashboardSummary = {
     totalVisits?: number;
     totalProjects?: number;
   };
-  pendingTasks?: Array<{
-    id: string;
-    title: string;
-    dueDate?: string | null;
-    status: string;
-  }>;
 };
 
 type AdminStats = {
@@ -331,6 +324,21 @@ function DashboardShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const toneStyle = toneClasses(tone);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, [menuOpen]);
+
   const mainLinks = [
     { label: "Ana Sayfa", href: "/dashboard", icon: <Home size={20} /> },
     { label: "Stok", href: "/stok", icon: <Building2 size={20} /> },
@@ -443,54 +451,84 @@ function DashboardShell({
 
       {menuOpen && (
         <div
-          className="fixed inset-0 z-[9999] bg-[#06194A]/55 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/55 px-4 pt-8 backdrop-blur-sm"
           onClick={() => setMenuOpen(false)}
+          onTouchMove={(event) => event.preventDefault()}
         >
           <aside
-            className="ml-auto flex h-full w-full max-w-sm flex-col overflow-auto rounded-[30px] border border-[#DDE7F3] bg-white p-5 shadow-2xl"
+            className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-[34px] border border-[#DDE7F3] bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
+            onTouchMove={(event) => event.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div
-                  className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black ${toneStyle.border} ${toneStyle.soft} ${toneStyle.text}`}
-                >
-                  EPH Menü
-                </div>
-
-                <h2 className="mt-2 text-2xl font-black text-[#06194A]">
-                  Hızlı Geçiş
-                </h2>
-
-                <p className="mt-1 text-sm font-semibold text-[#475569]">
-                  Platformun ana bölümlerine tek dokunuşla geç.
-                </p>
-              </div>
+            <div className="shrink-0 px-5 pb-3 pt-4 text-center">
+              <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-[#DDE7F3]" />
 
               <button
                 onClick={() => setMenuOpen(false)}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#27364F]"
+                className="absolute right-7 top-8 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#27364F] shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
+                aria-label="Menüyü kapat"
               >
-                <X size={20} />
+                <X size={22} />
               </button>
+
+              <div className="mx-auto inline-flex rounded-full border border-[#DDE7F3] bg-[#EFF6FF] px-4 py-2 text-xs font-black text-[#1557D6]">
+                EPH Menü
+              </div>
+
+              <h2 className="mt-4 text-[34px] font-black leading-none tracking-[-0.04em] text-[#06194A]">
+                Hızlı Geçiş
+              </h2>
+
+              <p className="mx-auto mt-3 max-w-xs text-center text-base font-semibold leading-7 text-[#475569]">
+                Platformun tüm bölümlerine hızlı geçiş yap.
+              </p>
             </div>
 
-            <div className="mt-5 grid gap-2">
-              {menuLinks.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMenuOpen(false)}
-                  className="flex min-h-14 items-center gap-3 rounded-2xl border border-[#DDE7F3] bg-white px-4 text-sm font-black text-[#27364F] transition hover:bg-[#F7FBFF]"
-                >
-                  <span
-                    className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneStyle.soft} ${toneStyle.text}`}
+            <div
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-6 pt-2"
+              style={{
+                WebkitOverflowScrolling: "touch",
+                touchAction: "pan-y",
+              }}
+            >
+              <div className="mx-auto grid max-w-sm gap-3">
+                {menuLinks.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMenuOpen(false)}
+                    className="grid min-h-[74px] grid-cols-[58px_1fr_24px] items-center gap-4 rounded-[24px] border border-[#DDE7F3] bg-white px-4 text-left shadow-[0_10px_26px_rgba(15,23,42,0.06)] transition hover:bg-[#F7FBFF]"
                   >
-                    {item.icon}
+                    <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
+                      {item.icon}
+                    </span>
+
+                    <span className="text-[20px] font-black text-[#06194A]">
+                      {item.label}
+                    </span>
+
+                    <ChevronRight size={22} className="text-[#1557D6]" />
+                  </Link>
+                ))}
+              </div>
+
+              <div className="mx-auto mt-7 max-w-sm text-center">
+                <div className="flex items-center justify-center gap-4">
+                  <span className="h-px flex-1 bg-[#DDE7F3]" />
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EFF6FF] text-[#1557D6]">
+                    <ShieldCheck size={23} />
                   </span>
-                  {item.label}
-                </Link>
-              ))}
+                  <span className="h-px flex-1 bg-[#DDE7F3]" />
+                </div>
+
+                <p className="mt-4 text-lg font-black text-[#1557D6]">
+                  Güvenli. Verimli. Kazançlı.
+                </p>
+
+                <p className="mt-1 text-sm font-bold text-[#64748B]">
+                  EPH Platform
+                </p>
+              </div>
             </div>
           </aside>
         </div>
