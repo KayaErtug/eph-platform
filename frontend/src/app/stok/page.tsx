@@ -2,22 +2,959 @@
 
 import LinaPanel from "../../components/LinaPanel";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/store/auth.store";
-import api from "@/lib/api";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import StokPremiumStyles from "@/components/stok/StokPremiumStyles";
-import StokKpiCards from "@/components/stok/StokKpiCards";
-import StokToolbar from "@/components/stok/StokToolbar";
-import StokTable from "@/components/stok/StokTable";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Bell, Menu, X } from "lucide-react";
+
+import api from "@/lib/api";
+import { useAuthStore } from "@/store/auth.store";
 import StokCreateModal from "@/components/stok/StokCreateModal";
+import StokTable from "@/components/stok/StokTable";
 import type {
   Project,
   ProjectFormState,
   Unit,
   UnitFormState,
 } from "@/components/stok/stokTypes";
+
+type ViewMode = "cards" | "list";
+
+type RoleType =
+  | "realtor"
+  | "contractor"
+  | "construction"
+  | "admin"
+  | "superadmin";
+
+type ToneType = "blue" | "orange" | "green" | "purple" | "slate";
+
+type VerifyPayload = {
+  tapuVerified?: boolean;
+  photoVerified?: boolean;
+  yetkiVerified?: boolean;
+  isOffMarket?: boolean;
+};
+
+const STATUS_OPTIONS = [
+  { value: "", label: "Tümü" },
+  { value: "SATILIK", label: "Satılık" },
+  { value: "KIRALIK", label: "Kiralık" },
+  { value: "ON_SATIS", label: "Ön Satış" },
+  { value: "PROJE_ASAMASI", label: "Proje" },
+  { value: "YAKINDA_SATISTA", label: "Yakında" },
+  { value: "INSAAT_HALINDE", label: "İnşaat" },
+  { value: "HEMEN_TESLIM", label: "Teslim" },
+  { value: "SATILDI", label: "Satıldı" },
+  { value: "PASIF", label: "Pasif" },
+];
+
+const QUICK_ACTIONS = [
+  {
+    label: "Yeni Portföy",
+    desc: "Stok kaydı oluştur",
+    action: "add",
+    accent: "#1557D6",
+  },
+  {
+    label: "Lina Yardımı",
+    desc: "Metin ve analiz desteği",
+    action: "lina",
+    accent: "#7C3AED",
+  },
+  {
+    label: "Network",
+    desc: "Talep ve fırsatlar",
+    href: "/network",
+    accent: "#EA580C",
+  },
+  {
+    label: "CRM",
+    desc: "Müşteri takibi",
+    href: "/crm",
+    accent: "#16A34A",
+  },
+  {
+    label: "Dashboard",
+    desc: "Kontrol merkezi",
+    href: "/dashboard",
+    accent: "#0F172A",
+  },
+];
+
+function normalizeRole(role?: string | null) {
+  return String(role || "")
+    .toLocaleUpperCase("tr-TR")
+    .trim();
+}
+
+function getRoleType(role?: string | null): RoleType {
+  const normalizedRole = normalizeRole(role);
+
+  if (normalizedRole === "SUPER_ADMIN") return "superadmin";
+  if (normalizedRole === "ADMIN") return "admin";
+
+  if (
+    normalizedRole === "INSAAT_FIRMASI" ||
+    normalizedRole === "İNŞAAT_FİRMASI"
+  ) {
+    return "construction";
+  }
+
+  if (
+    normalizedRole === "MUTEAHHIT" ||
+    normalizedRole === "MÜTEAHHİT" ||
+    normalizedRole === "MÜTAHHİT"
+  ) {
+    return "contractor";
+  }
+
+  return "realtor";
+}
+
+function roleLabel(role?: string | null) {
+  const normalizedRole = normalizeRole(role);
+
+  if (normalizedRole === "SUPER_ADMIN") return "Süper Admin";
+  if (normalizedRole === "ADMIN") return "Admin";
+  if (normalizedRole === "MUTEAHHIT") return "Müteahhit";
+  if (normalizedRole === "MÜTEAHHİT") return "Müteahhit";
+  if (normalizedRole === "MÜTAHHİT") return "Müteahhit";
+  if (normalizedRole === "INSAAT_FIRMASI") return "İnşaat Firması";
+  if (normalizedRole === "İNŞAAT_FİRMASI") return "İnşaat Firması";
+
+  return "Gayrimenkul Danışmanı";
+}
+
+function getTone(roleType: RoleType): ToneType {
+  if (roleType === "contractor") return "orange";
+  if (roleType === "construction") return "green";
+  if (roleType === "admin") return "purple";
+  if (roleType === "superadmin") return "slate";
+
+  return "blue";
+}
+
+function toneColors(tone: ToneType) {
+  const map = {
+    blue: {
+      main: "#1557D6",
+      hover: "#0F49BD",
+      soft: "#EFF6FF",
+      border: "#DDE7F3",
+      shadow: "rgba(21,87,214,0.24)",
+    },
+    orange: {
+      main: "#EA580C",
+      hover: "#C2410C",
+      soft: "#FFF7ED",
+      border: "#FED7AA",
+      shadow: "rgba(234,88,12,0.20)",
+    },
+    green: {
+      main: "#16A34A",
+      hover: "#15803D",
+      soft: "#F0FDF4",
+      border: "#BBF7D0",
+      shadow: "rgba(22,163,74,0.18)",
+    },
+    purple: {
+      main: "#7C3AED",
+      hover: "#6D28D9",
+      soft: "#F5F3FF",
+      border: "#DDD6FE",
+      shadow: "rgba(124,58,237,0.20)",
+    },
+    slate: {
+      main: "#0F172A",
+      hover: "#020617",
+      soft: "#F1F5F9",
+      border: "#DDE7F3",
+      shadow: "rgba(15,23,42,0.20)",
+    },
+  };
+
+  return map[tone];
+}
+
+function formatPrice(value?: number | string | null) {
+  const price = Number(value || 0);
+
+  if (!price) return "Fiyat yok";
+
+  return `${price.toLocaleString("tr-TR")} TL`;
+}
+
+function formatStatus(value?: string | null) {
+  const status = String(value || "").trim();
+
+  const map: Record<string, string> = {
+    SATILIK: "Satılık",
+    KIRALIK: "Kiralık",
+    ON_SATIS: "Ön Satış",
+    PROJE_ASAMASI: "Proje Aşaması",
+    YAKINDA_SATISTA: "Yakında Satışta",
+    INSAAT_HALINDE: "İnşaat Halinde",
+    HEMEN_TESLIM: "Hemen Teslim",
+    INSAAT_PROJESI: "İnşaat Projesi",
+    SATILDI: "Satıldı",
+    PASIF: "Pasif",
+  };
+
+  return map[status] || status || "Durum Yok";
+}
+
+function unitLocation(unit: Unit) {
+  return [unit.project?.district, unit.project?.city].filter(Boolean).join(" / ");
+}
+
+function unitTitle(unit: Unit) {
+  return unit.project?.name || "EPH Portföy";
+}
+
+function isUnitVerified(unit: Unit) {
+  return Boolean(
+    unit.isVerified ||
+      (unit.tapuVerified && unit.photoVerified && unit.yetkiVerified),
+  );
+}
+
+function countByStatus(units: Unit[], status: string) {
+  return units.filter((unit) => unit.status === status).length;
+}
+
+function Shell({
+  title,
+  role,
+  tone,
+  children,
+  onLogout,
+}: {
+  title: string;
+  role: string;
+  tone: ToneType;
+  children: React.ReactNode;
+  onLogout: () => void;
+}) {
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const colors = toneColors(tone);
+
+  const links = [
+    { label: "Dashboard", href: "/dashboard" },
+    { label: "İlanlarım", href: "/stok" },
+    { label: "CRM", href: "/crm" },
+    { label: "Network", href: "/network" },
+    { label: "Mesajlar", href: "/messages" },
+    { label: "Profil", href: "/profil" },
+  ];
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const scrollY = window.scrollY;
+    const originalPosition = document.body.style.position;
+    const originalTop = document.body.style.top;
+    const originalWidth = document.body.style.width;
+    const originalOverflow = document.body.style.overflow;
+
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.position = originalPosition;
+      document.body.style.top = originalTop;
+      document.body.style.width = originalWidth;
+      document.body.style.overflow = originalOverflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [menuOpen]);
+
+  return (
+    <main className="min-h-screen bg-[#F7FBFF] text-[#06194A]">
+      <header className="sticky top-0 z-50 border-b border-[#DDE7F3] bg-white/95 shadow-[0_10px_28px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+        <div className="mx-auto grid max-w-7xl grid-cols-[76px_1fr_76px] items-center gap-2 px-4 py-4 md:grid-cols-[150px_1fr_150px] md:px-6 lg:px-8">
+          <div className="flex justify-start">
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="flex h-[58px] w-[58px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_10px_24px_rgba(15,23,42,0.10)] md:h-[70px] md:w-[70px]"
+              aria-label="Dashboard'a dön"
+            >
+              <ArrowLeft size={23} strokeWidth={2.6} />
+              <span className="mt-1 text-[10px] font-black">GERİ</span>
+            </button>
+          </div>
+
+          <div className="min-w-0 text-center">
+            <div
+              className="mx-auto inline-flex max-w-full rounded-full border px-3 py-1 text-[10px] font-black md:text-[11px]"
+              style={{
+                borderColor: colors.border,
+                backgroundColor: colors.soft,
+                color: colors.main,
+              }}
+            >
+              {role}
+            </div>
+
+            <h1 className="mt-2 truncate text-[24px] font-black leading-none tracking-[-0.04em] text-[#06194A] md:text-[40px]">
+              {title}
+            </h1>
+
+            <p className="mt-1 truncate text-[12px] font-bold text-[#1557D6] md:text-[17px]">
+              EPH Platform İş Merkezi
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Link
+              href="/notification-settings"
+              className="relative hidden h-[58px] w-[58px] items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_10px_24px_rgba(15,23,42,0.10)] sm:flex md:h-[70px] md:w-[70px]"
+              aria-label="Bildirim ayarları"
+            >
+              <Bell size={23} />
+            </Link>
+
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="flex h-[58px] w-[58px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_10px_24px_rgba(15,23,42,0.10)] md:h-[70px] md:w-[70px]"
+              aria-label="Menüyü aç"
+            >
+              <Menu size={24} strokeWidth={2.7} />
+              <span className="mt-1 text-[10px] font-black">MENÜ</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <section className="mx-auto max-w-7xl px-4 py-6 pb-28 md:px-6 lg:px-8">
+        {children}
+      </section>
+
+      {menuOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/65 px-4 pt-8 backdrop-blur-sm">
+          <aside className="flex max-h-[92dvh] w-full max-w-[430px] flex-col overflow-hidden rounded-t-[36px] border border-[#DDE7F3] bg-white shadow-2xl">
+            <div className="relative shrink-0 px-6 pb-5 pt-6 text-center">
+              <div className="mx-auto mb-5 h-1.5 w-14 rounded-full bg-[#DDE7F3]" />
+
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="absolute right-5 top-7 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#06194A] shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
+                aria-label="Menüyü kapat"
+              >
+                <X size={24} />
+              </button>
+
+              <h2 className="text-[34px] font-black leading-none tracking-[-0.04em] text-[#06194A]">
+                EPH Menü
+              </h2>
+
+              <p className="mx-auto mt-3 max-w-[320px] text-[15px] font-bold leading-7 text-[#64748B]">
+                Tüm bölümlere simetrik ve hızlı geçiş.
+              </p>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-1">
+              <div className="grid gap-3">
+                {links.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMenuOpen(false)}
+                    className="flex h-[74px] w-full items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-white px-5 text-center text-[20px] font-black text-[#06194A] shadow-[0_10px_26px_rgba(15,23,42,0.06)]"
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  onLogout();
+                }}
+                className="mt-6 flex h-[62px] w-full items-center justify-center rounded-2xl bg-[#1557D6] text-[19px] font-black text-white shadow-[0_16px_34px_rgba(21,87,214,0.24)]"
+              >
+                Çıkış Yap
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+    </main>
+  );
+}
+
+function SectionCard({
+  title,
+  desc,
+  accent = "#1557D6",
+  children,
+}: {
+  title: string;
+  desc: string;
+  accent?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-[32px] border border-[#DDE7F3] bg-white text-center shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
+      <div className="mx-auto h-2 w-full" style={{ backgroundColor: accent }} />
+
+      <div className="p-5 md:p-6">
+        <h2 className="text-[26px] font-black leading-tight tracking-[-0.035em] text-[#06194A] md:text-[34px]">
+          {title}
+        </h2>
+
+        <p className="mx-auto mt-2 max-w-2xl text-[14px] font-semibold leading-7 text-[#475569] md:text-[16px]">
+          {desc}
+        </p>
+
+        <div className="mt-5">{children}</div>
+      </div>
+    </section>
+  );
+}
+
+function Hero({
+  firstName,
+  role,
+  totalUnits,
+  activeUnits,
+  soldUnits,
+  verifiedUnits,
+  tone,
+}: {
+  firstName: string;
+  role: string;
+  totalUnits: number;
+  activeUnits: number;
+  soldUnits: number;
+  verifiedUnits: number;
+  tone: ToneType;
+}) {
+  const colors = toneColors(tone);
+
+  return (
+    <section className="relative overflow-hidden rounded-[34px] border border-[#DDE7F3] bg-white p-6 text-center shadow-[0_22px_60px_rgba(15,23,42,0.10)] md:p-8">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(21,87,214,0.10),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(219,234,254,0.75),transparent_30%)]" />
+
+      <div className="relative">
+        <div
+          className="mx-auto inline-flex rounded-full border px-4 py-2 text-xs font-black"
+          style={{
+            color: colors.main,
+            backgroundColor: colors.soft,
+            borderColor: colors.border,
+          }}
+        >
+          {role}
+        </div>
+
+        <h2 className="mx-auto mt-5 max-w-4xl text-[38px] font-black leading-[1.02] tracking-[-0.05em] text-[#06194A] md:text-[64px]">
+          İlanlarım
+        </h2>
+
+        <p className="mx-auto mt-4 max-w-2xl text-base font-semibold leading-8 text-[#27364F] md:text-lg">
+          Hoşgeldiniz {firstName}. Portföy, proje ve ilan akışını mobil öncelikli
+          EPH v2 panelinden yönetin.
+        </p>
+
+        <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <HeroMini value={totalUnits} label="Toplam İlan" />
+          <HeroMini value={activeUnits} label="Aktif İlan" />
+          <HeroMini value={soldUnits} label="Kapanan" />
+          <HeroMini value={verifiedUnits} label="Doğrulanmış" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HeroMini({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="flex min-h-[112px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_10px_26px_rgba(15,23,42,0.06)]">
+      <div className="text-3xl font-black text-[#06194A]">{value}</div>
+      <div className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[#64748B]">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function KpiGrid({
+  units,
+  projects,
+}: {
+  units: Unit[];
+  projects: Project[];
+}) {
+  const activeCount = units.filter((unit) =>
+    ["SATILIK", "KIRALIK", "ON_SATIS", "PROJE_ASAMASI", "YAKINDA_SATISTA", "INSAAT_HALINDE", "HEMEN_TESLIM", "INSAAT_PROJESI"].includes(
+      unit.status || "",
+    ),
+  ).length;
+
+  const items = [
+    {
+      label: "Toplam Portföy",
+      value: units.length,
+      desc: "Kayıtlı bağımsız bölüm",
+      accent: "#1557D6",
+    },
+    {
+      label: "Aktif Stok",
+      value: activeCount,
+      desc: "Satış veya kiralama açık",
+      accent: "#16A34A",
+    },
+    {
+      label: "Projeler",
+      value: projects.length,
+      desc: "Bağlı proje kayıtları",
+      accent: "#EA580C",
+    },
+    {
+      label: "Doğrulanan",
+      value: units.filter(isUnitVerified).length,
+      desc: "Güven kontrolü tamam",
+      accent: "#7C3AED",
+    },
+  ];
+
+  return (
+    <section className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="flex min-h-[210px] flex-col items-center justify-center overflow-hidden rounded-[28px] border border-[#DDE7F3] bg-white text-center shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
+        >
+          <div className="h-2 w-full" style={{ backgroundColor: item.accent }} />
+
+          <div className="flex flex-1 flex-col items-center justify-center p-5">
+            <p className="text-[12px] font-black uppercase tracking-[0.15em] text-[#64748B]">
+              {item.label}
+            </p>
+
+            <p className="mt-3 text-[44px] font-black leading-none tracking-[-0.04em] text-[#06194A]">
+              {item.value}
+            </p>
+
+            <p className="mt-3 flex min-h-[44px] items-center justify-center text-sm font-semibold leading-6 text-[#475569]">
+              {item.desc}
+            </p>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function QuickActions({
+  canAddUnit,
+  onAdd,
+  onLina,
+}: {
+  canAddUnit: boolean;
+  onAdd: () => void;
+  onLina: () => void;
+}) {
+  const handleAction = (action?: string) => {
+    if (action === "add") {
+      if (canAddUnit) onAdd();
+      return;
+    }
+
+    if (action === "lina") {
+      onLina();
+    }
+  };
+
+  return (
+    <SectionCard
+      title="Hızlı İşlemler"
+      desc="İlan yönetiminde en çok kullanılan işlemler simetrik kart düzeninde."
+      accent="#1557D6"
+    >
+      <div className="scrollbar-hide -mx-5 overflow-x-auto px-5 pb-1">
+        <div className="flex w-max gap-3">
+          {QUICK_ACTIONS.map((item) => {
+            const content = (
+              <div className="flex h-[154px] w-[154px] shrink-0 flex-col items-center justify-center overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-white text-center shadow-[0_12px_30px_rgba(15,23,42,0.07)]">
+                <div
+                  className="h-2 w-full shrink-0"
+                  style={{ backgroundColor: item.accent }}
+                />
+
+                <div className="flex flex-1 flex-col items-center justify-center px-4">
+                  <p className="flex min-h-[42px] items-center justify-center text-[15px] font-black leading-5 text-[#06194A]">
+                    {item.label}
+                  </p>
+
+                  <p className="mt-2 flex min-h-[38px] items-center justify-center text-[11px] font-bold leading-5 text-[#64748B]">
+                    {item.desc}
+                  </p>
+                </div>
+              </div>
+            );
+
+            if (item.href) {
+              return (
+                <Link key={item.label} href={item.href}>
+                  {content}
+                </Link>
+              );
+            }
+
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => handleAction(item.action)}
+                disabled={item.action === "add" && !canAddUnit}
+                className="disabled:opacity-50"
+              >
+                {content}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
+function FilterCenter({
+  search,
+  setSearch,
+  statusFilter,
+  setStatusFilter,
+  cityFilter,
+  setCityFilter,
+  viewMode,
+  setViewMode,
+  visibleCount,
+  totalCount,
+}: {
+  search: string;
+  setSearch: (value: string) => void;
+  statusFilter: string;
+  setStatusFilter: (value: string) => void;
+  cityFilter: string;
+  setCityFilter: (value: string) => void;
+  viewMode: ViewMode;
+  setViewMode: (value: ViewMode) => void;
+  visibleCount: number;
+  totalCount: number;
+}) {
+  return (
+    <SectionCard
+      title="Filtre Merkezi"
+      desc={`${visibleCount} / ${totalCount} kayıt gösteriliyor. Arama, şehir ve durum filtreleri aktiftir.`}
+      accent="#EA580C"
+    >
+      <div className="grid gap-3">
+        <div className="grid gap-3 md:grid-cols-2">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Proje, şehir, mahalle, numara veya durum ara"
+            className="h-[58px] w-full rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 text-center text-sm font-bold text-[#06194A] outline-none placeholder:text-[#64748B] focus:border-[#1557D6] focus:bg-white"
+          />
+
+          <input
+            value={cityFilter}
+            onChange={(event) => setCityFilter(event.target.value)}
+            placeholder="Şehir filtrele"
+            className="h-[58px] w-full rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 text-center text-sm font-bold text-[#06194A] outline-none placeholder:text-[#64748B] focus:border-[#1557D6] focus:bg-white"
+          />
+        </div>
+
+        <div className="scrollbar-hide -mx-5 overflow-x-auto px-5 pb-1">
+          <div className="flex w-max gap-2">
+            {STATUS_OPTIONS.map((item) => (
+              <button
+                key={item.value || "all"}
+                type="button"
+                onClick={() => setStatusFilter(item.value)}
+                className={`h-[52px] w-[118px] shrink-0 rounded-2xl border text-center text-[12px] font-black transition ${
+                  statusFilter === item.value
+                    ? "border-[#1557D6] bg-[#1557D6] text-white shadow-[0_14px_30px_rgba(21,87,214,0.24)]"
+                    : "border-[#DDE7F3] bg-white text-[#27364F]"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setViewMode("cards")}
+            className={`h-[56px] rounded-2xl border text-center text-sm font-black ${
+              viewMode === "cards"
+                ? "border-[#1557D6] bg-[#1557D6] text-white"
+                : "border-[#DDE7F3] bg-white text-[#27364F]"
+            }`}
+          >
+            Kart Görünümü
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode("list")}
+            className={`h-[56px] rounded-2xl border text-center text-sm font-black ${
+              viewMode === "list"
+                ? "border-[#1557D6] bg-[#1557D6] text-white"
+                : "border-[#DDE7F3] bg-white text-[#27364F]"
+            }`}
+          >
+            Liste Görünümü
+          </button>
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
+function UnitCards({
+  units,
+  isAdmin,
+  onVerify,
+}: {
+  units: Unit[];
+  isAdmin: boolean;
+  onVerify: (unitId: string, payload: VerifyPayload) => void;
+}) {
+  if (units.length === 0) {
+    return (
+      <div className="flex min-h-[260px] items-center justify-center rounded-[28px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] p-8 text-center">
+        <p className="mx-auto max-w-[320px] text-sm font-bold leading-7 text-[#64748B]">
+          Filtrelere uygun portföy kaydı bulunamadı.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid auto-rows-fr gap-4 lg:grid-cols-2">
+      {units.map((unit) => (
+        <UnitCard
+          key={unit.id}
+          unit={unit}
+          isAdmin={isAdmin}
+          onVerify={onVerify}
+        />
+      ))}
+    </div>
+  );
+}
+
+function UnitCard({
+  unit,
+  isAdmin,
+  onVerify,
+}: {
+  unit: Unit;
+  isAdmin: boolean;
+  onVerify: (unitId: string, payload: VerifyPayload) => void;
+}) {
+  const verified = isUnitVerified(unit);
+  const location = unitLocation(unit);
+
+  return (
+    <article className="flex min-h-[390px] flex-col overflow-hidden rounded-[28px] border border-[#DDE7F3] bg-white text-center shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
+      <div
+        className="h-2 w-full shrink-0"
+        style={{
+          backgroundColor: verified ? "#16A34A" : "#EA580C",
+        }}
+      />
+
+      <div className="flex flex-1 flex-col items-center justify-between p-5">
+        <div className="w-full">
+          <div className="flex flex-wrap justify-center gap-2">
+            <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[11px] font-black text-[#1557D6]">
+              {formatStatus(unit.status)}
+            </span>
+
+            <span
+              className={`rounded-full px-3 py-1 text-[11px] font-black ${
+                verified
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              {verified ? "Doğrulanmış" : "Kontrol Bekliyor"}
+            </span>
+
+            {unit.isOffMarket && (
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-700">
+                Off-Market
+              </span>
+            )}
+          </div>
+
+          <h3 className="mx-auto mt-5 flex min-h-[58px] max-w-[420px] items-center justify-center text-[22px] font-black leading-tight tracking-[-0.035em] text-[#06194A]">
+            <span className="line-clamp-2">{unitTitle(unit)}</span>
+          </h3>
+
+          <p className="mx-auto mt-3 flex min-h-[24px] max-w-[380px] items-center justify-center text-sm font-bold text-[#64748B]">
+            <span className="line-clamp-1">
+              {location || "Konum bilgisi yok"} {unit.number ? `· No ${unit.number}` : ""}
+            </span>
+          </p>
+
+          <p className="mt-4 text-[28px] font-black leading-none tracking-[-0.035em] text-[#1557D6]">
+            {formatPrice(unit.price)}
+          </p>
+        </div>
+
+        <div className="mt-5 grid w-full grid-cols-2 gap-3 sm:grid-cols-4">
+          <UnitMini label="Tip" value={unit.type || "—"} />
+          <UnitMini label="Oda" value={unit.roomCount || "—"} />
+          <UnitMini label="Alan" value={unit.area ? `${unit.area} m²` : "—"} />
+          <UnitMini
+            label="Kat"
+            value={unit.floor != null ? String(unit.floor) : "—"}
+          />
+        </div>
+
+        {isAdmin && (
+          <div className="mt-5 w-full rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center">
+            <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#64748B]">
+              Admin Doğrulama
+            </p>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <VerifyButton
+                active={Boolean(unit.tapuVerified)}
+                label={unit.tapuVerified ? "Tapu Onaylı" : "Tapu Onayla"}
+                onClick={() =>
+                  onVerify(unit.id, {
+                    tapuVerified: !unit.tapuVerified,
+                    photoVerified: unit.photoVerified,
+                    yetkiVerified: unit.yetkiVerified,
+                    isOffMarket: unit.isOffMarket,
+                  })
+                }
+              />
+
+              <VerifyButton
+                active={Boolean(unit.photoVerified)}
+                label={
+                  unit.photoVerified ? "Fotoğraf Onaylı" : "Fotoğraf Onayla"
+                }
+                onClick={() =>
+                  onVerify(unit.id, {
+                    tapuVerified: unit.tapuVerified,
+                    photoVerified: !unit.photoVerified,
+                    yetkiVerified: unit.yetkiVerified,
+                    isOffMarket: unit.isOffMarket,
+                  })
+                }
+              />
+
+              <VerifyButton
+                active={Boolean(unit.yetkiVerified)}
+                label={unit.yetkiVerified ? "Yetki Onaylı" : "Yetki Onayla"}
+                onClick={() =>
+                  onVerify(unit.id, {
+                    tapuVerified: unit.tapuVerified,
+                    photoVerified: unit.photoVerified,
+                    yetkiVerified: !unit.yetkiVerified,
+                    isOffMarket: unit.isOffMarket,
+                  })
+                }
+              />
+
+              <VerifyButton
+                active={verified}
+                label="Tümünü Doğrula"
+                onClick={() =>
+                  onVerify(unit.id, {
+                    tapuVerified: true,
+                    photoVerified: true,
+                    yetkiVerified: true,
+                    isOffMarket: unit.isOffMarket,
+                  })
+                }
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function UnitMini({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-h-[74px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] p-3 text-center">
+      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#64748B]">
+        {label}
+      </p>
+
+      <p className="mt-1 line-clamp-1 text-sm font-black text-[#06194A]">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function VerifyButton({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`h-[48px] rounded-2xl border px-3 text-center text-[12px] font-black transition ${
+        active
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-[#DDE7F3] bg-white text-[#27364F] hover:border-[#1557D6]"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function InventorySection({
+  units,
+  viewMode,
+  isAdmin,
+  onVerify,
+}: {
+  units: Unit[];
+  viewMode: ViewMode;
+  isAdmin: boolean;
+  onVerify: (unitId: string, payload: VerifyPayload) => void;
+}) {
+  return (
+    <SectionCard
+      title="Canlı İlan Listesi"
+      desc="Kart ve liste görünümü aktiftir. Tüm içerikler mobil simetri kuralına göre hizalanır."
+      accent="#16A34A"
+    >
+      {viewMode === "cards" ? (
+        <UnitCards units={units} isAdmin={isAdmin} onVerify={onVerify} />
+      ) : (
+        <div className="overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-white text-left">
+          <StokTable units={units} />
+        </div>
+      )}
+    </SectionCard>
+  );
+}
 
 export default function StokPage() {
   const { user, logout } = useAuthStore();
@@ -32,6 +969,7 @@ export default function StokPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [projectForm, setProjectForm] = useState<ProjectFormState>({
@@ -56,10 +994,22 @@ export default function StokPage() {
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState(false);
 
+  const roleType = getRoleType(user?.role);
+  const tone = getTone(roleType);
+  const roleName = roleLabel(user?.role);
+  const isAdmin = roleType === "admin" || roleType === "superadmin";
+
+  const firstName =
+    user?.firstName?.trim() || user?.email?.split("@")[0] || "EPH Üyesi";
+
   const canAddUnit =
     user?.role === "MUTEAHHIT" ||
+    user?.role === "MÜTEAHHİT" ||
+    user?.role === "MÜTAHHİT" ||
     user?.role === "INSAAT_FIRMASI" ||
+    user?.role === "İNŞAAT_FİRMASI" ||
     user?.role === "ADMIN" ||
+    user?.role === "SUPER_ADMIN" ||
     user?.role === "EMLAKCI";
 
   useEffect(() => {
@@ -75,7 +1025,7 @@ export default function StokPage() {
     }
 
     fetchData();
-  }, [hydrated, user]);
+  }, [hydrated, user, router]);
 
   useEffect(() => {
     if (!hydrated || !user) return;
@@ -84,14 +1034,16 @@ export default function StokPage() {
   }, [statusFilter, cityFilter]);
 
   const fetchData = async () => {
+    setLoading(true);
+
     try {
       const [projectRes, unitRes] = await Promise.all([
         api.get("/projects"),
         api.get("/units"),
       ]);
 
-      setProjects(projectRes.data || []);
-      setUnits(unitRes.data || []);
+      setProjects(Array.isArray(projectRes.data) ? projectRes.data : []);
+      setUnits(Array.isArray(unitRes.data) ? unitRes.data : []);
     } finally {
       setLoading(false);
     }
@@ -105,7 +1057,7 @@ export default function StokPage() {
 
     const res = await api.get(`/units?${params.toString()}`);
 
-    setUnits(res.data || []);
+    setUnits(Array.isArray(res.data) ? res.data : []);
   };
 
   const filteredUnits = useMemo(() => {
@@ -123,6 +1075,7 @@ export default function StokPage() {
         unit.type,
         unit.status,
         unit.roomCount,
+        unit.description,
       ]
         .join(" ")
         .toLocaleLowerCase("tr-TR");
@@ -131,11 +1084,15 @@ export default function StokPage() {
     });
   }, [units, search]);
 
-  const myProjects = user?.role === "ADMIN" ? projects : [];
+  const activeUnits = units.filter((unit) =>
+    ["SATILIK", "KIRALIK", "ON_SATIS", "PROJE_ASAMASI", "YAKINDA_SATISTA", "INSAAT_HALINDE", "HEMEN_TESLIM", "INSAAT_PROJESI"].includes(
+      unit.status || "",
+    ),
+  ).length;
 
-  // Not: Emlakçı/Müteahhit kendi projesini yeni kayıt olarak açabilir.
-  // Rol bazlı proje filtreleme, aynı role sahip başka kullanıcının projesini seçtirip
-  // /units/project/:id endpointinde 403 Forbidden hatasına yol açıyordu.
+  const soldUnits = countByStatus(units, "SATILDI");
+  const verifiedUnits = units.filter(isUnitVerified).length;
+  const myProjects = isAdmin ? projects : [];
 
   const resetForm = () => {
     setSelectedProjectId("");
@@ -217,15 +1174,7 @@ export default function StokPage() {
     }
   };
 
-  const handleAdminVerify = async (
-    unitId: string,
-    payload: {
-      tapuVerified?: boolean;
-      photoVerified?: boolean;
-      yetkiVerified?: boolean;
-      isOffMarket?: boolean;
-    },
-  ) => {
+  const handleAdminVerify = async (unitId: string, payload: VerifyPayload) => {
     try {
       await api.patch(`/units/${unitId}/verify`, payload);
       await fetchData();
@@ -234,177 +1183,73 @@ export default function StokPage() {
     }
   };
 
+  const handleLogout = () => {
+    logout();
+    router.push("/giris");
+  };
+
   if (!hydrated || loading) {
     return (
-      <div
-        className="stock-page-v2"
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-        }}
-      >
-        <StokPremiumStyles />
-
-        <div
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: "50%",
-            border: "3px solid #1D4ED8",
-            borderTopColor: "transparent",
-            animation: "spin .8s linear infinite",
-          }}
-        />
-
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      </div>
+      <main className="flex min-h-screen items-center justify-center bg-[#F7FBFF]">
+        <div className="flex flex-col items-center gap-4 text-[#27364F]">
+          <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-[#1557D6] border-t-transparent" />
+          <p className="text-sm font-black">İlanlarım yükleniyor...</p>
+        </div>
+      </main>
     );
   }
 
-  if (user?.role === "ADMIN") {
-    return (
-      <>
-        <AdminInventoryCommandCenter
-          units={filteredUnits}
-          allUnits={units}
-          projects={projects}
+  return (
+    <Shell
+      title="İlanlarım"
+      role={roleName}
+      tone={tone}
+      onLogout={handleLogout}
+    >
+      <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
+
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <Hero
+          firstName={firstName}
+          role={roleName}
+          totalUnits={units.length}
+          activeUnits={activeUnits}
+          soldUnits={soldUnits}
+          verifiedUnits={verifiedUnits}
+          tone={tone}
+        />
+
+        <KpiGrid units={units} projects={projects} />
+
+        <QuickActions
+          canAddUnit={canAddUnit}
+          onAdd={() => {
+            resetForm();
+            setShowModal(true);
+          }}
+          onLina={() => setLinaOpen(true)}
+        />
+
+        <FilterCenter
           search={search}
           setSearch={setSearch}
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
           cityFilter={cityFilter}
           setCityFilter={setCityFilter}
-          onBack={() => router.push("/dashboard")}
-          onLogout={() => {
-            logout();
-            router.push("/giris");
-          }}
-          onAdd={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-          onLina={() => setLinaOpen(true)}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          visibleCount={filteredUnits.length}
+          totalCount={units.length}
+        />
+
+        <InventorySection
+          units={filteredUnits}
+          viewMode={viewMode}
+          isAdmin={isAdmin}
           onVerify={handleAdminVerify}
         />
-        <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
-        <StokCreateModal
-          open={showModal}
-          onClose={() => setShowModal(false)}
-          projects={myProjects}
-          selectedProjectId={selectedProjectId}
-          setSelectedProjectId={setSelectedProjectId}
-          projectForm={projectForm}
-          setProjectForm={setProjectForm}
-          unitForm={unitForm}
-          setUnitForm={setUnitForm}
-          formError={formError}
-          formSuccess={formSuccess}
-          formLoading={formLoading}
-          onSubmit={handleSubmit}
-        />
-      </>
-    );
-  }
-
-  return (
-    <div className="stock-page-v2">
-      <StokPremiumStyles />
-
-      <header className="stock-appbar-v2">
-        <button
-          onClick={() => router.push("/dashboard")}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
-          aria-label="Dashboard'a dön"
-        >
-          <ArrowLeft size={20} />
-        </button>
-
-        <Link href="/dashboard" className="stock-brand-v2">
-          <img src="/LOGO_EPH.png" alt="EPH" />
-
-          <div>
-            <div className="stock-brand-name">EPH Platform</div>
-            <div className="stock-brand-sub">Emlak Portföy Havuzu</div>
-          </div>
-        </Link>
-
-        <nav className="stock-nav-v2">
-          <Link href="/dashboard">Ana Sayfa</Link>
-
-          <Link href="/stok" className="active">
-            Stok
-          </Link>
-
-          <Link href="/network">Network</Link>
-
-          <Link href="/crm">CRM</Link>
-
-          <Link href="/market">Piyasa</Link>
-
-          <Link href="/profil">Profil</Link>
-
-          {user?.role === "ADMIN" && <Link href="/admin">Admin</Link>}
-        </nav>
-
-        <button
-          className="stock-logout-v2"
-          onClick={() => {
-            logout();
-            router.push("/giris");
-          }}
-        >
-          Çıkış
-        </button>
-      </header>
-
-      <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
-
-      <main className="stock-main-v2">
-        <section className="stock-hero-v2">
-          <div className="stock-hero-left-v2">
-            <div className="stock-section-kicker">Portföy Yönetimi</div>
-
-            <h1>Stok ve İlanlar</h1>
-
-            <p>
-              Proje, bağımsız bölüm ve portföy kayıtlarını tek ekrandan
-              yönetin.
-            </p>
-          </div>
-
-          <div className="stock-hero-card-v2">
-            <span>Aktif Kullanıcı</span>
-
-            <strong>
-              {user?.firstName || "EPH"} {user?.lastName || ""}
-            </strong>
-          </div>
-        </section>
-
-        <StokKpiCards units={units} projects={projects} />
-
-        <section className="stock-panel-v2">
-          <StokToolbar
-            search={search}
-            setSearch={setSearch}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            cityFilter={cityFilter}
-            setCityFilter={setCityFilter}
-            visibleCount={filteredUnits.length}
-            totalCount={units.length}
-            onAdd={() => {
-              resetForm();
-              setShowModal(true);
-            }}
-            onLina={() => setLinaOpen(true)}
-            canAddUnit={canAddUnit}
-          />
-
-          <StokTable units={filteredUnits} />
-        </section>
-      </main>
+      </div>
 
       <StokCreateModal
         open={showModal}
@@ -421,350 +1266,17 @@ export default function StokPage() {
         formLoading={formLoading}
         onSubmit={handleSubmit}
       />
-    </div>
+
+      <style jsx global>{`
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
+    </Shell>
   );
-}
-
-function AdminInventoryCommandCenter({
-  units,
-  allUnits,
-  projects,
-  search,
-  setSearch,
-  statusFilter,
-  setStatusFilter,
-  cityFilter,
-  setCityFilter,
-  onBack,
-  onLogout,
-  onAdd,
-  onLina,
-  onVerify,
-}: {
-  units: Unit[];
-  allUnits: Unit[];
-  projects: Project[];
-  search: string;
-  setSearch: (value: string) => void;
-  statusFilter: string;
-  setStatusFilter: (value: string) => void;
-  cityFilter: string;
-  setCityFilter: (value: string) => void;
-  onBack: () => void;
-  onLogout: () => void;
-  onAdd: () => void;
-  onLina: () => void;
-  onVerify: (
-    unitId: string,
-    payload: {
-      tapuVerified?: boolean;
-      photoVerified?: boolean;
-      yetkiVerified?: boolean;
-      isOffMarket?: boolean;
-    },
-  ) => void;
-}) {
-  const totalValue = allUnits.reduce((sum, unit) => sum + (Number(unit.price) || 0), 0);
-  const verifiedUnits = allUnits.filter((unit) => unit.isVerified).length;
-  const offMarketUnits = allUnits.filter((unit) => unit.isOffMarket).length;
-  const unverifiedUnits = allUnits.filter((unit) => !unit.isVerified).length;
-  const hotUnits = allUnits.filter((unit) => ["SATILIK", "KIRALIK", "ON_SATIS", "PROJE_ASAMASI", "YAKINDA_SATISTA", "INSAAT_PROJESI", "HEMEN_TESLIM"].includes(unit.status)).length;
-
-  const cityCounts = allUnits.reduce<Record<string, number>>((acc, unit) => {
-    const city = unit.project?.city || "Bilinmeyen";
-    acc[city] = (acc[city] || 0) + 1;
-    return acc;
-  }, {});
-
-  const topCities = Object.entries(cityCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
-
-  return (
-    <main className="min-h-screen overflow-hidden bg-[#020617] text-white">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_15%_12%,rgba(34,211,238,0.22),transparent_30%),radial-gradient(circle_at_85%_18%,rgba(201,168,76,0.22),transparent_28%),radial-gradient(circle_at_50%_92%,rgba(59,130,246,0.22),transparent_36%)]" />
-      <div className="pointer-events-none fixed inset-0 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,.35)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.35)_1px,transparent_1px)] [background-size:46px_46px]" />
-
-      <header className="sticky top-0 z-50 border-b border-cyan-300/15 bg-[#020617]/85 backdrop-blur-2xl">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={onBack} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/20 bg-white/5 text-cyan-100 transition hover:border-[#C9A84C] hover:text-[#F7DFA3]" aria-label="Dashboard'a dön"><ArrowLeft size={20} /></button>
-            <Link href="/dashboard" className="flex items-center gap-3 no-underline">
-              <div className="relative">
-                <div className="absolute inset-0 rounded-2xl bg-cyan-400/30 blur-xl" />
-                <img src="/LOGO_EPH.png" alt="EPH" className="relative h-11 w-11 object-contain" />
-              </div>
-              <div>
-                <div className="font-serif text-xl font-semibold text-white">EPH Inventory Core</div>
-                <div className="text-[10px] font-black uppercase tracking-[0.28em] text-[#C9A84C]">Admin Command Layer</div>
-              </div>
-            </Link>
-          </div>
-
-          <nav className="flex flex-wrap items-center justify-center gap-2">
-            {[["/dashboard","Mission"],["/admin","Admin"],["/network","Network"],["/crm","CRM"],["/market","Piyasa"],["/profil","Profil"]].map(([href,label]) => (
-              <Link key={href} href={href} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-slate-300 no-underline transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-white">{label}</Link>
-            ))}
-            <button onClick={onLogout} className="rounded-full border border-rose-400/25 bg-rose-500/10 px-4 py-2 text-xs font-black text-rose-200 transition hover:bg-rose-500/20">Çıkış</button>
-          </nav>
-        </div>
-      </header>
-
-      <section className="relative z-10 mx-auto max-w-7xl px-5 py-8 pb-24">
-        <section className="relative overflow-hidden rounded-[44px] border border-cyan-300/20 bg-[#061126]/90 p-6 shadow-2xl shadow-cyan-950/50 lg:p-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(34,211,238,0.26),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(201,168,76,0.22),transparent_26%),radial-gradient(circle_at_50%_95%,rgba(29,78,216,0.30),transparent_38%)]" />
-          <div className="absolute left-8 top-8 h-40 w-40 rounded-full border border-cyan-300/10" />
-          <div className="absolute right-8 top-10 h-28 w-28 rounded-full border border-[#C9A84C]/10" />
-
-          <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
-            <div className="rounded-[34px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-xl">
-              <div className="mb-6 flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.22em] text-cyan-100">◉ Inventory Mission Control</span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-100"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" />Sistem Aktif</span>
-              </div>
-              <h1 className="font-serif text-4xl font-semibold leading-tight md:text-6xl">Portföy<span className="block bg-gradient-to-r from-[#F7DFA3] via-cyan-100 to-white bg-clip-text text-transparent">Komuta Merkezi</span></h1>
-              <p className="mt-4 max-w-2xl text-sm font-medium leading-7 text-slate-300">Tüm stok akışı, proje yoğunluğu, doğrulama sinyalleri ve off-market fırsatları admin katmanında izlenir. Admin kullanıcı operasyonu yönetir; bireysel kullanıcı panelinden ayrıdır.</p>
-              <div className="mt-7 grid gap-3 sm:grid-cols-3">
-                <AdminSignal title="Toplam Değer" value={totalValue ? `${(totalValue / 1000000).toFixed(1)}M ₺` : "0 ₺"} />
-                <AdminSignal title="Riskli / Onaysız" value={String(unverifiedUnits)} />
-                <AdminSignal title="Sıcak Stok" value={String(hotUnits)} />
-              </div>
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                <button onClick={onAdd} className="rounded-2xl bg-[#C9A84C] px-5 py-3 text-sm font-black text-[#061126] shadow-xl shadow-[#C9A84C]/20 transition hover:scale-[1.02]">+ Yeni Stok Kaydı</button>
-                <button onClick={onLina} className="rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-5 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-300/15">Lina AI Analiz</button>
-              </div>
-            </div>
-
-            <div className="grid gap-4">
-              <div className="rounded-[34px] border border-white/10 bg-black/20 p-5 backdrop-blur-xl">
-                <div className="flex items-center justify-between gap-4">
-                  <div><p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/80">Radar Sinyalleri</p><h2 className="mt-2 text-2xl font-black text-white">Portföy Sağlığı</h2></div>
-                  <div className="flex h-14 w-14 items-center justify-center rounded-[22px] border border-[#C9A84C]/25 bg-[#C9A84C]/10 text-[#F7DFA3]">⌁</div>
-                </div>
-                <div className="mt-5 grid gap-3">
-                  <RadarLine label="Doğrulanmış Envanter" value={verifiedUnits} total={Math.max(allUnits.length, 1)} tone="cyan" />
-                  <RadarLine label="Off-Market Sinyali" value={offMarketUnits} total={Math.max(allUnits.length, 1)} tone="gold" />
-                  <RadarLine label="Onay Bekleyen Stok" value={unverifiedUnits} total={Math.max(allUnits.length, 1)} tone="rose" />
-                </div>
-              </div>
-
-              <div className="rounded-[34px] border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl">
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#C9A84C]">Bölgesel Isı Haritası</p>
-                <div className="mt-4 grid gap-2">
-                  {topCities.length > 0 ? topCities.map(([city,count]) => (
-                    <div key={city} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3"><span className="text-sm font-bold text-slate-200">{city}</span><span className="rounded-full bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-100">{count} kayıt</span></div>
-                  )) : <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-bold text-slate-400">Henüz bölgesel veri yok.</div>}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <AdminMetric label="Toplam Stok" value={allUnits.length} note="Canlı envanter" tone="cyan" />
-          <AdminMetric label="Proje Sayısı" value={projects.length} note="Aktif proje ağı" tone="gold" />
-          <AdminMetric label="Doğrulanmış" value={verifiedUnits} note="Güvenli portföy" tone="green" />
-          <AdminMetric label="Off-Market" value={offMarketUnits} note="Gizli fırsatlar" tone="violet" />
-        </section>
-
-        <section className="mt-6 rounded-[34px] border border-cyan-300/15 bg-[#061126]/85 p-5 shadow-2xl shadow-cyan-950/30 backdrop-blur-xl">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div><p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#C9A84C]">Inventory Grid</p><h2 className="mt-2 font-serif text-3xl font-semibold text-white">Canlı Portföy Radarı</h2></div>
-            <div className="flex flex-col gap-2 lg:flex-row">
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Proje, şehir, no veya durum ara..." className="h-12 min-w-[260px] rounded-2xl border border-cyan-300/15 bg-white/10 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-12 rounded-2xl border border-cyan-300/15 bg-[#08172D] px-4 text-sm font-bold text-white outline-none focus:border-cyan-300/40">
-                <option value="">Tüm Durumlar</option><option value="SATILIK">Satılık</option><option value="KIRALIK">Kiralık</option><option value="ON_SATIS">Ön Satış</option><option value="PROJE_ASAMASI">Proje Aşaması</option><option value="YAKINDA_SATISTA">Yakında Satışta</option><option value="INSAAT_HALINDE">İnşaat Halinde</option><option value="HEMEN_TESLIM">Hemen Teslim</option><option value="INSAAT_PROJESI">İnşaat Projesi</option><option value="SATILDI">Satıldı</option><option value="PASIF">Pasif</option>
-              </select>
-              <input value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} placeholder="Şehir filtrele" className="h-12 rounded-2xl border border-cyan-300/15 bg-white/10 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40" />
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-4 xl:grid-cols-2">
-            {units.length === 0 ? <div className="rounded-[28px] border border-dashed border-cyan-300/20 bg-white/[0.04] p-10 text-center text-sm font-bold text-slate-400 xl:col-span-2">Portföy kaydı bulunamadı.</div> : units.slice(0, 24).map((unit) => (
-                <AdminUnitCard key={unit.id} unit={unit} onVerify={onVerify} />
-              ))}
-          </div>
-        </section>
-      </section>
-    </main>
-  );
-}
-
-function AdminSignal({ title, value }: { title: string; value: string }) {
-  return <div className="rounded-[24px] border border-cyan-300/15 bg-white/[0.07] p-4 backdrop-blur"><p className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">{title}</p><p className="mt-2 text-xl font-black text-white">{value}</p></div>;
-}
-
-function RadarLine({ label, value, total, tone }: { label: string; value: number; total: number; tone: "cyan" | "gold" | "rose" }) {
-  const width = Math.min(100, Math.round((value / total) * 100));
-  const bar = tone === "gold" ? "bg-[#C9A84C]" : tone === "rose" ? "bg-rose-400" : "bg-cyan-300";
-  return <div className="rounded-[22px] border border-white/10 bg-white/[0.06] p-4"><div className="mb-3 flex items-center justify-between gap-4"><span className="text-xs font-black uppercase tracking-[0.16em] text-slate-300">{label}</span><span className="text-sm font-black text-white">{value}</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full ${bar}`} style={{ width: `${width}%` }} /></div></div>;
-}
-
-function AdminMetric({ label, value, note, tone }: { label: string; value: number; note: string; tone: string }) {
-  const colors: Record<string, string> = { cyan: "border-cyan-300/20 bg-cyan-300/10 text-cyan-100", gold: "border-[#C9A84C]/25 bg-[#C9A84C]/10 text-[#F7DFA3]", green: "border-emerald-300/20 bg-emerald-400/10 text-emerald-100", violet: "border-violet-300/20 bg-violet-400/10 text-violet-100" };
-  return <div className={`rounded-[30px] border p-5 shadow-xl shadow-black/20 ${colors[tone] || colors.cyan}`}><p className="text-[10px] font-black uppercase tracking-[0.22em] opacity-75">{label}</p><p className="mt-3 font-serif text-5xl font-semibold">{value}</p><p className="mt-3 text-xs font-bold opacity-70">{note}</p></div>;
-}
-
-function AdminUnitCard({
-  unit,
-  onVerify,
-}: {
-  unit: Unit;
-  onVerify: (
-    unitId: string,
-    payload: {
-      tapuVerified?: boolean;
-      photoVerified?: boolean;
-      yetkiVerified?: boolean;
-      isOffMarket?: boolean;
-    },
-  ) => void;
-}) {
-  const verified = unit.isVerified || (unit.tapuVerified && unit.photoVerified && unit.yetkiVerified);
-  const price = Number(unit.price || 0);
-
-  return (
-    <article className="group relative overflow-hidden rounded-[30px] border border-cyan-300/15 bg-white/[0.06] p-5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-white/[0.09]">
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/70 to-transparent opacity-0 transition group-hover:opacity-100" />
-
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100">
-              {unit.status || "Durum Yok"}
-            </span>
-
-            {unit.isOffMarket && (
-              <span className="rounded-full border border-[#C9A84C]/25 bg-[#C9A84C]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#F7DFA3]">
-                Off-Market
-              </span>
-            )}
-
-            <span
-              className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${
-                verified
-                  ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
-                  : "border-rose-300/25 bg-rose-400/10 text-rose-100"
-              }`}
-            >
-              {verified ? "Doğrulandı" : "Kontrol"}
-            </span>
-          </div>
-
-          <h3 className="mt-4 font-serif text-2xl font-semibold text-white">
-            {unit.project?.name || "EPH Portföy"}
-          </h3>
-
-          <p className="mt-1 text-sm font-semibold text-slate-400">
-            {[unit.project?.district, unit.project?.city].filter(Boolean).join(" / ") || "Konum yok"} · No {unit.number || "—"}
-          </p>
-        </div>
-
-        <div className="rounded-[22px] border border-[#C9A84C]/20 bg-[#C9A84C]/10 px-5 py-4 text-right">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#F7DFA3]/70">
-            Değer
-          </p>
-          <p className="mt-1 font-serif text-2xl font-semibold text-[#F7DFA3]">
-            {price ? `${price.toLocaleString("tr-TR")} ₺` : "—"}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-4">
-        <AdminUnitMini label="Tip" value={unit.type || "—"} />
-        <AdminUnitMini label="Oda" value={unit.roomCount || "—"} />
-        <AdminUnitMini label="Alan" value={unit.area ? `${unit.area} m²` : "—"} />
-        <AdminUnitMini label="Kat" value={unit.floor != null ? String(unit.floor) : "—"} />
-      </div>
-
-      <div className="mt-5 grid gap-2 sm:grid-cols-3">
-        <AdminCheck label="Tapu" active={Boolean(unit.tapuVerified)} />
-        <AdminCheck label="Fotoğraf" active={Boolean(unit.photoVerified)} />
-        <AdminCheck label="Yetki" active={Boolean(unit.yetkiVerified)} />
-      </div>
-
-      <div className="mt-5 rounded-[24px] border border-white/10 bg-black/20 p-4">
-        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#C9A84C]">
-          Admin Doğrulama
-        </p>
-
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <button
-            onClick={() =>
-              onVerify(unit.id, {
-                tapuVerified: !unit.tapuVerified,
-                photoVerified: unit.photoVerified,
-                yetkiVerified: unit.yetkiVerified,
-                isOffMarket: unit.isOffMarket,
-              })
-            }
-            className={`rounded-2xl border px-4 py-3 text-xs font-black transition ${
-              unit.tapuVerified
-                ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
-                : "border-white/10 bg-white/[0.06] text-slate-300 hover:border-emerald-300/30 hover:text-emerald-100"
-            }`}
-          >
-            {unit.tapuVerified ? "Tapu Onaylı" : "Tapu Onayla"}
-          </button>
-
-          <button
-            onClick={() =>
-              onVerify(unit.id, {
-                tapuVerified: unit.tapuVerified,
-                photoVerified: !unit.photoVerified,
-                yetkiVerified: unit.yetkiVerified,
-                isOffMarket: unit.isOffMarket,
-              })
-            }
-            className={`rounded-2xl border px-4 py-3 text-xs font-black transition ${
-              unit.photoVerified
-                ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
-                : "border-white/10 bg-white/[0.06] text-slate-300 hover:border-emerald-300/30 hover:text-emerald-100"
-            }`}
-          >
-            {unit.photoVerified ? "Fotoğraf Onaylı" : "Fotoğraf Onayla"}
-          </button>
-
-          <button
-            onClick={() =>
-              onVerify(unit.id, {
-                tapuVerified: unit.tapuVerified,
-                photoVerified: unit.photoVerified,
-                yetkiVerified: !unit.yetkiVerified,
-                isOffMarket: unit.isOffMarket,
-              })
-            }
-            className={`rounded-2xl border px-4 py-3 text-xs font-black transition ${
-              unit.yetkiVerified
-                ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
-                : "border-white/10 bg-white/[0.06] text-slate-300 hover:border-emerald-300/30 hover:text-emerald-100"
-            }`}
-          >
-            {unit.yetkiVerified ? "Yetki Onaylı" : "Yetki Onayla"}
-          </button>
-
-          <button
-            onClick={() =>
-              onVerify(unit.id, {
-                tapuVerified: true,
-                photoVerified: true,
-                yetkiVerified: true,
-                isOffMarket: unit.isOffMarket,
-              })
-            }
-            className="rounded-2xl border border-[#C9A84C]/25 bg-[#C9A84C] px-4 py-3 text-xs font-black text-[#061126] transition hover:scale-[1.02]"
-          >
-            Tümünü Doğrula
-          </button>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-
-function AdminUnitMini({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-3"><p className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-500">{label}</p><p className="mt-1 text-sm font-black text-slate-100">{value}</p></div>;
-}
-
-function AdminCheck({ label, active }: { label: string; active: boolean }) {
-  return <div className={`rounded-2xl border px-4 py-3 text-center text-xs font-black uppercase tracking-[0.16em] ${active ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100" : "border-rose-300/25 bg-rose-400/10 text-rose-100"}`}>{active ? "✓" : "!"} {label}</div>;
 }
