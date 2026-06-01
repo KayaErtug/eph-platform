@@ -412,7 +412,7 @@ function DashboardShell({
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-4 py-6 pb-28 md:px-6 lg:px-8">
+      <section className="mx-auto max-w-7xl px-4 py-7 pb-28 md:px-6 md:py-9 lg:px-8">
         {children}
       </section>
 
@@ -544,8 +544,8 @@ function WelcomeCard({
   const toneStyle = toneClasses(tone);
 
   return (
-    <section className="relative overflow-hidden rounded-[32px] border border-[#DDE7F3] bg-white p-6 text-center shadow-[0_22px_60px_rgba(15,23,42,0.10)] md:p-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(21,87,214,0.10),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(219,234,254,0.75),transparent_30%)]" />
+    <section className="relative overflow-hidden rounded-[32px] border border-[#DDE7F3] bg-white p-7 text-center shadow-[0_24px_70px_rgba(15,23,42,0.10)] md:p-10">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(21,87,214,0.12),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(219,234,254,0.85),transparent_34%)]" />
 
       <div className="relative">
         <div
@@ -555,15 +555,15 @@ function WelcomeCard({
           {role}
         </div>
 
-        <h2 className="mx-auto mt-5 max-w-4xl text-[34px] font-black leading-[1.08] tracking-[-0.045em] text-[#06194A] md:text-[58px]">
+        <h2 className="mx-auto mt-6 max-w-4xl text-[38px] font-black leading-[1.04] tracking-[-0.05em] text-[#06194A] md:text-[64px]">
           {greetingText()} {firstName}
         </h2>
 
-        <p className="mx-auto mt-4 max-w-2xl text-base font-semibold leading-8 text-[#27364F] md:text-lg">
-          Bugünkü portföy, müşteri, görev ve mesaj akışını tek ekrandan yönet.
+        <p className="mx-auto mt-5 max-w-2xl text-base font-bold leading-8 text-[#27364F] md:text-xl">
+          Portföylerini, müşteri takiplerini, görevlerini ve mesajlarını tek merkezden profesyonel şekilde yönet.
         </p>
 
-        <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <MiniSummary value={portfolioCount} label="Aktif Portföy" />
           <MiniSummary value={customerCount} label="CRM Kaydı" />
           <MiniSummary value={taskCount} label="Açık Görev" />
@@ -576,7 +576,7 @@ function WelcomeCard({
 
 function MiniSummary({ value, label }: { value: number; label: string }) {
   return (
-    <div className="rounded-2xl border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_10px_26px_rgba(15,23,42,0.06)]">
+    <div className="flex min-h-[118px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_10px_26px_rgba(15,23,42,0.06)]">
       <div className="text-3xl font-black text-[#06194A]">{value}</div>
       <div className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[#64748B]">
         {label}
@@ -605,21 +605,21 @@ function KpiCard({
   return (
     <Link
       href={href}
-      className="flex min-h-[238px] flex-col items-center justify-center rounded-[26px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_14px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(15,23,42,0.12)]"
+      className="flex min-h-[252px] flex-col items-center justify-center rounded-[28px] border border-[#DDE7F3] bg-white p-6 text-center shadow-[0_14px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(15,23,42,0.12)]"
     >
       <div
-        className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl ${toneStyle.soft} ${toneStyle.text}`}
+        className={`mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] ${toneStyle.soft} ${toneStyle.text}`}
       >
         {icon}
       </div>
 
-      <p className="mt-4 text-xs font-black uppercase tracking-[0.16em] text-[#64748B]">
+      <p className="mt-5 text-xs font-black uppercase tracking-[0.16em] text-[#64748B]">
         {title}
       </p>
 
-      <p className="mt-2 text-3xl font-black text-[#06194A]">{value}</p>
+      <p className="mt-3 text-4xl font-black text-[#06194A]">{value}</p>
 
-      <p className="mt-2 line-clamp-2 min-h-[48px] text-sm font-semibold leading-6 text-[#475569]">
+      <p className="mt-3 line-clamp-2 min-h-[48px] text-sm font-bold leading-6 text-[#475569]">
         {desc}
       </p>
     </Link>
@@ -638,14 +638,14 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_18px_48px_rgba(15,23,42,0.08)] md:p-6">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6] ring-1 ring-[#DDE7F3]">
+    <section className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_18px_48px_rgba(15,23,42,0.08)] md:p-7">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6] ring-1 ring-[#DDE7F3]">
         {icon}
       </div>
 
-      <h2 className="mt-4 text-2xl font-black text-[#06194A]">{title}</h2>
+      <h2 className="mt-5 text-2xl font-black tracking-[-0.03em] text-[#06194A] md:text-3xl">{title}</h2>
 
-      <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#475569]">
+      <p className="mx-auto mt-3 max-w-2xl text-sm font-bold leading-6 text-[#475569]">
         {desc}
       </p>
 
@@ -670,15 +670,15 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="flex h-[148px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_12px_30px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:shadow-[0_20px_44px_rgba(15,23,42,0.12)]"
+      className="flex min-h-[168px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_12px_30px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:shadow-[0_20px_44px_rgba(15,23,42,0.12)]"
     >
       <div
-        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl text-white ${toneStyle.bg} ${toneStyle.shadow}`}
+        className={`mx-auto flex h-14 w-14 items-center justify-center rounded-[20px] text-white ${toneStyle.bg} ${toneStyle.shadow}`}
       >
         {icon}
       </div>
 
-      <span className="mt-4 flex min-h-[40px] items-center justify-center text-center text-sm font-black leading-5 text-[#27364F]">
+      <span className="mt-4 flex min-h-[44px] items-center justify-center text-center text-[15px] font-black leading-5 text-[#27364F]">
         {label}
       </span>
     </Link>
@@ -699,7 +699,7 @@ function TaskRow({
   return (
     <Link
       href="/crm"
-      className="flex h-[104px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3 text-center transition hover:bg-white"
+      className="flex min-h-[118px] flex-col items-center justify-center rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3 text-center transition hover:bg-white"
     >
       <div className="line-clamp-1 text-sm font-black text-[#06194A]">
         {task.title}
@@ -719,7 +719,7 @@ function TaskRow({
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="flex h-[104px] items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-5 text-center text-sm font-semibold text-[#475569]">
+    <div className="flex min-h-[118px] items-center justify-center rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-5 text-center text-sm font-semibold text-[#475569]">
       {text}
     </div>
   );
@@ -731,7 +731,7 @@ function OpportunityCard({ post }: { post: FeaturedNetworkPost }) {
   return (
     <Link
       href={`/network/${post.id}`}
-      className="flex h-[286px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center shadow-[0_10px_26px_rgba(15,23,42,0.06)] transition hover:bg-white hover:shadow-[0_18px_42px_rgba(15,23,42,0.10)]"
+      className="flex min-h-[236px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center shadow-[0_10px_26px_rgba(15,23,42,0.06)] transition hover:bg-white hover:shadow-[0_18px_42px_rgba(15,23,42,0.10)]"
     >
       <div className="flex h-8 items-center justify-center rounded-full bg-[#EFF6FF] px-4 text-[11px] font-black text-[#1557D6]">
         {post.type || "Fırsat"}
@@ -774,7 +774,7 @@ function NotificationRow({
   return (
     <button
       onClick={onClick}
-      className="flex min-h-[145px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
+      className="flex min-h-[136px] flex-col items-center justify-center rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
     >
       <div className="flex flex-col items-center justify-center gap-2 md:flex-row">
         {!item.isRead && (
@@ -797,7 +797,7 @@ function AdminApplicationRow({ item }: { item: ApplicationItem }) {
   return (
     <Link
       href="/admin"
-      className="flex h-[122px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
+      className="flex min-h-[132px] flex-col items-center justify-center rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
     >
       <p className="line-clamp-1 text-sm font-black text-[#06194A]">
         {item.applicantName}
@@ -818,7 +818,7 @@ function AdminUserRow({ item }: { item: UserItem }) {
   return (
     <Link
       href="/admin"
-      className="flex h-[132px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
+      className="flex min-h-[132px] flex-col items-center justify-center rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
     >
       <p className="line-clamp-1 text-sm font-black text-[#06194A]">
         {item.firstName} {item.lastName}
@@ -1071,7 +1071,7 @@ export default function DashboardPage() {
       unreadMessages={unreadMessages}
       notificationCount={networkNotifications.unreadCount}
     >
-      <div className="mx-auto w-full max-w-6xl space-y-6">
+      <div className="mx-auto w-full max-w-6xl space-y-7">
         <WelcomeCard
           firstName={firstName}
           role={roleName}
@@ -1082,7 +1082,7 @@ export default function DashboardPage() {
           unreadMessages={unreadMessages}
         />
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
             href="/stok"
             icon={<Building2 size={23} />}
@@ -1123,7 +1123,7 @@ export default function DashboardPage() {
         <SectionCard
           icon={<Sparkles size={24} />}
           title="Hızlı İşlemler"
-          desc="Gün içinde en çok kullanılacak EPH operasyon kısayolları."
+          desc="Portföy, talep, CRM, mesaj ve Lina akışına tek dokunuşla geç."
         >
           <div className="grid auto-rows-fr grid-cols-2 gap-3 md:grid-cols-5">
             <QuickAction
@@ -1162,10 +1162,10 @@ export default function DashboardPage() {
         <SectionCard
           icon={<CalendarCheck size={24} />}
           title="CRM Görevleri"
-          desc="Bugünkü, geciken ve yaklaşan müşteri takiplerini buradan izle."
+          desc="Müşteri takiplerini gün, öncelik ve zaman akışına göre düzenli takip et."
         >
           <div className="grid auto-rows-fr gap-3 md:grid-cols-3">
-            <div className="flex min-h-[410px] flex-col rounded-[24px] border border-[#DDE7F3] bg-white p-4">
+            <div className="flex min-h-[390px] flex-col rounded-[24px] border border-[#DDE7F3] bg-white p-4">
               <div className="flex h-12 items-center justify-center">
                 <h3 className="text-sm font-black text-[#06194A]">
                   Bugünkü İşlerim
@@ -1183,7 +1183,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="flex min-h-[410px] flex-col rounded-[24px] border border-red-100 bg-red-50/50 p-4">
+            <div className="flex min-h-[390px] flex-col rounded-[24px] border border-red-100 bg-red-50/50 p-4">
               <div className="flex h-12 items-center justify-center">
                 <h3 className="text-sm font-black text-red-700">
                   Geciken Görevler
@@ -1201,7 +1201,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="flex min-h-[410px] flex-col rounded-[24px] border border-amber-100 bg-amber-50/50 p-4">
+            <div className="flex min-h-[390px] flex-col rounded-[24px] border border-amber-100 bg-amber-50/50 p-4">
               <div className="flex h-12 items-center justify-center">
                 <h3 className="text-sm font-black text-amber-700">
                   Yaklaşan Görevler
@@ -1225,7 +1225,7 @@ export default function DashboardPage() {
           <SectionCard
             icon={<Store size={24} />}
             title="EPH Fırsat Merkezi"
-            desc="Network akışındaki sıcak talepleri ve öne çıkan fırsatları takip et."
+            desc="Kapalı iş ağındaki güncel talepleri ve öne çıkan fırsatları takip et."
           >
             <div className="grid auto-rows-fr gap-3">
               {visibleOpportunityPosts.length > 0 ? (
@@ -1241,7 +1241,7 @@ export default function DashboardPage() {
           <SectionCard
             icon={<Bell size={24} />}
             title="Bildirimler"
-            desc="Okunmamış Network bildirimleri ve sistem uyarıları."
+            desc="Okunmamış bildirimleri ve önemli sistem hareketlerini buradan izle."
           >
             <div className="grid auto-rows-fr gap-3">
               {networkNotifications.items.length > 0 ? (
@@ -1318,18 +1318,17 @@ export default function DashboardPage() {
           title="Lina Önerisi"
           desc="Bugünkü iş akışını hızlandırmak için Lina'dan destek al."
         >
-          <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center">
+          <div className="flex min-h-[320px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
               <Bot size={30} />
             </div>
 
             <h3 className="mt-4 text-xl font-black text-[#06194A]">
-              Bugün Lina ile portföy metinlerini hızlandırabilirsin.
+              Lina ile iş akışını hızlandır.
             </h3>
 
-            <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#475569]">
-              İlan açıklaması, müşteri notu, paylaşım metni ve portföy özeti
-              hazırlamak için Lina'yı kullan.
+            <p className="mx-auto mt-3 max-w-2xl text-sm font-bold leading-6 text-[#475569]">
+              Portföy açıklaması, müşteri notu, paylaşım metni ve iş özeti hazırlamak için Lina'dan destek al.
             </p>
 
             <div className="mt-5 flex justify-center">
