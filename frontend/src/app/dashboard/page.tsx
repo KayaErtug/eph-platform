@@ -11,7 +11,6 @@ import {
   BriefcaseBusiness,
   Building2,
   CalendarCheck,
-  CheckCircle2,
   ChevronRight,
   Home,
   Loader2,
@@ -412,7 +411,7 @@ function DashboardShell({
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-4 py-7 pb-28 md:px-6 md:py-9 lg:px-8">
+      <section className="mx-auto max-w-7xl px-4 py-6 pb-28 md:px-6 lg:px-8">
         {children}
       </section>
 
@@ -544,26 +543,27 @@ function WelcomeCard({
   const toneStyle = toneClasses(tone);
 
   return (
-    <section className="relative overflow-hidden rounded-[32px] border border-[#DDE7F3] bg-white p-7 text-center shadow-[0_24px_70px_rgba(15,23,42,0.10)] md:p-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(21,87,214,0.12),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(219,234,254,0.85),transparent_34%)]" />
+    <section className="relative overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_14px_34px_rgba(15,23,42,0.06)] md:rounded-[32px] md:p-8">
+      <div className={`absolute inset-x-0 top-0 h-1.5 ${toneStyle.bg}`} />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(21,87,214,0.08),transparent_42%)]" />
 
-      <div className="relative">
+      <div className="relative flex min-h-[140px] flex-col items-center justify-center">
         <div
-          className={`mx-auto inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black ${toneStyle.border} ${toneStyle.soft} ${toneStyle.text}`}
+          className={`mx-auto inline-flex max-w-full items-center justify-center rounded-full border px-4 py-2 text-center text-[11px] font-black md:text-xs ${toneStyle.border} ${toneStyle.soft} ${toneStyle.text}`}
         >
-          <CheckCircle2 size={15} />
           {role}
         </div>
 
-        <h2 className="mx-auto mt-6 max-w-4xl text-[38px] font-black leading-[1.04] tracking-[-0.05em] text-[#06194A] md:text-[64px]">
-          {greetingText()} {firstName}
+        <h2 className="mx-auto mt-4 max-w-4xl text-center text-[28px] font-black leading-[1.05] tracking-[-0.045em] text-[#06194A] md:text-[58px]">
+          Hoşgeldiniz
         </h2>
 
-        <p className="mx-auto mt-5 max-w-2xl text-base font-bold leading-8 text-[#27364F] md:text-xl">
-          Portföylerini, müşteri takiplerini, görevlerini ve mesajlarını tek merkezden profesyonel şekilde yönet.
+        <p className="mx-auto mt-3 max-w-2xl text-center text-sm font-semibold leading-6 text-[#27364F] md:text-lg md:leading-8">
+          EPH Platform'a hoş geldiniz, {firstName}. Bugünkü portföy, müşteri,
+          görev ve mesaj akışını tek ekrandan yönetin.
         </p>
 
-        <div className="mt-8 grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-5 grid w-full grid-cols-2 gap-3 md:mt-7 md:grid-cols-4">
           <MiniSummary value={portfolioCount} label="Aktif Portföy" />
           <MiniSummary value={customerCount} label="CRM Kaydı" />
           <MiniSummary value={taskCount} label="Açık Görev" />
@@ -576,7 +576,7 @@ function WelcomeCard({
 
 function MiniSummary({ value, label }: { value: number; label: string }) {
   return (
-    <div className="flex min-h-[118px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_10px_26px_rgba(15,23,42,0.06)]">
+    <div className="rounded-2xl border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_10px_26px_rgba(15,23,42,0.06)]">
       <div className="text-3xl font-black text-[#06194A]">{value}</div>
       <div className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[#64748B]">
         {label}
@@ -587,14 +587,13 @@ function MiniSummary({ value, label }: { value: number; label: string }) {
 
 function KpiCard({
   href,
-  icon,
   title,
   value,
   desc,
   tone,
 }: {
   href: string;
-  icon: ReactNode;
+  icon?: ReactNode;
   title: string;
   value: string;
   desc: string;
@@ -605,21 +604,19 @@ function KpiCard({
   return (
     <Link
       href={href}
-      className="flex min-h-[252px] flex-col items-center justify-center rounded-[28px] border border-[#DDE7F3] bg-white p-6 text-center shadow-[0_14px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(15,23,42,0.12)]"
+      className="relative flex h-[140px] w-full flex-col items-center justify-center overflow-hidden rounded-[16px] border border-[#DDE7F3] bg-white px-4 py-4 text-center shadow-[0_12px_28px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-[0_20px_44px_rgba(15,23,42,0.10)] md:h-[210px] md:rounded-[26px] md:p-6"
     >
-      <div
-        className={`mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] ${toneStyle.soft} ${toneStyle.text}`}
-      >
-        {icon}
-      </div>
+      <div className={`absolute inset-x-0 top-0 h-1.5 ${toneStyle.bg}`} />
 
-      <p className="mt-5 text-xs font-black uppercase tracking-[0.16em] text-[#64748B]">
+      <p className="text-center text-[12px] font-black uppercase tracking-[0.12em] text-[#64748B] md:text-xs md:tracking-[0.16em]">
         {title}
       </p>
 
-      <p className="mt-3 text-4xl font-black text-[#06194A]">{value}</p>
+      <p className="mt-2 text-center text-3xl font-black leading-none text-[#06194A] md:text-4xl">
+        {value}
+      </p>
 
-      <p className="mt-3 line-clamp-2 min-h-[48px] text-sm font-bold leading-6 text-[#475569]">
+      <p className="mx-auto mt-2 line-clamp-2 max-w-[240px] text-center text-[13px] font-semibold leading-5 text-[#475569] md:text-sm md:leading-6">
         {desc}
       </p>
     </Link>
@@ -627,41 +624,43 @@ function KpiCard({
 }
 
 function SectionCard({
-  icon,
   title,
   desc,
   children,
+  tone = "blue",
 }: {
-  icon: ReactNode;
+  icon?: ReactNode;
   title: string;
   desc: string;
   children: ReactNode;
+  tone?: ToneType;
 }) {
+  const toneStyle = toneClasses(tone);
+
   return (
-    <section className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_18px_48px_rgba(15,23,42,0.08)] md:p-7">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6] ring-1 ring-[#DDE7F3]">
-        {icon}
-      </div>
+    <section className="relative overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_14px_34px_rgba(15,23,42,0.06)] md:rounded-[30px] md:p-6">
+      <div className={`absolute inset-x-0 top-0 h-1.5 ${toneStyle.bg}`} />
 
-      <h2 className="mt-5 text-2xl font-black tracking-[-0.03em] text-[#06194A] md:text-3xl">{title}</h2>
+      <h2 className="mt-4 text-center text-[22px] font-black leading-tight text-[#06194A] md:text-2xl">
+        {title}
+      </h2>
 
-      <p className="mx-auto mt-3 max-w-2xl text-sm font-bold leading-6 text-[#475569]">
+      <p className="mx-auto mt-2 max-w-2xl text-center text-sm font-semibold leading-6 text-[#475569]">
         {desc}
       </p>
 
-      <div className="mt-5">{children}</div>
+      <div className="mt-5 text-center">{children}</div>
     </section>
   );
 }
 
 function QuickAction({
   href,
-  icon,
   label,
   tone,
 }: {
   href: string;
-  icon: ReactNode;
+  icon?: ReactNode;
   label: string;
   tone: ToneType;
 }) {
@@ -670,15 +669,10 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="flex min-h-[168px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_12px_30px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:shadow-[0_20px_44px_rgba(15,23,42,0.12)]"
+      className="relative flex h-[72px] min-w-[96px] flex-1 items-center justify-center overflow-hidden rounded-[14px] border border-[#DDE7F3] bg-white px-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(15,23,42,0.10)] md:h-[86px] md:min-w-0"
     >
-      <div
-        className={`mx-auto flex h-14 w-14 items-center justify-center rounded-[20px] text-white ${toneStyle.bg} ${toneStyle.shadow}`}
-      >
-        {icon}
-      </div>
-
-      <span className="mt-4 flex min-h-[44px] items-center justify-center text-center text-[15px] font-black leading-5 text-[#27364F]">
+      <div className={`absolute inset-x-0 top-0 h-1.5 ${toneStyle.bg}`} />
+      <span className="flex min-h-[38px] items-center justify-center text-center text-[12px] font-black leading-4 text-[#27364F] md:text-sm md:leading-5">
         {label}
       </span>
     </Link>
@@ -699,18 +693,18 @@ function TaskRow({
   return (
     <Link
       href="/crm"
-      className="flex min-h-[118px] flex-col items-center justify-center rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3 text-center transition hover:bg-white"
+      className="flex h-[140px] flex-col items-center justify-center rounded-[16px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
     >
-      <div className="line-clamp-1 text-sm font-black text-[#06194A]">
+      <div className="line-clamp-1 text-center text-sm font-black text-[#06194A]">
         {task.title}
       </div>
 
-      <div className="mt-1 line-clamp-1 text-xs font-semibold text-[#475569]">
+      <div className="mt-2 line-clamp-2 text-center text-xs font-semibold leading-5 text-[#475569]">
         {task.customerName}
         {task.customerPhone ? ` · ${task.customerPhone}` : ""}
       </div>
 
-      <div className="mt-2 text-[11px] font-black text-[#1557D6]">
+      <div className="mt-3 text-center text-[11px] font-black text-[#1557D6]">
         {formatTaskTime(task.dueDate)}
       </div>
     </Link>
@@ -719,7 +713,7 @@ function TaskRow({
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="flex min-h-[118px] items-center justify-center rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-5 text-center text-sm font-semibold text-[#475569]">
+    <div className="flex h-[140px] items-center justify-center rounded-[16px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-5 text-center text-sm font-semibold text-[#475569]">
       {text}
     </div>
   );
@@ -731,35 +725,22 @@ function OpportunityCard({ post }: { post: FeaturedNetworkPost }) {
   return (
     <Link
       href={`/network/${post.id}`}
-      className="flex min-h-[236px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center shadow-[0_10px_26px_rgba(15,23,42,0.06)] transition hover:bg-white hover:shadow-[0_18px_42px_rgba(15,23,42,0.10)]"
+      className="relative flex h-[140px] flex-col items-center justify-center overflow-hidden rounded-[16px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center shadow-[0_10px_24px_rgba(15,23,42,0.05)] transition hover:bg-white hover:shadow-[0_16px_34px_rgba(15,23,42,0.09)]"
     >
-      <div className="flex h-8 items-center justify-center rounded-full bg-[#EFF6FF] px-4 text-[11px] font-black text-[#1557D6]">
-        {post.type || "Fırsat"}
-      </div>
+      <div className="absolute inset-x-0 top-0 h-1.5 bg-[#EF4444]" />
 
-      <h3 className="mt-5 flex min-h-[58px] max-w-full items-center justify-center overflow-hidden text-center text-lg font-black leading-tight text-[#06194A]">
+      <h3 className="mx-auto flex max-w-full items-center justify-center overflow-hidden text-center text-base font-black leading-tight text-[#06194A]">
         <span className="line-clamp-2">{post.title}</span>
       </h3>
 
-      <p className="mt-4 flex h-5 max-w-full items-center justify-center truncate text-xs font-bold text-[#64748B]">
-        {location || "Konum bilgisi yok"}
+      <p className="mt-2 line-clamp-1 max-w-full text-center text-xs font-bold text-[#64748B]">
+        {post.type || "Fırsat"} · {location || "Konum bilgisi yok"}
       </p>
 
-      <p className="mt-4 flex h-6 items-center justify-center text-sm font-black text-[#1557D6]">
-        {formatBudget(post.budget)}
+      <p className="mt-2 text-center text-xs font-black text-[#1557D6]">
+        {formatBudget(post.budget)} · 👁 {post.viewCount} · ⭐{" "}
+        {post.followerCount} · 💬 {post.requestCount}
       </p>
-
-      <div className="mt-5 flex h-7 items-center justify-center gap-2 text-[10px] font-black text-[#64748B]">
-        <span className="rounded-full bg-white px-3 py-1 shadow-sm">
-          👁 {post.viewCount}
-        </span>
-        <span className="rounded-full bg-white px-3 py-1 shadow-sm">
-          ⭐ {post.followerCount}
-        </span>
-        <span className="rounded-full bg-white px-3 py-1 shadow-sm">
-          💬 {post.requestCount}
-        </span>
-      </div>
     </Link>
   );
 }
@@ -774,19 +755,23 @@ function NotificationRow({
   return (
     <button
       onClick={onClick}
-      className="flex min-h-[136px] flex-col items-center justify-center rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
+      className="relative flex h-[140px] w-full flex-col items-center justify-center overflow-hidden rounded-[16px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
     >
-      <div className="flex flex-col items-center justify-center gap-2 md:flex-row">
+      <div className="absolute inset-x-0 top-0 h-1.5 bg-[#1557D6]" />
+
+      <div className="flex flex-col items-center justify-center gap-2">
         {!item.isRead && (
           <span className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-black text-white">
             YENİ
           </span>
         )}
 
-        <span className="text-sm font-black text-[#06194A]">{item.title}</span>
+        <span className="text-center text-sm font-black text-[#06194A]">
+          {item.title}
+        </span>
       </div>
 
-      <p className="mx-auto mt-3 line-clamp-3 max-w-3xl whitespace-pre-line text-xs font-semibold leading-6 text-[#475569]">
+      <p className="mx-auto mt-3 line-clamp-2 max-w-3xl whitespace-pre-line text-center text-xs font-semibold leading-5 text-[#475569]">
         {item.message}
       </p>
     </button>
@@ -797,17 +782,19 @@ function AdminApplicationRow({ item }: { item: ApplicationItem }) {
   return (
     <Link
       href="/admin"
-      className="flex min-h-[132px] flex-col items-center justify-center rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
+      className="relative flex h-[140px] flex-col items-center justify-center overflow-hidden rounded-[16px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
     >
-      <p className="line-clamp-1 text-sm font-black text-[#06194A]">
+      <div className="absolute inset-x-0 top-0 h-1.5 bg-[#7C3AED]" />
+
+      <p className="line-clamp-1 text-center text-sm font-black text-[#06194A]">
         {item.applicantName}
       </p>
 
-      <p className="mt-1 line-clamp-1 text-xs font-semibold text-[#475569]">
+      <p className="mt-2 line-clamp-1 text-center text-xs font-semibold text-[#475569]">
         {item.applicantEmail}
       </p>
 
-      <p className="mt-2 text-[11px] font-black text-[#1557D6]">
+      <p className="mt-3 text-center text-[11px] font-black text-[#1557D6]">
         {roleLabel(item.requestedRole)}
       </p>
     </Link>
@@ -818,23 +805,25 @@ function AdminUserRow({ item }: { item: UserItem }) {
   return (
     <Link
       href="/admin"
-      className="flex min-h-[132px] flex-col items-center justify-center rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
+      className="relative flex h-[140px] flex-col items-center justify-center overflow-hidden rounded-[16px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
     >
-      <p className="line-clamp-1 text-sm font-black text-[#06194A]">
+      <div className="absolute inset-x-0 top-0 h-1.5 bg-[#7C3AED]" />
+
+      <p className="line-clamp-1 text-center text-sm font-black text-[#06194A]">
         {item.firstName} {item.lastName}
       </p>
 
-      <p className="mt-1 line-clamp-1 text-xs font-semibold text-[#475569]">
+      <p className="mt-2 line-clamp-1 text-center text-xs font-semibold text-[#475569]">
         {item.email}
       </p>
 
       <div className="mt-3 flex flex-wrap justify-center gap-2">
-        <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[11px] font-black text-[#1557D6]">
+        <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-center text-[11px] font-black text-[#1557D6]">
           {roleLabel(item.role)}
         </span>
 
         <span
-          className={`rounded-full px-3 py-1 text-[11px] font-black ${
+          className={`rounded-full px-3 py-1 text-center text-[11px] font-black ${
             item.isApproved
               ? "bg-emerald-50 text-emerald-700"
               : "bg-amber-50 text-amber-700"
@@ -1071,7 +1060,7 @@ export default function DashboardPage() {
       unreadMessages={unreadMessages}
       notificationCount={networkNotifications.unreadCount}
     >
-      <div className="mx-auto w-full max-w-6xl space-y-7">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
         <WelcomeCard
           firstName={firstName}
           role={roleName}
@@ -1082,7 +1071,7 @@ export default function DashboardPage() {
           unreadMessages={unreadMessages}
         />
 
-        <section className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
             href="/stok"
             icon={<Building2 size={23} />}
@@ -1122,10 +1111,11 @@ export default function DashboardPage() {
 
         <SectionCard
           icon={<Sparkles size={24} />}
+          tone="purple"
           title="Hızlı İşlemler"
-          desc="Portföy, talep, CRM, mesaj ve Lina akışına tek dokunuşla geç."
+          desc="Gün içinde en çok kullanılacak EPH operasyon kısayolları."
         >
-          <div className="grid auto-rows-fr grid-cols-2 gap-3 md:grid-cols-5">
+          <div className="flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-5 md:overflow-visible md:pb-0">
             <QuickAction
               href="/stok"
               icon={<Plus size={21} />}
@@ -1161,11 +1151,12 @@ export default function DashboardPage() {
 
         <SectionCard
           icon={<CalendarCheck size={24} />}
+          tone="green"
           title="CRM Görevleri"
-          desc="Müşteri takiplerini gün, öncelik ve zaman akışına göre düzenli takip et."
+          desc="Bugünkü, geciken ve yaklaşan müşteri takiplerini buradan izle."
         >
           <div className="grid auto-rows-fr gap-3 md:grid-cols-3">
-            <div className="flex min-h-[390px] flex-col rounded-[24px] border border-[#DDE7F3] bg-white p-4">
+            <div className="flex min-h-[320px] flex-col rounded-[24px] border border-[#DDE7F3] bg-white p-4">
               <div className="flex h-12 items-center justify-center">
                 <h3 className="text-sm font-black text-[#06194A]">
                   Bugünkü İşlerim
@@ -1183,7 +1174,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="flex min-h-[390px] flex-col rounded-[24px] border border-red-100 bg-red-50/50 p-4">
+            <div className="flex min-h-[320px] flex-col rounded-[24px] border border-red-100 bg-red-50/50 p-4">
               <div className="flex h-12 items-center justify-center">
                 <h3 className="text-sm font-black text-red-700">
                   Geciken Görevler
@@ -1201,7 +1192,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="flex min-h-[390px] flex-col rounded-[24px] border border-amber-100 bg-amber-50/50 p-4">
+            <div className="flex min-h-[320px] flex-col rounded-[24px] border border-amber-100 bg-amber-50/50 p-4">
               <div className="flex h-12 items-center justify-center">
                 <h3 className="text-sm font-black text-amber-700">
                   Yaklaşan Görevler
@@ -1224,8 +1215,9 @@ export default function DashboardPage() {
         <section className="grid items-stretch gap-6 lg:grid-cols-2">
           <SectionCard
             icon={<Store size={24} />}
+            tone="orange"
             title="EPH Fırsat Merkezi"
-            desc="Kapalı iş ağındaki güncel talepleri ve öne çıkan fırsatları takip et."
+            desc="Network akışındaki sıcak talepleri ve öne çıkan fırsatları takip et."
           >
             <div className="grid auto-rows-fr gap-3">
               {visibleOpportunityPosts.length > 0 ? (
@@ -1240,8 +1232,9 @@ export default function DashboardPage() {
 
           <SectionCard
             icon={<Bell size={24} />}
+            tone="blue"
             title="Bildirimler"
-            desc="Okunmamış bildirimleri ve önemli sistem hareketlerini buradan izle."
+            desc="Okunmamış Network bildirimleri ve sistem uyarıları."
           >
             <div className="grid auto-rows-fr gap-3">
               {networkNotifications.items.length > 0 ? (
@@ -1315,20 +1308,20 @@ export default function DashboardPage() {
 
         <SectionCard
           icon={<Bot size={24} />}
+          tone="purple"
           title="Lina Önerisi"
           desc="Bugünkü iş akışını hızlandırmak için Lina'dan destek al."
         >
-          <div className="flex min-h-[320px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
-              <Bot size={30} />
-            </div>
+          <div className="relative flex min-h-[220px] flex-col items-center justify-center overflow-hidden rounded-[16px] border border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center">
+            <div className="absolute inset-x-0 top-0 h-1.5 bg-[#7C3AED]" />
 
-            <h3 className="mt-4 text-xl font-black text-[#06194A]">
-              Lina ile iş akışını hızlandır.
+            <h3 className="mt-2 text-center text-xl font-black text-[#06194A]">
+              Bugün Lina ile portföy metinlerini hızlandırabilirsin.
             </h3>
 
-            <p className="mx-auto mt-3 max-w-2xl text-sm font-bold leading-6 text-[#475569]">
-              Portföy açıklaması, müşteri notu, paylaşım metni ve iş özeti hazırlamak için Lina'dan destek al.
+            <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#475569]">
+              İlan açıklaması, müşteri notu, paylaşım metni ve portföy özeti
+              hazırlamak için Lina'yı kullan.
             </p>
 
             <div className="mt-5 flex justify-center">
