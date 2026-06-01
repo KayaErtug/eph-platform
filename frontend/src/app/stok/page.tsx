@@ -32,6 +32,8 @@ import StokKpiCards from "@/components/stok/StokKpiCards";
 import StokToolbar from "@/components/stok/StokToolbar";
 import StokTable from "@/components/stok/StokTable";
 import StokCreateModal from "@/components/stok/StokCreateModal";
+import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
+import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
 import type {
   Project,
   ProjectFormState,
@@ -79,6 +81,8 @@ export default function StokPage() {
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
   const [copiedUnitId, setCopiedUnitId] = useState("");
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [projectForm, setProjectForm] = useState<ProjectFormState>({
@@ -355,6 +359,85 @@ export default function StokPage() {
     await handleCopyShare(unit);
   };
 
+  const getPortfolioScore = (unit: Unit) => {
+    let score = 0;
+
+    if (unit.project?.name) score += 15;
+    if (unit.project?.city && unit.project?.district) score += 15;
+    if (unit.price) score += 12;
+    if (unit.area) score += 10;
+    if (unit.roomCount) score += 10;
+    if (unit.description) score += 10;
+    if (unit.tapuVerified) score += 8;
+    if (unit.photoVerified) score += 8;
+    if (unit.yetkiVerified || unit.isVerified) score += 12;
+
+    return Math.min(score || 72, 100);
+  };
+
+  const getPortfolioScoreLabel = (score: number) => {
+    if (score >= 90) return "Pekiyi";
+    if (score >= 80) return "Çok İyi";
+    if (score >= 70) return "İyi";
+    if (score >= 60) return "Geliştirilebilir";
+    return "Eksik";
+  };
+
+  const getPortfolioNo = (unit: Unit) => {
+    const raw = String(unit.id || "EPH").replace(/[^a-zA-Z0-9]/g, "");
+    return `EPH-${raw.slice(0, 4).toLocaleUpperCase("tr-TR") || "PORT"}-${raw
+      .slice(-4)
+      .toLocaleUpperCase("tr-TR") || "0001"}`;
+  };
+
+  const getPortfolioShareData = (unit: Unit): PortfolioShareData => {
+    const price = Number(unit.price || 0);
+    const score = getPortfolioScore(unit);
+    const title = unit.project?.name || "EPH Portföy";
+    const location =
+      [unit.project?.district, unit.project?.city].filter(Boolean).join(" / ") ||
+      "Konum bilgisi yok";
+
+    const shortDescription =
+      unit.description ||
+      "Yetkili portföy statüsünde, paylaşım için hazır profesyonel gayrimenkul kaydı.";
+
+    return {
+      id: unit.id,
+      title,
+      location,
+      price: price ? `${price.toLocaleString("tr-TR")} TL` : "Fiyat bilgisi yok",
+      roomCount: unit.roomCount || "—",
+      area: unit.area ? `${unit.area} m²` : "—",
+      floor: unit.floor != null ? `${unit.floor}. Kat` : "—",
+      authorization:
+        unit.yetkiVerified || unit.isVerified ? "Yetkili" : "Kontrol",
+      coverImage: "/showcase/stock.jpg",
+      consultantName:
+        [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+        "EPH Üyesi",
+      consultantPhone: "Telefon bilgisi",
+      portfolioNo: getPortfolioNo(unit),
+      score,
+      scoreLabel: getPortfolioScoreLabel(score),
+      shortDescription,
+      longDescription:
+        unit.description ||
+        "Bu portföy EPH Portföy Merkezi üzerinden hazırlanmıştır. Konum, fiyat, oda sayısı, alan bilgisi ve yetki durumu tek kart üzerinde paylaşılabilir formatta sunulur.",
+      features: [
+        { icon: "security", label: unit.yetkiVerified || unit.isVerified ? "Yetkili Portföy" : "Yetki Kontrol" },
+        { icon: "smart", label: "Lina Kartı" },
+        { icon: "car", label: "Portföy Kaydı" },
+        { icon: "pool", label: statusLabels[unit.status] || unit.status || "Portföy" },
+      ],
+    };
+  };
+
+  const handlePortfolioShare = (unit: Unit) => {
+    setShareData(getPortfolioShareData(unit));
+    setShareOpen(true);
+  };
+
   if (!hydrated || loading) {
     return (
       <div
@@ -405,7 +488,7 @@ export default function StokPage() {
               <img src="/LOGO_EPH.png" alt="EPH" className="h-10 w-10 object-contain" />
               <div className="min-w-0">
                 <div className="truncate text-sm font-black tracking-[-0.03em] text-[#06194A]">
-                  Stok / İlanlarım
+                  Portföy Merkezi
                 </div>
                 <div className="truncate text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#64748B]">
                   Portföy Merkezi
@@ -425,7 +508,7 @@ export default function StokPage() {
           <nav className="hidden items-center gap-2 lg:flex">
             {[
               ["/dashboard", "Dashboard"],
-              ["/stok", "Stok"],
+              ["/stok", "Portföy"],
               ["/network", "Network"],
               ["/crm", "CRM"],
               ["/market", "Piyasa"],
@@ -487,12 +570,12 @@ export default function StokPage() {
                 </div>
 
                 <h1 className="mt-6 max-w-2xl text-4xl font-black leading-tight tracking-[-0.055em] md:text-6xl">
-                  Stok ve İlanlarım
+                  Portföy Merkezi
                 </h1>
 
                 <p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-blue-50/90">
                   Portföylerinizi filtreleyin, detaylara tek dokunuşla girin,
-                  paylaşım linkini hazırlayın ve ilan akışınızı tek ekrandan yönetin.
+                  Lina destekli paylaşım kartları üretin ve portföy akışınızı tek ekrandan yönetin.
                 </p>
               </div>
 
@@ -515,7 +598,7 @@ export default function StokPage() {
                   className="inline-flex items-center justify-center gap-2 rounded-[24px] border border-white/22 bg-white/12 px-5 py-4 text-sm font-black text-white backdrop-blur transition hover:bg-white/18"
                 >
                   <Sparkles size={18} />
-                  Lina ile İlan Hazırla
+                  Lina ile Kart Hazırla
                 </button>
               </div>
             </div>
@@ -623,7 +706,7 @@ export default function StokPage() {
                 Canlı İlan Listesi
               </h2>
               <p className="mt-2 text-sm font-semibold text-[#64748B]">
-                Eski filtreleme akışı korundu. Kartlar tıklanabilir, liste görünümü ekrana sığacak şekilde düzenlendi.
+                Filtreleme akışı korundu. Kartlar tıklanabilir; Paylaş butonu Lina Paylaşım Merkezi'ni açar.
               </p>
             </div>
 
@@ -683,7 +766,7 @@ export default function StokPage() {
                     copied={copiedUnitId === unit.id}
                     onOpen={() => router.push(`/stok/${unit.id}`)}
                     onCopy={() => handleCopyShare(unit)}
-                    onShare={() => handleNativeShare(unit)}
+                    onShare={() => handlePortfolioShare(unit)}
                   />
                 ))
               )}
@@ -706,6 +789,12 @@ export default function StokPage() {
           />
         )}
       </main>
+
+      <PortfolioShareModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        data={shareData}
+      />
 
       <StokCreateModal
         open={showModal}
@@ -898,7 +987,7 @@ function PremiumUnitCard({
           className="inline-flex items-center justify-center gap-2 rounded-[18px] bg-[#1557D6] px-4 py-3 text-sm font-black text-white transition hover:bg-[#0F49BD]"
         >
           <Share2 size={16} />
-          Paylaş
+          Kart Hazırla
         </button>
 
         <a
