@@ -20,7 +20,7 @@ import {
 
 const liveItems = [
   "Karahasanlı bölgesinde satılık 2+1 daire aranıyor · müşteri hazır · komisyon paylaşımlı",
-  "Selçuk Bey’de 1160 m² kat karşılığı arsa · Bodrum + 5 Kat · %45" pazarlıklı,
+  "Selçuk Bey’de 1160 m² kat karşılığı arsa · Bodrum + 5 Kat · %45 pazarlıklı",
   "Doktor müşterim için Bölge Hastanesi yakınında 2+1 kiralık daire aranıyor · acil",
   "Çakmak’ta 1400 m² kat karşılığı arsa · Bodrum + 3 Kat · %35",
 ];
@@ -40,7 +40,7 @@ const modules = [
   {
     icon: BellRing,
     title: "Talep Akışı",
-    desc: "Lansman tanıtımları, alıcı, satıcı, kiracı ve yatırımcı talepleri doğru profesyonellere ulaşır.",
+    desc: "Alıcı, kiracı, satıcı ve yatırımcı talepleri doğru profesyonellere ulaşır.",
   },
   {
     icon: BriefcaseBusiness,
@@ -50,7 +50,7 @@ const modules = [
   {
     icon: MessageCircle,
     title: "Mesajlaşma",
-    desc: "Onaylı üyelerle güvenli ve hızlı iletişim kurun, tüm konuşmalar kayıt altında kalsın.",
+    desc: "Üyelerle güvenli ve hızlı iletişim kurun, tüm konuşmalar kayıt altında kalsın.",
   },
   {
     icon: Bot,
@@ -130,6 +130,13 @@ export default function LandingPage() {
               Başvuru
             </a>
           </nav>
+
+          <Link
+            href="/giris"
+            className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-xs font-black text-slate-800 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+          >
+            Giriş Yap
+          </Link>
         </div>
       </header>
 
@@ -154,10 +161,7 @@ export default function LandingPage() {
               talepler, CRM ve mesajlaşma tek merkezde toplanır.
             </p>
 
-            <div
-              id="guven"
-              className="mt-8 grid gap-4 sm:grid-cols-3"
-            >
+            <div id="guven" className="mt-8 grid gap-4 sm:grid-cols-3">
               {trustBoxes.map((item) => (
                 <div
                   key={item.title}
