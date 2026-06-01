@@ -109,27 +109,15 @@ export default function LandingPage() {
               <div className="truncate text-base font-black leading-tight sm:text-lg">
                 EPH Platform
               </div>
-              <div className="truncate text-[9px] font-black uppercase tracking-[0.2em] text-blue-600 sm:text-[10px] sm:tracking-[0.28em]">
+              <div className="truncate text-[9px] font-black uppercase tracking-[0.18em] text-blue-600 sm:text-[10px] sm:tracking-[0.28em]">
                 Emlak Portföy Havuzu
               </div>
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-8 text-sm font-black text-slate-600 lg:flex">
-            <a href="#kesfet" className="transition hover:text-blue-600">
-              Keşfet
-            </a>
-            <a href="#moduller" className="transition hover:text-blue-600">
-              Modüller
-            </a>
-            <a href="#guven" className="transition hover:text-blue-600">
-              Güven
-            </a>
-          </nav>
-
           <Link
             href="/giris"
-            className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 px-4 text-xs font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 sm:px-5"
+            className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 px-4 text-xs font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700"
           >
             Giriş
           </Link>
