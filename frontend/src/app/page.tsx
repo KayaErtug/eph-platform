@@ -14,7 +14,6 @@ import {
   LockKeyhole,
   MessageCircle,
   ShieldCheck,
-  Sparkles,
   UsersRound,
 } from "lucide-react";
 
@@ -96,9 +95,9 @@ export default function LandingPage() {
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-[#071332]">
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="mx-auto flex min-h-20 max-w-7xl items-center justify-between gap-3 px-4 py-3">
+          <Link href="/" className="flex min-w-0 items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
               <img
                 src="/LOGO_EPH.png"
                 alt="EPH Platform"
@@ -106,17 +105,17 @@ export default function LandingPage() {
               />
             </div>
 
-            <div>
-              <div className="text-lg font-black leading-tight">
+            <div className="min-w-0">
+              <div className="truncate text-base font-black leading-tight sm:text-lg">
                 EPH Platform
               </div>
-              <div className="text-[10px] font-black uppercase tracking-[0.28em] text-blue-600">
+              <div className="truncate text-[9px] font-black uppercase tracking-[0.2em] text-blue-600 sm:text-[10px] sm:tracking-[0.28em]">
                 Emlak Portföy Havuzu
               </div>
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-8 text-sm font-black text-slate-600 md:flex">
+          <nav className="hidden items-center gap-8 text-sm font-black text-slate-600 lg:flex">
             <a href="#kesfet" className="transition hover:text-blue-600">
               Keşfet
             </a>
@@ -126,49 +125,46 @@ export default function LandingPage() {
             <a href="#guven" className="transition hover:text-blue-600">
               Güven
             </a>
-            <a href="#basvuru" className="transition hover:text-blue-600">
-              Başvuru
-            </a>
           </nav>
 
           <Link
             href="/giris"
-            className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-xs font-black text-slate-800 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+            className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 px-4 text-xs font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 sm:px-5"
           >
-            Giriş Yap
+            Giriş
           </Link>
         </div>
       </header>
 
-      <section id="kesfet" className="mx-auto max-w-7xl px-5 pb-16 pt-16">
-        <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-          <div className="text-center lg:text-left">
+      <section id="kesfet" className="mx-auto max-w-7xl px-4 pb-12 pt-10">
+        <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+          <div className="text-center">
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 ring-1 ring-blue-100">
               <CheckCircle2 size={15} />
               Onaylı profesyonel ağ
             </div>
 
-            <h1 className="mt-7 text-4xl font-black leading-[1.08] tracking-tight md:text-6xl">
-              Emlak profesyonelleri için kapalı devre
+            <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-black leading-[1.08] tracking-tight md:text-6xl">
+              Gayrimenkul profesyonelleri için kapalı devre
               <span className="block text-blue-600">
                 portföy, talep ve iş birliği ağı.
               </span>
             </h1>
 
-            <p className="mx-auto mt-6 max-w-2xl text-base font-semibold leading-8 text-slate-600 lg:mx-0 md:text-lg">
+            <p className="mx-auto mt-5 max-w-2xl text-base font-semibold leading-8 text-slate-600 md:text-lg">
               EPH; gayrimenkul danışmanlarını, müteahhitleri ve inşaat
               firmalarını kontrollü bir iş ağı içinde buluşturur. Portföyler,
               talepler, CRM ve mesajlaşma tek merkezde toplanır.
             </p>
 
-            <div id="guven" className="mt-8 grid gap-4 sm:grid-cols-3">
+            <div id="guven" className="mx-auto mt-7 grid max-w-3xl gap-4 sm:grid-cols-3">
               {trustBoxes.map((item) => (
                 <div
                   key={item.title}
-                  className="flex min-h-[118px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm"
+                  className="flex min-h-[116px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm"
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-                    <item.icon size={23} />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+                    <item.icon size={24} />
                   </div>
                   <div className="mt-3 text-sm font-black text-slate-800">
                     {item.title}
@@ -178,8 +174,8 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between">
+          <div className="rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm">
+            <div className="flex flex-col items-center justify-center gap-3">
               <div>
                 <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">
                   Canlı İş Merkezi
@@ -201,10 +197,10 @@ export default function LandingPage() {
               {liveItems.map((item, index) => (
                 <div
                   key={item}
-                  className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-[#F8FAFC] p-4"
+                  className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-[#F8FAFC] p-4 text-left"
                 >
                   <span
-                    className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${
                       index === 0
                         ? "bg-emerald-500"
                         : index === 1
@@ -223,10 +219,10 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className="mt-10 flex justify-center">
+        <div className="mt-8 flex justify-center">
           <Link
             href="/kayit"
-            className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl bg-blue-600 px-9 text-sm font-black text-white shadow-xl shadow-blue-600/25 transition hover:-translate-y-1 hover:bg-blue-700"
+            className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl bg-blue-600 px-7 text-center text-sm font-black text-white shadow-xl shadow-blue-600/25 transition hover:-translate-y-1 hover:bg-blue-700 sm:px-9"
           >
             EPH&apos;ye Katılmak İçin Başvur
             <ArrowRight size={18} />
@@ -234,7 +230,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="moduller" className="mx-auto max-w-7xl px-5 py-12">
+      <section id="moduller" className="mx-auto max-w-7xl px-4 py-10">
         <SectionTitle
           eyebrow="EPH NE İŞE YARAR?"
           title="Tüm iş süreçlerinizi tek platformda yönetin"
@@ -247,7 +243,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-5 py-12">
+      <section className="mx-auto max-w-7xl px-4 py-10">
         <SectionTitle
           eyebrow="PLATFORM EKRANLARI"
           title="EPH’yi yakından tanıyın"
@@ -260,13 +256,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="basvuru" className="mx-auto max-w-7xl px-5 py-12">
-        <div className="rounded-[30px] border border-blue-100 bg-blue-50/40 p-8 text-center shadow-sm md:p-10">
+      <section id="basvuru" className="mx-auto max-w-7xl px-4 py-10">
+        <div className="rounded-[30px] border border-blue-100 bg-blue-50/40 p-7 text-center shadow-sm md:p-10">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 text-blue-700">
             <UsersRound size={36} />
           </div>
 
-          <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+          <h2 className="mx-auto mt-5 max-w-3xl text-3xl font-black tracking-tight md:text-4xl">
             Kapalı devre gayrimenkul iş ağına dahil olun.
           </h2>
 
@@ -279,7 +275,7 @@ export default function LandingPage() {
           <div className="mt-7 flex justify-center">
             <Link
               href="/kayit"
-              className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl bg-blue-600 px-9 text-sm font-black text-white shadow-xl shadow-blue-600/25 transition hover:-translate-y-1 hover:bg-blue-700"
+              className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl bg-blue-600 px-8 text-center text-sm font-black text-white shadow-xl shadow-blue-600/25 transition hover:-translate-y-1 hover:bg-blue-700"
             >
               Üyelik Başvurusu Yap
               <ArrowRight size={18} />
@@ -288,10 +284,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="border-t border-slate-200 bg-white px-5 py-8">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-5 text-center md:flex-row md:text-left">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
+      <footer className="border-t border-slate-200 bg-white px-4 py-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-5 text-center">
+          <Link href="/" className="flex items-center justify-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm">
               <img
                 src="/LOGO_EPH.png"
                 alt="EPH Platform"
@@ -299,7 +295,7 @@ export default function LandingPage() {
               />
             </div>
 
-            <div>
+            <div className="text-left">
               <div className="text-sm font-black">EPH Platform</div>
               <div className="text-[9px] font-black uppercase tracking-[0.22em] text-blue-600">
                 Emlak Portföy Havuzu
@@ -307,7 +303,7 @@ export default function LandingPage() {
             </div>
           </Link>
 
-          <div className="flex flex-wrap justify-center gap-6 text-xs font-black text-slate-600">
+          <div className="flex flex-wrap justify-center gap-5 text-xs font-black text-slate-600">
             <Link href="/kullanici-sozlesmesi">Kullanım Şartları</Link>
             <Link href="/gizlilik-politikasi">Gizlilik Politikası</Link>
             <Link href="/kvkk">KVKK</Link>
@@ -395,7 +391,7 @@ function SectionTitle({
       <p className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">
         {eyebrow}
       </p>
-      <h2 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">
+      <h2 className="mx-auto mt-3 max-w-4xl text-3xl font-black tracking-tight md:text-4xl">
         {title}
       </h2>
     </div>
