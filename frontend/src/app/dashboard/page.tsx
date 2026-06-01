@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Activity,
+  ArrowLeft,
   Bell,
   Bot,
   BriefcaseBusiness,
@@ -19,9 +20,11 @@ import {
   FileText,
   Home,
   Loader2,
+  Menu,
   MessageCircle,
   Plus,
   Radio,
+  Settings,
   ShieldCheck,
   Sparkles,
   Store,
@@ -29,13 +32,18 @@ import {
   UserCheck,
   UsersRound,
   WalletCards,
+  X,
 } from "lucide-react";
 
-import EphAppShell from "@/components/EphAppShell";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 
-type RoleType = "realtor" | "contractor" | "construction" | "admin" | "superadmin";
+type RoleType =
+  | "realtor"
+  | "contractor"
+  | "construction"
+  | "admin"
+  | "superadmin";
 type ToneType = "blue" | "orange" | "amber" | "slate" | "teal";
 
 type Conversation = {
@@ -148,7 +156,9 @@ type UserItem = {
 };
 
 function normalizeRole(role?: string | null) {
-  return String(role || "").toLocaleUpperCase("tr-TR").trim();
+  return String(role || "")
+    .toLocaleUpperCase("tr-TR")
+    .trim();
 }
 
 function getRoleType(role?: string | null): RoleType {
@@ -255,6 +265,163 @@ function flattenCustomerTasks(customers: CrmDashboardCustomer[]) {
         : Number.MAX_SAFE_INTEGER;
       return aTime - bTime;
     });
+}
+
+function DashboardShell({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const mainLinks = [
+    { label: "Ana Sayfa", href: "/dashboard", icon: <Home size={19} /> },
+    { label: "İlanlarım", href: "/stok", icon: <Building2 size={19} /> },
+    { label: "Müşterilerim", href: "/crm", icon: <UsersRound size={19} /> },
+    { label: "Pazaryeri", href: "/network", icon: <Store size={19} /> },
+    { label: "Lina", href: "/lina", icon: <Bot size={19} /> },
+  ];
+
+  const menuLinks = [
+    ...mainLinks,
+    { label: "Mesajlar", href: "/messages", icon: <MessageCircle size={19} /> },
+    { label: "Profil", href: "/profil", icon: <UserCheck size={19} /> },
+    {
+      label: "Bildirim Ayarları",
+      href: "/notification-settings",
+      icon: <Settings size={19} />,
+    },
+  ];
+
+  return (
+    <main className="min-h-screen bg-[#F4F7FB] text-slate-950">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4">
+          <button
+            onClick={() => router.back()}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            <ArrowLeft size={17} />
+            Geri
+          </button>
+
+          <div className="min-w-0 text-center">
+            <div className="mx-auto inline-flex rounded-full bg-blue-50 px-3 py-1 text-[11px] font-black text-blue-700">
+              Emlakçı Paneli
+            </div>
+            <h1 className="mt-1 truncate text-[22px] font-black tracking-tight text-slate-950">
+              {title}
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Link
+              href="/notification-settings"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
+              aria-label="Bildirim ayarları"
+            >
+              <Bell size={18} />
+            </Link>
+
+            <Link
+              href="/messages"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
+              aria-label="Mesajlar"
+            >
+              <MessageCircle size={18} />
+            </Link>
+
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700"
+              aria-label="Menüyü aç"
+            >
+              <Menu size={21} />
+            </button>
+          </div>
+        </div>
+
+        <nav className="border-t border-slate-100 px-4 py-3">
+          <div className="mx-auto grid max-w-3xl grid-cols-5 gap-2">
+            {mainLinks.map((item) => {
+              const active = item.href === "/dashboard";
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex min-h-[74px] flex-col items-center justify-center gap-2 rounded-2xl border px-2 text-center text-xs font-black transition ${
+                    active
+                      ? "border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                      : "border-slate-200 bg-white text-slate-800 hover:border-blue-200 hover:bg-blue-50"
+                  }`}
+                >
+                  {item.icon}
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      </header>
+
+      {menuOpen && (
+        <div
+          className="fixed inset-0 z-[9999] bg-slate-950/50 p-4 backdrop-blur-sm"
+          onClick={() => setMenuOpen(false)}
+        >
+          <aside
+            className="ml-auto flex h-full w-full max-w-sm flex-col rounded-[30px] bg-white p-5 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-[11px] font-black text-blue-700">
+                  EPH Menü
+                </div>
+                <h2 className="mt-2 text-2xl font-black text-slate-950">
+                  Hızlı Geçiş
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Platformun ana bölümlerine tek dokunuşla geç.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-2">
+              {menuLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMenuOpen(false)}
+                  className="flex min-h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:border-blue-200 hover:bg-blue-50"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                    {item.icon}
+                  </span>
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </aside>
+        </div>
+      )}
+
+      <section className="mx-auto max-w-7xl px-4 py-6 pb-28">
+        {children}
+      </section>
+    </main>
+  );
 }
 
 function StatCard({
@@ -607,9 +774,15 @@ function OpportunityCard({ post }: { post: FeaturedNetworkPost }) {
       </p>
 
       <div className="mt-3 flex flex-wrap justify-center gap-2 text-[10px] font-black text-slate-500">
-        <span className="rounded-full bg-white px-2 py-1">👁 {post.viewCount}</span>
-        <span className="rounded-full bg-white px-2 py-1">⭐ {post.followerCount}</span>
-        <span className="rounded-full bg-white px-2 py-1">💬 {post.requestCount}</span>
+        <span className="rounded-full bg-white px-2 py-1">
+          👁 {post.viewCount}
+        </span>
+        <span className="rounded-full bg-white px-2 py-1">
+          ⭐ {post.followerCount}
+        </span>
+        <span className="rounded-full bg-white px-2 py-1">
+          💬 {post.requestCount}
+        </span>
       </div>
     </Link>
   );
@@ -654,7 +827,7 @@ function SuperAdminDashboard({
   );
 
   return (
-    <EphAppShell title="EPH Yönetim Merkezi">
+    <DashboardShell title="EPH Yönetim Merkezi">
       <div className="mx-auto w-full max-w-6xl">
         <section className="overflow-hidden rounded-[36px] bg-gradient-to-br from-[#0F172A] via-[#134E4A] to-[#14B8A6] p-6 text-center text-white shadow-2xl md:p-9">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-4 py-2 text-xs font-black backdrop-blur">
@@ -1027,7 +1200,7 @@ function SuperAdminDashboard({
           </div>
         </section>
       </div>
-    </EphAppShell>
+    </DashboardShell>
   );
 }
 
@@ -1467,7 +1640,7 @@ export default function DashboardPage() {
   const totalOpportunityCount = visibleOpportunityPosts.length;
 
   return (
-    <EphAppShell title={pageConfig.title}>
+    <DashboardShell title={pageConfig.title}>
       <div className="mx-auto w-full max-w-6xl space-y-6">
         <section className="overflow-hidden rounded-[34px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-7">
           <div className="mx-auto inline-flex rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">
@@ -1479,7 +1652,8 @@ export default function DashboardPage() {
           </h1>
 
           <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-500 md:text-base">
-            Bugün seni bekleyen işleri, müşteri takiplerini ve EPH fırsatlarını tek ekrandan yönet.
+            Bugün seni bekleyen işleri, müşteri takiplerini ve EPH fırsatlarını
+            tek ekrandan yönet.
           </p>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1557,7 +1731,8 @@ export default function DashboardPage() {
           </h2>
 
           <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
-            Bugünkü, geciken ve yaklaşan müşteri görevlerini tek ekrandan takip et.
+            Bugünkü, geciken ve yaklaşan müşteri görevlerini tek ekrandan takip
+            et.
           </p>
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
@@ -1589,12 +1764,16 @@ export default function DashboardPage() {
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             <div className="rounded-[24px] border border-slate-100 bg-white p-4">
-              <h3 className="text-sm font-black text-slate-900">Bugünkü İşlerim</h3>
+              <h3 className="text-sm font-black text-slate-900">
+                Bugünkü İşlerim
+              </h3>
               <div className="mt-3 space-y-2">
                 {todayTasks.length > 0 ? (
-                  todayTasks.slice(0, 3).map((task) => (
-                    <DashboardTaskRow key={task.id} task={task} />
-                  ))
+                  todayTasks
+                    .slice(0, 3)
+                    .map((task) => (
+                      <DashboardTaskRow key={task.id} task={task} />
+                    ))
                 ) : (
                   <div className="rounded-2xl bg-slate-50 px-4 py-4 text-xs font-semibold text-slate-500">
                     Bugün için planlı görev yok.
@@ -1604,12 +1783,16 @@ export default function DashboardPage() {
             </div>
 
             <div className="rounded-[24px] border border-red-100 bg-red-50/50 p-4">
-              <h3 className="text-sm font-black text-red-700">Geciken Görevler</h3>
+              <h3 className="text-sm font-black text-red-700">
+                Geciken Görevler
+              </h3>
               <div className="mt-3 space-y-2">
                 {overdueTasks.length > 0 ? (
-                  overdueTasks.slice(0, 3).map((task) => (
-                    <DashboardTaskRow key={task.id} task={task} />
-                  ))
+                  overdueTasks
+                    .slice(0, 3)
+                    .map((task) => (
+                      <DashboardTaskRow key={task.id} task={task} />
+                    ))
                 ) : (
                   <div className="rounded-2xl bg-white px-4 py-4 text-xs font-semibold text-slate-500">
                     Geciken görev yok.
@@ -1619,12 +1802,16 @@ export default function DashboardPage() {
             </div>
 
             <div className="rounded-[24px] border border-amber-100 bg-amber-50/50 p-4">
-              <h3 className="text-sm font-black text-amber-700">Yaklaşan Görevler</h3>
+              <h3 className="text-sm font-black text-amber-700">
+                Yaklaşan Görevler
+              </h3>
               <div className="mt-3 space-y-2">
                 {upcomingTasks.length > 0 ? (
-                  upcomingTasks.slice(0, 3).map((task) => (
-                    <DashboardTaskRow key={task.id} task={task} />
-                  ))
+                  upcomingTasks
+                    .slice(0, 3)
+                    .map((task) => (
+                      <DashboardTaskRow key={task.id} task={task} />
+                    ))
                 ) : (
                   <div className="rounded-2xl bg-white px-4 py-4 text-xs font-semibold text-slate-500">
                     Yaklaşan görev yok.
@@ -1699,17 +1886,18 @@ export default function DashboardPage() {
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             {visibleOpportunityPosts.length > 0 ? (
-              visibleOpportunityPosts.slice(0, 3).map((post) => (
-                <OpportunityCard key={post.id} post={post} />
-              ))
+              visibleOpportunityPosts
+                .slice(0, 3)
+                .map((post) => <OpportunityCard key={post.id} post={post} />)
             ) : (
               <div className="rounded-2xl bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500 md:col-span-3">
-                Sana uygun yeni Network fırsatı yok. Kendi paylaşımların bu alanda sayılmaz.
+                Sana uygun yeni Network fırsatı yok. Kendi paylaşımların bu
+                alanda sayılmaz.
               </div>
             )}
           </div>
         </section>
       </div>
-    </EphAppShell>
+    </DashboardShell>
   );
 }
