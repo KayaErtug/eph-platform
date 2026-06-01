@@ -729,32 +729,32 @@ function OpportunityCard({ post }: { post: FeaturedNetworkPost }) {
   return (
     <Link
       href={`/network/${post.id}`}
-      className="block rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center transition hover:bg-white hover:shadow-sm"
+      className="flex h-[270px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center shadow-[0_10px_26px_rgba(15,23,42,0.06)] transition hover:bg-white hover:shadow-[0_18px_42px_rgba(15,23,42,0.10)]"
     >
-      <div className="mx-auto inline-flex rounded-full bg-[#EFF6FF] px-3 py-1 text-[11px] font-black text-[#1557D6]">
+      <div className="flex h-8 items-center justify-center rounded-full bg-[#EFF6FF] px-4 text-[11px] font-black text-[#1557D6]">
         {post.type || "Fırsat"}
       </div>
 
-      <h3 className="mt-3 line-clamp-2 text-lg font-black leading-tight text-[#06194A]">
-        {post.title}
+      <h3 className="mt-5 flex min-h-[58px] max-w-full items-center justify-center overflow-hidden text-center text-lg font-black leading-tight text-[#06194A]">
+        <span className="line-clamp-2">{post.title}</span>
       </h3>
 
-      <p className="mt-2 text-xs font-bold text-[#64748B]">
+      <p className="mt-4 flex h-5 max-w-full items-center justify-center truncate text-xs font-bold text-[#64748B]">
         {location || "Konum bilgisi yok"}
       </p>
 
-      <p className="mt-2 text-sm font-black text-[#1557D6]">
+      <p className="mt-4 flex h-6 items-center justify-center text-sm font-black text-[#1557D6]">
         {formatBudget(post.budget)}
       </p>
 
-      <div className="mt-3 flex flex-wrap justify-center gap-2 text-[10px] font-black text-[#64748B]">
-        <span className="rounded-full bg-white px-2 py-1">
+      <div className="mt-5 flex h-7 items-center justify-center gap-2 text-[10px] font-black text-[#64748B]">
+        <span className="rounded-full bg-white px-3 py-1 shadow-sm">
           👁 {post.viewCount}
         </span>
-        <span className="rounded-full bg-white px-2 py-1">
+        <span className="rounded-full bg-white px-3 py-1 shadow-sm">
           ⭐ {post.followerCount}
         </span>
-        <span className="rounded-full bg-white px-2 py-1">
+        <span className="rounded-full bg-white px-3 py-1 shadow-sm">
           💬 {post.requestCount}
         </span>
       </div>
@@ -772,7 +772,7 @@ function NotificationRow({
   return (
     <button
       onClick={onClick}
-      className="rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
+      className="flex min-h-[145px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
     >
       <div className="flex flex-col items-center justify-center gap-2 md:flex-row">
         {!item.isRead && (
@@ -784,7 +784,7 @@ function NotificationRow({
         <span className="text-sm font-black text-[#06194A]">{item.title}</span>
       </div>
 
-      <p className="mx-auto mt-2 max-w-3xl whitespace-pre-line text-xs font-semibold leading-6 text-[#475569]">
+      <p className="mx-auto mt-3 line-clamp-3 max-w-3xl whitespace-pre-line text-xs font-semibold leading-6 text-[#475569]">
         {item.message}
       </p>
     </button>
