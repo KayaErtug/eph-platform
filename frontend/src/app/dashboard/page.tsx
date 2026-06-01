@@ -60,6 +60,7 @@ type NetworkNotificationResponse = {
 
 type FeaturedNetworkPost = {
   id: string;
+  userId?: string | null;
   title: string;
   type: string;
   city?: string | null;
@@ -70,6 +71,7 @@ type FeaturedNetworkPost = {
   followerCount: number;
   requestCount: number;
   user?: {
+    id?: string | null;
     firstName: string;
     lastName: string;
     role: string;
@@ -1088,9 +1090,15 @@ export default function DashboardPage() {
           : Promise.resolve({ data: { unreadCount: 0, items: [] } }),
         api.get("/network/posts/featured"),
         api.get("/crm/customers"),
-        api.get("/admin/stats"),
-        api.get("/admin/applications?status=PENDING"),
-        api.get("/admin/users?filter=all"),
+        roleType === "admin" || roleType === "superadmin"
+          ? api.get("/admin/stats")
+          : Promise.resolve({ data: null }),
+        roleType === "admin" || roleType === "superadmin"
+          ? api.get("/admin/applications?status=PENDING")
+          : Promise.resolve({ data: [] }),
+        roleType === "admin" || roleType === "superadmin"
+          ? api.get("/admin/users?filter=all")
+          : Promise.resolve({ data: [] }),
       ]);
 
       if (summaryRes.status === "fulfilled") {
@@ -1452,7 +1460,11 @@ export default function DashboardPage() {
   }
 
   const portfolioUpdateCount = Math.max(stats.totalUnits || 0, 0);
-  const totalOpportunityCount = featuredPosts.length;
+  const visibleOpportunityPosts = featuredPosts.filter((post) => {
+    const ownerId = post.userId || post.user?.id;
+    return !user?.id || !ownerId || ownerId !== user.id;
+  });
+  const totalOpportunityCount = visibleOpportunityPosts.length;
 
   return (
     <EphAppShell title={pageConfig.title}>
@@ -1499,7 +1511,7 @@ export default function DashboardPage() {
               icon={<Store size={22} />}
               label="Fırsat"
               value={String(totalOpportunityCount)}
-              desc="Network akışındaki sıcak başlıklar"
+              desc="Sana ait olmayan sıcak başlıklar"
               tone="slate"
               href="/network"
             />
@@ -1686,13 +1698,13 @@ export default function DashboardPage() {
           </p>
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
-            {featuredPosts.length > 0 ? (
-              featuredPosts.slice(0, 3).map((post) => (
+            {visibleOpportunityPosts.length > 0 ? (
+              visibleOpportunityPosts.slice(0, 3).map((post) => (
                 <OpportunityCard key={post.id} post={post} />
               ))
             ) : (
               <div className="rounded-2xl bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500 md:col-span-3">
-                Şu anda öne çıkan Network fırsatı yok.
+                Sana uygun yeni Network fırsatı yok. Kendi paylaşımların bu alanda sayılmaz.
               </div>
             )}
           </div>
