@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Home,
   Loader2,
+  LogOut,
   Menu,
   MessageCircle,
   Plus,
@@ -86,22 +87,12 @@ type CrmDashboardCustomer = {
   phone?: string | null;
   city?: string | null;
   status: string;
-  activities?: Array<{
-    id: string;
-    type: string;
-    note: string;
-    createdAt: string;
-  }>;
   tasks?: Array<{
     id: string;
     title: string;
     dueDate?: string | null;
     status: string;
   }>;
-  _count?: {
-    activities?: number;
-    tasks?: number;
-  };
 };
 
 type DashboardSummary = {
@@ -117,11 +108,7 @@ type AdminStats = {
   totalUsers?: number;
   pendingUsers?: number;
   approvedUsers?: number;
-  totalInvitations?: number;
-  pendingDocuments?: number;
-  pendingNominations?: number;
   pendingApplications?: number;
-  byRole?: { role: string; count: number }[];
 };
 
 type ApplicationItem = {
@@ -263,7 +250,6 @@ function toneClasses(tone: ToneType) {
     blue: {
       text: "text-[#1557D6]",
       bg: "bg-[#1557D6]",
-      hover: "hover:bg-[#0F49BD]",
       soft: "bg-[#EFF6FF]",
       border: "border-[#DDE7F3]",
       shadow: "shadow-[0_16px_34px_rgba(21,87,214,0.24)]",
@@ -271,7 +257,6 @@ function toneClasses(tone: ToneType) {
     orange: {
       text: "text-[#EA580C]",
       bg: "bg-[#EA580C]",
-      hover: "hover:bg-[#C2410C]",
       soft: "bg-[#FFF7ED]",
       border: "border-[#FED7AA]",
       shadow: "shadow-[0_16px_34px_rgba(234,88,12,0.20)]",
@@ -279,7 +264,6 @@ function toneClasses(tone: ToneType) {
     green: {
       text: "text-[#16A34A]",
       bg: "bg-[#16A34A]",
-      hover: "hover:bg-[#15803D]",
       soft: "bg-[#F0FDF4]",
       border: "border-[#BBF7D0]",
       shadow: "shadow-[0_16px_34px_rgba(22,163,74,0.18)]",
@@ -287,7 +271,6 @@ function toneClasses(tone: ToneType) {
     purple: {
       text: "text-[#7C3AED]",
       bg: "bg-[#7C3AED]",
-      hover: "hover:bg-[#6D28D9]",
       soft: "bg-[#F5F3FF]",
       border: "border-[#DDD6FE]",
       shadow: "shadow-[0_16px_34px_rgba(124,58,237,0.20)]",
@@ -295,7 +278,6 @@ function toneClasses(tone: ToneType) {
     slate: {
       text: "text-[#0F172A]",
       bg: "bg-[#0F172A]",
-      hover: "hover:bg-[#1E293B]",
       soft: "bg-[#F1F5F9]",
       border: "border-[#DDE7F3]",
       shadow: "shadow-[0_16px_34px_rgba(15,23,42,0.20)]",
@@ -327,34 +309,42 @@ function DashboardShell({
   useEffect(() => {
     if (!menuOpen) return;
 
+    const scrollY = window.scrollY;
+    const originalPosition = document.body.style.position;
+    const originalTop = document.body.style.top;
+    const originalWidth = document.body.style.width;
     const originalOverflow = document.body.style.overflow;
-    const originalTouchAction = document.body.style.touchAction;
 
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
     document.body.style.overflow = "hidden";
-    document.body.style.touchAction = "none";
 
     return () => {
+      document.body.style.position = originalPosition;
+      document.body.style.top = originalTop;
+      document.body.style.width = originalWidth;
       document.body.style.overflow = originalOverflow;
-      document.body.style.touchAction = originalTouchAction;
+      window.scrollTo(0, scrollY);
     };
   }, [menuOpen]);
 
   const mainLinks = [
-    { label: "Ana Sayfa", href: "/dashboard", icon: <Home size={20} /> },
-    { label: "Stok", href: "/stok", icon: <Building2 size={20} /> },
-    { label: "CRM", href: "/crm", icon: <BriefcaseBusiness size={20} /> },
-    { label: "Network", href: "/network", icon: <Store size={20} /> },
-    { label: "Lina", href: "/lina", icon: <Bot size={20} /> },
+    { label: "Ana Sayfa", href: "/dashboard", icon: <Home size={22} /> },
+    { label: "Stok", href: "/stok", icon: <Building2 size={22} /> },
+    { label: "CRM", href: "/crm", icon: <BriefcaseBusiness size={22} /> },
+    { label: "Network", href: "/network", icon: <Store size={22} /> },
+    { label: "Lina", href: "/lina", icon: <Bot size={22} /> },
   ];
 
   const menuLinks = [
     ...mainLinks,
-    { label: "Mesajlar", href: "/messages", icon: <MessageCircle size={20} /> },
-    { label: "Profil", href: "/profil", icon: <UserCheck size={20} /> },
+    { label: "Mesajlar", href: "/messages", icon: <MessageCircle size={22} /> },
+    { label: "Profil", href: "/profil", icon: <UserCheck size={22} /> },
     {
       label: "Bildirim Ayarları",
       href: "/notification-settings",
-      icon: <Settings size={20} />,
+      icon: <Settings size={22} />,
     },
   ];
 
@@ -365,7 +355,7 @@ function DashboardShell({
           <div className="flex justify-start">
             <button
               onClick={() => router.back()}
-              className="flex h-[58px] w-[58px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition hover:-translate-y-0.5 hover:border-[#1557D6] md:h-[70px] md:w-[70px]"
+              className="flex h-[58px] w-[58px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_10px_24px_rgba(15,23,42,0.10)] md:h-[70px] md:w-[70px]"
               aria-label="Geri dön"
             >
               <ArrowLeft size={24} strokeWidth={2.6} />
@@ -392,7 +382,7 @@ function DashboardShell({
           <div className="flex justify-end gap-2">
             <Link
               href="/notification-settings"
-              className="relative hidden h-[58px] w-[58px] items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition hover:-translate-y-0.5 hover:border-[#1557D6] sm:flex md:h-[70px] md:w-[70px]"
+              className="relative hidden h-[58px] w-[58px] items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_10px_24px_rgba(15,23,42,0.10)] sm:flex md:h-[70px] md:w-[70px]"
               aria-label="Bildirim ayarları"
             >
               <Bell size={24} />
@@ -406,7 +396,7 @@ function DashboardShell({
 
             <button
               onClick={() => setMenuOpen(true)}
-              className="relative flex h-[58px] w-[58px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition hover:-translate-y-0.5 hover:border-[#1557D6] md:h-[70px] md:w-[70px]"
+              className="relative flex h-[58px] w-[58px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_10px_24px_rgba(15,23,42,0.10)] md:h-[70px] md:w-[70px]"
               aria-label="Menüyü aç"
             >
               <Menu size={25} strokeWidth={2.7} />
@@ -450,69 +440,58 @@ function DashboardShell({
       </nav>
 
       {menuOpen && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/55 px-4 pt-8 backdrop-blur-sm"
-          onClick={() => setMenuOpen(false)}
-          onTouchMove={(event) => event.preventDefault()}
-        >
-          <aside
-            className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-[34px] border border-[#DDE7F3] bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-            onTouchMove={(event) => event.stopPropagation()}
-          >
-            <div className="shrink-0 px-5 pb-3 pt-4 text-center">
-              <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-[#DDE7F3]" />
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/65 px-4 pt-8 backdrop-blur-sm">
+          <aside className="flex max-h-[92dvh] w-full max-w-[430px] flex-col overflow-hidden rounded-t-[36px] border border-[#DDE7F3] bg-white shadow-2xl">
+            <div className="relative shrink-0 px-6 pb-5 pt-6 text-center">
+              <div className="mx-auto mb-5 h-1.5 w-14 rounded-full bg-[#DDE7F3]" />
 
               <button
                 onClick={() => setMenuOpen(false)}
-                className="absolute right-7 top-8 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#27364F] shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
+                className="absolute right-5 top-7 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#06194A] shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
                 aria-label="Menüyü kapat"
               >
-                <X size={22} />
+                <X size={24} />
               </button>
 
-              <div className="mx-auto inline-flex rounded-full border border-[#DDE7F3] bg-[#EFF6FF] px-4 py-2 text-xs font-black text-[#1557D6]">
+              <h2 className="text-[36px] font-black leading-none tracking-[-0.04em] text-[#06194A]">
                 EPH Menü
-              </div>
-
-              <h2 className="mt-4 text-[34px] font-black leading-none tracking-[-0.04em] text-[#06194A]">
-                Hızlı Geçiş
               </h2>
 
-              <p className="mx-auto mt-3 max-w-xs text-center text-base font-semibold leading-7 text-[#475569]">
+              <p className="mx-auto mt-3 max-w-[320px] text-[16px] font-bold leading-7 text-[#64748B]">
                 Platformun tüm bölümlerine hızlı geçiş yap.
               </p>
             </div>
 
             <div
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-6 pt-2"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-1"
               style={{
                 WebkitOverflowScrolling: "touch",
-                touchAction: "pan-y",
               }}
             >
-              <div className="mx-auto grid max-w-sm gap-3">
+              <div className="grid gap-3">
                 {menuLinks.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={() => setMenuOpen(false)}
-                    className="grid min-h-[74px] grid-cols-[58px_1fr_24px] items-center gap-4 rounded-[24px] border border-[#DDE7F3] bg-white px-4 text-left shadow-[0_10px_26px_rgba(15,23,42,0.06)] transition hover:bg-[#F7FBFF]"
+                    className="grid h-[78px] w-full grid-cols-[62px_1fr_28px] items-center gap-4 rounded-[24px] border border-[#DDE7F3] bg-white px-4 text-left shadow-[0_10px_26px_rgba(15,23,42,0.06)]"
                   >
-                    <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
+                    <span className="flex h-[54px] w-[54px] items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
                       {item.icon}
                     </span>
 
-                    <span className="text-[20px] font-black text-[#06194A]">
+                    <span className="truncate text-[22px] font-black text-[#06194A]">
                       {item.label}
                     </span>
 
-                    <ChevronRight size={22} className="text-[#1557D6]" />
+                    <span className="flex justify-end">
+                      <ChevronRight size={25} className="text-[#06194A]" />
+                    </span>
                   </Link>
                 ))}
               </div>
 
-              <div className="mx-auto mt-7 max-w-sm text-center">
+              <div className="mt-8 text-center">
                 <div className="flex items-center justify-center gap-4">
                   <span className="h-px flex-1 bg-[#DDE7F3]" />
                   <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EFF6FF] text-[#1557D6]">
@@ -528,6 +507,14 @@ function DashboardShell({
                 <p className="mt-1 text-sm font-bold text-[#64748B]">
                   EPH Platform
                 </p>
+
+                <Link
+                  href="/giris"
+                  className="mt-6 flex h-[62px] w-full items-center justify-center gap-3 rounded-2xl bg-[#1557D6] text-[20px] font-black text-white shadow-[0_16px_34px_rgba(21,87,214,0.24)]"
+                >
+                  <LogOut size={24} />
+                  Çıkış Yap
+                </Link>
               </div>
             </div>
           </aside>
@@ -1285,21 +1272,6 @@ export default function DashboardPage() {
                 <MiniSummary
                   value={adminStats?.pendingApplications || 0}
                   label="Başvuru"
-                />
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <QuickAction
-                  href="/admin"
-                  icon={<ShieldCheck size={21} />}
-                  label="Admin"
-                  tone={tone}
-                />
-                <QuickAction
-                  href="/admin/referrals"
-                  icon={<UsersRound size={21} />}
-                  label="Referans"
-                  tone="blue"
                 />
               </div>
             </SectionCard>
