@@ -9,7 +9,6 @@ import { ArrowLeft, Bell, Menu, X } from "lucide-react";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import StokCreateModal from "@/components/stok/StokCreateModal";
-import StokTable from "@/components/stok/StokTable";
 import type {
   Project,
   ProjectFormState,
@@ -417,7 +416,6 @@ function SectionCard({
 }
 
 function Hero({
-  firstName,
   role,
   totalUnits,
   activeUnits,
@@ -425,7 +423,6 @@ function Hero({
   verifiedUnits,
   tone,
 }: {
-  firstName: string;
   role: string;
   totalUnits: number;
   activeUnits: number;
@@ -437,7 +434,8 @@ function Hero({
 
   return (
     <section className="relative overflow-hidden rounded-[34px] border border-[#DDE7F3] bg-white p-6 text-center shadow-[0_22px_60px_rgba(15,23,42,0.10)] md:p-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(21,87,214,0.10),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(219,234,254,0.75),transparent_30%)]" />
+      <div className="absolute inset-x-0 top-0 h-3" style={{ background: `linear-gradient(90deg, ${colors.main}, #DBEAFE, ${colors.main})` }} />
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(247,251,255,0.96),rgba(255,255,255,0.98)),radial-gradient(circle_at_top,rgba(219,234,254,0.85),transparent_34%)]" />
 
       <div className="relative">
         <div
@@ -456,8 +454,7 @@ function Hero({
         </h2>
 
         <p className="mx-auto mt-4 max-w-2xl text-base font-semibold leading-8 text-[#27364F] md:text-lg">
-          Hoşgeldiniz {firstName}. Portföy, proje ve ilan akışını mobil öncelikli
-          EPH v2 panelinden yönetin.
+          Portföy, proje ve ilan akışını mobil öncelikli premium stok panelinden yönetin.
         </p>
 
         <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -765,127 +762,133 @@ function UnitCard({
   const location = unitLocation(unit);
 
   return (
-    <article className="flex min-h-[390px] flex-col overflow-hidden rounded-[28px] border border-[#DDE7F3] bg-white text-center shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
-      <div
-        className="h-2 w-full shrink-0"
-        style={{
-          backgroundColor: verified ? "#16A34A" : "#EA580C",
-        }}
-      />
+    <article className="flex min-h-[390px] flex-col overflow-hidden rounded-[28px] border border-[#DDE7F3] bg-white text-center shadow-[0_14px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(15,23,42,0.12)]">
+      <Link href={`/stok/${unit.id}`} className="flex flex-1 flex-col text-inherit no-underline">
+        <div
+          className="h-2 w-full shrink-0"
+          style={{
+            backgroundColor: verified ? "#16A34A" : "#EA580C",
+          }}
+        />
 
-      <div className="flex flex-1 flex-col items-center justify-between p-5">
-        <div className="w-full">
-          <div className="flex flex-wrap justify-center gap-2">
-            <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[11px] font-black text-[#1557D6]">
-              {formatStatus(unit.status)}
-            </span>
-
-            <span
-              className={`rounded-full px-3 py-1 text-[11px] font-black ${
-                verified
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-amber-50 text-amber-700"
-              }`}
-            >
-              {verified ? "Doğrulanmış" : "Kontrol Bekliyor"}
-            </span>
-
-            {unit.isOffMarket && (
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-700">
-                Off-Market
+        <div className="flex flex-1 flex-col items-center justify-between p-5">
+          <div className="w-full">
+            <div className="flex flex-wrap justify-center gap-2">
+              <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[11px] font-black text-[#1557D6]">
+                {formatStatus(unit.status)}
               </span>
-            )}
-          </div>
 
-          <h3 className="mx-auto mt-5 flex min-h-[58px] max-w-[420px] items-center justify-center text-[22px] font-black leading-tight tracking-[-0.035em] text-[#06194A]">
-            <span className="line-clamp-2">{unitTitle(unit)}</span>
-          </h3>
+              <span
+                className={`rounded-full px-3 py-1 text-[11px] font-black ${
+                  verified
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-amber-50 text-amber-700"
+                }`}
+              >
+                {verified ? "Doğrulanmış" : "Kontrol Bekliyor"}
+              </span>
 
-          <p className="mx-auto mt-3 flex min-h-[24px] max-w-[380px] items-center justify-center text-sm font-bold text-[#64748B]">
-            <span className="line-clamp-1">
-              {location || "Konum bilgisi yok"} {unit.number ? `· No ${unit.number}` : ""}
-            </span>
-          </p>
+              {unit.isOffMarket && (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-700">
+                  Off-Market
+                </span>
+              )}
+            </div>
 
-          <p className="mt-4 text-[28px] font-black leading-none tracking-[-0.035em] text-[#1557D6]">
-            {formatPrice(unit.price)}
-          </p>
-        </div>
+            <h3 className="mx-auto mt-5 flex min-h-[58px] max-w-[420px] items-center justify-center text-[22px] font-black leading-tight tracking-[-0.035em] text-[#06194A]">
+              <span className="line-clamp-2">{unitTitle(unit)}</span>
+            </h3>
 
-        <div className="mt-5 grid w-full grid-cols-2 gap-3 sm:grid-cols-4">
-          <UnitMini label="Tip" value={unit.type || "—"} />
-          <UnitMini label="Oda" value={unit.roomCount || "—"} />
-          <UnitMini label="Alan" value={unit.area ? `${unit.area} m²` : "—"} />
-          <UnitMini
-            label="Kat"
-            value={unit.floor != null ? String(unit.floor) : "—"}
-          />
-        </div>
-
-        {isAdmin && (
-          <div className="mt-5 w-full rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center">
-            <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#64748B]">
-              Admin Doğrulama
+            <p className="mx-auto mt-3 flex min-h-[24px] max-w-[380px] items-center justify-center text-sm font-bold text-[#64748B]">
+              <span className="line-clamp-1">
+                {location || "Konum bilgisi yok"} {unit.number ? `· No ${unit.number}` : ""}
+              </span>
             </p>
 
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <VerifyButton
-                active={Boolean(unit.tapuVerified)}
-                label={unit.tapuVerified ? "Tapu Onaylı" : "Tapu Onayla"}
-                onClick={() =>
-                  onVerify(unit.id, {
-                    tapuVerified: !unit.tapuVerified,
-                    photoVerified: unit.photoVerified,
-                    yetkiVerified: unit.yetkiVerified,
-                    isOffMarket: unit.isOffMarket,
-                  })
-                }
-              />
-
-              <VerifyButton
-                active={Boolean(unit.photoVerified)}
-                label={
-                  unit.photoVerified ? "Fotoğraf Onaylı" : "Fotoğraf Onayla"
-                }
-                onClick={() =>
-                  onVerify(unit.id, {
-                    tapuVerified: unit.tapuVerified,
-                    photoVerified: !unit.photoVerified,
-                    yetkiVerified: unit.yetkiVerified,
-                    isOffMarket: unit.isOffMarket,
-                  })
-                }
-              />
-
-              <VerifyButton
-                active={Boolean(unit.yetkiVerified)}
-                label={unit.yetkiVerified ? "Yetki Onaylı" : "Yetki Onayla"}
-                onClick={() =>
-                  onVerify(unit.id, {
-                    tapuVerified: unit.tapuVerified,
-                    photoVerified: unit.photoVerified,
-                    yetkiVerified: !unit.yetkiVerified,
-                    isOffMarket: unit.isOffMarket,
-                  })
-                }
-              />
-
-              <VerifyButton
-                active={verified}
-                label="Tümünü Doğrula"
-                onClick={() =>
-                  onVerify(unit.id, {
-                    tapuVerified: true,
-                    photoVerified: true,
-                    yetkiVerified: true,
-                    isOffMarket: unit.isOffMarket,
-                  })
-                }
-              />
-            </div>
+            <p className="mt-4 text-[28px] font-black leading-none tracking-[-0.035em] text-[#1557D6]">
+              {formatPrice(unit.price)}
+            </p>
           </div>
-        )}
-      </div>
+
+          <div className="mt-5 grid w-full grid-cols-2 gap-3 sm:grid-cols-4">
+            <UnitMini label="Tip" value={unit.type || "—"} />
+            <UnitMini label="Oda" value={unit.roomCount || "—"} />
+            <UnitMini label="Alan" value={unit.area ? `${unit.area} m²` : "—"} />
+            <UnitMini
+              label="Kat"
+              value={unit.floor != null ? String(unit.floor) : "—"}
+            />
+          </div>
+
+          <div className="mt-5 flex h-[48px] w-full items-center justify-center rounded-2xl bg-[#1557D6] px-4 text-sm font-black text-white shadow-[0_14px_30px_rgba(21,87,214,0.22)]">
+            İlan Detayına Git
+          </div>
+        </div>
+      </Link>
+
+      {isAdmin && (
+        <div className="border-t border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center">
+          <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#64748B]">
+            Admin Doğrulama
+          </p>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <VerifyButton
+              active={Boolean(unit.tapuVerified)}
+              label={unit.tapuVerified ? "Tapu Onaylı" : "Tapu Onayla"}
+              onClick={() =>
+                onVerify(unit.id, {
+                  tapuVerified: !unit.tapuVerified,
+                  photoVerified: unit.photoVerified,
+                  yetkiVerified: unit.yetkiVerified,
+                  isOffMarket: unit.isOffMarket,
+                })
+              }
+            />
+
+            <VerifyButton
+              active={Boolean(unit.photoVerified)}
+              label={
+                unit.photoVerified ? "Fotoğraf Onaylı" : "Fotoğraf Onayla"
+              }
+              onClick={() =>
+                onVerify(unit.id, {
+                  tapuVerified: unit.tapuVerified,
+                  photoVerified: !unit.photoVerified,
+                  yetkiVerified: unit.yetkiVerified,
+                  isOffMarket: unit.isOffMarket,
+                })
+              }
+            />
+
+            <VerifyButton
+              active={Boolean(unit.yetkiVerified)}
+              label={unit.yetkiVerified ? "Yetki Onaylı" : "Yetki Onayla"}
+              onClick={() =>
+                onVerify(unit.id, {
+                  tapuVerified: unit.tapuVerified,
+                  photoVerified: unit.photoVerified,
+                  yetkiVerified: !unit.yetkiVerified,
+                  isOffMarket: unit.isOffMarket,
+                })
+              }
+            />
+
+            <VerifyButton
+              active={verified}
+              label="Tümünü Doğrula"
+              onClick={() =>
+                onVerify(unit.id, {
+                  tapuVerified: true,
+                  photoVerified: true,
+                  yetkiVerified: true,
+                  isOffMarket: unit.isOffMarket,
+                })
+              }
+            />
+          </div>
+        </div>
+      )}
     </article>
   );
 }
@@ -928,6 +931,153 @@ function VerifyButton({
   );
 }
 
+
+function CompactList({
+  units,
+}: {
+  units: Unit[];
+}) {
+  if (units.length === 0) {
+    return (
+      <div className="flex min-h-[220px] items-center justify-center rounded-[28px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] p-8 text-center">
+        <p className="mx-auto max-w-[320px] text-sm font-bold leading-7 text-[#64748B]">
+          Liste görünümünde gösterilecek kayıt bulunamadı.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      {units.map((unit) => {
+        const verified = isUnitVerified(unit);
+        const location = unitLocation(unit);
+
+        return (
+          <Link
+            key={unit.id}
+            href={`/stok/${unit.id}`}
+            className="grid min-h-[142px] grid-cols-[8px_1fr] overflow-hidden rounded-[26px] border border-[#DDE7F3] bg-white text-inherit shadow-[0_12px_30px_rgba(15,23,42,0.07)] no-underline transition hover:-translate-y-1 hover:shadow-[0_20px_44px_rgba(15,23,42,0.12)]"
+          >
+            <span
+              className="h-full w-full"
+              style={{ backgroundColor: verified ? "#16A34A" : "#EA580C" }}
+            />
+
+            <div className="grid gap-3 p-4 text-center md:grid-cols-[1.1fr_0.8fr_0.8fr_0.7fr] md:items-center">
+              <div className="flex min-h-[70px] flex-col items-center justify-center">
+                <p className="line-clamp-2 text-[18px] font-black leading-tight text-[#06194A]">
+                  {unitTitle(unit)}
+                </p>
+
+                <p className="mt-2 line-clamp-1 text-xs font-bold text-[#64748B]">
+                  {location || "Konum yok"} {unit.number ? `· No ${unit.number}` : ""}
+                </p>
+              </div>
+
+              <div className="flex min-h-[70px] flex-col items-center justify-center rounded-2xl bg-[#F7FBFF] px-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#64748B]">
+                  Fiyat
+                </p>
+                <p className="mt-1 line-clamp-1 text-[15px] font-black text-[#1557D6]">
+                  {formatPrice(unit.price)}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <UnitMini label="Oda" value={unit.roomCount || "—"} />
+                <UnitMini label="Alan" value={unit.area ? `${unit.area} m²` : "—"} />
+              </div>
+
+              <div className="flex min-h-[70px] flex-col items-center justify-center gap-2">
+                <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[11px] font-black text-[#1557D6]">
+                  {formatStatus(unit.status)}
+                </span>
+
+                <span
+                  className={`rounded-full px-3 py-1 text-[11px] font-black ${
+                    verified
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700"
+                  }`}
+                >
+                  {verified ? "Onaylı" : "Kontrol"}
+                </span>
+              </div>
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+function PremiumInsight({
+  units,
+}: {
+  units: Unit[];
+}) {
+  const saleCount = countByStatus(units, "SATILIK");
+  const rentCount = countByStatus(units, "KIRALIK");
+  const projectCount = units.filter((unit) =>
+    ["ON_SATIS", "PROJE_ASAMASI", "YAKINDA_SATISTA", "INSAAT_HALINDE", "INSAAT_PROJESI"].includes(
+      unit.status || "",
+    ),
+  ).length;
+
+  const total = Math.max(units.length, 1);
+
+  const items = [
+    { label: "Satılık", value: saleCount, accent: "#1557D6" },
+    { label: "Kiralık", value: rentCount, accent: "#16A34A" },
+    { label: "Proje", value: projectCount, accent: "#EA580C" },
+  ];
+
+  return (
+    <SectionCard
+      title="Portföy Dengesi"
+      desc="Stok dağılımı tek bakışta okunur. Bu bölüm listeye girmeden operasyon yönü verir."
+      accent="#7C3AED"
+    >
+      <div className="grid gap-3 md:grid-cols-3">
+        {items.map((item) => {
+          const width = Math.round((item.value / total) * 100);
+
+          return (
+            <div
+              key={item.label}
+              className="flex min-h-[168px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center"
+            >
+              <p className="text-[13px] font-black uppercase tracking-[0.15em] text-[#64748B]">
+                {item.label}
+              </p>
+
+              <p className="mt-2 text-[34px] font-black leading-none text-[#06194A]">
+                {item.value}
+              </p>
+
+              <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-white">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${width}%`,
+                    backgroundColor: item.accent,
+                  }}
+                />
+              </div>
+
+              <p className="mt-3 text-xs font-bold text-[#64748B]">
+                %{width} stok ağırlığı
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </SectionCard>
+  );
+}
+
+
 function InventorySection({
   units,
   viewMode,
@@ -948,9 +1098,7 @@ function InventorySection({
       {viewMode === "cards" ? (
         <UnitCards units={units} isAdmin={isAdmin} onVerify={onVerify} />
       ) : (
-        <div className="overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-white text-left">
-          <StokTable units={units} />
-        </div>
+        <CompactList units={units} />
       )}
     </SectionCard>
   );
@@ -998,9 +1146,6 @@ export default function StokPage() {
   const tone = getTone(roleType);
   const roleName = roleLabel(user?.role);
   const isAdmin = roleType === "admin" || roleType === "superadmin";
-
-  const firstName =
-    user?.firstName?.trim() || user?.email?.split("@")[0] || "EPH Üyesi";
 
   const canAddUnit =
     user?.role === "MUTEAHHIT" ||
@@ -1210,7 +1355,6 @@ export default function StokPage() {
 
       <div className="mx-auto w-full max-w-6xl space-y-6">
         <Hero
-          firstName={firstName}
           role={roleName}
           totalUnits={units.length}
           activeUnits={activeUnits}
@@ -1242,6 +1386,8 @@ export default function StokPage() {
           visibleCount={filteredUnits.length}
           totalCount={units.length}
         />
+
+        <PremiumInsight units={filteredUnits} />
 
         <InventorySection
           units={filteredUnits}
