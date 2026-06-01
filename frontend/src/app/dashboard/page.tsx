@@ -17,7 +17,6 @@ import {
   LogOut,
   Menu,
   MessageCircle,
-  Plus,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -126,6 +125,12 @@ type UserItem = {
   email: string;
   role: string;
   isApproved: boolean;
+};
+
+type QuickActionItem = {
+  href: string;
+  label: string;
+  tone: ToneType;
 };
 
 function normalizeRole(role?: string | null) {
@@ -660,7 +665,6 @@ function QuickAction({
   tone,
 }: {
   href: string;
-  icon?: ReactNode;
   label: string;
   tone: ToneType;
 }) {
@@ -669,13 +673,64 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="relative flex h-[72px] min-w-[96px] flex-1 items-center justify-center overflow-hidden rounded-[14px] border border-[#DDE7F3] bg-white px-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(15,23,42,0.10)] md:h-[86px] md:min-w-0"
+      className="relative flex h-[74px] w-[108px] shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-[#DDE7F3] bg-white px-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.05)] transition hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(15,23,42,0.10)] md:h-[86px] md:w-full md:shrink"
     >
       <div className={`absolute inset-x-0 top-0 h-1.5 ${toneStyle.bg}`} />
       <span className="flex min-h-[38px] items-center justify-center text-center text-[12px] font-black leading-4 text-[#27364F] md:text-sm md:leading-5">
         {label}
       </span>
     </Link>
+  );
+}
+
+function QuickActionsLoop({ items }: { items: QuickActionItem[] }) {
+  const loopItems = [...items, ...items, ...items];
+
+  return (
+    <div className="relative -mx-1 overflow-hidden px-1 md:mx-0 md:px-0">
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-white to-transparent md:hidden" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-white to-transparent md:hidden" />
+
+      <div className="flex w-max gap-3 py-1 md:grid md:w-full md:grid-cols-5 md:gap-3 md:py-0 md:[animation:none] eph-actions-loop">
+        {loopItems.map((item, index) => (
+          <div
+            key={`${item.href}-${item.label}-${index}`}
+            className={index >= items.length ? "md:hidden" : ""}
+          >
+            <QuickAction
+              href={item.href}
+              label={item.label}
+              tone={item.tone}
+            />
+          </div>
+        ))}
+      </div>
+
+      <style>{`
+        .eph-actions-loop {
+          animation: ephActionsLoop 17s linear infinite;
+        }
+
+        .eph-actions-loop:hover {
+          animation-play-state: paused;
+        }
+
+        @keyframes ephActionsLoop {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(calc(-1 * (108px * 5 + 12px * 5)));
+          }
+        }
+
+        @media (min-width: 768px) {
+          .eph-actions-loop {
+            transform: none !important;
+          }
+        }
+      `}</style>
+    </div>
   );
 }
 
@@ -713,7 +768,7 @@ function TaskRow({
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="flex h-[140px] items-center justify-center rounded-[16px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-5 text-center text-sm font-semibold text-[#475569]">
+    <div className="flex h-[140px] w-full items-center justify-center rounded-[16px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-5 text-center text-sm font-semibold text-[#475569]">
       {text}
     </div>
   );
@@ -725,7 +780,7 @@ function OpportunityCard({ post }: { post: FeaturedNetworkPost }) {
   return (
     <Link
       href={`/network/${post.id}`}
-      className="relative flex h-[140px] flex-col items-center justify-center overflow-hidden rounded-[16px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center shadow-[0_10px_24px_rgba(15,23,42,0.05)] transition hover:bg-white hover:shadow-[0_16px_34px_rgba(15,23,42,0.09)]"
+      className="relative flex h-[140px] w-full flex-col items-center justify-center overflow-hidden rounded-[16px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center shadow-[0_10px_24px_rgba(15,23,42,0.05)] transition hover:bg-white hover:shadow-[0_16px_34px_rgba(15,23,42,0.09)]"
     >
       <div className="absolute inset-x-0 top-0 h-1.5 bg-[#EF4444]" />
 
@@ -1041,6 +1096,14 @@ export default function DashboardPage() {
 
   const roleName = roleLabel(user?.role);
 
+  const quickActions: QuickActionItem[] = [
+    { href: "/stok", label: "Portföy Ekle", tone },
+    { href: "/network", label: "Talep Paylaş", tone: "orange" },
+    { href: "/crm", label: "CRM Aç", tone: "blue" },
+    { href: "/messages", label: "Mesajlar", tone: "green" },
+    { href: "/lina", label: "Lina", tone: "purple" },
+  ];
+
   if (!hydrated || loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F7FBFF]">
@@ -1115,38 +1178,7 @@ export default function DashboardPage() {
           title="Hızlı İşlemler"
           desc="Gün içinde en çok kullanılacak EPH operasyon kısayolları."
         >
-          <div className="flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-5 md:overflow-visible md:pb-0">
-            <QuickAction
-              href="/stok"
-              icon={<Plus size={21} />}
-              label="Portföy Ekle"
-              tone={tone}
-            />
-            <QuickAction
-              href="/network"
-              icon={<Store size={21} />}
-              label="Talep Paylaş"
-              tone="orange"
-            />
-            <QuickAction
-              href="/crm"
-              icon={<BriefcaseBusiness size={21} />}
-              label="CRM Aç"
-              tone="blue"
-            />
-            <QuickAction
-              href="/messages"
-              icon={<MessageCircle size={21} />}
-              label="Mesajlar"
-              tone="green"
-            />
-            <QuickAction
-              href="/lina"
-              icon={<Bot size={21} />}
-              label="Lina"
-              tone="purple"
-            />
-          </div>
+          <QuickActionsLoop items={quickActions} />
         </SectionCard>
 
         <SectionCard
