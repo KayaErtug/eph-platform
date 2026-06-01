@@ -454,6 +454,136 @@ function DashboardTaskRow({
   );
 }
 
+function greetingText() {
+  const hour = new Date().getHours();
+
+  if (hour < 11) return "Günaydın";
+  if (hour < 17) return "İyi günler";
+  return "İyi akşamlar";
+}
+
+function formatBudget(value?: number | null) {
+  if (!value) return "Bütçe yok";
+  return `${value.toLocaleString("tr-TR")} TL`;
+}
+
+function TodayFocusCard({
+  icon,
+  label,
+  value,
+  desc,
+  tone,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  desc: string;
+  tone: ToneType;
+}) {
+  const toneClass: Record<ToneType, string> = {
+    blue: "border-blue-100 bg-blue-50 text-blue-700",
+    orange: "border-orange-100 bg-orange-50 text-orange-700",
+    amber: "border-amber-100 bg-amber-50 text-amber-700",
+    slate: "border-slate-200 bg-slate-50 text-slate-700",
+    teal: "border-teal-100 bg-teal-50 text-teal-700",
+  };
+
+  return (
+    <div className="rounded-[24px] border border-slate-200 bg-white p-4 text-center shadow-sm">
+      <div
+        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border ${toneClass[tone]}`}
+      >
+        {icon}
+      </div>
+
+      <p className="mt-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+        {label}
+      </p>
+
+      <p className="mt-1 text-2xl font-black text-slate-950">{value}</p>
+
+      <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+        {desc}
+      </p>
+    </div>
+  );
+}
+
+function PerformanceCard({
+  icon,
+  title,
+  value,
+  desc,
+  tone,
+}: {
+  icon: ReactNode;
+  title: string;
+  value: string;
+  desc: string;
+  tone: ToneType;
+}) {
+  const toneClass: Record<ToneType, string> = {
+    blue: "bg-blue-600",
+    orange: "bg-orange-600",
+    amber: "bg-[#C9A84C]",
+    slate: "bg-slate-900",
+    teal: "bg-teal-600",
+  };
+
+  return (
+    <div className="rounded-[26px] border border-slate-200 bg-white p-5 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+      <div
+        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg ${toneClass[tone]}`}
+      >
+        {icon}
+      </div>
+
+      <p className="mt-4 text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+        {title}
+      </p>
+
+      <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
+
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+        {desc}
+      </p>
+    </div>
+  );
+}
+
+function OpportunityCard({ post }: { post: FeaturedNetworkPost }) {
+  const location = [post.city, post.district].filter(Boolean).join(" / ");
+
+  return (
+    <Link
+      href={`/network/${post.id}`}
+      className="block rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-center transition hover:border-blue-200 hover:bg-white hover:shadow-sm"
+    >
+      <div className="mx-auto inline-flex rounded-full bg-orange-50 px-3 py-1 text-[11px] font-black text-orange-700">
+        🔥 {post.type || "Fırsat"}
+      </div>
+
+      <h3 className="mt-3 line-clamp-2 text-lg font-black leading-tight text-slate-950">
+        {post.title}
+      </h3>
+
+      <p className="mt-2 text-xs font-bold text-slate-500">
+        {location || "Konum bilgisi yok"}
+      </p>
+
+      <p className="mt-2 text-sm font-black text-blue-700">
+        {formatBudget(post.budget)}
+      </p>
+
+      <div className="mt-3 flex flex-wrap justify-center gap-2 text-[10px] font-black text-slate-500">
+        <span className="rounded-full bg-white px-2 py-1">👁 {post.viewCount}</span>
+        <span className="rounded-full bg-white px-2 py-1">⭐ {post.followerCount}</span>
+        <span className="rounded-full bg-white px-2 py-1">💬 {post.requestCount}</span>
+      </div>
+    </Link>
+  );
+}
+
 function SuperAdminDashboard({
   adminStats,
   summary,
@@ -1276,43 +1406,87 @@ export default function DashboardPage() {
     );
   }
 
+  const portfolioUpdateCount = Math.max(stats.totalUnits || 0, 0);
+  const totalOpportunityCount = featuredPosts.length;
+
   return (
     <EphAppShell title={pageConfig.title}>
-      <div className="mx-auto w-full max-w-6xl">
-        <section
-          className={`overflow-hidden rounded-[32px] bg-gradient-to-br ${pageConfig.heroClass} p-6 text-center text-white shadow-2xl md:p-8`}
-        >
-          <div className="mx-auto inline-flex rounded-full border border-white/20 bg-white/15 px-4 py-2 text-xs font-black text-white backdrop-blur">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <section className="overflow-hidden rounded-[34px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-7">
+          <div className="mx-auto inline-flex rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">
             {roleLabel(user?.role)} Paneli
           </div>
 
-          <h1 className="mt-5 text-3xl font-black tracking-tight md:text-5xl">
-            {firstName}
+          <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950 md:text-6xl">
+            {greetingText()} {firstName} 👋
           </h1>
 
-          <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-white/75 md:text-base">
-            {pageConfig.subtitle}
+          <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-500 md:text-base">
+            Bugün seni bekleyen işleri, müşteri takiplerini ve EPH fırsatlarını tek ekrandan yönet.
           </p>
 
-          <div className="mt-6 inline-flex rounded-full bg-white/12 px-4 py-2 text-xs font-black text-white backdrop-blur">
-            EPH Platform · Rol bazlı panel
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <TodayFocusCard
+              icon={<CalendarCheck size={22} />}
+              label="Bugün"
+              value={`${todayTasks.length} görev`}
+              desc="Bugün tamamlanacak müşteri işleri"
+              tone="blue"
+            />
+            <TodayFocusCard
+              icon={<Clock3 size={22} />}
+              label="Geciken"
+              value={`${overdueTasks.length} görev`}
+              desc="Öncelikli takip bekleyen işler"
+              tone="amber"
+            />
+            <TodayFocusCard
+              icon={<MessageCircle size={22} />}
+              label="Mesaj"
+              value={String(unreadMessages)}
+              desc="Okunmamış görüşme ve dönüşler"
+              tone="teal"
+            />
+            <TodayFocusCard
+              icon={<Store size={22} />}
+              label="Fırsat"
+              value={String(totalOpportunityCount)}
+              desc="Network akışındaki sıcak başlıklar"
+              tone="slate"
+            />
           </div>
         </section>
 
-        <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {pageConfig.stats.map((item) => (
-            <StatCard
-              key={item.title}
-              icon={item.icon}
-              title={item.title}
-              value={item.value}
-              description={item.description}
-              tone={pageConfig.tone}
-            />
-          ))}
+        <section className="rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+          <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
+            <div className="text-center md:text-left">
+              <h2 className="text-2xl font-black text-slate-950">
+                Hızlı İşlemler
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+                Gün içinde en çok dokunacağın ana işlemler.
+              </p>
+            </div>
+
+            <div className="inline-flex rounded-full bg-slate-50 px-4 py-2 text-xs font-black text-slate-500">
+              EPH operasyon kısayolları
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {pageConfig.actions.map((item) => (
+              <QuickAction
+                key={item.label}
+                href={item.href}
+                icon={item.icon}
+                label={item.label}
+                tone={pageConfig.tone}
+              />
+            ))}
+          </div>
         </section>
 
-        <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+        <section className="rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
             <CalendarCheck size={24} />
           </div>
@@ -1397,27 +1571,74 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm md:p-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-black text-slate-900">
-              Hızlı İşlemler
-            </h2>
-
-            <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
-              En sık kullanacağın işlemlere buradan hızlıca ulaşabilirsin.
-            </p>
+        <section className="rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+            <TrendingUp size={24} />
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-            {pageConfig.actions.map((item) => (
-              <QuickAction
-                key={item.label}
-                href={item.href}
-                icon={item.icon}
-                label={item.label}
-                tone={pageConfig.tone}
-              />
-            ))}
+          <h2 className="mt-4 text-2xl font-black text-slate-950">
+            Bugünkü Performansım
+          </h2>
+
+          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+            Portföy, müşteri, görüşme ve takip gücünü hızlıca gör.
+          </p>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <PerformanceCard
+              icon={<Building2 size={22} />}
+              title="Portföy"
+              value={String(stats.totalUnits || 0)}
+              desc="Aktif ilan ve stok kayıtları"
+              tone={pageConfig.tone}
+            />
+            <PerformanceCard
+              icon={<UsersRound size={22} />}
+              title="Müşteri"
+              value={String(stats.totalCustomers || 0)}
+              desc="CRM tarafındaki toplam kayıt"
+              tone="blue"
+            />
+            <PerformanceCard
+              icon={<MessageCircle size={22} />}
+              title="Görüşme"
+              value={String(unreadMessages)}
+              desc="Okunmamış özel mesaj akışı"
+              tone="teal"
+            />
+            <PerformanceCard
+              icon={<Activity size={22} />}
+              title="Güncelleme"
+              value={String(portfolioUpdateCount)}
+              desc="Bugün takip edilecek portföy alanı"
+              tone="slate"
+            />
+          </div>
+        </section>
+
+        <section className="rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-50 text-orange-700">
+            <Store size={24} />
+          </div>
+
+          <h2 className="mt-4 text-2xl font-black text-slate-950">
+            EPH Fırsat Merkezi
+          </h2>
+
+          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+            Network akışındaki sıcak talepleri ve öne çıkan fırsatları kaçırma.
+          </p>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            {featuredPosts.length > 0 ? (
+              featuredPosts.slice(0, 3).map((post) => (
+                <OpportunityCard key={post.id} post={post} />
+              ))
+            ) : (
+              <div className="rounded-2xl bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500 md:col-span-3">
+                Şu anda öne çıkan Network fırsatı yok.
+              </div>
+            )}
           </div>
         </section>
       </div>
