@@ -29,9 +29,27 @@ import {
 } from "lucide-react";
 
 const stats = [
-  ["344+", "Aktif Üye"],
+  ["344+", "Onaylı Üye"],
   ["8.700+", "Portföy"],
   ["65+", "Başarılı Satış"],
+];
+
+const trustBoxes = [
+  {
+    icon: BadgeCheck,
+    title: "Onaylı Üyeler",
+    desc: "Platforma yalnızca değerlendirilen ve onaylanan sektör profesyonelleri katılır.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Referanslı Sistem",
+    desc: "Üyelik süreci referans ve admin kontrolüyle daha güvenli ilerler.",
+  },
+  {
+    icon: LockKeyhole,
+    title: "Kapalı Network",
+    desc: "Portföy, talep ve iş fırsatları yalnızca kapalı EPH ağı içinde paylaşılır.",
+  },
 ];
 
 const features = [
@@ -76,21 +94,27 @@ const features = [
 const liveActivities = [
   {
     icon: BellRing,
-    title: "Yeni Talep Paylaşıldı",
-    desc: "3+1 daire arayan müşteri talebi network’e düştü.",
+    title: "Karahasanlı Talebi",
+    desc: "Karahasanlı bölgesinde satılık 2+1 daire aranıyor · müşteri hazır · komisyon paylaşımlı",
     time: "Az önce",
   },
   {
     icon: Building2,
-    title: "Yeni Portföy Eklendi",
-    desc: "Denizli merkezde satılık portföy yayına alındı.",
+    title: "Selçuk Bey Arsası",
+    desc: "Selçuk Bey’de 1160 m² kat karşılığı arsa · Bodrum + 5 Kat · %45",
     time: "2 dk önce",
   },
   {
-    icon: Handshake,
-    title: "Ortak Satış Görüşmesi",
-    desc: "Gayrimenkul danışmanı ve müteahhit arasında görüşme başladı.",
+    icon: MessageCircle,
+    title: "Acil Kiralık Talebi",
+    desc: "Doktor müşterim için Bölge Hastanesi yakınında 2+1 kiralık daire aranıyor · acil",
     time: "5 dk önce",
+  },
+  {
+    icon: Handshake,
+    title: "Çakmak Arsası",
+    desc: "Çakmak’ta 1400 m² kat karşılığı arsa · Bodrum + 3 Kat · %40",
+    time: "8 dk önce",
   },
 ];
 
@@ -210,13 +234,9 @@ export default function LandingPage() {
               </button>
             </nav>
 
-            <div className="flex items-center gap-3">
-              <Link
-                href="/giris"
-                className="rounded-2xl border border-[#DDE7F3] bg-white px-5 py-3 text-xs font-black text-[#172033] shadow-sm transition hover:border-[#2563EB]/30 hover:bg-[#EFF6FF]"
-              >
-                Giriş Yap
-              </Link>
+            <div className="hidden items-center gap-2 rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] px-4 py-3 text-xs font-black text-[#2563EB] shadow-sm sm:flex">
+              <LockKeyhole size={15} />
+              Kapalı Network
             </div>
           </div>
         </header>
@@ -230,13 +250,13 @@ export default function LandingPage() {
           <div className="absolute bottom-12 right-10 h-40 w-40 rounded-full bg-[#CCFBF1] blur-3xl" />
 
           <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-16 lg:grid-cols-2">
-            <div className="text-center lg:text-left">
+            <div className="text-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#BFDBFE] bg-white px-4 py-2 text-xs font-black text-[#2563EB] shadow-sm">
                 <Zap size={14} />
                 Sektörün Kapalı Devre İş Ağı
               </div>
 
-              <h2 className="mt-7 text-4xl font-black leading-[1.08] tracking-tight text-[#172033] md:text-7xl">
+              <h2 className="mx-auto mt-7 max-w-5xl text-4xl font-black leading-[1.08] tracking-tight text-[#172033] md:text-7xl">
                 Gayrimenkul danışmanları,
                 <span className="block text-[#2563EB]">
                   emlak ofisleri, inşaat firmaları
@@ -245,57 +265,45 @@ export default function LandingPage() {
                 yeni nesil iş platformu.
               </h2>
 
-              <p className="mx-auto mt-8 max-w-3xl text-lg leading-9 text-[#5B6B82] lg:mx-0">
+              <p className="mx-auto mt-8 max-w-3xl text-lg leading-9 text-[#5B6B82]">
                 EPH Platform sayesinde gayrimenkul danışmanları ve emlak
                 ofisleri, potansiyel müşterilere daha hızlı, daha doğru ve daha
                 geniş portföy seçenekleri sunar. Bu sayede iş süreçleri
                 hızlanır ve satış fırsatları güçlenir.
               </p>
 
-              <div className="mt-8 grid grid-cols-1 gap-3 text-sm font-bold text-[#334155] sm:grid-cols-3">
-                <div className="rounded-2xl border border-[#DDE7F3] bg-white px-4 py-3 shadow-sm">
-                  Anlık Talep Paylaşımı
-                </div>
+              <div className="mx-auto mt-8 grid max-w-4xl grid-cols-1 gap-3 text-center text-sm font-bold text-[#334155] sm:grid-cols-3">
+                {trustBoxes.map((item) => (
+                  <div
+                    key={item.title}
+                    className="flex min-h-[148px] flex-col items-center justify-center rounded-3xl border border-[#DDE7F3] bg-white px-5 py-5 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#2563EB]">
+                      <item.icon size={23} />
+                    </div>
 
-                <div className="rounded-2xl border border-[#DDE7F3] bg-white px-4 py-3 shadow-sm">
-                  Ortak Satış Fırsatı
-                </div>
+                    <h3 className="mt-4 text-base font-black text-[#172033]">
+                      {item.title}
+                    </h3>
 
-                <div className="rounded-2xl border border-[#DDE7F3] bg-white px-4 py-3 shadow-sm">
-                  Güvenli Network
-                </div>
+                    <p className="mt-2 text-xs leading-5 text-[#64748B]">
+                      {item.desc}
+                    </p>
+                  </div>
+                ))}
               </div>
 
-              <div className="mt-10 flex flex-wrap justify-center gap-4 lg:justify-start">
+              <div className="mt-10 flex justify-center">
                 <Link
                   href="/kayit"
-                  className="group flex items-center gap-2 rounded-2xl bg-[#2563EB] px-7 py-4 text-sm font-black text-white shadow-lg shadow-[#2563EB]/20 transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
+                  className="group flex items-center justify-center gap-2 rounded-2xl bg-[#2563EB] px-8 py-4 text-center text-sm font-black text-white shadow-lg shadow-[#2563EB]/20 transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
                 >
-                  Üyelik Başvurusu Yap
+                  EPH&apos;ye Katılmak İçin Başvur
                   <ArrowRight
                     size={18}
                     className="transition group-hover:translate-x-1"
                   />
                 </Link>
-
-                <button
-                  type="button"
-                  onClick={() => setShowVideo(true)}
-                  className="group flex items-center gap-2 rounded-2xl border border-[#DDE7F3] bg-white px-7 py-4 text-sm font-black text-[#172033] shadow-sm transition hover:-translate-y-1 hover:border-[#2563EB]/30 hover:bg-[#EFF6FF]"
-                >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#14B8A6] text-white">
-                    <Play size={14} fill="white" />
-                  </span>
-                  Tanıtım Videosunu İzle
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setInfoModal("kesfet")}
-                  className="rounded-2xl border border-[#DDE7F3] bg-white px-7 py-4 text-sm font-black text-[#172033] shadow-sm transition hover:-translate-y-1 hover:border-[#F97316]/30 hover:bg-[#FFF7ED]"
-                >
-                  EPH’yi Keşfet
-                </button>
               </div>
 
               <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -325,7 +333,7 @@ export default function LandingPage() {
                   <div className="flex flex-col items-center justify-between gap-4 md:flex-row md:text-left">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.25em] text-[#2563EB]">
-                        CANLI İŞ AĞI
+                        CANLI İŞ MERKEZİ
                       </p>
 
                       <h3 className="mt-2 text-3xl font-black text-[#172033]">
@@ -400,6 +408,17 @@ export default function LandingPage() {
                       </div>
                     </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowVideo(true)}
+                    className="mx-auto mt-5 flex items-center justify-center gap-2 rounded-2xl border border-[#DDE7F3] bg-white px-6 py-4 text-sm font-black text-[#172033] shadow-sm transition hover:-translate-y-1 hover:border-[#2563EB]/30 hover:bg-[#EFF6FF]"
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#14B8A6] text-white">
+                      <Play size={14} fill="white" />
+                    </span>
+                    Tanıtım Videosunu İzle
+                  </button>
                 </div>
               </div>
             </div>
@@ -413,12 +432,12 @@ export default function LandingPage() {
           <div className="relative mx-auto max-w-7xl">
             <SectionHeader
               icon={Activity}
-              badge="Canlı Network Akışı"
-              title="Platform İçinde İş Fırsatları"
-              desc="Portföy, talep, mesajlaşma ve ortak satış süreçleri tek akışta izlenir. EPH, sektör profesyonellerine canlı ve düzenli bir iş takip merkezi sunar."
+              badge="Canlı İş Merkezi"
+              title="Platform İçinde Gerçek İş Fırsatları"
+              desc="Talep, portföy, arsa, proje ve ortak satış bilgileri kapalı network içinde düzenli biçimde paylaşılır."
             />
 
-            <div className="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-4">
               {liveActivities.map((item, index) => (
                 <div
                   key={item.title}
@@ -430,7 +449,9 @@ export default function LandingPage() {
                         ? "bg-[#DBEAFE]"
                         : index === 1
                           ? "bg-[#CCFBF1]"
-                          : "bg-[#FFEDD5]"
+                          : index === 2
+                            ? "bg-[#FFEDD5]"
+                            : "bg-[#EDE9FE]"
                     }`}
                   />
 
@@ -440,7 +461,9 @@ export default function LandingPage() {
                         ? "bg-[#DBEAFE] text-[#2563EB]"
                         : index === 1
                           ? "bg-[#CCFBF1] text-[#0F766E]"
-                          : "bg-[#FFEDD5] text-[#EA580C]"
+                          : index === 2
+                            ? "bg-[#FFEDD5] text-[#EA580C]"
+                            : "bg-[#EDE9FE] text-[#7C3AED]"
                     }`}
                   >
                     <item.icon size={28} />
@@ -450,7 +473,7 @@ export default function LandingPage() {
                     {item.title}
                   </h3>
 
-                  <p className="relative mt-3 min-h-[56px] text-sm leading-7 text-[#64748B]">
+                  <p className="relative mt-3 min-h-[112px] text-sm leading-7 text-[#64748B]">
                     {item.desc}
                   </p>
 
@@ -499,7 +522,7 @@ export default function LandingPage() {
                     <div className="absolute inset-0 bg-gradient-to-t from-white via-white/55 to-transparent" />
 
                     <div className="absolute bottom-0 left-0 right-0 p-6">
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#DBEAFE] text-[#2563EB] shadow-sm">
                           <item.icon size={24} />
                         </div>
@@ -515,7 +538,7 @@ export default function LandingPage() {
                         </div>
                       </div>
 
-                      <p className="mt-4 max-w-xl text-sm leading-7 text-[#64748B]">
+                      <p className="mt-4 max-w-xl text-center text-sm leading-7 text-[#64748B] sm:text-left">
                         {item.desc}
                       </p>
                     </div>
@@ -625,19 +648,12 @@ export default function LandingPage() {
                 değerlendirmesine alınır.
               </p>
 
-              <div className="mt-10 flex flex-wrap justify-center gap-4">
+              <div className="mt-10 flex justify-center">
                 <Link
                   href="/kayit"
-                  className="rounded-2xl bg-[#2563EB] px-8 py-4 text-sm font-black text-white shadow-lg shadow-[#2563EB]/20 transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
+                  className="rounded-2xl bg-[#2563EB] px-8 py-4 text-center text-sm font-black text-white shadow-lg shadow-[#2563EB]/20 transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
                 >
                   Üyelik Başvurusu Yap
-                </Link>
-
-                <Link
-                  href="/giris"
-                  className="rounded-2xl border border-[#DDE7F3] bg-white px-8 py-4 text-sm font-black text-[#172033] shadow-sm transition hover:-translate-y-1 hover:bg-[#EFF6FF]"
-                >
-                  Giriş Yap
                 </Link>
               </div>
             </div>
@@ -646,7 +662,7 @@ export default function LandingPage() {
 
         <footer className="border-t border-[#DDE7F3] bg-white px-5 py-10">
           <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 md:flex-row">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 text-center md:text-left">
               <img
                 src="/LOGO_EPH.png"
                 alt="EPH"
