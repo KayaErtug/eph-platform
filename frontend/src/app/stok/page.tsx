@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
 import api from "@/lib/api";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import StokPremiumStyles from "@/components/stok/StokPremiumStyles";
 import StokKpiCards from "@/components/stok/StokKpiCards";
 import StokToolbar from "@/components/stok/StokToolbar";
@@ -311,6 +312,14 @@ export default function StokPage() {
       <StokPremiumStyles />
 
       <header className="stock-appbar-v2">
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
+          aria-label="Dashboard'a dön"
+        >
+          <ArrowLeft size={20} />
+        </button>
+
         <Link href="/dashboard" className="stock-brand-v2">
           <img src="/LOGO_EPH.png" alt="EPH" />
 
@@ -477,7 +486,7 @@ function AdminInventoryCommandCenter({
       <header className="sticky top-0 z-50 border-b border-cyan-300/15 bg-[#020617]/85 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={onBack} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/20 bg-white/5 text-cyan-100 transition hover:border-[#C9A84C] hover:text-[#F7DFA3]">←</button>
+            <button onClick={onBack} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/20 bg-white/5 text-cyan-100 transition hover:border-[#C9A84C] hover:text-[#F7DFA3]" aria-label="Dashboard'a dön"><ArrowLeft size={20} /></button>
             <Link href="/dashboard" className="flex items-center gap-3 no-underline">
               <div className="relative">
                 <div className="absolute inset-0 rounded-2xl bg-cyan-400/30 blur-xl" />

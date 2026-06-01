@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  ArrowLeft,
   Bot,
   CheckCircle2,
   Loader2,
@@ -10,7 +11,6 @@ import {
   Send,
   Sparkles,
   Volume2,
-  X,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -244,11 +244,19 @@ export default function LinaPanel({
   };
 
   return (
-    <div className="fixed inset-0 z-[140] flex items-end justify-center bg-[#0F172A]/60 p-0 backdrop-blur-md md:items-center md:p-5">
-      <div className="flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-[34px] border border-[#DDE7F3] bg-white shadow-2xl md:h-[82vh] md:rounded-[36px]">
-        <header className="border-b border-[#DDE7F3] bg-[#F8FAFC] px-5 py-4">
-          <div className="flex items-center justify-between gap-4">
+    <div className="fixed inset-0 z-[140] flex bg-[#F4F7FB]">
+      <div className="flex h-screen w-full flex-col overflow-hidden bg-white">
+        <header className="shrink-0 border-b border-[#DDE7F3] bg-[#F8FAFC] px-4 py-3 md:px-6 md:py-4">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#172033] shadow-sm"
+                aria-label="Dashboard'a dön"
+              >
+                <ArrowLeft size={20} />
+              </button>
               <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-[#08111F] text-[#F7DFA3] shadow-lg">
                 <Sparkles size={25} />
 
@@ -283,15 +291,15 @@ export default function LinaPanel({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#172033]"
+                className="hidden h-11 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white px-4 text-xs font-black text-[#172033] shadow-sm md:flex"
               >
-                <X size={20} />
+                Dashboard
               </button>
             </div>
           </div>
         </header>
 
-        <section className="grid flex-1 overflow-hidden md:grid-cols-[330px_1fr]">
+        <section className="grid min-h-0 flex-1 overflow-hidden md:grid-cols-[330px_1fr]">
           <aside className="hidden border-r border-[#DDE7F3] bg-[#F8FAFC] p-5 text-center md:block">
             <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-sm">
               <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[34px] bg-[#08111F] text-[#F7DFA3] shadow-xl">

@@ -449,16 +449,17 @@ export default function CrmPage() {
       )}
 
       <section className="mx-auto min-h-screen max-w-7xl px-4 pb-28 pt-5">
-        <header className="mb-5 overflow-hidden rounded-[34px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="text-center lg:text-left">
-              <button
-                onClick={() => router.push("/dashboard")}
-                className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 lg:mx-0"
-              >
-                <ArrowLeft size={20} />
-              </button>
+        <header className="relative mb-5 overflow-hidden rounded-[34px] border border-slate-200 bg-white p-5 pt-20 shadow-sm lg:pt-5">
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="absolute left-5 top-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-[#1D4ED8] hover:text-[#1D4ED8]"
+            aria-label="Dashboard'a dön"
+          >
+            <ArrowLeft size={20} />
+          </button>
 
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="text-center lg:text-left lg:pl-16">
               <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
                 <BriefcaseBusiness size={14} />
                 Müşteri İlişkileri
