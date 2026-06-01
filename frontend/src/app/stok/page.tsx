@@ -2,19 +2,21 @@
 
 import LinaPanel from "../../components/LinaPanel";
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
 import api from "@/lib/api";
 import Link from "next/link";
 import {
   ArrowLeft,
-  Bell,
+  BarChart3,
   Building2,
   CheckCircle2,
   Copy,
   Eye,
   Grid2X2,
   Home,
+  Layers3,
   List,
   MapPin,
   MessageCircle,
@@ -51,6 +53,16 @@ const statusLabels: Record<string, string> = {
   SATILDI: "Satıldı",
   PASIF: "Pasif",
 };
+
+const hotStatuses = [
+  "SATILIK",
+  "KIRALIK",
+  "ON_SATIS",
+  "PROJE_ASAMASI",
+  "YAKINDA_SATISTA",
+  "INSAAT_PROJESI",
+  "HEMEN_TESLIM",
+];
 
 export default function StokPage() {
   const { user, logout } = useAuthStore();
@@ -172,25 +184,25 @@ export default function StokPage() {
   }, [units]);
 
   const verifiedCount = useMemo(() => {
-    return units.filter(
-      (unit) =>
-        unit.isVerified ||
-        (unit.tapuVerified && unit.photoVerified && unit.yetkiVerified),
-    ).length;
+    return units.filter((unit) => isUnitVerified(unit)).length;
   }, [units]);
 
   const activeCount = useMemo(() => {
-    return units.filter((unit) =>
-      [
-        "SATILIK",
-        "KIRALIK",
-        "ON_SATIS",
-        "PROJE_ASAMASI",
-        "YAKINDA_SATISTA",
-        "INSAAT_PROJESI",
-        "HEMEN_TESLIM",
-      ].includes(unit.status),
-    ).length;
+    return units.filter((unit) => hotStatuses.includes(unit.status)).length;
+  }, [units]);
+
+  const offMarketCount = useMemo(() => {
+    return units.filter((unit) => unit.isOffMarket).length;
+  }, [units]);
+
+  const topCity = useMemo(() => {
+    const counts = units.reduce<Record<string, number>>((acc, unit) => {
+      const city = unit.project?.city || "Bilinmeyen";
+      acc[city] = (acc[city] || 0) + 1;
+      return acc;
+    }, {});
+
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || "Henüz yok";
   }, [units]);
 
   const myProjects = user?.role === "ADMIN" ? projects : [];
@@ -346,7 +358,6 @@ export default function StokPage() {
   if (!hydrated || loading) {
     return (
       <div
-        className="stock-page-v2"
         style={{
           minHeight: "100vh",
           display: "grid",
@@ -376,7 +387,7 @@ export default function StokPage() {
     <div className="min-h-screen bg-[#F7FBFF] text-[#27364F]">
       <StokPremiumStyles />
 
-      <header className="sticky top-0 z-50 border-b border-[#DDE7F3] bg-[#F7FBFF]/90 backdrop-blur-2xl">
+      <header className="sticky top-0 z-50 border-b border-[#DDE7F3] bg-white/88 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="grid grid-cols-[52px_1fr_52px] items-center gap-3 lg:flex lg:gap-4">
             <button
@@ -389,7 +400,7 @@ export default function StokPage() {
 
             <Link
               href="/dashboard"
-              className="flex min-w-0 items-center justify-center gap-3 rounded-[24px] border border-[#DDE7F3] bg-white px-4 py-3 text-center no-underline shadow-[0_14px_40px_rgba(15,23,42,0.06)] lg:justify-start"
+              className="flex min-w-0 items-center justify-center gap-3 rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3 text-center no-underline shadow-[0_14px_40px_rgba(15,23,42,0.06)] lg:justify-start"
             >
               <img src="/LOGO_EPH.png" alt="EPH" className="h-10 w-10 object-contain" />
               <div className="min-w-0">
@@ -426,7 +437,7 @@ export default function StokPage() {
                 className={`rounded-full px-4 py-2 text-sm font-extrabold no-underline transition ${
                   href === "/stok"
                     ? "bg-[#1557D6] text-white shadow-[0_16px_34px_rgba(21,87,214,0.24)]"
-                    : "text-[#475569] hover:bg-white hover:text-[#1557D6]"
+                    : "text-[#475569] hover:bg-[#EFF6FF] hover:text-[#1557D6]"
                 }`}
               >
                 {label}
@@ -436,7 +447,7 @@ export default function StokPage() {
             {user?.role === "ADMIN" && (
               <Link
                 href="/admin"
-                className="rounded-full px-4 py-2 text-sm font-extrabold text-[#475569] no-underline transition hover:bg-white hover:text-[#1557D6]"
+                className="rounded-full px-4 py-2 text-sm font-extrabold text-[#475569] no-underline transition hover:bg-[#EFF6FF] hover:text-[#1557D6]"
               >
                 Admin
               </Link>
@@ -458,36 +469,41 @@ export default function StokPage() {
       <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
 
       <main className="mx-auto max-w-7xl px-4 pb-24 pt-6">
-        <section className="relative overflow-hidden rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] lg:p-8">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_16%,rgba(21,87,214,0.12),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(219,234,254,0.9),transparent_34%),linear-gradient(135deg,rgba(239,246,255,0.92),transparent_42%)]" />
+        <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="relative min-h-[520px] overflow-hidden rounded-[36px] border border-[#DDE7F3] bg-[#071A3F] p-5 text-white shadow-[0_30px_90px_rgba(15,23,42,0.14)] lg:p-8">
+            <div
+              className="absolute inset-0 bg-cover bg-center opacity-35"
+              style={{
+                backgroundImage: "url('/showcase/stock.jpg')",
+              }}
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(6,25,74,0.94),rgba(21,87,214,0.58)_48%,rgba(6,25,74,0.72)),radial-gradient(circle_at_20%_15%,rgba(255,255,255,0.24),transparent_26%)]" />
 
-          <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch">
-            <div className="flex min-h-[330px] flex-col justify-between rounded-[28px] border border-[#DDE7F3] bg-[#F7FBFF]/86 p-5 text-center lg:p-7 lg:text-left">
+            <div className="relative flex h-full min-h-[460px] flex-col justify-between">
               <div>
-                <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#DDE7F3] bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[#1557D6] lg:mx-0">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/12 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white backdrop-blur">
                   <Building2 size={15} />
-                  Canlı Portföy Yönetimi
+                  Premium Portföy Merkezi
                 </div>
 
-                <h1 className="mt-5 text-4xl font-black leading-tight tracking-[-0.05em] text-[#06194A] md:text-6xl">
+                <h1 className="mt-6 max-w-2xl text-4xl font-black leading-tight tracking-[-0.055em] md:text-6xl">
                   Stok ve İlanlarım
                 </h1>
 
-                <p className="mx-auto mt-4 max-w-2xl text-base font-semibold leading-8 text-[#475569] lg:mx-0">
-                  Satılık, kiralık, proje, kat karşılığı ve off-market portföyleri
-                  tek merkezden takip edin. Kartlar tıklanabilir, ilan detayına
-                  gider ve paylaşım için hazırdır.
+                <p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-blue-50/90">
+                  Portföylerinizi filtreleyin, detaylara tek dokunuşla girin,
+                  paylaşım linkini hazırlayın ve ilan akışınızı tek ekrandan yönetin.
                 </p>
               </div>
 
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
+              <div className="mt-8 grid gap-3 sm:grid-cols-2">
                 {canAddUnit && (
                   <button
                     onClick={() => {
                       resetForm();
                       setShowModal(true);
                     }}
-                    className="inline-flex items-center justify-center gap-2 rounded-[22px] bg-[#1557D6] px-5 py-4 text-sm font-black text-white shadow-[0_18px_38px_rgba(21,87,214,0.22)] transition hover:bg-[#0F49BD]"
+                    className="inline-flex items-center justify-center gap-2 rounded-[24px] bg-white px-5 py-4 text-sm font-black text-[#1557D6] shadow-[0_18px_38px_rgba(255,255,255,0.16)] transition hover:scale-[1.01]"
                   >
                     <Plus size={18} />
                     Yeni Portföy Ekle
@@ -496,69 +512,99 @@ export default function StokPage() {
 
                 <button
                   onClick={() => setLinaOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 rounded-[22px] border border-[#DDE7F3] bg-white px-5 py-4 text-sm font-black text-[#1557D6] shadow-[0_14px_34px_rgba(15,23,42,0.06)] transition hover:bg-[#EFF6FF]"
+                  className="inline-flex items-center justify-center gap-2 rounded-[24px] border border-white/22 bg-white/12 px-5 py-4 text-sm font-black text-white backdrop-blur transition hover:bg-white/18"
                 >
                   <Sparkles size={18} />
                   Lina ile İlan Hazırla
                 </button>
               </div>
             </div>
+          </div>
 
-            <div className="grid gap-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <HeroMetric
-                  icon={<Home size={20} />}
-                  label="Toplam Kayıt"
-                  value={units.length.toLocaleString("tr-TR")}
-                  note="Sistemdeki portföy"
-                />
+          <div className="grid gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <HeroMetric
+                icon={<Home size={20} />}
+                label="Toplam Kayıt"
+                value={units.length.toLocaleString("tr-TR")}
+                note="Sistemdeki portföy"
+              />
 
-                <HeroMetric
-                  icon={<TrendingUp size={20} />}
-                  label="Aktif İlan"
-                  value={activeCount.toLocaleString("tr-TR")}
-                  note="Satış / kiralama akışı"
-                />
+              <HeroMetric
+                icon={<TrendingUp size={20} />}
+                label="Aktif İlan"
+                value={activeCount.toLocaleString("tr-TR")}
+                note="Satış / kiralama akışı"
+              />
 
-                <HeroMetric
-                  icon={<CheckCircle2 size={20} />}
-                  label="Doğrulanmış"
-                  value={verifiedCount.toLocaleString("tr-TR")}
-                  note="Güven seviyesi"
-                />
+              <HeroMetric
+                icon={<CheckCircle2 size={20} />}
+                label="Doğrulanmış"
+                value={verifiedCount.toLocaleString("tr-TR")}
+                note="Güven seviyesi"
+              />
 
-                <HeroMetric
-                  icon={<Star size={20} />}
-                  label="Toplam Değer"
-                  value={
-                    totalValue
-                      ? `${(totalValue / 1000000).toFixed(1)}M ₺`
-                      : "0 ₺"
-                  }
-                  note="Yaklaşık envanter"
-                />
-              </div>
+              <HeroMetric
+                icon={<Star size={20} />}
+                label="Toplam Değer"
+                value={
+                  totalValue
+                    ? `${(totalValue / 1000000).toFixed(1)}M ₺`
+                    : "0 ₺"
+                }
+                note="Yaklaşık envanter"
+              />
+            </div>
 
-              <div className="rounded-[28px] border border-[#DDE7F3] bg-white p-5 shadow-[0_16px_42px_rgba(15,23,42,0.06)]">
-                <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-[#1557D6]">
-                  Hızlı Özet
-                </p>
-
-                <div className="mt-4 grid gap-3">
-                  <SummaryLine
-                    label="Gösterilen kayıt"
-                    value={`${filteredUnits.length} / ${units.length}`}
-                  />
-                  <SummaryLine
-                    label="Aktif kullanıcı"
-                    value={`${user?.firstName || "EPH"} ${user?.lastName || ""}`}
-                  />
-                  <SummaryLine
-                    label="Sayfa modu"
-                    value={viewMode === "cards" ? "Kart görünümü" : "Liste görünümü"}
-                  />
+            <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[#1557D6]">
+                    Portföy Dengesi
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+                    Güncel görünüm
+                  </h2>
+                </div>
+                <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]">
+                  <BarChart3 size={22} />
                 </div>
               </div>
+
+              <div className="mt-5 grid gap-3">
+                <BalanceLine label="Aktif Portföy" value={activeCount} total={Math.max(units.length, 1)} />
+                <BalanceLine label="Doğrulanmış" value={verifiedCount} total={Math.max(units.length, 1)} />
+                <BalanceLine label="Off-Market" value={offMarketCount} total={Math.max(units.length, 1)} />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+            <p className="text-center text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
+              Görsel Akış
+            </p>
+            <h2 className="mt-2 text-center text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+              İlan vitrini
+            </h2>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <VisualTile title="Konut" image="/showcase/stock.jpg" />
+              <VisualTile title="Proje" image="/showcase/dashboard.jpg" />
+              <VisualTile title="Network" image="/showcase/network.jpg" />
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+            <p className="text-center text-xs font-black uppercase tracking-[0.22em] text-[#1557D6] lg:text-left">
+              Hızlı Özet
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <SummaryLine label="Gösterilen kayıt" value={`${filteredUnits.length} / ${units.length}`} />
+              <SummaryLine label="Aktif kullanıcı" value={`${user?.firstName || "EPH"} ${user?.lastName || ""}`} />
+              <SummaryLine label="En yoğun şehir" value={topCity} />
+              <SummaryLine label="Sayfa modu" value={viewMode === "cards" ? "Kart görünümü" : "Liste görünümü"} />
             </div>
           </div>
         </section>
@@ -567,7 +613,7 @@ export default function StokPage() {
           <StokKpiCards units={units} projects={projects} />
         </div>
 
-        <section className="mt-6 rounded-[32px] border border-[#DDE7F3] bg-white p-4 shadow-[0_24px_70px_rgba(15,23,42,0.07)] lg:p-6">
+        <section className="mt-6 rounded-[36px] border border-[#DDE7F3] bg-white p-4 shadow-[0_24px_70px_rgba(15,23,42,0.07)] lg:p-6">
           <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="text-center lg:text-left">
               <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
@@ -577,7 +623,7 @@ export default function StokPage() {
                 Canlı İlan Listesi
               </h2>
               <p className="mt-2 text-sm font-semibold text-[#64748B]">
-                Her kart ilan detayına gider. Paylaş butonu ilan linkini hazırlar.
+                Eski filtreleme akışı korundu. Kartlar tıklanabilir, liste görünümü ekrana sığacak şekilde düzenlendi.
               </p>
             </div>
 
@@ -644,12 +690,21 @@ export default function StokPage() {
             </div>
           ) : (
             <div className="mt-5 overflow-hidden rounded-[28px] border border-[#DDE7F3] bg-[#F7FBFF]">
-              <div className="max-h-none overflow-x-auto">
+              <div className="w-full overflow-x-auto">
                 <StokTable units={filteredUnits} />
               </div>
             </div>
           )}
         </section>
+
+        {user?.role === "ADMIN" && (
+          <AdminVerificationPanel
+            units={filteredUnits}
+            allUnits={units}
+            projects={projects}
+            onVerify={handleAdminVerify}
+          />
+        )}
       </main>
 
       <StokCreateModal
@@ -671,19 +726,26 @@ export default function StokPage() {
   );
 }
 
+function isUnitVerified(unit: Unit) {
+  return Boolean(
+    unit.isVerified ||
+      (unit.tapuVerified && unit.photoVerified && unit.yetkiVerified),
+  );
+}
+
 function HeroMetric({
   icon,
   label,
   value,
   note,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: string;
   note: string;
 }) {
   return (
-    <div className="flex min-h-[154px] flex-col justify-between rounded-[28px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_16px_42px_rgba(15,23,42,0.06)]">
+    <div className="flex min-h-[178px] flex-col justify-between rounded-[32px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[20px] bg-[#EFF6FF] text-[#1557D6]">
         {icon}
       </div>
@@ -700,9 +762,53 @@ function HeroMetric({
   );
 }
 
+function BalanceLine({
+  label,
+  value,
+  total,
+}: {
+  label: string;
+  value: number;
+  total: number;
+}) {
+  const width = Math.min(100, Math.round((value / total) * 100));
+
+  return (
+    <div className="rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] p-4">
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <span className="text-xs font-black uppercase tracking-[0.16em] text-[#64748B]">
+          {label}
+        </span>
+        <span className="text-sm font-black text-[#06194A]">{value}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-[#DBEAFE]">
+        <div
+          className="h-full rounded-full bg-[#1557D6]"
+          style={{ width: `${width}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function VisualTile({ title, image }: { title: string; image: string }) {
+  return (
+    <div className="relative min-h-[158px] overflow-hidden rounded-[26px] border border-[#DDE7F3] bg-[#EFF6FF]">
+      <div
+        className="absolute inset-0 bg-cover bg-center transition duration-500 hover:scale-105"
+        style={{ backgroundImage: `url('${image}')` }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/82 via-[#06194A]/18 to-transparent" />
+      <div className="absolute bottom-4 left-4 right-4">
+        <p className="text-sm font-black text-white">{title}</p>
+      </div>
+    </div>
+  );
+}
+
 function SummaryLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-[20px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3">
+    <div className="flex min-h-[62px] items-center justify-between gap-4 rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3">
       <span className="text-sm font-extrabold text-[#64748B]">{label}</span>
       <span className="text-right text-sm font-black text-[#06194A]">{value}</span>
     </div>
@@ -722,9 +828,7 @@ function PremiumUnitCard({
   onCopy: () => void;
   onShare: () => void;
 }) {
-  const verified =
-    unit.isVerified ||
-    (unit.tapuVerified && unit.photoVerified && unit.yetkiVerified);
+  const verified = isUnitVerified(unit);
   const price = Number(unit.price || 0);
   const location =
     [unit.project?.district, unit.project?.city].filter(Boolean).join(" / ") ||
@@ -733,34 +837,33 @@ function PremiumUnitCard({
   return (
     <article
       onClick={onOpen}
-      className="group flex min-h-[430px] cursor-pointer flex-col justify-between overflow-hidden rounded-[30px] border border-[#DDE7F3] bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:border-[#1557D6]/35 hover:shadow-[0_28px_70px_rgba(21,87,214,0.14)]"
+      className="group flex min-h-[456px] cursor-pointer flex-col justify-between overflow-hidden rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:border-[#1557D6]/35 hover:shadow-[0_28px_70px_rgba(21,87,214,0.14)]"
     >
       <div>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-[#EFF6FF] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#1557D6]">
+        <div className="relative mb-5 min-h-[138px] overflow-hidden rounded-[26px] bg-[#EFF6FF]">
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-95 transition duration-500 group-hover:scale-105"
+            style={{ backgroundImage: "url('/showcase/stock.jpg')" }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/78 via-[#06194A]/12 to-transparent" />
+          <div className="absolute left-4 top-4 flex flex-wrap gap-2">
+            <span className="rounded-full bg-white/92 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#1557D6] shadow-sm">
               {statusLabels[unit.status] || unit.status || "Durum Yok"}
             </span>
 
             {verified && (
-              <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">
+              <span className="rounded-full bg-emerald-50/95 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700 shadow-sm">
                 Onaylı
-              </span>
-            )}
-
-            {unit.isOffMarket && (
-              <span className="rounded-full bg-amber-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-amber-700">
-                Off-Market
               </span>
             )}
           </div>
 
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-[#F7FBFF] text-[#1557D6] transition group-hover:bg-[#1557D6] group-hover:text-white">
+          <div className="absolute bottom-4 right-4 flex h-11 w-11 items-center justify-center rounded-[18px] bg-white text-[#1557D6] shadow-lg transition group-hover:bg-[#1557D6] group-hover:text-white">
             <Eye size={18} />
           </div>
         </div>
 
-        <h3 className="mt-5 line-clamp-2 text-2xl font-black leading-tight tracking-[-0.04em] text-[#06194A]">
+        <h3 className="line-clamp-2 text-2xl font-black leading-tight tracking-[-0.04em] text-[#06194A]">
           {unit.project?.name || "EPH Portföy"}
         </h3>
 
@@ -851,6 +954,259 @@ function EmptyInventory() {
       <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-7 text-[#64748B]">
         Arama veya filtreleri değiştirerek tekrar deneyin.
       </p>
+    </div>
+  );
+}
+
+function AdminVerificationPanel({
+  units,
+  allUnits,
+  projects,
+  onVerify,
+}: {
+  units: Unit[];
+  allUnits: Unit[];
+  projects: Project[];
+  onVerify: (
+    unitId: string,
+    payload: {
+      tapuVerified?: boolean;
+      photoVerified?: boolean;
+      yetkiVerified?: boolean;
+      isOffMarket?: boolean;
+    },
+  ) => void;
+}) {
+  const verifiedUnits = allUnits.filter((unit) => isUnitVerified(unit)).length;
+  const offMarketUnits = allUnits.filter((unit) => unit.isOffMarket).length;
+  const unverifiedUnits = allUnits.filter((unit) => !isUnitVerified(unit)).length;
+
+  return (
+    <section className="mt-6 rounded-[36px] border border-[#DDE7F3] bg-white p-4 shadow-[0_24px_70px_rgba(15,23,42,0.07)] lg:p-6">
+      <div className="flex flex-col gap-4 text-center lg:flex-row lg:items-center lg:justify-between lg:text-left">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
+            Admin Doğrulama Merkezi
+          </p>
+          <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+            Portföy kontrol paneli
+          </h2>
+          <p className="mt-2 text-sm font-semibold text-[#64748B]">
+            Eski admin doğrulama fonksiyonu korundu. Tapu, fotoğraf ve yetki onayları buradan yönetilir.
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <MiniAdminMetric label="Proje" value={projects.length} />
+          <MiniAdminMetric label="Onaylı" value={verifiedUnits} />
+          <MiniAdminMetric label="Off-Market" value={offMarketUnits} />
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-2">
+        {units.length === 0 ? (
+          <div className="rounded-[28px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] p-10 text-center text-sm font-bold text-[#64748B] xl:col-span-2">
+            Admin kontrolü için portföy kaydı bulunamadı.
+          </div>
+        ) : (
+          units.slice(0, 24).map((unit) => (
+            <AdminUnitCard key={unit.id} unit={unit} onVerify={onVerify} />
+          ))
+        )}
+      </div>
+
+      <div className="mt-5 rounded-[28px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center text-sm font-bold text-[#64748B]">
+        Onay bekleyen kayıt: {unverifiedUnits}
+      </div>
+    </section>
+  );
+}
+
+function MiniAdminMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="min-w-[112px] rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3 text-center">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#64748B]">
+        {label}
+      </p>
+      <p className="mt-1 text-2xl font-black text-[#06194A]">{value}</p>
+    </div>
+  );
+}
+
+function AdminUnitCard({
+  unit,
+  onVerify,
+}: {
+  unit: Unit;
+  onVerify: (
+    unitId: string,
+    payload: {
+      tapuVerified?: boolean;
+      photoVerified?: boolean;
+      yetkiVerified?: boolean;
+      isOffMarket?: boolean;
+    },
+  ) => void;
+}) {
+  const verified = isUnitVerified(unit);
+  const price = Number(unit.price || 0);
+
+  return (
+    <article className="rounded-[30px] border border-[#DDE7F3] bg-[#F7FBFF] p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#1557D6]">
+              {statusLabels[unit.status] || unit.status || "Durum Yok"}
+            </span>
+
+            {unit.isOffMarket && (
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-700">
+                Off-Market
+              </span>
+            )}
+
+            <span
+              className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${
+                verified
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-rose-50 text-rose-700"
+              }`}
+            >
+              {verified ? "Doğrulandı" : "Kontrol"}
+            </span>
+          </div>
+
+          <h3 className="mt-4 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+            {unit.project?.name || "EPH Portföy"}
+          </h3>
+
+          <p className="mt-1 text-sm font-semibold text-[#64748B]">
+            {[unit.project?.district, unit.project?.city].filter(Boolean).join(" / ") || "Konum yok"} · No {unit.number || "—"}
+          </p>
+        </div>
+
+        <div className="rounded-[22px] border border-[#DDE7F3] bg-white px-5 py-4 text-right">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#64748B]">
+            Değer
+          </p>
+          <p className="mt-1 text-2xl font-black text-[#06194A]">
+            {price ? `${price.toLocaleString("tr-TR")} ₺` : "—"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-4">
+        <AdminUnitMini label="Tip" value={unit.type || "—"} />
+        <AdminUnitMini label="Oda" value={unit.roomCount || "—"} />
+        <AdminUnitMini label="Alan" value={unit.area ? `${unit.area} m²` : "—"} />
+        <AdminUnitMini label="Kat" value={unit.floor != null ? String(unit.floor) : "—"} />
+      </div>
+
+      <div className="mt-5 grid gap-2 sm:grid-cols-3">
+        <AdminCheck label="Tapu" active={Boolean(unit.tapuVerified)} />
+        <AdminCheck label="Fotoğraf" active={Boolean(unit.photoVerified)} />
+        <AdminCheck label="Yetki" active={Boolean(unit.yetkiVerified)} />
+      </div>
+
+      <div className="mt-5 rounded-[24px] border border-[#DDE7F3] bg-white p-4">
+        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#1557D6]">
+          Admin Doğrulama
+        </p>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <button
+            onClick={() =>
+              onVerify(unit.id, {
+                tapuVerified: !unit.tapuVerified,
+                photoVerified: unit.photoVerified,
+                yetkiVerified: unit.yetkiVerified,
+                isOffMarket: unit.isOffMarket,
+              })
+            }
+            className={`rounded-2xl px-4 py-3 text-xs font-black transition ${
+              unit.tapuVerified
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-[#F7FBFF] text-[#64748B] hover:bg-[#EFF6FF] hover:text-[#1557D6]"
+            }`}
+          >
+            {unit.tapuVerified ? "Tapu Onaylı" : "Tapu Onayla"}
+          </button>
+
+          <button
+            onClick={() =>
+              onVerify(unit.id, {
+                tapuVerified: unit.tapuVerified,
+                photoVerified: !unit.photoVerified,
+                yetkiVerified: unit.yetkiVerified,
+                isOffMarket: unit.isOffMarket,
+              })
+            }
+            className={`rounded-2xl px-4 py-3 text-xs font-black transition ${
+              unit.photoVerified
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-[#F7FBFF] text-[#64748B] hover:bg-[#EFF6FF] hover:text-[#1557D6]"
+            }`}
+          >
+            {unit.photoVerified ? "Fotoğraf Onaylı" : "Fotoğraf Onayla"}
+          </button>
+
+          <button
+            onClick={() =>
+              onVerify(unit.id, {
+                tapuVerified: unit.tapuVerified,
+                photoVerified: unit.photoVerified,
+                yetkiVerified: !unit.yetkiVerified,
+                isOffMarket: unit.isOffMarket,
+              })
+            }
+            className={`rounded-2xl px-4 py-3 text-xs font-black transition ${
+              unit.yetkiVerified
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-[#F7FBFF] text-[#64748B] hover:bg-[#EFF6FF] hover:text-[#1557D6]"
+            }`}
+          >
+            {unit.yetkiVerified ? "Yetki Onaylı" : "Yetki Onayla"}
+          </button>
+
+          <button
+            onClick={() =>
+              onVerify(unit.id, {
+                tapuVerified: true,
+                photoVerified: true,
+                yetkiVerified: true,
+                isOffMarket: unit.isOffMarket,
+              })
+            }
+            className="rounded-2xl bg-[#1557D6] px-4 py-3 text-xs font-black text-white transition hover:bg-[#0F49BD]"
+          >
+            Tümünü Doğrula
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function AdminUnitMini({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-[#DDE7F3] bg-white p-3 text-center">
+      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#64748B]">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-black text-[#06194A]">{value}</p>
+    </div>
+  );
+}
+
+function AdminCheck({ label, active }: { label: string; active: boolean }) {
+  return (
+    <div
+      className={`rounded-2xl px-4 py-3 text-center text-xs font-black uppercase tracking-[0.16em] ${
+        active ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+      }`}
+    >
+      {active ? "✓" : "!"} {label}
     </div>
   );
 }
