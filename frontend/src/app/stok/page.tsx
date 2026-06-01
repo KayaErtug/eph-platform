@@ -20,6 +20,8 @@ import {
   List,
   MapPin,
   MessageCircle,
+  ShieldCheck,
+  Trophy,
   Plus,
   Search,
   Share2,
@@ -209,6 +211,43 @@ export default function StokPage() {
     return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || "Henüz yok";
   }, [units]);
 
+  const portfolioReport = useMemo(() => {
+    const scores = units.map((unit) => calculatePortfolioScore(unit));
+    const averageScore = scores.length
+      ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+      : 0;
+
+    const premiumCount = scores.filter((score) => score >= 90).length;
+    const strongCount = scores.filter((score) => score >= 80).length;
+    const missingDescription = units.filter((unit) => !unit.description).length;
+    const missingAuthority = units.filter(
+      (unit) => !unit.yetkiVerified && !unit.isVerified,
+    ).length;
+    const missingLocation = units.filter(
+      (unit) => !unit.project?.city || !unit.project?.district,
+    ).length;
+
+    const nextAdvice =
+      missingAuthority > 0
+        ? `${missingAuthority} portföyde yetki durumu eksik. Yetki bilgisini tamamlarsanız karne puanı yükselir.`
+        : missingDescription > 0
+          ? `${missingDescription} portföyde açıklama eksik. Lina ile açıklama hazırlayabilirsiniz.`
+          : missingLocation > 0
+            ? `${missingLocation} portföyde konum bilgisi eksik. İl ve ilçe bilgilerini tamamlayın.`
+            : "Portföy bilgileriniz güçlü görünüyor. Paylaşım kartları için hazır.";
+
+    return {
+      averageScore,
+      scoreLabel: getPortfolioScoreLabel(averageScore),
+      premiumCount,
+      strongCount,
+      missingDescription,
+      missingAuthority,
+      missingLocation,
+      nextAdvice,
+    };
+  }, [units]);
+
   const myProjects = user?.role === "ADMIN" ? projects : [];
 
   const resetForm = () => {
@@ -359,29 +398,7 @@ export default function StokPage() {
     await handleCopyShare(unit);
   };
 
-  const getPortfolioScore = (unit: Unit) => {
-    let score = 0;
 
-    if (unit.project?.name) score += 15;
-    if (unit.project?.city && unit.project?.district) score += 15;
-    if (unit.price) score += 12;
-    if (unit.area) score += 10;
-    if (unit.roomCount) score += 10;
-    if (unit.description) score += 10;
-    if (unit.tapuVerified) score += 8;
-    if (unit.photoVerified) score += 8;
-    if (unit.yetkiVerified || unit.isVerified) score += 12;
-
-    return Math.min(score || 72, 100);
-  };
-
-  const getPortfolioScoreLabel = (score: number) => {
-    if (score >= 90) return "Pekiyi";
-    if (score >= 80) return "Çok İyi";
-    if (score >= 70) return "İyi";
-    if (score >= 60) return "Geliştirilebilir";
-    return "Eksik";
-  };
 
   const getPortfolioNo = (unit: Unit) => {
     const raw = String(unit.id || "EPH").replace(/[^a-zA-Z0-9]/g, "");
@@ -392,7 +409,7 @@ export default function StokPage() {
 
   const getPortfolioShareData = (unit: Unit): PortfolioShareData => {
     const price = Number(unit.price || 0);
-    const score = getPortfolioScore(unit);
+    const score = calculatePortfolioScore(unit);
     const title = unit.project?.name || "EPH Portföy";
     const location =
       [unit.project?.district, unit.project?.city].filter(Boolean).join(" / ") ||
@@ -692,6 +709,62 @@ export default function StokPage() {
           </div>
         </section>
 
+        <section className="mt-6 grid gap-4 lg:grid-cols-3">
+          <PortfolioHealthCard
+            title="Portföy Sağlığı"
+            value={`${portfolioReport.averageScore}%`}
+            label={portfolioReport.scoreLabel}
+            icon={<ShieldCheck size={22} />}
+            progress={portfolioReport.averageScore}
+            note={`${activeCount} aktif portföy · ${portfolioReport.strongCount} güçlü kayıt`}
+          />
+
+          <PortfolioHealthCard
+            title="Portföy Karnesi"
+            value={`${portfolioReport.averageScore}/100`}
+            label={portfolioReport.scoreLabel}
+            icon={<Trophy size={22} />}
+            progress={portfolioReport.averageScore}
+            note={`${portfolioReport.premiumCount} portföy pekiyi seviyesinde`}
+          />
+
+          <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
+                  Lina Analizi
+                </p>
+                <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+                  Portföy önerileri
+                </h2>
+              </div>
+
+              <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]">
+                <Sparkles size={22} />
+              </div>
+            </div>
+
+            <p className="mt-4 text-sm font-bold leading-7 text-[#475569]">
+              {portfolioReport.nextAdvice}
+            </p>
+
+            <div className="mt-4 grid gap-2">
+              <ReportMiniLine
+                label="Açıklama eksik"
+                value={portfolioReport.missingDescription}
+              />
+              <ReportMiniLine
+                label="Yetki eksik"
+                value={portfolioReport.missingAuthority}
+              />
+              <ReportMiniLine
+                label="Konum eksik"
+                value={portfolioReport.missingLocation}
+              />
+            </div>
+          </div>
+        </section>
+
         <div className="mt-6">
           <StokKpiCards units={units} projects={projects} />
         </div>
@@ -904,6 +977,100 @@ function SummaryLine({ label, value }: { label: string; value: string }) {
   );
 }
 
+function calculatePortfolioScore(unit: Unit) {
+  let score = 0;
+
+  if (unit.project?.name) score += 15;
+  if (unit.project?.city && unit.project?.district) score += 15;
+  if (unit.price) score += 12;
+  if (unit.area) score += 10;
+  if (unit.roomCount) score += 10;
+  if (unit.description) score += 10;
+  if (unit.tapuVerified) score += 8;
+  if (unit.photoVerified) score += 8;
+  if (unit.yetkiVerified || unit.isVerified) score += 12;
+
+  return Math.min(score || 72, 100);
+}
+
+function getPortfolioScoreLabel(score: number) {
+  if (score >= 90) return "Pekiyi";
+  if (score >= 80) return "Çok İyi";
+  if (score >= 70) return "İyi";
+  if (score >= 60) return "Geliştirilebilir";
+  return "Eksik";
+}
+
+function PortfolioHealthCard({
+  title,
+  value,
+  label,
+  icon,
+  progress,
+  note,
+}: {
+  title: string;
+  value: string;
+  label: string;
+  icon: ReactNode;
+  progress: number;
+  note: string;
+}) {
+  return (
+    <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
+            {title}
+          </p>
+          <h2 className="mt-2 text-4xl font-black tracking-[-0.06em] text-[#06194A]">
+            {value}
+          </h2>
+        </div>
+
+        <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]">
+          {icon}
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-4">
+        <span className="rounded-full bg-[#EFF6FF] px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-[#1557D6]">
+          {label}
+        </span>
+        <span className="text-sm font-black text-[#64748B]">
+          {Math.round(progress)}%
+        </span>
+      </div>
+
+      <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#DBEAFE]">
+        <div
+          className="h-full rounded-full bg-[#1557D6]"
+          style={{ width: `${Math.max(0, Math.min(progress, 100))}%` }}
+        />
+      </div>
+
+      <p className="mt-4 text-sm font-bold leading-6 text-[#64748B]">{note}</p>
+    </div>
+  );
+}
+
+function ReportMiniLine({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-[18px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3">
+      <span className="text-xs font-black uppercase tracking-[0.14em] text-[#64748B]">
+        {label}
+      </span>
+      <span
+        className={`rounded-full px-3 py-1 text-xs font-black ${
+          value > 0 ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+        }`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function PremiumUnitCard({
   unit,
   copied,
@@ -919,6 +1086,8 @@ function PremiumUnitCard({
 }) {
   const verified = isUnitVerified(unit);
   const price = Number(unit.price || 0);
+  const score = calculatePortfolioScore(unit);
+  const scoreLabel = getPortfolioScoreLabel(score);
   const location =
     [unit.project?.district, unit.project?.city].filter(Boolean).join(" / ") ||
     "Konum bilgisi yok";
@@ -945,6 +1114,10 @@ function PremiumUnitCard({
                 Onaylı
               </span>
             )}
+
+            <span className="rounded-full bg-white/92 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#06194A] shadow-sm">
+              {scoreLabel} · {score}
+            </span>
           </div>
 
           <div className="absolute bottom-4 right-4 flex h-11 w-11 items-center justify-center rounded-[18px] bg-white text-[#1557D6] shadow-lg transition group-hover:bg-[#1557D6] group-hover:text-white">
