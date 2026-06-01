@@ -7,7 +7,6 @@ import {
   BellRing,
   Bot,
   Building2,
-  CheckCircle2,
   LockKeyhole,
   MessageCircle,
   Network,
@@ -27,7 +26,7 @@ const processCards = [
   {
     icon: ArrowRight,
     title: "Talep Akışı",
-    text: "Alıcı, kiracı, satıcı ve yatırımcı talepleri doğru profesyonellere ulaşır.",
+    text: "Proje lansmanları, alıcı, kiracı, satıcı ve yatırımcı talepleri doğru profesyonellere ulaşır.",
   },
   {
     icon: UsersRound,
@@ -37,12 +36,12 @@ const processCards = [
   {
     icon: MessageCircle,
     title: "Mesajlaşma",
-    text: "Üyelerle güvenli ve hızlı iletişim kurun, tüm görüşmeleri kayıt altında tutun.",
+    text: "Üyelerle güvenli ve hızlı iletişim kurun, tüm konuşmalar kayıt altında kalır.",
   },
   {
     icon: Bot,
     title: "Lina AI Asistan",
-    text: "Lina, süreçlerinizi kolaylaştırır ve işlerinizi hızlandırır.",
+    text: "Akıllı asistanınız Lina, süreçlerinizi kolaylaştırır ve zaman kazandırır.",
   },
 ];
 
@@ -69,7 +68,7 @@ const screens = [
     image: "/showcase/network.jpg",
     icon: Network,
     title: "Network",
-    text: "Doğru iş ortaklarıyla bağlantılar kurun",
+    text: "Doğru iş ortaklarıyla güçlü bağlantılar kurun",
   },
   {
     image: "/showcase/lina.jpg",
@@ -121,14 +120,14 @@ export default function LandingPage() {
   return (
     <main className="min-h-screen bg-white text-[#071332]">
       <header className="sticky top-0 z-50 border-b border-[#E2E8F0] bg-white/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <Link href="/" className="flex min-w-0 items-center gap-3">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+          <Link href="/" className="flex items-center justify-center gap-3 lg:justify-start">
             <img
               src="/LOGO_EPH.png"
               alt="EPH Platform"
               className="h-10 w-10 shrink-0 rounded-xl border border-[#E2E8F0] bg-white object-contain p-1 shadow-sm"
             />
-            <div className="min-w-0">
+            <div className="min-w-0 text-center lg:text-left">
               <p className="truncate text-sm font-black leading-tight text-[#071332] sm:text-base">
                 EPH Platform
               </p>
@@ -138,27 +137,26 @@ export default function LandingPage() {
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-8 text-sm font-black text-[#172554] lg:flex">
-            <a href="#kesfet" className="transition hover:text-[#2563EB]">
+          <nav className="flex w-full items-center justify-start gap-2 overflow-x-auto pb-1 text-xs font-black text-[#172554] scrollbar-hide lg:w-auto lg:justify-center lg:gap-6 lg:overflow-visible lg:pb-0 lg:text-sm">
+            <a href="#kesfet" className="shrink-0 rounded-full border border-[#E2E8F0] bg-white px-4 py-2 shadow-sm transition hover:text-[#2563EB] lg:border-0 lg:shadow-none">
               Keşfet
             </a>
-            <a href="#moduller" className="transition hover:text-[#2563EB]">
+            <a href="#moduller" className="shrink-0 rounded-full border border-[#E2E8F0] bg-white px-4 py-2 shadow-sm transition hover:text-[#2563EB] lg:border-0 lg:shadow-none">
               Modüller
             </a>
-            <a href="#guven" className="transition hover:text-[#2563EB]">
+            <a href="#guven" className="shrink-0 rounded-full border border-[#E2E8F0] bg-white px-4 py-2 shadow-sm transition hover:text-[#2563EB] lg:border-0 lg:shadow-none">
               Güven
             </a>
-            <a href="#hakkimizda" className="transition hover:text-[#2563EB]">
+            <a href="#hakkimizda" className="shrink-0 rounded-full border border-[#E2E8F0] bg-white px-4 py-2 shadow-sm transition hover:text-[#2563EB] lg:border-0 lg:shadow-none">
               Hakkımızda
             </a>
+            <Link href="/giris" className="shrink-0 rounded-full border border-[#E2E8F0] bg-white px-5 py-2 font-black text-[#071332] shadow-sm transition hover:border-[#2563EB] hover:text-[#2563EB]">
+              Giriş Yap
+            </Link>
+            <Link href="/kayit" className="shrink-0 rounded-full bg-[#2563EB] px-5 py-2 font-black text-white shadow-sm transition hover:bg-[#1D4ED8]">
+              Başvur
+            </Link>
           </nav>
-
-          <Link
-            href="/giris"
-            className="flex h-11 shrink-0 items-center justify-center rounded-full border border-[#E2E8F0] bg-white px-5 text-xs font-black text-[#071332] shadow-sm transition hover:border-[#2563EB] hover:text-[#2563EB] sm:text-sm"
-          >
-            Giriş Yap
-          </Link>
         </div>
       </header>
 
@@ -241,15 +239,13 @@ export default function LandingPage() {
               {liveItems.map((item) => (
                 <div
                   key={item.text}
-                  className="grid grid-cols-[auto_1fr_auto] items-start gap-3 rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-sm"
+                  className="grid grid-cols-[auto_1fr] gap-3 rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-sm sm:grid-cols-[auto_1fr_auto]"
                 >
-                  <span
-                    className={`mt-1 h-2.5 w-2.5 rounded-full ${item.dot}`}
-                  />
+                  <span className={`mt-1 h-2.5 w-2.5 rounded-full ${item.dot}`} />
                   <p className="text-left text-xs font-bold leading-5 text-[#334155] sm:text-sm">
                     {item.text}
                   </p>
-                  <p className="whitespace-nowrap text-xs font-semibold text-[#64748B]">
+                  <p className="col-span-2 text-left text-xs font-semibold text-[#64748B] sm:col-span-1 sm:text-right">
                     {item.time}
                   </p>
                 </div>
