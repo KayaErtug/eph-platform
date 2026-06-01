@@ -121,12 +121,16 @@ export default function LandingPage() {
     <main className="min-h-screen bg-white text-[#071332]">
       <header className="sticky top-0 z-50 border-b border-[#E2E8F0] bg-white/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <Link href="/" className="flex items-center justify-center gap-3 lg:justify-start">
+          <Link
+            href="/"
+            className="flex items-center justify-center gap-3 lg:justify-start"
+          >
             <img
               src="/LOGO_EPH.png"
               alt="EPH Platform"
               className="h-10 w-10 shrink-0 rounded-xl border border-[#E2E8F0] bg-white object-contain p-1 shadow-sm"
             />
+
             <div className="min-w-0 text-center lg:text-left">
               <p className="truncate text-sm font-black leading-tight text-[#071332] sm:text-base">
                 EPH Platform
@@ -137,23 +141,41 @@ export default function LandingPage() {
             </div>
           </Link>
 
-          <nav className="flex w-full items-center justify-start gap-2 overflow-x-auto pb-1 text-xs font-black text-[#172554] scrollbar-hide lg:w-auto lg:justify-center lg:gap-6 lg:overflow-visible lg:pb-0 lg:text-sm">
-            <a href="#kesfet" className="shrink-0 rounded-full border border-[#E2E8F0] bg-white px-4 py-2 shadow-sm transition hover:text-[#2563EB] lg:border-0 lg:shadow-none">
+          <nav className="grid w-full grid-cols-3 gap-2 text-center text-[11px] font-black text-[#172554] sm:grid-cols-6 lg:flex lg:w-auto lg:items-center lg:justify-center lg:gap-3 lg:text-sm">
+            <a
+              href="#kesfet"
+              className="flex min-h-10 items-center justify-center rounded-full border border-[#E2E8F0] bg-white px-3 shadow-sm transition hover:text-[#2563EB]"
+            >
               Keşfet
             </a>
-            <a href="#moduller" className="shrink-0 rounded-full border border-[#E2E8F0] bg-white px-4 py-2 shadow-sm transition hover:text-[#2563EB] lg:border-0 lg:shadow-none">
+            <a
+              href="#moduller"
+              className="flex min-h-10 items-center justify-center rounded-full border border-[#E2E8F0] bg-white px-3 shadow-sm transition hover:text-[#2563EB]"
+            >
               Modüller
             </a>
-            <a href="#guven" className="shrink-0 rounded-full border border-[#E2E8F0] bg-white px-4 py-2 shadow-sm transition hover:text-[#2563EB] lg:border-0 lg:shadow-none">
+            <a
+              href="#guven"
+              className="flex min-h-10 items-center justify-center rounded-full border border-[#E2E8F0] bg-white px-3 shadow-sm transition hover:text-[#2563EB]"
+            >
               Güven
             </a>
-            <a href="#hakkimizda" className="shrink-0 rounded-full border border-[#E2E8F0] bg-white px-4 py-2 shadow-sm transition hover:text-[#2563EB] lg:border-0 lg:shadow-none">
+            <a
+              href="#hakkimizda"
+              className="flex min-h-10 items-center justify-center rounded-full border border-[#E2E8F0] bg-white px-3 shadow-sm transition hover:text-[#2563EB]"
+            >
               Hakkımızda
             </a>
-            <Link href="/giris" className="shrink-0 rounded-full border border-[#E2E8F0] bg-white px-5 py-2 font-black text-[#071332] shadow-sm transition hover:border-[#2563EB] hover:text-[#2563EB]">
-              Giriş Yap
+            <Link
+              href="/giris"
+              className="flex min-h-10 items-center justify-center rounded-full border border-[#2563EB] bg-white px-3 font-black text-[#2563EB] shadow-sm"
+            >
+              Giriş
             </Link>
-            <Link href="/kayit" className="shrink-0 rounded-full bg-[#2563EB] px-5 py-2 font-black text-white shadow-sm transition hover:bg-[#1D4ED8]">
+            <Link
+              href="/kayit"
+              className="flex min-h-10 items-center justify-center rounded-full bg-[#2563EB] px-3 font-black text-white shadow-sm"
+            >
               Başvur
             </Link>
           </nav>
@@ -190,12 +212,14 @@ export default function LandingPage() {
                   Onaylı üyeler
                 </p>
               </div>
+
               <div className="rounded-3xl border border-[#E2E8F0] bg-white p-4 text-center shadow-sm">
                 <ShieldCheck className="mx-auto text-[#2563EB]" size={28} />
                 <p className="mt-3 text-xs font-black text-[#071332]">
                   Referanslı sistem
                 </p>
               </div>
+
               <div className="rounded-3xl border border-[#E2E8F0] bg-white p-4 text-center shadow-sm">
                 <LockKeyhole className="mx-auto text-[#2563EB]" size={28} />
                 <p className="mt-3 text-xs font-black text-[#071332]">
@@ -215,6 +239,7 @@ export default function LandingPage() {
                   EPH Kontrol Paneli
                 </h2>
               </div>
+
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2563EB] text-white shadow-lg shadow-blue-600/20">
                 <BellRing size={22} />
               </div>
@@ -227,6 +252,7 @@ export default function LandingPage() {
                   Portföy
                 </p>
               </div>
+
               <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 text-center">
                 <p className="text-2xl font-black text-[#071332]">344+</p>
                 <p className="mt-1 text-sm font-semibold text-[#64748B]">
@@ -241,7 +267,9 @@ export default function LandingPage() {
                   key={item.text}
                   className="grid grid-cols-[auto_1fr] gap-3 rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-sm sm:grid-cols-[auto_1fr_auto]"
                 >
-                  <span className={`mt-1 h-2.5 w-2.5 rounded-full ${item.dot}`} />
+                  <span
+                    className={`mt-1 h-2.5 w-2.5 rounded-full ${item.dot}`}
+                  />
                   <p className="text-left text-xs font-bold leading-5 text-[#334155] sm:text-sm">
                     {item.text}
                   </p>
@@ -271,6 +299,7 @@ export default function LandingPage() {
           <p className="text-xs font-black uppercase tracking-[0.22em] text-[#2563EB]">
             EPH ne işe yarar?
           </p>
+
           <h2 className="mx-auto mt-3 max-w-3xl text-3xl font-black tracking-tight text-[#071332] sm:text-4xl">
             Tüm iş süreçlerinizi tek platformda yönetin
           </h2>
@@ -301,6 +330,7 @@ export default function LandingPage() {
           <p className="text-xs font-black uppercase tracking-[0.22em] text-[#2563EB]">
             Platform Ekranları
           </p>
+
           <h2 className="mx-auto mt-3 max-w-3xl text-3xl font-black tracking-tight text-[#071332] sm:text-4xl">
             EPH’yi yakından tanıyın
           </h2>
@@ -318,6 +348,7 @@ export default function LandingPage() {
                     className="h-full w-full object-cover"
                   />
                 </div>
+
                 <div className="p-5">
                   <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-[#EFF6FF] text-[#2563EB]">
                     <item.icon size={18} />
@@ -373,6 +404,7 @@ export default function LandingPage() {
               alt="EPH Platform"
               className="h-9 w-9 rounded-xl border border-[#E2E8F0] bg-white object-contain p-1"
             />
+
             <div>
               <p className="text-sm font-black text-[#071332]">
                 EPH Platform
