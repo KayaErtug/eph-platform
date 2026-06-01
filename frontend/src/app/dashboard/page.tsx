@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Activity,
   ArrowLeft,
   Bell,
   Bot,
@@ -13,8 +12,6 @@ import {
   Building2,
   CalendarCheck,
   CheckCircle2,
-  CheckSquare,
-  Clock3,
   Crown,
   Home,
   Loader2,
@@ -271,39 +268,44 @@ function getTone(roleType: RoleType): ToneType {
 function toneClasses(tone: ToneType) {
   const map = {
     blue: {
-      text: "text-blue-700",
-      bg: "bg-blue-600",
-      soft: "bg-blue-50",
-      border: "border-blue-100",
-      shadow: "shadow-blue-600/20",
+      text: "text-[#1557D6]",
+      bg: "bg-[#1557D6]",
+      hover: "hover:bg-[#0F49BD]",
+      soft: "bg-[#EFF6FF]",
+      border: "border-[#DDE7F3]",
+      shadow: "shadow-[0_16px_34px_rgba(21,87,214,0.24)]",
     },
     orange: {
-      text: "text-orange-700",
-      bg: "bg-orange-600",
-      soft: "bg-orange-50",
-      border: "border-orange-100",
-      shadow: "shadow-orange-600/20",
+      text: "text-[#EA580C]",
+      bg: "bg-[#EA580C]",
+      hover: "hover:bg-[#C2410C]",
+      soft: "bg-[#FFF7ED]",
+      border: "border-[#FED7AA]",
+      shadow: "shadow-[0_16px_34px_rgba(234,88,12,0.20)]",
     },
     green: {
-      text: "text-green-700",
-      bg: "bg-green-600",
-      soft: "bg-green-50",
-      border: "border-green-100",
-      shadow: "shadow-green-600/20",
+      text: "text-[#16A34A]",
+      bg: "bg-[#16A34A]",
+      hover: "hover:bg-[#15803D]",
+      soft: "bg-[#F0FDF4]",
+      border: "border-[#BBF7D0]",
+      shadow: "shadow-[0_16px_34px_rgba(22,163,74,0.18)]",
     },
     purple: {
-      text: "text-purple-700",
-      bg: "bg-purple-600",
-      soft: "bg-purple-50",
-      border: "border-purple-100",
-      shadow: "shadow-purple-600/20",
+      text: "text-[#7C3AED]",
+      bg: "bg-[#7C3AED]",
+      hover: "hover:bg-[#6D28D9]",
+      soft: "bg-[#F5F3FF]",
+      border: "border-[#DDD6FE]",
+      shadow: "shadow-[0_16px_34px_rgba(124,58,237,0.20)]",
     },
     slate: {
-      text: "text-slate-800",
-      bg: "bg-slate-950",
-      soft: "bg-slate-100",
-      border: "border-slate-200",
-      shadow: "shadow-slate-900/20",
+      text: "text-[#0F172A]",
+      bg: "bg-[#0F172A]",
+      hover: "hover:bg-[#1E293B]",
+      soft: "bg-[#F1F5F9]",
+      border: "border-[#DDE7F3]",
+      shadow: "shadow-[0_16px_34px_rgba(15,23,42,0.20)]",
     },
   };
 
@@ -349,36 +351,43 @@ function DashboardShell({
   ];
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC] text-[#071332]">
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-start justify-between gap-3 px-4 py-4">
-          <button
-            onClick={() => router.back()}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
-            <ArrowLeft size={17} />
-            Geri
-          </button>
+    <main className="min-h-screen bg-[#F7FBFF] text-[#06194A]">
+      <header className="sticky top-0 z-50 border-b border-[#DDE7F3] bg-white/96 shadow-[0_10px_28px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+        <div className="mx-auto grid max-w-7xl grid-cols-[76px_1fr_76px] items-center gap-2 px-4 py-4 md:grid-cols-[150px_1fr_150px] md:px-6 lg:px-8">
+          <div className="flex justify-start">
+            <button
+              onClick={() => router.back()}
+              className="flex h-[58px] w-[58px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition hover:-translate-y-0.5 hover:border-[#1557D6] md:h-[70px] md:w-[70px]"
+              aria-label="Geri dön"
+            >
+              <ArrowLeft size={24} strokeWidth={2.6} />
+              <span className="mt-1 text-[10px] font-black">GERİ</span>
+            </button>
+          </div>
 
-          <div className="min-w-0 flex-1 px-1 text-center">
+          <div className="min-w-0 text-center">
             <div
-              className={`mx-auto inline-flex rounded-full border px-3 py-1 text-[11px] font-black ${toneStyle.border} ${toneStyle.soft} ${toneStyle.text}`}
+              className={`mx-auto inline-flex max-w-full rounded-full border px-3 py-1 text-[10px] font-black md:text-[11px] ${toneStyle.border} ${toneStyle.soft} ${toneStyle.text}`}
             >
               {role}
             </div>
 
-            <h1 className="mt-2 truncate text-[22px] font-black tracking-tight text-slate-950">
+            <h1 className="mt-2 truncate text-[24px] font-black leading-none tracking-[-0.04em] text-[#06194A] md:text-[40px]">
               {title}
             </h1>
+
+            <p className="mt-1 truncate text-[12px] font-bold text-[#1557D6] md:text-[17px]">
+              EPH Platform İş Merkezi
+            </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex justify-end gap-2">
             <Link
               href="/notification-settings"
-              className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
+              className="relative hidden h-[58px] w-[58px] items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition hover:-translate-y-0.5 hover:border-[#1557D6] sm:flex md:h-[70px] md:w-[70px]"
               aria-label="Bildirim ayarları"
             >
-              <Bell size={18} />
+              <Bell size={24} />
 
               {notificationCount > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white">
@@ -387,36 +396,29 @@ function DashboardShell({
               )}
             </Link>
 
-            <Link
-              href="/messages"
-              className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
-              aria-label="Mesajlar"
-            >
-              <MessageCircle size={18} />
-
-              {unreadMessages > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white">
-                  {unreadMessages}
-                </span>
-              )}
-            </Link>
-
             <button
               onClick={() => setMenuOpen(true)}
-              className={`flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-lg transition ${toneStyle.bg} ${toneStyle.shadow}`}
+              className="relative flex h-[58px] w-[58px] flex-col items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_10px_24px_rgba(15,23,42,0.10)] transition hover:-translate-y-0.5 hover:border-[#1557D6] md:h-[70px] md:w-[70px]"
               aria-label="Menüyü aç"
             >
-              <Menu size={21} />
+              <Menu size={25} strokeWidth={2.7} />
+              <span className="mt-1 text-[10px] font-black">MENÜ</span>
+
+              {unreadMessages + notificationCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white">
+                  {unreadMessages + notificationCount}
+                </span>
+              )}
             </button>
           </div>
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-4 py-6 pb-28">
+      <section className="mx-auto max-w-7xl px-4 py-6 pb-28 md:px-6 lg:px-8">
         {children}
       </section>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 py-3 backdrop-blur-xl md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#DDE7F3] bg-white/96 px-3 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl md:hidden">
         <div className="grid grid-cols-5 gap-2">
           {mainLinks.map((item) => {
             const active = item.href === "/dashboard";
@@ -427,8 +429,8 @@ function DashboardShell({
                 href={item.href}
                 className={`flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-2xl text-[10px] font-black ${
                   active
-                    ? `${toneStyle.bg} text-white shadow-lg ${toneStyle.shadow}`
-                    : "border border-slate-200 bg-white text-slate-700"
+                    ? `${toneStyle.bg} text-white ${toneStyle.shadow}`
+                    : "border border-[#DDE7F3] bg-white text-[#27364F]"
                 }`}
               >
                 {item.icon}
@@ -441,11 +443,11 @@ function DashboardShell({
 
       {menuOpen && (
         <div
-          className="fixed inset-0 z-[9999] bg-slate-950/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] bg-[#06194A]/55 p-4 backdrop-blur-sm"
           onClick={() => setMenuOpen(false)}
         >
           <aside
-            className="ml-auto flex h-full w-full max-w-sm flex-col overflow-auto rounded-[30px] bg-white p-5 shadow-2xl"
+            className="ml-auto flex h-full w-full max-w-sm flex-col overflow-auto rounded-[30px] border border-[#DDE7F3] bg-white p-5 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
@@ -456,18 +458,18 @@ function DashboardShell({
                   EPH Menü
                 </div>
 
-                <h2 className="mt-2 text-2xl font-black text-slate-950">
+                <h2 className="mt-2 text-2xl font-black text-[#06194A]">
                   Hızlı Geçiş
                 </h2>
 
-                <p className="mt-1 text-sm font-semibold text-slate-500">
+                <p className="mt-1 text-sm font-semibold text-[#475569]">
                   Platformun ana bölümlerine tek dokunuşla geç.
                 </p>
               </div>
 
               <button
                 onClick={() => setMenuOpen(false)}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#27364F]"
               >
                 <X size={20} />
               </button>
@@ -479,7 +481,7 @@ function DashboardShell({
                   key={item.href}
                   href={item.href}
                   onClick={() => setMenuOpen(false)}
-                  className="flex min-h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-slate-50"
+                  className="flex min-h-14 items-center gap-3 rounded-2xl border border-[#DDE7F3] bg-white px-4 text-sm font-black text-[#27364F] transition hover:bg-[#F7FBFF]"
                 >
                   <span
                     className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneStyle.soft} ${toneStyle.text}`}
@@ -517,27 +519,31 @@ function WelcomeCard({
   const toneStyle = toneClasses(tone);
 
   return (
-    <section className="overflow-hidden rounded-[30px] border border-slate-200 bg-white p-6 text-center shadow-sm md:p-8">
-      <div
-        className={`mx-auto inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black ${toneStyle.border} ${toneStyle.soft} ${toneStyle.text}`}
-      >
-        <CheckCircle2 size={15} />
-        {role}
-      </div>
+    <section className="relative overflow-hidden rounded-[32px] border border-[#DDE7F3] bg-white p-6 text-center shadow-[0_22px_60px_rgba(15,23,42,0.10)] md:p-8">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(21,87,214,0.10),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(219,234,254,0.75),transparent_30%)]" />
 
-      <h2 className="mt-5 text-4xl font-black tracking-tight text-slate-950 md:text-6xl">
-        {greetingText()} {firstName} 👋
-      </h2>
+      <div className="relative">
+        <div
+          className={`mx-auto inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black ${toneStyle.border} ${toneStyle.soft} ${toneStyle.text}`}
+        >
+          <CheckCircle2 size={15} />
+          {role}
+        </div>
 
-      <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-500 md:text-base">
-        Bugünkü portföy, müşteri, görev ve mesaj akışını tek ekrandan yönet.
-      </p>
+        <h2 className="mx-auto mt-5 max-w-4xl text-[34px] font-black leading-[1.08] tracking-[-0.045em] text-[#06194A] md:text-[58px]">
+          {greetingText()} {firstName}
+        </h2>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <MiniSummary value={portfolioCount} label="Aktif Portföy" />
-        <MiniSummary value={customerCount} label="CRM Kaydı" />
-        <MiniSummary value={taskCount} label="Açık Görev" />
-        <MiniSummary value={unreadMessages} label="Okunmamış Mesaj" />
+        <p className="mx-auto mt-4 max-w-2xl text-base font-semibold leading-8 text-[#27364F] md:text-lg">
+          Bugünkü portföy, müşteri, görev ve mesaj akışını tek ekrandan yönet.
+        </p>
+
+        <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <MiniSummary value={portfolioCount} label="Aktif Portföy" />
+          <MiniSummary value={customerCount} label="CRM Kaydı" />
+          <MiniSummary value={taskCount} label="Açık Görev" />
+          <MiniSummary value={unreadMessages} label="Okunmamış Mesaj" />
+        </div>
       </div>
     </section>
   );
@@ -545,9 +551,9 @@ function WelcomeCard({
 
 function MiniSummary({ value, label }: { value: number; label: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-4 text-center">
-      <div className="text-3xl font-black text-slate-950">{value}</div>
-      <div className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+    <div className="rounded-2xl border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_10px_26px_rgba(15,23,42,0.06)]">
+      <div className="text-3xl font-black text-[#06194A]">{value}</div>
+      <div className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[#64748B]">
         {label}
       </div>
     </div>
@@ -574,21 +580,21 @@ function KpiCard({
   return (
     <Link
       href={href}
-      className="block rounded-[26px] border border-slate-200 bg-white p-5 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+      className="block rounded-[26px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_14px_34px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(15,23,42,0.12)]"
     >
       <div
-        className={`mx-auto flex h-13 w-13 items-center justify-center rounded-2xl ${toneStyle.soft} ${toneStyle.text}`}
+        className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl ${toneStyle.soft} ${toneStyle.text}`}
       >
         {icon}
       </div>
 
-      <p className="mt-4 text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+      <p className="mt-4 text-xs font-black uppercase tracking-[0.16em] text-[#64748B]">
         {title}
       </p>
 
-      <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
+      <p className="mt-2 text-3xl font-black text-[#06194A]">{value}</p>
 
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+      <p className="mt-2 text-sm font-semibold leading-6 text-[#475569]">
         {desc}
       </p>
     </Link>
@@ -607,14 +613,14 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm md:p-6">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 text-blue-700 ring-1 ring-slate-200">
+    <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_18px_48px_rgba(15,23,42,0.08)] md:p-6">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6] ring-1 ring-[#DDE7F3]">
         {icon}
       </div>
 
-      <h2 className="mt-4 text-2xl font-black text-slate-950">{title}</h2>
+      <h2 className="mt-4 text-2xl font-black text-[#06194A]">{title}</h2>
 
-      <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+      <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#475569]">
         {desc}
       </p>
 
@@ -639,15 +645,15 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="rounded-[24px] border border-slate-200 bg-white p-4 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+      className="rounded-[24px] border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_12px_30px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:shadow-[0_20px_44px_rgba(15,23,42,0.12)]"
     >
       <div
-        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg ${toneStyle.bg} ${toneStyle.shadow}`}
+        className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl text-white ${toneStyle.bg} ${toneStyle.shadow}`}
       >
         {icon}
       </div>
 
-      <span className="mt-3 block text-sm font-black text-slate-800">
+      <span className="mt-3 block text-sm font-black text-[#27364F]">
         {label}
       </span>
     </Link>
@@ -668,16 +674,16 @@ function TaskRow({
   return (
     <Link
       href="/crm"
-      className="block rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-3 text-center transition hover:bg-white"
+      className="block rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3 text-center transition hover:bg-white"
     >
-      <div className="text-sm font-black text-slate-900">{task.title}</div>
+      <div className="text-sm font-black text-[#06194A]">{task.title}</div>
 
-      <div className="mt-1 text-xs font-semibold text-slate-500">
+      <div className="mt-1 text-xs font-semibold text-[#475569]">
         {task.customerName}
         {task.customerPhone ? ` · ${task.customerPhone}` : ""}
       </div>
 
-      <div className="mt-2 text-[11px] font-black text-blue-700">
+      <div className="mt-2 text-[11px] font-black text-[#1557D6]">
         {formatTaskTime(task.dueDate)}
       </div>
     </Link>
@@ -686,7 +692,7 @@ function TaskRow({
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-5 text-center text-sm font-semibold text-slate-500">
+    <div className="rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-5 text-center text-sm font-semibold text-[#475569]">
       {text}
     </div>
   );
@@ -698,25 +704,25 @@ function OpportunityCard({ post }: { post: FeaturedNetworkPost }) {
   return (
     <Link
       href={`/network/${post.id}`}
-      className="block rounded-[24px] border border-slate-200 bg-[#F8FAFC] p-4 text-center transition hover:bg-white hover:shadow-sm"
+      className="block rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center transition hover:bg-white hover:shadow-sm"
     >
-      <div className="mx-auto inline-flex rounded-full bg-orange-50 px-3 py-1 text-[11px] font-black text-orange-700">
+      <div className="mx-auto inline-flex rounded-full bg-[#EFF6FF] px-3 py-1 text-[11px] font-black text-[#1557D6]">
         {post.type || "Fırsat"}
       </div>
 
-      <h3 className="mt-3 line-clamp-2 text-lg font-black leading-tight text-slate-950">
+      <h3 className="mt-3 line-clamp-2 text-lg font-black leading-tight text-[#06194A]">
         {post.title}
       </h3>
 
-      <p className="mt-2 text-xs font-bold text-slate-500">
+      <p className="mt-2 text-xs font-bold text-[#64748B]">
         {location || "Konum bilgisi yok"}
       </p>
 
-      <p className="mt-2 text-sm font-black text-blue-700">
+      <p className="mt-2 text-sm font-black text-[#1557D6]">
         {formatBudget(post.budget)}
       </p>
 
-      <div className="mt-3 flex flex-wrap justify-center gap-2 text-[10px] font-black text-slate-500">
+      <div className="mt-3 flex flex-wrap justify-center gap-2 text-[10px] font-black text-[#64748B]">
         <span className="rounded-full bg-white px-2 py-1">
           👁 {post.viewCount}
         </span>
@@ -741,7 +747,7 @@ function NotificationRow({
   return (
     <button
       onClick={onClick}
-      className="rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-4 text-center transition hover:bg-white"
+      className="rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
     >
       <div className="flex flex-col items-center justify-center gap-2 md:flex-row">
         {!item.isRead && (
@@ -750,10 +756,10 @@ function NotificationRow({
           </span>
         )}
 
-        <span className="text-sm font-black text-slate-900">{item.title}</span>
+        <span className="text-sm font-black text-[#06194A]">{item.title}</span>
       </div>
 
-      <p className="mx-auto mt-2 max-w-3xl whitespace-pre-line text-xs font-semibold leading-6 text-slate-500">
+      <p className="mx-auto mt-2 max-w-3xl whitespace-pre-line text-xs font-semibold leading-6 text-[#475569]">
         {item.message}
       </p>
     </button>
@@ -764,15 +770,15 @@ function AdminApplicationRow({ item }: { item: ApplicationItem }) {
   return (
     <Link
       href="/admin"
-      className="block rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-4 text-center transition hover:bg-white"
+      className="block rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
     >
-      <p className="text-sm font-black text-slate-950">{item.applicantName}</p>
+      <p className="text-sm font-black text-[#06194A]">{item.applicantName}</p>
 
-      <p className="mt-1 text-xs font-semibold text-slate-500">
+      <p className="mt-1 text-xs font-semibold text-[#475569]">
         {item.applicantEmail}
       </p>
 
-      <p className="mt-2 text-[11px] font-black text-blue-700">
+      <p className="mt-2 text-[11px] font-black text-[#1557D6]">
         {roleLabel(item.requestedRole)}
       </p>
     </Link>
@@ -783,16 +789,16 @@ function AdminUserRow({ item }: { item: UserItem }) {
   return (
     <Link
       href="/admin"
-      className="block rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-4 text-center transition hover:bg-white"
+      className="block rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-4 text-center transition hover:bg-white"
     >
-      <p className="text-sm font-black text-slate-950">
+      <p className="text-sm font-black text-[#06194A]">
         {item.firstName} {item.lastName}
       </p>
 
-      <p className="mt-1 text-xs font-semibold text-slate-500">{item.email}</p>
+      <p className="mt-1 text-xs font-semibold text-[#475569]">{item.email}</p>
 
       <div className="mt-3 flex flex-wrap justify-center gap-2">
-        <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-black text-blue-700">
+        <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[11px] font-black text-[#1557D6]">
           {roleLabel(item.role)}
         </span>
 
@@ -1017,9 +1023,9 @@ export default function DashboardPage() {
 
   if (!hydrated || loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F8FAFC]">
-        <div className="flex flex-col items-center gap-4 text-slate-700">
-          <Loader2 className="animate-spin" size={34} />
+      <main className="flex min-h-screen items-center justify-center bg-[#F7FBFF]">
+        <div className="flex flex-col items-center gap-4 text-[#27364F]">
+          <Loader2 className="animate-spin text-[#1557D6]" size={34} />
           <p className="text-sm font-black">Dashboard yükleniyor...</p>
         </div>
       </main>
@@ -1128,8 +1134,8 @@ export default function DashboardPage() {
           desc="Bugünkü, geciken ve yaklaşan müşteri takiplerini buradan izle."
         >
           <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-[24px] border border-slate-200 bg-white p-4">
-              <h3 className="text-sm font-black text-slate-900">
+            <div className="rounded-[24px] border border-[#DDE7F3] bg-white p-4">
+              <h3 className="text-sm font-black text-[#06194A]">
                 Bugünkü İşlerim
               </h3>
 
@@ -1290,16 +1296,16 @@ export default function DashboardPage() {
           title="Lina Önerisi"
           desc="Bugünkü iş akışını hızlandırmak için Lina'dan destek al."
         >
-          <div className="rounded-[24px] border border-slate-200 bg-[#F8FAFC] p-5 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+          <div className="rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
               <Bot size={30} />
             </div>
 
-            <h3 className="mt-4 text-xl font-black text-slate-950">
+            <h3 className="mt-4 text-xl font-black text-[#06194A]">
               Bugün Lina ile portföy metinlerini hızlandırabilirsin.
             </h3>
 
-            <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+            <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#475569]">
               İlan açıklaması, müşteri notu, paylaşım metni ve portföy özeti
               hazırlamak için Lina'yı kullan.
             </p>
@@ -1307,7 +1313,7 @@ export default function DashboardPage() {
             <div className="mt-5 flex justify-center">
               <Link
                 href="/lina"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-7 text-sm font-black text-white shadow-lg shadow-blue-600/20"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1557D6] px-7 text-sm font-black text-white shadow-[0_16px_34px_rgba(21,87,214,0.24)] transition hover:bg-[#0F49BD]"
               >
                 Lina'yı Başlat
                 <Sparkles size={17} />
