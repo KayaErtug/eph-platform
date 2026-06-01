@@ -261,12 +261,14 @@ function StatCard({
   value,
   description,
   tone,
+  href,
 }: {
   icon: ReactNode;
   title: string;
   value: string;
   description: string;
   tone: ToneType;
+  href?: string;
 }) {
   const toneClass: Record<ToneType, string> = {
     blue: "bg-blue-50 text-blue-700",
@@ -276,8 +278,8 @@ function StatCard({
     teal: "bg-teal-50 text-teal-700",
   };
 
-  return (
-    <div className="rounded-[26px] border border-slate-200 bg-white p-5 text-center shadow-sm">
+  const content = (
+    <>
       <div
         className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl ${toneClass[tone]}`}
       >
@@ -293,6 +295,23 @@ function StatCard({
       <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
         {description}
       </p>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="block rounded-[26px] border border-slate-200 bg-white p-5 text-center shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="rounded-[26px] border border-slate-200 bg-white p-5 text-center shadow-sm">
+      {content}
     </div>
   );
 }
@@ -473,12 +492,14 @@ function TodayFocusCard({
   value,
   desc,
   tone,
+  href,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   desc: string;
   tone: ToneType;
+  href: string;
 }) {
   const toneClass: Record<ToneType, string> = {
     blue: "border-blue-100 bg-blue-50 text-blue-700",
@@ -489,7 +510,10 @@ function TodayFocusCard({
   };
 
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white p-4 text-center shadow-sm">
+    <Link
+      href={href}
+      className="block rounded-[24px] border border-slate-200 bg-white p-4 text-center shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
+    >
       <div
         className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border ${toneClass[tone]}`}
       >
@@ -505,7 +529,7 @@ function TodayFocusCard({
       <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
         {desc}
       </p>
-    </div>
+    </Link>
   );
 }
 
@@ -515,12 +539,14 @@ function PerformanceCard({
   value,
   desc,
   tone,
+  href,
 }: {
   icon: ReactNode;
   title: string;
   value: string;
   desc: string;
   tone: ToneType;
+  href: string;
 }) {
   const toneClass: Record<ToneType, string> = {
     blue: "bg-blue-600",
@@ -531,7 +557,10 @@ function PerformanceCard({
   };
 
   return (
-    <div className="rounded-[26px] border border-slate-200 bg-white p-5 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+    <Link
+      href={href}
+      className="block rounded-[26px] border border-slate-200 bg-white p-5 text-center shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
+    >
       <div
         className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg ${toneClass[tone]}`}
       >
@@ -547,7 +576,7 @@ function PerformanceCard({
       <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
         {desc}
       </p>
-    </div>
+    </Link>
   );
 }
 
@@ -1208,24 +1237,28 @@ export default function DashboardPage() {
             value: String(stats.totalProjects || 0),
             description: "Devam eden proje sayısı",
             icon: <Building2 size={22} />,
+            href: "/stok",
           },
           {
             title: "Toplam Stok",
             value: String(stats.totalUnits || 0),
             description: "Satıştaki bağımsız bölümler",
             icon: <Home size={22} />,
+            href: "/stok",
           },
           {
             title: "Bu Ay Tahsilat",
             value: "0 TL",
             description: "Tahsilat modülüyle dolacak",
             icon: <WalletCards size={22} />,
+            href: "/market",
           },
           {
             title: "Satış Performansı",
             value: "%0",
             description: "Satış oranı takibi",
             icon: <TrendingUp size={22} />,
+            href: "/stok",
           },
         ],
         actions: [
@@ -1255,24 +1288,28 @@ export default function DashboardPage() {
             value: String(stats.totalProjects || 0),
             description: "Devam eden projelerin",
             icon: <Building2 size={22} />,
+            href: "/stok",
           },
           {
             title: "Satılık Bölümler",
             value: String(stats.totalUnits || 0),
             description: "Satıştaki portföylerin",
             icon: <Home size={22} />,
+            href: "/stok",
           },
           {
             title: "İş Ortakları",
             value: String(stats.totalCustomers || 0),
             description: "Kayıtlı bağlantıların",
             icon: <BriefcaseBusiness size={22} />,
+            href: "/crm",
           },
           {
             title: "Mesajlar",
             value: String(unreadMessages),
             description: "Okunmamış görüşmeler",
             icon: <MessageCircle size={22} />,
+            href: "/messages",
           },
         ],
         actions: [
@@ -1302,24 +1339,28 @@ export default function DashboardPage() {
             value: String(stats.totalCustomers || 0),
             description: "Sistem kayıtları",
             icon: <UsersRound size={22} />,
+            href: "/admin",
           },
           {
             title: "Stok",
             value: String(stats.totalUnits || 0),
             description: "Toplam kayıt",
             icon: <Building2 size={22} />,
+            href: "/stok",
           },
           {
             title: "Ziyaret",
             value: String(stats.totalVisits || 0),
             description: "Platform trafiği",
             icon: <TrendingUp size={22} />,
+            href: "/admin",
           },
           {
             title: "Mesajlar",
             value: String(unreadMessages),
             description: "Okunmamış mesaj",
             icon: <MessageCircle size={22} />,
+            href: "/messages",
           },
         ],
         actions: [
@@ -1347,24 +1388,28 @@ export default function DashboardPage() {
           value: String(stats.totalUnits || 0),
           description: "Aktif portföy kayıtların",
           icon: <Building2 size={22} />,
+          href: "/stok",
         },
         {
           title: "Müşterilerim",
           value: String(stats.totalCustomers || 0),
           description: "CRM müşteri kayıtların",
           icon: <UsersRound size={22} />,
+          href: "/crm",
         },
         {
           title: "Görevler",
           value: String(pendingTaskCount),
           description: "Bekleyen işlerin",
           icon: <CalendarCheck size={22} />,
+          href: "/crm",
         },
         {
           title: "Mesajlar",
           value: String(unreadMessages),
           description: "Okunmamış görüşmeler",
           icon: <MessageCircle size={22} />,
+          href: "/messages",
         },
       ],
       actions: [
@@ -1432,6 +1477,7 @@ export default function DashboardPage() {
               value={`${todayTasks.length} görev`}
               desc="Bugün tamamlanacak müşteri işleri"
               tone="blue"
+              href="/crm"
             />
             <TodayFocusCard
               icon={<Clock3 size={22} />}
@@ -1439,6 +1485,7 @@ export default function DashboardPage() {
               value={`${overdueTasks.length} görev`}
               desc="Öncelikli takip bekleyen işler"
               tone="amber"
+              href="/crm"
             />
             <TodayFocusCard
               icon={<MessageCircle size={22} />}
@@ -1446,6 +1493,7 @@ export default function DashboardPage() {
               value={String(unreadMessages)}
               desc="Okunmamış görüşme ve dönüşler"
               tone="teal"
+              href="/messages"
             />
             <TodayFocusCard
               icon={<Store size={22} />}
@@ -1453,6 +1501,7 @@ export default function DashboardPage() {
               value={String(totalOpportunityCount)}
               desc="Network akışındaki sıcak başlıklar"
               tone="slate"
+              href="/network"
             />
           </div>
         </section>
@@ -1506,6 +1555,7 @@ export default function DashboardPage() {
               value={String(todayTasks.length)}
               description="Bugün tamamlanması gereken CRM işleri"
               tone="blue"
+              href="/crm"
             />
             <StatCard
               icon={<Clock3 size={22} />}
@@ -1513,6 +1563,7 @@ export default function DashboardPage() {
               value={String(overdueTasks.length)}
               description="Tarihi geçmiş ve tamamlanmamış işler"
               tone="amber"
+              href="/crm"
             />
             <StatCard
               icon={<CheckSquare size={22} />}
@@ -1520,6 +1571,7 @@ export default function DashboardPage() {
               value={String(upcomingTasks.length)}
               description="Bugünden sonraki planlı müşteri işleri"
               tone="slate"
+              href="/crm"
             />
           </div>
 
@@ -1591,6 +1643,7 @@ export default function DashboardPage() {
               value={String(stats.totalUnits || 0)}
               desc="Aktif ilan ve stok kayıtları"
               tone={pageConfig.tone}
+              href="/stok"
             />
             <PerformanceCard
               icon={<UsersRound size={22} />}
@@ -1598,6 +1651,7 @@ export default function DashboardPage() {
               value={String(stats.totalCustomers || 0)}
               desc="CRM tarafındaki toplam kayıt"
               tone="blue"
+              href="/crm"
             />
             <PerformanceCard
               icon={<MessageCircle size={22} />}
@@ -1605,6 +1659,7 @@ export default function DashboardPage() {
               value={String(unreadMessages)}
               desc="Okunmamış özel mesaj akışı"
               tone="teal"
+              href="/messages"
             />
             <PerformanceCard
               icon={<Activity size={22} />}
@@ -1612,6 +1667,7 @@ export default function DashboardPage() {
               value={String(portfolioUpdateCount)}
               desc="Bugün takip edilecek portföy alanı"
               tone="slate"
+              href="/stok"
             />
           </div>
         </section>
