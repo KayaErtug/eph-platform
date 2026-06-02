@@ -35,11 +35,10 @@ export class PortfolioImagesController {
   ) {
     return this.portfolioImagesService.uploadPortfolioImage({
       userId: user.id,
-      userRole: user.role,
       portfolioId,
       file,
       isCover: isCover === 'true',
-      sortOrder: sortOrder ? Number(sortOrder) : 0,
+      sortOrder: sortOrder ? Number(sortOrder) : undefined,
     });
   }
 }

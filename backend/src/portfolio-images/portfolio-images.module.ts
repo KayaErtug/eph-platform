@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
+import { PrismaModule } from '../prisma/prisma.module';
+import { SupabaseModule } from '../supabase/supabase.module';
 import { PortfolioImagesController } from './portfolio-images.controller';
 import { PortfolioImagesService } from './portfolio-images.service';
-import { SupabaseModule } from '../supabase/supabase.module';
-import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
-  imports: [SupabaseModule],
+  imports: [PrismaModule, SupabaseModule],
   controllers: [PortfolioImagesController],
-  providers: [PortfolioImagesService, PrismaService],
+  providers: [PortfolioImagesService],
 })
 export class PortfolioImagesModule {}
