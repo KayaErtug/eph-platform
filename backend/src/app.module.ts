@@ -23,6 +23,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { ReferralModule } from './referral/referral.module';
 import { NetworkModule } from './network/network.module';
 import { SystemMessagesModule } from './system-messages/system-messages.module';
+import { PortfolioImagesModule } from './portfolio-images/portfolio-images.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { SystemMessagesModule } from './system-messages/system-messages.module';
     MessagesModule,
     NetworkModule,
     SystemMessagesModule,
+    PortfolioImagesModule,
 
     DashboardModule,
 
