@@ -332,10 +332,10 @@ export default function StokDetailPage() {
         <section className="overflow-hidden rounded-[38px] border border-[#DDE7F3] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
           <div className="relative min-h-[620px] bg-[#06194A] text-white">
             <div
-              className="absolute inset-0 bg-cover bg-center opacity-70"
+              className="absolute inset-0 bg-cover bg-center opacity-100"
               style={{ backgroundImage: "url('/showcase/stock.jpg')" }}
             />
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(6,25,74,0.94),rgba(6,25,74,0.72)_42%,rgba(6,25,74,0.18)),linear-gradient(180deg,rgba(6,25,74,0.10),rgba(6,25,74,0.88))]" />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(6,25,74,0.72),rgba(6,25,74,0.46)_42%,rgba(6,25,74,0.05)),linear-gradient(180deg,rgba(6,25,74,0.04),rgba(6,25,74,0.58))]" />
 
             <div className="relative z-10 flex min-h-[620px] flex-col justify-between p-5 lg:p-8">
               <div className="flex items-center justify-between gap-4">
@@ -397,7 +397,7 @@ export default function StokDetailPage() {
                   </div>
                 </div>
 
-                <div className="rounded-[32px] border border-white/18 bg-white/14 p-5 text-white shadow-[0_26px_70px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+                <div className="rounded-[32px] border border-white/24 bg-[#06194A]/55 p-5 text-white shadow-[0_26px_70px_rgba(0,0,0,0.22)] backdrop-blur-md">
                   <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/70">
                     Satış Değeri
                   </p>
