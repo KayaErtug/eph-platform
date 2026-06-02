@@ -65,7 +65,7 @@ function getUnitImages(unit?: DetailUnit | null) {
     .filter((image) => image?.url || image?.supabaseUrl)
     .map((image) => ({
       ...image,
-      displayUrl: image.url || image.supabaseUrl || "",
+      displayUrl: image.supabaseUrl || image.url || "",
     }))
     .sort((a, b) => {
       if (a.isCover !== b.isCover) return a.isCover ? -1 : 1;
@@ -81,10 +81,30 @@ function getUnitCoverImage(unit?: DetailUnit | null) {
   return images.find((image) => image.isCover)?.displayUrl || images[0]?.displayUrl || "";
 }
 
-function formatMoney(value?: number) {
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  TRY: "₺",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+};
+
+function formatMoney(value?: number, currency?: string) {
   const numeric = Number(value || 0);
   if (!numeric) return "Fiyat belirtilmedi";
-  return `${numeric.toLocaleString("tr-TR")} ₺`;
+  const symbol = CURRENCY_SYMBOLS[currency || "TRY"] || "₺";
+  return `${numeric.toLocaleString("tr-TR")} ${symbol}`;
+}
+
+function formatFloorInfo(unit?: Pick<DetailUnit, "floor" | "floorLabel" | "totalFloors"> | null) {
+  if (!unit) return "Kat yok";
+
+  const floorText =
+    unit.floorLabel ||
+    (unit.floor != null ? `${unit.floor}. Kat` : "Kat yok");
+
+  const totalText = unit.totalFloors ? `${unit.totalFloors} Katlı` : "";
+
+  return totalText ? `${floorText} / ${totalText}` : floorText;
 }
 
 function formatDate(value?: string) {
@@ -361,10 +381,10 @@ export default function StokDetailPage() {
       id: item.id,
       title: item.project?.name || "EPH Portföy",
       location,
-      price: price ? `${price.toLocaleString("tr-TR")} TL` : "Fiyat bilgisi yok",
+      price: price ? formatMoney(price, item.priceCurrency) : "Fiyat bilgisi yok",
       roomCount: item.roomCount || "—",
       area: item.area ? `${item.area} m²` : "—",
-      floor: item.floor != null ? `${item.floor}. Kat` : "—",
+      floor: formatFloorInfo(item),
       authorization:
         item.yetkiVerified || item.isVerified ? "Yetkili" : "Kontrol",
       coverImage: activeGalleryImage || "/LOGO_EPH.png",
@@ -523,7 +543,7 @@ export default function StokDetailPage() {
                   <div className="mt-7 flex flex-wrap gap-3">
                     <SummaryChip icon={<Home size={17} />} label={unit.roomCount || "—"} />
                     <SummaryChip icon={<Sparkles size={17} />} label={unit.area ? `${unit.area} m²` : "—"} />
-                    <SummaryChip icon={<Building2 size={17} />} label={unit.floor != null ? `${unit.floor}. Kat` : "Kat yok"} />
+                    <SummaryChip icon={<Building2 size={17} />} label={formatFloorInfo(unit)} />
                     <SummaryChip icon={<TrendingUp size={17} />} label={calculatedSquareMeterPrice} />
                   </div>
                 </div>
@@ -534,7 +554,7 @@ export default function StokDetailPage() {
                   </p>
 
                   <p className="mt-2 text-5xl font-black tracking-[-0.065em] text-white">
-                    {formatMoney(unit.price)}
+                    {formatMoney(unit.price, unit.priceCurrency)}
                   </p>
 
                   <div className="mt-5 grid gap-2 sm:grid-cols-2">
@@ -625,7 +645,7 @@ export default function StokDetailPage() {
           <MetricCard
             icon={<WalletCards size={22} />}
             label="Fiyat"
-            value={formatMoney(unit.price)}
+            value={formatMoney(unit.price, unit.priceCurrency)}
             tone="blue"
           />
           <MetricCard
@@ -856,7 +876,7 @@ export default function StokDetailPage() {
                 <InfoRow label="Bağımsız Bölüm No" value={unit.number || "—"} />
                 <InfoRow
                   label="Kat"
-                  value={unit.floor != null ? String(unit.floor) : "—"}
+                  value={formatFloorInfo(unit)}
                 />
                 <InfoRow label="Mülk Tipi" value={typeLabel(unit.type)} />
                 <InfoRow label="Portföy No" value={getPortfolioNo(unit)} />

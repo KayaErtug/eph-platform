@@ -139,6 +139,9 @@ model Unit {
   projectId     String
   type          UnitType   @default(DAIRE)
   floor         Int?
+  floorLabel    String?
+  totalFloors   Int?
+  priceCurrency String?    @default("TRY")
   number        String
   roomCount     String?
   area          Float?

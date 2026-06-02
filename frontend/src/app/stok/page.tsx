@@ -69,6 +69,34 @@ const hotStatuses = [
   "HEMEN_TESLIM",
 ];
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  TRY: "₺",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+};
+
+function parseFormattedNumber(value: string) {
+  return Number(String(value || "").replace(/[^0-9]/g, ""));
+}
+
+function formatPrice(value?: number, currency?: string) {
+  const numeric = Number(value || 0);
+  const symbol = CURRENCY_SYMBOLS[currency || "TRY"] || "₺";
+  if (!numeric) return "Fiyat Yok";
+  return `${numeric.toLocaleString("tr-TR")} ${symbol}`;
+}
+
+function formatFloorInfo(unit: Pick<Unit, "floor" | "floorLabel" | "totalFloors">) {
+  const floorText =
+    unit.floorLabel ||
+    (unit.floor != null ? `${unit.floor}. Kat` : "Kat yok");
+
+  const totalText = unit.totalFloors ? `${unit.totalFloors} Katlı` : "";
+
+  return totalText ? `${floorText} / ${totalText}` : floorText;
+}
+
 export default function StokPage() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
@@ -98,10 +126,13 @@ export default function StokPage() {
   const [unitForm, setUnitForm] = useState<UnitFormState>({
     type: "DAIRE",
     floor: "",
+    floorLabel: "",
+    totalFloors: "",
     number: "",
     roomCount: "3+1",
     area: "",
     price: "",
+    priceCurrency: "TRY",
     status: "SATILIK",
     description: "",
   });
@@ -299,10 +330,13 @@ export default function StokPage() {
     setUnitForm({
       type: "DAIRE",
       floor: "",
+      floorLabel: "",
+      totalFloors: "",
       number: "",
       roomCount: "3+1",
       area: "",
       price: "",
+      priceCurrency: "TRY",
       status: "SATILIK",
       description: "",
     });
@@ -336,7 +370,9 @@ export default function StokPage() {
         projectId = projectRes.data.id;
       }
 
-      if (!unitForm.number || !unitForm.area || !unitForm.price) {
+      const numericPrice = parseFormattedNumber(unitForm.price);
+
+      if (!unitForm.number || !unitForm.area || !numericPrice) {
         setFormError("Birim numarası, alan ve fiyat zorunludur.");
         setFormLoading(false);
         return;
@@ -350,11 +386,14 @@ export default function StokPage() {
 
       const unitRes = await api.post(`/units/project/${projectId}`, {
         type: unitForm.type,
-        floor: unitForm.floor ? parseInt(unitForm.floor) : undefined,
+        floor: unitForm.floor ? parseInt(unitForm.floor, 10) : undefined,
+        floorLabel: unitForm.floorLabel || undefined,
+        totalFloors: unitForm.totalFloors ? parseInt(unitForm.totalFloors, 10) : undefined,
         number: unitForm.number,
         roomCount: unitForm.roomCount || undefined,
         area: parseFloat(unitForm.area),
-        price: parseFloat(unitForm.price),
+        price: numericPrice,
+        priceCurrency: unitForm.priceCurrency || "TRY",
         status: unitForm.status,
         description: unitForm.description || undefined,
       });
@@ -484,10 +523,10 @@ export default function StokPage() {
       id: unit.id,
       title,
       location,
-      price: price ? `${price.toLocaleString("tr-TR")} TL` : "Fiyat bilgisi yok",
+      price: price ? formatPrice(price, unit.priceCurrency) : "Fiyat bilgisi yok",
       roomCount: unit.roomCount || "—",
       area: unit.area ? `${unit.area} m²` : "—",
-      floor: unit.floor != null ? `${unit.floor}. Kat` : "—",
+      floor: formatFloorInfo(unit),
       authorization:
         unit.yetkiVerified || unit.isVerified ? "Yetkili" : "Kontrol",
       coverImage: getUnitCoverImage(unit) || "/LOGO_EPH.png",
@@ -964,9 +1003,14 @@ function isUnitVerified(unit: Unit) {
 }
 
 function getUnitCoverImage(unit: Unit) {
+  const cover = unit.images?.find((image) => image.isCover);
+  const first = unit.images?.[0];
+
   return (
-    unit.images?.find((image) => image.isCover)?.url ||
-    unit.images?.[0]?.url ||
+    cover?.supabaseUrl ||
+    cover?.url ||
+    first?.supabaseUrl ||
+    first?.url ||
     ""
   );
 }
@@ -1232,7 +1276,7 @@ function PremiumUnitCard({
             İlan Değeri
           </p>
           <p className="mt-2 text-3xl font-black tracking-[-0.04em] text-[#06194A]">
-            {price ? `${price.toLocaleString("tr-TR")} ₺` : "Fiyat Yok"}
+            {formatPrice(price, unit.priceCurrency)}
           </p>
         </div>
 
@@ -1240,7 +1284,7 @@ function PremiumUnitCard({
           <UnitInfo label="Tip" value={unit.type || "—"} />
           <UnitInfo label="Oda" value={unit.roomCount || "—"} />
           <UnitInfo label="Alan" value={unit.area ? `${unit.area} m²` : "—"} />
-          <UnitInfo label="No" value={unit.number || "—"} />
+          <UnitInfo label="Kat" value={formatFloorInfo(unit)} />
         </div>
       </div>
 
@@ -1455,7 +1499,7 @@ function AdminUnitCard({
         <AdminUnitMini label="Tip" value={unit.type || "—"} />
         <AdminUnitMini label="Oda" value={unit.roomCount || "—"} />
         <AdminUnitMini label="Alan" value={unit.area ? `${unit.area} m²` : "—"} />
-        <AdminUnitMini label="Kat" value={unit.floor != null ? String(unit.floor) : "—"} />
+        <AdminUnitMini label="Kat" value={formatFloorInfo(unit)} />
       </div>
 
       <div className="mt-5 grid gap-2 sm:grid-cols-3">

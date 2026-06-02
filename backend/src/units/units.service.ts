@@ -14,6 +14,9 @@ type CurrentUserPayload = {
 type CreateUnitPayload = {
   type: UnitType;
   floor?: number;
+  floorLabel?: string;
+  totalFloors?: number;
+  priceCurrency?: string;
   number: string;
   roomCount?: string;
   area?: number;
@@ -58,6 +61,9 @@ export class UnitsService {
       data: {
         type: data.type,
         floor: data.floor,
+        floorLabel: data.floorLabel,
+        totalFloors: data.totalFloors,
+        priceCurrency: data.priceCurrency || 'TRY',
         number: data.number,
         roomCount: data.roomCount,
         area: data.area,
