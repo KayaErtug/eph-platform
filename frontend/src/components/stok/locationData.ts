@@ -153,8 +153,11 @@ function toTitleCaseTR(value: string) {
 function normalizeList(payload: any): any[] {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.data)) return payload.data.data;
   if (Array.isArray(payload?.result)) return payload.result;
+  if (Array.isArray(payload?.results)) return payload.results;
   if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.payload)) return payload.payload;
   return [];
 }
 
@@ -168,22 +171,29 @@ function toOption(item: any, fallbackIndex: number): LocationOption {
     item?.koy ||
     item?.village ||
     item?.neighborhood ||
+    item?.town ||
     "";
+
   const id =
     item?.id ||
     item?.code ||
     item?.districtId ||
     item?.provinceId ||
     `${name}-${fallbackIndex}`;
+
   return { id: String(id), name: toTitleCaseTR(name) };
 }
 
 async function getJson(url: string) {
   const response = await fetch(url, {
     headers: { Accept: "application/json" },
+    cache: "no-store",
   });
-  if (!response.ok)
+
+  if (!response.ok) {
     throw new Error(`Konum verisi alınamadı: ${response.status}`);
+  }
+
   return response.json();
 }
 
@@ -194,16 +204,26 @@ function sortOptions(options: LocationOption[]) {
       (option, index, all) =>
         all.findIndex((item) => item.name === option.name) === index,
     )
-    .sort((a, b) => a.name.localeCompare(b.name, "tr"));
+    .sort((a, b) => a.name.localeCompare(b.name, "tr-TR"));
+}
+
+async function fetchPagedOptions(urlBase: string, limit = 1000) {
+  const firstPayload = await getJson(`${urlBase}&limit=${limit}&offset=0`);
+  const firstList = normalizeList(firstPayload).map(toOption);
+
+  if (firstList.length < limit) return firstList;
+
+  const secondPayload = await getJson(`${urlBase}&limit=${limit}&offset=${limit}`);
+  const secondList = normalizeList(secondPayload).map(toOption);
+
+  return [...firstList, ...secondList];
 }
 
 export async function fetchProvinceOptions(): Promise<LocationOption[]> {
   try {
     const payload = await getJson(`${API_BASE}/provinces?limit=100&sort=name`);
-    return [
-      ...sortOptions(normalizeList(payload).map(toOption)),
-      KKTC_PROVINCE,
-    ];
+    const provinces = sortOptions(normalizeList(payload).map(toOption));
+    return [...provinces, KKTC_PROVINCE];
   } catch {
     return [...FALLBACK_PROVINCES, KKTC_PROVINCE];
   }
@@ -228,39 +248,29 @@ export async function fetchDistrictOptions(
 export async function fetchPlaceOptions(
   provinceName: string,
   districtName: string,
+  districtId?: string,
 ): Promise<LocationOption[]> {
   if (!provinceName || !districtName) return [];
   if (provinceName === "KKTC") return KKTC_PLACES[districtName] || [];
 
-  try {
-    const [neighborhoodPayload, villagePayload, townPayload] =
-      await Promise.allSettled([
-        getJson(
-          `${API_BASE}/neighborhoods?province=${encodeURIComponent(provinceName)}&district=${encodeURIComponent(districtName)}&limit=5000&sort=name`,
-        ),
-        getJson(
-          `${API_BASE}/villages?province=${encodeURIComponent(provinceName)}&district=${encodeURIComponent(districtName)}&limit=5000&sort=name`,
-        ),
-        getJson(
-          `${API_BASE}/towns?province=${encodeURIComponent(provinceName)}&district=${encodeURIComponent(districtName)}&limit=5000&sort=name`,
-        ),
-      ]);
+  const provinceQuery = `province=${encodeURIComponent(provinceName)}`;
+  const districtQuery = districtId
+    ? `districtId=${encodeURIComponent(districtId)}`
+    : `district=${encodeURIComponent(districtName)}`;
 
-    const neighborhoods =
-      neighborhoodPayload.status === "fulfilled"
-        ? normalizeList(neighborhoodPayload.value).map(toOption)
-        : [];
-    const villages =
-      villagePayload.status === "fulfilled"
-        ? normalizeList(villagePayload.value).map(toOption)
-        : [];
-    const towns =
-      townPayload.status === "fulfilled"
-        ? normalizeList(townPayload.value).map(toOption)
-        : [];
+  const baseQuery = `${provinceQuery}&${districtQuery}&sort=name`;
 
-    return sortOptions([...neighborhoods, ...villages, ...towns]);
-  } catch {
-    return [];
-  }
+  const [neighborhoodPayload, villagePayload, townPayload] =
+    await Promise.allSettled([
+      fetchPagedOptions(`${API_BASE}/neighborhoods?${baseQuery}`),
+      fetchPagedOptions(`${API_BASE}/villages?${baseQuery}`),
+      fetchPagedOptions(`${API_BASE}/towns?${baseQuery}`),
+    ]);
+
+  const neighborhoods =
+    neighborhoodPayload.status === "fulfilled" ? neighborhoodPayload.value : [];
+  const villages = villagePayload.status === "fulfilled" ? villagePayload.value : [];
+  const towns = townPayload.status === "fulfilled" ? townPayload.value : [];
+
+  return sortOptions([...neighborhoods, ...villages, ...towns]);
 }
