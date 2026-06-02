@@ -641,317 +641,317 @@ div {
 }
 
 /* =========================================================
-   PORTFÖY EKLE MODAL V3 - MOBİL NİZAM / İNTİZAM / SİMETRİ
+   EPH PORTFÖY EKLE MODAL V4 — KOMPAKT CRM FORM
+   Hedef: iPhone 8 Plus, az başlık, çok bilgi, minimum boşluk.
 ========================================================= */
 
 .stock-modal-v2-backdrop {
-  padding: 18px 12px !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  overflow-y: auto !important;
+  padding: 8px !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
 .stock-modal-v2 {
-  width: min(940px, calc(100vw - 24px)) !important;
-  max-height: min(92vh, 940px) !important;
-  border-radius: 28px !important;
+  width: min(920px, calc(100vw - 16px)) !important;
+  max-height: calc(100dvh - 16px) !important;
   overflow: hidden !important;
+  border-radius: 24px !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
-.stock-modal-v2-head {
-  padding: 22px 24px 18px !important;
-  gap: 12px !important;
+.stock-modal-v2-head,
+.stock-modal-v4-head {
+  min-height: 58px !important;
+  padding: 10px 14px !important;
+  border-bottom: 1px solid #DDE7F3 !important;
+  display: grid !important;
+  grid-template-columns: 1fr 46px !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.stock-modal-v4-title,
+.stock-modal-v2-head > div {
+  min-width: 0 !important;
+  text-align: center !important;
+}
+
+.stock-modal-v2-head .stock-section-kicker {
+  display: none !important;
 }
 
 .stock-modal-v2-head h2 {
-  margin-top: 6px !important;
-  font-size: clamp(28px, 4vw, 42px) !important;
-  line-height: 1.08 !important;
+  margin: 0 !important;
+  font-size: clamp(22px, 5.2vw, 30px) !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.055em !important;
+  text-align: center !important;
+  color: #06194A !important;
 }
 
 .stock-modal-v2-head p {
-  margin-top: 8px !important;
-  font-size: clamp(14px, 2.8vw, 18px) !important;
-  line-height: 1.55 !important;
+  display: none !important;
 }
 
-.stock-modal-v2-head > button {
-  width: 54px !important;
-  height: 54px !important;
-  min-height: 54px !important;
-  border-radius: 22px !important;
-  flex: 0 0 auto !important;
+.stock-modal-v2-head button {
+  width: 46px !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  border-radius: 16px !important;
+  font-size: 30px !important;
+  line-height: 1 !important;
 }
 
 .stock-modal-v2-body {
-  padding: 18px 24px !important;
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding: 10px 12px 92px !important;
 }
 
-.stock-modal-v3-tabs {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 18px;
-  border: 1px solid #DDE7F3;
-  border-radius: 22px;
-  background: #F7FBFF;
-  padding: 6px;
+.stock-form-block {
+  margin: 0 0 10px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-.stock-modal-v3-tabs button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 42px;
-  border: 0;
-  border-radius: 17px;
-  background: transparent;
-  color: #64748B;
-  font-size: 13px;
-  font-weight: 900;
-  transition: 0.2s ease;
-}
-
-.stock-modal-v3-tabs button span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: #EAF2FF;
-  color: #1557D6;
-  font-size: 11px;
-  font-weight: 900;
-}
-
-.stock-modal-v3-tabs button.active {
-  background: #1557D6;
-  color: #FFFFFF;
-  box-shadow: 0 10px 26px rgba(21, 87, 214, 0.2);
-}
-
-.stock-modal-v3-tabs button.active span {
-  background: #FFFFFF;
-  color: #1557D6;
-}
-
-.stock-form-block-compact {
-  margin-top: 0 !important;
-  padding: 18px !important;
-  border-radius: 26px !important;
-}
-
-.stock-form-block-compact h3 {
-  margin-bottom: 14px !important;
-  font-size: 17px !important;
+.stock-form-block h3 {
+  margin: 2px 0 8px !important;
+  font-size: 16px !important;
+  line-height: 1.1 !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em !important;
+  color: #1557D6 !important;
+  text-align: center !important;
 }
 
 .stock-form-grid {
-  gap: 14px !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  align-items: start !important;
 }
 
 .stock-form-field {
-  gap: 7px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  align-items: stretch !important;
+}
+
+.stock-form-field.full {
+  grid-column: 1 / -1 !important;
 }
 
 .stock-form-field span {
-  font-size: 12px !important;
-  line-height: 1.25 !important;
+  min-height: 15px !important;
+  font-size: 10.5px !important;
+  line-height: 1.1 !important;
+  font-weight: 900 !important;
+  color: #64748B !important;
+  text-align: center !important;
+  letter-spacing: 0 !important;
 }
 
 .stock-form-field input,
-.stock-form-field select {
-  min-height: 48px !important;
-  height: 48px !important;
-  border-radius: 18px !important;
-  padding: 0 14px !important;
+.stock-form-field select,
+.stock-form-field textarea {
+  width: 100% !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  border-radius: 15px !important;
+  border: 1px solid #CBD8E8 !important;
+  background: #FFFFFF !important;
+  padding: 0 10px !important;
   font-size: 16px !important;
-  font-weight: 850 !important;
+  font-weight: 900 !important;
+  color: #06194A !important;
+  text-align: center !important;
+  text-align-last: center !important;
+  box-shadow: none !important;
+}
+
+.stock-form-field select option {
+  text-align: center !important;
 }
 
 .stock-form-field textarea {
-  min-height: 104px !important;
-  border-radius: 20px !important;
-  padding: 14px !important;
-  font-size: 15px !important;
-  font-weight: 750 !important;
+  min-height: 76px !important;
+  height: 76px !important;
+  padding: 10px !important;
+  line-height: 1.35 !important;
+  resize: vertical !important;
+  text-align: center !important;
 }
 
-.stock-image-step .stock-form-grid {
-  gap: 12px !important;
+.stock-form-field input::placeholder,
+.stock-form-field textarea::placeholder {
+  color: #9AA8BB !important;
+  font-weight: 800 !important;
+  text-align: center !important;
 }
 
-.stock-image-step .stock-save-btn {
-  min-height: 50px !important;
-  border-radius: 20px !important;
+.stock-form-error,
+.stock-form-success {
+  margin: 0 0 8px !important;
+  padding: 10px 12px !important;
+  border-radius: 16px !important;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+  font-weight: 900 !important;
+  text-align: center !important;
 }
 
-.stock-image-step .grid.gap-3.md\:grid-cols-3 {
+.stock-save-btn,
+.stock-cancel-btn {
+  min-height: 44px !important;
+  border-radius: 16px !important;
+  padding: 10px 16px !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+}
+
+.stock-form-field .stock-save-btn {
+  width: min(100%, 260px) !important;
+  margin: 0 auto !important;
+}
+
+.stock-modal-v2 .mt-4 {
+  margin-top: 8px !important;
+}
+
+.stock-modal-v2 .mt-5 {
+  margin-top: 10px !important;
+}
+
+.stock-modal-v2 .p-5 {
+  padding: 12px !important;
+}
+
+.stock-modal-v2 .p-4 {
+  padding: 10px !important;
+}
+
+.stock-modal-v2 img.h-56 {
+  height: 128px !important;
+}
+
+.stock-modal-v2 .h-28 {
+  height: 82px !important;
+}
+
+.stock-image-summary-row {
+  margin-top: 0 !important;
+}
+
+.stock-image-summary {
+  display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   gap: 8px !important;
 }
 
-.stock-image-step .grid.gap-3.md\:grid-cols-3 > div {
-  min-height: 82px !important;
-  padding: 12px 8px !important;
-  border-radius: 18px !important;
+.stock-image-summary > div {
+  min-height: 56px !important;
+  border: 1px solid #DDE7F3 !important;
+  border-radius: 16px !important;
+  background: #F7FBFF !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
 }
 
-.stock-image-step .grid.gap-3.md\:grid-cols-3 p:first-child {
-  font-size: 28px !important;
-  line-height: 1 !important;
-}
-
-.stock-image-step .grid.gap-3.md\:grid-cols-3 p:last-child {
+.stock-image-summary b {
   font-size: 10px !important;
-  letter-spacing: 0.14em !important;
+  line-height: 1 !important;
+  font-weight: 900 !important;
+  color: #64748B !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
 }
 
-.stock-modal-v3-foot {
+.stock-image-summary strong {
+  font-size: 14px !important;
+  line-height: 1 !important;
+  font-weight: 950 !important;
+  color: #06194A !important;
+}
+
+.stock-modal-v2-foot {
   position: sticky !important;
   bottom: 0 !important;
-  z-index: 8 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
+  z-index: 5 !important;
+  border-top: 1px solid #DDE7F3 !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(14px) !important;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+  display: grid !important;
+  grid-template-columns: 0.85fr 1.15fr !important;
   gap: 10px !important;
-  padding: 14px 24px calc(14px + env(safe-area-inset-bottom, 0px)) !important;
-  background: rgba(255, 255, 255, 0.94) !important;
-  backdrop-filter: blur(18px) !important;
 }
 
-.stock-modal-v3-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex: 1;
+.stock-modal-v2-foot button {
+  width: 100% !important;
 }
 
-.stock-modal-v3-foot .stock-cancel-btn,
-.stock-modal-v3-foot .stock-save-btn {
-  min-height: 46px !important;
-  border-radius: 18px !important;
-  padding: 0 18px !important;
-}
-
-@media (max-width: 768px) {
+@media (max-width: 480px) {
   .stock-modal-v2-backdrop {
-    align-items: flex-start !important;
-    padding: 12px 8px calc(78px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 6px !important;
   }
 
   .stock-modal-v2 {
-    width: min(92vw, 430px) !important;
-    max-height: calc(100svh - 96px) !important;
-    border-radius: 30px !important;
-  }
-
-  .stock-modal-v2-head {
-    padding: 18px 18px 14px !important;
-  }
-
-  .stock-modal-v2-head h2 {
-    font-size: 30px !important;
-  }
-
-  .stock-modal-v2-head p {
-    max-width: 330px !important;
-    font-size: 18px !important;
-    line-height: 1.42 !important;
-  }
-
-  .stock-modal-v2-head > button {
-    position: absolute !important;
-    right: 14px !important;
-    top: 14px !important;
-    width: 52px !important;
-    height: 52px !important;
-    min-height: 52px !important;
+    width: calc(100vw - 12px) !important;
+    max-height: calc(100dvh - 12px) !important;
+    border-radius: 22px !important;
   }
 
   .stock-modal-v2-body {
-    padding: 14px 18px !important;
-  }
-
-  .stock-modal-v3-tabs {
-    margin-bottom: 14px !important;
-    border-radius: 20px !important;
-    padding: 5px !important;
-  }
-
-  .stock-modal-v3-tabs button {
-    min-height: 40px !important;
-    gap: 5px !important;
-    font-size: 12px !important;
-  }
-
-  .stock-modal-v3-tabs button span {
-    width: 20px !important;
-    height: 20px !important;
-    font-size: 10px !important;
-  }
-
-  .stock-form-block-compact {
-    padding: 14px !important;
-    border-radius: 24px !important;
+    padding: 8px 10px 86px !important;
   }
 
   .stock-form-grid {
-    grid-template-columns: 1fr !important;
-    gap: 11px !important;
-  }
-
-  .stock-form-field input,
-  .stock-form-field select {
-    width: min(100%, 360px) !important;
-    min-height: 46px !important;
-    height: 46px !important;
-    border-radius: 18px !important;
-  }
-
-  .stock-form-field textarea {
-    width: min(100%, 360px) !important;
-    min-height: 96px !important;
-  }
-
-  .stock-image-step .rounded-\[24px\].border.border-dashed {
-    padding: 16px 14px !important;
-    border-radius: 22px !important;
-    font-size: 14px !important;
-    line-height: 1.45 !important;
-  }
-
-  .stock-modal-v3-foot {
-    padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
-  }
-
-  .stock-modal-v3-foot .stock-cancel-btn,
-  .stock-modal-v3-foot .stock-save-btn {
-    min-height: 44px !important;
-    padding: 0 14px !important;
-    font-size: 13px !important;
-  }
-}
-
-@media (max-width: 430px) {
-  .stock-modal-v2 {
-    width: calc(100vw - 26px) !important;
-  }
-
-  .stock-modal-v2-head h2 {
-    font-size: 27px !important;
-  }
-
-  .stock-modal-v2-head p {
-    font-size: 16px !important;
+    gap: 7px !important;
   }
 
   .stock-form-field input,
   .stock-form-field select,
   .stock-form-field textarea {
-    width: 100% !important;
+    min-height: 42px !important;
+    height: 42px !important;
+    border-radius: 14px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    font-size: 16px !important;
+  }
+
+  .stock-form-field textarea {
+    min-height: 68px !important;
+    height: 68px !important;
+  }
+
+  .stock-form-field span {
+    font-size: 10px !important;
+  }
+
+  .stock-save-btn,
+  .stock-cancel-btn {
+    min-height: 42px !important;
+    border-radius: 15px !important;
+    font-size: 13px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .stock-form-grid {
+    grid-template-columns: 1fr !important;
   }
 }

@@ -114,7 +114,6 @@ export default function StokPage() {
   const [copiedUnitId, setCopiedUnitId] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
   const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
-  const [showAnalysis, setShowAnalysis] = useState(false);
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [projectForm, setProjectForm] = useState<ProjectFormState>({
@@ -670,138 +669,205 @@ export default function StokPage() {
       <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
 
       <main className="mx-auto max-w-7xl px-4 pb-24 pt-6">
-        <section className="rounded-[34px] border border-[#DDE7F3] bg-white p-4 shadow-[0_24px_70px_rgba(15,23,42,0.07)] lg:p-6">
-          <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div className="text-center lg:text-left">
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
-                Premium Portföy Merkezi
-              </p>
-              <h1 className="mt-2 text-2xl font-black tracking-[-0.05em] text-[#06194A] md:text-4xl">
-                Portföy Merkezi
-              </h1>
-              <p className="mx-auto mt-2 max-w-2xl text-sm font-bold leading-6 text-[#64748B] lg:mx-0">
-                Portföylerinizi hızlıca ekleyin, filtreleyin ve paylaşım kartlarını tek merkezden yönetin.
-              </p>
-            </div>
+        <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="relative min-h-[520px] overflow-hidden rounded-[36px] border border-[#DDE7F3] bg-[#071A3F] p-5 text-white shadow-[0_30px_90px_rgba(15,23,42,0.14)] lg:p-8">
+            <div
+              className="absolute inset-0 bg-cover bg-center opacity-35"
+              style={{
+                backgroundImage: "url('/showcase/stock.jpg')",
+              }}
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(6,25,74,0.94),rgba(21,87,214,0.58)_48%,rgba(6,25,74,0.72)),radial-gradient(circle_at_20%_15%,rgba(255,255,255,0.24),transparent_26%)]" />
 
-            <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[360px]">
-              {canAddUnit && (
+            <div className="relative flex h-full min-h-[460px] flex-col justify-between">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/12 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white backdrop-blur">
+                  <Building2 size={15} />
+                  Premium Portföy Merkezi
+                </div>
+
+                <h1 className="mt-6 max-w-2xl text-4xl font-black leading-tight tracking-[-0.055em] md:text-6xl">
+                  Portföy Merkezi
+                </h1>
+
+                <p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-blue-50/90">
+                  Portföylerinizi filtreleyin, detaylara tek dokunuşla girin,
+                  Lina destekli paylaşım kartları üretin ve portföy akışınızı tek ekrandan yönetin.
+                </p>
+              </div>
+
+              <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                {canAddUnit && (
+                  <button
+                    onClick={() => {
+                      resetForm();
+                      setShowModal(true);
+                    }}
+                    className="inline-flex items-center justify-center gap-2 rounded-[24px] bg-white px-5 py-4 text-sm font-black text-[#1557D6] shadow-[0_18px_38px_rgba(255,255,255,0.16)] transition hover:scale-[1.01]"
+                  >
+                    <Plus size={18} />
+                    Yeni Portföy Ekle
+                  </button>
+                )}
+
                 <button
-                  onClick={() => {
-                    resetForm();
-                    setShowModal(true);
-                  }}
-                  className="inline-flex items-center justify-center gap-2 rounded-[22px] bg-[#1557D6] px-5 py-4 text-sm font-black text-white shadow-[0_18px_38px_rgba(21,87,214,0.20)] transition hover:bg-[#0F49BD]"
+                  onClick={() => setLinaOpen(true)}
+                  className="inline-flex items-center justify-center gap-2 rounded-[24px] border border-white/22 bg-white/12 px-5 py-4 text-sm font-black text-white backdrop-blur transition hover:bg-white/18"
                 >
-                  <Plus size={18} />
-                  Yeni Portföy Ekle
+                  <Sparkles size={18} />
+                  Lina ile Kart Hazırla
                 </button>
-              )}
-
-              <button
-                onClick={() => setLinaOpen(true)}
-                className="inline-flex items-center justify-center gap-2 rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-5 py-4 text-sm font-black text-[#1557D6] transition hover:bg-[#EFF6FF]"
-              >
-                <Sparkles size={18} />
-                Lina ile Hazırla
-              </button>
+              </div>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <HeroMetric
-              icon={<Home size={20} />}
-              label="Toplam Kayıt"
-              value={units.length.toLocaleString("tr-TR")}
-              note="Sistemdeki portföy"
-            />
+          <div className="grid gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <HeroMetric
+                icon={<Home size={20} />}
+                label="Toplam Kayıt"
+                value={units.length.toLocaleString("tr-TR")}
+                note="Sistemdeki portföy"
+              />
 
-            <HeroMetric
-              icon={<TrendingUp size={20} />}
-              label="Aktif İlan"
-              value={activeCount.toLocaleString("tr-TR")}
-              note="Satış / kiralama"
-            />
+              <HeroMetric
+                icon={<TrendingUp size={20} />}
+                label="Aktif İlan"
+                value={activeCount.toLocaleString("tr-TR")}
+                note="Satış / kiralama akışı"
+              />
 
-            <HeroMetric
-              icon={<CheckCircle2 size={20} />}
-              label="Doğrulanmış"
-              value={verifiedCount.toLocaleString("tr-TR")}
-              note="Güven seviyesi"
-            />
+              <HeroMetric
+                icon={<CheckCircle2 size={20} />}
+                label="Doğrulanmış"
+                value={verifiedCount.toLocaleString("tr-TR")}
+                note="Güven seviyesi"
+              />
 
-            <HeroMetric
-              icon={<Star size={20} />}
-              label="Toplam Değer"
-              value={
-                totalValue
-                  ? `${(totalValue / 1000000).toFixed(1)}M ₺`
-                  : "0 ₺"
-              }
-              note="Yaklaşık envanter"
-            />
+              <HeroMetric
+                icon={<Star size={20} />}
+                label="Toplam Değer"
+                value={
+                  totalValue
+                    ? `${(totalValue / 1000000).toFixed(1)}M ₺`
+                    : "0 ₺"
+                }
+                note="Yaklaşık envanter"
+              />
+            </div>
+
+            <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[#1557D6]">
+                    Portföy Dengesi
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+                    Güncel görünüm
+                  </h2>
+                </div>
+                <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]">
+                  <BarChart3 size={22} />
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3">
+                <BalanceLine label="Aktif Portföy" value={activeCount} total={Math.max(units.length, 1)} />
+                <BalanceLine label="Doğrulanmış" value={verifiedCount} total={Math.max(units.length, 1)} />
+                <BalanceLine label="Off-Market" value={offMarketCount} total={Math.max(units.length, 1)} />
+              </div>
+            </div>
           </div>
         </section>
 
-        <section className="mt-4 rounded-[30px] border border-[#DDE7F3] bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
-          <div className="flex flex-col gap-3 text-center lg:flex-row lg:items-center lg:justify-between lg:text-left">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
-                Portföy Analiz Merkezi
-              </p>
-              <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#06194A]">
-                Özet ve portföy sağlığı
-              </h2>
-            </div>
+        <section className="mt-6 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+            <p className="text-center text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
+              Görsel Akış
+            </p>
+            <h2 className="mt-2 text-center text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+              İlan vitrini
+            </h2>
 
-            <button
-              type="button"
-              onClick={() => setShowAnalysis((current) => !current)}
-              className="rounded-[18px] border border-[#DDE7F3] bg-[#F7FBFF] px-5 py-3 text-sm font-black text-[#1557D6] transition hover:bg-[#EFF6FF]"
-            >
-              {showAnalysis ? "Analizi Gizle" : "Analizi Göster"}
-            </button>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <VisualTile title="Konut" image="/showcase/stock.jpg" />
+              <VisualTile title="Proje" image="/showcase/dashboard.jpg" />
+              <VisualTile title="Network" image="/showcase/network.jpg" />
+            </div>
           </div>
 
-          {showAnalysis && (
-            <div className="mt-4 grid gap-4 lg:grid-cols-3">
-              <PortfolioHealthCard
-                title="Portföy Sağlığı"
-                value={`${portfolioReport.averageScore}%`}
-                label={portfolioReport.scoreLabel}
-                icon={<ShieldCheck size={22} />}
-                progress={portfolioReport.averageScore}
-                note={`${activeCount} aktif portföy · ${portfolioReport.strongCount} güçlü kayıt`}
-              />
+          <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+            <p className="text-center text-xs font-black uppercase tracking-[0.22em] text-[#1557D6] lg:text-left">
+              Hızlı Özet
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <SummaryLine label="Gösterilen kayıt" value={`${filteredUnits.length} / ${units.length}`} />
+              <SummaryLine label="Aktif kullanıcı" value={`${user?.firstName || "EPH"} ${user?.lastName || ""}`} />
+              <SummaryLine label="En yoğun şehir" value={topCity} />
+              <SummaryLine label="Sayfa modu" value={viewMode === "cards" ? "Kart görünümü" : "Liste görünümü"} />
+            </div>
+          </div>
+        </section>
 
-              <PortfolioHealthCard
-                title="Portföy Karnesi"
-                value={`${portfolioReport.averageScore}/100`}
-                label={portfolioReport.scoreLabel}
-                icon={<Trophy size={22} />}
-                progress={portfolioReport.averageScore}
-                note={`${portfolioReport.premiumCount} portföy pekiyi seviyesinde`}
-              />
+        <section className="mt-6 grid gap-4 lg:grid-cols-3">
+          <PortfolioHealthCard
+            title="Portföy Sağlığı"
+            value={`${portfolioReport.averageScore}%`}
+            label={portfolioReport.scoreLabel}
+            icon={<ShieldCheck size={22} />}
+            progress={portfolioReport.averageScore}
+            note={`${activeCount} aktif portföy · ${portfolioReport.strongCount} güçlü kayıt`}
+          />
 
-              <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+          <PortfolioHealthCard
+            title="Portföy Karnesi"
+            value={`${portfolioReport.averageScore}/100`}
+            label={portfolioReport.scoreLabel}
+            icon={<Trophy size={22} />}
+            progress={portfolioReport.averageScore}
+            note={`${portfolioReport.premiumCount} portföy pekiyi seviyesinde`}
+          />
+
+          <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
                   Lina Analizi
                 </p>
                 <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
                   Portföy önerileri
                 </h2>
-                <p className="mt-4 text-sm font-bold leading-7 text-[#475569]">
-                  {portfolioReport.nextAdvice}
-                </p>
-                <div className="mt-4 grid gap-2">
-                  <ReportMiniLine label="Açıklama eksik" value={portfolioReport.missingDescription} />
-                  <ReportMiniLine label="Yetki eksik" value={portfolioReport.missingAuthority} />
-                  <ReportMiniLine label="Konum eksik" value={portfolioReport.missingLocation} />
-                </div>
+              </div>
+
+              <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]">
+                <Sparkles size={22} />
               </div>
             </div>
-          )}
+
+            <p className="mt-4 text-sm font-bold leading-7 text-[#475569]">
+              {portfolioReport.nextAdvice}
+            </p>
+
+            <div className="mt-4 grid gap-2">
+              <ReportMiniLine
+                label="Açıklama eksik"
+                value={portfolioReport.missingDescription}
+              />
+              <ReportMiniLine
+                label="Yetki eksik"
+                value={portfolioReport.missingAuthority}
+              />
+              <ReportMiniLine
+                label="Konum eksik"
+                value={portfolioReport.missingLocation}
+              />
+            </div>
+          </div>
         </section>
+
+        <div className="mt-6">
+          <StokKpiCards units={units} projects={projects} />
+        </div>
 
         <section className="mt-6 rounded-[36px] border border-[#DDE7F3] bg-white p-4 shadow-[0_24px_70px_rgba(15,23,42,0.07)] lg:p-6">
           <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -961,7 +1027,7 @@ function HeroMetric({
   note: string;
 }) {
   return (
-    <div className="flex min-h-[132px] flex-col justify-center rounded-[26px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+    <div className="flex min-h-[178px] flex-col justify-between rounded-[32px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[20px] bg-[#EFF6FF] text-[#1557D6]">
         {icon}
       </div>
@@ -969,7 +1035,7 @@ function HeroMetric({
         <p className="mt-3 text-[11px] font-black uppercase tracking-[0.18em] text-[#64748B]">
           {label}
         </p>
-        <p className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+        <p className="mt-2 text-3xl font-black tracking-[-0.04em] text-[#06194A]">
           {value}
         </p>
         <p className="mt-1 text-xs font-bold text-[#64748B]">{note}</p>
@@ -1209,7 +1275,7 @@ function PremiumUnitCard({
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#64748B]">
             İlan Değeri
           </p>
-          <p className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+          <p className="mt-2 text-3xl font-black tracking-[-0.04em] text-[#06194A]">
             {formatPrice(price, unit.priceCurrency)}
           </p>
         </div>
