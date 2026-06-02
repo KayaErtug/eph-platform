@@ -24,10 +24,13 @@ export interface Unit {
   id: string;
   type: string;
   floor?: number;
+  floorLabel?: string;
+  totalFloors?: number;
   number: string;
   roomCount?: string;
   area?: number;
   price: number;
+  priceCurrency?: "TRY" | "USD" | "EUR" | "GBP" | string;
   status: string;
   description?: string;
   isVerified?: boolean;
@@ -62,10 +65,13 @@ export interface Project {
 export interface UnitFormState {
   type: string;
   floor: string;
+  floorLabel?: string;
+  totalFloors?: string;
   number: string;
   roomCount: string;
   area: string;
   price: string;
+  priceCurrency?: "TRY" | "USD" | "EUR" | "GBP";
   status: string;
   description: string;
 }
