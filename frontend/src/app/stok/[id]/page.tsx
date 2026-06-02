@@ -9,6 +9,8 @@ import {
   BarChart3,
   Building2,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   CircleUserRound,
   FileText,
@@ -25,6 +27,7 @@ import {
   Trophy,
   UsersRound,
   WalletCards,
+  X,
   Waves,
   Car,
   Dumbbell,
@@ -54,6 +57,15 @@ type DetailUnit = Unit & {
     };
   };
 };
+
+const CINKAYA_GALLERY = Array.from({ length: 17 }, (_, index) => {
+  const photoNo = index + 1;
+
+  return `/portfolio-images/cinkaya-bulvari/${photoNo}.jpg`;
+});
+
+const CINKAYA_DESCRIPTION =
+  "Çınkaya Bulvarı’nda, Sosyete Pazarı’na 100 metre mesafede yer alan ultra lüks 3+1 daire; 190 m² kullanım alanı, ebeveyn banyosu, giyinme odası, çift balkon, otomatik panjur, açık yüzme havuzu, açık otopark, çocuk oyun parkı, kamelya alanı, müştemilat bölümü ve toplantı salonu gibi güçlü sosyal donatılarla öne çıkar. 8 katlı binanın 3. katında bulunan, düz girişli asansörlü ve her katta yalnızca 2 daireden oluşan bu portföy; modern mimari, kaliteli malzeme ve merkezi konumuyla konforlu bir yaşam sunar.";
 
 function formatMoney(value?: number) {
   const numeric = Number(value || 0);
@@ -148,6 +160,8 @@ export default function StokDetailPage() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
+  const [activePhoto, setActivePhoto] = useState(0);
+  const [galleryOpen, setGalleryOpen] = useState(false);
 
   const unitId = params?.id;
 
@@ -249,7 +263,7 @@ export default function StokDetailPage() {
       floor: item.floor != null ? `${item.floor}. Kat` : "—",
       authorization:
         item.yetkiVerified || item.isVerified ? "Yetkili" : "Kontrol",
-      coverImage: "/showcase/stock.jpg",
+      coverImage: CINKAYA_GALLERY[activePhoto] || CINKAYA_GALLERY[0],
       consultantName:
         [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
         ownerName ||
@@ -260,10 +274,10 @@ export default function StokDetailPage() {
       scoreLabel: portfolioScoreLabel,
       shortDescription:
         item.description ||
-        "Yetkili portföy statüsünde, paylaşım için hazır profesyonel gayrimenkul kaydı.",
+        "Çınkaya Bulvarı’nda sosyal donatıları güçlü, 190 m² ultra lüks 3+1 portföy.",
       longDescription:
         item.description ||
-        "Bu portföy EPH Portföy Merkezi üzerinden hazırlanmıştır. Konum, fiyat, oda sayısı, alan bilgisi ve yetki durumu tek kart üzerinde paylaşılabilir formatta sunulur.",
+        CINKAYA_DESCRIPTION,
       features: [
         {
           icon: "security",
@@ -333,7 +347,7 @@ export default function StokDetailPage() {
           <div className="relative min-h-[620px] bg-[#06194A] text-white">
             <div
               className="absolute inset-0 bg-cover bg-center opacity-100"
-              style={{ backgroundImage: "url('/showcase/stock.jpg')" }}
+              style={{ backgroundImage: `url("${CINKAYA_GALLERY[activePhoto] || CINKAYA_GALLERY[0]}")` }}
             />
             <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(6,25,74,0.72),rgba(6,25,74,0.46)_42%,rgba(6,25,74,0.05)),linear-gradient(180deg,rgba(6,25,74,0.04),rgba(6,25,74,0.58))]" />
 
@@ -474,6 +488,83 @@ export default function StokDetailPage() {
           />
         </section>
 
+        <section className="mt-5 rounded-[34px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+          <div className="flex flex-col gap-4 text-center lg:flex-row lg:items-center lg:justify-between lg:text-left">
+            <div>
+              <div className="inline-flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#EFF6FF] text-[#1557D6]">
+                <FileText size={21} />
+              </div>
+
+              <h2 className="mt-3 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+                Portföy Galerisi
+              </h2>
+
+              <p className="mt-1 text-sm font-semibold leading-6 text-[#64748B]">
+                Çınkaya Bulvarı portföyüne ait gerçek fotoğraf vitrini.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setGalleryOpen(true)}
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] bg-[#1557D6] px-5 py-3 text-sm font-black text-white transition hover:bg-[#0F49BD]"
+            >
+              <FileText size={17} />
+              Galeriyi Aç
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+            <button
+              type="button"
+              onClick={() => setGalleryOpen(true)}
+              className="group relative min-h-[360px] overflow-hidden rounded-[30px] bg-[#06194A] text-left"
+            >
+              <img
+                src={CINKAYA_GALLERY[activePhoto] || CINKAYA_GALLERY[0]}
+                alt="Portföy galerisi kapak fotoğrafı"
+                className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+              />
+
+              <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/72 via-[#06194A]/10 to-transparent" />
+
+              <div className="absolute bottom-5 left-5 right-5">
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-white/72">
+                  Fotoğraf {activePhoto + 1} / {CINKAYA_GALLERY.length}
+                </p>
+
+                <h3 className="mt-2 text-2xl font-black tracking-[-0.04em] text-white">
+                  Büyük Görsel Önizleme
+                </h3>
+              </div>
+            </button>
+
+            <div className="grid max-h-[360px] grid-cols-3 gap-2 overflow-y-auto rounded-[28px] bg-[#F7FBFF] p-2">
+              {CINKAYA_GALLERY.map((photo, index) => (
+                <button
+                  key={photo}
+                  type="button"
+                  onClick={() => setActivePhoto(index)}
+                  className={`relative min-h-[92px] overflow-hidden rounded-[20px] border transition ${
+                    activePhoto === index
+                      ? "border-[#1557D6] ring-2 ring-[#1557D6]/20"
+                      : "border-[#DDE7F3]"
+                  }`}
+                >
+                  <img
+                    src={photo}
+                    alt={`Portföy fotoğrafı ${index + 1}`}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+
+                  <span className="absolute bottom-2 right-2 rounded-full bg-white/92 px-2 py-1 text-[10px] font-black text-[#06194A]">
+                    {index + 1}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section className="mt-5 grid gap-5 lg:grid-cols-[1.35fr_0.95fr]">
           <div className="space-y-5">
             <section className="rounded-[34px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
@@ -503,7 +594,7 @@ export default function StokDetailPage() {
               />
               <div className="mt-4 rounded-[26px] bg-[#F7FBFF] p-6 text-center text-base font-semibold leading-8 text-[#475569] md:text-left">
                 {unit.description ||
-                  "Bu portföy için henüz açıklama girilmemiş. Açıklama alanı; manzara, cephe, kullanım durumu, teslim bilgisi ve özel portföy notları için kullanılabilir."}
+                  CINKAYA_DESCRIPTION}
               </div>
             </section>
 
@@ -673,6 +764,83 @@ export default function StokDetailPage() {
           </aside>
         </section>
       </section>
+
+      {galleryOpen && (
+        <div className="fixed inset-0 z-[10001] bg-[#06194A]/92 p-4 backdrop-blur-xl">
+          <div className="mx-auto flex h-full max-w-7xl flex-col">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-white/60">
+                  Portföy Galerisi
+                </p>
+                <h2 className="mt-1 text-xl font-black text-white">
+                  Fotoğraf {activePhoto + 1} / {CINKAYA_GALLERY.length}
+                </h2>
+              </div>
+
+              <button
+                onClick={() => setGalleryOpen(false)}
+                className="flex h-12 w-12 items-center justify-center rounded-[20px] border border-white/20 bg-white/10 text-white"
+                aria-label="Galeriyi kapat"
+              >
+                <X size={21} />
+              </button>
+            </div>
+
+            <div className="relative min-h-0 flex-1 overflow-hidden rounded-[32px] bg-black">
+              <img
+                src={CINKAYA_GALLERY[activePhoto] || CINKAYA_GALLERY[0]}
+                alt="Büyük portföy fotoğrafı"
+                className="h-full w-full object-contain"
+              />
+
+              <button
+                onClick={() =>
+                  setActivePhoto((current) =>
+                    current === 0 ? CINKAYA_GALLERY.length - 1 : current - 1,
+                  )
+                }
+                className="absolute left-4 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#06194A]"
+                aria-label="Önceki fotoğraf"
+              >
+                <ChevronLeft size={24} />
+              </button>
+
+              <button
+                onClick={() =>
+                  setActivePhoto((current) =>
+                    current === CINKAYA_GALLERY.length - 1 ? 0 : current + 1,
+                  )
+                }
+                className="absolute right-4 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#06194A]"
+                aria-label="Sonraki fotoğraf"
+              >
+                <ChevronRight size={24} />
+              </button>
+            </div>
+
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+              {CINKAYA_GALLERY.map((photo, index) => (
+                <button
+                  key={photo}
+                  onClick={() => setActivePhoto(index)}
+                  className={`relative h-20 w-24 shrink-0 overflow-hidden rounded-[18px] border ${
+                    activePhoto === index
+                      ? "border-white"
+                      : "border-white/20 opacity-70"
+                  }`}
+                >
+                  <img
+                    src={photo}
+                    alt={`Küçük fotoğraf ${index + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <PortfolioShareModal
         open={shareOpen}
