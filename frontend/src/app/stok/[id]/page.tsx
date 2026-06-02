@@ -445,14 +445,38 @@ export default function StokDetailPage() {
                     </button>
                   </div>
 
-                  <div className="mt-5 rounded-[24px] bg-white/10 p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-xs font-black uppercase tracking-[0.18em] text-white/70">
-                        Portföy No
-                      </span>
-                      <span className="text-sm font-black text-white">
-                        {getPortfolioNo(unit)}
-                      </span>
+                  <div className="mt-5 grid gap-3">
+                    <div className="rounded-[24px] bg-white/10 p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-xs font-black uppercase tracking-[0.18em] text-white/70">
+                          Portföy No
+                        </span>
+                        <span className="text-sm font-black text-white">
+                          {getPortfolioNo(unit)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[24px] border border-white/18 bg-white/16 p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-[0.18em] text-white/70">
+                            Portföy Rozeti
+                          </p>
+                          <p className="mt-1 text-lg font-black text-white">
+                            ★★★★★ {portfolioScoreLabel}
+                          </p>
+                        </div>
+
+                        <div className="rounded-[18px] bg-white px-4 py-3 text-center text-[#1557D6]">
+                          <p className="text-2xl font-black leading-none">
+                            {portfolioScore}
+                          </p>
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em]">
+                            /100
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -632,12 +656,10 @@ export default function StokDetailPage() {
             </section>
 
             <section className="grid gap-5 lg:grid-cols-2">
-              <ReportCard
-                icon={<Trophy size={22} />}
-                title="Portföy Karnesi"
-                value={`${portfolioScore}/100`}
+              <PortfolioReportV2
+                score={portfolioScore}
                 label={portfolioScoreLabel}
-                progress={portfolioScore}
+                unit={unit}
               />
 
               <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
@@ -880,6 +902,97 @@ function FeatureCard({ icon, title }: { icon: ReactNode; title: string }) {
         {title}
       </p>
     </div>
+  );
+}
+
+function PortfolioReportV2({
+  score,
+  label,
+  unit,
+}: {
+  score: number;
+  label: string;
+  unit: DetailUnit;
+}) {
+  const items = [
+    {
+      label: "Fotoğraf Kalitesi",
+      value: unit.photoVerified ? 100 : 80,
+      note: unit.photoVerified ? "Fotoğraf kontrolü güçlü" : "Galeri mevcut, doğrulama bekliyor",
+    },
+    {
+      label: "Yetki Durumu",
+      value: unit.yetkiVerified || unit.isVerified ? 100 : 55,
+      note: unit.yetkiVerified || unit.isVerified ? "Yetkili portföy" : "Yetki bilgisi tamamlanmalı",
+    },
+    {
+      label: "Açıklama Kalitesi",
+      value: unit.description ? 95 : 45,
+      note: unit.description ? "Paylaşım için yeterli" : "Açıklama eksik",
+    },
+    {
+      label: "Konum Bilgisi",
+      value: unit.project?.city && unit.project?.district ? 95 : 50,
+      note: unit.project?.city && unit.project?.district ? "Konum net" : "Konum tamamlanmalı",
+    },
+    {
+      label: "Fiyat Bilgisi",
+      value: unit.price ? 100 : 40,
+      note: unit.price ? "Fiyat bilgisi girilmiş" : "Fiyat eksik",
+    },
+  ];
+
+  return (
+    <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
+            Portföy Karnesi 2.0
+          </p>
+          <h2 className="mt-2 text-4xl font-black tracking-[-0.06em] text-[#06194A]">
+            {score}/100
+          </h2>
+          <p className="mt-2 inline-flex rounded-full bg-[#EFF6FF] px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-[#1557D6]">
+            ★★★★★ {label}
+          </p>
+        </div>
+
+        <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]">
+          <Trophy size={22} />
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className="rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] p-4"
+          >
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-black text-[#06194A]">
+                  {item.label}
+                </p>
+                <p className="mt-1 text-xs font-bold text-[#64748B]">
+                  {item.note}
+                </p>
+              </div>
+
+              <span className="text-sm font-black text-[#1557D6]">
+                {item.value}
+              </span>
+            </div>
+
+            <div className="h-2 overflow-hidden rounded-full bg-[#DBEAFE]">
+              <div
+                className="h-full rounded-full bg-[#1557D6]"
+                style={{ width: `${item.value}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
