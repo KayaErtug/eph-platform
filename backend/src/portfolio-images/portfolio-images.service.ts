@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 type UploadPortfolioImageInput = {
   userId: string;
@@ -20,7 +21,10 @@ export class PortfolioImagesService {
   private readonly bucket =
     process.env.SUPABASE_STORAGE_BUCKET || 'portfolio-images';
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async uploadPortfolioImage(input: UploadPortfolioImageInput) {
     const { userId, portfolioId, file, isCover } = input;
@@ -33,6 +37,19 @@ export class PortfolioImagesService {
       throw new BadRequestException('Portföy ID zorunludur.');
     }
 
+    const unit = await this.prisma.unit.findUnique({
+      where: { id: portfolioId },
+      include: { project: true },
+    });
+
+    if (!unit) {
+      throw new NotFoundException('Portföy bulunamadı.');
+    }
+
+    if (unit.project.ownerId !== userId) {
+      throw new BadRequestException('Bu portföye görsel yükleme yetkiniz yok.');
+    }
+
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       throw new BadRequestException(
         'Sadece JPG, PNG veya WEBP formatında görsel yüklenebilir.',
@@ -41,6 +58,23 @@ export class PortfolioImagesService {
 
     if (file.size > MAX_FILE_SIZE) {
       throw new BadRequestException('Görsel boyutu en fazla 10 MB olabilir.');
+    }
+
+    const existingCount = await this.prisma.unitImage.count({
+      where: { unitId: portfolioId },
+    });
+
+    if (!isCover && existingCount >= 16) {
+      throw new BadRequestException(
+        'Bir portföy için en fazla 1 kapak ve 15 galeri fotoğrafı yüklenebilir.',
+      );
+    }
+
+    if (isCover) {
+      await this.prisma.unitImage.updateMany({
+        where: { unitId: portfolioId, isCover: true },
+        data: { isCover: false },
+      });
     }
 
     const extension = this.getExtension(file.originalname, file.mimetype);
@@ -62,6 +96,20 @@ export class PortfolioImagesService {
     const supabaseUrl = this.supabaseService.getPublicUrl(this.bucket, path);
     const imageUrl = this.supabaseService.getImageDomainUrl(path);
 
+    const image = await this.prisma.unitImage.create({
+      data: {
+        unitId: portfolioId,
+        imageUrl,
+        storagePath: path,
+        bucket: this.bucket,
+        fileName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        isCover: Boolean(isCover),
+        sortOrder: isCover ? 0 : existingCount + 1,
+      },
+    });
+
     return {
       success: true,
       bucket: this.bucket,
@@ -72,6 +120,7 @@ export class PortfolioImagesService {
       originalName: file.originalname,
       size: file.size,
       mimetype: file.mimetype,
+      image,
     };
   }
 
