@@ -12,9 +12,11 @@ import {
   CheckCircle2,
   CircleUserRound,
   FileText,
+  Flame,
   Home,
   MessageCircle,
   Phone,
+  MapPin,
   ShieldCheck,
   Share2,
   Sparkles,
@@ -23,6 +25,11 @@ import {
   Trophy,
   UsersRound,
   WalletCards,
+  Waves,
+  Car,
+  Dumbbell,
+  Baby,
+  Coffee,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -322,27 +329,27 @@ export default function StokDetailPage() {
   return (
     <main className="min-h-screen bg-[#F7FBFF] pb-28 text-[#27364F]">
       <section className="mx-auto max-w-7xl px-4 py-5">
-        <header className="mb-5 overflow-hidden rounded-[36px] border border-[#DDE7F3] bg-white p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] lg:p-7">
-          <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-stretch">
-            <div className="relative overflow-hidden rounded-[30px] bg-[#06194A] p-5 text-white lg:p-7">
-              <div
-                className="absolute inset-0 bg-cover bg-center opacity-30"
-                style={{ backgroundImage: "url('/showcase/stock.jpg')" }}
-              />
-              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(6,25,74,0.95),rgba(21,87,214,0.58)_52%,rgba(6,25,74,0.82)),radial-gradient(circle_at_18%_16%,rgba(255,255,255,0.22),transparent_28%)]" />
+        <section className="overflow-hidden rounded-[38px] border border-[#DDE7F3] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
+          <div className="relative min-h-[620px] bg-[#06194A] text-white">
+            <div
+              className="absolute inset-0 bg-cover bg-center opacity-70"
+              style={{ backgroundImage: "url('/showcase/stock.jpg')" }}
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(6,25,74,0.94),rgba(6,25,74,0.72)_42%,rgba(6,25,74,0.18)),linear-gradient(180deg,rgba(6,25,74,0.10),rgba(6,25,74,0.88))]" />
 
-              <div className="relative z-10">
+            <div className="relative z-10 flex min-h-[620px] flex-col justify-between p-5 lg:p-8">
+              <div className="flex items-center justify-between gap-4">
                 <button
                   onClick={() => router.push("/stok")}
-                  className="mb-5 flex h-12 w-12 items-center justify-center rounded-[20px] border border-white/18 bg-white/12 text-white backdrop-blur transition hover:bg-white/20"
+                  className="flex h-12 w-12 items-center justify-center rounded-[20px] border border-white/18 bg-white/12 text-white backdrop-blur transition hover:bg-white/20"
                   aria-label="Portföy merkezine dön"
                 >
                   <ArrowLeft size={20} />
                 </button>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
                   <div
-                    className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black"
+                    className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black shadow-lg"
                     style={{
                       color: style.color,
                       background: style.bg,
@@ -361,141 +368,146 @@ export default function StokDetailPage() {
                     {verified ? "Yetkili Portföy" : "Yetki Kontrol"}
                   </span>
                 </div>
+              </div>
 
-                <p className="mt-6 text-xs font-black uppercase tracking-[0.24em] text-white/72">
-                  🏘️ Portföy Detayı
-                </p>
+              <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.24em] text-white/72">
+                    🏘️ Portföy Vitrini
+                  </p>
 
-                <h1 className="mt-3 max-w-3xl text-4xl font-black leading-tight tracking-[-0.055em] md:text-6xl">
-                  {unitTitle(unit)}
-                </h1>
+                  <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight tracking-[-0.055em] md:text-6xl">
+                    {unitTitle(unit)}
+                  </h1>
 
-                <p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-white/78">
-                  {[unit.project?.district, unit.project?.city, unit.project?.address]
-                    .filter(Boolean)
-                    .join(" / ") || "Konum bilgisi yok"}
-                </p>
+                  <div className="mt-5 flex items-center gap-2 text-sm font-bold leading-7 text-white/82">
+                    <MapPin size={18} />
+                    <span>
+                      {[unit.project?.district, unit.project?.city, unit.project?.address]
+                        .filter(Boolean)
+                        .join(" / ") || "Konum bilgisi yok"}
+                    </span>
+                  </div>
 
-                <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
-                  <button
-                    onClick={handleOpenShareModal}
-                    className="inline-flex h-13 min-h-[52px] items-center justify-center gap-2 rounded-[22px] bg-white px-5 py-4 text-sm font-black text-[#1557D6] shadow-[0_18px_38px_rgba(255,255,255,0.16)] transition hover:scale-[1.01]"
-                  >
-                    <Share2 size={18} />
-                    Kart Hazırla
-                  </button>
+                  <div className="mt-7 flex flex-wrap gap-3">
+                    <SummaryChip icon={<Home size={17} />} label={unit.roomCount || "—"} />
+                    <SummaryChip icon={<Sparkles size={17} />} label={unit.area ? `${unit.area} m²` : "—"} />
+                    <SummaryChip icon={<Building2 size={17} />} label={unit.floor != null ? `${unit.floor}. Kat` : "Kat yok"} />
+                    <SummaryChip icon={<TrendingUp size={17} />} label={calculatedSquareMeterPrice} />
+                  </div>
+                </div>
 
-                  <button
-                    onClick={toggleFollow}
-                    className={`inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[22px] px-5 py-4 text-sm font-black transition ${
-                      isFollowing
-                        ? "bg-amber-100 text-amber-800"
-                        : "border border-white/18 bg-white/12 text-white backdrop-blur hover:bg-white/18"
-                    }`}
-                  >
-                    <Star size={18} fill={isFollowing ? "currentColor" : "none"} />
-                    {isFollowing ? "Takipte" : "Takibe Al"}
-                  </button>
+                <div className="rounded-[32px] border border-white/18 bg-white/14 p-5 text-white shadow-[0_26px_70px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/70">
+                    Satış Değeri
+                  </p>
+
+                  <p className="mt-2 text-5xl font-black tracking-[-0.065em] text-white">
+                    {formatMoney(unit.price)}
+                  </p>
+
+                  <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                    <button
+                      onClick={handleOpenShareModal}
+                      className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[22px] bg-white px-5 py-4 text-sm font-black text-[#1557D6] shadow-[0_18px_38px_rgba(255,255,255,0.16)] transition hover:scale-[1.01]"
+                    >
+                      <Share2 size={18} />
+                      Kart Hazırla
+                    </button>
+
+                    <button
+                      onClick={toggleFollow}
+                      className={`inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[22px] px-5 py-4 text-sm font-black transition ${
+                        isFollowing
+                          ? "bg-amber-100 text-amber-800"
+                          : "border border-white/18 bg-white/12 text-white backdrop-blur hover:bg-white/18"
+                      }`}
+                    >
+                      <Star
+                        size={18}
+                        fill={isFollowing ? "currentColor" : "none"}
+                      />
+                      {isFollowing ? "Takipte" : "Takibe Al"}
+                    </button>
+                  </div>
+
+                  <div className="mt-5 rounded-[24px] bg-white/10 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-xs font-black uppercase tracking-[0.18em] text-white/70">
+                        Portföy No
+                      </span>
+                      <span className="text-sm font-black text-white">
+                        {getPortfolioNo(unit)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div className="grid gap-4">
-              <ReportCard
-                icon={<Trophy size={22} />}
-                title="Portföy Karnesi"
-                value={`${portfolioScore}/100`}
-                label={portfolioScoreLabel}
-                progress={portfolioScore}
-              />
-
-              <section className="rounded-[30px] border border-[#DDE7F3] bg-[#F7FBFF] p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
-                      Lina Analizi
-                    </p>
-                    <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
-                      Paylaşım hazırlığı
-                    </h2>
-                  </div>
-
-                  <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-white text-[#1557D6]">
-                    <Sparkles size={22} />
-                  </div>
-                </div>
-
-                <p className="mt-4 text-sm font-bold leading-7 text-[#475569]">
-                  {linaAdvice}
-                </p>
-              </section>
             </div>
           </div>
-        </header>
+        </section>
 
-        <section className="grid gap-5 lg:grid-cols-[1.4fr_0.9fr]">
+        <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricCard
+            icon={<WalletCards size={22} />}
+            label="Fiyat"
+            value={formatMoney(unit.price)}
+            tone="blue"
+          />
+          <MetricCard
+            icon={<Home size={22} />}
+            label="Oda / Plan"
+            value={unit.roomCount || "—"}
+            tone="green"
+          />
+          <MetricCard
+            icon={<Sparkles size={22} />}
+            label="Alan"
+            value={unit.area ? `${unit.area} m²` : "—"}
+            tone="amber"
+          />
+          <MetricCard
+            icon={<TrendingUp size={22} />}
+            label="m² Değeri"
+            value={calculatedSquareMeterPrice}
+            tone="slate"
+          />
+        </section>
+
+        <section className="mt-5 grid gap-5 lg:grid-cols-[1.35fr_0.95fr]">
           <div className="space-y-5">
-            <section className="overflow-hidden rounded-[34px] border border-[#DDE7F3] bg-white shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
-              <div className="relative flex min-h-[330px] items-center justify-center bg-[#06194A] p-6 text-center text-white">
-                <div
-                  className="absolute inset-0 bg-cover bg-center opacity-42"
-                  style={{ backgroundImage: "url('/showcase/stock.jpg')" }}
-                />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,25,74,0.18),rgba(6,25,74,0.88)),radial-gradient(circle_at_20%_20%,rgba(59,130,246,.35),transparent_32%)]" />
-                <div className="relative">
-                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[28px] bg-white/14 backdrop-blur">
-                    <Building2 size={42} />
-                  </div>
-                  <h2 className="mt-5 text-3xl font-black">
-                    {unit.project?.name || "EPH Portföy"}
-                  </h2>
-                  <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-white/74">
-                    Kapak görseli modülü bağlanana kadar bu alan profesyonel portföy vitrini olarak çalışır.
-                  </p>
-                </div>
-              </div>
+            <section className="rounded-[34px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+              <SectionTitle
+                icon={<Sparkles size={21} />}
+                title="Portföy Özellikleri"
+                description="Gayrimenkulü ilk bakışta anlatan vitrin özellikleri"
+              />
 
-              <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-                <MetricCard
-                  icon={<WalletCards size={22} />}
-                  label="Fiyat"
-                  value={formatMoney(unit.price)}
-                  tone="blue"
-                />
-                <MetricCard
-                  icon={<Home size={22} />}
-                  label="Oda / Plan"
-                  value={unit.roomCount || "—"}
-                  tone="green"
-                />
-                <MetricCard
-                  icon={<Sparkles size={22} />}
-                  label="Alan"
-                  value={unit.area ? `${unit.area} m²` : "—"}
-                  tone="amber"
-                />
-                <MetricCard
-                  icon={<TrendingUp size={22} />}
-                  label="m² Değeri"
-                  value={calculatedSquareMeterPrice}
-                  tone="slate"
-                />
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <FeatureCard icon={<Waves size={21} />} title="Havuz" />
+                <FeatureCard icon={<Car size={21} />} title="Kapalı Otopark" />
+                <FeatureCard icon={<Flame size={21} />} title="Yerden Isıtma" />
+                <FeatureCard icon={<ShieldCheck size={21} />} title="7/24 Güvenlik" />
+                <FeatureCard icon={<Coffee size={21} />} title="Kafeterya" />
+                <FeatureCard icon={<Dumbbell size={21} />} title="Spor Salonu" />
+                <FeatureCard icon={<Baby size={21} />} title="Çocuk Alanı" />
+                <FeatureCard icon={<Sparkles size={21} />} title="Akıllı Ev" />
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+            <section className="rounded-[34px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
               <SectionTitle
                 icon={<FileText size={21} />}
                 title="Portföy Açıklaması"
                 description="Detaylı açıklama, paylaşım kartı ve PDF broşürde kullanılacak ana metindir"
               />
-              <div className="mt-4 rounded-[24px] bg-[#F7FBFF] p-5 text-center text-sm font-semibold leading-7 text-[#475569]">
+              <div className="mt-4 rounded-[26px] bg-[#F7FBFF] p-6 text-center text-base font-semibold leading-8 text-[#475569] md:text-left">
                 {unit.description ||
                   "Bu portföy için henüz açıklama girilmemiş. Açıklama alanı; manzara, cephe, kullanım durumu, teslim bilgisi ve özel portföy notları için kullanılabilir."}
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+            <section className="rounded-[34px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
               <SectionTitle
                 icon={<ShieldCheck size={21} />}
                 title="Doğrulama ve Güven"
@@ -508,7 +520,7 @@ export default function StokDetailPage() {
               </div>
             </section>
 
-            <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+            <section className="rounded-[34px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
               <SectionTitle
                 icon={<CalendarDays size={21} />}
                 title="Portföy Geçmişi"
@@ -526,6 +538,37 @@ export default function StokDetailPage() {
                   date={formatDate(unit.updatedAt || unit.createdAt)}
                 />
               </div>
+            </section>
+
+            <section className="grid gap-5 lg:grid-cols-2">
+              <ReportCard
+                icon={<Trophy size={22} />}
+                title="Portföy Karnesi"
+                value={`${portfolioScore}/100`}
+                label={portfolioScoreLabel}
+                progress={portfolioScore}
+              />
+
+              <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
+                      Lina Analizi
+                    </p>
+                    <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+                      Paylaşım hazırlığı
+                    </h2>
+                  </div>
+
+                  <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]">
+                    <Sparkles size={22} />
+                  </div>
+                </div>
+
+                <p className="mt-4 text-sm font-bold leading-7 text-[#475569]">
+                  {linaAdvice}
+                </p>
+              </section>
             </section>
           </div>
 
@@ -647,6 +690,28 @@ export default function StokDetailPage() {
         </div>
       </nav>
     </main>
+  );
+}
+
+function SummaryChip({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <div className="inline-flex min-h-[46px] items-center gap-2 rounded-[18px] border border-white/18 bg-white/14 px-4 text-sm font-black text-white backdrop-blur">
+      {icon}
+      {label}
+    </div>
+  );
+}
+
+function FeatureCard({ icon, title }: { icon: ReactNode; title: string }) {
+  return (
+    <div className="flex min-h-[92px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-white text-[#1557D6] shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
+        {icon}
+      </div>
+      <p className="mt-3 text-xs font-black uppercase tracking-[0.12em] text-[#06194A]">
+        {title}
+      </p>
+    </div>
   );
 }
 
