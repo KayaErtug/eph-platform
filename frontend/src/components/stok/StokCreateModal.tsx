@@ -40,6 +40,8 @@ interface Props {
   onSubmit: () => void;
 }
 
+type ModalStep = "project" | "property" | "images";
+
 const MAX_GALLERY_COUNT = 15;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MIN_FILE_SIZE = 30 * 1024;
@@ -447,6 +449,7 @@ export default function StokCreateModal({
   const [locationLoading, setLocationLoading] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState("");
   const [mainCategory, setMainCategory] = useState("KONUT");
+  const [activeStep, setActiveStep] = useState<ModalStep>("project");
 
   const selectedCurrency = String(unitForm.priceCurrency || "TRY");
   const selectedFloorLabel = String((unitForm as any).floorLabel || "");
@@ -467,6 +470,13 @@ export default function StokCreateModal({
   const showBedCountField = shouldShowBedCountField(unitForm.type);
   const showOpenAreaField = shouldShowOpenAreaField(unitForm.type);
   const showClosedAreaField = shouldShowClosedAreaField(unitForm.type);
+  const modalSteps: { key: ModalStep; label: string; shortLabel: string }[] = [
+    { key: "project", label: "Proje Bilgileri", shortLabel: "Proje" },
+    { key: "property", label: `${selectedSubCategory || "Mülk"} Bilgileri`, shortLabel: "Mülk" },
+    { key: "images", label: "Portföy Görselleri", shortLabel: "Görsel" },
+  ];
+  const activeStepIndex = modalSteps.findIndex((step) => step.key === activeStep);
+  const safeActiveStepIndex = activeStepIndex >= 0 ? activeStepIndex : 0;
 
   const totalSelectedImages = useMemo(() => {
     return (coverImage ? 1 : 0) + galleryImages.length;
@@ -551,6 +561,7 @@ export default function StokCreateModal({
   useEffect(() => {
     if (!open) return;
     setMainCategory(getMainCategoryFromType(unitForm.type));
+    setActiveStep("project");
   }, [open, unitForm.type]);
 
   if (!open) return null;
@@ -755,6 +766,16 @@ export default function StokCreateModal({
     onSubmit();
   };
 
+  const goNextStep = () => {
+    const nextStep = modalSteps[Math.min(safeActiveStepIndex + 1, modalSteps.length - 1)];
+    if (nextStep) setActiveStep(nextStep.key);
+  };
+
+  const goPrevStep = () => {
+    const prevStep = modalSteps[Math.max(safeActiveStepIndex - 1, 0)];
+    if (prevStep) setActiveStep(prevStep.key);
+  };
+
   return (
     <div className="stock-modal-v2-backdrop" onClick={onClose}>
       <div className="stock-modal-v2" onClick={(e) => e.stopPropagation()}>
@@ -773,7 +794,22 @@ export default function StokCreateModal({
           {localError && <div className="stock-form-error">{localError}</div>}
           {imageError && <div className="stock-form-error">{imageError}</div>}
 
-          <div className="stock-form-block">
+          <div className="stock-modal-v3-tabs" aria-label="Portföy ekleme adımları">
+            {modalSteps.map((step, index) => (
+              <button
+                key={step.key}
+                type="button"
+                className={activeStep === step.key ? "active" : ""}
+                onClick={() => setActiveStep(step.key)}
+              >
+                <span>{index + 1}</span>
+                {step.shortLabel}
+              </button>
+            ))}
+          </div>
+
+          {activeStep === "project" && (
+          <div className="stock-form-block stock-form-block-compact">
             <h3>Proje</h3>
             <div className="stock-form-grid">
               {projects.length > 0 && (
@@ -898,9 +934,11 @@ export default function StokCreateModal({
               )}
             </div>
           </div>
+          )}
 
-          <div className="stock-form-block">
-            <h3>Mülk Bilgileri</h3>
+          {activeStep === "property" && (
+          <div className="stock-form-block stock-form-block-compact">
+            <h3>{selectedSubCategory ? `${selectedSubCategory} Bilgileri` : "Mülk Bilgileri"}</h3>
             <div className="stock-form-grid">
               <label className="stock-form-field">
                 <span>Mülk Tipi *</span>
@@ -1143,8 +1181,10 @@ export default function StokCreateModal({
               </label>
             </div>
           </div>
+          )}
 
-          <div className="stock-form-block">
+          {activeStep === "images" && (
+          <div className="stock-form-block stock-form-block-compact stock-image-step">
             <h3>Portföy Görselleri</h3>
 
             <div className="stock-form-grid">
@@ -1297,20 +1337,35 @@ export default function StokCreateModal({
               </div>
             </div>
           </div>
+          )}
         </div>
 
-        <div className="stock-modal-v2-foot">
+        <div className="stock-modal-v2-foot stock-modal-v3-foot">
           <button className="stock-cancel-btn" onClick={onClose}>
             İptal
           </button>
 
-          <button
-            className="stock-save-btn"
-            onClick={handleSubmit}
-            disabled={formLoading || checkingImages}
-          >
-            {formLoading ? "Kaydediliyor..." : "Portföyü Kaydet"}
-          </button>
+          <div className="stock-modal-v3-actions">
+            {safeActiveStepIndex > 0 && (
+              <button type="button" className="stock-cancel-btn" onClick={goPrevStep}>
+                Geri
+              </button>
+            )}
+
+            {activeStep !== "images" ? (
+              <button type="button" className="stock-save-btn" onClick={goNextStep}>
+                Devam Et
+              </button>
+            ) : (
+              <button
+                className="stock-save-btn"
+                onClick={handleSubmit}
+                disabled={formLoading || checkingImages}
+              >
+                {formLoading ? "Kaydediliyor..." : "Portföyü Kaydet"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
