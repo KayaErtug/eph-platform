@@ -490,7 +490,7 @@ export default function StokPage() {
       floor: unit.floor != null ? `${unit.floor}. Kat` : "—",
       authorization:
         unit.yetkiVerified || unit.isVerified ? "Yetkili" : "Kontrol",
-      coverImage: getUnitCoverImage(unit),
+      coverImage: getUnitCoverImage(unit) || "/LOGO_EPH.png",
       consultantName:
         [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
         "EPH Üyesi",
@@ -967,7 +967,7 @@ function getUnitCoverImage(unit: Unit) {
   return (
     unit.images?.find((image) => image.isCover)?.url ||
     unit.images?.[0]?.url ||
-    "/showcase/stock.jpg"
+    ""
   );
 }
 
@@ -1176,11 +1176,27 @@ function PremiumUnitCard({
     >
       <div>
         <div className="relative mb-5 min-h-[138px] overflow-hidden rounded-[26px] bg-[#EFF6FF]">
-          <div
-            className="absolute inset-0 bg-cover bg-center opacity-95 transition duration-500 group-hover:scale-105"
-            style={{ backgroundImage: `url('${coverImage}')` }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/78 via-[#06194A]/12 to-transparent" />
+          {coverImage ? (
+            <>
+              <div
+                className="absolute inset-0 bg-cover bg-center opacity-95 transition duration-500 group-hover:scale-105"
+                style={{ backgroundImage: `url('${coverImage}')` }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/78 via-[#06194A]/12 to-transparent" />
+            </>
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[linear-gradient(135deg,#EFF6FF,#FFFFFF)] px-6 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-[22px] border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
+                <Building2 size={24} />
+              </div>
+              <p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-[#1557D6]">
+                Fotoğraf Eklenmedi
+              </p>
+              <p className="mt-1 text-[11px] font-bold text-[#64748B]">
+                Bu portföy için kapak görseli bekleniyor.
+              </p>
+            </div>
+          )}
           <div className="absolute left-4 top-4 flex flex-wrap gap-2">
             <span className="rounded-full bg-white/92 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#1557D6] shadow-sm">
               {statusLabels[unit.status] || unit.status || "Durum Yok"}
