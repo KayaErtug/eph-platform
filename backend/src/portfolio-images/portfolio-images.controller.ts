@@ -1,7 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
+  Get,
+  Param,
   Post,
+  Put,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -17,6 +21,12 @@ export class PortfolioImagesController {
   constructor(
     private readonly portfolioImagesService: PortfolioImagesService,
   ) {}
+
+  @Get(':portfolioId')
+  @UseGuards(JwtAuthGuard)
+  getPortfolioImages(@Param('portfolioId') portfolioId: string) {
+    return this.portfolioImagesService.getPortfolioImages(portfolioId);
+  }
 
   @Post('upload')
   @UseGuards(JwtAuthGuard)
@@ -35,10 +45,46 @@ export class PortfolioImagesController {
   ) {
     return this.portfolioImagesService.uploadPortfolioImage({
       userId: user.id,
+      userRole: user.role,
       portfolioId,
       file,
       isCover: isCover === 'true',
       sortOrder: sortOrder ? Number(sortOrder) : undefined,
+    });
+  }
+
+  @Put(':imageId/cover')
+  @UseGuards(JwtAuthGuard)
+  setCoverImage(@CurrentUser() user: any, @Param('imageId') imageId: string) {
+    return this.portfolioImagesService.setCoverImage({
+      userId: user.id,
+      userRole: user.role,
+      imageId,
+    });
+  }
+
+  @Put('reorder/:portfolioId')
+  @UseGuards(JwtAuthGuard)
+  reorderImages(
+    @CurrentUser() user: any,
+    @Param('portfolioId') portfolioId: string,
+    @Body('imageIds') imageIds: string[],
+  ) {
+    return this.portfolioImagesService.reorderImages({
+      userId: user.id,
+      userRole: user.role,
+      portfolioId,
+      imageIds,
+    });
+  }
+
+  @Delete(':imageId')
+  @UseGuards(JwtAuthGuard)
+  deleteImage(@CurrentUser() user: any, @Param('imageId') imageId: string) {
+    return this.portfolioImagesService.deleteImage({
+      userId: user.id,
+      userRole: user.role,
+      imageId,
     });
   }
 }

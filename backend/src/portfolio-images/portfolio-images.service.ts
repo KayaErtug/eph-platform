@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,10 +9,24 @@ import { SupabaseService } from '../supabase/supabase.service';
 
 type UploadPortfolioImageInput = {
   userId: string;
+  userRole?: string;
   portfolioId: string;
   file: Express.Multer.File;
   isCover?: boolean;
   sortOrder?: number;
+};
+
+type ImageActionInput = {
+  userId: string;
+  userRole?: string;
+  imageId: string;
+};
+
+type ReorderPortfolioImagesInput = {
+  userId: string;
+  userRole?: string;
+  portfolioId: string;
+  imageIds: string[];
 };
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -26,6 +41,26 @@ export class PortfolioImagesService {
     private readonly prisma: PrismaService,
     private readonly supabaseService: SupabaseService,
   ) {}
+
+  async getPortfolioImages(portfolioId: string) {
+    if (!portfolioId) {
+      throw new BadRequestException('Portföy ID zorunludur.');
+    }
+
+    const unit = await this.prisma.unit.findUnique({
+      where: { id: portfolioId },
+      select: { id: true },
+    });
+
+    if (!unit) {
+      throw new NotFoundException('Portföy bulunamadı.');
+    }
+
+    return this.prisma.unitImage.findMany({
+      where: { unitId: portfolioId },
+      orderBy: [{ isCover: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+  }
 
   async uploadPortfolioImage(input: UploadPortfolioImageInput) {
     const { userId, portfolioId, file, isCover } = input;
@@ -53,14 +88,11 @@ export class PortfolioImagesService {
       throw new BadRequestException('Görsel boyutu en fazla 10 MB olabilir.');
     }
 
-    const unit = await this.prisma.unit.findUnique({
-      where: { id: portfolioId },
-      include: { project: true },
+    await this.assertCanManagePortfolio({
+      userId,
+      userRole: input.userRole,
+      portfolioId,
     });
-
-    if (!unit) {
-      throw new NotFoundException('Portföy bulunamadı.');
-    }
 
     const extension = this.getExtension(file.originalname, file.mimetype);
     const safeUserId = this.slugify(userId);
@@ -81,10 +113,14 @@ export class PortfolioImagesService {
     const supabaseUrl = this.supabaseService.getPublicUrl(this.bucket, path);
 
     if (isCover) {
-      await this.prisma.unitImage.deleteMany({
+      await this.prisma.unitImage.updateMany({
         where: {
           unitId: portfolioId,
           isCover: true,
+        },
+        data: {
+          isCover: false,
+          sortOrder: 1,
         },
       });
     }
@@ -109,6 +145,181 @@ export class PortfolioImagesService {
       ...image,
       imageUrl: supabaseUrl,
     };
+  }
+
+  async setCoverImage(input: ImageActionInput) {
+    const image = await this.prisma.unitImage.findUnique({
+      where: { id: input.imageId },
+      include: {
+        unit: {
+          include: {
+            project: true,
+          },
+        },
+      },
+    });
+
+    if (!image) {
+      throw new NotFoundException('Görsel bulunamadı.');
+    }
+
+    await this.assertCanManagePortfolio({
+      userId: input.userId,
+      userRole: input.userRole,
+      portfolioId: image.unitId,
+    });
+
+    await this.prisma.$transaction([
+      this.prisma.unitImage.updateMany({
+        where: { unitId: image.unitId },
+        data: { isCover: false },
+      }),
+      this.prisma.unitImage.update({
+        where: { id: image.id },
+        data: {
+          isCover: true,
+          sortOrder: 0,
+        },
+      }),
+    ]);
+
+    return this.getPortfolioImages(image.unitId);
+  }
+
+  async deleteImage(input: ImageActionInput) {
+    const image = await this.prisma.unitImage.findUnique({
+      where: { id: input.imageId },
+      include: {
+        unit: {
+          include: {
+            project: true,
+          },
+        },
+      },
+    });
+
+    if (!image) {
+      throw new NotFoundException('Görsel bulunamadı.');
+    }
+
+    await this.assertCanManagePortfolio({
+      userId: input.userId,
+      userRole: input.userRole,
+      portfolioId: image.unitId,
+    });
+
+    const imageCount = await this.prisma.unitImage.count({
+      where: { unitId: image.unitId },
+    });
+
+    if (image.isCover && imageCount > 1) {
+      throw new BadRequestException(
+        'Kapak görselini silmeden önce galeriden başka bir görseli kapak yapın.',
+      );
+    }
+
+    await this.tryRemoveStorageFile(image.bucket || this.bucket, image.path);
+
+    await this.prisma.unitImage.delete({
+      where: { id: image.id },
+    });
+
+    const remainingImages = await this.prisma.unitImage.findMany({
+      where: { unitId: image.unitId },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    await Promise.all(
+      remainingImages.map((item, index) =>
+        this.prisma.unitImage.update({
+          where: { id: item.id },
+          data: { sortOrder: item.isCover ? 0 : index + 1 },
+        }),
+      ),
+    );
+
+    return this.getPortfolioImages(image.unitId);
+  }
+
+  async reorderImages(input: ReorderPortfolioImagesInput) {
+    if (!input.portfolioId) {
+      throw new BadRequestException('Portföy ID zorunludur.');
+    }
+
+    if (!Array.isArray(input.imageIds) || input.imageIds.length === 0) {
+      throw new BadRequestException('Sıralanacak görsel listesi zorunludur.');
+    }
+
+    await this.assertCanManagePortfolio({
+      userId: input.userId,
+      userRole: input.userRole,
+      portfolioId: input.portfolioId,
+    });
+
+    const images = await this.prisma.unitImage.findMany({
+      where: { unitId: input.portfolioId },
+    });
+
+    const imageSet = new Set(images.map((image) => image.id));
+
+    const hasForeignImage = input.imageIds.some((imageId) => !imageSet.has(imageId));
+
+    if (hasForeignImage) {
+      throw new BadRequestException(
+        'Sıralama listesinde bu portföye ait olmayan görsel var.',
+      );
+    }
+
+    await Promise.all(
+      input.imageIds.map((imageId, index) =>
+        this.prisma.unitImage.update({
+          where: { id: imageId },
+          data: { sortOrder: index },
+        }),
+      ),
+    );
+
+    return this.getPortfolioImages(input.portfolioId);
+  }
+
+  private async assertCanManagePortfolio(input: {
+    userId: string;
+    userRole?: string;
+    portfolioId: string;
+  }) {
+    const unit = await this.prisma.unit.findUnique({
+      where: { id: input.portfolioId },
+      include: { project: true },
+    });
+
+    if (!unit) {
+      throw new NotFoundException('Portföy bulunamadı.');
+    }
+
+    const isAdmin =
+      input.userRole === 'ADMIN' || input.userRole === 'SUPER_ADMIN';
+
+    if (!isAdmin && unit.project.ownerId !== input.userId) {
+      throw new ForbiddenException('Bu portföyün görsellerini yönetemezsiniz.');
+    }
+
+    return unit;
+  }
+
+  private async tryRemoveStorageFile(bucket: string, path: string) {
+    const serviceAsAny = this.supabaseService as any;
+
+    try {
+      if (typeof serviceAsAny.deleteFile === 'function') {
+        await serviceAsAny.deleteFile(bucket, path);
+      }
+
+      if (typeof serviceAsAny.removeFile === 'function') {
+        await serviceAsAny.removeFile(bucket, path);
+      }
+    } catch {
+      return;
+    }
   }
 
   private getExtension(originalName: string, mimetype: string) {

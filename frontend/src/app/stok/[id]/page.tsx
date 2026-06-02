@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode, type TouchEvent } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
   BadgeCheck,
   BarChart3,
   Building2,
@@ -14,6 +16,7 @@ import {
   CheckCircle2,
   CircleUserRound,
   FileText,
+  Camera,
   Flame,
   Home,
   MessageCircle,
@@ -33,6 +36,9 @@ import {
   Dumbbell,
   Baby,
   Coffee,
+  GripVertical,
+  Image as ImageIcon,
+  Trash2,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -57,6 +63,13 @@ type DetailUnit = Unit & {
     };
   };
 };
+
+type DetailImage = NonNullable<DetailUnit["images"]>[number] & {
+  displayUrl: string;
+};
+
+const MAX_GALLERY_COUNT = 15;
+
 
 function getUnitImages(unit?: DetailUnit | null) {
   const images = Array.isArray(unit?.images) ? unit.images : [];
@@ -150,10 +163,37 @@ function isUnitVerified(unit?: DetailUnit | null) {
   );
 }
 
+function getImageQualityScore(images: DetailImage[]) {
+  const count = images.length;
+
+  if (count <= 0) return 0;
+  if (count === 1) return 60;
+  if (count <= 4) return 70;
+  if (count <= 7) return 80;
+  if (count <= 11) return 90;
+  return 100;
+}
+
+function getImageQualityLabel(score: number) {
+  if (score >= 95) return "Vitrin Hazır";
+  if (score >= 85) return "Çok Güçlü";
+  if (score >= 75) return "Güçlü";
+  if (score >= 60) return "Başlangıç";
+  return "Görsel Eksik";
+}
+
+function formatFileSize(value?: number) {
+  const size = Number(value || 0);
+  if (!size) return "Boyut yok";
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(size / 1024))} KB`;
+}
+
 function calculatePortfolioScore(unit?: DetailUnit | null) {
   if (!unit) return 0;
 
   let score = 0;
+  const imageQualityScore = getImageQualityScore(getUnitImages(unit));
 
   if (unit.project?.name) score += 15;
   if (unit.project?.city && unit.project?.district) score += 15;
@@ -162,7 +202,8 @@ function calculatePortfolioScore(unit?: DetailUnit | null) {
   if (unit.roomCount) score += 10;
   if (unit.description) score += 10;
   if (unit.tapuVerified) score += 8;
-  if (unit.photoVerified) score += 8;
+  if (unit.photoVerified) score += 4;
+  if (imageQualityScore) score += Math.round(imageQualityScore * 0.12);
   if (unit.yetkiVerified || unit.isVerified) score += 12;
 
   return Math.min(score || 72, 100);
@@ -196,6 +237,9 @@ export default function StokDetailPage() {
   const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
   const [activePhoto, setActivePhoto] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryManageMode, setGalleryManageMode] = useState(false);
+  const [imageActionLoading, setImageActionLoading] = useState("");
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -222,6 +266,23 @@ export default function StokDetailPage() {
     if (!unitId || typeof window === "undefined") return;
     setIsFollowing(localStorage.getItem(`eph-stock-follow-${unitId}`) === "true");
   }, [unitId]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const shouldLockBody = galleryOpen || editOpen || deleteOpen || shareOpen;
+
+    if (shouldLockBody) {
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+
+      return () => {
+        document.body.style.overflow = previousOverflow;
+      };
+    }
+
+    document.body.style.overflow = "";
+  }, [galleryOpen, editOpen, deleteOpen, shareOpen]);
 
   useEffect(() => {
     if (!unit) return;
@@ -311,6 +372,129 @@ export default function StokDetailPage() {
     }
   };
 
+  const refreshPortfolioImages = async () => {
+    if (!unit?.id) return;
+
+    const response = await api.get(`/portfolio-images/${unit.id}`);
+    const nextImages = response.data || [];
+
+    setUnit((current) =>
+      current
+        ? {
+            ...current,
+            images: nextImages,
+          }
+        : current,
+    );
+  };
+
+  const updatePortfolioImagesFromResponse = (nextImages: DetailUnit["images"]) => {
+    setUnit((current) =>
+      current
+        ? {
+            ...current,
+            images: nextImages || [],
+          }
+        : current,
+    );
+  };
+
+  const handleSetCoverImage = async (imageId: string) => {
+    if (!unit) return;
+
+    setActionError("");
+    setImageActionLoading(`cover-${imageId}`);
+
+    try {
+      const response = await api.put(`/portfolio-images/${imageId}/cover`);
+      updatePortfolioImagesFromResponse(response.data || []);
+      setActivePhoto(0);
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || "Kapak görseli değiştirilemedi.");
+    } finally {
+      setImageActionLoading("");
+    }
+  };
+
+  const handleDeletePortfolioImage = async (imageId: string, isCover: boolean) => {
+    if (!unit) return;
+
+    if (isCover && galleryImages.length > 1) {
+      setActionError("Kapak görselini silmeden önce galeriden başka bir görseli kapak yapın.");
+      return;
+    }
+
+    const approved =
+      typeof window === "undefined" ||
+      window.confirm("Bu görseli portföy galerisinden silmek istiyor musunuz?");
+
+    if (!approved) return;
+
+    setActionError("");
+    setImageActionLoading(`delete-${imageId}`);
+
+    try {
+      const response = await api.delete(`/portfolio-images/${imageId}`);
+      updatePortfolioImagesFromResponse(response.data || []);
+      setActivePhoto(0);
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || "Görsel silinemedi.");
+    } finally {
+      setImageActionLoading("");
+    }
+  };
+
+  const handleReorderPortfolioImages = async (imageId: string, direction: "up" | "down") => {
+    if (!unit) return;
+
+    const currentIndex = galleryImages.findIndex((image) => image.id === imageId);
+    if (currentIndex < 0) return;
+
+    const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (nextIndex < 0 || nextIndex >= galleryImages.length) return;
+
+    const reorderedImages = [...galleryImages];
+    const [selectedImage] = reorderedImages.splice(currentIndex, 1);
+    reorderedImages.splice(nextIndex, 0, selectedImage);
+
+    setImageActionLoading(`reorder-${imageId}`);
+    setActionError("");
+
+    try {
+      const response = await api.put(`/portfolio-images/reorder/${unit.id}`, {
+        imageIds: reorderedImages.map((image) => image.id),
+      });
+
+      updatePortfolioImagesFromResponse(response.data || []);
+      setActivePhoto(nextIndex);
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || "Görsel sıralaması güncellenemedi.");
+    } finally {
+      setImageActionLoading("");
+    }
+  };
+
+  const handleGalleryTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    if (touchStartX == null || galleryImages.length <= 1) return;
+
+    const touchEndX = event.changedTouches[0]?.clientX || 0;
+    const diff = touchStartX - touchEndX;
+
+    if (Math.abs(diff) > 55) {
+      if (diff > 0) {
+        setActivePhoto((current) =>
+          current === galleryImages.length - 1 ? 0 : current + 1,
+        );
+      } else {
+        setActivePhoto((current) =>
+          current === 0 ? galleryImages.length - 1 : current - 1,
+        );
+      }
+    }
+
+    setTouchStartX(null);
+  };
+
   const calculatedSquareMeterPrice = useMemo(() => {
     const price = Number(unit?.price || 0);
     const area = Number(unit?.area || 0);
@@ -334,10 +518,33 @@ export default function StokDetailPage() {
   const galleryImages = useMemo(() => getUnitImages(unit), [unit]);
   const coverImage = useMemo(() => getUnitCoverImage(unit), [unit]);
   const activeGalleryImage = galleryImages[activePhoto]?.displayUrl || coverImage || "";
+  const imageQualityScore = useMemo(
+    () => getImageQualityScore(galleryImages),
+    [galleryImages],
+  );
+  const imageQualityLabel = useMemo(
+    () => getImageQualityLabel(imageQualityScore),
+    [imageQualityScore],
+  );
+  const imageProgress = Math.min(
+    100,
+    Math.round((galleryImages.length / MAX_GALLERY_COUNT) * 100),
+  );
 
   useEffect(() => {
     setActivePhoto(0);
   }, [unit?.id]);
+
+  useEffect(() => {
+    if (galleryImages.length === 0) {
+      setActivePhoto(0);
+      return;
+    }
+
+    if (activePhoto > galleryImages.length - 1) {
+      setActivePhoto(galleryImages.length - 1);
+    }
+  }, [galleryImages.length, activePhoto]);
 
   const verificationItems = [
     {
@@ -544,6 +751,7 @@ export default function StokDetailPage() {
                     <SummaryChip icon={<Home size={17} />} label={unit.roomCount || "—"} />
                     <SummaryChip icon={<Sparkles size={17} />} label={unit.area ? `${unit.area} m²` : "—"} />
                     <SummaryChip icon={<Building2 size={17} />} label={formatFloorInfo(unit)} />
+                    <SummaryChip icon={<Camera size={17} />} label={`${galleryImages.length}/${MAX_GALLERY_COUNT} Fotoğraf`} />
                     <SummaryChip icon={<TrendingUp size={17} />} label={calculatedSquareMeterPrice} />
                   </div>
                 </div>
@@ -641,7 +849,7 @@ export default function StokDetailPage() {
           </div>
         </section>
 
-        <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <MetricCard
             icon={<WalletCards size={22} />}
             label="Fiyat"
@@ -661,10 +869,16 @@ export default function StokDetailPage() {
             tone="amber"
           />
           <MetricCard
+            icon={<Camera size={22} />}
+            label="Fotoğraf"
+            value={`${galleryImages.length}/${MAX_GALLERY_COUNT}`}
+            tone="slate"
+          />
+          <MetricCard
             icon={<TrendingUp size={22} />}
             label="m² Değeri"
             value={calculatedSquareMeterPrice}
-            tone="slate"
+            tone="blue"
           />
         </section>
 
@@ -672,30 +886,96 @@ export default function StokDetailPage() {
           <div className="flex flex-col gap-4 text-center lg:flex-row lg:items-center lg:justify-between lg:text-left">
             <div>
               <div className="inline-flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#EFF6FF] text-[#1557D6]">
-                <FileText size={21} />
+                <ImageIcon size={21} />
               </div>
 
               <h2 className="mt-3 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
-                Portföy Galerisi
+                Portföy Görsel Yönetim Merkezi
               </h2>
 
               <p className="mt-1 text-sm font-semibold leading-6 text-[#64748B]">
-                Bu portföye yüklenen gerçek kapak ve galeri fotoğrafları burada gösterilir.
+                Kapak seçimi, galeri sıralaması, görsel silme ve kalite puanı bu merkezden yönetilir.
               </p>
             </div>
 
-            <button
-              onClick={() => galleryImages.length > 0 && setGalleryOpen(true)}
-              disabled={galleryImages.length === 0}
-              className={`inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] px-5 py-3 text-sm font-black transition ${
-                galleryImages.length > 0
-                  ? "bg-[#1557D6] text-white hover:bg-[#0F49BD]"
-                  : "cursor-not-allowed bg-slate-100 text-slate-400"
-              }`}
-            >
-              <FileText size={17} />
-              {galleryImages.length > 0 ? "Galeriyi Aç" : "Galeri Yok"}
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row lg:justify-end">
+              <button
+                onClick={() => refreshPortfolioImages()}
+                disabled={Boolean(imageActionLoading)}
+                className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] border border-[#DDE7F3] bg-white px-5 py-3 text-sm font-black text-[#475569] transition hover:bg-[#EFF6FF] hover:text-[#1557D6] disabled:opacity-60"
+              >
+                <Camera size={17} />
+                Görselleri Yenile
+              </button>
+
+              <button
+                onClick={() => setGalleryManageMode((current) => !current)}
+                disabled={galleryImages.length === 0}
+                className={`inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] px-5 py-3 text-sm font-black transition ${
+                  galleryManageMode
+                    ? "bg-[#06194A] text-white"
+                    : galleryImages.length > 0
+                      ? "bg-[#1557D6] text-white hover:bg-[#0F49BD]"
+                      : "cursor-not-allowed bg-slate-100 text-slate-400"
+                }`}
+              >
+                <GripVertical size={17} />
+                {galleryManageMode ? "Yönetimi Kapat" : "Görselleri Yönet"}
+              </button>
+
+              <button
+                onClick={() => galleryImages.length > 0 && setGalleryOpen(true)}
+                disabled={galleryImages.length === 0}
+                className={`inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] px-5 py-3 text-sm font-black transition ${
+                  galleryImages.length > 0
+                    ? "bg-[#1557D6] text-white hover:bg-[#0F49BD]"
+                    : "cursor-not-allowed bg-slate-100 text-slate-400"
+                }`}
+              >
+                <FileText size={17} />
+                {galleryImages.length > 0 ? "Galeriyi Aç" : "Galeri Yok"}
+              </button>
+            </div>
+          </div>
+
+          {actionError && (
+            <div className="mt-4 rounded-[22px] border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700">
+              {actionError}
+            </div>
+          )}
+
+          <div className="mt-5 grid gap-3 md:grid-cols-4">
+            <GalleryStatCard
+              icon={<Camera size={21} />}
+              label="Fotoğraf"
+              value={`${galleryImages.length}/${MAX_GALLERY_COUNT}`}
+              note="Kapak dahil toplam"
+            />
+            <GalleryStatCard
+              icon={<Star size={21} />}
+              label="Kalite"
+              value={`${imageQualityScore}/100`}
+              note={imageQualityLabel}
+            />
+            <GalleryStatCard
+              icon={<ImageIcon size={21} />}
+              label="Kapak"
+              value={galleryImages.some((image) => image.isCover) ? "Seçili" : "Yok"}
+              note={galleryImages.find((image) => image.isCover)?.originalName || "Kapak bekleniyor"}
+            />
+            <GalleryStatCard
+              icon={<CalendarDays size={21} />}
+              label="Son İşlem"
+              value={formatDate(unit.updatedAt || unit.createdAt)}
+              note="Portföy güncellemesi"
+            />
+          </div>
+
+          <div className="mt-5 overflow-hidden rounded-full bg-[#DBEAFE]">
+            <div
+              className="h-3 rounded-full bg-[#1557D6] transition-all"
+              style={{ width: `${imageProgress}%` }}
+            />
           </div>
 
           {galleryImages.length > 0 ? (
@@ -703,7 +983,7 @@ export default function StokDetailPage() {
               <button
                 type="button"
                 onClick={() => setGalleryOpen(true)}
-                className="group relative min-h-[360px] overflow-hidden rounded-[30px] bg-[#06194A] text-left"
+                className="group relative min-h-[380px] overflow-hidden rounded-[30px] bg-[#06194A] text-left"
               >
                 <img
                   src={activeGalleryImage}
@@ -713,6 +993,17 @@ export default function StokDetailPage() {
 
                 <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/72 via-[#06194A]/10 to-transparent" />
 
+                <div className="absolute left-5 top-5 flex flex-wrap gap-2">
+                  {galleryImages[activePhoto]?.isCover && (
+                    <span className="rounded-full bg-white/92 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#1557D6]">
+                      Kapak
+                    </span>
+                  )}
+                  <span className="rounded-full bg-white/92 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#06194A]">
+                    {galleryImages.length} Fotoğraf
+                  </span>
+                </div>
+
                 <div className="absolute bottom-5 left-5 right-5">
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-white/72">
                     Fotoğraf {activePhoto + 1} / {galleryImages.length}
@@ -721,32 +1012,97 @@ export default function StokDetailPage() {
                   <h3 className="mt-2 text-2xl font-black tracking-[-0.04em] text-white">
                     Büyük Görsel Önizleme
                   </h3>
+
+                  <p className="mt-2 text-sm font-bold text-white/78">
+                    {galleryImages[activePhoto]?.originalName || "EPH portföy görseli"} · {formatFileSize(galleryImages[activePhoto]?.size)}
+                  </p>
                 </div>
               </button>
 
-              <div className="grid max-h-[360px] grid-cols-3 gap-2 overflow-y-auto rounded-[28px] bg-[#F7FBFF] p-2">
-                {galleryImages.map((photo, index) => (
-                  <button
-                    key={photo.id || photo.displayUrl}
-                    type="button"
-                    onClick={() => setActivePhoto(index)}
-                    className={`relative min-h-[92px] overflow-hidden rounded-[20px] border transition ${
-                      activePhoto === index
-                        ? "border-[#1557D6] ring-2 ring-[#1557D6]/20"
-                        : "border-[#DDE7F3]"
-                    }`}
-                  >
-                    <img
-                      src={photo.displayUrl}
-                      alt={`Portföy fotoğrafı ${index + 1}`}
-                      className="absolute inset-0 h-full w-full object-cover"
-                    />
+              <div className="max-h-[420px] overflow-y-auto rounded-[28px] bg-[#F7FBFF] p-2">
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
+                  {galleryImages.map((photo, index) => (
+                    <div
+                      key={photo.id || photo.displayUrl}
+                      className={`relative overflow-hidden rounded-[22px] border bg-white transition ${
+                        activePhoto === index
+                          ? "border-[#1557D6] ring-2 ring-[#1557D6]/20"
+                          : "border-[#DDE7F3]"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setActivePhoto(index)}
+                        className="relative block h-28 w-full overflow-hidden"
+                      >
+                        <img
+                          src={photo.displayUrl}
+                          alt={`Portföy fotoğrafı ${index + 1}`}
+                          className="absolute inset-0 h-full w-full object-cover"
+                        />
 
-                    <span className="absolute bottom-2 right-2 rounded-full bg-white/92 px-2 py-1 text-[10px] font-black text-[#06194A]">
-                      {index + 1}
-                    </span>
-                  </button>
-                ))}
+                        <span className="absolute bottom-2 right-2 rounded-full bg-white/92 px-2 py-1 text-[10px] font-black text-[#06194A]">
+                          {index + 1}
+                        </span>
+
+                        {photo.isCover && (
+                          <span className="absolute left-2 top-2 rounded-full bg-[#1557D6] px-2 py-1 text-[10px] font-black text-white">
+                            Kapak
+                          </span>
+                        )}
+                      </button>
+
+                      {galleryManageMode && (
+                        <div className="grid gap-2 p-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleReorderPortfolioImages(photo.id, "up")}
+                              disabled={index === 0 || Boolean(imageActionLoading)}
+                              className="inline-flex min-h-[34px] items-center justify-center rounded-xl border border-[#DDE7F3] bg-[#F7FBFF] text-[#475569] disabled:opacity-40"
+                              aria-label="Görseli yukarı taşı"
+                            >
+                              <ArrowUp size={15} />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleReorderPortfolioImages(photo.id, "down")}
+                              disabled={index === galleryImages.length - 1 || Boolean(imageActionLoading)}
+                              className="inline-flex min-h-[34px] items-center justify-center rounded-xl border border-[#DDE7F3] bg-[#F7FBFF] text-[#475569] disabled:opacity-40"
+                              aria-label="Görseli aşağı taşı"
+                            >
+                              <ArrowDown size={15} />
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSetCoverImage(photo.id)}
+                            disabled={photo.isCover || Boolean(imageActionLoading)}
+                            className={`min-h-[36px] rounded-xl px-3 py-2 text-xs font-black ${
+                              photo.isCover
+                                ? "bg-[#EFF6FF] text-[#1557D6]"
+                                : "bg-[#1557D6] text-white disabled:opacity-50"
+                            }`}
+                          >
+                            {photo.isCover ? "Kapak Seçili" : "Kapak Yap"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePortfolioImage(photo.id, photo.isCover)}
+                            disabled={Boolean(imageActionLoading)}
+                            className="inline-flex min-h-[36px] items-center justify-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-50"
+                          >
+                            <Trash2 size={14} />
+                            Sil
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
@@ -975,21 +1331,48 @@ export default function StokDetailPage() {
                 </h2>
               </div>
 
-              <button
-                onClick={() => setGalleryOpen(false)}
-                className="flex h-12 w-12 items-center justify-center rounded-[20px] border border-white/20 bg-white/10 text-white"
-                aria-label="Galeriyi kapat"
-              >
-                <X size={21} />
-              </button>
+              <div className="flex items-center gap-2">
+                {galleryImages[activePhoto] && !galleryImages[activePhoto].isCover && (
+                  <button
+                    onClick={() => handleSetCoverImage(galleryImages[activePhoto].id)}
+                    disabled={Boolean(imageActionLoading)}
+                    className="hidden rounded-[18px] bg-white px-4 py-3 text-xs font-black text-[#1557D6] sm:inline-flex"
+                  >
+                    Kapak Yap
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setGalleryOpen(false)}
+                  className="flex h-12 w-12 items-center justify-center rounded-[20px] border border-white/20 bg-white/10 text-white"
+                  aria-label="Galeriyi kapat"
+                >
+                  <X size={21} />
+                </button>
+              </div>
             </div>
 
-            <div className="relative min-h-0 flex-1 overflow-hidden rounded-[32px] bg-black">
+            <div
+              className="relative min-h-0 flex-1 overflow-hidden rounded-[32px] bg-black"
+              onTouchStart={(event) => setTouchStartX(event.touches[0]?.clientX || null)}
+              onTouchEnd={handleGalleryTouchEnd}
+            >
               <img
                 src={activeGalleryImage}
                 alt="Büyük portföy fotoğrafı"
                 className="h-full w-full object-contain"
               />
+
+              <div className="absolute left-4 top-4 flex flex-wrap gap-2">
+                {galleryImages[activePhoto]?.isCover && (
+                  <span className="rounded-full bg-white/92 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#1557D6]">
+                    Kapak
+                  </span>
+                )}
+                <span className="rounded-full bg-white/92 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#06194A]">
+                  Kaydırarak gez
+                </span>
+              </div>
 
               {galleryImages.length > 1 && (
                 <>
@@ -1287,11 +1670,17 @@ function PortfolioReportV2({
   label: string;
   unit: DetailUnit;
 }) {
+  const imageCount = getUnitImages(unit).length;
+  const imageQualityScore = getImageQualityScore(getUnitImages(unit));
+
   const items = [
     {
       label: "Fotoğraf Kalitesi",
-      value: unit.photoVerified ? 100 : 80,
-      note: unit.photoVerified ? "Fotoğraf kontrolü güçlü" : "Galeri mevcut, doğrulama bekliyor",
+      value: imageQualityScore,
+      note:
+        imageCount > 0
+          ? `${imageCount} fotoğraf · ${getImageQualityLabel(imageQualityScore)}`
+          : "Görsel eklenmeli",
     },
     {
       label: "Yetki Durumu",
@@ -1415,6 +1804,37 @@ function ReportCard({
         />
       </div>
     </section>
+  );
+}
+
+function GalleryStatCard({
+  icon,
+  label,
+  value,
+  note,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <div className="flex min-h-[138px] flex-col justify-between rounded-[26px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-white text-[#1557D6] shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
+        {icon}
+      </div>
+      <div>
+        <p className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#64748B]">
+          {label}
+        </p>
+        <p className="mt-2 line-clamp-1 text-xl font-black text-[#06194A]">
+          {value}
+        </p>
+        <p className="mt-1 line-clamp-1 text-xs font-bold text-[#64748B]">
+          {note}
+        </p>
+      </div>
+    </div>
   );
 }
 
