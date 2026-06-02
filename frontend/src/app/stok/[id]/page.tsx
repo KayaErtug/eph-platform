@@ -176,6 +176,20 @@ export default function StokDetailPage() {
   const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
   const [activePhoto, setActivePhoto] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [editForm, setEditForm] = useState({
+    type: "DAIRE",
+    floor: "",
+    number: "",
+    roomCount: "",
+    area: "",
+    price: "",
+    status: "SATILIK",
+    description: "",
+  });
 
   const unitId = params?.id;
 
@@ -188,6 +202,21 @@ export default function StokDetailPage() {
     if (!unitId || typeof window === "undefined") return;
     setIsFollowing(localStorage.getItem(`eph-stock-follow-${unitId}`) === "true");
   }, [unitId]);
+
+  useEffect(() => {
+    if (!unit) return;
+
+    setEditForm({
+      type: unit.type || "DAIRE",
+      floor: unit.floor != null ? String(unit.floor) : "",
+      number: unit.number || "",
+      roomCount: unit.roomCount || "",
+      area: unit.area != null ? String(unit.area) : "",
+      price: unit.price != null ? String(unit.price) : "",
+      status: unit.status || "SATILIK",
+      description: unit.description || "",
+    });
+  }, [unit]);
 
   const fetchUnit = async () => {
     try {
@@ -207,6 +236,59 @@ export default function StokDetailPage() {
     const next = !isFollowing;
     setIsFollowing(next);
     localStorage.setItem(`eph-stock-follow-${unitId}`, String(next));
+  };
+
+  const openEditModal = () => {
+    setActionError("");
+    setEditOpen(true);
+  };
+
+  const handleUpdateUnit = async () => {
+    if (!unit) return;
+
+    setActionError("");
+
+    if (!editForm.number.trim() || !editForm.area.trim() || !editForm.price.trim()) {
+      setActionError("Birim numarası, alan ve fiyat zorunludur.");
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+
+      await api.patch(`/units/${unit.id}`, {
+        type: editForm.type,
+        floor: editForm.floor ? parseInt(editForm.floor, 10) : null,
+        number: editForm.number.trim(),
+        roomCount: editForm.roomCount.trim() || null,
+        area: parseFloat(editForm.area),
+        price: parseFloat(editForm.price),
+        status: editForm.status,
+        description: editForm.description.trim() || null,
+      });
+
+      await fetchUnit();
+      setEditOpen(false);
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || "Portföy güncellenemedi.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteUnit = async () => {
+    if (!unit) return;
+
+    setActionError("");
+
+    try {
+      setActionLoading(true);
+      await api.delete(`/units/${unit.id}`);
+      router.push("/stok");
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || "Portföy silinemedi.");
+      setActionLoading(false);
+    }
   };
 
   const calculatedSquareMeterPrice = useMemo(() => {
@@ -477,6 +559,25 @@ export default function StokDetailPage() {
                         fill={isFollowing ? "currentColor" : "none"}
                       />
                       {isFollowing ? "Takipte" : "Takibe Al"}
+                    </button>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button
+                      onClick={openEditModal}
+                      className="inline-flex min-h-[48px] items-center justify-center rounded-[20px] border border-white/18 bg-white/12 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:bg-white/18"
+                    >
+                      İlanı Güncelle
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActionError("");
+                        setDeleteOpen(true);
+                      }}
+                      className="inline-flex min-h-[48px] items-center justify-center rounded-[20px] bg-rose-50 px-5 py-3 text-sm font-black text-rose-700 transition hover:bg-rose-100"
+                    >
+                      İlanı Sil
                     </button>
                   </div>
 
@@ -922,6 +1023,200 @@ export default function StokDetailPage() {
         </div>
       )}
 
+      {editOpen && (
+        <div className="fixed inset-0 z-[10002] flex items-center justify-center bg-[#06194A]/70 p-4 backdrop-blur-xl">
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-[34px] border border-[#DDE7F3] bg-white p-5 shadow-[0_30px_90px_rgba(15,23,42,0.22)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
+                  Portföy Güncelle
+                </p>
+                <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+                  İlan bilgilerini düzenle
+                </h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#64748B]">
+                  Temel portföy bilgilerini güncelleyip kaydedebilirsiniz.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setEditOpen(false)}
+                className="flex h-11 w-11 items-center justify-center rounded-[18px] border border-[#DDE7F3] bg-[#F7FBFF] text-[#06194A]"
+                aria-label="Güncelleme penceresini kapat"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {actionError && (
+              <div className="mt-4 rounded-[22px] border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700">
+                {actionError}
+              </div>
+            )}
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <EditField label="Mülk Tipi">
+                <select
+                  value={editForm.type}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, type: event.target.value }))
+                  }
+                  className="h-12 w-full rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 text-sm font-bold text-[#06194A] outline-none"
+                >
+                  {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </EditField>
+
+              <EditField label="Durum">
+                <select
+                  value={editForm.status}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, status: event.target.value }))
+                  }
+                  className="h-12 w-full rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 text-sm font-bold text-[#06194A] outline-none"
+                >
+                  {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </EditField>
+
+              <EditField label="Daire / Bölüm No *">
+                <input
+                  value={editForm.number}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, number: event.target.value }))
+                  }
+                  className="h-12 w-full rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 text-sm font-bold text-[#06194A] outline-none"
+                />
+              </EditField>
+
+              <EditField label="Oda / Plan Tipi">
+                <input
+                  value={editForm.roomCount}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, roomCount: event.target.value }))
+                  }
+                  className="h-12 w-full rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 text-sm font-bold text-[#06194A] outline-none"
+                />
+              </EditField>
+
+              <EditField label="Alan m² *">
+                <input
+                  type="number"
+                  value={editForm.area}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, area: event.target.value }))
+                  }
+                  className="h-12 w-full rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 text-sm font-bold text-[#06194A] outline-none"
+                />
+              </EditField>
+
+              <EditField label="Fiyat TL *">
+                <input
+                  type="number"
+                  value={editForm.price}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, price: event.target.value }))
+                  }
+                  className="h-12 w-full rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 text-sm font-bold text-[#06194A] outline-none"
+                />
+              </EditField>
+
+              <EditField label="Kat">
+                <input
+                  type="number"
+                  value={editForm.floor}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, floor: event.target.value }))
+                  }
+                  className="h-12 w-full rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 text-sm font-bold text-[#06194A] outline-none"
+                />
+              </EditField>
+
+              <div className="md:col-span-2">
+                <EditField label="Açıklama">
+                  <textarea
+                    value={editForm.description}
+                    onChange={(event) =>
+                      setEditForm((current) => ({ ...current, description: event.target.value }))
+                    }
+                    rows={5}
+                    className="w-full rounded-2xl border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3 text-sm font-bold leading-6 text-[#06194A] outline-none"
+                  />
+                </EditField>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <button
+                onClick={() => setEditOpen(false)}
+                className="min-h-[52px] rounded-[20px] border border-[#DDE7F3] bg-white px-5 py-3 text-sm font-black text-[#475569]"
+                disabled={actionLoading}
+              >
+                Vazgeç
+              </button>
+
+              <button
+                onClick={handleUpdateUnit}
+                className="min-h-[52px] rounded-[20px] bg-[#1557D6] px-5 py-3 text-sm font-black text-white disabled:opacity-60"
+                disabled={actionLoading}
+              >
+                {actionLoading ? "Kaydediliyor..." : "Güncellemeyi Kaydet"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteOpen && (
+        <div className="fixed inset-0 z-[10003] flex items-center justify-center bg-[#06194A]/70 p-4 backdrop-blur-xl">
+          <div className="w-full max-w-lg rounded-[34px] border border-[#DDE7F3] bg-white p-6 text-center shadow-[0_30px_90px_rgba(15,23,42,0.22)]">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[22px] bg-rose-50 text-rose-700">
+              <FileText size={24} />
+            </div>
+
+            <h2 className="mt-4 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
+              İlanı silmek istiyor musunuz?
+            </h2>
+
+            <p className="mt-2 text-sm font-semibold leading-6 text-[#64748B]">
+              Bu portföy kalıcı olarak silinecek. Bu işlem geri alınamaz.
+            </p>
+
+            {actionError && (
+              <div className="mt-4 rounded-[22px] border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700">
+                {actionError}
+              </div>
+            )}
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <button
+                onClick={() => setDeleteOpen(false)}
+                className="min-h-[52px] rounded-[20px] border border-[#DDE7F3] bg-white px-5 py-3 text-sm font-black text-[#475569]"
+                disabled={actionLoading}
+              >
+                Vazgeç
+              </button>
+
+              <button
+                onClick={handleDeleteUnit}
+                className="min-h-[52px] rounded-[20px] bg-rose-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60"
+                disabled={actionLoading}
+              >
+                {actionLoading ? "Siliniyor..." : "Evet, İlanı Sil"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <PortfolioShareModal
         open={shareOpen}
         onClose={() => setShareOpen(false)}
@@ -1241,6 +1536,23 @@ function InfoRow({ label, value }: { label: string; value: string }) {
         {value}
       </span>
     </div>
+  );
+}
+
+function EditField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-[#64748B]">
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }
 
