@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useRef, useState } from "react";
@@ -33,15 +32,17 @@ const MIN_IMAGE_HEIGHT = 600;
 const MAX_DESCRIPTION_LENGTH = 500;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-const PRICE_CURRENCIES = [
-  { value: "TRY", label: "₺ Türk Lirası" },
-  { value: "USD", label: "$ Amerikan Doları" },
-  { value: "EUR", label: "€ Euro" },
-  { value: "GBP", label: "£ İngiliz Sterlini" },
-] as const;
+const CURRENCY_OPTIONS = [
+  { value: "TRY", label: "Türk Lirası", symbol: "₺" },
+  { value: "USD", label: "Amerikan Doları", symbol: "$" },
+  { value: "EUR", label: "Euro", symbol: "€" },
+  { value: "GBP", label: "İngiliz Sterlini", symbol: "£" },
+];
 
-const DISTRICTS_BY_CITY: Record<string, string[]> = {
+const CITY_DISTRICTS: Record<string, string[]> = {
   Denizli: [
+    "Merkezefendi",
+    "Pamukkale",
     "Acıpayam",
     "Babadağ",
     "Baklan",
@@ -56,8 +57,6 @@ const DISTRICTS_BY_CITY: Record<string, string[]> = {
     "Güney",
     "Honaz",
     "Kale",
-    "Merkezefendi",
-    "Pamukkale",
     "Sarayköy",
     "Serinhisar",
     "Tavas",
@@ -136,7 +135,6 @@ const DISTRICTS_BY_CITY: Record<string, string[]> = {
     "Zeytinburnu",
   ],
   Ankara: [
-    "Akyurt",
     "Altındağ",
     "Ayaş",
     "Bala",
@@ -198,27 +196,9 @@ const DISTRICTS_BY_CITY: Record<string, string[]> = {
   ],
 };
 
-const FLOOR_OPTIONS = [
-  "Kot -10",
-  "Kot -9",
-  "Kot -8",
-  "Kot -7",
-  "Kot -6",
-  "Kot -5",
-  "Kot -4",
-  "Kot -3",
-  "Kot -2",
-  "Kot -1",
-  "Bodrum 10",
-  "Bodrum 9",
-  "Bodrum 8",
-  "Bodrum 7",
-  "Bodrum 6",
-  "Bodrum 5",
-  "Bodrum 4",
-  "Bodrum 3",
-  "Bodrum 2",
-  "Bodrum 1",
+const FLOOR_LABEL_OPTIONS = [
+  ...Array.from({ length: 10 }, (_, index) => `Kot -${10 - index}`),
+  ...Array.from({ length: 10 }, (_, index) => `Bodrum ${10 - index}`),
   "Yarı Bodrum",
   "Giriş Katı",
   "Zemin Kat",
@@ -235,11 +215,7 @@ const FLOOR_OPTIONS = [
   "Penthouse",
   "Asma Kat",
   "Ara Kat",
-  "Ara Dubleks",
   "Villa Tipi",
-  "Tek Kat Villa",
-  "Dubleks Villa",
-  "Tripleks Villa",
   "Müstakil",
   "Tam Müstakil",
   "Dükkan Girişi",
@@ -247,11 +223,57 @@ const FLOOR_OPTIONS = [
   "AVM Katı",
   "Plaza Katı",
   "Ofis Katı",
+  "Fabrika Katı",
   "Depo Katı",
-  "Sanayi Katı",
 ];
 
-const TOTAL_FLOOR_OPTIONS = ["Belirtilmedi", ...Array.from({ length: 100 }, (_, index) => `${index + 1}`)];
+const BUILDING_FLOOR_OPTIONS = Array.from({ length: 100 }, (_, index) => String(index + 1));
+
+type AreaRule = {
+  keywords: string[];
+  min: number;
+  max: number;
+  label: string;
+};
+
+const AREA_RULES: AreaRule[] = [
+  {
+    keywords: ["DAIRE", "REZIDANS", "APART", "STUDYO", "LOFT", "PENTHOUSE"],
+    min: 20,
+    max: 1000,
+    label: "Daire / rezidans",
+  },
+  {
+    keywords: ["VILLA", "KOSK", "YALI", "KONAK", "MUSTAKIL"],
+    min: 50,
+    max: 5000,
+    label: "Villa / köşk / yalı",
+  },
+  {
+    keywords: ["DUKKAN", "MAGAZA", "OFIS", "HOME_OFFICE", "PLAZA", "TICARI"],
+    min: 10,
+    max: 10000,
+    label: "Dükkan / ofis / ticari alan",
+  },
+  {
+    keywords: ["DEPO", "FABRIKA", "SANAYI", "ATOLYE", "IMALATHANE", "LOJISTIK"],
+    min: 50,
+    max: 100000,
+    label: "Depo / fabrika / sanayi alanı",
+  },
+  {
+    keywords: ["ARSA", "IMARLI", "KONUT_IMARLI", "TICARI_IMARLI"],
+    min: 50,
+    max: 1000000,
+    label: "Arsa",
+  },
+  {
+    keywords: ["TARLA", "BAG", "BAHCE", "ZEYTINLIK", "CIFTLIK"],
+    min: 100,
+    max: 10000000,
+    label: "Tarla / bağ / bahçe",
+  },
+];
 
 function formatFileSize(size: number) {
   if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
@@ -262,73 +284,78 @@ function isAcceptedImage(file: File) {
   return ACCEPTED_IMAGE_TYPES.includes(file.type);
 }
 
-function normalizeText(value: string) {
+function normalizeTurkishText(value: string) {
   return value
     .trim()
     .toLocaleLowerCase("tr-TR")
-    .split(/(\s+|\/|-)/g)
+    .split(/(\s+|\/|-)/)
     .map((part) => {
-      if (/^\s+$/.test(part) || part === "/" || part === "-") return part;
+      if (/^\s+$|^\/$|^-$/.test(part)) return part;
+      if (!part) return part;
       return part.charAt(0).toLocaleUpperCase("tr-TR") + part.slice(1);
     })
-    .join("");
-}
-
-function normalizeLongText(value: string) {
-  return value
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/(^|[.!?]\s+)([a-zçğıöşü])/g, (match) => match.toLocaleUpperCase("tr-TR"));
-}
-
-function onlyDigits(value: string) {
-  return value.replace(/[^0-9]/g, "");
+    .join("")
+    .replace(/\s+/g, " ");
 }
 
 function formatPriceInput(value: string) {
-  const digits = onlyDigits(value);
-  if (!digits) return "";
-  return Number(digits).toLocaleString("tr-TR");
+  const onlyDigits = value.replace(/\D/g, "");
+  if (!onlyDigits) return "";
+  return Number(onlyDigits).toLocaleString("tr-TR");
 }
 
-function getNumericPrice(value: string) {
-  return Number(onlyDigits(value));
+function parseFormattedNumber(value: string) {
+  return value.replace(/\D/g, "");
 }
 
-function getFloorNumericValue(label: string) {
-  const normalFloor = label.match(/^(\d+)\. Kat$/);
-  if (normalFloor) return normalFloor[1];
+function getCurrencySymbol(value?: string) {
+  return CURRENCY_OPTIONS.find((option) => option.value === value)?.symbol || "₺";
+}
 
-  const kotFloor = label.match(/^Kot -(\d+)$/);
-  if (kotFloor) return `-${kotFloor[1]}`;
+function getAreaRule(type: string) {
+  const normalized = String(type || "").toLocaleUpperCase("tr-TR");
+  return (
+    AREA_RULES.find((rule) =>
+      rule.keywords.some((keyword) => normalized.includes(keyword)),
+    ) || {
+      keywords: [],
+      min: 10,
+      max: 1000000,
+      label: "Bu mülk tipi",
+    }
+  );
+}
 
-  const bodrumFloor = label.match(/^Bodrum (\d+)$/);
-  if (bodrumFloor) return `-${bodrumFloor[1]}`;
+function getFloorNumberFromLabel(label: string) {
+  const exactFloor = label.match(/^(\d+)\. Kat$/);
+  if (exactFloor) return exactFloor[1];
 
-  if (["Giriş Katı", "Zemin Kat", "Yüksek Giriş", "Bahçe Katı", "Bahçe Dubleksi", "Bahçe Terası", "Yarı Bodrum"].includes(label)) {
-    return "0";
-  }
+  if (label === "Zemin Kat" || label === "Giriş Katı" || label === "Dükkan Girişi") return "0";
+  if (label === "Yüksek Giriş") return "1";
+
+  const kot = label.match(/^Kot -(\d+)$/);
+  if (kot) return `-${kot[1]}`;
 
   return "";
 }
 
-function getImageSize(file: File) {
+function getImageDimensions(file: File) {
   return new Promise<{ width: number; height: number }>((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
     const image = new Image();
+    const url = URL.createObjectURL(file);
 
     image.onload = () => {
-      const result = { width: image.naturalWidth, height: image.naturalHeight };
-      URL.revokeObjectURL(objectUrl);
+      const result = { width: image.width, height: image.height };
+      URL.revokeObjectURL(url);
       resolve(result);
     };
 
     image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
+      URL.revokeObjectURL(url);
       reject(new Error("Görsel okunamadı."));
     };
 
-    image.src = objectUrl;
+    image.src = url;
   });
 }
 
@@ -355,11 +382,15 @@ export default function StokCreateModal({
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   const [imageError, setImageError] = useState("");
-  const [smartError, setSmartError] = useState("");
+  const [localError, setLocalError] = useState("");
+  const [checkingImages, setCheckingImages] = useState(false);
 
-  const selectedCityDistricts = DISTRICTS_BY_CITY[projectForm.city] || [];
-  const selectedCurrency = unitForm.priceCurrency || "TRY";
-  const currentDescriptionLength = unitForm.description.length;
+  const selectedCurrency = String((unitForm as any).currency || "TRY");
+  const selectedFloorLabel = String((unitForm as any).floorLabel || "");
+  const buildingFloorCount = String((unitForm as any).buildingFloorCount || "");
+  const priceDisplay = formatPriceInput(String(unitForm.price || ""));
+  const descriptionLength = unitForm.description.length;
+  const districtOptions = CITY_DISTRICTS[projectForm.city] || [];
 
   const totalSelectedImages = useMemo(() => {
     return (coverImage ? 1 : 0) + galleryImages.length;
@@ -371,7 +402,7 @@ export default function StokCreateModal({
     const invalidType = files.find((file) => !isAcceptedImage(file));
 
     if (invalidType) {
-      return "Sadece JPG, PNG veya WEBP formatında görsel yüklenebilir.";
+      return "Sadece JPG, PNG veya WEBP formatında görsel yükleyebilirsiniz.";
     }
 
     const tooLarge = files.find((file) => file.size > MAX_FILE_SIZE);
@@ -380,17 +411,18 @@ export default function StokCreateModal({
       return `Seçtiğiniz görsel 10 MB sınırını aşıyor. Lütfen daha küçük bir görsel seçiniz. (${tooLarge.name})`;
     }
 
-    const tooSmallFile = files.find((file) => file.size < MIN_FILE_SIZE);
+    const tooSmall = files.find((file) => file.size < MIN_FILE_SIZE);
 
-    if (tooSmallFile) {
-      return `Seçtiğiniz görsel dosyası çok küçük görünüyor. Daha kaliteli bir görsel seçiniz. (${tooSmallFile.name})`;
+    if (tooSmall) {
+      return `Seçtiğiniz görsel dosyası çok küçük görünüyor. Lütfen daha kaliteli bir görsel yükleyiniz. (${tooSmall.name})`;
     }
 
     for (const file of files) {
       try {
-        const size = await getImageSize(file);
-        if (size.width < MIN_IMAGE_WIDTH || size.height < MIN_IMAGE_HEIGHT) {
-          return `Görsel çözünürlüğü düşük. En az ${MIN_IMAGE_WIDTH}x${MIN_IMAGE_HEIGHT} piksel önerilir. (${file.name}: ${size.width}x${size.height})`;
+        const dimensions = await getImageDimensions(file);
+
+        if (dimensions.width < MIN_IMAGE_WIDTH || dimensions.height < MIN_IMAGE_HEIGHT) {
+          return `Yüklediğiniz görselin çözünürlüğü düşük. En az ${MIN_IMAGE_WIDTH}x${MIN_IMAGE_HEIGHT} piksel önerilir. (${file.name})`;
         }
       } catch {
         return `Görsel okunamadı. Lütfen farklı bir JPG, PNG veya WEBP dosyası seçiniz. (${file.name})`;
@@ -415,7 +447,9 @@ export default function StokCreateModal({
 
     if (!file) return;
 
+    setCheckingImages(true);
     const error = await validateFiles([file]);
+    setCheckingImages(false);
 
     if (error) {
       setImageError(error);
@@ -436,14 +470,6 @@ export default function StokCreateModal({
 
     if (files.length === 0) return;
 
-    const error = await validateFiles(files);
-
-    if (error) {
-      setImageError(error);
-      event.target.value = "";
-      return;
-    }
-
     const remaining = MAX_GALLERY_COUNT - galleryImages.length;
 
     if (remaining <= 0) {
@@ -453,13 +479,24 @@ export default function StokCreateModal({
     }
 
     const acceptedFiles = files.slice(0, remaining);
+
+    setCheckingImages(true);
+    const error = await validateFiles(acceptedFiles);
+    setCheckingImages(false);
+
+    if (error) {
+      setImageError(error);
+      event.target.value = "";
+      return;
+    }
+
     const newImages = acceptedFiles.map(createLocalImage);
 
     setGalleryImages((current) => [...current, ...newImages]);
 
     if (files.length > remaining) {
       setImageError(
-        `Galeri limiti ${MAX_GALLERY_COUNT} fotoğraf. Fazla seçilenler eklenmedi.`,
+        `En fazla ${MAX_GALLERY_COUNT} galeri fotoğrafı yükleyebilirsiniz. Fazla seçilen görseller eklenmedi.`,
       );
     }
 
@@ -479,41 +516,58 @@ export default function StokCreateModal({
     });
   };
 
-  const handleSmartSubmit = () => {
-    setSmartError("");
+  const setProjectField = (key: keyof ProjectFormState, value: string) => {
+    setProjectForm((current) => ({ ...current, [key]: value }));
+  };
 
+  const setProjectFieldFormatted = (key: keyof ProjectFormState, value: string) => {
+    setProjectForm((current) => ({ ...current, [key]: normalizeTurkishText(value) }));
+  };
+
+  const setUnitField = (key: keyof UnitFormState | string, value: string) => {
+    setUnitForm((current) => ({ ...current, [key]: value } as UnitFormState));
+  };
+
+  const validateSmartForm = () => {
     const area = Number(unitForm.area || 0);
-    const price = getNumericPrice(unitForm.price);
-    const unitNoDigits = onlyDigits(unitForm.number);
-    const currency = unitForm.priceCurrency || "TRY";
+    const price = Number(unitForm.price || 0);
+    const number = String(unitForm.number || "").trim();
+    const rule = getAreaRule(unitForm.type);
 
-    if (unitForm.type === "DAIRE" && area && (area < 20 || area > 500)) {
-      setSmartError("Daire metrekare değeri mantıksız görünüyor. 20 m² ile 500 m² arasında bir değer giriniz veya bilgiyi kontrol ediniz.");
-      return;
+    if (area && (area < rule.min || area > rule.max)) {
+      return `${rule.label} metrekare değeri mantıksız görünüyor. ${rule.min.toLocaleString("tr-TR")} m² ile ${rule.max.toLocaleString("tr-TR")} m² arasında bir değer giriniz veya bilgiyi kontrol ediniz.`;
     }
 
-    if (["VILLA", "ULTRA_LUKS_VILLA", "MUSTAKIL_EV"].includes(unitForm.type) && area && (area < 50 || area > 2000)) {
-      setSmartError("Villa/metrekare değeri mantıksız görünüyor. 50 m² ile 2000 m² arasında bir değer giriniz veya bilgiyi kontrol ediniz.");
-      return;
+    if (number.length > 4 || /^0{2,}/.test(number)) {
+      return "Daire / bağımsız bölüm numarası olağan dışı görünüyor. Lütfen değeri kontrol ediniz.";
     }
 
-    if (unitNoDigits.length > 4) {
-      setSmartError("Daire no çok uzun görünüyor. Lütfen bağımsız bölüm numarasını kontrol ediniz.");
-      return;
+    if (price && (price < 100000 || price > 5000000000)) {
+      return "Fiyat değeri olağan dışı görünüyor. Lütfen para birimini ve tutarı kontrol ediniz.";
     }
 
-    if (price && currency === "TRY" && (price < 100000 || price > 500000000)) {
-      setSmartError("TL fiyat değeri mantıksız görünüyor. Lütfen fiyat bilgisini kontrol ediniz.");
-      return;
+    if (descriptionLength > MAX_DESCRIPTION_LENGTH) {
+      return `Açıklama alanı en fazla ${MAX_DESCRIPTION_LENGTH} karakter olabilir.`;
     }
 
-    if (price && currency !== "TRY" && (price < 10000 || price > 50000000)) {
-      setSmartError("Döviz fiyat değeri mantıksız görünüyor. Lütfen fiyat bilgisini ve para birimini kontrol ediniz.");
-      return;
+    if (selectedFloorLabel && buildingFloorCount) {
+      const foundFloor = Number(getFloorNumberFromLabel(selectedFloorLabel));
+      const totalFloor = Number(buildingFloorCount);
+
+      if (foundFloor > totalFloor) {
+        return "Bulunduğu kat, toplam kat sayısından büyük olamaz. Lütfen kat bilgisini kontrol ediniz.";
+      }
     }
 
-    if (unitForm.description.length > MAX_DESCRIPTION_LENGTH) {
-      setSmartError(`Açıklama en fazla ${MAX_DESCRIPTION_LENGTH} karakter olabilir.`);
+    return "";
+  };
+
+  const handleSubmit = () => {
+    setLocalError("");
+    const error = validateSmartForm();
+
+    if (error) {
+      setLocalError(error);
       return;
     }
 
@@ -535,8 +589,8 @@ export default function StokCreateModal({
         <div className="stock-modal-v2-body">
           {formSuccess && <div className="stock-form-success">Portföy başarıyla eklendi.</div>}
           {formError && <div className="stock-form-error">{formError}</div>}
+          {localError && <div className="stock-form-error">{localError}</div>}
           {imageError && <div className="stock-form-error">{imageError}</div>}
-          {smartError && <div className="stock-form-error">{smartError}</div>}
 
           <div className="stock-form-block">
             <h3>Proje</h3>
@@ -564,12 +618,8 @@ export default function StokCreateModal({
                     <span>Proje Adı *</span>
                     <input
                       value={projectForm.name}
-                      onBlur={(e) =>
-                        setProjectForm((f) => ({ ...f, name: normalizeText(e.target.value) }))
-                      }
-                      onChange={(e) =>
-                        setProjectForm((f) => ({ ...f, name: e.target.value }))
-                      }
+                      onChange={(e) => setProjectField("name", e.target.value)}
+                      onBlur={(e) => setProjectFieldFormatted("name", e.target.value)}
                     />
                   </label>
 
@@ -577,15 +627,16 @@ export default function StokCreateModal({
                     <span>Şehir *</span>
                     <select
                       value={projectForm.city}
-                      onChange={(e) =>
-                        setProjectForm((f) => ({
-                          ...f,
-                          city: e.target.value,
-                          district: "",
-                        }))
-                      }
+                      onChange={(e) => {
+                        const nextCity = e.target.value;
+                        setProjectForm((current) => ({
+                          ...current,
+                          city: nextCity,
+                          district: CITY_DISTRICTS[nextCity]?.[0] || "",
+                        }));
+                      }}
                     >
-                      {CITIES.filter((city) => DISTRICTS_BY_CITY[city]).map((c) => (
+                      {CITIES.map((c) => (
                         <option key={c} value={c}>
                           {c}
                         </option>
@@ -595,31 +646,33 @@ export default function StokCreateModal({
 
                   <label className="stock-form-field">
                     <span>İlçe *</span>
-                    <select
-                      value={projectForm.district}
-                      onChange={(e) =>
-                        setProjectForm((f) => ({ ...f, district: e.target.value }))
-                      }
-                    >
-                      <option value="">İlçe seçiniz</option>
-                      {selectedCityDistricts.map((district) => (
-                        <option key={district} value={district}>
-                          {district}
-                        </option>
-                      ))}
-                    </select>
+                    {districtOptions.length > 0 ? (
+                      <select
+                        value={projectForm.district}
+                        onChange={(e) => setProjectField("district", e.target.value)}
+                      >
+                        <option value="">İlçe seçiniz</option>
+                        {districtOptions.map((district) => (
+                          <option key={district} value={district}>
+                            {district}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        value={projectForm.district}
+                        onChange={(e) => setProjectField("district", e.target.value)}
+                        onBlur={(e) => setProjectFieldFormatted("district", e.target.value)}
+                      />
+                    )}
                   </label>
 
                   <label className="stock-form-field">
                     <span>Adres *</span>
                     <input
                       value={projectForm.address}
-                      onBlur={(e) =>
-                        setProjectForm((f) => ({ ...f, address: normalizeText(e.target.value) }))
-                      }
-                      onChange={(e) =>
-                        setProjectForm((f) => ({ ...f, address: e.target.value }))
-                      }
+                      onChange={(e) => setProjectField("address", e.target.value)}
+                      onBlur={(e) => setProjectFieldFormatted("address", e.target.value)}
                     />
                   </label>
                 </>
@@ -634,9 +687,7 @@ export default function StokCreateModal({
                 <span>Mülk Tipi *</span>
                 <select
                   value={unitForm.type}
-                  onChange={(e) =>
-                    setUnitForm((f) => ({ ...f, type: e.target.value }))
-                  }
+                  onChange={(e) => setUnitField("type", e.target.value)}
                 >
                   {Object.entries(TYPE_LABELS).map(([v, l]) => (
                     <option key={v} value={v}>
@@ -650,9 +701,7 @@ export default function StokCreateModal({
                 <span>Durum *</span>
                 <select
                   value={unitForm.status}
-                  onChange={(e) =>
-                    setUnitForm((f) => ({ ...f, status: e.target.value }))
-                  }
+                  onChange={(e) => setUnitField("status", e.target.value)}
                 >
                   {Object.entries(STATUS_LABELS).map(([v, l]) => (
                     <option key={v} value={v}>
@@ -667,9 +716,7 @@ export default function StokCreateModal({
                 <input
                   list="room-count-options"
                   value={unitForm.roomCount}
-                  onChange={(e) =>
-                    setUnitForm((f) => ({ ...f, roomCount: e.target.value }))
-                  }
+                  onChange={(e) => setUnitField("roomCount", e.target.value)}
                   placeholder="Örn: 3+1, 2,5+1, 10+4, Loft"
                 />
                 <datalist id="room-count-options">
@@ -684,27 +731,26 @@ export default function StokCreateModal({
                 <input
                   type="number"
                   value={unitForm.area}
-                  onChange={(e) =>
-                    setUnitForm((f) => ({ ...f, area: e.target.value }))
-                  }
+                  onChange={(e) => setUnitField("area", e.target.value)}
+                  placeholder="Örn: 190"
                 />
               </label>
 
               <label className="stock-form-field">
                 <span>Bulunduğu Kat</span>
                 <select
-                  value={unitForm.floorLabel || ""}
+                  value={selectedFloorLabel}
                   onChange={(e) => {
                     const label = e.target.value;
-                    setUnitForm((f) => ({
-                      ...f,
+                    setUnitForm((current) => ({
+                      ...current,
                       floorLabel: label,
-                      floor: getFloorNumericValue(label),
-                    }));
+                      floor: getFloorNumberFromLabel(label),
+                    } as UnitFormState));
                   }}
                 >
                   <option value="">Kat seçiniz</option>
-                  {FLOOR_OPTIONS.map((floor) => (
+                  {FLOOR_LABEL_OPTIONS.map((floor) => (
                     <option key={floor} value={floor}>
                       {floor}
                     </option>
@@ -715,78 +761,63 @@ export default function StokCreateModal({
               <label className="stock-form-field">
                 <span>Toplam Kat Sayısı</span>
                 <select
-                  value={unitForm.totalFloors || ""}
-                  onChange={(e) =>
-                    setUnitForm((f) => ({
-                      ...f,
-                      totalFloors: e.target.value === "Belirtilmedi" ? "" : e.target.value,
-                    }))
-                  }
+                  value={buildingFloorCount}
+                  onChange={(e) => setUnitField("buildingFloorCount", e.target.value)}
                 >
-                  {TOTAL_FLOOR_OPTIONS.map((floor) => (
+                  <option value="">Seçiniz</option>
+                  {BUILDING_FLOOR_OPTIONS.map((floor) => (
                     <option key={floor} value={floor}>
-                      {floor === "Belirtilmedi" ? floor : `${floor} Katlı`}
+                      {floor} Katlı
                     </option>
                   ))}
                 </select>
               </label>
 
               <label className="stock-form-field">
-                <span>Daire No *</span>
+                <span>Daire / Bölüm No *</span>
                 <input
                   value={unitForm.number}
-                  onChange={(e) =>
-                    setUnitForm((f) => ({ ...f, number: e.target.value }))
-                  }
+                  onChange={(e) => setUnitField("number", e.target.value)}
+                  placeholder="Örn: 6, A-12, B Blok 3"
                 />
               </label>
 
               <label className="stock-form-field">
-                <span>Para Birimi</span>
+                <span>Para Birimi *</span>
                 <select
                   value={selectedCurrency}
-                  onChange={(e) =>
-                    setUnitForm((f) => ({
-                      ...f,
-                      priceCurrency: e.target.value as "TRY" | "USD" | "EUR" | "GBP",
-                    }))
-                  }
+                  onChange={(e) => setUnitField("currency", e.target.value)}
                 >
-                  {PRICE_CURRENCIES.map((currency) => (
+                  {CURRENCY_OPTIONS.map((currency) => (
                     <option key={currency.value} value={currency.value}>
-                      {currency.label}
+                      {currency.symbol} {currency.label}
                     </option>
                   ))}
                 </select>
               </label>
 
-              <label className="stock-form-field">
-                <span>Fiyat *</span>
+              <label className="stock-form-field full">
+                <span>Fiyat ({getCurrencySymbol(selectedCurrency)}) *</span>
                 <input
+                  type="text"
                   inputMode="numeric"
-                  value={formatPriceInput(unitForm.price)}
-                  onChange={(e) =>
-                    setUnitForm((f) => ({ ...f, price: onlyDigits(e.target.value) }))
-                  }
-                  placeholder="Örn: 4.400.000"
+                  value={priceDisplay}
+                  onChange={(e) => setUnitField("price", parseFormattedNumber(e.target.value))}
+                  placeholder="Örn: 10.500.000"
                 />
               </label>
 
               <label className="stock-form-field full">
-                <span>Açıklama ({currentDescriptionLength}/{MAX_DESCRIPTION_LENGTH})</span>
+                <span>Açıklama</span>
                 <textarea
-                  value={unitForm.description}
                   maxLength={MAX_DESCRIPTION_LENGTH}
-                  onBlur={(e) =>
-                    setUnitForm((f) => ({ ...f, description: normalizeLongText(e.target.value) }))
-                  }
-                  onChange={(e) =>
-                    setUnitForm((f) => ({
-                      ...f,
-                      description: e.target.value.slice(0, MAX_DESCRIPTION_LENGTH),
-                    }))
-                  }
+                  value={unitForm.description}
+                  onChange={(e) => setUnitField("description", e.target.value)}
+                  onBlur={(e) => setUnitField("description", normalizeTurkishText(e.target.value))}
                 />
+                <p className={`mt-2 text-xs font-black ${descriptionLength > 450 ? "text-amber-700" : "text-[#64748B]"}`}>
+                  {descriptionLength} / {MAX_DESCRIPTION_LENGTH} karakter
+                </p>
               </label>
             </div>
           </div>
@@ -810,8 +841,9 @@ export default function StokCreateModal({
                   type="button"
                   className="stock-save-btn"
                   onClick={() => coverInputRef.current?.click()}
+                  disabled={checkingImages}
                 >
-                  Kapak Fotoğrafı Seç
+                  {checkingImages ? "Görsel kontrol ediliyor..." : "Kapak Fotoğrafı Seç"}
                 </button>
 
                 {coverImage ? (
@@ -860,13 +892,13 @@ export default function StokCreateModal({
                   type="button"
                   className="stock-save-btn"
                   onClick={() => galleryInputRef.current?.click()}
-                  disabled={galleryImages.length >= MAX_GALLERY_COUNT}
+                  disabled={galleryImages.length >= MAX_GALLERY_COUNT || checkingImages}
                 >
-                  Galeri Fotoğrafı Seç
+                  {checkingImages ? "Görseller kontrol ediliyor..." : "Galeri Fotoğrafı Seç"}
                 </button>
 
                 <p className="mt-2 text-xs font-bold text-[#64748B]">
-                  Maksimum {MAX_GALLERY_COUNT} galeri fotoğrafı, her biri en fazla 10 MB. Önerilen minimum çözünürlük: {MIN_IMAGE_WIDTH}x{MIN_IMAGE_HEIGHT} px.
+                  Maksimum {MAX_GALLERY_COUNT} galeri fotoğrafı. JPG, PNG ve WEBP desteklenir. Her görsel en fazla 10 MB olmalıdır.
                 </p>
 
                 {galleryImages.length > 0 ? (
@@ -952,8 +984,8 @@ export default function StokCreateModal({
 
           <button
             className="stock-save-btn"
-            onClick={handleSmartSubmit}
-            disabled={formLoading}
+            onClick={handleSubmit}
+            disabled={formLoading || checkingImages}
           >
             {formLoading ? "Kaydediliyor..." : "Portföyü Kaydet"}
           </button>
