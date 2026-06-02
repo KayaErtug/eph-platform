@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ROOM_COUNT_OPTIONS, STATUS_LABELS, TYPE_LABELS } from "./stokConstants";
+import {
+  BUILDING_AGE_OPTIONS,
+  BUILDING_FLOOR_OPTIONS,
+  CATEGORY_OPTIONS,
+  CATEGORY_TYPE_MAP,
+  MAIN_CATEGORY_OPTIONS,
+  OFFICE_ROOM_COUNT_OPTIONS,
+  ROOM_COUNT_OPTIONS,
+  STATUS_LABELS,
+  TYPE_LABELS,
+} from "./stokConstants";
 import {
   fetchDistrictOptions,
   fetchPlaceOptions,
@@ -46,40 +56,36 @@ const CURRENCY_OPTIONS = [
 ];
 
 const FLOOR_LABEL_OPTIONS = [
-  "Kot -1",
-  "Bodrum",
+  ...Array.from({ length: 10 }, (_, index) => `Kot -${10 - index}`),
+  ...Array.from({ length: 10 }, (_, index) => `Bodrum ${10 - index}`),
   "Yarı Bodrum",
+  "Giriş Katı",
   "Zemin Kat",
   "Yüksek Giriş",
   "Bahçe Katı",
-
-  "1. Kat",
-  "2. Kat",
-  "3. Kat",
-  "4. Kat",
-  "5. Kat",
-  "6. Kat",
-  "7. Kat",
-  "8. Kat",
-  "9. Kat",
-  "10. Kat",
-  "11. Kat",
-  "12. Kat",
-  "13. Kat",
-  "14. Kat",
-  "15. Kat",
-
+  "Bahçe Dubleksi",
+  "Bahçe Terası",
+  ...Array.from({ length: 80 }, (_, index) => `${index + 1}. Kat`),
   "Çatı Katı",
+  "Çatı Dubleksi",
+  "Çatı Tripleksi",
   "Teras Katı",
+  "Teras Dubleksi",
   "Penthouse",
+  "Asma Kat",
+  "Ara Kat",
+  "Villa Tipi",
+  "Müstakil",
+  "Tam Müstakil",
+  "Dükkan Girişi",
+  "Çarşı Katı",
+  "AVM Katı",
+  "Plaza Katı",
+  "Ofis Katı",
+  "Fabrika Katı",
+  "Depo Katı",
 ];
 
-
-const BUILDING_FLOOR_OPTIONS = Array.from({ length: 100 }, (_, index) => String(index + 1));
-
-const SORTED_TYPE_OPTIONS = Object.entries(TYPE_LABELS).sort((a, b) =>
-  String(a[1]).localeCompare(String(b[1]), "tr-TR"),
-);
 
 const LAND_TYPE_KEYWORDS = [
   "ARSA",
@@ -184,33 +190,32 @@ function isVillaType(type: string) {
 }
 
 function shouldShowFloorFields(type: string) {
-  return !isLandType(type) && !isVillaType(type);
+  return isResidentialDetailType(type) || isOfficeDetailType(type);
 }
 
 function shouldShowBuildingFloorCount(type: string) {
-  return !isLandType(type);
+  return isResidentialDetailType(type) || isOfficeDetailType(type) || isTouristicType(type);
 }
 
 function getRoomLabel(type: string) {
-  if (isLandType(type)) return "Nitelik / İmar Durumu";
-  if (isIndustrialType(type)) return "Kullanım / Tesis Tipi";
-  if (isCommercialType(type)) return "Kullanım Tipi";
-  if (isVillaType(type)) return "Oda / Villa Planı";
-  return "Oda / Plan Tipi";
+  if (isTouristicType(type)) return "Oda Sayısı";
+  if (isOfficeDetailType(type)) return "Oda Sayısı";
+  if (isResidentialDetailType(type)) return "Oda Sayısı";
+  return "Oda Sayısı";
 }
 
 function getRoomPlaceholder(type: string) {
-  if (isLandType(type)) return "Örn: İmarlı, Tarla, Zeytinlik, Hisseli, Müstakil Parsel";
-  if (isIndustrialType(type)) return "Örn: Depo, Atölye, Üretim Alanı, Lojistik Merkez";
-  if (isCommercialType(type)) return "Örn: Cadde Üzeri, Plaza Ofis, Dükkan, Restoran";
-  if (isVillaType(type)) return "Örn: 5+1, 6+2, Dubleks, Tripleks";
-  return "Örn: 3+1, 2,5+1, 10+4, Loft";
+  if (isTouristicType(type)) return "Örn: 12 oda, 24 oda, 40 oda";
+  if (isOfficeDetailType(type)) return "Örn: 1+1, 2+1, 4+2";
+  return "Örn: 3+1, 4+1, 5+2";
 }
 
 function getAreaLabel(type: string) {
   if (isLandType(type)) return "Arazi Alanı (m²) *";
   if (isIndustrialType(type)) return "Kapalı / Kullanım Alanı (m²) *";
   if (isCommercialType(type)) return "Kullanım Alanı (m²) *";
+  if (type === "KAMP_YERI") return "Açık Alan (m²) *";
+  if (type === "TATIL_KOYU") return "Toplam Alan (m²) *";
   return "Alan (m²) *";
 }
 
@@ -228,6 +233,59 @@ function getNumberPlaceholder(type: string) {
   if (isCommercialType(type)) return "Örn: Dükkan 4, Ofis 12, Plaza 8";
   if (isVillaType(type)) return "Örn: Villa 6, A-12, Kapı 3";
   return "Örn: 6, A-12, B Blok 3";
+}
+
+
+function getTypeKeyFromCategory(mainCategory: string, subCategory: string) {
+  return CATEGORY_TYPE_MAP[mainCategory]?.[subCategory] || "DAIRE";
+}
+
+function getMainCategoryFromType(type: string) {
+  for (const [mainCategory, items] of Object.entries(CATEGORY_TYPE_MAP)) {
+    if (Object.values(items).includes(type)) return mainCategory;
+  }
+
+  return "KONUT";
+}
+
+function getSubCategoryFromType(type: string) {
+  const mainCategory = getMainCategoryFromType(type);
+  const items = CATEGORY_TYPE_MAP[mainCategory] || {};
+  const found = Object.entries(items).find(([, typeKey]) => typeKey === type);
+  return found?.[0] || CATEGORY_OPTIONS[mainCategory]?.[0] || "Daire";
+}
+
+function isResidentialDetailType(type: string) {
+  const mainCategory = getMainCategoryFromType(type);
+  return mainCategory === "KONUT" || mainCategory === "KONUT PROJELERİ";
+}
+
+function isOfficeDetailType(type: string) {
+  return type === "OFIS_BURO";
+}
+
+function isTouristicType(type: string) {
+  return getMainCategoryFromType(type) === "TURİSTİK TESİS";
+}
+
+function shouldShowRoomCountField(type: string) {
+  return isResidentialDetailType(type) || isOfficeDetailType(type) || ["OTEL", "APART_OTEL", "BUTIK_OTEL", "MOTEL", "PANSIYON", "DEVRE_MULK"].includes(type);
+}
+
+function shouldShowBuildingAgeField(type: string) {
+  return isResidentialDetailType(type) || isOfficeDetailType(type);
+}
+
+function shouldShowOpenAreaField(type: string) {
+  return ["KAMP_YERI", "TATIL_KOYU"].includes(type);
+}
+
+function shouldShowClosedAreaField(type: string) {
+  return type === "TATIL_KOYU";
+}
+
+function shouldShowBedCountField(type: string) {
+  return ["OTEL", "BUTIK_OTEL", "MOTEL", "PANSIYON"].includes(type);
 }
 
 type AreaRule = {
@@ -390,14 +448,27 @@ export default function StokCreateModal({
   const [placeOptions, setPlaceOptions] = useState<LocationOption[]>([]);
   const [locationLoading, setLocationLoading] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState("");
+  const [mainCategory, setMainCategory] = useState("KONUT");
 
-  const selectedCurrency = String((unitForm as any).currency || "TRY");
+  const selectedCurrency = String(unitForm.priceCurrency || "TRY");
   const selectedFloorLabel = String((unitForm as any).floorLabel || "");
-  const buildingFloorCount = String((unitForm as any).buildingFloorCount || "");
+  const buildingFloorCount = String((unitForm as any).totalFloors || "");
+  const buildingAge = String((unitForm as any).buildingAge || "");
+  const bedCount = String((unitForm as any).bedCount || "");
+  const openArea = String((unitForm as any).openArea || "");
+  const closedArea = String((unitForm as any).closedArea || "");
+  const selectedSubCategory = getSubCategoryFromType(unitForm.type);
+  const subCategoryOptions = CATEGORY_OPTIONS[mainCategory] || CATEGORY_OPTIONS.KONUT;
+  const roomOptions = isOfficeDetailType(unitForm.type) ? OFFICE_ROOM_COUNT_OPTIONS : ROOM_COUNT_OPTIONS;
   const priceDisplay = formatPriceInput(String(unitForm.price || ""));
   const descriptionLength = unitForm.description.length;
+  const showRoomCountField = shouldShowRoomCountField(unitForm.type);
+  const showBuildingAgeField = shouldShowBuildingAgeField(unitForm.type);
   const showFloorFields = shouldShowFloorFields(unitForm.type);
   const showBuildingFloorCount = shouldShowBuildingFloorCount(unitForm.type);
+  const showBedCountField = shouldShowBedCountField(unitForm.type);
+  const showOpenAreaField = shouldShowOpenAreaField(unitForm.type);
+  const showClosedAreaField = shouldShowClosedAreaField(unitForm.type);
 
   const totalSelectedImages = useMemo(() => {
     return (coverImage ? 1 : 0) + galleryImages.length;
@@ -478,6 +549,11 @@ export default function StokCreateModal({
       alive = false;
     };
   }, [open, projectForm.city, projectForm.district, districtOptions]);
+
+  useEffect(() => {
+    if (!open) return;
+    setMainCategory(getMainCategoryFromType(unitForm.type));
+  }, [open, unitForm.type]);
 
   if (!open) return null;
 
@@ -627,6 +703,30 @@ export default function StokCreateModal({
 
     if (price && (price < 100000 || price > 5000000000)) {
       return "Fiyat değeri olağan dışı görünüyor. Lütfen para birimini ve tutarı kontrol ediniz.";
+    }
+
+    if (showRoomCountField && !String(unitForm.roomCount || "").trim()) {
+      return "Oda sayısı zorunludur.";
+    }
+
+    if (showBuildingAgeField && !buildingAge) {
+      return "Bina yaşı zorunludur.";
+    }
+
+    if (showFloorFields && !selectedFloorLabel) {
+      return "Bulunduğu kat zorunludur.";
+    }
+
+    if (showBuildingFloorCount && !buildingFloorCount) {
+      return "Kat sayısı zorunludur.";
+    }
+
+    if (showBedCountField && !bedCount.trim()) {
+      return "Yatak sayısı zorunludur.";
+    }
+
+    if (showClosedAreaField && !closedArea.trim()) {
+      return "Kapalı alan zorunludur.";
     }
 
     if (descriptionLength > MAX_DESCRIPTION_LENGTH) {
@@ -807,24 +907,56 @@ export default function StokCreateModal({
               <label className="stock-form-field">
                 <span>Mülk Tipi *</span>
                 <select
-                  value={unitForm.type}
+                  value={mainCategory}
                   onChange={(e) => {
-                    const nextType = e.target.value;
+                    const nextMainCategory = e.target.value;
+                    const firstSubCategory = CATEGORY_OPTIONS[nextMainCategory]?.[0] || "Daire";
+                    const nextType = getTypeKeyFromCategory(nextMainCategory, firstSubCategory);
+
+                    setMainCategory(nextMainCategory);
                     setUnitForm((current) => ({
                       ...current,
                       type: nextType,
                       roomCount: "",
                       floor: "",
                       floorLabel: "",
-                      buildingFloorCount: "",
+                      totalFloors: "",
                       number: "",
                     } as UnitFormState));
                     setLocalError("");
                   }}
                 >
-                  {SORTED_TYPE_OPTIONS.map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
+                  {MAIN_CATEGORY_OPTIONS.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="stock-form-field">
+                <span>Alt Kategori *</span>
+                <select
+                  value={selectedSubCategory}
+                  onChange={(e) => {
+                    const subCategory = e.target.value;
+                    const nextType = getTypeKeyFromCategory(mainCategory, subCategory);
+
+                    setUnitForm((current) => ({
+                      ...current,
+                      type: nextType,
+                      roomCount: "",
+                      floor: "",
+                      floorLabel: "",
+                      totalFloors: "",
+                      number: "",
+                    } as UnitFormState));
+                    setLocalError("");
+                  }}
+                >
+                  {subCategoryOptions.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
                     </option>
                   ))}
                 </select>
@@ -844,60 +976,22 @@ export default function StokCreateModal({
                 </select>
               </label>
 
-              <label className="stock-form-field">
-                <span>{getRoomLabel(unitForm.type)}</span>
-                {isLandType(unitForm.type) ? (
+              {showRoomCountField && (
+                <label className="stock-form-field">
+                  <span>{getRoomLabel(unitForm.type)} *</span>
                   <select
                     value={unitForm.roomCount}
                     onChange={(e) => setUnitField("roomCount", e.target.value)}
                   >
-                    <option value="">Nitelik / imar durumu seçiniz</option>
-                    {LAND_QUALITY_OPTIONS.map((option) => (
+                    <option value="">Oda sayısı seçiniz</option>
+                    {roomOptions.map((option) => (
                       <option key={option} value={option}>
                         {option}
                       </option>
                     ))}
                   </select>
-                ) : isIndustrialType(unitForm.type) ? (
-                  <select
-                    value={unitForm.roomCount}
-                    onChange={(e) => setUnitField("roomCount", e.target.value)}
-                  >
-                    <option value="">Kullanım / tesis tipi seçiniz</option>
-                    {INDUSTRIAL_USAGE_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                ) : isCommercialType(unitForm.type) ? (
-                  <select
-                    value={unitForm.roomCount}
-                    onChange={(e) => setUnitField("roomCount", e.target.value)}
-                  >
-                    <option value="">Kullanım tipi seçiniz</option>
-                    {COMMERCIAL_USAGE_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <>
-                    <input
-                      list="room-count-options"
-                      value={unitForm.roomCount}
-                      onChange={(e) => setUnitField("roomCount", e.target.value)}
-                      placeholder={getRoomPlaceholder(unitForm.type)}
-                    />
-                    <datalist id="room-count-options">
-                      {ROOM_COUNT_OPTIONS.map((r) => (
-                        <option key={r} value={r} />
-                      ))}
-                    </datalist>
-                  </>
-                )}
-              </label>
+                </label>
+              )}
 
               <label className="stock-form-field">
                 <span>{getAreaLabel(unitForm.type)}</span>
@@ -908,6 +1002,59 @@ export default function StokCreateModal({
                   placeholder="Örn: 190"
                 />
               </label>
+
+              {showOpenAreaField && (
+                <label className="stock-form-field">
+                  <span>Açık Alan (m²) *</span>
+                  <input
+                    type="number"
+                    value={openArea}
+                    onChange={(e) => setUnitField("openArea", e.target.value)}
+                    placeholder="Örn: 5000"
+                  />
+                </label>
+              )}
+
+              {showClosedAreaField && (
+                <label className="stock-form-field">
+                  <span>Kapalı Alan (m²) *</span>
+                  <input
+                    type="number"
+                    value={closedArea}
+                    onChange={(e) => setUnitField("closedArea", e.target.value)}
+                    placeholder="Örn: 1200"
+                  />
+                </label>
+              )}
+
+              {showBedCountField && (
+                <label className="stock-form-field">
+                  <span>Yatak Sayısı *</span>
+                  <input
+                    type="number"
+                    value={bedCount}
+                    onChange={(e) => setUnitField("bedCount", e.target.value)}
+                    placeholder="Örn: 40"
+                  />
+                </label>
+              )}
+
+              {showBuildingAgeField && (
+                <label className="stock-form-field">
+                  <span>Bina Yaşı *</span>
+                  <select
+                    value={buildingAge}
+                    onChange={(e) => setUnitField("buildingAge", e.target.value)}
+                  >
+                    <option value="">Bina yaşı seçiniz</option>
+                    {BUILDING_AGE_OPTIONS.map((age) => (
+                      <option key={age} value={age}>
+                        {age}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
               {showFloorFields && (
                 <label className="stock-form-field">
@@ -938,7 +1085,7 @@ export default function StokCreateModal({
                   <span>{isVillaType(unitForm.type) ? "Yapı Kat Sayısı" : "Toplam Kat Sayısı"}</span>
                   <select
                     value={buildingFloorCount}
-                    onChange={(e) => setUnitField("buildingFloorCount", e.target.value)}
+                    onChange={(e) => setUnitField("totalFloors", e.target.value)}
                   >
                     <option value="">Seçiniz</option>
                     {BUILDING_FLOOR_OPTIONS.map((floor) => (
@@ -963,7 +1110,7 @@ export default function StokCreateModal({
                 <span>Para Birimi *</span>
                 <select
                   value={selectedCurrency}
-                  onChange={(e) => setUnitField("currency", e.target.value)}
+                  onChange={(e) => setUnitField("priceCurrency", e.target.value)}
                 >
                   {CURRENCY_OPTIONS.map((currency) => (
                     <option key={currency.value} value={currency.value}>
