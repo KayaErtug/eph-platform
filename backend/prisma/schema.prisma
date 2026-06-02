@@ -159,18 +159,19 @@ model Unit {
 }
 
 model UnitImage {
-  id          String   @id @default(uuid())
-  unitId      String
-  imageUrl    String
-  storagePath String
-  bucket      String   @default("portfolio-images")
-  fileName    String?
-  mimeType    String?
-  size        Int?
-  isCover     Boolean  @default(false)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  unitId       String
+  url          String
+  supabaseUrl  String?
+  path         String
+  bucket       String   @default("portfolio-images")
+  originalName String?
+  mimetype     String?
+  size         Int?
+  isCover      Boolean  @default(false)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
 

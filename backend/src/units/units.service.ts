@@ -22,6 +22,22 @@ type CreateUnitPayload = {
   description?: string;
 };
 
+const unitInclude = {
+  project: {
+    select: {
+      id: true,
+      name: true,
+      city: true,
+      district: true,
+      address: true,
+      owner: { select: { firstName: true, lastName: true, role: true } },
+    },
+  },
+  images: {
+    orderBy: [{ isCover: 'desc' as const }, { sortOrder: 'asc' as const }, { createdAt: 'asc' as const }],
+  },
+};
+
 @Injectable()
 export class UnitsService {
   constructor(private prisma: PrismaService) {}
@@ -50,36 +66,14 @@ export class UnitsService {
         description: data.description,
         projectId,
       },
-      include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-            city: true,
-            district: true,
-            address: true,
-            owner: { select: { firstName: true, lastName: true, role: true } },
-          },
-        },
-      },
+      include: unitInclude,
     });
   }
 
   async findOne(id: string) {
     const unit = await this.prisma.unit.findUnique({
       where: { id },
-      include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-            city: true,
-            district: true,
-            address: true,
-            owner: { select: { firstName: true, lastName: true, role: true } },
-          },
-        },
-      },
+      include: unitInclude,
     });
 
     if (!unit) {
@@ -96,18 +90,7 @@ export class UnitsService {
         status: filters?.status,
         type: filters?.type,
       },
-      include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-            city: true,
-            district: true,
-            address: true,
-            owner: { select: { firstName: true, lastName: true, role: true } },
-          },
-        },
-      },
+      include: unitInclude,
       orderBy: [{ floor: 'asc' }, { number: 'asc' }],
     });
   }
@@ -130,18 +113,7 @@ export class UnitsService {
             : undefined,
         },
       },
-      include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-            city: true,
-            district: true,
-            address: true,
-            owner: { select: { firstName: true, lastName: true, role: true } },
-          },
-        },
-      },
+      include: unitInclude,
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -163,18 +135,7 @@ export class UnitsService {
     return this.prisma.unit.update({
       where: { id },
       data: { status },
-      include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-            city: true,
-            district: true,
-            address: true,
-            owner: { select: { firstName: true, lastName: true, role: true } },
-          },
-        },
-      },
+      include: unitInclude,
     });
   }
 
@@ -195,18 +156,7 @@ export class UnitsService {
     return this.prisma.unit.update({
       where: { id },
       data,
-      include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-            city: true,
-            district: true,
-            address: true,
-            owner: { select: { firstName: true, lastName: true, role: true } },
-          },
-        },
-      },
+      include: unitInclude,
     });
   }
 
@@ -236,6 +186,7 @@ export class UnitsService {
     return this.prisma.unit.update({
       where: { id },
       data: { ...data, isVerified, verifiedAt },
+      include: unitInclude,
     });
   }
 

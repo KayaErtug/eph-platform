@@ -37,6 +37,7 @@ import StokCreateModal from "@/components/stok/StokCreateModal";
 import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
 import type {
+  LocalPortfolioImage,
   Project,
   ProjectFormState,
   Unit,
@@ -105,6 +106,8 @@ export default function StokPage() {
     description: "",
   });
 
+  const [coverImage, setCoverImage] = useState<LocalPortfolioImage | null>(null);
+  const [galleryImages, setGalleryImages] = useState<LocalPortfolioImage[]>([]);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState(false);
@@ -250,6 +253,39 @@ export default function StokPage() {
 
   const myProjects = user?.role === "ADMIN" ? projects : [];
 
+  const revokePortfolioPreviews = (
+    cover: LocalPortfolioImage | null,
+    gallery: LocalPortfolioImage[],
+  ) => {
+    if (cover?.previewUrl) URL.revokeObjectURL(cover.previewUrl);
+    gallery.forEach((image) => {
+      if (image.previewUrl) URL.revokeObjectURL(image.previewUrl);
+    });
+  };
+
+  const resetSelectedImages = () => {
+    revokePortfolioPreviews(coverImage, galleryImages);
+    setCoverImage(null);
+    setGalleryImages([]);
+  };
+
+  const uploadPortfolioImage = async (
+    unitId: string,
+    file: File,
+    isCover: boolean,
+    sortOrder: number,
+  ) => {
+    const payload = new FormData();
+    payload.append("portfolioId", unitId);
+    payload.append("isCover", isCover ? "true" : "false");
+    payload.append("sortOrder", String(sortOrder));
+    payload.append("file", file);
+
+    return api.post("/portfolio-images/upload", payload, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  };
+
   const resetForm = () => {
     setSelectedProjectId("");
 
@@ -273,6 +309,7 @@ export default function StokPage() {
 
     setFormError("");
     setFormSuccess(false);
+    resetSelectedImages();
   };
 
   const handleSubmit = async () => {
@@ -305,7 +342,13 @@ export default function StokPage() {
         return;
       }
 
-      await api.post(`/units/project/${projectId}`, {
+      if (!coverImage) {
+        setFormError("Kapak fotoğrafı zorunludur.");
+        setFormLoading(false);
+        return;
+      }
+
+      const unitRes = await api.post(`/units/project/${projectId}`, {
         type: unitForm.type,
         floor: unitForm.floor ? parseInt(unitForm.floor) : undefined,
         number: unitForm.number,
@@ -315,6 +358,24 @@ export default function StokPage() {
         status: unitForm.status,
         description: unitForm.description || undefined,
       });
+
+      const createdUnitId = unitRes.data?.id;
+
+      if (!createdUnitId) {
+        setFormError("Portföy oluşturuldu ancak görsel yükleme için unitId alınamadı.");
+        setFormLoading(false);
+        return;
+      }
+
+      await uploadPortfolioImage(createdUnitId, coverImage.file, true, 0);
+
+      if (galleryImages.length > 0) {
+        await Promise.all(
+          galleryImages.map((image, index) =>
+            uploadPortfolioImage(createdUnitId, image.file, false, index + 1),
+          ),
+        );
+      }
 
       setFormSuccess(true);
       await fetchData();
@@ -429,7 +490,7 @@ export default function StokPage() {
       floor: unit.floor != null ? `${unit.floor}. Kat` : "—",
       authorization:
         unit.yetkiVerified || unit.isVerified ? "Yetkili" : "Kontrol",
-      coverImage: "/showcase/stock.jpg",
+      coverImage: getUnitCoverImage(unit),
       consultantName:
         [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
         "EPH Üyesi",
@@ -871,7 +932,10 @@ export default function StokPage() {
 
       <StokCreateModal
         open={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={() => {
+          setShowModal(false);
+          resetForm();
+        }}
         projects={myProjects}
         selectedProjectId={selectedProjectId}
         setSelectedProjectId={setSelectedProjectId}
@@ -882,6 +946,10 @@ export default function StokPage() {
         formError={formError}
         formSuccess={formSuccess}
         formLoading={formLoading}
+        coverImage={coverImage}
+        setCoverImage={setCoverImage}
+        galleryImages={galleryImages}
+        setGalleryImages={setGalleryImages}
         onSubmit={handleSubmit}
       />
     </div>
@@ -892,6 +960,14 @@ function isUnitVerified(unit: Unit) {
   return Boolean(
     unit.isVerified ||
       (unit.tapuVerified && unit.photoVerified && unit.yetkiVerified),
+  );
+}
+
+function getUnitCoverImage(unit: Unit) {
+  return (
+    unit.images?.find((image) => image.isCover)?.url ||
+    unit.images?.[0]?.url ||
+    "/showcase/stock.jpg"
   );
 }
 
@@ -1091,6 +1167,7 @@ function PremiumUnitCard({
   const location =
     [unit.project?.district, unit.project?.city].filter(Boolean).join(" / ") ||
     "Konum bilgisi yok";
+  const coverImage = getUnitCoverImage(unit);
 
   return (
     <article
@@ -1101,7 +1178,7 @@ function PremiumUnitCard({
         <div className="relative mb-5 min-h-[138px] overflow-hidden rounded-[26px] bg-[#EFF6FF]">
           <div
             className="absolute inset-0 bg-cover bg-center opacity-95 transition duration-500 group-hover:scale-105"
-            style={{ backgroundImage: "url('/showcase/stock.jpg')" }}
+            style={{ backgroundImage: `url('${coverImage}')` }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/78 via-[#06194A]/12 to-transparent" />
           <div className="absolute left-4 top-4 flex flex-wrap gap-2">

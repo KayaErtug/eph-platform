@@ -1,20 +1,25 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase.service';
+import { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseService } from '../supabase/supabase.service';
 
 type UploadPortfolioImageInput = {
   userId: string;
+  userRole?: Role | string;
   portfolioId: string;
   file: Express.Multer.File;
   isCover?: boolean;
+  sortOrder?: number;
 };
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_GALLERY_COUNT = 15;
 
 @Injectable()
 export class PortfolioImagesService {
@@ -27,7 +32,7 @@ export class PortfolioImagesService {
   ) {}
 
   async uploadPortfolioImage(input: UploadPortfolioImageInput) {
-    const { userId, portfolioId, file, isCover } = input;
+    const { userId, userRole, portfolioId, file, isCover, sortOrder } = input;
 
     if (!file) {
       throw new NotFoundException('Yüklenecek görsel bulunamadı.');
@@ -46,8 +51,10 @@ export class PortfolioImagesService {
       throw new NotFoundException('Portföy bulunamadı.');
     }
 
-    if (unit.project.ownerId !== userId) {
-      throw new BadRequestException('Bu portföye görsel yükleme yetkiniz yok.');
+    const isAdmin = userRole === Role.ADMIN || userRole === 'ADMIN';
+
+    if (!isAdmin && unit.project.ownerId !== userId) {
+      throw new ForbiddenException('Bu portföye görsel yükleme yetkiniz yok.');
     }
 
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
@@ -60,28 +67,23 @@ export class PortfolioImagesService {
       throw new BadRequestException('Görsel boyutu en fazla 10 MB olabilir.');
     }
 
-    const existingCount = await this.prisma.unitImage.count({
-      where: { unitId: portfolioId },
-    });
-
-    if (!isCover && existingCount >= 16) {
-      throw new BadRequestException(
-        'Bir portföy için en fazla 1 kapak ve 15 galeri fotoğrafı yüklenebilir.',
-      );
-    }
-
-    if (isCover) {
-      await this.prisma.unitImage.updateMany({
-        where: { unitId: portfolioId, isCover: true },
-        data: { isCover: false },
+    if (!isCover) {
+      const galleryCount = await this.prisma.unitImage.count({
+        where: { unitId: portfolioId, isCover: false },
       });
+
+      if (galleryCount >= MAX_GALLERY_COUNT) {
+        throw new BadRequestException(
+          `Galeri için en fazla ${MAX_GALLERY_COUNT} fotoğraf yüklenebilir.`,
+        );
+      }
     }
 
     const extension = this.getExtension(file.originalname, file.mimetype);
     const safeUserId = this.slugify(userId);
     const safePortfolioId = this.slugify(portfolioId);
     const uniqueName = isCover
-      ? `cover.${extension}`
+      ? `cover-${Date.now()}.${extension}`
       : `${Date.now()}-${Math.random().toString(16).slice(2)}.${extension}`;
 
     const path = `portfolio/${safeUserId}/${safePortfolioId}/${uniqueName}`;
@@ -96,17 +98,25 @@ export class PortfolioImagesService {
     const supabaseUrl = this.supabaseService.getPublicUrl(this.bucket, path);
     const imageUrl = this.supabaseService.getImageDomainUrl(path);
 
-    const image = await this.prisma.unitImage.create({
+    if (isCover) {
+      await this.prisma.unitImage.updateMany({
+        where: { unitId: portfolioId, isCover: true },
+        data: { isCover: false },
+      });
+    }
+
+    const imageRecord = await this.prisma.unitImage.create({
       data: {
         unitId: portfolioId,
-        imageUrl,
-        storagePath: path,
+        url: imageUrl,
+        supabaseUrl,
+        path,
         bucket: this.bucket,
-        fileName: file.originalname,
-        mimeType: file.mimetype,
+        originalName: file.originalname,
+        mimetype: file.mimetype,
         size: file.size,
         isCover: Boolean(isCover),
-        sortOrder: isCover ? 0 : existingCount + 1,
+        sortOrder: Number.isFinite(sortOrder) ? Number(sortOrder) : 0,
       },
     });
 
@@ -116,11 +126,11 @@ export class PortfolioImagesService {
       path,
       supabaseUrl,
       imageUrl,
+      image: imageRecord,
       isCover: Boolean(isCover),
       originalName: file.originalname,
       size: file.size,
       mimetype: file.mimetype,
-      image,
     };
   }
 

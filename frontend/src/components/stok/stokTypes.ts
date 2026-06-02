@@ -1,3 +1,25 @@
+export type LocalPortfolioImage = {
+  id: string;
+  file: File;
+  previewUrl: string;
+};
+
+export interface UnitImage {
+  id: string;
+  unitId: string;
+  url: string;
+  supabaseUrl?: string;
+  path?: string;
+  bucket?: string;
+  originalName?: string;
+  mimetype?: string;
+  size?: number;
+  isCover: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Unit {
   id: string;
   type: string;
@@ -14,6 +36,7 @@ export interface Unit {
   photoVerified?: boolean;
   yetkiVerified?: boolean;
   createdAt?: string;
+  images?: UnitImage[];
   project: {
     id: string;
     name: string;

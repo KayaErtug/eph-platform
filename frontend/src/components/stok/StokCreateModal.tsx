@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { CITIES, ROOM_COUNT_OPTIONS, STATUS_LABELS, TYPE_LABELS } from "./stokConstants";
-import type { Project, ProjectFormState, UnitFormState } from "./stokTypes";
+import type { LocalPortfolioImage, Project, ProjectFormState, UnitFormState } from "./stokTypes";
 
 interface Props {
   open: boolean;
@@ -17,18 +17,16 @@ interface Props {
   formError: string;
   formSuccess: boolean;
   formLoading: boolean;
+  coverImage: LocalPortfolioImage | null;
+  setCoverImage: React.Dispatch<React.SetStateAction<LocalPortfolioImage | null>>;
+  galleryImages: LocalPortfolioImage[];
+  setGalleryImages: React.Dispatch<React.SetStateAction<LocalPortfolioImage[]>>;
   onSubmit: () => void;
 }
 
 const MAX_GALLERY_COUNT = 15;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
-
-type LocalImage = {
-  id: string;
-  file: File;
-  previewUrl: string;
-};
 
 function formatFileSize(size: number) {
   if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
@@ -52,13 +50,15 @@ export default function StokCreateModal({
   formError,
   formSuccess,
   formLoading,
+  coverImage,
+  setCoverImage,
+  galleryImages,
+  setGalleryImages,
   onSubmit,
 }: Props) {
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [coverImage, setCoverImage] = useState<LocalImage | null>(null);
-  const [galleryImages, setGalleryImages] = useState<LocalImage[]>([]);
   const [imageError, setImageError] = useState("");
 
   const totalSelectedImages = useMemo(() => {
@@ -83,7 +83,7 @@ export default function StokCreateModal({
     return "";
   };
 
-  const createLocalImage = (file: File): LocalImage => ({
+  const createLocalImage = (file: File): LocalPortfolioImage => ({
     id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()
       .toString(16)
       .slice(2)}`,
@@ -517,7 +517,11 @@ export default function StokCreateModal({
             İptal
           </button>
 
-          <button className="stock-save-btn" onClick={onSubmit} disabled={formLoading}>
+          <button
+            className="stock-save-btn"
+            onClick={onSubmit}
+            disabled={formLoading}
+          >
             {formLoading ? "Kaydediliyor..." : "Portföyü Kaydet"}
           </button>
         </div>

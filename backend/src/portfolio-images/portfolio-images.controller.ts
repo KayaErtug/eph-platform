@@ -31,12 +31,15 @@ export class PortfolioImagesController {
     @UploadedFile() file: Express.Multer.File,
     @Body('portfolioId') portfolioId: string,
     @Body('isCover') isCover?: string,
+    @Body('sortOrder') sortOrder?: string,
   ) {
     return this.portfolioImagesService.uploadPortfolioImage({
       userId: user.id,
+      userRole: user.role,
       portfolioId,
       file,
       isCover: isCover === 'true',
+      sortOrder: sortOrder ? Number(sortOrder) : 0,
     });
   }
 }
