@@ -46,7 +46,15 @@ const MIN_FILE_SIZE = 30 * 1024;
 const MIN_IMAGE_WIDTH = 800;
 const MIN_IMAGE_HEIGHT = 600;
 const MAX_DESCRIPTION_LENGTH = 500;
-const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ACCEPTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "application/octet-stream",
+];
 
 const CURRENCY_OPTIONS = [
   { value: "TRY", label: "Türk Lirası", symbol: "₺" },
@@ -338,7 +346,11 @@ function formatFileSize(size: number) {
 }
 
 function isAcceptedImage(file: File) {
-  return ACCEPTED_IMAGE_TYPES.includes(file.type);
+  const type = String(file.type || "").toLowerCase();
+
+  if (!type) return true;
+
+  return ACCEPTED_IMAGE_TYPES.includes(type);
 }
 
 function normalizeTurkishText(value: string) {
