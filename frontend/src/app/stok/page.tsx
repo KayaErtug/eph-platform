@@ -1,7 +1,7 @@
 "use client";
 
 import LinaPanel from "../../components/LinaPanel";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
@@ -15,7 +15,6 @@ import {
   CheckSquare,
   Eye,
   Grid2X2,
-  Heart,
   Home,
   List,
   LogOut,
@@ -116,6 +115,21 @@ function formatCompactPrice(value?: number, currency?: string) {
   return `${numeric.toLocaleString("tr-TR")} ${symbol}`;
 }
 
+
+function formatShortDate(value?: string) {
+  if (!value) return "Tarih yok";
+
+  try {
+    return new Date(value).toLocaleDateString("tr-TR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "Tarih yok";
+  }
+}
+
 function formatFloorInfo(unit: Pick<Unit, "floor" | "floorLabel" | "totalFloors">) {
   const floorText =
     unit.floorLabel ||
@@ -196,6 +210,7 @@ function unitTitle(unit: Unit) {
 export default function StokPage() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
@@ -680,7 +695,7 @@ export default function StokPage() {
     <div className="min-h-screen bg-[#F7FBFF] text-[#27364F]">
       <StokPremiumStyles />
 
-      <main className="mx-auto min-h-screen max-w-[520px] px-4 pb-28 pt-5">
+      <main className="mx-auto min-h-screen w-full max-w-[1180px] px-4 pb-32 pt-5 md:px-6 lg:px-8">
         <section className="eph-mobile-stock-head">
           <div className="flex items-start justify-between gap-3">
             <Link href="/dashboard" className="flex items-center gap-2 no-underline">
@@ -698,20 +713,31 @@ export default function StokPage() {
             <div className="flex items-start gap-3">
               <button
                 className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#06194A] shadow-[0_12px_26px_rgba(15,23,42,0.06)]"
-                onClick={() => setSearch((current) => current)}
-                aria-label="Ara"
+                onClick={() => searchInputRef.current?.focus()}
+                aria-label="Arama alanına git"
               >
                 <Search size={22} />
               </button>
 
               <button
+                className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-[0_12px_26px_rgba(15,23,42,0.06)]"
+                onClick={() => setLinaOpen(true)}
+                aria-label="Lina asistanı aç"
+              >
+                <Sparkles size={22} />
+              </button>
+
+              <button
                 className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#06194A] shadow-[0_12px_26px_rgba(15,23,42,0.06)]"
-                aria-label="Bildirimler"
+                onClick={() => router.push("/messages")}
+                aria-label="Mesajlar"
               >
                 <Bell size={22} />
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white">
-                  5
-                </span>
+                {requestCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white">
+                    {requestCount > 9 ? "9+" : requestCount}
+                  </span>
+                )}
               </button>
 
               <button
@@ -750,7 +776,7 @@ export default function StokPage() {
             />
           </div>
 
-          <div className="mt-4 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#DDE7F3] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.06)]">
+          <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-[18px] border border-[#DDE7F3] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.06)] sm:grid-cols-4">
             <button
               onClick={() => setStatusFilter((current) => (current ? "" : "SATILIK"))}
               className={`flex min-h-[48px] items-center justify-center gap-1.5 border-r border-[#DDE7F3] text-xs font-black ${
@@ -758,7 +784,7 @@ export default function StokPage() {
               }`}
             >
               <SlidersHorizontal size={16} />
-              Filtrele
+              {statusFilter ? "Satılık" : "Filtre"}
             </button>
 
             <button
@@ -779,15 +805,23 @@ export default function StokPage() {
 
             <button
               onClick={() => {
-                const firstCity = uniqueCities[0] || "";
-                setCityFilter((current) => (current ? "" : firstCity));
+                if (uniqueCities.length === 0) return;
+
+                setCityFilter((current) => {
+                  if (!current) return uniqueCities[0] || "";
+
+                  const currentIndex = uniqueCities.indexOf(current);
+                  const nextCity = uniqueCities[currentIndex + 1];
+
+                  return nextCity || "";
+                });
               }}
               className={`flex min-h-[48px] items-center justify-center gap-1.5 border-r border-[#DDE7F3] text-xs font-black ${
                 cityFilter ? "text-[#1557D6]" : "text-[#27364F]"
               }`}
             >
               <Map size={16} />
-              Harita
+              {cityFilter || "Şehir"}
             </button>
 
             <button
@@ -803,6 +837,7 @@ export default function StokPage() {
             <div className="flex items-center gap-2">
               <Search size={15} className="text-[#64748B]" />
               <input
+                ref={searchInputRef}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Portföy, şehir, ilçe ara..."
@@ -813,14 +848,14 @@ export default function StokPage() {
         </section>
 
         <section className="mt-5">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-lg font-black tracking-[-0.03em] text-[#06194A]">
-              Portföyler
+              Canlı Portföy Listesi
             </h2>
 
             <button
               onClick={() => setShowAllPortfolios((current) => !current)}
-              className="inline-flex items-center gap-1 text-sm font-black text-[#1557D6]"
+              className="inline-flex min-h-[38px] items-center gap-1 rounded-2xl bg-[#EFF6FF] px-3 text-sm font-black text-[#1557D6]"
             >
               {showAllPortfolios ? "Kısalt" : "Tümünü Gör"}
               <span>›</span>
@@ -846,7 +881,7 @@ export default function StokPage() {
               }}
             />
           ) : viewMode === "cards" ? (
-            <div className="grid gap-4">
+            <div className="grid gap-4 lg:grid-cols-2">
               {cardVisibleUnits.map((unit) => (
                 <MobilePortfolioCard
                   key={unit.id}
@@ -891,7 +926,7 @@ export default function StokPage() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <PremiumActionCard
                   title="Seçili Portföy"
                   value={selectedUnitIds.length}
@@ -916,6 +951,37 @@ export default function StokPage() {
                   note="Portföy başına ortalama"
                   icon={<TrendingUp size={19} />}
                 />
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUnitIds([])}
+                  disabled={selectedUnitIds.length === 0}
+                  className="min-h-[44px] rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-xs font-black text-[#475569] disabled:opacity-45"
+                >
+                  Seçimi Temizle
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch("");
+                    setStatusFilter("");
+                    setCityFilter("");
+                    setShowAllPortfolios(true);
+                    setViewMode("list");
+                  }}
+                  className="min-h-[44px] rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-xs font-black text-[#1557D6]"
+                >
+                  Tüm Portföyleri Aç
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLinaOpen(true)}
+                  className="min-h-[44px] rounded-[18px] bg-[#1557D6] px-3 text-xs font-black text-white"
+                >
+                  Lina ile Hazırla
+                </button>
               </div>
             </div>
 
@@ -1014,7 +1080,7 @@ export default function StokPage() {
             <Plus size={30} />
             <span className="absolute -bottom-6 text-xs font-bold text-[#27364F]">Ekle</span>
           </button>
-          <BottomItem href="/network" icon={<Heart size={22} />} label="Favoriler" />
+          <BottomItem href="/network" icon={<UsersRound size={22} />} label="Network" />
           <BottomItem href="/profil" icon={<User size={22} />} label="Profil" />
         </div>
       </nav>
@@ -1087,7 +1153,7 @@ function MobilePortfolioCard({
   const badgeLabel = statusLabels[unit.status] || unit.status || "Portföy";
 
   return (
-    <article className="grid min-h-[166px] grid-cols-[46%_1fr] overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-white shadow-[0_16px_38px_rgba(15,23,42,0.065)]">
+    <article className="grid min-h-[174px] grid-cols-[44%_1fr] overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-white shadow-[0_16px_38px_rgba(15,23,42,0.065)]">
       <button onClick={onOpen} className="relative min-h-[166px] overflow-hidden bg-[#EFF6FF] text-left">
         {image ? (
           <img src={image} alt={unit.project?.name || "Portföy"} className="h-full w-full object-cover" />
@@ -1146,7 +1212,7 @@ function MobilePortfolioCard({
 
         <div className="mt-2 flex items-center justify-between">
           <p className="text-xs font-bold text-[#64748B]">
-            {copied ? "Kopyalandı" : "Bugün eklendi"}
+            {copied ? "Kopyalandı" : formatShortDate(unit.createdAt)}
           </p>
 
           <div className="flex items-center gap-1">
@@ -1235,7 +1301,7 @@ function MobilePortfolioListRow({
           {price ? formatCompactPrice(price, unit.priceCurrency) : "Fiyat yok"}
         </p>
         <p className="mt-1 text-[10px] font-bold text-[#64748B]">
-          {copied ? "Kopyalandı" : "Bugün eklendi"}
+          {copied ? "Kopyalandı" : formatShortDate(unit.createdAt)}
         </p>
       </button>
 
