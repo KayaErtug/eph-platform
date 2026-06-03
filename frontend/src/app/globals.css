@@ -955,3 +955,405 @@ div {
     grid-template-columns: 1fr !important;
   }
 }
+
+
+/* =========================================================
+   EPH PORTFÖY EKLE MODAL V5 — SCROLL / HEADER FIX
+   Amaç: iPhone 8 Plus dahil modal başlığı formun üstüne düşmesin,
+   içerik doğal aksın, açıklama ve görsel alanlarına rahat geçilsin.
+========================================================= */
+
+.stock-modal-v2-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 999999 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 10px !important;
+  overflow: hidden !important;
+  background: rgba(15, 23, 42, 0.58) !important;
+  touch-action: none !important;
+}
+
+.stock-modal-v2.stock-modal-v5,
+.stock-modal-v5 {
+  position: relative !important;
+  inset: auto !important;
+  width: min(920px, calc(100vw - 20px)) !important;
+  height: min(820px, calc(100dvh - 20px)) !important;
+  max-height: calc(100dvh - 20px) !important;
+  margin: 0 auto !important;
+  overflow: hidden !important;
+  display: grid !important;
+  grid-template-rows: auto 1fr auto !important;
+  border-radius: 24px !important;
+  background: #ffffff !important;
+  border: 1px solid #dbe7f3 !important;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.22) !important;
+  transform: none !important;
+}
+
+.stock-modal-v5-head,
+.stock-modal-v2.stock-modal-v5 .stock-modal-v2-head {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 2 !important;
+  min-height: 50px !important;
+  height: 50px !important;
+  padding: 7px 10px !important;
+  display: grid !important;
+  grid-template-columns: 44px 1fr 44px !important;
+  align-items: center !important;
+  gap: 8px !important;
+  border-bottom: 1px solid #dbe7f3 !important;
+  background: #ffffff !important;
+  transform: none !important;
+}
+
+.stock-modal-v5-head::before,
+.stock-modal-v2.stock-modal-v5 .stock-modal-v2-head::before {
+  content: "" !important;
+  display: block !important;
+}
+
+.stock-modal-v5-head .stock-modal-v4-title,
+.stock-modal-v2.stock-modal-v5 .stock-modal-v4-title {
+  grid-column: 2 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+.stock-modal-v5-head h2,
+.stock-modal-v2.stock-modal-v5 .stock-modal-v2-head h2 {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  font-weight: 950 !important;
+  letter-spacing: -0.035em !important;
+  color: #06194a !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+.stock-modal-v5-head p,
+.stock-modal-v2.stock-modal-v5 .stock-modal-v2-head p {
+  display: none !important;
+}
+
+.stock-modal-v5-head button,
+.stock-modal-v2.stock-modal-v5 .stock-modal-v2-head button {
+  grid-column: 3 !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  margin: 0 !important;
+  border-radius: 14px !important;
+  border: 0 !important;
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  font-size: 30px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.stock-modal-v5-body,
+.stock-modal-v2.stock-modal-v5 .stock-modal-v2-body {
+  position: relative !important;
+  z-index: 1 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  padding: 10px 12px 18px !important;
+  touch-action: pan-y !important;
+}
+
+.stock-modal-v5-foot,
+.stock-modal-v2.stock-modal-v5 .stock-modal-v2-foot {
+  position: relative !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  z-index: 3 !important;
+  min-height: 58px !important;
+  border-top: 1px solid #dbe7f3 !important;
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+  display: grid !important;
+  grid-template-columns: 0.9fr 1.1fr !important;
+  gap: 10px !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-form-block {
+  margin-bottom: 10px !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-form-block h3 {
+  margin: 0 0 7px !important;
+  font-size: 15px !important;
+  line-height: 1.1 !important;
+  color: #1557d6 !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px 10px !important;
+  align-items: start !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-form-field span {
+  min-height: 14px !important;
+  font-size: 10px !important;
+  line-height: 1.05 !important;
+  margin: 0 !important;
+  color: #64748b !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-form-field input,
+.stock-modal-v2.stock-modal-v5 .stock-form-field select,
+.stock-modal-v2.stock-modal-v5 .stock-form-field textarea {
+  min-height: 42px !important;
+  height: 42px !important;
+  border-radius: 15px !important;
+  font-size: 16px !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+  text-align-last: center !important;
+  padding: 0 9px !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-form-field textarea {
+  min-height: 74px !important;
+  height: 74px !important;
+  padding: 10px !important;
+  resize: vertical !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-save-btn,
+.stock-modal-v2.stock-modal-v5 .stock-cancel-btn {
+  min-height: 42px !important;
+  border-radius: 15px !important;
+  font-size: 13px !important;
+  padding: 8px 12px !important;
+}
+
+@media (max-width: 768px) {
+  .stock-modal-v2-backdrop {
+    padding: 8px !important;
+  }
+
+  .stock-modal-v2.stock-modal-v5,
+  .stock-modal-v5 {
+    width: calc(100vw - 16px) !important;
+    height: calc(100dvh - 16px) !important;
+    max-height: calc(100dvh - 16px) !important;
+    border-radius: 22px !important;
+  }
+
+  .stock-modal-v2.stock-modal-v5 .stock-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 7px !important;
+  }
+
+  .stock-modal-v2.stock-modal-v5 .stock-form-block h3 {
+    font-size: 15px !important;
+    margin-bottom: 6px !important;
+  }
+
+  .stock-modal-v5-body,
+  .stock-modal-v2.stock-modal-v5 .stock-modal-v2-body {
+    padding: 9px 12px 16px !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .stock-modal-v2.stock-modal-v5 .stock-form-field.full {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+/* =========================================================
+   EPH PORTFÖY EKLE MODAL V6 — NO HEADER / REAL SCROLL FIX
+========================================================= */
+
+.stock-modal-v2-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 999999 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  padding: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  background: rgba(15, 23, 42, 0.58) !important;
+  touch-action: auto !important;
+}
+
+.stock-modal-v2.stock-modal-v5,
+.stock-modal-v5 {
+  position: relative !important;
+  width: min(920px, calc(100vw - 16px)) !important;
+  height: min(820px, calc(100dvh - 16px)) !important;
+  max-height: calc(100dvh - 16px) !important;
+  display: grid !important;
+  grid-template-rows: 1fr auto !important;
+  overflow: hidden !important;
+  border-radius: 24px !important;
+  background: #ffffff !important;
+  border: 1px solid #dbe7f3 !important;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.22) !important;
+}
+
+.stock-modal-v6-close {
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  z-index: 50 !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  font-size: 30px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08) !important;
+}
+
+.stock-modal-v5-body,
+.stock-modal-v6-body,
+.stock-modal-v2.stock-modal-v5 .stock-modal-v2-body {
+  position: relative !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  touch-action: pan-y !important;
+  padding: 14px 12px 16px !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-form-block,
+.stock-modal-v2.stock-modal-v5 .stock-form-block:first-of-type {
+  margin: 0 0 8px !important;
+  padding: 0 !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-form-block h3 {
+  display: none !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 7px 9px !important;
+  align-items: start !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-form-field {
+  gap: 3px !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-form-field span {
+  min-height: 13px !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+  margin: 0 !important;
+  color: #64748b !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-form-field input,
+.stock-modal-v2.stock-modal-v5 .stock-form-field select,
+.stock-modal-v2.stock-modal-v5 .stock-form-field textarea {
+  min-height: 41px !important;
+  height: 41px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+  text-align-last: center !important;
+  padding: 0 8px !important;
+}
+
+.stock-modal-v2.stock-modal-v5 .stock-form-field textarea {
+  min-height: 70px !important;
+  height: 70px !important;
+  padding: 9px !important;
+}
+
+.stock-modal-v5-foot,
+.stock-modal-v2.stock-modal-v5 .stock-modal-v2-foot {
+  position: relative !important;
+  z-index: 10 !important;
+  min-height: 56px !important;
+  padding: 7px 12px calc(7px + env(safe-area-inset-bottom, 0px)) !important;
+  border-top: 1px solid #dbe7f3 !important;
+  background: #ffffff !important;
+  display: grid !important;
+  grid-template-columns: 0.9fr 1.1fr !important;
+  gap: 10px !important;
+}
+
+@media (max-width: 768px) {
+  .stock-modal-v2-backdrop {
+    padding: 6px !important;
+  }
+
+  .stock-modal-v2.stock-modal-v5,
+  .stock-modal-v5 {
+    width: calc(100vw - 12px) !important;
+    height: calc(100dvh - 12px) !important;
+    max-height: calc(100dvh - 12px) !important;
+    border-radius: 22px !important;
+  }
+
+  .stock-modal-v6-close {
+    top: 8px !important;
+    right: 8px !important;
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    border-radius: 13px !important;
+  }
+
+  .stock-modal-v5-body,
+  .stock-modal-v6-body,
+  .stock-modal-v2.stock-modal-v5 .stock-modal-v2-body {
+    padding: 12px 10px 14px !important;
+  }
+
+  .stock-modal-v2.stock-modal-v5 .stock-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px 8px !important;
+  }
+
+  .stock-modal-v2.stock-modal-v5 .stock-form-field.full {
+    grid-column: 1 / -1 !important;
+  }
+}

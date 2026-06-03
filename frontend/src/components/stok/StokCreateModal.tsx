@@ -553,6 +553,29 @@ export default function StokCreateModal({
     setMainCategory(getMainCategoryFromType(unitForm.type));
   }, [open, unitForm.type]);
 
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return;
+
+    const scrollY = window.scrollY;
+    const originalOverflow = document.body.style.overflow;
+    const originalPosition = document.body.style.position;
+    const originalTop = document.body.style.top;
+    const originalWidth = document.body.style.width;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.position = originalPosition;
+      document.body.style.top = originalTop;
+      document.body.style.width = originalWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const validateFiles = async (files: File[]) => {
@@ -757,23 +780,20 @@ export default function StokCreateModal({
 
   return (
     <div className="stock-modal-v2-backdrop" onClick={onClose}>
-      <div className="stock-modal-v2" onClick={(e) => e.stopPropagation()}>
-        <div className="stock-modal-v2-head stock-modal-v4-head">
-          <div className="stock-modal-v4-title">
-            <h2>Yeni Portföy</h2>
-            <p>Portföy bilgilerini gir, görselleri ekle ve kaydet.</p>
-          </div>
-          <button onClick={onClose} aria-label="Kapat">×</button>
-        </div>
+      <div
+        className="stock-modal-v2 stock-modal-v5"
+        onClick={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+      >
+        <button className="stock-modal-v6-close" onClick={onClose} aria-label="Kapat">×</button>
 
-        <div className="stock-modal-v2-body">
+        <div className="stock-modal-v2-body stock-modal-v5-body stock-modal-v6-body">
           {formSuccess && <div className="stock-form-success">Portföy başarıyla eklendi.</div>}
           {formError && <div className="stock-form-error">{formError}</div>}
           {localError && <div className="stock-form-error">{localError}</div>}
           {imageError && <div className="stock-form-error">{imageError}</div>}
 
           <div className="stock-form-block">
-            <h3>Proje</h3>
             <div className="stock-form-grid">
               {projects.length > 0 && (
                 <label className="stock-form-field full">
@@ -899,7 +919,6 @@ export default function StokCreateModal({
           </div>
 
           <div className="stock-form-block">
-            <h3>Mülk Bilgileri</h3>
             <div className="stock-form-grid">
               <label className="stock-form-field">
                 <span>Mülk Tipi *</span>
@@ -1144,7 +1163,6 @@ export default function StokCreateModal({
           </div>
 
           <div className="stock-form-block">
-            <h3>Portföy Görselleri</h3>
 
             <div className="stock-form-grid">
               <div className="stock-form-field full">
@@ -1288,7 +1306,7 @@ export default function StokCreateModal({
           </div>
         </div>
 
-        <div className="stock-modal-v2-foot">
+        <div className="stock-modal-v2-foot stock-modal-v5-foot">
           <button className="stock-cancel-btn" onClick={onClose}>
             İptal
           </button>
