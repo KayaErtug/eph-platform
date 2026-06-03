@@ -997,3 +997,63 @@ div {
     padding-top: 56px !important;
   }
 }
+
+
+/* =========================================================
+   PORTFÖY MODAL V11 — GÖRSEL UYARI + KAYDET BUTONU FIX
+========================================================= */
+
+.stock-modal-v10 .stock-upload-hint {
+  display: block !important;
+  width: 100% !important;
+  margin: -2px auto 2px !important;
+  color: rgba(100, 116, 139, 0.66) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+  letter-spacing: 0.015em !important;
+  text-align: center !important;
+}
+
+.stock-modal-v10-body {
+  max-height: calc(100dvh - 160px) !important;
+  padding-bottom: 26px !important;
+  scroll-padding-bottom: 150px !important;
+}
+
+.stock-modal-v10-foot {
+  padding: 12px 14px calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+  transform: translateY(-6px) !important;
+  border-radius: 0 0 28px 28px !important;
+}
+
+.stock-modal-v10-foot .stock-save-btn,
+.stock-modal-v10-foot .stock-cancel-btn {
+  min-height: 46px !important;
+}
+
+@media (max-width: 768px) {
+  .stock-modal-v10 {
+    max-height: calc(100dvh - 34px) !important;
+  }
+
+  .stock-modal-v10-body {
+    max-height: calc(100dvh - 154px) !important;
+    padding-bottom: 28px !important;
+  }
+
+  .stock-modal-v10-foot {
+    padding: 10px 10px calc(26px + env(safe-area-inset-bottom, 0px)) !important;
+    transform: translateY(-8px) !important;
+  }
+
+  .stock-modal-v10 .stock-upload-hint {
+    font-size: 9.5px !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .stock-modal-v10-foot {
+    padding-bottom: calc(30px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}

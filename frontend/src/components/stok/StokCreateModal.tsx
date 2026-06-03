@@ -1167,6 +1167,7 @@ export default function StokCreateModal({
             <div className="stock-form-grid">
               <div className="stock-form-field full">
                 <span>Kapak Fotoğrafı * (1 adet)</span>
+                <small className="stock-upload-hint">JPG / PNG / WEBP · minimum 800×600 px · maksimum 10 MB</small>
 
                 <input
                   ref={coverInputRef}
@@ -1217,6 +1218,7 @@ export default function StokCreateModal({
 
               <div className="stock-form-field full">
                 <span>Galeri Fotoğrafları ({galleryImages.length}/{MAX_GALLERY_COUNT})</span>
+                <small className="stock-upload-hint">JPG / PNG / WEBP · minimum 800×600 px · maksimum 10 MB</small>
 
                 <input
                   ref={galleryInputRef}
