@@ -9,6 +9,7 @@ import {
   MAIN_CATEGORY_OPTIONS,
   OFFICE_ROOM_COUNT_OPTIONS,
   ROOM_COUNT_OPTIONS,
+  TOURISTIC_ROOM_BED_COUNT_OPTIONS,
   STATUS_LABELS,
   TYPE_LABELS,
 } from "./stokConstants";
@@ -469,7 +470,11 @@ export default function StokCreateModal({
   const closedArea = String((unitForm as any).closedArea || "");
   const selectedSubCategory = getSubCategoryFromType(unitForm.type);
   const subCategoryOptions = CATEGORY_OPTIONS[mainCategory] || CATEGORY_OPTIONS.KONUT;
-  const roomOptions = isOfficeDetailType(unitForm.type) ? OFFICE_ROOM_COUNT_OPTIONS : ROOM_COUNT_OPTIONS;
+  const roomOptions = isTouristicType(unitForm.type)
+        ? TOURISTIC_ROOM_BED_COUNT_OPTIONS
+        : isOfficeDetailType(unitForm.type)
+        ? OFFICE_ROOM_COUNT_OPTIONS
+        : ROOM_COUNT_OPTIONS;
   const priceDisplay = formatPriceInput(String(unitForm.price || ""));
   const descriptionLength = unitForm.description.length;
   const showRoomCountField = shouldShowRoomCountField(unitForm.type);
@@ -1056,16 +1061,23 @@ export default function StokCreateModal({
               )}
 
               {showBedCountField && (
-                <label className="stock-form-field">
-                  <span>Yatak Sayısı *</span>
-                  <input
-                    type="number"
-                    value={bedCount}
-                    onChange={(e) => setUnitField("bedCount", e.target.value)}
-                    placeholder="Örn: 40"
-                  />
-                </label>
-              )}
+ 		 <label className="stock-form-field">
+  		  <span>Yatak Sayısı *</span>
+
+  		  <select
+  		    value={bedCount}
+  		    onChange={(e) => setUnitField("bedCount", e.target.value)}
+  		  >
+    		  <option value="">Yatak sayısı seçiniz</option>
+
+  		    {TOURISTIC_ROOM_BED_COUNT_OPTIONS.map((option) => (
+      		  <option key={option} value={option}>
+       		   {option}
+       		 </option>
+    		  ))}
+  		  </select>
+		  </label>
+	      )}
 
               {showBuildingAgeField && (
                 <label className="stock-form-field">

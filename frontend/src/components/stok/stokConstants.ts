@@ -150,6 +150,15 @@ export const ROOM_COUNT_OPTIONS = [
 
 export const OFFICE_ROOM_COUNT_OPTIONS = ["1+0", "1+1", "2+1", "3+1", "4+1", "4+2"];
 
+export const TOURISTIC_ROOM_BED_COUNT_OPTIONS = [
+  "1-10 arası",
+  "11-50 arası",
+  "51-250 arası",
+  "251-500 arası",
+  "501-1000 arası",
+  "1000+",
+];
+
 export const BUILDING_AGE_OPTIONS = [
   "0",
   "1",
