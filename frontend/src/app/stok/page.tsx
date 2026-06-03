@@ -8,31 +8,32 @@ import { useAuthStore } from "@/store/auth.store";
 import api from "@/lib/api";
 import Link from "next/link";
 import {
-  ArrowLeft,
-  BarChart3,
+  ArrowUpDown,
+  Bell,
   Building2,
-  CheckCircle2,
-  Copy,
+  Camera,
+  CheckSquare,
   Eye,
   Grid2X2,
+  Heart,
   Home,
-  Layers3,
   List,
+  LogOut,
+  Map,
   MapPin,
-  MessageCircle,
-  ShieldCheck,
-  Trophy,
+  Maximize2,
   Plus,
   Search,
   Share2,
+  SlidersHorizontal,
   Sparkles,
+  Square,
   Star,
   TrendingUp,
+  User,
+  UsersRound,
 } from "lucide-react";
 import StokPremiumStyles from "@/components/stok/StokPremiumStyles";
-import StokKpiCards from "@/components/stok/StokKpiCards";
-import StokToolbar from "@/components/stok/StokToolbar";
-import StokTable from "@/components/stok/StokTable";
 import StokCreateModal from "@/components/stok/StokCreateModal";
 import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
@@ -49,19 +50,29 @@ type ViewMode = "cards" | "list";
 const statusLabels: Record<string, string> = {
   SATILIK: "Satılık",
   KIRALIK: "Kiralık",
+  GUNLUK_KIRALIK: "Günlük Kiralık",
+  DEVREN_SATILIK: "Devren Satılık",
+  DEVREN_KIRALIK: "Devren Kiralık",
   ON_SATIS: "Ön Satış",
   PROJE_ASAMASI: "Proje Aşaması",
   YAKINDA_SATISTA: "Yakında Satışta",
   INSAAT_HALINDE: "İnşaat Halinde",
   HEMEN_TESLIM: "Hemen Teslim",
   INSAAT_PROJESI: "İnşaat Projesi",
+  KAT_KARSILIGI: "Kat Karşılığı",
+  HASILAT_PAYLASIMLI: "Hasılat Paylaşımlı",
+  REZERVE: "Rezerve",
   SATILDI: "Satıldı",
+  KIRALANDI: "Kiralandı",
   PASIF: "Pasif",
 };
 
 const hotStatuses = [
   "SATILIK",
   "KIRALIK",
+  "GUNLUK_KIRALIK",
+  "DEVREN_SATILIK",
+  "DEVREN_KIRALIK",
   "ON_SATIS",
   "PROJE_ASAMASI",
   "YAKINDA_SATISTA",
@@ -83,7 +94,25 @@ function parseFormattedNumber(value: string) {
 function formatPrice(value?: number, currency?: string) {
   const numeric = Number(value || 0);
   const symbol = CURRENCY_SYMBOLS[currency || "TRY"] || "₺";
-  if (!numeric) return "Fiyat Yok";
+
+  if (!numeric) return "Fiyat yok";
+
+  return `${numeric.toLocaleString("tr-TR")} ${symbol}`;
+}
+
+function formatCompactPrice(value?: number, currency?: string) {
+  const numeric = Number(value || 0);
+  const symbol = CURRENCY_SYMBOLS[currency || "TRY"] || "₺";
+
+  if (!numeric) return "Fiyat yok";
+
+  if (numeric >= 1000000) {
+    const compact = numeric / 1000000;
+    return `${compact.toLocaleString("tr-TR", {
+      maximumFractionDigits: compact >= 10 ? 0 : 1,
+    })}M ${symbol}`;
+  }
+
   return `${numeric.toLocaleString("tr-TR")} ${symbol}`;
 }
 
@@ -95,6 +124,73 @@ function formatFloorInfo(unit: Pick<Unit, "floor" | "floorLabel" | "totalFloors"
   const totalText = unit.totalFloors ? `${unit.totalFloors} Katlı` : "";
 
   return totalText ? `${floorText} / ${totalText}` : floorText;
+}
+
+function getUnitImages(unit?: Unit | null) {
+  const images = Array.isArray(unit?.images) ? unit.images : [];
+
+  return images
+    .filter((image) => image?.url || image?.supabaseUrl)
+    .map((image) => ({
+      ...image,
+      displayUrl: image.supabaseUrl || image.url || "",
+    }))
+    .sort((a, b) => {
+      if (a.isCover !== b.isCover) return a.isCover ? -1 : 1;
+      if ((a.sortOrder || 0) !== (b.sortOrder || 0)) {
+        return (a.sortOrder || 0) - (b.sortOrder || 0);
+      }
+
+      return String(a.createdAt || "").localeCompare(String(b.createdAt || ""));
+    });
+}
+
+function getUnitCoverImage(unit?: Unit | null) {
+  const images = getUnitImages(unit);
+
+  return images.find((image) => image.isCover)?.displayUrl || images[0]?.displayUrl || "";
+}
+
+function isUnitVerified(unit?: Unit | null) {
+  return Boolean(
+    unit?.isVerified ||
+      (unit?.tapuVerified && unit?.photoVerified && unit?.yetkiVerified),
+  );
+}
+
+function calculatePortfolioScore(unit?: Unit | null) {
+  if (!unit) return 0;
+
+  let score = 0;
+  const imageCount = getUnitImages(unit).length;
+
+  if (unit.project?.name) score += 15;
+  if (unit.project?.city && unit.project?.district) score += 15;
+  if (unit.price) score += 15;
+  if (unit.area) score += 12;
+  if (unit.roomCount) score += 10;
+  if (unit.description) score += 12;
+  if (imageCount > 0 || unit.photoVerified) score += 9;
+  if (unit.yetkiVerified || unit.isVerified) score += 12;
+
+  return Math.min(score || 72, 100);
+}
+
+function getPortfolioScoreLabel(score: number) {
+  if (score >= 90) return "Pekiyi";
+  if (score >= 80) return "Çok İyi";
+  if (score >= 70) return "İyi";
+  if (score >= 60) return "Geliştirilebilir";
+
+  return "Eksik";
+}
+
+function unitTitle(unit: Unit) {
+  const projectName = unit.project?.name || "EPH Portföy";
+  const room = unit.roomCount ? `${unit.roomCount} ` : "";
+  const type = unit.type ? String(unit.type).replaceAll("_", " ") : "Portföy";
+
+  return `${projectName}${room ? ` · ${room}` : ""}${type ? ` ${type}` : ""}`;
 }
 
 export default function StokPage() {
@@ -111,6 +207,8 @@ export default function StokPage() {
   const [cityFilter, setCityFilter] = useState("");
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
+  const [sortMode, setSortMode] = useState<"newest" | "priceDesc" | "priceAsc">("newest");
+  const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([]);
   const [copiedUnitId, setCopiedUnitId] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
   const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
@@ -198,9 +296,9 @@ export default function StokPage() {
   const filteredUnits = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("tr-TR");
 
-    if (!q) return units;
+    let list = units.filter((unit) => {
+      if (!q) return true;
 
-    return units.filter((unit) => {
       const text = [
         unit.project?.name,
         unit.project?.city,
@@ -217,72 +315,45 @@ export default function StokPage() {
 
       return text.includes(q);
     });
-  }, [units, search]);
+
+    list = [...list].sort((a, b) => {
+      if (sortMode === "priceDesc") return Number(b.price || 0) - Number(a.price || 0);
+      if (sortMode === "priceAsc") return Number(a.price || 0) - Number(b.price || 0);
+
+      return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
+    });
+
+    return list;
+  }, [units, search, sortMode]);
+
+  const cardVisibleUnits = useMemo(() => filteredUnits.slice(0, 5), [filteredUnits]);
+  const listVisibleUnits = useMemo(() => filteredUnits.slice(0, 10), [filteredUnits]);
 
   const totalValue = useMemo(() => {
     return units.reduce((sum, unit) => sum + (Number(unit.price) || 0), 0);
-  }, [units]);
-
-  const verifiedCount = useMemo(() => {
-    return units.filter((unit) => isUnitVerified(unit)).length;
   }, [units]);
 
   const activeCount = useMemo(() => {
     return units.filter((unit) => hotStatuses.includes(unit.status)).length;
   }, [units]);
 
-  const offMarketCount = useMemo(() => {
-    return units.filter((unit) => unit.isOffMarket).length;
+  const favoriteCount = useMemo(() => {
+    return Math.max(0, selectedUnitIds.length);
+  }, [selectedUnitIds.length]);
+
+  const requestCount = useMemo(() => {
+    return units.filter((unit) => !isUnitVerified(unit)).length;
   }, [units]);
 
-  const topCity = useMemo(() => {
-    const counts = units.reduce<Record<string, number>>((acc, unit) => {
-      const city = unit.project?.city || "Bilinmeyen";
-      acc[city] = (acc[city] || 0) + 1;
-      return acc;
-    }, {});
-
-    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || "Henüz yok";
+  const uniqueCities = useMemo(() => {
+    return Array.from(
+      new Set(
+        units
+          .map((unit) => unit.project?.city)
+          .filter((city): city is string => Boolean(city)),
+      ),
+    ).sort((a, b) => a.localeCompare(b, "tr"));
   }, [units]);
-
-  const portfolioReport = useMemo(() => {
-    const scores = units.map((unit) => calculatePortfolioScore(unit));
-    const averageScore = scores.length
-      ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
-      : 0;
-
-    const premiumCount = scores.filter((score) => score >= 90).length;
-    const strongCount = scores.filter((score) => score >= 80).length;
-    const missingDescription = units.filter((unit) => !unit.description).length;
-    const missingAuthority = units.filter(
-      (unit) => !unit.yetkiVerified && !unit.isVerified,
-    ).length;
-    const missingLocation = units.filter(
-      (unit) => !unit.project?.city || !unit.project?.district,
-    ).length;
-
-    const nextAdvice =
-      missingAuthority > 0
-        ? `${missingAuthority} portföyde yetki durumu eksik. Yetki bilgisini tamamlarsanız karne puanı yükselir.`
-        : missingDescription > 0
-          ? `${missingDescription} portföyde açıklama eksik. Lina ile açıklama hazırlayabilirsiniz.`
-          : missingLocation > 0
-            ? `${missingLocation} portföyde konum bilgisi eksik. İl ve ilçe bilgilerini tamamlayın.`
-            : "Portföy bilgileriniz güçlü görünüyor. Paylaşım kartları için hazır.";
-
-    return {
-      averageScore,
-      scoreLabel: getPortfolioScoreLabel(averageScore),
-      premiumCount,
-      strongCount,
-      missingDescription,
-      missingAuthority,
-      missingLocation,
-      nextAdvice,
-    };
-  }, [units]);
-
-  const myProjects = user?.role === "ADMIN" ? projects : [];
 
   const revokePortfolioPreviews = (
     cover: LocalPortfolioImage | null,
@@ -430,23 +501,6 @@ export default function StokPage() {
     }
   };
 
-  const handleAdminVerify = async (
-    unitId: string,
-    payload: {
-      tapuVerified?: boolean;
-      photoVerified?: boolean;
-      yetkiVerified?: boolean;
-      isOffMarket?: boolean;
-    },
-  ) => {
-    try {
-      await api.patch(`/units/${unitId}/verify`, payload);
-      await fetchData();
-    } catch (e: any) {
-      alert(e?.response?.data?.message || "Doğrulama işlemi yapılamadı.");
-    }
-  };
-
   const getShareUrl = (unit: Unit) => {
     if (typeof window === "undefined") return "";
     return `${window.location.origin}/stok/${unit.id}`;
@@ -464,7 +518,7 @@ export default function StokPage() {
       unit.roomCount ? `${unit.roomCount}` : "",
       unit.area ? `${unit.area} m²` : "",
       unit.status ? statusLabels[unit.status] || unit.status : "",
-      price ? `${price.toLocaleString("tr-TR")} ₺` : "",
+      price ? formatPrice(price, unit.priceCurrency) : "",
     ]
       .filter(Boolean)
       .join(" · ");
@@ -482,24 +536,6 @@ export default function StokPage() {
     }
   };
 
-  const handleNativeShare = async (unit: Unit) => {
-    const url = getShareUrl(unit);
-    const text = getShareText(unit);
-
-    if (navigator.share) {
-      await navigator.share({
-        title: unit.project?.name || "EPH Portföy",
-        text,
-        url,
-      });
-      return;
-    }
-
-    await handleCopyShare(unit);
-  };
-
-
-
   const getPortfolioNo = (unit: Unit) => {
     const raw = String(unit.id || "EPH").replace(/[^a-zA-Z0-9]/g, "");
     return `EPH-${raw.slice(0, 4).toLocaleUpperCase("tr-TR") || "PORT"}-${raw
@@ -514,10 +550,6 @@ export default function StokPage() {
     const location =
       [unit.project?.district, unit.project?.city].filter(Boolean).join(" / ") ||
       "Konum bilgisi yok";
-
-    const shortDescription =
-      unit.description ||
-      "Yetkili portföy statüsünde, paylaşım için hazır profesyonel gayrimenkul kaydı.";
 
     return {
       id: unit.id,
@@ -537,7 +569,9 @@ export default function StokPage() {
       portfolioNo: getPortfolioNo(unit),
       score,
       scoreLabel: getPortfolioScoreLabel(score),
-      shortDescription,
+      shortDescription:
+        unit.description ||
+        "Yetkili portföy statüsünde, paylaşım için hazır profesyonel gayrimenkul kaydı.",
       longDescription:
         unit.description ||
         "Bu portföy EPH Portföy Merkezi üzerinden hazırlanmıştır. Konum, fiyat, oda sayısı, alan bilgisi ve yetki durumu tek kart üzerinde paylaşılabilir formatta sunulur.",
@@ -553,6 +587,14 @@ export default function StokPage() {
   const handlePortfolioShare = (unit: Unit) => {
     setShareData(getPortfolioShareData(unit));
     setShareOpen(true);
+  };
+
+  const toggleUnitSelection = (unitId: string) => {
+    setSelectedUnitIds((current) =>
+      current.includes(unitId)
+        ? current.filter((id) => id !== unitId)
+        : [...current, unitId],
+    );
   };
 
   if (!hydrated || loading) {
@@ -587,395 +629,212 @@ export default function StokPage() {
     <div className="min-h-screen bg-[#F7FBFF] text-[#27364F]">
       <StokPremiumStyles />
 
-      <header className="sticky top-0 z-50 border-b border-[#DDE7F3] bg-white/88 backdrop-blur-2xl">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="grid grid-cols-[52px_1fr_52px] items-center gap-3 lg:flex lg:gap-4">
-            <button
-              onClick={() => router.push("/dashboard")}
-              className="flex h-12 w-12 items-center justify-center rounded-[20px] border border-[#DDE7F3] bg-white text-[#06194A] shadow-[0_14px_40px_rgba(15,23,42,0.08)] transition hover:bg-[#EFF6FF]"
-              aria-label="Dashboard'a dön"
-            >
-              <ArrowLeft size={20} />
-            </button>
-
-            <Link
-              href="/dashboard"
-              className="flex min-w-0 items-center justify-center gap-3 rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3 text-center no-underline shadow-[0_14px_40px_rgba(15,23,42,0.06)] lg:justify-start"
-            >
-              <img src="/LOGO_EPH.png" alt="EPH" className="h-10 w-10 object-contain" />
-              <div className="min-w-0">
-                <div className="truncate text-sm font-black tracking-[-0.03em] text-[#06194A]">
-                  Portföy Merkezi
-                </div>
-                <div className="truncate text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#64748B]">
-                  Portföy Merkezi
-                </div>
+      <main className="mx-auto min-h-screen max-w-[520px] px-4 pb-28 pt-5">
+        <section className="eph-mobile-stock-head">
+          <div className="flex items-start justify-between gap-3">
+            <Link href="/dashboard" className="flex items-center gap-2 no-underline">
+              <img src="/LOGO_EPH.png" alt="EPH" className="h-12 w-12 object-contain" />
+              <div>
+                <p className="text-2xl font-black leading-none tracking-[-0.08em] text-[#06194A]">
+                  EPH
+                </p>
+                <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#27364F]">
+                  Portföy Havuzu
+                </p>
               </div>
             </Link>
 
-            <button
-              onClick={() => setLinaOpen(true)}
-              className="flex h-12 w-12 items-center justify-center rounded-[20px] border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_14px_40px_rgba(15,23,42,0.08)] transition hover:bg-[#EFF6FF]"
-              aria-label="Lina'yı aç"
-            >
-              <Sparkles size={19} />
-            </button>
+            <div className="flex items-start gap-3">
+              <button
+                className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#06194A] shadow-[0_12px_26px_rgba(15,23,42,0.06)]"
+                onClick={() => setSearch((current) => current)}
+                aria-label="Ara"
+              >
+                <Search size={22} />
+              </button>
+
+              <button
+                className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#06194A] shadow-[0_12px_26px_rgba(15,23,42,0.06)]"
+                aria-label="Bildirimler"
+              >
+                <Bell size={22} />
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white">
+                  5
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  logout();
+                  router.push("/giris");
+                }}
+                className="flex flex-col items-center justify-center rounded-2xl bg-white px-2 py-1 text-[#06194A] shadow-[0_12px_26px_rgba(15,23,42,0.06)]"
+                aria-label="Çıkış"
+              >
+                <LogOut size={22} />
+                <span className="text-[10px] font-bold">Çıkış</span>
+              </button>
+            </div>
           </div>
 
-          <nav className="hidden items-center gap-2 lg:flex">
-            {[
-              ["/dashboard", "Dashboard"],
-              ["/stok", "Portföy"],
-              ["/network", "Network"],
-              ["/crm", "CRM"],
-              ["/market", "Piyasa"],
-              ["/profil", "Profil"],
-            ].map(([href, label]) => (
-              <Link
-                key={href}
-                href={href}
-                className={`rounded-full px-4 py-2 text-sm font-extrabold no-underline transition ${
-                  href === "/stok"
-                    ? "bg-[#1557D6] text-white shadow-[0_16px_34px_rgba(21,87,214,0.24)]"
-                    : "text-[#475569] hover:bg-[#EFF6FF] hover:text-[#1557D6]"
-                }`}
-              >
-                {label}
-              </Link>
-            ))}
+          <div className="mt-5 text-center">
+            <h1 className="text-xl font-black tracking-[-0.04em] text-[#06194A]">
+              Hoş geldin, {user?.firstName || "Mustafa"}! 👋
+            </h1>
+            <p className="mt-1 text-xs font-semibold text-[#475569]">
+              Portföy havuzundaki güncel durumun
+            </p>
+          </div>
 
-            {user?.role === "ADMIN" && (
-              <Link
-                href="/admin"
-                className="rounded-full px-4 py-2 text-sm font-extrabold text-[#475569] no-underline transition hover:bg-[#EFF6FF] hover:text-[#1557D6]"
-              >
-                Admin
-              </Link>
-            )}
-
-            <button
-              className="rounded-full border border-[#DDE7F3] bg-white px-4 py-2 text-sm font-extrabold text-[#475569] transition hover:text-[#1557D6]"
-              onClick={() => {
-                logout();
-                router.push("/giris");
-              }}
-            >
-              Çıkış
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
-
-      <main className="mx-auto max-w-7xl px-4 pb-24 pt-6">
-        <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="relative min-h-[520px] overflow-hidden rounded-[36px] border border-[#DDE7F3] bg-[#071A3F] p-5 text-white shadow-[0_30px_90px_rgba(15,23,42,0.14)] lg:p-8">
-            <div
-              className="absolute inset-0 bg-cover bg-center opacity-35"
-              style={{
-                backgroundImage: "url('/showcase/stock.jpg')",
-              }}
+          <div className="mt-4 grid grid-cols-5 overflow-hidden rounded-[20px] border border-[#DDE7F3] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.06)]">
+            <MiniStat icon={<Home size={16} />} value={units.length} label="Toplam" />
+            <MiniStat icon={<Eye size={16} />} value={activeCount} label="Aktif" tone="green" />
+            <MiniStat icon={<Star size={16} />} value={favoriteCount} label="Favori" tone="orange" />
+            <MiniStat icon={<UsersRound size={16} />} value={requestCount} label="Talep" tone="purple" />
+            <MiniStat
+              icon={<TrendingUp size={16} />}
+              value={totalValue ? `${(totalValue / 1000000).toFixed(1)}M` : "0"}
+              label="Değer"
+              tone="blue"
             />
-            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(6,25,74,0.94),rgba(21,87,214,0.58)_48%,rgba(6,25,74,0.72)),radial-gradient(circle_at_20%_15%,rgba(255,255,255,0.24),transparent_26%)]" />
-
-            <div className="relative flex h-full min-h-[460px] flex-col justify-between">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/12 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white backdrop-blur">
-                  <Building2 size={15} />
-                  Premium Portföy Merkezi
-                </div>
-
-                <h1 className="mt-6 max-w-2xl text-4xl font-black leading-tight tracking-[-0.055em] md:text-6xl">
-                  Portföy Merkezi
-                </h1>
-
-                <p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-blue-50/90">
-                  Portföylerinizi filtreleyin, detaylara tek dokunuşla girin,
-                  Lina destekli paylaşım kartları üretin ve portföy akışınızı tek ekrandan yönetin.
-                </p>
-              </div>
-
-              <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                {canAddUnit && (
-                  <button
-                    onClick={() => {
-                      resetForm();
-                      setShowModal(true);
-                    }}
-                    className="inline-flex items-center justify-center gap-2 rounded-[24px] bg-white px-5 py-4 text-sm font-black text-[#1557D6] shadow-[0_18px_38px_rgba(255,255,255,0.16)] transition hover:scale-[1.01]"
-                  >
-                    <Plus size={18} />
-                    Yeni Portföy Ekle
-                  </button>
-                )}
-
-                <button
-                  onClick={() => setLinaOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 rounded-[24px] border border-white/22 bg-white/12 px-5 py-4 text-sm font-black text-white backdrop-blur transition hover:bg-white/18"
-                >
-                  <Sparkles size={18} />
-                  Lina ile Kart Hazırla
-                </button>
-              </div>
-            </div>
           </div>
 
-          <div className="grid gap-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <HeroMetric
-                icon={<Home size={20} />}
-                label="Toplam Kayıt"
-                value={units.length.toLocaleString("tr-TR")}
-                note="Sistemdeki portföy"
+          <div className="mt-4 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#DDE7F3] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.06)]">
+            <button
+              onClick={() => setStatusFilter((current) => (current ? "" : "SATILIK"))}
+              className={`flex min-h-[48px] items-center justify-center gap-1.5 border-r border-[#DDE7F3] text-xs font-black ${
+                statusFilter ? "text-[#1557D6]" : "text-[#27364F]"
+              }`}
+            >
+              <SlidersHorizontal size={16} />
+              Filtrele
+            </button>
+
+            <button
+              onClick={() =>
+                setSortMode((current) =>
+                  current === "newest"
+                    ? "priceDesc"
+                    : current === "priceDesc"
+                      ? "priceAsc"
+                      : "newest",
+                )
+              }
+              className="flex min-h-[48px] items-center justify-center gap-1.5 border-r border-[#DDE7F3] text-xs font-black text-[#27364F]"
+            >
+              <ArrowUpDown size={16} />
+              Sırala
+            </button>
+
+            <button
+              onClick={() => {
+                const firstCity = uniqueCities[0] || "";
+                setCityFilter((current) => (current ? "" : firstCity));
+              }}
+              className={`flex min-h-[48px] items-center justify-center gap-1.5 border-r border-[#DDE7F3] text-xs font-black ${
+                cityFilter ? "text-[#1557D6]" : "text-[#27364F]"
+              }`}
+            >
+              <Map size={16} />
+              Harita
+            </button>
+
+            <button
+              onClick={() => setViewMode((current) => (current === "cards" ? "list" : "cards"))}
+              className="flex min-h-[48px] items-center justify-center gap-1.5 bg-[#EFF6FF] text-xs font-black text-[#1557D6]"
+            >
+              {viewMode === "cards" ? <List size={16} /> : <Grid2X2 size={16} />}
+              {viewMode === "cards" ? "Liste" : "Kartlı"}
+            </button>
+          </div>
+
+          <div className="mt-3 rounded-[18px] border border-[#DDE7F3] bg-white px-3 py-2 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+            <div className="flex items-center gap-2">
+              <Search size={15} className="text-[#64748B]" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Portföy, şehir, ilçe ara..."
+                className="h-8 flex-1 bg-transparent text-sm font-bold text-[#06194A] outline-none placeholder:text-[#94A3B8]"
               />
-
-              <HeroMetric
-                icon={<TrendingUp size={20} />}
-                label="Aktif İlan"
-                value={activeCount.toLocaleString("tr-TR")}
-                note="Satış / kiralama akışı"
-              />
-
-              <HeroMetric
-                icon={<CheckCircle2 size={20} />}
-                label="Doğrulanmış"
-                value={verifiedCount.toLocaleString("tr-TR")}
-                note="Güven seviyesi"
-              />
-
-              <HeroMetric
-                icon={<Star size={20} />}
-                label="Toplam Değer"
-                value={
-                  totalValue
-                    ? `${(totalValue / 1000000).toFixed(1)}M ₺`
-                    : "0 ₺"
-                }
-                note="Yaklaşık envanter"
-              />
-            </div>
-
-            <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-[#1557D6]">
-                    Portföy Dengesi
-                  </p>
-                  <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
-                    Güncel görünüm
-                  </h2>
-                </div>
-                <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]">
-                  <BarChart3 size={22} />
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-3">
-                <BalanceLine label="Aktif Portföy" value={activeCount} total={Math.max(units.length, 1)} />
-                <BalanceLine label="Doğrulanmış" value={verifiedCount} total={Math.max(units.length, 1)} />
-                <BalanceLine label="Off-Market" value={offMarketCount} total={Math.max(units.length, 1)} />
-              </div>
             </div>
           </div>
         </section>
 
-        <section className="mt-6 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
-            <p className="text-center text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
-              Görsel Akış
-            </p>
-            <h2 className="mt-2 text-center text-2xl font-black tracking-[-0.04em] text-[#06194A]">
-              İlan vitrini
+        <section className="mt-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-black tracking-[-0.03em] text-[#06194A]">
+              Portföyler
             </h2>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <VisualTile title="Konut" image="/showcase/stock.jpg" />
-              <VisualTile title="Proje" image="/showcase/dashboard.jpg" />
-              <VisualTile title="Network" image="/showcase/network.jpg" />
-            </div>
+            <button className="inline-flex items-center gap-1 text-sm font-black text-[#1557D6]">
+              Tümünü Gör
+              <span>›</span>
+            </button>
           </div>
 
-          <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
-            <p className="text-center text-xs font-black uppercase tracking-[0.22em] text-[#1557D6] lg:text-left">
-              Hızlı Özet
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <SummaryLine label="Gösterilen kayıt" value={`${filteredUnits.length} / ${units.length}`} />
-              <SummaryLine label="Aktif kullanıcı" value={`${user?.firstName || "EPH"} ${user?.lastName || ""}`} />
-              <SummaryLine label="En yoğun şehir" value={topCity} />
-              <SummaryLine label="Sayfa modu" value={viewMode === "cards" ? "Kart görünümü" : "Liste görünümü"} />
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-6 grid gap-4 lg:grid-cols-3">
-          <PortfolioHealthCard
-            title="Portföy Sağlığı"
-            value={`${portfolioReport.averageScore}%`}
-            label={portfolioReport.scoreLabel}
-            icon={<ShieldCheck size={22} />}
-            progress={portfolioReport.averageScore}
-            note={`${activeCount} aktif portföy · ${portfolioReport.strongCount} güçlü kayıt`}
-          />
-
-          <PortfolioHealthCard
-            title="Portföy Karnesi"
-            value={`${portfolioReport.averageScore}/100`}
-            label={portfolioReport.scoreLabel}
-            icon={<Trophy size={22} />}
-            progress={portfolioReport.averageScore}
-            note={`${portfolioReport.premiumCount} portföy pekiyi seviyesinde`}
-          />
-
-          <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
-                  Lina Analizi
-                </p>
-                <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
-                  Portföy önerileri
-                </h2>
-              </div>
-
-              <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]">
-                <Sparkles size={22} />
-              </div>
-            </div>
-
-            <p className="mt-4 text-sm font-bold leading-7 text-[#475569]">
-              {portfolioReport.nextAdvice}
-            </p>
-
-            <div className="mt-4 grid gap-2">
-              <ReportMiniLine
-                label="Açıklama eksik"
-                value={portfolioReport.missingDescription}
-              />
-              <ReportMiniLine
-                label="Yetki eksik"
-                value={portfolioReport.missingAuthority}
-              />
-              <ReportMiniLine
-                label="Konum eksik"
-                value={portfolioReport.missingLocation}
-              />
-            </div>
-          </div>
-        </section>
-
-        <div className="mt-6">
-          <StokKpiCards units={units} projects={projects} />
-        </div>
-
-        <section className="mt-6 rounded-[36px] border border-[#DDE7F3] bg-white p-4 shadow-[0_24px_70px_rgba(15,23,42,0.07)] lg:p-6">
-          <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="text-center lg:text-left">
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
-                Filtre Merkezi
-              </p>
-              <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
-                Canlı İlan Listesi
-              </h2>
-              <p className="mt-2 text-sm font-semibold text-[#64748B]">
-                Filtreleme akışı korundu. Kartlar tıklanabilir; Paylaş butonu Lina Paylaşım Merkezi'ni açar.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-center gap-2 rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] p-1">
-              <button
-                onClick={() => setViewMode("cards")}
-                className={`inline-flex h-11 items-center gap-2 rounded-[18px] px-4 text-sm font-black transition ${
-                  viewMode === "cards"
-                    ? "bg-[#1557D6] text-white shadow-[0_14px_30px_rgba(21,87,214,0.22)]"
-                    : "text-[#64748B] hover:bg-white hover:text-[#1557D6]"
-                }`}
-              >
-                <Grid2X2 size={17} />
-                Kart
-              </button>
-
-              <button
-                onClick={() => setViewMode("list")}
-                className={`inline-flex h-11 items-center gap-2 rounded-[18px] px-4 text-sm font-black transition ${
-                  viewMode === "list"
-                    ? "bg-[#1557D6] text-white shadow-[0_14px_30px_rgba(21,87,214,0.22)]"
-                    : "text-[#64748B] hover:bg-white hover:text-[#1557D6]"
-                }`}
-              >
-                <List size={17} />
-                Liste
-              </button>
-            </div>
-          </div>
-
-          <StokToolbar
-            search={search}
-            setSearch={setSearch}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            cityFilter={cityFilter}
-            setCityFilter={setCityFilter}
-            visibleCount={filteredUnits.length}
-            totalCount={units.length}
-            onAdd={() => {
-              resetForm();
-              setShowModal(true);
-            }}
-            onLina={() => setLinaOpen(true)}
-            canAddUnit={canAddUnit}
-          />
-
-          {viewMode === "cards" ? (
-            <div className="mt-5 grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {filteredUnits.length === 0 ? (
-                <EmptyInventory />
-              ) : (
-                filteredUnits.map((unit) => (
-                  <PremiumUnitCard
-                    key={unit.id}
-                    unit={unit}
-                    copied={copiedUnitId === unit.id}
-                    onOpen={() => router.push(`/stok/${unit.id}`)}
-                    onCopy={() => handleCopyShare(unit)}
-                    onShare={() => handlePortfolioShare(unit)}
-                  />
-                ))
-              )}
+          {filteredUnits.length === 0 ? (
+            <EmptyMobileState
+              canAddUnit={canAddUnit}
+              onAdd={() => {
+                resetForm();
+                setShowModal(true);
+              }}
+            />
+          ) : viewMode === "cards" ? (
+            <div className="grid gap-4">
+              {cardVisibleUnits.map((unit) => (
+                <MobilePortfolioCard
+                  key={unit.id}
+                  unit={unit}
+                  selected={selectedUnitIds.includes(unit.id)}
+                  copied={copiedUnitId === unit.id}
+                  onOpen={() => router.push(`/stok/${unit.id}`)}
+                  onToggleSelect={() => toggleUnitSelection(unit.id)}
+                  onShare={() => handlePortfolioShare(unit)}
+                  onCopy={() => handleCopyShare(unit)}
+                />
+              ))}
             </div>
           ) : (
-            <div className="mt-5 overflow-hidden rounded-[28px] border border-[#DDE7F3] bg-[#F7FBFF]">
-              <div className="w-full overflow-x-auto">
-                <StokTable units={filteredUnits} />
-              </div>
+            <div className="overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-white shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
+              {listVisibleUnits.map((unit, index) => (
+                <MobilePortfolioListRow
+                  key={unit.id}
+                  index={index + 1}
+                  unit={unit}
+                  selected={selectedUnitIds.includes(unit.id)}
+                  copied={copiedUnitId === unit.id}
+                  onOpen={() => router.push(`/stok/${unit.id}`)}
+                  onToggleSelect={() => toggleUnitSelection(unit.id)}
+                  onShare={() => handlePortfolioShare(unit)}
+                  onCopy={() => handleCopyShare(unit)}
+                />
+              ))}
             </div>
           )}
         </section>
 
-        {user?.role === "ADMIN" && (
-          <AdminVerificationPanel
-            units={filteredUnits}
-            allUnits={units}
-            projects={projects}
-            onVerify={handleAdminVerify}
-          />
+        {user?.role === "ADMIN" && units.length > 0 && (
+          <section className="mt-5 rounded-[24px] border border-[#DDE7F3] bg-white p-4 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
+            <p className="text-center text-xs font-black uppercase tracking-[0.16em] text-[#1557D6]">
+              Admin Kısa Özet
+            </p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <AdminMini label="Toplam" value={units.length} />
+              <AdminMini label="Aktif" value={activeCount} />
+              <AdminMini label="Onay" value={requestCount} />
+            </div>
+          </section>
         )}
       </main>
 
-      <PortfolioShareModal
-        open={shareOpen}
-        onClose={() => setShareOpen(false)}
-        data={shareData}
-      />
+      <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
 
       <StokCreateModal
         open={showModal}
-        onClose={() => {
-          setShowModal(false);
-          resetForm();
-        }}
-        projects={myProjects}
+        onClose={() => setShowModal(false)}
+        projects={projects}
         selectedProjectId={selectedProjectId}
         setSelectedProjectId={setSelectedProjectId}
         projectForm={projectForm}
@@ -991,621 +850,344 @@ export default function StokPage() {
         setGalleryImages={setGalleryImages}
         onSubmit={handleSubmit}
       />
+
+      <PortfolioShareModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        data={shareData}
+      />
+
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#DDE7F3] bg-white/96 px-5 pb-6 pt-3 shadow-[0_-18px_40px_rgba(15,23,42,0.08)] backdrop-blur">
+        <div className="mx-auto flex max-w-[520px] items-center justify-between">
+          <BottomItem active href="/dashboard" icon={<Home size={22} />} label="Ana Sayfa" />
+          <BottomItem href="/stok" icon={<Building2 size={22} />} label="Portföyler" />
+          <button
+            onClick={() => {
+              resetForm();
+              setShowModal(true);
+            }}
+            disabled={!canAddUnit}
+            className="relative -mt-9 flex h-16 w-16 flex-col items-center justify-center rounded-full bg-[#1557D6] text-white shadow-[0_18px_36px_rgba(21,87,214,0.35)] disabled:opacity-50"
+          >
+            <Plus size={30} />
+            <span className="absolute -bottom-6 text-xs font-bold text-[#27364F]">Ekle</span>
+          </button>
+          <BottomItem href="/network" icon={<Heart size={22} />} label="Favoriler" />
+          <BottomItem href="/profil" icon={<User size={22} />} label="Profil" />
+        </div>
+      </nav>
     </div>
   );
 }
 
-function isUnitVerified(unit: Unit) {
-  return Boolean(
-    unit.isVerified ||
-      (unit.tapuVerified && unit.photoVerified && unit.yetkiVerified),
-  );
-}
-
-function getUnitCoverImage(unit: Unit) {
-  const cover = unit.images?.find((image) => image.isCover);
-  const first = unit.images?.[0];
-
-  return (
-    cover?.supabaseUrl ||
-    cover?.url ||
-    first?.supabaseUrl ||
-    first?.url ||
-    ""
-  );
-}
-
-function HeroMetric({
+function MiniStat({
   icon,
-  label,
   value,
-  note,
+  label,
+  tone = "blue",
 }: {
   icon: ReactNode;
+  value: string | number;
   label: string;
-  value: string;
-  note: string;
+  tone?: "blue" | "green" | "orange" | "purple";
 }) {
+  const tones = {
+    blue: "bg-[#EFF6FF] text-[#1557D6]",
+    green: "bg-emerald-50 text-emerald-700",
+    orange: "bg-orange-50 text-orange-600",
+    purple: "bg-violet-50 text-violet-700",
+  };
+
   return (
-    <div className="flex min-h-[178px] flex-col justify-between rounded-[32px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[20px] bg-[#EFF6FF] text-[#1557D6]">
+    <div className="flex min-h-[70px] flex-col items-center justify-center border-r border-[#DDE7F3] px-1 last:border-r-0">
+      <div className={`mb-1 flex h-8 w-8 items-center justify-center rounded-full ${tones[tone]}`}>
         {icon}
       </div>
-      <div>
-        <p className="mt-3 text-[11px] font-black uppercase tracking-[0.18em] text-[#64748B]">
-          {label}
-        </p>
-        <p className="mt-2 text-3xl font-black tracking-[-0.04em] text-[#06194A]">
-          {value}
-        </p>
-        <p className="mt-1 text-xs font-bold text-[#64748B]">{note}</p>
-      </div>
+      <p className="text-sm font-black leading-none text-[#06194A]">{value}</p>
+      <p className="mt-1 text-[10px] font-bold leading-none text-[#475569]">{label}</p>
     </div>
   );
 }
 
-function BalanceLine({
-  label,
-  value,
-  total,
-}: {
-  label: string;
-  value: number;
-  total: number;
-}) {
-  const width = Math.min(100, Math.round((value / total) * 100));
+function getBadgeTone(index: number) {
+  const tones = [
+    "bg-emerald-600 text-white",
+    "bg-[#1557D6] text-white",
+    "bg-violet-600 text-white",
+    "bg-emerald-600 text-white",
+    "bg-orange-500 text-white",
+  ];
 
-  return (
-    <div className="rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] p-4">
-      <div className="mb-3 flex items-center justify-between gap-4">
-        <span className="text-xs font-black uppercase tracking-[0.16em] text-[#64748B]">
-          {label}
-        </span>
-        <span className="text-sm font-black text-[#06194A]">{value}</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-[#DBEAFE]">
-        <div
-          className="h-full rounded-full bg-[#1557D6]"
-          style={{ width: `${width}%` }}
-        />
-      </div>
-    </div>
-  );
+  return tones[index % tones.length];
 }
 
-function VisualTile({ title, image }: { title: string; image: string }) {
-  return (
-    <div className="relative min-h-[158px] overflow-hidden rounded-[26px] border border-[#DDE7F3] bg-[#EFF6FF]">
-      <div
-        className="absolute inset-0 bg-cover bg-center transition duration-500 hover:scale-105"
-        style={{ backgroundImage: `url('${image}')` }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/82 via-[#06194A]/18 to-transparent" />
-      <div className="absolute bottom-4 left-4 right-4">
-        <p className="text-sm font-black text-white">{title}</p>
-      </div>
-    </div>
-  );
-}
-
-function SummaryLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex min-h-[62px] items-center justify-between gap-4 rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3">
-      <span className="text-sm font-extrabold text-[#64748B]">{label}</span>
-      <span className="text-right text-sm font-black text-[#06194A]">{value}</span>
-    </div>
-  );
-}
-
-function calculatePortfolioScore(unit: Unit) {
-  let score = 0;
-
-  if (unit.project?.name) score += 15;
-  if (unit.project?.city && unit.project?.district) score += 15;
-  if (unit.price) score += 12;
-  if (unit.area) score += 10;
-  if (unit.roomCount) score += 10;
-  if (unit.description) score += 10;
-  if (unit.tapuVerified) score += 8;
-  if (unit.photoVerified) score += 8;
-  if (unit.yetkiVerified || unit.isVerified) score += 12;
-
-  return Math.min(score || 72, 100);
-}
-
-function getPortfolioScoreLabel(score: number) {
-  if (score >= 90) return "Pekiyi";
-  if (score >= 80) return "Çok İyi";
-  if (score >= 70) return "İyi";
-  if (score >= 60) return "Geliştirilebilir";
-  return "Eksik";
-}
-
-function PortfolioHealthCard({
-  title,
-  value,
-  label,
-  icon,
-  progress,
-  note,
-}: {
-  title: string;
-  value: string;
-  label: string;
-  icon: ReactNode;
-  progress: number;
-  note: string;
-}) {
-  return (
-    <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
-            {title}
-          </p>
-          <h2 className="mt-2 text-4xl font-black tracking-[-0.06em] text-[#06194A]">
-            {value}
-          </h2>
-        </div>
-
-        <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]">
-          {icon}
-        </div>
-      </div>
-
-      <div className="mt-4 flex items-center justify-between gap-4">
-        <span className="rounded-full bg-[#EFF6FF] px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-[#1557D6]">
-          {label}
-        </span>
-        <span className="text-sm font-black text-[#64748B]">
-          {Math.round(progress)}%
-        </span>
-      </div>
-
-      <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#DBEAFE]">
-        <div
-          className="h-full rounded-full bg-[#1557D6]"
-          style={{ width: `${Math.max(0, Math.min(progress, 100))}%` }}
-        />
-      </div>
-
-      <p className="mt-4 text-sm font-bold leading-6 text-[#64748B]">{note}</p>
-    </div>
-  );
-}
-
-function ReportMiniLine({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-[18px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3">
-      <span className="text-xs font-black uppercase tracking-[0.14em] text-[#64748B]">
-        {label}
-      </span>
-      <span
-        className={`rounded-full px-3 py-1 text-xs font-black ${
-          value > 0 ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
-        }`}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function PremiumUnitCard({
+function MobilePortfolioCard({
   unit,
+  selected,
   copied,
   onOpen,
-  onCopy,
+  onToggleSelect,
   onShare,
+  onCopy,
 }: {
   unit: Unit;
+  selected: boolean;
   copied: boolean;
   onOpen: () => void;
-  onCopy: () => void;
+  onToggleSelect: () => void;
   onShare: () => void;
+  onCopy: () => void;
 }) {
-  const verified = isUnitVerified(unit);
+  const image = getUnitCoverImage(unit);
+  const images = getUnitImages(unit);
+  const location = [unit.project?.district, unit.project?.city].filter(Boolean).join(", ") || "Konum yok";
   const price = Number(unit.price || 0);
-  const score = calculatePortfolioScore(unit);
-  const scoreLabel = getPortfolioScoreLabel(score);
-  const location =
-    [unit.project?.district, unit.project?.city].filter(Boolean).join(" / ") ||
-    "Konum bilgisi yok";
-  const coverImage = getUnitCoverImage(unit);
+  const badgeLabel = statusLabels[unit.status] || unit.status || "Portföy";
 
   return (
-    <article
-      onClick={onOpen}
-      className="group flex min-h-[456px] cursor-pointer flex-col justify-between overflow-hidden rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:border-[#1557D6]/35 hover:shadow-[0_28px_70px_rgba(21,87,214,0.14)]"
-    >
-      <div>
-        <div className="relative mb-5 min-h-[138px] overflow-hidden rounded-[26px] bg-[#EFF6FF]">
-          {coverImage ? (
-            <>
-              <div
-                className="absolute inset-0 bg-cover bg-center opacity-95 transition duration-500 group-hover:scale-105"
-                style={{ backgroundImage: `url('${coverImage}')` }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/78 via-[#06194A]/12 to-transparent" />
-            </>
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[linear-gradient(135deg,#EFF6FF,#FFFFFF)] px-6 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-[22px] border border-[#DDE7F3] bg-white text-[#1557D6] shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
-                <Building2 size={24} />
-              </div>
-              <p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-[#1557D6]">
-                Fotoğraf Eklenmedi
-              </p>
-              <p className="mt-1 text-[11px] font-bold text-[#64748B]">
-                Bu portföy için kapak görseli bekleniyor.
-              </p>
-            </div>
-          )}
-          <div className="absolute left-4 top-4 flex flex-wrap gap-2">
-            <span className="rounded-full bg-white/92 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#1557D6] shadow-sm">
-              {statusLabels[unit.status] || unit.status || "Durum Yok"}
-            </span>
+    <article className="grid min-h-[166px] grid-cols-[46%_1fr] overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-white shadow-[0_16px_38px_rgba(15,23,42,0.065)]">
+      <button onClick={onOpen} className="relative min-h-[166px] overflow-hidden bg-[#EFF6FF] text-left">
+        {image ? (
+          <img src={image} alt={unit.project?.name || "Portföy"} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[#1557D6]">
+            <Building2 size={34} />
+          </div>
+        )}
 
-            {verified && (
-              <span className="rounded-full bg-emerald-50/95 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700 shadow-sm">
-                Onaylı
-              </span>
-            )}
+        <span className={`absolute left-3 top-3 rounded-full px-3 py-1 text-[10px] font-black ${getBadgeTone(images.length)}`}>
+          {badgeLabel}
+        </span>
 
-            <span className="rounded-full bg-white/92 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#06194A] shadow-sm">
-              {scoreLabel} · {score}
-            </span>
+        <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/58 px-2 py-1 text-[10px] font-black text-white backdrop-blur">
+          {images.length || 0}
+          <Camera size={12} />
+        </span>
+      </button>
+
+      <div className="flex min-w-0 flex-col justify-between p-4">
+        <div>
+          <div className="flex items-start justify-between gap-2">
+            <button onClick={onOpen} className="min-w-0 text-left">
+              <h3 className="line-clamp-1 text-base font-black tracking-[-0.03em] text-[#06194A]">
+                {unit.project?.name || "EPH Portföy"}
+              </h3>
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleSelect}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                selected ? "bg-[#1557D6] text-white" : "bg-[#F7FBFF] text-[#06194A]"
+              }`}
+              aria-label={selected ? "Seçili" : "Seç"}
+            >
+              {selected ? <CheckSquare size={18} /> : <Square size={18} />}
+            </button>
           </div>
 
-          <div className="absolute bottom-4 right-4 flex h-11 w-11 items-center justify-center rounded-[18px] bg-white text-[#1557D6] shadow-lg transition group-hover:bg-[#1557D6] group-hover:text-white">
-            <Eye size={18} />
-          </div>
-        </div>
-
-        <h3 className="line-clamp-2 text-2xl font-black leading-tight tracking-[-0.04em] text-[#06194A]">
-          {unit.project?.name || "EPH Portföy"}
-        </h3>
-
-        <div className="mt-3 flex items-center justify-center gap-2 text-sm font-bold text-[#64748B] lg:justify-start">
-          <MapPin size={16} />
-          <span className="line-clamp-1">{location}</span>
-        </div>
-
-        <div className="mt-5 rounded-[26px] border border-[#DDE7F3] bg-[#F7FBFF] p-4">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#64748B]">
-            İlan Değeri
+          <p className="mt-1 flex items-center gap-1 text-xs font-bold text-[#475569]">
+            <MapPin size={13} />
+            <span className="line-clamp-1">{location}</span>
           </p>
-          <p className="mt-2 text-3xl font-black tracking-[-0.04em] text-[#06194A]">
-            {formatPrice(price, unit.priceCurrency)}
+
+          <div className="mt-3 grid grid-cols-3 gap-1 text-[11px] font-black text-[#27364F]">
+            <span>{unit.roomCount || "—"}</span>
+            <span>{unit.area ? `${unit.area} m²` : "—"}</span>
+            <span className="line-clamp-1">{formatFloorInfo(unit)}</span>
+          </div>
+
+          <p className="mt-3 text-lg font-black tracking-[-0.04em] text-[#1557D6]">
+            {price ? formatPrice(price, unit.priceCurrency) : "Fiyat yok"}
           </p>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <UnitInfo label="Tip" value={unit.type || "—"} />
-          <UnitInfo label="Oda" value={unit.roomCount || "—"} />
-          <UnitInfo label="Alan" value={unit.area ? `${unit.area} m²` : "—"} />
-          <UnitInfo label="Kat" value={formatFloorInfo(unit)} />
+        <div className="mt-2 flex items-center justify-between">
+          <p className="text-xs font-bold text-[#64748B]">
+            {copied ? "Kopyalandı" : "Bugün eklendi"}
+          </p>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onCopy}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F7FBFF] text-[#1557D6]"
+              aria-label="Kopyala"
+            >
+              <Share2 size={15} />
+            </button>
+            <button
+              onClick={onShare}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EFF6FF] text-[#1557D6]"
+              aria-label="Paylaş"
+            >
+              <Sparkles size={15} />
+            </button>
+          </div>
         </div>
       </div>
+    </article>
+  );
+}
 
-      <div className="mt-5 grid gap-2 sm:grid-cols-3">
+function MobilePortfolioListRow({
+  unit,
+  index,
+  selected,
+  copied,
+  onOpen,
+  onToggleSelect,
+  onShare,
+  onCopy,
+}: {
+  unit: Unit;
+  index: number;
+  selected: boolean;
+  copied: boolean;
+  onOpen: () => void;
+  onToggleSelect: () => void;
+  onShare: () => void;
+  onCopy: () => void;
+}) {
+  const image = getUnitCoverImage(unit);
+  const images = getUnitImages(unit);
+  const location = [unit.project?.district, unit.project?.city].filter(Boolean).join(", ") || "Konum yok";
+  const price = Number(unit.price || 0);
+
+  return (
+    <article className="grid grid-cols-[86px_1fr_38px] gap-3 border-b border-[#DDE7F3] bg-white p-3 last:border-b-0">
+      <button onClick={onOpen} className="relative h-[86px] overflow-hidden rounded-[16px] bg-[#EFF6FF]">
+        {image ? (
+          <img src={image} alt={unit.project?.name || "Portföy"} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[#1557D6]">
+            <Building2 size={24} />
+          </div>
+        )}
+
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-[#1557D6] px-2 py-0.5 text-[9px] font-black text-white">
+          {index}
+        </span>
+
+        <span className="absolute bottom-1.5 right-1.5 inline-flex items-center gap-1 rounded-full bg-black/58 px-1.5 py-0.5 text-[9px] font-black text-white">
+          {images.length || 0}
+          <Camera size={10} />
+        </span>
+      </button>
+
+      <button onClick={onOpen} className="min-w-0 text-left">
+        <h3 className="line-clamp-1 text-sm font-black text-[#06194A]">
+          {unit.project?.name || "EPH Portföy"}
+        </h3>
+        <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-[#475569]">
+          <MapPin size={12} />
+          <span className="line-clamp-1">{location}</span>
+        </p>
+
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-black text-[#27364F]">
+          <span>{unit.roomCount || "—"}</span>
+          <span>{unit.area ? `${unit.area} m²` : "—"}</span>
+          <span>{formatFloorInfo(unit)}</span>
+        </div>
+
+        <p className="mt-2 text-sm font-black text-[#1557D6]">
+          {price ? formatCompactPrice(price, unit.priceCurrency) : "Fiyat yok"}
+        </p>
+        <p className="mt-1 text-[10px] font-bold text-[#64748B]">
+          {copied ? "Kopyalandı" : "Bugün eklendi"}
+        </p>
+      </button>
+
+      <div className="flex flex-col items-center justify-between gap-1">
         <button
-          onClick={(event) => {
-            event.stopPropagation();
-            onShare();
-          }}
-          className="inline-flex items-center justify-center gap-2 rounded-[18px] bg-[#1557D6] px-4 py-3 text-sm font-black text-white transition hover:bg-[#0F49BD]"
+          type="button"
+          onClick={onToggleSelect}
+          className={`flex h-8 w-8 items-center justify-center rounded-full ${
+            selected ? "bg-[#1557D6] text-white" : "bg-[#F7FBFF] text-[#06194A]"
+          }`}
+          aria-label={selected ? "Seçili" : "Seç"}
         >
-          <Share2 size={16} />
-          Kart Hazırla
+          {selected ? <CheckSquare size={17} /> : <Square size={17} />}
         </button>
 
-        <a
-          onClick={(event) => event.stopPropagation()}
-          href={`https://wa.me/?text=${encodeURIComponent(
-            `${unit.project?.name || "EPH Portföy"} - ${location}`,
-          )}`}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3 text-sm font-black text-[#1557D6] no-underline transition hover:bg-[#EFF6FF]"
+        <button
+          onClick={onShare}
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EFF6FF] text-[#1557D6]"
+          aria-label="Paylaş"
         >
-          <MessageCircle size={16} />
-          WhatsApp
-        </a>
+          <Sparkles size={15} />
+        </button>
 
         <button
-          onClick={(event) => {
-            event.stopPropagation();
-            onCopy();
-          }}
-          className="inline-flex items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-4 py-3 text-sm font-black text-[#475569] transition hover:bg-[#EFF6FF] hover:text-[#1557D6]"
+          onClick={onCopy}
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F7FBFF] text-[#1557D6]"
+          aria-label="Kopyala"
         >
-          <Copy size={16} />
-          {copied ? "Kopyalandı" : "Kopyala"}
+          <Share2 size={15} />
         </button>
       </div>
     </article>
   );
 }
 
-function UnitInfo({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-h-[76px] rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#64748B]">
-        {label}
-      </p>
-      <p className="mt-2 line-clamp-1 text-sm font-black text-[#06194A]">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function EmptyInventory() {
-  return (
-    <div className="col-span-full rounded-[30px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] p-10 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[22px] bg-white text-[#1557D6] shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
-        <Search size={22} />
-      </div>
-      <h3 className="mt-4 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
-        Portföy kaydı bulunamadı
-      </h3>
-      <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-7 text-[#64748B]">
-        Arama veya filtreleri değiştirerek tekrar deneyin.
-      </p>
-    </div>
-  );
-}
-
-function AdminVerificationPanel({
-  units,
-  allUnits,
-  projects,
-  onVerify,
+function EmptyMobileState({
+  canAddUnit,
+  onAdd,
 }: {
-  units: Unit[];
-  allUnits: Unit[];
-  projects: Project[];
-  onVerify: (
-    unitId: string,
-    payload: {
-      tapuVerified?: boolean;
-      photoVerified?: boolean;
-      yetkiVerified?: boolean;
-      isOffMarket?: boolean;
-    },
-  ) => void;
+  canAddUnit: boolean;
+  onAdd: () => void;
 }) {
-  const verifiedUnits = allUnits.filter((unit) => isUnitVerified(unit)).length;
-  const offMarketUnits = allUnits.filter((unit) => unit.isOffMarket).length;
-  const unverifiedUnits = allUnits.filter((unit) => !isUnitVerified(unit)).length;
-
   return (
-    <section className="mt-6 rounded-[36px] border border-[#DDE7F3] bg-white p-4 shadow-[0_24px_70px_rgba(15,23,42,0.07)] lg:p-6">
-      <div className="flex flex-col gap-4 text-center lg:flex-row lg:items-center lg:justify-between lg:text-left">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
-            Admin Doğrulama Merkezi
-          </p>
-          <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
-            Portföy kontrol paneli
-          </h2>
-          <p className="mt-2 text-sm font-semibold text-[#64748B]">
-            Eski admin doğrulama fonksiyonu korundu. Tapu, fotoğraf ve yetki onayları buradan yönetilir.
-          </p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3">
-          <MiniAdminMetric label="Proje" value={projects.length} />
-          <MiniAdminMetric label="Onaylı" value={verifiedUnits} />
-          <MiniAdminMetric label="Off-Market" value={offMarketUnits} />
-        </div>
+    <section className="rounded-[28px] border border-dashed border-[#DDE7F3] bg-white p-8 text-center shadow-[0_16px_38px_rgba(15,23,42,0.05)]">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#EFF6FF] text-[#1557D6]">
+        <Building2 size={28} />
       </div>
-
-      <div className="mt-5 grid gap-4 xl:grid-cols-2">
-        {units.length === 0 ? (
-          <div className="rounded-[28px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] p-10 text-center text-sm font-bold text-[#64748B] xl:col-span-2">
-            Admin kontrolü için portföy kaydı bulunamadı.
-          </div>
-        ) : (
-          units.slice(0, 24).map((unit) => (
-            <AdminUnitCard key={unit.id} unit={unit} onVerify={onVerify} />
-          ))
-        )}
-      </div>
-
-      <div className="mt-5 rounded-[28px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center text-sm font-bold text-[#64748B]">
-        Onay bekleyen kayıt: {unverifiedUnits}
-      </div>
+      <h2 className="mt-4 text-xl font-black text-[#06194A]">Henüz portföy yok</h2>
+      <p className="mt-2 text-sm font-semibold leading-6 text-[#64748B]">
+        İlk portföyünüzü ekleyerek liste görünümünü doldurun.
+      </p>
+      {canAddUnit && (
+        <button
+          onClick={onAdd}
+          className="mt-5 inline-flex min-h-[48px] items-center justify-center rounded-[20px] bg-[#1557D6] px-6 text-sm font-black text-white"
+        >
+          Portföy Ekle
+        </button>
+      )}
     </section>
   );
 }
 
-function MiniAdminMetric({ label, value }: { label: string; value: number }) {
+function AdminMini({ label, value }: { label: string; value: number }) {
   return (
-    <div className="min-w-[112px] rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3 text-center">
-      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#64748B]">
+    <div className="rounded-[18px] bg-[#F7FBFF] px-3 py-3 text-center">
+      <p className="text-[10px] font-black uppercase tracking-wide text-[#64748B]">
         {label}
       </p>
-      <p className="mt-1 text-2xl font-black text-[#06194A]">{value}</p>
+      <p className="mt-1 text-lg font-black text-[#06194A]">{value}</p>
     </div>
   );
 }
 
-function AdminUnitCard({
-  unit,
-  onVerify,
+function BottomItem({
+  icon,
+  label,
+  active,
+  href,
 }: {
-  unit: Unit;
-  onVerify: (
-    unitId: string,
-    payload: {
-      tapuVerified?: boolean;
-      photoVerified?: boolean;
-      yetkiVerified?: boolean;
-      isOffMarket?: boolean;
-    },
-  ) => void;
+  icon: ReactNode;
+  label: string;
+  active?: boolean;
+  href: string;
 }) {
-  const verified = isUnitVerified(unit);
-  const price = Number(unit.price || 0);
-
   return (
-    <article className="rounded-[30px] border border-[#DDE7F3] bg-[#F7FBFF] p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#1557D6]">
-              {statusLabels[unit.status] || unit.status || "Durum Yok"}
-            </span>
-
-            {unit.isOffMarket && (
-              <span className="rounded-full bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-700">
-                Off-Market
-              </span>
-            )}
-
-            <span
-              className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${
-                verified
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-rose-50 text-rose-700"
-              }`}
-            >
-              {verified ? "Doğrulandı" : "Kontrol"}
-            </span>
-          </div>
-
-          <h3 className="mt-4 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
-            {unit.project?.name || "EPH Portföy"}
-          </h3>
-
-          <p className="mt-1 text-sm font-semibold text-[#64748B]">
-            {[unit.project?.district, unit.project?.city].filter(Boolean).join(" / ") || "Konum yok"} · No {unit.number || "—"}
-          </p>
-        </div>
-
-        <div className="rounded-[22px] border border-[#DDE7F3] bg-white px-5 py-4 text-right">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#64748B]">
-            Değer
-          </p>
-          <p className="mt-1 text-2xl font-black text-[#06194A]">
-            {price ? `${price.toLocaleString("tr-TR")} ₺` : "—"}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-4">
-        <AdminUnitMini label="Tip" value={unit.type || "—"} />
-        <AdminUnitMini label="Oda" value={unit.roomCount || "—"} />
-        <AdminUnitMini label="Alan" value={unit.area ? `${unit.area} m²` : "—"} />
-        <AdminUnitMini label="Kat" value={formatFloorInfo(unit)} />
-      </div>
-
-      <div className="mt-5 grid gap-2 sm:grid-cols-3">
-        <AdminCheck label="Tapu" active={Boolean(unit.tapuVerified)} />
-        <AdminCheck label="Fotoğraf" active={Boolean(unit.photoVerified)} />
-        <AdminCheck label="Yetki" active={Boolean(unit.yetkiVerified)} />
-      </div>
-
-      <div className="mt-5 rounded-[24px] border border-[#DDE7F3] bg-white p-4">
-        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#1557D6]">
-          Admin Doğrulama
-        </p>
-
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <button
-            onClick={() =>
-              onVerify(unit.id, {
-                tapuVerified: !unit.tapuVerified,
-                photoVerified: unit.photoVerified,
-                yetkiVerified: unit.yetkiVerified,
-                isOffMarket: unit.isOffMarket,
-              })
-            }
-            className={`rounded-2xl px-4 py-3 text-xs font-black transition ${
-              unit.tapuVerified
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-[#F7FBFF] text-[#64748B] hover:bg-[#EFF6FF] hover:text-[#1557D6]"
-            }`}
-          >
-            {unit.tapuVerified ? "Tapu Onaylı" : "Tapu Onayla"}
-          </button>
-
-          <button
-            onClick={() =>
-              onVerify(unit.id, {
-                tapuVerified: unit.tapuVerified,
-                photoVerified: !unit.photoVerified,
-                yetkiVerified: unit.yetkiVerified,
-                isOffMarket: unit.isOffMarket,
-              })
-            }
-            className={`rounded-2xl px-4 py-3 text-xs font-black transition ${
-              unit.photoVerified
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-[#F7FBFF] text-[#64748B] hover:bg-[#EFF6FF] hover:text-[#1557D6]"
-            }`}
-          >
-            {unit.photoVerified ? "Fotoğraf Onaylı" : "Fotoğraf Onayla"}
-          </button>
-
-          <button
-            onClick={() =>
-              onVerify(unit.id, {
-                tapuVerified: unit.tapuVerified,
-                photoVerified: unit.photoVerified,
-                yetkiVerified: !unit.yetkiVerified,
-                isOffMarket: unit.isOffMarket,
-              })
-            }
-            className={`rounded-2xl px-4 py-3 text-xs font-black transition ${
-              unit.yetkiVerified
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-[#F7FBFF] text-[#64748B] hover:bg-[#EFF6FF] hover:text-[#1557D6]"
-            }`}
-          >
-            {unit.yetkiVerified ? "Yetki Onaylı" : "Yetki Onayla"}
-          </button>
-
-          <button
-            onClick={() =>
-              onVerify(unit.id, {
-                tapuVerified: true,
-                photoVerified: true,
-                yetkiVerified: true,
-                isOffMarket: unit.isOffMarket,
-              })
-            }
-            className="rounded-2xl bg-[#1557D6] px-4 py-3 text-xs font-black text-white transition hover:bg-[#0F49BD]"
-          >
-            Tümünü Doğrula
-          </button>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function AdminUnitMini({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-[#DDE7F3] bg-white p-3 text-center">
-      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#64748B]">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-black text-[#06194A]">{value}</p>
-    </div>
-  );
-}
-
-function AdminCheck({ label, active }: { label: string; active: boolean }) {
-  return (
-    <div
-      className={`rounded-2xl px-4 py-3 text-center text-xs font-black uppercase tracking-[0.16em] ${
-        active ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+    <Link
+      href={href}
+      className={`flex w-16 flex-col items-center gap-1 ${
+        active ? "text-[#1557D6]" : "text-[#27364F]"
       }`}
     >
-      {active ? "✓" : "!"} {label}
-    </div>
+      {icon}
+      <span className="text-[11px] font-bold">{label}</span>
+    </Link>
   );
 }
