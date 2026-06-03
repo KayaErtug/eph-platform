@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode, type TouchEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -208,6 +208,9 @@ export default function StokDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [imageUploadLoading, setImageUploadLoading] = useState("");
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!unitId) return;
@@ -270,6 +273,112 @@ export default function StokDetailPage() {
   const fullAddress = [unit?.project?.address, unit?.project?.district, unit?.project?.city].filter(Boolean).join(" / ") || "Adres bilgisi yok";
   const mapQuery = encodeURIComponent(fullAddress);
   const shareUrl = unit ? getCurrentShareUrl(unit.id) : "";
+
+  const validateImageFile = (file: File) => {
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+      "image/heic",
+      "image/heif",
+      "application/octet-stream",
+      "",
+    ];
+
+    const fileType = String(file.type || "").toLowerCase();
+    const fileName = String(file.name || "").toLowerCase();
+    const isAllowedType =
+      allowedTypes.includes(fileType) ||
+      /\.(jpg|jpeg|png|webp|heic|heif)$/i.test(fileName);
+
+    if (!isAllowedType) {
+      return "Sadece JPG, PNG veya WEBP formatında görsel yükleyebilirsiniz.";
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      return `Yüklediğiniz görsel dosyası çok büyük. Her bir görsel en fazla 15 MB olabilir. Seçilen görsel: ${(file.size / (1024 * 1024)).toFixed(1)} MB.`;
+    }
+
+    if (file.size < 20 * 1024) {
+      return "Seçtiğiniz görsel çok küçük görünüyor. Lütfen daha kaliteli bir görsel yükleyiniz.";
+    }
+
+    return "";
+  };
+
+  const uploadPortfolioImage = async (file: File, isCover: boolean, sortOrder: number) => {
+    if (!unit) return;
+
+    const validationError = validateImageFile(file);
+
+    if (validationError) {
+      setActionError(validationError);
+      return;
+    }
+
+    const payload = new FormData();
+
+    payload.append("portfolioId", unit.id);
+    payload.append("isCover", isCover ? "true" : "false");
+    payload.append("sortOrder", String(sortOrder));
+    payload.append("file", file);
+
+    setImageUploadLoading(isCover ? "cover" : "gallery");
+    setActionError("");
+
+    try {
+      await api.post("/portfolio-images/upload", payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      await fetchUnit();
+    } catch (err: any) {
+      setActionError(
+        err?.response?.data?.message ||
+          "Görsel yüklenemedi. Lütfen dosya formatını ve boyutunu kontrol ediniz.",
+      );
+    } finally {
+      setImageUploadLoading("");
+    }
+  };
+
+  const handleCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file) return;
+
+    await uploadPortfolioImage(file, true, 0);
+  };
+
+  const handleGalleryUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+
+    event.target.value = "";
+
+    if (!files.length || !unit) return;
+
+    const remaining = Math.max(0, MAX_GALLERY_COUNT - galleryImages.length);
+
+    if (remaining <= 0) {
+      setActionError(`En fazla ${MAX_GALLERY_COUNT} galeri fotoğrafı yükleyebilirsiniz.`);
+      return;
+    }
+
+    const selectedFiles = files.slice(0, remaining);
+
+    for (let index = 0; index < selectedFiles.length; index += 1) {
+      await uploadPortfolioImage(selectedFiles[index], false, galleryImages.length + index + 1);
+    }
+
+    if (files.length > remaining) {
+      setActionError(
+        `En fazla ${MAX_GALLERY_COUNT} galeri fotoğrafı yükleyebilirsiniz. Fazla seçilen görseller eklenmedi.`,
+      );
+    }
+  };
 
   const getPortfolioShareData = (item: DetailUnit): PortfolioShareData => ({
     id: item.id,
