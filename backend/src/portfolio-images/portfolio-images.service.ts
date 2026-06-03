@@ -30,7 +30,7 @@ type ReorderPortfolioImagesInput = {
 };
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_SIZE = 15 * 1024 * 1024;
 
 @Injectable()
 export class PortfolioImagesService {
@@ -85,7 +85,9 @@ export class PortfolioImagesService {
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      throw new BadRequestException('Görsel boyutu en fazla 10 MB olabilir.');
+      throw new BadRequestException(
+        `Yüklediğiniz görsel dosyası çok büyük. Her bir görsel en fazla 15 MB olabilir. Seçtiğiniz görsel: ${(file.size / (1024 * 1024)).toFixed(1)} MB. Lütfen daha düşük boyutlu bir JPG, PNG veya WEBP görsel yükleyiniz.`,
+      );
     }
 
     await this.assertCanManagePortfolio({

@@ -41,7 +41,7 @@ interface Props {
 }
 
 const MAX_GALLERY_COUNT = 15;
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_SIZE = 15 * 1024 * 1024;
 const MIN_FILE_SIZE = 30 * 1024;
 const MIN_IMAGE_WIDTH = 800;
 const MIN_IMAGE_HEIGHT = 600;
@@ -588,7 +588,7 @@ export default function StokCreateModal({
     const tooLarge = files.find((file) => file.size > MAX_FILE_SIZE);
 
     if (tooLarge) {
-      return `Seçtiğiniz görsel 10 MB sınırını aşıyor. Lütfen daha küçük bir görsel seçiniz. (${tooLarge.name})`;
+      return `Seçtiğiniz görsel 15 MB sınırını aşıyor. Seçilen görsel: ${formatFileSize(tooLarge.size)}. Lütfen daha düşük boyutlu bir JPG, PNG veya WEBP görsel yükleyiniz. (${tooLarge.name})`;
     }
 
     const tooSmall = files.find((file) => file.size < MIN_FILE_SIZE);
@@ -1167,7 +1167,7 @@ export default function StokCreateModal({
             <div className="stock-form-grid">
               <div className="stock-form-field full">
                 <span>Kapak Fotoğrafı * (1 adet)</span>
-                <small className="stock-upload-hint">JPG / PNG / WEBP · minimum 800×600 px · maksimum 10 MB</small>
+                <small className="stock-upload-hint">JPG / PNG / WEBP · min. 800×600 px · önerilen 1920×1080 · maks. 15 MB</small>
 
                 <input
                   ref={coverInputRef}
@@ -1218,7 +1218,7 @@ export default function StokCreateModal({
 
               <div className="stock-form-field full">
                 <span>Galeri Fotoğrafları ({galleryImages.length}/{MAX_GALLERY_COUNT})</span>
-                <small className="stock-upload-hint">JPG / PNG / WEBP · minimum 800×600 px · maksimum 10 MB</small>
+                <small className="stock-upload-hint">JPG / PNG / WEBP · min. 800×600 px · önerilen 1920×1080 · maks. 15 MB</small>
 
                 <input
                   ref={galleryInputRef}
@@ -1239,7 +1239,7 @@ export default function StokCreateModal({
                 </button>
 
                 <p className="mt-2 text-xs font-bold text-[#64748B]">
-                  JPG, PNG, WEBP desteklenir. Her görsel en fazla 10 MB olmalıdır.
+                  JPG, PNG, WEBP desteklenir. Her görsel en fazla 15 MB olmalıdır.
                 </p>
 
                 {galleryImages.length > 0 ? (
