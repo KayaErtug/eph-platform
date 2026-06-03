@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 
@@ -209,6 +210,7 @@ export default function StokDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
   const [imageUploadLoading, setImageUploadLoading] = useState("");
+  const [imageActionLoading, setImageActionLoading] = useState("");
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -380,6 +382,65 @@ export default function StokDetailPage() {
     }
   };
 
+  const handleSetCoverImage = async (imageId?: string) => {
+    if (!imageId) return;
+
+    try {
+      setActionError("");
+      setImageActionLoading(`cover-${imageId}`);
+      await api.put(`/portfolio-images/${imageId}/cover`);
+      await fetchUnit();
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || "Kapak fotoğrafı değiştirilemedi.");
+    } finally {
+      setImageActionLoading("");
+    }
+  };
+
+  const handleDeleteImage = async (imageId?: string) => {
+    if (!imageId) return;
+
+    try {
+      setActionError("");
+      setImageActionLoading(`delete-${imageId}`);
+      await api.delete(`/portfolio-images/${imageId}`);
+      await fetchUnit();
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || "Fotoğraf silinemedi.");
+    } finally {
+      setImageActionLoading("");
+    }
+  };
+
+  const handleMoveImage = async (imageId?: string, direction?: "up" | "down") => {
+    if (!unit || !imageId || !direction) return;
+
+    const currentIndex = galleryImages.findIndex((image) => image.id === imageId);
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= galleryImages.length) return;
+
+    const nextImages = [...galleryImages];
+    const current = nextImages[currentIndex];
+    const target = nextImages[targetIndex];
+
+    nextImages[currentIndex] = target;
+    nextImages[targetIndex] = current;
+
+    const imageIds = nextImages.map((image) => image.id).filter(Boolean) as string[];
+
+    try {
+      setActionError("");
+      setImageActionLoading(`move-${imageId}`);
+      await api.put(`/portfolio-images/reorder/${unit.id}`, { imageIds });
+      await fetchUnit();
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || "Fotoğraf sıralaması güncellenemedi.");
+    } finally {
+      setImageActionLoading("");
+    }
+  };
+
   const getPortfolioShareData = (item: DetailUnit): PortfolioShareData => ({
     id: item.id,
     title: item.project?.name || "EPH Portföy",
@@ -488,6 +549,9 @@ export default function StokDetailPage() {
 
   return (
     <main className="min-h-screen bg-[#F7FBFF] pb-28 text-[#27364F]">
+      <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleCoverUpload} />
+      <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={handleGalleryUpload} />
+
       <section className="mx-auto max-w-7xl px-4 py-4 md:py-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <button onClick={() => router.push("/stok")} className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-4 text-sm font-black text-[#06194A] shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
@@ -505,6 +569,12 @@ export default function StokDetailPage() {
             </button>
           </div>
         </div>
+
+        {actionError && (
+          <div className="mb-4 rounded-[24px] border border-rose-100 bg-rose-50 px-4 py-3 text-center text-sm font-black leading-6 text-rose-700">
+            {actionError}
+          </div>
+        )}
 
         <section className="overflow-hidden rounded-[34px] border border-[#DDE7F3] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
           <div className="grid lg:grid-cols-[1.2fr_0.8fr]">
@@ -565,6 +635,33 @@ export default function StokDetailPage() {
                     </div>
                   </div>
                 </div>
+
+                <div className="mt-4 rounded-[26px] border border-[#DDE7F3] bg-[#F7FBFF] p-4">
+                  <p className="text-center text-xs font-black uppercase tracking-[0.18em] text-[#64748B]">Fotoğraf Yönetimi</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => coverInputRef.current?.click()}
+                      disabled={imageUploadLoading === "cover"}
+                      className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[18px] bg-[#1557D6] px-4 text-sm font-black text-white disabled:opacity-60"
+                    >
+                      <Camera size={17} />
+                      {imageUploadLoading === "cover" ? "Yükleniyor..." : "Kapak Ekle / Değiştir"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
+                      disabled={imageUploadLoading === "gallery" || galleryImages.length >= MAX_GALLERY_COUNT}
+                      className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-4 text-sm font-black text-[#1557D6] disabled:opacity-60"
+                    >
+                      <Upload size={17} />
+                      {imageUploadLoading === "gallery" ? "Yükleniyor..." : "Galeriye Foto Ekle"}
+                    </button>
+                  </div>
+                  <p className="mt-3 text-center text-xs font-bold leading-5 text-[#64748B]">
+                    JPG, PNG, WEBP · En fazla 15 MB · Galeri sınırı {MAX_GALLERY_COUNT} fotoğraf.
+                  </p>
+                </div>
               </div>
               <div className="grid gap-2">
                 <button onClick={handleOpenShareModal} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[20px] bg-[#1557D6] px-5 py-3 text-sm font-black text-white shadow-[0_18px_38px_rgba(21,87,214,0.22)] transition hover:bg-[#0F49BD]">
@@ -590,22 +687,113 @@ export default function StokDetailPage() {
             </section>
 
             <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
-              <SectionTitle icon={<ImageIcon size={21} />} title="Galeri" description="Kapak ve detay görselleri" />
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <SectionTitle icon={<ImageIcon size={21} />} title="Galeri" description="Kapak, detay görselleri ve fotoğraf sıralaması" />
+                <div className="grid gap-2 sm:grid-cols-2 md:min-w-[360px]">
+                  <button
+                    type="button"
+                    onClick={() => coverInputRef.current?.click()}
+                    disabled={imageUploadLoading === "cover"}
+                    className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[#1557D6] px-4 text-sm font-black text-white disabled:opacity-60"
+                  >
+                    <Camera size={17} />
+                    {imageUploadLoading === "cover" ? "Yükleniyor..." : "Kapak Fotoğrafı"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    disabled={imageUploadLoading === "gallery" || galleryImages.length >= MAX_GALLERY_COUNT}
+                    className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-4 text-sm font-black text-[#1557D6] disabled:opacity-60"
+                  >
+                    <Upload size={17} />
+                    {imageUploadLoading === "gallery" ? "Yükleniyor..." : "Galeri Ekle"}
+                  </button>
+                </div>
+              </div>
+
               {galleryImages.length > 0 ? (
-                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {galleryImages.map((photo, index) => (
-                    <button key={photo.id || photo.displayUrl} onClick={() => { setActivePhoto(index); setGalleryOpen(true); }} className="group relative h-36 overflow-hidden rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] md:h-44">
-                      <img src={photo.displayUrl} alt={`Portföy fotoğrafı ${index + 1}`} className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/54 to-transparent opacity-80" />
-                      <span className="absolute bottom-3 right-3 rounded-full bg-white/92 px-3 py-1 text-[11px] font-black text-[#06194A]">{index + 1}</span>
-                      {photo.isCover && <span className="absolute left-3 top-3 rounded-full bg-[#1557D6] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">Kapak</span>}
-                    </button>
+                    <article key={photo.id || photo.displayUrl} className="overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActivePhoto(index);
+                          setGalleryOpen(true);
+                        }}
+                        className="group relative h-44 w-full overflow-hidden bg-[#F7FBFF]"
+                      >
+                        <img src={photo.displayUrl} alt={`Portföy fotoğrafı ${index + 1}`} className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/54 to-transparent opacity-80" />
+                        <span className="absolute bottom-3 right-3 rounded-full bg-white/92 px-3 py-1 text-[11px] font-black text-[#06194A]">{index + 1}</span>
+                        {photo.isCover && <span className="absolute left-3 top-3 rounded-full bg-[#1557D6] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">Kapak</span>}
+                      </button>
+
+                      <div className="grid gap-2 p-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSetCoverImage(photo.id)}
+                            disabled={Boolean(photo.isCover) || imageActionLoading === `cover-${photo.id}`}
+                            className="min-h-[42px] rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-xs font-black text-[#1557D6] disabled:opacity-50"
+                          >
+                            {photo.isCover ? "Kapak Fotoğrafı" : imageActionLoading === `cover-${photo.id}` ? "İşleniyor..." : "Kapak Yap"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteImage(photo.id)}
+                            disabled={imageActionLoading === `delete-${photo.id}`}
+                            className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[16px] bg-rose-50 px-3 text-xs font-black text-rose-700 disabled:opacity-50"
+                          >
+                            <Trash2 size={15} />
+                            {imageActionLoading === `delete-${photo.id}` ? "Siliniyor..." : "Sil"}
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveImage(photo.id, "up")}
+                            disabled={index === 0 || imageActionLoading === `move-${photo.id}`}
+                            className="inline-flex min-h-[40px] items-center justify-center gap-1 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-xs font-black text-[#64748B] disabled:opacity-40"
+                          >
+                            <ChevronLeft size={15} />
+                            Öne Al
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveImage(photo.id, "down")}
+                            disabled={index === galleryImages.length - 1 || imageActionLoading === `move-${photo.id}`}
+                            className="inline-flex min-h-[40px] items-center justify-center gap-1 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-xs font-black text-[#64748B] disabled:opacity-40"
+                          >
+                            Sona Al
+                            <ChevronRight size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    </article>
                   ))}
                 </div>
               ) : (
                 <div className="mt-4 rounded-[24px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] p-8 text-center">
                   <Camera className="mx-auto text-[#1557D6]" size={28} />
                   <p className="mt-3 text-sm font-bold text-[#64748B]">Bu portföy için galeri fotoğrafı henüz yüklenmemiş.</p>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => coverInputRef.current?.click()}
+                      className="min-h-[48px] rounded-[18px] bg-[#1557D6] px-4 text-sm font-black text-white"
+                    >
+                      Kapak Fotoğrafı Ekle
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="min-h-[48px] rounded-[18px] border border-[#DDE7F3] bg-white px-4 text-sm font-black text-[#1557D6]"
+                    >
+                      Galeri Fotoğrafı Ekle
+                    </button>
+                  </div>
                 </div>
               )}
             </section>
