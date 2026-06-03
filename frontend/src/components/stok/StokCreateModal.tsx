@@ -553,29 +553,6 @@ export default function StokCreateModal({
     setMainCategory(getMainCategoryFromType(unitForm.type));
   }, [open, unitForm.type]);
 
-  useEffect(() => {
-    if (!open || typeof window === "undefined") return;
-
-    const scrollY = window.scrollY;
-    const originalOverflow = document.body.style.overflow;
-    const originalPosition = document.body.style.position;
-    const originalTop = document.body.style.top;
-    const originalWidth = document.body.style.width;
-
-    document.body.style.overflow = "hidden";
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = "100%";
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.body.style.position = originalPosition;
-      document.body.style.top = originalTop;
-      document.body.style.width = originalWidth;
-      window.scrollTo(0, scrollY);
-    };
-  }, [open]);
-
   if (!open) return null;
 
   const validateFiles = async (files: File[]) => {
@@ -779,21 +756,25 @@ export default function StokCreateModal({
   };
 
   return (
-    <div className="stock-modal-v2-backdrop" onClick={onClose}>
-      <div
-        className="stock-modal-v2 stock-modal-v5"
-        onClick={(e) => e.stopPropagation()}
-        onTouchMove={(e) => e.stopPropagation()}
-      >
-        <button className="stock-modal-v6-close" onClick={onClose} aria-label="Kapat">×</button>
+    <div className="stock-modal-v2-backdrop" onClick={onClose} onTouchMove={(e) => e.preventDefault()}>
+      <div className="stock-modal-v2" onClick={(e) => e.stopPropagation()}>
+        <div className="stock-modal-v2-head">
+          <div>
+            <div className="stock-section-kicker">Yeni Portföy</div>
+            <h2>Yeni Portföy Ekle</h2>
+            <p>Gayrimenkul portföy kaydını görselleriyle birlikte oluştur.</p>
+          </div>
+          <button onClick={onClose}>×</button>
+        </div>
 
-        <div className="stock-modal-v2-body stock-modal-v5-body stock-modal-v6-body">
+        <div className="stock-modal-v2-body">
           {formSuccess && <div className="stock-form-success">Portföy başarıyla eklendi.</div>}
           {formError && <div className="stock-form-error">{formError}</div>}
           {localError && <div className="stock-form-error">{localError}</div>}
           {imageError && <div className="stock-form-error">{imageError}</div>}
 
           <div className="stock-form-block">
+            <h3>Proje</h3>
             <div className="stock-form-grid">
               {projects.length > 0 && (
                 <label className="stock-form-field full">
@@ -919,6 +900,7 @@ export default function StokCreateModal({
           </div>
 
           <div className="stock-form-block">
+            <h3>Mülk Bilgileri</h3>
             <div className="stock-form-grid">
               <label className="stock-form-field">
                 <span>Mülk Tipi *</span>
@@ -1074,7 +1056,7 @@ export default function StokCreateModal({
 
               {showFloorFields && (
                 <label className="stock-form-field">
-                  <span>Bulunduğu Kat *</span>
+                  <span>Bulunduğu Kat</span>
                   <select
                     value={selectedFloorLabel}
                     onChange={(e) => {
@@ -1098,7 +1080,7 @@ export default function StokCreateModal({
 
               {showBuildingFloorCount && (
                 <label className="stock-form-field">
-                  <span>{isVillaType(unitForm.type) ? "Yapı Kat Sayısı *" : "Toplam Kat Sayısı *"}</span>
+                  <span>{isVillaType(unitForm.type) ? "Yapı Kat Sayısı" : "Toplam Kat Sayısı"}</span>
                   <select
                     value={buildingFloorCount}
                     onChange={(e) => setUnitField("totalFloors", e.target.value)}
@@ -1163,6 +1145,7 @@ export default function StokCreateModal({
           </div>
 
           <div className="stock-form-block">
+            <h3>Portföy Görselleri</h3>
 
             <div className="stock-form-grid">
               <div className="stock-form-field full">
@@ -1210,7 +1193,7 @@ export default function StokCreateModal({
                   </div>
                 ) : (
                   <div className="mt-4 rounded-[24px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center text-sm font-bold text-[#64748B]">
-                    Kapak fotoğrafı kartta ve detay sayfasında ana görsel olur.
+                    Kapak fotoğrafı portföy kartlarında ve detay sayfasında ana görsel olarak kullanılacak.
                   </div>
                 )}
               </div>
@@ -1237,7 +1220,7 @@ export default function StokCreateModal({
                 </button>
 
                 <p className="mt-2 text-xs font-bold text-[#64748B]">
-                  JPG, PNG, WEBP desteklenir. Her görsel en fazla 10 MB olmalıdır.
+                  Maksimum {MAX_GALLERY_COUNT} galeri fotoğrafı. JPG, PNG ve WEBP desteklenir. Her görsel en fazla 10 MB olmalıdır.
                 </p>
 
                 {galleryImages.length > 0 ? (
@@ -1280,25 +1263,35 @@ export default function StokCreateModal({
                   </div>
                 ) : (
                   <div className="mt-4 rounded-[24px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center text-sm font-bold text-[#64748B]">
-                    Galeri fotoğrafları detay sayfasında gösterilir.
+                    Galeri fotoğrafları portföy detay sayfasında kullanılacak.
                   </div>
                 )}
               </div>
 
-              <div className="stock-form-field full stock-image-summary-row">
-                <span>Görsel Özeti</span>
-                <div className="stock-image-summary">
-                  <div>
-                    <b>Kapak</b>
-                    <strong>{coverImage ? "Seçildi" : "Bekliyor"}</strong>
+              <div className="stock-form-field full">
+                <span>Görsel Limiti</span>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-[20px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center">
+                    <p className="text-2xl font-black text-[#06194A]">1</p>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-[#64748B]">
+                      Kapak
+                    </p>
                   </div>
-                  <div>
-                    <b>Galeri</b>
-                    <strong>{galleryImages.length}/{MAX_GALLERY_COUNT}</strong>
+
+                  <div className="rounded-[20px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center">
+                    <p className="text-2xl font-black text-[#06194A]">15</p>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-[#64748B]">
+                      Galeri
+                    </p>
                   </div>
-                  <div>
-                    <b>Toplam</b>
-                    <strong>{totalSelectedImages}/16</strong>
+
+                  <div className="rounded-[20px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center">
+                    <p className="text-2xl font-black text-[#06194A]">
+                      {totalSelectedImages}
+                    </p>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-[#64748B]">
+                      Seçili
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1306,7 +1299,7 @@ export default function StokCreateModal({
           </div>
         </div>
 
-        <div className="stock-modal-v2-foot stock-modal-v5-foot">
+        <div className="stock-modal-v2-foot">
           <button className="stock-cancel-btn" onClick={onClose}>
             İptal
           </button>
