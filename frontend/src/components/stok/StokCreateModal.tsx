@@ -57,6 +57,16 @@ const ACCEPTED_IMAGE_TYPES = [
   "application/octet-stream",
 ];
 
+
+const TOURISTIC_BED_COUNT_VALUE_OPTIONS = [
+  { value: "10", label: "1-10 arası" },
+  { value: "50", label: "11-50 arası" },
+  { value: "250", label: "51-250 arası" },
+  { value: "500", label: "251-500 arası" },
+  { value: "1000", label: "501-1000 arası" },
+  { value: "1001", label: "1000+" },
+];
+
 const CURRENCY_OPTIONS = [
   { value: "TRY", label: "Türk Lirası", symbol: "₺" },
   { value: "USD", label: "Amerikan Doları", symbol: "$" },
@@ -471,10 +481,10 @@ export default function StokCreateModal({
   const selectedSubCategory = getSubCategoryFromType(unitForm.type);
   const subCategoryOptions = CATEGORY_OPTIONS[mainCategory] || CATEGORY_OPTIONS.KONUT;
   const roomOptions = isTouristicType(unitForm.type)
-        ? TOURISTIC_ROOM_BED_COUNT_OPTIONS
-        : isOfficeDetailType(unitForm.type)
-        ? OFFICE_ROOM_COUNT_OPTIONS
-        : ROOM_COUNT_OPTIONS;
+    ? TOURISTIC_ROOM_BED_COUNT_OPTIONS
+    : isOfficeDetailType(unitForm.type)
+      ? OFFICE_ROOM_COUNT_OPTIONS
+      : ROOM_COUNT_OPTIONS;
   const priceDisplay = formatPriceInput(String(unitForm.price || ""));
   const descriptionLength = unitForm.description.length;
   const showRoomCountField = shouldShowRoomCountField(unitForm.type);
@@ -1061,23 +1071,21 @@ export default function StokCreateModal({
               )}
 
               {showBedCountField && (
- 		 <label className="stock-form-field">
-  		  <span>Yatak Sayısı *</span>
-
-  		  <select
-  		    value={bedCount}
-  		    onChange={(e) => setUnitField("bedCount", e.target.value)}
-  		  >
-    		  <option value="">Yatak sayısı seçiniz</option>
-
-  		    {TOURISTIC_ROOM_BED_COUNT_OPTIONS.map((option) => (
-      		  <option key={option} value={option}>
-       		   {option}
-       		 </option>
-    		  ))}
-  		  </select>
-		  </label>
-	      )}
+                <label className="stock-form-field">
+                  <span>Yatak Sayısı *</span>
+                  <select
+                    value={bedCount}
+                    onChange={(e) => setUnitField("bedCount", e.target.value)}
+                  >
+                    <option value="">Yatak sayısı seçiniz</option>
+                    {TOURISTIC_BED_COUNT_VALUE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
               {showBuildingAgeField && (
                 <label className="stock-form-field">

@@ -13,6 +13,16 @@ function getFriendlyErrorMessage(error: any) {
   const serverMessage = error?.response?.data?.message;
 
   if (typeof serverMessage === "string" && serverMessage.trim()) {
+    const normalizedServerMessage = serverMessage.trim().toLowerCase();
+
+    if (
+      normalizedServerMessage === "internal server error" ||
+      normalizedServerMessage === "network error" ||
+      normalizedServerMessage === "request failed with status code 500"
+    ) {
+      return "Sunucu tarafında geçici bir hata oluştu. Lütfen bilgileri kontrol edip tekrar deneyiniz.";
+    }
+
     return serverMessage;
   }
 
