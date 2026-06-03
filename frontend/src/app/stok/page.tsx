@@ -207,6 +207,7 @@ export default function StokPage() {
   const [cityFilter, setCityFilter] = useState("");
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
+  const [showAllPortfolios, setShowAllPortfolios] = useState(false);
   const [sortMode, setSortMode] = useState<"newest" | "priceDesc" | "priceAsc">("newest");
   const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([]);
   const [copiedUnitId, setCopiedUnitId] = useState("");
@@ -268,6 +269,11 @@ export default function StokPage() {
     fetchUnits();
   }, [statusFilter, cityFilter]);
 
+
+  useEffect(() => {
+    setShowAllPortfolios(false);
+  }, [statusFilter, cityFilter, search, viewMode]);
+
   const fetchData = async () => {
     try {
       const [projectRes, unitRes] = await Promise.all([
@@ -326,8 +332,13 @@ export default function StokPage() {
     return list;
   }, [units, search, sortMode]);
 
-  const cardVisibleUnits = useMemo(() => filteredUnits.slice(0, 5), [filteredUnits]);
-  const listVisibleUnits = useMemo(() => filteredUnits.slice(0, 10), [filteredUnits]);
+  const cardVisibleUnits = useMemo(() => {
+    return showAllPortfolios ? filteredUnits : filteredUnits.slice(0, 5);
+  }, [filteredUnits, showAllPortfolios]);
+
+  const listVisibleUnits = useMemo(() => {
+    return showAllPortfolios ? filteredUnits : filteredUnits.slice(0, 10);
+  }, [filteredUnits, showAllPortfolios]);
 
   const totalValue = useMemo(() => {
     return units.reduce((sum, unit) => sum + (Number(unit.price) || 0), 0);
@@ -354,6 +365,46 @@ export default function StokPage() {
       ),
     ).sort((a, b) => a.localeCompare(b, "tr"));
   }, [units]);
+
+
+  const statusDistribution = useMemo(() => {
+    return Object.entries(
+      units.reduce<Record<string, number>>((acc, unit) => {
+        const key = statusLabels[unit.status] || unit.status || "Durum Yok";
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {}),
+    )
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+  }, [units]);
+
+  const cityDistribution = useMemo(() => {
+    return Object.entries(
+      units.reduce<Record<string, number>>((acc, unit) => {
+        const key = unit.project?.city || "Şehir Yok";
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {}),
+    )
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+  }, [units]);
+
+  const verifiedCount = useMemo(() => units.filter((unit) => isUnitVerified(unit)).length, [units]);
+  const photoReadyCount = useMemo(() => units.filter((unit) => getUnitImages(unit).length > 0).length, [units]);
+  const missingPhotoCount = useMemo(() => units.filter((unit) => getUnitImages(unit).length === 0).length, [units]);
+
+  const selectedValue = useMemo(() => {
+    return units
+      .filter((unit) => selectedUnitIds.includes(unit.id))
+      .reduce((sum, unit) => sum + (Number(unit.price) || 0), 0);
+  }, [selectedUnitIds, units]);
+
+  const averageValue = useMemo(() => {
+    if (!units.length) return 0;
+    return Math.round(totalValue / units.length);
+  }, [totalValue, units.length]);
 
   const revokePortfolioPreviews = (
     cover: LocalPortfolioImage | null,
@@ -767,11 +818,24 @@ export default function StokPage() {
               Portföyler
             </h2>
 
-            <button className="inline-flex items-center gap-1 text-sm font-black text-[#1557D6]">
-              Tümünü Gör
+            <button
+              onClick={() => setShowAllPortfolios((current) => !current)}
+              className="inline-flex items-center gap-1 text-sm font-black text-[#1557D6]"
+            >
+              {showAllPortfolios ? "Kısalt" : "Tümünü Gör"}
               <span>›</span>
             </button>
           </div>
+
+          {filteredUnits.length > 0 && (
+            <div className="mb-3 rounded-[18px] border border-[#DDE7F3] bg-white px-4 py-3 text-center text-xs font-black text-[#64748B] shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+              {showAllPortfolios
+                ? `${filteredUnits.length} portföyün tamamı gösteriliyor.`
+                : viewMode === "cards"
+                  ? `İlk 5 portföy gösteriliyor. Tümünü görmek için Tümünü Gör butonuna bas.`
+                  : `İlk 10 portföy gösteriliyor. Tümünü görmek için Tümünü Gör butonuna bas.`}
+            </div>
+          )}
 
           {filteredUnits.length === 0 ? (
             <EmptyMobileState
@@ -814,6 +878,84 @@ export default function StokPage() {
             </div>
           )}
         </section>
+
+        {units.length > 0 && (
+          <section className="mt-5 grid gap-4">
+            <div className="rounded-[26px] border border-[#DDE7F3] bg-white p-4 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
+              <div className="mb-3 text-center">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-[#1557D6]">
+                  Portföy Yönetim Merkezi
+                </p>
+                <h2 className="mt-1 text-lg font-black tracking-[-0.03em] text-[#06194A]">
+                  Seçili portföylerle hızlı işlem
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <PremiumActionCard
+                  title="Seçili Portföy"
+                  value={selectedUnitIds.length}
+                  note={selectedUnitIds.length ? `${formatCompactPrice(selectedValue)} değer` : "Kartlardan seçim yap"}
+                  icon={<CheckSquare size={19} />}
+                />
+                <PremiumActionCard
+                  title="Fotoğraf Hazır"
+                  value={photoReadyCount}
+                  note={`${missingPhotoCount} portföy fotoğraf bekliyor`}
+                  icon={<Camera size={19} />}
+                />
+                <PremiumActionCard
+                  title="Yetki Kontrol"
+                  value={verifiedCount}
+                  note={`${Math.max(0, units.length - verifiedCount)} kayıt kontrol bekliyor`}
+                  icon={<Eye size={19} />}
+                />
+                <PremiumActionCard
+                  title="Ortalama Değer"
+                  value={averageValue ? formatCompactPrice(averageValue) : "0"}
+                  note="Portföy başına ortalama"
+                  icon={<TrendingUp size={19} />}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-[26px] border border-[#DDE7F3] bg-white p-4 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
+                <p className="text-center text-xs font-black uppercase tracking-[0.16em] text-[#1557D6]">
+                  Şehir Dağılımı
+                </p>
+                <div className="mt-3 grid gap-2">
+                  {cityDistribution.length > 0 ? (
+                    cityDistribution.map(([label, value]) => (
+                      <InsightRow key={label} label={label} value={value} total={units.length} />
+                    ))
+                  ) : (
+                    <p className="rounded-[18px] bg-[#F7FBFF] px-4 py-3 text-center text-xs font-bold text-[#64748B]">
+                      Şehir verisi bulunamadı.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-[26px] border border-[#DDE7F3] bg-white p-4 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
+                <p className="text-center text-xs font-black uppercase tracking-[0.16em] text-[#1557D6]">
+                  Durum Dağılımı
+                </p>
+                <div className="mt-3 grid gap-2">
+                  {statusDistribution.length > 0 ? (
+                    statusDistribution.map(([label, value]) => (
+                      <InsightRow key={label} label={label} value={value} total={units.length} />
+                    ))
+                  ) : (
+                    <p className="rounded-[18px] bg-[#F7FBFF] px-4 py-3 text-center text-xs font-bold text-[#64748B]">
+                      Durum verisi bulunamadı.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         {user?.role === "ADMIN" && units.length > 0 && (
           <section className="mt-5 rounded-[24px] border border-[#DDE7F3] bg-white p-4 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
@@ -859,8 +1001,8 @@ export default function StokPage() {
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#DDE7F3] bg-white/96 px-5 pb-6 pt-3 shadow-[0_-18px_40px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="mx-auto flex max-w-[520px] items-center justify-between">
-          <BottomItem active href="/dashboard" icon={<Home size={22} />} label="Ana Sayfa" />
-          <BottomItem href="/stok" icon={<Building2 size={22} />} label="Portföyler" />
+          <BottomItem href="/dashboard" icon={<Home size={22} />} label="Ana Sayfa" />
+          <BottomItem active href="/stok" icon={<Building2 size={22} />} label="Portföyler" />
           <button
             onClick={() => {
               resetForm();
@@ -1154,6 +1296,52 @@ function EmptyMobileState({
         </button>
       )}
     </section>
+  );
+}
+
+function PremiumActionCard({
+  title,
+  value,
+  note,
+  icon,
+}: {
+  title: string;
+  value: string | number;
+  note: string;
+  icon: ReactNode;
+}) {
+  return (
+    <div className="min-h-[118px] rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center">
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
+        {icon}
+      </div>
+      <p className="mt-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#64748B]">
+        {title}
+      </p>
+      <p className="mt-1 text-lg font-black tracking-[-0.04em] text-[#06194A]">
+        {value}
+      </p>
+      <p className="mt-1 line-clamp-2 text-[11px] font-bold leading-4 text-[#64748B]">
+        {note}
+      </p>
+    </div>
+  );
+}
+
+function InsightRow({ label, value, total }: { label: string; value: number; total: number }) {
+  const percent = total ? Math.round((value / total) * 100) : 0;
+
+  return (
+    <div className="rounded-[18px] bg-[#F7FBFF] px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="min-w-0 truncate text-sm font-black text-[#06194A]">{label}</span>
+        <span className="text-xs font-black text-[#1557D6]">{value}</span>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+        <div className="h-full rounded-full bg-[#1557D6]" style={{ width: `${percent}%` }} />
+      </div>
+      <p className="mt-1 text-[10px] font-bold text-[#64748B]">%{percent}</p>
+    </div>
   );
 }
 
