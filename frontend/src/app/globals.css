@@ -640,8 +640,10 @@ div {
   }
 }
 
+
 /* =========================================================
-   EPH PORTFÖY MODAL V9 - PREMIUM METAL / SCROLL LOCK
+   PORTFÖY EKLE MODAL V10 — SADE / METALİK / SCROLL FIX
+   Amaç: Başlıksız kompakt form, premium X, modal içi scroll.
 ========================================================= */
 
 .stock-modal-v2-backdrop {
@@ -651,154 +653,106 @@ div {
   display: flex !important;
   align-items: flex-start !important;
   justify-content: center !important;
-  padding: 42px 12px 18px !important;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(21, 87, 214, 0.14), transparent 34%),
-    rgba(6, 25, 74, 0.38) !important;
-  backdrop-filter: blur(12px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(140%) !important;
   overflow: hidden !important;
+  padding: 34px 10px 14px !important;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(21, 87, 214, 0.18), transparent 34%),
+    radial-gradient(circle at 90% 15%, rgba(20, 184, 166, 0.16), transparent 30%),
+    rgba(6, 25, 74, 0.42) !important;
+  backdrop-filter: blur(14px) saturate(130%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(130%) !important;
   overscroll-behavior: contain !important;
   touch-action: none !important;
 }
 
-.stock-modal-v2,
-.stock-modal-v5 {
+.stock-modal-v10 {
   position: relative !important;
   width: min(100%, 760px) !important;
-  height: min(92dvh, 860px) !important;
-  max-height: 92dvh !important;
+  max-height: calc(100dvh - 54px) !important;
+  height: auto !important;
   margin: 0 auto !important;
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
-  border: 1px solid rgba(221, 231, 243, 0.9) !important;
-  border-radius: 30px !important;
+  border: 1px solid rgba(196, 210, 229, 0.86) !important;
+  border-radius: 28px !important;
   background:
     linear-gradient(145deg, rgba(255,255,255,0.98), rgba(247,251,255,0.96)),
-    radial-gradient(circle at top left, rgba(21,87,214,0.08), transparent 38%) !important;
+    radial-gradient(circle at 12% 0%, rgba(219,234,254,0.55), transparent 34%) !important;
   box-shadow:
-    0 26px 90px rgba(15, 23, 42, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+    0 28px 72px rgba(15, 23, 42, 0.20),
+    inset 0 1px 0 rgba(255,255,255,0.96) !important;
   overscroll-behavior: contain !important;
   touch-action: auto !important;
 }
 
-.stock-modal-v2::before,
-.stock-modal-v5::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
+.stock-modal-v10::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  border-radius: inherit !important;
   background:
-    linear-gradient(115deg, rgba(255,255,255,0.72), transparent 28%, transparent 70%, rgba(21,87,214,0.06)),
-    linear-gradient(180deg, rgba(255,255,255,0.72), transparent 22%);
-  z-index: 0;
+    linear-gradient(90deg, transparent, rgba(255,255,255,0.52), transparent),
+    linear-gradient(180deg, rgba(255,255,255,0.64), transparent 18%) !important;
+  opacity: 0.42 !important;
 }
 
-.stock-modal-v2 > *,
-.stock-modal-v5 > * {
-  position: relative;
-  z-index: 1;
+.stock-modal-v10-close {
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  z-index: 30 !important;
+  width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(203, 213, 225, 0.92) !important;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,0.96), rgba(239,246,255,0.92)) !important;
+  color: #06194A !important;
+  font-size: 24px !important;
+  line-height: 1 !important;
+  font-weight: 900 !important;
+  box-shadow:
+    0 12px 28px rgba(15, 23, 42, 0.13),
+    inset 0 1px 0 rgba(255,255,255,0.98),
+    inset 0 -10px 16px rgba(148, 163, 184, 0.10) !important;
 }
 
-.stock-modal-v2-body,
-.stock-modal-v5-body,
-.stock-modal-v6-body {
+.stock-modal-v10-close:hover {
+  transform: translateY(-1px) !important;
+  border-color: rgba(21, 87, 214, 0.28) !important;
+  color: #1557D6 !important;
+}
+
+.stock-modal-v10-body {
+  position: relative !important;
+  z-index: 2 !important;
   flex: 1 1 auto !important;
   min-height: 0 !important;
+  max-height: calc(100dvh - 150px) !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior: contain !important;
-  padding: 26px 14px 14px !important;
-  scrollbar-width: thin !important;
+  padding: 62px 14px 14px !important;
+  scroll-padding-bottom: 120px !important;
 }
 
-.stock-modal-v2-body::-webkit-scrollbar,
-.stock-modal-v5-body::-webkit-scrollbar,
-.stock-modal-v6-body::-webkit-scrollbar {
-  width: 7px;
+.stock-modal-v10-body::-webkit-scrollbar {
+  width: 6px !important;
 }
 
-.stock-modal-v2-body::-webkit-scrollbar-thumb,
-.stock-modal-v5-body::-webkit-scrollbar-thumb,
-.stock-modal-v6-body::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(21, 87, 214, 0.22);
+.stock-modal-v10-body::-webkit-scrollbar-thumb {
+  border-radius: 999px !important;
+  background: rgba(148, 163, 184, 0.55) !important;
 }
 
-.stock-modal-v6-close {
-  position: absolute !important;
-  top: 12px !important;
-  right: 12px !important;
-  z-index: 15 !important;
-  width: 44px !important;
-  height: 44px !important;
-  min-height: 44px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 0 !important;
-  border-radius: 18px !important;
-  border: 1px solid rgba(221, 231, 243, 0.95) !important;
-  background:
-    linear-gradient(145deg, rgba(255,255,255,0.98), rgba(235,244,255,0.94)) !important;
-  color: #06194A !important;
-  box-shadow:
-    0 14px 34px rgba(15, 23, 42, 0.14),
-    inset 0 1px 0 rgba(255,255,255,0.95),
-    inset 0 -8px 18px rgba(21,87,214,0.06) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  transition: transform .18s ease, box-shadow .18s ease, background .18s ease !important;
-}
-
-.stock-modal-v6-close::before {
-  content: "";
-  position: absolute;
-  inset: 5px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.86);
-  pointer-events: none;
-}
-
-.stock-modal-v6-close span,
-.stock-modal-v6-close {
-  font-size: 25px !important;
-  line-height: 1 !important;
-  font-weight: 900 !important;
-}
-
-.stock-modal-v6-close:hover {
-  transform: translateY(-1px) scale(1.02) !important;
-  background:
-    linear-gradient(145deg, #ffffff, #EFF6FF) !important;
-  box-shadow:
-    0 18px 42px rgba(21, 87, 214, 0.18),
-    inset 0 1px 0 rgba(255,255,255,0.96),
-    inset 0 -8px 18px rgba(21,87,214,0.08) !important;
-}
-
-.stock-modal-v2-foot,
-.stock-modal-v5-foot {
-  flex: 0 0 auto !important;
-  position: sticky !important;
-  bottom: 0 !important;
-  z-index: 8 !important;
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 10px !important;
-  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
-  border-top: 1px solid rgba(221, 231, 243, 0.9) !important;
-  background: rgba(255,255,255,0.94) !important;
-  backdrop-filter: blur(16px) saturate(150%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(150%) !important;
-  box-shadow: 0 -14px 34px rgba(15,23,42,0.06) !important;
-}
-
-.stock-form-block {
+.stock-modal-v10 .stock-form-block {
   margin: 0 0 10px !important;
   padding: 0 !important;
   border: 0 !important;
@@ -806,99 +760,89 @@ div {
   box-shadow: none !important;
 }
 
-.stock-form-grid {
+.stock-modal-v10 .stock-form-block h3,
+.stock-modal-v10 .stock-modal-v2-head,
+.stock-modal-v10 .stock-section-kicker {
+  display: none !important;
+}
+
+.stock-modal-v10 .stock-form-grid {
+  width: 100% !important;
   display: grid !important;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   gap: 10px !important;
-  width: 100% !important;
   align-items: stretch !important;
   justify-content: stretch !important;
 }
 
-.stock-form-field {
+.stock-modal-v10 .stock-form-field {
   width: 100% !important;
-  min-height: 76px !important;
+  min-height: 82px !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: flex-start !important;
-  gap: 5px !important;
-  margin: 0 !important;
-  padding: 11px 10px 10px !important;
-  border: 1px solid rgba(221, 231, 243, 0.72) !important;
-  border-radius: 20px !important;
+  gap: 6px !important;
+  padding: 9px !important;
+  border: 1px solid rgba(221, 231, 243, 0.78) !important;
+  border-radius: 18px !important;
   background:
-    linear-gradient(145deg, rgba(255,255,255,0.96), rgba(247,251,255,0.94)) !important;
+    linear-gradient(145deg, rgba(255,255,255,0.96), rgba(248,251,255,0.94)) !important;
   box-shadow:
-    0 8px 20px rgba(15, 23, 42, 0.045),
-    inset 0 1px 0 rgba(255,255,255,0.92),
-    inset 0 -10px 20px rgba(21,87,214,0.028) !important;
+    0 10px 22px rgba(15,23,42,0.055),
+    inset 0 1px 0 rgba(255,255,255,0.96),
+    inset 0 -12px 22px rgba(148,163,184,0.045) !important;
 }
 
-.stock-form-field.full {
+.stock-modal-v10 .stock-form-field.full {
   grid-column: 1 / -1 !important;
 }
 
-.stock-form-field > span {
+.stock-modal-v10 .stock-form-field > span {
   display: block !important;
-  width: 100% !important;
-  min-height: 16px !important;
+  min-height: 14px !important;
   margin: 0 !important;
-  color: #5B6B82 !important;
+  color: #475569 !important;
   font-size: 10px !important;
   font-weight: 900 !important;
-  line-height: 1.2 !important;
-  letter-spacing: .08em !important;
+  line-height: 1.15 !important;
+  letter-spacing: 0.06em !important;
   text-transform: uppercase !important;
   text-align: center !important;
 }
 
-.stock-form-field input,
-.stock-form-field select,
-.stock-form-field textarea {
+.stock-modal-v10 input,
+.stock-modal-v10 select,
+.stock-modal-v10 textarea {
   width: 100% !important;
   min-height: 42px !important;
   height: 42px !important;
   margin: 0 !important;
-  border: 1px solid rgba(221, 231, 243, 0.64) !important;
-  border-radius: 15px !important;
+  border: 1px solid rgba(203, 213, 225, 0.58) !important;
+  border-radius: 14px !important;
   outline: none !important;
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,251,255,0.96)) !important;
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(241,245,249,0.58)) !important;
   color: #06194A !important;
+  box-shadow:
+    inset 0 1px 3px rgba(15,23,42,0.075),
+    inset 0 -1px 0 rgba(255,255,255,0.88),
+    0 6px 14px rgba(15,23,42,0.035) !important;
   font-size: 15px !important;
   font-weight: 800 !important;
   text-align: center !important;
-  box-shadow:
-    inset 0 2px 8px rgba(15, 23, 42, 0.035),
-    inset 0 -1px 0 rgba(255,255,255,0.9),
-    0 3px 9px rgba(15, 23, 42, 0.025) !important;
-  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease !important;
 }
 
-.stock-form-field input:focus,
-.stock-form-field select:focus,
-.stock-form-field textarea:focus {
-  border-color: rgba(21, 87, 214, 0.34) !important;
-  background:
-    linear-gradient(180deg, #ffffff, #F7FBFF) !important;
-  box-shadow:
-    0 0 0 3px rgba(21, 87, 214, 0.08),
-    inset 0 2px 8px rgba(15, 23, 42, 0.035),
-    0 6px 16px rgba(21, 87, 214, 0.07) !important;
-}
-
-.stock-form-field select {
+.stock-modal-v10 select {
   appearance: none !important;
   -webkit-appearance: none !important;
-  padding-left: 34px !important;
-  padding-right: 34px !important;
+  padding: 0 34px 0 12px !important;
   background-image:
     linear-gradient(45deg, transparent 50%, #1557D6 50%),
     linear-gradient(135deg, #1557D6 50%, transparent 50%),
-    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,251,255,0.96)) !important;
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(241,245,249,0.58)) !important;
   background-position:
-    calc(100% - 20px) 18px,
-    calc(100% - 14px) 18px,
+    calc(100% - 18px) 18px,
+    calc(100% - 12px) 18px,
     0 0 !important;
   background-size:
     6px 6px,
@@ -907,132 +851,149 @@ div {
   background-repeat: no-repeat !important;
 }
 
-.stock-form-field textarea {
-  min-height: 112px !important;
-  height: 112px !important;
+.stock-modal-v10 textarea {
+  height: 118px !important;
+  min-height: 118px !important;
   resize: vertical !important;
   padding: 12px !important;
   line-height: 1.45 !important;
 }
 
-.stock-form-field p {
-  margin-top: 4px !important;
-  margin-bottom: 0 !important;
-  font-size: 10px !important;
-  line-height: 1.35 !important;
+.stock-modal-v10 input:focus,
+.stock-modal-v10 select:focus,
+.stock-modal-v10 textarea:focus {
+  border-color: rgba(21,87,214,0.35) !important;
+  box-shadow:
+    0 0 0 4px rgba(21,87,214,0.08),
+    inset 0 1px 3px rgba(15,23,42,0.075),
+    0 10px 22px rgba(21,87,214,0.08) !important;
 }
 
-.stock-save-btn,
-.stock-cancel-btn {
-  min-height: 44px !important;
-  border-radius: 16px !important;
+.stock-modal-v10 .stock-save-btn,
+.stock-modal-v10 .stock-cancel-btn {
+  min-height: 42px !important;
+  border-radius: 14px !important;
   font-size: 13px !important;
   font-weight: 900 !important;
 }
 
-.stock-save-btn {
+.stock-modal-v10 .stock-save-btn {
   border: 0 !important;
-  background: linear-gradient(145deg, #1557D6, #0F49BD) !important;
+  background: linear-gradient(135deg, #1557D6, #0F49BD) !important;
   color: #ffffff !important;
-  box-shadow: 0 14px 30px rgba(21, 87, 214, 0.22) !important;
+  box-shadow: 0 12px 24px rgba(21,87,214,0.22) !important;
 }
 
-.stock-cancel-btn {
-  border: 1px solid rgba(221,231,243,0.85) !important;
-  background: linear-gradient(145deg, #ffffff, #F7FBFF) !important;
+.stock-modal-v10 .stock-cancel-btn {
+  border: 1px solid rgba(203,213,225,0.84) !important;
+  background: linear-gradient(145deg, #ffffff, #f1f5f9) !important;
   color: #475569 !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 8px 18px rgba(15,23,42,0.045) !important;
 }
 
-.stock-image-summary-row {
+.stock-modal-v10 .stock-image-summary-row {
   min-height: auto !important;
 }
 
-.stock-image-summary {
+.stock-modal-v10 .stock-image-summary {
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   gap: 8px !important;
 }
 
-.stock-image-summary > div {
-  min-height: 58px !important;
+.stock-modal-v10 .stock-image-summary > div {
+  min-height: 54px !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(221,231,243,0.82) !important;
+  background: linear-gradient(145deg, #ffffff, #f7fbff) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.96) !important;
   display: flex !important;
   flex-direction: column !important;
-  align-items: center !important;
   justify-content: center !important;
-  border-radius: 16px !important;
-  border: 1px solid rgba(221,231,243,0.72) !important;
-  background: linear-gradient(145deg, #ffffff, #F7FBFF) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 5px 14px rgba(15,23,42,0.035) !important;
+  align-items: center !important;
 }
 
-.stock-image-summary b {
+.stock-modal-v10 .stock-image-summary b {
   color: #64748B !important;
-  font-size: 9px !important;
+  font-size: 10px !important;
   font-weight: 900 !important;
-  letter-spacing: .12em !important;
   text-transform: uppercase !important;
 }
 
-.stock-image-summary strong {
-  margin-top: 4px !important;
+.stock-modal-v10 .stock-image-summary strong {
+  margin-top: 3px !important;
   color: #06194A !important;
-  font-size: 13px !important;
+  font-size: 12px !important;
   font-weight: 900 !important;
+}
+
+.stock-modal-v10 .stock-modal-v10-foot,
+.stock-modal-v10-foot {
+  position: relative !important;
+  z-index: 4 !important;
+  flex: 0 0 auto !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 10px !important;
+  padding: 10px 14px 14px !important;
+  border-top: 1px solid rgba(221,231,243,0.84) !important;
+  background:
+    linear-gradient(180deg, rgba(247,251,255,0.88), rgba(255,255,255,0.98)) !important;
+  box-shadow: 0 -10px 24px rgba(15,23,42,0.055) !important;
 }
 
 @media (max-width: 768px) {
   .stock-modal-v2-backdrop {
-    padding: 36px 10px 12px !important;
-    align-items: flex-start !important;
+    padding: 30px 8px 10px !important;
   }
 
-  .stock-modal-v2,
-  .stock-modal-v5 {
+  .stock-modal-v10 {
     width: 100% !important;
-    height: calc(100dvh - 54px) !important;
-    max-height: calc(100dvh - 54px) !important;
-    border-radius: 28px !important;
+    max-height: calc(100dvh - 42px) !important;
+    border-radius: 24px !important;
   }
 
-  .stock-modal-v2-body,
-  .stock-modal-v5-body,
-  .stock-modal-v6-body {
-    padding: 28px 10px 10px !important;
+  .stock-modal-v10-body {
+    max-height: calc(100dvh - 136px) !important;
+    padding: 58px 10px 12px !important;
   }
 
-  .stock-form-grid {
+  .stock-modal-v10 .stock-form-grid {
     grid-template-columns: 1fr !important;
-    gap: 9px !important;
-    align-items: stretch !important;
-    justify-content: stretch !important;
+    gap: 8px !important;
   }
 
-  .stock-form-field {
-    min-height: 72px !important;
-    padding: 10px 9px 9px !important;
+  .stock-modal-v10 .stock-form-field {
+    min-height: 76px !important;
+    padding: 8px !important;
+    border-radius: 16px !important;
   }
 
-  .stock-form-field input,
-  .stock-form-field select,
-  .stock-form-field textarea {
-    font-size: 16px !important;
+  .stock-modal-v10 input,
+  .stock-modal-v10 select {
+    min-height: 40px !important;
+    height: 40px !important;
   }
 
-  .stock-form-field textarea {
-    min-height: 104px !important;
-    height: 104px !important;
+  .stock-modal-v10 textarea {
+    height: 108px !important;
+    min-height: 108px !important;
   }
 
-  .stock-modal-v6-close {
-    top: 9px !important;
-    right: 9px !important;
-    width: 42px !important;
-    height: 42px !important;
-    min-height: 42px !important;
+  .stock-modal-v10-close {
+    top: 8px !important;
+    right: 8px !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .stock-modal-v2-backdrop {
+    padding-top: 28px !important;
   }
 
-  .stock-image-summary {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  .stock-modal-v10-body {
+    padding-top: 56px !important;
   }
 }
