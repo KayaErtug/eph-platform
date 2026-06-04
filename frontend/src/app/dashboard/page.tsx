@@ -11,7 +11,6 @@ import {
   CalendarCheck,
   ChevronRight,
   Clock3,
-  Home,
   Loader2,
   MessageCircle,
   Sparkles,
@@ -303,7 +302,6 @@ export default function DashboardPage() {
   };
 
   const crmTasks = useMemo(() => flattenCustomerTasks(crmCustomers), [crmCustomers]);
-
   const todayStart = startOfToday();
   const todayEnd = endOfToday();
 
@@ -324,7 +322,7 @@ export default function DashboardPage() {
       return new Date(task.dueDate).getTime() > todayEnd.getTime();
     });
 
-    return [...overdue, ...today, ...future].slice(0, 3);
+    return [...overdue, ...today, ...future].slice(0, 2);
   }, [crmTasks, todayEnd, todayStart]);
 
   const visibleForumRequests = useMemo(() => {
@@ -333,11 +331,11 @@ export default function DashboardPage() {
         const ownerId = post.userId || post.user?.id;
         return !user?.id || !ownerId || ownerId !== user.id;
       })
-      .slice(0, 3);
+      .slice(0, 2);
   }, [featuredPosts, user?.id]);
 
   const latestNotifications = useMemo(() => {
-    return networkNotifications.items.slice(0, 3);
+    return networkNotifications.items.slice(0, 2);
   }, [networkNotifications.items]);
 
   const stats = summary?.stats || {
@@ -353,7 +351,7 @@ export default function DashboardPage() {
     return dueDate >= todayStart && dueDate <= todayEnd;
   }).length;
 
-  const commandText = `${todayTaskCount} göreviniz, ${unreadMessages} okunmamış mesajınız, ${visibleForumRequests.length} aktif talebiniz var.`;
+  const visibleRequestCount = visibleForumRequests.length;
 
   if (!hydrated || loading) {
     return (
@@ -367,46 +365,43 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-[calc(100dvh-74px)] bg-[#F8FAFC] px-4 pb-6 pt-6 text-[#06194A]">
-      <div className="mx-auto w-full max-w-[430px] space-y-4">
-        <section className="text-center">
-          <p className="mx-auto inline-flex min-h-[34px] items-center justify-center rounded-full border border-[#DDE7F3] bg-white px-4 text-[13px] font-black text-[#1557D6] shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+    <main className="min-h-[calc(100dvh-74px)] bg-[#F8FAFC] px-3 pb-4 pt-3 text-[#06194A]">
+      <div className="mx-auto w-full max-w-[430px] space-y-3">
+        <section className="rounded-[26px] border border-[#DDE7F3] bg-white px-4 py-4 text-center shadow-[0_16px_36px_rgba(15,23,42,0.065)]">
+          <p className="mx-auto inline-flex min-h-[28px] items-center justify-center rounded-full bg-[#EFF6FF] px-3 text-[12px] font-black text-[#1557D6]">
             {roleName}
           </p>
 
-          <h1 className="mt-4 text-center text-[30px] font-black leading-none tracking-[-0.045em] text-[#06194A]">
+          <h1 className="mt-2 text-center text-[26px] font-black leading-none tracking-[-0.05em] text-[#06194A]">
             Merhaba {firstName}
           </h1>
 
-          <p className="mx-auto mt-2 max-w-[330px] text-center text-[14px] font-bold leading-6 text-[#64748B]">
-            {commandText}
+          <p className="mx-auto mt-2 max-w-[330px] text-center text-[13px] font-extrabold leading-5 text-[#64748B]">
+            Bugün {todayTaskCount} görev, {unreadMessages} mesaj, {visibleRequestCount} talep sizi bekliyor.
           </p>
-        </section>
 
-        <DashboardCard className="pt-6">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#F1ECFF] text-[#6D28FF]">
-            <BriefcaseBusiness size={30} strokeWidth={2.5} />
-          </div>
-
-          <h2 className="mt-4 text-center text-[24px] font-black tracking-[-0.04em] text-[#06194A]">
-            Bugünkü İş Akışı
-          </h2>
-
-          <div className="mt-5 grid grid-cols-3 divide-x divide-[#DDE7F3]">
+          <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-[22px] border border-[#DDE7F3] bg-[#FBFDFF]">
             <HeroStat label="Görev" value={todayTaskCount} />
             <HeroStat label="Mesaj" value={unreadMessages} />
-            <HeroStat label="Talep" value={visibleForumRequests.length} />
+            <HeroStat label="Talep" value={visibleRequestCount} />
           </div>
-        </DashboardCard>
+        </section>
+
+        <section className="grid grid-cols-4 gap-2">
+          <Shortcut href="/stok" icon={<Building2 size={21} />} label="Portföy" />
+          <Shortcut href="/crm" icon={<UsersRound size={21} />} label="CRM" />
+          <Shortcut href="/network" icon={<MessageCircle size={21} />} label="Forum" />
+          <Shortcut href="/havuz" icon={<Target size={22} />} label="Havuz" />
+        </section>
 
         <SectionBlock
-          icon={<Clock3 size={22} />}
-          title="Acil İşlerim"
+          icon={<Clock3 size={20} />}
+          title="Acil İşler"
           actionHref="/crm"
-          actionLabel="CRM"
+          actionLabel="Tümü"
         >
           {urgentTasks.length > 0 ? (
-            <div className="grid gap-3">
+            <div className="grid gap-2">
               {urgentTasks.map((task) => (
                 <UrgentTaskCard key={task.id} task={task} />
               ))}
@@ -417,13 +412,13 @@ export default function DashboardPage() {
         </SectionBlock>
 
         <SectionBlock
-          icon={<MessageCircle size={22} />}
-          title="Bana Uygun Forum Talepleri"
+          icon={<MessageCircle size={20} />}
+          title="Uygun Talepler"
           actionHref="/network"
           actionLabel="Forum"
         >
           {visibleForumRequests.length > 0 ? (
-            <div className="grid gap-3">
+            <div className="grid gap-2">
               {visibleForumRequests.map((post) => (
                 <ForumRequestCard key={post.id} post={post} />
               ))}
@@ -433,34 +428,19 @@ export default function DashboardPage() {
           )}
         </SectionBlock>
 
-        <SectionBlock
-          icon={<Target size={22} />}
-          title="Bana Uygun Havuz Portföyleri"
-          actionHref="/havuz"
-          actionLabel="Havuz"
-        >
-          <div className="grid gap-3">
-            <PoolSuggestionCard
-              title="Yetkili Portföy"
-              desc="Havuz eşleşmeleri aktif hale geldiğinde burada size uygun portföyler listelenecek."
-              price="Lina eşleştirme bekliyor"
-            />
-          </div>
-        </SectionBlock>
-
-        <section className="grid grid-cols-2 gap-3">
+        <section className="grid grid-cols-2 gap-2">
           <SummaryMiniCard
-            icon={<Building2 size={23} />}
-            title="Portföy Özeti"
+            icon={<Building2 size={21} />}
+            title="Portföy"
             rows={[
               ["Toplam", String(stats.totalUnits || 0)],
-              ["Projeler", String(stats.totalProjects || 0)],
+              ["Proje", String(stats.totalProjects || 0)],
             ]}
           />
 
           <SummaryMiniCard
-            icon={<UsersRound size={23} />}
-            title="CRM Özeti"
+            icon={<BriefcaseBusiness size={21} />}
+            title="CRM"
             rows={[
               ["Müşteri", String(stats.totalCustomers || 0)],
               ["Görev", String(crmTasks.length)],
@@ -469,82 +449,45 @@ export default function DashboardPage() {
         </section>
 
         <SectionBlock
-          icon={<Sparkles size={22} />}
-          title="Lina Önerileri"
-          actionHref="/lina"
-          actionLabel="Lina"
+          icon={<Target size={20} />}
+          title="Havuz Eşleşmeleri"
+          actionHref="/havuz"
+          actionLabel="Havuz"
         >
-          <DashboardCard className="!p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#F1ECFF] text-[#6D28FF]">
-                <Bot size={23} />
-              </div>
-
-              <div className="min-w-0 flex-1 text-left">
-                <h3 className="text-left text-[16px] font-black text-[#06194A]">
-                  Lina bugün iş akışını sadeleştirebilir.
-                </h3>
-                <p className="mt-1 text-left text-[13px] font-bold leading-5 text-[#64748B]">
-                  Portföy metni, müşteri notu ve paylaşım açıklaması için Lina'yı kullan.
-                </p>
-              </div>
-
-              <ChevronRight className="shrink-0 text-[#06194A]" size={23} />
-            </div>
-          </DashboardCard>
+          <PoolSuggestionCard />
         </SectionBlock>
 
-        <SectionBlock
-          icon={<Bell size={22} />}
-          title="Son Bildirimler"
-          actionHref="/messages"
-          actionLabel="Mesajlar"
-        >
-          {latestNotifications.length > 0 ? (
-            <div className="grid gap-3">
-              {latestNotifications.map((item) => (
-                <NotificationMiniCard key={item.id} item={item} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState text="Şu anda yeni bildirim yok." />
-          )}
-        </SectionBlock>
+        <section className="grid grid-cols-2 gap-2">
+          <CompactInfoCard
+            href="/lina"
+            icon={<Bot size={22} />}
+            title="Lina Önerisi"
+            desc="Metin, not ve paylaşım desteği."
+          />
 
-        <section className="grid grid-cols-4 gap-3 pb-4">
-          <Shortcut href="/stok" icon={<Building2 size={23} />} label="Portföy" />
-          <Shortcut href="/crm" icon={<UsersRound size={23} />} label="CRM" />
-          <Shortcut href="/network" icon={<MessageCircle size={23} />} label="Forum" />
-          <Shortcut href="/havuz" icon={<Target size={24} />} label="Havuz" />
+          <CompactInfoCard
+            href="/messages"
+            icon={<Bell size={22} />}
+            title="Bildirimler"
+            desc={
+              latestNotifications.length > 0
+                ? latestNotifications[0].title
+                : "Yeni bildirim yok."
+            }
+          />
         </section>
       </div>
     </main>
   );
 }
 
-function DashboardCard({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      className={`rounded-[30px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_18px_42px_rgba(15,23,42,0.07)] ${className}`}
-    >
-      {children}
-    </section>
-  );
-}
-
 function HeroStat({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="px-2 text-center">
-      <p className="text-center text-[13px] font-bold text-[#64748B]">
+    <div className="min-h-[68px] px-2 py-3 text-center [&:not(:last-child)]:border-r [&:not(:last-child)]:border-[#DDE7F3]">
+      <p className="text-center text-[11px] font-black uppercase tracking-[0.08em] text-[#64748B]">
         {label}
       </p>
-      <p className="mt-2 text-center text-[31px] font-black leading-none text-[#06194A]">
+      <p className="mt-1 text-center text-[28px] font-black leading-none text-[#06194A]">
         {value}
       </p>
     </div>
@@ -565,20 +508,20 @@ function SectionBlock({
   children: React.ReactNode;
 }) {
   return (
-    <section>
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-3 shadow-[0_14px_32px_rgba(15,23,42,0.055)]">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-[#F1ECFF] text-[#6D28FF]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] bg-[#F1ECFF] text-[#6D28FF]">
             {icon}
           </span>
-          <h2 className="min-w-0 text-left text-[20px] font-black tracking-[-0.035em] text-[#06194A]">
+          <h2 className="min-w-0 text-left text-[18px] font-black tracking-[-0.04em] text-[#06194A]">
             {title}
           </h2>
         </div>
 
         <Link
           href={actionHref}
-          className="inline-flex min-h-[38px] shrink-0 items-center justify-center rounded-full bg-[#EFF6FF] px-4 text-[13px] font-black text-[#1557D6]"
+          className="inline-flex min-h-[34px] shrink-0 items-center justify-center rounded-full bg-[#EFF6FF] px-3 text-[12px] font-black text-[#1557D6]"
         >
           {actionLabel}
         </Link>
@@ -593,23 +536,23 @@ function UrgentTaskCard({ task }: { task: DashboardTask }) {
   return (
     <Link
       href="/crm"
-      className="grid grid-cols-[76px_1fr] items-center gap-3 rounded-[24px] border border-[#DDE7F3] bg-white p-4 shadow-[0_14px_32px_rgba(15,23,42,0.06)]"
+      className="grid min-h-[78px] grid-cols-[56px_1fr] items-center gap-3 rounded-[19px] border border-[#DDE7F3] bg-[#FBFDFF] p-3"
     >
-      <div className="flex h-16 w-16 flex-col items-center justify-center rounded-[20px] bg-[#FFF7ED] text-center text-[#EA580C]">
-        <Clock3 size={22} />
-        <span className="mt-1 text-[10px] font-black">ACİL</span>
+      <div className="flex h-12 w-12 flex-col items-center justify-center rounded-[17px] bg-[#FFF7ED] text-[#EA580C]">
+        <Clock3 size={18} />
+        <span className="mt-0.5 text-[9px] font-black">ACİL</span>
       </div>
 
       <div className="min-w-0 text-left">
-        <p className="text-left text-[12px] font-black text-[#1557D6]">
+        <p className="text-left text-[11px] font-black text-[#1557D6]">
           {formatTaskDate(task.dueDate)}
         </p>
 
-        <h3 className="mt-1 line-clamp-1 text-left text-[16px] font-black text-[#06194A]">
+        <h3 className="mt-0.5 line-clamp-1 text-left text-[15px] font-black text-[#06194A]">
           {task.title}
         </h3>
 
-        <p className="mt-1 line-clamp-1 text-left text-[13px] font-bold text-[#64748B]">
+        <p className="mt-0.5 line-clamp-1 text-left text-[12px] font-bold text-[#64748B]">
           {task.customerName}
           {task.customerPhone ? ` · ${task.customerPhone}` : ""}
         </p>
@@ -624,73 +567,41 @@ function ForumRequestCard({ post }: { post: FeaturedNetworkPost }) {
   return (
     <Link
       href={`/network/${post.id}`}
-      className="rounded-[24px] border border-[#DDE7F3] bg-white p-4 shadow-[0_14px_32px_rgba(15,23,42,0.06)]"
+      className="rounded-[19px] border border-[#DDE7F3] bg-[#FBFDFF] p-3"
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 text-left">
-          <p className="text-left text-[11px] font-black uppercase tracking-[0.13em] text-[#6D28FF]">
+          <p className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-[#6D28FF]">
             Portföy Aranıyor
           </p>
 
-          <h3 className="mt-2 line-clamp-2 text-left text-[17px] font-black leading-5 text-[#06194A]">
+          <h3 className="mt-1 line-clamp-1 text-left text-[15px] font-black text-[#06194A]">
             {post.title}
           </h3>
 
-          <p className="mt-2 line-clamp-1 text-left text-[13px] font-bold text-[#64748B]">
+          <p className="mt-1 line-clamp-1 text-left text-[12px] font-bold text-[#64748B]">
             {location || "Konum bilgisi yok"}
           </p>
         </div>
 
-        <div className="shrink-0 rounded-[16px] bg-[#EFF6FF] px-3 py-2 text-center">
-          <p className="text-[16px] font-black text-[#1557D6]">
+        <div className="shrink-0 rounded-[14px] bg-[#EFF6FF] px-2 py-1.5 text-center">
+          <p className="text-[14px] font-black text-[#1557D6]">
             {post.score || 0}
           </p>
-          <p className="text-[9px] font-black text-[#64748B]">PUAN</p>
+          <p className="text-[8px] font-black text-[#64748B]">PUAN</p>
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <p className="text-left text-[13px] font-black text-[#1557D6]">
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="text-left text-[12px] font-black text-[#1557D6]">
           {formatBudget(post.budget)}
         </p>
 
-        <span className="inline-flex min-h-[34px] items-center justify-center rounded-full bg-[#1557D6] px-4 text-[12px] font-black text-white">
+        <span className="inline-flex min-h-[30px] items-center justify-center rounded-full bg-[#1557D6] px-3 text-[11px] font-black text-white">
           İlgileniyorum
         </span>
       </div>
     </Link>
-  );
-}
-
-function PoolSuggestionCard({
-  title,
-  desc,
-  price,
-}: {
-  title: string;
-  desc: string;
-  price: string;
-}) {
-  return (
-    <DashboardCard className="!p-4">
-      <div className="grid grid-cols-[72px_1fr] items-center gap-3">
-        <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]">
-          <Target size={30} />
-        </div>
-
-        <div className="min-w-0 text-left">
-          <p className="text-left text-[11px] font-black uppercase tracking-[0.13em] text-[#6D28FF]">
-            {title}
-          </p>
-          <h3 className="mt-1 text-left text-[16px] font-black text-[#06194A]">
-            {price}
-          </h3>
-          <p className="mt-1 line-clamp-2 text-left text-[13px] font-bold leading-5 text-[#64748B]">
-            {desc}
-          </p>
-        </div>
-      </div>
-    </DashboardCard>
   );
 }
 
@@ -704,51 +615,84 @@ function SummaryMiniCard({
   rows: Array<[string, string]>;
 }) {
   return (
-    <DashboardCard className="!p-4">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#F1ECFF] text-[#6D28FF]">
+    <section className="rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_12px_28px_rgba(15,23,42,0.055)]">
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#F1ECFF] text-[#6D28FF]">
         {icon}
       </div>
 
-      <h3 className="mt-3 text-center text-[16px] font-black text-[#06194A]">
+      <h3 className="mt-2 text-center text-[15px] font-black text-[#06194A]">
         {title}
       </h3>
 
-      <div className="mt-3 grid gap-2">
+      <div className="mt-2 grid gap-1.5">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex items-center justify-between gap-3">
-            <span className="text-left text-[12px] font-bold text-[#64748B]">
+          <div key={label} className="flex items-center justify-between gap-2">
+            <span className="text-left text-[11px] font-bold text-[#64748B]">
               {label}
             </span>
-            <span className="text-right text-[14px] font-black text-[#06194A]">
+            <span className="text-right text-[13px] font-black text-[#06194A]">
               {value}
             </span>
           </div>
         ))}
       </div>
-    </DashboardCard>
+    </section>
   );
 }
 
-function NotificationMiniCard({ item }: { item: NetworkNotification }) {
+function PoolSuggestionCard() {
   return (
     <Link
-      href={item.postId ? `/network/${item.postId}` : "/messages"}
-      className="rounded-[24px] border border-[#DDE7F3] bg-white p-4 shadow-[0_14px_32px_rgba(15,23,42,0.06)]"
+      href="/havuz"
+      className="grid min-h-[76px] grid-cols-[54px_1fr_20px] items-center gap-3 rounded-[19px] border border-[#DDE7F3] bg-[#FBFDFF] p-3"
     >
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="line-clamp-1 text-left text-[16px] font-black text-[#06194A]">
-          {item.title}
-        </h3>
-
-        {!item.isRead && (
-          <span className="shrink-0 rounded-full bg-red-600 px-2 py-1 text-[10px] font-black text-white">
-            Yeni
-          </span>
-        )}
+      <div className="flex h-12 w-12 items-center justify-center rounded-[17px] bg-[#EFF6FF] text-[#1557D6]">
+        <Target size={24} />
       </div>
 
-      <p className="mt-2 line-clamp-2 text-left text-[13px] font-bold leading-5 text-[#64748B]">
-        {item.message}
+      <div className="min-w-0 text-left">
+        <p className="text-left text-[11px] font-black uppercase tracking-[0.12em] text-[#6D28FF]">
+          Yetkili Portföy
+        </p>
+        <h3 className="mt-0.5 text-left text-[14px] font-black text-[#06194A]">
+          Lina eşleştirme bekliyor
+        </h3>
+        <p className="mt-0.5 line-clamp-1 text-left text-[12px] font-bold text-[#64748B]">
+          Size uygun portföyler burada listelenecek.
+        </p>
+      </div>
+
+      <ChevronRight size={20} className="text-[#06194A]" />
+    </Link>
+  );
+}
+
+function CompactInfoCard({
+  href,
+  icon,
+  title,
+  desc,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="min-h-[118px] rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_12px_28px_rgba(15,23,42,0.055)]"
+    >
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#F1ECFF] text-[#6D28FF]">
+        {icon}
+      </div>
+
+      <h3 className="mt-2 text-center text-[14px] font-black text-[#06194A]">
+        {title}
+      </h3>
+
+      <p className="mt-1 line-clamp-2 text-center text-[11px] font-bold leading-4 text-[#64748B]">
+        {desc}
       </p>
     </Link>
   );
@@ -766,20 +710,20 @@ function Shortcut({
   return (
     <Link
       href={href}
-      className="flex min-h-[84px] flex-col items-center justify-center gap-2 rounded-[22px] border border-[#DDE7F3] bg-white px-2 text-center shadow-[0_12px_28px_rgba(15,23,42,0.06)]"
+      className="flex min-h-[70px] flex-col items-center justify-center gap-1.5 rounded-[20px] border border-[#DDE7F3] bg-white px-1 text-center shadow-[0_10px_24px_rgba(15,23,42,0.055)]"
     >
       <span className="text-[#6D28FF]">{icon}</span>
-      <span className="text-[12px] font-black text-[#06194A]">{label}</span>
+      <span className="text-[11px] font-black text-[#06194A]">{label}</span>
     </Link>
   );
 }
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <DashboardCard className="!p-5">
-      <p className="text-center text-[14px] font-bold leading-6 text-[#64748B]">
+    <div className="rounded-[19px] border border-[#DDE7F3] bg-[#FBFDFF] px-4 py-4">
+      <p className="text-center text-[13px] font-bold leading-5 text-[#64748B]">
         {text}
       </p>
-    </DashboardCard>
+    </div>
   );
 }
