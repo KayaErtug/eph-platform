@@ -55,6 +55,7 @@ model User {
   tasks                   Task[]
   visits                  UserVisit[]
   pushSubscriptions       PushSubscription[]
+  linaPreference          LinaPreference?
 
   superAdminProfile    SUPER_ADMIN?
   reportsCreated       Report[]               @relation("ReportReporter")
@@ -553,6 +554,40 @@ model PushSubscription {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+
+
+
+
+model LinaPreference {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+
+  voiceEnabled                 Boolean @default(false)
+  dashboardVoiceSummaryEnabled Boolean @default(false)
+  crmVoiceReminderEnabled      Boolean @default(false)
+  networkVoiceSummaryEnabled   Boolean @default(false)
+  poolVoiceSummaryEnabled      Boolean @default(false)
+
+  quietHoursEnabled Boolean @default(true)
+  quietHoursStart   String  @default("22:00")
+  quietHoursEnd     String  @default("08:00")
+
+  urgentVoiceEnabled Boolean @default(false)
+
+  summaryStyle String @default("normal")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+
+
+
 
 model AuditLog {
   id           String      @id @default(uuid())

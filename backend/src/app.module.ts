@@ -25,6 +25,8 @@ import { NetworkModule } from './network/network.module';
 import { SystemMessagesModule } from './system-messages/system-messages.module';
 import { PortfolioImagesModule } from './portfolio-images/portfolio-images.module';
 
+import { LinaModule } from './lina/lina.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -59,6 +61,8 @@ import { PortfolioImagesModule } from './portfolio-images/portfolio-images.modul
     DashboardModule,
 
     ReferralModule,
+
+    LinaModule,
   ],
 })
 export class AppModule {}
