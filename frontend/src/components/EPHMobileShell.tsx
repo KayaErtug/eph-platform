@@ -11,6 +11,7 @@ import {
   Menu,
   MessageSquare,
   Target,
+  User,
   UsersRound,
 } from "lucide-react";
 import LinaPanel from "./LinaPanel";
@@ -88,7 +89,7 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
           aria-label="Menü"
           onClick={() => router.push("/dashboard")}
         >
-          <Menu size={24} />
+          <Menu size={25} strokeWidth={2.5} />
         </button>
 
         <div className="eph-mobile-page-title">{title}</div>
@@ -100,7 +101,7 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
             aria-label="Bildirimler"
             onClick={() => router.push("/messages")}
           >
-            <Bell size={23} />
+            <Bell size={24} strokeWidth={2.35} />
             <span>3</span>
           </button>
 
@@ -110,7 +111,7 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
             aria-label="Profil"
             onClick={() => router.push("/profil")}
           >
-            <img src="/LOGO_EPH.png" alt="Profil" />
+            <User size={23} strokeWidth={2.35} />
           </button>
         </div>
       </header>
@@ -142,31 +143,31 @@ function EPHMobileBottomNav({ pathname }: { pathname: string }) {
       <BottomItem
         href="/dashboard"
         active={pathname.startsWith("/dashboard")}
-        icon={<Home size={23} />}
+        icon={<Home size={25} strokeWidth={2.35} />}
         label="Anasayfa"
       />
       <BottomItem
         href="/crm"
         active={pathname.startsWith("/crm")}
-        icon={<UsersRound size={23} />}
+        icon={<UsersRound size={25} strokeWidth={2.35} />}
         label="CRM"
       />
       <BottomItem
         href="/stok"
         active={pathname.startsWith("/stok")}
-        icon={<Building2 size={23} />}
+        icon={<Building2 size={25} strokeWidth={2.35} />}
         label="Portföy"
       />
       <BottomItem
         href="/network"
         active={pathname.startsWith("/network") || pathname.startsWith("/forum")}
-        icon={<MessageSquare size={23} />}
+        icon={<MessageSquare size={25} strokeWidth={2.35} />}
         label="Forum"
       />
       <BottomItem
         href="/havuz"
         active={pathname.startsWith("/havuz")}
-        icon={<Target size={24} />}
+        icon={<Target size={26} strokeWidth={2.35} />}
         label="Havuz"
       />
     </nav>
