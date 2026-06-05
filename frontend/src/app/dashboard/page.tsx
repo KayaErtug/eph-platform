@@ -302,6 +302,34 @@ export default function DashboardPage() {
     return dueDate >= todayStart && dueDate <= todayEnd;
   }).length;
 
+  const dashboardSummaryText = useMemo(() => {
+    const parts: string[] = [];
+
+    if (todayTaskCount > 0) {
+      parts.push(`${todayTaskCount} görev`);
+    }
+
+    if (unreadMessages > 0) {
+      parts.push(`${unreadMessages} mesaj`);
+    }
+
+    if (visibleForumRequests.length > 0) {
+      parts.push(`${visibleForumRequests.length} uygun talep`);
+    }
+
+    if (parts.length === 0) {
+      return "Bugün paneliniz sakin görünüyor.";
+    }
+
+    if (parts.length === 1) {
+      return `Bugün ${parts[0]} görünüyor.`;
+    }
+
+    const lastPart = parts.pop();
+
+    return `Bugün ${parts.join(", ")} ve ${lastPart} görünüyor.`;
+  }, [todayTaskCount, unreadMessages, visibleForumRequests.length]);
+
   if (!hydrated || loading) {
     return (
       <main className="flex min-h-[calc(100dvh-74px)] items-center justify-center bg-[#F7FBFF] px-4">
@@ -326,7 +354,7 @@ export default function DashboardPage() {
           </h1>
 
           <p className="mx-auto mt-3 max-w-[340px] text-center text-[13px] font-extrabold leading-5 text-[#64748B]">
-            Bugün {todayTaskCount} görev, {unreadMessages} mesaj ve {visibleForumRequests.length} uygun talep görünüyor.
+            {dashboardSummaryText}
           </p>
 
           <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-[#FBFDFF]">
