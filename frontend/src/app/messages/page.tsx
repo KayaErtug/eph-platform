@@ -4,13 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Clock3,
-  LockKeyhole,
-  MessageCircle,
-} from "lucide-react";
+import { Clock3, MessageCircle, Search } from "lucide-react";
 
 type PresenceStatus = "online" | "away" | "offline";
 
@@ -68,57 +62,45 @@ type Conversation = {
   messages: LastMessage[];
 };
 
-function formatDateTime(value?: string) {
-  if (!value) return "-";
+function formatTime(value?: string) {
+  if (!value) return "";
 
   const date = new Date(value);
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
 
-  return (
-    date.toLocaleDateString("tr-TR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }) +
-    " · " +
-    date.toLocaleTimeString("tr-TR", {
+  if (sameDay) {
+    return date.toLocaleTimeString("tr-TR", {
       hour: "2-digit",
       minute: "2-digit",
-    })
-  );
+    });
+  }
+
+  return date.toLocaleDateString("tr-TR", {
+    day: "2-digit",
+    month: "short",
+  });
 }
 
 function roleLabel(role?: string) {
   if (role === "EMLAKCI") return "Emlakçı";
   if (role === "MUTEAHHIT") return "Müteahhit";
-  if (role === "INSAAT_FIRMASI") return "İnşaat Firması";
-  if (role === "SUPER_ADMIN") return "EPH Süper Admin";
-  if (role === "ADMIN") return "EPH Admin";
+  if (role === "INSAAT_FIRMASI") return "İnşaat";
+  if (role === "SUPER_ADMIN") return "Süper Admin";
+  if (role === "ADMIN") return "Admin";
 
-  return "EPH Üyesi";
-}
-
-function presenceLabel(status?: PresenceStatus) {
-  if (status === "online") return "Online";
-  if (status === "away") return "Uzakta";
-  return "Çevrimdışı";
+  return "Üye";
 }
 
 function presenceDotClass(status?: PresenceStatus) {
   if (status === "online") return "bg-emerald-500";
   if (status === "away") return "bg-amber-400";
-  return "bg-slate-400";
+  return "bg-slate-300";
 }
 
-function presenceBadgeClass(status?: PresenceStatus) {
-  if (status === "online") {
-    return "border-emerald-100 bg-emerald-50 text-emerald-700";
-  }
-
-  if (status === "away") {
-    return "border-amber-100 bg-amber-50 text-amber-700";
-  }
-
-  return "border-slate-200 bg-slate-50 text-slate-500";
+function cleanMessage(body?: string) {
+  const text = String(body || "Henüz mesaj yok").trim();
+  return text.replace(/^\[[^\]]+\]\s*/g, "").trim() || "Henüz mesaj yok";
 }
 
 export default function MessagesInboxPage() {
@@ -132,15 +114,14 @@ export default function MessagesInboxPage() {
     offline: [],
   });
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   const presenceMap = useMemo(() => {
     const map = new Map<string, PresenceUser>();
 
-    [...presence.online, ...presence.away, ...presence.offline].forEach(
-      (presenceUser) => {
-        map.set(presenceUser.id, presenceUser);
-      }
-    );
+    [...presence.online, ...presence.away, ...presence.offline].forEach((presenceUser) => {
+      map.set(presenceUser.id, presenceUser);
+    });
 
     return map;
   }, [presence]);
@@ -154,20 +135,12 @@ export default function MessagesInboxPage() {
         api.get("/visits/presence"),
       ]);
 
-      setConversations(
-        Array.isArray(conversationsRes.data) ? conversationsRes.data : []
-      );
+      setConversations(Array.isArray(conversationsRes.data) ? conversationsRes.data : []);
 
       setPresence({
-        online: Array.isArray(presenceRes.data?.online)
-          ? presenceRes.data.online
-          : [],
-        away: Array.isArray(presenceRes.data?.away)
-          ? presenceRes.data.away
-          : [],
-        offline: Array.isArray(presenceRes.data?.offline)
-          ? presenceRes.data.offline
-          : [],
+        online: Array.isArray(presenceRes.data?.online) ? presenceRes.data.online : [],
+        away: Array.isArray(presenceRes.data?.away) ? presenceRes.data.away : [],
+        offline: Array.isArray(presenceRes.data?.offline) ? presenceRes.data.offline : [],
       });
     } catch (error) {
       console.error(error);
@@ -187,155 +160,145 @@ export default function MessagesInboxPage() {
     return () => clearInterval(interval);
   }, [user?.id]);
 
+  const filteredConversations = useMemo(() => {
+    const keyword = search.trim().toLocaleLowerCase("tr-TR");
+
+    if (!keyword) return conversations;
+
+    return conversations.filter((conversation) => {
+      const otherUser = conversation.participants.find((participant) => participant.user.id !== user?.id)?.user;
+
+      return [
+        conversation.title,
+        conversation.post?.title,
+        conversation.post?.city,
+        conversation.post?.district,
+        conversation.post?.neighborhood,
+        otherUser?.firstName,
+        otherUser?.lastName,
+        conversation.messages?.[0]?.body,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("tr-TR")
+        .includes(keyword);
+    });
+  }, [conversations, search, user?.id]);
+
+  const unreadTotal = conversations.reduce((total, conversation) => total + (conversation.unreadCount || 0), 0);
+
   return (
-    <main className="min-h-screen bg-[#F4F7FB]">
-      <section className="mx-auto min-h-screen max-w-5xl px-4 py-5">
-        <header className="mb-4 rounded-[28px] border border-slate-200 bg-white p-5">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push("/network")}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600"
-            >
-              <ArrowLeft size={20} />
-            </button>
-
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
-                <LockKeyhole size={14} />
-                Özel mesaj kutusu
-              </div>
-
-              <h1 className="mt-2 text-[28px] font-black tracking-tight text-[#0B1F44]">
+    <main className="min-h-[calc(100dvh-64px)] bg-[#F7FBFF] px-3 pb-4 pt-3 text-[#06194A]">
+      <section className="mx-auto w-full max-w-[430px] space-y-2">
+        <header className="rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 text-left">
+              <h1 className="text-[18px] font-black leading-none tracking-[-0.025em] text-[#06194A]">
                 Görüşmeler
               </h1>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Network paylaşımlarından başlayan özel iş görüşmelerini burada
-                takip edebilirsin.
+              <p className="mt-1 text-[11px] font-bold text-[#64748B]">
+                Özel iş görüşmeleri ve forum bağlantıları.
               </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5">
+              <MiniStat label="Toplam" value={conversations.length} />
+              <MiniStat label="Yeni" value={unreadTotal} accent />
             </div>
           </div>
         </header>
 
-        <section className="rounded-[28px] border border-slate-200 bg-white p-4">
+        <section className="rounded-[20px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+          <div className="flex items-center gap-2 rounded-[16px] bg-[#F7FBFF] px-3 py-2">
+            <Search size={15} className="text-[#94A3B8]" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="h-7 min-w-0 flex-1 bg-transparent text-[12px] font-bold text-[#06194A] outline-none placeholder:text-[#94A3B8]"
+              placeholder="Kişi, konu veya bölge ara..."
+            />
+          </div>
+        </section>
+
+        <section className="rounded-[22px] border border-[#DDE7F3] bg-white p-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
           {loading ? (
-            <div className="flex h-[360px] items-center justify-center text-sm font-bold text-slate-500">
+            <div className="flex h-[260px] items-center justify-center text-[12px] font-black text-[#64748B]">
               Görüşmeler yükleniyor...
             </div>
-          ) : conversations.length === 0 ? (
-            <div className="flex h-[360px] flex-col items-center justify-center text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#EEF4FF] text-[#1D4ED8]">
-                <MessageCircle size={30} />
+          ) : filteredConversations.length === 0 ? (
+            <div className="flex h-[260px] flex-col items-center justify-center text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#EFF6FF] text-[#1557D6]">
+                <MessageCircle size={24} />
               </div>
-
-              <div className="text-[20px] font-black text-[#0B1F44]">
-                Henüz görüşme yok
-              </div>
-
-              <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-                Bir Network paylaşımı üzerinden görüşme başlatıldığında burada
-                görünecek.
+              <div className="text-[16px] font-black text-[#06194A]">Görüşme yok</div>
+              <p className="mt-1 max-w-[280px] text-[12px] font-bold leading-5 text-[#64748B]">
+                Forum veya Havuz üzerinden görüşme başladığında burada görünecek.
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {conversations.map((conversation) => {
+            <div className="grid gap-1.5">
+              {filteredConversations.map((conversation) => {
                 const otherParticipants = conversation.participants.filter(
-                  (participant) => participant.user.id !== user?.id
+                  (participant) => participant.user.id !== user?.id,
                 );
 
                 const otherUser = otherParticipants[0]?.user;
-                const otherPresence = otherUser
-                  ? presenceMap.get(otherUser.id)
-                  : undefined;
+                const otherPresence = otherUser ? presenceMap.get(otherUser.id) : undefined;
                 const presenceStatus = otherPresence?.status || "offline";
                 const lastMessage = conversation.messages?.[0];
 
-                const location = [
-                  conversation.post?.city,
-                  conversation.post?.district,
-                  conversation.post?.neighborhood,
-                ]
+                const location = [conversation.post?.city, conversation.post?.district, conversation.post?.neighborhood]
                   .filter(Boolean)
                   .join(" / ");
+
+                const displayName = otherUser
+                  ? `${otherUser.firstName} ${otherUser.lastName}`.trim()
+                  : conversation.title || "EPH Görüşmesi";
 
                 return (
                   <button
                     key={conversation.id}
                     onClick={() => router.push(`/messages/${conversation.id}`)}
-                    className="relative w-full rounded-[24px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1D4ED8] hover:bg-[#F8FAFC]"
+                    className="relative grid min-h-[72px] w-full grid-cols-[42px_1fr_auto] items-center gap-2 rounded-[18px] bg-[#F7FBFF] px-2.5 py-2 text-left transition active:scale-[0.99]"
                   >
-                    {conversation.unreadCount ? (
-                      <div className="absolute right-4 top-4 flex h-7 min-w-7 items-center justify-center rounded-full bg-red-500 px-2 text-xs font-black text-white">
-                        {conversation.unreadCount}
-                      </div>
-                    ) : null}
+                    <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] bg-white text-[14px] font-black text-[#1557D6] shadow-[0_8px_18px_rgba(15,23,42,0.045)]">
+                      {otherUser?.firstName?.[0] || "E"}
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${presenceDotClass(
+                          presenceStatus,
+                        )}`}
+                      />
+                    </div>
 
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex min-w-0 items-start gap-3">
-                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF4FF] font-black text-[#1D4ED8]">
-                          {otherUser?.firstName?.[0] || "E"}
-
-                          <span
-                            className={`absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white ${presenceDotClass(
-                              presenceStatus
-                            )}`}
-                          />
-                        </div>
-
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h2 className="truncate text-[16px] font-black text-[#0B1F44]">
-                              {conversation.title}
-                            </h2>
-
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-black ${presenceBadgeClass(
-                                presenceStatus
-                              )}`}
-                            >
-                              <span
-                                className={`h-2 w-2 rounded-full ${presenceDotClass(
-                                  presenceStatus
-                                )}`}
-                              />
-                              {presenceLabel(presenceStatus)}
-                            </span>
-
-                            <span className="inline-flex items-center gap-1 rounded-full bg-[#F1F5F9] px-2 py-1 text-[11px] font-black text-slate-500">
-                              <CheckCircle2 size={13} />
-                              Özel
-                            </span>
-                          </div>
-
-                          <p className="mt-1 text-xs font-bold text-slate-500">
-                            {otherUser
-                              ? `${otherUser.firstName} ${otherUser.lastName} · ${roleLabel(
-                                  otherUser.role
-                                )}`
-                              : "EPH görüşmesi"}
-                          </p>
-
-                          {location && (
-                            <p className="mt-1 text-xs font-bold text-slate-400">
-                              {location}
-                            </p>
-                          )}
-
-                          <p className="mt-3 line-clamp-2 text-sm font-semibold leading-6 text-slate-600">
-                            {lastMessage?.body || "Henüz mesaj yok"}
-                          </p>
-                        </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <h2 className="truncate text-[13px] font-black text-[#06194A]">
+                          {displayName}
+                        </h2>
+                        {conversation.unreadCount ? (
+                          <span className="shrink-0 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-black text-white">
+                            {conversation.unreadCount}
+                          </span>
+                        ) : null}
                       </div>
 
-                      <div className="shrink-0 text-right">
-                        <div className="inline-flex items-center gap-1 text-xs font-bold text-slate-400">
-                          <Clock3 size={14} />
-                          {formatDateTime(
-                            lastMessage?.createdAt || conversation.updatedAt
-                          )}
-                        </div>
-                      </div>
+                      <p className="mt-0.5 truncate text-[10px] font-bold text-[#64748B]">
+                        {roleLabel(otherUser?.role)}{location ? ` • ${location}` : ""}
+                      </p>
+
+                      <p className="mt-1 truncate text-[11px] font-bold text-[#27364F]">
+                        {cleanMessage(lastMessage?.body)}
+                      </p>
+                    </div>
+
+                    <div className="flex h-full min-w-[44px] flex-col items-end justify-between gap-1 py-0.5 text-right">
+                      <span className="inline-flex items-center gap-1 text-[9px] font-black text-[#94A3B8]">
+                        <Clock3 size={10} />
+                        {formatTime(lastMessage?.createdAt || conversation.updatedAt)}
+                      </span>
+                      <span className="rounded-full bg-white px-2 py-1 text-[9px] font-black text-[#64748B]">
+                        Özel
+                      </span>
                     </div>
                   </button>
                 );
@@ -345,5 +308,16 @@ export default function MessagesInboxPage() {
         </section>
       </section>
     </main>
+  );
+}
+
+function MiniStat({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <div className={`min-h-[44px] min-w-[58px] rounded-[15px] px-2 py-1.5 text-center ${accent ? "bg-[#F4F0FF]" : "bg-[#F7FBFF]"}`}>
+      <p className={`text-[15px] font-black leading-none ${accent ? "text-[#6D4AFF]" : "text-[#06194A]"}`}>
+        {value}
+      </p>
+      <p className="mt-1 text-[9px] font-black text-[#64748B]">{label}</p>
+    </div>
   );
 }
