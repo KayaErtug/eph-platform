@@ -8,12 +8,9 @@ import {
   Bot,
   BriefcaseBusiness,
   Building2,
-  CalendarCheck,
-  ChevronRight,
   Clock3,
   Loader2,
   MessageCircle,
-  Sparkles,
   Target,
   UsersRound,
 } from "lucide-react";
@@ -21,10 +18,7 @@ import {
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 
-type Conversation = {
-  id: string;
-  unreadCount?: number;
-};
+type Conversation = { id: string; unreadCount?: number };
 
 type DashboardSummary = {
   stats?: {
@@ -52,8 +46,6 @@ type CrmDashboardCustomer = {
 
 type NetworkNotification = {
   id: string;
-  userId: string;
-  postId?: string | null;
   title: string;
   message: string;
   isRead: boolean;
@@ -95,9 +87,7 @@ type DashboardTask = {
 };
 
 function normalizeRole(role?: string | null) {
-  return String(role || "")
-    .toLocaleUpperCase("tr-TR")
-    .trim();
+  return String(role || "").toLocaleUpperCase("tr-TR").trim();
 }
 
 function roleLabel(role?: string | null) {
@@ -105,20 +95,8 @@ function roleLabel(role?: string | null) {
 
   if (normalizedRole === "SUPER_ADMIN") return "Süper Admin";
   if (normalizedRole === "ADMIN") return "Admin";
-  if (
-    normalizedRole === "MUTEAHHIT" ||
-    normalizedRole === "MÜTEAHHİT" ||
-    normalizedRole === "MÜTAHHİT"
-  ) {
-    return "Müteahhit";
-  }
-
-  if (
-    normalizedRole === "INSAAT_FIRMASI" ||
-    normalizedRole === "İNŞAAT_FİRMASI"
-  ) {
-    return "İnşaat Firması";
-  }
+  if (["MUTEAHHIT", "MÜTEAHHİT", "MÜTAHHİT"].includes(normalizedRole)) return "Müteahhit";
+  if (["INSAAT_FIRMASI", "İNŞAAT_FİRMASI"].includes(normalizedRole)) return "İnşaat Firması";
 
   return "Gayrimenkul Danışmanı";
 }
@@ -132,7 +110,6 @@ function formatBudget(value?: number | null) {
 
   if (value >= 1000000) {
     const compact = value / 1000000;
-
     return `${compact.toLocaleString("tr-TR", {
       maximumFractionDigits: compact >= 10 ? 0 : 1,
     })}M TL`;
@@ -149,16 +126,13 @@ function formatTaskDate(value?: string | null) {
   const tomorrow = new Date();
   tomorrow.setDate(today.getDate() + 1);
 
-  const isToday = date.toDateString() === today.toDateString();
-  const isTomorrow = date.toDateString() === tomorrow.toDateString();
-
   const time = date.toLocaleTimeString("tr-TR", {
     hour: "2-digit",
     minute: "2-digit",
   });
 
-  if (isToday) return `Bugün ${time}`;
-  if (isTomorrow) return `Yarın ${time}`;
+  if (date.toDateString() === today.toDateString()) return `Bugün ${time}`;
+  if (date.toDateString() === tomorrow.toDateString()) return `Yarın ${time}`;
 
   return `${date.toLocaleDateString("tr-TR", {
     day: "2-digit",
@@ -179,12 +153,8 @@ function flattenCustomerTasks(customers: CrmDashboardCustomer[]) {
         })),
     )
     .sort((a, b) => {
-      const aTime = a.dueDate
-        ? new Date(a.dueDate).getTime()
-        : Number.MAX_SAFE_INTEGER;
-      const bTime = b.dueDate
-        ? new Date(b.dueDate).getTime()
-        : Number.MAX_SAFE_INTEGER;
+      const aTime = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+      const bTime = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
 
       return aTime - bTime;
     });
@@ -240,9 +210,7 @@ export default function DashboardPage() {
       const [summaryRes, conversationsRes, notificationsRes, featuredRes, crmCustomersRes] =
         await Promise.allSettled([
           api.get("/dashboard/summary"),
-          user?.id
-            ? api.get(`/conversations?userId=${user.id}`)
-            : Promise.resolve({ data: [] }),
+          user?.id ? api.get(`/conversations?userId=${user.id}`) : Promise.resolve({ data: [] }),
           user?.id
             ? api.get(`/network/notifications?userId=${user.id}`)
             : Promise.resolve({ data: { unreadCount: 0, items: [] } }),
@@ -250,52 +218,35 @@ export default function DashboardPage() {
           api.get("/crm/customers"),
         ]);
 
-      if (summaryRes.status === "fulfilled") {
-        setSummary(summaryRes.value.data);
-      } else {
-        setSummary(null);
-      }
+      setSummary(summaryRes.status === "fulfilled" ? summaryRes.value.data : null);
 
       if (conversationsRes.status === "fulfilled") {
         const conversations = Array.isArray(conversationsRes.value.data)
           ? (conversationsRes.value.data as Conversation[])
           : [];
 
-        const unreadTotal = conversations.reduce(
-          (sum, item) => sum + (item.unreadCount || 0),
-          0,
-        );
-
-        setUnreadMessages(unreadTotal);
+        setUnreadMessages(conversations.reduce((sum, item) => sum + (item.unreadCount || 0), 0));
       } else {
         setUnreadMessages(0);
       }
 
-      if (notificationsRes.status === "fulfilled") {
-        setNetworkNotifications(
-          notificationsRes.value.data || { unreadCount: 0, items: [] },
-        );
-      } else {
-        setNetworkNotifications({ unreadCount: 0, items: [] });
-      }
+      setNetworkNotifications(
+        notificationsRes.status === "fulfilled"
+          ? notificationsRes.value.data || { unreadCount: 0, items: [] }
+          : { unreadCount: 0, items: [] },
+      );
 
-      if (featuredRes.status === "fulfilled") {
-        setFeaturedPosts(
-          Array.isArray(featuredRes.value.data) ? featuredRes.value.data : [],
-        );
-      } else {
-        setFeaturedPosts([]);
-      }
+      setFeaturedPosts(
+        featuredRes.status === "fulfilled" && Array.isArray(featuredRes.value.data)
+          ? featuredRes.value.data
+          : [],
+      );
 
-      if (crmCustomersRes.status === "fulfilled") {
-        setCrmCustomers(
-          Array.isArray(crmCustomersRes.value.data)
-            ? (crmCustomersRes.value.data as CrmDashboardCustomer[])
-            : [],
-        );
-      } else {
-        setCrmCustomers([]);
-      }
+      setCrmCustomers(
+        crmCustomersRes.status === "fulfilled" && Array.isArray(crmCustomersRes.value.data)
+          ? crmCustomersRes.value.data
+          : [],
+      );
     } finally {
       setLoading(false);
     }
@@ -335,7 +286,7 @@ export default function DashboardPage() {
   }, [featuredPosts, user?.id]);
 
   const latestNotifications = useMemo(() => {
-    return networkNotifications.items.slice(0, 2);
+    return networkNotifications.items.slice(0, 1);
   }, [networkNotifications.items]);
 
   const stats = summary?.stats || {
@@ -351,39 +302,37 @@ export default function DashboardPage() {
     return dueDate >= todayStart && dueDate <= todayEnd;
   }).length;
 
-  const visibleRequestCount = visibleForumRequests.length;
-
   if (!hydrated || loading) {
     return (
-      <main className="flex min-h-[calc(100dvh-74px)] items-center justify-center bg-[#F8FAFC] px-4">
+      <main className="flex min-h-[calc(100dvh-74px)] items-center justify-center bg-[#F7FBFF] px-4">
         <div className="flex flex-col items-center gap-4 text-center text-[#27364F]">
-          <Loader2 className="animate-spin text-[#6D28FF]" size={34} />
-          <p className="text-sm font-black">Anasayfa yükleniyor...</p>
+          <Loader2 className="animate-spin text-[#1557D6]" size={34} />
+          <p className="text-sm font-black">Dashboard hazırlanıyor...</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-[calc(100dvh-74px)] bg-[#F8FAFC] px-3 pb-4 pt-3 text-[#06194A]">
+    <main className="min-h-[calc(100dvh-74px)] bg-[#F7FBFF] px-3 pb-4 pt-3 text-[#06194A]">
       <div className="mx-auto w-full max-w-[430px] space-y-3">
-        <section className="rounded-[26px] border border-[#DDE7F3] bg-white px-4 py-4 text-center shadow-[0_16px_36px_rgba(15,23,42,0.065)]">
-          <p className="mx-auto inline-flex min-h-[28px] items-center justify-center rounded-full bg-[#EFF6FF] px-3 text-[12px] font-black text-[#1557D6]">
+        <section className="rounded-[30px] border border-[#DDE7F3] bg-white px-4 py-5 text-center shadow-[0_18px_42px_rgba(15,23,42,0.075)]">
+          <p className="mx-auto inline-flex min-h-[30px] items-center justify-center rounded-full bg-[#EFF6FF] px-4 text-[12px] font-black text-[#1557D6]">
             {roleName}
           </p>
 
-          <h1 className="mt-2 text-center text-[26px] font-black leading-none tracking-[-0.05em] text-[#06194A]">
+          <h1 className="mx-auto mt-3 max-w-[360px] text-center text-[28px] font-black leading-[0.98] tracking-[-0.055em] text-[#06194A]">
             Merhaba {firstName}
           </h1>
 
-          <p className="mx-auto mt-2 max-w-[330px] text-center text-[13px] font-extrabold leading-5 text-[#64748B]">
-            Bugün {todayTaskCount} görev, {unreadMessages} mesaj, {visibleRequestCount} talep sizi bekliyor.
+          <p className="mx-auto mt-3 max-w-[340px] text-center text-[13px] font-extrabold leading-5 text-[#64748B]">
+            Bugün {todayTaskCount} görev, {unreadMessages} mesaj ve {visibleForumRequests.length} uygun talep görünüyor.
           </p>
 
-          <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-[22px] border border-[#DDE7F3] bg-[#FBFDFF]">
+          <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-[#FBFDFF]">
             <HeroStat label="Görev" value={todayTaskCount} />
             <HeroStat label="Mesaj" value={unreadMessages} />
-            <HeroStat label="Talep" value={visibleRequestCount} />
+            <HeroStat label="Talep" value={visibleForumRequests.length} />
           </div>
         </section>
 
@@ -394,12 +343,7 @@ export default function DashboardPage() {
           <Shortcut href="/havuz" icon={<Target size={22} />} label="Havuz" />
         </section>
 
-        <SectionBlock
-          icon={<Clock3 size={20} />}
-          title="Acil İşler"
-          actionHref="/crm"
-          actionLabel="Tümü"
-        >
+        <SectionBlock icon={<Clock3 size={20} />} title="Acil İşler" actionHref="/crm" actionLabel="Tümü">
           {urgentTasks.length > 0 ? (
             <div className="grid gap-2">
               {urgentTasks.map((task) => (
@@ -411,12 +355,7 @@ export default function DashboardPage() {
           )}
         </SectionBlock>
 
-        <SectionBlock
-          icon={<MessageCircle size={20} />}
-          title="Uygun Talepler"
-          actionHref="/network"
-          actionLabel="Forum"
-        >
+        <SectionBlock icon={<MessageCircle size={20} />} title="Uygun Talepler" actionHref="/network" actionLabel="Forum">
           {visibleForumRequests.length > 0 ? (
             <div className="grid gap-2">
               {visibleForumRequests.map((post) => (
@@ -448,12 +387,7 @@ export default function DashboardPage() {
           />
         </section>
 
-        <SectionBlock
-          icon={<Target size={20} />}
-          title="Havuz Eşleşmeleri"
-          actionHref="/havuz"
-          actionLabel="Havuz"
-        >
+        <SectionBlock icon={<Target size={20} />} title="Havuz Eşleşmeleri" actionHref="/havuz" actionLabel="Havuz">
           <PoolSuggestionCard />
         </SectionBlock>
 
@@ -461,19 +395,15 @@ export default function DashboardPage() {
           <CompactInfoCard
             href="/lina"
             icon={<Bot size={22} />}
-            title="Lina Önerisi"
-            desc="Metin, not ve paylaşım desteği."
+            title="Lina"
+            desc="Metin, ses ve portföy desteği."
           />
 
           <CompactInfoCard
             href="/messages"
             icon={<Bell size={22} />}
             title="Bildirimler"
-            desc={
-              latestNotifications.length > 0
-                ? latestNotifications[0].title
-                : "Yeni bildirim yok."
-            }
+            desc={latestNotifications.length > 0 ? latestNotifications[0].title : "Yeni bildirim yok."}
           />
         </section>
       </div>
@@ -483,7 +413,7 @@ export default function DashboardPage() {
 
 function HeroStat({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="min-h-[68px] px-2 py-3 text-center [&:not(:last-child)]:border-r [&:not(:last-child)]:border-[#DDE7F3]">
+    <div className="min-h-[70px] px-2 py-3 text-center [&:not(:last-child)]:border-r [&:not(:last-child)]:border-[#DDE7F3]">
       <p className="text-center text-[11px] font-black uppercase tracking-[0.08em] text-[#64748B]">
         {label}
       </p>
@@ -508,10 +438,10 @@ function SectionBlock({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-3 shadow-[0_14px_32px_rgba(15,23,42,0.055)]">
+    <section className="rounded-[26px] border border-[#DDE7F3] bg-white p-3 shadow-[0_14px_34px_rgba(15,23,42,0.06)]">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] bg-[#F1ECFF] text-[#6D28FF]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] bg-[#EFF6FF] text-[#1557D6]">
             {icon}
           </span>
           <h2 className="min-w-0 text-left text-[18px] font-black tracking-[-0.04em] text-[#06194A]">
@@ -536,7 +466,7 @@ function UrgentTaskCard({ task }: { task: DashboardTask }) {
   return (
     <Link
       href="/crm"
-      className="grid min-h-[78px] grid-cols-[56px_1fr] items-center gap-3 rounded-[19px] border border-[#DDE7F3] bg-[#FBFDFF] p-3"
+      className="grid min-h-[82px] grid-cols-[56px_1fr] items-center gap-3 rounded-[20px] border border-[#DDE7F3] bg-[#FBFDFF] p-3"
     >
       <div className="flex h-12 w-12 flex-col items-center justify-center rounded-[17px] bg-[#FFF7ED] text-[#EA580C]">
         <Clock3 size={18} />
@@ -547,11 +477,9 @@ function UrgentTaskCard({ task }: { task: DashboardTask }) {
         <p className="text-left text-[11px] font-black text-[#1557D6]">
           {formatTaskDate(task.dueDate)}
         </p>
-
         <h3 className="mt-0.5 line-clamp-1 text-left text-[15px] font-black text-[#06194A]">
           {task.title}
         </h3>
-
         <p className="mt-0.5 line-clamp-1 text-left text-[12px] font-bold text-[#64748B]">
           {task.customerName}
           {task.customerPhone ? ` · ${task.customerPhone}` : ""}
@@ -565,40 +493,32 @@ function ForumRequestCard({ post }: { post: FeaturedNetworkPost }) {
   const location = [post.city, post.district].filter(Boolean).join(" / ");
 
   return (
-    <Link
-      href={`/network/${post.id}`}
-      className="rounded-[19px] border border-[#DDE7F3] bg-[#FBFDFF] p-3"
-    >
+    <Link href={`/network/${post.id}`} className="block min-h-[118px] rounded-[20px] border border-[#DDE7F3] bg-[#FBFDFF] p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 text-left">
-          <p className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-[#6D28FF]">
+          <p className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-[#1557D6]">
             Portföy Aranıyor
           </p>
-
           <h3 className="mt-1 line-clamp-1 text-left text-[15px] font-black text-[#06194A]">
             {post.title}
           </h3>
-
           <p className="mt-1 line-clamp-1 text-left text-[12px] font-bold text-[#64748B]">
             {location || "Konum bilgisi yok"}
           </p>
         </div>
 
         <div className="shrink-0 rounded-[14px] bg-[#EFF6FF] px-2 py-1.5 text-center">
-          <p className="text-[14px] font-black text-[#1557D6]">
-            {post.score || 0}
-          </p>
+          <p className="text-[14px] font-black text-[#1557D6]">{post.score || 0}</p>
           <p className="text-[8px] font-black text-[#64748B]">PUAN</p>
         </div>
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2">
+      <div className="mt-3 flex items-center justify-between gap-2">
         <p className="text-left text-[12px] font-black text-[#1557D6]">
           {formatBudget(post.budget)}
         </p>
-
         <span className="inline-flex min-h-[30px] items-center justify-center rounded-full bg-[#1557D6] px-3 text-[11px] font-black text-white">
-          İlgileniyorum
+          İncele
         </span>
       </div>
     </Link>
@@ -615,24 +535,18 @@ function SummaryMiniCard({
   rows: Array<[string, string]>;
 }) {
   return (
-    <section className="rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_12px_28px_rgba(15,23,42,0.055)]">
-      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#F1ECFF] text-[#6D28FF]">
+    <section className="min-h-[150px] rounded-[24px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#EFF6FF] text-[#1557D6]">
         {icon}
       </div>
 
-      <h3 className="mt-2 text-center text-[15px] font-black text-[#06194A]">
-        {title}
-      </h3>
+      <h3 className="mt-2 text-center text-[15px] font-black text-[#06194A]">{title}</h3>
 
       <div className="mt-2 grid gap-1.5">
         {rows.map(([label, value]) => (
           <div key={label} className="flex items-center justify-between gap-2">
-            <span className="text-left text-[11px] font-bold text-[#64748B]">
-              {label}
-            </span>
-            <span className="text-right text-[13px] font-black text-[#06194A]">
-              {value}
-            </span>
+            <span className="text-left text-[11px] font-bold text-[#64748B]">{label}</span>
+            <span className="text-right text-[13px] font-black text-[#06194A]">{value}</span>
           </div>
         ))}
       </div>
@@ -644,14 +558,14 @@ function PoolSuggestionCard() {
   return (
     <Link
       href="/havuz"
-      className="grid min-h-[76px] grid-cols-[54px_1fr_20px] items-center gap-3 rounded-[19px] border border-[#DDE7F3] bg-[#FBFDFF] p-3"
+      className="grid min-h-[82px] grid-cols-[54px_1fr] items-center gap-3 rounded-[20px] border border-[#DDE7F3] bg-[#FBFDFF] p-3"
     >
       <div className="flex h-12 w-12 items-center justify-center rounded-[17px] bg-[#EFF6FF] text-[#1557D6]">
         <Target size={24} />
       </div>
 
       <div className="min-w-0 text-left">
-        <p className="text-left text-[11px] font-black uppercase tracking-[0.12em] text-[#6D28FF]">
+        <p className="text-left text-[11px] font-black uppercase tracking-[0.12em] text-[#1557D6]">
           Yetkili Portföy
         </p>
         <h3 className="mt-0.5 text-left text-[14px] font-black text-[#06194A]">
@@ -661,8 +575,6 @@ function PoolSuggestionCard() {
           Size uygun portföyler burada listelenecek.
         </p>
       </div>
-
-      <ChevronRight size={20} className="text-[#06194A]" />
     </Link>
   );
 }
@@ -681,15 +593,13 @@ function CompactInfoCard({
   return (
     <Link
       href={href}
-      className="min-h-[118px] rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_12px_28px_rgba(15,23,42,0.055)]"
+      className="min-h-[124px] rounded-[24px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_12px_30px_rgba(15,23,42,0.06)]"
     >
-      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#F1ECFF] text-[#6D28FF]">
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#EFF6FF] text-[#1557D6]">
         {icon}
       </div>
 
-      <h3 className="mt-2 text-center text-[14px] font-black text-[#06194A]">
-        {title}
-      </h3>
+      <h3 className="mt-2 text-center text-[14px] font-black text-[#06194A]">{title}</h3>
 
       <p className="mt-1 line-clamp-2 text-center text-[11px] font-bold leading-4 text-[#64748B]">
         {desc}
@@ -710,9 +620,9 @@ function Shortcut({
   return (
     <Link
       href={href}
-      className="flex min-h-[70px] flex-col items-center justify-center gap-1.5 rounded-[20px] border border-[#DDE7F3] bg-white px-1 text-center shadow-[0_10px_24px_rgba(15,23,42,0.055)]"
+      className="flex min-h-[74px] flex-col items-center justify-center gap-1.5 rounded-[22px] border border-[#DDE7F3] bg-white px-1 text-center shadow-[0_10px_26px_rgba(15,23,42,0.055)]"
     >
-      <span className="text-[#6D28FF]">{icon}</span>
+      <span className="text-[#1557D6]">{icon}</span>
       <span className="text-[11px] font-black text-[#06194A]">{label}</span>
     </Link>
   );
@@ -720,10 +630,8 @@ function Shortcut({
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-[19px] border border-[#DDE7F3] bg-[#FBFDFF] px-4 py-4">
-      <p className="text-center text-[13px] font-bold leading-5 text-[#64748B]">
-        {text}
-      </p>
+    <div className="rounded-[20px] border border-[#DDE7F3] bg-[#FBFDFF] px-4 py-4">
+      <p className="text-center text-[13px] font-bold leading-5 text-[#64748B]">{text}</p>
     </div>
   );
 }
