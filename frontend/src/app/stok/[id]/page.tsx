@@ -20,11 +20,9 @@ import {
   MapPin,
   Maximize2,
   MessageCircle,
-  Phone,
   Send,
   Share2,
   ShieldCheck,
-  Sparkles,
   Trash2,
   Upload,
   X,
@@ -829,7 +827,7 @@ export default function StokDetailPage() {
               <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
                 <div className="rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3 text-center text-xs font-bold text-[#64748B] md:text-left">{shareUrl}</div>
                 <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-white p-2 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
-                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodedShareUrl}`} alt="İlan QR kodu" className="h-full w-full" />
+                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodedShareUrl}`} alt="Portföy QR kodu" className="h-full w-full" />
                 </div>
               </div>
             </section>
@@ -875,7 +873,7 @@ export default function StokDetailPage() {
             <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-700"><Trash2 size={24} /></div>
               <h2 className="mt-4 text-lg font-black text-[#06194A]">Yönetim</h2>
-              <button onClick={() => { setActionError(""); setDeleteOpen(true); }} className="mt-4 h-12 w-full rounded-2xl bg-rose-50 text-sm font-black text-rose-700">İlanı Sil</button>
+              <button onClick={() => { setActionError(""); setDeleteOpen(true); }} className="mt-4 h-12 w-full rounded-2xl bg-rose-50 text-sm font-black text-rose-700">Portföyü Sil</button>
             </section>
           </aside>
         </section>
@@ -915,12 +913,12 @@ export default function StokDetailPage() {
         <div className="fixed inset-0 z-[10003] flex items-center justify-center bg-[#06194A]/70 p-4 backdrop-blur-xl">
           <div className="w-full max-w-lg rounded-[34px] border border-[#DDE7F3] bg-white p-6 text-center shadow-[0_30px_90px_rgba(15,23,42,0.22)]">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[22px] bg-rose-50 text-rose-700"><FileText size={24} /></div>
-            <h2 className="mt-4 text-2xl font-black tracking-[-0.04em] text-[#06194A]">İlanı silmek istiyor musunuz?</h2>
+            <h2 className="mt-4 text-2xl font-black tracking-[-0.04em] text-[#06194A]">Portföyü silmek istiyor musunuz?</h2>
             <p className="mt-2 text-sm font-semibold leading-6 text-[#64748B]">Bu portföy kalıcı olarak silinecek. Bu işlem geri alınamaz.</p>
             {actionError && <div className="mt-4 rounded-[22px] border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700">{actionError}</div>}
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <button onClick={() => setDeleteOpen(false)} className="min-h-[52px] rounded-[20px] border border-[#DDE7F3] bg-white px-5 py-3 text-sm font-black text-[#475569]" disabled={actionLoading}>Vazgeç</button>
-              <button onClick={handleDeleteUnit} className="min-h-[52px] rounded-[20px] bg-rose-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60" disabled={actionLoading}>{actionLoading ? "Siliniyor..." : "Evet, İlanı Sil"}</button>
+              <button onClick={handleDeleteUnit} className="min-h-[52px] rounded-[20px] bg-rose-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60" disabled={actionLoading}>{actionLoading ? "Siliniyor..." : "Evet, Portföyü Sil"}</button>
             </div>
           </div>
         </div>
@@ -928,15 +926,6 @@ export default function StokDetailPage() {
 
       <PortfolioShareModal open={shareOpen} onClose={() => setShareOpen(false)} data={shareData} />
 
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-[#DDE7F3] bg-white/95 px-5 pb-6 pt-3 backdrop-blur">
-        <div className="mx-auto flex max-w-md items-center justify-between">
-          <BottomItem href="/dashboard" icon={<Home size={21} />} label="Ana Sayfa" />
-          <BottomItem active href="/stok" icon={<Building2 size={21} />} label="Portföy" />
-          <BottomItem href="/crm" icon={<Phone size={21} />} label="CRM" />
-          <BottomItem href="/network" icon={<MessageCircle size={21} />} label="Forum" />
-          <BottomItem href="/lina" icon={<Sparkles size={21} />} label="Lina" />
-        </div>
-      </nav>
     </main>
   );
 }
@@ -989,11 +978,3 @@ function ShareLink({ href, label, icon }: { href: string; label: string; icon: R
   );
 }
 
-function BottomItem({ icon, label, active, href }: { icon: ReactNode; label: string; active?: boolean; href: string }) {
-  return (
-    <Link href={href} className={`flex w-16 flex-col items-center gap-1 ${active ? "text-[#1557D6]" : "text-[#64748B]"}`}>
-      {icon}
-      <span className="text-[11px] font-bold">{label}</span>
-    </Link>
-  );
-}
