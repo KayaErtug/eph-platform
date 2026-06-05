@@ -100,7 +100,15 @@ export default function LinaPanel({
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "lina",
-      text: `Merhaba ${userName}, bugün sana nasıl yardımcı olabilirim? Portföy eklemek, müşteri analizi yapmak veya ilan açıklaması hazırlamak için buradayım.`,
+      text: `Günaydın ${userName} 👋
+
+	Bugün portföyünde 4 aktif görev,
+	8 eşleşen talep,
+	2 okunmamış mesaj bulunuyor.
+
+	Öncelikli olarak müşteri geri dönüşlerini ve yeni talep eşleşmelerini kontrol etmeni öneriyorum.
+
+	Nereden başlamak istersin?`,
     },
   ]);
 
@@ -305,7 +313,15 @@ export default function LinaPanel({
     setMessages([
       {
         role: "lina",
-        text: `Merhaba ${userName}, bugün sana nasıl yardımcı olabilirim? Portföy eklemek, müşteri analizi yapmak veya ilan açıklaması hazırlamak için buradayım.`,
+        text: `Günaydın ${userName} 👋
+
+	Bugün portföyünde 4 aktif görev,
+	8 eşleşen talep,
+	2 okunmamış mesaj bulunuyor.
+
+	Öncelikli olarak müşteri geri dönüşlerini ve yeni talep eşleşmelerini kontrol etmeni öneriyorum.
+
+	Nereden başlamak istersin?`,
       },
     ]);
 
