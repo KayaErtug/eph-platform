@@ -390,13 +390,13 @@ function normalizeActionTitle(actionTitle: string) {
 }
 
 const categories = [
-  "Tüm Akış",
-  "Satılık Talepleri",
-  "Kiralık Talepleri",
-  "Portföy Paylaşımı",
-  "Ortak Satış",
-  "Müteahhit & Proje",
-  "Arsa & Kat Karşılığı",
+  "Tümü",
+  "Satılık",
+  "Kiralık",
+  "Portföy",
+  "Ortak",
+  "Proje",
+  "Arsa",
 ];
 
 const filters = [
@@ -934,198 +934,160 @@ export default function NetworkPage() {
   }
 
   return (
-    <EphAppShell title="Pazaryeri">
-      <section className="mx-auto grid max-w-7xl gap-5 text-center lg:grid-cols-[280px_1fr_320px]">
-        <aside className="space-y-5">
-          <div
-            className={`overflow-hidden rounded-[30px] bg-gradient-to-br ${currentUserTheme.gradient} p-5 text-white shadow-2xl`}
-          >
-            <div className="flex flex-col items-center text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/20 text-3xl backdrop-blur">
-                {currentUserTheme.emoji}
-              </div>
+    <EphAppShell title="Forum">
+      <section className="mx-auto w-full max-w-[430px] space-y-3 px-3 pb-4 pt-3 text-[#06194A] lg:max-w-7xl">
+        <section className="rounded-[26px] border border-[#DDE7F3] bg-white p-3 shadow-[0_14px_34px_rgba(15,23,42,0.06)]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 text-left">
+              <p className="inline-flex min-h-[26px] items-center rounded-full bg-[#EFF6FF] px-3 text-[11px] font-black text-[#1557D6]">
+                Forum Merkezi
+              </p>
 
-              <div className="mt-3">
-                <h2 className="text-lg font-black">
-                  {user?.firstName} {user?.lastName}
-                </h2>
+              <h1 className="mt-2 text-[24px] font-black leading-none tracking-[-0.045em] text-[#06194A]">
+                Sektörel Akış
+              </h1>
 
-                <p className="mt-1 text-sm text-white/80">
-                  {roleLabel(user?.role)}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 grid grid-cols-3 gap-3">
-              <MiniStat label="Paylaşım" value={String(posts.length)} />
-              <MiniStat label="Takip" value={String(followedPosts.length)} />
-              <MiniStat label="Mesaj" value={String(conversationCount)} />
-            </div>
-          </div>
-
-          <div className="rounded-[30px] border border-white bg-white p-5 shadow-sm">
-            <h3 className="mb-4 text-center text-lg font-black text-[#0F172A]">
-              Kategoriler
-            </h3>
-
-            <div className="space-y-2">
-              {categories.map((category, index) => (
-                <button
-                  key={category}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-center text-sm font-black transition-all"
-                  style={
-                    index === 0
-                      ? {
-                          backgroundColor: currentUserTheme.primary,
-                          color: "#FFFFFF",
-                        }
-                      : {
-                          color: "#475569",
-                        }
-                  }
-                >
-                  {category}
-                  {index === 0 && <Sparkles size={16} />}
-                </button>
-              ))}
-            </div>
-          </div>
-        </aside>
-
-        <section className="space-y-5">
-          <div className="rounded-[32px] border border-white bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-3 rounded-2xl bg-[#F8FAFC] px-4 py-4">
-              <Search size={18} className="text-slate-400" />
-
-              <input
-                className="w-full bg-transparent text-center text-sm font-semibold outline-none placeholder:text-center"
-                placeholder="Talep, portföy, bölge veya kullanıcı ara..."
-              />
-            </div>
-
-            <div className="mb-5 flex justify-center gap-2 overflow-x-auto pb-2">
-              {filters.map((filter, index) => (
-                <button
-                  key={filter}
-                  className="shrink-0 rounded-full px-4 py-2 text-xs font-black"
-                  style={
-                    index === 0
-                      ? {
-                          backgroundColor: currentUserTheme.primary,
-                          color: "#FFFFFF",
-                        }
-                      : {
-                          border: "1px solid #E2E8F0",
-                          backgroundColor: "#FFFFFF",
-                          color: "#475569",
-                        }
-                  }
-                >
-                  {filter}
-                </button>
-              ))}
-            </div>
-
-            <div className="mb-4 grid gap-3 md:grid-cols-2">
-              <button
-                onClick={() => setShowFollowedOnly(false)}
-                className="flex h-13 items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition"
-                style={
-                  !showFollowedOnly
-                    ? {
-                        borderColor: currentUserTheme.primary,
-                        backgroundColor: currentUserTheme.primary,
-                        color: "#FFFFFF",
-                      }
-                    : {
-                        borderColor: currentUserTheme.border,
-                        backgroundColor: "#FFFFFF",
-                        color: currentUserTheme.text,
-                      }
-                }
-              >
-                <Sparkles size={18} />
-                Tüm Akış
-              </button>
-
-              <button
-                onClick={() => setShowFollowedOnly(true)}
-                className="relative flex h-13 items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition"
-                style={
-                  showFollowedOnly
-                    ? {
-                        borderColor: currentUserTheme.primary,
-                        backgroundColor: currentUserTheme.primary,
-                        color: "#FFFFFF",
-                      }
-                    : {
-                        borderColor: currentUserTheme.border,
-                        backgroundColor: "#FFFFFF",
-                        color: currentUserTheme.text,
-                      }
-                }
-              >
-                <Star size={18} />
-                Takip Ettiklerim
-                {followedPosts.length > 0 && (
-                  <span
-                    className="ml-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-black"
-                    style={
-                      showFollowedOnly
-                        ? {
-                            backgroundColor: "#FFFFFF",
-                            color: currentUserTheme.primary,
-                          }
-                        : {
-                            backgroundColor: currentUserTheme.soft,
-                            color: currentUserTheme.text,
-                          }
-                    }
-                  >
-                    {followedPosts.length}
-                  </span>
-                )}
-              </button>
+              <p className="mt-1 max-w-[285px] text-[12px] font-bold leading-5 text-[#64748B]">
+                Talepleri, portföyleri ve iş birliklerini tek ekranda takip edin.
+              </p>
             </div>
 
             <button
               onClick={() => setModalOpen(true)}
-              className={`flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r ${currentUserTheme.gradient} text-sm font-black text-white shadow-xl`}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#1557D6] text-white shadow-[0_14px_28px_rgba(21,87,214,0.24)]"
+              aria-label="Yeni paylaşım oluştur"
             >
-              <Plus size={20} />
-              Yeni Paylaşım Oluştur
+              <Plus size={22} />
+            </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <ForumStat label="Paylaşım" value={String(posts.length)} />
+            <ForumStat label="Mesaj" value={String(conversationCount)} />
+            <ForumStat label="Takip" value={String(followedPosts.length)} muted={followedPosts.length === 0} />
+          </div>
+        </section>
+
+        <section className="grid grid-cols-4 gap-2">
+          <ForumQuickCard icon={<Flame size={18} />} label="Sıcak" tone="orange" />
+          <ForumQuickCard icon={<TrendingUp size={18} />} label="Trend" tone="blue" />
+          <ForumQuickCard
+            icon={<MessageCircle size={18} />}
+            label={unreadCount > 0 ? `${unreadCount} Mesaj` : "Mesaj"}
+            tone="purple"
+            onClick={() => router.push("/messages")}
+          />
+          <ForumQuickCard
+            icon={<Star size={18} />}
+            label="Takip"
+            tone="yellow"
+            onClick={() => setShowFollowedOnly(true)}
+          />
+        </section>
+
+        <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+          <div className="flex items-center gap-2 rounded-[18px] bg-[#F7FBFF] px-3 py-2">
+            <Search size={17} className="text-[#94A3B8]" />
+            <input
+              className="h-8 min-w-0 flex-1 bg-transparent text-center text-[13px] font-bold text-[#06194A] outline-none placeholder:text-[#94A3B8]"
+              placeholder="Talep, portföy, bölge ara..."
+            />
+          </div>
+
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            {categories.map((category, index) => (
+              <button
+                key={category}
+                className={`shrink-0 rounded-full px-4 py-2 text-[12px] font-black ${
+                  index === 0
+                    ? "bg-[#1557D6] text-white"
+                    : "border border-[#DDE7F3] bg-white text-[#475569]"
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setShowFollowedOnly(false)}
+              className={`min-h-[40px] rounded-[16px] text-[12px] font-black ${
+                !showFollowedOnly
+                  ? "bg-[#1557D6] text-white"
+                  : "border border-[#DDE7F3] bg-white text-[#475569]"
+              }`}
+            >
+              Tüm Akış
+            </button>
+
+            <button
+              onClick={() => setShowFollowedOnly(true)}
+              className={`min-h-[40px] rounded-[16px] text-[12px] font-black ${
+                showFollowedOnly
+                  ? "bg-[#1557D6] text-white"
+                  : "border border-[#DDE7F3] bg-white text-[#475569]"
+              }`}
+            >
+              Takip Ettiklerim{followedPosts.length > 0 ? ` (${followedPosts.length})` : ""}
+            </button>
+          </div>
+        </section>
+
+        <section className="grid grid-cols-2 gap-2">
+          <ForumColorBlock
+            icon={<Building2 size={20} />}
+            title="Portföy"
+            desc="Yeni yetkili kayıtlar"
+            color="#1557D6"
+            bg="#EFF6FF"
+          />
+          <ForumColorBlock
+            icon={<UsersRound size={20} />}
+            title="İş Birliği"
+            desc="Ortak satış fırsatları"
+            color="#EA580C"
+            bg="#FFF7ED"
+          />
+        </section>
+
+        <section className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-[18px] font-black tracking-[-0.035em] text-[#06194A]">
+              Güncel Paylaşımlar
+            </h2>
+
+            <button
+              onClick={() => setModalOpen(true)}
+              className="text-[12px] font-black text-[#1557D6]"
+            >
+              Paylaşım Ekle
             </button>
           </div>
 
           {loading || (showFollowedOnly && followedLoading) ? (
-            <div className="rounded-[30px] bg-white p-10 text-center font-bold text-slate-500">
+            <div className="rounded-[24px] border border-[#DDE7F3] bg-white p-6 text-center text-[13px] font-bold text-[#64748B] shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
               {showFollowedOnly
-                ? "Takip ettiğin paylaşımlar yükleniyor..."
-                : "Pazaryeri yükleniyor..."}
+                ? "Takip ettiğiniz paylaşımlar yükleniyor..."
+                : "Forum akışı yükleniyor..."}
             </div>
           ) : displayPosts.length === 0 ? (
-            <div className="rounded-[30px] bg-white p-10 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-500">
-                {showFollowedOnly ? <Star size={28} /> : <Plus size={28} />}
+            <div className="rounded-[24px] border border-dashed border-[#DDE7F3] bg-white p-6 text-center shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#EFF6FF] text-[#1557D6]">
+                {showFollowedOnly ? <Star size={24} /> : <Plus size={24} />}
               </div>
-
-              <div className="text-lg font-black text-[#0F172A]">
+              <h2 className="mt-3 text-[16px] font-black text-[#06194A]">
+                {showFollowedOnly ? "Takip edilen paylaşım yok" : "Henüz paylaşım yok"}
+              </h2>
+              <p className="mx-auto mt-1 max-w-[290px] text-[12px] font-bold leading-5 text-[#64748B]">
                 {showFollowedOnly
-                  ? "Henüz takip ettiğin paylaşım yok"
-                  : "Henüz paylaşım yok"}
-              </div>
-
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-                {showFollowedOnly
-                  ? "İlgini çeken ilanların detayına girip Takibe Al butonuna basınca burada görünür."
-                  : "İlk talebi veya portföy fırsatını sen paylaşabilirsin."}
+                  ? "İlgilendiğiniz paylaşımları takibe aldığınızda burada görünür."
+                  : "İlk talebi veya portföy fırsatını siz paylaşabilirsiniz."}
               </p>
-
               {showFollowedOnly && (
                 <button
                   onClick={() => setShowFollowedOnly(false)}
-                  className="mt-5 rounded-2xl px-5 py-3 text-sm font-black text-white"
-                  style={{ backgroundColor: currentUserTheme.primary }}
+                  className="mt-4 min-h-[38px] rounded-[16px] bg-[#1557D6] px-4 text-[12px] font-black text-white"
                 >
                   Tüm Akışa Dön
                 </button>
@@ -1148,116 +1110,35 @@ export default function NetworkPage() {
           )}
         </section>
 
-        <aside className="space-y-5">
-          <div className="rounded-[30px] border border-white bg-white p-5 text-center shadow-sm">
-            <div className="mb-3 flex justify-center">
-              <div
-                className="flex h-14 w-14 items-center justify-center rounded-3xl"
-                style={{
-                  backgroundColor: currentUserTheme.soft,
-                  color: currentUserTheme.primary,
-                }}
-              >
-                <ShieldCheck size={28} />
-              </div>
-            </div>
+        <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+          <h2 className="text-center text-[18px] font-black tracking-[-0.035em] text-[#06194A]">
+            Bildirimler
+          </h2>
 
-            <h2 className="text-xl font-black text-[#0F172A]">
-              Güvenli Profesyonel Ağ
-            </h2>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {!pushEnabled ? (
+              <ForumActionButton
+                icon={<Volume2 size={17} />}
+                label={pushLoading ? "Açılıyor" : "Bildirim"}
+                onClick={enablePushNotifications}
+              />
+            ) : (
+              <ForumActionButton icon={<CheckCircle2 size={17} />} label="Açık" />
+            )}
 
-            <p className="mt-3 text-sm leading-7 text-slate-500">
-              Paylaşımlar yalnızca EPH üyelerine görünür.
-            </p>
+            {!soundEnabled ? (
+              <ForumActionButton icon={<Volume2 size={17} />} label="Ses" onClick={enableSound} />
+            ) : (
+              <ForumActionButton icon={<Volume2 size={17} />} label="Ses Açık" />
+            )}
+
+            <ForumActionButton
+              icon={<Settings size={17} />}
+              label="Ayar"
+              onClick={() => router.push("/notification-settings")}
+            />
           </div>
-
-          <div className="rounded-[30px] border border-white bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-center text-lg font-black text-[#0F172A]">
-              Hızlı Erişim
-            </h2>
-
-            <div className="space-y-3">
-              <QuickLink
-                icon={<Flame size={18} />}
-                label="Sıcak Talepler"
-                theme={currentUserTheme}
-              />
-              <QuickLink
-                icon={<TrendingUp size={18} />}
-                label="Trend Paylaşımlar"
-                theme={currentUserTheme}
-              />
-              <QuickLink
-                icon={<MessageCircle size={18} />}
-                label="Mesajlar"
-                theme={currentUserTheme}
-                onClick={() => router.push("/messages")}
-              />
-              <QuickLink
-                icon={<Star size={18} />}
-                label={`Takip Ettiklerim (${followedPosts.length})`}
-                theme={currentUserTheme}
-                onClick={() => setShowFollowedOnly(true)}
-              />
-            </div>
-          </div>
-
-          <div className="rounded-[30px] border border-white bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-center text-lg font-black text-[#0F172A]">
-              Bildirimler
-            </h2>
-
-            <div className="space-y-3">
-              {!pushEnabled && (
-                <button
-                  onClick={enablePushNotifications}
-                  disabled={pushLoading}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black text-white disabled:opacity-60"
-                  style={{ backgroundColor: currentUserTheme.primary }}
-                >
-                  <Volume2 size={18} />
-                  {pushLoading ? "Açılıyor..." : "Bildirimleri Aç"}
-                </button>
-              )}
-
-              {!soundEnabled && (
-                <button
-                  onClick={enableSound}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 text-sm font-black text-white"
-                >
-                  <Volume2 size={18} />
-                  Sesi Aç
-                </button>
-              )}
-
-              <button
-                onClick={() => router.push("/messages")}
-                className="relative flex h-11 w-full items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black text-white shadow-lg"
-                style={{ backgroundColor: currentUserTheme.primary }}
-              >
-                <Inbox size={18} />
-                Mesajlar
-                {unreadCount > 0 && (
-                  <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-600 px-2 text-xs font-black text-white">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => router.push("/notification-settings")}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border bg-white text-sm font-black"
-                style={{
-                  borderColor: currentUserTheme.border,
-                  color: currentUserTheme.text,
-                }}
-              >
-                <Settings size={18} />
-                Ayarlar
-              </button>
-            </div>
-          </div>
-        </aside>
+        </section>
       </section>
 
       {modalOpen && (
@@ -1310,14 +1191,14 @@ function AdminNetworkCommandGrid({
   ).length;
 
   return (
-    <EphAppShell title="Pazaryeri">
+    <EphAppShell title="Forum">
       <section className="mx-auto max-w-7xl text-center">
         <div
           className={`relative overflow-hidden rounded-[42px] bg-gradient-to-br ${adminTheme.gradient} p-7 text-white shadow-2xl`}
         >
           <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
             <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-cyan-100">
-              Pazaryeri Admin Görünümü
+              Forum Admin Görünümü
             </span>
 
             <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">
@@ -1327,7 +1208,7 @@ function AdminNetworkCommandGrid({
           </div>
 
           <h1 className="text-[42px] font-black leading-tight tracking-tight md:text-[64px]">
-            EPH Pazaryeri
+            EPH Forum
             <span className="block bg-gradient-to-r from-[#F7DFA3] via-cyan-100 to-white bg-clip-text text-transparent">
               Komuta Ekranı
             </span>
@@ -1451,7 +1332,7 @@ function AdminNetworkCommandGrid({
           <section className="space-y-5">
             {loading ? (
               <div className="rounded-[34px] border border-slate-200 bg-white p-10 text-center text-sm font-black text-slate-500">
-                Pazaryeri verileri yükleniyor...
+                Forum verileri yükleniyor...
               </div>
             ) : posts.length === 0 ? (
               <div className="rounded-[34px] border border-slate-200 bg-white p-10 text-center">
@@ -1460,7 +1341,7 @@ function AdminNetworkCommandGrid({
                 </div>
 
                 <p className="mt-2 text-sm text-slate-500">
-                  Pazaryeri akışı boş durumda.
+                  Forum akışı boş durumda.
                 </p>
               </div>
             ) : (
@@ -1549,6 +1430,101 @@ function AdminNetworkPostCard({
   );
 }
 
+function ForumStat({
+  label,
+  value,
+  muted,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+}) {
+  return (
+    <div className="min-h-[58px] rounded-[18px] bg-[#F7FBFF] px-2 py-2 text-center">
+      <p className="text-[20px] font-black leading-none text-[#06194A]">{value}</p>
+      <p className={`mt-1 text-[10px] font-black ${muted ? "text-[#94A3B8]" : "text-[#64748B]"}`}>
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function ForumQuickCard({
+  icon,
+  label,
+  tone,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  tone: "orange" | "blue" | "purple" | "yellow";
+  onClick?: () => void;
+}) {
+  const styles = {
+    orange: "bg-[#FFF7ED] text-[#EA580C] border-[#FED7AA]",
+    blue: "bg-[#EFF6FF] text-[#1557D6] border-[#DBEAFE]",
+    purple: "bg-[#F4F0FF] text-[#6D4AFF] border-[#DDD6FE]",
+    yellow: "bg-[#FEFCE8] text-[#A16207] border-[#FEF3C7]",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={`flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-[20px] border px-1 ${styles[tone]}`}
+    >
+      {icon}
+      <span className="text-[11px] font-black">{label}</span>
+    </button>
+  );
+}
+
+function ForumColorBlock({
+  icon,
+  title,
+  desc,
+  color,
+  bg,
+}: {
+  icon: ReactNode;
+  title: string;
+  desc: string;
+  color: string;
+  bg: string;
+}) {
+  return (
+    <div
+      className="min-h-[96px] rounded-[22px] border border-[#DDE7F3] p-3 text-left shadow-[0_10px_24px_rgba(15,23,42,0.045)]"
+      style={{ background: bg }}
+    >
+      <div className="flex h-9 w-9 items-center justify-center rounded-[15px] bg-white" style={{ color }}>
+        {icon}
+      </div>
+      <h3 className="mt-2 text-[15px] font-black text-[#06194A]">{title}</h3>
+      <p className="mt-0.5 text-[11px] font-bold leading-4 text-[#64748B]">{desc}</p>
+    </div>
+  );
+}
+
+function ForumActionButton({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex min-h-[48px] items-center justify-center gap-1 rounded-[17px] bg-[#F7FBFF] text-[11px] font-black text-[#1557D6]"
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
 function PremiumPostCard({
   post,
   currentUserId,
@@ -1576,45 +1552,84 @@ function PremiumPostCard({
   const ownerId = post.userId || postUser?.id;
   const isOwnPost = ownerId === currentUserId;
   const actions = getMarketplaceActions(currentUserRole, postUser?.role);
+  const location = [post.district, post.city].filter(Boolean).join(" / ") || "Konum yok";
 
   return (
     <article
       onClick={onOpenDetail}
-      className="group cursor-pointer overflow-hidden rounded-[32px] border bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-2xl"
-      style={{
-        borderColor: theme.border,
-        boxShadow: `0 18px 40px ${theme.primary}12`,
-      }}
+      className="cursor-pointer rounded-[24px] border border-[#DDE7F3] bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.055)] transition hover:border-[#1557D6]"
     >
-      <div className={`h-2 bg-gradient-to-r ${theme.gradient}`} />
-
-      <div className="p-6">
-        <PostHeader
-          post={post}
-          authorName={authorName}
-          theme={theme}
-          presenceStatus={presenceStatus}
-        />
-
-        <PostBody post={post} theme={theme} />
-
+      <div className="flex items-start gap-3">
         <div
-          className="mt-6 rounded-[24px] border p-4 text-center"
-          style={{
-            borderColor: theme.border,
-            backgroundColor: theme.soft,
-          }}
+          className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] text-[23px]"
+          style={{ backgroundColor: theme.soft }}
         >
-          <p
-            className="text-xs font-black leading-5"
-            style={{ color: theme.text }}
-          >
-            {isOwnPost
-              ? "Bu paylaşım sana ait. Detay sayfasından yayını takip edebilir veya güncelleyebilirsin."
-              : actions.note}
+          {theme.emoji}
+          <span
+            className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${presenceDotClass(
+              presenceStatus,
+            )}`}
+          />
+        </div>
+
+        <div className="min-w-0 flex-1 text-left">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="truncate text-[15px] font-black text-[#06194A]">
+                {authorName}
+              </h3>
+              <p className="mt-0.5 text-[11px] font-bold text-[#64748B]">
+                {roleLabel(postUser?.role)} • {presenceLabel(presenceStatus)} • {relativeTime(post.createdAt)}
+              </p>
+            </div>
+
+            <span
+              className="shrink-0 rounded-full px-2 py-1 text-[10px] font-black"
+              style={{ color: isHotPost(post) ? "#EA580C" : theme.text, backgroundColor: isHotPost(post) ? "#FFF7ED" : theme.soft }}
+            >
+              {post.urgency || "Normal"}
+            </span>
+          </div>
+
+          <p className="mt-3 text-[11px] font-black uppercase tracking-[0.1em]" style={{ color: theme.primary }}>
+            {post.type}
           </p>
 
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <h2 className="mt-1 line-clamp-2 text-[18px] font-black leading-[1.12] tracking-[-0.04em] text-[#06194A]">
+            {post.title}
+          </h2>
+
+          {post.description && (
+            <p className="mt-2 line-clamp-2 text-[12px] font-semibold leading-5 text-[#64748B]">
+              {post.description}
+            </p>
+          )}
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <SmallForumInfo label="Bölge" value={location} />
+            <SmallForumInfo label="Bütçe" value={post.budget ? formatMoney(post.budget) : "Belirtilmedi"} />
+          </div>
+
+          {post.tags?.length > 0 && (
+            <div className="mt-2 flex gap-1 overflow-hidden">
+              {post.tags.slice(0, 3).map((tag) => (
+                <span key={tag} className="shrink-0 rounded-full bg-[#F7FBFF] px-2 py-1 text-[10px] font-black text-[#64748B]">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenDetail();
+              }}
+              className="min-h-[38px] rounded-[16px] border border-[#DDE7F3] bg-white text-[12px] font-black text-[#1557D6]"
+            >
+              Detay
+            </button>
             <button
               onClick={(event) => {
                 event.stopPropagation();
@@ -1627,73 +1642,25 @@ function PremiumPostCard({
                 }
               }}
               disabled={isOwnPost}
-              className="rounded-2xl py-3 text-sm font-black transition-all"
-              style={
-                isOwnPost
-                  ? {
-                      backgroundColor: "#F1F5F9",
-                      color: "#94A3B8",
-                    }
-                  : {
-                      backgroundColor: theme.primary,
-                      color: "#FFFFFF",
-                    }
-              }
+              className="min-h-[38px] rounded-[16px] bg-[#1557D6] text-[12px] font-black text-white disabled:bg-[#E2E8F0] disabled:text-[#94A3B8]"
             >
               {isOwnPost ? "Kendi Paylaşımın" : actions.primary}
             </button>
-
-            <button
-              onClick={(event) => {
-                event.stopPropagation();
-
-                if (isOwnPost) {
-                  onOpenDetail();
-                  return;
-                }
-
-                onStartConversation(
-                  actions.secondary,
-                  createPresetMessage(actions.secondary, post.title),
-                );
-              }}
-              className="rounded-2xl border py-3 text-sm font-black"
-              style={{
-                borderColor: theme.border,
-                backgroundColor: "#FFFFFF",
-                color: theme.text,
-              }}
-            >
-              {isOwnPost ? "Güncelle" : actions.secondary}
-            </button>
-
-            <button
-              onClick={(event) => {
-                event.stopPropagation();
-
-                if (isOwnPost) {
-                  onOpenDetail();
-                  return;
-                }
-
-                onStartConversation(
-                  actions.tertiary,
-                  createPresetMessage(actions.tertiary, post.title),
-                );
-              }}
-              className={`rounded-2xl bg-gradient-to-r ${theme.gradient} py-3 text-sm font-black text-white shadow-lg`}
-            >
-              {isOwnPost ? "Gelen Talepler" : actions.tertiary}
-            </button>
           </div>
-        </div>
-
-        <div className="mt-5 grid gap-2 border-t border-slate-100 pt-4 text-center text-xs font-bold text-slate-400 md:grid-cols-2">
-          <span>Yayın: {formatDateTime(post.createdAt)}</span>
-          <span>Bitiş: {formatDateTime(post.expiresAt)}</span>
         </div>
       </div>
     </article>
+  );
+}
+
+function SmallForumInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[16px] bg-[#F7FBFF] px-3 py-2">
+      <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#94A3B8]">
+        {label}
+      </p>
+      <p className="mt-0.5 truncate text-[12px] font-black text-[#27364F]">{value}</p>
+    </div>
   );
 }
 
@@ -1711,10 +1678,10 @@ function PostHeader({
   const postUser = getPostUser(post);
 
   return (
-    <div className="mb-5 flex flex-col items-center justify-center text-center">
+    <div className="mb-4 flex items-center gap-3 text-left">
       <div className="relative">
         <div
-          className="flex h-16 w-16 items-center justify-center rounded-3xl text-3xl font-black shadow-xl"
+          className="flex h-11 w-11 items-center justify-center rounded-[17px] text-[21px] font-black"
           style={{
             backgroundColor: theme.soft,
             color: theme.primary,
@@ -1725,112 +1692,63 @@ function PostHeader({
         </div>
 
         <span
-          className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-[3px] border-white ${presenceDotClass(
+          className={`absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-[2px] border-white ${presenceDotClass(
             presenceStatus,
           )}`}
         />
       </div>
 
-      <div className="mt-4">
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <h3 className="text-[16px] font-black text-[#0F172A]">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <h3 className="truncate text-[14px] font-black text-[#06194A]">
             {authorName}
           </h3>
-
-          <CheckCircle2 size={18} style={{ color: theme.primary }} />
+          <CheckCircle2 size={15} style={{ color: theme.primary }} />
         </div>
-
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-          <p
-            className="inline-flex rounded-full px-4 py-1.5 text-xs font-black"
-            style={{ backgroundColor: theme.soft, color: theme.text }}
-          >
-            {roleLabel(postUser?.role)}
-          </p>
-
-          <p
-            className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-black"
-            style={presenceBadgeStyle(presenceStatus, theme)}
-          >
-            <span
-              className={`h-2 w-2 rounded-full ${presenceDotClass(presenceStatus)}`}
-            />
-            {presenceLabel(presenceStatus)}
-          </p>
-        </div>
-
-        <p className="mt-2 text-xs font-bold text-slate-400">
-          {relativeTime(post.createdAt)}
+        <p className="mt-0.5 truncate text-[11px] font-bold text-[#64748B]">
+          {roleLabel(postUser?.role)} • {presenceLabel(presenceStatus)} • {relativeTime(post.createdAt)}
         </p>
       </div>
-
-      <span
-        className="mt-4 rounded-full px-4 py-2 text-xs font-black"
-        style={{
-          backgroundColor: isHotPost(post) ? "#FEF2F2" : theme.soft,
-          color: isHotPost(post) ? "#DC2626" : theme.text,
-        }}
-      >
-        🔥 {post.urgency || "Normal"}
-      </span>
     </div>
   );
 }
 
 function PostBody({ post, theme }: { post: NetworkPost; theme: RoleTheme }) {
+  const location = [post.city, post.district].filter(Boolean).join(" / ");
+
   return (
     <>
-      <div className="mb-4 flex justify-center">
-        <div
-          className="inline-flex rounded-full px-4 py-2 text-xs font-black"
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span
+          className="rounded-full px-3 py-1 text-[10px] font-black"
           style={{ backgroundColor: theme.soft, color: theme.text }}
         >
           {post.type}
-        </div>
+        </span>
+        <span
+          className="rounded-full px-3 py-1 text-[10px] font-black"
+          style={{
+            backgroundColor: isHotPost(post) ? "#FFF7ED" : "#F7FBFF",
+            color: isHotPost(post) ? "#EA580C" : "#64748B",
+          }}
+        >
+          {post.urgency || "Normal"}
+        </span>
       </div>
 
-      <h2
-        className="text-center text-[26px] font-black leading-tight"
-        style={{ color: theme.text }}
-      >
+      <h2 className="line-clamp-2 text-[17px] font-black leading-[1.15] tracking-[-0.035em] text-[#06194A]">
         {post.title}
       </h2>
 
-      <p className="mt-4 text-center text-[15px] leading-8 text-slate-600">
-        {post.description}
-      </p>
-
-      {post.budget && (
-        <div className="mt-5 flex justify-center">
-          <div
-            className="inline-flex rounded-2xl px-4 py-3 text-sm font-black"
-            style={{ backgroundColor: theme.soft, color: theme.text }}
-          >
-            💰 {formatMoney(post.budget)}
-          </div>
-        </div>
+      {post.description && (
+        <p className="mt-2 line-clamp-2 text-[12px] font-semibold leading-5 text-[#64748B]">
+          {post.description}
+        </p>
       )}
 
-      <div className="mt-5 flex flex-wrap justify-center gap-2">
-        {post.city && (
-          <span
-            className="rounded-full px-3 py-2 text-xs font-black"
-            style={{ backgroundColor: theme.soft, color: theme.text }}
-          >
-            {post.city}
-            {post.district ? ` / ${post.district}` : ""}
-          </span>
-        )}
-
-        {post.tags.map((tag) => (
-          <span
-            key={tag}
-            className="rounded-full px-3 py-2 text-xs font-bold"
-            style={{ backgroundColor: "#F1F5F9", color: "#475569" }}
-          >
-            #{tag}
-          </span>
-        ))}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <SmallForumInfo label="Bölge" value={location || "Konum yok"} />
+        <SmallForumInfo label="Bütçe" value={post.budget ? formatMoney(post.budget) : "Belirtilmedi"} />
       </div>
     </>
   );
