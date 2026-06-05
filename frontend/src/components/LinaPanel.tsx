@@ -34,6 +34,13 @@ type LinaPanelProps = {
   onClose?: () => void;
 };
 
+type LinaChatResponse = {
+  success?: boolean;
+  message?: string;
+  reply?: string;
+  error?: string;
+};
+
 const QUICK_COMMANDS = [
   {
     title: "Portföy Oluştur",
@@ -86,7 +93,68 @@ const QUICK_COMMANDS = [
 ];
 
 function createWelcomeMessage(name: string) {
-  return `Günaydın ${name} 👋 Bugün portföyünde 4 aktif görev, 8 eşleşen talep ve 2 okunmamış mesaj bulunuyor. Öncelikli olarak müşteri geri dönüşlerini ve yeni talep eşleşmelerini kontrol etmeni öneriyorum. Nereden başlamak istersin?`;
+  return `${name}, şu anda Lina gerçek platform verilerine bağlı çalışacak şekilde hazırlanıyor. Sistemde yeterli CRM, görev veya talep verisi yoksa sayı uydurmayacağım. Portföy, ilan açıklaması, müşteri analizi veya fiyat yorumu için birlikte test yapabiliriz.`;
+}
+
+function getSafeUserName(user: unknown) {
+  const maybeUser = user as {
+    firstName?: string;
+    name?: string;
+    email?: string;
+  } | null;
+
+  return (
+    maybeUser?.firstName ||
+    maybeUser?.name ||
+    maybeUser?.email?.split("@")[0]?.split(".")[0] ||
+    "Profesyonel"
+  );
+}
+
+function getAuthToken(user: unknown) {
+  const maybeStore = useAuthStore.getState() as unknown as {
+    token?: string;
+    accessToken?: string;
+    jwt?: string;
+    authToken?: string;
+  };
+
+  const maybeUser = user as {
+    token?: string;
+    accessToken?: string;
+    jwt?: string;
+    authToken?: string;
+  } | null;
+
+  return (
+    maybeStore?.token ||
+    maybeStore?.accessToken ||
+    maybeStore?.jwt ||
+    maybeStore?.authToken ||
+    maybeUser?.token ||
+    maybeUser?.accessToken ||
+    maybeUser?.jwt ||
+    maybeUser?.authToken ||
+    ""
+  );
+}
+
+function getLinaChatEndpoints() {
+  const envBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  const isLocal =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1");
+
+  const endpoints = [
+    envBase ? `${envBase}/lina/chat` : "",
+    "/api/lina/chat",
+    "/lina/chat",
+    "https://emlakportfoyhavuzu.com/api/lina/chat",
+    isLocal ? "http://localhost:3001/lina/chat" : "",
+  ].filter(Boolean);
+
+  return Array.from(new Set(endpoints));
 }
 
 export default function LinaPanel({
@@ -95,10 +163,7 @@ export default function LinaPanel({
 }: LinaPanelProps) {
   const { user } = useAuthStore();
 
-  const userName =
-    user?.firstName ||
-    user?.email?.split("@")[0]?.split(".")[0] ||
-    "Profesyonel";
+  const userName = getSafeUserName(user);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const didMountMessagesRef = useRef(false);
@@ -167,6 +232,62 @@ export default function LinaPanel({
 
   if (!open) return null;
 
+  const callLinaBackend = async (text: string, history: Message[]) => {
+    const token = getAuthToken(user);
+    const endpoints = getLinaChatEndpoints();
+
+    let lastError = "";
+
+    for (const endpoint of endpoints) {
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            message: text,
+            sourceModule: "general",
+            history: history.map((messageItem) => ({
+              role: messageItem.role === "lina" ? "assistant" : "user",
+              content: messageItem.text,
+            })),
+          }),
+        });
+
+        const raw = await res.text();
+        let data: LinaChatResponse = {};
+
+        try {
+          data = raw ? (JSON.parse(raw) as LinaChatResponse) : {};
+        } catch {
+          data = { message: raw };
+        }
+
+        if (!res.ok) {
+          lastError = data?.message || data?.error || `HTTP ${res.status}`;
+          continue;
+        }
+
+        const reply = data?.message || data?.reply;
+
+        if (reply?.trim()) {
+          return reply.trim();
+        }
+
+        lastError = "Lina boş cevap döndürdü.";
+      } catch (error) {
+        lastError =
+          error instanceof Error
+            ? error.message
+            : "Lina bağlantısı kurulamadı.";
+      }
+    }
+
+    throw new Error(lastError || "Lina bağlantısı kurulamadı.");
+  };
+
   const speakWithElevenLabs = async (text: string) => {
     try {
       setVoiceError("");
@@ -233,32 +354,14 @@ export default function LinaPanel({
     setLoading(true);
 
     try {
-      const res = await fetch("/api/lina-stok", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: text,
-          history: newMessages.map((messageItem) => ({
-            role: messageItem.role === "lina" ? "assistant" : "user",
-            content: messageItem.text,
-          })),
-        }),
-      });
-
-      const data = await res.json();
-
-      const reply =
-        data?.reply ||
-        "Bu bilgiyi aldım. Daha doğru ilerlemek için konum, metrekare, fiyat ve portföy tipini de paylaşabilir misin?";
+      const reply = await callLinaBackend(text, newMessages);
 
       setMessages((prev) => [...prev, { role: "lina", text: reply }]);
 
       await speakWithElevenLabs(reply);
     } catch {
       const fallback =
-        "Bağlantı sırasında bir sorun oluştu. Lütfen biraz sonra tekrar deneyin.";
+        "Şu anda Lina'nın ana beyniyle bağlantı kurulamadı. Demo cevap üretmeyeceğim. Lütfen bağlantı ayarlarını kontrol ettikten sonra tekrar deneyin.";
 
       setMessages((prev) => [...prev, { role: "lina", text: fallback }]);
     } finally {
@@ -352,7 +455,9 @@ export default function LinaPanel({
             </button>
 
             <div className="text-center">
-              <h1 className="text-2xl font-black tracking-tight">Lina Asistan</h1>
+              <h1 className="text-2xl font-black tracking-tight">
+                Lina Asistan
+              </h1>
               <p className="text-xs font-bold text-[#475569]">
                 EPH operasyon zekası
               </p>
@@ -384,8 +489,8 @@ export default function LinaPanel({
               </h2>
 
               <p className="mt-4 text-base font-semibold leading-7 text-[#27364F]">
-                Bugün portföy, müşteri, talep ve ilan süreçlerinde sana yardım
-                etmeye hazırım.
+                Gerçek veri varsa analiz ederim. Veri yoksa sayı uydurmadan,
+                test edilebilir alanlara yönlendiririm.
               </p>
             </div>
 
@@ -410,14 +515,44 @@ export default function LinaPanel({
           </section>
 
           <section className="mt-4 grid grid-cols-4 overflow-hidden rounded-[26px] bg-white shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
-            <Metric icon={<CheckCircle2 size={23} />} value="4" label="Görev" sub="Aktif" color="#1557D6" bg="#EFF6FF" />
-            <Metric icon={<Bell size={23} />} value="2" label="Mesaj" sub="Okunmamış" color="#7C3AED" bg="#FAF5FF" />
-            <Metric icon={<Target size={23} />} value="8" label="Talep" sub="Eşleşen" color="#EA580C" bg="#FFF7ED" />
-            <Metric icon={<Star size={23} />} value="3" label="Fırsat" sub="Yeni" color="#0F766E" bg="#ECFDF5" />
+            <Metric
+              icon={<CheckCircle2 size={23} />}
+              value="—"
+              label="Görev"
+              sub="Gerçek veri"
+              color="#1557D6"
+              bg="#EFF6FF"
+            />
+            <Metric
+              icon={<Bell size={23} />}
+              value="—"
+              label="Mesaj"
+              sub="Gerçek veri"
+              color="#7C3AED"
+              bg="#FAF5FF"
+            />
+            <Metric
+              icon={<Target size={23} />}
+              value="—"
+              label="Talep"
+              sub="Gerçek veri"
+              color="#EA580C"
+              bg="#FFF7ED"
+            />
+            <Metric
+              icon={<Star size={23} />}
+              value="—"
+              label="Fırsat"
+              sub="Gerçek veri"
+              color="#0F766E"
+              bg="#ECFDF5"
+            />
           </section>
 
           <section className="mt-5">
-            <h3 className="px-1 text-xl font-black tracking-tight">Hızlı İşlemler</h3>
+            <h3 className="px-1 text-center text-xl font-black tracking-tight">
+              Hızlı İşlemler
+            </h3>
 
             <div className="mt-3 grid grid-cols-2 gap-3">
               {QUICK_COMMANDS.map((command) => (
@@ -429,7 +564,10 @@ export default function LinaPanel({
                 >
                   <span
                     className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-                    style={{ color: command.color, backgroundColor: command.bg }}
+                    style={{
+                      color: command.color,
+                      backgroundColor: command.bg,
+                    }}
                   >
                     {command.icon}
                   </span>
@@ -450,7 +588,9 @@ export default function LinaPanel({
           </section>
 
           <section className="mt-6">
-            <h3 className="px-1 text-xl font-black tracking-tight">Lina ile Sohbet</h3>
+            <h3 className="px-1 text-center text-xl font-black tracking-tight">
+              Lina ile Sohbet
+            </h3>
 
             <div className="mt-3 flex flex-col gap-3">
               {messages.map((messageItem, index) => {
@@ -463,7 +603,9 @@ export default function LinaPanel({
                   >
                     <div
                       className={`flex max-w-[92%] gap-3 rounded-[26px] px-4 py-4 shadow-[0_12px_34px_rgba(15,23,42,0.06)] ${
-                        isLina ? "bg-white text-[#06194A]" : "bg-[#1557D6] text-white"
+                        isLina
+                          ? "bg-white text-[#06194A]"
+                          : "bg-[#1557D6] text-white"
                       }`}
                     >
                       {isLina && (
