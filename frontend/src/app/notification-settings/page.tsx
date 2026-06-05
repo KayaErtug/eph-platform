@@ -7,11 +7,9 @@ import {
   Bell,
   BellRing,
   CheckCircle2,
-  ChevronRight,
-  Clock3,
-  Home,
   Megaphone,
   MessageCircle,
+  Music2,
   Play,
   Radio,
   ShieldCheck,
@@ -27,7 +25,6 @@ type PermissionState = "default" | "granted" | "denied" | "unsupported";
 type SoundOption = {
   id: string;
   label: string;
-  description: string;
   file: string;
 };
 
@@ -38,44 +35,32 @@ type Preferences = Record<PreferenceKey, boolean>;
 const SOUND_OPTIONS: SoundOption[] = [
   {
     id: "soft",
-    label: "EPH Classic",
-    description: "Varsayılan EPH bildirim sesi",
+    label: "Classic",
     file: "/sounds/universfield-new-notification-036-485897.mp3",
   },
   {
     id: "notification",
-    label: "EPH Soft",
-    description: "Daha net ve kısa bildirim tonu",
+    label: "Soft",
     file: "/sounds/universfield-new-notification-043-493471.mp3",
   },
   {
     id: "cat",
     label: "Kedi",
-    description: "Eğlenceli kısa bildirim sesi",
     file: "/sounds/dragon-studio-cat-meow-401729.mp3",
   },
   {
     id: "doorbell",
-    label: "Kapı Zili",
-    description: "Dikkat çeken net uyarı sesi",
+    label: "Gitar",
     file: "/sounds/dragon-studio-friendly-doorbell-499660.mp3",
   },
   {
     id: "cash",
-    label: "Yazarkasa",
-    description: "Fırsat ve satış hissi veren ses",
+    label: "Yazar",
     file: "/sounds/modestas123123-cash-register-kaching-sound-effect-125042.mp3",
-  },
-  {
-    id: "splash",
-    label: "Su Sesi",
-    description: "Hafif ve kısa alternatif",
-    file: "/sounds/universfield-water-splash-02-352021.mp3",
   },
   {
     id: "off",
     label: "Sessiz",
-    description: "Bildirim sesi çalmasın",
     file: "",
   },
 ];
@@ -96,15 +81,11 @@ export default function NotificationSettingsPage() {
   const [selectedSound, setSelectedSound] = useState("soft");
   const [loading, setLoading] = useState(false);
   const [testMessage, setTestMessage] = useState("");
-  const [lastTestAt, setLastTestAt] = useState("");
-  const [serviceWorkerStatus, setServiceWorkerStatus] = useState("Kontrol ediliyor");
+  const [serviceWorkerStatus, setServiceWorkerStatus] = useState("Bekliyor");
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
 
   const selectedSoundItem = useMemo(() => {
-    return (
-      SOUND_OPTIONS.find((item) => item.id === selectedSound) ||
-      SOUND_OPTIONS[0]
-    );
+    return SOUND_OPTIONS.find((item) => item.id === selectedSound) || SOUND_OPTIONS[0];
   }, [selectedSound]);
 
   useEffect(() => {
@@ -125,7 +106,6 @@ export default function NotificationSettingsPage() {
     setSelectedSound(storedSound);
     setSoundEnabled(localStorage.getItem("ephSoundEnabled") === "true");
     setPushEnabled(localStorage.getItem("ephPushEnabled") === "true");
-    setLastTestAt(localStorage.getItem("ephNotificationLastTestAt") || "");
 
     if (storedPreferences) {
       try {
@@ -149,10 +129,10 @@ export default function NotificationSettingsPage() {
           setServiceWorkerStatus(registration ? "Aktif" : "Bekliyor");
         })
         .catch(() => {
-          setServiceWorkerStatus("Kontrol edilemedi");
+          setServiceWorkerStatus("Yok");
         });
     } else {
-      setServiceWorkerStatus("Desteklenmiyor");
+      setServiceWorkerStatus("Yok");
     }
   }, []);
 
@@ -161,19 +141,7 @@ export default function NotificationSettingsPage() {
 
     window.setTimeout(() => {
       setTestMessage("");
-    }, 3500);
-  };
-
-  const markTestTime = () => {
-    const value = new Intl.DateTimeFormat("tr-TR", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date());
-
-    localStorage.setItem("ephNotificationLastTestAt", value);
-    setLastTestAt(value);
+    }, 2200);
   };
 
   const playSoundFile = async (file: string) => {
@@ -193,7 +161,7 @@ export default function NotificationSettingsPage() {
     if (sound.id === "off") {
       localStorage.setItem("ephSoundEnabled", "false");
       setSoundEnabled(false);
-      showMessage("Bildirim sesi kapatıldı.");
+      showMessage("Sessiz mod seçildi.");
       return;
     }
 
@@ -201,12 +169,9 @@ export default function NotificationSettingsPage() {
       await playSoundFile(sound.file);
       localStorage.setItem("ephSoundEnabled", "true");
       setSoundEnabled(true);
-      markTestTime();
-      showMessage(`${sound.label} seçildi ve test edildi.`);
+      showMessage(`${sound.label} seçildi.`);
     } catch {
-      showMessage(
-        "Ses seçildi fakat tarayıcı otomatik çalmayı engelledi. Sayfaya dokunup tekrar deneyin.",
-      );
+      showMessage("Ses seçildi. Test için tekrar dokun.");
     }
   };
 
@@ -216,7 +181,7 @@ export default function NotificationSettingsPage() {
 
       if (!("Notification" in window)) {
         setPermission("unsupported");
-        showMessage("Bu tarayıcı bildirimleri desteklemiyor.");
+        showMessage("Tarayıcı desteklemiyor.");
         return;
       }
 
@@ -226,7 +191,7 @@ export default function NotificationSettingsPage() {
       if (result !== "granted") {
         localStorage.setItem("ephPushEnabled", "false");
         setPushEnabled(false);
-        showMessage("Bildirim izni verilmedi. Tarayıcı ayarlarını kontrol edin.");
+        showMessage("Bildirim izni verilmedi.");
         return;
       }
 
@@ -246,8 +211,7 @@ export default function NotificationSettingsPage() {
       }
 
       const activeSound =
-        SOUND_OPTIONS.find((item) => item.id === selectedSound) ||
-        SOUND_OPTIONS[0];
+        SOUND_OPTIONS.find((item) => item.id === selectedSound) || SOUND_OPTIONS[0];
 
       if (activeSound.id !== "off") {
         localStorage.setItem("ephNotificationSound", activeSound.id);
@@ -257,7 +221,6 @@ export default function NotificationSettingsPage() {
 
         try {
           await playSoundFile(activeSound.file);
-          markTestTime();
         } catch {}
       }
 
@@ -265,13 +228,13 @@ export default function NotificationSettingsPage() {
       setPushEnabled(true);
 
       new Notification("EPH Bildirimleri Aktif", {
-        body: "Yeni mesaj, forum, havuz ve Lina bildirimleri için izin verildi.",
+        body: "Bildirim sistemi bu cihazda çalışıyor.",
         icon: "/web-app-manifest-192x192.png",
       });
 
-      showMessage("Bildirimler başarıyla etkinleştirildi.");
+      showMessage("Bildirimler aktif.");
     } catch {
-      showMessage("Bildirim etkinleştirme sırasında hata oluştu.");
+      showMessage("Bildirim hatası.");
     } finally {
       setLoading(false);
     }
@@ -284,12 +247,12 @@ export default function NotificationSettingsPage() {
     setPushEnabled(false);
     setSoundEnabled(false);
 
-    showMessage("Bildirim ve ses ayarı bu cihazda kapatıldı.");
+    showMessage("Bu cihazda kapatıldı.");
   };
 
   const testSelectedSound = async () => {
     if (selectedSoundItem.id === "off") {
-      showMessage("Sessiz mod seçili. Ses çalınmadı.");
+      showMessage("Sessiz mod seçili.");
       return;
     }
 
@@ -297,21 +260,20 @@ export default function NotificationSettingsPage() {
       await playSoundFile(selectedSoundItem.file);
       localStorage.setItem("ephSoundEnabled", "true");
       setSoundEnabled(true);
-      markTestTime();
-      showMessage("Seçili bildirim sesi çalışıyor.");
+      showMessage("Ses çalışıyor.");
     } catch {
-      showMessage("Tarayıcı sesi engelledi. Sayfaya dokunup tekrar deneyin.");
+      showMessage("Tarayıcı sesi engelledi.");
     }
   };
 
   const testBrowserNotification = () => {
     if (!("Notification" in window)) {
-      showMessage("Bu tarayıcı bildirim desteklemiyor.");
+      showMessage("Tarayıcı desteklemiyor.");
       return;
     }
 
     if (Notification.permission !== "granted") {
-      showMessage("Önce Bildirimleri Etkinleştir butonuna basın.");
+      showMessage("Önce izin ver.");
       return;
     }
 
@@ -320,7 +282,6 @@ export default function NotificationSettingsPage() {
       icon: "/web-app-manifest-192x192.png",
     });
 
-    markTestTime();
     showMessage("Test bildirimi gönderildi.");
   };
 
@@ -332,332 +293,319 @@ export default function NotificationSettingsPage() {
 
     setPreferences(next);
     localStorage.setItem("ephNotificationPreferences", JSON.stringify(next));
-    showMessage("Bildirim tercihi güncellendi.");
+  };
+
+  const allPreferencesActive = Object.values(preferences).every(Boolean);
+
+  const toggleAllPreferences = () => {
+    const nextValue = !allPreferencesActive;
+    const next: Preferences = {
+      messages: nextValue,
+      forum: nextValue,
+      pool: nextValue,
+      announcements: nextValue,
+      lina: nextValue,
+    };
+
+    setPreferences(next);
+    localStorage.setItem("ephNotificationPreferences", JSON.stringify(next));
+    showMessage(nextValue ? "Tümü açıldı." : "Tümü kapatıldı.");
   };
 
   if (!mounted) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F7FBFF]">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#1557D6] border-t-transparent" />
+        <div className="h-9 w-9 animate-spin rounded-full border-2 border-[#1557D6] border-t-transparent" />
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#F7FBFF] pb-24 text-[#06194A]">
-      <header className="sticky top-0 z-40 border-b border-[#DDE7F3] bg-[#F7FBFF]/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
+    <main className="h-[100svh] overflow-hidden bg-[#F7FBFF] text-[#06194A]">
+      <header className="h-[54px] bg-[#F7FBFF]/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-full max-w-[430px] items-center justify-between px-3">
           <Link
             href="/profil"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-[#DDE7F3] bg-white text-[#06194A] shadow-sm"
+            className="flex h-9 w-9 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#06194A] shadow-sm"
             aria-label="Profile dön"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={17} />
           </Link>
 
           <div className="text-center">
-            <h1 className="text-base font-black">Bildirim Ayarları</h1>
-            <p className="text-[11px] font-bold text-[#64748B]">
-              Ses, izin ve cihaz merkezi
-            </p>
+            <h1 className="text-[15px] font-black leading-tight">Bildirim Ayarları</h1>
+            <p className="text-[10px] font-bold text-[#64748B]">EPH Bildirim Merkezi</p>
           </div>
 
           <Link
             href="/messages"
-            className="relative flex h-11 w-11 items-center justify-center rounded-full border border-[#DDE7F3] bg-white text-[#06194A] shadow-sm"
+            className="relative flex h-9 w-9 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-sm"
             aria-label="Mesajlar"
           >
-            <MessageCircle size={18} />
+            <Bell size={17} />
             {pushEnabled && (
-              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#0F766E]" />
+              <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-[#16A34A]" />
             )}
           </Link>
         </div>
       </header>
 
-      <section className="mx-auto max-w-3xl px-4 py-5">
+      <section className="mx-auto flex h-[calc(100svh-54px)] max-w-[430px] flex-col gap-1.5 px-2.5 pb-2">
         {testMessage && (
-          <div className="mb-4 rounded-[24px] border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-center text-sm font-black text-[#1557D6]">
+          <div className="rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1.5 text-center text-[11px] font-black text-[#1557D6]">
             {testMessage}
           </div>
         )}
 
-        <section className="rounded-[34px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#EFF6FF] text-[#1557D6] shadow-sm">
-            <BellRing size={34} />
-          </div>
+        <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
+          <div className="grid grid-cols-[1fr_0.8fr_0.8fr_0.8fr] items-stretch gap-1.5">
+            <button
+              type="button"
+              onClick={pushEnabled ? disableNotifications : enableNotifications}
+              disabled={loading}
+              className="flex min-h-[92px] flex-col items-center justify-center rounded-[22px] bg-[#2563EB] px-2 py-2 text-center text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)] disabled:opacity-60"
+            >
+              <BellRing size={27} />
+              <span className="mt-1.5 text-[13px] font-black leading-tight">
+                Bildirim
+              </span>
+              <span className="mt-1.5 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-black text-[#16A34A]">
+                {loading ? "..." : pushEnabled ? "AKTİF" : "AÇ"}
+              </span>
+            </button>
 
-          <h2 className="mt-4 text-2xl font-black tracking-tight">
-            EPH Bildirim Merkezi
-          </h2>
-
-          <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-[#64748B]">
-            Mesaj, forum, havuz, duyuru ve Lina bildirimlerini bu cihaz için
-            yönet.
-          </p>
-
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            <Pill text={permission === "granted" ? "İzin açık" : "İzin bekliyor"} color="#1557D6" bg="#EFF6FF" />
-            <Pill text={soundEnabled ? selectedSoundItem.label : "Ses kapalı"} color="#0F766E" bg="#ECFDF5" />
-            <Pill text={pushEnabled ? "Cihaz aktif" : "Cihaz pasif"} color="#EA580C" bg="#FFF7ED" />
-          </div>
-
-          <div className="mt-5 grid grid-cols-3 gap-3">
-            <MiniStat
-              label="Tarayıcı"
+            <StatusMini
+              icon={<ShieldCheck size={18} />}
+              label="İzin"
               value={
                 permission === "granted"
                   ? "Açık"
                   : permission === "denied"
-                    ? "Engelli"
+                    ? "Kapalı"
                     : permission === "unsupported"
                       ? "Yok"
-                      : "Bekliyor"
+                      : "Bekle"
               }
+              active={permission === "granted"}
             />
-            <MiniStat label="Push" value={pushEnabled ? "Aktif" : "Pasif"} />
-            <MiniStat label="Worker" value={serviceWorkerStatus} />
-          </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={enableNotifications}
-              disabled={loading}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1557D6] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#0F49BD] disabled:opacity-60"
-            >
-              {loading ? (
-                <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Etkinleştiriliyor
-                </>
-              ) : (
-                <>
-                  <BellRing size={18} />
-                  Bildirimleri Etkinleştir
-                </>
-              )}
-            </button>
+            <StatusMini
+              icon={<Volume2 size={18} />}
+              label="Ses"
+              value={soundEnabled ? selectedSoundItem.label : "Kapalı"}
+              active={soundEnabled}
+            />
 
-            <button
-              type="button"
-              onClick={disableNotifications}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-5 py-3 text-sm font-black text-red-600"
-            >
-              <VolumeX size={18} />
-              Bu Cihazda Kapat
-            </button>
+            <StatusMini
+              icon={<Smartphone size={18} />}
+              label="Cihaz"
+              value={pushEnabled ? "Aktif" : "Pasif"}
+              active={pushEnabled}
+            />
           </div>
         </section>
 
-        <MenuGroup title="Bildirim Sesi">
-          {SOUND_OPTIONS.map((sound) => {
-            const active = selectedSound === sound.id;
+        <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+          <div className="mb-1.5 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Music2 size={16} className="text-[#1557D6]" />
+              <h2 className="text-[13px] font-black">Ses Seçimi</h2>
+            </div>
 
-            return (
-              <button
-                key={sound.id}
-                type="button"
-                onClick={() => saveSoundChoice(sound)}
-                className={`flex items-center gap-3 rounded-3xl px-4 py-4 text-left transition ${
-                  active ? "bg-[#EFF6FF]" : "bg-[#F8FAFC] hover:bg-[#EFF6FF]"
-                }`}
-              >
-                <span
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm"
-                  style={{ color: active ? "#1557D6" : "#64748B" }}
+            <button
+              type="button"
+              onClick={testSelectedSound}
+              className="inline-flex items-center gap-1 text-[11px] font-black text-[#1557D6]"
+            >
+              Test
+              <Play size={14} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-6 gap-1">
+            {SOUND_OPTIONS.map((sound) => {
+              const active = selectedSound === sound.id;
+
+              return (
+                <button
+                  key={sound.id}
+                  type="button"
+                  onClick={() => saveSoundChoice(sound)}
+                  className="min-w-0 text-center"
+                  aria-label={sound.label}
                 >
-                  {sound.id === "off" ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                </span>
-
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-black text-[#06194A]">
+                  <span
+                    className={`mx-auto flex h-10 w-10 items-center justify-center rounded-full border transition ${
+                      active
+                        ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
+                        : "border-[#DDE7F3] bg-[#F8FAFC] text-[#27364F]"
+                    }`}
+                  >
+                    {sound.id === "off" ? <VolumeX size={18} /> : <Bell size={17} />}
+                  </span>
+                  <span
+                    className={`mt-0.5 block truncate text-[9px] font-black ${
+                      active ? "text-[#1557D6]" : "text-[#27364F]"
+                    }`}
+                  >
                     {sound.label}
                   </span>
-                  <span className="mt-0.5 block truncate text-xs font-semibold text-[#64748B]">
-                    {sound.description}
-                  </span>
-                </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
-                {active ? (
-                  <CheckCircle2 size={20} className="text-[#1557D6]" />
-                ) : (
-                  <ChevronRight size={18} className="text-[#94A3B8]" />
-                )}
-              </button>
-            );
-          })}
-        </MenuGroup>
+        <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+          <div className="mb-1.5 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Radio size={16} className="text-[#1557D6]" />
+              <h2 className="text-[13px] font-black">Bildirim Türleri</h2>
+            </div>
 
-        <MenuGroup title="Test Merkezi">
-          <ActionRow
-            icon={<Play size={18} />}
-            title="Seçili Sesi Test Et"
-            value={selectedSoundItem.label}
-            color="#0F766E"
-            onClick={testSelectedSound}
-          />
-          <ActionRow
-            icon={<Megaphone size={18} />}
-            title="Test Bildirimi Gönder"
-            value="Tarayıcı bildirimi"
-            color="#1557D6"
+            <button
+              type="button"
+              onClick={toggleAllPreferences}
+              className="text-[11px] font-black text-[#1557D6]"
+            >
+              Tümü
+            </button>
+          </div>
+
+          <div className="grid grid-cols-5 gap-1">
+            <PreferenceTile
+              label="Mesaj"
+              active={preferences.messages}
+              onClick={() => togglePreference("messages")}
+              icon={<MessageCircle size={17} />}
+            />
+            <PreferenceTile
+              label="Forum"
+              active={preferences.forum}
+              onClick={() => togglePreference("forum")}
+              icon={<Radio size={17} />}
+            />
+            <PreferenceTile
+              label="Havuz"
+              active={preferences.pool}
+              onClick={() => togglePreference("pool")}
+              icon={<ShieldCheck size={17} />}
+            />
+            <PreferenceTile
+              label="Duyuru"
+              active={preferences.announcements}
+              onClick={() => togglePreference("announcements")}
+              icon={<Megaphone size={17} />}
+            />
+            <PreferenceTile
+              label="Lina"
+              active={preferences.lina}
+              onClick={() => togglePreference("lina")}
+              icon={<WandSparkles size={17} />}
+            />
+          </div>
+        </section>
+
+        <section className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
             onClick={testBrowserNotification}
-          />
-          <InfoLine
-            icon={<Clock3 size={18} />}
-            title="Son Test"
-            value={lastTestAt || "Henüz test yapılmadı"}
-            color="#EA580C"
-          />
-        </MenuGroup>
+            className="flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] bg-[#1557D6] px-2 text-left text-white shadow-[0_10px_22px_rgba(21,87,214,0.16)]"
+          >
+            <Megaphone size={18} />
+            <span>
+              <span className="block text-[12px] font-black">Test Bildirimi</span>
+              <span className="block text-[10px] font-semibold text-white/80">
+                Tarayıcı testi
+              </span>
+            </span>
+          </button>
 
-        <MenuGroup title="Bildirim Türleri">
-          <PreferenceRow
-            icon={<MessageCircle size={18} />}
-            title="Mesaj Bildirimleri"
-            value="Yeni görüşme ve cevaplar"
-            active={preferences.messages}
-            onClick={() => togglePreference("messages")}
-          />
-          <PreferenceRow
-            icon={<Radio size={18} />}
-            title="Forum Bildirimleri"
-            value="Yeni talep ve etkileşimler"
-            active={preferences.forum}
-            onClick={() => togglePreference("forum")}
-          />
-          <PreferenceRow
-            icon={<Home size={18} />}
-            title="Havuz Bildirimleri"
-            value="Eşleşme ve portföy fırsatları"
-            active={preferences.pool}
-            onClick={() => togglePreference("pool")}
-          />
-          <PreferenceRow
-            icon={<Sparkles size={18} />}
-            title="Sistem Duyuruları"
-            value="EPH yenilikleri ve duyurular"
-            active={preferences.announcements}
-            onClick={() => togglePreference("announcements")}
-          />
-          <PreferenceRow
-            icon={<WandSparkles size={18} />}
-            title="Lina Bildirimleri"
-            value="Lina önerileri ve hatırlatmaları"
-            active={preferences.lina}
-            onClick={() => togglePreference("lina")}
-          />
-        </MenuGroup>
+          <button
+            type="button"
+            onClick={testSelectedSound}
+            className="flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] border border-[#DDE7F3] bg-white px-2 text-left text-[#06194A] shadow-sm"
+          >
+            <Volume2 size={18} className="text-[#1557D6]" />
+            <span>
+              <span className="block text-[12px] font-black">Ses Testi</span>
+              <span className="block text-[10px] font-semibold text-[#64748B]">
+                {selectedSoundItem.label}
+              </span>
+            </span>
+          </button>
+        </section>
 
-        <MenuGroup title="Kontrol Notları">
-          <InfoLine
-            icon={<ShieldCheck size={18} />}
-            title="Tarayıcı İzni"
-            value="İzin engelliyse adres çubuğundaki kilit simgesinden açılmalı."
-            color="#1557D6"
+        <section className="grid grid-cols-3 gap-1.5 rounded-[22px] border border-[#DDE7F3] bg-white p-1.5 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+          <FooterStatus
+            icon={<ShieldCheck size={15} />}
+            label="Tarayıcı"
+            value={
+              permission === "granted"
+                ? "Açık"
+                : permission === "denied"
+                  ? "Kapalı"
+                  : permission === "unsupported"
+                    ? "Yok"
+                    : "Bekle"
+            }
+            active={permission === "granted"}
           />
-          <InfoLine
-            icon={<Smartphone size={18} />}
-            title="Mobil Kullanım"
-            value="iPhone bazı sesleri kullanıcı dokunuşu olmadan çalmayabilir."
-            color="#EA580C"
+          <FooterStatus
+            icon={<Radio size={15} />}
+            label="Servis"
+            value={serviceWorkerStatus}
+            active={serviceWorkerStatus === "Aktif"}
           />
-        </MenuGroup>
+          <FooterStatus
+            icon={<Sparkles size={15} />}
+            label="Push"
+            value={pushEnabled ? "Aktif" : "Pasif"}
+            active={pushEnabled}
+          />
+        </section>
       </section>
     </main>
   );
 }
 
-function Pill({ text, color, bg }: { text: string; color: string; bg: string }) {
+function StatusMini({
+  icon,
+  label,
+  value,
+  active,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  active: boolean;
+}) {
   return (
-    <span
-      className="inline-flex min-h-8 items-center justify-center rounded-full px-3 text-xs font-black"
-      style={{ color, backgroundColor: bg }}
-    >
-      {text}
-    </span>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[24px] border border-[#DDE7F3] bg-[#F8FAFC] p-3 text-center">
-      <div className="text-[10px] font-black uppercase tracking-[0.14em] text-[#94A3B8]">
-        {label}
+    <div className="flex min-h-[92px] min-w-0 flex-col items-center justify-center rounded-[20px] bg-[#F8FAFC] px-1 text-center">
+      <div
+        className={`flex h-9 w-9 items-center justify-center rounded-full ${
+          active ? "bg-[#ECFDF5] text-[#16A34A]" : "bg-[#F1F5F9] text-[#64748B]"
+        }`}
+      >
+        {icon}
       </div>
-      <div className="mt-1 truncate text-sm font-black text-[#06194A]">
+      <p className="mt-1 text-[9px] font-bold text-[#64748B]">{label}</p>
+      <p className={`max-w-full truncate text-[10px] font-black ${active ? "text-[#16A34A]" : "text-[#06194A]"}`}>
         {value}
-      </div>
+      </p>
+      {active && <CheckCircle2 size={12} className="mt-0.5 text-[#16A34A]" />}
     </div>
   );
 }
 
-function MenuGroup({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="mt-4 rounded-[30px] border border-[#DDE7F3] bg-white p-3 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
-      <h3 className="px-2 pb-3 text-center text-xs font-black uppercase tracking-[0.16em] text-[#94A3B8]">
-        {title}
-      </h3>
-      <div className="grid gap-2">{children}</div>
-    </section>
-  );
-}
-
-function ActionRow({
+function PreferenceTile({
   icon,
-  title,
-  value,
-  color,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  value: string;
-  color: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-3xl bg-[#F8FAFC] px-4 py-4 text-left transition hover:bg-[#EFF6FF]"
-    >
-      <span
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm"
-        style={{ color }}
-      >
-        {icon}
-      </span>
-
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-black text-[#06194A]">{title}</span>
-        <span className="mt-0.5 block truncate text-xs font-semibold text-[#64748B]">
-          {value}
-        </span>
-      </span>
-
-      <ChevronRight size={18} className="text-[#94A3B8]" />
-    </button>
-  );
-}
-
-function PreferenceRow({
-  icon,
-  title,
-  value,
+  label,
   active,
   onClick,
 }: {
   icon: React.ReactNode;
-  title: string;
-  value: string;
+  label: string;
   active: boolean;
   onClick: () => void;
 }) {
@@ -665,30 +613,26 @@ function PreferenceRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-3xl bg-[#F8FAFC] px-4 py-4 text-left transition hover:bg-[#EFF6FF]"
+      className="rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] p-1 text-center"
     >
       <span
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm"
-        style={{ color: active ? "#1557D6" : "#64748B" }}
+        className={`mx-auto flex h-8 w-8 items-center justify-center rounded-2xl ${
+          active ? "bg-[#EFF6FF] text-[#1557D6]" : "bg-white text-[#64748B]"
+        }`}
       >
         {icon}
       </span>
-
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-black text-[#06194A]">{title}</span>
-        <span className="mt-0.5 block truncate text-xs font-semibold text-[#64748B]">
-          {value}
-        </span>
+      <span className="mt-0.5 block truncate text-[9px] font-black text-[#06194A]">
+        {label}
       </span>
-
       <span
-        className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-          active ? "bg-[#1557D6]" : "bg-[#CBD5E1]"
+        className={`mx-auto mt-0.5 block h-4 w-8 rounded-full p-0.5 transition ${
+          active ? "bg-[#16A34A]" : "bg-[#CBD5E1]"
         }`}
       >
         <span
-          className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition ${
-            active ? "left-6" : "left-1"
+          className={`block h-3 w-3 rounded-full bg-white transition ${
+            active ? "translate-x-4" : "translate-x-0"
           }`}
         />
       </span>
@@ -696,32 +640,30 @@ function PreferenceRow({
   );
 }
 
-function InfoLine({
+function FooterStatus({
   icon,
-  title,
+  label,
   value,
-  color,
+  active,
 }: {
   icon: React.ReactNode;
-  title: string;
+  label: string;
   value: string;
-  color: string;
+  active: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-3xl bg-[#F8FAFC] px-4 py-4 text-left">
-      <span
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm"
-        style={{ color }}
+    <div className="min-w-0 border-r border-[#DDE7F3] px-1 text-center last:border-r-0">
+      <div
+        className={`mx-auto flex h-7 w-7 items-center justify-center rounded-full ${
+          active ? "bg-[#ECFDF5] text-[#16A34A]" : "bg-[#F1F5F9] text-[#64748B]"
+        }`}
       >
         {icon}
-      </span>
-
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-black text-[#06194A]">{title}</span>
-        <span className="mt-0.5 block text-xs font-semibold leading-5 text-[#64748B]">
-          {value}
-        </span>
-      </span>
+      </div>
+      <p className="mt-0.5 truncate text-[9px] font-bold text-[#64748B]">{label}</p>
+      <p className={`truncate text-[10px] font-black ${active ? "text-[#16A34A]" : "text-[#06194A]"}`}>
+        {value}
+      </p>
     </div>
   );
 }
