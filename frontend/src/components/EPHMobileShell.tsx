@@ -13,6 +13,9 @@ import {
   Target,
   User,
   UsersRound,
+  X,
+  Settings,
+  Bot,
 } from "lucide-react";
 import LinaPanel from "./LinaPanel";
 
@@ -71,10 +74,16 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [linaOpen, setLinaOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const showShell = shouldShowShell(pathname);
   const showBottomNav = shouldShowBottomNav(pathname);
   const title = useMemo(() => getTitle(pathname), [pathname]);
+
+  const go = (href: string) => {
+    setMenuOpen(false);
+    router.push(href);
+  };
 
   if (!showShell) {
     return <>{children}</>;
@@ -87,7 +96,7 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
           type="button"
           className="eph-mobile-icon-button"
           aria-label="Menü"
-          onClick={() => router.push("/dashboard")}
+          onClick={() => setMenuOpen(true)}
         >
           <Menu size={25} strokeWidth={2.5} />
         </button>
@@ -116,6 +125,47 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
+      {menuOpen && (
+        <div className="fixed inset-0 z-[999] bg-[#06194A]/35 backdrop-blur-[2px]" onClick={() => setMenuOpen(false)}>
+          <aside
+            className="h-full w-[286px] rounded-r-[28px] border-r border-[#DDE7F3] bg-white p-3 shadow-[20px_0_44px_rgba(15,23,42,0.18)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between rounded-[20px] bg-[#F7FBFF] px-3 py-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#1557D6]">
+                  EPH Menü
+                </p>
+                <h2 className="mt-1 text-[17px] font-black text-[#06194A]">
+                  Hızlı Erişim
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMenuOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-[14px] bg-white text-[#06194A] shadow-sm"
+                aria-label="Menüyü kapat"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid gap-1.5">
+              <MenuItem icon={<Home size={18} />} label="Anasayfa" onClick={() => go("/dashboard")} />
+              <MenuItem icon={<UsersRound size={18} />} label="CRM" onClick={() => go("/crm")} />
+              <MenuItem icon={<Building2 size={18} />} label="Portföy" onClick={() => go("/stok")} />
+              <MenuItem icon={<MessageSquare size={18} />} label="Forum" onClick={() => go("/network")} />
+              <MenuItem icon={<Target size={18} />} label="Havuz" onClick={() => go("/havuz")} />
+              <MenuItem icon={<Bell size={18} />} label="Mesajlar" badge="Yeni" onClick={() => go("/messages")} />
+              <MenuItem icon={<Bot size={18} />} label="Lina" onClick={() => setLinaOpen(true)} />
+              <MenuItem icon={<Settings size={18} />} label="Bildirim Ayarları" onClick={() => go("/notification-settings")} />
+              <MenuItem icon={<User size={18} />} label="Profil" onClick={() => go("/profil")} />
+            </div>
+          </aside>
+        </div>
+      )}
+
       <main className={showBottomNav ? "eph-mobile-content with-bottom-nav" : "eph-mobile-content"}>
         {children}
       </main>
@@ -134,6 +184,39 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
 
       <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
     </div>
+  );
+}
+
+function MenuItem({
+  icon,
+  label,
+  badge,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  badge?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-[44px] w-full items-center justify-between rounded-[16px] px-3 text-left text-[13px] font-black text-[#06194A] transition active:bg-[#EFF6FF]"
+    >
+      <span className="flex items-center gap-2.5">
+        <span className="flex h-8 w-8 items-center justify-center rounded-[13px] bg-[#EFF6FF] text-[#1557D6]">
+          {icon}
+        </span>
+        {label}
+      </span>
+
+      {badge && (
+        <span className="rounded-full bg-[#6D4AFF] px-2 py-1 text-[9px] font-black text-white">
+          {badge}
+        </span>
+      )}
+    </button>
   );
 }
 
