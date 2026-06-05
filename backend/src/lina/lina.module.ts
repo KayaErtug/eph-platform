@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+
+import { PrismaService } from '../prisma/prisma.service';
+
 import { LinaController } from './lina.controller';
 import { LinaService } from './lina.service';
 import { LinaAccessService } from './lina-access.service';
@@ -11,6 +14,7 @@ import { LinaVoiceService } from './lina-voice.service';
 @Module({
   controllers: [LinaController],
   providers: [
+    PrismaService,
     LinaService,
     LinaAccessService,
     LinaKvkkService,
