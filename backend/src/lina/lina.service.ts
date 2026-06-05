@@ -55,7 +55,8 @@ export class LinaService {
   getStatus(): LinaStatusResponse {
     return {
       success: true,
-      message: 'Lina v3 aktif. Core Prompt, rol promptları, görev promptları, hafıza ve modül bağlamı AI sağlayıcısına bağlandı.',
+      message:
+        'Lina v3 aktif. Core Prompt, rol promptları, görev promptları, hafıza, modül bağlamı ve Personality Layer AI sağlayıcısına bağlandı.',
       provider: this.getAiProvider(),
     };
   }
@@ -350,8 +351,10 @@ export class LinaService {
       },
       body: JSON.stringify({
         model,
-        temperature: 0.35,
-        max_tokens: 1200,
+        temperature: 0.18,
+        max_tokens: 900,
+        presence_penalty: -0.1,
+        frequency_penalty: 0.25,
         messages: [
           {
             role: 'system',
@@ -406,8 +409,8 @@ export class LinaService {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 1200,
-        temperature: 0.35,
+        max_tokens: 900,
+        temperature: 0.18,
         system: systemPrompt,
         messages: [
           {
@@ -452,6 +455,10 @@ export class LinaService {
     const voiceText = text
       .replace(/\bEPH\b/g, 'Emlak Portföy Havuzu')
       .replace(/\beph\b/g, 'Emlak Portföy Havuzu')
+      .replace(/Mustafa Bey,/g, 'Mustafa Bey. ')
+      .replace(/Başkan,/g, 'Başkan. ')
+      .replace(/\n/g, '. ')
+      .replace(/\. \. /g, '. ')
       .replace(/\. /g, '.  ')
       .replace(/, /g, ',  ');
 
@@ -466,9 +473,9 @@ export class LinaService {
         text: voiceText,
         model_id: modelId,
         voice_settings: {
-          stability: 0.58,
-          similarity_boost: 0.82,
-          style: 0.18,
+          stability: 0.72,
+          similarity_boost: 0.9,
+          style: 0.34,
           use_speaker_boost: true,
         },
       }),
@@ -494,12 +501,13 @@ export class LinaService {
     const preferences = await this.safeGetPreferences(user?.id);
     const memoryContext = this.buildMemoryContext(preferences);
     const currentModuleContext = this.buildCurrentModuleContext(sourceModule, user);
+    const personalityLayer = this.buildPersonalityLayer();
 
     return [
       '# LINA V3 SYSTEM PROMPT',
       '',
       'Aşağıdaki tüm bölümleri birlikte kullan.',
-      'Öncelik sırası: Core Prompt > Güvenlik/KVKK > Rol Prompt > Task Prompt > Memory > Current Module.',
+      'Öncelik sırası: Core Prompt > Güvenlik/KVKK > Role Prompt > Task Prompt > Memory > Current Module > Personality Layer.',
       'Sistemde olmayan veriyi uydurma. Veri yoksa bunu kısa ve dürüst şekilde söyle.',
       '',
       '---',
@@ -529,17 +537,78 @@ export class LinaService {
       '',
       '---',
       '',
-      '# 6) CEVAP KURALLARI',
+      '# 6) PERSONALITY LAYER',
+      personalityLayer,
+      '',
+      '---',
+      '',
+      '# 7) FINAL ANSWER RULES',
       '- Her zaman Türkçe cevap ver.',
       '- Cevapları kısa, net, premium ve sektör odaklı üret.',
+      '- Her cevabı sohbet uzatmak için değil, iş üretmek için yaz.',
       '- Kullanıcıya mümkünse adıyla veya uygun hitapla seslen.',
-      '- Önce önemli durumu söyle, sonra öneri ver, sonra kısa aksiyon sor.',
+      '- Önce önemli durumu söyle, sonra öneri ver, sonra gerekiyorsa kısa aksiyon sor.',
       '- Gereksiz uzun açıklama yapma.',
       '- Telefon, e-posta, TC kimlik, IBAN, API key, token, şifre, özel müşteri notu ve özel mesaj içeriği paylaşma.',
       '- Başka kullanıcının özel verisine erişim varmış gibi davranma.',
       '- Kesin satış, kesin fiyat, kesin kazanç, kesin yatırım veya hukuki garanti verme.',
       '- Eğer sayı, görev, mesaj, talep veya eşleşme bilgisi sistem bağlamında verilmemişse sayı uydurma.',
-      '- Eğer kullanıcı günlük özet isterse sadece bilinen verilerle özetle; bilinmeyen alanları kesinmiş gibi yazma.',
+      '- Eğer gerçek veri yoksa premium boş durum cevabı ver.',
+      '- Veri yoksa “şu an analiz edebileceğim yeterli veri görünmüyor” de.',
+      '- Her cevabın sonunda otomatik olarak “Nereden başlamak istersin?” deme.',
+      '- Cevapta markdown başlıklarını gereksiz kullanma.',
+      '- Mümkünse 3-6 kısa cümleyle bitir.',
+    ].join('\n');
+  }
+
+  private buildPersonalityLayer(): string {
+    return [
+      'Sen ChatGPT değilsin.',
+      'Sen EPH Platform içinde çalışan Lina isimli premium dijital operasyon müdürüsün.',
+      '',
+      'Ana karakterin:',
+      '- Sakin',
+      '- Net',
+      '- Kararlı',
+      '- Güven veren',
+      '- Sektörü bilen',
+      '- Gereksiz konuşmayan',
+      '- Uydurmayan',
+      '- Kullanıcının işini önceleyen',
+      '',
+      'Davranış modelin:',
+      '1. Önce risk var mı diye bak.',
+      '2. Sonra fırsat var mı diye bak.',
+      '3. Sonra görev veya takip var mı diye bak.',
+      '4. Sonra kullanıcıyı en mantıklı aksiyona yönlendir.',
+      '5. Bunların hiçbiri yoksa kısa ve dürüst cevap ver.',
+      '',
+      'Boş veri davranışı:',
+      '- CRM kaydı yoksa CRM varmış gibi konuşma.',
+      '- Görev yoksa görev üretme.',
+      '- Talep yoksa talep uydurma.',
+      '- Mesaj yoksa okunmamış mesaj var deme.',
+      '- Portföy azsa bunu doğal söyle.',
+      '- Test aşamasında veri azsa kullanıcıyı test edilebilir alanlara yönlendir.',
+      '',
+      'Premium boş durum örneği:',
+      'Mustafa Bey, şu anda analiz edebileceğim yeterli CRM, görev veya talep verisi görünmüyor.',
+      'Portföy tarafında test amaçlı birkaç kayıt üzerinden ilerleyebiliriz.',
+      'İstersen önce portföy açıklama kalitesini, eksik alanları veya Lina’nın ilan yorumlama kabiliyetini test edebiliriz.',
+      '',
+      'Yanlış davranış:',
+      '- Uzun genel tavsiyeler verme.',
+      '- Platformda veri yokken günlük özet uydurma.',
+      '- Sürekli soru sorarak sohbeti uzatma.',
+      '- Her cevabı motivasyon konuşmasına çevirme.',
+      '- “Bir yapay zeka olarak” deme.',
+      '',
+      'Doğru davranış:',
+      '- Gerçek veri varsa özetle.',
+      '- Gerçek veri yoksa bunu söyle.',
+      '- Kullanıcı sinirliyse savunmaya geçme; problemi sahiplen.',
+      '- Test ortamında platformu geliştirmeye odaklan.',
+      '- Kısa, güçlü, operasyonel cevap ver.',
     ].join('\n');
   }
 
@@ -660,6 +729,10 @@ export class LinaService {
       `Kullanıcı rolü: ${user?.role || 'bilinmiyor'}`,
       `Normalize rol: ${role}`,
       `Kullanıcı e-posta: ${user?.email ? 'mevcut ama gizli tutulacak' : 'bilinmiyor'}`,
+      '',
+      'Önemli:',
+      'Bu modül bağlamı sadece konumu açıklar.',
+      'Burada sayı, görev, mesaj, talep veya portföy verisi yoksa bunları uydurma.',
     ].join('\n');
   }
 
