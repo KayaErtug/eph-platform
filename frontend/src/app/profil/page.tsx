@@ -5,34 +5,24 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
-  BadgeCheck,
-  BarChart3,
   Bell,
   BriefcaseBusiness,
   Building2,
-  CheckCircle2,
-  ClipboardList,
+  ChevronRight,
   Crown,
-  Gauge,
   Headphones,
-  Home,
   KeyRound,
-  Layers3,
   LogOut,
   Mail,
   MessageCircle,
   Phone,
-  Rocket,
   Settings,
   ShieldCheck,
   Sparkles,
-  Star,
-  TrendingUp,
   UserRound,
   Users,
   WalletCards,
   WandSparkles,
-  Zap,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -64,23 +54,14 @@ type SafeUser = {
   officeName?: string;
   title?: string;
   memberCode?: string;
-  memberSince?: string;
   trustScore?: number;
-  riskLevel?: string;
 };
 
 type PresenceStatus = "online" | "away" | "offline";
 
 type PresenceUser = {
   id: string;
-  firstName?: string | null;
-  lastName?: string | null;
-  fullName?: string | null;
-  email?: string | null;
-  role?: string | null;
-  profileImageUrl?: string | null;
   status: PresenceStatus;
-  lastSeenAt?: string | null;
   lastPage?: string | null;
   minutesAgo?: number | null;
 };
@@ -92,66 +73,36 @@ type PresenceResponse = {
   offline: PresenceUser[];
 };
 
-const roleContent = {
+const roleTheme = {
   SUPER_ADMIN: {
-    className: "eph-role-super-admin",
     label: "Süper Admin",
-    title: "EPH Platform Yönetim Merkezi",
-    badge: "EPH Kurucu Profili",
-    primaryText: "text-[#14B8A6]",
-    softBg: "bg-[#F0FDFA]",
-    iconBg: "bg-[#14B8A6] text-white",
-    border: "border-[#99F6E4]",
     color: "#14B8A6",
-    heroGradient: "from-[#0F172A] via-[#134E4A] to-[#14B8A6]",
+    bg: "#ECFEFF",
+    badge: "Kurucu Erişimi",
   },
   ADMIN: {
-    className: "eph-role-admin",
     label: "Admin",
-    title: "Sistem yönetim panelin hazır.",
+    color: "#334155",
+    bg: "#F1F5F9",
     badge: "Yönetim Profili",
-    primaryText: "text-[#0F172A]",
-    softBg: "bg-[#F8FAFC]",
-    iconBg: "bg-[#E2E8F0] text-[#0F172A]",
-    border: "border-[#CBD5E1]",
-    color: "#0F172A",
-    heroGradient: "from-[#0F172A] via-[#1E293B] to-[#334155]",
   },
   EMLAKCI: {
-    className: "eph-role-emlakci",
     label: "Gayrimenkul Danışmanı",
-    title: "Portföy ve müşteri takibin hazır.",
-    badge: "Mavi / Turkuaz Profil",
-    primaryText: "text-[#2563EB]",
-    softBg: "bg-[#EFF6FF]",
-    iconBg: "bg-[#DBEAFE] text-[#2563EB]",
-    border: "border-[#BFDBFE]",
-    color: "#2563EB",
-    heroGradient: "from-[#1D4ED8] via-[#2563EB] to-[#38BDF8]",
+    color: "#1557D6",
+    bg: "#EFF6FF",
+    badge: "EPH Üyesi",
   },
   MUTEAHHIT: {
-    className: "eph-role-muteahhit",
     label: "Müteahhit",
-    title: "Proje ve satış ağın hazır.",
-    badge: "Turuncu / Lacivert Profil",
-    primaryText: "text-[#F97316]",
-    softBg: "bg-[#FFF7ED]",
-    iconBg: "bg-[#FFEDD5] text-[#EA580C]",
-    border: "border-[#FED7AA]",
-    color: "#F97316",
-    heroGradient: "from-[#9A3412] via-[#EA580C] to-[#FDBA74]",
+    color: "#EA580C",
+    bg: "#FFF7ED",
+    badge: "Proje Profili",
   },
   INSAAT_FIRMASI: {
-    className: "eph-role-insaat",
     label: "İnşaat Firması",
-    title: "Proje, stok ve satış takibin hazır.",
-    badge: "Kurumsal İnşaat Profili",
-    primaryText: "text-[#B45309]",
-    softBg: "bg-[#FFFBEB]",
-    iconBg: "bg-[#FEF3C7] text-[#B45309]",
-    border: "border-[#FDE68A]",
     color: "#B45309",
-    heroGradient: "from-[#78350F] via-[#B45309] to-[#FBBF24]",
+    bg: "#FFFBEB",
+    badge: "Kurumsal Profil",
   },
 };
 
@@ -164,25 +115,25 @@ function normalizeRole(role?: string | null) {
 function getTheme(role?: string | null) {
   const normalizedRole = normalizeRole(role);
 
-  if (normalizedRole === "SUPER_ADMIN") return roleContent.SUPER_ADMIN;
-  if (normalizedRole === "ADMIN") return roleContent.ADMIN;
+  if (normalizedRole === "SUPER_ADMIN") return roleTheme.SUPER_ADMIN;
+  if (normalizedRole === "ADMIN") return roleTheme.ADMIN;
 
   if (
     normalizedRole === "MUTEAHHIT" ||
     normalizedRole === "MÜTEAHHİT" ||
     normalizedRole === "MÜTAHHİT"
   ) {
-    return roleContent.MUTEAHHIT;
+    return roleTheme.MUTEAHHIT;
   }
 
   if (
     normalizedRole === "INSAAT_FIRMASI" ||
     normalizedRole === "İNŞAAT_FİRMASI"
   ) {
-    return roleContent.INSAAT_FIRMASI;
+    return roleTheme.INSAAT_FIRMASI;
   }
 
-  return roleContent.EMLAKCI;
+  return roleTheme.EMLAKCI;
 }
 
 function isSuperAdmin(role?: string | null) {
@@ -199,40 +150,6 @@ function presenceDotClass(status?: PresenceStatus) {
   if (status === "online") return "bg-emerald-500";
   if (status === "away") return "bg-amber-400";
   return "bg-slate-400";
-}
-
-function presenceBadgeClass(status?: PresenceStatus) {
-  if (status === "online")
-    return "border-emerald-100 bg-emerald-50 text-emerald-700";
-  if (status === "away") return "border-amber-100 bg-amber-50 text-amber-700";
-  return "border-slate-200 bg-slate-50 text-slate-500";
-}
-
-function formatLastSeen(minutesAgo?: number | null) {
-  if (minutesAgo === null || minutesAgo === undefined)
-    return "Son görülme bilgisi yok";
-  if (minutesAgo < 1) return "Az önce aktifti";
-  if (minutesAgo < 60) return `Son görülme: ${minutesAgo} dk önce`;
-
-  const hours = Math.floor(minutesAgo / 60);
-  if (hours < 24) return `Son görülme: ${hours} saat önce`;
-
-  const days = Math.floor(hours / 24);
-  return `Son görülme: ${days} gün önce`;
-}
-
-function formatMemberSince(value?: string) {
-  if (!value) return "Bilgi yok";
-
-  try {
-    return new Intl.DateTimeFormat("tr-TR", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    }).format(new Date(value));
-  } catch {
-    return value;
-  }
 }
 
 function shortUserId(value?: string) {
@@ -348,638 +265,328 @@ export default function ProfilPage() {
   }
 
   return (
-    <main className={`eph-page ${theme.className} min-h-screen bg-[#F7FBFF] pb-24`}>
-      <header className="sticky top-0 z-40 border-b border-[#DDE7F3] bg-white/92 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-5">
+    <main className="min-h-screen bg-[#F7FBFF] pb-24 text-[#06194A]">
+      <header className="sticky top-0 z-40 border-b border-[#DDE7F3] bg-[#F7FBFF]/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <button
             onClick={() => router.push("/dashboard")}
-            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#06194A] shadow-sm"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-[#DDE7F3] bg-white text-[#06194A] shadow-sm"
             aria-label="Dashboard'a dön"
           >
             <ArrowLeft size={18} />
           </button>
 
           <div className="text-center">
-            <h1 className="text-lg font-black text-[#06194A] sm:text-xl">
-              Profil V3
-            </h1>
-            <p className="text-[11px] font-bold text-[#64748B] sm:text-xs">
-              Kimlik, üyelik, erişim ve durum merkezi
+            <h1 className="text-base font-black">Profil</h1>
+            <p className="text-[11px] font-bold text-[#64748B]">
+              Hesap ve erişim merkezi
             </p>
           </div>
 
+          <Link
+            href="/notification-settings"
+            className="relative flex h-11 w-11 items-center justify-center rounded-full border border-[#DDE7F3] bg-white text-[#06194A] shadow-sm"
+            aria-label="Bildirim ayarları"
+          >
+            <Bell size={18} />
+            <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#1557D6]" />
+          </Link>
+        </div>
+      </header>
+
+      <section className="mx-auto max-w-3xl px-4 py-5">
+        <section className="rounded-[34px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+          <div className="relative mx-auto h-24 w-24">
+            <div
+              className="flex h-24 w-24 items-center justify-center rounded-full text-3xl font-black text-white shadow-sm"
+              style={{ backgroundColor: theme.color }}
+            >
+              {superAdmin ? <Crown size={42} /> : initials}
+            </div>
+
+            <span
+              className={`absolute bottom-1 right-1 h-5 w-5 rounded-full border-4 border-white ${presenceDotClass(
+                currentPresenceStatus,
+              )}`}
+            />
+          </div>
+
+          <h2 className="mt-4 text-2xl font-black tracking-tight">
+            {displayName}
+          </h2>
+
+          <p className="mt-1 text-sm font-bold text-[#64748B]">
+            {safeUser.email || "E-posta bilgisi yok"}
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <Pill text={theme.label} color={theme.color} bg={theme.bg} />
+            <Pill text={packageName} color="#1557D6" bg="#EFF6FF" />
+            <Pill
+              text={presenceLabel(currentPresenceStatus)}
+              color={
+                currentPresenceStatus === "online"
+                  ? "#059669"
+                  : currentPresenceStatus === "away"
+                    ? "#D97706"
+                    : "#64748B"
+              }
+              bg={
+                currentPresenceStatus === "online"
+                  ? "#ECFDF5"
+                  : currentPresenceStatus === "away"
+                    ? "#FFFBEB"
+                    : "#F8FAFC"
+              }
+            />
+          </div>
+        </section>
+
+        <section className="mt-4 grid grid-cols-3 gap-3">
+          <MiniStat label="Üye No" value={safeUser.memberCode || shortUserId(safeUser.id)} />
+          <MiniStat label="Güven" value={`${trustScore}/100`} />
+          <MiniStat label="Paket" value={packageName} />
+        </section>
+
+        <MenuGroup>
+          <MenuItem
+            href="/profil"
+            icon={<UserRound size={18} />}
+            title="Hesap Bilgileri"
+            value={safeUser.phone || "Telefon eklenmedi"}
+            color={theme.color}
+          />
+          <MenuItem
+            href="/notification-settings"
+            icon={<Bell size={18} />}
+            title="Bildirim Ayarları"
+            value="Ses ve uyarılar"
+            color="#EA580C"
+          />
+          <MenuItem
+            href="/market"
+            icon={<WalletCards size={18} />}
+            title="Üyelik ve Paket"
+            value={packageName}
+            color="#1557D6"
+          />
+          <MenuItem
+            href="/lina"
+            icon={<WandSparkles size={18} />}
+            title="Lina Asistan"
+            value="Akıllı iş desteği"
+            color="#7C3AED"
+          />
+        </MenuGroup>
+
+        <MenuGroup>
+          <MenuItem
+            href="/stok"
+            icon={<Building2 size={18} />}
+            title="Portföyüm"
+            value="İlan ve stok yönetimi"
+            color="#1557D6"
+          />
+          <MenuItem
+            href="/crm"
+            icon={<Users size={18} />}
+            title="CRM"
+            value="Müşteri ve görev takibi"
+            color="#0F766E"
+          />
+          <MenuItem
+            href="/messages"
+            icon={<MessageCircle size={18} />}
+            title="Mesajlar"
+            value="Görüşme merkezi"
+            color="#7C3AED"
+          />
+          <MenuItem
+            href="/network"
+            icon={<BriefcaseBusiness size={18} />}
+            title="Forum / Havuz"
+            value="Talep ve iş birliği"
+            color="#EA580C"
+          />
+        </MenuGroup>
+
+        <MenuGroup>
+          <InfoLine
+            icon={<Mail size={18} />}
+            title="E-posta"
+            value={safeUser.email || "Bilgi yok"}
+            color={theme.color}
+          />
+          <InfoLine
+            icon={<Phone size={18} />}
+            title="Telefon"
+            value={safeUser.phone || "Bilgi yok"}
+            color={theme.color}
+          />
+          <InfoLine
+            icon={<KeyRound size={18} />}
+            title="Referans Kodu"
+            value={referralCode}
+            color={theme.color}
+          />
+          <InfoLine
+            icon={<ShieldCheck size={18} />}
+            title="Hesap Durumu"
+            value={theme.badge}
+            color="#0F766E"
+          />
+        </MenuGroup>
+
+        {(userRole === "ADMIN" || userRole === "SUPER_ADMIN") && (
+          <MenuGroup>
+            <MenuItem
+              href="/admin"
+              icon={<Settings size={18} />}
+              title="Yönetim Merkezi"
+              value="Kullanıcı ve sistem yönetimi"
+              color={superAdmin ? "#14B8A6" : "#334155"}
+            />
+            <MenuItem
+              href="/admin/referrals"
+              icon={<Sparkles size={18} />}
+              title="Referans Kodları"
+              value="Davet ve erişim yönetimi"
+              color="#1557D6"
+            />
+          </MenuGroup>
+        )}
+
+        <MenuGroup>
+          <MenuItem
+            href="/help-center"
+            icon={<Headphones size={18} />}
+            title="Yardım Merkezi"
+            value="Destek ve sık sorulanlar"
+            color="#1557D6"
+          />
           <button
             onClick={() => {
               logout();
               router.push("/giris");
             }}
-            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600 shadow-sm"
-            aria-label="Çıkış yap"
+            className="flex w-full items-center gap-3 rounded-3xl bg-red-50 px-4 py-4 text-left transition hover:bg-red-100"
           >
-            <LogOut size={18} />
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-red-500 shadow-sm">
+              <LogOut size={18} />
+            </span>
+
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-black text-red-600">
+                Güvenli Çıkış Yap
+              </span>
+              <span className="mt-0.5 block truncate text-xs font-semibold text-red-400">
+                Oturumu kapat
+              </span>
+            </span>
+
+            <ChevronRight size={18} className="text-red-300" />
           </button>
-        </div>
-      </header>
-
-      <section className="mx-auto max-w-7xl px-4 py-5 sm:px-5 sm:py-6">
-        {superAdmin && (
-          <section
-            className={`mb-4 overflow-hidden rounded-[28px] bg-gradient-to-br ${theme.heroGradient} p-5 text-center text-white shadow-xl md:p-7`}
-          >
-            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-4 py-2 text-[11px] font-black backdrop-blur">
-              <Crown size={15} />
-              EPH Kurucu Alanı
-            </div>
-
-            <h2 className="mt-4 text-3xl font-black tracking-tight md:text-5xl">
-              Hoşgeldin Mustafa Abi
-            </h2>
-
-            <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 text-white/80">
-              EPH Platform Yönetim Merkezi. Kullanıcı, portföy, network ve
-              sistem durumunu tek ekrandan takip edebilirsin.
-            </p>
-
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              <FounderMiniCard
-                icon={<ShieldCheck size={20} />}
-                label="Rol"
-                value="Süper Admin"
-              />
-              <FounderMiniCard
-                icon={<Crown size={20} />}
-                label="Yetki"
-                value="Kurucu Erişimi"
-              />
-              <FounderMiniCard
-                icon={<Sparkles size={20} />}
-                label="Tema"
-                value="Turkuaz Yönetim"
-              />
-            </div>
-          </section>
-        )}
-
-        <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-          <section className="eph-card overflow-hidden p-5 text-center md:p-6">
-            <div
-              className={`mx-auto inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-[11px] font-black shadow-sm ${theme.border} ${theme.primaryText}`}
-            >
-              <BadgeCheck size={14} />
-              {theme.badge}
-            </div>
-
-            <div className="mt-5 flex flex-col items-center gap-4 md:flex-row md:text-left">
-              <div className="relative shrink-0">
-                <div
-                  className={`flex h-24 w-24 items-center justify-center rounded-[30px] text-3xl font-black shadow-sm ${theme.iconBg}`}
-                >
-                  {superAdmin ? <Crown size={42} /> : initials}
-                </div>
-
-                <span
-                  className={`absolute -bottom-1 -right-1 h-6 w-6 rounded-full border-4 border-white ${presenceDotClass(
-                    currentPresenceStatus,
-                  )}`}
-                />
-              </div>
-
-              <div className="min-w-0 flex-1 text-center md:text-left">
-                <h2 className="text-3xl font-black leading-tight text-[#06194A] md:text-4xl">
-                  {displayName}
-                </h2>
-
-                <p className={`mt-2 text-sm font-black ${theme.primaryText}`}>
-                  {superAdmin ? "Kurucu · Süper Admin" : theme.label}
-                </p>
-
-                <div
-                  className={`mx-auto mt-3 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black md:mx-0 ${presenceBadgeClass(
-                    currentPresenceStatus,
-                  )}`}
-                >
-                  <span
-                    className={`h-2.5 w-2.5 rounded-full ${presenceDotClass(
-                      currentPresenceStatus,
-                    )}`}
-                  />
-                  {presenceLabel(currentPresenceStatus)}
-                </div>
-
-                <p className="mt-2 text-xs font-bold text-[#64748B]">
-                  {formatLastSeen(currentPresence?.minutesAgo)}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <SmallStat
-                icon={<CheckCircle2 size={18} />}
-                label="Durum"
-                value={presenceLabel(currentPresenceStatus)}
-                color={theme.color}
-              />
-              <SmallStat
-                icon={<Crown size={18} />}
-                label="Üyelik"
-                value={packageName}
-                color={theme.color}
-              />
-              <SmallStat
-                icon={<ShieldCheck size={18} />}
-                label="Güven"
-                value={`${trustScore}/100`}
-                color={theme.color}
-              />
-            </div>
-          </section>
-
-          <section className="eph-card p-5 text-center md:p-6">
-            <div
-              className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl"
-              style={{
-                backgroundColor: superAdmin ? "#F0FDFA" : "#EFF6FF",
-                color: theme.color,
-              }}
-            >
-              <ClipboardList size={22} />
-            </div>
-
-            <h3 className="mt-3 text-2xl font-black text-[#06194A]">
-              EPH Kimlik Kartı
-            </h3>
-
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#64748B]">
-              Üyelik, rol, referans ve platform kimliği tek kartta.
-            </p>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <DetailRow label="Üye No" value={safeUser.memberCode || shortUserId(safeUser.id)} />
-              <DetailRow label="Rol" value={superAdmin ? "Süper Admin" : theme.label} />
-              <DetailRow label="Paket" value={packageName} />
-              <DetailRow label="Katılım" value={formatMemberSince(safeUser.memberSince)} />
-              <DetailRow label="Güven Skoru" value={`${trustScore}/100`} />
-              <DetailRow label="Referans" value={referralCode} />
-            </div>
-          </section>
-        </div>
-
-        <section className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <MetricCard
-            icon={<Building2 size={20} />}
-            label="Aktif İlan"
-            value={superAdmin ? "Tüm platform" : "Hazır"}
-            desc="Portföy ekranı"
-            color={theme.color}
-          />
-          <MetricCard
-            icon={<Layers3 size={20} />}
-            label="Pasif İlan"
-            value="Kontrol"
-            desc="Arşiv ve taslak"
-            color="#64748B"
-          />
-          <MetricCard
-            icon={<Users size={20} />}
-            label="CRM"
-            value="Açık"
-            desc="Müşteri takibi"
-            color="#0F766E"
-          />
-          <MetricCard
-            icon={<MessageCircle size={20} />}
-            label="Mesajlar"
-            value="Aktif"
-            desc="Görüşmeler"
-            color="#7C3AED"
-          />
-          <MetricCard
-            icon={<BriefcaseBusiness size={20} />}
-            label="Network"
-            value="Canlı"
-            desc="Talep akışı"
-            color="#EA580C"
-          />
-        </section>
-
-        <section className="mt-4 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="eph-card p-5 text-center">
-            <div
-              className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl"
-              style={{ backgroundColor: "#EFF6FF", color: theme.color }}
-            >
-              <Rocket size={22} />
-            </div>
-
-            <h3 className="mt-3 text-2xl font-black text-[#06194A]">
-              Hızlı İşlemler
-            </h3>
-
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#64748B]">
-              En çok kullanılan bölümlere tek dokunuşla geç.
-            </p>
-
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <QuickAction href="/stok" icon={<Building2 size={18} />} title="Portföyüm" />
-              <QuickAction href="/crm" icon={<Users size={18} />} title="CRM" />
-              <QuickAction href="/messages" icon={<MessageCircle size={18} />} title="Mesajlar" />
-              <QuickAction href="/network" icon={<BriefcaseBusiness size={18} />} title="Network" />
-              <QuickAction href="/lina" icon={<WandSparkles size={18} />} title="Lina" />
-              <QuickAction href="/market" icon={<WalletCards size={18} />} title="Market" />
-            </div>
-          </div>
-
-          <div className="eph-card p-5 text-center">
-            <div
-              className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl"
-              style={{ backgroundColor: "#ECFDF5", color: "#0F766E" }}
-            >
-              <Gauge size={22} />
-            </div>
-
-            <h3 className="mt-3 text-2xl font-black text-[#06194A]">
-              EPH Durum Merkezi
-            </h3>
-
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#64748B]">
-              Oturum, bildirim, paket ve hesap doğrulama durumu.
-            </p>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <StatusRow
-                icon={<Zap size={18} />}
-                label="Anlık Durum"
-                value={presenceLabel(currentPresenceStatus)}
-                color={
-                  currentPresenceStatus === "online"
-                    ? "#10B981"
-                    : currentPresenceStatus === "away"
-                      ? "#F59E0B"
-                      : "#64748B"
-                }
-              />
-              <StatusRow
-                icon={<Home size={18} />}
-                label="Son Sayfa"
-                value={currentPresence?.lastPage || "Bilgi yok"}
-                color={theme.color}
-              />
-              <StatusRow
-                icon={<Bell size={18} />}
-                label="Bildirim"
-                value="Ayarlar hazır"
-                color="#EA580C"
-              />
-              <StatusRow
-                icon={<ShieldCheck size={18} />}
-                label="Doğrulama"
-                value={trustScore >= 80 ? "Güvenli" : "Kontrol gerekli"}
-                color="#0F766E"
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-4 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="eph-card p-5 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F5F3FF] text-[#7C3AED]">
-              <WandSparkles size={22} />
-            </div>
-
-            <h3 className="mt-3 text-2xl font-black text-[#06194A]">
-              Lina bugün senin için ne yapabilir?
-            </h3>
-
-            <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[#64748B]">
-              Portföy üretimi, açıklama yazımı, müşteri yorumu ve fiyat önerisi
-              için Lina’ya hızlıca geçebilirsin.
-            </p>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <LinaAction title="Portföy oluştur" desc="Yeni ilan metni" />
-              <LinaAction title="Açıklama yaz" desc="Profesyonel açıklama" />
-              <LinaAction title="Müşteri analizi" desc="Talep yorumlama" />
-              <LinaAction title="Fiyat önerisi" desc="Pazar odaklı fikir" />
-            </div>
-
-            <Link
-              href="/lina"
-              className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#1557D6] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#0F49BD]"
-            >
-              <Sparkles size={17} />
-              Lina Asistan’a Git
-            </Link>
-          </div>
-
-          <div className="grid gap-3">
-            <InfoCard
-              icon={<Mail size={20} />}
-              label="E-posta"
-              value={safeUser.email || "E-posta bilgisi yok"}
-              color={theme.color}
-            />
-
-            <InfoCard
-              icon={<Phone size={20} />}
-              label="Telefon"
-              value={safeUser.phone || "Telefon bilgisi yok"}
-              color={theme.color}
-            />
-
-            <InfoCard
-              icon={<Building2 size={20} />}
-              label="Firma / Ofis"
-              value={
-                superAdmin
-                  ? "EPH Platform"
-                  : safeUser.companyName ||
-                    safeUser.officeName ||
-                    "Firma bilgisi yok"
-              }
-              color={theme.color}
-            />
-
-            <InfoCard
-              icon={<KeyRound size={20} />}
-              label="Referans Kodu"
-              value={referralCode}
-              color={theme.color}
-            />
-          </div>
-        </section>
-
-        {(userRole === "ADMIN" || userRole === "SUPER_ADMIN") && (
-          <section className="mt-4 eph-card p-5 text-center">
-            <div
-              className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl"
-              style={{
-                backgroundColor: superAdmin ? "#F0FDFA" : "#F5F3FF",
-                color: superAdmin ? "#14B8A6" : "#7C3AED",
-              }}
-            >
-              <Settings size={22} />
-            </div>
-
-            <h3 className="mt-3 text-2xl font-black text-[#06194A]">
-              {superAdmin ? "Süper Admin Hızlı Erişim" : "Admin Hızlı Erişim"}
-            </h3>
-
-            <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[#64748B]">
-              Kullanıcı yönetimi, referans kodları ve sistem kontrolleri için
-              yönetim modüllerine hızlıca geçebilirsin.
-            </p>
-
-            <div className="mt-4 flex flex-wrap justify-center gap-3">
-              <Link href="/admin" className="eph-btn-primary">
-                Yönetim Merkezi
-              </Link>
-
-              <Link href="/admin/referrals" className="eph-btn-soft">
-                Referans Kodları
-              </Link>
-            </div>
-          </section>
-        )}
-
-        <section className="mt-4 eph-card p-5 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FFF7ED] text-[#EA580C]">
-            <Bell size={22} />
-          </div>
-
-          <h3 className="mt-3 text-2xl font-black text-[#06194A]">
-            Bildirim ve Güvenlik
-          </h3>
-
-          <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[#64748B]">
-            Bildirim sesi, hesap güvenliği ve oturum işlemlerini buradan takip
-            edebilirsin.
-          </p>
-
-          <div className="mt-4 flex flex-wrap justify-center gap-3">
-            <Link href="/notification-settings" className="eph-btn-soft">
-              Bildirim Ayarları
-            </Link>
-
-            <button
-              onClick={() => {
-                logout();
-                router.push("/giris");
-              }}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-5 py-3 text-sm font-black text-red-600"
-            >
-              <LogOut size={17} />
-              Güvenli Çıkış Yap
-            </button>
-          </div>
-        </section>
+        </MenuGroup>
       </section>
     </main>
   );
 }
 
-function FounderMiniCard({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-}) {
+function Pill({ text, color, bg }: { text: string; color: string; bg: string }) {
   return (
-    <div className="rounded-3xl border border-white/15 bg-white/10 p-4 text-center backdrop-blur">
-      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-white">
-        {icon}
-      </div>
-
-      <div className="mt-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/60">
-        {label}
-      </div>
-
-      <div className="mt-1 text-lg font-black text-white">{value}</div>
-    </div>
+    <span
+      className="inline-flex min-h-8 items-center justify-center rounded-full px-3 text-xs font-black"
+      style={{ color, backgroundColor: bg }}
+    >
+      {text}
+    </span>
   );
 }
 
-function SmallStat({
-  icon,
-  label,
-  value,
-  color = "#2563EB",
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  color?: string;
-}) {
+function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-3xl border border-[#DDE7F3] bg-[#F8FAFC] p-4 text-center">
-      <div
-        className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-sm"
-        style={{ color }}
-      >
-        {icon}
-      </div>
-
-      <div className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-[#94A3B8]">
+    <div className="rounded-[24px] border border-[#DDE7F3] bg-white p-3 text-center shadow-sm">
+      <div className="text-[10px] font-black uppercase tracking-[0.14em] text-[#94A3B8]">
         {label}
       </div>
-
-      <div className="mt-1 truncate text-base font-black text-[#06194A]">
+      <div className="mt-1 truncate text-sm font-black text-[#06194A]">
         {value}
       </div>
     </div>
   );
 }
 
-function MetricCard({
-  icon,
-  label,
-  value,
-  desc,
-  color,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  desc: string;
-  color: string;
-}) {
+function MenuGroup({ children }: { children: ReactNode }) {
   return (
-    <div className="eph-card p-4 text-center">
-      <div
-        className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F8FAFC]"
-        style={{ color }}
-      >
-        {icon}
-      </div>
-
-      <div className="mt-3 text-[11px] font-black uppercase tracking-[0.16em] text-[#94A3B8]">
-        {label}
-      </div>
-
-      <div className="mt-1 text-xl font-black text-[#06194A]">{value}</div>
-
-      <p className="mt-1 text-xs font-semibold text-[#64748B]">{desc}</p>
-    </div>
+    <section className="mt-4 rounded-[30px] border border-[#DDE7F3] bg-white p-3 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
+      <div className="grid gap-2">{children}</div>
+    </section>
   );
 }
 
-function QuickAction({
+function MenuItem({
   href,
   icon,
   title,
+  value,
+  color,
 }: {
   href: string;
   icon: ReactNode;
   title: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="rounded-3xl border border-[#DDE7F3] bg-[#F8FAFC] p-4 text-center transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
-    >
-      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-sm">
-        {icon}
-      </div>
-
-      <div className="mt-3 text-sm font-black text-[#06194A]">{title}</div>
-    </Link>
-  );
-}
-
-function StatusRow({
-  icon,
-  label,
-  value,
-  color,
-}: {
-  icon: ReactNode;
-  label: string;
   value: string;
   color: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-3xl border border-[#DDE7F3] bg-[#F8FAFC] p-4 text-left">
-      <div
+    <Link
+      href={href}
+      className="flex items-center gap-3 rounded-3xl bg-[#F8FAFC] px-4 py-4 text-left transition hover:bg-[#EFF6FF]"
+    >
+      <span
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm"
         style={{ color }}
       >
         {icon}
-      </div>
+      </span>
 
-      <div className="min-w-0">
-        <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#94A3B8]">
-          {label}
-        </div>
-
-        <div className="mt-1 truncate text-sm font-black text-[#06194A]">
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-black text-[#06194A]">{title}</span>
+        <span className="mt-0.5 block truncate text-xs font-semibold text-[#64748B]">
           {value}
-        </div>
-      </div>
-    </div>
-  );
-}
+        </span>
+      </span>
 
-function LinaAction({ title, desc }: { title: string; desc: string }) {
-  return (
-    <Link
-      href="/lina"
-      className="rounded-3xl border border-[#E9D5FF] bg-[#FAF5FF] p-4 text-center transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
-    >
-      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#7C3AED] shadow-sm">
-        <Star size={17} />
-      </div>
-
-      <div className="mt-3 text-sm font-black text-[#06194A]">{title}</div>
-      <div className="mt-1 text-xs font-semibold text-[#64748B]">{desc}</div>
+      <ChevronRight size={18} className="text-[#94A3B8]" />
     </Link>
   );
 }
 
-function InfoCard({
+function InfoLine({
   icon,
-  label,
+  title,
   value,
-  color = "#2563EB",
+  color,
 }: {
   icon: ReactNode;
-  label: string;
+  title: string;
   value: string;
-  color?: string;
+  color: string;
 }) {
   return (
-    <div className="eph-card flex flex-col items-center gap-3 p-4 text-center sm:flex-row sm:text-left">
-      <div
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EFF6FF]"
+    <div className="flex items-center gap-3 rounded-3xl bg-[#F8FAFC] px-4 py-4 text-left">
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm"
         style={{ color }}
       >
         {icon}
-      </div>
+      </span>
 
-      <div className="min-w-0">
-        <div className="text-xs font-black uppercase tracking-[0.18em] text-[#94A3B8]">
-          {label}
-        </div>
-
-        <div className="mt-1 break-words text-sm font-black text-[#06194A]">
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-black text-[#06194A]">{title}</span>
+        <span className="mt-0.5 block break-words text-xs font-semibold text-[#64748B]">
           {value}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-3xl border border-[#DDE7F3] bg-[#F8FAFC] p-4 text-center">
-      <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#94A3B8]">
-        {label}
-      </div>
-
-      <div className="mt-2 break-words text-sm font-black text-[#06194A]">
-        {value}
-      </div>
+        </span>
+      </span>
     </div>
   );
 }
