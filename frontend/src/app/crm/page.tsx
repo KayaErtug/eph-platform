@@ -1,16 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   BriefcaseBusiness,
   CheckCircle2,
-  CircleUserRound,
   Clock3,
   FileText,
-  Home,
   ListFilter,
   Loader2,
   MessageCircle,
@@ -163,7 +159,7 @@ function activityTypeLabel(type?: string) {
 }
 
 export default function CrmPage() {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const router = useRouter();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -338,10 +334,6 @@ export default function CrmPage() {
     setSelectedCustomer(res.data);
   };
 
-  const handleLogout = () => {
-    logout();
-    router.push("/giris");
-  };
 
   const filteredCustomers = useMemo(() => {
     const keyword = search.toLowerCase().trim();
@@ -408,9 +400,9 @@ export default function CrmPage() {
 
   if (!hydrated || loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F7FB] text-[#0B1F44]">
+      <main className="flex min-h-screen items-center justify-center bg-[#F7FBFF] text-[#06194A]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="animate-spin text-[#1D4ED8]" size={34} />
+          <Loader2 className="animate-spin text-[#1557D6]" size={34} />
           <p className="text-xs font-black uppercase tracking-[0.26em] text-slate-500">
             CRM verileri yükleniyor
           </p>
@@ -420,7 +412,7 @@ export default function CrmPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F4F7FB] text-[#111827]">
+    <main className="min-h-screen bg-[#F7FBFF] text-[#27364F]">
       {showAddModal && (
         <AddCustomerModal
           form={form}
@@ -448,28 +440,21 @@ export default function CrmPage() {
         />
       )}
 
-      <section className="mx-auto min-h-screen max-w-7xl px-4 pb-28 pt-5">
-        <header className="relative mb-5 overflow-hidden rounded-[34px] border border-slate-200 bg-white p-5 pt-20 shadow-sm lg:pt-5">
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="absolute left-5 top-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-[#1D4ED8] hover:text-[#1D4ED8]"
-            aria-label="Dashboard'a dön"
-          >
-            <ArrowLeft size={20} />
-          </button>
+      <section className="mx-auto min-h-screen max-w-7xl px-4 pb-8 pt-5">
+        <header className="mb-5 overflow-hidden rounded-[34px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_18px_42px_rgba(15,23,42,0.075)]">
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="text-center lg:text-left lg:pl-16">
-              <div className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1 text-xs font-black text-[#1D4ED8]">
+            <div className="text-center">
+              <div className="inline-flex items-center gap-2 rounded-full bg-[#EFF6FF] px-3 py-1 text-xs font-black text-[#1557D6]">
                 <BriefcaseBusiness size={14} />
                 Müşteri İlişkileri
               </div>
 
-              <h1 className="mt-3 text-[31px] font-black tracking-tight text-[#0B1F44] md:text-[42px]">
+              <h1 className="mt-3 text-[31px] font-black tracking-tight text-[#06194A] md:text-[42px]">
                 CRM Merkezi
               </h1>
 
-              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500 lg:mx-0">
+              <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-[#64748B]">
                 Lead, müşteri, aktivite ve görev takibini tek profesyonel ekrandan yönet.
               </p>
             </div>
@@ -477,17 +462,10 @@ export default function CrmPage() {
             <div className="flex justify-center gap-2 lg:justify-end">
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex h-12 items-center gap-2 rounded-2xl bg-[#0B1F44] px-4 text-sm font-black text-white"
+                className="flex h-12 items-center gap-2 rounded-2xl bg-[#1557D6] px-4 text-sm font-black text-white"
               >
                 <Plus size={18} />
                 Müşteri Ekle
-              </button>
-
-              <button
-                onClick={handleLogout}
-                className="h-12 rounded-2xl border border-red-100 bg-red-50 px-4 text-xs font-black text-red-600"
-              >
-                Çıkış
               </button>
             </div>
           </div>
@@ -505,7 +483,7 @@ export default function CrmPage() {
             <Clock3 size={24} />
           </div>
 
-          <h2 className="mt-4 text-2xl font-black text-[#0B1F44]">
+          <h2 className="mt-4 text-2xl font-black text-[#06194A]">
             CRM Görev Alarm Merkezi
           </h2>
 
@@ -545,7 +523,7 @@ export default function CrmPage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Müşteri, telefon, şehir veya ilgi alanı ara..."
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-[#F8FAFC] pl-11 pr-4 text-center text-sm font-bold text-slate-700 outline-none focus:border-[#1D4ED8] lg:text-left"
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-[#F8FAFC] pl-11 pr-4 text-center text-sm font-bold text-slate-700 outline-none focus:border-[#1557D6] lg:text-left"
               />
             </div>
 
@@ -554,7 +532,7 @@ export default function CrmPage() {
                 onClick={() => setView("pipeline")}
                 className={`flex h-12 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black ${
                   view === "pipeline"
-                    ? "bg-[#1D4ED8] text-white"
+                    ? "bg-[#1557D6] text-white"
                     : "border border-slate-200 bg-white text-slate-500"
                 }`}
               >
@@ -566,7 +544,7 @@ export default function CrmPage() {
                 onClick={() => setView("list")}
                 className={`flex h-12 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black ${
                   view === "list"
-                    ? "bg-[#1D4ED8] text-white"
+                    ? "bg-[#1557D6] text-white"
                     : "border border-slate-200 bg-white text-slate-500"
                 }`}
               >
@@ -576,7 +554,7 @@ export default function CrmPage() {
 
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#0B1F44] px-4 text-sm font-black text-white"
+                className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#06194A] px-4 text-sm font-black text-white"
               >
                 <Plus size={18} />
                 Ekle
@@ -632,11 +610,11 @@ export default function CrmPage() {
           <section className="rounded-[28px] border border-slate-200 bg-white p-3 shadow-sm">
             {filteredCustomers.length === 0 ? (
               <div className="flex h-[320px] flex-col items-center justify-center text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#EEF4FF] text-[#1D4ED8]">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#EFF6FF] text-[#1557D6]">
                   <UsersRound size={30} />
                 </div>
 
-                <div className="text-[20px] font-black text-[#0B1F44]">
+                <div className="text-[20px] font-black text-[#06194A]">
                   Müşteri bulunamadı
                 </div>
 
@@ -659,15 +637,6 @@ export default function CrmPage() {
         )}
       </section>
 
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 px-5 pb-6 pt-3 backdrop-blur">
-        <div className="mx-auto flex max-w-md items-center justify-between">
-          <BottomItem href="/dashboard" icon={<Home size={21} />} label="Ana Sayfa" />
-          <BottomItem href="/stok" icon={<BriefcaseBusiness size={21} />} label="İlanlar" />
-          <BottomItem href="/network" icon={<MessageCircle size={21} />} label="Network" />
-          <BottomItem active href="/crm" icon={<UsersRound size={21} />} label="CRM" />
-          <BottomItem href="/profil" icon={<CircleUserRound size={21} />} label="Profil" />
-        </div>
-      </nav>
 
       <style jsx global>{`
         .premium-input {
@@ -716,7 +685,7 @@ function TaskSummaryCard({
         <span className="text-xl font-black">{value}</span>
       </div>
 
-      <h3 className="mt-3 text-sm font-black text-[#0B1F44]">{title}</h3>
+      <h3 className="mt-3 text-sm font-black text-[#06194A]">{title}</h3>
       <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
         {description}
       </p>
@@ -735,7 +704,7 @@ function KpiCard({
 }) {
   return (
     <div className="rounded-[24px] border border-slate-200 bg-[#F8FAFC] p-4 text-center">
-      <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#1D4ED8]">
+      <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
         {icon}
       </div>
 
@@ -743,7 +712,7 @@ function KpiCard({
         {title}
       </p>
 
-      <p className="mt-2 text-[25px] font-black text-[#0B1F44]">{value}</p>
+      <p className="mt-2 text-[25px] font-black text-[#06194A]">{value}</p>
     </div>
   );
 }
@@ -763,11 +732,11 @@ function CustomerCard({
   return (
     <button
       onClick={onClick}
-      className="w-full rounded-[24px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1D4ED8] hover:bg-[#F8FAFC]"
+      className="w-full rounded-[24px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1557D6] hover:bg-[#F8FAFC]"
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-[16px] font-black text-[#0B1F44]">
+          <h3 className="text-[16px] font-black text-[#06194A]">
             {customer.firstName} {customer.lastName}
           </h3>
 
@@ -787,7 +756,7 @@ function CustomerCard({
         </span>
       </div>
 
-      <p className="text-[18px] font-black text-[#1D4ED8]">
+      <p className="text-[18px] font-black text-[#1557D6]">
         {money(customer.budget)}
       </p>
 
@@ -841,12 +810,12 @@ function CustomerListRow({
   return (
     <button
       onClick={onClick}
-      className="w-full rounded-[22px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1D4ED8] hover:bg-[#F8FAFC]"
+      className="w-full rounded-[22px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1557D6] hover:bg-[#F8FAFC]"
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-[16px] font-black text-[#0B1F44]">
+            <h3 className="truncate text-[16px] font-black text-[#06194A]">
               {customer.firstName} {customer.lastName}
             </h3>
 
@@ -934,7 +903,7 @@ function InsightBox({
 function MiniCounter({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-[#F8FAFC] px-2 py-2 text-center">
-      <p className="truncate text-sm font-black text-[#0B1F44]">{value}</p>
+      <p className="truncate text-sm font-black text-[#06194A]">{value}</p>
       <p className="text-[9px] font-black uppercase text-slate-400">{label}</p>
     </div>
   );
@@ -970,7 +939,7 @@ function AddCustomerModal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0B1F44]/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#06194A]/60 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -979,11 +948,11 @@ function AddCustomerModal({
       >
         <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white p-5">
           <div>
-            <p className="text-xs font-black uppercase tracking-wide text-[#1D4ED8]">
+            <p className="text-xs font-black uppercase tracking-wide text-[#1557D6]">
               CRM
             </p>
 
-            <h2 className="mt-1 text-[25px] font-black tracking-tight text-[#0B1F44]">
+            <h2 className="mt-1 text-[25px] font-black tracking-tight text-[#06194A]">
               Yeni Müşteri Ekle
             </h2>
           </div>
@@ -1174,7 +1143,7 @@ function AddCustomerModal({
                     }
                     className={`rounded-full border px-3 py-2 text-xs font-black ${
                       active
-                        ? "border-[#1D4ED8] bg-[#EEF4FF] text-[#1D4ED8]"
+                        ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
                         : "border-slate-200 bg-white text-slate-500"
                     }`}
                   >
@@ -1203,7 +1172,7 @@ function AddCustomerModal({
           <button
             onClick={onSubmit}
             disabled={formLoading || !form.firstName || !form.lastName}
-            className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-[#1D4ED8] text-sm font-black text-white disabled:opacity-50"
+            className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-[#1557D6] text-sm font-black text-white disabled:opacity-50"
           >
             {formLoading ? "Kaydediliyor..." : "Müşteri Ekle"}
           </button>
@@ -1251,7 +1220,7 @@ function CustomerDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0B1F44]/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#06194A]/60 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -1261,7 +1230,7 @@ function CustomerDetailModal({
         <div className="sticky top-0 z-10 border-b border-slate-200 bg-white p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-[26px] font-black tracking-tight text-[#0B1F44]">
+              <h2 className="text-[26px] font-black tracking-tight text-[#06194A]">
                 {customer.firstName} {customer.lastName}
               </h2>
 
@@ -1309,7 +1278,7 @@ function CustomerDetailModal({
                   {item.label}
                 </p>
 
-                <p className="mt-2 text-sm font-black text-[#0B1F44]">
+                <p className="mt-2 text-sm font-black text-[#06194A]">
                   {item.value}
                 </p>
               </div>
@@ -1373,7 +1342,7 @@ function CustomerDetailModal({
               <button
                 onClick={onAddActivity}
                 disabled={activityLoading || !activityForm.note}
-                className="h-12 rounded-2xl bg-[#1D4ED8] px-5 text-sm font-black text-white disabled:opacity-50"
+                className="h-12 rounded-2xl bg-[#1557D6] px-5 text-sm font-black text-white disabled:opacity-50"
               >
                 Ekle
               </button>
@@ -1383,11 +1352,11 @@ function CustomerDetailModal({
               {customer.activities?.length ? (
                 customer.activities.map((activity) => (
                   <div key={activity.id} className="rounded-2xl bg-[#F8FAFC] p-4">
-                    <p className="text-xs font-black uppercase tracking-wide text-[#1D4ED8]">
+                    <p className="text-xs font-black uppercase tracking-wide text-[#1557D6]">
                       {activityTypeLabel(activity.type)}
                     </p>
 
-                    <p className="mt-2 text-sm font-semibold text-[#0B1F44]">
+                    <p className="mt-2 text-sm font-semibold text-[#06194A]">
                       {activity.note}
                     </p>
 
@@ -1433,7 +1402,7 @@ function CustomerDetailModal({
               <button
                 onClick={onAddTask}
                 disabled={taskLoading || !taskForm.title}
-                className="h-12 rounded-2xl bg-[#0B1F44] px-5 text-sm font-black text-white disabled:opacity-50"
+                className="h-12 rounded-2xl bg-[#06194A] px-5 text-sm font-black text-white disabled:opacity-50"
               >
                 Ekle
               </button>
@@ -1457,7 +1426,7 @@ function CustomerDetailModal({
                           className={`text-sm font-black ${
                             task.status === "TAMAMLANDI"
                               ? "text-slate-400 line-through"
-                              : "text-[#0B1F44]"
+                              : "text-[#06194A]"
                           }`}
                         >
                           {task.title}
@@ -1492,7 +1461,7 @@ function CustomerDetailModal({
 function FormSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <div className="mb-3 text-center text-xs font-black uppercase tracking-wide text-[#1D4ED8]">
+      <div className="mb-3 text-center text-xs font-black uppercase tracking-wide text-[#1557D6]">
         {title}
       </div>
       {children}
@@ -1509,26 +1478,3 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function BottomItem({
-  icon,
-  label,
-  active,
-  href,
-}: {
-  icon: ReactNode;
-  label: string;
-  active?: boolean;
-  href: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex w-16 flex-col items-center gap-1 ${
-        active ? "text-[#1D4ED8]" : "text-slate-500"
-      }`}
-    >
-      {icon}
-      <span className="text-[11px] font-bold">{label}</span>
-    </Link>
-  );
-}
