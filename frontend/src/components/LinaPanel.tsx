@@ -85,14 +85,23 @@ const QUICK_COMMANDS = [
   },
 ];
 
+function createWelcomeMessage(name: string) {
+  return `Günaydın ${name} 👋 Bugün portföyünde 4 aktif görev, 8 eşleşen talep ve 2 okunmamış mesaj bulunuyor. Öncelikli olarak müşteri geri dönüşlerini ve yeni talep eşleşmelerini kontrol etmeni öneriyorum. Nereden başlamak istersin?`;
+}
+
 export default function LinaPanel({
   open = true,
   onClose = () => {},
 }: LinaPanelProps) {
   const { user } = useAuthStore();
 
-  const userName = user?.firstName || "Profesyonel";
+  const userName =
+    user?.firstName ||
+    user?.email?.split("@")[0]?.split(".")[0] ||
+    "Profesyonel";
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const didMountMessagesRef = useRef(false);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -100,15 +109,7 @@ export default function LinaPanel({
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "lina",
-      text: `Günaydın ${userName} 👋
-
-	Bugün portföyünde 4 aktif görev,
-	8 eşleşen talep,
-	2 okunmamış mesaj bulunuyor.
-
-	Öncelikli olarak müşteri geri dönüşlerini ve yeni talep eşleşmelerini kontrol etmeni öneriyorum.
-
-	Nereden başlamak istersin?`,
+      text: createWelcomeMessage(userName),
     },
   ]);
 
@@ -147,6 +148,11 @@ export default function LinaPanel({
   useEffect(() => {
     if (!open) return;
 
+    if (!didMountMessagesRef.current) {
+      didMountMessagesRef.current = true;
+      return;
+    }
+
     window.setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 100);
@@ -167,13 +173,23 @@ export default function LinaPanel({
       stopCurrentAudio();
       setSpeaking(true);
 
-      const res = await fetch("/lina-voice", {
+      let res = await fetch("/lina-voice", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ text }),
       });
+
+      if (!res.ok) {
+        res = await fetch("/api/lina-voice", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ text }),
+        });
+      }
 
       if (!res.ok) {
         setSpeaking(false);
@@ -313,15 +329,7 @@ export default function LinaPanel({
     setMessages([
       {
         role: "lina",
-        text: `Günaydın ${userName} 👋
-
-	Bugün portföyünde 4 aktif görev,
-	8 eşleşen talep,
-	2 okunmamış mesaj bulunuyor.
-
-	Öncelikli olarak müşteri geri dönüşlerini ve yeni talep eşleşmelerini kontrol etmeni öneriyorum.
-
-	Nereden başlamak istersin?`,
+        text: createWelcomeMessage(userName),
       },
     ]);
 
@@ -355,7 +363,10 @@ export default function LinaPanel({
               onClick={
                 speaking
                   ? stopCurrentAudio
-                  : () => speakWithElevenLabs(messages[messages.length - 1]?.text || "")
+                  : () =>
+                      speakWithElevenLabs(
+                        messages[messages.length - 1]?.text || "",
+                      )
               }
               className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-[0_8px_22px_rgba(15,23,42,0.08)]"
               aria-label="Lina sesi"
@@ -470,7 +481,7 @@ export default function LinaPanel({
                       )}
 
                       <div className="min-w-0">
-                        <p className="whitespace-pre-line text-sm font-semibold leading-6">
+                        <p className="text-left text-sm font-semibold leading-6">
                           {messageItem.text}
                         </p>
 
@@ -481,7 +492,7 @@ export default function LinaPanel({
                             className="mt-3 inline-flex items-center justify-center gap-2 rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] px-4 py-2 text-xs font-black text-[#1557D6]"
                           >
                             <Volume2 size={14} />
-                            Dinle
+                            {speaking ? "Çalıyor" : "Dinle"}
                           </button>
                         )}
                       </div>
