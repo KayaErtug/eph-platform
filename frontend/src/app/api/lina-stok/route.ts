@@ -71,38 +71,160 @@ JSON_END
 
 Türkçe konuş. Kısa yaz. Samimi ama profesyonel davran.`;
 
+type LinaHistoryItem = {
+  role?: string;
+  content?: string;
+};
+
+function createSafeErrorMessage(status: number, data: any) {
+  const errorCode = data?.error?.code || "";
+  const errorType = data?.error?.type || "";
+  const errorMessage = data?.error?.message || "";
+
+  if (status === 401 || errorCode === "invalid_api_key") {
+    return "Lina şu anda OpenAI API anahtarını doğrulayamadı. OPENAI_API_KEY değerini kontrol etmek gerekiyor.";
+  }
+
+  if (
+    status === 429 ||
+    errorCode === "insufficient_quota" ||
+    errorType === "insufficient_quota"
+  ) {
+    return "Lina şu anda OpenAI kota veya ödeme limiti nedeniyle cevap veremiyor. OpenAI hesabındaki kullanım/kredi durumunu kontrol etmek gerekiyor.";
+  }
+
+  if (errorCode === "model_not_found") {
+    return "Lina için seçilen OpenAI modeli bulunamadı. Model adını kontrol etmek gerekiyor.";
+  }
+
+  if (status >= 500) {
+    return "OpenAI tarafında geçici bir sorun oluştu. Birkaç dakika sonra tekrar deneyelim.";
+  }
+
+  return (
+    errorMessage ||
+    "Lina cevap üretirken beklenmeyen bir sorun oluştu. Sunucu loglarını kontrol etmek gerekiyor."
+  );
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { message, history, userName } = await req.json();
-    const userGreeting = userName ? `Kullanıcının adı: ${userName}. Ona her zaman adıyla hitap et.` : "";
+    const body = await req.json();
+    const message = String(body?.message || "").trim();
+    const history = Array.isArray(body?.history) ? body.history : [];
+    const userName = String(body?.userName || "").trim();
+
+    if (!message) {
+      return NextResponse.json({
+        reply: "Lina'ya göndermek istediğin mesaj boş görünüyor. Kısa bir bilgi yazar mısın?",
+        intent: null,
+      });
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY?.trim();
+
+    if (!apiKey) {
+      console.error("Lina OpenAI hatası: OPENAI_API_KEY bulunamadı.");
+
+      return NextResponse.json({
+        reply:
+          "Lina şu anda OpenAI API anahtarına erişemiyor. Sunucuda OPENAI_API_KEY tanımlı değil veya okunamıyor.",
+        intent: null,
+      });
+    }
+
+    const userGreeting = userName
+      ? `Kullanıcının adı: ${userName}. Ona her zaman adıyla hitap et.`
+      : "";
+
+    const safeHistory = history
+      .slice(-30)
+      .map((item: LinaHistoryItem) => {
+        const role = item?.role === "assistant" ? "assistant" : "user";
+
+        return {
+          role,
+          content: String(item?.content || "").slice(0, 4000),
+        };
+      })
+      .filter((item: { role: string; content: string }) => item.content.trim());
+
     const messages = [
-      ...history.slice(-30),
-      { role: "user", content: message },
+      {
+        role: "system",
+        content: SYSTEM_PROMPT + (userGreeting ? "\n\n" + userGreeting : ""),
+      },
+      ...safeHistory,
+      {
+        role: "user",
+        content: message,
+      },
     ];
+
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
         max_tokens: 1500,
-        messages: [{ role: "system", content: SYSTEM_PROMPT + (userGreeting ? "\n\n" + userGreeting : "") }, ...messages],
+        temperature: 0.5,
+        messages,
       }),
     });
-    const data = await res.json();
-    const reply = data.choices?.[0]?.message?.content || "Bir hata oluştu.";
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      console.error("Lina OpenAI API hatası:", {
+        status: res.status,
+        statusText: res.statusText,
+        data,
+      });
+
+      return NextResponse.json({
+        reply: createSafeErrorMessage(res.status, data),
+        intent: null,
+      });
+    }
+
+    const reply = data?.choices?.[0]?.message?.content;
+
+    if (!reply) {
+      console.error("Lina boş cevap hatası:", data);
+
+      return NextResponse.json({
+        reply:
+          "Lina OpenAI'dan boş cevap aldı. API cevabı beklenen formatta dönmedi.",
+        intent: null,
+      });
+    }
 
     let intent = null;
+
     try {
       const jsonMatch = reply.match(/JSON_START([\s\S]*?)JSON_END/);
-      if (jsonMatch) intent = JSON.parse(jsonMatch[1].trim());
-    } catch {}
+
+      if (jsonMatch) {
+        intent = JSON.parse(jsonMatch[1].trim());
+      }
+    } catch (error) {
+      console.error("Lina JSON ayrıştırma uyarısı:", error);
+    }
 
     return NextResponse.json({ reply, intent });
   } catch (err) {
-    console.error("Lina hatası:", err);
-    return NextResponse.json({ error: "Lina hatası" }, { status: 500 });
+    console.error("Lina route hatası:", err);
+
+    return NextResponse.json(
+      {
+        reply:
+          "Lina sunucu tarafında beklenmeyen bir hata yaşadı. Logları kontrol etmek gerekiyor.",
+        intent: null,
+      },
+      { status: 500 },
+    );
   }
 }
