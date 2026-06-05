@@ -165,8 +165,9 @@ function EPHMobileBottomNav({ pathname }: { pathname: string }) {
         label="Forum"
       />
       <BottomItem
-        href="/havuz"
-        active={pathname.startsWith("/havuz")}
+        
+	href="/network"
+        active={pathname.startsWith("/network")}
         icon={<Target size={26} strokeWidth={2.35} />}
         label="Havuz"
       />
