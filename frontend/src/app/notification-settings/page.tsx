@@ -25,6 +25,7 @@ type PermissionState = "default" | "granted" | "denied" | "unsupported";
 type SoundOption = {
   id: string;
   label: string;
+  description: string;
   file: string;
 };
 
@@ -35,32 +36,38 @@ type Preferences = Record<PreferenceKey, boolean>;
 const SOUND_OPTIONS: SoundOption[] = [
   {
     id: "soft",
-    label: "Classic",
+    label: "EPH Classic",
+    description: "Varsayılan ses",
     file: "/sounds/universfield-new-notification-036-485897.mp3",
   },
   {
     id: "notification",
-    label: "Soft",
+    label: "EPH Soft",
+    description: "Kısa ve net",
     file: "/sounds/universfield-new-notification-043-493471.mp3",
   },
   {
     id: "cat",
     label: "Kedi",
+    description: "Eğlenceli ton",
     file: "/sounds/dragon-studio-cat-meow-401729.mp3",
   },
   {
     id: "doorbell",
     label: "Gitar",
+    description: "Dikkat çeker",
     file: "/sounds/dragon-studio-friendly-doorbell-499660.mp3",
   },
   {
     id: "cash",
-    label: "Yazar",
+    label: "Yazarkasa",
+    description: "Fırsat sesi",
     file: "/sounds/modestas123123-cash-register-kaching-sound-effect-125042.mp3",
   },
   {
     id: "off",
     label: "Sessiz",
+    description: "Ses çalmasın",
     file: "",
   },
 ];
@@ -81,6 +88,7 @@ export default function NotificationSettingsPage() {
   const [selectedSound, setSelectedSound] = useState("soft");
   const [loading, setLoading] = useState(false);
   const [testMessage, setTestMessage] = useState("");
+  const [lastTestAt, setLastTestAt] = useState("");
   const [serviceWorkerStatus, setServiceWorkerStatus] = useState("Bekliyor");
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
 
@@ -106,6 +114,7 @@ export default function NotificationSettingsPage() {
     setSelectedSound(storedSound);
     setSoundEnabled(localStorage.getItem("ephSoundEnabled") === "true");
     setPushEnabled(localStorage.getItem("ephPushEnabled") === "true");
+    setLastTestAt(localStorage.getItem("ephNotificationLastTestAt") || "");
 
     if (storedPreferences) {
       try {
@@ -138,10 +147,19 @@ export default function NotificationSettingsPage() {
 
   const showMessage = (message: string) => {
     setTestMessage(message);
+    window.setTimeout(() => setTestMessage(""), 2600);
+  };
 
-    window.setTimeout(() => {
-      setTestMessage("");
-    }, 2200);
+  const markTestTime = () => {
+    const value = new Intl.DateTimeFormat("tr-TR", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date());
+
+    localStorage.setItem("ephNotificationLastTestAt", value);
+    setLastTestAt(value);
   };
 
   const playSoundFile = async (file: string) => {
@@ -169,9 +187,10 @@ export default function NotificationSettingsPage() {
       await playSoundFile(sound.file);
       localStorage.setItem("ephSoundEnabled", "true");
       setSoundEnabled(true);
+      markTestTime();
       showMessage(`${sound.label} seçildi.`);
     } catch {
-      showMessage("Ses seçildi. Test için tekrar dokun.");
+      showMessage("Ses seçildi. Tarayıcı engellerse test butonuna bas.");
     }
   };
 
@@ -181,7 +200,7 @@ export default function NotificationSettingsPage() {
 
       if (!("Notification" in window)) {
         setPermission("unsupported");
-        showMessage("Tarayıcı desteklemiyor.");
+        showMessage("Bu tarayıcı bildirim desteklemiyor.");
         return;
       }
 
@@ -221,6 +240,7 @@ export default function NotificationSettingsPage() {
 
         try {
           await playSoundFile(activeSound.file);
+          markTestTime();
         } catch {}
       }
 
@@ -234,7 +254,7 @@ export default function NotificationSettingsPage() {
 
       showMessage("Bildirimler aktif.");
     } catch {
-      showMessage("Bildirim hatası.");
+      showMessage("Bildirim etkinleştirme hatası.");
     } finally {
       setLoading(false);
     }
@@ -247,7 +267,7 @@ export default function NotificationSettingsPage() {
     setPushEnabled(false);
     setSoundEnabled(false);
 
-    showMessage("Bu cihazda kapatıldı.");
+    showMessage("Bu cihazda bildirim kapatıldı.");
   };
 
   const testSelectedSound = async () => {
@@ -260,20 +280,21 @@ export default function NotificationSettingsPage() {
       await playSoundFile(selectedSoundItem.file);
       localStorage.setItem("ephSoundEnabled", "true");
       setSoundEnabled(true);
+      markTestTime();
       showMessage("Ses çalışıyor.");
     } catch {
-      showMessage("Tarayıcı sesi engelledi.");
+      showMessage("Tarayıcı sesi engelledi. Sayfaya dokunup tekrar dene.");
     }
   };
 
   const testBrowserNotification = () => {
     if (!("Notification" in window)) {
-      showMessage("Tarayıcı desteklemiyor.");
+      showMessage("Tarayıcı bildirim desteklemiyor.");
       return;
     }
 
     if (Notification.permission !== "granted") {
-      showMessage("Önce izin ver.");
+      showMessage("Önce bildirim izni ver.");
       return;
     }
 
@@ -282,6 +303,7 @@ export default function NotificationSettingsPage() {
       icon: "/web-app-manifest-192x192.png",
     });
 
+    markTestTime();
     showMessage("Test bildirimi gönderildi.");
   };
 
@@ -309,7 +331,7 @@ export default function NotificationSettingsPage() {
 
     setPreferences(next);
     localStorage.setItem("ephNotificationPreferences", JSON.stringify(next));
-    showMessage(nextValue ? "Tümü açıldı." : "Tümü kapatıldı.");
+    showMessage(nextValue ? "Tüm türler açıldı." : "Tüm türler kapatıldı.");
   };
 
   if (!mounted) {
@@ -321,61 +343,59 @@ export default function NotificationSettingsPage() {
   }
 
   return (
-    <main className="h-[100svh] overflow-hidden bg-[#F7FBFF] text-[#06194A]">
-      <header className="h-[54px] bg-[#F7FBFF]/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-full max-w-[430px] items-center justify-between px-3">
+    <main className="min-h-screen bg-[#F7FBFF] pb-20 text-[#06194A]">
+      <header className="sticky top-0 z-40 border-b border-[#DDE7F3] bg-[#F7FBFF]/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[460px] items-center justify-between px-4 py-3">
           <Link
             href="/profil"
-            className="flex h-9 w-9 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#06194A] shadow-sm"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#06194A] shadow-sm"
             aria-label="Profile dön"
           >
-            <ArrowLeft size={17} />
+            <ArrowLeft size={18} />
           </Link>
 
           <div className="text-center">
-            <h1 className="text-[15px] font-black leading-tight">Bildirim Ayarları</h1>
-            <p className="text-[10px] font-bold text-[#64748B]">EPH Bildirim Merkezi</p>
+            <h1 className="text-base font-black leading-tight">Bildirim Ayarları</h1>
+            <p className="text-[11px] font-bold text-[#64748B]">EPH Bildirim Merkezi</p>
           </div>
 
           <Link
             href="/messages"
-            className="relative flex h-9 w-9 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-sm"
+            className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-sm"
             aria-label="Mesajlar"
           >
-            <Bell size={17} />
+            <Bell size={18} />
             {pushEnabled && (
-              <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-[#16A34A]" />
+              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#16A34A]" />
             )}
           </Link>
         </div>
       </header>
 
-      <section className="mx-auto flex h-[calc(100svh-54px)] max-w-[430px] flex-col gap-1.5 px-2.5 pb-2">
+      <section className="mx-auto max-w-[460px] px-4 py-4">
         {testMessage && (
-          <div className="rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1.5 text-center text-[11px] font-black text-[#1557D6]">
+          <div className="mb-3 rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-2 text-center text-xs font-black text-[#1557D6]">
             {testMessage}
           </div>
         )}
 
-        <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
-          <div className="grid grid-cols-[1fr_0.8fr_0.8fr_0.8fr] items-stretch gap-1.5">
+        <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-4 shadow-[0_16px_44px_rgba(15,23,42,0.08)]">
+          <div className="grid grid-cols-[1.1fr_0.9fr_0.9fr_0.9fr] items-stretch gap-2">
             <button
               type="button"
               onClick={pushEnabled ? disableNotifications : enableNotifications}
               disabled={loading}
-              className="flex min-h-[92px] flex-col items-center justify-center rounded-[22px] bg-[#2563EB] px-2 py-2 text-center text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)] disabled:opacity-60"
+              className="flex min-h-[118px] flex-col items-center justify-center rounded-[28px] bg-[#2563EB] px-3 py-3 text-center text-white shadow-[0_16px_30px_rgba(37,99,235,0.24)] disabled:opacity-60"
             >
-              <BellRing size={27} />
-              <span className="mt-1.5 text-[13px] font-black leading-tight">
-                Bildirim
-              </span>
-              <span className="mt-1.5 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-black text-[#16A34A]">
+              <BellRing size={32} />
+              <span className="mt-2 text-sm font-black leading-tight">Bildirimler</span>
+              <span className="mt-2 rounded-full bg-white px-3 py-1 text-[11px] font-black text-[#16A34A]">
                 {loading ? "..." : pushEnabled ? "AKTİF" : "AÇ"}
               </span>
             </button>
 
             <StatusMini
-              icon={<ShieldCheck size={18} />}
+              icon={<ShieldCheck size={20} />}
               label="İzin"
               value={
                 permission === "granted"
@@ -384,45 +404,60 @@ export default function NotificationSettingsPage() {
                     ? "Kapalı"
                     : permission === "unsupported"
                       ? "Yok"
-                      : "Bekle"
+                      : "Bekliyor"
               }
               active={permission === "granted"}
             />
 
             <StatusMini
-              icon={<Volume2 size={18} />}
+              icon={<Volume2 size={20} />}
               label="Ses"
               value={soundEnabled ? selectedSoundItem.label : "Kapalı"}
               active={soundEnabled}
             />
 
             <StatusMini
-              icon={<Smartphone size={18} />}
+              icon={<Smartphone size={20} />}
               label="Cihaz"
               value={pushEnabled ? "Aktif" : "Pasif"}
               active={pushEnabled}
             />
           </div>
-        </section>
 
-        <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-          <div className="mb-1.5 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <Music2 size={16} className="text-[#1557D6]" />
-              <h2 className="text-[13px] font-black">Ses Seçimi</h2>
-            </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[#DDE7F3] pt-3">
+            <button
+              type="button"
+              onClick={testBrowserNotification}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#1557D6] px-3 text-xs font-black text-white shadow-sm"
+            >
+              <Megaphone size={16} />
+              Test Bildirimi
+            </button>
 
             <button
               type="button"
               onClick={testSelectedSound}
-              className="inline-flex items-center gap-1 text-[11px] font-black text-[#1557D6]"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-[#DDE7F3] bg-white px-3 text-xs font-black text-[#1557D6] shadow-sm"
             >
-              Test
-              <Play size={14} />
+              <Play size={16} />
+              Ses Testi
             </button>
           </div>
+        </section>
 
-          <div className="grid grid-cols-6 gap-1">
+        <section className="mt-4 rounded-[30px] border border-[#DDE7F3] bg-white p-4 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Music2 size={18} className="text-[#1557D6]" />
+              <h2 className="text-base font-black">Bildirim Sesi</h2>
+            </div>
+
+            <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[11px] font-black text-[#1557D6]">
+              {selectedSoundItem.label}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
             {SOUND_OPTIONS.map((sound) => {
               const active = selectedSound === sound.id;
 
@@ -431,24 +466,29 @@ export default function NotificationSettingsPage() {
                   key={sound.id}
                   type="button"
                   onClick={() => saveSoundChoice(sound)}
-                  className="min-w-0 text-center"
+                  className={`rounded-[24px] border p-3 text-center transition ${
+                    active
+                      ? "border-[#1557D6] bg-[#EFF6FF]"
+                      : "border-[#DDE7F3] bg-[#F8FAFC] hover:bg-white"
+                  }`}
                   aria-label={sound.label}
                 >
                   <span
-                    className={`mx-auto flex h-10 w-10 items-center justify-center rounded-full border transition ${
-                      active
-                        ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
-                        : "border-[#DDE7F3] bg-[#F8FAFC] text-[#27364F]"
+                    className={`mx-auto flex h-11 w-11 items-center justify-center rounded-2xl ${
+                      active ? "bg-[#1557D6] text-white" : "bg-white text-[#27364F]"
                     }`}
                   >
-                    {sound.id === "off" ? <VolumeX size={18} /> : <Bell size={17} />}
+                    {sound.id === "off" ? <VolumeX size={19} /> : <Bell size={18} />}
                   </span>
                   <span
-                    className={`mt-0.5 block truncate text-[9px] font-black ${
-                      active ? "text-[#1557D6]" : "text-[#27364F]"
+                    className={`mt-2 block truncate text-xs font-black ${
+                      active ? "text-[#1557D6]" : "text-[#06194A]"
                     }`}
                   >
                     {sound.label}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[10px] font-bold text-[#64748B]">
+                    {sound.description}
                   </span>
                 </button>
               );
@@ -456,113 +496,93 @@ export default function NotificationSettingsPage() {
           </div>
         </section>
 
-        <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-          <div className="mb-1.5 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <Radio size={16} className="text-[#1557D6]" />
-              <h2 className="text-[13px] font-black">Bildirim Türleri</h2>
+        <section className="mt-4 rounded-[30px] border border-[#DDE7F3] bg-white p-4 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Radio size={18} className="text-[#1557D6]" />
+              <h2 className="text-base font-black">Bildirim Türleri</h2>
             </div>
 
             <button
               type="button"
               onClick={toggleAllPreferences}
-              className="text-[11px] font-black text-[#1557D6]"
+              className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[11px] font-black text-[#1557D6]"
             >
-              Tümü
+              Tümünü Yönet
             </button>
           </div>
 
-          <div className="grid grid-cols-5 gap-1">
-            <PreferenceTile
-              label="Mesaj"
+          <div className="grid grid-cols-2 gap-2">
+            <PreferenceRow
+              label="Mesajlar"
               active={preferences.messages}
               onClick={() => togglePreference("messages")}
-              icon={<MessageCircle size={17} />}
+              icon={<MessageCircle size={18} />}
             />
-            <PreferenceTile
+            <PreferenceRow
               label="Forum"
               active={preferences.forum}
               onClick={() => togglePreference("forum")}
-              icon={<Radio size={17} />}
+              icon={<Radio size={18} />}
             />
-            <PreferenceTile
+            <PreferenceRow
               label="Havuz"
               active={preferences.pool}
               onClick={() => togglePreference("pool")}
-              icon={<ShieldCheck size={17} />}
+              icon={<ShieldCheck size={18} />}
             />
-            <PreferenceTile
-              label="Duyuru"
+            <PreferenceRow
+              label="Duyurular"
               active={preferences.announcements}
               onClick={() => togglePreference("announcements")}
-              icon={<Megaphone size={17} />}
+              icon={<Megaphone size={18} />}
             />
-            <PreferenceTile
+            <PreferenceRow
               label="Lina"
               active={preferences.lina}
               onClick={() => togglePreference("lina")}
-              icon={<WandSparkles size={17} />}
+              icon={<WandSparkles size={18} />}
+              wide
             />
           </div>
         </section>
 
-        <section className="grid grid-cols-2 gap-1.5">
-          <button
-            type="button"
-            onClick={testBrowserNotification}
-            className="flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] bg-[#1557D6] px-2 text-left text-white shadow-[0_10px_22px_rgba(21,87,214,0.16)]"
-          >
-            <Megaphone size={18} />
-            <span>
-              <span className="block text-[12px] font-black">Test Bildirimi</span>
-              <span className="block text-[10px] font-semibold text-white/80">
-                Tarayıcı testi
-              </span>
-            </span>
-          </button>
+        <section className="mt-4 rounded-[30px] border border-[#DDE7F3] bg-white p-4 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
+          <div className="mb-3 flex items-center gap-2">
+            <Sparkles size={18} className="text-[#1557D6]" />
+            <h2 className="text-base font-black">Durum Merkezi</h2>
+          </div>
 
-          <button
-            type="button"
-            onClick={testSelectedSound}
-            className="flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] border border-[#DDE7F3] bg-white px-2 text-left text-[#06194A] shadow-sm"
-          >
-            <Volume2 size={18} className="text-[#1557D6]" />
-            <span>
-              <span className="block text-[12px] font-black">Ses Testi</span>
-              <span className="block text-[10px] font-semibold text-[#64748B]">
-                {selectedSoundItem.label}
-              </span>
-            </span>
-          </button>
-        </section>
-
-        <section className="grid grid-cols-3 gap-1.5 rounded-[22px] border border-[#DDE7F3] bg-white p-1.5 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-          <FooterStatus
-            icon={<ShieldCheck size={15} />}
-            label="Tarayıcı"
-            value={
-              permission === "granted"
-                ? "Açık"
-                : permission === "denied"
-                  ? "Kapalı"
-                  : permission === "unsupported"
-                    ? "Yok"
-                    : "Bekle"
-            }
-            active={permission === "granted"}
-          />
-          <FooterStatus
-            icon={<Radio size={15} />}
-            label="Servis"
-            value={serviceWorkerStatus}
-            active={serviceWorkerStatus === "Aktif"}
-          />
-          <FooterStatus
-            icon={<Sparkles size={15} />}
-            label="Push"
-            value={pushEnabled ? "Aktif" : "Pasif"}
-            active={pushEnabled}
-          />
+          <div className="grid gap-2">
+            <StatusLine
+              label="Tarayıcı İzni"
+              value={
+                permission === "granted"
+                  ? "Açık"
+                  : permission === "denied"
+                    ? "Kapalı"
+                    : permission === "unsupported"
+                      ? "Desteklenmiyor"
+                      : "Bekliyor"
+              }
+              active={permission === "granted"}
+            />
+            <StatusLine
+              label="Servis Çalışanı"
+              value={serviceWorkerStatus}
+              active={serviceWorkerStatus === "Aktif"}
+            />
+            <StatusLine
+              label="Push Servisi"
+              value={pushEnabled ? "Aktif" : "Pasif"}
+              active={pushEnabled}
+            />
+            <StatusLine
+              label="Son Test"
+              value={lastTestAt || "Henüz test yapılmadı"}
+              active={Boolean(lastTestAt)}
+            />
+          </div>
         </section>
       </section>
     </main>
@@ -581,58 +601,63 @@ function StatusMini({
   active: boolean;
 }) {
   return (
-    <div className="flex min-h-[92px] min-w-0 flex-col items-center justify-center rounded-[20px] bg-[#F8FAFC] px-1 text-center">
+    <div className="flex min-h-[118px] min-w-0 flex-col items-center justify-center rounded-[24px] bg-[#F8FAFC] px-1.5 text-center">
       <div
-        className={`flex h-9 w-9 items-center justify-center rounded-full ${
+        className={`flex h-11 w-11 items-center justify-center rounded-full ${
           active ? "bg-[#ECFDF5] text-[#16A34A]" : "bg-[#F1F5F9] text-[#64748B]"
         }`}
       >
         {icon}
       </div>
-      <p className="mt-1 text-[9px] font-bold text-[#64748B]">{label}</p>
-      <p className={`max-w-full truncate text-[10px] font-black ${active ? "text-[#16A34A]" : "text-[#06194A]"}`}>
+      <p className="mt-2 text-[10px] font-bold text-[#64748B]">{label}</p>
+      <p className={`max-w-full truncate text-[11px] font-black ${active ? "text-[#16A34A]" : "text-[#06194A]"}`}>
         {value}
       </p>
-      {active && <CheckCircle2 size={12} className="mt-0.5 text-[#16A34A]" />}
+      {active && <CheckCircle2 size={14} className="mt-1 text-[#16A34A]" />}
     </div>
   );
 }
 
-function PreferenceTile({
+function PreferenceRow({
   icon,
   label,
   active,
   onClick,
+  wide,
 }: {
   icon: React.ReactNode;
   label: string;
   active: boolean;
   onClick: () => void;
+  wide?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] p-1 text-center"
+      className={`flex min-h-14 items-center justify-between gap-2 rounded-[22px] border border-[#DDE7F3] bg-[#F8FAFC] px-3 text-left ${
+        wide ? "col-span-2" : ""
+      }`}
     >
-      <span
-        className={`mx-auto flex h-8 w-8 items-center justify-center rounded-2xl ${
-          active ? "bg-[#EFF6FF] text-[#1557D6]" : "bg-white text-[#64748B]"
-        }`}
-      >
-        {icon}
+      <span className="flex min-w-0 items-center gap-2">
+        <span
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${
+            active ? "bg-[#EFF6FF] text-[#1557D6]" : "bg-white text-[#64748B]"
+          }`}
+        >
+          {icon}
+        </span>
+        <span className="truncate text-sm font-black text-[#06194A]">{label}</span>
       </span>
-      <span className="mt-0.5 block truncate text-[9px] font-black text-[#06194A]">
-        {label}
-      </span>
+
       <span
-        className={`mx-auto mt-0.5 block h-4 w-8 rounded-full p-0.5 transition ${
+        className={`relative h-6 w-11 shrink-0 rounded-full transition ${
           active ? "bg-[#16A34A]" : "bg-[#CBD5E1]"
         }`}
       >
         <span
-          className={`block h-3 w-3 rounded-full bg-white transition ${
-            active ? "translate-x-4" : "translate-x-0"
+          className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${
+            active ? "left-6" : "left-1"
           }`}
         />
       </span>
@@ -640,30 +665,26 @@ function PreferenceTile({
   );
 }
 
-function FooterStatus({
-  icon,
+function StatusLine({
   label,
   value,
   active,
 }: {
-  icon: React.ReactNode;
   label: string;
   value: string;
   active: boolean;
 }) {
   return (
-    <div className="min-w-0 border-r border-[#DDE7F3] px-1 text-center last:border-r-0">
-      <div
-        className={`mx-auto flex h-7 w-7 items-center justify-center rounded-full ${
+    <div className="flex items-center justify-between gap-3 rounded-[22px] bg-[#F8FAFC] px-4 py-3">
+      <span className="text-sm font-black text-[#06194A]">{label}</span>
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${
           active ? "bg-[#ECFDF5] text-[#16A34A]" : "bg-[#F1F5F9] text-[#64748B]"
         }`}
       >
-        {icon}
-      </div>
-      <p className="mt-0.5 truncate text-[9px] font-bold text-[#64748B]">{label}</p>
-      <p className={`truncate text-[10px] font-black ${active ? "text-[#16A34A]" : "text-[#06194A]"}`}>
+        {active && <CheckCircle2 size={13} />}
         {value}
-      </p>
+      </span>
     </div>
   );
 }
