@@ -277,7 +277,7 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
                 <MenuRow
                   icon={<HelpCircle size={17} />}
                   label="Yardım Merkezi"
-                  onClick={() => comingSoon("Yardım Merkezi yakında aktif olacak.")}
+                  onClick={() => go("/help-center")}
                 />
                 <MenuRow danger icon={<LogOut size={17} />} label="Çıkış Yap" onClick={handleLogout} />
               </MenuSection>
