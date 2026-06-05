@@ -9,7 +9,6 @@ import api from "@/lib/api";
 import Link from "next/link";
 import {
   ArrowUpDown,
-  Bell,
   Building2,
   Camera,
   CheckSquare,
@@ -17,10 +16,8 @@ import {
   Grid2X2,
   Home,
   List,
-  LogOut,
   Map,
   MapPin,
-  Maximize2,
   Plus,
   Search,
   Share2,
@@ -29,7 +26,6 @@ import {
   Square,
   Star,
   TrendingUp,
-  User,
   UsersRound,
 } from "lucide-react";
 import StokPremiumStyles from "@/components/stok/StokPremiumStyles";
@@ -115,7 +111,6 @@ function formatCompactPrice(value?: number, currency?: string) {
   return `${numeric.toLocaleString("tr-TR")} ${symbol}`;
 }
 
-
 function formatShortDate(value?: string) {
   if (!value) return "Tarih yok";
 
@@ -199,16 +194,8 @@ function getPortfolioScoreLabel(score: number) {
   return "Eksik";
 }
 
-function unitTitle(unit: Unit) {
-  const projectName = unit.project?.name || "EPH Portföy";
-  const room = unit.roomCount ? `${unit.roomCount} ` : "";
-  const type = unit.type ? String(unit.type).replaceAll("_", " ") : "Portföy";
-
-  return `${projectName}${room ? ` · ${room}` : ""}${type ? ` ${type}` : ""}`;
-}
-
 export default function StokPage() {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -276,14 +263,13 @@ export default function StokPage() {
     }
 
     fetchData();
-  }, [hydrated, user]);
+  }, [hydrated, user, router]);
 
   useEffect(() => {
     if (!hydrated || !user) return;
 
     fetchUnits();
-  }, [statusFilter, cityFilter]);
-
+  }, [statusFilter, cityFilter, hydrated, user]);
 
   useEffect(() => {
     setShowAllPortfolios(false);
@@ -363,11 +349,11 @@ export default function StokPage() {
     return units.filter((unit) => hotStatuses.includes(unit.status)).length;
   }, [units]);
 
-  const favoriteCount = useMemo(() => {
+  const selectedCount = useMemo(() => {
     return Math.max(0, selectedUnitIds.length);
   }, [selectedUnitIds.length]);
 
-  const requestCount = useMemo(() => {
+  const pendingControlCount = useMemo(() => {
     return units.filter((unit) => !isUnitVerified(unit)).length;
   }, [units]);
 
@@ -380,7 +366,6 @@ export default function StokPage() {
       ),
     ).sort((a, b) => a.localeCompare(b, "tr"));
   }, [units]);
-
 
   const statusDistribution = useMemo(() => {
     return Object.entries(
@@ -695,79 +680,60 @@ export default function StokPage() {
     <div className="min-h-screen bg-[#F7FBFF] text-[#27364F]">
       <StokPremiumStyles />
 
-      <main className="mx-auto min-h-screen w-full max-w-[1180px] px-4 pb-32 pt-5 md:px-6 lg:px-8">
+      <main className="mx-auto min-h-screen w-full max-w-[1180px] px-4 pb-8 pt-5 md:px-6 lg:px-8">
         <section className="eph-mobile-stock-head">
-          <div className="flex items-start justify-between gap-3">
-            <Link href="/dashboard" className="flex items-center gap-2 no-underline">
-              <img src="/LOGO_EPH.png" alt="EPH" className="h-12 w-12 object-contain" />
-              <div>
-                <p className="text-2xl font-black leading-none tracking-[-0.08em] text-[#06194A]">
-                  EPH
-                </p>
-                <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#27364F]">
-                  Portföy Havuzu
-                </p>
-              </div>
-            </Link>
+          <div className="rounded-[30px] border border-[#DDE7F3] bg-white px-4 py-5 text-center shadow-[0_18px_42px_rgba(15,23,42,0.075)]">
+            <p className="mx-auto inline-flex min-h-[30px] items-center justify-center rounded-full bg-[#EFF6FF] px-4 text-[12px] font-black text-[#1557D6]">
+              Portföy Yönetimi
+            </p>
 
-            <div className="flex items-start gap-3">
+            <h1 className="mx-auto mt-3 max-w-[360px] text-center text-[28px] font-black leading-[0.98] tracking-[-0.055em] text-[#06194A]">
+              Portföy Merkezi
+            </h1>
+
+            <p className="mx-auto mt-3 max-w-[340px] text-center text-[13px] font-extrabold leading-5 text-[#64748B]">
+              Portföylerinizi yönetin, paylaşın ve takip edin.
+            </p>
+
+            <div className="mt-5 grid grid-cols-3 gap-2">
               <button
-                className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#06194A] shadow-[0_12px_26px_rgba(15,23,42,0.06)]"
+                type="button"
                 onClick={() => searchInputRef.current?.focus()}
-                aria-label="Arama alanına git"
+                className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-[18px] border border-[#DDE7F3] bg-[#FBFDFF] text-[11px] font-black text-[#06194A]"
               >
-                <Search size={22} />
+                <Search size={19} />
+                Ara
               </button>
 
               <button
-                className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-[0_12px_26px_rgba(15,23,42,0.06)]"
+                type="button"
                 onClick={() => setLinaOpen(true)}
-                aria-label="Lina asistanı aç"
+                className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-[18px] border border-[#DDE7F3] bg-[#FBFDFF] text-[11px] font-black text-[#1557D6]"
               >
-                <Sparkles size={22} />
+                <Sparkles size={19} />
+                Lina
               </button>
 
               <button
-                className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#06194A] shadow-[0_12px_26px_rgba(15,23,42,0.06)]"
-                onClick={() => router.push("/messages")}
-                aria-label="Mesajlar"
-              >
-                <Bell size={22} />
-                {requestCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white">
-                    {requestCount > 9 ? "9+" : requestCount}
-                  </span>
-                )}
-              </button>
-
-              <button
+                type="button"
                 onClick={() => {
-                  logout();
-                  router.push("/giris");
+                  resetForm();
+                  setShowModal(true);
                 }}
-                className="flex flex-col items-center justify-center rounded-2xl bg-white px-2 py-1 text-[#06194A] shadow-[0_12px_26px_rgba(15,23,42,0.06)]"
-                aria-label="Çıkış"
+                disabled={!canAddUnit}
+                className="flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-[18px] bg-[#1557D6] text-[11px] font-black text-white disabled:opacity-50"
               >
-                <LogOut size={22} />
-                <span className="text-[10px] font-bold">Çıkış</span>
+                <Plus size={20} />
+                Ekle
               </button>
             </div>
-          </div>
-
-          <div className="mt-5 text-center">
-            <h1 className="text-xl font-black tracking-[-0.04em] text-[#06194A]">
-              Hoş geldin, {user?.firstName || "Mustafa"}! 👋
-            </h1>
-            <p className="mt-1 text-xs font-semibold text-[#475569]">
-              Portföy havuzundaki güncel durumun
-            </p>
           </div>
 
           <div className="mt-4 grid grid-cols-5 overflow-hidden rounded-[20px] border border-[#DDE7F3] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.06)]">
             <MiniStat icon={<Home size={16} />} value={units.length} label="Toplam" />
             <MiniStat icon={<Eye size={16} />} value={activeCount} label="Aktif" tone="green" />
-            <MiniStat icon={<Star size={16} />} value={favoriteCount} label="Favori" tone="orange" />
-            <MiniStat icon={<UsersRound size={16} />} value={requestCount} label="Talep" tone="purple" />
+            <MiniStat icon={<Star size={16} />} value={selectedCount} label="Seçili" tone="orange" />
+            <MiniStat icon={<UsersRound size={16} />} value={pendingControlCount} label="Onay" tone="purple" />
             <MiniStat
               icon={<TrendingUp size={16} />}
               value={totalValue ? `${(totalValue / 1000000).toFixed(1)}M` : "0"}
@@ -867,8 +833,8 @@ export default function StokPage() {
               {showAllPortfolios
                 ? `${filteredUnits.length} portföyün tamamı gösteriliyor.`
                 : viewMode === "cards"
-                  ? `İlk 5 portföy gösteriliyor. Tümünü görmek için Tümünü Gör butonuna bas.`
-                  : `İlk 10 portföy gösteriliyor. Tümünü görmek için Tümünü Gör butonuna bas.`}
+                  ? "İlk 5 portföy gösteriliyor. Tümünü görmek için Tümünü Gör butonuna bas."
+                  : "İlk 10 portföy gösteriliyor. Tümünü görmek için Tümünü Gör butonuna bas."}
             </div>
           )}
 
@@ -1031,7 +997,7 @@ export default function StokPage() {
             <div className="mt-3 grid grid-cols-3 gap-2">
               <AdminMini label="Toplam" value={units.length} />
               <AdminMini label="Aktif" value={activeCount} />
-              <AdminMini label="Onay" value={requestCount} />
+              <AdminMini label="Onay" value={pendingControlCount} />
             </div>
           </section>
         )}
@@ -1064,26 +1030,6 @@ export default function StokPage() {
         onClose={() => setShareOpen(false)}
         data={shareData}
       />
-
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#DDE7F3] bg-white/96 px-5 pb-6 pt-3 shadow-[0_-18px_40px_rgba(15,23,42,0.08)] backdrop-blur">
-        <div className="mx-auto flex max-w-[520px] items-center justify-between">
-          <BottomItem href="/dashboard" icon={<Home size={22} />} label="Ana Sayfa" />
-          <BottomItem active href="/stok" icon={<Building2 size={22} />} label="Portföyler" />
-          <button
-            onClick={() => {
-              resetForm();
-              setShowModal(true);
-            }}
-            disabled={!canAddUnit}
-            className="relative -mt-9 flex h-16 w-16 flex-col items-center justify-center rounded-full bg-[#1557D6] text-white shadow-[0_18px_36px_rgba(21,87,214,0.35)] disabled:opacity-50"
-          >
-            <Plus size={30} />
-            <span className="absolute -bottom-6 text-xs font-bold text-[#27364F]">Ekle</span>
-          </button>
-          <BottomItem href="/network" icon={<UsersRound size={22} />} label="Network" />
-          <BottomItem href="/profil" icon={<User size={22} />} label="Profil" />
-        </div>
-      </nav>
     </div>
   );
 }
@@ -1107,7 +1053,7 @@ function MiniStat({
   };
 
   return (
-    <div className="flex min-h-[70px] flex-col items-center justify-center border-r border-[#DDE7F3] px-1 last:border-r-0">
+    <div className="flex min-h-[70px] flex-col items-center justify-center border-r border-[#DDE7F3] px-1 text-center last:border-r-0">
       <div className={`mb-1 flex h-8 w-8 items-center justify-center rounded-full ${tones[tone]}`}>
         {icon}
       </div>
@@ -1419,29 +1365,5 @@ function AdminMini({ label, value }: { label: string; value: number }) {
       </p>
       <p className="mt-1 text-lg font-black text-[#06194A]">{value}</p>
     </div>
-  );
-}
-
-function BottomItem({
-  icon,
-  label,
-  active,
-  href,
-}: {
-  icon: ReactNode;
-  label: string;
-  active?: boolean;
-  href: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex w-16 flex-col items-center gap-1 ${
-        active ? "text-[#1557D6]" : "text-[#27364F]"
-      }`}
-    >
-      {icon}
-      <span className="text-[11px] font-bold">{label}</span>
-    </Link>
   );
 }
