@@ -192,8 +192,7 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
           onClick={() => setMenuOpen(false)}
         >
           <aside
-	    className="fixed left-0 top-0 z-[1000] flex h-dvh w-[318px] max-w-[86vw] flex-col overflow-hidden rounded-r-[32px] border-r border-[#DDE7F3] bg-white shadow-[22px_0_		54px_rgba(15,23,42,0.22)]"
-            
+            className="fixed bottom-0 left-0 top-0 z-[1000] flex h-[100dvh] w-[318px] max-w-[86vw] translate-x-0 flex-col overflow-hidden rounded-r-[32px] border-r border-[#DDE7F3] bg-white shadow-[22px_0_54px_rgba(15,23,42,0.22)]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="relative overflow-hidden bg-gradient-to-br from-[#1557D6] via-[#4F46E5] to-[#7C3AED] px-4 pb-4 pt-4 text-white">
