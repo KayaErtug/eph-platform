@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs';
+import * as path from 'path';
 
 import { LinaChatDto } from './dto/lina-chat.dto';
 import { LinaVoiceDto } from './dto/lina-voice.dto';
@@ -40,6 +42,8 @@ type LinaVoiceResponse = {
 
 @Injectable()
 export class LinaService {
+  private readonly promptCache = new Map<string, string>();
+
   constructor(
     private readonly configService: ConfigService,
     private readonly linaAccessService: LinaAccessService,
@@ -51,7 +55,7 @@ export class LinaService {
   getStatus(): LinaStatusResponse {
     return {
       success: true,
-      message: 'Lina v2 aktif. Türkçe yazılı yanıt, PostgreSQL tercih hafızası ve sesli yanıt pipeline hazır.',
+      message: 'Lina v3 aktif. Core Prompt, rol promptları, görev promptları, hafıza ve modül bağlamı AI sağlayıcısına bağlandı.',
       provider: this.getAiProvider(),
     };
   }
@@ -336,6 +340,7 @@ export class LinaService {
     }
 
     const model = this.configService.get<string>('OPENAI_MODEL') || 'gpt-4.1-mini';
+    const systemPrompt = await this.buildSystemPrompt(sourceModule, user);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -345,11 +350,12 @@ export class LinaService {
       },
       body: JSON.stringify({
         model,
-        temperature: 0.3,
+        temperature: 0.35,
+        max_tokens: 1200,
         messages: [
           {
             role: 'system',
-            content: this.buildSystemPrompt(sourceModule, user),
+            content: systemPrompt,
           },
           {
             role: 'user',
@@ -389,6 +395,7 @@ export class LinaService {
     }
 
     const model = this.configService.get<string>('ANTHROPIC_MODEL') || 'claude-3-5-haiku-latest';
+    const systemPrompt = await this.buildSystemPrompt(sourceModule, user);
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -399,9 +406,9 @@ export class LinaService {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 700,
-        temperature: 0.3,
-        system: this.buildSystemPrompt(sourceModule, user),
+        max_tokens: 1200,
+        temperature: 0.35,
+        system: systemPrompt,
         messages: [
           {
             role: 'user',
@@ -459,9 +466,9 @@ export class LinaService {
         text: voiceText,
         model_id: modelId,
         voice_settings: {
-          stability: 0.55,
-          similarity_boost: 0.75,
-          style: 0.15,
+          stability: 0.58,
+          similarity_boost: 0.82,
+          style: 0.18,
           use_speaker_boost: true,
         },
       }),
@@ -477,18 +484,222 @@ export class LinaService {
     return Buffer.from(arrayBuffer);
   }
 
-  private buildSystemPrompt(sourceModule: LinaModuleName, user?: LinaApiUser): string {
+  private async buildSystemPrompt(sourceModule: LinaModuleName, user?: LinaApiUser): Promise<string> {
+    const corePrompt = this.readPromptFile(['core', 'Lina_Core_Prompt.md'], this.getFallbackCorePrompt());
+    const rolePrompt = this.readPromptFile(this.getRolePromptPath(user?.role), this.getFallbackRolePrompt(user?.role));
+    const taskPrompts = this.getTaskPromptPaths(sourceModule)
+      .map((promptPath) => this.readPromptFile(promptPath, ''))
+      .filter((content) => content.trim().length > 0);
+
+    const preferences = await this.safeGetPreferences(user?.id);
+    const memoryContext = this.buildMemoryContext(preferences);
+    const currentModuleContext = this.buildCurrentModuleContext(sourceModule, user);
+
+    return [
+      '# LINA V3 SYSTEM PROMPT',
+      '',
+      'Aşağıdaki tüm bölümleri birlikte kullan.',
+      'Öncelik sırası: Core Prompt > Güvenlik/KVKK > Rol Prompt > Task Prompt > Memory > Current Module.',
+      'Sistemde olmayan veriyi uydurma. Veri yoksa bunu kısa ve dürüst şekilde söyle.',
+      '',
+      '---',
+      '',
+      '# 1) CORE PROMPT',
+      corePrompt,
+      '',
+      '---',
+      '',
+      '# 2) ROLE PROMPT',
+      rolePrompt,
+      '',
+      '---',
+      '',
+      '# 3) TASK PROMPTS',
+      taskPrompts.length ? taskPrompts.join('\n\n---\n\n') : 'Bu modül için ek görev promptu bulunamadı.',
+      '',
+      '---',
+      '',
+      '# 4) MEMORY',
+      memoryContext,
+      '',
+      '---',
+      '',
+      '# 5) CURRENT MODULE',
+      currentModuleContext,
+      '',
+      '---',
+      '',
+      '# 6) CEVAP KURALLARI',
+      '- Her zaman Türkçe cevap ver.',
+      '- Cevapları kısa, net, premium ve sektör odaklı üret.',
+      '- Kullanıcıya mümkünse adıyla veya uygun hitapla seslen.',
+      '- Önce önemli durumu söyle, sonra öneri ver, sonra kısa aksiyon sor.',
+      '- Gereksiz uzun açıklama yapma.',
+      '- Telefon, e-posta, TC kimlik, IBAN, API key, token, şifre, özel müşteri notu ve özel mesaj içeriği paylaşma.',
+      '- Başka kullanıcının özel verisine erişim varmış gibi davranma.',
+      '- Kesin satış, kesin fiyat, kesin kazanç, kesin yatırım veya hukuki garanti verme.',
+      '- Eğer sayı, görev, mesaj, talep veya eşleşme bilgisi sistem bağlamında verilmemişse sayı uydurma.',
+      '- Eğer kullanıcı günlük özet isterse sadece bilinen verilerle özetle; bilinmeyen alanları kesinmiş gibi yazma.',
+    ].join('\n');
+  }
+
+  private readPromptFile(relativeParts: string[], fallback: string): string {
+    const cacheKey = relativeParts.join('/');
+
+    if (this.promptCache.has(cacheKey)) {
+      return this.promptCache.get(cacheKey) || fallback;
+    }
+
+    const possiblePaths = [
+      path.join(process.cwd(), 'src', 'lina', ...relativeParts),
+      path.join(process.cwd(), 'backend', 'src', 'lina', ...relativeParts),
+      path.join(__dirname, '..', ...relativeParts),
+      path.join(__dirname, '..', '..', 'src', 'lina', ...relativeParts),
+    ];
+
+    for (const filePath of possiblePaths) {
+      try {
+        if (fs.existsSync(filePath)) {
+          const content = fs.readFileSync(filePath, 'utf8').trim();
+
+          if (content) {
+            this.promptCache.set(cacheKey, content);
+            return content;
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    this.promptCache.set(cacheKey, fallback);
+    return fallback;
+  }
+
+  private getRolePromptPath(role?: string): string[] {
+    const normalizedRole = this.normalizeRole(role);
+
+    const rolePromptMap: Record<string, string[]> = {
+      EMLAKCI: ['roles', 'Lina_Prompt_Emlakci.md'],
+      MUTEAHHIT: ['roles', 'Lina_Prompt_Muteahhit.md'],
+      INSAAT_FIRMASI: ['roles', 'Lina_Prompt_InsaatFirmasi.md'],
+      ADMIN: ['roles', 'Lina_Prompt_Admin.md'],
+      SUPER_ADMIN: ['roles', 'Lina_Prompt_SuperAdmin.md'],
+      MODERATOR: ['roles', 'Lina_Prompt_Moderator.md'],
+    };
+
+    return rolePromptMap[normalizedRole] || ['roles', 'Lina_Prompt_Emlakci.md'];
+  }
+
+  private getTaskPromptPaths(sourceModule: LinaModuleName): string[][] {
+    const paths: string[][] = [['tasks', 'Lina_Task_Memory.md']];
+
+    const moduleTaskMap: Partial<Record<LinaModuleName, string[]>> = {
+      dashboard: ['tasks', 'Lina_Task_Dashboard.md'],
+      crm: ['tasks', 'Lina_Task_CRM.md'],
+      network: ['tasks', 'Lina_Task_Forum.md'],
+      pool: ['tasks', 'Lina_Task_Pool.md'],
+      notifications: ['tasks', 'Lina_Task_Notifications.md'],
+      admin: ['tasks', 'Lina_Task_AccessControl.md'],
+      audit: ['tasks', 'Lina_Task_Audit.md'],
+      general: ['tasks', 'Lina_Task_Dashboard.md'],
+    };
+
+    const modulePath = moduleTaskMap[sourceModule];
+
+    if (modulePath && modulePath.join('/') !== paths[0].join('/')) {
+      paths.push(modulePath);
+    }
+
+    return paths;
+  }
+
+  private async safeGetPreferences(userId?: string) {
+    try {
+      return await this.linaMemoryService.getPreferences(userId);
+    } catch {
+      return null;
+    }
+  }
+
+  private buildMemoryContext(preferences: unknown): string {
+    if (!preferences) {
+      return [
+        'Kullanıcıya ait kayıtlı Lina tercih/hafıza verisi şu anda okunamadı.',
+        'Hafıza verisi yoksa geçmiş bilgi uydurma.',
+      ].join('\n');
+    }
+
+    return [
+      'Aşağıdaki kullanıcı tercih/hafıza verisini yalnızca yardımcı bağlam olarak kullan.',
+      'Bu veri kullanıcıya özel kabul edilir.',
+      'Bu veri yoksa veya belirsizse uydurma yapma.',
+      '',
+      JSON.stringify(preferences, null, 2).slice(0, 6000),
+    ].join('\n');
+  }
+
+  private buildCurrentModuleContext(sourceModule: LinaModuleName, user?: LinaApiUser): string {
+    const role = this.normalizeRole(user?.role);
+
+    const moduleDescriptions: Record<LinaModuleName, string> = {
+      dashboard: 'Kullanıcı platform ana panelinde. Öncelik: günlük özet, acil işler, fırsatlar ve okunmamış bildirimler.',
+      crm: 'Kullanıcı CRM modülünde. Öncelik: müşteri takibi, görevler, randevular, geri dönüşler ve fırsat eşleştirmeleri.',
+      network: 'Kullanıcı EPH Network/forum alanında. Öncelik: talepler, paylaşımlar, görüşme başlatma ve güvenli iletişim.',
+      pool: 'Kullanıcı portföy/havuz alanında. Öncelik: portföy eşleşmeleri, yetki durumu, kalite ve paylaşılabilirlik.',
+      notifications: 'Kullanıcı bildirim alanında. Öncelik: mesajlar, görev hatırlatmaları ve sessiz saat tercihleri.',
+      admin: 'Kullanıcı admin alanında. Öncelik: başvurular, şikayetler, moderasyon, güvenlik ve yetki sınırları.',
+      audit: 'Kullanıcı denetim/audit alanında. Öncelik: kayıt bütünlüğü, riskler, işlem geçmişi ve güvenlik uyarıları.',
+      general: 'Genel Lina konuşması. Öncelik: kullanıcının rolüne göre en faydalı iş yönlendirmesini yapmak.',
+    };
+
+    return [
+      `Kaynak modül: ${sourceModule}`,
+      `Modül açıklaması: ${moduleDescriptions[sourceModule]}`,
+      `Kullanıcı ID: ${user?.id || 'bilinmiyor'}`,
+      `Kullanıcı rolü: ${user?.role || 'bilinmiyor'}`,
+      `Normalize rol: ${role}`,
+      `Kullanıcı e-posta: ${user?.email ? 'mevcut ama gizli tutulacak' : 'bilinmiyor'}`,
+    ].join('\n');
+  }
+
+  private getFallbackCorePrompt(): string {
     return [
       'Sen EPH Platform içindeki Lina AI asistanısın.',
       'Yalnızca Türkçe yazılı ve sesli yanıt üretirsin.',
       'Kullanıcı yabancı dil isterse platform yönetimine talep iletmesini söylersin.',
+      'KVKK, gizlilik, veri erişim sınırları ve platform güvenliği her şeyden önce gelir.',
       'Telefon, e-posta, açık adres, TC kimlik, IBAN, API key, token, şifre, özel müşteri notu ve özel mesaj içeriği paylaşmazsın.',
       'Başka kullanıcıların CRM, portföy, mesaj veya özel bilgilerine erişim varmış gibi davranmazsın.',
       'Cevapların profesyonel, kısa, net ve sektör odaklı olmalı.',
       'Kesin satış, kesin kazanç, kesin fiyat veya hukuki garanti vermezsin.',
-      `Kaynak modül: ${sourceModule}.`,
-      `Kullanıcı rolü: ${user?.role || 'bilinmiyor'}.`,
     ].join('\n');
+  }
+
+  private getFallbackRolePrompt(role?: string): string {
+    const normalizedRole = this.normalizeRole(role);
+
+    if (normalizedRole === 'ADMIN') {
+      return 'Admin rolünde Lina platform düzeni, başvurular, şikayetler, moderasyon ve güvenlik odağıyla çalışır. Admin sınırlarını aşan işlemlerde Super Admin yetkisi gerektiğini belirtir.';
+    }
+
+    if (normalizedRole === 'SUPER_ADMIN') {
+      return 'Super Admin rolünde Lina platform sağlığı, audit log, admin denetimi, güvenlik, KVKK ve büyüme analizine odaklanır. Karar vermez, risk ve öneri sunar.';
+    }
+
+    if (normalizedRole === 'MODERATOR') {
+      return 'Moderatör rolünde Lina içerik inceleme, şikayet değerlendirme ve raporlama desteği verir. Moderatör karar vermez, raporlar.';
+    }
+
+    if (normalizedRole === 'MUTEAHHIT') {
+      return 'Müteahhit rolünde Lina proje satışları, arsa fırsatları, satılmayan stoklar, yatırımcı talepleri ve emlakçı iş birliklerine odaklanır.';
+    }
+
+    if (normalizedRole === 'INSAAT_FIRMASI') {
+      return 'İnşaat firması rolünde Lina iş fırsatları, ihale/teklif, taşeron, tedarik ve operasyonel risklere odaklanır.';
+    }
+
+    return 'Emlakçı rolünde Lina CRM, portföy, talep, havuz, görev ve mesajları iş fırsatına dönüştürmeye odaklanır.';
   }
 
   private localFallbackAnswer(message: string): string {
@@ -516,6 +727,21 @@ export class LinaService {
     }
 
     return 'general';
+  }
+
+  private normalizeRole(role?: string): string {
+    return String(role || 'EMLAKCI')
+      .trim()
+      .toUpperCase()
+      .replace(/İ/g, 'I')
+      .replace(/İ/g, 'I')
+      .replace(/Ğ/g, 'G')
+      .replace(/Ü/g, 'U')
+      .replace(/Ş/g, 'S')
+      .replace(/Ö/g, 'O')
+      .replace(/Ç/g, 'C')
+      .replace(/\s+/g, '_')
+      .replace(/-/g, '_');
   }
 
   private isForeignLanguageRequest(message: string): boolean {
