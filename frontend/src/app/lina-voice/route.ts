@@ -5,6 +5,9 @@ import path from "path";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const DEFAULT_LINA_VOICE_ID = "LYfSi2g3Frvxg50fRl91";
+const DEFAULT_LINA_MODEL_ID = "eleven_multilingual_v2";
+
 function readEnvValue(key: string) {
   const fromProcess = process.env[key];
 
@@ -31,18 +34,37 @@ function readEnvValue(key: string) {
   }
 }
 
+function normalizeVoiceText(text: string) {
+  return String(text || "")
+    .replace(/\bEPH\b/g, "Emlak Portföy Havuzu")
+    .replace(/\beph\b/g, "Emlak Portföy Havuzu")
+    .replace(/\bTRY\b/g, "Türk Lirası")
+    .replace(/\bTL\b/g, "Türk Lirası")
+    .replace(/₺/g, " Türk Lirası ")
+    .replace(/\b0\s*km\b/gi, "sıfır kilometre")
+    .replace(/\b0km\b/gi, "sıfır kilometre")
+    .replace(/\b(\d+)\s*[,.]\s*5\s*\+\s*(\d+)\b/g, "$1 buçuk artı $2")
+    .replace(/\b(\d+)\s*\+\s*(\d+)\b/g, "$1 artı $2")
+    .replace(/\n/g, ". ")
+    .replace(/\. \. /g, ". ")
+    .replace(/\. /g, ". ")
+    .replace(/, /g, ", ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { text } = await req.json();
 
     const cleanText =
       typeof text === "string" && text.trim().length > 0
-        ? text.trim()
+        ? normalizeVoiceText(text.trim())
         : "Merhaba, ben Lina. Size nasıl yardımcı olabilirim?";
 
     const apiKey = readEnvValue("ELEVENLABS_API_KEY");
-    const voiceId =
-      readEnvValue("ELEVENLABS_VOICE_ID") || "21m00Tcm4TlvDq8ikWAM";
+    const voiceId = readEnvValue("ELEVENLABS_VOICE_ID") || DEFAULT_LINA_VOICE_ID;
+    const modelId = readEnvValue("ELEVENLABS_MODEL_ID") || DEFAULT_LINA_MODEL_ID;
 
     if (!apiKey) {
       return NextResponse.json(
@@ -63,11 +85,11 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           text: cleanText,
-          model_id: "eleven_multilingual_v2",
+          model_id: modelId,
           voice_settings: {
-            stability: 0.58,
-            similarity_boost: 0.82,
-            style: 0.18,
+            stability: 0.92,
+            similarity_boost: 0.98,
+            style: 0.05,
             use_speaker_boost: true,
           },
         }),
