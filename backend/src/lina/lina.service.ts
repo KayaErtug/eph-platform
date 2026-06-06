@@ -869,6 +869,9 @@ export class LinaService {
       "- Her cevabın sonunda otomatik olarak “Nereden başlamak istersin?” deme.",
       "- Cevapta markdown başlıklarını gereksiz kullanma.",
       "- Mümkünse 3-6 kısa cümleyle bitir.",
+      "- Örnek promptlarda geçen Ali Bey, Ahmet Bey, Cenk Bey, Murat Bey, Mustafa Bey gibi isimleri gerçek kullanıcı adı gibi kullanma.",
+      "- Kullanıcı adı canlı veritabanı bağlamında varsa yalnızca o adı kullan; yoksa isimle hitap etme.",
+      "- Kullanıcı ilan veya portföy eklemek istediğinde uzun liste verme; portföy oluşturma sihirbazına geç ve tek seferde yalnızca bir sonraki bilgiyi sor.",
     ].join("\n");
   }
 
@@ -1131,8 +1134,10 @@ export class LinaService {
   private buildRealEstateKnowledgeContext(): string {
     const knowledgeFiles = [
       ["knowledge", "Lina_Knowledge_RealEstate.md"],
+      ["knowledge", "Lina_Knowledge_Geography.md"],
       ["tasks", "Lina_Task_RealEstateLanguage.md"],
       ["tasks", "Lina_Task_Pronunciation.md"],
+      ["tasks", "Lina_Task_PortfoyOlusturma.md"],
     ];
 
     const chunks = knowledgeFiles
@@ -1253,6 +1258,8 @@ export class LinaService {
       ["tasks", "Lina_Task_Memory.md"],
       ["tasks", "Lina_Task_RealEstateLanguage.md"],
       ["tasks", "Lina_Task_Pronunciation.md"],
+      ["tasks", "Lina_Task_PortfoyOlusturma.md"],
+      ["tasks", "Lina_Task_Validation.md"],
     ];
 
     const moduleTaskMap: Partial<Record<LinaModuleName, string[]>> = {
