@@ -334,7 +334,9 @@ export class LinaService {
   }
 
   private async askOpenAi(message: string, sourceModule: LinaModuleName, user?: LinaApiUser): Promise<string> {
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
+    const apiKey =
+  	this.configService.get<string>('OPENAI_API_KEY') ||
+  	process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
       return this.localFallbackAnswer(message);
