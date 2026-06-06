@@ -11,6 +11,7 @@ import { LinaAccessService, LinaAccessUser, LinaModuleName } from './lina-access
 import { LinaKvkkService } from './lina-kvkk.service';
 import { LinaAuditService } from './lina-audit.service';
 import { LinaMemoryService } from './lina-memory.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 type LinaApiUser = LinaAccessUser & {
   email?: string;
@@ -50,6 +51,7 @@ export class LinaService {
     private readonly linaKvkkService: LinaKvkkService,
     private readonly linaAuditService: LinaAuditService,
     private readonly linaMemoryService: LinaMemoryService,
+    private readonly prisma: PrismaService,
   ) {}
 
   getStatus(): LinaStatusResponse {
@@ -342,7 +344,10 @@ export class LinaService {
       return this.localFallbackAnswer(message);
     }
 
-    const model = this.configService.get<string>('OPENAI_MODEL') || 'gpt-4.1-mini';
+    const model =
+      this.configService.get<string>('OPENAI_MODEL') ||
+      process.env.OPENAI_MODEL ||
+      'gpt-4.1-mini';
     const systemPrompt = await this.buildSystemPrompt(sourceModule, user);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -393,13 +398,18 @@ export class LinaService {
   }
 
   private async askClaude(message: string, sourceModule: LinaModuleName, user?: LinaApiUser): Promise<string> {
-    const apiKey = this.configService.get<string>('ANTHROPIC_API_KEY');
+    const apiKey =
+      this.configService.get<string>('ANTHROPIC_API_KEY') ||
+      process.env.ANTHROPIC_API_KEY;
 
     if (!apiKey) {
       return this.localFallbackAnswer(message);
     }
 
-    const model = this.configService.get<string>('ANTHROPIC_MODEL') || 'claude-3-5-haiku-latest';
+    const model =
+      this.configService.get<string>('ANTHROPIC_MODEL') ||
+      process.env.ANTHROPIC_MODEL ||
+      'claude-3-5-haiku-latest';
     const systemPrompt = await this.buildSystemPrompt(sourceModule, user);
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -445,14 +455,21 @@ export class LinaService {
   }
 
   private async askElevenLabs(text: string): Promise<Buffer> {
-    const apiKey = this.configService.get<string>('ELEVENLABS_API_KEY');
-    const voiceId = this.configService.get<string>('ELEVENLABS_VOICE_ID');
+    const apiKey =
+      this.configService.get<string>('ELEVENLABS_API_KEY') ||
+      process.env.ELEVENLABS_API_KEY;
+    const voiceId =
+      this.configService.get<string>('ELEVENLABS_VOICE_ID') ||
+      process.env.ELEVENLABS_VOICE_ID;
 
     if (!apiKey || !voiceId) {
       throw new Error('ELEVENLABS_CONFIG_MISSING');
     }
 
-    const modelId = this.configService.get<string>('ELEVENLABS_MODEL_ID') || 'eleven_multilingual_v2';
+    const modelId =
+      this.configService.get<string>('ELEVENLABS_MODEL_ID') ||
+      process.env.ELEVENLABS_MODEL_ID ||
+      'eleven_multilingual_v2';
 
     const voiceText = text
       .replace(/\bEPH\b/g, 'Emlak Portföy Havuzu')
@@ -503,6 +520,7 @@ export class LinaService {
     const preferences = await this.safeGetPreferences(user?.id);
     const memoryContext = this.buildMemoryContext(preferences);
     const currentModuleContext = this.buildCurrentModuleContext(sourceModule, user);
+    const liveDatabaseContext = await this.buildLiveDatabaseContext(user);
     const personalityLayer = this.buildPersonalityLayer();
 
     return [
@@ -539,12 +557,17 @@ export class LinaService {
       '',
       '---',
       '',
-      '# 6) PERSONALITY LAYER',
+      '# 6) LIVE DATABASE CONTEXT',
+      liveDatabaseContext,
+      '',
+      '---',
+      '',
+      '# 7) PERSONALITY LAYER',
       personalityLayer,
       '',
       '---',
       '',
-      '# 7) FINAL ANSWER RULES',
+      '# 8) FINAL ANSWER RULES',
       '- Her zaman Türkçe cevap ver.',
       '- Cevapları kısa, net, premium ve sektör odaklı üret.',
       '- Her cevabı sohbet uzatmak için değil, iş üretmek için yaz.',
@@ -561,6 +584,240 @@ export class LinaService {
       '- Cevapta markdown başlıklarını gereksiz kullanma.',
       '- Mümkünse 3-6 kısa cümleyle bitir.',
     ].join('\n');
+  }
+
+  private async buildLiveDatabaseContext(user?: LinaApiUser): Promise<string> {
+    if (!user?.id) {
+      return [
+        'Kullanıcı kimliği doğrulanamadı.',
+        'Canlı veritabanı bağlamı oluşturulamadı.',
+        'Kullanıcıya gerçek sayı söyleme.',
+      ].join('\n');
+    }
+
+    try {
+      const [
+        dbUser,
+        projectCount,
+        unitCount,
+        activeUnitCount,
+        customerCount,
+        taskCount,
+        pendingTaskCount,
+        conversationCount,
+        sentMessageCount,
+        unreadNetworkNotificationCount,
+        networkPostCount,
+        latestUnits,
+        latestCustomers,
+        latestTasks,
+      ] = await Promise.all([
+        this.prisma.user.findUnique({
+          where: { id: user.id },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            city: true,
+            district: true,
+            memberCode: true,
+            createdAt: true,
+          },
+        }),
+        this.prisma.project.count({
+          where: { ownerId: user.id },
+        }),
+        this.prisma.unit.count({
+          where: {
+            project: {
+              ownerId: user.id,
+            },
+          },
+        }),
+        this.prisma.unit.count({
+          where: {
+            isOffMarket: false,
+            project: {
+              ownerId: user.id,
+            },
+          },
+        }),
+        this.prisma.customer.count({
+          where: { ownerId: user.id },
+        }),
+        this.prisma.task.count({
+          where: { userId: user.id },
+        }),
+        this.prisma.task.count({
+          where: {
+            userId: user.id,
+            status: 'BEKLIYOR',
+          },
+        }),
+        this.prisma.conversationParticipant.count({
+          where: { userId: user.id },
+        }),
+        this.prisma.message.count({
+          where: { senderId: user.id },
+        }),
+        this.prisma.networkNotification.count({
+          where: {
+            userId: user.id,
+            isRead: false,
+          },
+        }),
+        this.prisma.networkPost.count({
+          where: {
+            userId: user.id,
+            isActive: true,
+          },
+        }),
+        this.prisma.unit.findMany({
+          where: {
+            project: {
+              ownerId: user.id,
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 5,
+          select: {
+            number: true,
+            type: true,
+            status: true,
+            price: true,
+            priceCurrency: true,
+            roomCount: true,
+            area: true,
+            isOffMarket: true,
+            isVerified: true,
+            project: {
+              select: {
+                name: true,
+                city: true,
+                district: true,
+              },
+            },
+          },
+        }),
+        this.prisma.customer.findMany({
+          where: { ownerId: user.id },
+          orderBy: { updatedAt: 'desc' },
+          take: 5,
+          select: {
+            firstName: true,
+            lastName: true,
+            city: true,
+            status: true,
+            budget: true,
+            interestedType: true,
+            interestedArea: true,
+          },
+        }),
+        this.prisma.task.findMany({
+          where: { userId: user.id },
+          orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { updatedAt: 'desc' }],
+          take: 5,
+          select: {
+            title: true,
+            status: true,
+            dueDate: true,
+            customer: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        }),
+      ]);
+
+      const displayName = [dbUser?.firstName, dbUser?.lastName].filter(Boolean).join(' ').trim();
+      const userRole = dbUser?.role || user.role || 'bilinmiyor';
+
+      const unitLines = latestUnits.length
+        ? latestUnits.map((unit, index) => {
+            const location = [unit.project?.city, unit.project?.district].filter(Boolean).join(' / ');
+            const price = this.formatMoney(unit.price, unit.priceCurrency || 'TRY');
+            return `${index + 1}. ${unit.project?.name || 'Proje'} - ${unit.number} - ${unit.type} - ${unit.status} - ${price} - ${unit.area || 'm2 yok'} m² - ${location || 'konum yok'} - ${unit.isOffMarket ? 'pasif' : 'aktif'} - ${unit.isVerified ? 'doğrulanmış' : 'doğrulanmamış'}`;
+          })
+        : ['Kullanıcının portföyünde kayıtlı ilan bulunmuyor.'];
+
+      const customerLines = latestCustomers.length
+        ? latestCustomers.map((customer, index) => {
+            const name = [customer.firstName, customer.lastName].filter(Boolean).join(' ').trim() || 'İsimsiz müşteri';
+            return `${index + 1}. ${name} - ${customer.status} - ${customer.city || 'şehir yok'} - ${customer.interestedType || 'talep tipi yok'} - bütçe: ${this.formatMoney(customer.budget, 'TRY')}`;
+          })
+        : ['Kullanıcının CRM tarafında kayıtlı müşterisi bulunmuyor.'];
+
+      const taskLines = latestTasks.length
+        ? latestTasks.map((task, index) => {
+            const customerName = [task.customer?.firstName, task.customer?.lastName].filter(Boolean).join(' ').trim();
+            return `${index + 1}. ${task.title} - ${task.status} - tarih: ${this.formatDate(task.dueDate)}${customerName ? ` - müşteri: ${customerName}` : ''}`;
+          })
+        : ['Kullanıcının CRM tarafında kayıtlı görevi bulunmuyor.'];
+
+      return [
+        'Bu bölüm canlı veritabanından oluşturulmuştur.',
+        'Bu bölümdeki sayıları gerçek veri olarak kabul et.',
+        'Bu bölümde olmayan sayıları uydurma.',
+        '',
+        `Kullanıcı adı: ${displayName || 'bilinmiyor'}`,
+        `Kullanıcı rolü: ${userRole}`,
+        `Kullanıcı şehir/ilçe: ${[dbUser?.city, dbUser?.district].filter(Boolean).join(' / ') || 'bilinmiyor'}`,
+        `Üye kodu: ${dbUser?.memberCode || 'bilinmiyor'}`,
+        '',
+        'Özet sayılar:',
+        `- Proje sayısı: ${projectCount}`,
+        `- Toplam ilan/portföy sayısı: ${unitCount}`,
+        `- Aktif ilan/portföy sayısı: ${activeUnitCount}`,
+        `- CRM müşteri sayısı: ${customerCount}`,
+        `- CRM toplam görev sayısı: ${taskCount}`,
+        `- CRM bekleyen görev sayısı: ${pendingTaskCount}`,
+        `- Mesajlaşma konuşması sayısı: ${conversationCount}`,
+        `- Kullanıcının gönderdiği mesaj sayısı: ${sentMessageCount}`,
+        `- Okunmamış network bildirimi sayısı: ${unreadNetworkNotificationCount}`,
+        `- Aktif network paylaşımı sayısı: ${networkPostCount}`,
+        '',
+        'Son portföy/ilan kayıtları:',
+        ...unitLines,
+        '',
+        'Son CRM müşteri kayıtları:',
+        ...customerLines,
+        '',
+        'Son CRM görev kayıtları:',
+        ...taskLines,
+        '',
+        'Cevaplama kuralı:',
+        '- Kullanıcı portföyümde kaç ilan var diye sorarsa Toplam ilan/portföy sayısını söyle.',
+        '- Kullanıcı aktif ilan sorarsa Aktif ilan/portföy sayısını söyle.',
+        '- Kullanıcı CRM veya müşteri sorarsa CRM müşteri sayısını ve son müşteri kayıtlarını referans al.',
+        '- Kullanıcı görev sorarsa CRM toplam/bekleyen görev sayılarını referans al.',
+        '- Veri sıfırsa bunu doğal ve profesyonel söyle; sıfır olmayan veri varsa net sayı ver.',
+      ].join('\n');
+    } catch (error) {
+      return [
+        'Canlı veritabanı bağlamı oluşturulurken hata oluştu.',
+        'Bu durumda gerçek sayı uydurma.',
+        `Teknik hata: ${error instanceof Error ? error.message : 'UNKNOWN_LIVE_CONTEXT_ERROR'}`,
+      ].join('\n');
+    }
+  }
+
+  private formatMoney(value?: number | null, currency = 'TRY'): string {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      return 'belirtilmemiş';
+    }
+
+    return `${Math.round(value).toLocaleString('tr-TR')} ${currency}`;
+  }
+
+  private formatDate(value?: Date | null): string {
+    if (!value) {
+      return 'belirtilmemiş';
+    }
+
+    return value.toLocaleDateString('tr-TR');
   }
 
   private buildPersonalityLayer(): string {
