@@ -45,6 +45,9 @@ export class LinaPortfolioEngineService {
   }
 
   buildEnginePrompt(session: LinaPortfolioSessionContext): string {
+    const nextQuestion = this.getNextQuestion(session);
+    const hasStarted = this.hasMeaningfulPortfolioStart(session);
+
     return [
       'LINA PORTFÖY V5 ENGINE',
       'Kararı backend verir. Lina yalnızca kullanıcıya doğal ve kısa cevap yazar.',
@@ -61,16 +64,72 @@ export class LinaPortfolioEngineService {
       `Fiyat: ${session.price ?? 'Eksik'} ${session.currency}`,
       `Sıradaki adım: ${session.step}`,
       `Eksik alanlar: ${session.missingFields.length ? session.missingFields.join(', ') : 'Yok'}`,
+      `Engine tarafından önerilen tek soru: ${nextQuestion}`,
+      '',
+      'İnsansı tepki kuralı:',
+      hasStarted
+        ? '- Bu oturum zaten başladıysa gereksiz “Elbette/Tabii” girişini tekrar etme. Kayıt cümlesi + tek soru ile ilerle.'
+        : '- Bu yeni portföy akışının ilk cevabıysa kısa ve doğal kabul cümlesiyle başla. Örnek: “Elbette Tamer Bey. Daire ilanını oluşturmaya başlıyorum.”',
       '',
       'Kesin kurallar:',
       '- Kullanıcı daha önce verdiği bilgiyi tekrar sorma.',
-      '- Eksik alanlardan yalnızca ilk mantıklı bilgiyi sor.',
+      '- Eksik alanlardan yalnızca Engine tarafından önerilen tek soruyu sor.',
       '- Oda sayısı varsa tekrar oda sayısı sorma.',
-      '- İşlem türü SATILIK veya KİRALIK ise tekrar satılık mı kiralık mı diye sorma.',
-      '- Portföy türü DAİRE ise tekrar daire/villa/arsa diye sorma.',
+      '- İşlem türü SATILIK veya KIRALIK ise tekrar satılık mı kiralık mı diye sorma.',
+      '- Portföy türü DAIRE ise tekrar daire/villa/arsa diye sorma.',
       '- Konum bilgisi varsa tekrar konum sorma.',
-      '- Cevap kısa ve operasyonel olsun.',
+      '- Kullanıcı Honaz, Pamukkale, Merkezefendi gibi bir ilçe verdiyse “kaydetmemi ister misiniz?” diye sorma; direkt kaydettiğini söyle.',
+      '- Cevap kısa, sıcak ve operasyonel olsun.',
     ].join('\n');
+  }
+
+  private getNextQuestion(session: LinaPortfolioSessionContext): string {
+    const missing = session.missingFields || [];
+
+    if (missing.includes('İşlem Türü')) {
+      return 'İşlem türü satılık mı, kiralık mı olacak?';
+    }
+
+    if (missing.includes('İl')) {
+      return 'İlan hangi ilde?';
+    }
+
+    if (missing.includes('İlçe')) {
+      return 'İlçe bilgisini paylaşır mısınız?';
+    }
+
+    if (missing.includes('Mahalle')) {
+      return 'Mahalle bilgisini paylaşır mısınız?';
+    }
+
+    if (missing.includes('Oda Sayısı')) {
+      return 'Oda sayısı nedir?';
+    }
+
+    if (missing.includes('Metrekare')) {
+      return 'Metrekare bilgisini paylaşır mısınız?';
+    }
+
+    if (missing.includes('Bulunduğu Kat')) {
+      return 'Daire kaçıncı katta?';
+    }
+
+    if (missing.includes('Bina Kat Sayısı')) {
+      return 'Bina toplam kaç katlı?';
+    }
+
+    if (missing.includes('Fiyat')) {
+      return 'Satış fiyatını paylaşır mısınız?';
+    }
+
+    return 'Bilgiler tamamlandı. Onaylıyor musunuz?';
+  }
+
+  private hasMeaningfulPortfolioStart(session: LinaPortfolioSessionContext): boolean {
+    const state = session.state || {};
+    const userMessageCount = state.userMessages?.length || 0;
+
+    return userMessageCount > 1;
   }
 
   private extractFieldsFromMessage(message: string): ExtractedPortfolioFields {
@@ -115,6 +174,11 @@ export class LinaPortfolioEngineService {
     const city = this.extractKnownCity(normalized);
     if (city) {
       fields.city = city;
+    }
+
+    const knownDistrict = this.extractKnownDistrict(normalized);
+    if (knownDistrict) {
+      fields.district = knownDistrict;
     }
 
     const simpleNeighborhood = this.extractSimpleNeighborhood(message);
@@ -294,6 +358,60 @@ export class LinaPortfolioEngineService {
     }
 
     return null;
+  }
+
+  private extractKnownDistrict(normalized: string): string | null {
+    const districts = [
+      'honaz',
+      'merkezefendi',
+      'pamukkale',
+      'acipayam',
+      'buldan',
+      'tavas',
+      'cal',
+      'civril',
+      'saraykoy',
+      'serinhisar',
+      'cardak',
+      'bozkurt',
+      'bekilli',
+      'guney',
+      'kale',
+      'cameli',
+      'babadag',
+      'beyagac',
+      'baklan',
+    ];
+
+    const match = districts.find((district) => normalized.includes(district));
+
+    if (!match) {
+      return null;
+    }
+
+    const displayMap: Record<string, string> = {
+      honaz: 'Honaz',
+      merkezefendi: 'Merkezefendi',
+      pamukkale: 'Pamukkale',
+      acipayam: 'Acıpayam',
+      buldan: 'Buldan',
+      tavas: 'Tavas',
+      cal: 'Çal',
+      civril: 'Çivril',
+      saraykoy: 'Sarayköy',
+      serinhisar: 'Serinhisar',
+      cardak: 'Çardak',
+      bozkurt: 'Bozkurt',
+      bekilli: 'Bekilli',
+      guney: 'Güney',
+      kale: 'Kale',
+      cameli: 'Çameli',
+      babadag: 'Babadağ',
+      beyagac: 'Beyağaç',
+      baklan: 'Baklan',
+    };
+
+    return displayMap[match] || match;
   }
 
   private extractSimpleNeighborhood(message: string): string | null {
