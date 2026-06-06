@@ -15,6 +15,7 @@ import {
 import { LinaKvkkService } from "./lina-kvkk.service";
 import { LinaAuditService } from "./lina-audit.service";
 import { LinaMemoryService } from "./lina-memory.service";
+import { LinaPortfolioSessionService } from "./portfolio/lina-portfolio-session.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 type LinaApiUser = LinaAccessUser & {
@@ -55,6 +56,7 @@ export class LinaService {
     private readonly linaKvkkService: LinaKvkkService,
     private readonly linaAuditService: LinaAuditService,
     private readonly linaMemoryService: LinaMemoryService,
+    private readonly linaPortfolioSessionService: LinaPortfolioSessionService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -62,7 +64,7 @@ export class LinaService {
     return {
       success: true,
       message:
-        "Lina v4 aktif. Core Prompt, rol promptları, görev promptları, hafıza, modül bağlamı, canlı veritabanı bağlamı, emlak kütüphanesi, telaffuz katmanı, Personality Layer ve Voice Personality AI sağlayıcısına bağlandı.",
+        "Lina v4 aktif. Core Prompt, rol promptları, görev promptları, hafıza, modül bağlamı, canlı veritabanı bağlamı, emlak kütüphanesi, telaffuz katmanı ve Personality Layer AI sağlayıcısına bağlandı.",
       provider: this.getAiProvider(),
     };
   }
@@ -120,13 +122,35 @@ export class LinaService {
 
     const inputFilter = this.linaKvkkService.filterText(message);
     const safeUserMessage = inputFilter.safeText;
+    const portfolioRuntimeContext = await this.buildPortfolioRuntimeContext(
+      safeUserMessage,
+      sourceModule,
+      user,
+    );
 
     try {
       const provider = this.getAiProvider();
       const rawAnswer =
         provider === "claude"
-          ? await this.askClaude(safeUserMessage, sourceModule, user)
-          : await this.askOpenAi(safeUserMessage, sourceModule, user);
+          ? await this.askClaude(
+              safeUserMessage,
+              sourceModule,
+              user,
+              portfolioRuntimeContext,
+            )
+          : await this.askOpenAi(
+              safeUserMessage,
+              sourceModule,
+              user,
+              portfolioRuntimeContext,
+            );
+
+      await this.rememberPortfolioAssistantMessage(
+        safeUserMessage,
+        rawAnswer,
+        sourceModule,
+        user,
+      );
 
       const outputFilter = this.linaKvkkService.filterText(rawAnswer);
       const kvkkFiltered = outputFilter.filtered || inputFilter.filtered;
@@ -363,6 +387,7 @@ export class LinaService {
     message: string,
     sourceModule: LinaModuleName,
     user?: LinaApiUser,
+    portfolioRuntimeContext = "",
   ): Promise<string> {
     const apiKey =
       this.configService.get<string>("OPENAI_API_KEY") ||
@@ -376,7 +401,11 @@ export class LinaService {
       this.configService.get<string>("OPENAI_MODEL") ||
       process.env.OPENAI_MODEL ||
       "gpt-4.1-mini";
-    const systemPrompt = await this.buildSystemPrompt(sourceModule, user);
+    const systemPrompt = await this.buildSystemPrompt(
+      sourceModule,
+      user,
+      portfolioRuntimeContext,
+    );
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -429,6 +458,7 @@ export class LinaService {
     message: string,
     sourceModule: LinaModuleName,
     user?: LinaApiUser,
+    portfolioRuntimeContext = "",
   ): Promise<string> {
     const apiKey =
       this.configService.get<string>("ANTHROPIC_API_KEY") ||
@@ -442,7 +472,11 @@ export class LinaService {
       this.configService.get<string>("ANTHROPIC_MODEL") ||
       process.env.ANTHROPIC_MODEL ||
       "claude-3-5-haiku-latest";
-    const systemPrompt = await this.buildSystemPrompt(sourceModule, user);
+    const systemPrompt = await this.buildSystemPrompt(
+      sourceModule,
+      user,
+      portfolioRuntimeContext,
+    );
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -520,9 +554,9 @@ export class LinaService {
           text: voiceText,
           model_id: modelId,
           voice_settings: {
-            stability: 0.88,
-            similarity_boost: 0.95,
-            style: 0.1,
+            stability: 0.92,
+            similarity_boost: 0.98,
+            style: 0.05,
             use_speaker_boost: true,
           },
         }),
@@ -776,9 +810,244 @@ export class LinaService {
     return parts.join(" ");
   }
 
+
+  private async buildPortfolioRuntimeContext(
+    message: string,
+    sourceModule: LinaModuleName,
+    user?: LinaApiUser,
+  ): Promise<string> {
+    if (!user?.id || !this.isPortfolioFlowMessage(message, sourceModule)) {
+      return "";
+    }
+
+    try {
+      const session = await this.linaPortfolioSessionService.appendUserMessage(
+        user.id,
+        message,
+      );
+      const sessionPrompt =
+        await this.linaPortfolioSessionService.buildSessionPrompt(user.id);
+      const recentMessages = session.state.userMessages || [];
+      const recentConversation = recentMessages.slice(-8).join("\n");
+      const resolvedLocation = this.resolveKnownDenizliLocation(
+        [recentConversation, message].filter(Boolean).join(" "),
+      );
+
+      return [
+        "Bu bölüm portföy/ilan oluşturma konuşması için yüksek öncelikli canlı bağlamdır.",
+        "Kullanıcı ilan, portföy veya gayrimenkul kaydı oluşturuyorsa bu bölümü mutlaka dikkate al.",
+        "",
+        sessionPrompt,
+        "",
+        "SON KULLANICI MESAJLARI",
+        recentConversation || "Henüz kayıtlı mesaj yok.",
+        "",
+        "ÇÖZÜMLENEN COĞRAFİ BAĞLAM",
+        resolvedLocation,
+        "",
+        "PORTFÖY AKIŞ KURALLARI",
+        "- Kullanıcı 'daire ilanı', 'daire girelim' veya 'daire ekleyelim' dediyse portföy türü DAİRE olarak kabul edilir; tekrar daire/villa/arsa diye sorma.",
+        "- Kullanıcı 'satılık' dediyse işlem türü SATILIK olarak kabul edilir; tekrar satılık mı kiralık mı diye sorma.",
+        "- Kullanıcı 'kiralık' dediyse işlem türü KİRALIK olarak kabul edilir; tekrar satılık mı kiralık mı diye sorma.",
+        "- Kullanıcı mahalle söylediğinde ve bu mahalle coğrafya bilgisinde tek ilçeye bağlıysa ilçeyi tahmin olarak değil, sistem eşleşmesi olarak kullan.",
+        "- Bilinen konum varsa aynı konumu tekrar sorma; sıradaki eksik portföy bilgisini sor.",
+        "- Bilinmeyen veya birden fazla ilçede geçen mahalle varsa sadece o noktayı netleştir.",
+        "- Her cevapta tek sonraki eksik bilgiyi sor.",
+        "- 'Başka nasıl yardımcı olabilirim?' deme.",
+      ].join("\n");
+    } catch (error) {
+      return [
+        "Portföy oluşturma oturum bağlamı hazırlanırken teknik hata oluştu.",
+        "Bu durumda kullanıcıdan aynı bilgileri tekrar tekrar isteme; kısa şekilde bir sonraki eksik bilgiyi sor.",
+        `Teknik hata: ${error instanceof Error ? error.message : "UNKNOWN_PORTFOLIO_CONTEXT_ERROR"}`,
+      ].join("\n");
+    }
+  }
+
+  private async rememberPortfolioAssistantMessage(
+    userMessage: string,
+    assistantMessage: string,
+    sourceModule: LinaModuleName,
+    user?: LinaApiUser,
+  ): Promise<void> {
+    if (!user?.id || !this.isPortfolioFlowMessage(userMessage, sourceModule)) {
+      return;
+    }
+
+    try {
+      await this.linaPortfolioSessionService.appendAssistantMessage(
+        user.id,
+        assistantMessage,
+      );
+    } catch {
+      return;
+    }
+  }
+
+  private isPortfolioFlowMessage(
+    message: string,
+    sourceModule: LinaModuleName,
+  ): boolean {
+    const normalized = this.normalizeTextForSearch(message);
+
+    if (sourceModule === "pool") {
+      return true;
+    }
+
+    const portfolioKeywords = [
+      "ilan",
+      "portfoy",
+      "portföy",
+      "daire",
+      "konut",
+      "villa",
+      "arsa",
+      "tarla",
+      "dukkan",
+      "dükkan",
+      "isyeri",
+      "işyeri",
+      "iş yeri",
+      "satilik",
+      "satılık",
+      "kiralik",
+      "kiralık",
+      "metrekare",
+      "m2",
+      "katli",
+      "katlı",
+      "fiyat",
+      "tl",
+      "milyon",
+      "denizli",
+      "honaz",
+      "merkezefendi",
+      "pamukkale",
+    ];
+
+    return portfolioKeywords.some((keyword) =>
+      normalized.includes(this.normalizeTextForSearch(keyword)),
+    );
+  }
+
+  private resolveKnownDenizliLocation(message: string): string {
+    const geographyContent = this.readPromptFile(
+      ["knowledge", "Lina_Knowledge_Geography.md"],
+      "{}",
+    );
+
+    let geography: Record<string, string[]> = {};
+
+    try {
+      const parsed = JSON.parse(geographyContent) as unknown;
+
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        geography = parsed as Record<string, string[]>;
+      }
+    } catch {
+      geography = {};
+    }
+
+    const normalizedMessage = this.normalizeTextForSearch(message);
+    const matches: Array<{ district: string; neighborhood: string }> = [];
+
+    for (const [district, neighborhoods] of Object.entries(geography)) {
+      if (normalizedMessage.includes(this.normalizeTextForSearch(district))) {
+        matches.push({
+          district,
+          neighborhood: "",
+        });
+      }
+
+      for (const neighborhood of neighborhoods || []) {
+        const normalizedNeighborhood =
+          this.normalizeTextForSearch(neighborhood);
+
+        if (
+          normalizedNeighborhood.length >= 4 &&
+          normalizedMessage.includes(normalizedNeighborhood)
+        ) {
+          matches.push({
+            district,
+            neighborhood,
+          });
+        }
+      }
+    }
+
+    const neighborhoodMatches = matches.filter((match) => match.neighborhood);
+
+    if (neighborhoodMatches.length === 1) {
+      const match = neighborhoodMatches[0];
+
+      return [
+        `Sistem coğrafya eşleşmesi: Denizli / ${match.district} / ${match.neighborhood}`,
+        "Bu eşleşme bilinen mahalle listesine göre tek sonuçtur.",
+        "Bu durumda kullanıcıdan ilçeyi tekrar isteme.",
+      ].join("\n");
+    }
+
+    if (neighborhoodMatches.length > 1) {
+      const options = neighborhoodMatches
+        .map(
+          (match) =>
+            `Denizli / ${match.district} / ${match.neighborhood}`,
+        )
+        .join("; ");
+
+      return [
+        "Aynı mahalle adı birden fazla ilçede görünüyor.",
+        `Olası eşleşmeler: ${options}`,
+        "Kullanıcıdan yalnızca ilçeyi netleştirmesini iste.",
+      ].join("\n");
+    }
+
+    const districtMatches = Array.from(
+      new Set(matches.map((match) => match.district).filter(Boolean)),
+    );
+
+    if (districtMatches.length === 1) {
+      return [
+        `Sistem coğrafya eşleşmesi: Denizli / ${districtMatches[0]}`,
+        "Mahalle bilgisi henüz net değil.",
+      ].join("\n");
+    }
+
+    if (districtMatches.length > 1) {
+      return [
+        `Mesajda birden fazla ilçe geçiyor: ${districtMatches.join(", ")}`,
+        "Kullanıcıdan konumu tek ilçe/mahalle olarak netleştirmesini iste.",
+      ].join("\n");
+    }
+
+    return [
+      "Bu mesajda sistem coğrafya listesine göre net mahalle/ilçe eşleşmesi bulunamadı.",
+      "Coğrafi bilgi uydurma. Gerekirse kullanıcıdan ilçe veya mahalleyi kısa şekilde netleştirmesini iste.",
+    ].join("\n");
+  }
+
+  private normalizeTextForSearch(value: string): string {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/ı/g, "i")
+      .replace(/İ/g, "i")
+      .replace(/ğ/g, "g")
+      .replace(/ü/g, "u")
+      .replace(/ş/g, "s")
+      .replace(/ö/g, "o")
+      .replace(/ç/g, "c")
+      .replace(/â/g, "a")
+      .replace(/î/g, "i")
+      .replace(/û/g, "u")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ");
+  }
+
   private async buildSystemPrompt(
     sourceModule: LinaModuleName,
     user?: LinaApiUser,
+    portfolioRuntimeContext = "",
   ): Promise<string> {
     const corePrompt = this.readPromptFile(
       ["core", "Lina_Core_Prompt.md"],
@@ -801,13 +1070,16 @@ export class LinaService {
     const liveDatabaseContext = await this.buildLiveDatabaseContext(user);
     const realEstateKnowledgeContext = this.buildRealEstateKnowledgeContext();
     const personalityLayer = this.buildPersonalityLayer();
-    const voicePersonality = this.buildVoicePersonalityLayer();
+    const voicePersonality = this.readPromptFile(
+      ["voice", "Lina_Voice_Personality.md"],
+      "",
+    );
 
     return [
       "# LINA V3 SYSTEM PROMPT",
       "",
       "Aşağıdaki tüm bölümleri birlikte kullan.",
-      "Öncelik sırası: Core Prompt > Güvenlik/KVKK > Role Prompt > Task Prompt > Memory > Current Module > Live Database Context > Real Estate Knowledge > Personality Layer > Voice Personality.",
+      "Öncelik sırası: Core Prompt > Güvenlik/KVKK > Role Prompt > Task Prompt > Memory > Current Module > Live Database Context > Real Estate Knowledge > Portfolio Runtime Context > Personality Layer > Voice Personality.",
       "Sistemde olmayan veriyi uydurma. Veri yoksa bunu kısa ve dürüst şekilde söyle.",
       "",
       "---",
@@ -849,17 +1121,26 @@ export class LinaService {
       "",
       "---",
       "",
-      "# 8) PERSONALITY LAYER",
+      "# 8) PORTFOLIO RUNTIME CONTEXT",
+      portfolioRuntimeContext.trim()
+        ? portfolioRuntimeContext
+        : "Aktif portföy oluşturma konuşması algılanmadı.",
+      "",
+      "---",
+      "",
+      "# 9) PERSONALITY LAYER",
       personalityLayer,
       "",
       "---",
       "",
-      "# 9) VOICE PERSONALITY",
-      voicePersonality,
+      "# 10) VOICE PERSONALITY",
+      voicePersonality.trim()
+        ? voicePersonality
+        : "Ses karakteri için ek dosya bulunamadı. Lina kısa, net, sakin ve tutarlı konuşur.",
       "",
       "---",
       "",
-      "# 10) FINAL ANSWER RULES",
+      "# 11) FINAL ANSWER RULES",
       "- Her zaman Türkçe cevap ver.",
       "- Cevapları kısa, net, premium ve sektör odaklı üret.",
       "- Her cevabı sohbet uzatmak için değil, iş üretmek için yaz.",
@@ -1208,25 +1489,6 @@ export class LinaService {
       "- Kullanıcı sinirliyse savunmaya geçme; problemi sahiplen.",
       "- Test ortamında platformu geliştirmeye odaklan.",
       "- Kısa, güçlü, operasyonel cevap ver.",
-    ].join("\n");
-  }
-
-  private buildVoicePersonalityLayer(): string {
-    const voicePersonality = this.readPromptFile(
-      ["voice", "Lina_Voice_Personality.md"],
-      "",
-    );
-
-    if (voicePersonality.trim().length > 0) {
-      return voicePersonality;
-    }
-
-    return [
-      "Lina sesli yanıtlarda aynı karakteri korur.",
-      "Ses tonu sakin, net, güven veren, profesyonel ve sıcak olmalıdır.",
-      "Lina yavaş konuşmaz; kısa cümlelerle, normalden biraz hızlı ve anlaşılır konuşur.",
-      "Aşırı neşeli, çocuksu, robotik, satış temsilcisi gibi veya çok resmi konuşmaz.",
-      "Sesli yanıtlarda gereksiz uzun açıklama yapmaz.",
     ].join("\n");
   }
 
