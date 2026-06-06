@@ -829,9 +829,6 @@ export class LinaService {
         await this.linaPortfolioSessionService.buildSessionPrompt(user.id);
       const recentMessages = session.state.userMessages || [];
       const recentConversation = recentMessages.slice(-8).join("\n");
-      const resolvedLocation = this.resolveKnownDenizliLocation(
-        [recentConversation, message].filter(Boolean).join(" "),
-      );
 
       return [
         "Bu bölüm portföy/ilan oluşturma konuşması için yüksek öncelikli canlı bağlamdır.",
@@ -842,16 +839,13 @@ export class LinaService {
         "SON KULLANICI MESAJLARI",
         recentConversation || "Henüz kayıtlı mesaj yok.",
         "",
-        "ÇÖZÜMLENEN COĞRAFİ BAĞLAM",
-        resolvedLocation,
-        "",
         "PORTFÖY AKIŞ KURALLARI",
         "- Kullanıcı 'daire ilanı', 'daire girelim' veya 'daire ekleyelim' dediyse portföy türü DAİRE olarak kabul edilir; tekrar daire/villa/arsa diye sorma.",
         "- Kullanıcı 'satılık' dediyse işlem türü SATILIK olarak kabul edilir; tekrar satılık mı kiralık mı diye sorma.",
         "- Kullanıcı 'kiralık' dediyse işlem türü KİRALIK olarak kabul edilir; tekrar satılık mı kiralık mı diye sorma.",
-        "- Kullanıcı mahalle söylediğinde ve bu mahalle coğrafya bilgisinde tek ilçeye bağlıysa ilçeyi tahmin olarak değil, sistem eşleşmesi olarak kullan.",
-        "- Bilinen konum varsa aynı konumu tekrar sorma; sıradaki eksik portföy bilgisini sor.",
-        "- Bilinmeyen veya birden fazla ilçede geçen mahalle varsa sadece o noktayı netleştir.",
+        "- Kullanıcı il, ilçe veya mahalle söylediyse bu bilgileri konuşma içinde koru; aynı bilgiyi tekrar sorma.",
+        "- Konumda eksik bilgi varsa yalnızca eksik olan parçayı sor.",
+        "- Konumu bilmiyorsan ilçe veya mahalle uydurma.",
         "- Her cevapta tek sonraki eksik bilgiyi sor.",
         "- 'Başka nasıl yardımcı olabilirim?' deme.",
       ].join("\n");
@@ -928,102 +922,6 @@ export class LinaService {
     return portfolioKeywords.some((keyword) =>
       normalized.includes(this.normalizeTextForSearch(keyword)),
     );
-  }
-
-  private resolveKnownDenizliLocation(message: string): string {
-    const geographyContent = this.readPromptFile(
-      ["knowledge", "Lina_Knowledge_Geography.md"],
-      "{}",
-    );
-
-    let geography: Record<string, string[]> = {};
-
-    try {
-      const parsed = JSON.parse(geographyContent) as unknown;
-
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        geography = parsed as Record<string, string[]>;
-      }
-    } catch {
-      geography = {};
-    }
-
-    const normalizedMessage = this.normalizeTextForSearch(message);
-    const matches: Array<{ district: string; neighborhood: string }> = [];
-
-    for (const [district, neighborhoods] of Object.entries(geography)) {
-      if (normalizedMessage.includes(this.normalizeTextForSearch(district))) {
-        matches.push({
-          district,
-          neighborhood: "",
-        });
-      }
-
-      for (const neighborhood of neighborhoods || []) {
-        const normalizedNeighborhood =
-          this.normalizeTextForSearch(neighborhood);
-
-        if (
-          normalizedNeighborhood.length >= 4 &&
-          normalizedMessage.includes(normalizedNeighborhood)
-        ) {
-          matches.push({
-            district,
-            neighborhood,
-          });
-        }
-      }
-    }
-
-    const neighborhoodMatches = matches.filter((match) => match.neighborhood);
-
-    if (neighborhoodMatches.length === 1) {
-      const match = neighborhoodMatches[0];
-
-      return [
-        `Sistem coğrafya eşleşmesi: Denizli / ${match.district} / ${match.neighborhood}`,
-        "Bu eşleşme bilinen mahalle listesine göre tek sonuçtur.",
-        "Bu durumda kullanıcıdan ilçeyi tekrar isteme.",
-      ].join("\n");
-    }
-
-    if (neighborhoodMatches.length > 1) {
-      const options = neighborhoodMatches
-        .map(
-          (match) =>
-            `Denizli / ${match.district} / ${match.neighborhood}`,
-        )
-        .join("; ");
-
-      return [
-        "Aynı mahalle adı birden fazla ilçede görünüyor.",
-        `Olası eşleşmeler: ${options}`,
-        "Kullanıcıdan yalnızca ilçeyi netleştirmesini iste.",
-      ].join("\n");
-    }
-
-    const districtMatches = Array.from(
-      new Set(matches.map((match) => match.district).filter(Boolean)),
-    );
-
-    if (districtMatches.length === 1) {
-      return [
-        `Sistem coğrafya eşleşmesi: Denizli / ${districtMatches[0]}`,
-        "Mahalle bilgisi henüz net değil.",
-      ].join("\n");
-    }
-
-    if (districtMatches.length > 1) {
-      return [
-        `Mesajda birden fazla ilçe geçiyor: ${districtMatches.join(", ")}`,
-        "Kullanıcıdan konumu tek ilçe/mahalle olarak netleştirmesini iste.",
-      ].join("\n");
-    }
-
-    return [
-      "Bu mesajda sistem coğrafya listesine göre net mahalle/ilçe eşleşmesi bulunamadı.",
-      "Coğrafi bilgi uydurma. Gerekirse kullanıcıdan ilçe veya mahalleyi kısa şekilde netleştirmesini iste.",
-    ].join("\n");
   }
 
   private normalizeTextForSearch(value: string): string {
@@ -1421,7 +1319,6 @@ export class LinaService {
   private buildRealEstateKnowledgeContext(): string {
     const knowledgeFiles = [
       ["knowledge", "Lina_Knowledge_RealEstate.md"],
-      ["knowledge", "Lina_Knowledge_Geography.md"],
       ["tasks", "Lina_Task_RealEstateLanguage.md"],
       ["tasks", "Lina_Task_Pronunciation.md"],
       ["tasks", "Lina_Task_PortfoyOlusturma.md"],
