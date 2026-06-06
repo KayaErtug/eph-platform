@@ -540,8 +540,167 @@ export class LinaService {
   }
 
   private normalizeVoiceTextForRealEstate(text: string): string {
-    const numberWords = [
-      "sıfır",
+    return this.applyVoicePunctuationPauses(
+      this.normalizeRealEstateSpeechTokens(
+        String(text || "")
+          .replace(/\bEPH\b/g, "Emlak Portföy Havuzu")
+          .replace(/\beph\b/g, "Emlak Portföy Havuzu"),
+      ),
+    );
+  }
+
+  private normalizeRealEstateSpeechTokens(text: string): string {
+    let normalized = text;
+
+    normalized = normalized
+      .replace(/\bTRY\b/g, "Türk Lirası")
+      .replace(/\bTL\b/g, "Türk Lirası")
+      .replace(/₺/g, " Türk Lirası ")
+      .replace(/\bUSD\b/g, "Amerikan Doları")
+      .replace(/\bEUR\b/g, "Euro")
+      .replace(/\bKAKS\b/g, "kaks")
+      .replace(/\bTAKS\b/g, "taks")
+      .replace(/\bBrüt\b/g, "bürüt")
+      .replace(/\bbrüt\b/g, "bürüt")
+      .replace(/\bNo\b/g, "numara")
+      .replace(/\bno\b/g, "numara")
+      .replace(/\bDaire No\b/g, "daire numarası")
+      .replace(/\bAda\s*\/\s*Parsel\b/gi, "ada parsel")
+      .replace(/\bada\s*\/\s*parsel\b/gi, "ada parsel")
+      .replace(/\b0\s*km\b/gi, "sıfır kilometre")
+      .replace(/\b0km\b/gi, "sıfır kilometre");
+
+    normalized = this.normalizeMoneyForVoice(normalized);
+    normalized = this.normalizeRoomCountsForVoice(normalized);
+    normalized = this.normalizeParcelFractionsForVoice(normalized);
+    normalized = this.normalizeMeasurementForVoice(normalized);
+    normalized = this.normalizeRealEstateZeroMeaningForVoice(normalized);
+
+    return normalized.replace(/\s+\/\s+/g, " ").replace(/\s{2,}/g, " ").trim();
+  }
+
+  private normalizeMoneyForVoice(text: string): string {
+    return text.replace(
+      /\b(\d{1,3}(?:[.,]\d{3})+|\d+)\s*(Türk Lirası|Amerikan Doları|Euro)\b/gi,
+      (_match, amount, currency) => {
+        const numberValue = this.parseTurkishNumber(amount);
+
+        if (numberValue === null) {
+          return `${amount} ${currency}`;
+        }
+
+        return `${this.numberToTurkishWords(numberValue)} ${currency}`;
+      },
+    );
+  }
+
+  private normalizeRoomCountsForVoice(text: string): string {
+    return text
+      .replace(/\b(\d+)\s*[,.]\s*5\s*\+\s*(\d+)\b/g, (_match, room, living) => {
+        return `${this.numberToTurkishWords(Number(room))} buçuk artı ${this.numberToTurkishWords(Number(living))}`;
+      })
+      .replace(/\b(\d+)\s*\+\s*(\d+)\b/g, (_match, room, living) => {
+        return `${this.numberToTurkishWords(Number(room))} artı ${this.numberToTurkishWords(Number(living))}`;
+      });
+  }
+
+  private normalizeParcelFractionsForVoice(text: string): string {
+    return text.replace(/\b(\d+)\s*\/\s*(\d+)\b/g, (_match, left, right) => {
+      return `${this.numberToTurkishWords(Number(left))}e ${this.numberToTurkishWords(Number(right))}`;
+    });
+  }
+
+  private normalizeMeasurementForVoice(text: string): string {
+    return text
+      .replace(/\b(\d{1,3}(?:[.,]\d{3})+|\d+)\s*(m²|m2|metrekare)\b/gi, (_match, value) => {
+        const numberValue = this.parseTurkishNumber(value);
+        const spoken = numberValue === null ? String(value) : this.numberToTurkishWords(numberValue);
+
+        return `${spoken} metrekare`;
+      })
+      .replace(/\b(\d{1,3}(?:[.,]\d{3})+|\d+)\s*(m³|m3|metreküp)\b/gi, (_match, value) => {
+        const numberValue = this.parseTurkishNumber(value);
+        const spoken = numberValue === null ? String(value) : this.numberToTurkishWords(numberValue);
+
+        return `${spoken} metreküp`;
+      })
+      .replace(/\b(\d{1,3}(?:[.,]\d{3})+|\d+)\s*cm\b/gi, (_match, value) => {
+        const numberValue = this.parseTurkishNumber(value);
+        const spoken = numberValue === null ? String(value) : this.numberToTurkishWords(numberValue);
+
+        return `${spoken} santimetre`;
+      })
+      .replace(/\b(\d{1,3}(?:[.,]\d{3})+|\d+)\s*km\b/gi, (_match, value) => {
+        const numberValue = this.parseTurkishNumber(value);
+        const spoken = numberValue === null ? String(value) : this.numberToTurkishWords(numberValue);
+
+        return `${spoken} kilometre`;
+      })
+      .replace(
+        /\b(\d{1,3}(?:[.,]\d{3})+|\d+)\s*metre\b(?=\s*(daire|konut|villa|arsa|tarla|bahçe|bağ|dükkan|iş yeri|ofis|parsel|alan|net|brüt|bürüt|satılık|kiralık|ilan|portföy))/gi,
+        (_match, value) => {
+          const numberValue = this.parseTurkishNumber(value);
+          const spoken = numberValue === null ? String(value) : this.numberToTurkishWords(numberValue);
+
+          return `${spoken} metrekare`;
+        },
+      );
+  }
+
+  private normalizeRealEstateZeroMeaningForVoice(text: string): string {
+    return text
+      .replace(/\bsıfır\s+(daire|konut|villa|ev|iş yeri|dükkan|ofis)\b/gi, "hiç kullanılmamış $1")
+      .replace(
+        /\b(daire|konut|villa|ev|iş yeri|dükkan|ofis)\s+sıfır\b/gi,
+        "$1 hiç kullanılmamış",
+      )
+      .replace(
+        /\b((?:bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on|on bir|on iki)\s+(?:buçuk\s+)?artı\s+(?:bir|iki|üç|dört|beş))\s+sıfır\b/gi,
+        "$1 hiç kullanılmamış",
+      );
+  }
+
+  private applyVoicePunctuationPauses(text: string): string {
+    return text
+      .replace(/Mustafa Bey,/g, "Mustafa Bey. ")
+      .replace(/Tamer Bey,/g, "Tamer Bey. ")
+      .replace(/Ali Bey,/g, "Ali Bey. ")
+      .replace(/Başkan,/g, "Başkan. ")
+      .replace(/\n/g, ". ")
+      .replace(/\. \. /g, ". ")
+      .replace(/\. /g, ".  ")
+      .replace(/, /g, ",  ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+
+  private parseTurkishNumber(value: string): number | null {
+    const normalized = String(value || "").replace(/[.,]/g, "").trim();
+
+    if (!/^\d+$/.test(normalized)) {
+      return null;
+    }
+
+    const parsed = Number(normalized);
+
+    if (!Number.isSafeInteger(parsed) || parsed < 0) {
+      return null;
+    }
+
+    return parsed;
+  }
+
+  private numberToTurkishWords(value: number): string {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      return String(value);
+    }
+
+    if (value === 0) {
+      return "sıfır";
+    }
+
+    const ones = [
+      "",
       "bir",
       "iki",
       "üç",
@@ -551,66 +710,70 @@ export class LinaService {
       "yedi",
       "sekiz",
       "dokuz",
+    ];
+    const tens = [
+      "",
       "on",
-      "on bir",
-      "on iki",
-      "on üç",
-      "on dört",
-      "on beş",
-      "on altı",
-      "on yedi",
-      "on sekiz",
-      "on dokuz",
       "yirmi",
+      "otuz",
+      "kırk",
+      "elli",
+      "altmış",
+      "yetmiş",
+      "seksen",
+      "doksan",
     ];
 
-    const readSmallNumber = (value: string) => {
-      const parsed = Number(value);
+    const readBelowThousand = (num: number): string => {
+      const parts: string[] = [];
+      const hundreds = Math.floor(num / 100);
+      const remainder = num % 100;
+      const ten = Math.floor(remainder / 10);
+      const one = remainder % 10;
 
-      if (Number.isInteger(parsed) && parsed >= 0 && parsed <= 20) {
-        return numberWords[parsed];
+      if (hundreds > 0) {
+        parts.push(hundreds === 1 ? "yüz" : `${ones[hundreds]} yüz`);
       }
 
-      return value;
+      if (ten > 0) {
+        parts.push(tens[ten]);
+      }
+
+      if (one > 0) {
+        parts.push(ones[one]);
+      }
+
+      return parts.join(" ");
     };
 
-    return text
-      .replace(/\bEPH\b/g, "Emlak Portföy Havuzu")
-      .replace(/\beph\b/g, "Emlak Portföy Havuzu")
-      .replace(/\bTRY\b/g, "Türk Lirası")
-      .replace(/\bTL\b/g, "Türk Lirası")
-      .replace(/₺/g, " Türk Lirası ")
-      .replace(/\bUSD\b/g, "Amerikan Doları")
-      .replace(/\bEUR\b/g, "Euro")
-      .replace(/\b0\s*km\b/gi, "sıfır kilometre")
-      .replace(/\b0km\b/gi, "sıfır kilometre")
-      .replace(/(\d+)\s*(m²|m2)\b/gi, "$1 metrekare")
-      .replace(/(\d+)\s*(m³|m3)\b/gi, "$1 metreküp")
-      .replace(/(\d+)\s*cm\b/gi, "$1 santimetre")
-      .replace(/(\d+)\s*km\b/gi, "$1 kilometre")
-      .replace(/\b(\d+)\s*,\s*5\s*\+\s*(\d+)\b/g, (_match, room, living) => {
-        return `${readSmallNumber(room)} buçuk artı ${readSmallNumber(living)}`;
-      })
-      .replace(/\b(\d+)\s*\+\s*(\d+)\b/g, (_match, room, living) => {
-        return `${readSmallNumber(room)} artı ${readSmallNumber(living)}`;
-      })
-      .replace(/\b(\d+)\s*\/\s*(\d+)\b/g, "$1'e $2")
-      .replace(/\bAda\s*\/\s*Parsel\b/g, "ada parsel")
-      .replace(/\bada\s*\/\s*parsel\b/gi, "ada parsel")
-      .replace(/\bNo\b/g, "numara")
-      .replace(/\bno\b/g, "numara")
-      .replace(/\bDaire No\b/g, "daire numarası")
-      .replace(/\bKAKS\b/g, "kaks")
-      .replace(/\bTAKS\b/g, "taks")
-      .replace(/\bBrüt\b/g, "bürüt")
-      .replace(/\bbrüt\b/g, "bürüt")
-      .replace(/Mustafa Bey,/g, "Mustafa Bey. ")
-      .replace(/Başkan,/g, "Başkan. ")
-      .replace(/\s+\/\s+/g, " ")
-      .replace(/\n/g, ". ")
-      .replace(/\. \. /g, ". ")
-      .replace(/\. /g, ".  ")
-      .replace(/, /g, ",  ");
+    const groups: Array<[number, string]> = [
+      [1_000_000_000, "milyar"],
+      [1_000_000, "milyon"],
+      [1_000, "bin"],
+    ];
+
+    let remaining = value;
+    const parts: string[] = [];
+
+    for (const [base, label] of groups) {
+      const groupValue = Math.floor(remaining / base);
+
+      if (groupValue > 0) {
+        if (base === 1_000 && groupValue === 1) {
+          parts.push(label);
+        } else {
+          parts.push(`${this.numberToTurkishWords(groupValue)} ${label}`);
+        }
+
+        remaining %= base;
+      }
+    }
+
+    if (remaining > 0) {
+      parts.push(readBelowThousand(remaining));
+    }
+
+    return parts.join(" ");
   }
 
   private async buildSystemPrompt(
