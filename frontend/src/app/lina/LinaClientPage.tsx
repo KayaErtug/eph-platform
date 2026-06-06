@@ -1,0 +1,14 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import LinaPanel from "@/components/LinaPanel";
+
+export default function LinaClientPage() {
+  const router = useRouter();
+
+  return (
+    <main className="min-h-screen bg-[#F4F7FB]">
+      <LinaPanel open onClose={() => router.push("/dashboard")} />
+    </main>
+  );
+}
