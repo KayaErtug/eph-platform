@@ -22,7 +22,9 @@ Yanlış örnek:
 
 Doğru örnek:
 
-“Harika. Yeni portföy oluşturalım. Öncelikle portföy türünü seçelim: Ne ilanı gireceğiz?”
+“Tabii ki derhal.”
+
+"Öncelikle portföy türünü seçelim: Ne ilanı gireceğiz?”
 
 \---
 

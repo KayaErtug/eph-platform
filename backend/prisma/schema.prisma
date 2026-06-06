@@ -56,6 +56,7 @@ model User {
   visits                  UserVisit[]
   pushSubscriptions       PushSubscription[]
   linaPreference          LinaPreference?
+  linaPortfolioSessions   LinaPortfolioSession[]
 
   superAdminProfile    SUPER_ADMIN?
   reportsCreated       Report[]               @relation("ReportReporter")
@@ -587,6 +588,52 @@ model LinaPreference {
 
 
 
+
+
+
+
+
+
+model LinaPortfolioSession {
+  id     String @id @default(uuid())
+  userId String
+
+  mode        String @default("PORTFOLIO_CREATE")
+  sessionType String @default("PORTFOLIO_DRAFT")
+  title       String?
+
+  propertyType    String?
+  transactionType String?
+  step            String @default("TRANSACTION_TYPE")
+
+  city         String?
+  district     String?
+  neighborhood String?
+
+  roomCount          String?
+  squareMeter        Float?
+  floor              String?
+  buildingFloorCount Int?
+  price              Float?
+  currency           String @default("TRY")
+
+  status         String   @default("DRAFT")
+  confirmationStatus String @default("WAITING")
+  stateJson      Json?
+
+  lastActivityAt DateTime @default(now())
+  expiresAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([lastActivityAt])
+}
 
 
 model AuditLog {

@@ -62,7 +62,7 @@ export class LinaService {
     return {
       success: true,
       message:
-        "Lina v4 aktif. Core Prompt, rol promptları, görev promptları, hafıza, modül bağlamı, canlı veritabanı bağlamı, emlak kütüphanesi, telaffuz katmanı ve Personality Layer AI sağlayıcısına bağlandı.",
+        "Lina v4 aktif. Core Prompt, rol promptları, görev promptları, hafıza, modül bağlamı, canlı veritabanı bağlamı, emlak kütüphanesi, telaffuz katmanı, Personality Layer ve Voice Personality AI sağlayıcısına bağlandı.",
       provider: this.getAiProvider(),
     };
   }
@@ -520,9 +520,9 @@ export class LinaService {
           text: voiceText,
           model_id: modelId,
           voice_settings: {
-            stability: 0.72,
-            similarity_boost: 0.9,
-            style: 0.34,
+            stability: 0.88,
+            similarity_boost: 0.95,
+            style: 0.1,
             use_speaker_boost: true,
           },
         }),
@@ -801,12 +801,13 @@ export class LinaService {
     const liveDatabaseContext = await this.buildLiveDatabaseContext(user);
     const realEstateKnowledgeContext = this.buildRealEstateKnowledgeContext();
     const personalityLayer = this.buildPersonalityLayer();
+    const voicePersonality = this.buildVoicePersonalityLayer();
 
     return [
       "# LINA V3 SYSTEM PROMPT",
       "",
       "Aşağıdaki tüm bölümleri birlikte kullan.",
-      "Öncelik sırası: Core Prompt > Güvenlik/KVKK > Role Prompt > Task Prompt > Memory > Current Module > Live Database Context > Real Estate Knowledge > Personality Layer.",
+      "Öncelik sırası: Core Prompt > Güvenlik/KVKK > Role Prompt > Task Prompt > Memory > Current Module > Live Database Context > Real Estate Knowledge > Personality Layer > Voice Personality.",
       "Sistemde olmayan veriyi uydurma. Veri yoksa bunu kısa ve dürüst şekilde söyle.",
       "",
       "---",
@@ -853,7 +854,12 @@ export class LinaService {
       "",
       "---",
       "",
-      "# 9) FINAL ANSWER RULES",
+      "# 9) VOICE PERSONALITY",
+      voicePersonality,
+      "",
+      "---",
+      "",
+      "# 10) FINAL ANSWER RULES",
       "- Her zaman Türkçe cevap ver.",
       "- Cevapları kısa, net, premium ve sektör odaklı üret.",
       "- Her cevabı sohbet uzatmak için değil, iş üretmek için yaz.",
@@ -1202,6 +1208,25 @@ export class LinaService {
       "- Kullanıcı sinirliyse savunmaya geçme; problemi sahiplen.",
       "- Test ortamında platformu geliştirmeye odaklan.",
       "- Kısa, güçlü, operasyonel cevap ver.",
+    ].join("\n");
+  }
+
+  private buildVoicePersonalityLayer(): string {
+    const voicePersonality = this.readPromptFile(
+      ["voice", "Lina_Voice_Personality.md"],
+      "",
+    );
+
+    if (voicePersonality.trim().length > 0) {
+      return voicePersonality;
+    }
+
+    return [
+      "Lina sesli yanıtlarda aynı karakteri korur.",
+      "Ses tonu sakin, net, güven veren, profesyonel ve sıcak olmalıdır.",
+      "Lina yavaş konuşmaz; kısa cümlelerle, normalden biraz hızlı ve anlaşılır konuşur.",
+      "Aşırı neşeli, çocuksu, robotik, satış temsilcisi gibi veya çok resmi konuşmaz.",
+      "Sesli yanıtlarda gereksiz uzun açıklama yapmaz.",
     ].join("\n");
   }
 

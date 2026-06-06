@@ -10,6 +10,7 @@ import { LinaAuditService } from './lina-audit.service';
 import { LinaMemoryService } from './lina-memory.service';
 import { LinaNotificationService } from './lina-notification.service';
 import { LinaVoiceService } from './lina-voice.service';
+import { LinaPortfolioSessionService } from './portfolio/lina-portfolio-session.service';
 
 @Module({
   controllers: [LinaController],
@@ -22,6 +23,7 @@ import { LinaVoiceService } from './lina-voice.service';
     LinaMemoryService,
     LinaNotificationService,
     LinaVoiceService,
+    LinaPortfolioSessionService,
   ],
   exports: [
     LinaService,
@@ -31,6 +33,7 @@ import { LinaVoiceService } from './lina-voice.service';
     LinaMemoryService,
     LinaNotificationService,
     LinaVoiceService,
+    LinaPortfolioSessionService,
   ],
 })
 export class LinaModule {}
