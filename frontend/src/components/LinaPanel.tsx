@@ -93,7 +93,11 @@ const QUICK_COMMANDS = [
 ];
 
 function createWelcomeMessage(name: string) {
-  return `${name}, şu anda Lina gerçek platform verilerine bağlı çalışacak şekilde hazırlanıyor. Sistemde yeterli CRM, görev veya talep verisi yoksa sayı uydurmayacağım. Portföy, ilan açıklaması, müşteri analizi veya fiyat yorumu için birlikte test yapabiliriz.`;
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12 ? "günaydın" : hour < 18 ? "iyi günler" : "iyi akşamlar";
+
+  return `Merhaba ${name}, ${greeting}. Size nasıl yardımcı olabilirim?`;
 }
 
 function getSafeUserName(user: unknown) {
