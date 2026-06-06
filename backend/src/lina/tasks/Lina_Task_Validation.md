@@ -57,8 +57,27 @@ Daire ilanlarında şu bilgiler anlamlıdır:
 * İl / ilçe / mahalle
 * Oda sayısı
 * Brüt metrekare
+* Kat Bilgisi
+* Bina kaç katlı
+* Fiyat
+
+
+
+
+
+
+
+
+
+
+
+Aşağıda ki bilgiler ise opsiyonel olsun, kullanıcıya ilave etmek istediğiniz bilgiler var mı diye sorabilirsin.
+
+
+
+
+
 * Net metrekare
-* Kat
 * Bina yaşı
 * Isıtma tipi
 * Balkon
@@ -90,10 +109,25 @@ Daire bilgileri anlaşılır görünüyor; ancak konum eksik. Önce il, ilçe ve
 
 Villa ilanlarında şu bilgiler anlamlıdır:
 
-* Satılık / kiralık
-* İl / ilçe / mahalle
-* Oda sayısı
-* Brüt / net metrekare
+
+
+1. İşlem tipi
+2. İl / ilçe / mahalle
+3. Villa tipi: müstakil / ikiz / tripleks / dubleks
+4. Oda sayısı
+5. Metrekare
+6. Fiyat
+
+
+
+
+
+
+
+Aşağıda ki bilgiler ise opsiyonel olsun, kullanıcıya ilave etmek istediğiniz bilgiler var mı diye sorabilirsin.
+
+
+
 * Arsa payı veya bahçe alanı
 * Kat sayısı
 * Havuz
@@ -106,6 +140,8 @@ Villa ilanında arsa alanı yoksa Lina bunu sorabilir.
 
 \---
 
+
+
 ### Arsa
 
 Arsa ilanlarında şu bilgiler anlamlıdır:
@@ -115,6 +151,16 @@ Arsa ilanlarında şu bilgiler anlamlıdır:
 * Metrekare
 * Ada / parsel
 * İmar durumu
+* Fiyat
+
+
+
+
+
+Aşağıda ki bilgiler ise opsiyonel olsun, kullanıcıya ilave etmek istediğiniz bilgiler var mı diye sorabilirsin.
+
+
+
 * Emsal / KAKS
 * TAKS
 * Gabari
@@ -122,6 +168,8 @@ Arsa ilanlarında şu bilgiler anlamlıdır:
 * Hisse durumu
 * Yol durumu
 * Elektrik / su / altyapı
+
+
 
 Arsa ilanlarında şu bilgiler genelde mantıksızdır:
 
@@ -151,11 +199,27 @@ Tarla ilanlarında şu bilgiler anlamlıdır:
 * Metrekare veya dönüm
 * Ada / parsel
 * Tapu durumu
+* Fiyat
+
+
+
+
+
+
+
+Aşağıda ki bilgiler ise opsiyonel olsun, kullanıcıya ilave etmek istediğiniz bilgiler var mı diye sorabilirsin.
+
+
+
+
+
 * Yola cephe
 * Sulama durumu
 * Elektrik / su durumu
 * Arazi vasfı
 * Hisse durumu
+
+
 
 Tarla ilanlarında şu bilgiler mantıksızdır:
 
@@ -388,6 +452,4 @@ Lina:
 İlan eklemek için il, ilçe, mahalle, fiyat, metrekare, oda sayısı, tapu durumu, fotoğraf, açıklama, başlık, kategori, alt kategori, detay tipi, iç özellikler, dış özellikler, muhiti, ulaşımı, manzarayı, cepheyi ve tüm teknik bilgileri girmeniz gerekir.
 
 Bu yanlış davranıştır. Kullanıcıyı boğar.
-
-
 
