@@ -322,6 +322,7 @@ export default function LinaPanel({
       const audioUrl = URL.createObjectURL(blob);
       const audio = new Audio(audioUrl);
 
+      audio.playbackRate = 1.12;
       audioRef.current = audio;
 
       audio.onended = () => {
