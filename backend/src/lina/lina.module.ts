@@ -11,6 +11,7 @@ import { LinaMemoryService } from './lina-memory.service';
 import { LinaNotificationService } from './lina-notification.service';
 import { LinaVoiceService } from './lina-voice.service';
 import { LinaPortfolioSessionService } from './portfolio/lina-portfolio-session.service';
+import { LinaPortfolioEngineService } from './portfolio/lina-portfolio-engine.service';
 import { LinaGeoService } from './geo/lina-geo.service';
 
 @Module({
@@ -25,6 +26,7 @@ import { LinaGeoService } from './geo/lina-geo.service';
     LinaNotificationService,
     LinaVoiceService,
     LinaPortfolioSessionService,
+    LinaPortfolioEngineService,
     LinaGeoService,
   ],
   exports: [
@@ -36,6 +38,7 @@ import { LinaGeoService } from './geo/lina-geo.service';
     LinaNotificationService,
     LinaVoiceService,
     LinaPortfolioSessionService,
+    LinaPortfolioEngineService,
     LinaGeoService,
   ],
 })

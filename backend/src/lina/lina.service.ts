@@ -16,6 +16,7 @@ import { LinaKvkkService } from "./lina-kvkk.service";
 import { LinaAuditService } from "./lina-audit.service";
 import { LinaMemoryService } from "./lina-memory.service";
 import { LinaPortfolioSessionService } from "./portfolio/lina-portfolio-session.service";
+import { LinaPortfolioEngineService } from "./portfolio/lina-portfolio-engine.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 type LinaApiUser = LinaAccessUser & {
@@ -57,6 +58,7 @@ export class LinaService {
     private readonly linaAuditService: LinaAuditService,
     private readonly linaMemoryService: LinaMemoryService,
     private readonly linaPortfolioSessionService: LinaPortfolioSessionService,
+    private readonly linaPortfolioEngineService: LinaPortfolioEngineService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -64,7 +66,7 @@ export class LinaService {
     return {
       success: true,
       message:
-        "Lina v4 aktif. Core Prompt, rol promptları, görev promptları, hafıza, modül bağlamı, canlı veritabanı bağlamı, emlak kütüphanesi, telaffuz katmanı ve Personality Layer AI sağlayıcısına bağlandı.",
+        "Lina v5 aktif. Karar motoru, portföy oturum hafızası, canlı veri bağlamı ve tek anayasa katmanı AI sağlayıcısına bağlandı.",
       provider: this.getAiProvider(),
     };
   }
@@ -821,39 +823,38 @@ export class LinaService {
     }
 
     try {
-      const session = await this.linaPortfolioSessionService.appendUserMessage(
+      const session = await this.linaPortfolioEngineService.processUserMessage(
         user.id,
         message,
       );
-      const sessionPrompt =
-        await this.linaPortfolioSessionService.buildSessionPrompt(user.id);
+      const enginePrompt = this.linaPortfolioEngineService.buildEnginePrompt(session);
       const recentMessages = session.state.userMessages || [];
       const recentConversation = recentMessages.slice(-8).join("\n");
 
       return [
-        "Bu bölüm portföy/ilan oluşturma konuşması için yüksek öncelikli canlı bağlamdır.",
-        "Kullanıcı ilan, portföy veya gayrimenkul kaydı oluşturuyorsa bu bölümü mutlaka dikkate al.",
+        "Bu bölüm Lina V5 portföy oluşturma motorunun yüksek öncelikli canlı bağlamıdır.",
+        "Kararı GPT değil backend engine verir. Lina yalnızca bu karara göre kısa ve doğal cevap yazar.",
         "",
-        sessionPrompt,
+        enginePrompt,
         "",
         "SON KULLANICI MESAJLARI",
         recentConversation || "Henüz kayıtlı mesaj yok.",
         "",
-        "PORTFÖY AKIŞ KURALLARI",
-        "- Kullanıcı 'daire ilanı', 'daire girelim' veya 'daire ekleyelim' dediyse portföy türü DAİRE olarak kabul edilir; tekrar daire/villa/arsa diye sorma.",
-        "- Kullanıcı 'satılık' dediyse işlem türü SATILIK olarak kabul edilir; tekrar satılık mı kiralık mı diye sorma.",
-        "- Kullanıcı 'kiralık' dediyse işlem türü KİRALIK olarak kabul edilir; tekrar satılık mı kiralık mı diye sorma.",
-        "- Kullanıcı il, ilçe veya mahalle söylediyse bu bilgileri konuşma içinde koru; aynı bilgiyi tekrar sorma.",
-        "- Konumda eksik bilgi varsa yalnızca eksik olan parçayı sor.",
-        "- Konumu bilmiyorsan ilçe veya mahalle uydurma.",
-        "- Her cevapta tek sonraki eksik bilgiyi sor.",
+        "V5 CEVAP KURALLARI",
+        "- Engine alanı dolu gösteriyorsa kullanıcıdan aynı alanı tekrar isteme.",
+        "- Eksik alanlardan yalnızca ilk mantıklı bilgiyi sor.",
+        "- Kullanıcı 3+1 dediyse oda sayısı verilmiştir; tekrar oda sayısı sorma.",
+        "- Kullanıcı satılık dediyse işlem türü verilmiştir; tekrar satılık mı kiralık mı diye sorma.",
+        "- Kullanıcı daire dediyse portföy türü verilmiştir; tekrar daire/villa/arsa diye sorma.",
+        "- Konum bilgisi eksikse sadece eksik parçayı sor; ilçe veya mahalle uydurma.",
+        "- Her cevap tek sonraki eksik bilgiye odaklansın.",
         "- 'Başka nasıl yardımcı olabilirim?' deme.",
       ].join("\n");
     } catch (error) {
       return [
-        "Portföy oluşturma oturum bağlamı hazırlanırken teknik hata oluştu.",
+        "Portföy V5 engine bağlamı hazırlanırken teknik hata oluştu.",
         "Bu durumda kullanıcıdan aynı bilgileri tekrar tekrar isteme; kısa şekilde bir sonraki eksik bilgiyi sor.",
-        `Teknik hata: ${error instanceof Error ? error.message : "UNKNOWN_PORTFOLIO_CONTEXT_ERROR"}`,
+        `Teknik hata: ${error instanceof Error ? error.message : "UNKNOWN_PORTFOLIO_ENGINE_ERROR"}`,
       ].join("\n");
     }
   }
@@ -955,9 +956,10 @@ export class LinaService {
       this.getRolePromptPath(user?.role),
       this.getFallbackRolePrompt(user?.role),
     );
-    const taskPrompts = this.getTaskPromptPaths(sourceModule)
-      .map((promptPath) => this.readPromptFile(promptPath, ""))
-      .filter((content) => content.trim().length > 0);
+    const v5Constitution = this.readPromptFile(
+      ["core", "Lina_V5_Constitution.md"],
+      this.getFallbackV5Constitution(),
+    );
 
     const preferences = await this.safeGetPreferences(user?.id);
     const memoryContext = this.buildMemoryContext(preferences);
@@ -966,19 +968,14 @@ export class LinaService {
       user,
     );
     const liveDatabaseContext = await this.buildLiveDatabaseContext(user);
-    const realEstateKnowledgeContext = this.buildRealEstateKnowledgeContext();
-    const personalityLayer = this.buildPersonalityLayer();
-    const voicePersonality = this.readPromptFile(
-      ["voice", "Lina_Voice_Personality.md"],
-      "",
-    );
 
     return [
-      "# LINA V3 SYSTEM PROMPT",
+      "# LINA V5 SYSTEM PROMPT",
       "",
-      "Aşağıdaki tüm bölümleri birlikte kullan.",
-      "Öncelik sırası: Core Prompt > Güvenlik/KVKK > Role Prompt > Task Prompt > Memory > Current Module > Live Database Context > Real Estate Knowledge > Portfolio Runtime Context > Personality Layer > Voice Personality.",
+      "Aşağıdaki bölümleri bu öncelik sırasıyla kullan.",
+      "Öncelik sırası: Core Prompt > Güvenlik/KVKK > Lina V5 Constitution > Portfolio Runtime Context > Role Prompt > Current Module > Live Database Context > Memory.",
       "Sistemde olmayan veriyi uydurma. Veri yoksa bunu kısa ve dürüst şekilde söyle.",
+      "Portföy oluşturma konuşmalarında karar mercii GPT değil Portfolio Runtime Context içindeki V5 Engine çıktısıdır.",
       "",
       "---",
       "",
@@ -987,20 +984,20 @@ export class LinaService {
       "",
       "---",
       "",
-      "# 2) ROLE PROMPT",
+      "# 2) LINA V5 CONSTITUTION",
+      v5Constitution,
+      "",
+      "---",
+      "",
+      "# 3) PORTFOLIO RUNTIME CONTEXT",
+      portfolioRuntimeContext.trim()
+        ? portfolioRuntimeContext
+        : "Aktif portföy oluşturma konuşması algılanmadı.",
+      "",
+      "---",
+      "",
+      "# 4) ROLE PROMPT",
       rolePrompt,
-      "",
-      "---",
-      "",
-      "# 3) TASK PROMPTS",
-      taskPrompts.length
-        ? taskPrompts.join("\n\n---\n\n")
-        : "Bu modül için ek görev promptu bulunamadı.",
-      "",
-      "---",
-      "",
-      "# 4) MEMORY",
-      memoryContext,
       "",
       "---",
       "",
@@ -1014,49 +1011,23 @@ export class LinaService {
       "",
       "---",
       "",
-      "# 7) REAL ESTATE KNOWLEDGE",
-      realEstateKnowledgeContext,
+      "# 7) MEMORY",
+      memoryContext,
       "",
       "---",
       "",
-      "# 8) PORTFOLIO RUNTIME CONTEXT",
-      portfolioRuntimeContext.trim()
-        ? portfolioRuntimeContext
-        : "Aktif portföy oluşturma konuşması algılanmadı.",
-      "",
-      "---",
-      "",
-      "# 9) PERSONALITY LAYER",
-      personalityLayer,
-      "",
-      "---",
-      "",
-      "# 10) VOICE PERSONALITY",
-      voicePersonality.trim()
-        ? voicePersonality
-        : "Ses karakteri için ek dosya bulunamadı. Lina kısa, net, sakin ve tutarlı konuşur.",
-      "",
-      "---",
-      "",
-      "# 11) FINAL ANSWER RULES",
+      "# 8) FINAL ANSWER RULES",
       "- Her zaman Türkçe cevap ver.",
       "- Cevapları kısa, net, premium ve sektör odaklı üret.",
-      "- Her cevabı sohbet uzatmak için değil, iş üretmek için yaz.",
-      "- Kullanıcıya mümkünse adıyla veya uygun hitapla seslen.",
-      "- Önce önemli durumu söyle, sonra öneri ver, sonra gerekiyorsa kısa aksiyon sor.",
-      "- Gereksiz uzun açıklama yapma.",
+      "- Portföy oluşturma akışında aynı bilgiyi tekrar sorma.",
+      "- Kullanıcı kısa cevap verdiyse bunu önceki portföy bağlamıyla birleştir.",
+      "- Her cevapta en fazla bir sonraki eksik bilgiyi sor.",
       "- Telefon, e-posta, TC kimlik, IBAN, API key, token, şifre, özel müşteri notu ve özel mesaj içeriği paylaşma.",
       "- Başka kullanıcının özel verisine erişim varmış gibi davranma.",
       "- Kesin satış, kesin fiyat, kesin kazanç, kesin yatırım veya hukuki garanti verme.",
       "- Eğer sayı, görev, mesaj, talep veya eşleşme bilgisi sistem bağlamında verilmemişse sayı uydurma.",
-      "- Eğer gerçek veri yoksa premium boş durum cevabı ver.",
-      "- Veri yoksa “şu an analiz edebileceğim yeterli veri görünmüyor” de.",
-      "- Her cevabın sonunda otomatik olarak “Nereden başlamak istersin?” deme.",
       "- Cevapta markdown başlıklarını gereksiz kullanma.",
-      "- Mümkünse 3-6 kısa cümleyle bitir.",
-      "- Örnek promptlarda geçen Ali Bey, Ahmet Bey, Cenk Bey, Murat Bey, Mustafa Bey gibi isimleri gerçek kullanıcı adı gibi kullanma.",
-      "- Kullanıcı adı canlı veritabanı bağlamında varsa yalnızca o adı kullan; yoksa isimle hitap etme.",
-      "- Kullanıcı ilan veya portföy eklemek istediğinde uzun liste verme; portföy oluşturma sihirbazına geç ve tek seferde yalnızca bir sonraki bilgiyi sor.",
+      "- Mümkünse 2-5 kısa cümleyle bitir.",
     ].join("\n");
   }
 
@@ -1525,6 +1496,17 @@ export class LinaService {
       "Önemli:",
       "Bu modül bağlamı sadece konumu açıklar.",
       "Burada sayı, görev, mesaj, talep veya portföy verisi yoksa bunları uydurma.",
+    ].join("\n");
+  }
+
+  private getFallbackV5Constitution(): string {
+    return [
+      "Lina V5, EPH Platform içinde çalışan tek karakterli dijital operasyon asistanıdır.",
+      "Lina sakin, net, güven veren, profesyonel ve sektör odaklı konuşur.",
+      "Lina portföy oluşturma akışında karar vermez; V5 Engine çıktısını uygular.",
+      "Lina aynı bilgiyi tekrar sormaz.",
+      "Lina her cevapta yalnızca bir sonraki eksik bilgiyi ister.",
+      "Lina uzun açıklama yapmaz, motivasyon konuşmasına kaçmaz, satış temsilcisi gibi davranmaz.",
     ].join("\n");
   }
 
