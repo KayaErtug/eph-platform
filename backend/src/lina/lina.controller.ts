@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 
 import { LinaService } from './lina.service';
 import { LinaChatDto } from './dto/lina-chat.dto';
 import { LinaVoiceDto } from './dto/lina-voice.dto';
 import { LinaPreferencesDto } from './dto/lina-preferences.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 type LinaRequestUser = {
   id?: string;
@@ -25,26 +26,31 @@ export class LinaController {
     return this.linaService.getStatus();
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('chat')
   async chat(@Body() body: LinaChatDto, @Req() request: RequestWithUser) {
     return this.linaService.createTextReply(body, this.extractUser(request));
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('voice')
   async voice(@Body() body: LinaVoiceDto, @Req() request: RequestWithUser) {
     return this.linaService.createVoice(body, this.extractUser(request));
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('preferences')
   async getPreferences(@Req() request: RequestWithUser) {
     return this.linaService.getPreferences(this.extractUser(request));
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch('preferences')
   async updatePreferences(@Body() body: LinaPreferencesDto, @Req() request: RequestWithUser) {
     return this.linaService.updatePreferences(body, this.extractUser(request));
   }
 
+  @UseGuards(JwtAuthGuard)
   @Delete('memory')
   async resetMemory(@Req() request: RequestWithUser) {
     return this.linaService.resetMemory(this.extractUser(request));
