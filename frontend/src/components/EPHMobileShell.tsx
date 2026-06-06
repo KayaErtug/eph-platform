@@ -26,7 +26,6 @@ import {
   X,
 } from "lucide-react";
 
-import LinaPanel from "./LinaPanel";
 import { useAuthStore } from "@/store/auth.store";
 
 const MAIN_ROUTES = [
@@ -114,7 +113,6 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
 
-  const [linaOpen, setLinaOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const showShell = shouldShowShell(pathname);
@@ -128,7 +126,7 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
 
   const openLina = () => {
     setMenuOpen(false);
-    setLinaOpen(true);
+    router.push("/lina");
   };
 
   const feedbackMail = (subject: string) => {
@@ -290,19 +288,19 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <button
-        type="button"
-        className="eph-mobile-lina-fab"
-        onClick={() => setLinaOpen(true)}
-        aria-label="Lina"
-      >
-        <span className="eph-mobile-lina-star">✦</span>
-        <span>Lina</span>
-      </button>
+      {!pathname.startsWith("/lina") && (
+        <button
+          type="button"
+          className="eph-mobile-lina-fab"
+          onClick={openLina}
+          aria-label="Lina"
+        >
+          <span className="eph-mobile-lina-star">✦</span>
+          <span>Lina</span>
+        </button>
+      )}
 
       {showBottomNav && <EPHMobileBottomNav pathname={pathname} />}
-
-      <LinaPanel open={linaOpen} onClose={() => setLinaOpen(false)} />
     </div>
   );
 }
