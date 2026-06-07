@@ -20,6 +20,7 @@ import {
   XCircle,
 } from "lucide-react";
 import api from "@/lib/api";
+import { getRoleDisplayName } from "@/lib/role-labels";
 
 type ApplicationStatus = "PENDING" | "APPROVED" | "REJECTED" | "INVITED" | "REGISTERED" | string;
 
@@ -69,15 +70,6 @@ type DashboardResponse = {
     total: number;
   };
   items: ApplicationItem[];
-};
-
-const roleLabels: Record<string, string> = {
-  EMLAKCI: "Emlakçı",
-  MUTEAHHIT: "Müteahhit",
-  INSAAT_FIRMASI: "İnşaat Firması",
-  MODERATOR: "Moderatör",
-  ADMIN: "Admin",
-  SUPER_ADMIN: "Süper Admin",
 };
 
 const statusLabels: Record<string, string> = {
@@ -419,7 +411,7 @@ export default function AdminKatilimTalepleriPage() {
 
                       <p className="meta-line">
                         <BriefcaseBusiness size={14} />
-                        <span>{roleLabels[item.requestedRole] || item.requestedRole}</span>
+                        <span>{getRoleDisplayName(item.requestedRole)}</span>
                         <b>•</b>
                         <MapPin size={14} />
                         <span>{item.district || "-"} / {item.city || "-"}</span>
@@ -487,7 +479,7 @@ export default function AdminKatilimTalepleriPage() {
               <div className="avatar large">{initials(selected.applicantName)}</div>
               <div>
                 <h2>{selected.applicantName}</h2>
-                <p>{roleLabels[selected.requestedRole] || selected.requestedRole}</p>
+                <p>{getRoleDisplayName(selected.requestedRole)}</p>
               </div>
             </div>
 
