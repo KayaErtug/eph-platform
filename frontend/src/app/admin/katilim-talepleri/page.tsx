@@ -1,10 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Bell, Check, Download, Eye, Filter, Menu, MoreHorizontal, Search, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Bell,
+  Check,
+  Download,
+  Eye,
+  Filter,
+  Menu,
+  MoreHorizontal,
+  Search,
+  X,
+} from "lucide-react";
 import api from "@/lib/api";
 
-type ApplicationStatus = "PENDING" | "APPROVED" | "REJECTED" | "INVITED" | "REGISTERED" | string;
+type ApplicationStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "INVITED"
+  | "REGISTERED"
+  | string;
 
 type ApplicationItem = {
   id: string;
@@ -66,13 +83,22 @@ const statusLabels: Record<string, string> = {
   REGISTERED: "Kayıt Tamamlandı",
 };
 
+const cardThemes = [
+  "theme-blue",
+  "theme-green",
+  "theme-purple",
+  "theme-amber",
+  "theme-cyan",
+  "theme-rose",
+];
+
 function formatDate(value?: string | null) {
   if (!value) return "-";
 
   return new Intl.DateTimeFormat("tr-TR", {
     day: "2-digit",
     month: "2-digit",
-    year: "numeric",
+    year: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
@@ -299,46 +325,50 @@ export default function AdminKatilimTalepleriPage() {
         <section className="summary-grid">
           <article className="summary-card blue">
             <div className="summary-icon">⌛</div>
-            <span>Bekleyen Talepler</span>
-            <strong>{summary.pending}</strong>
-            <small>Onay bekleyen başvurular</small>
+            <div>
+              <span>Bekleyen</span>
+              <strong>{summary.pending}</strong>
+            </div>
           </article>
 
           <article className="summary-card green">
             <div className="summary-icon">✓</div>
-            <span>Onaylananlar Bu Ay</span>
-            <strong>{summary.approvedThisMonth}</strong>
-            <small>Toplam onaylanan başvuru</small>
+            <div>
+              <span>Onaylanan</span>
+              <strong>{summary.approvedThisMonth}</strong>
+            </div>
           </article>
 
           <article className="summary-card red">
             <div className="summary-icon">×</div>
-            <span>Reddedilenler Bu Ay</span>
-            <strong>{summary.rejectedThisMonth}</strong>
-            <small>Toplam reddedilen başvuru</small>
+            <div>
+              <span>Reddedilen</span>
+              <strong>{summary.rejectedThisMonth}</strong>
+            </div>
           </article>
 
           <article className="summary-card purple">
             <div className="summary-icon">👥</div>
-            <span>Pilot Başvurular</span>
-            <strong>{summary.pilotThisMonth}</strong>
-            <small>Bu ayki pilot başvurular</small>
+            <div>
+              <span>Pilot</span>
+              <strong>{summary.pilotThisMonth}</strong>
+            </div>
           </article>
         </section>
 
         <section className="panel">
           <div className="filters">
             <label className="search-box">
-              <Search size={18} />
+              <Search size={17} />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Ara: ad, e-posta, telefon, şehir..."
+                placeholder="Ara: ad, e-posta, telefon..."
               />
             </label>
 
             <select value={type} onChange={(event) => setType(event.target.value)}>
-              <option value="all">Başvuru Türü</option>
+              <option value="all">Tür</option>
               <option value="referansli">Referanslı</option>
               <option value="referanssiz">Referanssız</option>
               <option value="pilot">Pilot</option>
@@ -363,12 +393,12 @@ export default function AdminKatilimTalepleriPage() {
             </select>
 
             <button className="secondary-button" type="button">
-              <Filter size={17} />
+              <Filter size={16} />
               Filtrele
             </button>
 
             <button className="secondary-button export-button" type="button">
-              <Download size={17} />
+              <Download size={16} />
               Dışa Aktar
             </button>
           </div>
@@ -450,59 +480,66 @@ export default function AdminKatilimTalepleriPage() {
               </div>
 
               <div className="mobile-list">
-                {filteredItems.map((item) => (
-                  <article className="mobile-card" key={item.id}>
-                    <div className="mobile-card-top">
-                      <div className="person-cell">
-                        <div className="avatar soft">{initials(item.applicantName)}</div>
-                        <div>
+                {filteredItems.map((item, index) => (
+                  <article className={`mobile-card ${cardThemes[index % cardThemes.length]}`} key={item.id}>
+                    <div className="mobile-card-main">
+                      <div className="avatar soft">{initials(item.applicantName)}</div>
+
+                      <div className="mobile-person">
+                        <div className="mobile-name-row">
                           <strong>{item.applicantName}</strong>
+                          <span className={`status-pill ${item.status.toLowerCase()}`}>
+                            {statusLabels[item.status] || item.status}
+                          </span>
+                        </div>
+
+                        <div className="mobile-line">
                           <span>{item.applicantEmail}</span>
-                          <small>{item.applicantPhone}</small>
+                          <span>{item.applicantPhone}</span>
+                        </div>
+
+                        <div className="mobile-meta">
+                          <span>{roleLabels[item.requestedRole] || item.requestedRole}</span>
+                          <span>{formatDate(item.createdAt)}</span>
+                          <span>{item.city || item.district ? `${item.city || ""} ${item.district || ""}` : "Konum yok"}</span>
+                        </div>
+
+                        <div className="mobile-bottom">
+                          <div className="badge-list">
+                            {getTypeBadges(item).map((badge) => (
+                              <span className={`badge ${badge === "Pilot" ? "pilot" : ""}`} key={badge}>
+                                {badge}
+                              </span>
+                            ))}
+                          </div>
+
+                          <div className="mobile-actions">
+                            <button onClick={() => openDetail(item)}>
+                              <Eye size={15} />
+                            </button>
+                            <button
+                              className="approve"
+                              disabled={busyId === item.id || item.status !== "PENDING"}
+                              onClick={() => handleStatusChange(item.id, "APPROVED")}
+                            >
+                              <Check size={16} />
+                            </button>
+                            <button
+                              className="reject"
+                              disabled={busyId === item.id || item.status !== "PENDING"}
+                              onClick={() => {
+                                setSelected(item);
+                                setNote(item.adminNote || "");
+                              }}
+                            >
+                              <X size={16} />
+                            </button>
+                            <button onClick={() => openDetail(item)}>
+                              <MoreHorizontal size={16} />
+                            </button>
+                          </div>
                         </div>
                       </div>
-
-                      <div className="badge-list right">
-                        {getTypeBadges(item).map((badge) => (
-                          <span className={`badge ${badge === "Pilot" ? "pilot" : ""}`} key={badge}>
-                            {badge}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="mobile-meta">
-                      <span>{roleLabels[item.requestedRole] || item.requestedRole}</span>
-                      <span>{formatDate(item.createdAt)}</span>
-                      <span className={`status-pill ${item.status.toLowerCase()}`}>
-                        {statusLabels[item.status] || item.status}
-                      </span>
-                    </div>
-
-                    <div className="mobile-actions">
-                      <button onClick={() => openDetail(item)}>
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        className="approve"
-                        disabled={busyId === item.id || item.status !== "PENDING"}
-                        onClick={() => handleStatusChange(item.id, "APPROVED")}
-                      >
-                        <Check size={17} />
-                      </button>
-                      <button
-                        className="reject"
-                        disabled={busyId === item.id || item.status !== "PENDING"}
-                        onClick={() => {
-                          setSelected(item);
-                          setNote(item.adminNote || "");
-                        }}
-                      >
-                        <X size={17} />
-                      </button>
-                      <button onClick={() => openDetail(item)}>
-                        <MoreHorizontal size={17} />
-                      </button>
                     </div>
                   </article>
                 ))}
@@ -543,7 +580,9 @@ export default function AdminKatilimTalepleriPage() {
               </div>
               <div>
                 <span>Şehir</span>
-                <strong>{selected.city || "-"} {selected.district || ""}</strong>
+                <strong>
+                  {selected.city || "-"} {selected.district || ""}
+                </strong>
               </div>
               <div>
                 <span>Başvuru Türü</span>
@@ -824,13 +863,14 @@ export default function AdminKatilimTalepleriPage() {
         }
 
         .summary-card {
-          min-height: 148px;
+          min-height: 116px;
           background: white;
           border: 1px solid #e2e8f0;
           border-radius: 24px;
-          padding: 22px;
-          display: grid;
-          gap: 6px;
+          padding: 18px;
+          display: flex;
+          align-items: center;
+          gap: 14px;
           box-shadow: 0 18px 50px rgba(15, 23, 42, 0.06);
         }
 
@@ -841,46 +881,60 @@ export default function AdminKatilimTalepleriPage() {
           display: grid;
           place-items: center;
           font-weight: 900;
-          margin-bottom: 4px;
+          flex: 0 0 auto;
+        }
+
+        .summary-card.blue {
+          background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+        }
+
+        .summary-card.green {
+          background: linear-gradient(135deg, #ffffff 0%, #ecfdf5 100%);
+        }
+
+        .summary-card.red {
+          background: linear-gradient(135deg, #ffffff 0%, #fff1f2 100%);
+        }
+
+        .summary-card.purple {
+          background: linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%);
         }
 
         .summary-card.blue .summary-icon {
-          background: #eff6ff;
+          background: #dbeafe;
           color: #2563eb;
         }
 
         .summary-card.green .summary-icon {
-          background: #ecfdf5;
+          background: #dcfce7;
           color: #16a34a;
         }
 
         .summary-card.red .summary-icon {
-          background: #fef2f2;
+          background: #fee2e2;
           color: #dc2626;
         }
 
         .summary-card.purple .summary-icon {
-          background: #f5f3ff;
+          background: #ede9fe;
           color: #7c3aed;
         }
 
         .summary-card span {
+          display: block;
           color: #0f172a;
-          font-size: 14px;
-          font-weight: 800;
+          font-size: 13px;
+          font-weight: 900;
+          white-space: nowrap;
         }
 
         .summary-card strong {
-          font-size: 30px;
+          display: block;
+          margin-top: 6px;
+          font-size: 26px;
           line-height: 1;
           font-weight: 950;
           letter-spacing: -0.05em;
-        }
-
-        .summary-card small {
-          color: #64748b;
-          font-size: 12px;
-          font-weight: 700;
         }
 
         .panel {
@@ -892,10 +946,10 @@ export default function AdminKatilimTalepleriPage() {
         }
 
         .filters {
-          padding: 18px;
+          padding: 14px;
           display: grid;
           grid-template-columns: minmax(220px, 1.2fr) repeat(3, minmax(140px, 0.6fr)) auto auto;
-          gap: 12px;
+          gap: 10px;
           border-bottom: 1px solid #e2e8f0;
         }
 
@@ -904,8 +958,8 @@ export default function AdminKatilimTalepleriPage() {
         .secondary-button,
         .primary-button,
         .danger-button {
-          min-height: 48px;
-          border-radius: 16px;
+          min-height: 44px;
+          border-radius: 15px;
           border: 1px solid #e2e8f0;
           background: white;
           color: #0f172a;
@@ -959,9 +1013,9 @@ export default function AdminKatilimTalepleriPage() {
 
         .error-box,
         .empty-state {
-          margin: 18px;
+          margin: 14px;
           border-radius: 18px;
-          padding: 18px;
+          padding: 16px;
           font-weight: 800;
           text-align: center;
         }
@@ -1035,21 +1089,18 @@ export default function AdminKatilimTalepleriPage() {
         .badge-list {
           display: flex;
           flex-wrap: wrap;
-          gap: 6px;
-        }
-
-        .badge-list.right {
-          justify-content: flex-end;
+          gap: 5px;
         }
 
         .badge {
           border-radius: 9px;
-          padding: 6px 8px;
+          padding: 5px 7px;
           background: #eff6ff;
           color: #2563eb;
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 950;
           text-transform: uppercase;
+          line-height: 1;
         }
 
         .badge.pilot {
@@ -1065,13 +1116,14 @@ export default function AdminKatilimTalepleriPage() {
 
         .status-pill {
           width: fit-content;
-          border-radius: 10px;
-          padding: 7px 10px;
+          border-radius: 9px;
+          padding: 6px 8px;
           background: #fef3c7;
           color: #b45309;
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 950;
           text-transform: uppercase;
+          line-height: 1;
         }
 
         .status-pill.approved {
@@ -1121,48 +1173,174 @@ export default function AdminKatilimTalepleriPage() {
         }
 
         .mobile-card {
-          margin: 12px;
-          padding: 14px;
+          position: relative;
+          overflow: hidden;
+          margin: 8px 10px;
+          padding: 10px;
           border: 1px solid #e2e8f0;
-          border-radius: 24px;
+          border-radius: 18px;
           background: #ffffff;
+          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.055);
         }
 
-        .mobile-card-top {
+        .mobile-card::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 4px;
+          background: #2563eb;
+        }
+
+        .mobile-card.theme-blue {
+          background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+        }
+
+        .mobile-card.theme-blue::before {
+          background: #2563eb;
+        }
+
+        .mobile-card.theme-green {
+          background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+        }
+
+        .mobile-card.theme-green::before {
+          background: #16a34a;
+        }
+
+        .mobile-card.theme-purple {
+          background: linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%);
+        }
+
+        .mobile-card.theme-purple::before {
+          background: #7c3aed;
+        }
+
+        .mobile-card.theme-amber {
+          background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%);
+        }
+
+        .mobile-card.theme-amber::before {
+          background: #f59e0b;
+        }
+
+        .mobile-card.theme-cyan {
+          background: linear-gradient(135deg, #ffffff 0%, #ecfeff 100%);
+        }
+
+        .mobile-card.theme-cyan::before {
+          background: #06b6d4;
+        }
+
+        .mobile-card.theme-rose {
+          background: linear-gradient(135deg, #ffffff 0%, #fff1f2 100%);
+        }
+
+        .mobile-card.theme-rose::before {
+          background: #e11d48;
+        }
+
+        .mobile-card-main {
           display: flex;
-          justify-content: space-between;
-          gap: 12px;
           align-items: flex-start;
+          gap: 9px;
+          min-width: 0;
+        }
+
+        .mobile-person {
+          width: 100%;
+          min-width: 0;
+        }
+
+        .mobile-name-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          min-width: 0;
+        }
+
+        .mobile-name-row strong {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: #071332;
+          font-size: 13px;
+          font-weight: 950;
+          letter-spacing: -0.02em;
+        }
+
+        .mobile-line {
+          margin-top: 3px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #475569;
+          font-size: 11px;
+          font-weight: 750;
+          min-width: 0;
+        }
+
+        .mobile-line span {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .mobile-line span:first-child {
+          max-width: 52%;
         }
 
         .mobile-meta {
-          margin-top: 14px;
+          margin-top: 6px;
           display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
+          grid-template-columns: 0.8fr 0.9fr 1fr;
+          gap: 6px;
           color: #64748b;
-          font-size: 12px;
-          font-weight: 800;
+          font-size: 10.5px;
+          font-weight: 850;
+        }
+
+        .mobile-meta span {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .mobile-bottom {
+          margin-top: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
         }
 
         .mobile-actions {
-          margin-top: 14px;
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(4, 34px);
+          gap: 6px;
         }
 
         .mobile-actions button {
-          width: 100%;
+          width: 34px;
+          height: 32px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.76);
+          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
         }
 
         .panel-footer {
-          padding: 18px 22px;
+          padding: 12px 16px;
           display: flex;
           justify-content: space-between;
           gap: 12px;
           border-top: 1px solid #e2e8f0;
           color: #64748b;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 800;
         }
 
@@ -1293,10 +1471,6 @@ export default function AdminKatilimTalepleriPage() {
             grid-template-columns: 1fr 1fr;
           }
 
-          .export-button {
-            grid-column: span 1;
-          }
-
           .desktop-table {
             overflow-x: auto;
           }
@@ -1311,6 +1485,7 @@ export default function AdminKatilimTalepleriPage() {
           .admin-page {
             display: block;
             min-height: 100dvh;
+            background: #f8fafc;
           }
 
           .sidebar {
@@ -1318,17 +1493,18 @@ export default function AdminKatilimTalepleriPage() {
           }
 
           .content {
-            padding: 14px;
-            padding-bottom: 92px;
+            padding: 8px;
+            padding-bottom: 76px;
           }
 
           .topbar {
             position: sticky;
             top: 0;
             z-index: 20;
-            margin: -14px -14px 16px;
-            padding: 12px 14px;
-            background: rgba(248, 250, 252, 0.92);
+            margin: -8px -8px 8px;
+            padding: 8px 10px;
+            min-height: 48px;
+            background: rgba(248, 250, 252, 0.94);
             backdrop-filter: blur(16px);
             border-bottom: 1px solid #e2e8f0;
           }
@@ -1340,6 +1516,7 @@ export default function AdminKatilimTalepleriPage() {
 
           .mobile-title h1 {
             font-size: 18px;
+            letter-spacing: -0.03em;
           }
 
           .page-title {
@@ -1347,57 +1524,67 @@ export default function AdminKatilimTalepleriPage() {
           }
 
           .back-button {
-            font-size: 13px;
+            font-size: 12px;
+            gap: 5px;
           }
 
           .top-actions {
-            gap: 7px;
+            gap: 6px;
           }
 
           .top-actions button {
-            width: 38px;
-            height: 38px;
-            border-radius: 14px;
+            width: 34px;
+            height: 34px;
+            border-radius: 13px;
           }
 
           .summary-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 12px;
-            margin-bottom: 14px;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 6px;
+            margin-bottom: 8px;
           }
 
           .summary-card {
-            min-height: 124px;
-            border-radius: 20px;
-            padding: 14px;
+            min-height: 58px;
+            border-radius: 16px;
+            padding: 7px 5px;
+            display: grid;
+            place-items: center;
+            text-align: center;
+            gap: 3px;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
           }
 
           .summary-icon {
-            width: 38px;
-            height: 38px;
-            border-radius: 14px;
-          }
-
-          .summary-card span {
-            font-size: 12px;
-          }
-
-          .summary-card strong {
-            font-size: 24px;
-          }
-
-          .summary-card small {
+            width: 22px;
+            height: 22px;
+            border-radius: 8px;
             font-size: 11px;
           }
 
+          .summary-card span {
+            font-size: 9px;
+            line-height: 1.05;
+            white-space: normal;
+            min-height: 18px;
+            display: grid;
+            place-items: center;
+          }
+
+          .summary-card strong {
+            margin-top: 0;
+            font-size: 17px;
+            line-height: 1;
+          }
+
           .panel {
-            border-radius: 22px;
+            border-radius: 18px;
           }
 
           .filters {
-            padding: 12px;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            padding: 8px;
+            grid-template-columns: 1fr 1fr 38px 38px;
+            gap: 6px;
           }
 
           .search-box {
@@ -1407,13 +1594,42 @@ export default function AdminKatilimTalepleriPage() {
           .filters select,
           .secondary-button,
           .search-box {
-            min-height: 44px;
-            border-radius: 15px;
-            font-size: 12px;
+            min-height: 36px;
+            height: 36px;
+            border-radius: 13px;
+            font-size: 11px;
           }
 
-          .export-button {
-            grid-column: auto;
+          .search-box {
+            padding: 0 10px;
+            gap: 7px;
+          }
+
+          .search-box input::placeholder {
+            color: #94a3b8;
+          }
+
+          .filters select {
+            padding: 0 9px;
+            min-width: 0;
+          }
+
+          .secondary-button {
+            padding: 0;
+            gap: 0;
+          }
+
+          .secondary-button svg {
+            width: 15px;
+            height: 15px;
+          }
+
+          .secondary-button {
+            font-size: 0;
+          }
+
+          .filters select:nth-of-type(3) {
+            grid-column: span 2;
           }
 
           .desktop-table {
@@ -1422,53 +1638,59 @@ export default function AdminKatilimTalepleriPage() {
 
           .mobile-list {
             display: block;
+            padding-top: 4px;
           }
 
-          .person-cell {
-            min-width: 0;
-          }
-
-          .person-cell strong {
-            max-width: 150px;
-          }
-
-          .person-cell span,
-          .person-cell small {
-            max-width: 160px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-          }
-
-          .badge-list.right {
-            max-width: 110px;
+          .mobile-card .avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 13px;
+            font-size: 12px;
           }
 
           .badge {
-            font-size: 10px;
-            padding: 5px 7px;
+            font-size: 8.5px;
+            padding: 4px 5px;
+            border-radius: 7px;
+          }
+
+          .status-pill {
+            font-size: 8.5px;
+            padding: 5px 6px;
+            border-radius: 7px;
           }
 
           .panel-footer {
-            padding: 14px;
+            padding: 8px 12px;
+            font-size: 11px;
+          }
+
+          .error-box,
+          .empty-state {
+            margin: 8px;
+            padding: 12px;
             font-size: 12px;
           }
 
           .detail-modal {
-            border-radius: 24px;
-            padding: 18px;
-          }
-
-          .modal-header {
-            align-items: flex-start;
+            border-radius: 22px;
+            padding: 16px;
           }
 
           .modal-header h2 {
-            font-size: 20px;
+            font-size: 19px;
           }
 
           .detail-grid {
             grid-template-columns: 1fr;
+            gap: 8px;
+          }
+
+          .detail-grid div,
+          .message-box,
+          .note-box {
+            border-radius: 16px;
+            padding: 12px;
           }
 
           .modal-actions {
