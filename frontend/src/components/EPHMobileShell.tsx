@@ -100,7 +100,7 @@ function roleLabel(role?: string | null) {
   const normalized = String(role || "").toLocaleUpperCase("tr-TR");
 
   if (normalized === "ADMIN") return "Admin";
-  if (normalized === "SUPER_ADMIN") return "Süper Admin";
+  if (normalized === "SUPER_ADMIN") return "Yazılım Ekibi";
   if (normalized === "EMLAKCI") return "Emlakçı";
   if (["MUTEAHHIT", "MÜTEAHHİT", "MÜTAHHİT"].includes(normalized)) return "Müteahhit";
   if (["INSAAT_FIRMASI", "İNŞAAT_FİRMASI"].includes(normalized)) return "İnşaat Firması";

@@ -86,7 +86,7 @@ function roleLabel(role?: string) {
   if (role === "EMLAKCI") return "Emlakçı";
   if (role === "MUTEAHHIT") return "Müteahhit";
   if (role === "INSAAT_FIRMASI") return "İnşaat";
-  if (role === "SUPER_ADMIN") return "Süper Admin";
+  if (role === "SUPER_ADMIN") return "Yazılım Ekibi";
   if (role === "ADMIN") return "Admin";
 
   return "Üye";

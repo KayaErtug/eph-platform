@@ -93,7 +93,7 @@ function normalizeRole(role?: string | null) {
 function roleLabel(role?: string | null) {
   const normalizedRole = normalizeRole(role);
 
-  if (normalizedRole === "SUPER_ADMIN") return "Süper Admin";
+  if (normalizedRole === "SUPER_ADMIN") return "Yazılım Ekibi";
   if (normalizedRole === "ADMIN") return "Admin";
   if (["MUTEAHHIT", "MÜTEAHHİT", "MÜTAHHİT"].includes(normalizedRole)) return "Müteahhit";
   if (["INSAAT_FIRMASI", "İNŞAAT_FİRMASI"].includes(normalizedRole)) return "İnşaat Firması";

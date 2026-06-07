@@ -75,7 +75,7 @@ type PresenceResponse = {
 
 const roleTheme = {
   SUPER_ADMIN: {
-    label: "Süper Admin",
+    label: "Yazılım Ekibi",
     color: "#14B8A6",
     bg: "#ECFEFF",
     badge: "Kurucu Erişimi",
