@@ -24,6 +24,7 @@ type Role =
   | "EMLAKCI"
   | "MUTEAHHIT"
   | "INSAAT_FIRMASI"
+  | "MODERATOR"   
   | "ADMIN"
   | "SUPER_ADMIN";
 
@@ -56,6 +57,7 @@ const ROLE_LABELS: Record<Role, string> = {
   EMLAKCI: "Gayrimenkul Danışmanı",
   MUTEAHHIT: "Müteahhit",
   INSAAT_FIRMASI: "İnşaat Firması",
+  MODERATOR: "Moderatör",
   ADMIN: "Admin",
   SUPER_ADMIN: "Yazılım Ekibi",
 };
@@ -360,6 +362,10 @@ export default function AdminReferralsPage() {
                     <option value="EMLAKCI">Gayrimenkul Danışmanı</option>
                     <option value="MUTEAHHIT">Müteahhit</option>
                     <option value="INSAAT_FIRMASI">İnşaat Firması</option>
+		    <option value="MODERATOR">Moderatör</option>
+                    <option value="ADMIN">Admin</option>
+		    <option value="SUPER_ADMIN">Yazılım Ekibi</option>
+		    
                   </select>
                 </label>
               </div>
