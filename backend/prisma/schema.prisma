@@ -86,14 +86,43 @@ model SUPER_ADMIN {
 }
 
 model Invitation {
-  id        String           @id @default(uuid())
-  code      String           @unique
-  role      Role
-  status    InvitationStatus @default(PENDING)
-  maxUses   Int              @default(1)
-  usedCount Int              @default(0)
-  expiresAt DateTime
-  createdAt DateTime         @default(now())
+  id                    String           @id @default(uuid())
+  code                  String           @unique
+  role                  Role
+  status                InvitationStatus @default(PENDING)
+  maxUses               Int              @default(1)
+  usedCount             Int              @default(0)
+  expiresAt             DateTime
+
+  davetKoduTuru         DavetKoduTuru    @default(REFERANSLI_BASVURU)
+  adayEposta            String?
+  adayAdSoyad           String?
+  adayTelefon           String?
+  pilotDavetiMi         Boolean          @default(false)
+
+  olusturanKullaniciId  String?
+  olusturanRol          Role?
+  onayYetkiSeviyesi     OnayYetkiSeviyesi @default(MODERATOR_ADMIN_SUPER_ADMIN)
+
+  epostaGonderildiMi    Boolean          @default(false)
+  epostaGonderimTarihi  DateTime?
+  epostaHataMesaji      String?
+
+  iptalEdenKullaniciId  String?
+  iptalTarihi           DateTime?
+  iptalSebebi           String?
+
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@index([role])
+  @@index([status])
+  @@index([davetKoduTuru])
+  @@index([adayEposta])
+  @@index([pilotDavetiMi])
+  @@index([olusturanKullaniciId])
+  @@index([olusturanRol])
+  @@index([expiresAt])
 }
 
 model ReferralCandidate {
@@ -331,29 +360,68 @@ model Application {
   applicantPhone        String
   requestedRole         Role
   message               String?
+
+  basvuruTuru           BasvuruTuru       @default(REFERANSSIZ)
+  pilotBasvuruMu        Boolean           @default(false)
+
   referralCode          String?
+  invitationId          String?
   referrerId            String?
+  referansliMi          Boolean           @default(false)
+  referansDogrulandiMi  Boolean           @default(false)
+  referansOlusturanId   String?
+
   status                ApplicationStatus @default(PENDING)
   adminNote             String?
+  moderatorNote         String?
   profession            String?
   city                  String?
+  district              String?
+
+  onayYetkiSeviyesi     OnayYetkiSeviyesi @default(ADMIN_SUPER_ADMIN)
+  onaylayanRol          Role?
+
   ipAddress             String?
   userAgent             String?
   isVip                 Boolean           @default(false)
   isRisky               Boolean           @default(false)
   riskNote              String?
+
   platformAccepted      Boolean           @default(false)
   kvkkAccepted          Boolean           @default(false)
   privacyAccepted       Boolean           @default(false)
   userAgreementAccepted Boolean           @default(false)
   legalAcceptedAt       DateTime?
+
   reviewedAt            DateTime?
   reviewedById          String?
+
+  rejectedAt            DateTime?
+  rejectedById          String?
+  rejectReason          String?
+
+  epostaGonderildiMi    Boolean           @default(false)
+  epostaGonderimTarihi  DateTime?
+  epostaHataMesaji      String?
+
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
   referrer   User? @relation(fields: [referrerId], references: [id])
   reviewedBy User? @relation("ApplicationReviewer", fields: [reviewedById], references: [id])
+
+  @@index([applicantEmail])
+  @@index([requestedRole])
+  @@index([basvuruTuru])
+  @@index([pilotBasvuruMu])
+  @@index([referralCode])
+  @@index([invitationId])
+  @@index([referansliMi])
+  @@index([referansOlusturanId])
+  @@index([status])
+  @@index([onayYetkiSeviyesi])
+  @@index([reviewedById])
+  @@index([createdAt])
 }
 
 model Lead {
@@ -739,6 +807,24 @@ enum InvitationStatus {
   USED
   EXPIRED
   REVOKED
+}
+
+enum BasvuruTuru {
+  REFERANSSIZ
+  REFERANSLI
+  PILOT
+}
+
+enum OnayYetkiSeviyesi {
+  MODERATOR_ADMIN_SUPER_ADMIN
+  ADMIN_SUPER_ADMIN
+  SUPER_ADMIN
+}
+
+enum DavetKoduTuru {
+  REFERANSLI_BASVURU
+  PILOT_DAVETI
+  YONETICI_DAVETI
 }
 
 enum DocumentType {
