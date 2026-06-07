@@ -5,12 +5,11 @@ import {
   ArrowLeft,
   Bell,
   Check,
-  Download,
   Eye,
   Filter,
   Menu,
-  MoreHorizontal,
   Search,
+  ShieldCheck,
   X,
 } from "lucide-react";
 import api from "@/lib/api";
@@ -41,10 +40,15 @@ type ApplicationItem = {
   city?: string | null;
   district?: string | null;
   onayYetkiSeviyesi?: string | null;
+  isVip?: boolean;
+  isRisky?: boolean;
+  riskNote?: string | null;
+  platformAccepted?: boolean;
+  kvkkAccepted?: boolean;
+  privacyAccepted?: boolean;
+  userAgreementAccepted?: boolean;
   createdAt: string;
   updatedAt: string;
-  reviewedAt?: string | null;
-  rejectedAt?: string | null;
   rejectReason?: string | null;
   referrer?: {
     id: string;
@@ -127,6 +131,60 @@ function getTypeBadges(item: ApplicationItem) {
   }
 
   return badges;
+}
+
+function getTrustScore(item: ApplicationItem) {
+  let score = 48;
+
+  if (item.referansliMi) score += 14;
+  if (item.referansDogrulandiMi) score += 14;
+  if (item.kvkkAccepted) score += 7;
+  if (item.privacyAccepted) score += 5;
+  if (item.platformAccepted) score += 5;
+  if (item.userAgreementAccepted) score += 5;
+  if (item.applicantPhone?.length >= 10) score += 4;
+  if (item.city) score += 3;
+  if (item.isVip) score += 4;
+  if (item.isRisky) score -= 28;
+
+  return Math.max(0, Math.min(score, 100));
+}
+
+function getDecision(item: ApplicationItem) {
+  const score = getTrustScore(item);
+
+  if (item.isRisky || score < 55) {
+    return {
+      label: "İncelenmeli",
+      className: "review",
+      text: "Eksik veya riskli bilgi var.",
+    };
+  }
+
+  if (score >= 80 && (item.referansliMi || item.referansDogrulandiMi)) {
+    return {
+      label: "Onaylanabilir",
+      className: "approve",
+      text: "Bilgiler güçlü görünüyor.",
+    };
+  }
+
+  return {
+    label: "Kontrol Et",
+    className: "neutral",
+    text: "Manuel kontrol önerilir.",
+  };
+}
+
+function getLegalText(item: ApplicationItem) {
+  const accepted = [
+    item.kvkkAccepted,
+    item.privacyAccepted,
+    item.platformAccepted,
+    item.userAgreementAccepted,
+  ].filter(Boolean).length;
+
+  return `${accepted}/4 yasal onay`;
 }
 
 export default function AdminKatilimTalepleriPage() {
@@ -303,6 +361,7 @@ export default function AdminKatilimTalepleriPage() {
           </a>
 
           <div className="mobile-title">
+            <span className="flag">🇹🇷</span>
             <h1>Katılım Talepleri</h1>
           </div>
 
@@ -318,8 +377,11 @@ export default function AdminKatilimTalepleriPage() {
         </header>
 
         <div className="page-title">
-          <h1>Katılım Talepleri</h1>
-          <p>Platforma katılmak isteyen kullanıcıların başvurularını yönetin.</p>
+          <div className="desktop-title-row">
+            <span className="flag desktop-flag">🇹🇷</span>
+            <h1>Katılım Talepleri</h1>
+          </div>
+          <p>Başvuruları güven, referans ve yasal onay bilgileriyle yönetin.</p>
         </div>
 
         <section className="summary-grid">
@@ -363,7 +425,7 @@ export default function AdminKatilimTalepleriPage() {
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Ara: ad, e-posta, telefon..."
+                placeholder="Ara: ad, telefon..."
               />
             </label>
 
@@ -396,11 +458,6 @@ export default function AdminKatilimTalepleriPage() {
               <Filter size={16} />
               Filtrele
             </button>
-
-            <button className="secondary-button export-button" type="button">
-              <Download size={16} />
-              Dışa Aktar
-            </button>
           </div>
 
           {error ? <div className="error-box">{error}</div> : null}
@@ -414,139 +471,142 @@ export default function AdminKatilimTalepleriPage() {
               <div className="desktop-table">
                 <div className="table-head">
                   <span>Başvuru Sahibi</span>
-                  <span>Tür</span>
+                  <span>Karar</span>
+                  <span>Güven</span>
                   <span>Rol</span>
-                  <span>Tarih</span>
                   <span>Durum</span>
                   <span>İşlemler</span>
                 </div>
 
-                {filteredItems.map((item) => (
-                  <article className="table-row" key={item.id}>
-                    <div className="person-cell">
-                      <div className="avatar soft">{initials(item.applicantName)}</div>
-                      <div>
-                        <strong>{item.applicantName}</strong>
-                        <span>{item.applicantEmail}</span>
-                        <small>{item.applicantPhone}</small>
+                {filteredItems.map((item) => {
+                  const decision = getDecision(item);
+                  const score = getTrustScore(item);
+
+                  return (
+                    <article className="table-row" key={item.id}>
+                      <div className="person-cell">
+                        <div className="avatar soft">{initials(item.applicantName)}</div>
+                        <div>
+                          <strong>{item.applicantName}</strong>
+                          <span>{item.applicantEmail}</span>
+                          <small>{item.applicantPhone}</small>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="badge-list">
-                      {getTypeBadges(item).map((badge) => (
-                        <span className={`badge ${badge === "Pilot" ? "pilot" : ""}`} key={badge}>
-                          {badge}
-                        </span>
-                      ))}
-                    </div>
+                      <span className={`decision-pill ${decision.className}`}>{decision.label}</span>
 
-                    <span className="role-text">{roleLabels[item.requestedRole] || item.requestedRole}</span>
+                      <span className="trust-score">{score}/100</span>
 
-                    <span className="date-text">{formatDate(item.createdAt)}</span>
+                      <span className="role-text">{roleLabels[item.requestedRole] || item.requestedRole}</span>
 
-                    <span className={`status-pill ${item.status.toLowerCase()}`}>
-                      {statusLabels[item.status] || item.status}
-                    </span>
+                      <span className={`status-pill ${item.status.toLowerCase()}`}>
+                        {statusLabels[item.status] || item.status}
+                      </span>
 
-                    <div className="row-actions">
-                      <button onClick={() => openDetail(item)} title="Detay">
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        className="approve"
-                        disabled={busyId === item.id || item.status !== "PENDING"}
-                        onClick={() => handleStatusChange(item.id, "APPROVED")}
-                        title="Onayla"
-                      >
-                        <Check size={17} />
-                      </button>
-                      <button
-                        className="reject"
-                        disabled={busyId === item.id || item.status !== "PENDING"}
-                        onClick={() => {
-                          setSelected(item);
-                          setNote(item.adminNote || "");
-                        }}
-                        title="Reddet"
-                      >
-                        <X size={17} />
-                      </button>
-                      <button onClick={() => openDetail(item)} title="Diğer">
-                        <MoreHorizontal size={17} />
-                      </button>
-                    </div>
-                  </article>
-                ))}
+                      <div className="row-actions">
+                        <button onClick={() => openDetail(item)} title="Detay">
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          className="approve"
+                          disabled={busyId === item.id || item.status !== "PENDING"}
+                          onClick={() => handleStatusChange(item.id, "APPROVED")}
+                          title="Onayla"
+                        >
+                          <Check size={17} />
+                        </button>
+                        <button
+                          className="reject"
+                          disabled={busyId === item.id || item.status !== "PENDING"}
+                          onClick={() => {
+                            setSelected(item);
+                            setNote(item.adminNote || "");
+                          }}
+                          title="Reddet"
+                        >
+                          <X size={17} />
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
 
               <div className="mobile-list">
-                {filteredItems.map((item, index) => (
-                  <article className={`mobile-card ${cardThemes[index % cardThemes.length]}`} key={item.id}>
-                    <div className="mobile-card-main">
-                      <div className="avatar soft">{initials(item.applicantName)}</div>
+                {filteredItems.map((item, index) => {
+                  const score = getTrustScore(item);
+                  const decision = getDecision(item);
 
-                      <div className="mobile-person">
-                        <div className="mobile-name-row">
-                          <strong>{item.applicantName}</strong>
-                          <span className={`status-pill ${item.status.toLowerCase()}`}>
-                            {statusLabels[item.status] || item.status}
-                          </span>
-                        </div>
+                  return (
+                    <article className={`mobile-card ${cardThemes[index % cardThemes.length]}`} key={item.id}>
+                      <div className="mobile-top">
+                        <div className="avatar soft">{initials(item.applicantName)}</div>
 
-                        <div className="mobile-line">
-                          <span>{item.applicantEmail}</span>
-                          <span>{item.applicantPhone}</span>
-                        </div>
+                        <div className="mobile-main">
+                          <div className="mobile-name-row">
+                            <strong>{item.applicantName}</strong>
+                            <span className={`decision-pill ${decision.className}`}>{decision.label}</span>
+                          </div>
 
-                        <div className="mobile-meta">
-                          <span>{roleLabels[item.requestedRole] || item.requestedRole}</span>
-                          <span>{formatDate(item.createdAt)}</span>
-                          <span>{item.city || item.district ? `${item.city || ""} ${item.district || ""}` : "Konum yok"}</span>
-                        </div>
+                          <div className="mobile-sub">
+                            {roleLabels[item.requestedRole] || item.requestedRole} • {item.city || "Şehir yok"}
+                          </div>
 
-                        <div className="mobile-bottom">
-                          <div className="badge-list">
+                          <div className="decision-strip">
+                            <span>
+                              <ShieldCheck size={13} />
+                              Güven {score}
+                            </span>
+                            <span>{item.referansDogrulandiMi ? "Ref doğrulandı" : item.referansliMi ? "Ref bekliyor" : "Ref yok"}</span>
+                            <span>{getLegalText(item)}</span>
+                          </div>
+
+                          <div className="mobile-badges">
                             {getTypeBadges(item).map((badge) => (
                               <span className={`badge ${badge === "Pilot" ? "pilot" : ""}`} key={badge}>
                                 {badge}
                               </span>
                             ))}
-                          </div>
 
-                          <div className="mobile-actions">
-                            <button onClick={() => openDetail(item)}>
-                              <Eye size={15} />
-                            </button>
-                            <button
-                              className="approve"
-                              disabled={busyId === item.id || item.status !== "PENDING"}
-                              onClick={() => handleStatusChange(item.id, "APPROVED")}
-                            >
-                              <Check size={16} />
-                            </button>
-                            <button
-                              className="reject"
-                              disabled={busyId === item.id || item.status !== "PENDING"}
-                              onClick={() => {
-                                setSelected(item);
-                                setNote(item.adminNote || "");
-                              }}
-                            >
-                              <X size={16} />
-                            </button>
-                            <button onClick={() => openDetail(item)}>
-                              <MoreHorizontal size={16} />
-                            </button>
+                            <span className={`status-pill ${item.status.toLowerCase()}`}>
+                              {statusLabels[item.status] || item.status}
+                            </span>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </article>
-                ))}
+
+                      <div className="mobile-foot">
+                        <span>{formatDate(item.createdAt)}</span>
+                        <div className="mobile-actions">
+                          <button onClick={() => openDetail(item)}>
+                            <Eye size={15} />
+                          </button>
+                          <button
+                            className="approve"
+                            disabled={busyId === item.id || item.status !== "PENDING"}
+                            onClick={() => handleStatusChange(item.id, "APPROVED")}
+                          >
+                            <Check size={16} />
+                          </button>
+                          <button
+                            className="reject"
+                            disabled={busyId === item.id || item.status !== "PENDING"}
+                            onClick={() => {
+                              setSelected(item);
+                              setNote(item.adminNote || "");
+                            }}
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
 
               <div className="panel-footer">
-                <span>Toplam {filteredItems.length} kayıt</span>
+                <span>{filteredItems.length} kayıt</span>
                 <span>{summary.total} toplam başvuru</span>
               </div>
             </>
@@ -566,6 +626,19 @@ export default function AdminKatilimTalepleriPage() {
               <div>
                 <h2>{selected.applicantName}</h2>
                 <p>{roleLabels[selected.requestedRole] || selected.requestedRole}</p>
+              </div>
+            </div>
+
+            <div className="decision-panel">
+              <div>
+                <span>Lina Ön Değerlendirme</span>
+                <strong>{getDecision(selected).label}</strong>
+                <small>{getDecision(selected).text}</small>
+              </div>
+              <div>
+                <span>Güven Skoru</span>
+                <strong>{getTrustScore(selected)}/100</strong>
+                <small>{selected.isRisky ? selected.riskNote || "Riskli başvuru" : "Kritik risk görünmüyor"}</small>
               </div>
             </div>
 
@@ -589,12 +662,16 @@ export default function AdminKatilimTalepleriPage() {
                 <strong>{getTypeBadges(selected).join(" / ")}</strong>
               </div>
               <div>
-                <span>Referans Kodu</span>
-                <strong>{selected.referralCode || "-"}</strong>
+                <span>Referans</span>
+                <strong>
+                  {selected.referrer
+                    ? `${selected.referrer.firstName} ${selected.referrer.lastName}`
+                    : selected.referralCode || "Referans yok"}
+                </strong>
               </div>
               <div>
-                <span>Durum</span>
-                <strong>{statusLabels[selected.status] || selected.status}</strong>
+                <span>Yasal Onay</span>
+                <strong>{getLegalText(selected)}</strong>
               </div>
             </div>
 
@@ -682,7 +759,6 @@ export default function AdminKatilimTalepleriPage() {
           display: grid;
           place-items: center;
           font-weight: 900;
-          letter-spacing: -0.04em;
         }
 
         .brand strong,
@@ -834,6 +910,30 @@ export default function AdminKatilimTalepleriPage() {
           display: none;
         }
 
+        .desktop-title-row {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+        }
+
+        .flag {
+          display: inline-grid;
+          place-items: center;
+          width: 30px;
+          height: 30px;
+          border-radius: 999px;
+          background: #fff1f2;
+          box-shadow: inset 0 0 0 1px #fecdd3;
+          font-size: 18px;
+        }
+
+        .desktop-flag {
+          width: 38px;
+          height: 38px;
+          font-size: 23px;
+        }
+
         .page-title {
           text-align: center;
           margin-bottom: 24px;
@@ -948,7 +1048,7 @@ export default function AdminKatilimTalepleriPage() {
         .filters {
           padding: 14px;
           display: grid;
-          grid-template-columns: minmax(220px, 1.2fr) repeat(3, minmax(140px, 0.6fr)) auto auto;
+          grid-template-columns: minmax(220px, 1.2fr) repeat(3, minmax(140px, 0.6fr)) auto;
           gap: 10px;
           border-bottom: 1px solid #e2e8f0;
         }
@@ -1039,7 +1139,7 @@ export default function AdminKatilimTalepleriPage() {
         .table-head,
         .table-row {
           display: grid;
-          grid-template-columns: 1.45fr 0.9fr 0.75fr 0.75fr 0.65fr 0.65fr;
+          grid-template-columns: 1.45fr 0.75fr 0.55fr 0.75fr 0.65fr 0.55fr;
           gap: 14px;
           align-items: center;
           padding: 16px 22px;
@@ -1056,7 +1156,7 @@ export default function AdminKatilimTalepleriPage() {
 
         .table-row {
           border-top: 1px solid #e2e8f0;
-          min-height: 92px;
+          min-height: 88px;
         }
 
         .person-cell {
@@ -1108,22 +1208,28 @@ export default function AdminKatilimTalepleriPage() {
           color: #7c3aed;
         }
 
-        .role-text {
+        .role-text,
+        .trust-score {
           color: #0f172a;
           font-size: 13px;
-          font-weight: 850;
+          font-weight: 900;
         }
 
-        .status-pill {
+        .status-pill,
+        .decision-pill {
           width: fit-content;
           border-radius: 9px;
           padding: 6px 8px;
-          background: #fef3c7;
-          color: #b45309;
           font-size: 10px;
           font-weight: 950;
           text-transform: uppercase;
           line-height: 1;
+          white-space: nowrap;
+        }
+
+        .status-pill {
+          background: #fef3c7;
+          color: #b45309;
         }
 
         .status-pill.approved {
@@ -1136,8 +1242,17 @@ export default function AdminKatilimTalepleriPage() {
           color: #b91c1c;
         }
 
-        .status-pill.invited,
-        .status-pill.registered {
+        .decision-pill.approve {
+          background: #dcfce7;
+          color: #15803d;
+        }
+
+        .decision-pill.review {
+          background: #fee2e2;
+          color: #b91c1c;
+        }
+
+        .decision-pill.neutral {
           background: #e0f2fe;
           color: #0369a1;
         }
@@ -1175,10 +1290,10 @@ export default function AdminKatilimTalepleriPage() {
         .mobile-card {
           position: relative;
           overflow: hidden;
-          margin: 8px 10px;
-          padding: 10px;
+          margin: 7px 9px;
+          padding: 9px;
           border: 1px solid #e2e8f0;
-          border-radius: 18px;
+          border-radius: 17px;
           background: #ffffff;
           box-shadow: 0 10px 24px rgba(15, 23, 42, 0.055);
         }
@@ -1241,23 +1356,23 @@ export default function AdminKatilimTalepleriPage() {
           background: #e11d48;
         }
 
-        .mobile-card-main {
+        .mobile-top {
           display: flex;
           align-items: flex-start;
           gap: 9px;
           min-width: 0;
         }
 
-        .mobile-person {
-          width: 100%;
+        .mobile-main {
           min-width: 0;
+          width: 100%;
         }
 
         .mobile-name-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 8px;
+          gap: 7px;
           min-width: 0;
         }
 
@@ -1272,69 +1387,79 @@ export default function AdminKatilimTalepleriPage() {
           letter-spacing: -0.02em;
         }
 
-        .mobile-line {
+        .mobile-sub {
           margin-top: 3px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
           color: #475569;
           font-size: 11px;
-          font-weight: 750;
-          min-width: 0;
-        }
-
-        .mobile-line span {
-          min-width: 0;
+          font-weight: 850;
+          white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          white-space: nowrap;
         }
 
-        .mobile-line span:first-child {
-          max-width: 52%;
-        }
-
-        .mobile-meta {
+        .decision-strip {
           margin-top: 6px;
           display: grid;
-          grid-template-columns: 0.8fr 0.9fr 1fr;
-          gap: 6px;
-          color: #64748b;
-          font-size: 10.5px;
-          font-weight: 850;
+          grid-template-columns: 0.85fr 1fr 0.85fr;
+          gap: 5px;
         }
 
-        .mobile-meta span {
-          min-width: 0;
+        .decision-strip span {
+          min-height: 24px;
+          border-radius: 9px;
+          background: rgba(255, 255, 255, 0.74);
+          border: 1px solid rgba(226, 232, 240, 0.92);
+          color: #475569;
+          font-size: 9.5px;
+          font-weight: 900;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 3px;
+          white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          white-space: nowrap;
+          padding: 0 4px;
         }
 
-        .mobile-bottom {
-          margin-top: 8px;
+        .mobile-badges {
+          margin-top: 6px;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          flex-wrap: wrap;
+        }
+
+        .mobile-foot {
+          margin-top: 7px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 8px;
+          gap: 7px;
+        }
+
+        .mobile-foot > span {
+          color: #64748b;
+          font-size: 10.5px;
+          font-weight: 900;
         }
 
         .mobile-actions {
           display: grid;
-          grid-template-columns: repeat(4, 34px);
+          grid-template-columns: repeat(3, 34px);
           gap: 6px;
         }
 
         .mobile-actions button {
           width: 34px;
-          height: 32px;
+          height: 31px;
           border-radius: 12px;
           background: rgba(255, 255, 255, 0.76);
           box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
         }
 
         .panel-footer {
-          padding: 12px 16px;
+          padding: 10px 14px;
           display: flex;
           justify-content: space-between;
           gap: 12px;
@@ -1377,7 +1502,7 @@ export default function AdminKatilimTalepleriPage() {
           align-items: center;
           gap: 14px;
           padding-right: 46px;
-          margin-bottom: 18px;
+          margin-bottom: 14px;
         }
 
         .modal-header h2 {
@@ -1385,7 +1510,6 @@ export default function AdminKatilimTalepleriPage() {
           color: #071332;
           font-size: 22px;
           font-weight: 950;
-          letter-spacing: -0.03em;
         }
 
         .modal-header p {
@@ -1394,13 +1518,14 @@ export default function AdminKatilimTalepleriPage() {
           font-weight: 800;
         }
 
-        .detail-grid {
+        .decision-panel {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-columns: 1fr 1fr;
           gap: 12px;
-          margin-bottom: 14px;
+          margin-bottom: 12px;
         }
 
+        .decision-panel div,
         .detail-grid div,
         .message-box,
         .note-box {
@@ -1410,6 +1535,7 @@ export default function AdminKatilimTalepleriPage() {
           background: #f8fafc;
         }
 
+        .decision-panel span,
         .detail-grid span,
         .message-box span,
         .note-box {
@@ -1418,12 +1544,27 @@ export default function AdminKatilimTalepleriPage() {
           font-weight: 900;
         }
 
+        .decision-panel strong,
         .detail-grid strong {
           display: block;
           margin-top: 6px;
           color: #0f172a;
           font-size: 14px;
           font-weight: 900;
+        }
+
+        .decision-panel small {
+          display: block;
+          margin-top: 5px;
+          color: #64748b;
+          font-weight: 750;
+        }
+
+        .detail-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+          margin-bottom: 14px;
         }
 
         .message-box {
@@ -1510,13 +1651,22 @@ export default function AdminKatilimTalepleriPage() {
           }
 
           .mobile-title {
-            display: block;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
             text-align: center;
           }
 
           .mobile-title h1 {
             font-size: 18px;
             letter-spacing: -0.03em;
+          }
+
+          .flag {
+            width: 25px;
+            height: 25px;
+            font-size: 15px;
           }
 
           .page-title {
@@ -1545,9 +1695,9 @@ export default function AdminKatilimTalepleriPage() {
           }
 
           .summary-card {
-            min-height: 58px;
+            min-height: 54px;
             border-radius: 16px;
-            padding: 7px 5px;
+            padding: 6px 5px;
             display: grid;
             place-items: center;
             text-align: center;
@@ -1556,24 +1706,21 @@ export default function AdminKatilimTalepleriPage() {
           }
 
           .summary-icon {
-            width: 22px;
-            height: 22px;
+            width: 21px;
+            height: 21px;
             border-radius: 8px;
             font-size: 11px;
           }
 
           .summary-card span {
-            font-size: 9px;
+            font-size: 8.8px;
             line-height: 1.05;
             white-space: normal;
-            min-height: 18px;
-            display: grid;
-            place-items: center;
           }
 
           .summary-card strong {
             margin-top: 0;
-            font-size: 17px;
+            font-size: 16px;
             line-height: 1;
           }
 
@@ -1583,7 +1730,7 @@ export default function AdminKatilimTalepleriPage() {
 
           .filters {
             padding: 8px;
-            grid-template-columns: 1fr 1fr 38px 38px;
+            grid-template-columns: 1fr 1fr 38px;
             gap: 6px;
           }
 
@@ -1605,31 +1752,24 @@ export default function AdminKatilimTalepleriPage() {
             gap: 7px;
           }
 
-          .search-box input::placeholder {
-            color: #94a3b8;
-          }
-
           .filters select {
             padding: 0 9px;
             min-width: 0;
           }
 
+          .filters select:nth-of-type(3) {
+            display: none;
+          }
+
           .secondary-button {
             padding: 0;
             gap: 0;
+            font-size: 0;
           }
 
           .secondary-button svg {
             width: 15px;
             height: 15px;
-          }
-
-          .secondary-button {
-            font-size: 0;
-          }
-
-          .filters select:nth-of-type(3) {
-            grid-column: span 2;
           }
 
           .desktop-table {
@@ -1642,20 +1782,21 @@ export default function AdminKatilimTalepleriPage() {
           }
 
           .mobile-card .avatar {
-            width: 34px;
-            height: 34px;
+            width: 33px;
+            height: 33px;
             border-radius: 13px;
             font-size: 12px;
           }
 
           .badge {
-            font-size: 8.5px;
+            font-size: 8.3px;
             padding: 4px 5px;
             border-radius: 7px;
           }
 
-          .status-pill {
-            font-size: 8.5px;
+          .status-pill,
+          .decision-pill {
+            font-size: 8.3px;
             padding: 5px 6px;
             border-radius: 7px;
           }
@@ -1681,11 +1822,13 @@ export default function AdminKatilimTalepleriPage() {
             font-size: 19px;
           }
 
+          .decision-panel,
           .detail-grid {
             grid-template-columns: 1fr;
             gap: 8px;
           }
 
+          .decision-panel div,
           .detail-grid div,
           .message-box,
           .note-box {
