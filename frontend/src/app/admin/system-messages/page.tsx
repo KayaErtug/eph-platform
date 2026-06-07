@@ -405,7 +405,7 @@ export default function SystemMessagesPage() {
           MUTEAHHIT: "MUTEAHHITLER",
           INSAAT_FIRMASI: "INSAAT_FIRMALARI",
           ADMIN: "ADMINLER",
-          SUPER_ADMIN: "SUPER_ADMINLER",
+          SUPER_ADMIN: "Yazılım Ekibi",
         };
 
         await sendOne({ targetType: roleTargetMap[targetRole], targetRole });

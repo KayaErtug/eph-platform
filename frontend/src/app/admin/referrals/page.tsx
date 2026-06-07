@@ -57,7 +57,7 @@ const ROLE_LABELS: Record<Role, string> = {
   MUTEAHHIT: "Müteahhit",
   INSAAT_FIRMASI: "İnşaat Firması",
   ADMIN: "Admin",
-  SUPER_ADMIN: "Süper Admin",
+  SUPER_ADMIN: "Yazılım Ekibi",
 };
 
 const EMPTY_FORM = {
