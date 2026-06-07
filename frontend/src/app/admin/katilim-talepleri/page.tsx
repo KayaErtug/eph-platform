@@ -8,19 +8,16 @@ import {
   Eye,
   Filter,
   Menu,
+  RefreshCcw,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
+  User,
   X,
 } from "lucide-react";
 import api from "@/lib/api";
 
-type ApplicationStatus =
-  | "PENDING"
-  | "APPROVED"
-  | "REJECTED"
-  | "INVITED"
-  | "REGISTERED"
-  | string;
+type ApplicationStatus = "PENDING" | "APPROVED" | "REJECTED" | "INVITED" | "REGISTERED" | string;
 
 type ApplicationItem = {
   id: string;
@@ -87,22 +84,15 @@ const statusLabels: Record<string, string> = {
   REGISTERED: "Kayıt Tamamlandı",
 };
 
-const cardThemes = [
-  "theme-blue",
-  "theme-green",
-  "theme-purple",
-  "theme-amber",
-  "theme-cyan",
-  "theme-rose",
-];
+const cardThemes = ["theme-blue", "theme-green", "theme-purple", "theme-amber", "theme-cyan", "theme-rose"];
 
 function formatDate(value?: string | null) {
   if (!value) return "-";
 
   return new Intl.DateTimeFormat("tr-TR", {
     day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
+    month: "short",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
@@ -184,7 +174,7 @@ function getLegalText(item: ApplicationItem) {
     item.userAgreementAccepted,
   ].filter(Boolean).length;
 
-  return `${accepted}/4 yasal onay`;
+  return `Yasal Onay ${accepted}/4`;
 }
 
 export default function AdminKatilimTalepleriPage() {
@@ -205,9 +195,7 @@ export default function AdminKatilimTalepleriPage() {
 
     try {
       const response = await api.get<DashboardResponse>("/admin/katilim-talepleri", {
-        params: {
-          status: selectedStatus,
-        },
+        params: { status: selectedStatus },
       });
 
       setData(response.data);
@@ -333,15 +321,6 @@ export default function AdminKatilimTalepleriPage() {
           <a href="/admin/users">Kullanıcılar</a>
           <a href="/admin/roles">Roller & Yetkiler</a>
           <a href="/admin/invitations">Davet Yönetimi</a>
-
-          <p>Sistem</p>
-          <a href="/notification-settings">Bildirimler</a>
-          <a href="/admin/reports">Raporlar</a>
-          <a href="/admin/settings">Ayarlar</a>
-
-          <p>Lina V5</p>
-          <a href="/lina">Lina Paneli</a>
-          <a href="/admin/lina/decisions">Karar Motoru</a>
         </nav>
 
         <div className="admin-card">
@@ -355,263 +334,221 @@ export default function AdminKatilimTalepleriPage() {
 
       <section className="content">
         <header className="topbar">
-          <a className="back-button" href="/admin">
-            <ArrowLeft size={18} />
-            Geri
-          </a>
+          <button className="top-icon" aria-label="Menü">
+            <Menu size={22} />
+          </button>
 
-          <div className="mobile-title">
-            <span className="flag">🇹🇷</span>
-            <h1>Katılım Talepleri</h1>
-          </div>
+          <strong>ADMIN</strong>
 
           <div className="top-actions">
-            <button aria-label="Bildirimler">
-              <Bell size={18} />
+            <button className="top-icon" aria-label="Bildirimler">
+              <Bell size={20} />
               <small>3</small>
             </button>
-            <button aria-label="Menü">
-              <Menu size={20} />
+            <button className="top-icon" aria-label="Profil">
+              <User size={20} />
             </button>
           </div>
         </header>
 
-        <div className="page-title">
-          <div className="desktop-title-row">
-            <span className="flag desktop-flag">🇹🇷</span>
-            <h1>Katılım Talepleri</h1>
+        <section className="flag-banner">
+          <div className="flag-symbol">★</div>
+          <div className="quote">
+            <p>Vatan ne Türkiye'dir Türklere, ne Türkistan.</p>
+            <p>Vatan büyük ve müebbet bir ülkedir: Turan.</p>
+            <span>- Ziya Gökalp</span>
           </div>
-          <p>Başvuruları güven, referans ve yasal onay bilgileriyle yönetin.</p>
-        </div>
+        </section>
+
+        <section className="page-head">
+          <a href="/admin" className="back-link">
+            <ArrowLeft size={22} />
+          </a>
+
+          <h1>Katılım Talepleri</h1>
+
+          <div className="head-actions">
+            <button>
+              <Filter size={19} />
+              <span>Filtre</span>
+            </button>
+            <button onClick={() => loadApplications(status)}>
+              <RefreshCcw size={19} />
+            </button>
+          </div>
+        </section>
 
         <section className="summary-grid">
           <article className="summary-card blue">
             <div className="summary-icon">⌛</div>
-            <div>
-              <span>Bekleyen</span>
-              <strong>{summary.pending}</strong>
-            </div>
+            <span>Bekleyen</span>
+            <strong>{summary.pending}</strong>
+            <i />
           </article>
 
           <article className="summary-card green">
             <div className="summary-icon">✓</div>
-            <div>
-              <span>Onaylanan</span>
-              <strong>{summary.approvedThisMonth}</strong>
-            </div>
+            <span>Onaylanan</span>
+            <strong>{summary.approvedThisMonth}</strong>
+            <i />
           </article>
 
           <article className="summary-card red">
             <div className="summary-icon">×</div>
-            <div>
-              <span>Reddedilen</span>
-              <strong>{summary.rejectedThisMonth}</strong>
-            </div>
+            <span>Reddedilen</span>
+            <strong>{summary.rejectedThisMonth}</strong>
+            <i />
           </article>
 
           <article className="summary-card purple">
             <div className="summary-icon">👥</div>
-            <div>
-              <span>Pilot</span>
-              <strong>{summary.pilotThisMonth}</strong>
-            </div>
+            <span>Pilot</span>
+            <strong>{summary.pilotThisMonth}</strong>
+            <i />
           </article>
         </section>
 
-        <section className="panel">
-          <div className="filters">
-            <label className="search-box">
-              <Search size={17} />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Ara: ad, telefon..."
-              />
-            </label>
+        <section className="filters">
+          <label className="search-box">
+            <Search size={22} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Ara: ad, telefon, e-posta..."
+            />
+          </label>
 
-            <select value={type} onChange={(event) => setType(event.target.value)}>
-              <option value="all">Tür</option>
-              <option value="referansli">Referanslı</option>
-              <option value="referanssiz">Referanssız</option>
-              <option value="pilot">Pilot</option>
-            </select>
+          <button className="filter-square" type="button">
+            <SlidersHorizontal size={22} />
+          </button>
 
-            <select value={role} onChange={(event) => setRole(event.target.value)}>
-              <option value="all">Rol</option>
-              <option value="EMLAKCI">Emlakçı</option>
-              <option value="MUTEAHHIT">Müteahhit</option>
-              <option value="INSAAT_FIRMASI">İnşaat Firması</option>
-              <option value="MODERATOR">Moderatör</option>
-              <option value="ADMIN">Admin</option>
-            </select>
+          <select value={type} onChange={(event) => setType(event.target.value)}>
+            <option value="all">Tüm Türler</option>
+            <option value="referansli">Referanslı</option>
+            <option value="referanssiz">Referanssız</option>
+            <option value="pilot">Pilot</option>
+          </select>
 
-            <select value={status} onChange={(event) => handleStatusFilter(event.target.value)}>
-              <option value="all">Durum</option>
-              <option value="PENDING">Bekliyor</option>
-              <option value="APPROVED">Onaylandı</option>
-              <option value="REJECTED">Reddedildi</option>
-              <option value="INVITED">Davet Edildi</option>
-              <option value="REGISTERED">Kayıt Tamamlandı</option>
-            </select>
+          <select value={role} onChange={(event) => setRole(event.target.value)}>
+            <option value="all">Tüm Roller</option>
+            <option value="EMLAKCI">Emlakçı</option>
+            <option value="MUTEAHHIT">Müteahhit</option>
+            <option value="INSAAT_FIRMASI">İnşaat Firması</option>
+            <option value="MODERATOR">Moderatör</option>
+            <option value="ADMIN">Admin</option>
+          </select>
 
-            <button className="secondary-button" type="button">
-              <Filter size={16} />
-              Filtrele
-            </button>
-          </div>
+          <select value={status} onChange={(event) => handleStatusFilter(event.target.value)}>
+            <option value="all">Tüm Durumlar</option>
+            <option value="PENDING">Bekliyor</option>
+            <option value="APPROVED">Onaylandı</option>
+            <option value="REJECTED">Reddedildi</option>
+            <option value="INVITED">Davet Edildi</option>
+            <option value="REGISTERED">Kayıt Tamamlandı</option>
+          </select>
+        </section>
 
-          {error ? <div className="error-box">{error}</div> : null}
+        {error ? <div className="error-box">{error}</div> : null}
 
-          {loading ? (
-            <div className="empty-state">Katılım talepleri yükleniyor...</div>
-          ) : filteredItems.length === 0 ? (
-            <div className="empty-state">Gösterilecek katılım talebi bulunamadı.</div>
-          ) : (
-            <>
-              <div className="desktop-table">
-                <div className="table-head">
-                  <span>Başvuru Sahibi</span>
-                  <span>Karar</span>
-                  <span>Güven</span>
-                  <span>Rol</span>
-                  <span>Durum</span>
-                  <span>İşlemler</span>
-                </div>
+        {loading ? (
+          <div className="empty-state">Katılım talepleri yükleniyor...</div>
+        ) : filteredItems.length === 0 ? (
+          <div className="empty-state">Gösterilecek katılım talebi bulunamadı.</div>
+        ) : (
+          <section className="application-list">
+            {filteredItems.map((item, index) => {
+              const score = getTrustScore(item);
+              const decision = getDecision(item);
 
-                {filteredItems.map((item) => {
-                  const decision = getDecision(item);
-                  const score = getTrustScore(item);
+              return (
+                <article className={`application-card ${cardThemes[index % cardThemes.length]}`} key={item.id}>
+                  <div className="card-top">
+                    <div className="avatar soft">{initials(item.applicantName)}</div>
 
-                  return (
-                    <article className="table-row" key={item.id}>
-                      <div className="person-cell">
-                        <div className="avatar soft">{initials(item.applicantName)}</div>
-                        <div>
-                          <strong>{item.applicantName}</strong>
-                          <span>{item.applicantEmail}</span>
-                          <small>{item.applicantPhone}</small>
-                        </div>
-                      </div>
+                    <div className="person-info">
+                      <h2>{item.applicantName}</h2>
+                      <p>
+                        {item.applicantEmail}
+                        <span>|</span>
+                        {item.applicantPhone}
+                      </p>
+                      <p>
+                        🧰 {roleLabels[item.requestedRole] || item.requestedRole}
+                        <span>|</span>
+                        📍 {item.district || "Pamukkale"} / {item.city || "Denizli"}
+                      </p>
+                    </div>
 
-                      <span className={`decision-pill ${decision.className}`}>{decision.label}</span>
-
-                      <span className="trust-score">{score}/100</span>
-
-                      <span className="role-text">{roleLabels[item.requestedRole] || item.requestedRole}</span>
-
+                    <div className="status-block">
                       <span className={`status-pill ${item.status.toLowerCase()}`}>
                         {statusLabels[item.status] || item.status}
                       </span>
+                      <small>{formatDate(item.createdAt)}</small>
+                    </div>
+                  </div>
 
-                      <div className="row-actions">
-                        <button onClick={() => openDetail(item)} title="Detay">
-                          <Eye size={16} />
-                        </button>
-                        <button
-                          className="approve"
-                          disabled={busyId === item.id || item.status !== "PENDING"}
-                          onClick={() => handleStatusChange(item.id, "APPROVED")}
-                          title="Onayla"
-                        >
-                          <Check size={17} />
-                        </button>
-                        <button
-                          className="reject"
-                          disabled={busyId === item.id || item.status !== "PENDING"}
-                          onClick={() => {
-                            setSelected(item);
-                            setNote(item.adminNote || "");
-                          }}
-                          title="Reddet"
-                        >
-                          <X size={17} />
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
+                  <div className="decision-row">
+                    <span className="info-pill blue-pill">
+                      <User size={17} />
+                      {getTypeBadges(item)[0]}
+                    </span>
 
-              <div className="mobile-list">
-                {filteredItems.map((item, index) => {
-                  const score = getTrustScore(item);
-                  const decision = getDecision(item);
+                    <span className={`info-pill ${item.referansDogrulandiMi ? "green-pill" : "red-pill"}`}>
+                      <ShieldCheck size={17} />
+                      {item.referansDogrulandiMi ? "Ref. Doğrulandı" : item.referansliMi ? "Ref. Bekliyor" : "Ref. Yok"}
+                    </span>
 
-                  return (
-                    <article className={`mobile-card ${cardThemes[index % cardThemes.length]}`} key={item.id}>
-                      <div className="mobile-top">
-                        <div className="avatar soft">{initials(item.applicantName)}</div>
+                    <span className="info-pill green-pill">
+                      <ShieldCheck size={17} />
+                      {getLegalText(item)}
+                    </span>
 
-                        <div className="mobile-main">
-                          <div className="mobile-name-row">
-                            <strong>{item.applicantName}</strong>
-                            <span className={`decision-pill ${decision.className}`}>{decision.label}</span>
-                          </div>
+                    <span className={`trust-box ${score >= 80 ? "good" : score >= 60 ? "mid" : "bad"}`}>
+                      <small>Güven Skoru</small>
+                      <strong>{score}<b>/100</b></strong>
+                    </span>
+                  </div>
 
-                          <div className="mobile-sub">
-                            {roleLabels[item.requestedRole] || item.requestedRole} • {item.city || "Şehir yok"}
-                          </div>
+                  <div className="lina-row">
+                    <span>✦ Lina Ön Değerlendirme</span>
+                    <strong className={decision.className}>{decision.label}</strong>
+                  </div>
 
-                          <div className="decision-strip">
-                            <span>
-                              <ShieldCheck size={13} />
-                              Güven {score}
-                            </span>
-                            <span>{item.referansDogrulandiMi ? "Ref doğrulandı" : item.referansliMi ? "Ref bekliyor" : "Ref yok"}</span>
-                            <span>{getLegalText(item)}</span>
-                          </div>
+                  <div className="card-bottom">
+                    <p>
+                      Evet Onay Yetkisi: <b>{item.onayYetkiSeviyesi || "ADMIN_SUPER_ADMIN"}</b>
+                      <br />
+                      İlçe: <b>{item.district || "Pamukkale"}</b>
+                    </p>
 
-                          <div className="mobile-badges">
-                            {getTypeBadges(item).map((badge) => (
-                              <span className={`badge ${badge === "Pilot" ? "pilot" : ""}`} key={badge}>
-                                {badge}
-                              </span>
-                            ))}
-
-                            <span className={`status-pill ${item.status.toLowerCase()}`}>
-                              {statusLabels[item.status] || item.status}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mobile-foot">
-                        <span>{formatDate(item.createdAt)}</span>
-                        <div className="mobile-actions">
-                          <button onClick={() => openDetail(item)}>
-                            <Eye size={15} />
-                          </button>
-                          <button
-                            className="approve"
-                            disabled={busyId === item.id || item.status !== "PENDING"}
-                            onClick={() => handleStatusChange(item.id, "APPROVED")}
-                          >
-                            <Check size={16} />
-                          </button>
-                          <button
-                            className="reject"
-                            disabled={busyId === item.id || item.status !== "PENDING"}
-                            onClick={() => {
-                              setSelected(item);
-                              setNote(item.adminNote || "");
-                            }}
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-
-              <div className="panel-footer">
-                <span>{filteredItems.length} kayıt</span>
-                <span>{summary.total} toplam başvuru</span>
-              </div>
-            </>
-          )}
-        </section>
+                    <div className="card-actions">
+                      <button onClick={() => openDetail(item)}>
+                        <Eye size={19} />
+                      </button>
+                      <button
+                        className="approve"
+                        disabled={busyId === item.id || item.status !== "PENDING"}
+                        onClick={() => handleStatusChange(item.id, "APPROVED")}
+                      >
+                        <Check size={21} />
+                      </button>
+                      <button
+                        className="reject"
+                        disabled={busyId === item.id || item.status !== "PENDING"}
+                        onClick={() => {
+                          setSelected(item);
+                          setNote(item.adminNote || "");
+                        }}
+                      >
+                        <X size={21} />
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </section>
+        )}
       </section>
 
       {selected ? (
@@ -641,46 +578,6 @@ export default function AdminKatilimTalepleriPage() {
                 <small>{selected.isRisky ? selected.riskNote || "Riskli başvuru" : "Kritik risk görünmüyor"}</small>
               </div>
             </div>
-
-            <div className="detail-grid">
-              <div>
-                <span>E-posta</span>
-                <strong>{selected.applicantEmail}</strong>
-              </div>
-              <div>
-                <span>Telefon</span>
-                <strong>{selected.applicantPhone}</strong>
-              </div>
-              <div>
-                <span>Şehir</span>
-                <strong>
-                  {selected.city || "-"} {selected.district || ""}
-                </strong>
-              </div>
-              <div>
-                <span>Başvuru Türü</span>
-                <strong>{getTypeBadges(selected).join(" / ")}</strong>
-              </div>
-              <div>
-                <span>Referans</span>
-                <strong>
-                  {selected.referrer
-                    ? `${selected.referrer.firstName} ${selected.referrer.lastName}`
-                    : selected.referralCode || "Referans yok"}
-                </strong>
-              </div>
-              <div>
-                <span>Yasal Onay</span>
-                <strong>{getLegalText(selected)}</strong>
-              </div>
-            </div>
-
-            {selected.message ? (
-              <div className="message-box">
-                <span>Başvuru Mesajı</span>
-                <p>{selected.message}</p>
-              </div>
-            ) : null}
 
             <label className="note-box">
               Admin Notu
@@ -825,454 +722,612 @@ export default function AdminKatilimTalepleriPage() {
           padding: 14px;
         }
 
-        .avatar {
-          width: 42px;
-          height: 42px;
-          border-radius: 16px;
-          display: grid;
-          place-items: center;
-          font-weight: 900;
-          background: #0f172a;
-          color: white;
-          flex: 0 0 auto;
-        }
-
-        .avatar.soft {
-          background: #eff6ff;
-          color: #2563eb;
-        }
-
-        .avatar.large {
-          width: 58px;
-          height: 58px;
-          border-radius: 22px;
-          font-size: 18px;
-        }
-
         .content {
           width: 100%;
           min-width: 0;
-          padding: 24px;
+          padding-bottom: 40px;
         }
 
         .topbar {
+          height: 96px;
+          padding: 0 34px;
+          background: #ffffff;
+          border-bottom: 1px solid #e2e8f0;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 14px;
-          margin-bottom: 18px;
+          position: sticky;
+          top: 0;
+          z-index: 40;
         }
 
-        .back-button {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          color: #0f172a;
-          text-decoration: none;
-          font-weight: 800;
+        .topbar > strong {
+          color: #071332;
+          font-size: 28px;
+          letter-spacing: -0.04em;
+          font-weight: 950;
         }
 
         .top-actions {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
         }
 
-        .top-actions button,
-        .row-actions button,
-        .mobile-actions button,
-        .modal-close {
-          width: 42px;
-          height: 42px;
-          border-radius: 14px;
+        .top-icon {
+          width: 58px;
+          height: 58px;
+          border-radius: 18px;
           border: 1px solid #e2e8f0;
           background: #ffffff;
-          color: #0f172a;
-          display: inline-grid;
+          color: #071332;
+          display: grid;
           place-items: center;
-          cursor: pointer;
           position: relative;
+          box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
         }
 
-        .top-actions small {
+        .top-icon small {
           position: absolute;
           top: -7px;
           right: -7px;
-          background: #2563eb;
-          color: white;
+          min-width: 22px;
+          height: 22px;
           border-radius: 999px;
-          padding: 2px 6px;
-          font-size: 10px;
+          background: #ef1235;
+          color: #ffffff;
+          display: grid;
+          place-items: center;
+          font-size: 12px;
+          font-weight: 950;
+        }
+
+        .flag-banner {
+          height: 150px;
+          background:
+            linear-gradient(90deg, rgba(220, 38, 38, 0.92) 0%, rgba(220, 38, 38, 0.72) 22%, rgba(255, 255, 255, 0.92) 48%, rgba(255, 255, 255, 1) 100%),
+            radial-gradient(circle at 80% 70%, rgba(15, 23, 42, 0.12), transparent 34%);
+          border-bottom: 1px solid #e2e8f0;
+          display: grid;
+          grid-template-columns: 240px 1fr;
+          align-items: center;
+          padding: 0 48px;
+          overflow: hidden;
+          position: relative;
+        }
+
+        .flag-symbol {
+          width: 128px;
+          height: 128px;
+          color: #ffffff;
+          display: grid;
+          place-items: center;
+          font-size: 84px;
+          text-shadow: 0 8px 18px rgba(127, 29, 29, 0.22);
+        }
+
+        .quote {
+          color: #0f1f44;
+          font-weight: 800;
+          text-align: left;
+        }
+
+        .quote p {
+          margin: 0 0 8px;
+          font-size: 21px;
+          line-height: 1.28;
+        }
+
+        .quote span {
+          display: block;
+          margin-top: 4px;
+          font-size: 18px;
+          font-family: cursive;
+          opacity: 0.74;
+          text-align: right;
+        }
+
+        .page-head {
+          display: grid;
+          grid-template-columns: 42px 1fr auto;
+          align-items: center;
+          gap: 16px;
+          padding: 30px 34px 22px;
+        }
+
+        .back-link {
+          color: #071332;
+          display: grid;
+          place-items: center;
+        }
+
+        .page-head h1 {
+          margin: 0;
+          color: #071332;
+          font-size: 38px;
+          line-height: 1;
+          font-weight: 950;
+          letter-spacing: -0.055em;
+        }
+
+        .head-actions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .head-actions button {
+          min-width: 72px;
+          height: 56px;
+          border: 1px solid #e2e8f0;
+          background: #ffffff;
+          color: #071332;
+          border-radius: 18px;
+          font-size: 17px;
           font-weight: 900;
-        }
-
-        .mobile-title {
-          display: none;
-        }
-
-        .desktop-title-row {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 10px;
-        }
-
-        .flag {
-          display: inline-grid;
-          place-items: center;
-          width: 30px;
-          height: 30px;
-          border-radius: 999px;
-          background: #fff1f2;
-          box-shadow: inset 0 0 0 1px #fecdd3;
-          font-size: 18px;
-        }
-
-        .desktop-flag {
-          width: 38px;
-          height: 38px;
-          font-size: 23px;
-        }
-
-        .page-title {
-          text-align: center;
-          margin-bottom: 24px;
-        }
-
-        .page-title h1,
-        .mobile-title h1 {
-          margin: 0;
-          color: #071332;
-          font-size: 28px;
-          line-height: 1.15;
-          font-weight: 950;
-          letter-spacing: -0.04em;
-        }
-
-        .page-title p {
-          margin: 8px 0 0;
-          color: #475569;
-          font-size: 14px;
+          gap: 9px;
+          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.055);
         }
 
         .summary-grid {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 16px;
-          margin-bottom: 20px;
+          padding: 0 34px 22px;
         }
 
         .summary-card {
-          min-height: 116px;
-          background: white;
+          min-height: 92px;
+          background: #ffffff;
           border: 1px solid #e2e8f0;
-          border-radius: 24px;
-          padding: 18px;
-          display: flex;
+          border-radius: 20px;
+          padding: 13px 16px 12px;
+          display: grid;
+          grid-template-columns: 40px 1fr;
+          grid-template-rows: auto auto 4px;
           align-items: center;
-          gap: 14px;
-          box-shadow: 0 18px 50px rgba(15, 23, 42, 0.06);
+          column-gap: 10px;
+          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
         }
 
         .summary-icon {
-          width: 48px;
-          height: 48px;
-          border-radius: 16px;
+          width: 38px;
+          height: 38px;
+          border-radius: 999px;
           display: grid;
           place-items: center;
-          font-weight: 900;
-          flex: 0 0 auto;
+          font-weight: 950;
+          grid-row: 1 / span 2;
+          font-size: 20px;
         }
 
-        .summary-card.blue {
-          background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+        .summary-card span {
+          color: #0f1f44;
+          font-size: 13px;
+          line-height: 1;
+          font-weight: 950;
+          text-transform: uppercase;
         }
 
-        .summary-card.green {
-          background: linear-gradient(135deg, #ffffff 0%, #ecfdf5 100%);
+        .summary-card strong {
+          color: #2563eb;
+          font-size: 28px;
+          line-height: 1;
+          font-weight: 950;
+          margin-top: 4px;
         }
 
-        .summary-card.red {
-          background: linear-gradient(135deg, #ffffff 0%, #fff1f2 100%);
-        }
-
-        .summary-card.purple {
-          background: linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%);
+        .summary-card i {
+          grid-column: 1 / -1;
+          height: 3px;
+          border-radius: 999px;
+          background: #2563eb;
+          margin-top: 9px;
         }
 
         .summary-card.blue .summary-icon {
-          background: #dbeafe;
+          background: #eff6ff;
           color: #2563eb;
         }
 
         .summary-card.green .summary-icon {
-          background: #dcfce7;
+          background: #ecfdf5;
           color: #16a34a;
         }
 
+        .summary-card.green strong {
+          color: #16a34a;
+        }
+
+        .summary-card.green i {
+          background: #16a34a;
+        }
+
         .summary-card.red .summary-icon {
-          background: #fee2e2;
-          color: #dc2626;
+          background: #fff1f2;
+          color: #e11d48;
+        }
+
+        .summary-card.red strong {
+          color: #e11d48;
+        }
+
+        .summary-card.red i {
+          background: #e11d48;
         }
 
         .summary-card.purple .summary-icon {
-          background: #ede9fe;
+          background: #f5f3ff;
           color: #7c3aed;
         }
 
-        .summary-card span {
-          display: block;
-          color: #0f172a;
-          font-size: 13px;
-          font-weight: 900;
-          white-space: nowrap;
+        .summary-card.purple strong {
+          color: #7c3aed;
         }
 
-        .summary-card strong {
-          display: block;
-          margin-top: 6px;
-          font-size: 26px;
-          line-height: 1;
-          font-weight: 950;
-          letter-spacing: -0.05em;
-        }
-
-        .panel {
-          background: white;
-          border: 1px solid #e2e8f0;
-          border-radius: 24px;
-          box-shadow: 0 18px 50px rgba(15, 23, 42, 0.06);
-          overflow: hidden;
+        .summary-card.purple i {
+          background: #7c3aed;
         }
 
         .filters {
-          padding: 14px;
+          padding: 0 34px 26px;
           display: grid;
-          grid-template-columns: minmax(220px, 1.2fr) repeat(3, minmax(140px, 0.6fr)) auto;
-          gap: 10px;
-          border-bottom: 1px solid #e2e8f0;
+          grid-template-columns: 1fr 74px;
+          gap: 14px;
         }
 
         .search-box,
-        .filters select,
-        .secondary-button,
-        .primary-button,
-        .danger-button {
-          min-height: 44px;
-          border-radius: 15px;
+        .filter-square,
+        .filters select {
+          min-height: 58px;
+          border-radius: 18px;
           border: 1px solid #e2e8f0;
-          background: white;
-          color: #0f172a;
-          font-weight: 800;
-          font-size: 14px;
+          background: #ffffff;
+          color: #071332;
+          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
         }
 
         .search-box {
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 0 14px;
+          gap: 14px;
+          padding: 0 18px;
         }
 
         .search-box input {
           width: 100%;
           border: 0;
           outline: 0;
-          color: #0f172a;
-          font: inherit;
           background: transparent;
-          min-width: 0;
+          font-size: 19px;
+          color: #071332;
+          font-weight: 750;
+        }
+
+        .filter-square {
+          display: grid;
+          place-items: center;
         }
 
         .filters select {
-          padding: 0 14px;
-        }
-
-        .secondary-button,
-        .primary-button,
-        .danger-button {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          padding: 0 16px;
-          cursor: pointer;
-        }
-
-        .primary-button {
-          background: #2563eb;
-          border-color: #2563eb;
-          color: white;
-        }
-
-        .danger-button {
-          background: #fff7f7;
-          border-color: #fecaca;
-          color: #dc2626;
+          padding: 0 18px;
+          font-size: 17px;
+          font-weight: 900;
         }
 
         .error-box,
         .empty-state {
-          margin: 14px;
-          border-radius: 18px;
+          margin: 0 34px 18px;
+          border-radius: 20px;
           padding: 16px;
-          font-weight: 800;
           text-align: center;
-        }
-
-        .error-box {
-          background: #fff7f7;
-          color: #b91c1c;
-          border: 1px solid #fecaca;
-        }
-
-        .empty-state {
-          background: #f8fafc;
-          color: #475569;
+          font-weight: 900;
           border: 1px solid #e2e8f0;
+          background: #ffffff;
         }
 
-        .desktop-table {
-          display: block;
-        }
-
-        .table-head,
-        .table-row {
+        .application-list {
           display: grid;
-          grid-template-columns: 1.45fr 0.75fr 0.55fr 0.75fr 0.65fr 0.55fr;
-          gap: 14px;
-          align-items: center;
-          padding: 16px 22px;
+          gap: 20px;
+          padding: 0 34px 100px;
         }
 
-        .table-head {
-          background: #f8fafc;
-          color: #64748b;
-          font-size: 12px;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-        }
-
-        .table-row {
-          border-top: 1px solid #e2e8f0;
-          min-height: 88px;
-        }
-
-        .person-cell {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          min-width: 0;
-        }
-
-        .person-cell strong {
-          display: block;
-          color: #0f172a;
-          font-size: 14px;
-          font-weight: 900;
-          white-space: nowrap;
+        .application-card {
+          position: relative;
           overflow: hidden;
-          text-overflow: ellipsis;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 26px;
+          padding: 24px;
+          box-shadow: 0 16px 38px rgba(15, 23, 42, 0.075);
         }
 
-        .person-cell span,
-        .person-cell small,
-        .date-text {
-          display: block;
-          color: #64748b;
-          font-size: 12px;
-          font-weight: 700;
-          margin-top: 3px;
+        .application-card::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 5px;
+          background: #2563eb;
         }
 
-        .badge-list {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 5px;
+        .theme-blue::before {
+          background: #2563eb;
         }
 
-        .badge {
-          border-radius: 9px;
-          padding: 5px 7px;
+        .theme-green::before {
+          background: #16a34a;
+        }
+
+        .theme-purple::before {
+          background: #7c3aed;
+        }
+
+        .theme-amber::before {
+          background: #f59e0b;
+        }
+
+        .theme-cyan::before {
+          background: #06b6d4;
+        }
+
+        .theme-rose::before {
+          background: #e11d48;
+        }
+
+        .card-top {
+          display: grid;
+          grid-template-columns: 64px 1fr auto;
+          gap: 16px;
+          align-items: start;
+        }
+
+        .avatar {
+          width: 52px;
+          height: 52px;
+          border-radius: 999px;
+          display: grid;
+          place-items: center;
+          background: #0f172a;
+          color: white;
+          font-weight: 950;
+          font-size: 18px;
+        }
+
+        .avatar.soft {
           background: #eff6ff;
           color: #2563eb;
-          font-size: 10px;
-          font-weight: 950;
-          text-transform: uppercase;
+          border: 1px solid #bfdbfe;
+        }
+
+        .avatar.large {
+          width: 64px;
+          height: 64px;
+        }
+
+        .person-info h2 {
+          margin: 0 0 6px;
+          color: #071332;
+          font-size: 24px;
           line-height: 1;
-        }
-
-        .badge.pilot {
-          background: #f5f3ff;
-          color: #7c3aed;
-        }
-
-        .role-text,
-        .trust-score {
-          color: #0f172a;
-          font-size: 13px;
-          font-weight: 900;
-        }
-
-        .status-pill,
-        .decision-pill {
-          width: fit-content;
-          border-radius: 9px;
-          padding: 6px 8px;
-          font-size: 10px;
           font-weight: 950;
-          text-transform: uppercase;
-          line-height: 1;
+          letter-spacing: -0.035em;
+        }
+
+        .person-info p {
+          margin: 0 0 7px;
+          color: #334155;
+          font-size: 14px;
+          font-weight: 850;
+        }
+
+        .person-info span {
+          margin: 0 12px;
+          color: #cbd5e1;
+        }
+
+        .status-block {
+          display: grid;
+          justify-items: end;
+          gap: 9px;
+        }
+
+        .status-block small {
+          color: #475569;
+          font-size: 14px;
+          font-weight: 850;
           white-space: nowrap;
         }
 
         .status-pill {
+          width: fit-content;
+          border-radius: 999px;
+          padding: 9px 18px;
           background: #fef3c7;
           color: #b45309;
+          font-size: 13px;
+          font-weight: 950;
+          text-transform: uppercase;
+          white-space: nowrap;
         }
 
-        .status-pill.approved {
-          background: #dcfce7;
-          color: #15803d;
+        .decision-row {
+          margin-top: 22px;
+          display: grid;
+          grid-template-columns: 1fr 1.22fr 1.25fr 1.1fr;
+          gap: 14px;
+          align-items: center;
         }
 
-        .status-pill.rejected {
-          background: #fee2e2;
-          color: #b91c1c;
-        }
-
-        .decision-pill.approve {
-          background: #dcfce7;
-          color: #15803d;
-        }
-
-        .decision-pill.review {
-          background: #fee2e2;
-          color: #b91c1c;
-        }
-
-        .decision-pill.neutral {
-          background: #e0f2fe;
-          color: #0369a1;
-        }
-
-        .row-actions,
-        .mobile-actions {
+        .info-pill,
+        .trust-box {
+          min-height: 52px;
+          border-radius: 14px;
+          border: 1px solid #e2e8f0;
+          background: rgba(255, 255, 255, 0.78);
           display: flex;
           align-items: center;
-          gap: 8px;
+          justify-content: center;
+          gap: 9px;
+          color: #0f1f44;
+          font-size: 14px;
+          font-weight: 950;
+          white-space: nowrap;
         }
 
-        .row-actions button.approve,
-        .mobile-actions button.approve {
+        .blue-pill {
+          color: #2563eb;
+          border-color: #bfdbfe;
+          background: #f8fbff;
+        }
+
+        .green-pill {
+          color: #15803d;
+          border-color: #bbf7d0;
+          background: #f7fef9;
+        }
+
+        .red-pill {
+          color: #b91c1c;
+          border-color: #fecaca;
+          background: #fff7f7;
+        }
+
+        .trust-box {
+          display: grid;
+          grid-template-columns: 34px 1fr;
+          column-gap: 7px;
+          justify-content: start;
+          padding: 0 12px;
+          color: #15803d;
+        }
+
+        .trust-box::before {
+          content: "盾";
+          width: 30px;
+          height: 30px;
+          display: grid;
+          place-items: center;
+          font-size: 20px;
+        }
+
+        .trust-box small {
+          color: #475569;
+          font-size: 10px;
+          text-transform: uppercase;
+          font-weight: 950;
+          display: block;
+        }
+
+        .trust-box strong {
+          display: block;
+          color: #16a34a;
+          font-size: 23px;
+          line-height: 1;
+          font-weight: 950;
+        }
+
+        .trust-box b {
+          font-size: 13px;
+          color: #334155;
+        }
+
+        .trust-box.mid {
+          color: #ea580c;
+        }
+
+        .trust-box.mid strong {
+          color: #ea580c;
+        }
+
+        .trust-box.bad,
+        .trust-box.bad strong {
+          color: #dc2626;
+        }
+
+        .lina-row {
+          margin-top: 18px;
+          width: min(470px, 100%);
+          min-height: 50px;
+          border-radius: 14px;
+          border: 1px solid #dbeafe;
+          background: #f8fbff;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 0 18px;
+          color: #0f1f44;
+          font-size: 15px;
+          font-weight: 950;
+        }
+
+        .lina-row strong {
+          border-radius: 999px;
+          padding: 9px 18px;
+          font-size: 14px;
+          text-transform: uppercase;
+        }
+
+        .lina-row strong.approve {
+          background: #dcfce7;
+          color: #15803d;
+        }
+
+        .lina-row strong.neutral {
+          background: #ffedd5;
+          color: #ea580c;
+        }
+
+        .lina-row strong.review {
+          background: #fee2e2;
+          color: #b91c1c;
+        }
+
+        .card-bottom {
+          margin-top: 16px;
+          display: flex;
+          align-items: end;
+          justify-content: space-between;
+          gap: 18px;
+        }
+
+        .card-bottom p {
+          margin: 0;
+          color: #334155;
+          font-size: 15px;
+          font-weight: 850;
+          line-height: 1.45;
+        }
+
+        .card-actions {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        }
+
+        .card-actions button {
+          width: 58px;
+          height: 58px;
+          border-radius: 16px;
+          border: 1px solid #e2e8f0;
+          background: #ffffff;
+          color: #071332;
+          display: grid;
+          place-items: center;
+        }
+
+        .card-actions button.approve {
           background: #ecfdf5;
           color: #16a34a;
           border-color: #bbf7d0;
         }
 
-        .row-actions button.reject,
-        .mobile-actions button.reject {
+        .card-actions button.reject {
           background: #fff7f7;
           color: #dc2626;
           border-color: #fecaca;
@@ -1283,192 +1338,6 @@ export default function AdminKatilimTalepleriPage() {
           cursor: not-allowed;
         }
 
-        .mobile-list {
-          display: none;
-        }
-
-        .mobile-card {
-          position: relative;
-          overflow: hidden;
-          margin: 7px 9px;
-          padding: 9px;
-          border: 1px solid #e2e8f0;
-          border-radius: 17px;
-          background: #ffffff;
-          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.055);
-        }
-
-        .mobile-card::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: 4px;
-          background: #2563eb;
-        }
-
-        .mobile-card.theme-blue {
-          background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
-        }
-
-        .mobile-card.theme-blue::before {
-          background: #2563eb;
-        }
-
-        .mobile-card.theme-green {
-          background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
-        }
-
-        .mobile-card.theme-green::before {
-          background: #16a34a;
-        }
-
-        .mobile-card.theme-purple {
-          background: linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%);
-        }
-
-        .mobile-card.theme-purple::before {
-          background: #7c3aed;
-        }
-
-        .mobile-card.theme-amber {
-          background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%);
-        }
-
-        .mobile-card.theme-amber::before {
-          background: #f59e0b;
-        }
-
-        .mobile-card.theme-cyan {
-          background: linear-gradient(135deg, #ffffff 0%, #ecfeff 100%);
-        }
-
-        .mobile-card.theme-cyan::before {
-          background: #06b6d4;
-        }
-
-        .mobile-card.theme-rose {
-          background: linear-gradient(135deg, #ffffff 0%, #fff1f2 100%);
-        }
-
-        .mobile-card.theme-rose::before {
-          background: #e11d48;
-        }
-
-        .mobile-top {
-          display: flex;
-          align-items: flex-start;
-          gap: 9px;
-          min-width: 0;
-        }
-
-        .mobile-main {
-          min-width: 0;
-          width: 100%;
-        }
-
-        .mobile-name-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 7px;
-          min-width: 0;
-        }
-
-        .mobile-name-row strong {
-          min-width: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          color: #071332;
-          font-size: 13px;
-          font-weight: 950;
-          letter-spacing: -0.02em;
-        }
-
-        .mobile-sub {
-          margin-top: 3px;
-          color: #475569;
-          font-size: 11px;
-          font-weight: 850;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .decision-strip {
-          margin-top: 6px;
-          display: grid;
-          grid-template-columns: 0.85fr 1fr 0.85fr;
-          gap: 5px;
-        }
-
-        .decision-strip span {
-          min-height: 24px;
-          border-radius: 9px;
-          background: rgba(255, 255, 255, 0.74);
-          border: 1px solid rgba(226, 232, 240, 0.92);
-          color: #475569;
-          font-size: 9.5px;
-          font-weight: 900;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 3px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          padding: 0 4px;
-        }
-
-        .mobile-badges {
-          margin-top: 6px;
-          display: flex;
-          align-items: center;
-          gap: 5px;
-          flex-wrap: wrap;
-        }
-
-        .mobile-foot {
-          margin-top: 7px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 7px;
-        }
-
-        .mobile-foot > span {
-          color: #64748b;
-          font-size: 10.5px;
-          font-weight: 900;
-        }
-
-        .mobile-actions {
-          display: grid;
-          grid-template-columns: repeat(3, 34px);
-          gap: 6px;
-        }
-
-        .mobile-actions button {
-          width: 34px;
-          height: 31px;
-          border-radius: 12px;
-          background: rgba(255, 255, 255, 0.76);
-          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
-        }
-
-        .panel-footer {
-          padding: 10px 14px;
-          display: flex;
-          justify-content: space-between;
-          gap: 12px;
-          border-top: 1px solid #e2e8f0;
-          color: #64748b;
-          font-size: 12px;
-          font-weight: 800;
-        }
-
         .modal-backdrop {
           position: fixed;
           inset: 0;
@@ -1476,7 +1345,7 @@ export default function AdminKatilimTalepleriPage() {
           display: grid;
           place-items: center;
           padding: 18px;
-          z-index: 60;
+          z-index: 100;
         }
 
         .detail-modal {
@@ -1495,6 +1364,14 @@ export default function AdminKatilimTalepleriPage() {
           position: absolute;
           top: 16px;
           right: 16px;
+          width: 42px;
+          height: 42px;
+          border-radius: 14px;
+          border: 1px solid #e2e8f0;
+          background: #ffffff;
+          color: #071332;
+          display: grid;
+          place-items: center;
         }
 
         .modal-header {
@@ -1526,8 +1403,6 @@ export default function AdminKatilimTalepleriPage() {
         }
 
         .decision-panel div,
-        .detail-grid div,
-        .message-box,
         .note-box {
           border: 1px solid #e2e8f0;
           border-radius: 18px;
@@ -1536,19 +1411,16 @@ export default function AdminKatilimTalepleriPage() {
         }
 
         .decision-panel span,
-        .detail-grid span,
-        .message-box span,
         .note-box {
           color: #64748b;
           font-size: 12px;
           font-weight: 900;
         }
 
-        .decision-panel strong,
-        .detail-grid strong {
+        .decision-panel strong {
           display: block;
           margin-top: 6px;
-          color: #0f172a;
+          color: #071332;
           font-size: 14px;
           font-weight: 900;
         }
@@ -1558,24 +1430,6 @@ export default function AdminKatilimTalepleriPage() {
           margin-top: 5px;
           color: #64748b;
           font-weight: 750;
-        }
-
-        .detail-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px;
-          margin-bottom: 14px;
-        }
-
-        .message-box {
-          margin-bottom: 14px;
-        }
-
-        .message-box p {
-          margin: 8px 0 0;
-          color: #0f172a;
-          font-weight: 750;
-          line-height: 1.5;
         }
 
         .note-box {
@@ -1592,7 +1446,7 @@ export default function AdminKatilimTalepleriPage() {
           padding: 12px;
           outline: none;
           resize: vertical;
-          color: #0f172a;
+          color: #071332;
           font: inherit;
           background: white;
         }
@@ -1603,241 +1457,235 @@ export default function AdminKatilimTalepleriPage() {
           gap: 10px;
         }
 
-        @media (max-width: 1120px) {
-          .summary-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
+        .secondary-button,
+        .primary-button,
+        .danger-button {
+          min-height: 48px;
+          border-radius: 16px;
+          border: 1px solid #e2e8f0;
+          background: white;
+          color: #071332;
+          font-weight: 900;
+        }
 
-          .filters {
-            grid-template-columns: 1fr 1fr;
-          }
+        .primary-button {
+          background: #2563eb;
+          color: white;
+          border-color: #2563eb;
+        }
 
-          .desktop-table {
-            overflow-x: auto;
-          }
-
-          .table-head,
-          .table-row {
-            min-width: 920px;
-          }
+        .danger-button {
+          background: #fff7f7;
+          color: #dc2626;
+          border-color: #fecaca;
         }
 
         @media (max-width: 760px) {
           .admin-page {
             display: block;
             min-height: 100dvh;
-            background: #f8fafc;
           }
 
           .sidebar {
             display: none;
           }
 
-          .content {
-            padding: 8px;
-            padding-bottom: 76px;
-          }
-
           .topbar {
-            position: sticky;
-            top: 0;
-            z-index: 20;
-            margin: -8px -8px 8px;
-            padding: 8px 10px;
-            min-height: 48px;
-            background: rgba(248, 250, 252, 0.94);
-            backdrop-filter: blur(16px);
-            border-bottom: 1px solid #e2e8f0;
+            height: 78px;
+            padding: 0 18px;
           }
 
-          .mobile-title {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 7px;
-            text-align: center;
+          .topbar > strong {
+            font-size: 22px;
           }
 
-          .mobile-title h1 {
-            font-size: 18px;
-            letter-spacing: -0.03em;
+          .top-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 17px;
           }
 
-          .flag {
-            width: 25px;
-            height: 25px;
-            font-size: 15px;
+          .flag-banner {
+            height: 112px;
+            grid-template-columns: 118px 1fr;
+            padding: 0 16px;
+            background:
+              linear-gradient(90deg, rgba(220, 38, 38, 0.95) 0%, rgba(220, 38, 38, 0.68) 30%, rgba(255, 255, 255, 0.92) 58%, rgba(255, 255, 255, 1) 100%),
+              radial-gradient(circle at 82% 80%, rgba(15, 23, 42, 0.13), transparent 38%);
           }
 
-          .page-title {
-            display: none;
+          .flag-symbol {
+            width: 92px;
+            height: 92px;
+            font-size: 60px;
           }
 
-          .back-button {
+          .quote p {
+            font-size: 13px;
+            line-height: 1.35;
+            margin-bottom: 4px;
+          }
+
+          .quote span {
             font-size: 12px;
-            gap: 5px;
           }
 
-          .top-actions {
-            gap: 6px;
+          .page-head {
+            grid-template-columns: 28px 1fr auto;
+            gap: 9px;
+            padding: 20px 18px 14px;
           }
 
-          .top-actions button {
-            width: 34px;
-            height: 34px;
-            border-radius: 13px;
+          .page-head h1 {
+            font-size: 30px;
           }
 
-          .summary-grid {
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 6px;
-            margin-bottom: 8px;
+          .head-actions {
+            gap: 9px;
           }
 
-          .summary-card {
-            min-height: 54px;
+          .head-actions button {
+            min-width: 48px;
+            height: 48px;
             border-radius: 16px;
-            padding: 6px 5px;
-            display: grid;
-            place-items: center;
-            text-align: center;
-            gap: 3px;
-            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
-          }
-
-          .summary-icon {
-            width: 21px;
-            height: 21px;
-            border-radius: 8px;
-            font-size: 11px;
-          }
-
-          .summary-card span {
-            font-size: 8.8px;
-            line-height: 1.05;
-            white-space: normal;
-          }
-
-          .summary-card strong {
-            margin-top: 0;
-            font-size: 16px;
-            line-height: 1;
-          }
-
-          .panel {
-            border-radius: 18px;
-          }
-
-          .filters {
-            padding: 8px;
-            grid-template-columns: 1fr 1fr 38px;
-            gap: 6px;
-          }
-
-          .search-box {
-            grid-column: 1 / -1;
-          }
-
-          .filters select,
-          .secondary-button,
-          .search-box {
-            min-height: 36px;
-            height: 36px;
-            border-radius: 13px;
-            font-size: 11px;
-          }
-
-          .search-box {
-            padding: 0 10px;
-            gap: 7px;
-          }
-
-          .filters select {
-            padding: 0 9px;
-            min-width: 0;
-          }
-
-          .filters select:nth-of-type(3) {
-            display: none;
-          }
-
-          .secondary-button {
-            padding: 0;
-            gap: 0;
             font-size: 0;
           }
 
-          .secondary-button svg {
-            width: 15px;
-            height: 15px;
-          }
-
-          .desktop-table {
+          .head-actions button span {
             display: none;
           }
 
-          .mobile-list {
-            display: block;
-            padding-top: 4px;
-          }
-
-          .mobile-card .avatar {
-            width: 33px;
-            height: 33px;
-            border-radius: 13px;
-            font-size: 12px;
-          }
-
-          .badge {
-            font-size: 8.3px;
-            padding: 4px 5px;
-            border-radius: 7px;
-          }
-
-          .status-pill,
-          .decision-pill {
-            font-size: 8.3px;
-            padding: 5px 6px;
-            border-radius: 7px;
-          }
-
-          .panel-footer {
-            padding: 8px 12px;
-            font-size: 11px;
-          }
-
-          .error-box,
-          .empty-state {
-            margin: 8px;
-            padding: 12px;
-            font-size: 12px;
-          }
-
-          .detail-modal {
-            border-radius: 22px;
-            padding: 16px;
-          }
-
-          .modal-header h2 {
-            font-size: 19px;
-          }
-
-          .decision-panel,
-          .detail-grid {
-            grid-template-columns: 1fr;
+          .summary-grid {
             gap: 8px;
+            padding: 0 18px 14px;
           }
 
-          .decision-panel div,
-          .detail-grid div,
-          .message-box,
-          .note-box {
+          .summary-card {
+            min-height: 64px;
             border-radius: 16px;
-            padding: 12px;
+            padding: 8px 8px 7px;
+            grid-template-columns: 25px 1fr;
+            column-gap: 6px;
           }
 
-          .modal-actions {
-            grid-template-columns: 1fr;
+          .summary-icon {
+            width: 25px;
+            height: 25px;
+            font-size: 14px;
+          }
+
+          .summary-card span {
+            font-size: 9.5px;
+            line-height: 1;
+          }
+
+          .summary-card strong {
+            font-size: 20px;
+          }
+
+          .summary-card i {
+            margin-top: 5px;
+          }
+
+          .filters {
+            padding: 0 18px 18px;
+            grid-template-columns: 1fr 58px;
+            gap: 10px;
+          }
+
+          .search-box,
+          .filter-square,
+          .filters select {
+            min-height: 54px;
+            border-radius: 17px;
+          }
+
+          .search-box input {
+            font-size: 17px;
+          }
+
+          .filters select {
+            font-size: 15px;
+          }
+
+          .application-list {
+            gap: 16px;
+            padding: 0 18px 96px;
+          }
+
+          .application-card {
+            border-radius: 24px;
+            padding: 20px;
+          }
+
+          .card-top {
+            grid-template-columns: 55px 1fr auto;
+            gap: 12px;
+          }
+
+          .avatar {
+            width: 48px;
+            height: 48px;
+            font-size: 17px;
+          }
+
+          .person-info h2 {
+            font-size: 22px;
+          }
+
+          .person-info p {
+            font-size: 13px;
+            line-height: 1.35;
+          }
+
+          .status-block small {
+            font-size: 13px;
+          }
+
+          .status-pill {
+            padding: 8px 15px;
+            font-size: 12px;
+          }
+
+          .decision-row {
+            margin-top: 18px;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+          }
+
+          .info-pill,
+          .trust-box {
+            min-height: 48px;
+            font-size: 13px;
+          }
+
+          .trust-box {
+            grid-column: span 1;
+          }
+
+          .lina-row {
+            margin-top: 14px;
+            min-height: 48px;
+            font-size: 14px;
+            padding: 0 13px;
+          }
+
+          .lina-row strong {
+            font-size: 12px;
+            padding: 8px 12px;
+          }
+
+          .card-bottom {
+            margin-top: 14px;
+          }
+
+          .card-bottom p {
+            font-size: 13px;
+          }
+
+          .card-actions button {
+            width: 54px;
+            height: 54px;
           }
         }
       `}</style>
