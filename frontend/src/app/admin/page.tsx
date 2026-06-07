@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
+import { getRoleDisplayName } from "@/lib/role-labels";
 
 type TabKey = "overview" | "users" | "traffic" | "radar" | "messages" | "applications" | "documents" | "leads" | "stock" | "trust";
 
@@ -112,7 +113,7 @@ const ROLE_LABELS: Record<string, string> = {
   MUTEAHHIT: "Müteahhit",
   INSAAT_FIRMASI: "İnşaat Firması",
   ADMIN: "Admin",
-  SUPER_ADMIN: "Süper Admin",
+  SUPER_ADMIN: "Yazılım Ekibi",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -165,7 +166,7 @@ function fullName(user?: { firstName?: string; lastName?: string }) {
 }
 
 function roleLabel(role?: string) {
-  return ROLE_LABELS[role || ""] || role || "Rol yok";
+  return getRoleDisplayName(role);
 }
 
 function money(value?: number) {
@@ -397,7 +398,7 @@ function OverviewTab({ stats, users, applications, documents, leads, units, setA
 }
 
 function UsersTab({ users, allUsers, search, setSearch, roleFilter, setRoleFilter, cityFilter, setCityFilter, cityOptions, actionLoading, onCreate, onApprove, onSuspend, onDelete, onRole }: { users: (UserItem & { lastVisit?: VisitItem; presence: any })[]; allUsers: (UserItem & { lastVisit?: VisitItem; presence: any })[]; search: string; setSearch: (v: string) => void; roleFilter: string; setRoleFilter: (v: string) => void; cityFilter: string; setCityFilter: (v: string) => void; cityOptions: string[]; actionLoading: string | null; onCreate: () => void; onApprove: (id: string) => void; onSuspend: (id: string) => void; onDelete: (id: string) => void; onRole: (u: UserItem) => void }) {
-  return <section><SectionHeader title="Üyeler" desc={`${users.length} kayıt gösteriliyor. Toplam ${allUsers.length} üye.`} action={<PrimaryButton icon={<Plus size={16} />} onClick={onCreate}>Yeni Üye</PrimaryButton>} /><div className="mb-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]"><div className="relative"><Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ad, e-posta, şehir veya üye no ara..." className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-bold outline-none focus:border-sky-400" /></div><select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Şehirler</option>{cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}</select><select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Roller</option><option value="EMLAKCI">Emlakçı</option><option value="MUTEAHHIT">Müteahhit</option><option value="INSAAT_FIRMASI">İnşaat Firması</option><option value="ADMIN">Admin</option><option value="SUPER_ADMIN">Süper Admin</option></select></div>{users.length === 0 ? <Empty>Kullanıcı bulunamadı.</Empty> : <div className="space-y-3">{users.map((u) => <div key={u.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_auto] lg:items-center"><div className="flex items-start gap-3"><div className="relative"><Avatar firstName={u.firstName} lastName={u.lastName} imageUrl={u.profileImageUrl} size="lg" /><span className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-white ${u.presence.dot}`} /></div><div className="min-w-0"><h3 className="truncate text-lg font-black text-slate-950">{u.firstName} {u.lastName}</h3><p className="truncate text-sm font-bold text-slate-500">{u.email}</p><p className="text-xs font-bold text-slate-400">{u.phone || "Telefon yok"}</p><div className="mt-2 flex flex-wrap gap-2"><Pill className={roleClass(u.role)}>{roleLabel(u.role)}</Pill><Pill className={u.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{u.isApproved ? "Onaylı" : "Bekliyor"}</Pill><Pill className={u.presence.badge}>{u.presence.label}</Pill></div></div></div><div className="grid gap-2 rounded-2xl bg-slate-50 p-3"><InfoLine label="Üye No" value={u.memberCode || "Atanmadı"} strong /><InfoLine label="Konum" value={`${u.city || "Şehir yok"}${u.district ? ` / ${u.district}` : ""}`} /><InfoLine label="Bölge Kodu" value={u.cityPlateCode ? `TR ${u.cityPlateCode}` : "—"} /><InfoLine label="Son Aktivite" value={fmt(u.lastVisit?.createdAt)} /></div><div className="flex flex-wrap gap-2 lg:justify-end">{!u.isApproved && <PrimaryButton tone="success" disabled={actionLoading === u.id} icon={<Check size={15} />} onClick={() => onApprove(u.id)}>Onayla</PrimaryButton>}{u.role !== "ADMIN" && u.role !== "SUPER_ADMIN" && <>{u.isApproved && <PrimaryButton tone="light" disabled={actionLoading === u.id} onClick={() => { if (confirm("Kullanıcı askıya alınacak. Emin misiniz?")) onSuspend(u.id); }}>Askıya Al</PrimaryButton>}<PrimaryButton tone="light" icon={<UserCog size={15} />} onClick={() => onRole(u)}>Rol</PrimaryButton><PrimaryButton tone="danger" disabled={actionLoading === u.id} icon={<Trash2 size={15} />} onClick={() => { if (confirm("Kullanıcı silinecek. Emin misiniz?")) onDelete(u.id); }}>Sil</PrimaryButton></>}{(u.role === "ADMIN" || u.role === "SUPER_ADMIN") && <PrimaryButton tone="light" icon={<ShieldCheck size={15} />}>Yetkili</PrimaryButton>}</div></div></div>)}</div>}</section>;
+  return <section><SectionHeader title="Üyeler" desc={`${users.length} kayıt gösteriliyor. Toplam ${allUsers.length} üye.`} action={<PrimaryButton icon={<Plus size={16} />} onClick={onCreate}>Yeni Üye</PrimaryButton>} /><div className="mb-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]"><div className="relative"><Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ad, e-posta, şehir veya üye no ara..." className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-bold outline-none focus:border-sky-400" /></div><select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Şehirler</option>{cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}</select><select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Roller</option><option value="EMLAKCI">Emlakçı</option><option value="MUTEAHHIT">Müteahhit</option><option value="INSAAT_FIRMASI">İnşaat Firması</option><option value="ADMIN">Admin</option><option value="SUPER_ADMIN">Yazılım Ekibi</option></select></div>{users.length === 0 ? <Empty>Kullanıcı bulunamadı.</Empty> : <div className="space-y-3">{users.map((u) => <div key={u.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_auto] lg:items-center"><div className="flex items-start gap-3"><div className="relative"><Avatar firstName={u.firstName} lastName={u.lastName} imageUrl={u.profileImageUrl} size="lg" /><span className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-white ${u.presence.dot}`} /></div><div className="min-w-0"><h3 className="truncate text-lg font-black text-slate-950">{u.firstName} {u.lastName}</h3><p className="truncate text-sm font-bold text-slate-500">{u.email}</p><p className="text-xs font-bold text-slate-400">{u.phone || "Telefon yok"}</p><div className="mt-2 flex flex-wrap gap-2"><Pill className={roleClass(u.role)}>{roleLabel(u.role)}</Pill><Pill className={u.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{u.isApproved ? "Onaylı" : "Bekliyor"}</Pill><Pill className={u.presence.badge}>{u.presence.label}</Pill></div></div></div><div className="grid gap-2 rounded-2xl bg-slate-50 p-3"><InfoLine label="Üye No" value={u.memberCode || "Atanmadı"} strong /><InfoLine label="Konum" value={`${u.city || "Şehir yok"}${u.district ? ` / ${u.district}` : ""}`} /><InfoLine label="Bölge Kodu" value={u.cityPlateCode ? `TR ${u.cityPlateCode}` : "—"} /><InfoLine label="Son Aktivite" value={fmt(u.lastVisit?.createdAt)} /></div><div className="flex flex-wrap gap-2 lg:justify-end">{!u.isApproved && <PrimaryButton tone="success" disabled={actionLoading === u.id} icon={<Check size={15} />} onClick={() => onApprove(u.id)}>Onayla</PrimaryButton>}{u.role !== "ADMIN" && u.role !== "SUPER_ADMIN" && <>{u.isApproved && <PrimaryButton tone="light" disabled={actionLoading === u.id} onClick={() => { if (confirm("Kullanıcı askıya alınacak. Emin misiniz?")) onSuspend(u.id); }}>Askıya Al</PrimaryButton>}<PrimaryButton tone="light" icon={<UserCog size={15} />} onClick={() => onRole(u)}>Rol</PrimaryButton><PrimaryButton tone="danger" disabled={actionLoading === u.id} icon={<Trash2 size={15} />} onClick={() => { if (confirm("Kullanıcı silinecek. Emin misiniz?")) onDelete(u.id); }}>Sil</PrimaryButton></>}{(u.role === "ADMIN" || u.role === "SUPER_ADMIN") && <PrimaryButton tone="light" icon={<ShieldCheck size={15} />}>Yetkili</PrimaryButton>}</div></div></div>)}</div>}</section>;
 }
 
 
@@ -457,7 +458,7 @@ function LiveWatchPanel({ rows, onRefresh }: { rows: { user: UserItem; visit?: V
     <div className="mb-5 rounded-[32px] border border-slate-200 bg-white p-4 shadow-sm lg:p-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-sky-600">Süper Admin</p>
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-sky-600">Yazılım Ekibi</p>
           <h3 className="mt-1 text-2xl font-black tracking-tight text-slate-950">Canlı İzleme</h3>
           <p className="mt-1 text-sm font-semibold text-slate-500">Canlı olarak hangi kullanıcının hangi sayfada olduğunu gösterir.</p>
         </div>
@@ -518,7 +519,7 @@ function LiveMovementFeed({ visits }: { visits: VisitItem[] }) {
     <div className="mb-5 rounded-[32px] border border-slate-200 bg-white p-4 shadow-sm lg:p-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-rose-600">Süper Admin Radar</p>
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-rose-600">Yazılım Ekibi Radarı</p>
           <h3 className="mt-1 text-2xl font-black tracking-tight text-slate-950">Canlı Hareket Akışı</h3>
           <p className="mt-1 text-sm font-semibold text-slate-500">Platformdaki son kullanıcı hareketlerini zaman sırasına göre gösterir.</p>
         </div>
@@ -590,7 +591,7 @@ function RadarTab({ rows, visits, onRefresh }: { rows: { user: UserItem; visit?:
     <section>
       <SectionHeader
         title="Radar Merkezi"
-        desc="Canlı izleme ve son hareket akışı burada tutulur. Süper Admin kayıtları bu ekranda gizlenir."
+        desc="Canlı izleme ve son hareket akışı burada tutulur. Yazılım Ekibi kayıtları bu ekranda gizlenir."
         action={<PrimaryButton tone="light" icon={<RefreshCw size={16} />} onClick={onRefresh}>Yenile</PrimaryButton>}
       />
 
@@ -613,7 +614,7 @@ function TrafficTab({ rows, trafficFilter, setTrafficFilter, onRefresh }: { rows
     <section>
       <SectionHeader
         title="Canlı Trafik"
-        desc="Üyelerin gerçek son aktif durumunu gösterir. Kullanıcı offline görünse bile Süper Admin gerçek aktiviteyi burada takip eder."
+        desc="Üyelerin gerçek son aktif durumunu gösterir. Kullanıcı offline görünse bile Yazılım Ekibi gerçek aktiviteyi burada takip eder."
         action={<PrimaryButton tone="light" icon={<RefreshCw size={16} />} onClick={onRefresh}>Yenile</PrimaryButton>}
       />
 

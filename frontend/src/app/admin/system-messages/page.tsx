@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
+import { getRoleDisplayName } from "@/lib/role-labels";
 
 type RecipientMode = "SINGLE" | "MULTIPLE" | "ROLE" | "CITY" | "CITY_ROLE" | "ALL";
 
@@ -45,7 +46,7 @@ const roleLabels: Record<string, string> = {
   MUTEAHHIT: "Müteahhit",
   INSAAT_FIRMASI: "İnşaat Firması",
   ADMIN: "Admin",
-  SUPER_ADMIN: "Süper Admin",
+  SUPER_ADMIN: getRoleDisplayName("SUPER_ADMIN"),
 };
 
 const selectableRoles = [
@@ -53,7 +54,7 @@ const selectableRoles = [
   { value: "MUTEAHHIT", label: "Müteahhit" },
   { value: "INSAAT_FIRMASI", label: "İnşaat Firması" },
   { value: "ADMIN", label: "Admin" },
-  { value: "SUPER_ADMIN", label: "Süper Admin" },
+  { value: "SUPER_ADMIN", label: getRoleDisplayName("SUPER_ADMIN") },
 ];
 
 const categoryLabels: Record<string, string> = {
@@ -471,7 +472,7 @@ export default function SystemMessagesPage() {
       MUTEAHHITLER: "Müteahhitler",
       INSAAT_FIRMALARI: "İnşaat Firmaları",
       ADMINLER: "Adminler",
-      SUPER_ADMINLER: "Süper Adminler",
+      SUPER_ADMINLER: "Yazılım Ekibi",
       OZEL_GRUP: "Özel Grup",
     };
 

@@ -7,18 +7,36 @@ export const ROLE_DISPLAY_NAMES: Record<string, string> = {
   SUPER_ADMIN: "Yazılım Ekibi",
 };
 
-export function getRoleDisplayName(role?: string | null) {
-  if (!role) return "-";
+export function normalizeRoleKey(role?: string | null) {
+  return String(role || "")
+    .toLocaleUpperCase("tr-TR")
+    .trim();
+}
 
-  return ROLE_DISPLAY_NAMES[role] || role;
+export function getRoleDisplayName(role?: string | null, fallback = "Rol yok") {
+  const normalizedRole = normalizeRoleKey(role);
+
+  if (!normalizedRole) return fallback;
+
+  if (["MÜTEAHHİT", "MÜTAHHİT"].includes(normalizedRole)) {
+    return ROLE_DISPLAY_NAMES.MUTEAHHIT;
+  }
+
+  if (normalizedRole === "İNŞAAT_FİRMASI") {
+    return ROLE_DISPLAY_NAMES.INSAAT_FIRMASI;
+  }
+
+  return ROLE_DISPLAY_NAMES[normalizedRole] || role || fallback;
 }
 
 export function hideTechnicalSuperAdminText(value?: string | null) {
   if (!value) return "";
 
-  return value
+  return String(value)
+    .replace(/SUPER_ADMINLER/g, "Yazılım Ekibi")
     .replace(/SUPER_ADMIN/g, "Yazılım Ekibi")
     .replace(/SUPER ADMIN/g, "Yazılım Ekibi")
     .replace(/Super Admin/g, "Yazılım Ekibi")
+    .replace(/Süper Adminler/g, "Yazılım Ekibi")
     .replace(/Süper Admin/g, "Yazılım Ekibi");
 }
