@@ -20,6 +20,9 @@ model User {
   isApproved      Boolean @default(false)
   adminVisible    Boolean @default(true)
 
+  hesapTuru      KullaniciHesapTuru @default(GERCEK)
+  pilotKullaniciMi Boolean @default(false)
+
   memberCode  String?   @unique
   memberSince DateTime?
   trustScore  Int       @default(70)
@@ -657,6 +660,7 @@ enum Role {
   EMLAKCI
   MUTEAHHIT
   INSAAT_FIRMASI
+  MODERATOR
   ADMIN
   SUPER_ADMIN
 }
@@ -947,4 +951,1592 @@ enum AuditAction {
   VIEW_SENSITIVE_DATA_ATTEMPT
   SYSTEM_SECURITY_ACTION
   TECHNICAL_SUPPORT_ACCESS
+}
+// ======================================================
+// EPH PLATFORM - LINA V5 FINAL EK SCHEMA
+// Not: Model adlarında Türkçe anlam korunmuştur; teknik güvenlik için Türkçe karakter kullanılmamıştır.
+// ======================================================
+
+enum KullaniciHesapTuru {
+  GERCEK
+  PILOT
+  TEST
+  SISTEM
+}
+
+enum UyelikPaketKodu {
+  SILVER
+  GOLD
+  PREMIUM
+  PLATINIUM
+  KURUMSAL
+}
+
+enum UyelikDurumu {
+  AKTIF
+  PASIF
+  SURESI_DOLDU
+  IPTAL
+}
+
+enum KontorHareketTuru {
+  YUKLEME
+  HARCAMA
+  IADE
+  HEDIYE
+  DUZELTME
+}
+
+enum KontorIslemTuru {
+  FORUM_ACIL_ETIKETI
+  FORUM_SABITLEME
+  FORUM_VITRIN
+  PORTFOY_ONE_CIKARMA
+  LINA_ILAN_ACIKLAMASI
+  LINA_ILAN_DUZENLEME
+  LINA_SESTEN_ILAN
+  SOSYAL_MEDYA_METNI
+  INSTAGRAM_GONDERISI
+  INSTAGRAM_REELS
+  WHATSAPP_PORTFOY_KARTI
+  PDF_PORTFOY_DOSYASI
+  TOPLU_ISLEM
+  TOPLU_EPOSTA
+  EK_GORUSME_HAKKI
+  DIGER
+}
+
+enum KotaDonemi {
+  GUNLUK
+  AYLIK
+  YILLIK
+}
+
+enum AdminMesajTuru {
+  TEKNIK_BILGILENDIRME
+  KAMPANYA
+  KONTOR_BAKIYE
+  PROFIL_EVRAK
+  PAKET_UYELIK
+  KURAL_GUVENLIK
+  GENEL_DUYURU
+  KISIYE_OZEL_MESAJ
+}
+
+enum DestekTalepDurumu {
+  ACIK
+  ISLENIYOR
+  YANITLANDI
+  KAPANDI
+}
+
+enum LinaKanal {
+  YAZILI
+  SESLI
+  SISTEM
+  PROAKTIF
+  EPOSTA
+}
+
+enum LinaModul {
+  GENEL
+  PORTFOY
+  CRM
+  FORUM
+  HAVUZ
+  GOREV
+  RAPORLAMA
+  PROAKTIF_TARAMA
+  BILGI_KUTUPHANESI
+  DENETIM
+  SES
+  BILDIRIM
+  EPOSTA
+  YETKI
+  KALIBRASYON
+}
+
+enum LinaNiyet {
+  BILGI_ALMA
+  ISLEM_YAPMA
+  PORTFOY_EKLEME
+  PORTFOY_GUNCELLEME
+  MUSTERI_TAKIBI
+  TALEP_OLUSTURMA
+  ESLESME_ARAMA
+  GOREV_OLUSTURMA
+  RAPOR_ISTEME
+  SIKAYET
+  ONERI
+  BELIRSIZ
+}
+
+enum LinaDurum {
+  BEKLIYOR
+  ISLENIYOR
+  TAMAMLANDI
+  REDDEDILDI
+  HATA
+  IPTAL
+}
+
+enum LinaKararSeviyesi {
+  BILGILENDIRME
+  ONERI
+  UYARI
+  AKSIYON
+  KRITIK
+}
+
+enum LinaRiskSeviyesi {
+  YOK
+  DUSUK
+  ORTA
+  YUKSEK
+  KRITIK
+}
+
+enum LinaFirsatSeviyesi {
+  YOK
+  DUSUK
+  ORTA
+  YUKSEK
+  COK_YUKSEK
+}
+
+enum LinaHafizaKatmani {
+  OTURUM
+  ISLEM
+  KULLANICI
+  ROL
+  KURUMSAL
+  BOLGESEL_TERIM
+  SISTEM
+  DENETIM
+}
+
+enum LinaHafizaOnemi {
+  DUSUK
+  ORTA
+  YUKSEK
+  KALICI
+}
+
+enum LinaDenetimTuru {
+  BILGI
+  UYARI
+  HATA
+  YETKI_IHLALI
+  CELISKI
+  RED
+  GUVENLIK
+}
+
+enum LinaOneriDurumu {
+  BEKLIYOR
+  GOSTERILDI
+  ONAYLANDI
+  REDDEDILDI
+  UYGULANDI
+  SURESI_DOLDU
+}
+
+enum LinaGorevOnceligi {
+  DUSUK
+  NORMAL
+  YUKSEK
+  ACIL
+}
+
+enum LinaGorevDurumu {
+  BEKLIYOR
+  DEVAM_EDIYOR
+  TAMAMLANDI
+  IPTAL_EDILDI
+  GECIKTI
+}
+
+enum LinaBilgiTuru {
+  ANAYASA
+  KURAL
+  SSS
+  EGITIM
+  TERIM
+  PROSEDUR
+  SENARYO
+}
+
+enum LinaTerimGuveni {
+  DUSUK
+  ORTA
+  YUKSEK
+  ONAYLI
+}
+
+enum LinaEpostaHesabi {
+  BILDIRIM
+  DESTEK
+  INFO
+}
+
+enum LinaEpostaDurumu {
+  BEKLIYOR
+  GONDERILDI
+  HATA
+  IPTAL
+}
+
+model UyelikPaketi {
+  id                         String          @id @default(uuid())
+  paketKodu                  UyelikPaketKodu @unique
+  paketAdi                   String
+  aciklama                   String?
+  aktifPortfoyLimiti         Int
+  aylikForumKonusuLimiti     Int?
+  aylikMesajBaslatmaLimiti   Int?
+  gunlukMesajBaslatmaLimiti  Int?
+  gunlukForumIlgiLimiti      Int?
+  gunlukHavuzMesajLimiti     Int?
+  verilenKontor              Int             @default(0)
+  fiyat                      Decimal?
+  paraBirimi                 String          @default("TRY")
+  aktifMi                    Boolean         @default(true)
+  olusturulmaTarihi          DateTime        @default(now())
+  guncellenmeTarihi          DateTime        @updatedAt
+
+  @@index([paketKodu])
+  @@index([aktifMi])
+}
+
+model KullaniciUyelikPaketi {
+  id                String       @id @default(uuid())
+  kullaniciId       String
+  paketId           String
+  durum             UyelikDurumu @default(AKTIF)
+  baslangicTarihi   DateTime     @default(now())
+  bitisTarihi       DateTime?
+  pilotPaketMi      Boolean      @default(false)
+  testPaketiMi      Boolean      @default(false)
+  notlar            String?
+  olusturulmaTarihi DateTime     @default(now())
+  guncellenmeTarihi DateTime     @updatedAt
+
+  @@index([kullaniciId])
+  @@index([paketId])
+  @@index([durum])
+  @@index([baslangicTarihi])
+  @@index([bitisTarihi])
+}
+
+model KontorCuzdani {
+  id                String   @id @default(uuid())
+  kullaniciId       String   @unique
+  bakiye            Int      @default(0)
+  toplamYukleme     Int      @default(0)
+  toplamHarcama     Int      @default(0)
+  toplamHediye      Int      @default(0)
+  aktifMi           Boolean  @default(true)
+  olusturulmaTarihi DateTime @default(now())
+  guncellenmeTarihi DateTime @updatedAt
+
+  @@index([kullaniciId])
+  @@index([aktifMi])
+}
+
+model KontorHareketi {
+  id                String            @id @default(uuid())
+  kullaniciId       String
+  hareketTuru       KontorHareketTuru
+  islemTuru         KontorIslemTuru
+  miktar            Int
+  oncekiBakiye      Int
+  sonrakiBakiye     Int
+  aciklama          String?
+  ilgiliKayitTuru   String?
+  ilgiliKayitId     String?
+  olusturanId       String?
+  olusturulmaTarihi DateTime          @default(now())
+
+  @@index([kullaniciId])
+  @@index([hareketTuru])
+  @@index([islemTuru])
+  @@index([ilgiliKayitTuru])
+  @@index([ilgiliKayitId])
+  @@index([olusturulmaTarihi])
+}
+
+model KotaKullanimi {
+  id                String     @id @default(uuid())
+  kullaniciId       String
+  kotaKodu          String
+  donem             KotaDonemi
+  limit             Int
+  kullanilan        Int        @default(0)
+  donemBaslangic    DateTime
+  donemBitis        DateTime
+  olusturulmaTarihi DateTime   @default(now())
+  guncellenmeTarihi DateTime   @updatedAt
+
+  @@unique([kullaniciId, kotaKodu, donem, donemBaslangic])
+  @@index([kullaniciId])
+  @@index([kotaKodu])
+  @@index([donem])
+  @@index([donemBaslangic])
+  @@index([donemBitis])
+}
+
+model MesajlasmaLimiti {
+  id                              String          @id @default(uuid())
+  paketKodu                       UyelikPaketKodu @unique
+  gunlukYeniGorusmeLimiti         Int
+  aylikYeniGorusmeLimiti          Int
+  mevcutKonusmaCevapSinirsizMi    Boolean         @default(true)
+  gunlukForumIlgiLimiti           Int
+  gunlukHavuzMesajLimiti          Int
+  ekBesGorusmeKontoru             Int             @default(50)
+  ekOnBesGorusmeKontoru           Int             @default(125)
+  ekElliGorusmeKontoru            Int             @default(350)
+  aktifMi                         Boolean         @default(true)
+  olusturulmaTarihi               DateTime        @default(now())
+  guncellenmeTarihi               DateTime        @updatedAt
+
+  @@index([aktifMi])
+}
+
+model AdminDuyuru {
+  id                   String           @id @default(uuid())
+  olusturanId          String?
+  mesajTuru            AdminMesajTuru
+  baslik               String
+  icerik               String
+  hedefRol             String?
+  hedefIl              String?
+  hedefPaket           UyelikPaketKodu?
+  hedefKullaniciId     String?
+  yayindaMi            Boolean          @default(false)
+  gonderildiMi         Boolean          @default(false)
+  yayinTarihi          DateTime?
+  sonGecerlilikTarihi  DateTime?
+  olusturulmaTarihi    DateTime         @default(now())
+  guncellenmeTarihi    DateTime         @updatedAt
+
+  @@index([olusturanId])
+  @@index([mesajTuru])
+  @@index([hedefRol])
+  @@index([hedefIl])
+  @@index([hedefPaket])
+  @@index([hedefKullaniciId])
+  @@index([yayindaMi])
+  @@index([gonderildiMi])
+}
+
+model DestekTalebi {
+  id                String            @id @default(uuid())
+  kullaniciId       String
+  baslik            String
+  aciklama          String
+  kategori          String?
+  durum             DestekTalepDurumu @default(ACIK)
+  oncelik           LinaGorevOnceligi @default(NORMAL)
+  sonYanitTarihi    DateTime?
+  kapanmaTarihi     DateTime?
+  olusturulmaTarihi DateTime          @default(now())
+  guncellenmeTarihi DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([kategori])
+  @@index([durum])
+  @@index([oncelik])
+}
+
+model LinaKonusma {
+  id                 String             @id @default(uuid())
+  kullaniciId        String?
+  rol                String?
+  kanal              LinaKanal          @default(YAZILI)
+  modul              LinaModul          @default(GENEL)
+  niyet              LinaNiyet          @default(BELIRSIZ)
+  kullaniciMesaji    String
+  linaCevabi         String?
+  ozet               String?
+  belirsizlikVarMi   Boolean            @default(false)
+  yetkiUygunMu       Boolean            @default(true)
+  riskSeviyesi       LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi     LinaFirsatSeviyesi @default(YOK)
+  durum              LinaDurum          @default(TAMAMLANDI)
+  olusturulmaTarihi  DateTime           @default(now())
+  guncellenmeTarihi  DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([rol])
+  @@index([modul])
+  @@index([niyet])
+  @@index([olusturulmaTarihi])
+}
+
+model LinaBaglam {
+  id                 String    @id @default(uuid())
+  kullaniciId        String?
+  konusmaId          String?
+  modul              LinaModul @default(GENEL)
+  rol                String?
+  baglamBasligi      String?
+  baglamIcerigi      Json
+  aktifMi            Boolean   @default(true)
+  gecerlilikTarihi   DateTime?
+  olusturulmaTarihi  DateTime  @default(now())
+  guncellenmeTarihi  DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([modul])
+  @@index([aktifMi])
+}
+
+model LinaHafiza {
+  id                 String             @id @default(uuid())
+  kullaniciId        String?
+  konusmaId          String?
+  katman             LinaHafizaKatmani
+  onem               LinaHafizaOnemi    @default(ORTA)
+  baslik             String
+  icerik             String
+  veri               Json?
+  kaliciMi           Boolean            @default(false)
+  aktifMi            Boolean            @default(true)
+  kaynakModul        LinaModul          @default(GENEL)
+  olusturulmaTarihi  DateTime           @default(now())
+  guncellenmeTarihi  DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([katman])
+  @@index([onem])
+  @@index([aktifMi])
+}
+
+model LinaTercih {
+  id                   String   @id @default(uuid())
+  kullaniciId          String   @unique
+  sesliYanitAktifMi    Boolean  @default(false)
+  proaktifBildirimMi   Boolean  @default(true)
+  sessizSaatAktifMi    Boolean  @default(true)
+  sessizSaatBaslangic  String   @default("22:00")
+  sessizSaatBitis      String   @default("08:00")
+  yanitUzunlugu        String   @default("NORMAL")
+  hitapTercihi         String?
+  bolgeselDilAktifMi   Boolean  @default(true)
+  olusturulmaTarihi    DateTime @default(now())
+  guncellenmeTarihi    DateTime @updatedAt
+
+  @@index([kullaniciId])
+}
+
+model LinaKarar {
+  id                 String             @id @default(uuid())
+  kullaniciId        String?
+  konusmaId          String?
+  modul              LinaModul          @default(GENEL)
+  niyet              LinaNiyet          @default(BELIRSIZ)
+  kararSeviyesi      LinaKararSeviyesi  @default(BILGILENDIRME)
+  riskSeviyesi       LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi     LinaFirsatSeviyesi @default(YOK)
+  kararBasligi       String
+  kararOzeti         String
+  gerekce            String?
+  veriOzeti          Json?
+  uygulanabilirMi    Boolean            @default(true)
+  otomatikMi         Boolean            @default(false)
+  durum              LinaDurum          @default(TAMAMLANDI)
+  olusturulmaTarihi  DateTime           @default(now())
+  guncellenmeTarihi  DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([modul])
+  @@index([kararSeviyesi])
+  @@index([riskSeviyesi])
+  @@index([firsatSeviyesi])
+  @@index([olusturulmaTarihi])
+}
+
+model LinaOneri {
+  id                  String             @id @default(uuid())
+  kullaniciId         String?
+  konusmaId           String?
+  kararId             String?
+  modul               LinaModul          @default(GENEL)
+  oneriDurumu         LinaOneriDurumu    @default(BEKLIYOR)
+  baslik              String
+  aciklama            String
+  gerekce             String?
+  oncelik             LinaGorevOnceligi  @default(NORMAL)
+  riskSeviyesi        LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi      LinaFirsatSeviyesi @default(YOK)
+  hedefUrl            String?
+  aksiyonTipi         String?
+  aksiyonVerisi       Json?
+  gosterilmeTarihi    DateTime?
+  cevaplanmaTarihi    DateTime?
+  sonGecerlilikTarihi DateTime?
+  olusturulmaTarihi   DateTime           @default(now())
+  guncellenmeTarihi   DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([kararId])
+  @@index([modul])
+  @@index([oneriDurumu])
+  @@index([oncelik])
+  @@index([olusturulmaTarihi])
+}
+
+model LinaGorev {
+  id                       String            @id @default(uuid())
+  kullaniciId              String?
+  konusmaId                String?
+  kararId                  String?
+  modul                    LinaModul         @default(GENEL)
+  baslik                   String
+  aciklama                 String?
+  oncelik                  LinaGorevOnceligi @default(NORMAL)
+  durum                    LinaGorevDurumu   @default(BEKLIYOR)
+  hedefUrl                 String?
+  gorevVerisi              Json?
+  baslangicTarihi          DateTime?
+  bitisTarihi              DateTime?
+  hatirlatmaTarihi         DateTime?
+  tamamlanmaTarihi         DateTime?
+  otomatikOlustuMu         Boolean           @default(false)
+  kullaniciOnayiGerekliMi  Boolean           @default(true)
+  olusturulmaTarihi        DateTime          @default(now())
+  guncellenmeTarihi        DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([kararId])
+  @@index([modul])
+  @@index([oncelik])
+  @@index([durum])
+  @@index([hatirlatmaTarihi])
+}
+
+model LinaDenetim {
+  id                 String           @id @default(uuid())
+  kullaniciId        String?
+  konusmaId          String?
+  kararId            String?
+  gorevId            String?
+  denetimTuru        LinaDenetimTuru
+  modul              LinaModul        @default(GENEL)
+  baslik             String
+  aciklama           String?
+  oncekiDeger        Json?
+  sonrakiDeger       Json?
+  ekVeri             Json?
+  riskSeviyesi       LinaRiskSeviyesi @default(YOK)
+  cozulduMu          Boolean          @default(false)
+  cozumAciklamasi    String?
+  cozumTarihi        DateTime?
+  olusturulmaTarihi  DateTime         @default(now())
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([kararId])
+  @@index([gorevId])
+  @@index([denetimTuru])
+  @@index([modul])
+  @@index([riskSeviyesi])
+  @@index([cozulduMu])
+}
+
+model LinaBilgiKutuphanesi {
+  id                         String        @id @default(uuid())
+  bilgiTuru                  LinaBilgiTuru
+  modul                      LinaModul     @default(GENEL)
+  rol                        String?
+  baslik                     String
+  ozet                       String?
+  icerik                     String
+  etiketler                  String[]
+  surum                      String        @default("1.0.0")
+  aktifMi                    Boolean       @default(true)
+  onayliMi                   Boolean       @default(false)
+  kaynakDosya                String?
+  kaynakBaslik               String?
+  gecerlilikBaslangicTarihi  DateTime?
+  gecerlilikBitisTarihi      DateTime?
+  olusturanKullaniciId       String?
+  onaylayanKullaniciId       String?
+  olusturulmaTarihi          DateTime      @default(now())
+  guncellenmeTarihi          DateTime      @updatedAt
+
+  @@index([bilgiTuru])
+  @@index([modul])
+  @@index([rol])
+  @@index([aktifMi])
+  @@index([onayliMi])
+}
+
+model LinaBolgeselTerim {
+  id                   String          @id @default(uuid())
+  il                   String?
+  ilce                 String?
+  mahalle              String?
+  terim                String
+  standartKarsilik     String
+  aciklama             String?
+  ornekKullanim        String?
+  kaynak               String?
+  guvenSeviyesi        LinaTerimGuveni @default(ORTA)
+  aktifMi              Boolean         @default(true)
+  onayliMi             Boolean         @default(false)
+  kullanimSayisi       Int             @default(0)
+  olusturanKullaniciId String?
+  onaylayanKullaniciId String?
+  olusturulmaTarihi    DateTime        @default(now())
+  guncellenmeTarihi    DateTime        @updatedAt
+
+  @@index([il])
+  @@index([ilce])
+  @@index([mahalle])
+  @@index([terim])
+  @@index([standartKarsilik])
+  @@index([guvenSeviyesi])
+  @@index([aktifMi])
+  @@index([onayliMi])
+}
+
+model LinaCrmMusteri {
+  id                 String   @id @default(uuid())
+  kullaniciId        String
+  adSoyad            String
+  telefon            String?
+  email              String?
+  musteriTipi        String?
+  kaynak             String?
+  il                 String?
+  ilce               String?
+  mahalle            String?
+  notlar             String?
+  etiketler          String[]
+  aktifMi            Boolean  @default(true)
+  olusturulmaTarihi  DateTime @default(now())
+  guncellenmeTarihi  DateTime @updatedAt
+
+  @@index([kullaniciId])
+  @@index([adSoyad])
+  @@index([telefon])
+  @@index([il])
+  @@index([ilce])
+  @@index([mahalle])
+  @@index([aktifMi])
+}
+
+model LinaCrmTalep {
+  id                 String            @id @default(uuid())
+  kullaniciId        String
+  musteriId          String?
+  talepBasligi       String
+  talepAciklamasi    String?
+  talepTuru          String
+  kategori           String?
+  altKategori        String?
+  il                 String?
+  ilce               String?
+  mahalle            String?
+  minFiyat           Decimal?
+  maxFiyat           Decimal?
+  paraBirimi         String            @default("TRY")
+  minMetrekare       Int?
+  maxMetrekare       Int?
+  odaSayisi          String?
+  binaYasi           String?
+  katBilgisi         String?
+  aciliyetSeviyesi   LinaGorevOnceligi @default(NORMAL)
+  durum              LinaDurum         @default(BEKLIYOR)
+  linaOzet           String?
+  linaPuan           Int?
+  aktifMi            Boolean           @default(true)
+  olusturulmaTarihi  DateTime          @default(now())
+  guncellenmeTarihi  DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([musteriId])
+  @@index([talepTuru])
+  @@index([kategori])
+  @@index([il])
+  @@index([ilce])
+  @@index([mahalle])
+  @@index([durum])
+  @@index([aktifMi])
+}
+
+model LinaCrmGorusme {
+  id                 String    @id @default(uuid())
+  kullaniciId        String
+  musteriId          String?
+  talepId            String?
+  gorusmeTuru        String
+  baslik             String
+  notlar             String?
+  sonuc              String?
+  duyguDurumu        String?
+  satinAlmaNiyeti    String?
+  linaOzet           String?
+  linaSonrakiAdim    String?
+  gorusmeTarihi      DateTime  @default(now())
+  sonrakiTakipTarihi DateTime?
+  olusturulmaTarihi  DateTime  @default(now())
+  guncellenmeTarihi  DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([musteriId])
+  @@index([talepId])
+  @@index([gorusmeTarihi])
+  @@index([sonrakiTakipTarihi])
+}
+
+model LinaCrmTakip {
+  id                 String            @id @default(uuid())
+  kullaniciId        String
+  musteriId          String?
+  talepId            String?
+  baslik             String
+  aciklama           String?
+  takipTarihi        DateTime
+  tamamlanmaTarihi   DateTime?
+  oncelik            LinaGorevOnceligi @default(NORMAL)
+  durum              LinaGorevDurumu   @default(BEKLIYOR)
+  linaHatirlatsinMi  Boolean           @default(true)
+  otomatikOlustuMu   Boolean           @default(false)
+  olusturulmaTarihi  DateTime          @default(now())
+  guncellenmeTarihi  DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([musteriId])
+  @@index([talepId])
+  @@index([takipTarihi])
+  @@index([durum])
+}
+
+model LinaPortfoyAnaliz {
+  id                 String             @id @default(uuid())
+  kullaniciId        String
+  portfoyId          String
+  kalitePuani        Int                @default(0)
+  eksikBilgiPuani    Int                @default(0)
+  pazarlamaPuani     Int                @default(0)
+  eslesmePuani       Int                @default(0)
+  baslikAnalizi      String?
+  aciklamaAnalizi    String?
+  fiyatAnalizi       String?
+  konumAnalizi       String?
+  gorselAnalizi      String?
+  eksikAlanlar       String[]
+  onerilenAksiyonlar Json?
+  riskSeviyesi       LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi     LinaFirsatSeviyesi @default(YOK)
+  sonAnalizTarihi    DateTime           @default(now())
+  olusturulmaTarihi  DateTime           @default(now())
+  guncellenmeTarihi  DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([portfoyId])
+  @@index([kalitePuani])
+  @@index([riskSeviyesi])
+  @@index([firsatSeviyesi])
+}
+
+model LinaPortfoyOneri {
+  id                 String            @id @default(uuid())
+  kullaniciId        String
+  portfoyId          String
+  analizId           String?
+  baslik             String
+  aciklama           String
+  gerekce            String?
+  oneriTuru          String
+  oncelik            LinaGorevOnceligi @default(NORMAL)
+  durum              LinaOneriDurumu   @default(BEKLIYOR)
+  uygulanacakAlan    String?
+  eskiDeger          Json?
+  onerilenDeger      Json?
+  olusturulmaTarihi  DateTime          @default(now())
+  guncellenmeTarihi  DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([portfoyId])
+  @@index([analizId])
+  @@index([oneriTuru])
+  @@index([durum])
+}
+
+model LinaPortfoyPaylasim {
+  id                 String    @id @default(uuid())
+  kullaniciId        String
+  portfoyId          String
+  kanal              String
+  paylasimBasligi    String?
+  paylasimMetni      String?
+  hedefUrl           String?
+  gorselUrl          String?
+  paylasimDurumu     LinaDurum @default(BEKLIYOR)
+  tiklanmaSayisi     Int       @default(0)
+  goruntulenmeSayisi Int       @default(0)
+  paylasimTarihi     DateTime?
+  olusturulmaTarihi  DateTime  @default(now())
+  guncellenmeTarihi  DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([portfoyId])
+  @@index([kanal])
+  @@index([paylasimDurumu])
+}
+
+model LinaPortfoyEslesme {
+  id                 String             @id @default(uuid())
+  kullaniciId        String
+  portfoyId          String
+  hedefKullaniciId   String?
+  hedefTalepId       String?
+  eslesmePuani       Int                @default(0)
+  eslesmeGerekcesi   String?
+  eksikNoktalar      String[]
+  riskSeviyesi       LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi     LinaFirsatSeviyesi @default(ORTA)
+  durum              LinaDurum          @default(BEKLIYOR)
+  olusturulmaTarihi  DateTime           @default(now())
+  guncellenmeTarihi  DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([portfoyId])
+  @@index([hedefKullaniciId])
+  @@index([hedefTalepId])
+  @@index([eslesmePuani])
+  @@index([durum])
+}
+
+model LinaForumAnaliz {
+  id                 String             @id @default(uuid())
+  kullaniciId        String
+  forumGonderiId     String
+  niyet              LinaNiyet          @default(BELIRSIZ)
+  modul              LinaModul          @default(FORUM)
+  talepTuru          String?
+  kategori           String?
+  altKategori        String?
+  il                 String?
+  ilce               String?
+  mahalle            String?
+  butceMin           Decimal?
+  butceMax           Decimal?
+  paraBirimi         String             @default("TRY")
+  aciliyetSeviyesi   LinaGorevOnceligi  @default(NORMAL)
+  guvenPuani         Int                @default(0)
+  eslesmePotansiyeli Int                @default(0)
+  linaOzeti          String?
+  eksikBilgiler      String[]
+  onerilenAksiyonlar Json?
+  riskSeviyesi       LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi     LinaFirsatSeviyesi @default(ORTA)
+  sonAnalizTarihi    DateTime           @default(now())
+  olusturulmaTarihi  DateTime           @default(now())
+  guncellenmeTarihi  DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([forumGonderiId])
+  @@index([niyet])
+  @@index([talepTuru])
+  @@index([kategori])
+  @@index([il])
+  @@index([ilce])
+  @@index([mahalle])
+}
+
+model LinaForumEslesme {
+  id                       String    @id @default(uuid())
+  kullaniciId              String
+  analizId                 String
+  forumGonderiId           String
+  hedefKullaniciId         String?
+  portfoyId                String?
+  crmTalepId               String?
+  havuzKaydiId             String?
+  eslesmePuani             Int       @default(0)
+  eslesmeGerekcesi         String?
+  eksikNoktalar            String[]
+  kullaniciyaGosterildiMi  Boolean   @default(false)
+  gorusmeBaslatildiMi      Boolean   @default(false)
+  durum                    LinaDurum @default(BEKLIYOR)
+  olusturulmaTarihi        DateTime  @default(now())
+  guncellenmeTarihi        DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([analizId])
+  @@index([forumGonderiId])
+  @@index([hedefKullaniciId])
+  @@index([portfoyId])
+  @@index([crmTalepId])
+  @@index([havuzKaydiId])
+  @@index([eslesmePuani])
+  @@index([durum])
+}
+
+model LinaForumOneri {
+  id                 String            @id @default(uuid())
+  kullaniciId        String
+  forumGonderiId     String
+  analizId           String?
+  baslik             String
+  aciklama           String
+  gerekce            String?
+  oneriTuru          String
+  oncelik            LinaGorevOnceligi @default(NORMAL)
+  durum              LinaOneriDurumu   @default(BEKLIYOR)
+  uygulanacakAlan    String?
+  eskiDeger          Json?
+  onerilenDeger      Json?
+  olusturulmaTarihi  DateTime          @default(now())
+  guncellenmeTarihi  DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([forumGonderiId])
+  @@index([analizId])
+  @@index([oneriTuru])
+  @@index([durum])
+}
+
+model LinaForumFirsat {
+  id                       String             @id @default(uuid())
+  kullaniciId              String?
+  forumGonderiId           String
+  firsatBasligi            String
+  firsatOzeti              String
+  firsatGerekcesi          String?
+  ilgiliModul              LinaModul          @default(FORUM)
+  firsatSeviyesi           LinaFirsatSeviyesi @default(ORTA)
+  riskSeviyesi             LinaRiskSeviyesi   @default(YOK)
+  hedefUrl                 String?
+  aksiyonVerisi            Json?
+  kullaniciyaGosterildiMi  Boolean            @default(false)
+  durum                    LinaDurum          @default(BEKLIYOR)
+  olusturulmaTarihi        DateTime           @default(now())
+  guncellenmeTarihi        DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([forumGonderiId])
+  @@index([firsatSeviyesi])
+  @@index([riskSeviyesi])
+  @@index([durum])
+}
+
+model LinaHavuzKaydi {
+  id                 String    @id @default(uuid())
+  kullaniciId        String
+  portfoyId          String
+  havuzDurumu        LinaDurum @default(BEKLIYOR)
+  yetkiliMi          Boolean   @default(false)
+  paylasimaUygunMu   Boolean   @default(false)
+  gizlilikUygunMu    Boolean   @default(true)
+  il                 String?
+  ilce               String?
+  mahalle            String?
+  kategori           String?
+  altKategori        String?
+  fiyat              Decimal?
+  paraBirimi         String    @default("TRY")
+  linaOzeti          String?
+  guvenPuani         Int       @default(0)
+  kalitePuani        Int       @default(0)
+  aktifMi            Boolean   @default(true)
+  olusturulmaTarihi  DateTime  @default(now())
+  guncellenmeTarihi  DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([portfoyId])
+  @@index([havuzDurumu])
+  @@index([yetkiliMi])
+  @@index([paylasimaUygunMu])
+  @@index([il])
+  @@index([ilce])
+  @@index([mahalle])
+  @@index([aktifMi])
+}
+
+model LinaHavuzAnaliz {
+  id                 String             @id @default(uuid())
+  kullaniciId        String
+  havuzKaydiId       String
+  portfoyId          String
+  guvenPuani         Int                @default(0)
+  kalitePuani        Int                @default(0)
+  eslesmePuani       Int                @default(0)
+  yetkiAnalizi       String?
+  fiyatAnalizi       String?
+  konumAnalizi       String?
+  gizlilikAnalizi    String?
+  eksikBilgiler      String[]
+  riskSeviyesi       LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi     LinaFirsatSeviyesi @default(ORTA)
+  linaOzeti          String?
+  onerilenAksiyonlar Json?
+  sonAnalizTarihi    DateTime           @default(now())
+  olusturulmaTarihi  DateTime           @default(now())
+  guncellenmeTarihi  DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([havuzKaydiId])
+  @@index([portfoyId])
+  @@index([guvenPuani])
+  @@index([kalitePuani])
+}
+
+model LinaHavuzEslesme {
+  id                       String             @id @default(uuid())
+  kullaniciId              String
+  havuzKaydiId             String
+  portfoyId                String
+  hedefKullaniciId         String?
+  crmTalepId               String?
+  forumGonderiId           String?
+  eslesmePuani             Int                @default(0)
+  eslesmeGerekcesi         String?
+  eksikNoktalar            String[]
+  kullaniciyaGosterildiMi  Boolean            @default(false)
+  gorusmeBaslatildiMi      Boolean            @default(false)
+  riskSeviyesi             LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi           LinaFirsatSeviyesi @default(ORTA)
+  durum                    LinaDurum          @default(BEKLIYOR)
+  olusturulmaTarihi        DateTime           @default(now())
+  guncellenmeTarihi        DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([havuzKaydiId])
+  @@index([portfoyId])
+  @@index([hedefKullaniciId])
+  @@index([crmTalepId])
+  @@index([forumGonderiId])
+  @@index([eslesmePuani])
+  @@index([durum])
+}
+
+model LinaHavuzOneri {
+  id                 String            @id @default(uuid())
+  kullaniciId        String
+  havuzKaydiId       String
+  portfoyId          String
+  baslik             String
+  aciklama           String
+  gerekce            String?
+  oneriTuru          String
+  oncelik            LinaGorevOnceligi @default(NORMAL)
+  durum              LinaOneriDurumu   @default(BEKLIYOR)
+  uygulanacakAlan    String?
+  eskiDeger          Json?
+  onerilenDeger      Json?
+  olusturulmaTarihi  DateTime          @default(now())
+  guncellenmeTarihi  DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([havuzKaydiId])
+  @@index([portfoyId])
+  @@index([oneriTuru])
+  @@index([durum])
+}
+
+model LinaProaktifTaramaKurali {
+  id                   String    @id @default(uuid())
+  kuralAdi             String
+  aciklama             String?
+  modul                LinaModul
+  rol                  String?
+  aktifMi              Boolean   @default(true)
+  calismaSikligi       String    @default("GUNLUK")
+  sonCalismaTarihi     DateTime?
+  sonrakiCalismaTarihi DateTime?
+  kuralVerisi          Json?
+  esikDegerler         Json?
+  olusturulmaTarihi    DateTime  @default(now())
+  guncellenmeTarihi    DateTime  @updatedAt
+
+  @@index([modul])
+  @@index([rol])
+  @@index([aktifMi])
+  @@index([sonrakiCalismaTarihi])
+}
+
+model LinaProaktifTaramaSonucu {
+  id                       String             @id @default(uuid())
+  kuralId                  String?
+  kullaniciId              String?
+  modul                    LinaModul
+  taramaBasligi            String
+  taramaOzeti              String?
+  bulunanVeri              Json?
+  riskSeviyesi             LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi           LinaFirsatSeviyesi @default(YOK)
+  aksiyonGerekliMi         Boolean            @default(false)
+  kullaniciyaGosterildiMi  Boolean            @default(false)
+  durum                    LinaDurum          @default(BEKLIYOR)
+  olusturulmaTarihi        DateTime           @default(now())
+  guncellenmeTarihi        DateTime           @updatedAt
+
+  @@index([kuralId])
+  @@index([kullaniciId])
+  @@index([modul])
+  @@index([riskSeviyesi])
+  @@index([firsatSeviyesi])
+  @@index([durum])
+}
+
+model LinaProaktifOneri {
+  id                 String            @id @default(uuid())
+  sonucId            String
+  kullaniciId        String?
+  modul              LinaModul
+  baslik             String
+  aciklama           String
+  gerekce            String?
+  oncelik            LinaGorevOnceligi @default(NORMAL)
+  durum              LinaOneriDurumu   @default(BEKLIYOR)
+  hedefUrl           String?
+  aksiyonTipi        String?
+  aksiyonVerisi      Json?
+  olusturulmaTarihi  DateTime          @default(now())
+  guncellenmeTarihi  DateTime          @updatedAt
+
+  @@index([sonucId])
+  @@index([kullaniciId])
+  @@index([modul])
+  @@index([oncelik])
+  @@index([durum])
+}
+
+model LinaProaktifUyari {
+  id                 String           @id @default(uuid())
+  kullaniciId        String?
+  modul              LinaModul
+  baslik             String
+  aciklama           String?
+  riskSeviyesi       LinaRiskSeviyesi @default(ORTA)
+  ilgiliKayitTuru    String?
+  ilgiliKayitId      String?
+  cozulduMu          Boolean          @default(false)
+  cozumAciklamasi    String?
+  cozumTarihi        DateTime?
+  olusturulmaTarihi  DateTime         @default(now())
+  guncellenmeTarihi  DateTime         @updatedAt
+
+  @@index([kullaniciId])
+  @@index([modul])
+  @@index([riskSeviyesi])
+  @@index([cozulduMu])
+}
+
+model LinaRapor {
+  id                 String             @id @default(uuid())
+  kullaniciId        String?
+  raporBasligi       String
+  raporOzeti         String?
+  raporIcerigi       String?
+  modul              LinaModul          @default(RAPORLAMA)
+  rol                String?
+  donemBaslangic     DateTime?
+  donemBitis         DateTime?
+  veriKaynaklari     String[]
+  raporVerisi        Json?
+  riskSeviyesi       LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi     LinaFirsatSeviyesi @default(YOK)
+  durum              LinaDurum          @default(TAMAMLANDI)
+  olusturulmaTarihi  DateTime           @default(now())
+  guncellenmeTarihi  DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([modul])
+  @@index([rol])
+  @@index([donemBaslangic])
+  @@index([donemBitis])
+  @@index([durum])
+}
+
+model LinaRaporBolumu {
+  id                 String   @id @default(uuid())
+  raporId            String
+  sira               Int      @default(0)
+  baslik             String
+  ozet               String?
+  icerik             String?
+  veri               Json?
+  grafikVerisi       Json?
+  olusturulmaTarihi  DateTime @default(now())
+  guncellenmeTarihi  DateTime @updatedAt
+
+  @@index([raporId])
+  @@index([sira])
+}
+
+model LinaRaporAksiyonu {
+  id                 String            @id @default(uuid())
+  raporId            String
+  kullaniciId        String?
+  baslik             String
+  aciklama           String?
+  gerekce            String?
+  ilgiliModul        LinaModul
+  oncelik            LinaGorevOnceligi @default(NORMAL)
+  durum              LinaOneriDurumu   @default(BEKLIYOR)
+  hedefUrl           String?
+  aksiyonVerisi      Json?
+  olusturulmaTarihi  DateTime          @default(now())
+  guncellenmeTarihi  DateTime          @updatedAt
+
+  @@index([raporId])
+  @@index([kullaniciId])
+  @@index([ilgiliModul])
+  @@index([oncelik])
+  @@index([durum])
+}
+
+model LinaSesTercihi {
+  id                   String   @id @default(uuid())
+  kullaniciId          String   @unique
+  sesliYanitAktifMi    Boolean  @default(false)
+  sesliBildirimAktifMi Boolean  @default(false)
+  mikrofonAktifMi      Boolean  @default(false)
+  sesSaglayici         String   @default("ELEVENLABS")
+  sesKimligi           String?
+  sesAdi               String   @default("EPH Classic")
+  hiz                  Float    @default(1.0)
+  ton                  String?
+  duygu                String?
+  sessizSaatAktifMi    Boolean  @default(true)
+  sessizSaatBaslangic  String   @default("22:00")
+  sessizSaatBitis      String   @default("08:00")
+  olusturulmaTarihi    DateTime @default(now())
+  guncellenmeTarihi    DateTime @updatedAt
+
+  @@index([kullaniciId])
+}
+
+model LinaSesKaydi {
+  id                String    @id @default(uuid())
+  kullaniciId       String?
+  konusmaId         String?
+  kanal             LinaKanal @default(SESLI)
+  modul             LinaModul @default(GENEL)
+  sesTuru           String
+  metin             String?
+  sesDosyaUrl       String?
+  sureSaniye        Int?
+  dosyaBoyutu       Int?
+  mimeTuru          String?
+  sesSaglayici      String?
+  sesKimligi        String?
+  basariliMi        Boolean   @default(true)
+  hataMesaji        String?
+  olusturulmaTarihi DateTime  @default(now())
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([kanal])
+  @@index([modul])
+  @@index([sesTuru])
+  @@index([basariliMi])
+}
+
+model LinaSesCozumleme {
+  id                String   @id @default(uuid())
+  kullaniciId       String?
+  sesKaydiId        String?
+  kaynakDil         String   @default("tr")
+  cozumlenenMetin   String?
+  guvenPuani        Float?
+  basariliMi        Boolean  @default(true)
+  hataMesaji        String?
+  olusturulmaTarihi DateTime @default(now())
+
+  @@index([kullaniciId])
+  @@index([sesKaydiId])
+  @@index([basariliMi])
+}
+
+model LinaBildirim {
+  id                 String            @id @default(uuid())
+  kullaniciId        String
+  modul              LinaModul         @default(GENEL)
+  baslik             String
+  mesaj              String
+  bildirimTuru       String
+  oncelik            LinaGorevOnceligi @default(NORMAL)
+  hedefUrl           String?
+  ilgiliKayitTuru    String?
+  ilgiliKayitId      String?
+  sesliMi            Boolean           @default(false)
+  epostaMi           Boolean           @default(false)
+  okunduMu           Boolean           @default(false)
+  gonderildiMi       Boolean           @default(false)
+  planlananTarih     DateTime?
+  gonderimTarihi     DateTime?
+  okunmaTarihi       DateTime?
+  durum              LinaDurum         @default(BEKLIYOR)
+  olusturulmaTarihi  DateTime          @default(now())
+  guncellenmeTarihi  DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([modul])
+  @@index([bildirimTuru])
+  @@index([oncelik])
+  @@index([okunduMu])
+  @@index([gonderildiMi])
+  @@index([planlananTarih])
+  @@index([durum])
+}
+
+model LinaBildirimTercihi {
+  id                     String   @id @default(uuid())
+  kullaniciId            String   @unique
+  genelBildirimAktifMi   Boolean  @default(true)
+  proaktifBildirimMi     Boolean  @default(true)
+  sesliBildirimMi        Boolean  @default(false)
+  epostaBildirimMi       Boolean  @default(true)
+  crmBildirimMi          Boolean  @default(true)
+  portfoyBildirimMi      Boolean  @default(true)
+  forumBildirimMi        Boolean  @default(true)
+  havuzBildirimMi        Boolean  @default(true)
+  gorevBildirimMi        Boolean  @default(true)
+  raporBildirimMi        Boolean  @default(true)
+  sessizSaatAktifMi      Boolean  @default(true)
+  sessizSaatBaslangic    String   @default("22:00")
+  sessizSaatBitis        String   @default("08:00")
+  acilBildirimHerZamanMi Boolean  @default(true)
+  olusturulmaTarihi      DateTime @default(now())
+  guncellenmeTarihi      DateTime @updatedAt
+
+  @@index([kullaniciId])
+}
+
+model LinaBildirimGonderimKaydi {
+  id                String    @id @default(uuid())
+  bildirimId        String
+  kullaniciId       String
+  kanal             LinaKanal @default(SISTEM)
+  basariliMi        Boolean   @default(false)
+  hataMesaji        String?
+  denemeSayisi      Int       @default(0)
+  saglayici         String?
+  saglayiciCevabi   Json?
+  olusturulmaTarihi DateTime  @default(now())
+
+  @@index([bildirimId])
+  @@index([kullaniciId])
+  @@index([kanal])
+  @@index([basariliMi])
+}
+
+model LinaEpostaSablonu {
+  id                String           @id @default(uuid())
+  sablonKodu        String           @unique
+  hesap             LinaEpostaHesabi
+  baslik            String
+  konu              String
+  icerik            String
+  aktifMi           Boolean          @default(true)
+  olusturulmaTarihi DateTime         @default(now())
+  guncellenmeTarihi DateTime         @updatedAt
+
+  @@index([hesap])
+  @@index([aktifMi])
+}
+
+model LinaEpostaGonderimKaydi {
+  id                String           @id @default(uuid())
+  bildirimId        String?
+  kullaniciId       String?
+  hesap             LinaEpostaHesabi
+  aliciEposta       String
+  konu              String
+  icerik            String
+  sablonKodu        String?
+  ilgiliKayitTuru   String?
+  ilgiliKayitId     String?
+  durum             LinaEpostaDurumu @default(BEKLIYOR)
+  hataMesaji        String?
+  denemeSayisi      Int              @default(0)
+  gonderimTarihi    DateTime?
+  olusturulmaTarihi DateTime         @default(now())
+  guncellenmeTarihi DateTime         @updatedAt
+
+  @@index([bildirimId])
+  @@index([kullaniciId])
+  @@index([hesap])
+  @@index([aliciEposta])
+  @@index([sablonKodu])
+  @@index([durum])
+  @@index([olusturulmaTarihi])
+}
+
+model LinaYetkiKurali {
+  id                String    @id @default(uuid())
+  rol               String
+  modul             LinaModul
+  islemKodu         String
+  izinliMi          Boolean   @default(false)
+  onayGerekliMi     Boolean   @default(false)
+  aciklama          String?
+  aktifMi           Boolean   @default(true)
+  olusturulmaTarihi DateTime  @default(now())
+  guncellenmeTarihi DateTime  @updatedAt
+
+  @@unique([rol, modul, islemKodu])
+  @@index([rol])
+  @@index([modul])
+  @@index([aktifMi])
+}
+
+model LinaYetkiKontrolKaydi {
+  id                String    @id @default(uuid())
+  kullaniciId       String?
+  rol               String?
+  modul             LinaModul
+  islemKodu         String
+  izinVerildiMi     Boolean   @default(false)
+  onayGerekliMi     Boolean   @default(false)
+  gerekce           String?
+  istekVerisi       Json?
+  olusturulmaTarihi DateTime  @default(now())
+
+  @@index([kullaniciId])
+  @@index([rol])
+  @@index([modul])
+  @@index([islemKodu])
+  @@index([izinVerildiMi])
+  @@index([onayGerekliMi])
+}
+
+model LinaOnayKaydi {
+  id                    String    @id @default(uuid())
+  isteyenKullaniciId    String?
+  onaylayanKullaniciId  String?
+  modul                 LinaModul
+  islemKodu             String
+  baslik                String
+  aciklama              String?
+  istekVerisi           Json?
+  sonucVerisi           Json?
+  durum                 LinaDurum @default(BEKLIYOR)
+  onayTarihi            DateTime?
+  retTarihi             DateTime?
+  retGerekcesi          String?
+  sonGecerlilikTarihi   DateTime?
+  olusturulmaTarihi     DateTime  @default(now())
+  guncellenmeTarihi     DateTime  @updatedAt
+
+  @@index([isteyenKullaniciId])
+  @@index([onaylayanKullaniciId])
+  @@index([modul])
+  @@index([islemKodu])
+  @@index([durum])
+  @@index([sonGecerlilikTarihi])
+}
+
+model LinaRetKaydi {
+  id                 String    @id @default(uuid())
+  kullaniciId        String?
+  konusmaId          String?
+  modul              LinaModul
+  niyet              LinaNiyet @default(BELIRSIZ)
+  retSebebi          String
+  retAciklamasi      String?
+  guvenlikRiskiVarMi Boolean   @default(false)
+  yetkiIhlaliVarMi   Boolean   @default(false)
+  belirsizlikVarMi   Boolean   @default(false)
+  istekVerisi        Json?
+  olusturulmaTarihi  DateTime  @default(now())
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([modul])
+  @@index([niyet])
+  @@index([guvenlikRiskiVarMi])
+  @@index([yetkiIhlaliVarMi])
+}
+
+model LinaGeriBildirim {
+  id                String    @id @default(uuid())
+  kullaniciId       String?
+  konusmaId         String?
+  modul             LinaModul @default(GENEL)
+  puan              Int?
+  begenildiMi       Boolean?
+  geriBildirimMetni String?
+  sorunTuru         String?
+  beklenti          String?
+  olusturulmaTarihi DateTime  @default(now())
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([modul])
+  @@index([puan])
+}
+
+model LinaYanitDegerlendirme {
+  id                String   @id @default(uuid())
+  konusmaId         String
+  dogrulukPuani     Int      @default(0)
+  faydaPuani        Int      @default(0)
+  tonPuani          Int      @default(0)
+  baglamPuani       Int      @default(0)
+  hataVarMi         Boolean  @default(false)
+  hataAciklamasi    String?
+  iyilestirmeNotu   String?
+  olusturulmaTarihi DateTime @default(now())
+
+  @@index([konusmaId])
+  @@index([dogrulukPuani])
+  @@index([faydaPuani])
+  @@index([tonPuani])
+  @@index([baglamPuani])
+  @@index([hataVarMi])
+}
+
+model LinaKalibrasyon {
+  id                String    @id @default(uuid())
+  kullaniciId       String?
+  rol               String?
+  modul             LinaModul @default(GENEL)
+  ayarBasligi       String
+  ayarAciklamasi    String?
+  ayarVerisi        Json
+  aktifMi           Boolean   @default(true)
+  baslangicTarihi   DateTime  @default(now())
+  bitisTarihi       DateTime?
+  olusturulmaTarihi DateTime  @default(now())
+  guncellenmeTarihi DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([rol])
+  @@index([modul])
+  @@index([aktifMi])
+}
+
+model LinaOneriBasariKaydi {
+  id                 String    @id @default(uuid())
+  kullaniciId        String?
+  oneriId            String?
+  modul              LinaModul @default(GENEL)
+  uygulandiMi        Boolean   @default(false)
+  sonucBasariliMi    Boolean?
+  sonucAciklamasi    String?
+  kullaniciMemnunMu  Boolean?
+  etkiPuani          Int?
+  olusturulmaTarihi  DateTime  @default(now())
+  guncellenmeTarihi  DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([oneriId])
+  @@index([modul])
+  @@index([uygulandiMi])
+  @@index([sonucBasariliMi])
+  @@index([etkiPuani])
 }

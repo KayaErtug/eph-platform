@@ -12,6 +12,7 @@ export class InvitationsService {
       EMLAKCI: 'EMK',
       MUTEAHHIT: 'MUH',
       INSAAT_FIRMASI: 'INS',
+      MODERATOR: 'MOD',
       ADMIN: 'ADM',
       SUPER_ADMIN: 'SUP',
     };
