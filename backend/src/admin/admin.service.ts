@@ -55,6 +55,14 @@ export class AdminService {
     return code;
   }
 
+  private normalizeApplicationStatus(status?: string) {
+    if (!status || status === "all") {
+      return {};
+    }
+
+    return { status: status as any };
+  }
+
   async getStats() {
     const totalUsers = await this.prisma.user.count();
     const pendingUsers = await this.prisma.user.count({ where: { isApproved: false } });
@@ -86,7 +94,6 @@ export class AdminService {
       byRole: byRole.map((r) => ({ role: r.role, count: r._count.role })),
     };
   }
-
 
   async getTrafficSummary() {
     const now = new Date();
@@ -282,7 +289,7 @@ export class AdminService {
     const user = await this.prisma.user.findUnique({ where: { id } });
 
     if (!user) {
-      throw new NotFoundException("Kullanici bulunamadi.");
+      throw new NotFoundException("Kullanıcı bulunamadı.");
     }
 
     const updated = await this.prisma.user.update({
@@ -310,7 +317,7 @@ export class AdminService {
     const user = await this.prisma.user.findUnique({ where: { id } });
 
     if (!user) {
-      throw new NotFoundException("Kullanici bulunamadi.");
+      throw new NotFoundException("Kullanıcı bulunamadı.");
     }
 
     return this.prisma.user.delete({ where: { id } });
@@ -320,11 +327,11 @@ export class AdminService {
     const user = await this.prisma.user.findUnique({ where: { id } });
 
     if (!user) {
-      throw new NotFoundException("Kullanici bulunamadi.");
+      throw new NotFoundException("Kullanıcı bulunamadı.");
     }
 
-    if (user.role === "ADMIN") {
-      throw new BadRequestException("Admin askıya alınamaz.");
+    if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") {
+      throw new BadRequestException("Admin hesabı askıya alınamaz.");
     }
 
     const updated = await this.prisma.user.update({
@@ -352,10 +359,10 @@ export class AdminService {
     const user = await this.prisma.user.findUnique({ where: { id } });
 
     if (!user) {
-      throw new NotFoundException("Kullanici bulunamadi.");
+      throw new NotFoundException("Kullanıcı bulunamadı.");
     }
 
-    if (user.role === "ADMIN") {
+    if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") {
       throw new BadRequestException("Admin rolü değiştirilemez.");
     }
 
@@ -387,7 +394,7 @@ export class AdminService {
     });
 
     if (existing) {
-      throw new BadRequestException("Bu email zaten kayıtlı.");
+      throw new BadRequestException("Bu e-posta zaten kayıtlı.");
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);
@@ -412,7 +419,7 @@ export class AdminService {
         email: true,
         profileImageUrl: true,
         role: true,
-	city: true,
+        city: true,
         district: true,
         cityPlateCode: true,
         isApproved: true,
@@ -542,7 +549,7 @@ export class AdminService {
     const doc = await this.prisma.document.findUnique({ where: { id } });
 
     if (!doc) {
-      throw new NotFoundException("Belge bulunamadi.");
+      throw new NotFoundException("Belge bulunamadı.");
     }
 
     return this.prisma.document.update({
@@ -555,7 +562,7 @@ export class AdminService {
     const doc = await this.prisma.document.findUnique({ where: { id } });
 
     if (!doc) {
-      throw new NotFoundException("Belge bulunamadi.");
+      throw new NotFoundException("Belge bulunamadı.");
     }
 
     return this.prisma.document.update({
@@ -591,7 +598,7 @@ export class AdminService {
     });
 
     if (!nomination) {
-      throw new NotFoundException("Tavsiye bulunamadi.");
+      throw new NotFoundException("Tavsiye bulunamadı.");
     }
 
     const updated = await this.prisma.nomination.update({
@@ -613,10 +620,8 @@ export class AdminService {
   }
 
   async getApplications(status?: string) {
-    const where = status && status !== "all" ? { status: status as any } : {};
-
     return this.prisma.application.findMany({
-      where,
+      where: this.normalizeApplicationStatus(status),
       include: {
         referrer: {
           select: {
@@ -628,25 +633,167 @@ export class AdminService {
             role: true,
           },
         },
+        reviewedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
+        },
       },
-      orderBy: [{ referrerId: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     });
   }
 
-  async updateApplicationStatus(id: string, status: string, adminNote?: string) {
+  async getApplicationDashboard(status?: string) {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [applications, pending, approvedThisMonth, rejectedThisMonth, pilotThisMonth, total] =
+      await Promise.all([
+        this.getApplications(status),
+        this.prisma.application.count({ where: { status: "PENDING" as any } }),
+        this.prisma.application.count({
+          where: {
+            status: "APPROVED" as any,
+            reviewedAt: { gte: startOfMonth },
+          },
+        }),
+        this.prisma.application.count({
+          where: {
+            status: "REJECTED" as any,
+            rejectedAt: { gte: startOfMonth },
+          },
+        }),
+        this.prisma.application.count({
+          where: {
+            pilotBasvuruMu: true,
+            createdAt: { gte: startOfMonth },
+          },
+        }),
+        this.prisma.application.count(),
+      ]);
+
+    return {
+      summary: {
+        pending,
+        approvedThisMonth,
+        rejectedThisMonth,
+        pilotThisMonth,
+        total,
+      },
+      items: applications,
+    };
+  }
+
+  async getApplicationDetail(id: string) {
+    const application = await this.prisma.application.findUnique({
+      where: { id },
+      include: {
+        referrer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            profileImageUrl: true,
+            role: true,
+          },
+        },
+        reviewedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException("Başvuru bulunamadı.");
+    }
+
+    return application;
+  }
+
+  async approveApplication(id: string, adminNote?: string) {
+    return this.updateApplicationStatus(id, "APPROVED", adminNote);
+  }
+
+  async rejectApplication(id: string, adminNote?: string, rejectReason?: string) {
+    return this.updateApplicationStatus(id, "REJECTED", adminNote, rejectReason);
+  }
+
+  async updateApplicationNote(id: string, adminNote: string) {
     const application = await this.prisma.application.findUnique({
       where: { id },
     });
 
     if (!application) {
-      throw new NotFoundException("Basvuru bulunamadi.");
+      throw new NotFoundException("Başvuru bulunamadı.");
     }
+
+    return this.prisma.application.update({
+      where: { id },
+      data: {
+        adminNote,
+      },
+    });
+  }
+
+  async updateApplicationStatus(id: string, status: string, adminNote?: string, rejectReason?: string) {
+    const application = await this.prisma.application.findUnique({
+      where: { id },
+    });
+
+    if (!application) {
+      throw new NotFoundException("Başvuru bulunamadı.");
+    }
+
+    const normalizedStatus = status as any;
+    const now = new Date();
 
     const updated = await this.prisma.application.update({
       where: { id },
       data: {
-        status: status as any,
+        status: normalizedStatus,
         ...(adminNote !== undefined && { adminNote }),
+        ...(status === "APPROVED" && {
+          reviewedAt: now,
+          rejectedAt: null,
+          rejectedById: null,
+          rejectReason: null,
+        }),
+        ...(status === "REJECTED" && {
+          rejectedAt: now,
+          rejectReason: rejectReason || adminNote || "Başvuru reddedildi.",
+        }),
+      },
+      include: {
+        referrer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            profileImageUrl: true,
+            role: true,
+          },
+        },
+        reviewedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
+        },
       },
     });
 

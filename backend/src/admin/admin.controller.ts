@@ -17,7 +17,7 @@ import { Role } from "@prisma/client";
 
 @Controller("admin")
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+@Roles(Role.ADMIN, Role.SUPER_ADMIN)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
@@ -136,8 +136,41 @@ export class AdminController {
   @Patch("applications/:id/status")
   updateApplicationStatus(
     @Param("id") id: string,
-    @Body() body: { status: string; adminNote?: string },
+    @Body() body: { status: string; adminNote?: string; rejectReason?: string },
   ) {
-    return this.adminService.updateApplicationStatus(id, body.status, body.adminNote);
+    return this.adminService.updateApplicationStatus(
+      id,
+      body.status,
+      body.adminNote,
+      body.rejectReason,
+    );
+  }
+
+  @Get("katilim-talepleri")
+  getKatilimTalepleri(@Query("status") status?: string) {
+    return this.adminService.getApplicationDashboard(status);
+  }
+
+  @Get("katilim-talepleri/:id")
+  getKatilimTalebi(@Param("id") id: string) {
+    return this.adminService.getApplicationDetail(id);
+  }
+
+  @Patch("katilim-talepleri/:id/onayla")
+  approveKatilimTalebi(@Param("id") id: string, @Body() body: { adminNote?: string }) {
+    return this.adminService.approveApplication(id, body.adminNote);
+  }
+
+  @Patch("katilim-talepleri/:id/reddet")
+  rejectKatilimTalebi(
+    @Param("id") id: string,
+    @Body() body: { adminNote?: string; rejectReason?: string },
+  ) {
+    return this.adminService.rejectApplication(id, body.adminNote, body.rejectReason);
+  }
+
+  @Patch("katilim-talepleri/:id/not")
+  updateKatilimTalebiNotu(@Param("id") id: string, @Body() body: { adminNote?: string }) {
+    return this.adminService.updateApplicationNote(id, body.adminNote || "");
   }
 }
