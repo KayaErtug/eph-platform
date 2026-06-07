@@ -6,7 +6,6 @@ import {
   Bell,
   Check,
   Eye,
-  Filter,
   Menu,
   RefreshCcw,
   Search,
@@ -84,7 +83,7 @@ const statusLabels: Record<string, string> = {
   REGISTERED: "Kayıt Tamamlandı",
 };
 
-const cardThemes = ["theme-blue", "theme-green", "theme-purple", "theme-amber", "theme-cyan", "theme-rose"];
+const rowThemes = ["blue", "green", "purple", "amber", "cyan", "rose"];
 
 function formatDate(value?: string | null) {
   if (!value) return "-";
@@ -92,7 +91,6 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat("tr-TR", {
     day: "2-digit",
     month: "short",
-    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
@@ -107,20 +105,12 @@ function initials(name: string) {
     .join("");
 }
 
-function getTypeBadges(item: ApplicationItem) {
-  const badges: string[] = [];
-
+function getReferenceText(item: ApplicationItem) {
   if (item.referansliMi || item.basvuruTuru === "REFERANSLI") {
-    badges.push("Referanslı");
-  } else {
-    badges.push("Referanssız");
+    return item.referansDogrulandiMi ? "Ref. Doğrulandı" : "Referanslı";
   }
 
-  if (item.pilotBasvuruMu) {
-    badges.push("Pilot");
-  }
-
-  return badges;
+  return "Referanssız";
 }
 
 function getTrustScore(item: ApplicationItem) {
@@ -138,6 +128,11 @@ function getTrustScore(item: ApplicationItem) {
   if (item.isRisky) score -= 28;
 
   return Math.max(0, Math.min(score, 100));
+}
+
+function getLegalCount(item: ApplicationItem) {
+  return [item.kvkkAccepted, item.privacyAccepted, item.platformAccepted, item.userAgreementAccepted].filter(Boolean)
+    .length;
 }
 
 function getDecision(item: ApplicationItem) {
@@ -164,17 +159,6 @@ function getDecision(item: ApplicationItem) {
     className: "neutral",
     text: "Manuel kontrol önerilir.",
   };
-}
-
-function getLegalText(item: ApplicationItem) {
-  const accepted = [
-    item.kvkkAccepted,
-    item.privacyAccepted,
-    item.platformAccepted,
-    item.userAgreementAccepted,
-  ].filter(Boolean).length;
-
-  return `Yasal Onay ${accepted}/4`;
 }
 
 export default function AdminKatilimTalepleriPage() {
@@ -302,124 +286,95 @@ export default function AdminKatilimTalepleriPage() {
 
   return (
     <main className="admin-page">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">EPH</div>
-          <div>
-            <strong>EPH</strong>
-            <span>Emlak Portföy Havuzu</span>
-          </div>
-        </div>
-
-        <nav className="side-nav">
-          <p>Kontrol Merkezi</p>
-          <a href="/admin">Dashboard</a>
-          <a className="active" href="/admin/katilim-talepleri">
-            Katılım Talepleri <small>{summary.pending}</small>
-          </a>
-          <a href="/admin/ref-kodlari">Ref Kodları</a>
-          <a href="/admin/users">Kullanıcılar</a>
-          <a href="/admin/roles">Roller & Yetkiler</a>
-          <a href="/admin/invitations">Davet Yönetimi</a>
-        </nav>
-
-        <div className="admin-card">
-          <div className="avatar">ME</div>
-          <div>
-            <strong>Mustafa Ertuğ Kaya</strong>
-            <span>Süper Admin</span>
-          </div>
-        </div>
-      </aside>
-
-      <section className="content">
-        <header className="topbar">
-          <button className="top-icon" aria-label="Menü">
+      <section className="mobile-shell">
+        <header className="admin-top">
+          <button className="top-button" aria-label="Menü">
             <Menu size={22} />
           </button>
 
-          <strong>ADMIN</strong>
+          <div className="top-title">
+            <strong>ADMIN</strong>
+            <span>Başvuru İnceleme Merkezi</span>
+          </div>
 
           <div className="top-actions">
-            <button className="top-icon" aria-label="Bildirimler">
-              <Bell size={20} />
+            <button className="top-button" aria-label="Bildirimler">
+              <Bell size={19} />
               <small>3</small>
             </button>
-            <button className="top-icon" aria-label="Profil">
-              <User size={20} />
+            <button className="top-button" aria-label="Profil">
+              <User size={19} />
             </button>
           </div>
         </header>
 
-        <section className="flag-banner">
-          <div className="flag-symbol">★</div>
-          <div className="quote">
-            <p>Vatan ne Türkiye'dir Türklere, ne Türkistan.</p>
-            <p>Vatan büyük ve müebbet bir ülkedir: Turan.</p>
-            <span>- Ziya Gökalp</span>
-          </div>
-        </section>
+        <section className="sticky-command">
+          <section className="flag-panel">
+            <div className="flag-left">
+              <span className="moon" />
+              <span className="star">★</span>
+            </div>
 
-        <section className="page-head">
-          <a href="/admin" className="back-link">
-            <ArrowLeft size={22} />
-          </a>
+            <div className="quote-card">
+              <p>Vatan ne Türkiye'dir Türklere, ne Türkistan.</p>
+              <p>Vatan büyük ve müebbet bir ülkedir: Turan.</p>
+              <span>— Ziya Gökalp</span>
+            </div>
+          </section>
 
-          <h1>Katılım Talepleri</h1>
+          <section className="page-bar">
+            <a href="/admin" className="back-link" aria-label="Admin sayfasına dön">
+              <ArrowLeft size={22} />
+            </a>
 
-          <div className="head-actions">
-            <button>
-              <Filter size={19} />
-              <span>Filtre</span>
+            <div>
+              <h1>Katılım Talepleri</h1>
+              <p>Yüksek yoğunluklu karar ekranı</p>
+            </div>
+
+            <button className="refresh-button" onClick={() => loadApplications(status)} aria-label="Yenile">
+              <RefreshCcw size={18} />
             </button>
-            <button onClick={() => loadApplications(status)}>
-              <RefreshCcw size={19} />
+          </section>
+
+          <section className="summary-strip">
+            <button className={status === "PENDING" ? "active blue" : "blue"} onClick={() => handleStatusFilter("PENDING")}>
+              <span>Bekleyen</span>
+              <strong>{summary.pending}</strong>
             </button>
-          </div>
+            <button
+              className={status === "APPROVED" ? "active green" : "green"}
+              onClick={() => handleStatusFilter("APPROVED")}
+            >
+              <span>Onay</span>
+              <strong>{summary.approvedThisMonth}</strong>
+            </button>
+            <button
+              className={status === "REJECTED" ? "active red" : "red"}
+              onClick={() => handleStatusFilter("REJECTED")}
+            >
+              <span>Red</span>
+              <strong>{summary.rejectedThisMonth}</strong>
+            </button>
+            <button className={type === "pilot" ? "active purple" : "purple"} onClick={() => setType(type === "pilot" ? "all" : "pilot")}>
+              <span>Pilot</span>
+              <strong>{summary.pilotThisMonth}</strong>
+            </button>
+          </section>
         </section>
 
-        <section className="summary-grid">
-          <article className="summary-card blue">
-            <div className="summary-icon">⌛</div>
-            <span>Bekleyen</span>
-            <strong>{summary.pending}</strong>
-            <i />
-          </article>
-
-          <article className="summary-card green">
-            <div className="summary-icon">✓</div>
-            <span>Onaylanan</span>
-            <strong>{summary.approvedThisMonth}</strong>
-            <i />
-          </article>
-
-          <article className="summary-card red">
-            <div className="summary-icon">×</div>
-            <span>Reddedilen</span>
-            <strong>{summary.rejectedThisMonth}</strong>
-            <i />
-          </article>
-
-          <article className="summary-card purple">
-            <div className="summary-icon">👥</div>
-            <span>Pilot</span>
-            <strong>{summary.pilotThisMonth}</strong>
-            <i />
-          </article>
-        </section>
-
-        <section className="filters">
+        <section className="toolbox">
           <label className="search-box">
-            <Search size={22} />
+            <Search size={18} />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Ara: ad, telefon, e-posta..."
+              placeholder="Ad, telefon, e-posta..."
             />
           </label>
 
-          <button className="filter-square" type="button">
-            <SlidersHorizontal size={22} />
+          <button className="filter-button" type="button" aria-label="Filtre">
+            <SlidersHorizontal size={19} />
           </button>
 
           <select value={type} onChange={(event) => setType(event.target.value)}>
@@ -459,78 +414,64 @@ export default function AdminKatilimTalepleriPage() {
             {filteredItems.map((item, index) => {
               const score = getTrustScore(item);
               const decision = getDecision(item);
+              const legalCount = getLegalCount(item);
+              const theme = rowThemes[index % rowThemes.length];
 
               return (
-                <article className={`application-card ${cardThemes[index % cardThemes.length]}`} key={item.id}>
-                  <div className="card-top">
-                    <div className="avatar soft">{initials(item.applicantName)}</div>
+                <article className={`application-card ${theme}`} key={item.id}>
+                  <div className="accent" />
 
-                    <div className="person-info">
-                      <h2>{item.applicantName}</h2>
-                      <p>
-                        {item.applicantEmail}
-                        <span>|</span>
-                        {item.applicantPhone}
-                      </p>
-                      <p>
-                        🧰 {roleLabels[item.requestedRole] || item.requestedRole}
-                        <span>|</span>
-                        📍 {item.district || "Pamukkale"} / {item.city || "Denizli"}
-                      </p>
+                  <div className="row-main">
+                    <div className="mini-avatar">{initials(item.applicantName)}</div>
+
+                    <div className="identity">
+                      <div className="identity-top">
+                        <h2>{item.applicantName}</h2>
+                        <span className={`status-pill ${item.status.toLowerCase()}`}>
+                          {statusLabels[item.status] || item.status}
+                        </span>
+                      </div>
+
+                      <div className="meta-line">
+                        <span>{roleLabels[item.requestedRole] || item.requestedRole}</span>
+                        <i />
+                        <span>
+                          {item.district || "-"} / {item.city || "-"}
+                        </span>
+                        <i />
+                        <span>{formatDate(item.createdAt)}</span>
+                      </div>
+
+                      <div className="compact-grid">
+                        <span>{getReferenceText(item)}</span>
+                        {item.pilotBasvuruMu ? <span>Pilot</span> : <span>Standart</span>}
+                        <span>Yasal {legalCount}/4</span>
+                        <strong className={score >= 80 ? "good" : score >= 60 ? "mid" : "bad"}>{score}/100</strong>
+                      </div>
                     </div>
 
-                    <div className="status-block">
-                      <span className={`status-pill ${item.status.toLowerCase()}`}>
-                        {statusLabels[item.status] || item.status}
-                      </span>
-                      <small>{formatDate(item.createdAt)}</small>
+                    <div className="decision-mini">
+                      <span>Lina</span>
+                      <strong className={decision.className}>{decision.label}</strong>
                     </div>
                   </div>
 
-                  <div className="decision-row">
-                    <span className="info-pill blue-pill">
-                      <User size={17} />
-                      {getTypeBadges(item)[0]}
-                    </span>
-
-                    <span className={`info-pill ${item.referansDogrulandiMi ? "green-pill" : "red-pill"}`}>
-                      <ShieldCheck size={17} />
-                      {item.referansDogrulandiMi ? "Ref. Doğrulandı" : item.referansliMi ? "Ref. Bekliyor" : "Ref. Yok"}
-                    </span>
-
-                    <span className="info-pill green-pill">
-                      <ShieldCheck size={17} />
-                      {getLegalText(item)}
-                    </span>
-
-                    <span className={`trust-box ${score >= 80 ? "good" : score >= 60 ? "mid" : "bad"}`}>
-                      <small>Güven Skoru</small>
-                      <strong>{score}<b>/100</b></strong>
-                    </span>
-                  </div>
-
-                  <div className="lina-row">
-                    <span>✦ Lina Ön Değerlendirme</span>
-                    <strong className={decision.className}>{decision.label}</strong>
-                  </div>
-
-                  <div className="card-bottom">
+                  <div className="row-footer">
                     <p>
-                      Evet Onay Yetkisi: <b>{item.onayYetkiSeviyesi || "ADMIN_SUPER_ADMIN"}</b>
-                      <br />
-                      İlçe: <b>{item.district || "Pamukkale"}</b>
+                      Yetki: <b>{item.onayYetkiSeviyesi || "ADMIN_SUPER_ADMIN"}</b>
                     </p>
 
-                    <div className="card-actions">
-                      <button onClick={() => openDetail(item)}>
-                        <Eye size={19} />
+                    <div className="quick-actions">
+                      <button onClick={() => openDetail(item)} aria-label="Detay">
+                        <Eye size={17} />
                       </button>
                       <button
                         className="approve"
                         disabled={busyId === item.id || item.status !== "PENDING"}
                         onClick={() => handleStatusChange(item.id, "APPROVED")}
+                        aria-label="Onayla"
                       >
-                        <Check size={21} />
+                        <Check size={18} />
                       </button>
                       <button
                         className="reject"
@@ -539,8 +480,9 @@ export default function AdminKatilimTalepleriPage() {
                           setSelected(item);
                           setNote(item.adminNote || "");
                         }}
+                        aria-label="Reddet"
                       >
-                        <X size={21} />
+                        <X size={18} />
                       </button>
                     </div>
                   </div>
@@ -549,6 +491,29 @@ export default function AdminKatilimTalepleriPage() {
             })}
           </section>
         )}
+
+        <nav className="bottom-nav">
+          <a href="/admin" className="active">
+            <span>▦</span>
+            Özet
+          </a>
+          <a href="/admin/users">
+            <span>♙</span>
+            Üyeler
+          </a>
+          <a href="/admin/traffic">
+            <span>⌁</span>
+            Trafik
+          </a>
+          <a href="/admin/radar">
+            <span>◎</span>
+            Radar
+          </a>
+          <a href="/admin/system-messages">
+            <span>☷</span>
+            Mesaj
+          </a>
+        </nav>
       </section>
 
       {selected ? (
@@ -559,10 +524,11 @@ export default function AdminKatilimTalepleriPage() {
             </button>
 
             <div className="modal-header">
-              <div className="avatar soft large">{initials(selected.applicantName)}</div>
+              <div className="modal-avatar">{initials(selected.applicantName)}</div>
               <div>
                 <h2>{selected.applicantName}</h2>
-                <p>{roleLabels[selected.requestedRole] || selected.requestedRole}</p>
+                <p>{selected.applicantEmail}</p>
+                <p>{selected.applicantPhone}</p>
               </div>
             </div>
 
@@ -576,6 +542,18 @@ export default function AdminKatilimTalepleriPage() {
                 <span>Güven Skoru</span>
                 <strong>{getTrustScore(selected)}/100</strong>
                 <small>{selected.isRisky ? selected.riskNote || "Riskli başvuru" : "Kritik risk görünmüyor"}</small>
+              </div>
+              <div>
+                <span>Rol / Konum</span>
+                <strong>{roleLabels[selected.requestedRole] || selected.requestedRole}</strong>
+                <small>
+                  {selected.district || "-"} / {selected.city || "-"}
+                </small>
+              </div>
+              <div>
+                <span>Onay Yetkisi</span>
+                <strong>{selected.onayYetkiSeviyesi || "ADMIN_SUPER_ADMIN"}</strong>
+                <small>{getReferenceText(selected)}</small>
               </div>
             </div>
 
@@ -613,10 +591,11 @@ export default function AdminKatilimTalepleriPage() {
 
       <style jsx>{`
         .admin-page {
-          min-height: 100vh;
-          background: #f8fafc;
+          min-height: 100dvh;
+          background:
+            radial-gradient(circle at top left, rgba(219, 234, 254, 0.8), transparent 32%),
+            linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
           color: #071332;
-          display: flex;
           font-family:
             Inter,
             ui-sans-serif,
@@ -627,374 +606,281 @@ export default function AdminKatilimTalepleriPage() {
             sans-serif;
         }
 
-        .sidebar {
-          width: 280px;
-          min-height: 100vh;
-          background: #ffffff;
-          border-right: 1px solid #e2e8f0;
-          padding: 24px 18px;
-          display: flex;
-          flex-direction: column;
-          gap: 24px;
+        .mobile-shell {
+          width: min(100%, 860px);
+          min-height: 100dvh;
+          margin: 0 auto;
+          background: rgba(248, 251, 255, 0.98);
+          box-shadow: 0 0 45px rgba(15, 23, 42, 0.08);
+        }
+
+        .admin-top {
+          height: 76px;
+          padding: 0 14px;
+          background: rgba(255, 255, 255, 0.96);
+          border-bottom: 1px solid #dbe5f1;
+          display: grid;
+          grid-template-columns: 46px 1fr auto;
+          align-items: center;
+          gap: 10px;
           position: sticky;
           top: 0;
+          z-index: 50;
+          backdrop-filter: blur(18px);
         }
 
-        .brand,
-        .admin-card {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .brand-mark {
-          width: 48px;
-          height: 48px;
-          border-radius: 18px;
-          background: #eff6ff;
-          color: #2563eb;
+        .top-title {
           display: grid;
-          place-items: center;
-          font-weight: 900;
+          justify-items: center;
+          gap: 2px;
+          min-width: 0;
         }
 
-        .brand strong,
-        .admin-card strong {
-          display: block;
-          font-size: 16px;
-          font-weight: 900;
+        .top-title strong {
+          color: #071332;
+          font-size: 21px;
+          line-height: 1;
+          font-weight: 950;
+          letter-spacing: 0.04em;
         }
 
-        .brand span,
-        .admin-card span {
-          display: block;
+        .top-title span {
           color: #64748b;
-          font-size: 12px;
-          margin-top: 2px;
-        }
-
-        .side-nav {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          flex: 1;
-        }
-
-        .side-nav p {
-          margin: 16px 8px 6px;
-          color: #64748b;
-          font-size: 11px;
+          font-size: 10px;
+          font-weight: 850;
           text-transform: uppercase;
           letter-spacing: 0.08em;
-          font-weight: 800;
-        }
-
-        .side-nav a {
-          min-height: 44px;
-          border-radius: 16px;
-          padding: 0 14px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          color: #475569;
-          text-decoration: none;
-          font-size: 14px;
-          font-weight: 700;
-        }
-
-        .side-nav a.active,
-        .side-nav a:hover {
-          background: #eff6ff;
-          color: #2563eb;
-        }
-
-        .side-nav small {
-          background: #2563eb;
-          color: white;
-          border-radius: 999px;
-          padding: 4px 8px;
-          font-size: 11px;
-        }
-
-        .admin-card {
-          border: 1px solid #e2e8f0;
-          border-radius: 24px;
-          padding: 14px;
-        }
-
-        .content {
-          width: 100%;
-          min-width: 0;
-          padding-bottom: 40px;
-        }
-
-        .topbar {
-          height: 96px;
-          padding: 0 34px;
-          background: #ffffff;
-          border-bottom: 1px solid #e2e8f0;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          position: sticky;
-          top: 0;
-          z-index: 40;
-        }
-
-        .topbar > strong {
-          color: #071332;
-          font-size: 28px;
-          letter-spacing: -0.04em;
-          font-weight: 950;
+          white-space: nowrap;
         }
 
         .top-actions {
           display: flex;
-          align-items: center;
-          gap: 12px;
+          gap: 8px;
         }
 
-        .top-icon {
-          width: 58px;
-          height: 58px;
-          border-radius: 18px;
+        .top-button {
+          width: 44px;
+          height: 44px;
+          border-radius: 15px;
           border: 1px solid #e2e8f0;
           background: #ffffff;
           color: #071332;
           display: grid;
           place-items: center;
           position: relative;
-          box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+          box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
         }
 
-        .top-icon small {
+        .top-button small {
           position: absolute;
-          top: -7px;
-          right: -7px;
-          min-width: 22px;
-          height: 22px;
+          top: -6px;
+          right: -6px;
+          min-width: 20px;
+          height: 20px;
           border-radius: 999px;
           background: #ef1235;
           color: #ffffff;
           display: grid;
           place-items: center;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 950;
+          border: 2px solid #ffffff;
         }
 
-        .flag-banner {
-          height: 150px;
-          background:
-            linear-gradient(90deg, rgba(220, 38, 38, 0.92) 0%, rgba(220, 38, 38, 0.72) 22%, rgba(255, 255, 255, 0.92) 48%, rgba(255, 255, 255, 1) 100%),
-            radial-gradient(circle at 80% 70%, rgba(15, 23, 42, 0.12), transparent 34%);
-          border-bottom: 1px solid #e2e8f0;
+        .sticky-command {
+          position: sticky;
+          top: 76px;
+          z-index: 45;
+          background: rgba(248, 251, 255, 0.96);
+          border-bottom: 1px solid rgba(219, 229, 241, 0.9);
+          backdrop-filter: blur(18px);
+        }
+
+        .flag-panel {
+          height: 92px;
           display: grid;
-          grid-template-columns: 240px 1fr;
+          grid-template-columns: 116px 1fr;
           align-items: center;
-          padding: 0 48px;
           overflow: hidden;
+          background:
+            linear-gradient(90deg, rgba(213, 25, 38, 0.96) 0%, rgba(213, 25, 38, 0.78) 31%, rgba(255, 255, 255, 0.92) 59%, #ffffff 100%),
+            radial-gradient(circle at 83% 76%, rgba(15, 23, 42, 0.12), transparent 34%);
+          box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.08);
+        }
+
+        .flag-left {
+          height: 92px;
           position: relative;
         }
 
-        .flag-symbol {
-          width: 128px;
-          height: 128px;
+        .moon {
+          position: absolute;
+          width: 44px;
+          height: 44px;
+          left: 20px;
+          top: 24px;
+          border-radius: 999px;
+          background: #ffffff;
+          box-shadow: 12px 0 0 #d51926;
+        }
+
+        .star {
+          position: absolute;
+          left: 72px;
+          top: 31px;
           color: #ffffff;
-          display: grid;
-          place-items: center;
-          font-size: 84px;
-          text-shadow: 0 8px 18px rgba(127, 29, 29, 0.22);
+          font-size: 24px;
+          line-height: 1;
+          text-shadow: 0 4px 12px rgba(127, 29, 29, 0.3);
         }
 
-        .quote {
+        .quote-card {
+          margin-right: 12px;
+          padding: 10px 12px;
+          border-radius: 16px;
+          background: rgba(241, 245, 249, 0.58);
           color: #0f1f44;
-          font-weight: 800;
-          text-align: left;
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.46);
         }
 
-        .quote p {
-          margin: 0 0 8px;
-          font-size: 21px;
-          line-height: 1.28;
+        .quote-card p {
+          margin: 0 0 3px;
+          font-size: 11.5px;
+          line-height: 1.25;
+          font-weight: 900;
         }
 
-        .quote span {
+        .quote-card span {
           display: block;
-          margin-top: 4px;
-          font-size: 18px;
-          font-family: cursive;
-          opacity: 0.74;
+          margin-top: 2px;
           text-align: right;
+          color: #334155;
+          font-size: 10px;
+          font-weight: 850;
+          font-style: italic;
         }
 
-        .page-head {
+        .page-bar {
+          min-height: 56px;
+          padding: 8px 14px;
           display: grid;
-          grid-template-columns: 42px 1fr auto;
+          grid-template-columns: 30px 1fr 40px;
           align-items: center;
-          gap: 16px;
-          padding: 30px 34px 22px;
+          gap: 9px;
         }
 
         .back-link {
           color: #071332;
           display: grid;
           place-items: center;
+          text-decoration: none;
         }
 
-        .page-head h1 {
+        .page-bar h1 {
           margin: 0;
           color: #071332;
-          font-size: 38px;
+          font-size: 24px;
           line-height: 1;
           font-weight: 950;
-          letter-spacing: -0.055em;
+          letter-spacing: -0.045em;
+          text-align: center;
         }
 
-        .head-actions {
-          display: flex;
-          align-items: center;
-          gap: 12px;
+        .page-bar p {
+          margin: 4px 0 0;
+          color: #64748b;
+          font-size: 10.5px;
+          line-height: 1;
+          font-weight: 850;
+          text-align: center;
         }
 
-        .head-actions button {
-          min-width: 72px;
-          height: 56px;
-          border: 1px solid #e2e8f0;
+        .refresh-button {
+          width: 40px;
+          height: 40px;
+          border-radius: 14px;
+          border: 1px solid #dbe5f1;
           background: #ffffff;
           color: #071332;
-          border-radius: 18px;
-          font-size: 17px;
-          font-weight: 900;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 9px;
-          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.055);
-        }
-
-        .summary-grid {
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 16px;
-          padding: 0 34px 22px;
-        }
-
-        .summary-card {
-          min-height: 92px;
-          background: #ffffff;
-          border: 1px solid #e2e8f0;
-          border-radius: 20px;
-          padding: 13px 16px 12px;
-          display: grid;
-          grid-template-columns: 40px 1fr;
-          grid-template-rows: auto auto 4px;
-          align-items: center;
-          column-gap: 10px;
-          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
-        }
-
-        .summary-icon {
-          width: 38px;
-          height: 38px;
-          border-radius: 999px;
           display: grid;
           place-items: center;
-          font-weight: 950;
-          grid-row: 1 / span 2;
-          font-size: 20px;
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
         }
 
-        .summary-card span {
-          color: #0f1f44;
-          font-size: 13px;
+        .summary-strip {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 7px;
+          padding: 0 14px 10px;
+        }
+
+        .summary-strip button {
+          min-height: 48px;
+          border: 1px solid #dbe5f1;
+          background: #ffffff;
+          border-radius: 15px;
+          padding: 6px 6px;
+          display: grid;
+          place-items: center;
+          gap: 2px;
+          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+        }
+
+        .summary-strip span {
+          color: #475569;
+          font-size: 9.5px;
           line-height: 1;
           font-weight: 950;
           text-transform: uppercase;
         }
 
-        .summary-card strong {
-          color: #2563eb;
-          font-size: 28px;
+        .summary-strip strong {
+          color: #1557d6;
+          font-size: 20px;
           line-height: 1;
           font-weight: 950;
-          margin-top: 4px;
         }
 
-        .summary-card i {
-          grid-column: 1 / -1;
-          height: 3px;
-          border-radius: 999px;
-          background: #2563eb;
-          margin-top: 9px;
+        .summary-strip .active {
+          border-width: 2px;
+          transform: translateY(-1px);
         }
 
-        .summary-card.blue .summary-icon {
-          background: #eff6ff;
-          color: #2563eb;
-        }
-
-        .summary-card.green .summary-icon {
-          background: #ecfdf5;
+        .summary-strip .green strong {
           color: #16a34a;
         }
 
-        .summary-card.green strong {
-          color: #16a34a;
-        }
-
-        .summary-card.green i {
-          background: #16a34a;
-        }
-
-        .summary-card.red .summary-icon {
-          background: #fff1f2;
+        .summary-strip .red strong {
           color: #e11d48;
         }
 
-        .summary-card.red strong {
-          color: #e11d48;
-        }
-
-        .summary-card.red i {
-          background: #e11d48;
-        }
-
-        .summary-card.purple .summary-icon {
-          background: #f5f3ff;
+        .summary-strip .purple strong {
           color: #7c3aed;
         }
 
-        .summary-card.purple strong {
-          color: #7c3aed;
-        }
-
-        .summary-card.purple i {
-          background: #7c3aed;
-        }
-
-        .filters {
-          padding: 0 34px 26px;
+        .toolbox {
+          padding: 12px 14px 9px;
           display: grid;
-          grid-template-columns: 1fr 74px;
-          gap: 14px;
+          grid-template-columns: 1fr 46px;
+          gap: 8px;
         }
 
         .search-box,
-        .filter-square,
-        .filters select {
-          min-height: 58px;
-          border-radius: 18px;
-          border: 1px solid #e2e8f0;
+        .filter-button,
+        .toolbox select {
+          min-height: 44px;
+          border-radius: 14px;
+          border: 1px solid #dbe5f1;
           background: #ffffff;
           color: #071332;
-          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
         }
 
         .search-box {
           display: flex;
           align-items: center;
-          gap: 14px;
-          padding: 0 18px;
+          gap: 9px;
+          padding: 0 12px;
         }
 
         .search-box input {
@@ -1002,372 +888,428 @@ export default function AdminKatilimTalepleriPage() {
           border: 0;
           outline: 0;
           background: transparent;
-          font-size: 19px;
           color: #071332;
-          font-weight: 750;
+          font-size: 14px;
+          font-weight: 800;
         }
 
-        .filter-square {
+        .search-box input::placeholder {
+          color: #94a3b8;
+        }
+
+        .filter-button {
           display: grid;
           place-items: center;
         }
 
-        .filters select {
-          padding: 0 18px;
-          font-size: 17px;
+        .toolbox select {
+          grid-column: span 1;
+          padding: 0 10px;
+          font-size: 12.5px;
           font-weight: 900;
         }
 
         .error-box,
         .empty-state {
-          margin: 0 34px 18px;
-          border-radius: 20px;
-          padding: 16px;
+          margin: 0 14px 10px;
+          border-radius: 16px;
+          padding: 13px;
           text-align: center;
           font-weight: 900;
-          border: 1px solid #e2e8f0;
+          font-size: 13px;
+          border: 1px solid #dbe5f1;
           background: #ffffff;
+          color: #334155;
+        }
+
+        .error-box {
+          color: #b91c1c;
+          background: #fff7f7;
+          border-color: #fecaca;
         }
 
         .application-list {
           display: grid;
-          gap: 20px;
-          padding: 0 34px 100px;
+          gap: 8px;
+          padding: 0 14px 92px;
         }
 
         .application-card {
           position: relative;
           overflow: hidden;
+          border-radius: 18px;
+          border: 1px solid #dbe5f1;
           background: #ffffff;
-          border: 1px solid #e2e8f0;
-          border-radius: 26px;
-          padding: 24px;
-          box-shadow: 0 16px 38px rgba(15, 23, 42, 0.075);
+          padding: 10px 10px 9px 14px;
+          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.058);
         }
 
-        .application-card::before {
-          content: "";
+        .application-card .accent {
           position: absolute;
-          left: 0;
           top: 0;
           bottom: 0;
-          width: 5px;
-          background: #2563eb;
+          left: 0;
+          width: 4px;
+          background: #1557d6;
         }
 
-        .theme-blue::before {
-          background: #2563eb;
-        }
-
-        .theme-green::before {
+        .application-card.green .accent {
           background: #16a34a;
         }
 
-        .theme-purple::before {
+        .application-card.purple .accent {
           background: #7c3aed;
         }
 
-        .theme-amber::before {
+        .application-card.amber .accent {
           background: #f59e0b;
         }
 
-        .theme-cyan::before {
+        .application-card.cyan .accent {
           background: #06b6d4;
         }
 
-        .theme-rose::before {
+        .application-card.rose .accent {
           background: #e11d48;
         }
 
-        .card-top {
+        .application-card.blue {
+          background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+        }
+
+        .application-card.green {
+          background: linear-gradient(135deg, #ffffff 0%, #f7fef9 100%);
+        }
+
+        .application-card.purple {
+          background: linear-gradient(135deg, #ffffff 0%, #fbf8ff 100%);
+        }
+
+        .application-card.amber {
+          background: linear-gradient(135deg, #ffffff 0%, #fffaf2 100%);
+        }
+
+        .application-card.cyan {
+          background: linear-gradient(135deg, #ffffff 0%, #f2fdff 100%);
+        }
+
+        .application-card.rose {
+          background: linear-gradient(135deg, #ffffff 0%, #fff7f9 100%);
+        }
+
+        .row-main {
           display: grid;
-          grid-template-columns: 64px 1fr auto;
-          gap: 16px;
+          grid-template-columns: 38px 1fr 82px;
+          gap: 9px;
           align-items: start;
         }
 
-        .avatar {
-          width: 52px;
-          height: 52px;
+        .mini-avatar,
+        .modal-avatar {
+          width: 38px;
+          height: 38px;
           border-radius: 999px;
-          display: grid;
-          place-items: center;
-          background: #0f172a;
-          color: white;
-          font-weight: 950;
-          font-size: 18px;
-        }
-
-        .avatar.soft {
           background: #eff6ff;
-          color: #2563eb;
+          color: #1557d6;
           border: 1px solid #bfdbfe;
-        }
-
-        .avatar.large {
-          width: 64px;
-          height: 64px;
-        }
-
-        .person-info h2 {
-          margin: 0 0 6px;
-          color: #071332;
-          font-size: 24px;
-          line-height: 1;
-          font-weight: 950;
-          letter-spacing: -0.035em;
-        }
-
-        .person-info p {
-          margin: 0 0 7px;
-          color: #334155;
-          font-size: 14px;
-          font-weight: 850;
-        }
-
-        .person-info span {
-          margin: 0 12px;
-          color: #cbd5e1;
-        }
-
-        .status-block {
-          display: grid;
-          justify-items: end;
-          gap: 9px;
-        }
-
-        .status-block small {
-          color: #475569;
-          font-size: 14px;
-          font-weight: 850;
-          white-space: nowrap;
-        }
-
-        .status-pill {
-          width: fit-content;
-          border-radius: 999px;
-          padding: 9px 18px;
-          background: #fef3c7;
-          color: #b45309;
-          font-size: 13px;
-          font-weight: 950;
-          text-transform: uppercase;
-          white-space: nowrap;
-        }
-
-        .decision-row {
-          margin-top: 22px;
-          display: grid;
-          grid-template-columns: 1fr 1.22fr 1.25fr 1.1fr;
-          gap: 14px;
-          align-items: center;
-        }
-
-        .info-pill,
-        .trust-box {
-          min-height: 52px;
-          border-radius: 14px;
-          border: 1px solid #e2e8f0;
-          background: rgba(255, 255, 255, 0.78);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 9px;
-          color: #0f1f44;
-          font-size: 14px;
-          font-weight: 950;
-          white-space: nowrap;
-        }
-
-        .blue-pill {
-          color: #2563eb;
-          border-color: #bfdbfe;
-          background: #f8fbff;
-        }
-
-        .green-pill {
-          color: #15803d;
-          border-color: #bbf7d0;
-          background: #f7fef9;
-        }
-
-        .red-pill {
-          color: #b91c1c;
-          border-color: #fecaca;
-          background: #fff7f7;
-        }
-
-        .trust-box {
-          display: grid;
-          grid-template-columns: 34px 1fr;
-          column-gap: 7px;
-          justify-content: start;
-          padding: 0 12px;
-          color: #15803d;
-        }
-
-        .trust-box::before {
-          content: "盾";
-          width: 30px;
-          height: 30px;
           display: grid;
           place-items: center;
-          font-size: 20px;
-        }
-
-        .trust-box small {
-          color: #475569;
-          font-size: 10px;
-          text-transform: uppercase;
-          font-weight: 950;
-          display: block;
-        }
-
-        .trust-box strong {
-          display: block;
-          color: #16a34a;
-          font-size: 23px;
-          line-height: 1;
+          font-size: 14px;
           font-weight: 950;
         }
 
-        .trust-box b {
-          font-size: 13px;
-          color: #334155;
+        .identity {
+          min-width: 0;
         }
 
-        .trust-box.mid {
-          color: #ea580c;
-        }
-
-        .trust-box.mid strong {
-          color: #ea580c;
-        }
-
-        .trust-box.bad,
-        .trust-box.bad strong {
-          color: #dc2626;
-        }
-
-        .lina-row {
-          margin-top: 18px;
-          width: min(470px, 100%);
-          min-height: 50px;
-          border-radius: 14px;
-          border: 1px solid #dbeafe;
-          background: #f8fbff;
+        .identity-top {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 14px;
-          padding: 0 18px;
-          color: #0f1f44;
-          font-size: 15px;
+          gap: 6px;
+          min-width: 0;
+        }
+
+        .identity h2 {
+          margin: 0;
+          color: #071332;
+          font-size: 15.5px;
+          line-height: 1.05;
           font-weight: 950;
+          letter-spacing: -0.025em;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
-        .lina-row strong {
+        .status-pill {
+          flex: 0 0 auto;
           border-radius: 999px;
-          padding: 9px 18px;
-          font-size: 14px;
+          padding: 4px 7px;
+          background: #fef3c7;
+          color: #b45309;
+          font-size: 9.5px;
+          line-height: 1;
+          font-weight: 950;
           text-transform: uppercase;
+          white-space: nowrap;
         }
 
-        .lina-row strong.approve {
+        .status-pill.approved {
           background: #dcfce7;
           color: #15803d;
         }
 
-        .lina-row strong.neutral {
-          background: #ffedd5;
-          color: #ea580c;
-        }
-
-        .lina-row strong.review {
+        .status-pill.rejected {
           background: #fee2e2;
           color: #b91c1c;
         }
 
-        .card-bottom {
-          margin-top: 16px;
-          display: flex;
-          align-items: end;
-          justify-content: space-between;
-          gap: 18px;
-        }
-
-        .card-bottom p {
-          margin: 0;
-          color: #334155;
-          font-size: 15px;
-          font-weight: 850;
-          line-height: 1.45;
-        }
-
-        .card-actions {
+        .meta-line {
+          margin-top: 5px;
           display: flex;
           align-items: center;
-          gap: 14px;
+          gap: 5px;
+          min-width: 0;
+          color: #475569;
+          font-size: 11px;
+          line-height: 1;
+          font-weight: 850;
+          white-space: nowrap;
+          overflow: hidden;
         }
 
-        .card-actions button {
-          width: 58px;
-          height: 58px;
-          border-radius: 16px;
-          border: 1px solid #e2e8f0;
+        .meta-line span {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .meta-line i {
+          width: 3px;
+          height: 3px;
+          border-radius: 999px;
+          background: #cbd5e1;
+          flex: 0 0 auto;
+        }
+
+        .compact-grid {
+          margin-top: 7px;
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 5px;
+        }
+
+        .compact-grid span,
+        .compact-grid strong {
+          min-height: 24px;
+          border-radius: 9px;
+          border: 1px solid rgba(219, 229, 241, 0.95);
+          background: rgba(255, 255, 255, 0.8);
+          color: #334155;
+          display: grid;
+          place-items: center;
+          padding: 0 4px;
+          font-size: 9.5px;
+          line-height: 1;
+          font-weight: 950;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .compact-grid strong.good {
+          color: #15803d;
+          background: #f0fdf4;
+          border-color: #bbf7d0;
+        }
+
+        .compact-grid strong.mid {
+          color: #ea580c;
+          background: #fff7ed;
+          border-color: #fed7aa;
+        }
+
+        .compact-grid strong.bad {
+          color: #dc2626;
+          background: #fff7f7;
+          border-color: #fecaca;
+        }
+
+        .decision-mini {
+          min-height: 55px;
+          border-radius: 14px;
+          border: 1px solid #dbeafe;
+          background: rgba(248, 251, 255, 0.82);
+          display: grid;
+          align-content: center;
+          justify-items: center;
+          gap: 4px;
+          padding: 6px;
+        }
+
+        .decision-mini span {
+          color: #64748b;
+          font-size: 9px;
+          line-height: 1;
+          font-weight: 950;
+          text-transform: uppercase;
+        }
+
+        .decision-mini strong {
+          max-width: 100%;
+          border-radius: 999px;
+          padding: 5px 7px;
+          font-size: 9.5px;
+          line-height: 1;
+          font-weight: 950;
+          text-transform: uppercase;
+          white-space: nowrap;
+        }
+
+        .decision-mini strong.approve {
+          background: #dcfce7;
+          color: #15803d;
+        }
+
+        .decision-mini strong.neutral {
+          background: #ffedd5;
+          color: #ea580c;
+        }
+
+        .decision-mini strong.review {
+          background: #fee2e2;
+          color: #b91c1c;
+        }
+
+        .row-footer {
+          margin-top: 8px;
+          display: grid;
+          grid-template-columns: 1fr auto;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .row-footer p {
+          margin: 0;
+          color: #475569;
+          font-size: 10.5px;
+          line-height: 1.15;
+          font-weight: 850;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .row-footer b {
+          color: #071332;
+        }
+
+        .quick-actions {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .quick-actions button {
+          width: 34px;
+          height: 34px;
+          border-radius: 12px;
+          border: 1px solid #dbe5f1;
           background: #ffffff;
           color: #071332;
           display: grid;
           place-items: center;
         }
 
-        .card-actions button.approve {
+        .quick-actions button.approve {
           background: #ecfdf5;
           color: #16a34a;
           border-color: #bbf7d0;
         }
 
-        .card-actions button.reject {
+        .quick-actions button.reject {
           background: #fff7f7;
           color: #dc2626;
           border-color: #fecaca;
         }
 
+        button {
+          cursor: pointer;
+        }
+
         button:disabled {
-          opacity: 0.45;
+          opacity: 0.44;
           cursor: not-allowed;
+        }
+
+        .bottom-nav {
+          position: fixed;
+          left: 50%;
+          bottom: 10px;
+          width: min(calc(100% - 28px), 832px);
+          transform: translateX(-50%);
+          min-height: 62px;
+          border-radius: 22px;
+          border: 1px solid #dbe5f1;
+          background: rgba(255, 255, 255, 0.95);
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          padding: 7px 8px;
+          box-shadow: 0 18px 38px rgba(15, 23, 42, 0.14);
+          backdrop-filter: blur(18px);
+          z-index: 60;
+        }
+
+        .bottom-nav a {
+          color: #64748b;
+          text-decoration: none;
+          display: grid;
+          place-items: center;
+          gap: 2px;
+          font-size: 10.5px;
+          font-weight: 900;
+        }
+
+        .bottom-nav a span {
+          font-size: 20px;
+          line-height: 1;
+        }
+
+        .bottom-nav a.active {
+          color: #1557d6;
         }
 
         .modal-backdrop {
           position: fixed;
           inset: 0;
-          background: rgba(15, 23, 42, 0.32);
+          background: rgba(15, 23, 42, 0.42);
           display: grid;
           place-items: center;
-          padding: 18px;
+          padding: 14px;
           z-index: 100;
         }
 
         .detail-modal {
-          width: min(680px, 100%);
-          max-height: calc(100vh - 36px);
+          width: min(650px, 100%);
+          max-height: calc(100dvh - 28px);
           overflow: auto;
           background: white;
-          border-radius: 28px;
-          border: 1px solid #e2e8f0;
-          padding: 22px;
+          border-radius: 24px;
+          border: 1px solid #dbe5f1;
+          padding: 18px;
           position: relative;
           box-shadow: 0 28px 80px rgba(15, 23, 42, 0.24);
         }
 
         .modal-close {
           position: absolute;
-          top: 16px;
-          right: 16px;
-          width: 42px;
-          height: 42px;
-          border-radius: 14px;
-          border: 1px solid #e2e8f0;
+          top: 13px;
+          right: 13px;
+          width: 38px;
+          height: 38px;
+          border-radius: 13px;
+          border: 1px solid #dbe5f1;
           background: #ffffff;
           color: #071332;
           display: grid;
@@ -1375,75 +1317,86 @@ export default function AdminKatilimTalepleriPage() {
         }
 
         .modal-header {
-          display: flex;
+          display: grid;
+          grid-template-columns: 48px 1fr;
           align-items: center;
-          gap: 14px;
+          gap: 12px;
           padding-right: 46px;
           margin-bottom: 14px;
+        }
+
+        .modal-avatar {
+          width: 48px;
+          height: 48px;
+          font-size: 16px;
         }
 
         .modal-header h2 {
           margin: 0;
           color: #071332;
-          font-size: 22px;
+          font-size: 20px;
           font-weight: 950;
+          letter-spacing: -0.025em;
         }
 
         .modal-header p {
-          margin: 5px 0 0;
+          margin: 3px 0 0;
           color: #64748b;
-          font-weight: 800;
+          font-size: 12px;
+          font-weight: 850;
         }
 
         .decision-panel {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 12px;
-          margin-bottom: 12px;
+          gap: 8px;
+          margin-bottom: 10px;
         }
 
         .decision-panel div,
         .note-box {
-          border: 1px solid #e2e8f0;
-          border-radius: 18px;
-          padding: 14px;
-          background: #f8fafc;
+          border: 1px solid #dbe5f1;
+          border-radius: 16px;
+          padding: 12px;
+          background: #f8fbff;
         }
 
         .decision-panel span,
         .note-box {
           color: #64748b;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 900;
         }
 
         .decision-panel strong {
           display: block;
-          margin-top: 6px;
+          margin-top: 5px;
           color: #071332;
-          font-size: 14px;
-          font-weight: 900;
+          font-size: 13px;
+          font-weight: 950;
         }
 
         .decision-panel small {
           display: block;
-          margin-top: 5px;
+          margin-top: 4px;
           color: #64748b;
+          font-size: 11px;
+          line-height: 1.25;
           font-weight: 750;
         }
 
         .note-box {
           display: grid;
-          gap: 10px;
-          margin-bottom: 16px;
+          gap: 8px;
+          margin-bottom: 12px;
         }
 
         .note-box textarea {
-          min-height: 110px;
+          min-height: 100px;
           width: 100%;
-          border: 1px solid #e2e8f0;
-          border-radius: 16px;
-          padding: 12px;
+          border: 1px solid #dbe5f1;
+          border-radius: 14px;
+          padding: 11px;
           outline: none;
           resize: vertical;
           color: #071332;
@@ -1454,24 +1407,25 @@ export default function AdminKatilimTalepleriPage() {
         .modal-actions {
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
-          gap: 10px;
+          gap: 8px;
         }
 
         .secondary-button,
         .primary-button,
         .danger-button {
-          min-height: 48px;
-          border-radius: 16px;
-          border: 1px solid #e2e8f0;
+          min-height: 46px;
+          border-radius: 15px;
+          border: 1px solid #dbe5f1;
           background: white;
           color: #071332;
-          font-weight: 900;
+          font-size: 12px;
+          font-weight: 950;
         }
 
         .primary-button {
-          background: #2563eb;
+          background: #1557d6;
           color: white;
-          border-color: #2563eb;
+          border-color: #1557d6;
         }
 
         .danger-button {
@@ -1480,212 +1434,98 @@ export default function AdminKatilimTalepleriPage() {
           border-color: #fecaca;
         }
 
-        @media (max-width: 760px) {
-          .admin-page {
-            display: block;
-            min-height: 100dvh;
+        @media (min-width: 861px) {
+          .mobile-shell {
+            margin-top: 0;
           }
 
-          .sidebar {
-            display: none;
+          .admin-top {
+            height: 82px;
           }
 
-          .topbar {
-            height: 78px;
-            padding: 0 18px;
+          .sticky-command {
+            top: 82px;
           }
 
-          .topbar > strong {
-            font-size: 22px;
+          .flag-panel {
+            height: 110px;
+            grid-template-columns: 170px 1fr;
           }
 
-          .top-icon {
-            width: 52px;
-            height: 52px;
-            border-radius: 17px;
+          .flag-left {
+            height: 110px;
           }
 
-          .flag-banner {
-            height: 112px;
-            grid-template-columns: 118px 1fr;
-            padding: 0 16px;
-            background:
-              linear-gradient(90deg, rgba(220, 38, 38, 0.95) 0%, rgba(220, 38, 38, 0.68) 30%, rgba(255, 255, 255, 0.92) 58%, rgba(255, 255, 255, 1) 100%),
-              radial-gradient(circle at 82% 80%, rgba(15, 23, 42, 0.13), transparent 38%);
+          .moon {
+            width: 56px;
+            height: 56px;
+            left: 34px;
+            top: 27px;
+            box-shadow: 16px 0 0 #d51926;
           }
 
-          .flag-symbol {
-            width: 92px;
-            height: 92px;
-            font-size: 60px;
+          .star {
+            left: 102px;
+            top: 37px;
+            font-size: 31px;
           }
 
-          .quote p {
+          .quote-card p {
+            font-size: 16px;
+          }
+
+          .quote-card span {
             font-size: 13px;
-            line-height: 1.35;
-            margin-bottom: 4px;
           }
 
-          .quote span {
-            font-size: 12px;
+          .page-bar h1 {
+            font-size: 28px;
           }
 
-          .page-head {
-            grid-template-columns: 28px 1fr auto;
-            gap: 9px;
-            padding: 20px 18px 14px;
-          }
-
-          .page-head h1 {
-            font-size: 30px;
-          }
-
-          .head-actions {
-            gap: 9px;
-          }
-
-          .head-actions button {
-            min-width: 48px;
-            height: 48px;
-            border-radius: 16px;
-            font-size: 0;
-          }
-
-          .head-actions button span {
-            display: none;
-          }
-
-          .summary-grid {
-            gap: 8px;
-            padding: 0 18px 14px;
-          }
-
-          .summary-card {
-            min-height: 64px;
-            border-radius: 16px;
-            padding: 8px 8px 7px;
-            grid-template-columns: 25px 1fr;
-            column-gap: 6px;
-          }
-
-          .summary-icon {
-            width: 25px;
-            height: 25px;
-            font-size: 14px;
-          }
-
-          .summary-card span {
-            font-size: 9.5px;
-            line-height: 1;
-          }
-
-          .summary-card strong {
-            font-size: 20px;
-          }
-
-          .summary-card i {
-            margin-top: 5px;
-          }
-
-          .filters {
-            padding: 0 18px 18px;
-            grid-template-columns: 1fr 58px;
-            gap: 10px;
-          }
-
-          .search-box,
-          .filter-square,
-          .filters select {
+          .summary-strip button {
             min-height: 54px;
-            border-radius: 17px;
-          }
-
-          .search-box input {
-            font-size: 17px;
-          }
-
-          .filters select {
-            font-size: 15px;
           }
 
           .application-list {
-            gap: 16px;
-            padding: 0 18px 96px;
+            grid-template-columns: 1fr 1fr;
           }
 
           .application-card {
-            border-radius: 24px;
-            padding: 20px;
+            min-height: 132px;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .row-main {
+            grid-template-columns: 34px 1fr 74px;
+            gap: 7px;
           }
 
-          .card-top {
-            grid-template-columns: 55px 1fr auto;
-            gap: 12px;
-          }
-
-          .avatar {
-            width: 48px;
-            height: 48px;
-            font-size: 17px;
-          }
-
-          .person-info h2 {
-            font-size: 22px;
-          }
-
-          .person-info p {
-            font-size: 13px;
-            line-height: 1.35;
-          }
-
-          .status-block small {
-            font-size: 13px;
-          }
-
-          .status-pill {
-            padding: 8px 15px;
+          .mini-avatar {
+            width: 34px;
+            height: 34px;
             font-size: 12px;
           }
 
-          .decision-row {
-            margin-top: 18px;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-          }
-
-          .info-pill,
-          .trust-box {
-            min-height: 48px;
-            font-size: 13px;
-          }
-
-          .trust-box {
-            grid-column: span 1;
-          }
-
-          .lina-row {
-            margin-top: 14px;
-            min-height: 48px;
+          .identity h2 {
             font-size: 14px;
-            padding: 0 13px;
           }
 
-          .lina-row strong {
-            font-size: 12px;
-            padding: 8px 12px;
+          .compact-grid {
+            grid-template-columns: 1fr 1fr;
           }
 
-          .card-bottom {
-            margin-top: 14px;
+          .decision-mini {
+            min-height: 50px;
           }
 
-          .card-bottom p {
-            font-size: 13px;
+          .quick-actions button {
+            width: 31px;
+            height: 31px;
           }
 
-          .card-actions button {
-            width: 54px;
-            height: 54px;
+          .quote-card p {
+            font-size: 10.5px;
           }
         }
       `}</style>
