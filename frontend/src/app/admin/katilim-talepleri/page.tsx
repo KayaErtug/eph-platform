@@ -3,16 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
-  Bell,
   Check,
-  ChevronDown,
   Eye,
-  Menu,
+  Filter,
   RefreshCcw,
   Search,
   ShieldCheck,
   SlidersHorizontal,
-  Sparkles,
   User,
   X,
 } from "lucide-react";
@@ -85,7 +82,7 @@ const statusLabels: Record<string, string> = {
   REGISTERED: "Kayıt Tamamlandı",
 };
 
-const laneClasses = ["lane-blue", "lane-green", "lane-violet", "lane-orange", "lane-cyan", "lane-slate"];
+const cardThemes = ["theme-blue", "theme-green", "theme-purple", "theme-amber", "theme-cyan", "theme-rose"];
 
 function formatDate(value?: string | null) {
   if (!value) return "-";
@@ -93,6 +90,7 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat("tr-TR", {
     day: "2-digit",
     month: "short",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
@@ -107,10 +105,8 @@ function initials(name: string) {
     .join("");
 }
 
-function shortName(name: string) {
-  const clean = name.trim();
-  if (clean.length <= 20) return clean;
-  return `${clean.slice(0, 20)}...`;
+function getTypeLabel(item: ApplicationItem) {
+  return item.referansliMi || item.basvuruTuru === "REFERANSLI" ? "Referanslı" : "Referanssız";
 }
 
 function getTrustScore(item: ApplicationItem) {
@@ -135,8 +131,7 @@ function getDecision(item: ApplicationItem) {
 
   if (item.isRisky || score < 55) {
     return {
-      label: "İncele",
-      longLabel: "İncelenmeli",
+      label: "İncelenmeli",
       className: "review",
       text: "Eksik veya riskli bilgi var.",
     };
@@ -144,34 +139,28 @@ function getDecision(item: ApplicationItem) {
 
   if (score >= 80 && (item.referansliMi || item.referansDogrulandiMi)) {
     return {
-      label: "Onay",
-      longLabel: "Onaylanabilir",
+      label: "Onaylanabilir",
       className: "approve",
       text: "Bilgiler güçlü görünüyor.",
     };
   }
 
   return {
-    label: "Kontrol",
-    longLabel: "Kontrol Et",
+    label: "Kontrol Et",
     className: "neutral",
     text: "Manuel kontrol önerilir.",
   };
 }
 
-function getLegalCount(item: ApplicationItem) {
-  return [item.kvkkAccepted, item.privacyAccepted, item.platformAccepted, item.userAgreementAccepted].filter(Boolean).length;
-}
+function getLegalText(item: ApplicationItem) {
+  const accepted = [
+    item.kvkkAccepted,
+    item.privacyAccepted,
+    item.platformAccepted,
+    item.userAgreementAccepted,
+  ].filter(Boolean).length;
 
-function getRefText(item: ApplicationItem) {
-  if (item.referansliMi || item.basvuruTuru === "REFERANSLI") return "Referanslı";
-  return "Refsiz";
-}
-
-function statusClass(status: ApplicationStatus) {
-  if (status === "APPROVED" || status === "REGISTERED") return "ok";
-  if (status === "REJECTED") return "bad";
-  return "wait";
+  return `Yasal Onay ${accepted}/4`;
 }
 
 export default function AdminKatilimTalepleriPage() {
@@ -231,12 +220,6 @@ export default function AdminKatilimTalepleriPage() {
       return matchesQuery && matchesRole && matchesType;
     });
   }, [data?.items, query, role, type]);
-
-  const priorityItem = useMemo(() => {
-    return [...filteredItems]
-      .filter((item) => item.status === "PENDING")
-      .sort((first, second) => getTrustScore(second) - getTrustScore(first))[0];
-  }, [filteredItems]);
 
   async function handleStatusChange(id: string, nextStatus: "APPROVED" | "REJECTED") {
     setBusyId(id);
@@ -303,270 +286,235 @@ export default function AdminKatilimTalepleriPage() {
     total: 0,
   };
 
-  const riskyCount = (data?.items || []).filter((item) => item.isRisky || getTrustScore(item) < 55).length;
-  const todayCount = (data?.items || []).filter((item) => {
-    if (!item.createdAt) return false;
-    const created = new Date(item.createdAt);
-    const today = new Date();
-    return created.toDateString() === today.toDateString();
-  }).length;
-
   return (
-    <main className="command-page">
-      <section className="phone-shell">
-        <header className="topbar">
-          <button className="icon-button" aria-label="Menü">
-            <Menu size={20} />
+    <main className="applications-page">
+      <section className="flag-banner" aria-label="Türk Bayrağı ve Ziya Gökalp sözü">
+        <div className="quote-card">
+          <p>Vatan ne Türkiye'dir Türklere, ne Türkistan.</p>
+          <p>Vatan büyük ve müebbet bir ülkedir: Turan.</p>
+          <span>— Ziya Gökalp</span>
+        </div>
+      </section>
+
+      <section className="page-head">
+        <a href="/admin" className="back-link" aria-label="Admin paneline dön">
+          <ArrowLeft size={25} />
+        </a>
+        <h1>Katılım Talepleri</h1>
+        <div className="head-actions">
+          <button type="button" aria-label="Filtre">
+            <Filter size={18} />
+            <span>Filtre</span>
           </button>
-
-          <div className="top-title">
-            <strong>ADMİN</strong>
-            <span>Başvuru Karar Merkezi</span>
-          </div>
-
-          <div className="top-actions">
-            <button className="icon-button" aria-label="Bildirimler">
-              <Bell size={18} />
-              <small>3</small>
-            </button>
-            <button className="icon-button" aria-label="Profil">
-              <User size={18} />
-            </button>
-          </div>
-        </header>
-
-        <section className="hero-panel">
-          <div className="flag-bg" />
-          <div className="hero-glass">
-            <span>T.C. EPH YÖNETİM MERKEZİ</span>
-            <h1>Katılım Talepleri</h1>
-            <p>Vatan ne Türkiye'dir Türklere, ne Türkistan. Vatan büyük ve müebbet bir ülkedir: Turan.</p>
-            <b>— Ziya Gökalp</b>
-          </div>
-        </section>
-
-        <section className="page-strip">
-          <a href="/admin" className="round-link" aria-label="Geri dön">
-            <ArrowLeft size={18} />
-          </a>
-
-          <div>
-            <span>KARAR MASASI</span>
-            <h2>İnceleme Sırası</h2>
-          </div>
-
-          <button className="round-link" onClick={() => loadApplications(status)} aria-label="Yenile">
-            <RefreshCcw size={18} />
+          <button type="button" aria-label="Yenile" onClick={() => loadApplications(status)}>
+            <RefreshCcw size={20} />
           </button>
-        </section>
+        </div>
+      </section>
 
-        <section className="metrics-bar">
-          <div>
-            <span>Bekleyen</span>
-            <strong>{summary.pending}</strong>
-          </div>
-          <div>
-            <span>Bugün</span>
-            <strong>{todayCount || summary.pending}</strong>
-          </div>
-          <div>
-            <span>Risk</span>
-            <strong>{riskyCount}</strong>
-          </div>
-          <div>
-            <span>Pilot</span>
-            <strong>{summary.pilotThisMonth}</strong>
-          </div>
-          <div>
-            <span>Onay</span>
-            <strong>{summary.approvedThisMonth}</strong>
-          </div>
-        </section>
+      <section className="summary-grid">
+        <article className="summary-card blue">
+          <div className="summary-icon">⌛</div>
+          <span>Bekleyen</span>
+          <strong>{summary.pending}</strong>
+          <i />
+        </article>
 
-        {priorityItem ? (
-          <section className="priority-card">
-            <div>
-              <span>SIRADAKİ ÖNCELİK</span>
-              <strong>{shortName(priorityItem.applicantName)}</strong>
-              <p>{roleLabels[priorityItem.requestedRole] || priorityItem.requestedRole} • {priorityItem.district || "-"} / {priorityItem.city || "Denizli"}</p>
-            </div>
-            <button onClick={() => openDetail(priorityItem)}>
-              <small>Güven</small>
-              <b>{getTrustScore(priorityItem)}</b>
-            </button>
-          </section>
-        ) : null}
+        <article className="summary-card green">
+          <div className="summary-icon">✓</div>
+          <span>Onaylanan</span>
+          <strong>{summary.approvedThisMonth}</strong>
+          <i />
+        </article>
 
-        <section className="filter-dock">
-          <label className="search-box">
-            <Search size={17} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Ad, telefon, e-posta..."
-            />
-          </label>
+        <article className="summary-card red">
+          <div className="summary-icon">×</div>
+          <span>Reddedilen</span>
+          <strong>{summary.rejectedThisMonth}</strong>
+          <i />
+        </article>
 
-          <button className="filter-button" type="button" aria-label="Filtre">
-            <SlidersHorizontal size={18} />
-          </button>
+        <article className="summary-card purple">
+          <div className="summary-icon">👥</div>
+          <span>Pilot</span>
+          <strong>{summary.pilotThisMonth}</strong>
+          <i />
+        </article>
+      </section>
 
-          <label className="select-box">
-            <select value={type} onChange={(event) => setType(event.target.value)}>
-              <option value="all">Tüm Türler</option>
-              <option value="referansli">Referanslı</option>
-              <option value="referanssiz">Referanssız</option>
-              <option value="pilot">Pilot</option>
-            </select>
-            <ChevronDown size={16} />
-          </label>
+      <section className="filters">
+        <label className="search-box">
+          <Search size={23} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Ara: ad, telefon, e-posta..."
+          />
+        </label>
 
-          <label className="select-box compact-select">
-            <select value={role} onChange={(event) => setRole(event.target.value)}>
-              <option value="all">Rol</option>
-              <option value="EMLAKCI">Emlakçı</option>
-              <option value="MUTEAHHIT">Müteahhit</option>
-              <option value="INSAAT_FIRMASI">İnşaat Firması</option>
-              <option value="MODERATOR">Moderatör</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-            <ChevronDown size={16} />
-          </label>
+        <button className="filter-square" type="button" aria-label="Gelişmiş filtre">
+          <SlidersHorizontal size={23} />
+        </button>
 
-          <label className="select-box full-select">
-            <select value={status} onChange={(event) => handleStatusFilter(event.target.value)}>
-              <option value="all">Tüm Durumlar</option>
-              <option value="PENDING">Bekliyor</option>
-              <option value="APPROVED">Onaylandı</option>
-              <option value="REJECTED">Reddedildi</option>
-              <option value="INVITED">Davet Edildi</option>
-              <option value="REGISTERED">Kayıt Tamamlandı</option>
-            </select>
-            <ChevronDown size={16} />
-          </label>
-        </section>
+        <select value={type} onChange={(event) => setType(event.target.value)}>
+          <option value="all">Tüm Türler</option>
+          <option value="referansli">Referanslı</option>
+          <option value="referanssiz">Referanssız</option>
+          <option value="pilot">Pilot</option>
+        </select>
 
-        {error ? <div className="feedback-box error">{error}</div> : null}
+        <select value={role} onChange={(event) => setRole(event.target.value)}>
+          <option value="all">Tüm Roller</option>
+          <option value="EMLAKCI">Emlakçı</option>
+          <option value="MUTEAHHIT">Müteahhit</option>
+          <option value="INSAAT_FIRMASI">İnşaat Firması</option>
+          <option value="MODERATOR">Moderatör</option>
+          <option value="ADMIN">Admin</option>
+        </select>
 
-        {loading ? (
-          <div className="feedback-box">Katılım talepleri yükleniyor...</div>
-        ) : filteredItems.length === 0 ? (
-          <div className="feedback-box">Gösterilecek katılım talebi bulunamadı.</div>
-        ) : (
-          <section className="application-stream">
-            {filteredItems.map((item, index) => {
-              const score = getTrustScore(item);
-              const decision = getDecision(item);
+        <select value={status} onChange={(event) => handleStatusFilter(event.target.value)}>
+          <option value="all">Tüm Durumlar</option>
+          <option value="PENDING">Bekliyor</option>
+          <option value="APPROVED">Onaylandı</option>
+          <option value="REJECTED">Reddedildi</option>
+          <option value="INVITED">Davet Edildi</option>
+          <option value="REGISTERED">Kayıt Tamamlandı</option>
+        </select>
+      </section>
 
-              return (
-                <article className={`mini-card ${laneClasses[index % laneClasses.length]}`} key={item.id}>
-                  <div className="mini-avatar">{initials(item.applicantName)}</div>
+      {error ? <div className="error-box">{error}</div> : null}
 
-                  <div className="mini-main">
-                    <div className="mini-line-one">
-                      <h3>{shortName(item.applicantName)}</h3>
-                      <span className={`status-pill ${statusClass(item.status)}`}>{statusLabels[item.status] || item.status}</span>
-                    </div>
+      {loading ? (
+        <div className="empty-state">Katılım talepleri yükleniyor...</div>
+      ) : filteredItems.length === 0 ? (
+        <div className="empty-state">Gösterilecek katılım talebi bulunamadı.</div>
+      ) : (
+        <section className="application-list">
+          {filteredItems.map((item, index) => {
+            const score = getTrustScore(item);
+            const decision = getDecision(item);
+            const roleText = roleLabels[item.requestedRole] || item.requestedRole;
+            const locationText = `${item.district || "Pamukkale"} / ${item.city || "Denizli"}`;
 
-                    <div className="mini-line-two">
-                      <span>{roleLabels[item.requestedRole] || item.requestedRole}</span>
-                      <i />
-                      <span>{item.district || "-"} / {item.city || "Denizli"}</span>
-                      <i />
-                      <span>{formatDate(item.createdAt)}</span>
-                    </div>
+            return (
+              <article className={`application-card ${cardThemes[index % cardThemes.length]}`} key={item.id}>
+                <div className="card-top">
+                  <div className="avatar soft">{initials(item.applicantName)}</div>
 
-                    <div className="chip-row">
-                      <span>{getRefText(item)}</span>
-                      {item.pilotBasvuruMu ? <span>Pilot</span> : null}
-                      <span>Yasal {getLegalCount(item)}/4</span>
-                      <span className={score >= 80 ? "score-good" : score >= 60 ? "score-mid" : "score-bad"}>{score}/100</span>
-                      <span className={`lina-chip ${decision.className}`}>Lina: {decision.label}</span>
-                    </div>
-
-                    <div className="authority-line">Yetki: {item.onayYetkiSeviyesi || "ADMIN_SUPER_ADMIN"}</div>
+                  <div className="person-info">
+                    <h2>{item.applicantName}</h2>
+                    <p className="contact-line">
+                      <span>{item.applicantEmail}</span>
+                      <b>|</b>
+                      <span>{item.applicantPhone}</span>
+                    </p>
+                    <p className="meta-line">
+                      <span>▣ {roleText}</span>
+                      <b>|</b>
+                      <span>⌖ {locationText}</span>
+                    </p>
                   </div>
 
-                  <div className="mini-actions">
-                    <button onClick={() => openDetail(item)} aria-label="Detay">
-                      <Eye size={17} />
+                  <div className="status-block">
+                    <span className={`status-pill ${item.status.toLowerCase()}`}>
+                      {statusLabels[item.status] || item.status}
+                    </span>
+                    <small>{formatDate(item.createdAt)}</small>
+                  </div>
+                </div>
+
+                <div className="decision-row">
+                  <span className="info-pill blue-pill">
+                    <User size={17} />
+                    {getTypeLabel(item)}
+                  </span>
+
+                  <span className={`info-pill ${item.referansDogrulandiMi ? "green-pill" : "red-pill"}`}>
+                    <ShieldCheck size={17} />
+                    {item.referansDogrulandiMi ? "Ref. Doğrulandı" : item.referansliMi ? "Ref. Bekliyor" : "Ref. Yok"}
+                  </span>
+
+                  <span className="info-pill green-pill">
+                    <ShieldCheck size={17} />
+                    {getLegalText(item)}
+                  </span>
+
+                  <span className={`trust-box ${score >= 80 ? "good" : score >= 60 ? "mid" : "bad"}`}>
+                    <small>Güven Skoru</small>
+                    <strong>{score}<b>/100</b></strong>
+                  </span>
+                </div>
+
+                <div className="lina-row">
+                  <span>✦ Lina Ön Değerlendirme</span>
+                  <strong className={decision.className}>{decision.label}</strong>
+                </div>
+
+                <div className="card-bottom">
+                  <p>
+                    Evet Onay Yetkisi: <b>{item.onayYetkiSeviyesi || "ADMIN_SUPER_ADMIN"}</b>
+                    <br />
+                    İlçe: <b>{item.district || "Pamukkale"}</b>
+                  </p>
+
+                  <div className="card-actions">
+                    <button type="button" onClick={() => openDetail(item)} aria-label="Başvuru detayını aç">
+                      <Eye size={19} />
                     </button>
                     <button
-                      className="yes"
+                      type="button"
+                      className="approve"
                       disabled={busyId === item.id || item.status !== "PENDING"}
                       onClick={() => handleStatusChange(item.id, "APPROVED")}
-                      aria-label="Onayla"
+                      aria-label="Başvuruyu onayla"
                     >
-                      <Check size={18} />
+                      <Check size={21} />
                     </button>
                     <button
-                      className="no"
+                      type="button"
+                      className="reject"
                       disabled={busyId === item.id || item.status !== "PENDING"}
                       onClick={() => {
                         setSelected(item);
                         setNote(item.adminNote || "");
                       }}
-                      aria-label="Reddet"
+                      aria-label="Başvuruyu reddet"
                     >
-                      <X size={18} />
+                      <X size={21} />
                     </button>
                   </div>
-                </article>
-              );
-            })}
-          </section>
-        )}
-
-        <button className="lina-float" aria-label="Lina">
-          <Sparkles size={22} />
-          <span>Lina</span>
-        </button>
-
-        <nav className="bottom-nav">
-          <a className="active" href="/admin">▦<span>Özet</span></a>
-          <a href="/admin/users">♟<span>Üyeler</span></a>
-          <a href="/admin/traffic">⌁<span>Trafik</span></a>
-          <a href="/admin/radar">◎<span>Radar</span></a>
-          <a href="/admin/system-messages">☷<span>Mesaj</span></a>
-        </nav>
-      </section>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+      )}
 
       {selected ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="detail-modal">
-            <button className="modal-close" onClick={() => setSelected(null)}>
+            <button className="modal-close" onClick={() => setSelected(null)} aria-label="Kapat">
               <X size={18} />
             </button>
 
-            <div className="modal-head">
-              <div className="modal-avatar">{initials(selected.applicantName)}</div>
+            <div className="modal-header">
+              <div className="avatar soft large">{initials(selected.applicantName)}</div>
               <div>
-                <span>Başvuru Dosyası</span>
                 <h2>{selected.applicantName}</h2>
-                <p>{roleLabels[selected.requestedRole] || selected.requestedRole} • {selected.district || "-"} / {selected.city || "Denizli"}</p>
+                <p>{roleLabels[selected.requestedRole] || selected.requestedRole}</p>
               </div>
             </div>
 
-            <div className="modal-grid">
+            <div className="decision-panel">
               <div>
-                <span>Lina Kararı</span>
-                <strong>{getDecision(selected).longLabel}</strong>
+                <span>Lina Ön Değerlendirme</span>
+                <strong>{getDecision(selected).label}</strong>
                 <small>{getDecision(selected).text}</small>
               </div>
               <div>
                 <span>Güven Skoru</span>
                 <strong>{getTrustScore(selected)}/100</strong>
                 <small>{selected.isRisky ? selected.riskNote || "Riskli başvuru" : "Kritik risk görünmüyor"}</small>
-              </div>
-              <div>
-                <span>Yasal Onay</span>
-                <strong>{getLegalCount(selected)}/4</strong>
-                <small>KVKK, gizlilik, platform ve kullanıcı sözleşmesi.</small>
-              </div>
-              <div>
-                <span>Referans</span>
-                <strong>{getRefText(selected)}</strong>
-                <small>{selected.referansDogrulandiMi ? "Referans doğrulandı." : "Doğrulama kontrol edilebilir."}</small>
               </div>
             </div>
 
@@ -603,12 +551,11 @@ export default function AdminKatilimTalepleriPage() {
       ) : null}
 
       <style jsx>{`
-        .command-page {
+        .applications-page {
           min-height: 100vh;
-          background: #263244;
+          background: #f8fafc;
           color: #071332;
-          display: flex;
-          justify-content: center;
+          padding-bottom: 112px;
           font-family:
             Inter,
             ui-sans-serif,
@@ -619,616 +566,550 @@ export default function AdminKatilimTalepleriPage() {
             sans-serif;
         }
 
-        .phone-shell {
-          width: min(100%, 430px);
-          min-height: 100vh;
-          background:
-            radial-gradient(circle at 50% 0%, rgba(219, 234, 254, 0.95), transparent 250px),
-            linear-gradient(180deg, #f8fbff 0%, #edf4fb 100%);
-          position: relative;
-          overflow: hidden;
-          padding-bottom: 100px;
-          box-shadow: 0 22px 70px rgba(15, 23, 42, 0.28);
-        }
-
-        .topbar {
-          height: 70px;
-          display: grid;
-          grid-template-columns: 50px 1fr 104px;
+        .flag-banner {
+          height: 150px;
+          background-image:
+            linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.22) 42%, rgba(255, 255, 255, 0.92) 72%, rgba(255, 255, 255, 0.98) 100%),
+            url("/admin-bayrak.jpg");
+          background-size: cover;
+          background-position: center;
+          border-bottom: 1px solid #e2e8f0;
+          display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 0 12px;
-          background: rgba(255, 255, 255, 0.92);
-          border-bottom: 1px solid #dce6f2;
-          position: sticky;
-          top: 0;
-          z-index: 60;
-          backdrop-filter: blur(18px);
+          justify-content: flex-end;
+          padding: 18px 34px;
         }
 
-        .top-title {
+        .quote-card {
+          width: min(540px, 58%);
+          border-radius: 0;
+          padding: 0;
+          background: transparent;
           text-align: center;
-          min-width: 0;
+          color: #0f1f44;
+          text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
         }
 
-        .top-title strong {
+        .quote-card p {
+          margin: 0 0 7px;
+          font-size: 20px;
+          line-height: 1.28;
+          font-weight: 850;
+        }
+
+        .quote-card span {
           display: block;
+          margin-top: 4px;
           font-size: 17px;
-          font-weight: 950;
-          letter-spacing: 0.015em;
-          color: #06194a;
+          font-family: cursive;
+          opacity: 0.74;
+          text-align: right;
         }
 
-        .top-title span {
-          display: block;
-          margin-top: 2px;
-          font-size: 9px;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          font-weight: 950;
-          color: #64748b;
-        }
-
-        .top-actions {
+        .page-head {
           display: grid;
-          grid-template-columns: 48px 48px;
-          gap: 8px;
-          justify-content: end;
+          grid-template-columns: 42px 1fr auto;
+          align-items: center;
+          gap: 16px;
+          padding: 30px 34px 22px;
         }
 
-        .icon-button,
-        .round-link,
-        .filter-button {
-          border: 1px solid #dbe5f0;
-          background: rgba(255, 255, 255, 0.92);
+        .back-link {
           color: #071332;
           display: grid;
           place-items: center;
-          box-shadow: 0 10px 28px rgba(15, 23, 42, 0.065);
-          position: relative;
+          text-decoration: none;
         }
 
-        .icon-button,
-        .round-link {
-          width: 48px;
-          height: 48px;
-          border-radius: 17px;
-        }
-
-        .icon-button small {
-          position: absolute;
-          top: -5px;
-          right: -4px;
-          min-width: 19px;
-          height: 19px;
-          border-radius: 999px;
-          background: #ef1235;
-          color: white;
-          display: grid;
-          place-items: center;
-          font-size: 11px;
-          font-weight: 950;
-        }
-
-        .hero-panel {
-          height: 130px;
-          position: relative;
-          overflow: hidden;
-          border-bottom: 1px solid #dbe5f0;
-          background: #dc1f2e;
-        }
-
-        .flag-bg {
-          position: absolute;
-          inset: 0;
-          background:
-            linear-gradient(90deg, rgba(0, 0, 0, 0.12), rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.12)),
-            url("/admin-bayrak.jpg") center / cover no-repeat;
-          filter: saturate(1.08) contrast(1.03);
-          transform: scale(1.02);
-        }
-
-        .hero-panel::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(90deg, rgba(111, 12, 24, 0.1), rgba(248, 250, 252, 0.42));
-        }
-
-        .hero-glass {
-          position: absolute;
-          right: 12px;
-          top: 14px;
-          width: 72%;
-          min-height: 100px;
-          border-radius: 23px;
-          border: 1px solid rgba(255, 255, 255, 0.74);
-          background: rgba(255, 255, 255, 0.76);
-          backdrop-filter: blur(12px);
-          box-shadow: 0 14px 36px rgba(127, 29, 29, 0.22);
-          text-align: center;
-          padding: 12px 14px;
-          z-index: 2;
-        }
-
-        .hero-glass span {
-          color: #66718a;
-          font-size: 9px;
-          line-height: 1;
-          letter-spacing: 0.16em;
-          font-weight: 950;
-        }
-
-        .hero-glass h1 {
-          margin: 4px 0 6px;
-          color: #071332;
-          font-size: 18px;
-          line-height: 0.95;
-          font-weight: 950;
-          letter-spacing: -0.035em;
-        }
-
-        .hero-glass p {
+        .page-head h1 {
           margin: 0;
           color: #071332;
-          font-size: 11px;
-          line-height: 1.25;
-          font-weight: 850;
-        }
-
-        .hero-glass b {
-          display: block;
-          margin-top: 2px;
-          color: #071332;
-          font-size: 11px;
-          font-style: italic;
+          font-size: 38px;
+          line-height: 1;
           font-weight: 950;
+          letter-spacing: -0.055em;
         }
 
-        .page-strip {
-          height: 68px;
-          display: grid;
-          grid-template-columns: 50px 1fr 50px;
+        .head-actions {
+          display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 0 12px;
-          background: rgba(255, 255, 255, 0.68);
-          border-bottom: 1px solid #dce6f2;
+          gap: 12px;
         }
 
-        .page-strip div {
-          text-align: center;
-          min-width: 0;
-        }
-
-        .page-strip span {
-          display: block;
-          color: #7a869a;
-          font-size: 9px;
-          line-height: 1;
-          letter-spacing: 0.22em;
-          font-weight: 950;
-        }
-
-        .page-strip h2 {
-          margin: 5px 0 0;
-          color: #071332;
-          font-size: 25px;
-          line-height: 1;
-          font-weight: 950;
-          letter-spacing: -0.06em;
-        }
-
-        .metrics-bar {
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          gap: 7px;
-          padding: 10px 10px 8px;
-        }
-
-        .metrics-bar div {
-          min-height: 50px;
-          border: 1px solid #dbe5f0;
-          border-radius: 16px;
-          background: rgba(255, 255, 255, 0.86);
-          display: grid;
-          place-items: center;
-          align-content: center;
-          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.045);
-        }
-
-        .metrics-bar span {
-          color: #64748b;
-          font-size: 8.5px;
-          line-height: 1;
-          letter-spacing: 0.035em;
-          text-transform: uppercase;
-          font-weight: 950;
-        }
-
-        .metrics-bar strong {
-          margin-top: 4px;
-          color: #1557d6;
-          font-size: 22px;
-          line-height: 1;
-          font-weight: 950;
-        }
-
-        .priority-card {
-          margin: 0 10px 8px;
-          min-height: 76px;
-          border-radius: 20px;
-          background:
-            linear-gradient(135deg, rgba(11, 35, 86, 0.96), rgba(21, 87, 214, 0.94)),
-            radial-gradient(circle at 90% 20%, rgba(255, 255, 255, 0.25), transparent 90px);
-          color: white;
-          display: grid;
-          grid-template-columns: 1fr 68px;
-          align-items: center;
-          gap: 8px;
-          padding: 11px 12px 11px 22px;
-          box-shadow: 0 14px 28px rgba(21, 87, 214, 0.22);
-        }
-
-        .priority-card span {
-          display: block;
-          color: rgba(255, 255, 255, 0.78);
-          font-size: 9px;
-          line-height: 1;
-          letter-spacing: 0.14em;
-          font-weight: 950;
-        }
-
-        .priority-card strong {
-          display: block;
-          margin-top: 5px;
-          font-size: 18px;
-          line-height: 1;
-          font-weight: 950;
-          letter-spacing: -0.035em;
-        }
-
-        .priority-card p {
-          margin: 5px 0 0;
-          color: rgba(255, 255, 255, 0.82);
-          font-size: 11px;
-          font-weight: 850;
-        }
-
-        .priority-card button {
-          width: 62px;
+        .head-actions button {
+          min-width: 72px;
           height: 56px;
-          border: 1px solid rgba(255, 255, 255, 0.28);
-          border-radius: 17px;
-          background: rgba(255, 255, 255, 0.18);
-          color: white;
+          border: 1px solid #e2e8f0;
+          background: #ffffff;
+          color: #071332;
+          border-radius: 18px;
+          font-size: 17px;
+          font-weight: 900;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 9px;
+          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.055);
+        }
+
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 16px;
+          padding: 0 34px 22px;
+        }
+
+        .summary-card {
+          min-height: 92px;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 20px;
+          padding: 13px 16px 12px;
+          display: grid;
+          grid-template-columns: 40px 1fr;
+          grid-template-rows: auto auto 4px;
+          align-items: center;
+          column-gap: 10px;
+          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+        }
+
+        .summary-icon {
+          width: 38px;
+          height: 38px;
+          border-radius: 999px;
           display: grid;
           place-items: center;
-          align-content: center;
+          font-weight: 950;
+          grid-row: 1 / span 2;
+          font-size: 20px;
         }
 
-        .priority-card small {
-          font-size: 9px;
-          font-weight: 900;
-        }
-
-        .priority-card b {
-          font-size: 22px;
+        .summary-card span {
+          color: #0f1f44;
+          font-size: 13px;
           line-height: 1;
           font-weight: 950;
+          text-transform: uppercase;
         }
 
-        .filter-dock {
-          padding: 0 10px 10px;
+        .summary-card strong {
+          color: #2563eb;
+          font-size: 28px;
+          line-height: 1;
+          font-weight: 950;
+          margin-top: 4px;
+        }
+
+        .summary-card i {
+          grid-column: 1 / -1;
+          height: 3px;
+          border-radius: 999px;
+          background: #2563eb;
+          margin-top: 9px;
+        }
+
+        .summary-card.blue .summary-icon {
+          background: #eff6ff;
+          color: #2563eb;
+        }
+
+        .summary-card.green .summary-icon {
+          background: #ecfdf5;
+          color: #16a34a;
+        }
+
+        .summary-card.green strong,
+        .summary-card.green .summary-icon {
+          color: #16a34a;
+        }
+
+        .summary-card.green i {
+          background: #16a34a;
+        }
+
+        .summary-card.red .summary-icon {
+          background: #fff1f2;
+          color: #e11d48;
+        }
+
+        .summary-card.red strong {
+          color: #e11d48;
+        }
+
+        .summary-card.red i {
+          background: #e11d48;
+        }
+
+        .summary-card.purple .summary-icon {
+          background: #f5f3ff;
+          color: #7c3aed;
+        }
+
+        .summary-card.purple strong {
+          color: #7c3aed;
+        }
+
+        .summary-card.purple i {
+          background: #7c3aed;
+        }
+
+        .filters {
+          padding: 0 34px 26px;
           display: grid;
-          grid-template-columns: 1fr 48px;
-          gap: 8px;
+          grid-template-columns: 1fr 74px;
+          gap: 14px;
         }
 
         .search-box,
-        .select-box,
-        .filter-button {
-          min-height: 44px;
-          border: 1px solid #dbe5f0;
-          border-radius: 16px;
-          background: rgba(255, 255, 255, 0.9);
-          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+        .filter-square,
+        .filters select {
+          min-height: 58px;
+          border-radius: 18px;
+          border: 1px solid #e2e8f0;
+          background: #ffffff;
+          color: #071332;
+          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
         }
 
         .search-box {
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 0 14px;
-          color: #071332;
+          gap: 14px;
+          padding: 0 18px;
         }
 
         .search-box input {
-          min-width: 0;
           width: 100%;
           border: 0;
           outline: 0;
           background: transparent;
+          font-size: 19px;
           color: #071332;
-          font-size: 15px;
-          font-weight: 850;
+          font-weight: 750;
         }
 
-        .search-box input::placeholder {
-          color: #94a3b8;
+        .filter-square {
+          display: grid;
+          place-items: center;
         }
 
-        .select-box {
-          position: relative;
-          display: flex;
-          align-items: center;
-          padding: 0 10px 0 14px;
-        }
-
-        .select-box select {
-          appearance: none;
-          width: 100%;
-          min-width: 0;
-          border: 0;
-          outline: 0;
-          background: transparent;
-          color: #071332;
-          font-size: 15px;
-          font-weight: 950;
-          text-align: center;
-        }
-
-        .select-box svg {
-          flex: 0 0 auto;
-        }
-
-        .compact-select {
-          max-width: 100%;
-        }
-
-        .full-select {
-          grid-column: 1 / -1;
-        }
-
-        .feedback-box {
-          margin: 8px 10px;
-          border-radius: 18px;
-          border: 1px solid #dbe5f0;
-          background: rgba(255, 255, 255, 0.88);
-          color: #071332;
-          padding: 14px;
-          text-align: center;
+        .filters select {
+          padding: 0 18px;
+          font-size: 17px;
           font-weight: 900;
         }
 
-        .feedback-box.error {
-          background: #fff1f2;
-          color: #be123c;
-          border-color: #fecdd3;
-        }
-
-        .application-stream {
-          display: grid;
-          gap: 9px;
-          padding: 0 10px 18px;
-        }
-
-        .mini-card {
-          min-height: 116px;
+        .error-box,
+        .empty-state {
+          margin: 0 34px 18px;
           border-radius: 20px;
-          border: 1px solid #dbe5f0;
-          background: rgba(255, 255, 255, 0.94);
-          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.055);
+          padding: 16px;
+          text-align: center;
+          font-weight: 900;
+          border: 1px solid #e2e8f0;
+          background: #ffffff;
+        }
+
+        .application-list {
           display: grid;
-          grid-template-columns: 48px 1fr 108px;
-          gap: 8px;
-          padding: 9px 10px 9px 12px;
+          gap: 20px;
+          padding: 0 34px;
+        }
+
+        .application-card {
           position: relative;
           overflow: hidden;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 26px;
+          padding: 24px;
+          box-shadow: 0 16px 38px rgba(15, 23, 42, 0.075);
         }
 
-        .mini-card::before {
+        .application-card::before {
           content: "";
           position: absolute;
           left: 0;
           top: 0;
           bottom: 0;
-          width: 4px;
-          background: #1557d6;
+          width: 5px;
+          background: #2563eb;
         }
 
-        .lane-green::before { background: #16a34a; }
-        .lane-violet::before { background: #7c3aed; }
-        .lane-orange::before { background: #f97316; }
-        .lane-cyan::before { background: #06b6d4; }
-        .lane-slate::before { background: #475569; }
+        .theme-blue::before {
+          background: #2563eb;
+        }
 
-        .mini-avatar,
-        .modal-avatar {
-          border-radius: 16px;
+        .theme-green::before {
+          background: #16a34a;
+        }
+
+        .theme-purple::before {
+          background: #7c3aed;
+        }
+
+        .theme-amber::before {
+          background: #f59e0b;
+        }
+
+        .theme-cyan::before {
+          background: #06b6d4;
+        }
+
+        .theme-rose::before {
+          background: #e11d48;
+        }
+
+        .card-top {
+          display: grid;
+          grid-template-columns: 64px 1fr auto;
+          gap: 16px;
+          align-items: start;
+        }
+
+        .avatar {
+          width: 52px;
+          height: 52px;
+          border-radius: 999px;
           display: grid;
           place-items: center;
+          background: #0f172a;
+          color: white;
+          font-weight: 950;
+          font-size: 18px;
+        }
+
+        .avatar.soft {
           background: #eff6ff;
+          color: #2563eb;
           border: 1px solid #bfdbfe;
-          color: #1557d6;
-          font-weight: 950;
         }
 
-        .mini-avatar {
-          width: 38px;
-          height: 38px;
-          margin-top: 5px;
-          font-size: 13px;
+        .avatar.large {
+          width: 64px;
+          height: 64px;
         }
 
-        .mini-main {
-          min-width: 0;
-          align-self: center;
-        }
-
-        .mini-line-one {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          min-width: 0;
-        }
-
-        .mini-line-one h3 {
-          min-width: 0;
-          margin: 0;
+        .person-info h2 {
+          margin: 0 0 6px;
           color: #071332;
-          font-size: 20px;
-          line-height: 0.94;
+          font-size: 24px;
+          line-height: 1;
           font-weight: 950;
-          letter-spacing: -0.055em;
+          letter-spacing: -0.035em;
+        }
+
+        .person-info p {
+          margin: 0 0 7px;
+          color: #334155;
+          font-size: 14px;
+          font-weight: 850;
+        }
+
+        .person-info b {
+          margin: 0 12px;
+          color: #cbd5e1;
+        }
+
+        .status-block {
+          display: grid;
+          justify-items: end;
+          gap: 9px;
+        }
+
+        .status-block small {
+          color: #475569;
+          font-size: 14px;
+          font-weight: 850;
+          white-space: nowrap;
         }
 
         .status-pill {
-          flex: 0 0 auto;
+          width: fit-content;
           border-radius: 999px;
-          padding: 4px 8px;
-          font-size: 8px;
+          padding: 9px 18px;
+          background: #fef3c7;
+          color: #b45309;
+          font-size: 13px;
+          font-weight: 950;
+          text-transform: uppercase;
+          white-space: nowrap;
+        }
+
+        .decision-row {
+          margin-top: 22px;
+          display: grid;
+          grid-template-columns: 1fr 1.22fr 1.25fr 1.1fr;
+          gap: 14px;
+          align-items: center;
+        }
+
+        .info-pill,
+        .trust-box {
+          min-height: 52px;
+          border-radius: 14px;
+          border: 1px solid #e2e8f0;
+          background: rgba(255, 255, 255, 0.78);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 9px;
+          color: #0f1f44;
+          font-size: 14px;
+          font-weight: 950;
+          white-space: nowrap;
+        }
+
+        .blue-pill {
+          color: #2563eb;
+          border-color: #bfdbfe;
+          background: #f8fbff;
+        }
+
+        .green-pill {
+          color: #15803d;
+          border-color: #bbf7d0;
+          background: #f7fef9;
+        }
+
+        .red-pill {
+          color: #b91c1c;
+          border-color: #fecaca;
+          background: #fff7f7;
+        }
+
+        .trust-box {
+          display: grid;
+          grid-template-columns: 34px 1fr;
+          column-gap: 7px;
+          justify-content: start;
+          padding: 0 12px;
+          color: #15803d;
+        }
+
+        .trust-box::before {
+          content: "✓";
+          width: 30px;
+          height: 30px;
+          display: grid;
+          place-items: center;
+          border-radius: 999px;
+          border: 2px solid currentColor;
+          font-size: 15px;
+        }
+
+        .trust-box small {
+          color: #475569;
+          font-size: 10px;
+          text-transform: uppercase;
+          font-weight: 950;
+          display: block;
+        }
+
+        .trust-box strong {
+          display: block;
+          color: #16a34a;
+          font-size: 23px;
           line-height: 1;
           font-weight: 950;
+        }
+
+        .trust-box b {
+          font-size: 13px;
+          color: #334155;
+        }
+
+        .trust-box.mid,
+        .trust-box.mid strong {
+          color: #ea580c;
+        }
+
+        .trust-box.bad,
+        .trust-box.bad strong {
+          color: #dc2626;
+        }
+
+        .lina-row {
+          margin-top: 18px;
+          width: min(470px, 100%);
+          min-height: 50px;
+          border-radius: 14px;
+          border: 1px solid #dbeafe;
+          background: #f8fbff;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 0 18px;
+          color: #0f1f44;
+          font-size: 15px;
+          font-weight: 950;
+        }
+
+        .lina-row strong {
+          border-radius: 999px;
+          padding: 9px 18px;
+          font-size: 14px;
           text-transform: uppercase;
         }
 
-        .status-pill.wait {
-          background: #fff7ed;
-          color: #ea580c;
-        }
-
-        .status-pill.ok {
-          background: #ecfdf5;
+        .lina-row strong.approve {
+          background: #dcfce7;
           color: #15803d;
         }
 
-        .status-pill.bad {
-          background: #fff1f2;
-          color: #be123c;
+        .lina-row strong.neutral {
+          background: #ffedd5;
+          color: #ea580c;
         }
 
-        .mini-line-two {
-          margin-top: 5px;
+        .lina-row strong.review {
+          background: #fee2e2;
+          color: #b91c1c;
+        }
+
+        .card-bottom {
+          margin-top: 16px;
+          display: flex;
+          align-items: end;
+          justify-content: space-between;
+          gap: 18px;
+        }
+
+        .card-bottom p {
+          margin: 0;
+          color: #334155;
+          font-size: 15px;
+          font-weight: 850;
+          line-height: 1.45;
+        }
+
+        .card-actions {
           display: flex;
           align-items: center;
-          gap: 5px;
-          color: #334155;
-          font-size: 10.5px;
-          line-height: 1;
-          font-weight: 900;
-          white-space: nowrap;
-          overflow: hidden;
+          gap: 14px;
         }
 
-        .mini-line-two span {
-          min-width: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .mini-line-two i {
-          width: 3px;
-          height: 3px;
-          border-radius: 999px;
-          background: #cbd5e1;
-          flex: 0 0 auto;
-        }
-
-        .chip-row {
-          margin-top: 6px;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 4px;
-        }
-
-        .chip-row span {
-          border-radius: 999px;
-          background: #f8fafc;
+        .card-actions button {
+          width: 58px;
+          height: 58px;
+          border-radius: 16px;
           border: 1px solid #e2e8f0;
-          color: #071332;
-          padding: 3px 6px;
-          font-size: 8.5px;
-          line-height: 1;
-          font-weight: 950;
-          white-space: nowrap;
-        }
-
-        .chip-row .score-good {
-          background: #ecfdf5;
-          color: #15803d;
-          border-color: #bbf7d0;
-        }
-
-        .chip-row .score-mid {
-          background: #fff7ed;
-          color: #ea580c;
-          border-color: #fed7aa;
-        }
-
-        .chip-row .score-bad {
-          background: #fff1f2;
-          color: #be123c;
-          border-color: #fecdd3;
-        }
-
-        .chip-row .lina-chip.approve {
-          background: #ecfdf5;
-          color: #15803d;
-          border-color: #bbf7d0;
-        }
-
-        .chip-row .lina-chip.neutral {
-          background: #fff7ed;
-          color: #ea580c;
-          border-color: #fed7aa;
-        }
-
-        .chip-row .lina-chip.review {
-          background: #fff1f2;
-          color: #be123c;
-          border-color: #fecdd3;
-        }
-
-        .authority-line {
-          margin-top: 6px;
-          color: #071332;
-          font-size: 10px;
-          line-height: 1;
-          font-weight: 950;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .mini-actions {
-          align-self: stretch;
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 6px;
-          align-items: end;
-        }
-
-        .mini-actions button {
-          width: 32px;
-          height: 42px;
-          border-radius: 13px;
-          border: 1px solid #dbe5f0;
           background: #ffffff;
           color: #071332;
           display: grid;
           place-items: center;
         }
 
-        .mini-actions .yes {
-          color: #16a34a;
+        .card-actions button.approve {
           background: #ecfdf5;
+          color: #16a34a;
           border-color: #bbf7d0;
         }
 
-        .mini-actions .no {
-          color: #dc2626;
+        .card-actions button.reject {
           background: #fff7f7;
+          color: #dc2626;
           border-color: #fecaca;
         }
 
@@ -1237,86 +1118,24 @@ export default function AdminKatilimTalepleriPage() {
           cursor: not-allowed;
         }
 
-        .lina-float {
-          position: fixed;
-          left: calc(50% + 129px);
-          bottom: 86px;
-          width: 64px;
-          height: 64px;
-          border: 0;
-          border-radius: 23px;
-          background: linear-gradient(135deg, #7c3aed, #4f46e5);
-          color: white;
-          display: grid;
-          place-items: center;
-          align-content: center;
-          gap: 1px;
-          box-shadow: 0 18px 34px rgba(79, 70, 229, 0.35);
-          z-index: 80;
-        }
-
-        .lina-float span {
-          font-size: 12px;
-          line-height: 1;
-          font-weight: 950;
-        }
-
-        .bottom-nav {
-          position: fixed;
-          left: 50%;
-          bottom: 12px;
-          width: min(calc(100% - 20px), 410px);
-          transform: translateX(-50%);
-          height: 62px;
-          border-radius: 24px;
-          border: 1px solid #dbe5f0;
-          background: rgba(255, 255, 255, 0.94);
-          backdrop-filter: blur(18px);
-          box-shadow: 0 18px 42px rgba(15, 23, 42, 0.12);
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          align-items: center;
-          z-index: 70;
-        }
-
-        .bottom-nav a {
-          color: #64748b;
-          text-decoration: none;
-          display: grid;
-          place-items: center;
-          gap: 3px;
-          font-size: 16px;
-          font-weight: 950;
-        }
-
-        .bottom-nav a span {
-          font-size: 10px;
-          line-height: 1;
-          font-weight: 950;
-        }
-
-        .bottom-nav a.active {
-          color: #1557d6;
-        }
-
         .modal-backdrop {
           position: fixed;
           inset: 0;
-          background: rgba(15, 23, 42, 0.42);
+          background: rgba(15, 23, 42, 0.32);
           display: grid;
           place-items: center;
           padding: 18px;
-          z-index: 120;
+          z-index: 100;
         }
 
         .detail-modal {
           width: min(680px, 100%);
           max-height: calc(100vh - 36px);
           overflow: auto;
-          background: #ffffff;
+          background: white;
           border-radius: 28px;
           border: 1px solid #e2e8f0;
-          padding: 20px;
+          padding: 22px;
           position: relative;
           box-shadow: 0 28px 80px rgba(15, 23, 42, 0.24);
         }
@@ -1335,89 +1154,72 @@ export default function AdminKatilimTalepleriPage() {
           place-items: center;
         }
 
-        .modal-head {
+        .modal-header {
           display: flex;
           align-items: center;
-          gap: 13px;
+          gap: 14px;
           padding-right: 46px;
           margin-bottom: 14px;
         }
 
-        .modal-avatar {
-          width: 58px;
-          height: 58px;
-          font-size: 18px;
-        }
-
-        .modal-head span {
-          color: #64748b;
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          font-weight: 950;
-        }
-
-        .modal-head h2 {
-          margin: 3px 0 0;
+        .modal-header h2 {
+          margin: 0;
           color: #071332;
           font-size: 22px;
-          line-height: 1;
           font-weight: 950;
         }
 
-        .modal-head p {
+        .modal-header p {
           margin: 5px 0 0;
           color: #64748b;
-          font-size: 13px;
-          font-weight: 850;
+          font-weight: 800;
         }
 
-        .modal-grid {
+        .decision-panel {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 10px;
+          gap: 12px;
           margin-bottom: 12px;
         }
 
-        .modal-grid div,
+        .decision-panel div,
         .note-box {
           border: 1px solid #e2e8f0;
           border-radius: 18px;
-          padding: 13px;
+          padding: 14px;
           background: #f8fafc;
         }
 
-        .modal-grid span,
+        .decision-panel span,
         .note-box {
           color: #64748b;
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 900;
         }
 
-        .modal-grid strong {
+        .decision-panel strong {
           display: block;
-          margin-top: 5px;
+          margin-top: 6px;
           color: #071332;
           font-size: 14px;
-          font-weight: 950;
+          font-weight: 900;
         }
 
-        .modal-grid small {
+        .decision-panel small {
           display: block;
           margin-top: 5px;
           color: #64748b;
-          font-size: 11px;
           font-weight: 750;
         }
 
         .note-box {
           display: grid;
-          gap: 9px;
-          margin-bottom: 14px;
+          gap: 10px;
+          margin-bottom: 16px;
         }
 
         .note-box textarea {
-          min-height: 100px;
+          min-height: 110px;
           width: 100%;
           border: 1px solid #e2e8f0;
           border-radius: 16px;
@@ -1443,13 +1245,13 @@ export default function AdminKatilimTalepleriPage() {
           border: 1px solid #e2e8f0;
           background: white;
           color: #071332;
-          font-weight: 950;
+          font-weight: 900;
         }
 
         .primary-button {
-          background: #1557d6;
+          background: #2563eb;
           color: white;
-          border-color: #1557d6;
+          border-color: #2563eb;
         }
 
         .danger-button {
@@ -1458,28 +1260,190 @@ export default function AdminKatilimTalepleriPage() {
           border-color: #fecaca;
         }
 
-        @media (max-width: 430px) {
-          .phone-shell {
-            width: 100%;
+        @media (max-width: 760px) {
+          .applications-page {
+            min-height: 100dvh;
           }
 
-          .lina-float {
-            left: auto;
-            right: 14px;
-          }
-        }
-
-        @media (max-width: 380px) {
-          .mini-card {
-            grid-template-columns: 42px 1fr 96px;
+          .flag-banner {
+            height: 118px;
+            padding: 10px 16px;
+            background-image:
+              linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.12) 36%, rgba(255, 255, 255, 0.88) 69%, rgba(255, 255, 255, 0.97) 100%),
+              url("/admin-bayrak.jpg");
+            background-position: center;
           }
 
-          .mini-line-one h3 {
-            font-size: 18px;
+          .quote-card {
+            width: 57%;
           }
 
-          .mini-actions button {
-            width: 29px;
+          .quote-card p {
+            font-size: 13px;
+            line-height: 1.35;
+            margin-bottom: 4px;
+          }
+
+          .quote-card span {
+            font-size: 12px;
+          }
+
+          .page-head {
+            grid-template-columns: 28px 1fr auto;
+            gap: 9px;
+            padding: 22px 18px 15px;
+          }
+
+          .page-head h1 {
+            font-size: 30px;
+          }
+
+          .head-actions {
+            gap: 9px;
+          }
+
+          .head-actions button {
+            min-width: 48px;
+            height: 48px;
+            border-radius: 16px;
+            font-size: 0;
+          }
+
+          .head-actions button span {
+            display: none;
+          }
+
+          .summary-grid {
+            gap: 8px;
+            padding: 0 18px 14px;
+          }
+
+          .summary-card {
+            min-height: 64px;
+            border-radius: 16px;
+            padding: 8px 8px 7px;
+            grid-template-columns: 25px 1fr;
+            column-gap: 6px;
+          }
+
+          .summary-icon {
+            width: 25px;
+            height: 25px;
+            font-size: 14px;
+          }
+
+          .summary-card span {
+            font-size: 9.5px;
+            line-height: 1;
+          }
+
+          .summary-card strong {
+            font-size: 20px;
+          }
+
+          .summary-card i {
+            margin-top: 5px;
+          }
+
+          .filters {
+            padding: 0 18px 18px;
+            grid-template-columns: 1fr 58px;
+            gap: 10px;
+          }
+
+          .search-box,
+          .filter-square,
+          .filters select {
+            min-height: 54px;
+            border-radius: 17px;
+          }
+
+          .search-box input {
+            font-size: 17px;
+          }
+
+          .filters select {
+            font-size: 15px;
+          }
+
+          .application-list {
+            gap: 16px;
+            padding: 0 18px;
+          }
+
+          .application-card {
+            border-radius: 24px;
+            padding: 20px;
+          }
+
+          .card-top {
+            grid-template-columns: 55px 1fr auto;
+            gap: 12px;
+          }
+
+          .avatar {
+            width: 48px;
+            height: 48px;
+            font-size: 17px;
+          }
+
+          .person-info h2 {
+            font-size: 22px;
+          }
+
+          .person-info p {
+            font-size: 13px;
+            line-height: 1.35;
+          }
+
+          .person-info b {
+            margin: 0 8px;
+          }
+
+          .status-block small {
+            font-size: 13px;
+          }
+
+          .status-pill {
+            padding: 8px 15px;
+            font-size: 12px;
+          }
+
+          .decision-row {
+            margin-top: 18px;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+          }
+
+          .info-pill,
+          .trust-box {
+            min-height: 48px;
+            font-size: 13px;
+          }
+
+          .lina-row {
+            margin-top: 14px;
+            min-height: 48px;
+            font-size: 14px;
+            padding: 0 13px;
+          }
+
+          .lina-row strong {
+            font-size: 12px;
+            padding: 8px 12px;
+          }
+
+          .card-bottom {
+            margin-top: 14px;
+          }
+
+          .card-bottom p {
+            font-size: 13px;
+          }
+
+          .card-actions button {
+            width: 54px;
+            height: 54px;
           }
         }
       `}</style>
