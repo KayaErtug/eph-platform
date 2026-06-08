@@ -237,10 +237,22 @@ function presenceFromDate(value?: string | null) {
 }
 
 function Avatar({ firstName, lastName, imageUrl, size = "md" }: { firstName?: string; lastName?: string; imageUrl?: string | null; size?: "sm" | "md" | "lg" }) {
-  const sizeClass = size === "lg" ? "h-14 w-14 text-lg" : size === "sm" ? "h-10 w-10 text-sm" : "h-12 w-12 text-base";
+  const [imageFailed, setImageFailed] = useState(false);
+  const sizeClass = size === "lg" ? "h-16 w-16 text-xl" : size === "sm" ? "h-10 w-10 text-sm" : "h-12 w-12 text-base";
+  const showImage = Boolean(imageUrl) && !imageFailed;
+
   return (
     <div className={`${sizeClass} shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-sky-100 to-indigo-100 shadow-sm`}>
-      {imageUrl ? <img src={imageUrl} alt={`${firstName || ""} ${lastName || ""}`} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center font-black text-slate-700">{initials(firstName, lastName)}</div>}
+      {showImage ? (
+        <img
+          src={imageUrl || ""}
+          alt={`${firstName || ""} ${lastName || ""}`}
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center font-black text-slate-700">{initials(firstName, lastName)}</div>
+      )}
     </div>
   );
 }
@@ -436,23 +448,30 @@ export default function AdminPage() {
 
       {selectedUser && <Modal title={isMaskedSoftwareTeam(selectedUser) ? "Yazılım Ekibi Detayı" : "Üye Detayı"} desc={`${safeUserName(selectedUser)} · ${roleLabel(selectedUser.role)}`} onClose={() => setSelectedUser(null)}>
         <div className="space-y-4">
-          <div className="flex items-start gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-            <Avatar firstName={selectedUser.firstName} lastName={selectedUser.lastName} imageUrl={selectedUser.profileImageUrl} size="lg" />
-            <div className="min-w-0 flex-1">
-              <h3 className="truncate text-lg font-black text-slate-950">{fullName(selectedUser)}</h3>
-              <p className="truncate text-sm font-bold text-slate-500">{selectedUser.email}</p>
-              <p className="text-xs font-bold text-slate-400">{selectedUser.phone || "Telefon yok"}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
+          <div className="flex flex-col items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-5 text-center">
+            {isMaskedSoftwareTeam(selectedUser) ? (
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-slate-950 text-white shadow-sm">
+                <ShieldCheck size={30} />
+              </div>
+            ) : (
+              <Avatar firstName={selectedUser.firstName} lastName={selectedUser.lastName} imageUrl={selectedUser.profileImageUrl} size="lg" />
+            )}
+            <div className="min-w-0 w-full">
+              <h3 className="truncate text-lg font-black text-slate-950">{safeUserName(selectedUser)}</h3>
+              <p className="truncate text-sm font-bold text-slate-500">{safeUserEmail(selectedUser)}</p>
+              <p className="text-xs font-bold text-slate-400">{safeUserPhone(selectedUser)}</p>
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
                 <Pill className={roleClass(selectedUser.role)}>{roleLabel(selectedUser.role)}</Pill>
                 <Pill className={selectedUser.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{selectedUser.isApproved ? "Onaylı" : "Bekliyor"}</Pill>
+                {isMaskedSoftwareTeam(selectedUser) && <Pill className="border-sky-200 bg-sky-50 text-sky-800">Korunan Profil</Pill>}
               </div>
             </div>
           </div>
 
           <div className="grid gap-2 rounded-3xl border border-slate-200 bg-white p-4">
-            <InfoLine label="Üye No" value={selectedUser.memberCode || "Atanmadı"} strong />
-            <InfoLine label="Konum" value={`${selectedUser.city || "Şehir yok"}${selectedUser.district ? ` / ${selectedUser.district}` : ""}`} />
-            <InfoLine label="Bölge Kodu" value={selectedUser.cityPlateCode ? `TR ${selectedUser.cityPlateCode}` : "—"} />
+            <InfoLine label="Üye No" value={safeMemberCode(selectedUser)} strong />
+            <InfoLine label="Konum" value={isMaskedSoftwareTeam(selectedUser) ? "Gizli" : `${selectedUser.city || "Şehir yok"}${selectedUser.district ? ` / ${selectedUser.district}` : ""}`} />
+            <InfoLine label="Bölge Kodu" value={isMaskedSoftwareTeam(selectedUser) ? "Gizli" : selectedUser.cityPlateCode ? `TR ${selectedUser.cityPlateCode}` : "—"} />
             <InfoLine label="Kayıt" value={fmt(selectedUser.memberSince || undefined)} />
           </div>
 
@@ -527,7 +546,7 @@ export default function AdminPage() {
         <section className="min-w-0 flex-1">
           <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur-xl lg:px-8"><div className="flex items-center justify-between gap-3"><button onClick={() => setMenuOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 lg:hidden"><Menu size={20} /></button><div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">EPH Yönetim Merkezi</p><h1 className="truncate text-xl font-black tracking-tight text-slate-950 sm:text-2xl">{navItems.find((i) => i.key === activeTab)?.label || "Özet"}</h1></div><div className="flex items-center gap-2"><Link href="/dashboard" className="hidden rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 sm:inline-flex">Ana Sayfa</Link><button onClick={refreshCurrentTab} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700"><RefreshCw size={18} /></button><button onClick={() => { logout(); router.push("/giris"); }} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 text-rose-700"><LogOut size={18} /></button></div></div></header>
           {menuOpen && <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm lg:hidden" onClick={() => setMenuOpen(false)}><aside className="h-full w-[86%] max-w-sm bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between"><AdminBrand /><button onClick={() => setMenuOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200"><X size={18} /></button></div><nav className="mt-6 space-y-2">{navItems.map((item) => <NavButton key={item.key} item={item} active={activeTab === item.key} onClick={() => { setActiveTab(item.key); setMenuOpen(false); }} />)}</nav></aside></div>}
-          <div className="px-4 py-5 pb-24 lg:px-8 lg:py-8">
+          <div className="px-4 py-5 pb-32 lg:px-8 lg:py-8">
             {activeTab === "overview" && <OverviewTab stats={stats} users={usersWithPresence} applications={applications} documents={documents} leads={leads} units={units} setActiveTab={setActiveTab} />}
             {activeTab === "users" && <UsersTab users={filteredUsers} allUsers={usersWithPresence} search={userSearch} setSearch={setUserSearch} roleFilter={roleFilter} setRoleFilter={setRoleFilter} cityFilter={cityFilter} setCityFilter={setCityFilter} cityOptions={cityOptions} actionLoading={actionLoading} onCreate={() => setCreateUserModal(true)} onApprove={(id) => act(id, async () => { await api.patch(`/admin/users/${id}/approve`); await Promise.all([fetchUsers(), fetchStats()]); })} currentRole={currentRole} currentUserId={user?.id} onInspect={(item) => setSelectedUser(item)} onSuspend={(item) => { setSuspendModal(item); setSuspendReason(""); setSuspendDuration("ONE_HOUR"); }} onDelete={(id) => act(id, async () => { await api.delete(`/admin/users/${id}/reject`); await Promise.all([fetchUsers(), fetchStats()]); })} onRole={(item) => { setRoleModal({ id: item.id, role: item.role }); setNewRole(item.role); }} onMemberCode={(id) => act(id, async () => { await api.patch(`/admin/users/${id}/member-code`); await Promise.all([fetchUsers(), fetchStats()]); })} onBulkMemberCodes={() => act("member-codes", async () => { const ok = confirm("Üye numarası olmayan onaylı kullanıcılara toplu üye no oluşturulsun mu?"); if (!ok) return; await api.patch("/admin/users/member-codes/missing"); await Promise.all([fetchUsers(), fetchStats()]); })} />}
             {activeTab === "traffic" && <TrafficTab rows={trafficRows} trafficFilter={trafficFilter} setTrafficFilter={setTrafficFilter} onRefresh={fetchVisits} />}
@@ -550,7 +569,14 @@ function AdminBrand() { return <Link href="/admin" className="flex items-center 
 function NavButton({ item, active, onClick }: { item: { key: TabKey; label: string; icon: ReactNode; badge?: number }; active: boolean; onClick: () => void }) { return <button onClick={onClick} className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-black transition ${active ? "bg-slate-950 text-white shadow-lg shadow-slate-200" : "text-slate-600 hover:bg-slate-100"}`}><span className="flex items-center gap-3">{item.icon}{item.label}</span>{(item.badge || 0) > 0 && <span className={`rounded-full px-2 py-0.5 text-[10px] ${active ? "bg-white text-slate-950" : "bg-rose-100 text-rose-700"}`}>{item.badge}</span>}</button>; }
 function QuickLine({ title, value, icon }: { title: string; value: number; icon: ReactNode }) { return <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-700">{icon}</div><p className="text-sm font-black text-slate-700">{title}</p></div><p className="text-2xl font-black text-slate-950">{value}</p></div>; }
 function MemberMini({ user }: { user: UserItem & { presence?: any } }) { const presence = user.presence || presenceFromDate(null); const masked = isMaskedSoftwareTeam(user); return <div className={`flex items-center gap-3 rounded-2xl border p-3 ${masked ? "border-slate-800 bg-slate-950 text-white" : "border-slate-200 bg-slate-50"}`}><div className="relative"><Avatar firstName={user.firstName} lastName={user.lastName} imageUrl={masked ? null : user.profileImageUrl} /><span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 ${masked ? "border-slate-950" : "border-white"} ${presence.dot}`} /></div><div className="min-w-0 flex-1"><p className={`truncate text-sm font-black ${masked ? "text-white" : "text-slate-950"}`}>{safeUserName(user)}</p><p className={`truncate text-xs font-bold ${masked ? "text-slate-300" : "text-slate-500"}`}>{masked ? "Bilgiler gizli" : user.memberCode || "Üye No bekleniyor"}</p></div><Pill className={masked ? "border-slate-700 bg-slate-900 text-slate-100" : roleClass(user.role)}>{roleLabel(user.role)}</Pill></div>; }
-function InfoLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) { return <div className="flex items-center justify-between gap-3"><span className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</span><span className={`text-right text-xs ${strong ? "font-black text-slate-950" : "font-bold text-slate-600"}`}>{value}</span></div>; }
+function InfoLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="w-full rounded-2xl border border-white/10 bg-white/70 px-3 py-3 text-center shadow-sm">
+      <span className="block text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</span>
+      <span className={`mt-1 block break-words text-sm ${strong ? "font-black text-slate-950" : "font-bold text-slate-600"}`}>{value}</span>
+    </div>
+  );
+}
 
 function OverviewTab({ stats, users, applications, documents, leads, units, setActiveTab }: { stats: Stats | null; users: (UserItem & { presence: any })[]; applications: ApplicationItem[]; documents: DocumentItem[]; leads: LeadItem[]; units: UnitItem[]; setActiveTab: (tab: TabKey) => void }) {
   const onlineCount = users.filter((u) => u.presence.label === "Online").length;
@@ -560,37 +586,186 @@ function OverviewTab({ stats, users, applications, documents, leads, units, setA
 function UsersTab({ users, allUsers, search, setSearch, roleFilter, setRoleFilter, cityFilter, setCityFilter, cityOptions, actionLoading, currentRole, currentUserId, onCreate, onApprove, onSuspend, onDelete, onRole, onInspect, onMemberCode, onBulkMemberCodes }: { users: (UserItem & { lastVisit?: VisitItem; presence: any })[]; allUsers: (UserItem & { lastVisit?: VisitItem; presence: any })[]; search: string; setSearch: (v: string) => void; roleFilter: string; setRoleFilter: (v: string) => void; cityFilter: string; setCityFilter: (v: string) => void; cityOptions: string[]; actionLoading: string | null; currentRole: string; currentUserId?: string; onCreate: () => void; onApprove: (id: string) => void; onSuspend: (u: UserItem) => void; onDelete: (id: string) => void; onRole: (u: UserItem) => void; onInspect: (u: UserItem) => void; onMemberCode: (id: string) => void; onBulkMemberCodes: () => void }) {
   const isSoftwareTeam = currentRole === "SUPER_ADMIN";
   const isAdmin = currentRole === "ADMIN";
-
   const missingMemberCodeCount = allUsers.filter((u) => u.isApproved && !u.memberCode).length;
 
-  return <section><SectionHeader title="Üyeler" desc={`${users.length} kayıt gösteriliyor. Toplam ${allUsers.length} üye.`} action={<div className="flex flex-wrap gap-2">{isSoftwareTeam && missingMemberCodeCount > 0 && <PrimaryButton tone="light" icon={<Database size={16} />} onClick={onBulkMemberCodes}>Eksik Üye Noları Oluştur</PrimaryButton>}<PrimaryButton icon={<Plus size={16} />} onClick={onCreate}>Yeni Üye</PrimaryButton></div>} /><div className="mb-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]"><div className="relative"><Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ad, e-posta, şehir veya üye no ara..." className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-bold outline-none focus:border-sky-400" /></div><select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Şehirler</option>{cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}</select><select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Roller</option><option value="EMLAKCI">Emlakçı</option><option value="MUTEAHHIT">Müteahhit</option><option value="INSAAT_FIRMASI">İnşaat Firması</option><option value="MODERATOR">Moderatör</option><option value="ADMIN">Admin</option><option value="SUPER_ADMIN">Yazılım Ekibi</option></select></div>{users.length === 0 ? <Empty>Kullanıcı bulunamadı.</Empty> : <div className="space-y-3">{users.map((u) => {
-    const isSelf = currentUserId === u.id;
-    const targetIsAuthority = u.role === "ADMIN" || u.role === "SUPER_ADMIN";
-    const adminCanSuspend = isAdmin && !isSelf && !targetIsAuthority && u.isApproved;
-    const softwareTeamCanManage = isSoftwareTeam && !isSelf;
+  return (
+    <section className="pb-32">
+      <SectionHeader
+        title="Üyeler"
+        desc={`${users.length} kayıt gösteriliyor. Toplam ${allUsers.length} üye.`}
+        action={
+          <div className="flex flex-wrap justify-center gap-2 sm:justify-end">
+            {isSoftwareTeam && missingMemberCodeCount > 0 && (
+              <PrimaryButton tone="light" icon={<Database size={16} />} onClick={onBulkMemberCodes}>
+                Eksik Üye Noları Oluştur
+              </PrimaryButton>
+            )}
+            <PrimaryButton icon={<Plus size={16} />} onClick={onCreate}>Yeni Üye</PrimaryButton>
+          </div>
+        }
+      />
 
-    const maskedSoftwareTeam = isMaskedSoftwareTeam(u);
+      <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Ad, e-posta, şehir veya üye no ara..."
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-center text-sm font-bold outline-none focus:border-sky-400 sm:text-left"
+          />
+        </div>
 
-    return <div key={u.id} className={`rounded-3xl border p-4 shadow-sm ${maskedSoftwareTeam ? "border-slate-800 bg-slate-950 text-white shadow-slate-950/10" : "border-slate-200 bg-white"}`}><div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_auto] lg:items-center"><button type="button" onClick={() => onInspect(u)} className="flex flex-col items-center gap-3 text-center"><div className="relative"><Avatar firstName={u.firstName} lastName={u.lastName} imageUrl={maskedSoftwareTeam ? null : u.profileImageUrl} size="lg" /><span className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 ${maskedSoftwareTeam ? "border-slate-950" : "border-white"} ${u.presence.dot}`} /></div><div className="min-w-0 w-full text-center"><h3 className={`truncate text-lg font-black ${maskedSoftwareTeam ? "text-white" : "text-slate-950"}`}>{safeUserName(u)}</h3><p className={`truncate text-sm font-bold ${maskedSoftwareTeam ? "text-slate-300" : "text-slate-500"}`}>{safeUserEmail(u)}</p><p className={`text-xs font-bold ${maskedSoftwareTeam ? "text-slate-400" : "text-slate-400"}`}>{safeUserPhone(u)}</p><div className="mt-2 flex flex-wrap gap-2"><Pill className={maskedSoftwareTeam ? "border-slate-700 bg-slate-900 text-slate-100" : roleClass(u.role)}>{roleLabel(u.role)}</Pill><Pill className={u.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{u.isApproved ? "Onaylı" : "Bekliyor"}</Pill><Pill className={u.presence.badge}>{u.presence.label}</Pill>{maskedSoftwareTeam && <Pill className="border-violet-800 bg-violet-950/80 text-violet-100">Gizli Profil</Pill>}{(u.restrictions || []).length > 0 && <Pill className="border-amber-200 bg-amber-50 text-amber-800">Askıda</Pill>}</div></div></button><button type="button" onClick={() => onInspect(u)} className={`grid gap-2 rounded-2xl p-4 text-center ${maskedSoftwareTeam ? "bg-slate-900" : "bg-slate-50"}`}><InfoLine label="Üye No" value={safeMemberCode(u)} strong /><InfoLine label="Konum" value={maskedSoftwareTeam ? "Gizli" : `${u.city || "Şehir yok"}${u.district ? ` / ${u.district}` : ""}`} /><InfoLine label="Bölge Kodu" value={maskedSoftwareTeam ? "Gizli" : u.cityPlateCode ? `TR ${u.cityPlateCode}` : "—"} /><InfoLine label="Son Aktivite" value={fmt(u.lastVisit?.createdAt)} /></button><div className="flex flex-wrap gap-2 lg:justify-end">
-      <PrimaryButton tone="light" icon={<Eye size={15} />} onClick={() => onInspect(u)}>İncele</PrimaryButton>
+        <select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-black outline-none focus:border-sky-400">
+          <option value="all">Tüm Şehirler</option>
+          {cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}
+        </select>
 
-      {!u.isApproved && !isSelf && <PrimaryButton tone="success" disabled={actionLoading === u.id} icon={<Check size={15} />} onClick={() => onApprove(u.id)}>Onayla</PrimaryButton>}
+        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-center text-sm font-black outline-none focus:border-sky-400">
+          <option value="all">Tüm Roller</option>
+          <option value="EMLAKCI">Emlakçı</option>
+          <option value="MUTEAHHIT">Müteahhit</option>
+          <option value="INSAAT_FIRMASI">İnşaat Firması</option>
+          <option value="MODERATOR">Moderatör</option>
+          <option value="ADMIN">Admin</option>
+          <option value="SUPER_ADMIN">Yazılım Ekibi</option>
+        </select>
+      </div>
 
-      {adminCanSuspend && <PrimaryButton tone="light" disabled={actionLoading === u.id} onClick={() => onSuspend(u)}>1 Saat Askıya Al</PrimaryButton>}
+      {users.length === 0 ? (
+        <Empty>Kullanıcı bulunamadı.</Empty>
+      ) : (
+        <div className="grid gap-4">
+          {users.map((u) => {
+            const isSelf = currentUserId === u.id;
+            const targetIsAuthority = u.role === "ADMIN" || u.role === "SUPER_ADMIN";
+            const adminCanSuspend = isAdmin && !isSelf && !targetIsAuthority && u.isApproved;
+            const softwareTeamCanManage = isSoftwareTeam && !isSelf;
+            const maskedSoftwareTeam = isMaskedSoftwareTeam(u);
 
-      {softwareTeamCanManage && <>
-        {!u.memberCode && <PrimaryButton tone="light" disabled={actionLoading === u.id} icon={<Database size={15} />} onClick={() => onMemberCode(u.id)}>Üye No Oluştur</PrimaryButton>}
-        <PrimaryButton tone="light" disabled={actionLoading === u.id} onClick={() => onSuspend(u)}>Askıya Al</PrimaryButton>
-        <PrimaryButton tone="light" icon={<UserCog size={15} />} onClick={() => onRole(u)}>Rol</PrimaryButton>
-        <PrimaryButton tone="danger" disabled={actionLoading === u.id} icon={<Trash2 size={15} />} onClick={() => { if (confirm("Kullanıcı silinecek. Emin misiniz?")) onDelete(u.id); }}>Sil</PrimaryButton>
-      </>}
+            return (
+              <article
+                key={u.id}
+                className={`min-h-[430px] rounded-[30px] border p-4 shadow-sm transition sm:min-h-[360px] ${
+                  maskedSoftwareTeam
+                    ? "border-[#0f1f3d] bg-gradient-to-br from-[#06194A] via-[#0B214F] to-[#111827] text-white shadow-slate-950/10"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="grid h-full gap-4 lg:grid-cols-[1.1fr_1fr_auto] lg:items-stretch">
+                  <button
+                    type="button"
+                    onClick={() => onInspect(u)}
+                    className={`flex h-full w-full flex-col items-center justify-center rounded-[26px] px-4 py-5 text-center ${
+                      maskedSoftwareTeam ? "bg-white/5" : "bg-slate-50/70"
+                    }`}
+                  >
+                    <div className="relative">
+                      {maskedSoftwareTeam ? (
+                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-white shadow-sm">
+                          <ShieldCheck size={30} />
+                        </div>
+                      ) : (
+                        <Avatar firstName={u.firstName} lastName={u.lastName} imageUrl={u.profileImageUrl} size="lg" />
+                      )}
+                      <span className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 ${maskedSoftwareTeam ? "border-[#06194A]" : "border-white"} ${u.presence.dot}`} />
+                    </div>
 
-      {isSelf && <PrimaryButton tone="light" icon={<ShieldCheck size={15} />}>Kendi Hesabın</PrimaryButton>}
-      {!softwareTeamCanManage && !adminCanSuspend && !isSelf && targetIsAuthority && <PrimaryButton tone="light" icon={<ShieldCheck size={15} />} onClick={() => onInspect(u)}>{maskedSoftwareTeam ? "Korunan Profil" : "Yetkili Detayı"}</PrimaryButton>}
-    </div></div></div>;
-  })}</div>}</section>;
+                    <div className="mt-4 w-full min-w-0 text-center">
+                      <h3 className={`truncate text-xl font-black tracking-tight ${maskedSoftwareTeam ? "text-white" : "text-slate-950"}`}>
+                        {maskedSoftwareTeam ? "Yazılım Ekibi" : safeUserName(u)}
+                      </h3>
+
+                      {maskedSoftwareTeam ? (
+                        <>
+                          <p className="mx-auto mt-2 max-w-[260px] text-sm font-bold leading-6 text-slate-200">
+                            Bu profil güvenlik politikaları gereği sınırlı görüntülenmektedir.
+                          </p>
+                          <p className="mt-2 text-xs font-black uppercase tracking-[0.22em] text-sky-200">Korunan Profil</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="mt-2 truncate text-sm font-bold text-slate-500">{safeUserEmail(u)}</p>
+                          <p className="mt-1 text-xs font-bold text-slate-400">{safeUserPhone(u)}</p>
+                        </>
+                      )}
+
+                      <div className="mt-4 flex min-h-[74px] flex-wrap items-center justify-center gap-2">
+                        <Pill className={maskedSoftwareTeam ? "border-white/15 bg-white/10 text-white" : roleClass(u.role)}>{roleLabel(u.role)}</Pill>
+                        <Pill className={u.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{u.isApproved ? "Onaylı" : "Bekliyor"}</Pill>
+                        <Pill className={u.presence.badge}>{u.presence.label}</Pill>
+                        {maskedSoftwareTeam && <Pill className="border-sky-300/30 bg-sky-300/10 text-sky-100">Korunan Profil</Pill>}
+                        {(u.restrictions || []).length > 0 && <Pill className="border-amber-200 bg-amber-50 text-amber-800">Askıda</Pill>}
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onInspect(u)}
+                    className={`grid h-full min-h-[190px] place-items-center gap-3 rounded-[26px] p-4 text-center ${
+                      maskedSoftwareTeam ? "border border-white/10 bg-white/5" : "bg-slate-50"
+                    }`}
+                  >
+                    <InfoLine label="Üye No" value={safeMemberCode(u)} strong />
+                    <InfoLine label="Konum" value={maskedSoftwareTeam ? "Gizli" : `${u.city || "Şehir yok"}${u.district ? ` / ${u.district}` : ""}`} />
+                    <InfoLine label="Bölge Kodu" value={maskedSoftwareTeam ? "Gizli" : u.cityPlateCode ? `TR ${u.cityPlateCode}` : "—"} />
+                    <InfoLine label="Son Aktivite" value={fmt(u.lastVisit?.createdAt)} />
+                  </button>
+
+                  <div className="flex h-full min-h-[150px] flex-wrap items-center justify-center gap-2 lg:max-w-[210px] lg:flex-col lg:items-stretch lg:justify-center">
+                    <PrimaryButton tone="light" icon={<Eye size={15} />} onClick={() => onInspect(u)}>
+                      İncele
+                    </PrimaryButton>
+
+                    {!u.isApproved && !isSelf && (
+                      <PrimaryButton tone="success" disabled={actionLoading === u.id} icon={<Check size={15} />} onClick={() => onApprove(u.id)}>
+                        Onayla
+                      </PrimaryButton>
+                    )}
+
+                    {adminCanSuspend && (
+                      <PrimaryButton tone="light" disabled={actionLoading === u.id} onClick={() => onSuspend(u)}>
+                        1 Saat Askıya Al
+                      </PrimaryButton>
+                    )}
+
+                    {softwareTeamCanManage && (
+                      <>
+                        {!u.memberCode && (
+                          <PrimaryButton tone="light" disabled={actionLoading === u.id} icon={<Database size={15} />} onClick={() => onMemberCode(u.id)}>
+                            Üye No Oluştur
+                          </PrimaryButton>
+                        )}
+                        <PrimaryButton tone="light" disabled={actionLoading === u.id} onClick={() => onSuspend(u)}>
+                          Askıya Al
+                        </PrimaryButton>
+                        <PrimaryButton tone="light" icon={<UserCog size={15} />} onClick={() => onRole(u)}>
+                          Rol
+                        </PrimaryButton>
+                        <PrimaryButton tone="danger" disabled={actionLoading === u.id} icon={<Trash2 size={15} />} onClick={() => { if (confirm("Kullanıcı silinecek. Emin misiniz?")) onDelete(u.id); }}>
+                          Sil
+                        </PrimaryButton>
+                      </>
+                    )}
+
+                    {isSelf && <PrimaryButton tone="light" icon={<ShieldCheck size={15} />}>Kendi Hesabın</PrimaryButton>}
+
+                    {!softwareTeamCanManage && !adminCanSuspend && !isSelf && targetIsAuthority && (
+                      <PrimaryButton tone="light" icon={<ShieldCheck size={15} />} onClick={() => onInspect(u)}>
+                        {maskedSoftwareTeam ? "Korunan Profil" : "Yetkili Detayı"}
+                      </PrimaryButton>
+                    )}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
 }
-
 
 function presenceText(label?: string) {
   if (label === "Online") return "Online";

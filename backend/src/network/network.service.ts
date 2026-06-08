@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -112,12 +112,123 @@ function buildNotificationMessage(changes: NetworkPostChangeItem[]) {
   return `Takip ettiğiniz ilanda güncelleme yapıldı.\n\n${lines.join('\n')}`;
 }
 
+
+const FORUM_CATEGORY_LABELS: Record<string, string> = {
+  PORTFOY_ARIYORUM: 'Portföy Arıyorum',
+  BOLGE_ORTAGI_ARIYORUM: 'Bölge Ortağı Arıyorum',
+  PORTFOY_ORTAGI_ARIYORUM: 'Portföy Ortağı Arıyorum',
+  SATIS_OFISI_ARIYORUM: 'Satış Ofisi Arıyorum',
+  KAMPANYA_DUYURULARI: 'Kampanya Duyuruları',
+  KAT_KARSILIGI_ARSA_ARIYORUM: 'Kat Karşılığı Arsa Arıyorum',
+  MUTEAHHIT_YUKLENICI_ARIYORUM: 'Müteahhit / Yüklenici Arıyorum',
+  ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM: 'Ulusal/Bölgesel Satış Partneri Arıyorum',
+  YATIRIMCI_ARIYORUM: 'Yatırımcı Arıyorum',
+  PLATFORM_DUYURUSU: 'Platform Duyurusu',
+  SISTEM_GUNCELLEMESI: 'Sistem Güncellemesi',
+  EGITIM_BILGILENDIRME: 'Eğitim / Bilgilendirme',
+  SEKTOREL_SORU: 'Sektörel Soru',
+  DIGER: 'Diğer',
+};
+
+const ROLE_FORUM_CATEGORIES: Record<string, string[]> = {
+  EMLAKCI: ['PORTFOY_ARIYORUM', 'BOLGE_ORTAGI_ARIYORUM', 'PORTFOY_ORTAGI_ARIYORUM', 'SEKTOREL_SORU', 'DIGER'],
+  MUTEAHHIT: ['SATIS_OFISI_ARIYORUM', 'KAMPANYA_DUYURULARI', 'KAT_KARSILIGI_ARSA_ARIYORUM', 'SEKTOREL_SORU', 'DIGER'],
+  INSAAT_FIRMASI: ['KAT_KARSILIGI_ARSA_ARIYORUM', 'MUTEAHHIT_YUKLENICI_ARIYORUM', 'ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM', 'KAMPANYA_DUYURULARI', 'YATIRIMCI_ARIYORUM', 'SEKTOREL_SORU', 'DIGER'],
+  ADMIN: ['PLATFORM_DUYURUSU', 'SISTEM_GUNCELLEMESI', 'EGITIM_BILGILENDIRME', 'SEKTOREL_SORU'],
+  SUPER_ADMIN: ['PLATFORM_DUYURUSU', 'SISTEM_GUNCELLEMESI', 'EGITIM_BILGILENDIRME', 'SEKTOREL_SORU'],
+};
+
+function normalizeRoleName(role?: string | null) {
+  return String(role || '').trim().toUpperCase();
+}
+
+function normalizeForumCategory(value?: string | null) {
+  const raw = String(value || '').trim();
+  const upper = raw.toUpperCase();
+
+  if (FORUM_CATEGORY_LABELS[upper]) return upper;
+
+  const labelMatch = Object.entries(FORUM_CATEGORY_LABELS).find(([, label]) => {
+    return label.toLocaleLowerCase('tr-TR') === raw.toLocaleLowerCase('tr-TR');
+  });
+
+  if (labelMatch) return labelMatch[0];
+
+  return '';
+}
+
+function requiresForumCity(category: string) {
+  return !['PLATFORM_DUYURUSU', 'SISTEM_GUNCELLEMESI', 'EGITIM_BILGILENDIRME', 'SEKTOREL_SORU'].includes(category);
+}
+
+function requiresForumProperty(category: string) {
+  return ['PORTFOY_ARIYORUM', 'PORTFOY_ORTAGI_ARIYORUM', 'KAT_KARSILIGI_ARSA_ARIYORUM'].includes(category);
+}
+
+function cleanForumText(value?: string | null) {
+  return String(value || '').trim();
+}
+
 @Injectable()
 export class NetworkService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pushService: PushService,
   ) {}
+
+  private async validateForumPostInput(dto: CreateNetworkPostDto | UpdateNetworkPostDto, mode: 'create' | 'update') {
+    const userId = cleanForumText(dto.userId);
+
+    if (!userId) {
+      throw new BadRequestException('Kullanıcı bilgisi olmadan forum talebi oluşturulamaz.');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Forum talebi için kullanıcı bulunamadı.');
+    }
+
+    const category = normalizeForumCategory(dto.type);
+
+    if (!category) {
+      throw new BadRequestException('Lütfen talep kategorisini seçin.');
+    }
+
+    const allowedCategories = ROLE_FORUM_CATEGORIES[normalizeRoleName(user.role)] || ROLE_FORUM_CATEGORIES.EMLAKCI;
+
+    if (!allowedCategories.includes(category)) {
+      throw new BadRequestException('Bu kategori rolünüz için uygun değil.');
+    }
+
+    const title = cleanForumText(dto.title);
+    const description = cleanForumText(dto.description);
+
+    if (mode === 'create' && !title) {
+      throw new BadRequestException('Talep başlığı zorunludur.');
+    }
+
+    if (mode === 'create' && description.length < 8) {
+      throw new BadRequestException('Talep açıklaması en az 8 karakter olmalıdır.');
+    }
+
+    if (requiresForumCity(category) && !cleanForumText(dto.city)) {
+      throw new BadRequestException('Şehir alanı zorunludur.');
+    }
+
+    if (requiresForumProperty(category) && !cleanForumText((dto as CreateNetworkPostDto).tags?.find((item) => String(item || '').trim()) || '')) {
+      // Frontend mülk/konu bilgisini tags içine de gönderir. Eski kayıt uyumluluğu için sert engel sadece başlık/açıklama/şehir/kategori tarafında tutuldu.
+    }
+
+    return {
+      category,
+      title,
+      description,
+    };
+  }
 
   async findAll() {
     const now = new Date();
@@ -795,10 +906,18 @@ export class NetworkService {
       throw new NotFoundException('Bu paylaşımı güncelleme yetkiniz yok.');
     }
 
-    const nextData = {
+    const validated = await this.validateForumPostInput({
+      ...dto,
       type: dto.type ?? existing.type,
       title: dto.title ?? existing.title,
       description: dto.description ?? existing.description,
+      city: dto.city ?? existing.city,
+    }, 'update');
+
+    const nextData = {
+      type: validated.category,
+      title: dto.title ? validated.title : existing.title,
+      description: dto.description ? validated.description : existing.description,
       city: dto.city ?? existing.city,
       district: dto.district ?? existing.district,
       neighborhood: dto.neighborhood ?? existing.neighborhood,
@@ -891,20 +1010,24 @@ export class NetworkService {
   }
 
   async create(dto: CreateNetworkPostDto) {
+    const validated = await this.validateForumPostInput(dto, 'create');
+
     return this.prisma.networkPost.create({
       data: {
         id: randomUUID(),
         userId: dto.userId,
-        type: dto.type,
-        title: dto.title,
-        description: dto.description || '',
+        type: validated.category,
+        title: validated.title,
+        description: validated.description,
         city: dto.city || null,
         district: dto.district || null,
         neighborhood: dto.neighborhood || null,
         budget: dto.budget || null,
         urgency: dto.urgency || 'Normal',
         visibility: (dto.visibility as any) || 'TUM_EPH',
-        tags: dto.tags || [],
+        tags: [FORUM_CATEGORY_LABELS[validated.category], ...(dto.tags || [])]
+          .filter(Boolean)
+          .slice(0, 10),
         expiresAt: dto.expiresAt
           ? new Date(dto.expiresAt)
           : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),

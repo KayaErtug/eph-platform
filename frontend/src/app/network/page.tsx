@@ -5,12 +5,9 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   BriefcaseBusiness,
-  CheckCircle2,
   Clock3,
-  Eye,
   Flame,
   Handshake,
-  HelpCircle,
   Inbox,
   Loader2,
   MapPin,
@@ -21,10 +18,7 @@ import {
   Send,
   Settings2,
   Sparkles,
-  Star,
   Target,
-  TrendingUp,
-  UsersRound,
   X,
 } from "lucide-react";
 
@@ -68,13 +62,30 @@ type Conversation = {
 
 type ForumCategory =
   | "PORTFOY_ARIYORUM"
-  | "IS_ORTAGI_ARIYORUM"
-  | "YATIRIMCI_ALICI_ARIYORUM"
+  | "BOLGE_ORTAGI_ARIYORUM"
+  | "PORTFOY_ORTAGI_ARIYORUM"
+  | "SATIS_OFISI_ARIYORUM"
+  | "KAMPANYA_DUYURULARI"
+  | "KAT_KARSILIGI_ARSA_ARIYORUM"
+  | "MUTEAHHIT_YUKLENICI_ARIYORUM"
+  | "ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM"
+  | "YATIRIMCI_ARIYORUM"
+  | "PLATFORM_DUYURUSU"
+  | "SISTEM_GUNCELLEMESI"
+  | "EGITIM_BILGILENDIRME"
   | "SEKTOREL_SORU"
-  | "DUYURU";
+  | "DIGER";
+
+type ForumCategoryOption = {
+  value: ForumCategory;
+  label: string;
+  hint: string;
+  group: "Talep" | "Ortaklık" | "Duyuru" | "Soru" | "Diğer";
+};
 
 type CreateTopicForm = {
-  category: ForumCategory;
+  title: string;
+  category: ForumCategory | "";
   city: string;
   district: string;
   propertyType: string;
@@ -85,39 +96,33 @@ type CreateTopicForm = {
   visibility: string;
 };
 
-const TOP_FILTERS = ["Tümü", "Satılık", "Kiralık", "Kat Karşılığı", "Ortak", "Proje", "Arsa"];
-
-const FLOW_FILTERS = ["Tümü", "Talepler", "İş Birlikleri", "Sorular", "Duyurular"];
-
-const FORUM_CATEGORIES: Array<{ value: ForumCategory; label: string; hint: string }> = [
-  {
-    value: "PORTFOY_ARIYORUM",
-    label: "Portföy Arıyorum",
-    hint: "Hazır müşteriniz için uygun portföy arayın.",
-  },
-  {
-    value: "IS_ORTAGI_ARIYORUM",
-    label: "İş Ortağı Arıyorum",
-    hint: "Bölge, proje veya satış için iş ortağı bulun.",
-  },
-  {
-    value: "YATIRIMCI_ALICI_ARIYORUM",
-    label: "Yatırımcı / Alıcı Arıyorum",
-    hint: "Alıcı, yatırımcı veya ortak yatırım talebi açın.",
-  },
-  {
-    value: "SEKTOREL_SORU",
-    label: "Sektörel Soru",
-    hint: "Mevzuat, bölge, değerleme veya süreç sorusu sorun.",
-  },
-  {
-    value: "DUYURU",
-    label: "Duyuru ve Bilgilendirme",
-    hint: "Proje, yetkili satış veya kurumsal bilgilendirme paylaşın.",
-  },
+const ALL_CATEGORY_OPTIONS: ForumCategoryOption[] = [
+  { value: "PORTFOY_ARIYORUM", label: "Portföy Arıyorum", hint: "Hazır müşteriniz veya talebiniz için uygun portföy arayın.", group: "Talep" },
+  { value: "BOLGE_ORTAGI_ARIYORUM", label: "Bölge Ortağı Arıyorum", hint: "Belirli şehir/ilçede aktif çalışan bölge ortağı bulun.", group: "Ortaklık" },
+  { value: "PORTFOY_ORTAGI_ARIYORUM", label: "Portföy Ortağı Arıyorum", hint: "Yetkili portföy sahibi veya paylaşım ortağı arayın.", group: "Ortaklık" },
+  { value: "SATIS_OFISI_ARIYORUM", label: "Satış Ofisi Arıyorum", hint: "Proje ya da portföy satışını yönetecek ofis arayın.", group: "Ortaklık" },
+  { value: "KAMPANYA_DUYURULARI", label: "Kampanya Duyuruları", hint: "Kampanya, lansman veya dönemsel bilgilendirme paylaşın.", group: "Duyuru" },
+  { value: "KAT_KARSILIGI_ARSA_ARIYORUM", label: "Kat Karşılığı Arsa Arıyorum", hint: "Kat karşılığı değerlendirilecek arsa talebi açın.", group: "Talep" },
+  { value: "MUTEAHHIT_YUKLENICI_ARIYORUM", label: "Müteahhit / Yüklenici Arıyorum", hint: "Uygulama, yapım veya geliştirme ortağı arayın.", group: "Ortaklık" },
+  { value: "ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM", label: "Ulusal/Bölgesel Satış Partneri Arıyorum", hint: "Proje veya portföy için satış partneri ağı kurun.", group: "Ortaklık" },
+  { value: "YATIRIMCI_ARIYORUM", label: "Yatırımcı Arıyorum", hint: "Finansman, yatırım veya proje ortağı arayın.", group: "Talep" },
+  { value: "PLATFORM_DUYURUSU", label: "Platform Duyurusu", hint: "EPH yönetim duyurusu yayınlayın.", group: "Duyuru" },
+  { value: "SISTEM_GUNCELLEMESI", label: "Sistem Güncellemesi", hint: "Sistem değişiklikleri ve bakım bilgisi paylaşın.", group: "Duyuru" },
+  { value: "EGITIM_BILGILENDIRME", label: "Eğitim / Bilgilendirme", hint: "Eğitim, kullanım ve bilgilendirme konusu açın.", group: "Duyuru" },
+  { value: "SEKTOREL_SORU", label: "Sektörel Soru", hint: "Tapu, imar, ifraz, değerleme veya süreç sorusu sorun.", group: "Soru" },
+  { value: "DIGER", label: "Diğer", hint: "Listede olmayan profesyonel ihtiyacınızı paylaşın.", group: "Diğer" },
 ];
 
-const VALID_OPTIONS = ["7 gün", "15 gün", "30 gün"];
+const ROLE_CATEGORY_MAP: Record<string, ForumCategory[]> = {
+  EMLAKCI: ["PORTFOY_ARIYORUM", "BOLGE_ORTAGI_ARIYORUM", "PORTFOY_ORTAGI_ARIYORUM", "SEKTOREL_SORU", "DIGER"],
+  MUTEAHHIT: ["SATIS_OFISI_ARIYORUM", "KAMPANYA_DUYURULARI", "KAT_KARSILIGI_ARSA_ARIYORUM", "SEKTOREL_SORU", "DIGER"],
+  INSAAT_FIRMASI: ["KAT_KARSILIGI_ARSA_ARIYORUM", "MUTEAHHIT_YUKLENICI_ARIYORUM", "ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM", "KAMPANYA_DUYURULARI", "YATIRIMCI_ARIYORUM", "SEKTOREL_SORU", "DIGER"],
+  ADMIN: ["PLATFORM_DUYURUSU", "SISTEM_GUNCELLEMESI", "EGITIM_BILGILENDIRME", "SEKTOREL_SORU"],
+  SUPER_ADMIN: ["PLATFORM_DUYURUSU", "SISTEM_GUNCELLEMESI", "EGITIM_BILGILENDIRME", "SEKTOREL_SORU"],
+};
+
+const FLOW_FILTERS = ["Tümü", "Talep", "Ortaklık", "Duyuru", "Soru", "Diğer"];
+const VALID_OPTIONS = ["3 gün", "7 gün", "15 gün", "30 gün"];
 const URGENCY_OPTIONS = ["Normal", "Acil", "Müşteri Hazır", "Sıcak Talep"];
 const VISIBILITY_OPTIONS = [
   { label: "Tüm EPH", value: "TUM_EPH" },
@@ -127,7 +132,8 @@ const VISIBILITY_OPTIONS = [
 ];
 
 const DEFAULT_FORM: CreateTopicForm = {
-  category: "PORTFOY_ARIYORUM",
+  title: "",
+  category: "",
   city: "",
   district: "",
   propertyType: "",
@@ -160,44 +166,57 @@ function roleLabel(role?: string | null) {
 
   if (normalized === "ADMIN" || normalized === "SUPER_ADMIN") return "Admin";
   if (["MUTEAHHIT", "MÜTEAHHİT", "MÜTAHHİT"].includes(normalized)) return "Müteahhit";
-  if (["INSAAT_FIRMASI", "İNŞAAT_FİRMASI"].includes(normalized)) return "İnşaat";
-  if (normalized.includes("YATIRIM")) return "Yatırımcı";
+  if (["INSAAT_FIRMASI", "İNŞAAT_FİRMASI"].includes(normalized)) return "İnşaat Firması";
 
   return "Emlakçı";
 }
 
+function getCategoryOption(value?: string | null) {
+  const normalized = String(value || "").trim();
+  const byValue = ALL_CATEGORY_OPTIONS.find((item) => item.value === normalized);
+
+  if (byValue) return byValue;
+
+  const byLabel = ALL_CATEGORY_OPTIONS.find((item) => normalizeText(item.label) === normalizeText(normalized));
+
+  if (byLabel) return byLabel;
+
+  const text = normalizeText(normalized);
+
+  if (text.includes("portföy") || text.includes("portfoy")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "PORTFOY_ARIYORUM")!;
+  if (text.includes("bölge") || text.includes("bolge")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "BOLGE_ORTAGI_ARIYORUM")!;
+  if (text.includes("satış ofisi") || text.includes("satis ofisi")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "SATIS_OFISI_ARIYORUM")!;
+  if (text.includes("kampanya")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "KAMPANYA_DUYURULARI")!;
+  if (text.includes("kat") || text.includes("arsa")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "KAT_KARSILIGI_ARSA_ARIYORUM")!;
+  if (text.includes("yüklenici") || text.includes("yuklenici") || text.includes("müteahhit") || text.includes("muteahhit")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "MUTEAHHIT_YUKLENICI_ARIYORUM")!;
+  if (text.includes("yatırım") || text.includes("yatirim")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "YATIRIMCI_ARIYORUM")!;
+  if (text.includes("soru")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "SEKTOREL_SORU")!;
+  if (text.includes("duyuru")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "PLATFORM_DUYURUSU")!;
+
+  return ALL_CATEGORY_OPTIONS.find((item) => item.value === "DIGER")!;
+}
+
 function categoryLabel(value?: string | null) {
-  const normalized = normalizeText(value);
+  return getCategoryOption(value).label;
+}
 
-  if (normalized.includes("ortak")) return "İş Birliği";
-  if (normalized.includes("yatırım") || normalized.includes("yatirim") || normalized.includes("alıcı") || normalized.includes("alici")) return "Yatırımcı";
-  if (normalized.includes("soru")) return "Soru";
-  if (normalized.includes("duyuru")) return "Duyuru";
-  if (normalized.includes("portföy") || normalized.includes("portfoy")) return "Portföy Arıyorum";
-  if (normalized.includes("arsa") || normalized.includes("kat")) return "Kat Karşılığı";
-  if (normalized.includes("proje")) return "Proje";
-  if (normalized.includes("kiralık") || normalized.includes("kiralik")) return "Kiralık";
-  if (normalized.includes("satılık") || normalized.includes("satilik")) return "Satılık";
-
-  return value || "Talep";
+function categoryGroup(value?: string | null) {
+  return getCategoryOption(value).group;
 }
 
 function categoryTone(value?: string | null) {
-  const label = categoryLabel(value);
+  const group = categoryGroup(value);
 
-  if (label === "İş Birliği") return "bg-orange-50 text-orange-700";
-  if (label === "Yatırımcı") return "bg-violet-50 text-violet-700";
-  if (label === "Soru") return "bg-slate-100 text-slate-700";
-  if (label === "Duyuru") return "bg-emerald-50 text-emerald-700";
-  if (label === "Kat Karşılığı") return "bg-amber-50 text-amber-700";
-  if (label === "Kiralık") return "bg-cyan-50 text-cyan-700";
-  if (label === "Proje") return "bg-indigo-50 text-indigo-700";
+  if (group === "Ortaklık") return "bg-orange-50 text-orange-700";
+  if (group === "Duyuru") return "bg-emerald-50 text-emerald-700";
+  if (group === "Soru") return "bg-slate-100 text-slate-700";
+  if (group === "Diğer") return "bg-violet-50 text-violet-700";
 
   return "bg-[#EFF6FF] text-[#1557D6]";
 }
 
 function formatMoney(value?: string | number | null) {
-  if (value == null || value === "") return "Bütçe yok";
+  if (value == null || value === "") return "";
 
   const numeric = typeof value === "number" ? value : Number(String(value).replace(/\D/g, ""));
 
@@ -206,98 +225,81 @@ function formatMoney(value?: string | number | null) {
   return `${numeric.toLocaleString("tr-TR")} TL`;
 }
 
-function relativeTime(value?: string | null) {
+function formatDateTime(value?: string | null) {
   if (!value) return "Yeni";
 
-  const diff = Date.now() - new Date(value).getTime();
-  const minute = Math.floor(diff / 60000);
-  const hour = Math.floor(minute / 60);
-  const day = Math.floor(hour / 24);
+  return new Date(value).toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
-  if (minute < 1) return "Az önce";
-  if (minute < 60) return `${minute} dk önce`;
-  if (hour < 24) return `${hour} saat önce`;
+function remainingTime(value?: string | null) {
+  if (!value) return "Süre yok";
 
-  return `${day} gün önce`;
+  const diff = new Date(value).getTime() - Date.now();
+
+  if (diff <= 0) return "Süre doldu";
+
+  const day = Math.ceil(diff / (1000 * 60 * 60 * 24));
+
+  return `${day} gün kaldı`;
 }
 
 function expiresAtFromValidFor(value: string) {
   const date = new Date();
 
-  if (value === "7 gün") date.setDate(date.getDate() + 7);
+  if (value === "3 gün") date.setDate(date.getDate() + 3);
+  else if (value === "7 gün") date.setDate(date.getDate() + 7);
   else if (value === "15 gün") date.setDate(date.getDate() + 15);
   else date.setDate(date.getDate() + 30);
 
   return date.toISOString();
 }
 
-function buildAutoTitle(form: CreateTopicForm) {
-  const city = form.city.trim();
-  const district = form.district.trim();
-  const location = [city, district].filter(Boolean).join(" ");
-  const propertyType = form.propertyType.trim();
-  const budget = form.budget.trim();
-
-  if (form.category === "PORTFOY_ARIYORUM") {
-    const subject = [location, propertyType].filter(Boolean).join(" ");
-    return `${subject || "Uygun portföy"} aranıyor`;
-  }
-
-  if (form.category === "IS_ORTAGI_ARIYORUM") {
-    return `${location || "Bölge"} için iş ortağı aranıyor`;
-  }
-
-  if (form.category === "YATIRIMCI_ALICI_ARIYORUM") {
-    const budgetText = budget ? `${formatMoney(budget)} bütçeli ` : "";
-    return `${budgetText}${propertyType || "yatırım"} için yatırımcı / alıcı aranıyor`;
-  }
-
-  if (form.category === "SEKTOREL_SORU") {
-    return `${location || "Sektörel"} konuda görüş arıyorum`;
-  }
-
-  return `${location || "EPH"} duyurusu`;
-}
-
-function buildPresetMessage(post: NetworkPost) {
-  return `Merhaba,
-
-"${post.title}" konusuyla ilgileniyorum.
-
-Detayları görüşebilir miyiz?`;
-}
-
-function postMatchesTopFilter(post: NetworkPost, filter: string) {
-  if (filter === "Tümü") return true;
-
-  const haystack = normalizeText(
-    [post.type, post.title, post.description, ...(post.tags || [])].filter(Boolean).join(" "),
-  );
-
-  if (filter === "Kat Karşılığı") {
-    return haystack.includes("kat") || haystack.includes("arsa") || haystack.includes("karşılığı") || haystack.includes("karsiligi");
-  }
-
-  return haystack.includes(normalizeText(filter));
-}
-
 function postMatchesFlowFilter(post: NetworkPost, filter: string) {
   if (filter === "Tümü") return true;
-
-  const label = categoryLabel(`${post.type || ""} ${post.title || ""} ${(post.tags || []).join(" ")}`);
-  const haystack = normalizeText(`${label} ${post.type || ""} ${post.title || ""}`);
-
-  if (filter === "Talepler") return haystack.includes("talep") || haystack.includes("arıyorum") || haystack.includes("ariyorum") || haystack.includes("portföy");
-  if (filter === "İş Birlikleri") return haystack.includes("iş") || haystack.includes("ortak");
-  if (filter === "Sorular") return haystack.includes("soru");
-  if (filter === "Duyurular") return haystack.includes("duyuru");
-
-  return true;
+  return categoryGroup(post.type) === filter;
 }
 
 function isHotPost(post: NetworkPost) {
   const haystack = normalizeText([post.urgency, post.title, post.description].filter(Boolean).join(" "));
   return haystack.includes("acil") || haystack.includes("sıcak") || haystack.includes("sicak") || haystack.includes("hazır") || haystack.includes("hazir");
+}
+
+function buildPresetMessage(post: NetworkPost) {
+  return `Merhaba,\n\n"${post.title}" konusuyla ilgileniyorum.\n\nDetayları görüşebilir miyiz?`;
+}
+
+function getRoleCategories(role?: string | null) {
+  const normalized = normalizeRole(role);
+  const values = ROLE_CATEGORY_MAP[normalized] || ROLE_CATEGORY_MAP.EMLAKCI;
+
+  return values
+    .map((value) => ALL_CATEGORY_OPTIONS.find((item) => item.value === value))
+    .filter(Boolean) as ForumCategoryOption[];
+}
+
+function isCategoryLocationRequired(category?: ForumCategory | "") {
+  return category !== "PLATFORM_DUYURUSU" && category !== "SISTEM_GUNCELLEMESI" && category !== "EGITIM_BILGILENDIRME" && category !== "SEKTOREL_SORU";
+}
+
+function isPropertyRequired(category?: ForumCategory | "") {
+  return ["PORTFOY_ARIYORUM", "PORTFOY_ORTAGI_ARIYORUM", "KAT_KARSILIGI_ARSA_ARIYORUM"].includes(String(category));
+}
+
+function getOneLineDescription(post: NetworkPost) {
+  const detail = String(post.description || "").trim();
+
+  if (detail) return detail;
+
+  const location = [post.city, post.district].filter(Boolean).join(" / ");
+  const budget = post.budget ? formatMoney(post.budget) : "";
+
+  return [location, budget].filter(Boolean).join(" · ") || "Detay için konuyu açın.";
 }
 
 export default function NetworkPage() {
@@ -309,7 +311,6 @@ export default function NetworkPage() {
   const [creating, setCreating] = useState(false);
   const [conversationCount, setConversationCount] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [topFilter, setTopFilter] = useState("Tümü");
   const [flowFilter, setFlowFilter] = useState("Tümü");
   const [search, setSearch] = useState("");
   const lastUnreadRef = useRef(0);
@@ -356,27 +357,19 @@ export default function NetworkPage() {
     return () => clearInterval(interval);
   }, [user?.id]);
 
+  const roleCategories = useMemo(() => getRoleCategories(user?.role), [user?.role]);
+
   const filteredPosts = useMemo(() => {
     const keyword = normalizeText(search);
 
     return posts
-      .filter((post) => postMatchesTopFilter(post, topFilter))
       .filter((post) => postMatchesFlowFilter(post, flowFilter))
       .filter((post) => {
         if (!keyword) return true;
 
         const userName = getUserName(getPostUser(post));
         const haystack = normalizeText(
-          [
-            post.title,
-            post.description,
-            post.type,
-            post.city,
-            post.district,
-            post.neighborhood,
-            userName,
-            ...(post.tags || []),
-          ]
+          [post.title, post.description, post.type, post.city, post.district, post.neighborhood, userName, ...(post.tags || [])]
             .filter(Boolean)
             .join(" "),
         );
@@ -386,9 +379,8 @@ export default function NetworkPage() {
       .sort((a, b) => {
         if (isHotPost(a) !== isHotPost(b)) return isHotPost(a) ? -1 : 1;
         return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
-      })
-      .slice(0, 12);
-  }, [flowFilter, posts, search, topFilter]);
+      });
+  }, [flowFilter, posts, search]);
 
   const quickCounts = useMemo(() => {
     const hot = posts.filter(isHotPost).length;
@@ -412,28 +404,25 @@ export default function NetworkPage() {
       return;
     }
 
-    const title = buildAutoTitle(form);
-    const selectedCategory = FORUM_CATEGORIES.find((item) => item.value === form.category);
-    const tags = [
-      selectedCategory?.label,
-      form.propertyType,
-      form.urgency,
-      form.city,
-      form.district,
-    ]
-      .filter(Boolean)
-      .slice(0, 8);
+    const selectedCategory = ALL_CATEGORY_OPTIONS.find((item) => item.value === form.category);
+
+    if (!selectedCategory) {
+      alert("Lütfen talep kategorisini seçin.");
+      return;
+    }
+
+    const tags = [selectedCategory.label, form.propertyType, form.urgency, form.city, form.district].filter(Boolean).slice(0, 8);
 
     try {
       setCreating(true);
 
       await api.post("/network/posts", {
         userId: user.id,
-        type: selectedCategory?.label || "Talep",
-        title,
-        description: form.detail,
-        city: form.city || null,
-        district: form.district || null,
+        type: selectedCategory.value,
+        title: form.title.trim(),
+        description: form.detail.trim(),
+        city: form.city.trim() || null,
+        district: form.district.trim() || null,
         neighborhood: null,
         budget: form.budget ? Number(form.budget.replace(/\D/g, "")) : null,
         urgency: form.urgency,
@@ -493,14 +482,12 @@ export default function NetworkPage() {
   return (
     <main className="min-h-[calc(100dvh-64px)] bg-[#F7FBFF] px-3 pb-4 pt-2 text-[#06194A]">
       <div className="mx-auto w-full max-w-[430px] space-y-2">
-        <TopCategoryBar value={topFilter} onChange={setTopFilter} />
-
         <SloganStrip />
 
         <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
           <div className="grid grid-cols-4 overflow-hidden rounded-[19px] border border-[#DDE7F3] bg-[#FBFDFF]">
             <QuickItem icon={<Flame size={17} />} label="Acil" value={quickCounts.hot} tone="orange" />
-            <QuickItem icon={<TrendingUp size={17} />} label="Trend" value={quickCounts.trend} tone="blue" />
+            <QuickItem icon={<Target size={17} />} label="Talep" value={posts.length} tone="blue" />
             <QuickItem icon={<MessageCircle size={17} />} label="Mesaj" value={quickCounts.messages} tone="purple" onClick={() => router.push("/messages")} />
             <QuickItem icon={<Bell size={17} />} label="Bildirim" value={quickCounts.unread} tone="yellow" onClick={() => router.push("/messages")} />
           </div>
@@ -514,15 +501,11 @@ export default function NetworkPage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 className="min-w-0 flex-1 bg-transparent text-[13px] font-bold text-[#06194A] outline-none placeholder:text-[#94A3B8]"
-                placeholder="Talep, bölge, ilan no ara..."
+                placeholder="Talep, kategori, şehir ara..."
               />
             </div>
 
-            <button
-              type="button"
-              className="flex h-11 items-center justify-center rounded-[17px] border border-[#DDE7F3] bg-white text-[#06194A]"
-              aria-label="Filtre"
-            >
+            <button type="button" className="flex h-11 items-center justify-center rounded-[17px] border border-[#DDE7F3] bg-white text-[#06194A]" aria-label="Filtre">
               <Settings2 size={18} />
             </button>
           </div>
@@ -533,11 +516,7 @@ export default function NetworkPage() {
                 key={filter}
                 type="button"
                 onClick={() => setFlowFilter(filter)}
-                className={`shrink-0 rounded-full px-3.5 py-2 text-[12px] font-black ${
-                  flowFilter === filter
-                    ? "bg-[#6D4AFF] text-white"
-                    : "border border-[#DDE7F3] bg-white text-[#27364F]"
-                }`}
+                className={`shrink-0 rounded-full px-3.5 py-2 text-[12px] font-black ${flowFilter === filter ? "bg-[#6D4AFF] text-white" : "border border-[#DDE7F3] bg-white text-[#27364F]"}`}
               >
                 {filter}
               </button>
@@ -548,21 +527,13 @@ export default function NetworkPage() {
         <section className="rounded-[24px] border border-[#DDE7F3] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
           <div className="flex items-center justify-between border-b border-[#EAF0F7] px-3 py-2">
             <div>
-              <h1 className="text-center text-[17px] font-black tracking-[-0.03em] text-[#06194A]">
-                Sektörel Akış
-              </h1>
-              <p className="text-[10px] font-bold text-[#64748B]">
-                {filteredPosts.length} konu gösteriliyor
-              </p>
+              <h1 className="text-center text-[17px] font-black tracking-[-0.03em] text-[#06194A]">Forum Talepleri</h1>
+              <p className="text-[10px] font-bold text-[#64748B]">{filteredPosts.length} talep gösteriliyor</p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[16px] bg-[#1557D6] px-3 text-[12px] font-black text-white shadow-[0_10px_22px_rgba(21,87,214,0.22)]"
-            >
+            <button type="button" onClick={() => setModalOpen(true)} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[16px] bg-[#1557D6] px-3 text-[12px] font-black text-white shadow-[0_10px_22px_rgba(21,87,214,0.22)]">
               <Plus size={17} />
-              Konu Aç
+              Talep Aç
             </button>
           </div>
 
@@ -578,50 +549,15 @@ export default function NetworkPage() {
           ) : (
             <div className="divide-y divide-[#EAF0F7]">
               {filteredPosts.map((post, index) => (
-                <ForumTopicRow
-                  key={post.id}
-                  post={post}
-                  index={index}
-                  onOpen={() => router.push(`/network/${post.id}`)}
-                  onMessage={() => startConversation(post)}
-                />
+                <ForumTopicRow key={post.id} post={post} index={index} onOpen={() => router.push(`/network/${post.id}`)} onMessage={() => startConversation(post)} />
               ))}
             </div>
           )}
         </section>
       </div>
 
-      {modalOpen && (
-        <CreateTopicModal
-          creating={creating}
-          onClose={() => setModalOpen(false)}
-          onCreate={handleCreateTopic}
-        />
-      )}
+      {modalOpen && <CreateTopicModal creating={creating} userRole={user?.role} categories={roleCategories} onClose={() => setModalOpen(false)} onCreate={handleCreateTopic} />}
     </main>
-  );
-}
-
-function TopCategoryBar({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return (
-    <section className="-mx-3 border-b border-[#DDE7F3] bg-white/94 px-3 py-2 backdrop-blur">
-      <div className="mx-auto flex max-w-[430px] gap-2 overflow-x-auto pb-0.5">
-        {TOP_FILTERS.map((filter) => (
-          <button
-            key={filter}
-            type="button"
-            onClick={() => onChange(filter)}
-            className={`shrink-0 rounded-full px-3.5 py-2 text-[12px] font-black ${
-              value === filter
-                ? "bg-[#6D4AFF] text-white shadow-[0_10px_20px_rgba(109,74,255,0.18)]"
-                : "border border-[#DDE7F3] bg-white text-[#27364F]"
-            }`}
-          >
-            {filter}
-          </button>
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -630,25 +566,13 @@ function SloganStrip() {
     <section className="overflow-hidden rounded-[18px] border border-[#DDE7F3] bg-white px-3 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.035)]">
       <div className="flex items-center justify-center gap-2 text-center text-[12px] font-black text-[#27364F]">
         <Sparkles size={15} className="shrink-0 text-[#6D4AFF]" />
-        <span>Elinizdekini değil, neye ihtiyacınız olduğunu paylaşın.</span>
+        <span>Elinizdekini değil, ihtiyacınızı paylaşın.</span>
       </div>
     </section>
   );
 }
 
-function QuickItem({
-  icon,
-  label,
-  value,
-  tone,
-  onClick,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: number;
-  tone: "orange" | "blue" | "purple" | "yellow";
-  onClick?: () => void;
-}) {
+function QuickItem({ icon, label, value, tone, onClick }: { icon: ReactNode; label: string; value: number; tone: "orange" | "blue" | "purple" | "yellow"; onClick?: () => void }) {
   const tones = {
     orange: "bg-orange-50 text-orange-700",
     blue: "bg-[#EFF6FF] text-[#1557D6]",
@@ -657,11 +581,7 @@ function QuickItem({
   };
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex min-h-[54px] flex-col items-center justify-center gap-1 border-r border-[#DDE7F3] px-1 text-center last:border-r-0"
-    >
+    <button type="button" onClick={onClick} className="flex min-h-[54px] flex-col items-center justify-center gap-1 border-r border-[#DDE7F3] px-1 text-center last:border-r-0">
       <span className={`flex h-7 w-7 items-center justify-center rounded-full ${tones[tone]}`}>{icon}</span>
       <span className="text-[10px] font-black leading-none text-[#06194A]">
         {label}
@@ -671,54 +591,34 @@ function QuickItem({
   );
 }
 
-function ForumTopicRow({
-  post,
-  index,
-  onOpen,
-  onMessage,
-}: {
-  post: NetworkPost;
-  index: number;
-  onOpen: () => void;
-  onMessage: () => void;
-}) {
+function ForumTopicRow({ post, index, onOpen, onMessage }: { post: NetworkPost; index: number; onOpen: () => void; onMessage: () => void }) {
   const postUser = getPostUser(post);
   const userName = getUserName(postUser);
   const role = roleLabel(postUser?.role);
   const location = [post.city, post.district].filter(Boolean).join(" / ");
   const hot = isHotPost(post);
-  const comments = Number(post.requestCount || post.followerCount || 0);
-  const views = Number(post.viewCount || 0);
+  const group = categoryGroup(post.type);
+  const meta = [formatDateTime(post.createdAt), remainingTime(post.expiresAt)].filter(Boolean).join(" · ");
+  const description = getOneLineDescription(post);
 
   return (
-    <article className="grid min-h-[74px] grid-cols-[104px_1fr_72px] items-center gap-2 px-2.5 py-2">
-      <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-2 text-left">
-        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EFF6FF] text-[13px] font-black text-[#1557D6]">
-          {userName.slice(0, 1).toLocaleUpperCase("tr-TR")}
-          {hot && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-white" />}
-        </div>
-
-        <div className="min-w-0">
-          <p className="truncate text-[12px] font-black leading-4 text-[#06194A]">{userName}</p>
-          <p className="truncate text-[10px] font-bold leading-4 text-[#64748B]">{role} · {relativeTime(post.createdAt)}</p>
-        </div>
+    <article className="grid min-h-[86px] grid-cols-[42px_1fr_66px] items-center gap-2 px-2.5 py-2.5">
+      <button type="button" onClick={onOpen} className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EFF6FF] text-[13px] font-black text-[#1557D6]">
+        {userName.slice(0, 1).toLocaleUpperCase("tr-TR")}
+        {hot && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-white" />}
       </button>
 
-      <button type="button" onClick={onOpen} className="min-w-0 border-l border-[#EAF0F7] pl-2 text-left">
+      <button type="button" onClick={onOpen} className="min-w-0 text-left">
         <div className="flex min-w-0 items-center gap-1.5">
-          <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase ${categoryTone(`${post.type || ""} ${post.title || ""}`)}`}>
-            {categoryLabel(`${post.type || ""} ${post.title || ""}`)}
-          </span>
+          <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase ${categoryTone(post.type)}`}>{categoryLabel(post.type)}</span>
           {hot && <span className="shrink-0 rounded-md bg-orange-50 px-1.5 py-0.5 text-[9px] font-black text-orange-700">ACİL</span>}
+          <span className="truncate text-[10px] font-bold text-[#94A3B8]">{group}</span>
         </div>
 
-        <h2 className="mt-1 line-clamp-1 text-[13px] font-black leading-4 tracking-[-0.01em] text-[#06194A]">
-          {post.title}
-        </h2>
-
-        <p className="mt-0.5 line-clamp-1 text-[11px] font-bold leading-4 text-[#64748B]">
-          {[location, post.budget ? formatMoney(post.budget) : "", post.neighborhood].filter(Boolean).join(" · ") || post.description || "Detay için aç"}
-        </p>
+        <h2 className="mt-1 line-clamp-1 text-[13px] font-black leading-4 tracking-[-0.01em] text-[#06194A]">{post.title}</h2>
+        <p className="mt-0.5 line-clamp-1 text-[11px] font-bold leading-4 text-[#64748B]">{description}</p>
+        <p className="mt-0.5 line-clamp-1 text-[10px] font-black leading-4 text-[#94A3B8]">{location ? `${location} · ` : ""}{meta}</p>
+        <span className="sr-only">{index + 1}. konu, {role}</span>
       </button>
 
       <div className="flex items-center justify-end gap-1 text-[#27364F]">
@@ -728,7 +628,6 @@ function ForumTopicRow({
         <button type="button" onClick={onOpen} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F7FBFF]" aria-label="Detay">
           <MoreVertical size={15} />
         </button>
-        <span className="sr-only">{index + 1}. konu, {comments} ilgi, {views} görüntülenme</span>
       </div>
     </article>
   );
@@ -740,46 +639,45 @@ function EmptyForumState({ onCreate }: { onCreate: () => void }) {
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#EFF6FF] text-[#1557D6]">
         <Inbox size={24} />
       </div>
-      <h2 className="mt-3 text-[16px] font-black text-[#06194A]">Uygun konu bulunamadı</h2>
-      <p className="mx-auto mt-1 max-w-[280px] text-[12px] font-bold leading-5 text-[#64748B]">
-        Filtreyi değiştirin veya yeni bir ihtiyaç konusu açın.
-      </p>
-      <button
-        type="button"
-        onClick={onCreate}
-        className="mt-4 inline-flex h-10 items-center justify-center gap-1.5 rounded-[16px] bg-[#1557D6] px-4 text-[12px] font-black text-white"
-      >
+      <h2 className="mt-3 text-[16px] font-black text-[#06194A]">Uygun talep bulunamadı</h2>
+      <p className="mx-auto mt-1 max-w-[280px] text-[12px] font-bold leading-5 text-[#64748B]">Filtreyi değiştirin veya yeni bir ihtiyaç talebi açın.</p>
+      <button type="button" onClick={onCreate} className="mt-4 inline-flex h-10 items-center justify-center gap-1.5 rounded-[16px] bg-[#1557D6] px-4 text-[12px] font-black text-white">
         <Plus size={16} />
-        Konu Aç
+        Talep Aç
       </button>
     </div>
   );
 }
 
-function CreateTopicModal({
-  creating,
-  onClose,
-  onCreate,
-}: {
-  creating: boolean;
-  onClose: () => void;
-  onCreate: (form: CreateTopicForm) => void;
-}) {
+function CreateTopicModal({ creating, userRole, categories, onClose, onCreate }: { creating: boolean; userRole?: string | null; categories: ForumCategoryOption[]; onClose: () => void; onCreate: (form: CreateTopicForm) => void }) {
   const [form, setForm] = useState<CreateTopicForm>(DEFAULT_FORM);
-  const selectedCategory = FORUM_CATEGORIES.find((item) => item.value === form.category) || FORUM_CATEGORIES[0];
-  const autoTitle = buildAutoTitle(form);
-  const canSubmit = form.detail.trim().length >= 8;
+  const selectedCategory = categories.find((item) => item.value === form.category) || null;
+  const needsLocation = isCategoryLocationRequired(form.category);
+  const needsProperty = isPropertyRequired(form.category);
+
+  const errors = useMemo(() => {
+    const items: string[] = [];
+
+    if (!form.category) items.push("Kategori seçimi zorunlu.");
+    if (!form.title.trim()) items.push("Talep başlığı zorunlu.");
+    if (needsLocation && !form.city.trim()) items.push("Şehir zorunlu.");
+    if (needsProperty && !form.propertyType.trim()) items.push("Mülk / konu alanı zorunlu.");
+    if (!form.validFor) items.push("Süre seçimi zorunlu.");
+    if (form.detail.trim().length < 8) items.push("Açıklama en az 8 karakter olmalı.");
+
+    return items;
+  }, [form.category, form.city, form.detail, form.propertyType, form.title, form.validFor, needsLocation, needsProperty]);
+
+  const canSubmit = errors.length === 0;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/48 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
-      <div
-        className="max-h-[92dvh] w-full max-w-[430px] overflow-y-auto rounded-t-[30px] border border-[#DDE7F3] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.22)] sm:rounded-[30px]"
-        onClick={(event) => event.stopPropagation()}
-      >
+      <div className="max-h-[92dvh] w-full max-w-[430px] overflow-y-auto rounded-t-[30px] border border-[#DDE7F3] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.22)] sm:rounded-[30px]" onClick={(event) => event.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#EAF0F7] bg-white px-4 py-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6D4AFF]">Forum</p>
-            <h2 className="text-[18px] font-black tracking-[-0.03em] text-[#06194A]">İhtiyaç Konusu Aç</h2>
+            <h2 className="text-[18px] font-black tracking-[-0.03em] text-[#06194A]">Rol Bazlı Talep Aç</h2>
+            <p className="mt-0.5 text-[11px] font-bold text-[#64748B]">{roleLabel(userRole)} rolüne uygun kategoriler gösteriliyor.</p>
           </div>
           <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#F7FBFF] text-[#06194A]">
             <X size={19} />
@@ -787,127 +685,84 @@ function CreateTopicModal({
         </div>
 
         <div className="space-y-3 p-4">
-          <div className="rounded-[22px] border border-[#DDE7F3] bg-[#F7FBFF] p-3 text-center">
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#64748B]">Otomatik Konu Başlığı</p>
-            <p className="mt-1 text-[15px] font-black leading-5 text-[#06194A]">{autoTitle}</p>
-            <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
-              Başlığı sistem oluşturur. Siz sadece ihtiyacınızı net anlatın.
-            </p>
-          </div>
-
-          <ForumField label="Konu Türü">
+          <ForumField label="Talep Kategorisi *">
             <div className="grid gap-2">
-              {FORUM_CATEGORIES.map((category) => (
+              {categories.map((category) => (
                 <button
                   key={category.value}
                   type="button"
                   onClick={() => setForm((current) => ({ ...current, category: category.value }))}
-                  className={`rounded-[18px] border px-3 py-2.5 text-left ${
-                    form.category === category.value
-                      ? "border-[#6D4AFF] bg-[#F4F0FF]"
-                      : "border-[#DDE7F3] bg-white"
-                  }`}
+                  className={`rounded-[18px] border px-3 py-2.5 text-left ${form.category === category.value ? "border-[#6D4AFF] bg-[#F4F0FF]" : "border-[#DDE7F3] bg-white"}`}
                 >
-                  <p className="text-[13px] font-black text-[#06194A]">{category.label}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[13px] font-black text-[#06194A]">{category.label}</p>
+                    <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black ${categoryTone(category.value)}`}>{category.group}</span>
+                  </div>
                   <p className="mt-0.5 text-[11px] font-bold leading-4 text-[#64748B]">{category.hint}</p>
                 </button>
               ))}
             </div>
           </ForumField>
 
+          <ForumField label="Talep Başlığı *">
+            <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="forum-input" placeholder="Örn: Merkezefendi'de 3+1 daire arıyorum" />
+          </ForumField>
+
           <div className="grid grid-cols-2 gap-2">
-            <ForumField label="Şehir">
-              <input
-                value={form.city}
-                onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
-                className="forum-input"
-                placeholder="Denizli"
-              />
+            <ForumField label={needsLocation ? "Şehir *" : "Şehir"}>
+              <input value={form.city} onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))} className="forum-input" placeholder="Denizli" />
             </ForumField>
 
             <ForumField label="İlçe">
-              <input
-                value={form.district}
-                onChange={(event) => setForm((current) => ({ ...current, district: event.target.value }))}
-                className="forum-input"
-                placeholder="Merkezefendi"
-              />
+              <input value={form.district} onChange={(event) => setForm((current) => ({ ...current, district: event.target.value }))} className="forum-input" placeholder="Merkezefendi" />
             </ForumField>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <ForumField label="Mülk / Konu">
-              <input
-                value={form.propertyType}
-                onChange={(event) => setForm((current) => ({ ...current, propertyType: event.target.value }))}
-                className="forum-input"
-                placeholder="3+1 Daire"
-              />
+            <ForumField label={needsProperty ? "Mülk / Konu *" : "Mülk / Konu"}>
+              <input value={form.propertyType} onChange={(event) => setForm((current) => ({ ...current, propertyType: event.target.value }))} className="forum-input" placeholder="3+1 Daire" />
             </ForumField>
 
             <ForumField label="Bütçe">
-              <input
-                value={form.budget}
-                onChange={(event) => setForm((current) => ({ ...current, budget: event.target.value }))}
-                className="forum-input"
-                placeholder="5.000.000"
-              />
+              <input value={form.budget} onChange={(event) => setForm((current) => ({ ...current, budget: event.target.value }))} className="forum-input" placeholder="5.000.000" />
             </ForumField>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <ForumField label="Öncelik">
-              <select
-                value={form.urgency}
-                onChange={(event) => setForm((current) => ({ ...current, urgency: event.target.value }))}
-                className="forum-input"
-              >
+              <select value={form.urgency} onChange={(event) => setForm((current) => ({ ...current, urgency: event.target.value }))} className="forum-input">
                 {URGENCY_OPTIONS.map((option) => <option key={option}>{option}</option>)}
               </select>
             </ForumField>
 
-            <ForumField label="Süre">
-              <select
-                value={form.validFor}
-                onChange={(event) => setForm((current) => ({ ...current, validFor: event.target.value }))}
-                className="forum-input"
-              >
+            <ForumField label="Süre *">
+              <select value={form.validFor} onChange={(event) => setForm((current) => ({ ...current, validFor: event.target.value }))} className="forum-input">
                 {VALID_OPTIONS.map((option) => <option key={option}>{option}</option>)}
-              </select>
-            </ForumField>
-
-            <ForumField label="Görünürlük">
-              <select
-                value={form.visibility}
-                onChange={(event) => setForm((current) => ({ ...current, visibility: event.target.value }))}
-                className="forum-input"
-              >
-                {VISIBILITY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </ForumField>
           </div>
 
-          <ForumField label="Alt Açıklama / İhtiyaç Detayı">
-            <textarea
-              value={form.detail}
-              onChange={(event) => setForm((current) => ({ ...current, detail: event.target.value }))}
-              className="forum-input min-h-[104px] resize-none py-3"
-              placeholder={`${selectedCategory.label}: İhtiyacınızı kısa ve net yazın. Örn: Müşterim hazır, tapusu temiz, 3+1 daire arıyorum.`}
-            />
+          <ForumField label="Görünürlük">
+            <select value={form.visibility} onChange={(event) => setForm((current) => ({ ...current, visibility: event.target.value }))} className="forum-input">
+              {VISIBILITY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
           </ForumField>
+
+          <ForumField label="1 Satırlık Açıklama *">
+            <textarea value={form.detail} onChange={(event) => setForm((current) => ({ ...current, detail: event.target.value }))} rows={3} className="forum-input min-h-[86px] py-3" placeholder={`${selectedCategory?.label || "Talep"}: İhtiyacınızı kısa ve net yazın.`} />
+          </ForumField>
+
+          {errors.length > 0 && (
+            <div className="rounded-[18px] border border-amber-200 bg-amber-50 p-3 text-[11px] font-black leading-5 text-amber-800">
+              {errors[0]}
+            </div>
+          )}
         </div>
 
         <div className="sticky bottom-0 grid grid-cols-[1fr_1fr] gap-2 border-t border-[#EAF0F7] bg-white p-4">
-          <button type="button" onClick={onClose} className="h-11 rounded-[17px] border border-[#DDE7F3] bg-white text-[13px] font-black text-[#64748B]">
-            Vazgeç
-          </button>
-          <button
-            type="button"
-            disabled={creating || !canSubmit}
-            onClick={() => onCreate(form)}
-            className="h-11 rounded-[17px] bg-[#1557D6] text-[13px] font-black text-white disabled:opacity-45"
-          >
-            {creating ? "Açılıyor..." : "Konuyu Aç"}
+          <button type="button" onClick={onClose} className="h-11 rounded-[17px] border border-[#DDE7F3] bg-white text-[13px] font-black text-[#64748B]">Vazgeç</button>
+          <button type="button" disabled={creating || !canSubmit} onClick={() => onCreate(form)} className="h-11 rounded-[17px] bg-[#1557D6] text-[13px] font-black text-white disabled:opacity-45">
+            {creating ? "Açılıyor..." : "Talebi Aç"}
           </button>
         </div>
 
