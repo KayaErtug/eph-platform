@@ -59,6 +59,16 @@ type UserItem = {
   cityPlateCode?: string | null;
   isApproved: boolean;
   isVerified?: boolean;
+  restrictions?: {
+    id: string;
+    type: string;
+    reason?: string | null;
+    startsAt?: string | null;
+    endsAt?: string | null;
+    isActive: boolean;
+    createdAt?: string | null;
+    createdBy?: { id: string; firstName: string; lastName: string; role: string } | null;
+  }[];
   documents?: { id: string; type: string; status: string; fileUrl: string; fileName: string }[];
 };
 
@@ -268,6 +278,10 @@ export default function AdminPage() {
   const [cityFilter, setCityFilter] = useState("all");
   const [trafficFilter, setTrafficFilter] = useState("all");
   const [roleModal, setRoleModal] = useState<{ id: string; role: string } | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
+  const [suspendModal, setSuspendModal] = useState<UserItem | null>(null);
+  const [suspendReason, setSuspendReason] = useState("");
+  const [suspendDuration, setSuspendDuration] = useState("ONE_HOUR");
   const [newRole, setNewRole] = useState("");
   const [createUserModal, setCreateUserModal] = useState(false);
   const [createUserForm, setCreateUserForm] = useState({ firstName: "", lastName: "", email: "", phone: "", password: "", role: "EMLAKCI" });
@@ -313,6 +327,34 @@ export default function AdminPage() {
     await fetchStats();
   };
   const act = async (id: string, fn: () => Promise<any>) => { setActionLoading(id); try { await fn(); } finally { setActionLoading(null); } };
+  const currentRole = user?.role || "";
+  const isSoftwareTeam = currentRole === "SUPER_ADMIN";
+
+  const closeSuspendModal = () => {
+    setSuspendModal(null);
+    setSuspendReason("");
+    setSuspendDuration("ONE_HOUR");
+  };
+
+  const submitSuspend = async () => {
+    if (!suspendModal) return;
+    const reason = suspendReason.trim();
+
+    if (!reason) {
+      alert("Askıya alma sebebi zorunludur.");
+      return;
+    }
+
+    await act(suspendModal.id, async () => {
+      await api.patch(`/admin/users/${suspendModal.id}/suspend`, {
+        reason,
+        duration: isSoftwareTeam ? suspendDuration : "ONE_HOUR",
+      });
+      await Promise.all([fetchUsers(), fetchStats()]);
+      closeSuspendModal();
+      setSelectedUser(null);
+    });
+  };
 
   const cityOptions = useMemo(() => Array.from(new Set(users.map((u) => u.city).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "tr")), [users]);
   const visitByUser = useMemo(() => {
@@ -358,9 +400,95 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
-      {roleModal && <Modal title="Rol Değiştir" desc="Kullanıcının platform rolünü güncelle." onClose={() => { setRoleModal(null); setNewRole(""); }}><label className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-slate-500">Yeni Rol</label><select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 outline-none focus:border-sky-400"><option value="">Seçiniz</option><option value="EMLAKCI">Emlakçı</option><option value="MUTEAHHIT">Müteahhit</option><option value="INSAAT_FIRMASI">İnşaat Firması</option></select><div className="mt-5 flex justify-end gap-3"><PrimaryButton tone="light" onClick={() => { setRoleModal(null); setNewRole(""); }}>Vazgeç</PrimaryButton><PrimaryButton disabled={!newRole || actionLoading === roleModal.id} icon={<UserCog size={15} />} onClick={() => act(roleModal.id, async () => { await api.patch(`/admin/users/${roleModal.id}/role`, { role: newRole }); await Promise.all([fetchUsers(), fetchStats()]); setRoleModal(null); setNewRole(""); })}>Güncelle</PrimaryButton></div></Modal>}
+      {roleModal && <Modal title="Rol Değiştir" desc="Kullanıcının platform rolünü güncelle." onClose={() => { setRoleModal(null); setNewRole(""); }}><label className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-slate-500">Yeni Rol</label><select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 outline-none focus:border-sky-400"><option value="">Seçiniz</option><option value="EMLAKCI">Emlakçı</option><option value="MUTEAHHIT">Müteahhit</option><option value="INSAAT_FIRMASI">İnşaat Firması</option><option value="MODERATOR">Moderatör</option><option value="ADMIN">Admin</option><option value="SUPER_ADMIN">Yazılım Ekibi</option></select><div className="mt-5 flex justify-end gap-3"><PrimaryButton tone="light" onClick={() => { setRoleModal(null); setNewRole(""); }}>Vazgeç</PrimaryButton><PrimaryButton disabled={!newRole || actionLoading === roleModal.id} icon={<UserCog size={15} />} onClick={() => act(roleModal.id, async () => { await api.patch(`/admin/users/${roleModal.id}/role`, { role: newRole }); await Promise.all([fetchUsers(), fetchStats()]); setRoleModal(null); setNewRole(""); })}>Güncelle</PrimaryButton></div></Modal>}
 
-      {createUserModal && <Modal title="Yeni Üye Ekle" desc="Manuel olarak onaylı kullanıcı oluştur." onClose={() => { setCreateUserModal(false); setCreateUserError(""); }}><div className="grid gap-4 sm:grid-cols-2"><Input label="Ad" value={createUserForm.firstName} onChange={(v) => setCreateUserForm((c) => ({ ...c, firstName: v }))} /><Input label="Soyad" value={createUserForm.lastName} onChange={(v) => setCreateUserForm((c) => ({ ...c, lastName: v }))} /></div><div className="mt-4 grid gap-4"><Input label="E-posta" type="email" value={createUserForm.email} onChange={(v) => setCreateUserForm((c) => ({ ...c, email: v }))} /><Input label="Telefon" value={createUserForm.phone} onChange={(v) => setCreateUserForm((c) => ({ ...c, phone: v }))} /><Input label="Şifre" type="password" value={createUserForm.password} onChange={(v) => setCreateUserForm((c) => ({ ...c, password: v }))} /><div><label className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-slate-500">Rol</label><select value={createUserForm.role} onChange={(e) => setCreateUserForm((c) => ({ ...c, role: e.target.value }))} className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 outline-none focus:border-sky-400"><option value="EMLAKCI">Emlakçı</option><option value="MUTEAHHIT">Müteahhit</option><option value="INSAAT_FIRMASI">İnşaat Firması</option><option value="ADMIN">Admin</option></select></div></div>{createUserError && <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700">{createUserError}</p>}<div className="mt-5 flex justify-end gap-3"><PrimaryButton tone="light" onClick={() => { setCreateUserModal(false); setCreateUserError(""); }}>Vazgeç</PrimaryButton><PrimaryButton disabled={createUserLoading} icon={<Plus size={15} />} onClick={async () => { if (!createUserForm.firstName || !createUserForm.lastName || !createUserForm.email || !createUserForm.phone || !createUserForm.password) { setCreateUserError("Tüm alanlar zorunludur."); return; } setCreateUserLoading(true); setCreateUserError(""); try { await api.post("/admin/users", createUserForm); setCreateUserModal(false); setCreateUserForm({ firstName: "", lastName: "", email: "", phone: "", password: "", role: "EMLAKCI" }); await Promise.all([fetchUsers(), fetchStats()]); } catch (error: any) { setCreateUserError(error?.response?.data?.message || "Bir hata oluştu."); } finally { setCreateUserLoading(false); } }}>Üye Ekle</PrimaryButton></div></Modal>}
+
+      {selectedUser && <Modal title="Üye Detayı" desc={`${fullName(selectedUser)} · ${roleLabel(selectedUser.role)}`} onClose={() => setSelectedUser(null)}>
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <Avatar firstName={selectedUser.firstName} lastName={selectedUser.lastName} imageUrl={selectedUser.profileImageUrl} size="lg" />
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-lg font-black text-slate-950">{fullName(selectedUser)}</h3>
+              <p className="truncate text-sm font-bold text-slate-500">{selectedUser.email}</p>
+              <p className="text-xs font-bold text-slate-400">{selectedUser.phone || "Telefon yok"}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Pill className={roleClass(selectedUser.role)}>{roleLabel(selectedUser.role)}</Pill>
+                <Pill className={selectedUser.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{selectedUser.isApproved ? "Onaylı" : "Bekliyor"}</Pill>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-2 rounded-3xl border border-slate-200 bg-white p-4">
+            <InfoLine label="Üye No" value={selectedUser.memberCode || "Atanmadı"} strong />
+            <InfoLine label="Konum" value={`${selectedUser.city || "Şehir yok"}${selectedUser.district ? ` / ${selectedUser.district}` : ""}`} />
+            <InfoLine label="Bölge Kodu" value={selectedUser.cityPlateCode ? `TR ${selectedUser.cityPlateCode}` : "—"} />
+            <InfoLine label="Kayıt" value={fmt(selectedUser.memberSince || undefined)} />
+          </div>
+
+          {(selectedUser.restrictions || []).length > 0 && (
+            <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">Aktif Askı Kaydı</p>
+              <p className="mt-2 text-sm font-black text-amber-950">{selectedUser.restrictions?.[0]?.reason || "Sebep belirtilmemiş."}</p>
+              <p className="mt-1 text-xs font-bold text-amber-700">Bitiş: {selectedUser.restrictions?.[0]?.endsAt ? fmt(selectedUser.restrictions?.[0]?.endsAt) : "Süresiz"}</p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap justify-end gap-2">
+            {selectedUser.id !== user?.id && !selectedUser.isApproved && (
+              <PrimaryButton tone="success" disabled={actionLoading === selectedUser.id} icon={<Check size={15} />} onClick={() => act(selectedUser.id, async () => { await api.patch(`/admin/users/${selectedUser.id}/approve`); await Promise.all([fetchUsers(), fetchStats()]); setSelectedUser(null); })}>Onayla</PrimaryButton>
+            )}
+
+            {selectedUser.id !== user?.id && isSoftwareTeam && (
+              <>
+                <PrimaryButton tone="light" disabled={actionLoading === selectedUser.id} onClick={() => { setSuspendModal(selectedUser); }}>Askıya Al</PrimaryButton>
+                <PrimaryButton tone="light" icon={<UserCog size={15} />} onClick={() => { setRoleModal({ id: selectedUser.id, role: selectedUser.role }); setNewRole(selectedUser.role); setSelectedUser(null); }}>Rol Değiştir</PrimaryButton>
+                <PrimaryButton tone="danger" disabled={actionLoading === selectedUser.id} icon={<Trash2 size={15} />} onClick={() => { if (confirm("Kullanıcı silinecek. Emin misiniz?")) act(selectedUser.id, async () => { await api.delete(`/admin/users/${selectedUser.id}/reject`); await Promise.all([fetchUsers(), fetchStats()]); setSelectedUser(null); }); }}>Sil</PrimaryButton>
+              </>
+            )}
+
+            {selectedUser.id !== user?.id && currentRole === "ADMIN" && selectedUser.role !== "ADMIN" && selectedUser.role !== "SUPER_ADMIN" && selectedUser.isApproved && (
+              <PrimaryButton tone="light" disabled={actionLoading === selectedUser.id} onClick={() => { setSuspendModal(selectedUser); }}>1 Saat Askıya Al</PrimaryButton>
+            )}
+
+            <PrimaryButton tone="light" onClick={() => setSelectedUser(null)}>Kapat</PrimaryButton>
+          </div>
+        </div>
+      </Modal>}
+
+      {suspendModal && <Modal title="Hesabı Askıya Al" desc={`${fullName(suspendModal)} için işlem sebebini yaz.`} onClose={closeSuspendModal}>
+        <div className="space-y-4">
+          {isSoftwareTeam && (
+            <div>
+              <label className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-slate-500">Askı Süresi</label>
+              <select value={suspendDuration} onChange={(e) => setSuspendDuration(e.target.value)} className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 outline-none focus:border-sky-400">
+                <option value="ONE_HOUR">1 Saat</option>
+                <option value="ONE_DAY">1 Gün</option>
+                <option value="ONE_WEEK">1 Hafta</option>
+                <option value="ONE_MONTH">1 Ay</option>
+                <option value="PERMANENT">Süresiz</option>
+              </select>
+            </div>
+          )}
+
+          {!isSoftwareTeam && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
+              Admin hesabı kullanıcıyı sadece 1 saat askıya alabilir. Bu hak 24 saatte 1 kez kullanılabilir.
+            </div>
+          )}
+
+          <div>
+            <label className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-slate-500">Sebep</label>
+            <textarea value={suspendReason} onChange={(e) => setSuspendReason(e.target.value)} rows={4} placeholder="Askıya alma sebebini yazın..." className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none placeholder:text-slate-400 focus:border-sky-400" />
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <PrimaryButton tone="light" onClick={closeSuspendModal}>Vazgeç</PrimaryButton>
+            <PrimaryButton tone="danger" disabled={actionLoading === suspendModal.id} onClick={submitSuspend}>Askıya Al</PrimaryButton>
+          </div>
+        </div>
+      </Modal>}
+
+      {createUserModal && <Modal title="Yeni Üye Ekle" desc="Manuel olarak onaylı kullanıcı oluştur." onClose={() => { setCreateUserModal(false); setCreateUserError(""); }}><div className="grid gap-4 sm:grid-cols-2"><Input label="Ad" value={createUserForm.firstName} onChange={(v) => setCreateUserForm((c) => ({ ...c, firstName: v }))} /><Input label="Soyad" value={createUserForm.lastName} onChange={(v) => setCreateUserForm((c) => ({ ...c, lastName: v }))} /></div><div className="mt-4 grid gap-4"><Input label="E-posta" type="email" value={createUserForm.email} onChange={(v) => setCreateUserForm((c) => ({ ...c, email: v }))} /><Input label="Telefon" value={createUserForm.phone} onChange={(v) => setCreateUserForm((c) => ({ ...c, phone: v }))} /><Input label="Şifre" type="password" value={createUserForm.password} onChange={(v) => setCreateUserForm((c) => ({ ...c, password: v }))} /><div><label className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-slate-500">Rol</label><select value={createUserForm.role} onChange={(e) => setCreateUserForm((c) => ({ ...c, role: e.target.value }))} className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 outline-none focus:border-sky-400"><option value="EMLAKCI">Emlakçı</option><option value="MUTEAHHIT">Müteahhit</option><option value="INSAAT_FIRMASI">İnşaat Firması</option>{isSoftwareTeam && <><option value="MODERATOR">Moderatör</option><option value="ADMIN">Admin</option><option value="SUPER_ADMIN">Yazılım Ekibi</option></>}</select></div></div>{createUserError && <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700">{createUserError}</p>}<div className="mt-5 flex justify-end gap-3"><PrimaryButton tone="light" onClick={() => { setCreateUserModal(false); setCreateUserError(""); }}>Vazgeç</PrimaryButton><PrimaryButton disabled={createUserLoading} icon={<Plus size={15} />} onClick={async () => { if (!createUserForm.firstName || !createUserForm.lastName || !createUserForm.email || !createUserForm.phone || !createUserForm.password) { setCreateUserError("Tüm alanlar zorunludur."); return; } setCreateUserLoading(true); setCreateUserError(""); try { await api.post("/admin/users", createUserForm); setCreateUserModal(false); setCreateUserForm({ firstName: "", lastName: "", email: "", phone: "", password: "", role: "EMLAKCI" }); await Promise.all([fetchUsers(), fetchStats()]); } catch (error: any) { setCreateUserError(error?.response?.data?.message || "Bir hata oluştu."); } finally { setCreateUserLoading(false); } }}>Üye Ekle</PrimaryButton></div></Modal>}
 
       <div className="lg:flex">
         <aside className="hidden min-h-screen w-72 shrink-0 border-r border-slate-200 bg-white p-5 lg:sticky lg:top-0 lg:block"><AdminBrand /><nav className="mt-8 space-y-2">{navItems.map((item) => <NavButton key={item.key} item={item} active={activeTab === item.key} onClick={() => setActiveTab(item.key)} />)}</nav><div className="mt-8 rounded-3xl bg-slate-950 p-5 text-white"><p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Mobil Öncelikli</p><p className="mt-2 text-sm font-bold leading-6 text-slate-200">EPH yönetimi telefon ekranından rahat kullanılacak şekilde yenileniyor.</p></div></aside>
@@ -369,7 +497,7 @@ export default function AdminPage() {
           {menuOpen && <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm lg:hidden" onClick={() => setMenuOpen(false)}><aside className="h-full w-[86%] max-w-sm bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between"><AdminBrand /><button onClick={() => setMenuOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200"><X size={18} /></button></div><nav className="mt-6 space-y-2">{navItems.map((item) => <NavButton key={item.key} item={item} active={activeTab === item.key} onClick={() => { setActiveTab(item.key); setMenuOpen(false); }} />)}</nav></aside></div>}
           <div className="px-4 py-5 pb-24 lg:px-8 lg:py-8">
             {activeTab === "overview" && <OverviewTab stats={stats} users={usersWithPresence} applications={applications} documents={documents} leads={leads} units={units} setActiveTab={setActiveTab} />}
-            {activeTab === "users" && <UsersTab users={filteredUsers} allUsers={usersWithPresence} search={userSearch} setSearch={setUserSearch} roleFilter={roleFilter} setRoleFilter={setRoleFilter} cityFilter={cityFilter} setCityFilter={setCityFilter} cityOptions={cityOptions} actionLoading={actionLoading} onCreate={() => setCreateUserModal(true)} onApprove={(id) => act(id, async () => { await api.patch(`/admin/users/${id}/approve`); await Promise.all([fetchUsers(), fetchStats()]); })} onSuspend={(id) => act(id, async () => { await api.patch(`/admin/users/${id}/suspend`); await Promise.all([fetchUsers(), fetchStats()]); })} onDelete={(id) => act(id, async () => { await api.delete(`/admin/users/${id}/reject`); await Promise.all([fetchUsers(), fetchStats()]); })} onRole={(item) => { setRoleModal({ id: item.id, role: item.role }); setNewRole(item.role); }} />}
+            {activeTab === "users" && <UsersTab users={filteredUsers} allUsers={usersWithPresence} search={userSearch} setSearch={setUserSearch} roleFilter={roleFilter} setRoleFilter={setRoleFilter} cityFilter={cityFilter} setCityFilter={setCityFilter} cityOptions={cityOptions} actionLoading={actionLoading} onCreate={() => setCreateUserModal(true)} onApprove={(id) => act(id, async () => { await api.patch(`/admin/users/${id}/approve`); await Promise.all([fetchUsers(), fetchStats()]); })} currentRole={currentRole} currentUserId={user?.id} onInspect={(item) => setSelectedUser(item)} onSuspend={(item) => { setSuspendModal(item); setSuspendReason(""); setSuspendDuration("ONE_HOUR"); }} onDelete={(id) => act(id, async () => { await api.delete(`/admin/users/${id}/reject`); await Promise.all([fetchUsers(), fetchStats()]); })} onRole={(item) => { setRoleModal({ id: item.id, role: item.role }); setNewRole(item.role); }} />}
             {activeTab === "traffic" && <TrafficTab rows={trafficRows} trafficFilter={trafficFilter} setTrafficFilter={setTrafficFilter} onRefresh={fetchVisits} />}
             {activeTab === "radar" && <RadarTab rows={usersWithPresence.map((u) => ({ user: u, visit: u.lastVisit, presence: u.presence }))} visits={visits} onRefresh={fetchVisits} />}
             {activeTab === "messages" && <SystemMessagesTab />}
@@ -397,8 +525,33 @@ function OverviewTab({ stats, users, applications, documents, leads, units, setA
   return <div className="space-y-5"><div className="rounded-[32px] bg-slate-950 p-5 text-white shadow-sm lg:p-8"><p className="text-xs font-black uppercase tracking-[0.24em] text-sky-300">Komuta Merkezi</p><h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Platformu cebinden yönet.</h2><p className="mt-4 max-w-2xl text-sm font-semibold leading-7 text-slate-300">Üye yönetimi, canlı trafik, başvurular ve kurumsal mesajlar tek merkezde toplandı.</p><div className="mt-6 flex flex-wrap gap-2"><PrimaryButton tone="light" icon={<UsersRound size={16} />} onClick={() => setActiveTab("users")}>Üyelere Git</PrimaryButton><PrimaryButton tone="light" icon={<Activity size={16} />} onClick={() => setActiveTab("traffic")}>Canlı Trafik</PrimaryButton><Link href="/admin/system-messages"><PrimaryButton tone="light" icon={<MessageSquareText size={16} />}>Kurumsal Mesaj</PrimaryButton></Link></div></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><StatCard title="Toplam Üye" value={stats?.totalUsers || users.length} icon={<UsersRound size={20} />} /><StatCard title="Online Üye" value={onlineCount} icon={<Activity size={20} />} desc="Son 5 dakika" /><StatCard title="Başvuru" value={stats?.pendingApplications || 0} icon={<Mail size={20} />} desc="Bekleyen" /><StatCard title="Stok" value={units.length} icon={<Building2 size={20} />} /></div><div className="grid gap-5 xl:grid-cols-2"><div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><SectionHeader title="Son Üyeler" desc="Üye no ve şehir bilgileriyle birlikte." action={<button onClick={() => setActiveTab("users")} className="text-sm font-black text-sky-700">Tümünü Gör</button>} /><div className="space-y-3">{users.slice(0, 5).map((u) => <MemberMini key={u.id} user={u} />)}{users.length === 0 && <Empty>Üye yok.</Empty>}</div></div><div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><SectionHeader title="Bekleyen İşler" desc="Başvuru ve belge kontrol listesi." /><div className="space-y-3"><QuickLine title="Bekleyen başvurular" value={applications.filter((a) => a.status === "PENDING").length} icon={<Mail size={18} />} /><QuickLine title="Bekleyen belgeler" value={documents.filter((d) => d.status === "PENDING").length} icon={<FileText size={18} />} /><QuickLine title="Lina aday kayıtları" value={leads.length} icon={<Sparkles size={18} />} /></div></div></div></div>;
 }
 
-function UsersTab({ users, allUsers, search, setSearch, roleFilter, setRoleFilter, cityFilter, setCityFilter, cityOptions, actionLoading, onCreate, onApprove, onSuspend, onDelete, onRole }: { users: (UserItem & { lastVisit?: VisitItem; presence: any })[]; allUsers: (UserItem & { lastVisit?: VisitItem; presence: any })[]; search: string; setSearch: (v: string) => void; roleFilter: string; setRoleFilter: (v: string) => void; cityFilter: string; setCityFilter: (v: string) => void; cityOptions: string[]; actionLoading: string | null; onCreate: () => void; onApprove: (id: string) => void; onSuspend: (id: string) => void; onDelete: (id: string) => void; onRole: (u: UserItem) => void }) {
-  return <section><SectionHeader title="Üyeler" desc={`${users.length} kayıt gösteriliyor. Toplam ${allUsers.length} üye.`} action={<PrimaryButton icon={<Plus size={16} />} onClick={onCreate}>Yeni Üye</PrimaryButton>} /><div className="mb-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]"><div className="relative"><Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ad, e-posta, şehir veya üye no ara..." className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-bold outline-none focus:border-sky-400" /></div><select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Şehirler</option>{cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}</select><select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Roller</option><option value="EMLAKCI">Emlakçı</option><option value="MUTEAHHIT">Müteahhit</option><option value="INSAAT_FIRMASI">İnşaat Firması</option><option value="ADMIN">Admin</option><option value="SUPER_ADMIN">Yazılım Ekibi</option></select></div>{users.length === 0 ? <Empty>Kullanıcı bulunamadı.</Empty> : <div className="space-y-3">{users.map((u) => <div key={u.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_auto] lg:items-center"><div className="flex items-start gap-3"><div className="relative"><Avatar firstName={u.firstName} lastName={u.lastName} imageUrl={u.profileImageUrl} size="lg" /><span className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-white ${u.presence.dot}`} /></div><div className="min-w-0"><h3 className="truncate text-lg font-black text-slate-950">{u.firstName} {u.lastName}</h3><p className="truncate text-sm font-bold text-slate-500">{u.email}</p><p className="text-xs font-bold text-slate-400">{u.phone || "Telefon yok"}</p><div className="mt-2 flex flex-wrap gap-2"><Pill className={roleClass(u.role)}>{roleLabel(u.role)}</Pill><Pill className={u.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{u.isApproved ? "Onaylı" : "Bekliyor"}</Pill><Pill className={u.presence.badge}>{u.presence.label}</Pill></div></div></div><div className="grid gap-2 rounded-2xl bg-slate-50 p-3"><InfoLine label="Üye No" value={u.memberCode || "Atanmadı"} strong /><InfoLine label="Konum" value={`${u.city || "Şehir yok"}${u.district ? ` / ${u.district}` : ""}`} /><InfoLine label="Bölge Kodu" value={u.cityPlateCode ? `TR ${u.cityPlateCode}` : "—"} /><InfoLine label="Son Aktivite" value={fmt(u.lastVisit?.createdAt)} /></div><div className="flex flex-wrap gap-2 lg:justify-end">{!u.isApproved && <PrimaryButton tone="success" disabled={actionLoading === u.id} icon={<Check size={15} />} onClick={() => onApprove(u.id)}>Onayla</PrimaryButton>}{u.role !== "ADMIN" && u.role !== "SUPER_ADMIN" && <>{u.isApproved && <PrimaryButton tone="light" disabled={actionLoading === u.id} onClick={() => { if (confirm("Kullanıcı askıya alınacak. Emin misiniz?")) onSuspend(u.id); }}>Askıya Al</PrimaryButton>}<PrimaryButton tone="light" icon={<UserCog size={15} />} onClick={() => onRole(u)}>Rol</PrimaryButton><PrimaryButton tone="danger" disabled={actionLoading === u.id} icon={<Trash2 size={15} />} onClick={() => { if (confirm("Kullanıcı silinecek. Emin misiniz?")) onDelete(u.id); }}>Sil</PrimaryButton></>}{(u.role === "ADMIN" || u.role === "SUPER_ADMIN") && <PrimaryButton tone="light" icon={<ShieldCheck size={15} />}>Yetkili</PrimaryButton>}</div></div></div>)}</div>}</section>;
+function UsersTab({ users, allUsers, search, setSearch, roleFilter, setRoleFilter, cityFilter, setCityFilter, cityOptions, actionLoading, currentRole, currentUserId, onCreate, onApprove, onSuspend, onDelete, onRole, onInspect }: { users: (UserItem & { lastVisit?: VisitItem; presence: any })[]; allUsers: (UserItem & { lastVisit?: VisitItem; presence: any })[]; search: string; setSearch: (v: string) => void; roleFilter: string; setRoleFilter: (v: string) => void; cityFilter: string; setCityFilter: (v: string) => void; cityOptions: string[]; actionLoading: string | null; currentRole: string; currentUserId?: string; onCreate: () => void; onApprove: (id: string) => void; onSuspend: (u: UserItem) => void; onDelete: (id: string) => void; onRole: (u: UserItem) => void; onInspect: (u: UserItem) => void }) {
+  const isSoftwareTeam = currentRole === "SUPER_ADMIN";
+  const isAdmin = currentRole === "ADMIN";
+
+  return <section><SectionHeader title="Üyeler" desc={`${users.length} kayıt gösteriliyor. Toplam ${allUsers.length} üye.`} action={<PrimaryButton icon={<Plus size={16} />} onClick={onCreate}>Yeni Üye</PrimaryButton>} /><div className="mb-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]"><div className="relative"><Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ad, e-posta, şehir veya üye no ara..." className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-bold outline-none focus:border-sky-400" /></div><select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Şehirler</option>{cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}</select><select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black outline-none focus:border-sky-400"><option value="all">Tüm Roller</option><option value="EMLAKCI">Emlakçı</option><option value="MUTEAHHIT">Müteahhit</option><option value="INSAAT_FIRMASI">İnşaat Firması</option><option value="MODERATOR">Moderatör</option><option value="ADMIN">Admin</option><option value="SUPER_ADMIN">Yazılım Ekibi</option></select></div>{users.length === 0 ? <Empty>Kullanıcı bulunamadı.</Empty> : <div className="space-y-3">{users.map((u) => {
+    const isSelf = currentUserId === u.id;
+    const targetIsAuthority = u.role === "ADMIN" || u.role === "SUPER_ADMIN";
+    const adminCanSuspend = isAdmin && !isSelf && !targetIsAuthority && u.isApproved;
+    const softwareTeamCanManage = isSoftwareTeam && !isSelf;
+
+    return <div key={u.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_auto] lg:items-center"><button type="button" onClick={() => onInspect(u)} className="flex items-start gap-3 text-left"><div className="relative"><Avatar firstName={u.firstName} lastName={u.lastName} imageUrl={u.profileImageUrl} size="lg" /><span className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-white ${u.presence.dot}`} /></div><div className="min-w-0"><h3 className="truncate text-lg font-black text-slate-950">{u.firstName} {u.lastName}</h3><p className="truncate text-sm font-bold text-slate-500">{u.email}</p><p className="text-xs font-bold text-slate-400">{u.phone || "Telefon yok"}</p><div className="mt-2 flex flex-wrap gap-2"><Pill className={roleClass(u.role)}>{roleLabel(u.role)}</Pill><Pill className={u.isApproved ? statusClass("APPROVED") : statusClass("PENDING")}>{u.isApproved ? "Onaylı" : "Bekliyor"}</Pill><Pill className={u.presence.badge}>{u.presence.label}</Pill>{(u.restrictions || []).length > 0 && <Pill className="border-amber-200 bg-amber-50 text-amber-800">Askıda</Pill>}</div></div></button><button type="button" onClick={() => onInspect(u)} className="grid gap-2 rounded-2xl bg-slate-50 p-3 text-left"><InfoLine label="Üye No" value={u.memberCode || "Atanmadı"} strong /><InfoLine label="Konum" value={`${u.city || "Şehir yok"}${u.district ? ` / ${u.district}` : ""}`} /><InfoLine label="Bölge Kodu" value={u.cityPlateCode ? `TR ${u.cityPlateCode}` : "—"} /><InfoLine label="Son Aktivite" value={fmt(u.lastVisit?.createdAt)} /></button><div className="flex flex-wrap gap-2 lg:justify-end">
+      <PrimaryButton tone="light" icon={<Eye size={15} />} onClick={() => onInspect(u)}>İncele</PrimaryButton>
+
+      {!u.isApproved && !isSelf && <PrimaryButton tone="success" disabled={actionLoading === u.id} icon={<Check size={15} />} onClick={() => onApprove(u.id)}>Onayla</PrimaryButton>}
+
+      {adminCanSuspend && <PrimaryButton tone="light" disabled={actionLoading === u.id} onClick={() => onSuspend(u)}>1 Saat Askıya Al</PrimaryButton>}
+
+      {softwareTeamCanManage && <>
+        <PrimaryButton tone="light" disabled={actionLoading === u.id} onClick={() => onSuspend(u)}>Askıya Al</PrimaryButton>
+        <PrimaryButton tone="light" icon={<UserCog size={15} />} onClick={() => onRole(u)}>Rol</PrimaryButton>
+        <PrimaryButton tone="danger" disabled={actionLoading === u.id} icon={<Trash2 size={15} />} onClick={() => { if (confirm("Kullanıcı silinecek. Emin misiniz?")) onDelete(u.id); }}>Sil</PrimaryButton>
+      </>}
+
+      {isSelf && <PrimaryButton tone="light" icon={<ShieldCheck size={15} />}>Kendi Hesabın</PrimaryButton>}
+      {!softwareTeamCanManage && !adminCanSuspend && !isSelf && targetIsAuthority && <PrimaryButton tone="light" icon={<ShieldCheck size={15} />} onClick={() => onInspect(u)}>Yetkili Detayı</PrimaryButton>}
+    </div></div></div>;
+  })}</div>}</section>;
 }
 
 
