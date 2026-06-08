@@ -179,6 +179,37 @@ function roleLabel(role?: string) {
   return getRoleDisplayName(role);
 }
 
+
+function isMaskedSoftwareTeam(user?: { role?: string; firstName?: string; lastName?: string; email?: string | null; phone?: string | null; memberCode?: string | null }) {
+  if (!user) return false;
+  return (
+    user.role === "SUPER_ADMIN" &&
+    user.firstName === "Yazılım" &&
+    user.lastName === "Ekibi" &&
+    (user.email === "gizli@eph.local" || user.phone === "Gizli" || user.memberCode === "Gizli")
+  );
+}
+
+function safeUserName(user?: { firstName?: string; lastName?: string; role?: string }) {
+  if (isMaskedSoftwareTeam(user)) return "Yazılım Ekibi";
+  return fullName(user);
+}
+
+function safeUserEmail(user?: { email?: string | null; role?: string; firstName?: string; lastName?: string }) {
+  if (isMaskedSoftwareTeam(user)) return "Bilgiler gizli";
+  return user?.email || "E-posta yok";
+}
+
+function safeUserPhone(user?: { phone?: string | null; role?: string; firstName?: string; lastName?: string; email?: string | null }) {
+  if (isMaskedSoftwareTeam(user)) return "Telefon gizli";
+  return user?.phone || "Telefon yok";
+}
+
+function safeMemberCode(user?: { memberCode?: string | null; role?: string; firstName?: string; lastName?: string; email?: string | null; phone?: string | null }) {
+  if (isMaskedSoftwareTeam(user)) return "Gizli";
+  return user?.memberCode || "Atanmadı";
+}
+
 function money(value?: number) {
   if (!value) return "—";
   return `${value.toLocaleString("tr-TR")} ₺`;
