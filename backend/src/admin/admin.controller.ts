@@ -8,18 +8,44 @@ import {
   Query,
   Body,
   UseGuards,
+  Req,
 } from "@nestjs/common";
+import { Request } from "express";
 import { AdminService } from "./admin.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { Role } from "@prisma/client";
 
+type AdminRequestUser = {
+  id?: string;
+  sub?: string;
+  userId?: string;
+  role?: Role | string;
+  email?: string;
+};
+
+type AdminRequest = Request & {
+  user?: AdminRequestUser;
+};
+
 @Controller("admin")
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.SUPER_ADMIN)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
+
+  private extractActor(request: AdminRequest) {
+    return {
+      id: request.user?.id || request.user?.sub || request.user?.userId,
+      role: request.user?.role,
+      email: request.user?.email,
+      ipAddress:
+        request.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() ||
+        request.socket.remoteAddress,
+      userAgent: request.headers["user-agent"],
+    };
+  }
 
   @Get("stats")
   getStats() {
@@ -37,23 +63,35 @@ export class AdminController {
   }
 
   @Patch("users/:id/approve")
-  approveUser(@Param("id") id: string) {
-    return this.adminService.approveUser(id);
+  approveUser(@Param("id") id: string, @Req() request: AdminRequest) {
+    return this.adminService.approveUser(id, this.extractActor(request));
   }
 
   @Delete("users/:id/reject")
-  rejectUser(@Param("id") id: string) {
-    return this.adminService.rejectUser(id);
+  rejectUser(@Param("id") id: string, @Req() request: AdminRequest) {
+    return this.adminService.rejectUser(id, this.extractActor(request));
   }
 
   @Patch("users/:id/suspend")
-  suspendUser(@Param("id") id: string) {
-    return this.adminService.suspendUser(id);
+  suspendUser(
+    @Param("id") id: string,
+    @Body()
+    body: {
+      reason?: string;
+      duration?: "ONE_HOUR" | "ONE_DAY" | "ONE_WEEK" | "ONE_MONTH" | "PERMANENT";
+    },
+    @Req() request: AdminRequest,
+  ) {
+    return this.adminService.suspendUser(id, this.extractActor(request), body);
   }
 
   @Patch("users/:id/role")
-  changeUserRole(@Param("id") id: string, @Body() body: { role: string }) {
-    return this.adminService.changeUserRole(id, body.role);
+  changeUserRole(
+    @Param("id") id: string,
+    @Body() body: { role: Role | string },
+    @Req() request: AdminRequest,
+  ) {
+    return this.adminService.changeUserRole(id, body.role, this.extractActor(request));
   }
 
   @Post("users")
@@ -65,10 +103,11 @@ export class AdminController {
       email: string;
       phone: string;
       password: string;
-      role: string;
+      role: Role | string;
     },
+    @Req() request: AdminRequest,
   ) {
-    return this.adminService.createUser(body);
+    return this.adminService.createUser(body, this.extractActor(request));
   }
 
   @Get("referrals")

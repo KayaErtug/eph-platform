@@ -1,8 +1,23 @@
-import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { MailService } from "../mail.service";
 import { Role } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
+
+type AdminActor = {
+  id?: string;
+  role?: Role | string;
+  email?: string;
+  ipAddress?: string;
+  userAgent?: string;
+};
+
+type SuspendDuration = "ONE_HOUR" | "ONE_DAY" | "ONE_WEEK" | "ONE_MONTH" | "PERMANENT";
 
 @Injectable()
 export class AdminService {
@@ -61,6 +76,130 @@ export class AdminService {
     }
 
     return { status: status as any };
+  }
+
+  private getActorId(actor?: AdminActor): string {
+    const actorId = actor?.id;
+
+    if (!actorId) {
+      throw new ForbiddenException("Yönetici kimliği doğrulanamadı.");
+    }
+
+    return actorId;
+  }
+
+  private getActorRole(actor?: AdminActor): Role | string {
+    const role = actor?.role;
+
+    if (!role) {
+      throw new ForbiddenException("Yönetici rolü doğrulanamadı.");
+    }
+
+    return role;
+  }
+
+  private isSoftwareTeam(actor?: AdminActor): boolean {
+    return this.getActorRole(actor) === Role.SUPER_ADMIN;
+  }
+
+  private isAdmin(actor?: AdminActor): boolean {
+    return this.getActorRole(actor) === Role.ADMIN;
+  }
+
+  private requireSoftwareTeam(actor?: AdminActor) {
+    if (!this.isSoftwareTeam(actor)) {
+      throw new ForbiddenException("Bu işlem sadece Yazılım Ekibi tarafından yapılabilir.");
+    }
+  }
+
+  private ensureReason(reason?: string): string {
+    const cleanReason = String(reason || "").trim();
+
+    if (!cleanReason) {
+      throw new BadRequestException("İşlem sebebi zorunludur.");
+    }
+
+    return cleanReason;
+  }
+
+  private normalizeSuspendDuration(duration?: string): SuspendDuration {
+    const value = String(duration || "ONE_HOUR").trim().toUpperCase();
+
+    if (["ONE_HOUR", "1_HOUR", "1_SAAT", "SAAT", "HOUR"].includes(value)) {
+      return "ONE_HOUR";
+    }
+
+    if (["ONE_DAY", "1_DAY", "1_GUN", "1_GÜN", "GUN", "GÜN", "DAY"].includes(value)) {
+      return "ONE_DAY";
+    }
+
+    if (["ONE_WEEK", "1_WEEK", "1_HAFTA", "HAFTA", "WEEK"].includes(value)) {
+      return "ONE_WEEK";
+    }
+
+    if (["ONE_MONTH", "1_MONTH", "1_AY", "AY", "MONTH"].includes(value)) {
+      return "ONE_MONTH";
+    }
+
+    if (["PERMANENT", "SURESIZ", "SÜRESİZ", "KALICI"].includes(value)) {
+      return "PERMANENT";
+    }
+
+    throw new BadRequestException("Geçersiz askıya alma süresi.");
+  }
+
+  private calculateSuspendEndDate(duration: SuspendDuration): Date | null {
+    const endsAt = new Date();
+
+    if (duration === "ONE_HOUR") {
+      endsAt.setHours(endsAt.getHours() + 1);
+      return endsAt;
+    }
+
+    if (duration === "ONE_DAY") {
+      endsAt.setDate(endsAt.getDate() + 1);
+      return endsAt;
+    }
+
+    if (duration === "ONE_WEEK") {
+      endsAt.setDate(endsAt.getDate() + 7);
+      return endsAt;
+    }
+
+    if (duration === "ONE_MONTH") {
+      endsAt.setMonth(endsAt.getMonth() + 1);
+      return endsAt;
+    }
+
+    return null;
+  }
+
+  private async logAdminAction(data: {
+    actor?: AdminActor;
+    targetUserId?: string;
+    action: string;
+    entityType: string;
+    entityId?: string;
+    description?: string;
+    metadata?: Record<string, any>;
+  }) {
+    try {
+      await this.prisma.adminActionLog.create({
+        data: {
+          actorId: data.actor?.id || null,
+          targetUserId: data.targetUserId || null,
+          action: data.action,
+          entityType: data.entityType,
+          entityId: data.entityId || null,
+          description: data.description || null,
+          metadata: data.metadata || undefined,
+          ipAddress: data.actor?.ipAddress || null,
+          userAgent: data.actor?.userAgent || null,
+        },
+      });
+    } catch (error) {
+      console.error("Admin işlem logu yazılamadı:", error);
+    }
   }
 
   async getStats() {
@@ -242,6 +381,8 @@ export class AdminService {
   }
 
   async getUsers(filter?: "pending" | "approved" | "all") {
+    const now = new Date();
+
     const where =
       filter === "pending"
         ? { isApproved: false }
@@ -280,12 +421,37 @@ export class AdminService {
             createdAt: true,
           },
         },
+        restrictions: {
+          where: {
+            isActive: true,
+            OR: [{ endsAt: null }, { endsAt: { gt: now } }],
+          },
+          select: {
+            id: true,
+            type: true,
+            reason: true,
+            startsAt: true,
+            endsAt: true,
+            isActive: true,
+            createdAt: true,
+            createdBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
       },
       orderBy: { createdAt: "desc" },
     });
   }
 
-  async approveUser(id: string) {
+  async approveUser(id: string, actor?: AdminActor) {
     const user = await this.prisma.user.findUnique({ where: { id } });
 
     if (!user) {
@@ -306,6 +472,15 @@ export class AdminService {
       },
     });
 
+    await this.logAdminAction({
+      actor,
+      targetUserId: id,
+      action: "USER_APPROVED",
+      entityType: "User",
+      entityId: id,
+      description: `${user.email} kullanıcısı onaylandı.`,
+    });
+
     try {
       await this.mail.sendUserApproved(user.email, user.firstName);
     } catch {}
@@ -313,26 +488,117 @@ export class AdminService {
     return updated;
   }
 
-  async rejectUser(id: string) {
+  async rejectUser(id: string, actor?: AdminActor) {
+    this.requireSoftwareTeam(actor);
+
     const user = await this.prisma.user.findUnique({ where: { id } });
 
     if (!user) {
       throw new NotFoundException("Kullanıcı bulunamadı.");
     }
 
-    return this.prisma.user.delete({ where: { id } });
+    if (user.id === this.getActorId(actor)) {
+      throw new BadRequestException("Kendi hesabınızı silemezsiniz.");
+    }
+
+    const deleted = await this.prisma.user.delete({ where: { id } });
+
+    await this.logAdminAction({
+      actor,
+      targetUserId: id,
+      action: "USER_DELETED",
+      entityType: "User",
+      entityId: id,
+      description: `${user.email} kullanıcısı Yazılım Ekibi tarafından silindi.`,
+      metadata: {
+        deletedUserRole: user.role,
+      },
+    });
+
+    return deleted;
   }
 
-  async suspendUser(id: string) {
+  async suspendUser(
+    id: string,
+    actor?: AdminActor,
+    body?: {
+      reason?: string;
+      duration?: SuspendDuration | string;
+    },
+  ) {
+    const actorId = this.getActorId(actor);
+    const reason = this.ensureReason(body?.reason);
+
     const user = await this.prisma.user.findUnique({ where: { id } });
 
     if (!user) {
       throw new NotFoundException("Kullanıcı bulunamadı.");
     }
 
-    if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") {
-      throw new BadRequestException("Admin hesabı askıya alınamaz.");
+    if (user.id === actorId) {
+      throw new BadRequestException("Kendi hesabınızı askıya alamazsınız.");
     }
+
+    let duration: SuspendDuration = this.normalizeSuspendDuration(body?.duration);
+
+    if (this.isAdmin(actor)) {
+      if (user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN) {
+        throw new ForbiddenException("Admin, Admin veya Yazılım Ekibi hesabını askıya alamaz.");
+      }
+
+      duration = "ONE_HOUR";
+
+      const last24Hours = new Date();
+      last24Hours.setHours(last24Hours.getHours() - 24);
+
+      const adminSuspendCount = await this.prisma.userRestriction.count({
+        where: {
+          createdById: actorId,
+          type: "GECICI_ASKI" as any,
+          createdAt: { gte: last24Hours },
+        },
+      });
+
+      if (adminSuspendCount >= 1) {
+        throw new ForbiddenException(
+          "Admin askıya alma hakkınızı son 24 saat içinde kullandınız. Yeni hak 24 saat sonra açılır.",
+        );
+      }
+    }
+
+    if (!this.isAdmin(actor) && !this.isSoftwareTeam(actor)) {
+      throw new ForbiddenException("Bu işlem için yetkiniz yok.");
+    }
+
+    const endsAt = this.calculateSuspendEndDate(duration);
+    const restrictionType = duration === "PERMANENT" ? "KALICI_ASKI" : "GECICI_ASKI";
+
+    await this.prisma.userRestriction.updateMany({
+      where: {
+        userId: id,
+        isActive: true,
+        type: {
+          in: ["GECICI_ASKI", "KALICI_ASKI"] as any,
+        },
+      },
+      data: {
+        isActive: false,
+        liftedAt: new Date(),
+        liftedNote: "Yeni askıya alma işlemi nedeniyle önceki aktif askı kapatıldı.",
+      },
+    });
+
+    const restriction = await this.prisma.userRestriction.create({
+      data: {
+        userId: id,
+        createdById: actorId,
+        type: restrictionType as any,
+        reason,
+        startsAt: new Date(),
+        endsAt,
+        isActive: true,
+      },
+    });
 
     const updated = await this.prisma.user.update({
       where: { id },
@@ -348,27 +614,60 @@ export class AdminService {
       },
     });
 
+    await this.logAdminAction({
+      actor,
+      targetUserId: id,
+      action: this.isSoftwareTeam(actor) ? "USER_SUSPENDED_BY_SOFTWARE_TEAM" : "USER_SUSPENDED_BY_ADMIN",
+      entityType: "UserRestriction",
+      entityId: restriction.id,
+      description:
+        duration === "PERMANENT"
+          ? `${user.email} kullanıcısı süresiz askıya alındı.`
+          : `${user.email} kullanıcısı süreli askıya alındı.`,
+      metadata: {
+        duration,
+        endsAt,
+        reason,
+        targetRole: user.role,
+      },
+    });
+
     try {
       await this.mail.sendUserSuspended(user.email, user.firstName);
     } catch {}
 
-    return updated;
+    return {
+      user: updated,
+      restriction,
+      message:
+        duration === "PERMANENT"
+          ? "Kullanıcı süresiz askıya alındı."
+          : "Kullanıcı süreli askıya alındı.",
+    };
   }
 
-  async changeUserRole(id: string, role: string) {
+  async changeUserRole(id: string, role: Role | string, actor?: AdminActor) {
+    this.requireSoftwareTeam(actor);
+
+    const normalizedRole = String(role || "").trim().toUpperCase() as Role;
+
+    if (!Object.values(Role).includes(normalizedRole)) {
+      throw new BadRequestException("Geçersiz rol.");
+    }
+
     const user = await this.prisma.user.findUnique({ where: { id } });
 
     if (!user) {
       throw new NotFoundException("Kullanıcı bulunamadı.");
     }
 
-    if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") {
-      throw new BadRequestException("Admin rolü değiştirilemez.");
+    if (user.id === this.getActorId(actor)) {
+      throw new BadRequestException("Kendi rolünüzü değiştiremezsiniz.");
     }
 
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id },
-      data: { role: role as any },
+      data: { role: normalizedRole },
       select: {
         id: true,
         firstName: true,
@@ -379,16 +678,48 @@ export class AdminService {
         isApproved: true,
       },
     });
+
+    await this.logAdminAction({
+      actor,
+      targetUserId: id,
+      action: "USER_ROLE_CHANGED",
+      entityType: "User",
+      entityId: id,
+      description: `${user.email} kullanıcısının rolü değiştirildi.`,
+      metadata: {
+        oldRole: user.role,
+        newRole: normalizedRole,
+      },
+    });
+
+    return updated;
   }
 
-  async createUser(data: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    password: string;
-    role: string;
-  }) {
+  async createUser(
+    data: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string;
+      password: string;
+      role: Role | string;
+    },
+    actor?: AdminActor,
+  ) {
+    const normalizedRole = String(data.role || "").trim().toUpperCase() as Role;
+
+    if (!Object.values(Role).includes(normalizedRole)) {
+      throw new BadRequestException("Geçersiz rol.");
+    }
+
+    if (
+      normalizedRole === Role.ADMIN ||
+      normalizedRole === Role.MODERATOR ||
+      normalizedRole === Role.SUPER_ADMIN
+    ) {
+      this.requireSoftwareTeam(actor);
+    }
+
     const existing = await this.prisma.user.findUnique({
       where: { email: data.email },
     });
@@ -400,14 +731,14 @@ export class AdminService {
     const passwordHash = await bcrypt.hash(data.password, 10);
     const referralCode = await this.generateUniqueReferralCode();
 
-    return this.prisma.user.create({
+    const created = await this.prisma.user.create({
       data: {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
         phone: data.phone,
         passwordHash,
-        role: data.role as any,
+        role: normalizedRole,
         isApproved: true,
         isVerified: true,
         referralCode,
@@ -426,6 +757,20 @@ export class AdminService {
         referralCode: true,
       },
     });
+
+    await this.logAdminAction({
+      actor,
+      targetUserId: created.id,
+      action: "USER_CREATED",
+      entityType: "User",
+      entityId: created.id,
+      description: `${created.email} kullanıcısı oluşturuldu.`,
+      metadata: {
+        createdRole: created.role,
+      },
+    });
+
+    return created;
   }
 
   async getReferralCodes() {
