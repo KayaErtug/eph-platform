@@ -8,10 +8,16 @@ import {
   Bot,
   BriefcaseBusiness,
   Building2,
+  ClipboardCheck,
   Clock3,
+  KeyRound,
+  LayoutDashboard,
   Loader2,
   MessageCircle,
+  ShieldCheck,
   Target,
+  UserCog,
+  UserPlus,
   UsersRound,
 } from "lucide-react";
 
@@ -86,6 +92,14 @@ type DashboardTask = {
   customerPhone?: string | null;
 };
 
+type QuickAccessItem = {
+  href: string;
+  label: string;
+  desc: string;
+  icon: React.ReactNode;
+  roles?: string[];
+};
+
 function normalizeRole(role?: string | null) {
   return String(role || "").toLocaleUpperCase("tr-TR").trim();
 }
@@ -95,10 +109,21 @@ function roleLabel(role?: string | null) {
 
   if (normalizedRole === "SUPER_ADMIN") return "Yazılım Ekibi";
   if (normalizedRole === "ADMIN") return "Admin";
+  if (normalizedRole === "MODERATOR") return "Moderatör";
   if (["MUTEAHHIT", "MÜTEAHHİT", "MÜTAHHİT"].includes(normalizedRole)) return "Müteahhit";
   if (["INSAAT_FIRMASI", "İNŞAAT_FİRMASI"].includes(normalizedRole)) return "İnşaat Firması";
 
   return "Gayrimenkul Danışmanı";
+}
+
+function isAdminRole(role?: string | null) {
+  const normalizedRole = normalizeRole(role);
+  return normalizedRole === "ADMIN" || normalizedRole === "SUPER_ADMIN";
+}
+
+function isModeratorOrAbove(role?: string | null) {
+  const normalizedRole = normalizeRole(role);
+  return normalizedRole === "MODERATOR" || normalizedRole === "ADMIN" || normalizedRole === "SUPER_ADMIN";
 }
 
 function getFirstName(user?: { firstName?: string | null; email?: string | null } | null) {
@@ -187,6 +212,7 @@ export default function DashboardPage() {
 
   const firstName = getFirstName(user);
   const roleName = roleLabel(user?.role);
+  const normalizedRole = normalizeRole(user?.role);
 
   useEffect(() => {
     setHydrated(true);
@@ -289,6 +315,93 @@ export default function DashboardPage() {
     return networkNotifications.items.slice(0, 1);
   }, [networkNotifications.items]);
 
+  const quickAccessItems = useMemo<QuickAccessItem[]>(() => {
+    const items: QuickAccessItem[] = [
+      {
+        href: "/stok",
+        label: "Portföy",
+        desc: "İlan ve portföyler",
+        icon: <Building2 size={21} />,
+      },
+      {
+        href: "/crm",
+        label: "CRM",
+        desc: "Müşteri takibi",
+        icon: <UsersRound size={21} />,
+      },
+      {
+        href: "/network",
+        label: "Forum",
+        desc: "Talep ve akış",
+        icon: <MessageCircle size={21} />,
+      },
+      {
+        href: "/havuz",
+        label: "Havuz",
+        desc: "Eşleşmeler",
+        icon: <Target size={22} />,
+      },
+      {
+        href: "/lina",
+        label: "Lina",
+        desc: "AI asistan",
+        icon: <Bot size={22} />,
+      },
+      {
+        href: "/messages",
+        label: "Mesajlar",
+        desc: unreadMessages > 0 ? `${unreadMessages} okunmamış` : "Gelen kutusu",
+        icon: <MessageCircle size={21} />,
+      },
+      {
+        href: "/notification-settings",
+        label: "Bildirim",
+        desc: networkNotifications.unreadCount > 0 ? `${networkNotifications.unreadCount} yeni` : "Ayarlar",
+        icon: <Bell size={21} />,
+      },
+      {
+        href: "/kayit",
+        label: "Kayıt",
+        desc: "Kayıt merkezi",
+        icon: <UserPlus size={21} />,
+        roles: ["MODERATOR", "ADMIN", "SUPER_ADMIN"],
+      },
+      {
+        href: "/admin/referrals",
+        label: "Referans",
+        desc: "Ref kodları",
+        icon: <KeyRound size={21} />,
+        roles: ["ADMIN", "SUPER_ADMIN"],
+      },
+      {
+        href: "/admin/katilim-talepleri",
+        label: "Başvuru",
+        desc: "Onay merkezi",
+        icon: <ClipboardCheck size={21} />,
+        roles: ["MODERATOR", "ADMIN", "SUPER_ADMIN"],
+      },
+      {
+        href: "/admin",
+        label: "Admin",
+        desc: "Yönetim",
+        icon: <LayoutDashboard size={21} />,
+        roles: ["ADMIN", "SUPER_ADMIN"],
+      },
+      {
+        href: "/admin",
+        label: "Kullanıcı",
+        desc: "Yönetim",
+        icon: <UserCog size={21} />,
+        roles: ["SUPER_ADMIN"],
+      },
+    ];
+
+    return items.filter((item) => {
+      if (!item.roles) return true;
+      return item.roles.includes(normalizedRole);
+    });
+  }, [networkNotifications.unreadCount, normalizedRole, unreadMessages]);
+
   const stats = summary?.stats || {
     totalUnits: 0,
     totalCustomers: 0,
@@ -364,12 +477,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="grid grid-cols-4 gap-2">
-          <Shortcut href="/stok" icon={<Building2 size={21} />} label="Portföy" />
-          <Shortcut href="/crm" icon={<UsersRound size={21} />} label="CRM" />
-          <Shortcut href="/network" icon={<MessageCircle size={21} />} label="Forum" />
-          <Shortcut href="/havuz" icon={<Target size={22} />} label="Havuz" />
-        </section>
+        <QuickAccessCenter items={quickAccessItems} />
 
         <SectionBlock icon={<Clock3 size={20} />} title="Acil İşler" actionHref="/crm" actionLabel="Tümü">
           {urgentTasks.length > 0 ? (
@@ -449,6 +557,49 @@ function HeroStat({ label, value }: { label: string; value: number | string }) {
         {value}
       </p>
     </div>
+  );
+}
+
+function QuickAccessCenter({ items }: { items: QuickAccessItem[] }) {
+  return (
+    <section className="rounded-[28px] border border-[#DDE7F3] bg-white p-3 shadow-[0_16px_38px_rgba(15,23,42,0.065)]">
+      <div className="mb-3 text-center">
+        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#1557D6]">
+          Hızlı Erişim
+        </p>
+        <h2 className="mt-1 text-[22px] font-black tracking-[-0.04em] text-[#06194A]">
+          Kolay Menü
+        </h2>
+        <p className="mx-auto mt-1 max-w-[320px] text-[12px] font-bold leading-5 text-[#64748B]">
+          En çok kullanılan sayfalara tek dokunuşla ulaşın.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {items.map((item) => (
+          <QuickAccessCard key={`${item.href}-${item.label}`} item={item} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function QuickAccessCard({ item }: { item: QuickAccessItem }) {
+  return (
+    <Link
+      href={item.href}
+      className="flex min-h-[92px] flex-col items-center justify-center rounded-[22px] border border-[#DDE7F3] bg-[#FBFDFF] px-2 py-3 text-center transition hover:border-[#1557D6]/40 hover:bg-[#EFF6FF]"
+    >
+      <span className="flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#EFF6FF] text-[#1557D6]">
+        {item.icon}
+      </span>
+      <span className="mt-2 text-[12px] font-black leading-4 text-[#06194A]">
+        {item.label}
+      </span>
+      <span className="mt-0.5 line-clamp-1 text-[9px] font-extrabold leading-3 text-[#64748B]">
+        {item.desc}
+      </span>
+    </Link>
   );
 }
 
@@ -632,26 +783,6 @@ function CompactInfoCard({
       <p className="mt-1 line-clamp-2 text-center text-[11px] font-bold leading-4 text-[#64748B]">
         {desc}
       </p>
-    </Link>
-  );
-}
-
-function Shortcut({
-  href,
-  icon,
-  label,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex min-h-[74px] flex-col items-center justify-center gap-1.5 rounded-[22px] border border-[#DDE7F3] bg-white px-1 text-center shadow-[0_10px_26px_rgba(15,23,42,0.055)]"
-    >
-      <span className="text-[#1557D6]">{icon}</span>
-      <span className="text-[11px] font-black text-[#06194A]">{label}</span>
     </Link>
   );
 }
