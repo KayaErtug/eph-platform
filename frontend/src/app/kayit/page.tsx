@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import {
-  Building2,
   CheckCircle2,
   Eye,
   EyeOff,
@@ -17,7 +16,6 @@ import {
   Phone,
   ShieldCheck,
   UserRound,
-  XCircle,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -28,8 +26,28 @@ const ROLE_LABELS: Record<string, string> = {
   EMLAKCI: "Emlakçı",
   MUTEAHHIT: "Müteahhit",
   INSAAT_FIRMASI: "İnşaat Firması",
+  MODERATOR: "Moderatör",
   ADMIN: "Admin",
+  SUPER_ADMIN: "Yazılım Ekibi",
 };
+
+function normalizePhoneForForm(value?: string | null) {
+  const digits = String(value || "").replace(/\D/g, "");
+
+  if (digits.startsWith("90") && digits.length >= 12) {
+    return digits.slice(2, 12);
+  }
+
+  if (digits.startsWith("0") && digits.length >= 11) {
+    return digits.slice(1, 11);
+  }
+
+  if (digits.length > 10) {
+    return digits.slice(-10);
+  }
+
+  return digits.slice(0, 10);
+}
 
 function KayitForm() {
   const router = useRouter();
@@ -59,6 +77,7 @@ function KayitForm() {
   });
 
   const inviteCode = watch("inviteCode");
+  const phoneValue = watch("phone") || "";
 
   useEffect(() => {
     if (!inviteCode || inviteCode.length < 4) {
@@ -73,10 +92,12 @@ function KayitForm() {
 
         const res = await api.get(`/referral/${inviteCode}`);
 
-        setValue("firstName", res.data.firstName);
-        setValue("lastName", res.data.lastName);
-        setValue("email", res.data.email);
-        setValue("phone", res.data.phone);
+        setValue("firstName", res.data.firstName || "");
+        setValue("lastName", res.data.lastName || "");
+        setValue("email", res.data.email || "");
+        setValue("phone", normalizePhoneForForm(res.data.phone), {
+          shouldValidate: true,
+        });
 
         setDetectedRole(res.data.role);
 
@@ -100,6 +121,7 @@ function KayitForm() {
     try {
       const payload = {
         ...data,
+        phone: normalizePhoneForForm(data.phone),
       };
 
       const res = await api.post("/auth/register", payload);
@@ -210,6 +232,7 @@ function KayitForm() {
         }
 
         .title{
+          text-align:center;
           font-size:34px;
           font-weight:900;
           color:#0B1F44;
@@ -217,6 +240,7 @@ function KayitForm() {
 
         .subtitle{
           margin-top:8px;
+          text-align:center;
           color:#64748B;
           line-height:1.6;
         }
@@ -228,8 +252,9 @@ function KayitForm() {
         .field label{
           display:block;
           margin-bottom:8px;
+          text-align:center;
           font-size:13px;
-          font-weight:800;
+          font-weight:900;
           color:#334155;
         }
 
@@ -251,14 +276,23 @@ function KayitForm() {
           border:1px solid #CBD5E1;
           background:#fff;
           padding:0 14px 0 46px;
+          text-align:center;
           font-size:15px;
-          font-weight:650;
+          font-weight:800;
+          color:#06194A;
           outline:none;
         }
 
         .input:focus{
           border-color:#1D4ED8;
           box-shadow:0 0 0 4px rgba(29,78,216,.10);
+        }
+
+        .input.locked{
+          background:#EEF6FF;
+          border-color:#BBD7FF;
+          color:#0B1F44;
+          cursor:not-allowed;
         }
 
         .password-btn{
@@ -282,7 +316,9 @@ function KayitForm() {
           font-weight:800;
           display:flex;
           align-items:center;
+          justify-content:center;
           gap:8px;
+          text-align:center;
         }
 
         .error{
@@ -292,8 +328,22 @@ function KayitForm() {
           color:#BE123C;
           padding:12px;
           border-radius:14px;
+          text-align:center;
           font-size:13px;
           font-weight:800;
+        }
+
+        .hint{
+          margin-top:10px;
+          background:#EFF6FF;
+          border:1px solid #BFDBFE;
+          color:#1557D6;
+          padding:12px;
+          border-radius:14px;
+          text-align:center;
+          font-size:12px;
+          font-weight:800;
+          line-height:1.5;
         }
 
         .submit{
@@ -307,6 +357,11 @@ function KayitForm() {
           font-size:15px;
           font-weight:900;
           cursor:pointer;
+        }
+
+        .submit:disabled{
+          opacity:.65;
+          cursor:not-allowed;
         }
 
         .bottom{
@@ -340,6 +395,11 @@ function KayitForm() {
             min-height:100vh;
             align-items:flex-start;
             padding:32px 22px;
+          }
+
+          .card{
+            max-width:460px;
+            margin:0 auto;
           }
         }
       `}</style>
@@ -420,8 +480,9 @@ function KayitForm() {
 
                     <input
                       {...register("inviteCode")}
-                      placeholder="EPH-7KQ9M2XA"
+                      placeholder="EPH-05-ADM08-1524XXXXXXX"
                       className="input"
+                      style={{ textTransform: "uppercase" }}
                     />
                   </div>
 
@@ -432,11 +493,17 @@ function KayitForm() {
                   )}
 
                   {referralValid && detectedRole && (
-                    <div className="success">
-                      <CheckCircle2 size={16} />
+                    <>
+                      <div className="success">
+                        <CheckCircle2 size={16} />
+                        {ROLE_LABELS[detectedRole]} referans kaydı bulundu.
+                      </div>
 
-                      {ROLE_LABELS[detectedRole]} referans kaydı bulundu.
-                    </div>
+                      <div className="hint">
+                        Referanslı kayıtta ad, soyad ve e-posta bilgileri güvenlik için kilitlenir.
+                        Telefon ve şifre alanını siz belirleyebilirsiniz.
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -448,8 +515,9 @@ function KayitForm() {
 
                     <input
                       {...register("firstName")}
+                      readOnly={referralValid}
                       placeholder="Ad"
-                      className="input"
+                      className={`input ${referralValid ? "locked" : ""}`}
                     />
                   </div>
 
@@ -468,8 +536,9 @@ function KayitForm() {
 
                     <input
                       {...register("lastName")}
+                      readOnly={referralValid}
                       placeholder="Soyad"
-                      className="input"
+                      className={`input ${referralValid ? "locked" : ""}`}
                     />
                   </div>
 
@@ -488,9 +557,10 @@ function KayitForm() {
 
                     <input
                       {...register("email")}
+                      readOnly={referralValid}
                       type="email"
                       placeholder="mail@example.com"
-                      className="input"
+                      className={`input ${referralValid ? "locked" : ""}`}
                     />
                   </div>
 
@@ -509,9 +579,21 @@ function KayitForm() {
 
                     <input
                       {...register("phone")}
-                      placeholder="+90 5xx xxx xx xx"
+                      value={phoneValue}
+                      onChange={(event) =>
+                        setValue("phone", normalizePhoneForForm(event.target.value), {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        })
+                      }
+                      inputMode="numeric"
+                      placeholder="5324101050"
                       className="input"
                     />
+                  </div>
+
+                  <div className="hint">
+                    Telefon numarasını başında 0 veya +90 olmadan, 10 haneli yazın.
                   </div>
 
                   {errors.phone && (
