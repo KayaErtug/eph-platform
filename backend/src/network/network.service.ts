@@ -35,6 +35,8 @@ type UpdateNetworkPostDto = {
 };
 
 
+const MAX_FORUM_DESCRIPTION_LENGTH = 600;
+
 type NetworkPostChangeItem = {
   field: string;
   label: string;
@@ -211,8 +213,12 @@ export class NetworkService {
       throw new BadRequestException('Talep başlığı zorunludur.');
     }
 
-    if (mode === 'create' && description.length < 8) {
-      throw new BadRequestException('Talep açıklaması en az 8 karakter olmalıdır.');
+    if (mode === 'create' && description.length < 12) {
+      throw new BadRequestException('Talep açıklaması en az 12 karakter olmalıdır.');
+    }
+
+    if (description.length > MAX_FORUM_DESCRIPTION_LENGTH) {
+      throw new BadRequestException(`Talep açıklaması en fazla ${MAX_FORUM_DESCRIPTION_LENGTH} karakter olabilir.`);
     }
 
     if (requiresForumCity(category) && !cleanForumText(dto.city)) {

@@ -131,6 +131,26 @@ const VISIBILITY_OPTIONS = [
   { label: "Sadece bağlantılarım", value: "SADECE_BAGLANTILARIM" },
 ];
 
+const MAX_FORUM_DESCRIPTION_LENGTH = 600;
+
+const CITY_OPTIONS = [
+  "Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Aksaray", "Amasya", "Ankara", "Antalya", "Ardahan", "Artvin", "Aydın", "Balıkesir", "Bartın", "Batman", "Bayburt", "Bilecik", "Bingöl", "Bitlis", "Bolu", "Burdur", "Bursa", "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır", "Düzce", "Edirne", "Elazığ", "Erzincan", "Erzurum", "Eskişehir", "Gaziantep", "Giresun", "Gümüşhane", "Hakkari", "Hatay", "Iğdır", "Isparta", "İstanbul", "İzmir", "Kahramanmaraş", "Karabük", "Karaman", "Kars", "Kastamonu", "Kayseri", "Kırıkkale", "Kırklareli", "Kırşehir", "Kilis", "Kocaeli", "Konya", "Kütahya", "Kıbrıs", "Malatya", "Manisa", "Mardin", "Mersin", "Muğla", "Muş", "Nevşehir", "Niğde", "Ordu", "Osmaniye", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Şanlıurfa", "Şırnak", "Tekirdağ", "Tokat", "Trabzon", "Tunceli", "Uşak", "Van", "Yalova", "Yozgat", "Zonguldak"
+];
+
+const DISTRICT_OPTIONS_BY_CITY: Record<string, string[]> = {
+  Denizli: ["Acıpayam", "Babadağ", "Baklan", "Bekilli", "Beyağaç", "Bozkurt", "Buldan", "Çal", "Çameli", "Çardak", "Çivril", "Güney", "Honaz", "Kale", "Merkezefendi", "Pamukkale", "Sarayköy", "Serinhisar", "Tavas"],
+  İstanbul: ["Adalar", "Arnavutköy", "Ataşehir", "Avcılar", "Bağcılar", "Bahçelievler", "Bakırköy", "Başakşehir", "Bayrampaşa", "Beşiktaş", "Beykoz", "Beylikdüzü", "Beyoğlu", "Büyükçekmece", "Çatalca", "Çekmeköy", "Esenler", "Esenyurt", "Eyüpsultan", "Fatih", "Gaziosmanpaşa", "Güngören", "Kadıköy", "Kağıthane", "Kartal", "Küçükçekmece", "Maltepe", "Pendik", "Sancaktepe", "Sarıyer", "Silivri", "Sultanbeyli", "Sultangazi", "Şile", "Şişli", "Tuzla", "Ümraniye", "Üsküdar", "Zeytinburnu"],
+  Ankara: ["Altındağ", "Ayaş", "Bala", "Beypazarı", "Çankaya", "Çubuk", "Elmadağ", "Etimesgut", "Gölbaşı", "Keçiören", "Kızılcahamam", "Mamak", "Nallıhan", "Polatlı", "Pursaklar", "Sincan", "Yenimahalle"],
+  İzmir: ["Aliağa", "Balçova", "Bayındır", "Bayraklı", "Bergama", "Bornova", "Buca", "Çeşme", "Çiğli", "Dikili", "Foça", "Gaziemir", "Güzelbahçe", "Karabağlar", "Karaburun", "Karşıyaka", "Kemalpaşa", "Konak", "Menderes", "Menemen", "Narlıdere", "Seferihisar", "Selçuk", "Torbalı", "Urla"],
+  Muğla: ["Bodrum", "Dalaman", "Datça", "Fethiye", "Kavaklıdere", "Köyceğiz", "Marmaris", "Menteşe", "Milas", "Ortaca", "Seydikemer", "Ula", "Yatağan"],
+  Antalya: ["Akseki", "Alanya", "Aksu", "Döşemealtı", "Elmalı", "Finike", "Gazipaşa", "Kaş", "Kemer", "Kepez", "Konyaaltı", "Korkuteli", "Kumluca", "Manavgat", "Muratpaşa", "Serik"],
+  Kıbrıs: ["Lefkoşa", "Girne", "Gazimağusa", "Güzelyurt", "İskele", "Lefke"],
+};
+
+function getDistrictOptions(city: string) {
+  return DISTRICT_OPTIONS_BY_CITY[city] || ["Merkez"];
+}
+
 const DEFAULT_FORM: CreateTopicForm = {
   title: "",
   category: "",
@@ -411,6 +431,11 @@ export default function NetworkPage() {
       return;
     }
 
+    if (form.detail.trim().length > MAX_FORUM_DESCRIPTION_LENGTH) {
+      alert(`Açıklama en fazla ${MAX_FORUM_DESCRIPTION_LENGTH} karakter olabilir.`);
+      return;
+    }
+
     const tags = [selectedCategory.label, form.propertyType, form.urgency, form.city, form.district].filter(Boolean).slice(0, 8);
 
     try {
@@ -654,114 +679,147 @@ function CreateTopicModal({ creating, userRole, categories, onClose, onCreate }:
   const selectedCategory = categories.find((item) => item.value === form.category) || null;
   const needsLocation = isCategoryLocationRequired(form.category);
   const needsProperty = isPropertyRequired(form.category);
+  const districtOptions = useMemo(() => getDistrictOptions(form.city), [form.city]);
+  const remainingDescription = MAX_FORUM_DESCRIPTION_LENGTH - form.detail.length;
+
+  const updateCity = (city: string) => {
+    setForm((current) => ({
+      ...current,
+      city,
+      district: "",
+    }));
+  };
 
   const errors = useMemo(() => {
     const items: string[] = [];
 
     if (!form.category) items.push("Kategori seçimi zorunlu.");
     if (!form.title.trim()) items.push("Talep başlığı zorunlu.");
-    if (needsLocation && !form.city.trim()) items.push("Şehir zorunlu.");
-    if (needsProperty && !form.propertyType.trim()) items.push("Mülk / konu alanı zorunlu.");
+    if (needsLocation && !form.city.trim()) items.push("Şehir seçimi zorunlu.");
+    if (needsLocation && !form.district.trim()) items.push("İlçe seçimi zorunlu.");
+    if (needsProperty && !form.propertyType.trim()) items.push("Konu alanı zorunlu.");
     if (!form.validFor) items.push("Süre seçimi zorunlu.");
-    if (form.detail.trim().length < 8) items.push("Açıklama en az 8 karakter olmalı.");
+    if (form.detail.trim().length < 12) items.push("Açıklama en az 12 karakter olmalı.");
+    if (form.detail.length > MAX_FORUM_DESCRIPTION_LENGTH) items.push(`Açıklama en fazla ${MAX_FORUM_DESCRIPTION_LENGTH} karakter olabilir.`);
 
     return items;
-  }, [form.category, form.city, form.detail, form.propertyType, form.title, form.validFor, needsLocation, needsProperty]);
+  }, [form.category, form.city, form.detail, form.district, form.propertyType, form.title, form.validFor, needsLocation, needsProperty]);
 
   const canSubmit = errors.length === 0;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/48 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
-      <div className="max-h-[92dvh] w-full max-w-[430px] overflow-y-auto rounded-t-[30px] border border-[#DDE7F3] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.22)] sm:rounded-[30px]" onClick={(event) => event.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#EAF0F7] bg-white px-4 py-3">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6D4AFF]">Forum</p>
-            <h2 className="text-[18px] font-black tracking-[-0.03em] text-[#06194A]">Rol Bazlı Talep Aç</h2>
-            <p className="mt-0.5 text-[11px] font-bold text-[#64748B]">{roleLabel(userRole)} rolüne uygun kategoriler gösteriliyor.</p>
-          </div>
-          <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#F7FBFF] text-[#06194A]">
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/52 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
+      <div className="max-h-[94dvh] w-full max-w-[520px] overflow-y-auto rounded-t-[32px] border border-[#DDE7F3] bg-[#F7FBFF] shadow-[0_28px_80px_rgba(15,23,42,0.24)] sm:rounded-[32px]" onClick={(event) => event.stopPropagation()}>
+        <div className="sticky top-0 z-10 border-b border-[#DDE7F3] bg-white/95 px-5 py-4 text-center backdrop-blur-xl">
+          <button type="button" onClick={onClose} className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#F7FBFF] text-[#06194A]">
             <X size={19} />
           </button>
+
+          <p className="mx-auto w-fit rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#1557D6]">Forum Talep Merkezi</p>
+          <h2 className="mx-auto mt-2 text-center text-[22px] font-black tracking-[-0.04em] text-[#06194A]">Rol Bazlı Talep Aç</h2>
+          <p className="mx-auto mt-1 max-w-[340px] text-center text-[12px] font-bold leading-5 text-[#64748B]">{roleLabel(userRole)} rolüne uygun kategoriler gösteriliyor. Fotoğraf yok; talep net, kısa ve iş odaklı kalır.</p>
         </div>
 
-        <div className="space-y-3 p-4">
-          <ForumField label="Talep Kategorisi *">
-            <div className="grid gap-2">
-              {categories.map((category) => (
-                <button
-                  key={category.value}
-                  type="button"
-                  onClick={() => setForm((current) => ({ ...current, category: category.value }))}
-                  className={`rounded-[18px] border px-3 py-2.5 text-left ${form.category === category.value ? "border-[#6D4AFF] bg-[#F4F0FF]" : "border-[#DDE7F3] bg-white"}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[13px] font-black text-[#06194A]">{category.label}</p>
-                    <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black ${categoryTone(category.value)}`}>{category.group}</span>
-                  </div>
-                  <p className="mt-0.5 text-[11px] font-bold leading-4 text-[#64748B]">{category.hint}</p>
-                </button>
-              ))}
+        <div className="space-y-4 p-4">
+          <section className="rounded-[26px] border border-[#DDE7F3] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.045)]">
+            <ForumField label="Talep Kategorisi *">
+              <div className="grid gap-2 sm:grid-cols-2">
+                {categories.map((category) => (
+                  <button
+                    key={category.value}
+                    type="button"
+                    onClick={() => setForm((current) => ({ ...current, category: category.value }))}
+                    className={`min-h-[88px] rounded-[20px] border px-3 py-3 text-center transition ${form.category === category.value ? "border-[#1557D6] bg-[#EFF6FF] shadow-[0_10px_24px_rgba(21,87,214,0.12)]" : "border-[#DDE7F3] bg-white hover:bg-[#F7FBFF]"}`}
+                  >
+                    <div className="flex flex-col items-center justify-center gap-1.5">
+                      <span className={`rounded-full px-2.5 py-1 text-[9px] font-black ${categoryTone(category.value)}`}>{category.group}</span>
+                      <p className="text-[13px] font-black leading-4 text-[#06194A]">{category.label}</p>
+                      <p className="line-clamp-2 text-[10px] font-bold leading-4 text-[#64748B]">{category.hint}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </ForumField>
+          </section>
+
+          <section className="rounded-[26px] border border-[#DDE7F3] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.045)]">
+            <div className="grid gap-3">
+              <ForumField label="Talep Başlığı *">
+                <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="forum-input" placeholder="Talebinizi kısa bir başlıkla yazın" maxLength={90} />
+              </ForumField>
+
+              <div className="grid grid-cols-2 gap-2">
+                <ForumField label={needsLocation ? "Şehir *" : "Şehir"}>
+                  <select value={form.city} onChange={(event) => updateCity(event.target.value)} className="forum-input">
+                    <option value="">Şehir seçin</option>
+                    {CITY_OPTIONS.map((city) => <option key={city} value={city}>{city}</option>)}
+                  </select>
+                </ForumField>
+
+                <ForumField label={needsLocation ? "İlçe *" : "İlçe"}>
+                  <select value={form.district} onChange={(event) => setForm((current) => ({ ...current, district: event.target.value }))} className="forum-input" disabled={!form.city}>
+                    <option value="">İlçe seçin</option>
+                    {districtOptions.map((district) => <option key={district} value={district}>{district}</option>)}
+                  </select>
+                </ForumField>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <ForumField label={needsProperty ? "Konu *" : "Konu"}>
+                  <input value={form.propertyType} onChange={(event) => setForm((current) => ({ ...current, propertyType: event.target.value }))} className="forum-input" placeholder="" maxLength={70} />
+                </ForumField>
+
+                <ForumField label="Bütçe">
+                  <input value={form.budget} onChange={(event) => setForm((current) => ({ ...current, budget: event.target.value }))} className="forum-input" placeholder="Opsiyonel" inputMode="numeric" />
+                </ForumField>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <ForumField label="Öncelik">
+                  <select value={form.urgency} onChange={(event) => setForm((current) => ({ ...current, urgency: event.target.value }))} className="forum-input">
+                    {URGENCY_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                  </select>
+                </ForumField>
+
+                <ForumField label="Süre *">
+                  <select value={form.validFor} onChange={(event) => setForm((current) => ({ ...current, validFor: event.target.value }))} className="forum-input">
+                    {VALID_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                  </select>
+                </ForumField>
+              </div>
+
+              <ForumField label="Görünürlük">
+                <select value={form.visibility} onChange={(event) => setForm((current) => ({ ...current, visibility: event.target.value }))} className="forum-input">
+                  {VISIBILITY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </ForumField>
+
+              <ForumField label="Talep Açıklaması *">
+                <textarea
+                  value={form.detail}
+                  onChange={(event) => setForm((current) => ({ ...current, detail: event.target.value.slice(0, MAX_FORUM_DESCRIPTION_LENGTH) }))}
+                  rows={5}
+                  className="forum-input min-h-[126px] py-3 leading-5"
+                  placeholder={`${selectedCategory?.label || "Talep"}: İhtiyacınızı birkaç satırla net anlatın. Kartta sadece ilk satır görünecek; detayda tamamı okunacak.`}
+                />
+                <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-black text-[#94A3B8]">
+                  <span>Kartta 1 satır görünür, detayda tamamı açılır.</span>
+                  <span className={remainingDescription < 60 ? "text-rose-600" : "text-[#94A3B8]"}>{form.detail.length}/{MAX_FORUM_DESCRIPTION_LENGTH}</span>
+                </div>
+              </ForumField>
             </div>
-          </ForumField>
-
-          <ForumField label="Talep Başlığı *">
-            <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="forum-input" placeholder="Örn: Merkezefendi'de 3+1 daire arıyorum" />
-          </ForumField>
-
-          <div className="grid grid-cols-2 gap-2">
-            <ForumField label={needsLocation ? "Şehir *" : "Şehir"}>
-              <input value={form.city} onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))} className="forum-input" placeholder="Denizli" />
-            </ForumField>
-
-            <ForumField label="İlçe">
-              <input value={form.district} onChange={(event) => setForm((current) => ({ ...current, district: event.target.value }))} className="forum-input" placeholder="Merkezefendi" />
-            </ForumField>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <ForumField label={needsProperty ? "Mülk / Konu *" : "Mülk / Konu"}>
-              <input value={form.propertyType} onChange={(event) => setForm((current) => ({ ...current, propertyType: event.target.value }))} className="forum-input" placeholder="3+1 Daire" />
-            </ForumField>
-
-            <ForumField label="Bütçe">
-              <input value={form.budget} onChange={(event) => setForm((current) => ({ ...current, budget: event.target.value }))} className="forum-input" placeholder="5.000.000" />
-            </ForumField>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <ForumField label="Öncelik">
-              <select value={form.urgency} onChange={(event) => setForm((current) => ({ ...current, urgency: event.target.value }))} className="forum-input">
-                {URGENCY_OPTIONS.map((option) => <option key={option}>{option}</option>)}
-              </select>
-            </ForumField>
-
-            <ForumField label="Süre *">
-              <select value={form.validFor} onChange={(event) => setForm((current) => ({ ...current, validFor: event.target.value }))} className="forum-input">
-                {VALID_OPTIONS.map((option) => <option key={option}>{option}</option>)}
-              </select>
-            </ForumField>
-          </div>
-
-          <ForumField label="Görünürlük">
-            <select value={form.visibility} onChange={(event) => setForm((current) => ({ ...current, visibility: event.target.value }))} className="forum-input">
-              {VISIBILITY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </ForumField>
-
-          <ForumField label="1 Satırlık Açıklama *">
-            <textarea value={form.detail} onChange={(event) => setForm((current) => ({ ...current, detail: event.target.value }))} rows={3} className="forum-input min-h-[86px] py-3" placeholder={`${selectedCategory?.label || "Talep"}: İhtiyacınızı kısa ve net yazın.`} />
-          </ForumField>
+          </section>
 
           {errors.length > 0 && (
-            <div className="rounded-[18px] border border-amber-200 bg-amber-50 p-3 text-[11px] font-black leading-5 text-amber-800">
+            <div className="rounded-[20px] border border-amber-200 bg-amber-50 p-3 text-center text-[12px] font-black leading-5 text-amber-800">
               {errors[0]}
             </div>
           )}
         </div>
 
-        <div className="sticky bottom-0 grid grid-cols-[1fr_1fr] gap-2 border-t border-[#EAF0F7] bg-white p-4">
-          <button type="button" onClick={onClose} className="h-11 rounded-[17px] border border-[#DDE7F3] bg-white text-[13px] font-black text-[#64748B]">Vazgeç</button>
-          <button type="button" disabled={creating || !canSubmit} onClick={() => onCreate(form)} className="h-11 rounded-[17px] bg-[#1557D6] text-[13px] font-black text-white disabled:opacity-45">
+        <div className="sticky bottom-0 grid grid-cols-[1fr_1fr] gap-2 border-t border-[#DDE7F3] bg-white/96 p-4 backdrop-blur-xl">
+          <button type="button" onClick={onClose} className="h-12 rounded-[18px] border border-[#DDE7F3] bg-white text-[13px] font-black text-[#64748B]">Vazgeç</button>
+          <button type="button" disabled={creating || !canSubmit} onClick={() => onCreate(form)} className="h-12 rounded-[18px] bg-[#1557D6] text-[13px] font-black text-white shadow-[0_12px_24px_rgba(21,87,214,0.22)] disabled:opacity-45">
             {creating ? "Açılıyor..." : "Talebi Aç"}
           </button>
         </div>
@@ -769,15 +827,24 @@ function CreateTopicModal({ creating, userRole, categories, onClose, onCreate }:
         <style jsx global>{`
           .forum-input {
             width: 100%;
-            min-height: 42px;
-            border-radius: 16px;
+            min-height: 46px;
+            border-radius: 18px;
             border: 1px solid #dde7f3;
             background: #f7fbff;
-            padding: 0 12px;
+            padding: 0 13px;
             font-size: 12px;
             font-weight: 800;
             color: #06194a;
             outline: none;
+          }
+
+          .forum-input:disabled {
+            background: #f1f5f9;
+            color: #94a3b8;
+          }
+
+          .forum-input::placeholder {
+            color: #94a3b8;
           }
 
           .forum-input:focus {
@@ -793,8 +860,8 @@ function CreateTopicModal({ creating, userRole, categories, onClose, onCreate }:
 
 function ForumField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.1em] text-[#64748B]">{label}</span>
+    <label className="block text-center">
+      <span className="mb-1.5 block text-center text-[10px] font-black uppercase tracking-[0.1em] text-[#64748B]">{label}</span>
       {children}
     </label>
   );
