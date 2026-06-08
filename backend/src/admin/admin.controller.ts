@@ -62,6 +62,17 @@ export class AdminController {
     return this.adminService.getTrafficSummary();
   }
 
+
+  @Patch("users/member-codes/missing")
+  assignMissingMemberCodes(@Req() request: AdminRequest) {
+    return this.adminService.assignMissingMemberCodes(this.extractActor(request));
+  }
+
+  @Patch("users/:id/member-code")
+  assignMemberCode(@Param("id") id: string, @Req() request: AdminRequest) {
+    return this.adminService.assignMemberCodeToUser(id, this.extractActor(request));
+  }
+
   @Patch("users/:id/approve")
   approveUser(@Param("id") id: string, @Req() request: AdminRequest) {
     return this.adminService.approveUser(id, this.extractActor(request));
