@@ -1336,6 +1336,46 @@ export class AdminService {
     });
   }
 
+  async deleteApplication(id: string, actor?: AdminActor) {
+    this.requireSoftwareTeam(actor);
+
+    const application = await this.prisma.application.findUnique({
+      where: { id },
+    });
+
+    if (!application) {
+      throw new NotFoundException("Başvuru bulunamadı.");
+    }
+
+    const deleted = await this.prisma.application.delete({
+      where: { id },
+    });
+
+    await this.logAdminAction({
+      actor,
+      action: "APPLICATION_DELETED",
+      entityType: "Application",
+      entityId: id,
+      description: `${application.applicantEmail} başvurusu Yazılım Ekibi tarafından kalıcı olarak silindi.`,
+      metadata: {
+        applicantName: application.applicantName,
+        applicantEmail: application.applicantEmail,
+        applicantPhone: application.applicantPhone,
+        requestedRole: application.requestedRole,
+        status: application.status,
+        basvuruTuru: application.basvuruTuru,
+        pilotBasvuruMu: application.pilotBasvuruMu,
+        referralCode: application.referralCode,
+      },
+    });
+
+    return {
+      success: true,
+      message: "Başvuru kalıcı olarak silindi.",
+      deletedApplication: deleted,
+    };
+  }
+
   async updateApplicationStatus(id: string, status: string, adminNote?: string, rejectReason?: string) {
     const application = await this.prisma.application.findUnique({
       where: { id },

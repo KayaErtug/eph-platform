@@ -13,6 +13,7 @@ import {
   RefreshCcw,
   Search,
   ShieldCheck,
+  Trash2,
   SlidersHorizontal,
   UserRound,
   UsersRound,
@@ -153,6 +154,95 @@ function getDecision(item: ApplicationItem) {
   return { label: "Eksik Profil", className: "neutral" };
 }
 
+function decodeJwtPayload(token: string): any {
+  try {
+    const payload = token.split(".")[1];
+
+    if (!payload) return null;
+
+    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = window.atob(normalizedPayload);
+    const json = decodeURIComponent(
+      decoded
+        .split("")
+        .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
+        .join(""),
+    );
+
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+function findRoleInValue(value: any): string {
+  if (!value) return "";
+
+  if (typeof value === "string") {
+    const cleanValue = value.trim();
+
+    if (cleanValue === "SUPER_ADMIN" || cleanValue === "ADMIN" || cleanValue === "MODERATOR") {
+      return cleanValue;
+    }
+
+    if (cleanValue.split(".").length === 3) {
+      const payload = decodeJwtPayload(cleanValue);
+      const roleFromPayload = findRoleInValue(payload);
+
+      if (roleFromPayload) return roleFromPayload;
+    }
+
+    try {
+      return findRoleInValue(JSON.parse(cleanValue));
+    } catch {
+      return "";
+    }
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const role = findRoleInValue(item);
+
+      if (role) return role;
+    }
+
+    return "";
+  }
+
+  if (typeof value === "object") {
+    const directRole = value.role || value.userRole || value?.user?.role || value?.state?.user?.role;
+
+    if (typeof directRole === "string") {
+      return directRole;
+    }
+
+    for (const nestedValue of Object.values(value)) {
+      const role = findRoleInValue(nestedValue);
+
+      if (role) return role;
+    }
+  }
+
+  return "";
+}
+
+function getStoredCurrentRole(): string {
+  if (typeof window === "undefined") return "";
+
+  for (let index = 0; index < window.localStorage.length; index++) {
+    const key = window.localStorage.key(index);
+
+    if (!key) continue;
+
+    const role = findRoleInValue(window.localStorage.getItem(key));
+
+    if (role) return role;
+  }
+
+  return "";
+}
+
+
 export default function AdminKatilimTalepleriPage() {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -164,6 +254,7 @@ export default function AdminKatilimTalepleriPage() {
   const [selected, setSelected] = useState<ApplicationItem | null>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const [currentRole, setCurrentRole] = useState("");
 
   async function loadApplications(selectedStatus = status) {
     setLoading(true);
@@ -183,6 +274,7 @@ export default function AdminKatilimTalepleriPage() {
   }
 
   useEffect(() => {
+    setCurrentRole(getStoredCurrentRole());
     loadApplications("all");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -258,6 +350,30 @@ export default function AdminKatilimTalepleriPage() {
     }
   }
 
+  async function handleDeleteApplication(item: ApplicationItem) {
+    const confirmed = window.confirm("Bu başvuru kalıcı olarak silinecek. Bu işlem geri alınamaz.");
+
+    if (!confirmed) return;
+
+    setBusyId(item.id);
+    setError("");
+
+    try {
+      await api.delete(`/admin/katilim-talepleri/${item.id}`);
+
+      if (selected?.id === item.id) {
+        setSelected(null);
+        setNote("");
+      }
+
+      await loadApplications(status);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || "Başvuru silinemedi.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function openDetail(item: ApplicationItem) {
     setSelected(item);
     setNote(item.adminNote || "");
@@ -275,6 +391,8 @@ export default function AdminKatilimTalepleriPage() {
     pilotThisMonth: 0,
     total: 0,
   };
+
+  const isSoftwareTeam = currentRole === "SUPER_ADMIN";
 
   return (
     <main className="applications-page">
@@ -459,6 +577,17 @@ export default function AdminKatilimTalepleriPage() {
                       >
                         <X size={20} />
                       </button>
+                      {isSoftwareTeam ? (
+                        <button
+                          type="button"
+                          className="delete"
+                          disabled={busyId === item.id}
+                          onClick={() => handleDeleteApplication(item)}
+                          aria-label="Başvuruyu kalıcı olarak sil"
+                        >
+                          <Trash2 size={19} />
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </article>
@@ -512,6 +641,16 @@ export default function AdminKatilimTalepleriPage() {
             </label>
 
             <div className="modal-actions">
+              {isSoftwareTeam ? (
+                <button
+                  className="delete-button"
+                  onClick={() => handleDeleteApplication(selected)}
+                  disabled={busyId === selected.id}
+                >
+                  <Trash2 size={17} />
+                  Sil
+                </button>
+              ) : null}
               <button className="secondary-button" onClick={handleSaveNote} disabled={busyId === selected.id}>
                 Notu Kaydet
               </button>
@@ -1054,6 +1193,12 @@ export default function AdminKatilimTalepleriPage() {
           border-color: #fecaca;
         }
 
+        .card-actions button.delete {
+          color: #b91c1c;
+          background: #fef2f2;
+          border-color: #fecaca;
+        }
+
         button:disabled {
           opacity: 0.45;
           cursor: not-allowed;
@@ -1162,13 +1307,14 @@ export default function AdminKatilimTalepleriPage() {
 
         .modal-actions {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
+          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
           gap: 10px;
         }
 
         .secondary-button,
         .primary-button,
-        .danger-button {
+        .danger-button,
+        .delete-button {
           min-height: 50px;
           border-radius: 16px;
           border: 1px solid #dbe5f1;
@@ -1186,6 +1332,16 @@ export default function AdminKatilimTalepleriPage() {
         .danger-button {
           background: #fff7f7;
           color: #dc2626;
+          border-color: #fecaca;
+        }
+
+        .delete-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          background: #fee2e2;
+          color: #b91c1c;
           border-color: #fecaca;
         }
 

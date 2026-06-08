@@ -213,6 +213,11 @@ export class AdminController {
     return this.adminService.rejectApplication(id, body.adminNote, body.rejectReason);
   }
 
+  @Delete("katilim-talepleri/:id")
+  deleteKatilimTalebi(@Param("id") id: string, @Req() request: AdminRequest) {
+    return this.adminService.deleteApplication(id, this.extractActor(request));
+  }
+
   @Patch("katilim-talepleri/:id/not")
   updateKatilimTalebiNotu(@Param("id") id: string, @Body() body: { adminNote?: string }) {
     return this.adminService.updateApplicationNote(id, body.adminNote || "");
