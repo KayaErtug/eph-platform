@@ -315,82 +315,89 @@ export default function DashboardPage() {
     return networkNotifications.items.slice(0, 1);
   }, [networkNotifications.items]);
 
+  const stats = summary?.stats || {
+    totalUnits: 0,
+    totalCustomers: 0,
+    totalVisits: 0,
+    totalProjects: 0,
+  };
+
   const quickAccessItems = useMemo<QuickAccessItem[]>(() => {
     const items: QuickAccessItem[] = [
       {
         href: "/stok",
         label: "Portföy",
-        desc: "İlan ve portföyler",
+        desc: String(stats.totalUnits || 0),
         icon: <Building2 size={21} />,
       },
       {
         href: "/crm",
         label: "CRM",
-        desc: "Müşteri takibi",
+        desc: `${crmTasks.length} görev`,
         icon: <UsersRound size={21} />,
       },
       {
         href: "/network",
         label: "Forum",
-        desc: "Talep ve akış",
+        desc: `${visibleForumRequests.length} talep`,
         icon: <MessageCircle size={21} />,
       },
       {
         href: "/havuz",
         label: "Havuz",
-        desc: "Eşleşmeler",
+        desc: "Eşleşme",
         icon: <Target size={22} />,
       },
       {
         href: "/lina",
         label: "Lina",
-        desc: "AI asistan",
+        desc: "Asistan",
         icon: <Bot size={22} />,
       },
       {
         href: "/messages",
         label: "Mesajlar",
-        desc: unreadMessages > 0 ? `${unreadMessages} okunmamış` : "Gelen kutusu",
+        desc: unreadMessages > 0 ? `${unreadMessages} yeni` : "0 yeni",
         icon: <MessageCircle size={21} />,
       },
       {
         href: "/notification-settings",
-        label: "Bildirim",
+        label: "Bildirimler",
         desc: networkNotifications.unreadCount > 0 ? `${networkNotifications.unreadCount} yeni` : "Ayarlar",
         icon: <Bell size={21} />,
       },
       {
         href: "/kayit",
-        label: "Kayıt",
-        desc: "Kayıt merkezi",
+        label: "Kayıt Merkezi",
+        desc: "Üyelik oluştur",
         icon: <UserPlus size={21} />,
         roles: ["MODERATOR", "ADMIN", "SUPER_ADMIN"],
       },
       {
-        href: "/admin/referrals",
-        label: "Referans",
-        desc: "Ref kodları",
-        icon: <KeyRound size={21} />,
-        roles: ["ADMIN", "SUPER_ADMIN"],
-      },
-      {
         href: "/admin/katilim-talepleri",
-        label: "Başvuru",
-        desc: "Onay merkezi",
+        label: "Başvuru Merkezi",
+        desc: "Onay bekleyen",
         icon: <ClipboardCheck size={21} />,
         roles: ["MODERATOR", "ADMIN", "SUPER_ADMIN"],
       },
       {
+        href: "/admin/referrals",
+        label: "Referans Kodları",
+        desc: "Davet kodu",
+        icon: <KeyRound size={21} />,
+        roles: ["ADMIN", "SUPER_ADMIN"],
+      },
+      {
         href: "/admin",
-        label: "Admin",
+        label: "Admin Paneli",
         desc: "Yönetim",
         icon: <LayoutDashboard size={21} />,
         roles: ["ADMIN", "SUPER_ADMIN"],
       },
       {
         href: "/admin",
-        label: "Kullanıcı",
-        desc: "Yönetim",
+        label: "Kullanıcı Yönetimi",
+        desc: "Tam yetki",
         icon: <UserCog size={21} />,
         roles: ["SUPER_ADMIN"],
       },
@@ -400,14 +407,14 @@ export default function DashboardPage() {
       if (!item.roles) return true;
       return item.roles.includes(normalizedRole);
     });
-  }, [networkNotifications.unreadCount, normalizedRole, unreadMessages]);
-
-  const stats = summary?.stats || {
-    totalUnits: 0,
-    totalCustomers: 0,
-    totalVisits: 0,
-    totalProjects: 0,
-  };
+  }, [
+    crmTasks.length,
+    networkNotifications.unreadCount,
+    normalizedRole,
+    stats.totalUnits,
+    unreadMessages,
+    visibleForumRequests.length,
+  ]);
 
   const todayTaskCount = crmTasks.filter((task) => {
     if (!task.dueDate) return false;
@@ -565,7 +572,7 @@ function QuickAccessCenter({ items }: { items: QuickAccessItem[] }) {
     <section className="rounded-[28px] border border-[#DDE7F3] bg-white p-3 shadow-[0_16px_38px_rgba(15,23,42,0.065)]">
       <div className="mb-3 text-center">
         <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#1557D6]">
-          Hızlı Erişim
+          Hızlı Erişim Merkezi
         </p>
         <h2 className="mt-1 text-[22px] font-black tracking-[-0.04em] text-[#06194A]">
           Kolay Menü
@@ -593,10 +600,10 @@ function QuickAccessCard({ item }: { item: QuickAccessItem }) {
       <span className="flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#EFF6FF] text-[#1557D6]">
         {item.icon}
       </span>
-      <span className="mt-2 text-[12px] font-black leading-4 text-[#06194A]">
+      <span className="mt-2 line-clamp-2 min-h-[32px] text-[11px] font-black leading-4 text-[#06194A]">
         {item.label}
       </span>
-      <span className="mt-0.5 line-clamp-1 text-[9px] font-extrabold leading-3 text-[#64748B]">
+      <span className="mt-0.5 inline-flex min-h-[20px] items-center justify-center rounded-full bg-white px-2 text-[9px] font-black leading-3 text-[#1557D6]">
         {item.desc}
       </span>
     </Link>
