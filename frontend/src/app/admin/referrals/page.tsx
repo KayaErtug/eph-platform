@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
-  Copy,
   KeyRound,
   Lock,
   LogOut,
@@ -699,9 +698,9 @@ function CodeBox({
 
       <button
         onClick={() => onCopy(code)}
-        className="ml-1 rounded-xl border border-white/10 bg-white/10 p-2 text-white transition hover:bg-white/20"
+        className="ml-2 inline-flex min-h-9 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-[11px] font-black text-cyan-100 transition hover:bg-cyan-300/20"
       >
-        {copiedCode === code ? <CheckCircle2 size={15} /> : <Copy size={15} />}
+        {copiedCode === code ? "KOPYALANDI ✓" : "KOPYALA"}
       </button>
     </div>
   );
