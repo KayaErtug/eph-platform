@@ -53,24 +53,16 @@ export class AdminController {
   }
 
   @Get("users")
-  getUsers(@Query("filter") filter?: "pending" | "approved" | "all") {
-    return this.adminService.getUsers(filter || "all");
+  getUsers(
+    @Query("filter") filter?: "pending" | "approved" | "all",
+    @Req() request?: AdminRequest,
+  ) {
+    return this.adminService.getUsers(filter || "all", this.extractActor(request as AdminRequest));
   }
 
   @Get("traffic-summary")
-  getTrafficSummary() {
-    return this.adminService.getTrafficSummary();
-  }
-
-
-  @Patch("users/member-codes/missing")
-  assignMissingMemberCodes(@Req() request: AdminRequest) {
-    return this.adminService.assignMissingMemberCodes(this.extractActor(request));
-  }
-
-  @Patch("users/:id/member-code")
-  assignMemberCode(@Param("id") id: string, @Req() request: AdminRequest) {
-    return this.adminService.assignMemberCodeToUser(id, this.extractActor(request));
+  getTrafficSummary(@Req() request: AdminRequest) {
+    return this.adminService.getTrafficSummary(this.extractActor(request));
   }
 
   @Patch("users/:id/approve")
@@ -122,8 +114,8 @@ export class AdminController {
   }
 
   @Get("referrals")
-  getReferralCodes() {
-    return this.adminService.getReferralCodes();
+  getReferralCodes(@Req() request: AdminRequest) {
+    return this.adminService.getReferralCodes(this.extractActor(request));
   }
 
   @Post("referrals")
