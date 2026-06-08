@@ -93,7 +93,7 @@ export class MailService {
       SUPER_ADMIN: 'Yazılım Ekibi',
     };
 
-    const basvuruLink = `https://emlakportfoyhavuzu.com/kayit?referans=${encodeURIComponent(data.referralCode)}`;
+    const basvuruLink = "https://emlakportfoyhavuzu.com/kayit";
     const sonGecerlilik = data.expiresAt
       ? data.expiresAt.toLocaleDateString('tr-TR', {
           day: '2-digit',
@@ -141,7 +141,7 @@ export class MailService {
   }
 
   async sendApplicationInvited(email: string, name: string, inviteCode: string) {
-    const kayitLink = `https://emlakportfoyhavuzu.com/kayit?davet=${inviteCode}`;
+    const kayitLink = "https://emlakportfoyhavuzu.com/kayit";
     await this.transporter.sendMail({
       from: '"EPH Platform" <bildirim@emlakportfoyhavuzu.com>',
       to: email,
