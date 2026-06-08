@@ -35,7 +35,7 @@ const phoneSchema = z
   .transform((value) => normalizePhoneForSystem(value))
   .refine(
     (value) => /^\+90 5\d{2} \d{3} \d{2} \d{2}$/.test(value),
-    "Telefon numarası +90 532 340 50 50 formatına uygun olmalıdır"
+    "Telefon numarası +90 532 282 88 75 formatına uygun olmalıdır"
   );
 
 export const registerSchema = z.object({

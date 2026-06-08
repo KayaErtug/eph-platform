@@ -20,7 +20,11 @@ import {
 
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
-import { registerSchema, RegisterFormData } from "@/schemas/auth.schema";
+import {
+  normalizePhoneForSystem,
+  registerSchema,
+  RegisterFormData,
+} from "@/schemas/auth.schema";
 
 const ROLE_LABELS: Record<string, string> = {
   EMLAKCI: "Emlakçı",
@@ -31,37 +35,15 @@ const ROLE_LABELS: Record<string, string> = {
   SUPER_ADMIN: "Yazılım Ekibi",
 };
 
-function normalizePhoneForForm(value?: string | null) {
-  const raw = String(value || "").trim();
-  const digits = raw.replace(/\D/g, "");
-
-  let local = digits;
-
-  if (local.startsWith("0090")) local = local.slice(4);
-  if (local.startsWith("90")) local = local.slice(2);
-  if (local.startsWith("0")) local = local.slice(1);
-  if (local.length > 10) local = local.slice(-10);
-
-  if (local.length !== 10 || !local.startsWith("5")) return raw;
-
-  return `+90 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6, 8)} ${local.slice(8, 10)}`;
-}
-
 function KayitForm() {
   const router = useRouter();
-
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const [loading, setLoading] = useState(false);
-
   const [serverError, setServerError] = useState("");
-
   const [showPassword, setShowPassword] = useState(false);
-
   const [detectedRole, setDetectedRole] = useState<string | null>(null);
-
   const [referralLoading, setReferralLoading] = useState(false);
-
   const [referralValid, setReferralValid] = useState(false);
 
   const {
@@ -93,12 +75,11 @@ function KayitForm() {
         setValue("firstName", res.data.firstName || "");
         setValue("lastName", res.data.lastName || "");
         setValue("email", res.data.email || "");
-        setValue("phone", normalizePhoneForForm(res.data.phone), {
+        setValue("phone", normalizePhoneForSystem(res.data.phone), {
           shouldValidate: true,
         });
 
         setDetectedRole(res.data.role);
-
         setReferralValid(true);
       } catch {
         setReferralValid(false);
@@ -113,19 +94,17 @@ function KayitForm() {
 
   const onSubmit = async (data: RegisterFormData) => {
     setLoading(true);
-
     setServerError("");
 
     try {
       const payload = {
         ...data,
-        phone: normalizePhoneForForm(data.phone),
+        phone: normalizePhoneForSystem(data.phone),
       };
 
       const res = await api.post("/auth/register", payload);
 
       setAuth(res.data.user, res.data.token);
-
       router.push("/dashboard");
     } catch (err: any) {
       setServerError(err?.response?.data?.message || "Bir hata oluştu.");
@@ -137,268 +116,52 @@ function KayitForm() {
   return (
     <>
       <style>{`
-        *{
-          box-sizing:border-box;
-        }
-
-        body{
-          margin:0;
-          background:#F5F7FA;
-          font-family:Inter,sans-serif;
-        }
-
-        .page{
-          min-height:100vh;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          padding:24px;
-          background:#F5F7FA;
-        }
-
-        .shell{
-          width:100%;
-          max-width:1120px;
-          min-height:720px;
-          display:grid;
-          grid-template-columns:.95fr 1.05fr;
-          overflow:hidden;
-          border-radius:32px;
-          background:#fff;
-          border:1px solid #E2E8F0;
-        }
-
-        .left{
-          background:#0B1F44;
-          color:#fff;
-          padding:42px;
-          display:flex;
-          flex-direction:column;
-          justify-content:space-between;
-        }
-
-        .brand{
-          display:flex;
-          align-items:center;
-          gap:12px;
-        }
-
-        .brand img{
-          width:42px;
-          height:42px;
-          border-radius:12px;
-          background:#fff;
-        }
-
-        .brand-title{
-          font-size:22px;
-          font-weight:900;
-        }
-
-        .hero h1{
-          font-size:48px;
-          line-height:1.05;
-          margin-top:24px;
-          font-weight:900;
-        }
-
-        .hero p{
-          margin-top:18px;
-          line-height:1.7;
-          color:rgba(255,255,255,.72);
-        }
-
-        .feature{
-          margin-top:16px;
-          border:1px solid rgba(255,255,255,.12);
-          background:rgba(255,255,255,.05);
-          padding:16px;
-          border-radius:18px;
-        }
-
-        .right{
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          padding:42px;
-          background:#FAFBFC;
-        }
-
-        .card{
-          width:100%;
-          max-width:460px;
-        }
-
-        .title{
-          text-align:center;
-          font-size:34px;
-          font-weight:900;
-          color:#0B1F44;
-        }
-
-        .subtitle{
-          margin-top:8px;
-          text-align:center;
-          color:#64748B;
-          line-height:1.6;
-        }
-
-        .field{
-          margin-top:18px;
-        }
-
-        .field label{
-          display:block;
-          margin-bottom:8px;
-          text-align:center;
-          font-size:13px;
-          font-weight:900;
-          color:#334155;
-        }
-
-        .input-wrap{
-          position:relative;
-        }
-
-        .icon{
-          position:absolute;
-          left:14px;
-          top:14px;
-          color:#64748B;
-        }
-
-        .input{
-          width:100%;
-          height:52px;
-          border-radius:16px;
-          border:1px solid #CBD5E1;
-          background:#fff;
-          padding:0 14px 0 46px;
-          text-align:center;
-          font-size:15px;
-          font-weight:800;
-          color:#06194A;
-          outline:none;
-        }
-
-        .input:focus{
-          border-color:#1D4ED8;
-          box-shadow:0 0 0 4px rgba(29,78,216,.10);
-        }
-
-        .input.locked{
-          background:#EEF6FF;
-          border-color:#BBD7FF;
-          color:#0B1F44;
-          cursor:not-allowed;
-        }
-
-        .password-btn{
-          position:absolute;
-          right:14px;
-          top:13px;
-          border:none;
-          background:none;
-          cursor:pointer;
-          color:#64748B;
-        }
-
-        .success{
-          margin-top:10px;
-          background:#ECFDF3;
-          border:1px solid #BBF7D0;
-          color:#047857;
-          padding:12px;
-          border-radius:14px;
-          font-size:13px;
-          font-weight:800;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          gap:8px;
-          text-align:center;
-        }
-
-        .error{
-          margin-top:10px;
-          background:#FFF1F2;
-          border:1px solid #FECDD3;
-          color:#BE123C;
-          padding:12px;
-          border-radius:14px;
-          text-align:center;
-          font-size:13px;
-          font-weight:800;
-        }
-
-        .hint{
-          margin-top:10px;
-          background:#EFF6FF;
-          border:1px solid #BFDBFE;
-          color:#1557D6;
-          padding:12px;
-          border-radius:14px;
-          text-align:center;
-          font-size:12px;
-          font-weight:800;
-          line-height:1.5;
-        }
-
-        .submit{
-          width:100%;
-          height:54px;
-          margin-top:24px;
-          border:none;
-          border-radius:16px;
-          background:#1D4ED8;
-          color:#fff;
-          font-size:15px;
-          font-weight:900;
-          cursor:pointer;
-        }
-
-        .submit:disabled{
-          opacity:.65;
-          cursor:not-allowed;
-        }
-
-        .bottom{
-          margin-top:20px;
-          text-align:center;
-          color:#64748B;
-        }
-
-        .bottom a{
-          color:#1D4ED8;
-          font-weight:800;
-        }
-
+        *{box-sizing:border-box}
+        body{margin:0;background:#F7FBFF;font-family:Inter,Arial,sans-serif}
+        .page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#F7FBFF;color:#06194A}
+        .shell{width:100%;max-width:1120px;min-height:720px;display:grid;grid-template-columns:.95fr 1.05fr;overflow:hidden;border-radius:32px;background:#fff;border:1px solid #DDE7F3;box-shadow:0 24px 70px rgba(15,23,42,.10)}
+        .left{background:linear-gradient(145deg,#06194A,#1557D6);color:#fff;padding:42px;display:flex;flex-direction:column;justify-content:space-between}
+        .brand{display:flex;align-items:center;gap:12px}
+        .brand img{width:44px;height:44px;border-radius:14px;background:#fff}
+        .brand-title{font-size:22px;font-weight:900}
+        .hero h1{font-size:46px;line-height:1.05;margin:28px 0 0;font-weight:900;letter-spacing:-.055em}
+        .hero p{margin-top:18px;line-height:1.7;color:rgba(255,255,255,.78)}
+        .pill{display:inline-flex;gap:8px;align-items:center;border:1px solid rgba(255,255,255,.20);padding:9px 14px;border-radius:999px;font-size:13px;font-weight:900;background:rgba(255,255,255,.08)}
+        .feature{margin-top:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);padding:16px;border-radius:20px;font-weight:800}
+        .right{display:flex;align-items:center;justify-content:center;padding:42px;background:#FAFCFF}
+        .card{width:100%;max-width:500px}
+        .title{text-align:center;font-size:34px;font-weight:950;color:#06194A;letter-spacing:-.045em}
+        .subtitle{margin:8px auto 0;max-width:420px;text-align:center;color:#64748B;line-height:1.6;font-weight:700}
+        form{margin-top:22px}
+        .form-grid{display:grid;gap:12px}
+        .row{display:grid;grid-template-columns:44px 112px 1fr 34px;align-items:center;gap:10px;min-height:66px;border:1px solid #DDE7F3;background:#fff;border-radius:22px;padding:10px 12px;box-shadow:0 10px 24px rgba(15,23,42,.04)}
+        .row.ref{grid-template-columns:44px 1fr}
+        .row.locked{background:#F4F8FF;border-color:#C7DDFF}
+        .row-icon{display:flex;height:42px;width:42px;align-items:center;justify-content:center;border-radius:16px;background:#EFF6FF;color:#1557D6}
+        .row-label{text-align:left;font-size:12px;font-weight:950;color:#475569;letter-spacing:.02em}
+        .input{width:100%;height:42px;border:0;background:transparent;text-align:right;font-size:15px;font-weight:900;color:#06194A;outline:none}
+        .input::placeholder{color:#94A3B8}
+        .lock-dot{display:flex;height:30px;width:30px;align-items:center;justify-content:center;border-radius:999px;background:#E0ECFF;color:#1557D6;font-size:13px;font-weight:950}
+        .password-btn{border:0;background:#EFF6FF;color:#1557D6;border-radius:999px;height:32px;width:32px;cursor:pointer}
+        .success,.error,.hint{margin-top:10px;border-radius:16px;padding:12px;text-align:center;font-size:13px;font-weight:900;line-height:1.5}
+        .success{background:#ECFDF3;border:1px solid #BBF7D0;color:#047857;display:flex;align-items:center;justify-content:center;gap:8px}
+        .error{background:#FFF1F2;border:1px solid #FECDD3;color:#BE123C}
+        .hint{background:#EFF6FF;border:1px solid #BFDBFE;color:#1557D6}
+        .submit{width:100%;height:56px;margin-top:18px;border:0;border-radius:20px;background:#1557D6;color:#fff;font-size:15px;font-weight:950;cursor:pointer;box-shadow:0 14px 28px rgba(21,87,214,.20)}
+        .submit:disabled{opacity:.65;cursor:not-allowed}
+        .bottom{margin-top:20px;text-align:center;color:#64748B;font-weight:700}
+        .bottom a{color:#1557D6;font-weight:950}
         @media(max-width:900px){
-
-          .page{
-            padding:0;
-          }
-
-          .shell{
-            display:block;
-            min-height:100vh;
-            border-radius:0;
-          }
-
-          .left{
-            display:none;
-          }
-
-          .right{
-            min-height:100vh;
-            align-items:flex-start;
-            padding:32px 22px;
-          }
-
-          .card{
-            max-width:460px;
-            margin:0 auto;
-          }
+          .page{padding:0}
+          .shell{display:block;min-height:100vh;border-radius:0;box-shadow:none}
+          .left{display:none}
+          .right{min-height:100vh;align-items:flex-start;padding:28px 16px}
+          .card{max-width:460px;margin:0 auto}
+          .title{font-size:30px}
+          .row{grid-template-columns:40px 88px 1fr 30px;gap:8px;padding:9px 10px;border-radius:20px}
+          .row-icon{height:38px;width:38px;border-radius:14px}
+          .row-label{font-size:11px}
+          .input{font-size:14px}
         }
       `}</style>
 
@@ -407,58 +170,30 @@ function KayitForm() {
           <aside className="left">
             <div className="brand">
               <img src="/LOGO_EPH.png" alt="EPH" />
-
               <div>
                 <div className="brand-title">EPH Platform</div>
-
-                <div style={{ opacity: 0.65 }}>
-                  Emlak Portföy Havuzu
-                </div>
+                <div style={{ opacity: 0.7 }}>Emlak Portföy Havuzu</div>
               </div>
             </div>
 
             <div className="hero">
-              <div
-                style={{
-                  display: "inline-flex",
-                  gap: 8,
-                  alignItems: "center",
-                  border: "1px solid rgba(255,255,255,.15)",
-                  padding: "8px 14px",
-                  borderRadius: 999,
-                  fontSize: 13,
-                  fontWeight: 800,
-                }}
-              >
+              <div className="pill">
                 <ShieldCheck size={16} />
                 Profesyonel Üyelik Sistemi
               </div>
 
-              <h1>
-                Türkiye’nin yeni nesil emlak ağına katılın.
-              </h1>
+              <h1>Türkiye’nin yeni nesil emlak ağına katılın.</h1>
 
               <p>
-                Referans kodunuz varsa bilgileriniz otomatik doldurulur.
-                Referansınız yoksa normal başvuru oluşturabilirsiniz.
+                Referans kodunuz varsa bilgileriniz otomatik doldurulur. Referansınız yoksa normal üyelik başvurusu yapabilirsiniz.
               </p>
 
-              <div className="feature">
-                <strong>✓ Referanslı VIP kayıt</strong>
-              </div>
-
-              <div className="feature">
-                <strong>✓ Admin onaylı güvenli üyelik</strong>
-              </div>
-
-              <div className="feature">
-                <strong>✓ Profesyonel emlak ağı</strong>
-              </div>
+              <div className="feature">✓ Referanslı VIP kayıt</div>
+              <div className="feature">✓ Admin onaylı güvenli üyelik</div>
+              <div className="feature">✓ Profesyonel emlak ağı</div>
             </div>
 
-            <div style={{ opacity: 0.45, fontSize: 13 }}>
-              © 2026 EPH Platform
-            </div>
+            <div style={{ opacity: 0.5, fontSize: 13 }}>© 2026 EPH Platform</div>
           </aside>
 
           <section className="right">
@@ -470,199 +205,114 @@ function KayitForm() {
               </div>
 
               <form onSubmit={handleSubmit(onSubmit)}>
-                <div className="field">
-                  <label>Referans kodu (opsiyonel)</label>
+                <div className="form-grid">
+                  <div>
+                    <div className="row ref">
+                      <span className="row-icon"><KeyRound size={18} /></span>
+                      <input
+                        {...register("inviteCode")}
+                        placeholder="EPH-05-ADM08-1524XXXXXXX"
+                        className="input"
+                        style={{ textTransform: "uppercase", textAlign: "center" }}
+                      />
+                    </div>
 
-                  <div className="input-wrap">
-                    <KeyRound className="icon" size={18} />
+                    {referralLoading && <div className="success">Kontrol ediliyor...</div>}
 
-                    <input
-                      {...register("inviteCode")}
-                      placeholder="EPH-05-ADM08-1524XXXXXXX"
-                      className="input"
-                      style={{ textTransform: "uppercase" }}
-                    />
+                    {referralValid && detectedRole && (
+                      <>
+                        <div className="success">
+                          <CheckCircle2 size={16} />
+                          {ROLE_LABELS[detectedRole]} referans kaydı bulundu.
+                        </div>
+                        <div className="hint">
+                          Ad, soyad ve e-posta güvenlik için kilitlendi. Telefon ve şifre alanını siz belirleyebilirsiniz.
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  {referralLoading && (
-                    <div className="success">
-                      Kontrol ediliyor...
-                    </div>
-                  )}
+                  <FormRow icon={<UserRound size={18} />} label="Ad" locked={referralValid}>
+                    <input {...register("firstName")} readOnly={referralValid} placeholder="Ad" className="input" />
+                  </FormRow>
+                  {errors.firstName && <div className="error">{errors.firstName.message}</div>}
 
-                  {referralValid && detectedRole && (
-                    <>
-                      <div className="success">
-                        <CheckCircle2 size={16} />
-                        {ROLE_LABELS[detectedRole]} referans kaydı bulundu.
-                      </div>
+                  <FormRow icon={<UserRound size={18} />} label="Soyad" locked={referralValid}>
+                    <input {...register("lastName")} readOnly={referralValid} placeholder="Soyad" className="input" />
+                  </FormRow>
+                  {errors.lastName && <div className="error">{errors.lastName.message}</div>}
 
-                      <div className="hint">
-                        Referanslı kayıtta ad, soyad ve e-posta bilgileri güvenlik için kilitlenir.
-                        Telefon ve şifre alanını siz belirleyebilirsiniz.
-                      </div>
-                    </>
-                  )}
-                </div>
+                  <FormRow icon={<Mail size={18} />} label="E-posta" locked={referralValid}>
+                    <input {...register("email")} readOnly={referralValid} type="email" placeholder="mail@example.com" className="input" />
+                  </FormRow>
+                  {errors.email && <div className="error">{errors.email.message}</div>}
 
-                <div className="field">
-                  <label>Ad</label>
-
-                  <div className="input-wrap">
-                    <UserRound className="icon" size={18} />
-
-                    <input
-                      {...register("firstName")}
-                      readOnly={referralValid}
-                      placeholder="Ad"
-                      className={`input ${referralValid ? "locked" : ""}`}
-                    />
-                  </div>
-
-                  {errors.firstName && (
-                    <div className="error">
-                      {errors.firstName.message}
-                    </div>
-                  )}
-                </div>
-
-                <div className="field">
-                  <label>Soyad</label>
-
-                  <div className="input-wrap">
-                    <UserRound className="icon" size={18} />
-
-                    <input
-                      {...register("lastName")}
-                      readOnly={referralValid}
-                      placeholder="Soyad"
-                      className={`input ${referralValid ? "locked" : ""}`}
-                    />
-                  </div>
-
-                  {errors.lastName && (
-                    <div className="error">
-                      {errors.lastName.message}
-                    </div>
-                  )}
-                </div>
-
-                <div className="field">
-                  <label>E-posta</label>
-
-                  <div className="input-wrap">
-                    <Mail className="icon" size={18} />
-
-                    <input
-                      {...register("email")}
-                      readOnly={referralValid}
-                      type="email"
-                      placeholder="mail@example.com"
-                      className={`input ${referralValid ? "locked" : ""}`}
-                    />
-                  </div>
-
-                  {errors.email && (
-                    <div className="error">
-                      {errors.email.message}
-                    </div>
-                  )}
-                </div>
-
-                <div className="field">
-                  <label>Telefon</label>
-
-                  <div className="input-wrap">
-                    <Phone className="icon" size={18} />
-
+                  <FormRow icon={<Phone size={18} />} label="Telefon">
                     <input
                       {...register("phone")}
                       value={phoneValue}
                       onChange={(event) =>
-                        setValue("phone", normalizePhoneForForm(event.target.value), {
+                        setValue("phone", normalizePhoneForSystem(event.target.value), {
                           shouldDirty: true,
                           shouldValidate: true,
                         })
                       }
                       inputMode="tel"
-                      placeholder="+90 532 340 50 50"
+                      placeholder="+90 532 282 88 75"
                       className="input"
                     />
-                  </div>
+                  </FormRow>
+                  <div className="hint">Nasıl yazarsanız yazın sistem +90 532 282 88 75 formatına çevirir.</div>
+                  {errors.phone && <div className="error">{errors.phone.message}</div>}
 
-                  <div className="hint">
-                    Nasıl yazarsanız yazın sistem +90 532 340 50 50 formatına çevirir.
-                  </div>
-
-                  {errors.phone && (
-                    <div className="error">
-                      {errors.phone.message}
-                    </div>
-                  )}
-                </div>
-
-                <div className="field">
-                  <label>Şifre</label>
-
-                  <div className="input-wrap">
-                    <LockKeyhole className="icon" size={18} />
-
-                    <input
-                      {...register("password")}
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Şifre oluştur"
-                      className="input"
-                      style={{ paddingRight: 48 }}
-                    />
-
-                    <button
-                      type="button"
-                      className="password-btn"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <EyeOff size={19} />
-                      ) : (
-                        <Eye size={19} />
-                      )}
+                  <FormRow icon={<LockKeyhole size={18} />} label="Şifre" action={
+                    <button type="button" className="password-btn" onClick={() => setShowPassword(!showPassword)}>
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
-                  </div>
+                  }>
+                    <input {...register("password")} type={showPassword ? "text" : "password"} placeholder="Şifre oluştur" className="input" />
+                  </FormRow>
+                  {errors.password && <div className="error">{errors.password.message}</div>}
 
-                  {errors.password && (
-                    <div className="error">
-                      {errors.password.message}
-                    </div>
-                  )}
+                  {serverError && <div className="error">{serverError}</div>}
                 </div>
 
-                {serverError && (
-                  <div className="error">
-                    {serverError}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="submit"
-                  disabled={loading}
-                >
-                  {loading
-                    ? "Hesap oluşturuluyor..."
-                    : "Üyelik Başvurusu Gönder"}
+                <button type="submit" className="submit" disabled={loading}>
+                  {loading ? "Hesap oluşturuluyor..." : "Üyelik Başvurusu Gönder"}
                 </button>
               </form>
 
               <div className="bottom">
-                Zaten hesabınız var mı?{" "}
-                <Link href="/giris">
-                  Giriş Yap
-                </Link>
+                Zaten hesabınız var mı? <Link href="/giris">Giriş Yap</Link>
               </div>
             </div>
           </section>
         </section>
       </main>
     </>
+  );
+}
+
+function FormRow({
+  icon,
+  label,
+  locked,
+  action,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  locked?: boolean;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`row ${locked ? "locked" : ""}`}>
+      <span className="row-icon">{icon}</span>
+      <span className="row-label">{label}</span>
+      {children}
+      {action || (locked ? <span className="lock-dot">🔒</span> : <span />)}
+    </div>
   );
 }
 
