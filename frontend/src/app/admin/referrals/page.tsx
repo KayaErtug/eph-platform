@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  CalendarClock,
   CheckCircle2,
   KeyRound,
   Lock,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 
 import api from "@/lib/api";
+import { normalizePhoneForSystem } from "@/schemas/auth.schema";
 import { useAuthStore } from "@/store/auth.store";
 
 type Role =
@@ -61,12 +63,22 @@ const ROLE_LABELS: Record<Role, string> = {
   SUPER_ADMIN: "Yazılım Ekibi",
 };
 
+const EXPIRE_OPTIONS = [
+  { label: "1 Gün", value: 1 },
+  { label: "3 Gün", value: 3 },
+  { label: "7 Gün", value: 7 },
+  { label: "10 Gün", value: 10 },
+  { label: "15 Gün", value: 15 },
+  { label: "30 Gün", value: 30 },
+];
+
 const EMPTY_FORM = {
   firstName: "",
   lastName: "",
   email: "",
   phone: "",
   role: "EMLAKCI" as Role,
+  expiresInDays: 7,
 };
 
 function normalizeRole(value?: string | null) {
@@ -143,6 +155,13 @@ export default function AdminReferralsPage() {
       return;
     }
 
+    const normalizedPhone = normalizePhoneForSystem(form.phone);
+
+    if (!/^\+90 5\d{2} \d{3} \d{2} \d{2}$/.test(normalizedPhone)) {
+      setError("Telefon numarası +90 532 340 50 50 formatına uygun olmalıdır.");
+      return;
+    }
+
     setCreating(true);
 
     try {
@@ -150,8 +169,9 @@ export default function AdminReferralsPage() {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim(),
+        phone: normalizedPhone,
         role: form.role,
+        expiresInDays: form.expiresInDays,
       });
 
       setSuccess(`Referans kodu oluşturuldu: ${res.data.referralCode}`);
@@ -376,7 +396,7 @@ export default function AdminReferralsPage() {
                 <Input
                   label="Telefon"
                   value={form.phone}
-                  onChange={(value) => setForm({ ...form, phone: value })}
+                  onChange={(value) => setForm({ ...form, phone: normalizePhoneForSystem(value) })}
                 />
 
                 <label className="sm:col-span-2">
@@ -399,6 +419,30 @@ export default function AdminReferralsPage() {
 		    <option value="SUPER_ADMIN">Yazılım Ekibi</option>
 		    
                   </select>
+                </label>
+
+                <label className="sm:col-span-2">
+                  <span className="mb-2 flex items-center justify-center gap-2 text-center text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                    <CalendarClock size={14} />
+                    Geçerlilik Süresi
+                  </span>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {EXPIRE_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setForm({ ...form, expiresInDays: option.value })}
+                        className={`h-11 rounded-2xl border px-2 text-xs font-black transition ${
+                          form.expiresInDays === option.value
+                            ? "border-[#C9A84C] bg-[#C9A84C] text-[#061126]"
+                            : "border-cyan-300/15 bg-white/10 text-slate-200"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </label>
               </div>
 

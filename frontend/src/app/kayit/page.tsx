@@ -32,21 +32,19 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 function normalizePhoneForForm(value?: string | null) {
-  const digits = String(value || "").replace(/\D/g, "");
+  const raw = String(value || "").trim();
+  const digits = raw.replace(/\D/g, "");
 
-  if (digits.startsWith("90") && digits.length >= 12) {
-    return digits.slice(2, 12);
-  }
+  let local = digits;
 
-  if (digits.startsWith("0") && digits.length >= 11) {
-    return digits.slice(1, 11);
-  }
+  if (local.startsWith("0090")) local = local.slice(4);
+  if (local.startsWith("90")) local = local.slice(2);
+  if (local.startsWith("0")) local = local.slice(1);
+  if (local.length > 10) local = local.slice(-10);
 
-  if (digits.length > 10) {
-    return digits.slice(-10);
-  }
+  if (local.length !== 10 || !local.startsWith("5")) return raw;
 
-  return digits.slice(0, 10);
+  return `+90 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6, 8)} ${local.slice(8, 10)}`;
 }
 
 function KayitForm() {
@@ -586,14 +584,14 @@ function KayitForm() {
                           shouldValidate: true,
                         })
                       }
-                      inputMode="numeric"
-                      placeholder="5324101050"
+                      inputMode="tel"
+                      placeholder="+90 532 340 50 50"
                       className="input"
                     />
                   </div>
 
                   <div className="hint">
-                    Telefon numarasını başında 0 veya +90 olmadan, 10 haneli yazın.
+                    Nasıl yazarsanız yazın sistem +90 532 340 50 50 formatına çevirir.
                   </div>
 
                   {errors.phone && (
