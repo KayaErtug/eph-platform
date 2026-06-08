@@ -93,7 +93,7 @@ export class MailService {
       SUPER_ADMIN: 'Yazılım Ekibi',
     };
 
-    const basvuruLink = `https://emlakportfoyhavuzu.com/katilim?referans=${encodeURIComponent(data.referralCode)}`;
+    const basvuruLink = `https://emlakportfoyhavuzu.com/kayit?referans=${encodeURIComponent(data.referralCode)}`;
     const sonGecerlilik = data.expiresAt
       ? data.expiresAt.toLocaleDateString('tr-TR', {
           day: '2-digit',
