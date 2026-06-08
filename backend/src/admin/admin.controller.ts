@@ -134,6 +134,11 @@ export class AdminController {
     return this.adminService.deactivateReferralCandidate(id);
   }
 
+  @Delete("referrals/:id")
+  deleteReferralCandidate(@Param("id") id: string, @Req() request: AdminRequest) {
+    return this.adminService.deleteReferralCandidate(id, this.extractActor(request));
+  }
+
   @Get("invitations")
   getInvitations() {
     return this.adminService.getInvitations();

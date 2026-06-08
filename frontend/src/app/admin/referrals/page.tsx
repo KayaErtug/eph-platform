@@ -70,6 +70,17 @@ const EMPTY_FORM = {
   role: "EMLAKCI" as Role,
 };
 
+function normalizeRole(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLocaleUpperCase("tr-TR");
+}
+
+function isSoftwareTeamRole(value?: string | null) {
+  const role = normalizeRole(value);
+  return role === "SUPER_ADMIN" || role === "YAZILIM EKIBI" || role === "YAZILIM EKİBİ";
+}
+
 export default function AdminReferralsPage() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
@@ -164,6 +175,28 @@ export default function AdminReferralsPage() {
       await fetchReferrals();
     } catch (err: any) {
       setError(err?.response?.data?.message || "Referans kodu pasifleştirilemedi.");
+    }
+  };
+
+  const deleteCandidate = async (id: string, code: string) => {
+    setError("");
+    setSuccess("");
+
+    if (!isSoftwareTeamRole(user?.role)) {
+      setError("Referans kodu silme yetkisi sadece Yazılım Ekibi'ndedir.");
+      return;
+    }
+
+    if (!confirm(`${code} referans kodu kalıcı olarak silinecek. Emin misiniz?`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/admin/referrals/${id}`);
+      setSuccess("Referans kodu silindi.");
+      await fetchReferrals();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Referans kodu silinemedi.");
     }
   };
 
@@ -414,6 +447,8 @@ export default function AdminReferralsPage() {
                     copiedCode={copiedCode}
                     onCopy={copyCode}
                     onDeactivate={deactivateCandidate}
+                    onDelete={deleteCandidate}
+                    canDelete={isSoftwareTeamRole(user?.role)}
                   />
                 ))}
               </div>
@@ -524,11 +559,15 @@ function CandidateRow({
   copiedCode,
   onCopy,
   onDeactivate,
+  onDelete,
+  canDelete,
 }: {
   item: ReferralCandidate;
   copiedCode: string;
   onCopy: (code: string) => void;
   onDeactivate: (id: string) => void;
+  onDelete: (id: string, code: string) => void;
+  canDelete: boolean;
 }) {
   const isUsed = Boolean(item.usedAt);
 
@@ -558,12 +597,29 @@ function CandidateRow({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {item.isActive && !isUsed && (
+        {isUsed ? (
+          <span className="rounded-full border border-slate-300/20 bg-slate-400/10 px-4 py-2 text-xs font-black text-slate-300">
+            Kullanılmış Kod
+          </span>
+        ) : item.isActive ? (
           <button
             onClick={() => onDeactivate(item.id)}
-            className="rounded-full border border-rose-300/25 bg-rose-400/10 px-4 py-2 text-xs font-black text-rose-100"
+            className="rounded-full border border-amber-300/25 bg-amber-400/10 px-4 py-2 text-xs font-black text-amber-100"
           >
             Pasifleştir
+          </button>
+        ) : (
+          <span className="rounded-full border border-rose-300/25 bg-rose-400/10 px-4 py-2 text-xs font-black text-rose-100">
+            Pasif Kod
+          </span>
+        )}
+
+        {canDelete && (
+          <button
+            onClick={() => onDelete(item.id, item.referralCode)}
+            className="rounded-full border border-rose-300/25 bg-rose-400/10 px-4 py-2 text-xs font-black text-rose-100"
+          >
+            Sil
           </button>
         )}
       </div>

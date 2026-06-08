@@ -71,6 +71,62 @@ export class MailService {
     });
   }
 
+
+  async sendReferralInvitation(data: {
+    email: string;
+    name: string;
+    role: string;
+    referralCode: string;
+    expiresAt?: Date;
+  }) {
+    const ROLE_LABELS: Record<string, string> = {
+      EMLAKCI: 'Gayrimenkul Danışmanı',
+      MUTEAHHIT: 'Müteahhit',
+      INSAAT_FIRMASI: 'İnşaat Firması',
+      MODERATOR: 'Moderatör',
+      ADMIN: 'Admin',
+      SUPER_ADMIN: 'Yazılım Ekibi',
+    };
+
+    const basvuruLink = `https://emlakportfoyhavuzu.com/katilim?referans=${encodeURIComponent(data.referralCode)}`;
+    const sonGecerlilik = data.expiresAt
+      ? data.expiresAt.toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })
+      : '30 gün';
+
+    await this.transporter.sendMail({
+      from: '"EPH Platform" <bildirim@emlakportfoyhavuzu.com>',
+      to: data.email,
+      subject: 'EPH Platform Davet Kodunuz',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#F7FBFF;padding:24px;">
+          <div style="background:#ffffff;border:1px solid #DDE7F3;border-radius:24px;overflow:hidden;">
+            <div style="background:#1557D6;padding:24px;text-align:center;">
+              <h1 style="color:#ffffff;margin:0;font-size:24px;">EPH Platform Davetiniz Hazır</h1>
+              <p style="color:#DBEAFE;margin:8px 0 0;font-size:14px;">Emlak Portföy Havuzu resmi davet bildirimi</p>
+            </div>
+
+            <div style="padding:28px;color:#27364F;">
+              <p style="font-size:16px;line-height:1.7;margin:0 0 14px;">Merhaba <strong>${data.name}</strong>,</p>
+              <p style="font-size:15px;line-height:1.7;margin:0 0 18px;">EPH Platform'a <strong>${ROLE_LABELS[data.role] || data.role}</strong> rolüyle davet edildiniz. Aşağıdaki referans kodunu kullanarak katılım başvurunuzu oluşturabilirsiniz.</p>
+
+              <div style="background:#EFF6FF;border:2px dashed #1557D6;border-radius:18px;padding:22px;margin:24px 0;text-align:center;">
+                <p style="margin:0 0 8px;color:#64748B;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">Referans Kodunuz</p>
+                <p style="margin:0;color:#06194A;font-size:26px;font-weight:900;letter-spacing:2px;font-family:monospace;">${data.referralCode}</p>
+              </div>
+
+              <div style="text-align:center;margin:24px 0;">
+                <a href="${basvuruLink}" style="display:inline-block;background:#1557D6;color:#ffffff;text-decoration:none;border-radius:14px;padding:14px 24px;font-size:15px;font-weight:800;">Katılım Başvurusu Oluştur</a>
+              </div>
+
+              <p style="font-size:13px;line-height:1.6;color:#64748B;margin:18px 0 0;">Bu davet kodu yalnızca sizin için oluşturulmuştur. Son geçerlilik: <strong>${sonGecerlilik}</strong>.</p>
+              <p style="font-size:13px;line-height:1.6;color:#64748B;margin:8px 0 0;">Herhangi bir sorunuz için: <strong>info@emlakportfoyhavuzu.com</strong></p>
+            </div>
+          </div>
+        </div>
+      `,
+    });
+  }
+
   async sendApplicationInvited(email: string, name: string, inviteCode: string) {
     const kayitLink = `https://emlakportfoyhavuzu.com/kayit?davet=${inviteCode}`;
     await this.transporter.sendMail({

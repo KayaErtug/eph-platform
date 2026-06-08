@@ -70,6 +70,130 @@ export class AdminService {
     return code;
   }
 
+  private readonly tersTurkAlfabesi: Record<string, string> = {
+    A: "29",
+    B: "28",
+    C: "27",
+    Ç: "26",
+    D: "25",
+    E: "24",
+    F: "23",
+    G: "22",
+    Ğ: "21",
+    H: "20",
+    I: "19",
+    İ: "18",
+    J: "17",
+    K: "16",
+    L: "15",
+    M: "14",
+    N: "13",
+    O: "12",
+    Ö: "11",
+    P: "10",
+    R: "09",
+    S: "08",
+    Ş: "07",
+    T: "06",
+    U: "05",
+    Ü: "04",
+    V: "03",
+    Y: "02",
+    Z: "01",
+  };
+
+  private readonly rolKodlari: Record<Role, string> = {
+    EMLAKCI: "EML",
+    MUTEAHHIT: "MUT",
+    INSAAT_FIRMASI: "INS",
+    MODERATOR: "MOD",
+    ADMIN: "ADM",
+    SUPER_ADMIN: "SUP",
+  };
+
+  private guvenlikKoduUret(length = 7): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+    return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  }
+
+  private normalizeName(value: string): string {
+    return value
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLocaleUpperCase("tr-TR");
+  }
+
+  private getHarfKodu(harf: string): string {
+    const kod = this.tersTurkAlfabesi[harf.toLocaleUpperCase("tr-TR")];
+
+    if (!kod) {
+      throw new BadRequestException(`Referans kodu üretilemedi. Desteklenmeyen karakter: ${harf}`);
+    }
+
+    return kod;
+  }
+
+  private adayAdSoyadAyir(firstName: string, lastName: string) {
+    const ad = this.normalizeName(firstName);
+    const soyad = this.normalizeName(lastName);
+
+    if (!ad || !soyad) {
+      throw new BadRequestException("Referans kodu için ad ve soyad gereklidir.");
+    }
+
+    if (ad.length < 2 || soyad.length < 2) {
+      throw new BadRequestException("Referans kodu için ad ve soyad en az 2 harf olmalıdır.");
+    }
+
+    return { ad, soyad };
+  }
+
+  private generateProfessionalReferralCode(firstName: string, lastName: string, role: Role): string {
+    const { ad, soyad } = this.adayAdSoyadAyir(firstName, lastName);
+
+    const adIlk = this.getHarfKodu(ad[0]);
+    const soyadIlk = this.getHarfKodu(soyad[0]);
+    const adIkinci = this.getHarfKodu(ad[1]);
+    const soyadIkinci = this.getHarfKodu(soyad[1]);
+
+    return `EPH-${adIlk}-${this.rolKodlari[role]}${soyadIlk}-${adIkinci}${soyadIkinci}${this.guvenlikKoduUret()}`;
+  }
+
+  private async generateUniqueProfessionalReferralCode(firstName: string, lastName: string, role: Role): Promise<string> {
+    let code = this.generateProfessionalReferralCode(firstName, lastName, role);
+
+    let existingUser = await this.prisma.user.findFirst({
+      where: { referralCode: code },
+    });
+
+    let existingCandidate = await this.prisma.referralCandidate.findFirst({
+      where: { referralCode: code },
+    });
+
+    let existingInvitation = await this.prisma.invitation.findUnique({
+      where: { code },
+    });
+
+    while (existingUser || existingCandidate || existingInvitation) {
+      code = this.generateProfessionalReferralCode(firstName, lastName, role);
+
+      existingUser = await this.prisma.user.findFirst({
+        where: { referralCode: code },
+      });
+
+      existingCandidate = await this.prisma.referralCandidate.findFirst({
+        where: { referralCode: code },
+      });
+
+      existingInvitation = await this.prisma.invitation.findUnique({
+        where: { code },
+      });
+    }
+
+    return code;
+  }
+
   private normalizeApplicationStatus(status?: string) {
     if (!status || status === "all") {
       return {};
@@ -806,9 +930,19 @@ export class AdminService {
     phone: string;
     role: Role;
   }) {
+    const firstName = data.firstName.trim();
+    const lastName = data.lastName.trim();
+    const email = data.email.trim().toLowerCase();
+    const phone = data.phone.trim();
+    const role = data.role;
+
+    if (!Object.values(Role).includes(role)) {
+      throw new BadRequestException("Geçersiz rol.");
+    }
+
     const existingUser = await this.prisma.user.findFirst({
       where: {
-        OR: [{ email: data.email }, { phone: data.phone }],
+        OR: [{ email }, { phone }],
       },
     });
 
@@ -818,7 +952,7 @@ export class AdminService {
 
     const existingCandidate = await this.prisma.referralCandidate.findFirst({
       where: {
-        OR: [{ email: data.email }, { phone: data.phone }],
+        OR: [{ email }, { phone }],
       },
     });
 
@@ -826,19 +960,77 @@ export class AdminService {
       throw new BadRequestException("Bu kişi için daha önce referans kodu oluşturulmuş.");
     }
 
-    const referralCode = await this.generateUniqueReferralCode();
-
-    return this.prisma.referralCandidate.create({
-      data: {
-        referralCode,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        phone: data.phone,
-        role: data.role,
-        isActive: true,
+    const existingInvitation = await this.prisma.invitation.findFirst({
+      where: {
+        OR: [{ adayEposta: email }, { adayAdSoyad: `${firstName} ${lastName}` }],
       },
     });
+
+    if (existingInvitation) {
+      throw new BadRequestException("Bu kişi için daha önce davet kodu oluşturulmuş.");
+    }
+
+    const referralCode = await this.generateUniqueProfessionalReferralCode(firstName, lastName, role);
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    const [candidate, invitation] = await this.prisma.$transaction([
+      this.prisma.referralCandidate.create({
+        data: {
+          referralCode,
+          firstName,
+          lastName,
+          email,
+          phone,
+          role,
+          isActive: true,
+        },
+      }),
+      this.prisma.invitation.create({
+        data: {
+          code: referralCode,
+          role,
+          adayAdSoyad: `${firstName} ${lastName}`,
+          adayEposta: email,
+          pilotDavetiMi: true,
+          expiresAt,
+          maxUses: 1,
+          onayYetkiSeviyesi: "MODERATOR_ADMIN_SUPER_ADMIN" as any,
+        },
+      }),
+    ]);
+
+    try {
+      await this.mail.sendReferralInvitation({
+        email,
+        name: `${firstName} ${lastName}`,
+        role,
+        referralCode,
+        expiresAt,
+      });
+    } catch (error: any) {
+      console.error("Referans davet maili gönderilemedi:", error?.message || error);
+    }
+
+    await this.logAdminAction({
+      action: "REFERRAL_INVITATION_CREATED",
+      entityType: "Invitation",
+      entityId: invitation.id,
+      description: `${email} adresi için referans davet kodu oluşturuldu.`,
+      metadata: {
+        referralCode,
+        role,
+        candidateId: candidate.id,
+        expiresAt,
+      },
+    });
+
+    return {
+      ...candidate,
+      invitation,
+      mailSent: true,
+    };
   }
 
   async deactivateReferralCandidate(id: string) {
@@ -854,6 +1046,59 @@ export class AdminService {
       where: { id },
       data: { isActive: false },
     });
+  }
+
+  async deleteReferralCandidate(id: string, actor?: AdminActor) {
+    this.requireSoftwareTeam(actor);
+
+    const candidate = await this.prisma.referralCandidate.findUnique({
+      where: { id },
+    });
+
+    if (!candidate) {
+      throw new NotFoundException("Referans kaydı bulunamadı.");
+    }
+
+    if (candidate.usedAt) {
+      throw new BadRequestException("Kullanılmış referans kodu silinemez. Sadece pasifleştirilebilir.");
+    }
+
+    const invitation = await this.prisma.invitation.findUnique({
+      where: { code: candidate.referralCode },
+    });
+
+    await this.prisma.$transaction([
+      ...(invitation
+        ? [
+            this.prisma.invitation.delete({
+              where: { code: candidate.referralCode },
+            }),
+          ]
+        : []),
+      this.prisma.referralCandidate.delete({
+        where: { id },
+      }),
+    ]);
+
+    await this.logAdminAction({
+      actor,
+      action: "REFERRAL_INVITATION_DELETED",
+      entityType: "ReferralCandidate",
+      entityId: id,
+      description: `${candidate.email} adresine ait referans kodu Yazılım Ekibi tarafından silindi.`,
+      metadata: {
+        referralCode: candidate.referralCode,
+        role: candidate.role,
+        candidateEmail: candidate.email,
+        invitationId: invitation?.id || null,
+      },
+    });
+
+    return {
+      success: true,
+      message: "Referans kodu silindi.",
+      deletedReferralCode: candidate.referralCode,
+    };
   }
 
   async getInvitations() {
