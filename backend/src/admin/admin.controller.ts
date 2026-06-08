@@ -113,6 +113,16 @@ export class AdminController {
     return this.adminService.createUser(body, this.extractActor(request));
   }
 
+  @Patch("users/member-codes/missing")
+  assignMissingMemberCodes(@Req() request: AdminRequest) {
+    return this.adminService.assignMissingMemberCodes(this.extractActor(request));
+  }
+
+  @Patch("users/:id/member-code")
+  assignMemberCodeToUser(@Param("id") id: string, @Req() request: AdminRequest) {
+    return this.adminService.assignMemberCodeToUser(id, this.extractActor(request));
+  }
+
   @Get("referrals")
   getReferralCodes(@Req() request: AdminRequest) {
     return this.adminService.getReferralCodes(this.extractActor(request));

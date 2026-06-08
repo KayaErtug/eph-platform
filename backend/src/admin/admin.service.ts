@@ -236,6 +236,176 @@ export class AdminService {
     }
   }
 
+
+  private readonly ilPlakaKodlari: Record<string, string> = {
+    ADANA: "01",
+    ADIYAMAN: "02",
+    AFYONKARAHISAR: "03",
+    AĞRI: "04",
+    AMASYA: "05",
+    ANKARA: "06",
+    ANTALYA: "07",
+    ARTVIN: "08",
+    AYDIN: "09",
+    BALIKESIR: "10",
+    BILECIK: "11",
+    BINGOL: "12",
+    BITLIS: "13",
+    BOLU: "14",
+    BURDUR: "15",
+    BURSA: "16",
+    CANAKKALE: "17",
+    CANKIRI: "18",
+    CORUM: "19",
+    DENIZLI: "20",
+    DIYARBAKIR: "21",
+    EDIRNE: "22",
+    ELAZIG: "23",
+    ERZINCAN: "24",
+    ERZURUM: "25",
+    ESKISEHIR: "26",
+    GAZIANTEP: "27",
+    GIRESUN: "28",
+    GUMUSHANE: "29",
+    HAKKARI: "30",
+    HATAY: "31",
+    ISPARTA: "32",
+    MERSIN: "33",
+    ISTANBUL: "34",
+    IZMIR: "35",
+    KARS: "36",
+    KASTAMONU: "37",
+    KAYSERI: "38",
+    KIRKLARELI: "39",
+    KIRSEHIR: "40",
+    KOCAELI: "41",
+    KONYA: "42",
+    KUTAHYA: "43",
+    MALATYA: "44",
+    MANISA: "45",
+    KAHRAMANMARAS: "46",
+    MARDIN: "47",
+    MUGLA: "48",
+    MUS: "49",
+    NEVSEHIR: "50",
+    NIGDE: "51",
+    ORDU: "52",
+    RIZE: "53",
+    SAKARYA: "54",
+    SAMSUN: "55",
+    SIIRT: "56",
+    SINOP: "57",
+    SIVAS: "58",
+    TEKIRDAG: "59",
+    TOKAT: "60",
+    TRABZON: "61",
+    TUNCELI: "62",
+    SANLIURFA: "63",
+    USAK: "64",
+    VAN: "65",
+    YOZGAT: "66",
+    ZONGULDAK: "67",
+    AKSARAY: "68",
+    BAYBURT: "69",
+    KARAMAN: "70",
+    KIRIKKALE: "71",
+    BATMAN: "72",
+    SIRNAK: "73",
+    BARTIN: "74",
+    ARDAHAN: "75",
+    IGDIR: "76",
+    YALOVA: "77",
+    KARABUK: "78",
+    KILIS: "79",
+    OSMANIYE: "80",
+    DUZCE: "81",
+  };
+
+  private normalizeCityName(value?: string | null): string {
+    return String(value || "")
+      .trim()
+      .toLocaleUpperCase("tr-TR")
+      .replace(/Ç/g, "C")
+      .replace(/Ğ/g, "G")
+      .replace(/İ/g, "I")
+      .replace(/İ/g, "I")
+      .replace(/Ö/g, "O")
+      .replace(/Ş/g, "S")
+      .replace(/Ü/g, "U");
+  }
+
+  private normalizeMemberPlateCode(cityPlateCode?: string | null, city?: string | null): string {
+    const rawPlate = String(cityPlateCode || "").trim();
+    const plateDigits = rawPlate.match(/\d{1,2}/)?.[0];
+
+    if (plateDigits) {
+      return plateDigits.padStart(2, "0").slice(-2);
+    }
+
+    const normalizedCity = this.normalizeCityName(city);
+
+    return this.ilPlakaKodlari[normalizedCity] || "00";
+  }
+
+  private getMemberYear(memberSince?: Date | string | null, createdAt?: Date | string | null): string {
+    const baseDate = memberSince || createdAt || new Date();
+    const date = baseDate instanceof Date ? baseDate : new Date(baseDate);
+
+    if (Number.isNaN(date.getTime())) {
+      return String(new Date().getFullYear());
+    }
+
+    return String(date.getFullYear());
+  }
+
+  private async getNextMemberSequence(): Promise<number> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        memberCode: { not: null },
+      },
+      select: {
+        memberCode: true,
+      },
+    });
+
+    const maxSequence = users.reduce((max, user) => {
+      const match = String(user.memberCode || "").match(/^EPH-\d{2}-\d{4}-(\d{6})$/);
+      const sequence = match ? Number(match[1]) : 0;
+
+      return Number.isFinite(sequence) && sequence > max ? sequence : max;
+    }, 0);
+
+    return maxSequence + 1;
+  }
+
+  private async generateUniqueMemberCode(user: {
+    cityPlateCode?: string | null;
+    city?: string | null;
+    memberSince?: Date | string | null;
+    createdAt?: Date | string | null;
+  }): Promise<string> {
+    const plateCode = this.normalizeMemberPlateCode(user.cityPlateCode, user.city);
+    const year = this.getMemberYear(user.memberSince, user.createdAt);
+    let sequence = await this.getNextMemberSequence();
+    let memberCode = `EPH-${plateCode}-${year}-${String(sequence).padStart(6, "0")}`;
+
+    let existing = await this.prisma.user.findUnique({
+      where: { memberCode },
+      select: { id: true },
+    });
+
+    while (existing) {
+      sequence += 1;
+      memberCode = `EPH-${plateCode}-${year}-${String(sequence).padStart(6, "0")}`;
+      existing = await this.prisma.user.findUnique({
+        where: { memberCode },
+        select: { id: true },
+      });
+    }
+
+    return memberCode;
+  }
+
   private maskSoftwareTeamUserForActor<T extends Record<string, any>>(user: T | null, actor?: AdminActor): T | null {
     if (!user) {
       return user;
@@ -655,9 +825,15 @@ export class AdminService {
       throw new NotFoundException("Kullanıcı bulunamadı.");
     }
 
+    const memberCode = user.memberCode || (await this.generateUniqueMemberCode(user));
+
     const updated = await this.prisma.user.update({
       where: { id },
-      data: { isApproved: true },
+      data: {
+        isApproved: true,
+        ...(user.memberCode ? {} : { memberCode }),
+        ...(!user.memberSince ? { memberSince: new Date() } : {}),
+      },
       select: {
         id: true,
         firstName: true,
@@ -665,6 +841,8 @@ export class AdminService {
         email: true,
         profileImageUrl: true,
         role: true,
+        memberCode: true,
+        memberSince: true,
         isApproved: true,
       },
     });
@@ -950,6 +1128,34 @@ export class AdminService {
         city: true,
         district: true,
         cityPlateCode: true,
+        memberCode: true,
+        memberSince: true,
+        createdAt: true,
+        isApproved: true,
+        referralCode: true,
+      },
+    });
+
+    const createdMemberCode = await this.generateUniqueMemberCode(created);
+
+    const createdWithMemberCode = await this.prisma.user.update({
+      where: { id: created.id },
+      data: {
+        memberCode: createdMemberCode,
+        memberSince: new Date(),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        profileImageUrl: true,
+        role: true,
+        city: true,
+        district: true,
+        cityPlateCode: true,
+        memberCode: true,
+        memberSince: true,
         isApproved: true,
         referralCode: true,
       },
@@ -967,7 +1173,165 @@ export class AdminService {
       },
     });
 
-    return created;
+    return createdWithMemberCode;
+  }
+
+  async assignMemberCodeToUser(id: string, actor?: AdminActor) {
+    this.requireSoftwareTeam(actor);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        profileImageUrl: true,
+        role: true,
+        memberCode: true,
+        memberSince: true,
+        city: true,
+        district: true,
+        cityPlateCode: true,
+        isApproved: true,
+        isVerified: true,
+        nominationPoints: true,
+        nominationQuota: true,
+        referralCode: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException("Kullanıcı bulunamadı.");
+    }
+
+    if (user.memberCode) {
+      return {
+        success: true,
+        message: "Kullanıcının üye numarası zaten var.",
+        user,
+      };
+    }
+
+    const memberCode = await this.generateUniqueMemberCode(user);
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: {
+        memberCode,
+        ...(!user.memberSince ? { memberSince: new Date() } : {}),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        profileImageUrl: true,
+        role: true,
+        memberCode: true,
+        memberSince: true,
+        city: true,
+        district: true,
+        cityPlateCode: true,
+        isApproved: true,
+        isVerified: true,
+        nominationPoints: true,
+        nominationQuota: true,
+        referralCode: true,
+        createdAt: true,
+      },
+    });
+
+    await this.logAdminAction({
+      actor,
+      targetUserId: id,
+      action: "USER_MEMBER_CODE_ASSIGNED",
+      entityType: "User",
+      entityId: id,
+      description: `${user.email} kullanıcısına ${memberCode} üye numarası atandı.`,
+      metadata: {
+        memberCode,
+        plateCode: memberCode.split("-")[1],
+      },
+    });
+
+    return {
+      success: true,
+      message: "Üye numarası oluşturuldu.",
+      user: updated,
+    };
+  }
+
+  async assignMissingMemberCodes(actor?: AdminActor) {
+    this.requireSoftwareTeam(actor);
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        isApproved: true,
+        memberCode: null,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        city: true,
+        cityPlateCode: true,
+        memberSince: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const updatedUsers = [];
+
+    for (const user of users) {
+      const memberCode = await this.generateUniqueMemberCode(user);
+
+      const updated = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          memberCode,
+          ...(!user.memberSince ? { memberSince: new Date() } : {}),
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          role: true,
+          memberCode: true,
+          memberSince: true,
+          city: true,
+          district: true,
+          cityPlateCode: true,
+          isApproved: true,
+        },
+      });
+
+      updatedUsers.push(updated);
+    }
+
+    await this.logAdminAction({
+      actor,
+      action: "MISSING_MEMBER_CODES_ASSIGNED",
+      entityType: "User",
+      description: `${updatedUsers.length} kullanıcıya toplu üye numarası atandı.`,
+      metadata: {
+        count: updatedUsers.length,
+        memberCodes: updatedUsers.map((user) => user.memberCode),
+      },
+    });
+
+    return {
+      success: true,
+      message: `${updatedUsers.length} kullanıcıya üye numarası oluşturuldu.`,
+      count: updatedUsers.length,
+      users: updatedUsers,
+    };
   }
 
   async getReferralCodes(actor?: AdminActor) {
