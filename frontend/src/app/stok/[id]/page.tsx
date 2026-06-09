@@ -294,7 +294,10 @@ export default function StokDetailPage() {
 
   const locationText = [unit?.project?.district, unit?.project?.city].filter(Boolean).join(" / ") || "Konum bilgisi yok";
   const fullAddress = [unit?.project?.address, unit?.project?.district, unit?.project?.city].filter(Boolean).join(" / ") || "Adres bilgisi yok";
-  const mapQuery = encodeURIComponent(fullAddress);
+  const projectLatitude = Number((unit?.project as any)?.latitude || 0);
+  const projectLongitude = Number((unit?.project as any)?.longitude || 0);
+  const hasProjectCoordinates = Number.isFinite(projectLatitude) && Number.isFinite(projectLongitude) && Boolean(projectLatitude) && Boolean(projectLongitude);
+  const mapQuery = encodeURIComponent(hasProjectCoordinates ? `${projectLatitude},${projectLongitude}` : fullAddress);
   const shareUrl = unit ? getCurrentShareUrl(unit.id) : "";
 
   const validateImageFile = (file: File) => {
@@ -834,7 +837,13 @@ export default function StokDetailPage() {
                   <InfoRow label="İlçe" value={unit.project?.district || "—"} />
                   <InfoRow label="Adres" value={unit.project?.address || "—"} />
                 </div>
-                <iframe title="Portföy haritası" src={`https://www.google.com/maps?q=${mapQuery}&output=embed`} className="h-72 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+                <iframe
+                  title="Portföy haritası"
+                  src={`https://www.google.com/maps?q=${mapQuery}&z=${hasProjectCoordinates ? 17 : 14}&output=embed`}
+                  className="h-72 w-full border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
               </div>
             </section>
 
