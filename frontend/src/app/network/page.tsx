@@ -46,6 +46,9 @@ type NetworkPost = {
   tags?: string[] | null;
   expiresAt?: string | null;
   createdAt?: string | null;
+  viewCount?: number | null;
+  followerCount?: number | null;
+  requestCount?: number | null;
 };
 
 type ForumCategory =
@@ -531,6 +534,10 @@ export default function NetworkPage() {
   const [intentFilter, setIntentFilter] = useState("Tümü");
   const [personalFilter, setPersonalFilter] = useState<PersonalTabKey>("ALL");
   const [search, setSearch] = useState("");
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [cityFilter, setCityFilter] = useState("");
+  const [urgencyFilter, setUrgencyFilter] = useState("Tümü");
+  const [budgetMaxFilter, setBudgetMaxFilter] = useState("");
   const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
   const [interestedPostIds, setInterestedPostIds] = useState<Set<string>>(new Set());
 
@@ -539,24 +546,44 @@ export default function NetworkPage() {
   const fetchPosts = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/network/posts");
-      setPosts(Array.isArray(res.data) ? res.data : []);
+
+      const [postsRes, followedRes] = await Promise.all([
+        api.get("/network/posts"),
+        user?.id
+          ? api.get("/network/posts/followed", {
+              params: {
+                userId: user.id,
+              },
+            })
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      const nextPosts = Array.isArray(postsRes.data) ? postsRes.data : [];
+      const followedItems = Array.isArray(followedRes.data) ? followedRes.data : [];
+      const nextSavedIds = new Set<string>(
+        followedItems
+          .map((item: { post?: NetworkPost | null }) => item?.post?.id)
+          .filter(Boolean) as string[],
+      );
+
+      setPosts(nextPosts);
+      setSavedPostIds(nextSavedIds);
     } catch {
       setPosts([]);
+      setSavedPostIds(new Set());
     } finally {
       setLoading(false);
     }
   };
 
   const syncPersonalStorage = () => {
-    setSavedPostIds(readStoredPostIds("eph-saved-network-"));
     setInterestedPostIds(readStoredPostIds("eph-interested-network-"));
   };
 
   useEffect(() => {
     fetchPosts();
     syncPersonalStorage();
-  }, []);
+  }, [user?.id]);
 
   const baseFilteredPosts = useMemo(() => {
     const keyword = normalizeText(search);
@@ -564,6 +591,24 @@ export default function NetworkPage() {
     return posts
       .filter((post) => postMatchesCategory(post, flowFilter))
       .filter((post) => postMatchesIntent(post, intentFilter))
+      .filter((post) => {
+        if (!cityFilter) return true;
+
+        return post.city === cityFilter;
+      })
+      .filter((post) => {
+        if (urgencyFilter === "Tümü") return true;
+
+        return String(post.urgency || "Normal") === urgencyFilter;
+      })
+      .filter((post) => {
+        const budgetMax = Number(String(budgetMaxFilter || "").replace(/\D/g, ""));
+
+        if (!budgetMax) return true;
+        if (!post.budget) return false;
+
+        return post.budget <= budgetMax;
+      })
       .filter((post) => {
         if (!keyword) return true;
 
@@ -580,7 +625,7 @@ export default function NetworkPage() {
 
         return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
       });
-  }, [flowFilter, intentFilter, posts, search]);
+  }, [budgetMaxFilter, cityFilter, flowFilter, intentFilter, posts, search, urgencyFilter]);
 
   const filteredPosts = useMemo(() => {
     if (personalFilter === "MINE") {
@@ -700,7 +745,11 @@ export default function NetworkPage() {
   	},
   });
       setPosts((current) => current.filter((item) => item.id !== post.id));
-      localStorage.removeItem(`eph-saved-network-${post.id}`);
+      setSavedPostIds((current) => {
+        const next = new Set(current);
+        next.delete(post.id);
+        return next;
+      });
       localStorage.removeItem(`eph-interested-network-${post.id}`);
       syncPersonalStorage();
     } catch (error: any) {
@@ -710,12 +759,66 @@ export default function NetworkPage() {
     }
   };
 
-  const handleToggleSave = (post: NetworkPost) => {
-    const key = `eph-saved-network-${post.id}`;
-    const next = !savedPostIds.has(post.id);
+  const handleToggleSave = async (post: NetworkPost) => {
+    if (!user?.id) {
+      alert("Kaydetmek için lütfen tekrar giriş yapın.");
+      router.push("/giris");
+      return;
+    }
 
-    localStorage.setItem(key, next ? "1" : "0");
-    syncPersonalStorage();
+    if (post.userId === user.id) {
+      alert("Kendi talebinizi kaydetmenize gerek yok.");
+      return;
+    }
+
+    const isSaved = savedPostIds.has(post.id);
+    const previousSavedIds = new Set(savedPostIds);
+
+    setSavedPostIds((current) => {
+      const next = new Set(current);
+
+      if (isSaved) next.delete(post.id);
+      else next.add(post.id);
+
+      return next;
+    });
+
+    setPosts((current) =>
+      current.map((item) => {
+        if (item.id !== post.id) return item;
+
+        const currentCount = item.followerCount || 0;
+
+        return {
+          ...item,
+          followerCount: Math.max(0, currentCount + (isSaved ? -1 : 1)),
+        };
+      }),
+    );
+
+    try {
+      const res = isSaved
+        ? await api.delete(`/network/posts/${post.id}/follow`, {
+            data: {
+              userId: user.id,
+            },
+          })
+        : await api.post(`/network/posts/${post.id}/follow`, {
+            userId: user.id,
+          });
+
+      const followerCount = Number(res?.data?.followerCount);
+
+      if (Number.isFinite(followerCount)) {
+        setPosts((current) =>
+          current.map((item) => (item.id === post.id ? { ...item, followerCount } : item)),
+        );
+      }
+    } catch (error: any) {
+      setSavedPostIds(previousSavedIds);
+      await fetchPosts();
+      alert(error?.response?.data?.message || "Kaydetme işlemi tamamlanamadı.");
+    }
   };
 
   const handleOpenPost = (post: NetworkPost) => {
@@ -862,22 +965,92 @@ export default function NetworkPage() {
 
             <button
               type="button"
-              className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[22px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#06194A]"
+              onClick={() => setFilterPanelOpen((current) => !current)}
+              className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[22px] border px-3 text-[12px] font-black ${
+                cityFilter ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]" : "border-[#DDE7F3] bg-white text-[#06194A]"
+              }`}
             >
               <MapPin size={16} className="text-[#1557D6]" />
-              Şehir
+              <span className="max-w-[92px] truncate">{cityFilter || "Şehir"}</span>
               <ChevronDown size={14} />
             </button>
 
             <button
               type="button"
-              className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[22px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#06194A]"
+              onClick={() => setFilterPanelOpen((current) => !current)}
+              className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[22px] border px-3 text-[12px] font-black ${
+                filterPanelOpen || cityFilter || urgencyFilter !== "Tümü" || budgetMaxFilter
+                  ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
+                  : "border-[#DDE7F3] bg-white text-[#06194A]"
+              }`}
             >
               <SlidersHorizontal size={15} className="text-[#1557D6]" />
               Filtrele
             </button>
           </div>
         </section>
+
+        {filterPanelOpen && (
+          <section className="rounded-[26px] border border-[#DDE7F3] bg-white/95 p-3 shadow-[0_14px_34px_rgba(15,23,42,0.075)]">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <FieldLabel title="Şehir" />
+                <select
+                  value={cityFilter}
+                  onChange={(event) => setCityFilter(event.target.value)}
+                  className="h-11 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-center text-[12px] font-black text-[#06194A] outline-none"
+                >
+                  <option value="">Tüm şehirler</option>
+                  {CITY_OPTIONS.map((city, index) => (
+                    <option key={`filter-city-${city}-${index}`} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <FieldLabel title="Aciliyet" />
+                <select
+                  value={urgencyFilter}
+                  onChange={(event) => setUrgencyFilter(event.target.value)}
+                  className="h-11 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-center text-[12px] font-black text-[#06194A] outline-none"
+                >
+                  <option value="Tümü">Tümü</option>
+                  {URGENCY_OPTIONS.map((item, index) => (
+                    <option key={`filter-urgency-${item}-${index}`} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-2 grid grid-cols-[1fr_104px] gap-2">
+              <div>
+                <FieldLabel title="Azami Bütçe" />
+                <input
+                  value={budgetMaxFilter}
+                  onChange={(event) => setBudgetMaxFilter(formatBudgetInput(event.target.value))}
+                  className="h-11 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-center text-[12px] font-black text-[#06194A] outline-none placeholder:text-[#94A3B8]"
+                  placeholder="Örn: 9.000.000"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCityFilter("");
+                  setUrgencyFilter("Tümü");
+                  setBudgetMaxFilter("");
+                }}
+                className="mt-6 h-11 rounded-[18px] border border-[#DDE7F3] bg-[#F8FBFF] px-3 text-[12px] font-black text-[#06194A]"
+              >
+                Temizle
+              </button>
+            </div>
+          </section>
+        )}
 
         <section className="rounded-[26px] border border-white bg-white/95 p-3 shadow-[0_14px_34px_rgba(15,23,42,0.075)]">
           <div className="flex items-center gap-2">
@@ -1083,9 +1256,9 @@ function RequestCard({
         </div>
 
         <div className="mt-1 flex items-center gap-2 text-[10px] font-black text-[#64748B]">
-          <span>👁 {Number(post.id.slice(0, 2).replace(/\D/g, "")) + 18 || 18}</span>
-          <span>⭐ {isSaved ? 1 : 0}</span>
-          <span>🤝 {isInterested ? 1 : 0}</span>
+          <span>👁 {post.viewCount || 0}</span>
+          <span>⭐ {post.followerCount || 0}</span>
+          <span>🤝 {post.requestCount || (isInterested ? 1 : 0)}</span>
         </div>
       </button>
 
