@@ -1,8 +1,13 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { randomUUID } from 'crypto';
-import { PrismaService } from '../prisma/prisma.service';
-import { PushService } from '../push/push.service';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { randomUUID } from "crypto";
+import { PrismaService } from "../prisma/prisma.service";
+import { PushService } from "../push/push.service";
 
 type CreateNetworkPostDto = {
   userId: string;
@@ -34,7 +39,6 @@ type UpdateNetworkPostDto = {
   expiresAt?: string;
 };
 
-
 const MAX_FORUM_TITLE_LENGTH = 50;
 const MAX_FORUM_TOPIC_LENGTH = 100;
 const MAX_FORUM_DESCRIPTION_LENGTH = 200;
@@ -47,8 +51,8 @@ type NetworkPostChangeItem = {
 };
 
 function normalizeValue(value: unknown) {
-  if (value == null) return '';
-  if (Array.isArray(value)) return value.join(',');
+  if (value == null) return "";
+  if (Array.isArray(value)) return value.join(",");
   if (value instanceof Date) return value.toISOString();
   return String(value);
 }
@@ -60,42 +64,42 @@ function valuesChanged(oldValue: unknown, newValue: unknown) {
 function summarizeChanges(changes: NetworkPostChangeItem[]) {
   const labels = changes.map((change) => change.label);
 
-  if (labels.includes('Bütçe')) return 'Bu ilanda fiyat değişti.';
-  if (labels.includes('Açıklama')) return 'Bu ilanda açıklama değişti.';
+  if (labels.includes("Bütçe")) return "Bu ilanda fiyat değişti.";
+  if (labels.includes("Açıklama")) return "Bu ilanda açıklama değişti.";
   if (
-    labels.includes('İl') ||
-    labels.includes('İlçe') ||
-    labels.includes('Mahalle')
+    labels.includes("İl") ||
+    labels.includes("İlçe") ||
+    labels.includes("Mahalle")
   ) {
-    return 'Bu ilanda lokasyon değişti.';
+    return "Bu ilanda lokasyon değişti.";
   }
 
-  return `Bu ilanda ${labels.join(', ')} değişti.`;
+  return `Bu ilanda ${labels.join(", ")} değişti.`;
 }
 
 function formatNotificationValue(value: unknown) {
-  if (value == null || value === '') return 'Boş';
-  if (Array.isArray(value)) return value.join(', ') || 'Boş';
+  if (value == null || value === "") return "Boş";
+  if (Array.isArray(value)) return value.join(", ") || "Boş";
 
   if (value instanceof Date) {
-    return value.toLocaleDateString('tr-TR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
+    return value.toLocaleDateString("tr-TR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
     });
   }
 
-  if (typeof value === 'number') {
-    return `${value.toLocaleString('tr-TR')} TL`;
+  if (typeof value === "number") {
+    return `${value.toLocaleString("tr-TR")} TL`;
   }
 
   const text = String(value);
 
   if (/^\d{4}-\d{2}-\d{2}T/.test(text)) {
-    return new Date(text).toLocaleDateString('tr-TR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
+    return new Date(text).toLocaleDateString("tr-TR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
     });
   }
 
@@ -106,78 +110,111 @@ function buildNotificationMessage(changes: NetworkPostChangeItem[]) {
   const important = changes.slice(0, 4);
 
   if (important.length === 0) {
-    return 'Takip ettiğiniz ilanda güncelleme yapıldı.';
+    return "Takip ettiğiniz ilanda güncelleme yapıldı.";
   }
 
   const lines = important.map((change) => {
     return `${change.label}: ${formatNotificationValue(change.oldValue)} → ${formatNotificationValue(change.newValue)}`;
   });
 
-  return `Takip ettiğiniz ilanda güncelleme yapıldı.\n\n${lines.join('\n')}`;
+  return `Takip ettiğiniz ilanda güncelleme yapıldı.\n\n${lines.join("\n")}`;
 }
 
-
 const FORUM_CATEGORY_LABELS: Record<string, string> = {
-  PORTFOY_ARIYORUM: 'Portföy Arıyorum',
-  KAT_KARSILIGI_ARSA_ARIYORUM: 'Kat Karşılığı Arsa Arıyorum',
-  BOLGESEL_SATIS_OFISI_ARIYORUM: 'Bölgesel Satış Ofisi Arıyorum',
-  IS_ORTAGI_ARIYORUM: 'İş Ortağı Arıyorum',
-  YATIRIMCI_ARIYORUM: 'Yatırımcı Arıyorum',
-  SEKTOREL_IHTIYACLAR: 'Sektörel İhtiyaçlar',
-  DUYURU: 'Duyuru',
-  KAMPANYA_DUYURU: 'Kampanya & Duyuru',
-  DIGER: 'Diğer',
+  PORTFOY_ARIYORUM: "Portföy Arıyorum",
+  KAT_KARSILIGI_ARSA_ARIYORUM: "Kat Karşılığı Arsa Arıyorum",
+  BOLGESEL_SATIS_OFISI_ARIYORUM: "Bölgesel Satış Ofisi Arıyorum",
+  IS_ORTAGI_ARIYORUM: "İş Ortağı Arıyorum",
+  YATIRIMCI_ARIYORUM: "Yatırımcı Arıyorum",
+  SEKTOREL_IHTIYACLAR: "Sektörel İhtiyaçlar",
+  DUYURU: "Duyuru",
+  KAMPANYA_DUYURU: "Kampanya & Duyuru",
+  DIGER: "Diğer",
 
   // Eski kayıtlarla geriye dönük uyumluluk
-  BOLGE_ORTAGI_ARIYORUM: 'Bölge Ortağı Arıyorum',
-  PORTFOY_ORTAGI_ARIYORUM: 'Portföy Ortağı Arıyorum',
-  SATIS_OFISI_ARIYORUM: 'Satış Ofisi Arıyorum',
-  KAMPANYA_DUYURULARI: 'Kampanya Duyuruları',
-  MUTEAHHIT_YUKLENICI_ARIYORUM: 'Müteahhit / Yüklenici Arıyorum',
-  ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM: 'Ulusal/Bölgesel Satış Partneri Arıyorum',
-  PLATFORM_DUYURUSU: 'Platform Duyurusu',
-  SISTEM_GUNCELLEMESI: 'Sistem Güncellemesi',
-  EGITIM_BILGILENDIRME: 'Eğitim / Bilgilendirme',
-  SEKTOREL_SORU: 'Sektörel Soru',
+  BOLGE_ORTAGI_ARIYORUM: "Bölge Ortağı Arıyorum",
+  PORTFOY_ORTAGI_ARIYORUM: "Portföy Ortağı Arıyorum",
+  SATIS_OFISI_ARIYORUM: "Satış Ofisi Arıyorum",
+  KAMPANYA_DUYURULARI: "Kampanya Duyuruları",
+  MUTEAHHIT_YUKLENICI_ARIYORUM: "Müteahhit / Yüklenici Arıyorum",
+  ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM:
+    "Ulusal/Bölgesel Satış Partneri Arıyorum",
+  PLATFORM_DUYURUSU: "Platform Duyurusu",
+  SISTEM_GUNCELLEMESI: "Sistem Güncellemesi",
+  EGITIM_BILGILENDIRME: "Eğitim / Bilgilendirme",
+  SEKTOREL_SORU: "Sektörel Soru",
 };
 
 const ROLE_FORUM_CATEGORIES: Record<string, string[]> = {
-  EMLAKCI: ['PORTFOY_ARIYORUM', 'KAT_KARSILIGI_ARSA_ARIYORUM', 'SEKTOREL_IHTIYACLAR', 'DUYURU'],
-  MUTEAHHIT: ['BOLGESEL_SATIS_OFISI_ARIYORUM', 'KAT_KARSILIGI_ARSA_ARIYORUM', 'KAMPANYA_DUYURU', 'SEKTOREL_IHTIYACLAR', 'DIGER'],
-  INSAAT_FIRMASI: ['KAT_KARSILIGI_ARSA_ARIYORUM', 'BOLGESEL_SATIS_OFISI_ARIYORUM', 'IS_ORTAGI_ARIYORUM', 'YATIRIMCI_ARIYORUM', 'SEKTOREL_IHTIYACLAR', 'KAMPANYA_DUYURU', 'DIGER'],
-  ADMIN: ['DUYURU', 'SEKTOREL_IHTIYACLAR'],
-  SUPER_ADMIN: ['DUYURU', 'SEKTOREL_IHTIYACLAR', 'DIGER'],
+  EMLAKCI: [
+    "PORTFOY_ARIYORUM",
+    "KAT_KARSILIGI_ARSA_ARIYORUM",
+    "SEKTOREL_IHTIYACLAR",
+    "DUYURU",
+  ],
+  MUTEAHHIT: [
+    "BOLGESEL_SATIS_OFISI_ARIYORUM",
+    "KAT_KARSILIGI_ARSA_ARIYORUM",
+    "KAMPANYA_DUYURU",
+    "SEKTOREL_IHTIYACLAR",
+    "DIGER",
+  ],
+  INSAAT_FIRMASI: [
+    "KAT_KARSILIGI_ARSA_ARIYORUM",
+    "BOLGESEL_SATIS_OFISI_ARIYORUM",
+    "IS_ORTAGI_ARIYORUM",
+    "YATIRIMCI_ARIYORUM",
+    "SEKTOREL_IHTIYACLAR",
+    "KAMPANYA_DUYURU",
+    "DIGER",
+  ],
+  ADMIN: ["DUYURU", "SEKTOREL_IHTIYACLAR"],
+  SUPER_ADMIN: ["DUYURU", "SEKTOREL_IHTIYACLAR", "DIGER"],
 };
 
 function normalizeRoleName(role?: string | null) {
-  return String(role || '').trim().toUpperCase();
+  return String(role || "")
+    .trim()
+    .toUpperCase();
 }
 
 function normalizeForumCategory(value?: string | null) {
-  const raw = String(value || '').trim();
+  const raw = String(value || "").trim();
   const upper = raw.toUpperCase();
 
   if (FORUM_CATEGORY_LABELS[upper]) return upper;
 
   const labelMatch = Object.entries(FORUM_CATEGORY_LABELS).find(([, label]) => {
-    return label.toLocaleLowerCase('tr-TR') === raw.toLocaleLowerCase('tr-TR');
+    return label.toLocaleLowerCase("tr-TR") === raw.toLocaleLowerCase("tr-TR");
   });
 
   if (labelMatch) return labelMatch[0];
 
-  return '';
+  return "";
 }
 
 function requiresForumCity(category: string) {
-  return !['DUYURU', 'KAMPANYA_DUYURU', 'PLATFORM_DUYURUSU', 'SISTEM_GUNCELLEMESI', 'EGITIM_BILGILENDIRME'].includes(category);
+  return ![
+    "DUYURU",
+    "KAMPANYA_DUYURU",
+    "PLATFORM_DUYURUSU",
+    "SISTEM_GUNCELLEMESI",
+    "EGITIM_BILGILENDIRME",
+  ].includes(category);
 }
 
 function requiresForumProperty(category: string) {
-  return ['PORTFOY_ARIYORUM', 'KAT_KARSILIGI_ARSA_ARIYORUM'].includes(category);
+  return ["PORTFOY_ARIYORUM", "KAT_KARSILIGI_ARSA_ARIYORUM"].includes(category);
 }
 
 function cleanForumText(value?: string | null) {
-  return String(value || '').trim();
+  return String(value || "").trim();
+}
+
+function isForumManagerRole(role?: string | null) {
+  const normalizedRole = normalizeRoleName(role);
+
+  return normalizedRole === "ADMIN" || normalizedRole === "SUPER_ADMIN";
 }
 
 @Injectable()
@@ -187,11 +224,16 @@ export class NetworkService {
     private readonly pushService: PushService,
   ) {}
 
-  private async validateForumPostInput(dto: CreateNetworkPostDto | UpdateNetworkPostDto, mode: 'create' | 'update') {
+  private async validateForumPostInput(
+    dto: CreateNetworkPostDto | UpdateNetworkPostDto,
+    mode: "create" | "update",
+  ) {
     const userId = cleanForumText(dto.userId);
 
     if (!userId) {
-      throw new BadRequestException('Kullanıcı bilgisi olmadan forum talebi oluşturulamaz.');
+      throw new BadRequestException(
+        "Kullanıcı bilgisi olmadan forum talebi oluşturulamaz.",
+      );
     }
 
     const user = await this.prisma.user.findUnique({
@@ -200,56 +242,79 @@ export class NetworkService {
     });
 
     if (!user) {
-      throw new BadRequestException('Forum talebi için kullanıcı bulunamadı.');
+      throw new BadRequestException("Forum talebi için kullanıcı bulunamadı.");
     }
 
     const category = normalizeForumCategory(dto.type);
 
     if (!category) {
-      throw new BadRequestException('Lütfen talep kategorisini seçin.');
+      throw new BadRequestException("Lütfen talep kategorisini seçin.");
     }
 
-    const allowedCategories = ROLE_FORUM_CATEGORIES[normalizeRoleName(user.role)] || ROLE_FORUM_CATEGORIES.EMLAKCI;
+    const allowedCategories =
+      ROLE_FORUM_CATEGORIES[normalizeRoleName(user.role)] ||
+      ROLE_FORUM_CATEGORIES.EMLAKCI;
 
     if (!allowedCategories.includes(category)) {
-      throw new BadRequestException('Bu kategori rolünüz için uygun değil.');
+      throw new BadRequestException("Bu kategori rolünüz için uygun değil.");
     }
 
     const title = cleanForumText(dto.title);
     const description = cleanForumText(dto.description);
 
-    if (mode === 'create' && !title) {
-      throw new BadRequestException('Talep başlığı zorunludur.');
+    if (mode === "create" && !title) {
+      throw new BadRequestException("Talep başlığı zorunludur.");
     }
 
     if (title.length > MAX_FORUM_TITLE_LENGTH) {
-      throw new BadRequestException(`Talep başlığı en fazla ${MAX_FORUM_TITLE_LENGTH} karakter olabilir.`);
+      throw new BadRequestException(
+        `Talep başlığı en fazla ${MAX_FORUM_TITLE_LENGTH} karakter olabilir.`,
+      );
     }
 
-    if (mode === 'create' && description.length < 12) {
-      throw new BadRequestException('Talep açıklaması en az 12 karakter olmalıdır.');
+    if (mode === "create" && description.length < 12) {
+      throw new BadRequestException(
+        "Talep açıklaması en az 12 karakter olmalıdır.",
+      );
     }
 
     if (description.length > MAX_FORUM_DESCRIPTION_LENGTH) {
-      throw new BadRequestException(`Talep açıklaması en fazla ${MAX_FORUM_DESCRIPTION_LENGTH} karakter olabilir.`);
+      throw new BadRequestException(
+        `Talep açıklaması en fazla ${MAX_FORUM_DESCRIPTION_LENGTH} karakter olabilir.`,
+      );
     }
 
     if (requiresForumCity(category) && !cleanForumText(dto.city)) {
-      throw new BadRequestException('Şehir alanı zorunludur.');
+      throw new BadRequestException("Şehir alanı zorunludur.");
     }
 
-    if (requiresForumProperty(category) && !cleanForumText((dto as CreateNetworkPostDto).tags?.find((item) => String(item || '').trim()) || '')) {
+    if (
+      requiresForumProperty(category) &&
+      !cleanForumText(
+        (dto as CreateNetworkPostDto).tags?.find((item) =>
+          String(item || "").trim(),
+        ) || "",
+      )
+    ) {
       // Frontend mülk/konu bilgisini tags içine de gönderir. Eski kayıt uyumluluğu için sert engel sadece başlık/açıklama/şehir/kategori tarafında tutuldu.
     }
 
-    const topicTag = cleanForumText((dto as CreateNetworkPostDto).tags?.find((item) => {
-      const cleanItem = cleanForumText(item);
+    const topicTag = cleanForumText(
+      (dto as CreateNetworkPostDto).tags?.find((item) => {
+        const cleanItem = cleanForumText(item);
 
-      return cleanItem && !cleanItem.startsWith('Döviz:') && !FORUM_CATEGORY_LABELS[normalizeForumCategory(cleanItem)];
-    }) || '');
+        return (
+          cleanItem &&
+          !cleanItem.startsWith("Döviz:") &&
+          !FORUM_CATEGORY_LABELS[normalizeForumCategory(cleanItem)]
+        );
+      }) || "",
+    );
 
     if (topicTag.length > MAX_FORUM_TOPIC_LENGTH) {
-      throw new BadRequestException(`Konu en fazla ${MAX_FORUM_TOPIC_LENGTH} karakter olabilir.`);
+      throw new BadRequestException(
+        `Konu en fazla ${MAX_FORUM_TOPIC_LENGTH} karakter olabilir.`,
+      );
     }
 
     return {
@@ -280,7 +345,7 @@ export class NetworkService {
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
   }
@@ -306,7 +371,7 @@ export class NetworkService {
     });
 
     if (!post) {
-      throw new NotFoundException('Pazaryeri paylaşımı bulunamadı.');
+      throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
     }
 
     return post;
@@ -325,7 +390,7 @@ export class NetworkService {
     });
 
     if (!post) {
-      throw new NotFoundException('Pazaryeri paylaşımı bulunamadı.');
+      throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
     }
 
     const conversations = await this.prisma.conversation.findMany({
@@ -350,7 +415,7 @@ export class NetworkService {
         },
         Message: {
           orderBy: {
-            createdAt: 'desc',
+            createdAt: "desc",
           },
           take: 1,
           select: {
@@ -369,14 +434,14 @@ export class NetworkService {
         },
       },
       orderBy: {
-        updatedAt: 'desc',
+        updatedAt: "desc",
       },
     });
 
     const byTitleMap = new Map<string, number>();
 
     conversations.forEach((conversation) => {
-      const title = conversation.title || 'EPH GÖRÜŞMESİ';
+      const title = conversation.title || "EPH GÖRÜŞMESİ";
       byTitleMap.set(title, (byTitleMap.get(title) || 0) + 1);
     });
 
@@ -400,7 +465,7 @@ export class NetworkService {
       }),
       this.prisma.networkPostView
         .groupBy({
-          by: ['userId'],
+          by: ["userId"],
           where: {
             postId: id,
             userId: {
@@ -461,7 +526,7 @@ export class NetworkService {
     });
 
     if (!post) {
-      throw new NotFoundException('Pazaryeri paylaşımı bulunamadı.');
+      throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
     }
 
     await this.prisma.networkPostView.create({
@@ -479,7 +544,7 @@ export class NetworkService {
       }),
       this.prisma.networkPostView
         .groupBy({
-          by: ['userId'],
+          by: ["userId"],
           where: {
             postId: id,
             userId: {
@@ -513,7 +578,7 @@ export class NetworkService {
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
 
@@ -535,7 +600,6 @@ export class NetworkService {
     });
   }
 
-
   async getFollowStatus(id: string, userId?: string) {
     const post = await this.prisma.networkPost.findFirst({
       where: {
@@ -548,7 +612,7 @@ export class NetworkService {
     });
 
     if (!post) {
-      throw new NotFoundException('Pazaryeri paylaşımı bulunamadı.');
+      throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
     }
 
     const followerCount = await this.prisma.networkPostFollower.count({
@@ -585,7 +649,7 @@ export class NetworkService {
     if (!userId) {
       return {
         ok: false,
-        message: 'Takip işlemi için kullanıcı bilgisi eksik.',
+        message: "Takip işlemi için kullanıcı bilgisi eksik.",
       };
     }
 
@@ -601,13 +665,13 @@ export class NetworkService {
     });
 
     if (!post) {
-      throw new NotFoundException('Pazaryeri paylaşımı bulunamadı.');
+      throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
     }
 
     if (post.userId === userId) {
       return {
         ok: false,
-        message: 'Kendi paylaşımınızı takip etmenize gerek yok.',
+        message: "Kendi paylaşımınızı takip etmenize gerek yok.",
       };
     }
 
@@ -632,7 +696,7 @@ export class NetworkService {
     if (!userId) {
       return {
         ok: false,
-        message: 'Takipten çıkmak için kullanıcı bilgisi eksik.',
+        message: "Takipten çıkmak için kullanıcı bilgisi eksik.",
       };
     }
 
@@ -674,7 +738,7 @@ export class NetworkService {
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
 
@@ -684,7 +748,6 @@ export class NetworkService {
       post: follow.post,
     }));
   }
-
 
   async getNotifications(userId: string) {
     if (!userId) {
@@ -706,7 +769,7 @@ export class NetworkService {
           userId,
         },
         orderBy: {
-          createdAt: 'desc',
+          createdAt: "desc",
         },
         take: 12,
       }),
@@ -745,8 +808,8 @@ export class NetworkService {
   private buildPushBody(changes: NetworkPostChangeItem[]) {
     const labels = changes.map((change) => change.label);
 
-    if (labels.includes('Bütçe')) {
-      const budgetChange = changes.find((change) => change.label === 'Bütçe');
+    if (labels.includes("Bütçe")) {
+      const budgetChange = changes.find((change) => change.label === "Bütçe");
 
       if (budgetChange) {
         return `Takip ettiğiniz ilanda fiyat değişti: ${formatNotificationValue(
@@ -754,22 +817,22 @@ export class NetworkService {
         )} → ${formatNotificationValue(budgetChange.newValue)}`;
       }
 
-      return 'Takip ettiğiniz ilanda fiyat değişti.';
+      return "Takip ettiğiniz ilanda fiyat değişti.";
     }
 
     if (
-      labels.includes('İl') ||
-      labels.includes('İlçe') ||
-      labels.includes('Mahalle')
+      labels.includes("İl") ||
+      labels.includes("İlçe") ||
+      labels.includes("Mahalle")
     ) {
-      return 'Takip ettiğiniz ilanda lokasyon değişti.';
+      return "Takip ettiğiniz ilanda lokasyon değişti.";
     }
 
-    if (labels.includes('Açıklama')) {
-      return 'Takip ettiğiniz ilanda açıklama değişti.';
+    if (labels.includes("Açıklama")) {
+      return "Takip ettiğiniz ilanda açıklama değişti.";
     }
 
-    return 'Takip ettiğiniz ilanda güncelleme yapıldı.';
+    return "Takip ettiğiniz ilanda güncelleme yapıldı.";
   }
 
   private async createUpdateNotifications(
@@ -814,14 +877,13 @@ export class NetworkService {
     await Promise.allSettled(
       uniqueUserIds.map((userId) =>
         this.pushService.sendToUser(userId, {
-          title: 'EPH Pazaryeri',
+          title: "EPH Pazaryeri",
           body: pushBody,
           url: `/network/${postId}`,
         }),
       ),
     );
   }
-
 
   async getPostFollowers(id: string) {
     const post = await this.prisma.networkPost.findFirst({
@@ -835,7 +897,7 @@ export class NetworkService {
     });
 
     if (!post) {
-      throw new NotFoundException('Pazaryeri paylaşımı bulunamadı.');
+      throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
     }
 
     const followers = await this.prisma.networkPostFollower.findMany({
@@ -853,7 +915,7 @@ export class NetworkService {
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
 
@@ -892,7 +954,7 @@ export class NetworkService {
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
       take: 50,
     });
@@ -919,6 +981,35 @@ export class NetworkService {
       .slice(0, 6);
   }
 
+  private async getNetworkActionUser(userId?: string | null) {
+    const cleanUserId = cleanForumText(userId);
+
+    if (!cleanUserId) {
+      throw new BadRequestException("İşlem için kullanıcı bilgisi eksik.");
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: cleanUserId },
+      select: { id: true, role: true },
+    });
+
+    if (!user) {
+      throw new BadRequestException("İşlem yapan kullanıcı bulunamadı.");
+    }
+
+    return user;
+  }
+
+  private ensureCanManageNetworkPost(
+    ownerId: string,
+    actionUser: { id: string; role?: string | null },
+  ) {
+    if (ownerId === actionUser.id) return;
+    if (isForumManagerRole(actionUser.role)) return;
+
+    throw new ForbiddenException("Bu paylaşım için işlem yetkiniz yok.");
+  }
+
   async update(id: string, dto: UpdateNetworkPostDto) {
     const existing = await this.prisma.networkPost.findFirst({
       where: {
@@ -928,25 +1019,30 @@ export class NetworkService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Pazaryeri paylaşımı bulunamadı.');
+      throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
     }
 
-    if (existing.userId !== dto.userId) {
-      throw new NotFoundException('Bu paylaşımı güncelleme yetkiniz yok.');
-    }
+    const actionUser = await this.getNetworkActionUser(dto.userId);
+    this.ensureCanManageNetworkPost(existing.userId, actionUser);
 
-    const validated = await this.validateForumPostInput({
-      ...dto,
-      type: dto.type ?? existing.type,
-      title: dto.title ?? existing.title,
-      description: dto.description ?? existing.description,
-      city: dto.city ?? existing.city,
-    }, 'update');
+    const validated = await this.validateForumPostInput(
+      {
+        ...dto,
+        userId: existing.userId,
+        type: dto.type ?? existing.type,
+        title: dto.title ?? existing.title,
+        description: dto.description ?? existing.description,
+        city: dto.city ?? existing.city,
+      },
+      "update",
+    );
 
     const nextData = {
       type: validated.category,
       title: dto.title ? validated.title : existing.title,
-      description: dto.description ? validated.description : existing.description,
+      description: dto.description
+        ? validated.description
+        : existing.description,
       city: dto.city ?? existing.city,
       district: dto.district ?? existing.district,
       neighborhood: dto.neighborhood ?? existing.neighborhood,
@@ -963,17 +1059,17 @@ export class NetworkService {
       field: keyof typeof nextData;
       label: string;
     }> = [
-      { field: 'type', label: 'Paylaşım tipi' },
-      { field: 'title', label: 'Başlık' },
-      { field: 'description', label: 'Açıklama' },
-      { field: 'city', label: 'İl' },
-      { field: 'district', label: 'İlçe' },
-      { field: 'neighborhood', label: 'Mahalle' },
-      { field: 'budget', label: 'Bütçe' },
-      { field: 'urgency', label: 'Aciliyet' },
-      { field: 'visibility', label: 'Görünürlük' },
-      { field: 'tags', label: 'Etiketler' },
-      { field: 'expiresAt', label: 'Geçerlilik tarihi' },
+      { field: "type", label: "Paylaşım tipi" },
+      { field: "title", label: "Başlık" },
+      { field: "description", label: "Açıklama" },
+      { field: "city", label: "İl" },
+      { field: "district", label: "İlçe" },
+      { field: "neighborhood", label: "Mahalle" },
+      { field: "budget", label: "Bütçe" },
+      { field: "urgency", label: "Aciliyet" },
+      { field: "visibility", label: "Görünürlük" },
+      { field: "tags", label: "Etiketler" },
+      { field: "expiresAt", label: "Geçerlilik tarihi" },
     ];
 
     watchedFields.forEach((item) => {
@@ -1014,7 +1110,7 @@ export class NetworkService {
       await this.prisma.networkPostUpdateLog.create({
         data: {
           postId: id,
-          userId: dto.userId,
+          userId: actionUser.id,
           summary: summarizeChanges(changes),
           changes: {
             items: changes.map((change) => ({
@@ -1029,7 +1125,7 @@ export class NetworkService {
 
       await this.createUpdateNotifications(
         id,
-        dto.userId,
+        actionUser.id,
         updatedPost.title,
         changes,
       );
@@ -1038,8 +1134,45 @@ export class NetworkService {
     return updatedPost;
   }
 
+  async remove(id: string, userId: string) {
+    const existing = await this.prisma.networkPost.findFirst({
+      where: {
+        id,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        userId: true,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
+    }
+
+    const actionUser = await this.getNetworkActionUser(userId);
+    this.ensureCanManageNetworkPost(existing.userId, actionUser);
+
+    await this.prisma.networkPost.update({
+      where: {
+        id,
+      },
+      data: {
+        isActive: false,
+        updatedAt: new Date(),
+      },
+    });
+
+    return {
+      ok: true,
+      postId: id,
+      deletedBy: actionUser.id,
+      message: "Talep başarıyla silindi.",
+    };
+  }
+
   async create(dto: CreateNetworkPostDto) {
-    const validated = await this.validateForumPostInput(dto, 'create');
+    const validated = await this.validateForumPostInput(dto, "create");
 
     return this.prisma.networkPost.create({
       data: {
@@ -1052,8 +1185,8 @@ export class NetworkService {
         district: dto.district || null,
         neighborhood: dto.neighborhood || null,
         budget: dto.budget || null,
-        urgency: dto.urgency || 'Normal',
-        visibility: (dto.visibility as any) || 'TUM_EPH',
+        urgency: dto.urgency || "Normal",
+        visibility: (dto.visibility as any) || "TUM_EPH",
         tags: [FORUM_CATEGORY_LABELS[validated.category], ...(dto.tags || [])]
           .filter(Boolean)
           .slice(0, 10),
