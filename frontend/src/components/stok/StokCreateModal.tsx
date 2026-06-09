@@ -20,6 +20,7 @@ import {
   type LocationOption,
 } from "./locationData";
 import type { LocalPortfolioImage, Project, ProjectFormState, UnitFormState } from "./stokTypes";
+import GoogleGeoPicker from "./GoogleGeoPicker";
 
 interface Props {
   open: boolean;
@@ -940,6 +941,27 @@ export default function StokCreateModal({
                       />
                     )}
                   </label>
+
+                  <div className="stock-form-field full">
+                    <GoogleGeoPicker
+                      city={projectForm.city}
+                      district={projectForm.district}
+                      address={projectForm.address}
+                      latitude={Number((projectForm as any).latitude || 0) || null}
+                      longitude={Number((projectForm as any).longitude || 0) || null}
+                      mapAddress={String((projectForm as any).mapAddress || "")}
+                      placeId={String((projectForm as any).placeId || "")}
+                      onChange={(location) => {
+                        setProjectForm((current) => ({
+                          ...(current as any),
+                          latitude: location.latitude,
+                          longitude: location.longitude,
+                          mapAddress: location.mapAddress,
+                          placeId: location.placeId || "",
+                        }));
+                      }}
+                    />
+                  </div>
                 </>
               )}
             </div>

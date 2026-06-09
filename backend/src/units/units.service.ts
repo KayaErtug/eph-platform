@@ -1,10 +1,11 @@
 import {
+  ForbiddenException,
   Injectable,
   NotFoundException,
-  ForbiddenException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { Role, UnitStatus, UnitType } from '@prisma/client';
+
+import { PrismaService } from '../prisma/prisma.service';
 
 type CurrentUserPayload = {
   id: string;
@@ -33,11 +34,27 @@ const unitInclude = {
       city: true,
       district: true,
       address: true,
-      owner: { select: { firstName: true, lastName: true, role: true } },
+      latitude: true,
+      longitude: true,
+      mapAddress: true,
+      placeId: true,
+      ownerId: true,
+      owner: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+        },
+      },
     },
   },
   images: {
-    orderBy: [{ isCover: 'desc' as const }, { sortOrder: 'asc' as const }, { createdAt: 'asc' as const }],
+    orderBy: [
+      { isCover: 'desc' as const },
+      { sortOrder: 'asc' as const },
+      { createdAt: 'asc' as const },
+    ],
   },
 };
 
@@ -45,17 +62,64 @@ const unitInclude = {
 export class UnitsService {
   constructor(private prisma: PrismaService) {}
 
-  private canManageUnit(user: CurrentUserPayload, ownerId: string) {
-    if (user.role === Role.ADMIN || user.role === 'ADMIN') return true;
-    return ownerId === user.id;
+  private isSuperAdmin(user?: CurrentUserPayload) {
+    return user?.role === Role.SUPER_ADMIN || user?.role === 'SUPER_ADMIN';
   }
 
-  async create(user: CurrentUserPayload, projectId: string, data: CreateUnitPayload) {
-    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+  private isAdmin(user?: CurrentUserPayload) {
+    return user?.role === Role.ADMIN || user?.role === 'ADMIN';
+  }
+
+  private isOwner(user: CurrentUserPayload, ownerId: string) {
+    return Boolean(user?.id && ownerId && user.id === ownerId);
+  }
+
+  private ensureCanViewUnit(user: CurrentUserPayload, ownerId: string) {
+    if (this.isSuperAdmin(user)) return;
+    if (this.isOwner(user, ownerId)) return;
+
+    throw new ForbiddenException('Bu portföyü görüntüleme yetkiniz yok.');
+  }
+
+  private ensureCanManageUnit(user: CurrentUserPayload, ownerId: string) {
+    if (this.isSuperAdmin(user)) return;
+    if (this.isOwner(user, ownerId)) return;
+
+    throw new ForbiddenException('Bu portföy için işlem yetkiniz yok.');
+  }
+
+  private getPrivateUnitWhere(user: CurrentUserPayload) {
+    if (this.isSuperAdmin(user)) return {};
+
+    if (this.isAdmin(user)) {
+      return {
+        id: '__ADMIN_PORTFOY_GOREMEZ__',
+      };
+    }
+
+    return {
+      project: {
+        ownerId: user.id,
+      },
+    };
+  }
+
+  async create(
+    user: CurrentUserPayload,
+    projectId: string,
+    data: CreateUnitPayload,
+  ) {
+    const project = await this.prisma.project.findUnique({
+      where: {
+        id: projectId,
+      },
+    });
 
     if (!project) {
       throw new NotFoundException('Proje bulunamadı.');
     }
+
+    this.ensureCanManageUnit(user, project.ownerId);
 
     return this.prisma.unit.create({
       data: {
@@ -76,9 +140,11 @@ export class UnitsService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(user: CurrentUserPayload, id: string) {
     const unit = await this.prisma.unit.findUnique({
-      where: { id },
+      where: {
+        id,
+      },
       include: unitInclude,
     });
 
@@ -86,10 +152,32 @@ export class UnitsService {
       throw new NotFoundException('Birim bulunamadı.');
     }
 
+    this.ensureCanViewUnit(user, unit.project.ownerId);
+
     return unit;
   }
 
-  async findByProject(projectId: string, filters?: { status?: UnitStatus; type?: UnitType }) {
+  async findByProject(
+    user: CurrentUserPayload,
+    projectId: string,
+    filters?: { status?: UnitStatus; type?: UnitType },
+  ) {
+    const project = await this.prisma.project.findUnique({
+      where: {
+        id: projectId,
+      },
+      select: {
+        id: true,
+        ownerId: true,
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Proje bulunamadı.');
+    }
+
+    this.ensureCanViewUnit(user, project.ownerId);
+
     return this.prisma.unit.findMany({
       where: {
         projectId,
@@ -101,18 +189,25 @@ export class UnitsService {
     });
   }
 
-  async findAll(filters?: {
-    status?: UnitStatus;
-    type?: UnitType;
-    city?: string;
-    isOffMarket?: boolean;
-  }) {
+  async findAll(
+    user: CurrentUserPayload,
+    filters?: {
+      status?: UnitStatus;
+      type?: UnitType;
+      city?: string;
+      isOffMarket?: boolean;
+    },
+  ) {
     return this.prisma.unit.findMany({
       where: {
+        ...this.getPrivateUnitWhere(user),
         status: filters?.status,
         type: filters?.type,
         isOffMarket: filters?.isOffMarket,
         project: {
+          ...(this.isSuperAdmin(user) || this.isAdmin(user)
+            ? {}
+            : { ownerId: user.id }),
           isActive: true,
           city: filters?.city
             ? { contains: filters.city, mode: 'insensitive' }
@@ -120,47 +215,59 @@ export class UnitsService {
         },
       },
       include: unitInclude,
-      orderBy: { createdAt: 'desc' },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
   }
 
   async updateStatus(id: string, user: CurrentUserPayload, status: UnitStatus) {
     const unit = await this.prisma.unit.findUnique({
-      where: { id },
-      include: { project: true },
+      where: {
+        id,
+      },
+      include: {
+        project: true,
+      },
     });
 
     if (!unit) {
       throw new NotFoundException('Birim bulunamadı.');
     }
 
-    if (!this.canManageUnit(user, unit.project.ownerId)) {
-      throw new ForbiddenException('Bu birimi güncelleme yetkiniz yok.');
-    }
+    this.ensureCanManageUnit(user, unit.project.ownerId);
 
     return this.prisma.unit.update({
-      where: { id },
-      data: { status },
+      where: {
+        id,
+      },
+      data: {
+        status,
+      },
       include: unitInclude,
     });
   }
 
   async update(id: string, user: CurrentUserPayload, data: any) {
     const unit = await this.prisma.unit.findUnique({
-      where: { id },
-      include: { project: true },
+      where: {
+        id,
+      },
+      include: {
+        project: true,
+      },
     });
 
     if (!unit) {
       throw new NotFoundException('Birim bulunamadı.');
     }
 
-    if (!this.canManageUnit(user, unit.project.ownerId)) {
-      throw new ForbiddenException('Bu birimi güncelleme yetkiniz yok.');
-    }
+    this.ensureCanManageUnit(user, unit.project.ownerId);
 
     return this.prisma.unit.update({
-      where: { id },
+      where: {
+        id,
+      },
       data,
       include: unitInclude,
     });
@@ -175,41 +282,55 @@ export class UnitsService {
       isOffMarket?: boolean;
     },
   ) {
-    const unit = await this.prisma.unit.findUnique({ where: { id } });
+    const unit = await this.prisma.unit.findUnique({
+      where: {
+        id,
+      },
+    });
 
     if (!unit) {
       throw new NotFoundException('Birim bulunamadı.');
     }
 
-    const isVerified = !!(
-      data.tapuVerified ||
-      data.photoVerified ||
-      data.yetkiVerified
+    const isVerified = Boolean(
+      data.tapuVerified || data.photoVerified || data.yetkiVerified,
     );
 
     const verifiedAt = isVerified ? new Date() : null;
 
     return this.prisma.unit.update({
-      where: { id },
-      data: { ...data, isVerified, verifiedAt },
+      where: {
+        id,
+      },
+      data: {
+        ...data,
+        isVerified,
+        verifiedAt,
+      },
       include: unitInclude,
     });
   }
 
   async remove(id: string, user: CurrentUserPayload) {
     const unit = await this.prisma.unit.findUnique({
-      where: { id },
-      include: { project: true },
+      where: {
+        id,
+      },
+      include: {
+        project: true,
+      },
     });
 
     if (!unit) {
       throw new NotFoundException('Birim bulunamadı.');
     }
 
-    if (!this.canManageUnit(user, unit.project.ownerId)) {
-      throw new ForbiddenException('Bu birimi silme yetkiniz yok.');
-    }
+    this.ensureCanManageUnit(user, unit.project.ownerId);
 
-    return this.prisma.unit.delete({ where: { id } });
+    return this.prisma.unit.delete({
+      where: {
+        id,
+      },
+    });
   }
 }

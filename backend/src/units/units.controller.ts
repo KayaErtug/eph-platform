@@ -1,20 +1,21 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
   Body,
+  Controller,
+  Delete,
+  Get,
   Param,
+  Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { UnitsService } from './units.service';
+import { Role, UnitStatus, UnitType } from '@prisma/client';
+
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Role, UnitStatus, UnitType } from '@prisma/client';
+import { UnitsService } from './units.service';
 
 @Controller('units')
 @UseGuards(JwtAuthGuard)
@@ -23,7 +24,7 @@ export class UnitsController {
 
   @Post('project/:projectId')
   @UseGuards(RolesGuard)
-  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
   create(
     @CurrentUser() user: any,
     @Param('projectId') projectId: string,
@@ -34,12 +35,13 @@ export class UnitsController {
 
   @Get()
   findAll(
+    @CurrentUser() user: any,
     @Query('status') status?: UnitStatus,
     @Query('type') type?: UnitType,
     @Query('city') city?: string,
     @Query('isOffMarket') isOffMarket?: string,
   ) {
-    return this.unitsService.findAll({
+    return this.unitsService.findAll(user, {
       status,
       type,
       city,
@@ -54,21 +56,22 @@ export class UnitsController {
 
   @Get('project/:projectId')
   findByProject(
+    @CurrentUser() user: any,
     @Param('projectId') projectId: string,
     @Query('status') status?: UnitStatus,
     @Query('type') type?: UnitType,
   ) {
-    return this.unitsService.findByProject(projectId, { status, type });
+    return this.unitsService.findByProject(user, projectId, { status, type });
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.unitsService.findOne(id);
+  findOne(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.unitsService.findOne(user, id);
   }
 
   @Patch(':id/verify')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.SUPER_ADMIN)
   verify(
     @Param('id') id: string,
     @Body()
@@ -84,7 +87,7 @@ export class UnitsController {
 
   @Patch(':id/status')
   @UseGuards(RolesGuard)
-  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
   updateStatus(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -95,14 +98,14 @@ export class UnitsController {
 
   @Patch(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
   update(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
     return this.unitsService.update(id, user, body);
   }
 
   @Delete(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
   remove(@Param('id') id: string, @CurrentUser() user: any) {
     return this.unitsService.remove(id, user);
   }

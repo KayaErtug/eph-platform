@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   CircleUserRound,
   Copy,
+  Edit3,
   ExternalLink,
   FileText,
   Home,
@@ -173,6 +174,28 @@ function getPortfolioNo(unit: DetailUnit) {
 function getCurrentShareUrl(unitId?: string) {
   if (typeof window === "undefined") return "";
   return `${window.location.origin}/stok/${unitId || ""}`;
+}
+
+
+function canEditDetailUnit(unit?: DetailUnit | null, user?: { id?: string | null; role?: string | null } | null) {
+  const role = String(user?.role || "").toUpperCase();
+
+  if (!unit || !user?.id) return false;
+  if (role === "ADMIN" || role === "SUPER_ADMIN") return true;
+
+  const possibleOwnerIds = [
+    (unit as any)?.userId,
+    (unit as any)?.ownerId,
+    (unit as any)?.createdById,
+    (unit as any)?.project?.userId,
+    (unit as any)?.project?.ownerId,
+    (unit as any)?.project?.createdById,
+    (unit as any)?.project?.owner?.id,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value));
+
+  return possibleOwnerIds.includes(String(user.id));
 }
 
 function makeShareText(unit: DetailUnit) {
@@ -542,6 +565,7 @@ export default function StokDetailPage() {
   }
 
   const style = statusStyle(unit.status);
+  const canEditPortfolio = canEditDetailUnit(unit, user);
   const encodedShareText = encodeURIComponent(makeShareText(unit));
   const encodedShareUrl = encodeURIComponent(shareUrl);
 
@@ -557,6 +581,12 @@ export default function StokDetailPage() {
             Geri
           </button>
           <div className="flex items-center gap-2">
+            {canEditPortfolio && (
+              <button onClick={() => router.push(`/stok?edit=${unit.id}`)} className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-4 text-sm font-black text-[#1557D6] shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
+                <Edit3 size={17} />
+                Güncelle
+              </button>
+            )}
             <button onClick={handleCopyLink} className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-4 text-sm font-black text-[#475569] shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
               <Copy size={17} />
               {copied ? "Kopyalandı" : "Link"}
@@ -873,7 +903,14 @@ export default function StokDetailPage() {
             <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_20px_55px_rgba(15,23,42,0.07)]">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-700"><Trash2 size={24} /></div>
               <h2 className="mt-4 text-lg font-black text-[#06194A]">Yönetim</h2>
-              <button onClick={() => { setActionError(""); setDeleteOpen(true); }} className="mt-4 h-12 w-full rounded-2xl bg-rose-50 text-sm font-black text-rose-700">Portföyü Sil</button>
+              <div className="mt-4 grid gap-2">
+                {canEditPortfolio && (
+                  <button onClick={() => router.push(`/stok?edit=${unit.id}`)} className="h-12 w-full rounded-2xl bg-[#EFF6FF] text-sm font-black text-[#1557D6]">
+                    Portföyü Güncelle
+                  </button>
+                )}
+                <button onClick={() => { setActionError(""); setDeleteOpen(true); }} className="h-12 w-full rounded-2xl bg-rose-50 text-sm font-black text-rose-700">Portföyü Sil</button>
+              </div>
             </section>
           </aside>
         </section>

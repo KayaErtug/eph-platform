@@ -6,6 +6,18 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 
+type ProjectLocationBody = {
+  name: string;
+  description?: string;
+  city: string;
+  district: string;
+  address: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  mapAddress?: string | null;
+  placeId?: string | null;
+};
+
 @Controller('projects')
 @UseGuards(JwtAuthGuard)
 export class ProjectsController {
@@ -14,13 +26,7 @@ export class ProjectsController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
-  create(@CurrentUser() user: any, @Body() body: {
-    name: string;
-    description?: string;
-    city: string;
-    district: string;
-    address: string;
-  }) {
+  create(@CurrentUser() user: any, @Body() body: ProjectLocationBody) {
     return this.projectsService.create(user.id, body);
   }
 
@@ -47,7 +53,7 @@ export class ProjectsController {
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
-  update(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
+  update(@Param('id') id: string, @CurrentUser() user: any, @Body() body: Partial<ProjectLocationBody> & { isActive?: boolean }) {
     return this.projectsService.update(id, user.id, body);
   }
 
