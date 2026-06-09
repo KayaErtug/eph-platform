@@ -5,20 +5,27 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   BriefcaseBusiness,
+  Bookmark,
+  ChevronRight,
   Clock3,
+  Construction,
   Flame,
   Handshake,
+  Home,
   Inbox,
   Loader2,
   MapPin,
+  Megaphone,
   MessageCircle,
   MoreVertical,
   Plus,
   Search,
   Send,
   Settings2,
+  SlidersHorizontal,
   Sparkles,
   Target,
+  Wrench,
   X,
 } from "lucide-react";
 
@@ -62,19 +69,24 @@ type Conversation = {
 
 type ForumCategory =
   | "PORTFOY_ARIYORUM"
+  | "KAT_KARSILIGI_ARSA_ARIYORUM"
+  | "BOLGESEL_SATIS_OFISI_ARIYORUM"
+  | "IS_ORTAGI_ARIYORUM"
+  | "YATIRIMCI_ARIYORUM"
+  | "SEKTOREL_IHTIYACLAR"
+  | "DUYURU"
+  | "KAMPANYA_DUYURU"
+  | "DIGER"
   | "BOLGE_ORTAGI_ARIYORUM"
   | "PORTFOY_ORTAGI_ARIYORUM"
   | "SATIS_OFISI_ARIYORUM"
   | "KAMPANYA_DUYURULARI"
-  | "KAT_KARSILIGI_ARSA_ARIYORUM"
   | "MUTEAHHIT_YUKLENICI_ARIYORUM"
   | "ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM"
-  | "YATIRIMCI_ARIYORUM"
   | "PLATFORM_DUYURUSU"
   | "SISTEM_GUNCELLEMESI"
   | "EGITIM_BILGILENDIRME"
-  | "SEKTOREL_SORU"
-  | "DIGER";
+  | "SEKTOREL_SORU";
 
 type ForumCategoryOption = {
   value: ForumCategory;
@@ -90,6 +102,7 @@ type CreateTopicForm = {
   district: string;
   propertyType: string;
   budget: string;
+  currency: string;
   detail: string;
   urgency: string;
   validFor: string;
@@ -98,30 +111,46 @@ type CreateTopicForm = {
 
 const ALL_CATEGORY_OPTIONS: ForumCategoryOption[] = [
   { value: "PORTFOY_ARIYORUM", label: "Portföy Arıyorum", hint: "Hazır müşteriniz veya talebiniz için uygun portföy arayın.", group: "Talep" },
-  { value: "BOLGE_ORTAGI_ARIYORUM", label: "Bölge Ortağı Arıyorum", hint: "Belirli şehir/ilçede aktif çalışan bölge ortağı bulun.", group: "Ortaklık" },
-  { value: "PORTFOY_ORTAGI_ARIYORUM", label: "Portföy Ortağı Arıyorum", hint: "Yetkili portföy sahibi veya paylaşım ortağı arayın.", group: "Ortaklık" },
-  { value: "SATIS_OFISI_ARIYORUM", label: "Satış Ofisi Arıyorum", hint: "Proje ya da portföy satışını yönetecek ofis arayın.", group: "Ortaklık" },
-  { value: "KAMPANYA_DUYURULARI", label: "Kampanya Duyuruları", hint: "Kampanya, lansman veya dönemsel bilgilendirme paylaşın.", group: "Duyuru" },
-  { value: "KAT_KARSILIGI_ARSA_ARIYORUM", label: "Kat Karşılığı Arsa Arıyorum", hint: "Kat karşılığı değerlendirilecek arsa talebi açın.", group: "Talep" },
-  { value: "MUTEAHHIT_YUKLENICI_ARIYORUM", label: "Müteahhit / Yüklenici Arıyorum", hint: "Uygulama, yapım veya geliştirme ortağı arayın.", group: "Ortaklık" },
-  { value: "ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM", label: "Ulusal/Bölgesel Satış Partneri Arıyorum", hint: "Proje veya portföy için satış partneri ağı kurun.", group: "Ortaklık" },
+  { value: "KAT_KARSILIGI_ARSA_ARIYORUM", label: "Kat Karşılığı Arsa Arıyorum", hint: "Arsa, müteahhit veya kat karşılığı geliştirme talebi açın.", group: "Talep" },
+  { value: "BOLGESEL_SATIS_OFISI_ARIYORUM", label: "Bölgesel Satış Ofisi Arıyorum", hint: "Proje ya da portföy satışı için bölgesel satış ofisi arayın.", group: "Ortaklık" },
+  { value: "IS_ORTAGI_ARIYORUM", label: "İş Ortağı Arıyorum", hint: "Mimar, satış partneri, yüklenici veya çözüm ortağı arayın.", group: "Ortaklık" },
   { value: "YATIRIMCI_ARIYORUM", label: "Yatırımcı Arıyorum", hint: "Finansman, yatırım veya proje ortağı arayın.", group: "Talep" },
-  { value: "PLATFORM_DUYURUSU", label: "Platform Duyurusu", hint: "EPH yönetim duyurusu yayınlayın.", group: "Duyuru" },
-  { value: "SISTEM_GUNCELLEMESI", label: "Sistem Güncellemesi", hint: "Sistem değişiklikleri ve bakım bilgisi paylaşın.", group: "Duyuru" },
-  { value: "EGITIM_BILGILENDIRME", label: "Eğitim / Bilgilendirme", hint: "Eğitim, kullanım ve bilgilendirme konusu açın.", group: "Duyuru" },
-  { value: "SEKTOREL_SORU", label: "Sektörel Soru", hint: "Tapu, imar, ifraz, değerleme veya süreç sorusu sorun.", group: "Soru" },
+  { value: "SEKTOREL_IHTIYACLAR", label: "Sektörel İhtiyaçlar", hint: "Tapu takipçisi, ekspertiz, drone, fotoğrafçı, mimar ve benzeri ihtiyaçları paylaşın.", group: "Soru" },
+  { value: "DUYURU", label: "Duyuru", hint: "Sektörel veya platform odaklı kısa duyuru paylaşın.", group: "Duyuru" },
+  { value: "KAMPANYA_DUYURU", label: "Kampanya & Duyuru", hint: "Kampanya, lansman veya dönemsel bilgilendirme paylaşın.", group: "Duyuru" },
   { value: "DIGER", label: "Diğer", hint: "Listede olmayan profesyonel ihtiyacınızı paylaşın.", group: "Diğer" },
+  { value: "BOLGE_ORTAGI_ARIYORUM", label: "Bölge Ortağı Arıyorum", hint: "Eski kayıt kategorisi.", group: "Ortaklık" },
+  { value: "PORTFOY_ORTAGI_ARIYORUM", label: "Portföy Ortağı Arıyorum", hint: "Eski kayıt kategorisi.", group: "Ortaklık" },
+  { value: "SATIS_OFISI_ARIYORUM", label: "Satış Ofisi Arıyorum", hint: "Eski kayıt kategorisi.", group: "Ortaklık" },
+  { value: "KAMPANYA_DUYURULARI", label: "Kampanya Duyuruları", hint: "Eski kayıt kategorisi.", group: "Duyuru" },
+  { value: "MUTEAHHIT_YUKLENICI_ARIYORUM", label: "Müteahhit / Yüklenici Arıyorum", hint: "Eski kayıt kategorisi.", group: "Ortaklık" },
+  { value: "ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM", label: "Ulusal/Bölgesel Satış Partneri Arıyorum", hint: "Eski kayıt kategorisi.", group: "Ortaklık" },
+  { value: "PLATFORM_DUYURUSU", label: "Platform Duyurusu", hint: "Eski kayıt kategorisi.", group: "Duyuru" },
+  { value: "SISTEM_GUNCELLEMESI", label: "Sistem Güncellemesi", hint: "Eski kayıt kategorisi.", group: "Duyuru" },
+  { value: "EGITIM_BILGILENDIRME", label: "Eğitim / Bilgilendirme", hint: "Eski kayıt kategorisi.", group: "Duyuru" },
+  { value: "SEKTOREL_SORU", label: "Sektörel Soru", hint: "Eski kayıt kategorisi.", group: "Soru" },
 ];
 
 const ROLE_CATEGORY_MAP: Record<string, ForumCategory[]> = {
-  EMLAKCI: ["PORTFOY_ARIYORUM", "BOLGE_ORTAGI_ARIYORUM", "PORTFOY_ORTAGI_ARIYORUM", "SEKTOREL_SORU", "DIGER"],
-  MUTEAHHIT: ["SATIS_OFISI_ARIYORUM", "KAMPANYA_DUYURULARI", "KAT_KARSILIGI_ARSA_ARIYORUM", "SEKTOREL_SORU", "DIGER"],
-  INSAAT_FIRMASI: ["KAT_KARSILIGI_ARSA_ARIYORUM", "MUTEAHHIT_YUKLENICI_ARIYORUM", "ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM", "KAMPANYA_DUYURULARI", "YATIRIMCI_ARIYORUM", "SEKTOREL_SORU", "DIGER"],
-  ADMIN: ["PLATFORM_DUYURUSU", "SISTEM_GUNCELLEMESI", "EGITIM_BILGILENDIRME", "SEKTOREL_SORU"],
-  SUPER_ADMIN: ["PLATFORM_DUYURUSU", "SISTEM_GUNCELLEMESI", "EGITIM_BILGILENDIRME", "SEKTOREL_SORU"],
+  EMLAKCI: ["PORTFOY_ARIYORUM", "KAT_KARSILIGI_ARSA_ARIYORUM", "SEKTOREL_IHTIYACLAR", "DUYURU"],
+  MUTEAHHIT: ["BOLGESEL_SATIS_OFISI_ARIYORUM", "KAT_KARSILIGI_ARSA_ARIYORUM", "KAMPANYA_DUYURU", "SEKTOREL_IHTIYACLAR", "DIGER"],
+  INSAAT_FIRMASI: ["KAT_KARSILIGI_ARSA_ARIYORUM", "BOLGESEL_SATIS_OFISI_ARIYORUM", "IS_ORTAGI_ARIYORUM", "YATIRIMCI_ARIYORUM", "SEKTOREL_IHTIYACLAR", "KAMPANYA_DUYURU", "DIGER"],
+  ADMIN: ["DUYURU", "SEKTOREL_IHTIYACLAR"],
+  SUPER_ADMIN: ["DUYURU", "SEKTOREL_IHTIYACLAR", "DIGER"],
 };
 
-const FLOW_FILTERS = ["Tümü", "Talep", "Ortaklık", "Duyuru", "Soru", "Diğer"];
+const REQUEST_TABS = [
+  { key: "Tümü", label: "Tümü", shortLabel: "Tümü", icon: "target", tone: "violet" },
+  { key: "Portföy Arıyorum", label: "Portföy Arıyorum", shortLabel: "Portföy", icon: "home", tone: "blue" },
+  { key: "Kat Karşılığı Arsa Arıyorum", label: "Kat Karşılığı Arsa Arıyorum", shortLabel: "Kat Arsa", icon: "construction", tone: "green" },
+  { key: "Bölgesel Satış Ofisi Arıyorum", label: "Bölgesel Satış Ofisi Arıyorum", shortLabel: "Satış Ofisi", icon: "sales", tone: "orange" },
+  { key: "İş Ortağı Arıyorum", label: "İş Ortağı Arıyorum", shortLabel: "İş Ortağı", icon: "handshake", tone: "orange" },
+  { key: "Yatırımcı Arıyorum", label: "Yatırımcı Arıyorum", shortLabel: "Yatırımcı", icon: "investor", tone: "violet" },
+  { key: "Sektörel İhtiyaçlar", label: "Sektörel İhtiyaçlar", shortLabel: "Sektörel", icon: "wrench", tone: "orange" },
+  { key: "Duyuru", label: "Duyuru", shortLabel: "Duyuru", icon: "megaphone", tone: "purple" },
+  { key: "Diğer", label: "Diğer", shortLabel: "Diğer", icon: "other", tone: "violet" },
+] as const;
+
 const VALID_OPTIONS = ["3 gün", "7 gün", "15 gün", "30 gün"];
 const URGENCY_OPTIONS = ["Normal", "Acil", "Müşteri Hazır", "Sıcak Talep"];
 const VISIBILITY_OPTIONS = [
@@ -131,7 +160,11 @@ const VISIBILITY_OPTIONS = [
   { label: "Sadece bağlantılarım", value: "SADECE_BAGLANTILARIM" },
 ];
 
-const MAX_FORUM_DESCRIPTION_LENGTH = 600;
+const MAX_FORUM_TITLE_LENGTH = 50;
+const MAX_FORUM_TOPIC_LENGTH = 100;
+const MAX_FORUM_DESCRIPTION_LENGTH = 200;
+
+const CURRENCY_OPTIONS = ["TRY", "USD", "EUR", "GBP"];
 
 const CITY_OPTIONS = [
   "Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Aksaray", "Amasya", "Ankara", "Antalya", "Ardahan", "Artvin", "Aydın", "Balıkesir", "Bartın", "Batman", "Bayburt", "Bilecik", "Bingöl", "Bitlis", "Bolu", "Burdur", "Bursa", "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır", "Düzce", "Edirne", "Elazığ", "Erzincan", "Erzurum", "Eskişehir", "Gaziantep", "Giresun", "Gümüşhane", "Hakkari", "Hatay", "Iğdır", "Isparta", "İstanbul", "İzmir", "Kahramanmaraş", "Karabük", "Karaman", "Kars", "Kastamonu", "Kayseri", "Kırıkkale", "Kırklareli", "Kırşehir", "Kilis", "Kocaeli", "Konya", "Kütahya", "Kıbrıs", "Malatya", "Manisa", "Mardin", "Mersin", "Muğla", "Muş", "Nevşehir", "Niğde", "Ordu", "Osmaniye", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Şanlıurfa", "Şırnak", "Tekirdağ", "Tokat", "Trabzon", "Tunceli", "Uşak", "Van", "Yalova", "Yozgat", "Zonguldak"
@@ -158,6 +191,7 @@ const DEFAULT_FORM: CreateTopicForm = {
   district: "",
   propertyType: "",
   budget: "",
+  currency: "TRY",
   detail: "",
   urgency: "Normal",
   validFor: "7 gün",
@@ -204,14 +238,14 @@ function getCategoryOption(value?: string | null) {
   const text = normalizeText(normalized);
 
   if (text.includes("portföy") || text.includes("portfoy")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "PORTFOY_ARIYORUM")!;
-  if (text.includes("bölge") || text.includes("bolge")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "BOLGE_ORTAGI_ARIYORUM")!;
-  if (text.includes("satış ofisi") || text.includes("satis ofisi")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "SATIS_OFISI_ARIYORUM")!;
-  if (text.includes("kampanya")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "KAMPANYA_DUYURULARI")!;
+  if (text.includes("bölge") || text.includes("bolge") || text.includes("satış ofisi") || text.includes("satis ofisi")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "BOLGESEL_SATIS_OFISI_ARIYORUM")!;
+  if (text.includes("iş ortağı") || text.includes("is ortagi")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "IS_ORTAGI_ARIYORUM")!;
+  if (text.includes("kampanya")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "KAMPANYA_DUYURU")!;
   if (text.includes("kat") || text.includes("arsa")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "KAT_KARSILIGI_ARSA_ARIYORUM")!;
   if (text.includes("yüklenici") || text.includes("yuklenici") || text.includes("müteahhit") || text.includes("muteahhit")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "MUTEAHHIT_YUKLENICI_ARIYORUM")!;
   if (text.includes("yatırım") || text.includes("yatirim")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "YATIRIMCI_ARIYORUM")!;
-  if (text.includes("soru")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "SEKTOREL_SORU")!;
-  if (text.includes("duyuru")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "PLATFORM_DUYURUSU")!;
+  if (text.includes("soru") || text.includes("sektörel") || text.includes("sektorel")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "SEKTOREL_IHTIYACLAR")!;
+  if (text.includes("duyuru")) return ALL_CATEGORY_OPTIONS.find((item) => item.value === "DUYURU")!;
 
   return ALL_CATEGORY_OPTIONS.find((item) => item.value === "DIGER")!;
 }
@@ -235,14 +269,31 @@ function categoryTone(value?: string | null) {
   return "bg-[#EFF6FF] text-[#1557D6]";
 }
 
-function formatMoney(value?: string | number | null) {
+function formatMoney(value?: string | number | null, currency = "TRY") {
   if (value == null || value === "") return "";
 
   const numeric = typeof value === "number" ? value : Number(String(value).replace(/\D/g, ""));
 
   if (!numeric) return String(value);
 
-  return `${numeric.toLocaleString("tr-TR")} TL`;
+  const currencyLabel = currency === "TRY" ? "TL" : currency;
+
+  return `${numeric.toLocaleString("tr-TR")} ${currencyLabel}`;
+}
+
+function formatBudgetInput(value: string) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 13);
+
+  if (!digits) return "";
+
+  return Number(digits).toLocaleString("tr-TR");
+}
+
+function budgetCurrencyFromPost(post: NetworkPost) {
+  const tag = (post.tags || []).find((item) => String(item || "").startsWith("Döviz:"));
+  const currency = String(tag || "").replace("Döviz:", "").trim();
+
+  return currency || "TRY";
 }
 
 function formatDateTime(value?: string | null) {
@@ -280,9 +331,50 @@ function expiresAtFromValidFor(value: string) {
   return date.toISOString();
 }
 
+function categoryFamily(value?: string | null) {
+  const category = getCategoryOption(value).value;
+
+  if (category === "PORTFOY_ARIYORUM") return "Portföy Arıyorum";
+  if (category === "KAT_KARSILIGI_ARSA_ARIYORUM") return "Kat Karşılığı Arsa Arıyorum";
+  if (["BOLGESEL_SATIS_OFISI_ARIYORUM", "SATIS_OFISI_ARIYORUM"].includes(category)) return "Bölgesel Satış Ofisi Arıyorum";
+  if (["IS_ORTAGI_ARIYORUM", "BOLGE_ORTAGI_ARIYORUM", "PORTFOY_ORTAGI_ARIYORUM", "MUTEAHHIT_YUKLENICI_ARIYORUM", "ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM"].includes(category)) return "İş Ortağı Arıyorum";
+  if (category === "YATIRIMCI_ARIYORUM") return "Yatırımcı Arıyorum";
+  if (["SEKTOREL_IHTIYACLAR", "SEKTOREL_SORU"].includes(category)) return "Sektörel İhtiyaçlar";
+  if (["DUYURU", "KAMPANYA_DUYURU", "KAMPANYA_DUYURULARI", "PLATFORM_DUYURUSU", "SISTEM_GUNCELLEMESI", "EGITIM_BILGILENDIRME"].includes(category)) return "Duyuru";
+  if (category === "DIGER") return "Diğer";
+
+  return "Tümü";
+}
+
 function postMatchesFlowFilter(post: NetworkPost, filter: string) {
-  if (filter === "Tümü") return true;
-  return categoryGroup(post.type) === filter;
+  if (filter === "Tümü" || filter === "Tüm Talepler") return true;
+  return categoryFamily(post.type) === filter;
+}
+
+function tabCount(posts: NetworkPost[], key: string) {
+  if (key === "Tümü" || key === "Tüm Talepler") return posts.length;
+  return posts.filter((post) => categoryFamily(post.type) === key).length;
+}
+
+function toneClasses(tone: string) {
+  if (tone === "green") return { tile: "from-emerald-50 to-white border-emerald-100 text-emerald-600 shadow-emerald-100/70", active: "border-emerald-300 shadow-emerald-200/80 ring-2 ring-emerald-100", pill: "bg-emerald-100 text-emerald-700", accent: "bg-emerald-500", button: "bg-emerald-50 text-emerald-700 border-emerald-100" };
+  if (tone === "orange") return { tile: "from-orange-50 to-white border-orange-100 text-orange-600 shadow-orange-100/70", active: "border-orange-300 shadow-orange-200/80 ring-2 ring-orange-100", pill: "bg-orange-100 text-orange-700", accent: "bg-orange-500", button: "bg-orange-50 text-orange-700 border-orange-100" };
+  if (tone === "purple") return { tile: "from-violet-50 to-white border-violet-100 text-violet-600 shadow-violet-100/70", active: "border-violet-300 shadow-violet-200/80 ring-2 ring-violet-100", pill: "bg-violet-100 text-violet-700", accent: "bg-violet-500", button: "bg-violet-50 text-violet-700 border-violet-100" };
+  if (tone === "violet") return { tile: "from-purple-50 to-white border-purple-100 text-purple-600 shadow-purple-100/70", active: "border-purple-300 shadow-purple-200/80 ring-2 ring-purple-100", pill: "bg-purple-100 text-purple-700", accent: "bg-purple-500", button: "bg-purple-50 text-purple-700 border-purple-100" };
+
+  return { tile: "from-blue-50 to-white border-blue-100 text-blue-600 shadow-blue-100/70", active: "border-blue-300 shadow-blue-200/80 ring-2 ring-blue-100", pill: "bg-blue-100 text-blue-700", accent: "bg-blue-500", button: "bg-blue-50 text-blue-700 border-blue-100" };
+}
+
+function RequestTabIcon({ icon, size = 28 }: { icon: string; size?: number }) {
+  if (icon === "home") return <Home size={size} strokeWidth={2.4} />;
+  if (icon === "construction") return <Construction size={size} strokeWidth={2.4} />;
+  if (icon === "sales") return <BriefcaseBusiness size={size} strokeWidth={2.4} />;
+  if (icon === "handshake") return <Handshake size={size} strokeWidth={2.4} />;
+  if (icon === "investor") return <Sparkles size={size} strokeWidth={2.4} />;
+  if (icon === "wrench") return <Wrench size={size} strokeWidth={2.4} />;
+  if (icon === "megaphone") return <Megaphone size={size} strokeWidth={2.4} />;
+  if (icon === "other") return <Inbox size={size} strokeWidth={2.4} />;
+  return <Target size={size} strokeWidth={2.4} />;
 }
 
 function isHotPost(post: NetworkPost) {
@@ -304,11 +396,11 @@ function getRoleCategories(role?: string | null) {
 }
 
 function isCategoryLocationRequired(category?: ForumCategory | "") {
-  return category !== "PLATFORM_DUYURUSU" && category !== "SISTEM_GUNCELLEMESI" && category !== "EGITIM_BILGILENDIRME" && category !== "SEKTOREL_SORU";
+  return !["DUYURU", "KAMPANYA_DUYURU", "PLATFORM_DUYURUSU", "SISTEM_GUNCELLEMESI", "EGITIM_BILGILENDIRME"].includes(String(category));
 }
 
 function isPropertyRequired(category?: ForumCategory | "") {
-  return ["PORTFOY_ARIYORUM", "PORTFOY_ORTAGI_ARIYORUM", "KAT_KARSILIGI_ARSA_ARIYORUM"].includes(String(category));
+  return ["PORTFOY_ARIYORUM", "KAT_KARSILIGI_ARSA_ARIYORUM"].includes(String(category));
 }
 
 function getOneLineDescription(post: NetworkPost) {
@@ -317,7 +409,7 @@ function getOneLineDescription(post: NetworkPost) {
   if (detail) return detail;
 
   const location = [post.city, post.district].filter(Boolean).join(" / ");
-  const budget = post.budget ? formatMoney(post.budget) : "";
+  const budget = post.budget ? formatMoney(post.budget, budgetCurrencyFromPost(post)) : "";
 
   return [location, budget].filter(Boolean).join(" · ") || "Detay için konuyu açın.";
 }
@@ -331,7 +423,7 @@ export default function NetworkPage() {
   const [creating, setCreating] = useState(false);
   const [conversationCount, setConversationCount] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [flowFilter, setFlowFilter] = useState("Tümü");
+  const [flowFilter, setFlowFilter] = useState("Tüm Talepler");
   const [search, setSearch] = useState("");
   const lastUnreadRef = useRef(0);
 
@@ -436,7 +528,7 @@ export default function NetworkPage() {
       return;
     }
 
-    const tags = [selectedCategory.label, form.propertyType, form.urgency, form.city, form.district].filter(Boolean).slice(0, 8);
+    const tags = [selectedCategory.label, form.propertyType, form.urgency, form.city, form.district, form.budget ? `Döviz:${form.currency}` : ""].filter(Boolean).slice(0, 8);
 
     try {
       setCreating(true);
@@ -505,60 +597,91 @@ export default function NetworkPage() {
   };
 
   return (
-    <main className="min-h-[calc(100dvh-64px)] bg-[#F7FBFF] px-3 pb-4 pt-2 text-[#06194A]">
-      <div className="mx-auto w-full max-w-[430px] space-y-2">
-        <SloganStrip />
-
-        <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="grid grid-cols-4 overflow-hidden rounded-[19px] border border-[#DDE7F3] bg-[#FBFDFF]">
-            <QuickItem icon={<Flame size={17} />} label="Acil" value={quickCounts.hot} tone="orange" />
-            <QuickItem icon={<Target size={17} />} label="Talep" value={posts.length} tone="blue" />
-            <QuickItem icon={<MessageCircle size={17} />} label="Mesaj" value={quickCounts.messages} tone="purple" onClick={() => router.push("/messages")} />
-            <QuickItem icon={<Bell size={17} />} label="Bildirim" value={quickCounts.unread} tone="yellow" onClick={() => router.push("/messages")} />
-          </div>
+    <main className="min-h-[calc(100dvh-64px)] bg-[#EAF1FA] px-3 pb-24 pt-2 text-[#06194A]">
+      <div className="mx-auto w-full max-w-[430px] space-y-3">
+        <section className="rounded-[26px] border border-white/80 bg-gradient-to-b from-[#F9FBFF] to-[#EAF1FA] px-3 py-2.5 text-center shadow-[0_18px_44px_rgba(15,23,42,0.09)]">
+          <h1 className="text-center text-[27px] font-black leading-none tracking-[-0.05em] text-[#06194A]">
+            Talep Merkezi
+          </h1>
+          <p className="mx-auto mt-1 max-w-[320px] text-center text-[12px] font-extrabold leading-5 text-[#475569]">
+            Elinizdekini değil, ihtiyacınızı paylaşın.
+          </p>
         </section>
 
-        <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="grid grid-cols-[1fr_44px] gap-2">
-            <div className="flex h-11 items-center gap-2 rounded-[17px] bg-[#F7FBFF] px-3">
-              <Search size={17} className="shrink-0 text-[#94A3B8]" />
+        <section className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {REQUEST_TABS.map((tab) => {
+            const active = flowFilter === tab.key;
+            const tone = toneClasses(tab.tone);
+
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setFlowFilter(tab.key)}
+                className={`relative min-h-[72px] w-[86px] shrink-0 rounded-[18px] border bg-gradient-to-b p-1.5 text-center shadow-[0_12px_26px_rgba(15,23,42,0.07)] transition active:scale-[0.98] ${tone.tile} ${active ? tone.active : ""}`}
+              >
+                <span className="mx-auto flex h-8 w-8 items-center justify-center rounded-[14px] bg-white/70">
+                  <RequestTabIcon icon={tab.icon} size={17} />
+                </span>
+                <span className="mt-1 block min-h-[18px] whitespace-nowrap text-center text-[9px] font-black leading-[10px] text-[#06194A]">
+                  {tab.shortLabel}
+                </span>
+                <span className={`mx-auto mt-0.5 inline-flex min-h-[18px] min-w-[28px] items-center justify-center rounded-full px-1.5 text-center text-[9.5px] font-black ${tone.pill}`}>
+                  {tabCount(posts, tab.key)}
+                </span>
+                {active && <span className={`absolute -bottom-1 left-1/2 h-1 w-9 -translate-x-1/2 rounded-full ${tone.accent}`} />}
+              </button>
+            );
+          })}
+        </section>
+
+        <section className="rounded-[24px] border border-white/80 bg-white/92 p-2.5 shadow-[0_16px_38px_rgba(15,23,42,0.09)] backdrop-blur-xl">
+          <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+            <div className="flex h-11 items-center gap-2 rounded-[18px] bg-[#F2F6FC] px-3">
+              <Search size={17} className="shrink-0 text-[#64748B]" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-[13px] font-bold text-[#06194A] outline-none placeholder:text-[#94A3B8]"
-                placeholder="Talep, kategori, şehir ara..."
+                className="min-w-0 flex-1 bg-transparent text-left text-[13px] font-bold text-[#06194A] outline-none placeholder:text-[#94A3B8]"
+                placeholder="Talep başlığı, şehir, ilçe..."
               />
             </div>
-
-            <button type="button" className="flex h-11 items-center justify-center rounded-[17px] border border-[#DDE7F3] bg-white text-[#06194A]" aria-label="Filtre">
-              <Settings2 size={18} />
+            <button type="button" className="flex h-11 min-w-[74px] items-center justify-center gap-1.5 rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#1557D6]" aria-label="Filtre">
+              Filtrele
+              <SlidersHorizontal size={15} />
             </button>
-          </div>
-
-          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-            {FLOW_FILTERS.map((filter) => (
-              <button
-                key={filter}
-                type="button"
-                onClick={() => setFlowFilter(filter)}
-                className={`shrink-0 rounded-full px-3.5 py-2 text-[12px] font-black ${flowFilter === filter ? "bg-[#6D4AFF] text-white" : "border border-[#DDE7F3] bg-white text-[#27364F]"}`}
-              >
-                {filter}
-              </button>
-            ))}
           </div>
         </section>
 
-        <section className="rounded-[24px] border border-[#DDE7F3] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="flex items-center justify-between border-b border-[#EAF0F7] px-3 py-2">
-            <div>
-              <h1 className="text-center text-[17px] font-black tracking-[-0.03em] text-[#06194A]">Forum Talepleri</h1>
-              <p className="text-[10px] font-bold text-[#64748B]">{filteredPosts.length} talep gösteriliyor</p>
-            </div>
+        <section className="grid grid-cols-4 rounded-[24px] border border-white/80 bg-white/92 p-2.5 shadow-[0_14px_32px_rgba(15,23,42,0.075)]">
+          <MiniMetric label="Toplam" value={posts.length} tone="blue" />
+          <MiniMetric label="Kat K." value={tabCount(posts, "Kat Karşılığı Arsa Arıyorum")} tone="green" />
+          <MiniMetric label="Sektörel" value={tabCount(posts, "Sektörel İhtiyaçlar")} tone="orange" />
+          <MiniMetric label="Duyuru" value={tabCount(posts, "Duyuru")} tone="purple" />
+        </section>
 
-            <button type="button" onClick={() => setModalOpen(true)} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[16px] bg-[#1557D6] px-3 text-[12px] font-black text-white shadow-[0_10px_22px_rgba(21,87,214,0.22)]">
-              <Plus size={17} />
-              Talep Aç
+        {flowFilter === "Kat Karşılığı Arsa Arıyorum" && (
+          <section className="rounded-[26px] border border-emerald-100 bg-gradient-to-br from-white to-emerald-50 p-3 text-center shadow-[0_16px_38px_rgba(16,185,129,0.12)]">
+            <p className="text-center text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">Kat Karşılığı Merkezi</p>
+            <h2 className="mt-1 text-center text-[20px] font-black tracking-[-0.04em] text-[#06194A]">Yüksek değerli arsa talepleri</h2>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <CenterStat label="Aktif Arsa" value={tabCount(posts, "Kat Karşılığı Arsa Arıyorum")} />
+              <CenterStat label="Müteahhit" value={posts.filter((post) => normalizeText(categoryLabel(post.type)).includes("müteahhit")).length} />
+              <CenterStat label="Yatırımcı" value={posts.filter((post) => normalizeText(categoryLabel(post.type)).includes("yatırım")).length} />
+            </div>
+          </section>
+        )}
+
+        <section className="rounded-[26px] border border-white/80 bg-white/92 shadow-[0_18px_44px_rgba(15,23,42,0.09)] backdrop-blur-xl">
+          <div className="flex items-center justify-between gap-2 border-b border-[#E3ECF6] px-3 py-2.5">
+            <div className="min-w-0 flex-1 text-center">
+              <h2 className="truncate text-center text-[18px] font-black tracking-[-0.04em] text-[#06194A]">
+                {flowFilter}
+              </h2>
+              <p className="text-center text-[10px] font-bold text-[#64748B]">{filteredPosts.length} talep gösteriliyor</p>
+            </div>
+            <button type="button" onClick={() => setModalOpen(true)} className="inline-flex min-h-[36px] items-center justify-center rounded-[16px] bg-[#1557D6] px-3 text-[11px] font-black text-white shadow-[0_10px_22px_rgba(21,87,214,0.22)]">
+              Yeni Talep
             </button>
           </div>
 
@@ -566,111 +689,84 @@ export default function NetworkPage() {
             <div className="flex min-h-[260px] items-center justify-center">
               <div className="text-center">
                 <Loader2 className="mx-auto animate-spin text-[#1557D6]" size={28} />
-                <p className="mt-3 text-[12px] font-black text-[#64748B]">Forum yükleniyor...</p>
+                <p className="mt-3 text-center text-[12px] font-black text-[#64748B]">Talep merkezi yükleniyor...</p>
               </div>
             </div>
           ) : filteredPosts.length === 0 ? (
             <EmptyForumState onCreate={() => setModalOpen(true)} />
           ) : (
-            <div className="divide-y divide-[#EAF0F7]">
-              {filteredPosts.map((post, index) => (
-                <ForumTopicRow key={post.id} post={post} index={index} onOpen={() => router.push(`/network/${post.id}`)} onMessage={() => startConversation(post)} />
+            <div className="space-y-2 p-2.5">
+              {filteredPosts.map((post) => (
+                <RequestCenterCard key={post.id} post={post} onOpen={() => router.push(`/network/${post.id}`)} />
               ))}
             </div>
           )}
         </section>
       </div>
 
+
       {modalOpen && <CreateTopicModal creating={creating} userRole={user?.role} categories={roleCategories} onClose={() => setModalOpen(false)} onCreate={handleCreateTopic} />}
     </main>
   );
 }
+function MiniMetric({ label, value, tone }: { label: string; value: number; tone: string }) {
+  const classes = toneClasses(tone);
 
-function SloganStrip() {
   return (
-    <section className="overflow-hidden rounded-[18px] border border-[#DDE7F3] bg-white px-3 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.035)]">
-      <div className="flex items-center justify-center gap-2 text-center text-[12px] font-black text-[#27364F]">
-        <Sparkles size={15} className="shrink-0 text-[#6D4AFF]" />
-        <span>Elinizdekini değil, ihtiyacınızı paylaşın.</span>
-      </div>
-    </section>
+    <div className="min-h-[54px] border-r border-[#E3ECF6] px-1.5 text-center last:border-r-0">
+      <p className="text-center text-[9px] font-black uppercase tracking-[0.08em] text-[#64748B]">{label}</p>
+      <p className={`mx-auto mt-1 inline-flex min-h-[25px] min-w-[34px] items-center justify-center rounded-full px-2 text-center text-[15px] font-black ${classes.pill}`}>{value}</p>
+    </div>
   );
 }
 
-function QuickItem({ icon, label, value, tone, onClick }: { icon: ReactNode; label: string; value: number; tone: "orange" | "blue" | "purple" | "yellow"; onClick?: () => void }) {
-  const tones = {
-    orange: "bg-orange-50 text-orange-700",
-    blue: "bg-[#EFF6FF] text-[#1557D6]",
-    purple: "bg-violet-50 text-violet-700",
-    yellow: "bg-amber-50 text-amber-700",
-  };
-
+function CenterStat({ label, value }: { label: string; value: number }) {
   return (
-    <button type="button" onClick={onClick} className="flex min-h-[54px] flex-col items-center justify-center gap-1 border-r border-[#DDE7F3] px-1 text-center last:border-r-0">
-      <span className={`flex h-7 w-7 items-center justify-center rounded-full ${tones[tone]}`}>{icon}</span>
-      <span className="text-[10px] font-black leading-none text-[#06194A]">
-        {label}
-        {value > 0 ? ` ${value}` : ""}
-      </span>
-    </button>
+    <div className="rounded-[18px] border border-emerald-100 bg-white/78 px-2 py-2 text-center">
+      <p className="text-center text-[16px] font-black leading-none text-emerald-700">{value}</p>
+      <p className="mt-1 text-center text-[9px] font-black uppercase tracking-[0.06em] text-[#64748B]">{label}</p>
+    </div>
   );
 }
 
-function ForumTopicRow({ post, index, onOpen, onMessage }: { post: NetworkPost; index: number; onOpen: () => void; onMessage: () => void }) {
-  const postUser = getPostUser(post);
-  const userName = getUserName(postUser);
-  const role = roleLabel(postUser?.role);
-  const location = [post.city, post.district].filter(Boolean).join(" / ");
+function RequestCenterCard({ post, onOpen }: { post: NetworkPost; onOpen: () => void }) {
+  const family = categoryFamily(post.type);
+  const tab = REQUEST_TABS.find((item) => item.key === family) || REQUEST_TABS[0];
+  const tone = toneClasses(tab.tone);
+  const location = [post.city, post.district].filter(Boolean).join(" / ") || "Konum yok";
+  const budget = post.budget ? formatMoney(post.budget, budgetCurrencyFromPost(post)) : "Bütçe yok";
   const hot = isHotPost(post);
-  const group = categoryGroup(post.type);
-  const meta = [formatDateTime(post.createdAt), remainingTime(post.expiresAt)].filter(Boolean).join(" · ");
-  const description = getOneLineDescription(post);
 
   return (
-    <article className="grid min-h-[86px] grid-cols-[42px_1fr_66px] items-center gap-2 px-2.5 py-2.5">
-      <button type="button" onClick={onOpen} className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EFF6FF] text-[13px] font-black text-[#1557D6]">
-        {userName.slice(0, 1).toLocaleUpperCase("tr-TR")}
-        {hot && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-white" />}
-      </button>
+    <article className="relative min-h-[100px] overflow-hidden rounded-[20px] border border-white bg-gradient-to-br from-white to-[#F6FAFF] p-2 shadow-[0_10px_24px_rgba(15,23,42,0.07)]">
+      <span className={`absolute left-0 top-0 h-full w-1 ${tone.accent}`} />
 
-      <button type="button" onClick={onOpen} className="min-w-0 text-left">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase ${categoryTone(post.type)}`}>{categoryLabel(post.type)}</span>
-          {hot && <span className="shrink-0 rounded-md bg-orange-50 px-1.5 py-0.5 text-[9px] font-black text-orange-700">ACİL</span>}
-          <span className="truncate text-[10px] font-bold text-[#94A3B8]">{group}</span>
+      <div className="grid h-full grid-cols-[1fr_74px] items-center gap-2 pl-1.5">
+        <div className="min-w-0 text-left">
+          <div className="flex items-center gap-1.5">
+            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] bg-gradient-to-br ${tone.tile}`}>
+              <RequestTabIcon icon={tab.icon} size={16} />
+            </span>
+            <p className={`line-clamp-1 text-left text-[9px] font-black uppercase tracking-[0.09em] ${tab.tone === "green" ? "text-emerald-700" : tab.tone === "orange" ? "text-orange-600" : tab.tone === "purple" ? "text-violet-700" : tab.tone === "violet" ? "text-purple-700" : "text-[#1557D6]"}`}>
+              {categoryLabel(post.type)} {hot ? "• Acil" : ""}
+            </p>
+          </div>
+
+          <h3 className="mt-1 line-clamp-1 text-left text-[15px] font-black leading-5 tracking-[-0.03em] text-[#06194A]">
+            {post.title}
+          </h3>
+
+          <div className="mt-1 grid gap-0.5 text-left text-[10.5px] font-extrabold leading-4 text-[#64748B]">
+            <p className="line-clamp-1 text-left"><MapPin size={11} className="mr-1 inline-block align-[-1px]" />{location}</p>
+            <p className="line-clamp-1 text-left"><span className="font-black text-[#1557D6]">{budget}</span> <span className="text-[#94A3B8]">•</span> <span className="font-black text-[#16A34A]">{remainingTime(post.expiresAt)}</span></p>
+          </div>
         </div>
 
-        <h2 className="mt-1 line-clamp-1 text-[13px] font-black leading-4 tracking-[-0.01em] text-[#06194A]">{post.title}</h2>
-        <p className="mt-0.5 line-clamp-1 text-[11px] font-bold leading-4 text-[#64748B]">{description}</p>
-        <p className="mt-0.5 line-clamp-1 text-[10px] font-black leading-4 text-[#94A3B8]">{location ? `${location} · ` : ""}{meta}</p>
-        <span className="sr-only">{index + 1}. konu, {role}</span>
-      </button>
-
-      <div className="flex items-center justify-end gap-1 text-[#27364F]">
-        <button type="button" onClick={onMessage} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F7FBFF]" aria-label="Mesaj gönder">
-          <MessageCircle size={15} />
-        </button>
-        <button type="button" onClick={onOpen} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F7FBFF]" aria-label="Detay">
-          <MoreVertical size={15} />
+        <button type="button" onClick={onOpen} className={`inline-flex min-h-[34px] w-full items-center justify-center rounded-[14px] border px-2 text-[11px] font-black ${tone.button}`}>
+          İncele
         </button>
       </div>
     </article>
-  );
-}
-
-function EmptyForumState({ onCreate }: { onCreate: () => void }) {
-  return (
-    <div className="px-4 py-8 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#EFF6FF] text-[#1557D6]">
-        <Inbox size={24} />
-      </div>
-      <h2 className="mt-3 text-[16px] font-black text-[#06194A]">Uygun talep bulunamadı</h2>
-      <p className="mx-auto mt-1 max-w-[280px] text-[12px] font-bold leading-5 text-[#64748B]">Filtreyi değiştirin veya yeni bir ihtiyaç talebi açın.</p>
-      <button type="button" onClick={onCreate} className="mt-4 inline-flex h-10 items-center justify-center gap-1.5 rounded-[16px] bg-[#1557D6] px-4 text-[12px] font-black text-white">
-        <Plus size={16} />
-        Talep Aç
-      </button>
-    </div>
   );
 }
 
@@ -695,9 +791,11 @@ function CreateTopicModal({ creating, userRole, categories, onClose, onCreate }:
 
     if (!form.category) items.push("Kategori seçimi zorunlu.");
     if (!form.title.trim()) items.push("Talep başlığı zorunlu.");
+    if (form.title.length > MAX_FORUM_TITLE_LENGTH) items.push(`Talep başlığı en fazla ${MAX_FORUM_TITLE_LENGTH} karakter olabilir.`);
     if (needsLocation && !form.city.trim()) items.push("Şehir seçimi zorunlu.");
     if (needsLocation && !form.district.trim()) items.push("İlçe seçimi zorunlu.");
     if (needsProperty && !form.propertyType.trim()) items.push("Konu alanı zorunlu.");
+    if (form.propertyType.length > MAX_FORUM_TOPIC_LENGTH) items.push(`Konu en fazla ${MAX_FORUM_TOPIC_LENGTH} karakter olabilir.`);
     if (!form.validFor) items.push("Süre seçimi zorunlu.");
     if (form.detail.trim().length < 12) items.push("Açıklama en az 12 karakter olmalı.");
     if (form.detail.length > MAX_FORUM_DESCRIPTION_LENGTH) items.push(`Açıklama en fazla ${MAX_FORUM_DESCRIPTION_LENGTH} karakter olabilir.`);
@@ -715,8 +813,8 @@ function CreateTopicModal({ creating, userRole, categories, onClose, onCreate }:
             <X size={19} />
           </button>
 
-          <p className="mx-auto w-fit rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#1557D6]">Forum Talep Merkezi</p>
-          <h2 className="mx-auto mt-2 text-center text-[22px] font-black tracking-[-0.04em] text-[#06194A]">Rol Bazlı Talep Aç</h2>
+          <p className="mx-auto w-fit rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#1557D6]">Talep Merkezi</p>
+          <h2 className="mx-auto mt-2 text-center text-[22px] font-black tracking-[-0.04em] text-[#06194A]">Talep Aç</h2>
           <p className="mx-auto mt-1 max-w-[340px] text-center text-[12px] font-bold leading-5 text-[#64748B]">{roleLabel(userRole)} rolüne uygun kategoriler gösteriliyor. Fotoğraf yok; talep net, kısa ve iş odaklı kalır.</p>
         </div>
 
@@ -745,7 +843,7 @@ function CreateTopicModal({ creating, userRole, categories, onClose, onCreate }:
           <section className="rounded-[26px] border border-[#DDE7F3] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.045)]">
             <div className="grid gap-3">
               <ForumField label="Talep Başlığı *">
-                <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="forum-input" placeholder="Talebinizi kısa bir başlıkla yazın" maxLength={90} />
+                <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="forum-input" placeholder="Talebinizi kısa bir başlıkla yazın" maxLength={MAX_FORUM_TITLE_LENGTH} />
               </ForumField>
 
               <div className="grid grid-cols-2 gap-2">
@@ -766,11 +864,27 @@ function CreateTopicModal({ creating, userRole, categories, onClose, onCreate }:
 
               <div className="grid grid-cols-2 gap-2">
                 <ForumField label={needsProperty ? "Konu *" : "Konu"}>
-                  <input value={form.propertyType} onChange={(event) => setForm((current) => ({ ...current, propertyType: event.target.value }))} className="forum-input" placeholder="" maxLength={70} />
+                  <input value={form.propertyType} onChange={(event) => setForm((current) => ({ ...current, propertyType: event.target.value }))} className="forum-input" placeholder="" maxLength={MAX_FORUM_TOPIC_LENGTH} />
                 </ForumField>
 
                 <ForumField label="Bütçe">
-                  <input value={form.budget} onChange={(event) => setForm((current) => ({ ...current, budget: event.target.value }))} className="forum-input" placeholder="Opsiyonel" inputMode="numeric" />
+                  <div className="grid grid-cols-[1fr_82px] gap-2">
+                    <input
+                      value={form.budget}
+                      onChange={(event) => setForm((current) => ({ ...current, budget: formatBudgetInput(event.target.value) }))}
+                      className="forum-input text-center"
+                      placeholder="Opsiyonel"
+                      inputMode="numeric"
+                    />
+                    <select
+                      value={form.currency}
+                      onChange={(event) => setForm((current) => ({ ...current, currency: event.target.value }))}
+                      className="forum-input text-center"
+                      aria-label="Döviz kodu"
+                    >
+                      {CURRENCY_OPTIONS.map((currency) => <option key={currency} value={currency}>{currency === "TRY" ? "TL" : currency}</option>)}
+                    </select>
+                  </div>
                 </ForumField>
               </div>
 
@@ -827,10 +941,10 @@ function CreateTopicModal({ creating, userRole, categories, onClose, onCreate }:
         <style jsx global>{`
           .forum-input {
             width: 100%;
-            min-height: 46px;
+            min-height: 48px;
             border-radius: 18px;
             border: 1px solid #dde7f3;
-            background: #f7fbff;
+            background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
             padding: 0 13px;
             font-size: 12px;
             font-weight: 800;
@@ -854,6 +968,29 @@ function CreateTopicModal({ creating, userRole, categories, onClose, onCreate }:
           }
         `}</style>
       </div>
+    </div>
+  );
+}
+
+function EmptyForumState({ onCreate }: { onCreate: () => void }) {
+  return (
+    <div className="mx-2.5 rounded-[24px] border border-dashed border-[#C9D8EA] bg-white/85 px-4 py-8 text-center shadow-[0_12px_28px_rgba(15,23,42,0.055)]">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#EFF6FF] text-[#1557D6]">
+        <Target size={22} />
+      </div>
+      <h3 className="mt-3 text-center text-[18px] font-black tracking-[-0.03em] text-[#06194A]">
+        Bu sekmede talep yok
+      </h3>
+      <p className="mx-auto mt-1 max-w-[260px] text-center text-[12px] font-bold leading-5 text-[#64748B]">
+        İlk talebi siz açın; kategori, şehir ve süre bilgisiyle Talep Merkezi dolmaya başlasın.
+      </p>
+      <button
+        type="button"
+        onClick={onCreate}
+        className="mt-4 inline-flex min-h-[40px] items-center justify-center rounded-full bg-[#1557D6] px-5 text-[12px] font-black text-white shadow-[0_12px_24px_rgba(21,87,214,0.20)]"
+      >
+        Yeni Talep Aç
+      </button>
     </div>
   );
 }

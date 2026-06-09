@@ -35,7 +35,9 @@ type UpdateNetworkPostDto = {
 };
 
 
-const MAX_FORUM_DESCRIPTION_LENGTH = 600;
+const MAX_FORUM_TITLE_LENGTH = 50;
+const MAX_FORUM_TOPIC_LENGTH = 100;
+const MAX_FORUM_DESCRIPTION_LENGTH = 200;
 
 type NetworkPostChangeItem = {
   field: string;
@@ -117,27 +119,34 @@ function buildNotificationMessage(changes: NetworkPostChangeItem[]) {
 
 const FORUM_CATEGORY_LABELS: Record<string, string> = {
   PORTFOY_ARIYORUM: 'Portföy Arıyorum',
+  KAT_KARSILIGI_ARSA_ARIYORUM: 'Kat Karşılığı Arsa Arıyorum',
+  BOLGESEL_SATIS_OFISI_ARIYORUM: 'Bölgesel Satış Ofisi Arıyorum',
+  IS_ORTAGI_ARIYORUM: 'İş Ortağı Arıyorum',
+  YATIRIMCI_ARIYORUM: 'Yatırımcı Arıyorum',
+  SEKTOREL_IHTIYACLAR: 'Sektörel İhtiyaçlar',
+  DUYURU: 'Duyuru',
+  KAMPANYA_DUYURU: 'Kampanya & Duyuru',
+  DIGER: 'Diğer',
+
+  // Eski kayıtlarla geriye dönük uyumluluk
   BOLGE_ORTAGI_ARIYORUM: 'Bölge Ortağı Arıyorum',
   PORTFOY_ORTAGI_ARIYORUM: 'Portföy Ortağı Arıyorum',
   SATIS_OFISI_ARIYORUM: 'Satış Ofisi Arıyorum',
   KAMPANYA_DUYURULARI: 'Kampanya Duyuruları',
-  KAT_KARSILIGI_ARSA_ARIYORUM: 'Kat Karşılığı Arsa Arıyorum',
   MUTEAHHIT_YUKLENICI_ARIYORUM: 'Müteahhit / Yüklenici Arıyorum',
   ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM: 'Ulusal/Bölgesel Satış Partneri Arıyorum',
-  YATIRIMCI_ARIYORUM: 'Yatırımcı Arıyorum',
   PLATFORM_DUYURUSU: 'Platform Duyurusu',
   SISTEM_GUNCELLEMESI: 'Sistem Güncellemesi',
   EGITIM_BILGILENDIRME: 'Eğitim / Bilgilendirme',
   SEKTOREL_SORU: 'Sektörel Soru',
-  DIGER: 'Diğer',
 };
 
 const ROLE_FORUM_CATEGORIES: Record<string, string[]> = {
-  EMLAKCI: ['PORTFOY_ARIYORUM', 'BOLGE_ORTAGI_ARIYORUM', 'PORTFOY_ORTAGI_ARIYORUM', 'SEKTOREL_SORU', 'DIGER'],
-  MUTEAHHIT: ['SATIS_OFISI_ARIYORUM', 'KAMPANYA_DUYURULARI', 'KAT_KARSILIGI_ARSA_ARIYORUM', 'SEKTOREL_SORU', 'DIGER'],
-  INSAAT_FIRMASI: ['KAT_KARSILIGI_ARSA_ARIYORUM', 'MUTEAHHIT_YUKLENICI_ARIYORUM', 'ULUSAL_BOLGESEL_SATIS_PARTNERI_ARIYORUM', 'KAMPANYA_DUYURULARI', 'YATIRIMCI_ARIYORUM', 'SEKTOREL_SORU', 'DIGER'],
-  ADMIN: ['PLATFORM_DUYURUSU', 'SISTEM_GUNCELLEMESI', 'EGITIM_BILGILENDIRME', 'SEKTOREL_SORU'],
-  SUPER_ADMIN: ['PLATFORM_DUYURUSU', 'SISTEM_GUNCELLEMESI', 'EGITIM_BILGILENDIRME', 'SEKTOREL_SORU'],
+  EMLAKCI: ['PORTFOY_ARIYORUM', 'KAT_KARSILIGI_ARSA_ARIYORUM', 'SEKTOREL_IHTIYACLAR', 'DUYURU'],
+  MUTEAHHIT: ['BOLGESEL_SATIS_OFISI_ARIYORUM', 'KAT_KARSILIGI_ARSA_ARIYORUM', 'KAMPANYA_DUYURU', 'SEKTOREL_IHTIYACLAR', 'DIGER'],
+  INSAAT_FIRMASI: ['KAT_KARSILIGI_ARSA_ARIYORUM', 'BOLGESEL_SATIS_OFISI_ARIYORUM', 'IS_ORTAGI_ARIYORUM', 'YATIRIMCI_ARIYORUM', 'SEKTOREL_IHTIYACLAR', 'KAMPANYA_DUYURU', 'DIGER'],
+  ADMIN: ['DUYURU', 'SEKTOREL_IHTIYACLAR'],
+  SUPER_ADMIN: ['DUYURU', 'SEKTOREL_IHTIYACLAR', 'DIGER'],
 };
 
 function normalizeRoleName(role?: string | null) {
@@ -160,11 +169,11 @@ function normalizeForumCategory(value?: string | null) {
 }
 
 function requiresForumCity(category: string) {
-  return !['PLATFORM_DUYURUSU', 'SISTEM_GUNCELLEMESI', 'EGITIM_BILGILENDIRME', 'SEKTOREL_SORU'].includes(category);
+  return !['DUYURU', 'KAMPANYA_DUYURU', 'PLATFORM_DUYURUSU', 'SISTEM_GUNCELLEMESI', 'EGITIM_BILGILENDIRME'].includes(category);
 }
 
 function requiresForumProperty(category: string) {
-  return ['PORTFOY_ARIYORUM', 'PORTFOY_ORTAGI_ARIYORUM', 'KAT_KARSILIGI_ARSA_ARIYORUM'].includes(category);
+  return ['PORTFOY_ARIYORUM', 'KAT_KARSILIGI_ARSA_ARIYORUM'].includes(category);
 }
 
 function cleanForumText(value?: string | null) {
@@ -213,6 +222,10 @@ export class NetworkService {
       throw new BadRequestException('Talep başlığı zorunludur.');
     }
 
+    if (title.length > MAX_FORUM_TITLE_LENGTH) {
+      throw new BadRequestException(`Talep başlığı en fazla ${MAX_FORUM_TITLE_LENGTH} karakter olabilir.`);
+    }
+
     if (mode === 'create' && description.length < 12) {
       throw new BadRequestException('Talep açıklaması en az 12 karakter olmalıdır.');
     }
@@ -227,6 +240,16 @@ export class NetworkService {
 
     if (requiresForumProperty(category) && !cleanForumText((dto as CreateNetworkPostDto).tags?.find((item) => String(item || '').trim()) || '')) {
       // Frontend mülk/konu bilgisini tags içine de gönderir. Eski kayıt uyumluluğu için sert engel sadece başlık/açıklama/şehir/kategori tarafında tutuldu.
+    }
+
+    const topicTag = cleanForumText((dto as CreateNetworkPostDto).tags?.find((item) => {
+      const cleanItem = cleanForumText(item);
+
+      return cleanItem && !cleanItem.startsWith('Döviz:') && !FORUM_CATEGORY_LABELS[normalizeForumCategory(cleanItem)];
+    }) || '');
+
+    if (topicTag.length > MAX_FORUM_TOPIC_LENGTH) {
+      throw new BadRequestException(`Konu en fazla ${MAX_FORUM_TOPIC_LENGTH} karakter olabilir.`);
     }
 
     return {
