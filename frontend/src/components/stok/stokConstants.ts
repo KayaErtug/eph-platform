@@ -81,13 +81,43 @@ export const CATEGORY_TYPE_MAP: Record<string, Record<string, string>> = {
 export const STATUS_LABELS: Record<string, string> = {
   SATILIK: "Satılık",
   KIRALIK: "Kiralık",
+  GUNLUK_KIRALIK: "Günlük Kiralık",
+  DEVREN_SATILIK: "Devren Satılık",
+  DEVREN_KIRALIK: "Devren Kiralık",
   ON_SATIS: "Ön Satış",
+  PROJE_ASAMASI: "Proje Aşaması",
+  YAKINDA_SATISTA: "Yakında Satışta",
+  INSAAT_HALINDE: "İnşaat Halinde",
+  TESLIME_HAZIR: "Teslime Hazır",
+  HEMEN_TESLIM: "Hemen Teslim",
+  INSAAT_PROJESI: "İnşaat Projesi",
+  KAT_KARSILIGI: "Kat Karşılığı",
+  HASILAT_PAYLASIMLI: "Hasılat Paylaşımlı",
+  REZERVE: "Rezerve",
+  SATILDI: "Satıldı",
+  KIRALANDI: "Kiralandı",
+  PASIF: "Pasif",
 };
 
 export const STATUS_COLORS: Record<string, { color: string; bg: string; border: string; dot: string }> = {
   SATILIK: { color: "#067647", bg: "#ECFDF3", border: "#ABEFC6", dot: "#17B26A" },
   KIRALIK: { color: "#175CD3", bg: "#EFF8FF", border: "#B2DDFF", dot: "#2E90FA" },
+  GUNLUK_KIRALIK: { color: "#155EEF", bg: "#EEF4FF", border: "#C7D7FE", dot: "#444CE7" },
+  DEVREN_SATILIK: { color: "#854A0E", bg: "#FEF6EE", border: "#F9DBAF", dot: "#EF6820" },
+  DEVREN_KIRALIK: { color: "#854A0E", bg: "#FEF6EE", border: "#F9DBAF", dot: "#EF6820" },
   ON_SATIS: { color: "#B54708", bg: "#FFFAEB", border: "#FEDF89", dot: "#F79009" },
+  PROJE_ASAMASI: { color: "#363F72", bg: "#F8F9FC", border: "#D5D9EB", dot: "#4E5BA6" },
+  YAKINDA_SATISTA: { color: "#5925DC", bg: "#F4F3FF", border: "#D9D6FE", dot: "#7A5AF8" },
+  INSAAT_HALINDE: { color: "#B42318", bg: "#FEF3F2", border: "#FECDCA", dot: "#F04438" },
+  TESLIME_HAZIR: { color: "#027A48", bg: "#ECFDF3", border: "#ABEFC6", dot: "#12B76A" },
+  HEMEN_TESLIM: { color: "#05603A", bg: "#F0FDF4", border: "#BBF7D0", dot: "#16A34A" },
+  INSAAT_PROJESI: { color: "#344054", bg: "#F9FAFB", border: "#EAECF0", dot: "#667085" },
+  KAT_KARSILIGI: { color: "#7A2E0E", bg: "#FFF4ED", border: "#FFD6AE", dot: "#F97316" },
+  HASILAT_PAYLASIMLI: { color: "#6941C6", bg: "#F9F5FF", border: "#E9D7FE", dot: "#9E77ED" },
+  REZERVE: { color: "#3538CD", bg: "#EEF4FF", border: "#C7D7FE", dot: "#6172F3" },
+  SATILDI: { color: "#667085", bg: "#F2F4F7", border: "#D0D5DD", dot: "#98A2B3" },
+  KIRALANDI: { color: "#667085", bg: "#F2F4F7", border: "#D0D5DD", dot: "#98A2B3" },
+  PASIF: { color: "#667085", bg: "#F2F4F7", border: "#D0D5DD", dot: "#98A2B3" },
 };
 
 export const TYPE_LABELS: Record<string, string> = {
@@ -180,7 +210,44 @@ export const BUILDING_FLOOR_OPTIONS = [
 ];
 
 export const STATUS_GROUPS = [
-  { label: "Durum", statuses: ["SATILIK", "KIRALIK", "ON_SATIS"] },
+  {
+    label: "Aktif Pazarlama",
+    statuses: [
+      "SATILIK",
+      "KIRALIK",
+      "GUNLUK_KIRALIK",
+      "DEVREN_SATILIK",
+      "DEVREN_KIRALIK",
+    ],
+  },
+  {
+    label: "Proje / İnşaat",
+    statuses: [
+      "ON_SATIS",
+      "PROJE_ASAMASI",
+      "YAKINDA_SATISTA",
+      "INSAAT_HALINDE",
+      "TESLIME_HAZIR",
+      "HEMEN_TESLIM",
+      "INSAAT_PROJESI",
+    ],
+  },
+  {
+    label: "Ortaklık / Arsa",
+    statuses: [
+      "KAT_KARSILIGI",
+      "HASILAT_PAYLASIMLI",
+    ],
+  },
+  {
+    label: "Sonuç / Pasif",
+    statuses: [
+      "REZERVE",
+      "SATILDI",
+      "KIRALANDI",
+      "PASIF",
+    ],
+  },
 ];
 
 export const CITIES = ["Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya","Artvin","Aydın","Balıkesir","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari","Hatay","Isparta","İçel","İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir","Kocaeli","Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla","Muş","Nevşehir","Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas","Tekirdağ","Tokat","Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak","Aksaray","Bayburt","Karaman","Kırıkkale","Batman","Şırnak","Bartın","Ardahan","Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"];
