@@ -79,6 +79,8 @@ type TopicForm = {
   visibility: string;
 };
 
+type PersonalTabKey = "ALL" | "MINE" | "SAVED" | "INTERESTED";
+
 const CATEGORY_IMAGES: Record<string, string> = {
   "Tüm Talepler": "/talep-merkezi/tum-talepler.jpg",
   "Portföy Arıyorum": "/talep-merkezi/portfoy-ariyorum.jpg",
@@ -102,6 +104,13 @@ const REQUEST_TABS = [
   { key: "Duyuru", label: "Duyuru", countTone: "bg-red-100 text-red-700" },
   { key: "Diğer", label: "Diğer", countTone: "bg-slate-100 text-slate-700" },
 ] as const;
+
+const PERSONAL_TABS: { key: PersonalTabKey; label: string; icon: string }[] = [
+  { key: "ALL", label: "Tüm Talepler", icon: "🌐" },
+  { key: "MINE", label: "Taleplerim", icon: "📌" },
+  { key: "SAVED", label: "Kaydettiklerim", icon: "⭐" },
+  { key: "INTERESTED", label: "İlgilendiklerim", icon: "🤝" },
+];
 
 const ALL_CATEGORY_OPTIONS: ForumCategoryOption[] = [
   {
@@ -481,6 +490,22 @@ function formFromPost(post: NetworkPost): TopicForm {
   };
 }
 
+function readStoredPostIds(prefix: string) {
+  if (typeof window === "undefined") return new Set<string>();
+
+  const values = new Set<string>();
+
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index) || "";
+
+    if (key.startsWith(prefix) && window.localStorage.getItem(key) === "1") {
+      values.add(key.replace(prefix, ""));
+    }
+  }
+
+  return values;
+}
+
 function MarqueeRow({ children, duration = 34 }: { children: ReactNode; duration?: number }) {
   return (
     <div className="talep-marquee-viewport overflow-hidden">
@@ -504,7 +529,10 @@ export default function NetworkPage() {
   const [deletingId, setDeletingId] = useState("");
   const [flowFilter, setFlowFilter] = useState("Tüm Talepler");
   const [intentFilter, setIntentFilter] = useState("Tümü");
+  const [personalFilter, setPersonalFilter] = useState<PersonalTabKey>("ALL");
   const [search, setSearch] = useState("");
+  const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
+  const [interestedPostIds, setInterestedPostIds] = useState<Set<string>>(new Set());
 
   const roleCategories = useMemo(() => getRoleCategories(user?.role), [user?.role]);
 
@@ -520,11 +548,17 @@ export default function NetworkPage() {
     }
   };
 
+  const syncPersonalStorage = () => {
+    setSavedPostIds(readStoredPostIds("eph-saved-network-"));
+    setInterestedPostIds(readStoredPostIds("eph-interested-network-"));
+  };
+
   useEffect(() => {
     fetchPosts();
+    syncPersonalStorage();
   }, []);
 
-  const filteredPosts = useMemo(() => {
+  const baseFilteredPosts = useMemo(() => {
     const keyword = normalizeText(search);
 
     return posts
@@ -547,6 +581,33 @@ export default function NetworkPage() {
         return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
       });
   }, [flowFilter, intentFilter, posts, search]);
+
+  const filteredPosts = useMemo(() => {
+    if (personalFilter === "MINE") {
+      return baseFilteredPosts.filter((post) => user?.id && post.userId === user.id);
+    }
+
+    if (personalFilter === "SAVED") {
+      return baseFilteredPosts.filter((post) => savedPostIds.has(post.id));
+    }
+
+    if (personalFilter === "INTERESTED") {
+      return baseFilteredPosts.filter((post) => interestedPostIds.has(post.id));
+    }
+
+    return baseFilteredPosts;
+  }, [baseFilteredPosts, interestedPostIds, personalFilter, savedPostIds, user?.id]);
+
+  const mineCount = useMemo(() => posts.filter((post) => user?.id && post.userId === user.id).length, [posts, user?.id]);
+  const savedCount = useMemo(() => posts.filter((post) => savedPostIds.has(post.id)).length, [posts, savedPostIds]);
+  const interestedCount = useMemo(() => posts.filter((post) => interestedPostIds.has(post.id)).length, [posts, interestedPostIds]);
+
+  const personalTabCounts: Record<PersonalTabKey, number> = {
+    ALL: posts.length,
+    MINE: mineCount,
+    SAVED: savedCount,
+    INTERESTED: interestedCount,
+  };
 
   const saveTopic = async (form: TopicForm) => {
     if (!user?.id) {
@@ -635,11 +696,26 @@ export default function NetworkPage() {
       setDeletingId(post.id);
       await api.delete(`/network/posts/${post.id}`);
       setPosts((current) => current.filter((item) => item.id !== post.id));
+      localStorage.removeItem(`eph-saved-network-${post.id}`);
+      localStorage.removeItem(`eph-interested-network-${post.id}`);
+      syncPersonalStorage();
     } catch (error: any) {
       alert(error?.response?.data?.message || "Talep silinemedi.");
     } finally {
       setDeletingId("");
     }
+  };
+
+  const handleToggleSave = (post: NetworkPost) => {
+    const key = `eph-saved-network-${post.id}`;
+    const next = !savedPostIds.has(post.id);
+
+    localStorage.setItem(key, next ? "1" : "0");
+    syncPersonalStorage();
+  };
+
+  const handleOpenPost = (post: NetworkPost) => {
+    router.push(`/network/${post.id}`);
   };
 
   const openCreateModal = () => {
@@ -654,10 +730,12 @@ export default function NetworkPage() {
 
   const metrics = [
     { id: "total", label: "Toplam Talep", value: posts.length, tone: "text-[#1557D6]" },
+    { id: "mine", label: "Taleplerim", value: mineCount, tone: "text-orange-600" },
+    { id: "saved", label: "Kaydettiklerim", value: savedCount, tone: "text-amber-600" },
+    { id: "interested", label: "İlgilendiklerim", value: interestedCount, tone: "text-emerald-600" },
     { id: "portfoy", label: "Portföy Arıyorum", value: tabCount(posts, "Portföy Arıyorum"), tone: "text-emerald-600" },
     { id: "kat", label: "Kat Karşılığı", value: tabCount(posts, "Kat Karşılığı Arsa Arıyorum"), tone: "text-orange-600" },
     { id: "sektorel", label: "Sektörel İhtiyaçlar", value: tabCount(posts, "Sektörel İhtiyaçlar"), tone: "text-violet-600" },
-    { id: "duyuru", label: "Duyuru", value: tabCount(posts, "Duyuru"), tone: "text-red-600" },
   ];
 
   return (
@@ -704,6 +782,31 @@ export default function NetworkPage() {
             Elinizdekini değil, ihtiyacınızı paylaşın.
           </p>
           <span className="mx-auto mt-3 block h-1 w-10 rounded-full bg-[#1557D6]" />
+        </section>
+
+        <section className="rounded-[26px] border border-white bg-white/95 p-2 shadow-[0_14px_34px_rgba(15,23,42,0.075)]">
+          <div className="grid grid-cols-4 gap-1.5">
+            {PERSONAL_TABS.map((tab) => {
+              const active = personalFilter === tab.key;
+
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setPersonalFilter(tab.key)}
+                  className={`min-h-[58px] rounded-[20px] border px-1.5 py-2 text-center transition active:scale-[0.98] ${
+                    active ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]" : "border-[#E2EAF5] bg-white text-[#06194A]"
+                  }`}
+                >
+                  <span className="block text-center text-[16px] leading-none">{tab.icon}</span>
+                  <span className="mt-1 block text-center text-[9.5px] font-black leading-[11px]">{tab.label}</span>
+                  <span className="mt-1 inline-flex min-w-[22px] justify-center rounded-full bg-white px-1.5 text-[10px] font-black text-[#1557D6]">
+                    {personalTabCounts[tab.key]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         <section className="-mx-2 overflow-hidden pl-2">
@@ -820,7 +923,7 @@ export default function NetworkPage() {
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1 text-center">
               <h2 className="text-center text-[22px] font-black tracking-[-0.04em] text-[#06194A]">
-                {flowFilter === "Tüm Talepler" ? "Tüm Talepler" : flowFilter}
+                {PERSONAL_TABS.find((item) => item.key === personalFilter)?.label || "Tüm Talepler"}
               </h2>
               <p className="text-center text-[11px] font-bold text-[#64748B]">{filteredPosts.length} talep listeleniyor</p>
             </div>
@@ -845,20 +948,30 @@ export default function NetworkPage() {
               </div>
             </div>
           ) : filteredPosts.length === 0 ? (
-            <EmptyForumState onCreate={openCreateModal} />
+            <EmptyForumState activeTab={personalFilter} onCreate={openCreateModal} />
           ) : (
             <div>
-              {filteredPosts.map((post, index) => (
-                <RequestCard
-                  key={`network-post-${post.id}-${index}`}
-                  post={post}
-                  canManage={canManagePost(post, user)}
-                  deleting={deletingId === post.id}
-                  onOpen={() => router.push(`/network/${post.id}`)}
-                  onEdit={() => openEditModal(post)}
-                  onDelete={() => handleDeletePost(post)}
-                />
-              ))}
+              {filteredPosts.map((post, index) => {
+                const isMine = Boolean(user?.id && post.userId === user.id);
+                const isSaved = savedPostIds.has(post.id);
+                const isInterested = interestedPostIds.has(post.id);
+
+                return (
+                  <RequestCard
+                    key={`network-post-${post.id}-${index}`}
+                    post={post}
+                    canManage={canManagePost(post, user)}
+                    deleting={deletingId === post.id}
+                    isMine={isMine}
+                    isSaved={isSaved}
+                    isInterested={isInterested}
+                    onOpen={() => handleOpenPost(post)}
+                    onEdit={() => openEditModal(post)}
+                    onDelete={() => handleDeletePost(post)}
+                    onToggleSave={() => handleToggleSave(post)}
+                  />
+                );
+              })}
             </div>
           )}
         </section>
@@ -904,16 +1017,24 @@ function RequestCard({
   post,
   canManage,
   deleting,
+  isMine,
+  isSaved,
+  isInterested,
   onOpen,
   onEdit,
   onDelete,
+  onToggleSave,
 }: {
   post: NetworkPost;
   canManage: boolean;
   deleting: boolean;
+  isMine: boolean;
+  isSaved: boolean;
+  isInterested: boolean;
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleSave: () => void;
 }) {
   const category = categoryLabel(post.type);
   const location = [post.city, post.district].filter(Boolean).join(" / ");
@@ -923,7 +1044,7 @@ function RequestCard({
   const image = getCategoryImage(post.type);
 
   return (
-    <article className="grid min-h-[134px] grid-cols-[82px_1fr_76px] gap-2 border-b border-[#E7EEF8] bg-white px-2.5 py-3 last:border-b-0">
+    <article className="grid min-h-[146px] grid-cols-[82px_1fr_76px] gap-2 border-b border-[#E7EEF8] bg-white px-2.5 py-3 last:border-b-0">
       <button
         type="button"
         onClick={onOpen}
@@ -933,9 +1054,15 @@ function RequestCard({
       </button>
 
       <button type="button" onClick={onOpen} className="min-w-0 text-left">
-        <span className={`inline-flex max-w-full rounded-full border px-2 py-0.5 text-[9px] font-black uppercase leading-4 ${categoryBadgeClass(post.type)}`}>
-          <span className="truncate">{category}</span>
-        </span>
+        <div className="flex flex-wrap gap-1">
+          <span className={`inline-flex max-w-full rounded-full border px-2 py-0.5 text-[9px] font-black uppercase leading-4 ${categoryBadgeClass(post.type)}`}>
+            <span className="truncate">{category}</span>
+          </span>
+
+          {isMine && <StatusBadge tone="mine" label="Benim Talebim" />}
+          {isSaved && <StatusBadge tone="saved" label="Kaydedildi" />}
+          {isInterested && <StatusBadge tone="interested" label="İlgilenildi" />}
+        </div>
 
         <h3 className="mt-1 line-clamp-2 text-left text-[14px] font-black leading-5 tracking-[-0.03em] text-[#06194A]">
           {post.title}
@@ -950,12 +1077,24 @@ function RequestCard({
           <span className="text-[#1557D6]">{budget}</span>
           <span className={remainingDanger ? "text-red-500" : "text-emerald-600"}>• {remaining}</span>
         </div>
+
+        <div className="mt-1 flex items-center gap-2 text-[10px] font-black text-[#64748B]">
+          <span>👁 {Number(post.id.slice(0, 2).replace(/\D/g, "")) + 18 || 18}</span>
+          <span>⭐ {isSaved ? 1 : 0}</span>
+          <span>🤝 {isInterested ? 1 : 0}</span>
+        </div>
       </button>
 
       <div className="flex flex-col items-end gap-2">
         <div className="flex items-center gap-1">
-          <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full border border-[#E2EAF5] bg-white text-[#06194A]">
-            <Bookmark size={17} />
+          <button
+            type="button"
+            onClick={onToggleSave}
+            className={`flex h-9 w-9 items-center justify-center rounded-full border ${
+              isSaved ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]" : "border-[#E2EAF5] bg-white text-[#06194A]"
+            }`}
+          >
+            <Bookmark size={17} fill={isSaved ? "currentColor" : "none"} />
           </button>
 
           <button
@@ -994,17 +1133,44 @@ function RequestCard({
   );
 }
 
-function EmptyForumState({ onCreate }: { onCreate: () => void }) {
+function StatusBadge({ label, tone }: { label: string; tone: "mine" | "saved" | "interested" }) {
+  const className =
+    tone === "mine"
+      ? "bg-orange-50 text-orange-700 border-orange-100"
+      : tone === "saved"
+        ? "bg-amber-50 text-amber-700 border-amber-100"
+        : "bg-emerald-50 text-emerald-700 border-emerald-100";
+
+  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black leading-4 ${className}`}>{label}</span>;
+}
+
+function EmptyForumState({ activeTab, onCreate }: { activeTab: PersonalTabKey; onCreate: () => void }) {
+  const title =
+    activeTab === "MINE"
+      ? "Henüz talebiniz yok"
+      : activeTab === "SAVED"
+        ? "Kaydedilmiş talep yok"
+        : activeTab === "INTERESTED"
+          ? "İlgilendiğiniz talep yok"
+          : "Talep bulunamadı";
+
+  const text =
+    activeTab === "MINE"
+      ? "İlk talebinizi oluşturarak Talep Merkezi'nde görünür olun."
+      : activeTab === "SAVED"
+        ? "Beğendiğiniz talepleri kaydedip burada takip edebilirsiniz."
+        : activeTab === "INTERESTED"
+          ? "İlgilendiğiniz talepler burada listelenecek."
+          : "Seçtiğin filtrelere uygun talep yok. Yeni bir talep oluşturarak ağı başlatabilirsin.";
+
   return (
     <div className="flex min-h-[300px] items-center justify-center p-5">
       <div className="mx-auto max-w-[300px] text-center">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#EFF6FF] text-[#1557D6]">
           <Bell size={28} />
         </div>
-        <h3 className="mt-4 text-center text-[20px] font-black tracking-[-0.04em] text-[#06194A]">Talep bulunamadı</h3>
-        <p className="mt-2 text-center text-[13px] font-bold leading-5 text-[#64748B]">
-          Seçtiğin filtrelere uygun talep yok. Yeni bir talep oluşturarak ağı başlatabilirsin.
-        </p>
+        <h3 className="mt-4 text-center text-[20px] font-black tracking-[-0.04em] text-[#06194A]">{title}</h3>
+        <p className="mt-2 text-center text-[13px] font-bold leading-5 text-[#64748B]">{text}</p>
         <button
           type="button"
           onClick={onCreate}
