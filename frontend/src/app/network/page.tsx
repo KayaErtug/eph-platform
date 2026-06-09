@@ -694,7 +694,11 @@ export default function NetworkPage() {
 
     try {
       setDeletingId(post.id);
-      await api.delete(`/network/posts/${post.id}`);
+      await api.delete(`/network/posts/${post.id}`, {
+  	data: {
+    	userId: user?.id,
+  	},
+  });
       setPosts((current) => current.filter((item) => item.id !== post.id));
       localStorage.removeItem(`eph-saved-network-${post.id}`);
       localStorage.removeItem(`eph-interested-network-${post.id}`);
