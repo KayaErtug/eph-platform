@@ -1,17 +1,28 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Role } from '@prisma/client';
+
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MessagesService } from './messages.service';
 
+type AuthUser = {
+  id: string;
+  role: Role;
+};
+
 @Controller('conversations')
+@UseGuards(JwtAuthGuard)
 export class MessagesController {
   constructor(private readonly messagesService: MessagesService) {}
 
   @Get()
-  getConversations(@Query('userId') userId: string) {
-    return this.messagesService.getConversations(userId);
+  getConversations(@CurrentUser() user: AuthUser) {
+    return this.messagesService.getConversations(user.id, user.role);
   }
 
   @Post('start')
   startConversation(
+    @CurrentUser() user: AuthUser,
     @Body()
     body: {
       postId?: string;
@@ -20,39 +31,34 @@ export class MessagesController {
       participantId?: string;
     },
   ) {
-    return this.messagesService.startConversation(body);
+    return this.messagesService.startConversation(body, user.id, user.role);
   }
 
   @Get(':id')
-  getConversation(@Param('id') id: string) {
-    return this.messagesService.getConversation(id);
+  getConversation(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.messagesService.getConversation(id, user.id, user.role);
   }
 
   @Get(':id/messages')
-  getMessages(@Param('id') id: string) {
-    return this.messagesService.getMessages(id);
+  getMessages(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.messagesService.getMessages(id, user.id, user.role);
   }
 
   @Post(':id/messages')
   sendMessage(
     @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
     @Body()
     body: {
-      senderId: string;
+      senderId?: string;
       body: string;
     },
   ) {
-    return this.messagesService.sendMessage(id, body);
+    return this.messagesService.sendMessage(id, body, user.id, user.role);
   }
 
   @Post(':id/read')
-  markAsRead(
-    @Param('id') id: string,
-    @Body()
-    body: {
-      userId: string;
-    },
-  ) {
-    return this.messagesService.markAsRead(id, body.userId);
+  markAsRead(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.messagesService.markAsRead(id, user.id, user.role);
   }
 }

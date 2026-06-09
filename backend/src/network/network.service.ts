@@ -214,7 +214,7 @@ function cleanForumText(value?: string | null) {
 function isForumManagerRole(role?: string | null) {
   const normalizedRole = normalizeRoleName(role);
 
-  return normalizedRole === "ADMIN" || normalizedRole === "SUPER_ADMIN";
+  return normalizedRole === "SUPER_ADMIN";
 }
 
 @Injectable()

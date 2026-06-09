@@ -1,5 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { randomUUID } from 'crypto';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { PushService } from '../push/push.service';
 
@@ -10,17 +16,115 @@ export class MessagesService {
     private readonly pushService: PushService,
   ) {}
 
-  async getConversations(userId: string) {
-    if (!userId) return [];
+  private isSuperAdmin(userRole: Role) {
+    return userRole === Role.SUPER_ADMIN;
+  }
 
-    const conversations = await this.prisma.conversation.findMany({
+  private async getConversationWithParticipants(conversationId: string) {
+    const conversation = await this.prisma.conversation.findUnique({
       where: {
+        id: conversationId,
+      },
+      include: {
+        NetworkPost: true,
         ConversationParticipant: {
-          some: {
-            userId,
+          include: {
+            User: true,
           },
         },
       },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Görüşme bulunamadı.');
+    }
+
+    return conversation;
+  }
+
+  private isConversationParticipant(
+    conversation: {
+      ConversationParticipant: Array<{
+        userId: string;
+      }>;
+    },
+    userId: string,
+  ) {
+    return conversation.ConversationParticipant.some(
+      (participant) => participant.userId === userId,
+    );
+  }
+
+  private ensureCanReadConversation(
+    conversation: {
+      ConversationParticipant: Array<{
+        userId: string;
+      }>;
+    },
+    userId: string,
+    userRole: Role,
+  ) {
+    if (this.isSuperAdmin(userRole)) return;
+
+    if (this.isConversationParticipant(conversation, userId)) return;
+
+    throw new ForbiddenException('Bu görüşmeye erişim yetkiniz yok.');
+  }
+
+  private ensureCanWriteConversation(
+    conversation: {
+      ConversationParticipant: Array<{
+        userId: string;
+      }>;
+    },
+    userId: string,
+  ) {
+    if (this.isConversationParticipant(conversation, userId)) return;
+
+    throw new ForbiddenException('Bu görüşmeye mesaj gönderme yetkiniz yok.');
+  }
+
+  private mapParticipant(item: any) {
+    return {
+      id: item.id,
+      userId: item.userId,
+      user: {
+        id: item.User.id,
+        firstName: item.User.firstName,
+        lastName: item.User.lastName,
+        email: item.User.email,
+        role: item.User.role,
+      },
+    };
+  }
+
+  private mapMessage(message: any) {
+    return {
+      id: message.id,
+      body: message.body,
+      createdAt: message.createdAt,
+      sender: {
+        id: message.User.id,
+        firstName: message.User.firstName,
+        lastName: message.User.lastName,
+        role: message.User.role,
+      },
+    };
+  }
+
+  async getConversations(userId: string, userRole: Role) {
+    if (!userId) return [];
+
+    const conversations = await this.prisma.conversation.findMany({
+      where: this.isSuperAdmin(userRole)
+        ? {}
+        : {
+            ConversationParticipant: {
+              some: {
+                userId,
+              },
+            },
+          },
       include: {
         NetworkPost: true,
         ConversationParticipant: {
@@ -49,17 +153,19 @@ export class MessagesService {
           (item) => item.userId === userId,
         );
 
-        const unreadCount = await this.prisma.message.count({
-          where: {
-            conversationId: conversation.id,
-            senderId: {
-              not: userId,
-            },
-            createdAt: {
-              gt: myParticipant?.lastReadAt || new Date(0),
-            },
-          },
-        });
+        const unreadCount = this.isSuperAdmin(userRole)
+          ? 0
+          : await this.prisma.message.count({
+              where: {
+                conversationId: conversation.id,
+                senderId: {
+                  not: userId,
+                },
+                createdAt: {
+                  gt: myParticipant?.lastReadAt || new Date(0),
+                },
+              },
+            });
 
         return {
           id: conversation.id,
@@ -67,28 +173,12 @@ export class MessagesService {
           status: conversation.status,
           postId: conversation.postId,
           post: conversation.NetworkPost,
-          participants: conversation.ConversationParticipant.map((item) => ({
-            id: item.id,
-            userId: item.userId,
-            user: {
-              id: item.User.id,
-              firstName: item.User.firstName,
-              lastName: item.User.lastName,
-              email: item.User.email,
-              role: item.User.role,
-            },
-          })),
-          messages: conversation.Message.map((message) => ({
-            id: message.id,
-            body: message.body,
-            createdAt: message.createdAt,
-            sender: {
-              id: message.User.id,
-              firstName: message.User.firstName,
-              lastName: message.User.lastName,
-              role: message.User.role,
-            },
-          })),
+          participants: conversation.ConversationParticipant.map((item) =>
+            this.mapParticipant(item),
+          ),
+          messages: conversation.Message.map((message) =>
+            this.mapMessage(message),
+          ),
           unreadCount,
           createdAt: conversation.createdAt,
           updatedAt: conversation.updatedAt,
@@ -97,27 +187,11 @@ export class MessagesService {
     );
   }
 
-  async getConversation(conversationId: string) {
-    const conversation = await this.prisma.conversation.findUnique({
-      where: {
-        id: conversationId,
-      },
-      include: {
-        NetworkPost: true,
-        ConversationParticipant: {
-          include: {
-            User: true,
-          },
-        },
-      },
-    });
+  async getConversation(conversationId: string, userId: string, userRole: Role) {
+    const conversation =
+      await this.getConversationWithParticipants(conversationId);
 
-    if (!conversation) {
-      return {
-        ok: false,
-        message: 'Görüşme bulunamadı.',
-      };
-    }
+    this.ensureCanReadConversation(conversation, userId, userRole);
 
     return {
       id: conversation.id,
@@ -125,32 +199,43 @@ export class MessagesService {
       status: conversation.status,
       postId: conversation.postId,
       post: conversation.NetworkPost,
-      participants: conversation.ConversationParticipant.map((item) => ({
-        id: item.id,
-        userId: item.userId,
-        user: {
-          id: item.User.id,
-          firstName: item.User.firstName,
-          lastName: item.User.lastName,
-          email: item.User.email,
-          role: item.User.role,
-        },
-      })),
+      participants: conversation.ConversationParticipant.map((item) =>
+        this.mapParticipant(item),
+      ),
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
     };
   }
 
-  async startConversation(body: {
-    postId?: string;
-    title?: string;
-    creatorId?: string;
-    participantId?: string;
-  }) {
-    if (!body.creatorId || !body.participantId) {
+  async startConversation(
+    body: {
+      postId?: string;
+      title?: string;
+      creatorId?: string;
+      participantId?: string;
+    },
+    userId: string,
+    userRole: Role,
+  ) {
+    if (!body.participantId) {
       return {
         ok: false,
-        message: 'Görüşme başlatmak için kullanıcı bilgisi eksik.',
+        message: 'Görüşme başlatmak için karşı kullanıcı bilgisi eksik.',
+      };
+    }
+
+    const creatorId = body.creatorId || userId;
+
+    if (!this.isSuperAdmin(userRole) && creatorId !== userId) {
+      throw new ForbiddenException(
+        'Başka bir kullanıcı adına görüşme başlatamazsınız.',
+      );
+    }
+
+    if (creatorId === body.participantId) {
+      return {
+        ok: false,
+        message: 'Kendinizle görüşme başlatmanıza gerek yok.',
       };
     }
 
@@ -163,7 +248,7 @@ export class MessagesService {
         ConversationParticipant: {
           every: {
             userId: {
-              in: [body.creatorId, body.participantId],
+              in: [creatorId, body.participantId],
             },
           },
         },
@@ -187,7 +272,7 @@ export class MessagesService {
           create: [
             {
               id: randomUUID(),
-              userId: body.creatorId,
+              userId: creatorId,
             },
             {
               id: randomUUID(),
@@ -199,7 +284,12 @@ export class MessagesService {
     });
   }
 
-  async getMessages(conversationId: string) {
+  async getMessages(conversationId: string, userId: string, userRole: Role) {
+    const conversation =
+      await this.getConversationWithParticipants(conversationId);
+
+    this.ensureCanReadConversation(conversation, userId, userRole);
+
     const messages = await this.prisma.message.findMany({
       where: {
         conversationId,
@@ -212,31 +302,40 @@ export class MessagesService {
       },
     });
 
-    return messages.map((message) => ({
-      id: message.id,
-      body: message.body,
-      createdAt: message.createdAt,
-      sender: {
-        id: message.User.id,
-        firstName: message.User.firstName,
-        lastName: message.User.lastName,
-        role: message.User.role,
-      },
-    }));
+    return messages.map((message) => this.mapMessage(message));
   }
 
   async sendMessage(
     conversationId: string,
     body: {
-      senderId: string;
+      senderId?: string;
       body: string;
     },
+    userId: string,
+    userRole: Role,
   ) {
-    if (!body.senderId || !body.body?.trim()) {
+    if (!body.body?.trim()) {
       return {
         ok: false,
-        message: 'Mesaj göndermek için gerekli bilgiler eksik.',
+        message: 'Mesaj göndermek için mesaj içeriği eksik.',
       };
+    }
+
+    const conversation =
+      await this.getConversationWithParticipants(conversationId);
+
+    this.ensureCanWriteConversation(conversation, userId);
+
+    if (body.senderId && body.senderId !== userId) {
+      throw new ForbiddenException(
+        'Başka bir kullanıcı adına mesaj gönderemezsiniz.',
+      );
+    }
+
+    if (this.isSuperAdmin(userRole) && !this.isConversationParticipant(conversation, userId)) {
+      throw new ForbiddenException(
+        'Super Admin görüşmeleri inceleyebilir fakat taraf olmadığı görüşmeye mesaj gönderemez.',
+      );
     }
 
     const message = await this.prisma.message.create({
@@ -250,7 +349,7 @@ export class MessagesService {
         },
         User: {
           connect: {
-            id: body.senderId,
+            id: userId,
           },
         },
       },
@@ -274,7 +373,7 @@ export class MessagesService {
     });
 
     const receiverIds = message.Conversation.ConversationParticipant
-      .filter((item) => item.userId !== body.senderId)
+      .filter((item) => item.userId !== userId)
       .map((item) => item.userId);
 
     await Promise.all(
@@ -287,24 +386,25 @@ export class MessagesService {
       ),
     );
 
-    return {
-      id: message.id,
-      body: message.body,
-      createdAt: message.createdAt,
-      sender: {
-        id: message.User.id,
-        firstName: message.User.firstName,
-        lastName: message.User.lastName,
-        role: message.User.role,
-      },
-    };
+    return this.mapMessage(message);
   }
 
-  async markAsRead(conversationId: string, userId: string) {
+  async markAsRead(conversationId: string, userId: string, userRole: Role) {
     if (!conversationId || !userId) {
       return {
         ok: false,
         message: 'Okundu bilgisi için kullanıcı veya görüşme eksik.',
+      };
+    }
+
+    const conversation =
+      await this.getConversationWithParticipants(conversationId);
+
+    this.ensureCanReadConversation(conversation, userId, userRole);
+
+    if (this.isSuperAdmin(userRole) && !this.isConversationParticipant(conversation, userId)) {
+      return {
+        ok: true,
       };
     }
 
