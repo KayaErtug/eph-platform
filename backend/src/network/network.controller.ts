@@ -1,124 +1,90 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-} from "@nestjs/common";
-import { NetworkService } from "./network.service";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { NetworkService } from './network.service';
 
-@Controller("network")
+@Controller('network')
 export class NetworkController {
   constructor(private readonly networkService: NetworkService) {}
 
-  @Get("posts")
+  @Get('posts')
   findAll() {
     return this.networkService.findAll();
   }
 
-  @Get("posts/followed")
-  getFollowedPosts(@Query("userId") userId: string) {
+  @Get('posts/followed')
+  getFollowedPosts(@Query('userId') userId: string) {
     return this.networkService.getFollowedPosts(userId);
   }
 
-  @Get("posts/featured")
+  @Get('posts/featured')
   getFeaturedPosts() {
     return this.networkService.getFeaturedPosts();
   }
 
-  @Get("notifications")
-  getNotifications(@Query("userId") userId: string) {
+  @Get('notifications')
+  getNotifications(@Query('userId') userId: string) {
     return this.networkService.getNotifications(userId);
   }
 
-  @Post("notifications/read")
-  markNotificationsAsRead(
-    @Body()
-    body: {
-      userId: string;
-    },
-  ) {
+  @Post('notifications/read')
+  markNotificationsAsRead(@Body() body: { userId: string }) {
     return this.networkService.markNotificationsAsRead(body.userId);
   }
 
-  @Get("posts/:id/stats")
-  getPostStats(@Param("id") id: string) {
+  @Get('posts/:id/stats')
+  getPostStats(@Param('id') id: string) {
     return this.networkService.getPostStats(id);
   }
 
-  @Get("posts/:id/update-logs")
-  getUpdateLogs(@Param("id") id: string) {
+  @Get('posts/:id/update-logs')
+  getUpdateLogs(@Param('id') id: string) {
     return this.networkService.getUpdateLogs(id);
   }
 
-  @Post("posts/:id/view")
-  recordPostView(
-    @Param("id") id: string,
-    @Body()
-    body: {
-      userId?: string;
-    },
-  ) {
+  @Post('posts/:id/view')
+  recordPostView(@Param('id') id: string, @Body() body: { userId?: string }) {
     return this.networkService.recordPostView(id, body?.userId);
   }
 
-  @Get("posts/:id/follow-status")
-  getFollowStatus(@Param("id") id: string, @Query("userId") userId?: string) {
+  @Get('posts/:id/follow-status')
+  getFollowStatus(@Param('id') id: string, @Query('userId') userId?: string) {
     return this.networkService.getFollowStatus(id, userId);
   }
 
-  @Get("posts/:id/followers")
-  getPostFollowers(@Param("id") id: string) {
+  @Get('posts/:id/followers')
+  getPostFollowers(@Param('id') id: string) {
     return this.networkService.getPostFollowers(id);
   }
 
-  @Post("posts/:id/follow")
-  followPost(
-    @Param("id") id: string,
-    @Body()
-    body: {
-      userId: string;
-    },
-  ) {
+  @Post('posts/:id/follow')
+  followPost(@Param('id') id: string, @Body() body: { userId: string }) {
     return this.networkService.followPost(id, body.userId);
   }
 
-  @Delete("posts/:id/follow")
-  unfollowPost(
-    @Param("id") id: string,
-    @Body()
-    body: {
-      userId: string;
-    },
-  ) {
+  @Delete('posts/:id/follow')
+  unfollowPost(@Param('id') id: string, @Body() body: { userId: string }) {
     return this.networkService.unfollowPost(id, body.userId);
   }
 
-  @Get("posts/:id")
-  findOne(@Param("id") id: string) {
+  @Get('posts/:id')
+  findOne(@Param('id') id: string) {
     return this.networkService.findOne(id);
   }
 
-  @Patch("posts/:id")
-  update(@Param("id") id: string, @Body() body: any) {
+  @Patch('posts/:id')
+  update(@Param('id') id: string, @Body() body: any) {
     return this.networkService.update(id, body);
   }
 
-  @Delete("posts/:id")
+  @Delete('posts/:id')
   remove(
-    @Param("id") id: string,
-    @Body()
-    body: {
-      userId: string;
-    },
+    @Param('id') id: string,
+    @Body() body?: { userId?: string },
+    @Query('userId') queryUserId?: string,
   ) {
-    return this.networkService.remove(id, body.userId);
+    return this.networkService.remove(id, body?.userId || queryUserId || '');
   }
 
-  @Post("posts")
+  @Post('posts')
   create(@Body() body: any) {
     return this.networkService.create(body);
   }
