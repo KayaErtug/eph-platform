@@ -722,7 +722,7 @@ export default function StokDetailPage() {
   const safeDescription =
     unit.description || "Bu portföy için açıklama henüz eklenmedi.";
   const shortDescription =
-    safeDescription.length > 235
+    safeDescription.length > 140
       ? `${safeDescription.slice(0, 235).trim()}...`
       : safeDescription;
   const visibleDescription = descriptionExpanded
@@ -793,7 +793,7 @@ export default function StokDetailPage() {
           <button
             type="button"
             onClick={() => galleryImages.length > 0 && setGalleryOpen(true)}
-            className="group relative block h-[245px] w-full overflow-hidden bg-[#06194A] text-left md:h-[360px]"
+            className="group relative block h-[190px] w-full overflow-hidden bg-[#06194A] text-left md:h-[360px]"
           >
             {activeGalleryImage ? (
               <img
@@ -853,7 +853,7 @@ export default function StokDetailPage() {
                     key={photo.id || photo.displayUrl}
                     type="button"
                     onClick={() => setActivePhoto(index)}
-                    className={`relative h-[58px] w-[72px] shrink-0 overflow-hidden rounded-[14px] border ${activePhoto === index ? "border-[#1557D6] ring-2 ring-blue-100" : "border-[#DDE7F3]"}`}
+                    className={`relative h-[50px] w-[60px] shrink-0 overflow-hidden rounded-[14px] border ${activePhoto === index ? "border-[#1557D6] ring-2 ring-blue-100" : "border-[#DDE7F3]"}`}
                   >
                     <img
                       src={photo.displayUrl}
@@ -891,7 +891,7 @@ export default function StokDetailPage() {
             )}
           </div>
         </section>
-        <section className="mt-3 rounded-[28px] border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_14px_36px_rgba(15,23,42,0.055)]">
+        
           <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#64748B]">
             Fiyat
           </p>
@@ -912,25 +912,21 @@ export default function StokDetailPage() {
             />
           ))}
         </section>
-        <section className="mt-3 grid grid-cols-2 gap-2">
-          <div className="rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_26px_rgba(15,23,42,0.045)]">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#64748B]">
-              Portföy No
-            </p>
-            <p className="mt-1 truncate text-[12px] font-black text-[#06194A]">
-              {getPortfolioNo(unit)}
-            </p>
-          </div>
-          <div className="rounded-[22px] border border-emerald-100 bg-emerald-50 p-3 shadow-[0_10px_26px_rgba(15,23,42,0.045)]">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-700">
-              Doğrulama
-            </p>
-            <p className="mt-1 inline-flex items-center gap-1 text-[12px] font-black text-emerald-700">
-              <ShieldCheck size={14} />
-              {verified ? "Doğrulanmış" : "Kontrol"}
-            </p>
-          </div>
+
+
+
+        <section className="mt-2 flex items-center justify-between gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-3 py-2 text-[11px] font-black shadow-[0_8px_20px_rgba(15,23,42,0.04)]">
+          <span className="min-w-0 truncate text-[#64748B]">
+            {getPortfolioNo(unit)}
+          </span>
+          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 ${verified ? "bg-emerald-50 text-emerald-700" : "bg-[#F7FBFF] text-[#64748B]"}`}>
+            <ShieldCheck size={13} />
+            {verified ? "Doğrulanmış" : "Kontrol"}
+          </span>
         </section>
+
+
+
         <section className="mt-3 overflow-hidden rounded-[28px] border border-[#DDE7F3] bg-white shadow-[0_14px_36px_rgba(15,23,42,0.055)]">
           <button
             type="button"
@@ -960,7 +956,7 @@ export default function StokDetailPage() {
           <iframe
             title="Portföy haritası"
             src={`https://www.google.com/maps?q=${mapQuery}&z=${hasProjectCoordinates ? 17 : 14}&output=embed`}
-            className="h-[225px] w-full border-0"
+            className="h-[150px] w-full border-0"
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
           />
@@ -973,7 +969,7 @@ export default function StokDetailPage() {
           <p className="mt-3 whitespace-pre-line text-left text-[13px] font-semibold leading-6 text-[#475569]">
             {visibleDescription}
           </p>
-          {safeDescription.length > 235 && (
+          {safeDescription.length > 140 && (
             <button
               type="button"
               onClick={() => setDescriptionExpanded((current) => !current)}
@@ -1159,8 +1155,8 @@ export default function StokDetailPage() {
               </button>
             </div>
           </section>
-        )}{" "}
-      </section>
+        )}
+      
 
       {galleryOpen && galleryImages.length > 0 && (
         <div className="fixed inset-0 z-[10001] bg-[#06194A]/92 p-4 backdrop-blur-xl">
@@ -1296,7 +1292,7 @@ function InfoBox({
   value: string;
 }) {
   return (
-    <div className="flex min-h-[92px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-white p-3 text-center">
+    <div className="flex min-h-[64px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-white p-3 text-center">
       <div className="text-[#1557D6]">{icon}</div>
       <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#64748B]">
         {label}
