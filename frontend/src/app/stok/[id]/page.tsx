@@ -823,7 +823,10 @@ export default function StokDetailPage() {
                   borderColor: style.border,
                 }}
               >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: style.dot }} />
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: style.dot }}
+                />
                 {statusLabel(unit.status)}
               </span>
               <span className="inline-flex items-center gap-1 rounded-full border border-white/18 bg-black/35 px-2.5 py-1 text-[10px] font-black text-white backdrop-blur">
@@ -878,7 +881,7 @@ export default function StokDetailPage() {
           )}
 
           <div className="p-3">
-            <div className="flex items-start justify-between gap-3">
+            <div className="text-center">
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#64748B]">
                   Fiyat
@@ -887,26 +890,31 @@ export default function StokDetailPage() {
                   {formatMoney(unit.price, unit.priceCurrency)}
                 </p>
               </div>
-              <div className="shrink-0 rounded-[14px] bg-[#EFF6FF] px-2.5 py-2 text-right">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#64748B]">m²</p>
-                <p className="mt-0.5 text-[13px] font-black text-[#1557D6]">{calculatedSquareMeterPrice}</p>
-              </div>
             </div>
 
-            <div className="mt-2 flex items-center gap-1.5 text-[12px] font-black text-[#27364F]">
+            <div className="mt-2 flex items-center justify-center gap-1.5 text-[12px] font-black text-[#27364F]">
               <MapPin size={15} className="shrink-0 text-[#1557D6]" />
               <span className="min-w-0 truncate">{locationText}</span>
             </div>
 
             <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#DDE7F3] bg-[#FBFDFF]">
               {primaryInfoBoxes.map((item) => (
-                <InfoBox key={item.label} icon={item.icon} label={item.label} value={item.value} />
+                <InfoBox
+                  key={item.label}
+                  icon={item.icon}
+                  label={item.label}
+                  value={item.value}
+                />
               ))}
             </div>
 
             <div className="mt-2 flex items-center justify-between gap-2 rounded-[16px] border border-[#DDE7F3] bg-white px-3 py-2 text-[11px] font-black">
-              <span className="min-w-0 truncate text-[#64748B]">{getPortfolioNo(unit)}</span>
-              <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 ${verified ? "bg-emerald-50 text-emerald-700" : "bg-[#F7FBFF] text-[#64748B]"}`}>
+              <span className="min-w-0 truncate text-[#64748B]">
+                {getPortfolioNo(unit)}
+              </span>
+              <span
+                className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 ${verified ? "bg-emerald-50 text-emerald-700" : "bg-[#F7FBFF] text-[#64748B]"}`}
+              >
                 <ShieldCheck size={13} />
                 {verified ? "Doğrulanmış" : "Kontrol"}
               </span>
@@ -915,23 +923,23 @@ export default function StokDetailPage() {
         </section>
 
         <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-[#1557D6]">
-              <FileText size={17} />
-              <h2 className="text-[16px] font-black text-[#06194A]">Açıklama</h2>
-            </div>
+          <div className="flex items-center justify-center gap-2 text-[#1557D6]">
+            <FileText size={17} />
+            <h2 className="text-center text-[16px] font-black text-[#06194A]">
+              Açıklama
+            </h2>
+          </div>
+          <p className="mt-2 whitespace-pre-line text-left text-[12px] font-semibold leading-5 text-[#475569]">
+            {visibleDescription}
             {safeDescription.length > 140 && (
               <button
                 type="button"
                 onClick={() => setDescriptionExpanded((current) => !current)}
-                className="text-[12px] font-black text-[#1557D6]"
+                className="ml-1 inline font-black text-[#1557D6]"
               >
                 {descriptionExpanded ? "Daha Az" : "Devamı"}
               </button>
             )}
-          </div>
-          <p className="mt-2 whitespace-pre-line text-left text-[12px] font-semibold leading-5 text-[#475569]">
-            {visibleDescription}
           </p>
         </section>
 
@@ -969,22 +977,30 @@ export default function StokDetailPage() {
           />
         </section>
 
-        <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-[#1557D6]">
-              <Share2 size={17} />
-              <h2 className="text-[16px] font-black text-[#06194A]">Paylaş</h2>
-            </div>
-            <button
-              onClick={handleNativeShare}
-              className="rounded-[14px] bg-[#EFF6FF] px-2.5 py-1.5 text-[11px] font-black text-[#1557D6]"
-            >
-              Cihazdan
-            </button>
+        <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+          <div className="flex items-center justify-center gap-2 text-[#1557D6]">
+            <Share2 size={17} />
+            <h2 className="text-center text-[16px] font-black text-[#06194A]">
+              Paylaş
+            </h2>
           </div>
+          <button
+            onClick={handleNativeShare}
+            className="mx-auto mt-2 block rounded-[14px] bg-[#EFF6FF] px-3 py-1.5 text-[11px] font-black text-[#1557D6]"
+          >
+            Cihazdan
+          </button>
           <div className="mt-3 grid grid-cols-4 gap-2">
-            <ShareLink href={`https://wa.me/?text=${encodedShareText}`} label="WhatsApp" icon={<MessageCircle size={17} />} />
-            <ShareLink href={`https://t.me/share/url?url=${encodedShareUrl}&text=${encodedShareText}`} label="Telegram" icon={<Send size={17} />} />
+            <ShareLink
+              href={`https://wa.me/?text=${encodedShareText}`}
+              label="WhatsApp"
+              icon={<MessageCircle size={17} />}
+            />
+            <ShareLink
+              href={`https://t.me/share/url?url=${encodedShareUrl}&text=${encodedShareText}`}
+              label="Telegram"
+              icon={<Send size={17} />}
+            />
             <button
               onClick={handleCopyLink}
               className="inline-flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-[16px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#475569]"
@@ -1011,9 +1027,13 @@ export default function StokDetailPage() {
             <InfoRow label="Portföy" value={unit.project?.name || "—"} />
             <InfoRow label="Mülk Tipi" value={typeLabel(unit.type)} />
             <InfoRow label="Durum" value={statusLabel(unit.status)} />
-            <InfoRow label={isLandDetailType(unit.type) ? "Ada / Parsel" : "Bağımsız Bölüm"} value={unit.number || "—"} />
+            <InfoRow
+              label={
+                isLandDetailType(unit.type) ? "Ada / Parsel" : "Bağımsız Bölüm"
+              }
+              value={unit.number || "—"}
+            />
             <InfoRow label="Kayıt" value={formatDate(unit.createdAt)} />
-            <InfoRow label="m² Fiyat" value={calculatedSquareMeterPrice} />
           </div>
         </section>
 
@@ -1037,8 +1057,14 @@ export default function StokDetailPage() {
 
           <div className="mt-3 grid grid-cols-3 gap-2">
             <TrustRow label="Tapu" active={Boolean(unit.tapuVerified)} />
-            <TrustRow label="Fotoğraf" active={Boolean(unit.photoVerified || galleryImages.length > 0)} />
-            <TrustRow label="Yetki" active={Boolean(unit.yetkiVerified || unit.isVerified)} />
+            <TrustRow
+              label="Fotoğraf"
+              active={Boolean(unit.photoVerified || galleryImages.length > 0)}
+            />
+            <TrustRow
+              label="Yetki"
+              active={Boolean(unit.yetkiVerified || unit.isVerified)}
+            />
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -1061,7 +1087,9 @@ export default function StokDetailPage() {
           <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
             <div className="flex items-center justify-center gap-2 text-[#1557D6]">
               <Camera size={17} />
-              <h2 className="text-[16px] font-black text-[#06194A]">Fotoğraf Yönetimi</h2>
+              <h2 className="text-[16px] font-black text-[#06194A]">
+                Fotoğraf Yönetimi
+              </h2>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
@@ -1076,7 +1104,10 @@ export default function StokDetailPage() {
               <button
                 type="button"
                 onClick={() => galleryInputRef.current?.click()}
-                disabled={imageUploadLoading === "gallery" || galleryImages.length >= MAX_GALLERY_COUNT}
+                disabled={
+                  imageUploadLoading === "gallery" ||
+                  galleryImages.length >= MAX_GALLERY_COUNT
+                }
                 className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#1557D6] disabled:opacity-60"
               >
                 <Upload size={16} />
