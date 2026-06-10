@@ -723,7 +723,7 @@ export default function StokDetailPage() {
     unit.description || "Bu portföy için açıklama henüz eklenmedi.";
   const shortDescription =
     safeDescription.length > 140
-      ? `${safeDescription.slice(0, 235).trim()}...`
+      ? `${safeDescription.slice(0, 140).trim()}...`
       : safeDescription;
   const visibleDescription = descriptionExpanded
     ? safeDescription
@@ -749,51 +749,51 @@ export default function StokDetailPage() {
         onChange={handleGalleryUpload}
       />
 
-      <section className="mx-auto max-w-7xl px-4 py-4 md:py-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <section className="mx-auto w-full max-w-[430px] px-3 py-3">
+        <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-1">
           <button
             onClick={() => router.push("/stok")}
-            className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-4 text-sm font-black text-[#06194A] shadow-[0_12px_28px_rgba(15,23,42,0.06)]"
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#06194A] shadow-[0_8px_18px_rgba(15,23,42,0.05)]"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} />
             Geri
           </button>
-          <div className="flex items-center gap-2">
-            {canEditPortfolio && (
-              <button
-                onClick={() => router.push(`/stok?edit=${unit.id}`)}
-                className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-4 text-sm font-black text-[#1557D6] shadow-[0_12px_28px_rgba(15,23,42,0.06)]"
-              >
-                <Edit3 size={17} />
-                Güncelle
-              </button>
-            )}
+          {canEditPortfolio && (
             <button
-              onClick={handleCopyLink}
-              className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-4 text-sm font-black text-[#475569] shadow-[0_12px_28px_rgba(15,23,42,0.06)]"
+              onClick={() => router.push(`/stok?edit=${unit.id}`)}
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#1557D6] shadow-[0_8px_18px_rgba(15,23,42,0.05)]"
             >
-              <Copy size={17} />
-              {copied ? "Kopyalandı" : "Link"}
+              <Edit3 size={15} />
+              Güncelle
             </button>
-            <button
-              onClick={handleOpenShareModal}
-              className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[#1557D6] px-4 text-sm font-black text-white shadow-[0_14px_30px_rgba(21,87,214,0.22)]"
-            >
-              <Share2 size={17} />
-              Paylaş
-            </button>
-          </div>
+          )}
+          <button
+            onClick={handleCopyLink}
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#475569] shadow-[0_8px_18px_rgba(15,23,42,0.05)]"
+          >
+            <Copy size={15} />
+            {copied ? "Kopyalandı" : "Link"}
+          </button>
+          <button
+            onClick={handleOpenShareModal}
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] bg-[#1557D6] px-3 text-[12px] font-black text-white shadow-[0_12px_24px_rgba(21,87,214,0.22)]"
+          >
+            <Share2 size={15} />
+            Paylaş
+          </button>
         </div>
+
         {actionError && (
-          <div className="mb-4 rounded-[24px] border border-rose-100 bg-rose-50 px-4 py-3 text-center text-sm font-black leading-6 text-rose-700">
+          <div className="mb-2 rounded-[18px] border border-rose-100 bg-rose-50 px-3 py-2 text-center text-[12px] font-black leading-5 text-rose-700">
             {actionError}
           </div>
         )}
-        <section className="overflow-hidden rounded-[28px] border border-[#DDE7F3] bg-white shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
+
+        <section className="overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.07)]">
           <button
             type="button"
             onClick={() => galleryImages.length > 0 && setGalleryOpen(true)}
-            className="group relative block h-[190px] w-full overflow-hidden bg-[#06194A] text-left md:h-[360px]"
+            className="group relative block h-[190px] w-full overflow-hidden bg-[#06194A] text-left"
           >
             {activeGalleryImage ? (
               <img
@@ -803,57 +803,54 @@ export default function StokDetailPage() {
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.18),transparent_28%),linear-gradient(135deg,#06194A,#1557D6)]">
-                <div className="rounded-[24px] border border-white/18 bg-white/12 px-5 py-4 text-center backdrop-blur">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/70">
+                <div className="rounded-[20px] border border-white/18 bg-white/12 px-4 py-3 text-center backdrop-blur">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70">
                     Fotoğraf Eklenmedi
                   </p>
-                  <p className="mt-2 text-xs font-bold text-white/85">
+                  <p className="mt-1 text-[11px] font-bold text-white/85">
                     Kapak görseli bekleniyor.
                   </p>
                 </div>
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/58 via-transparent to-[#06194A]/8" />
-            <div className="absolute left-3 top-3 flex items-center gap-2">
+            <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/72 via-[#06194A]/10 to-[#06194A]/10" />
+            <div className="absolute left-2 top-2 flex items-center gap-1.5">
               <span
-                className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[10px] font-black shadow-lg"
+                className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-black shadow-lg"
                 style={{
                   color: style.color,
                   background: style.bg,
                   borderColor: style.border,
                 }}
               >
-                <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ background: style.dot }}
-                />
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: style.dot }} />
                 {statusLabel(unit.status)}
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/18 bg-black/35 px-3 py-1.5 text-[10px] font-black text-white backdrop-blur">
-                <Camera size={13} />
+              <span className="inline-flex items-center gap-1 rounded-full border border-white/18 bg-black/35 px-2.5 py-1 text-[10px] font-black text-white backdrop-blur">
+                <Camera size={12} />
                 {galleryImages.length}/{MAX_GALLERY_COUNT}
               </span>
             </div>
-            <div className="absolute bottom-3 left-3 right-3">
-              <p className="line-clamp-2 text-[18px] font-black leading-tight tracking-[-0.04em] text-white drop-shadow md:text-2xl">
+            <div className="absolute bottom-2 left-2 right-2">
+              <p className="line-clamp-2 text-[18px] font-black leading-tight tracking-[-0.04em] text-white drop-shadow">
                 {unitTitle(unit)}
               </p>
-              <div className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-white/90">
-                <MapPin size={14} />
+              <div className="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-white/90">
+                <MapPin size={13} />
                 <span className="truncate">{fullAddress}</span>
               </div>
             </div>
           </button>
 
-          <div className="border-t border-[#E8F0FA] bg-white p-3">
-            {galleryImages.length > 0 ? (
-              <div className="flex gap-2 overflow-x-auto pb-1">
+          {galleryImages.length > 0 && (
+            <div className="border-b border-[#E8F0FA] bg-white px-2.5 py-2">
+              <div className="flex gap-2 overflow-x-auto pb-0.5">
                 {galleryImages.slice(0, 8).map((photo, index) => (
                   <button
                     key={photo.id || photo.displayUrl}
                     type="button"
                     onClick={() => setActivePhoto(index)}
-                    className={`relative h-[50px] w-[60px] shrink-0 overflow-hidden rounded-[14px] border ${activePhoto === index ? "border-[#1557D6] ring-2 ring-blue-100" : "border-[#DDE7F3]"}`}
+                    className={`relative h-[46px] w-[58px] shrink-0 overflow-hidden rounded-[12px] border ${activePhoto === index ? "border-[#1557D6] ring-2 ring-blue-100" : "border-[#DDE7F3]"}`}
                   >
                     <img
                       src={photo.displayUrl}
@@ -871,63 +868,74 @@ export default function StokDetailPage() {
                   <button
                     type="button"
                     onClick={() => setGalleryOpen(true)}
-                    className="flex h-[58px] w-[72px] shrink-0 items-center justify-center rounded-[14px] border border-[#DDE7F3] bg-[#06194A] text-sm font-black text-white"
+                    className="flex h-[46px] w-[58px] shrink-0 items-center justify-center rounded-[12px] border border-[#DDE7F3] bg-[#06194A] text-[12px] font-black text-white"
                   >
                     +{galleryImages.length - 8}
                   </button>
                 )}
               </div>
-            ) : (
+            </div>
+          )}
+
+          <div className="p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#64748B]">
+                  Fiyat
+                </p>
+                <p className="mt-0.5 text-[30px] font-black leading-none tracking-[-0.06em] text-[#06194A]">
+                  {formatMoney(unit.price, unit.priceCurrency)}
+                </p>
+              </div>
+              <div className="shrink-0 rounded-[14px] bg-[#EFF6FF] px-2.5 py-2 text-right">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#64748B]">m²</p>
+                <p className="mt-0.5 text-[13px] font-black text-[#1557D6]">{calculatedSquareMeterPrice}</p>
+              </div>
+            </div>
+
+            <div className="mt-2 flex items-center gap-1.5 text-[12px] font-black text-[#27364F]">
+              <MapPin size={15} className="shrink-0 text-[#1557D6]" />
+              <span className="min-w-0 truncate">{locationText}</span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#DDE7F3] bg-[#FBFDFF]">
+              {primaryInfoBoxes.map((item) => (
+                <InfoBox key={item.label} icon={item.icon} label={item.label} value={item.value} />
+              ))}
+            </div>
+
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-[16px] border border-[#DDE7F3] bg-white px-3 py-2 text-[11px] font-black">
+              <span className="min-w-0 truncate text-[#64748B]">{getPortfolioNo(unit)}</span>
+              <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 ${verified ? "bg-emerald-50 text-emerald-700" : "bg-[#F7FBFF] text-[#64748B]"}`}>
+                <ShieldCheck size={13} />
+                {verified ? "Doğrulanmış" : "Kontrol"}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-[#1557D6]">
+              <FileText size={17} />
+              <h2 className="text-[16px] font-black text-[#06194A]">Açıklama</h2>
+            </div>
+            {safeDescription.length > 140 && (
               <button
                 type="button"
-                onClick={() =>
-                  canEditPortfolio && coverInputRef.current?.click()
-                }
-                className="flex h-[58px] w-full items-center justify-center gap-2 rounded-[16px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] text-xs font-black text-[#64748B]"
+                onClick={() => setDescriptionExpanded((current) => !current)}
+                className="text-[12px] font-black text-[#1557D6]"
               >
-                <Camera size={16} />
-                Kapak fotoğrafı ekle
+                {descriptionExpanded ? "Daha Az" : "Devamı"}
               </button>
             )}
           </div>
-        </section>
-        
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#64748B]">
-            Fiyat
-          </p>
-          <p className="mt-1 text-[34px] font-black leading-none tracking-[-0.055em] text-[#06194A]">
-            {formatMoney(unit.price, unit.priceCurrency)}
-          </p>
-          <p className="mt-2 text-sm font-black text-[#1557D6]">
-            {calculatedSquareMeterPrice}
+          <p className="mt-2 whitespace-pre-line text-left text-[12px] font-semibold leading-5 text-[#475569]">
+            {visibleDescription}
           </p>
         </section>
-        <section className="mt-3 grid grid-cols-4 gap-2">
-          {primaryInfoBoxes.map((item) => (
-            <InfoBox
-              key={item.label}
-              icon={item.icon}
-              label={item.label}
-              value={item.value}
-            />
-          ))}
-        </section>
 
-
-
-        <section className="mt-2 flex items-center justify-between gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-3 py-2 text-[11px] font-black shadow-[0_8px_20px_rgba(15,23,42,0.04)]">
-          <span className="min-w-0 truncate text-[#64748B]">
-            {getPortfolioNo(unit)}
-          </span>
-          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 ${verified ? "bg-emerald-50 text-emerald-700" : "bg-[#F7FBFF] text-[#64748B]"}`}>
-            <ShieldCheck size={13} />
-            {verified ? "Doğrulanmış" : "Kontrol"}
-          </span>
-        </section>
-
-
-
-        <section className="mt-3 overflow-hidden rounded-[28px] border border-[#DDE7F3] bg-white shadow-[0_14px_36px_rgba(15,23,42,0.055)]">
+        <section className="mt-3 overflow-hidden rounded-[22px] border border-[#DDE7F3] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
           <button
             type="button"
             onClick={() =>
@@ -938,225 +946,168 @@ export default function StokDetailPage() {
                 "noopener,noreferrer",
               )
             }
-            className="flex w-full items-center justify-between gap-3 border-b border-[#E8F0FA] px-4 py-3 text-left"
+            className="flex w-full items-center justify-between gap-3 border-b border-[#E8F0FA] px-3 py-2.5 text-left"
           >
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#64748B]">
                 Konum
               </p>
-              <p className="mt-1 truncate text-sm font-black text-[#06194A]">
+              <p className="mt-0.5 truncate text-[13px] font-black text-[#06194A]">
                 {locationText}
               </p>
-              <p className="mt-0.5 truncate text-xs font-bold text-[#64748B]">
-                {unit.project?.address || "Adres bilgisi yok"}
-              </p>
             </div>
-            <MapPin className="shrink-0 text-[#1557D6]" size={22} />
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-[14px] bg-[#EFF6FF] px-2.5 py-1.5 text-[11px] font-black text-[#1557D6]">
+              Haritada Aç <ExternalLink size={12} />
+            </span>
           </button>
           <iframe
             title="Portföy haritası"
             src={`https://www.google.com/maps?q=${mapQuery}&z=${hasProjectCoordinates ? 17 : 14}&output=embed`}
-            className="h-[150px] w-full border-0"
+            className="h-[135px] w-full border-0"
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
           />
         </section>
-        <section className="mt-3 rounded-[28px] border border-[#DDE7F3] bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.055)]">
-          <div className="flex items-center justify-center gap-2 text-[#1557D6]">
-            <FileText size={18} />
-            <h2 className="text-lg font-black text-[#06194A]">Açıklama</h2>
-          </div>
-          <p className="mt-3 whitespace-pre-line text-left text-[13px] font-semibold leading-6 text-[#475569]">
-            {visibleDescription}
-          </p>
-          {safeDescription.length > 140 && (
+
+        <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-[#1557D6]">
+              <Share2 size={17} />
+              <h2 className="text-[16px] font-black text-[#06194A]">Paylaş</h2>
+            </div>
             <button
-              type="button"
-              onClick={() => setDescriptionExpanded((current) => !current)}
-              className="mx-auto mt-3 block text-sm font-black text-[#1557D6]"
+              onClick={handleNativeShare}
+              className="rounded-[14px] bg-[#EFF6FF] px-2.5 py-1.5 text-[11px] font-black text-[#1557D6]"
             >
-              {descriptionExpanded ? "Daha Az Göster" : "Devamını Oku"}
+              Cihazdan
             </button>
-          )}
-        </section>
-        <section className="mt-3 rounded-[28px] border border-[#DDE7F3] bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.055)]">
-          <div className="flex items-center justify-center gap-2 text-[#1557D6]">
-            <Share2 size={18} />
-            <h2 className="text-lg font-black text-[#06194A]">Paylaşım</h2>
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <ShareLink
-              href={`https://wa.me/?text=${encodedShareText}`}
-              label="WhatsApp"
-              icon={<MessageCircle size={18} />}
-            />
-            <ShareLink
-              href={`https://t.me/share/url?url=${encodedShareUrl}&text=${encodedShareText}`}
-              label="Telegram"
-              icon={<Send size={18} />}
-            />
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            <ShareLink href={`https://wa.me/?text=${encodedShareText}`} label="WhatsApp" icon={<MessageCircle size={17} />} />
+            <ShareLink href={`https://t.me/share/url?url=${encodedShareUrl}&text=${encodedShareText}`} label="Telegram" icon={<Send size={17} />} />
             <button
               onClick={handleCopyLink}
-              className="inline-flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-[18px] border border-[#DDE7F3] bg-white px-2 text-[11px] font-black text-[#475569]"
+              className="inline-flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-[16px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#475569]"
             >
-              <Copy size={18} />
-              {copied ? "Kopyalandı" : "Kopyala"}
+              <Copy size={17} />
+              {copied ? "Kopyalandı" : "Link"}
             </button>
             <button
               onClick={handleOpenShareModal}
-              className="inline-flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-[18px] bg-[#1557D6] px-2 text-[11px] font-black text-white"
+              className="inline-flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-[16px] bg-[#1557D6] px-2 text-[10px] font-black text-white"
             >
-              <Share2 size={18} />
+              <Share2 size={17} />
               Kart / QR
             </button>
-            <button
-              onClick={handleNativeShare}
-              className="inline-flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-[18px] border border-[#DDE7F3] bg-white px-2 text-[11px] font-black text-[#1557D6]"
-            >
-              <Send size={18} />
-              Cihazdan
-            </button>
-            <ShareLink
-              href={`https://www.facebook.com/sharer/sharer.php?u=${encodedShareUrl}`}
-              label="Facebook"
-              icon={<ExternalLink size={18} />}
-            />
           </div>
         </section>
-        <section className="mt-3 rounded-[28px] border border-[#DDE7F3] bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.055)]">
-          <div className="flex items-center justify-center gap-2 text-[#1557D6]">
-            <Building2 size={18} />
-            <h2 className="text-lg font-black text-[#06194A]">Detaylar</h2>
+
+        <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+          <div className="flex items-center gap-2 text-[#1557D6]">
+            <Building2 size={17} />
+            <h2 className="text-[16px] font-black text-[#06194A]">Detaylar</h2>
           </div>
-          <div className="mt-4 space-y-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <InfoRow label="Portföy" value={unit.project?.name || "—"} />
             <InfoRow label="Mülk Tipi" value={typeLabel(unit.type)} />
             <InfoRow label="Durum" value={statusLabel(unit.status)} />
-            <InfoRow
-              label={
-                isLandDetailType(unit.type) ? "Ada / Parsel" : "Bağımsız Bölüm"
-              }
-              value={unit.number || "—"}
-            />
-            <InfoRow label="Kayıt Tarihi" value={formatDate(unit.createdAt)} />
+            <InfoRow label={isLandDetailType(unit.type) ? "Ada / Parsel" : "Bağımsız Bölüm"} value={unit.number || "—"} />
+            <InfoRow label="Kayıt" value={formatDate(unit.createdAt)} />
+            <InfoRow label="m² Fiyat" value={calculatedSquareMeterPrice} />
           </div>
         </section>
-        <section className="mt-3 rounded-[28px] border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_14px_36px_rgba(15,23,42,0.055)]">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-            <CircleUserRound size={23} />
-          </div>
-          <h2 className="mt-3 text-lg font-black text-[#06194A]">
-            Danışman / Sahip
-          </h2>
-          <p className="mt-1 text-sm font-semibold text-[#64748B]">
-            {ownerName || "Kullanıcı bilgisi yok"}
-          </p>
-          {unit.project?.owner?.role && (
-            <span className="mt-3 inline-flex rounded-full bg-[#F7FBFF] px-3 py-2 text-xs font-black text-[#64748B]">
-              {unit.project.owner.role}
+
+        <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[#EFF6FF] text-[#1557D6]">
+              <CircleUserRound size={22} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-black text-[#06194A]">
+                {ownerName || "Kullanıcı bilgisi yok"}
+              </p>
+              <p className="mt-0.5 truncate text-[11px] font-bold text-[#64748B]">
+                {unit.project?.owner?.role || "Danışman / Sahip"}
+              </p>
+            </div>
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700">
+              Güven
             </span>
-          )}
-          <div className="mt-4 grid grid-cols-2 gap-2">
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <TrustRow label="Tapu" active={Boolean(unit.tapuVerified)} />
+            <TrustRow label="Fotoğraf" active={Boolean(unit.photoVerified || galleryImages.length > 0)} />
+            <TrustRow label="Yetki" active={Boolean(unit.yetkiVerified || unit.isVerified)} />
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <Link
               href="/messages"
-              className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#06194A] text-sm font-black text-white"
+              className="flex h-10 items-center justify-center gap-2 rounded-[16px] bg-[#06194A] text-[12px] font-black text-white"
             >
-              <MessageCircle size={18} /> Mesaj
+              <MessageCircle size={16} /> Mesaj
             </Link>
             <button
               onClick={handleOpenShareModal}
-              className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-[#DDE7F3] bg-white text-sm font-black text-[#1557D6]"
+              className="flex h-10 items-center justify-center gap-2 rounded-[16px] border border-[#DDE7F3] bg-white text-[12px] font-black text-[#1557D6]"
             >
-              <Share2 size={18} /> Kart
+              <Share2 size={16} /> Kart
             </button>
           </div>
         </section>
-        <section className="mt-3 rounded-[28px] border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_14px_36px_rgba(15,23,42,0.055)]">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
-            <BadgeCheck size={23} />
-          </div>
-          <h2 className="mt-3 text-lg font-black text-[#06194A]">
-            Güven Durumu
-          </h2>
-          <div className="mt-4 grid gap-2">
-            <TrustRow label="Tapu" active={Boolean(unit.tapuVerified)} />
-            <TrustRow
-              label="Fotoğraf"
-              active={Boolean(unit.photoVerified || galleryImages.length > 0)}
-            />
-            <TrustRow
-              label="Yetki"
-              active={Boolean(unit.yetkiVerified || unit.isVerified)}
-            />
-          </div>
-        </section>
+
         {canEditPortfolio && (
-          <section className="mt-3 rounded-[28px] border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_14px_36px_rgba(15,23,42,0.055)]">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
-              <Camera size={22} />
+          <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+            <div className="flex items-center justify-center gap-2 text-[#1557D6]">
+              <Camera size={17} />
+              <h2 className="text-[16px] font-black text-[#06194A]">Fotoğraf Yönetimi</h2>
             </div>
-            <h2 className="mt-3 text-lg font-black text-[#06194A]">
-              Fotoğraf Yönetimi
-            </h2>
-            <div className="mt-4 grid gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => coverInputRef.current?.click()}
                 disabled={imageUploadLoading === "cover"}
-                className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[18px] bg-[#1557D6] px-4 text-sm font-black text-white disabled:opacity-60"
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] bg-[#1557D6] px-3 text-[12px] font-black text-white disabled:opacity-60"
               >
-                <Camera size={17} />
-                {imageUploadLoading === "cover"
-                  ? "Yükleniyor..."
-                  : "Kapak Ekle / Değiştir"}
+                <Camera size={16} />
+                {imageUploadLoading === "cover" ? "Yükleniyor..." : "Kapak"}
               </button>
               <button
                 type="button"
                 onClick={() => galleryInputRef.current?.click()}
-                disabled={
-                  imageUploadLoading === "gallery" ||
-                  galleryImages.length >= MAX_GALLERY_COUNT
-                }
-                className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-4 text-sm font-black text-[#1557D6] disabled:opacity-60"
+                disabled={imageUploadLoading === "gallery" || galleryImages.length >= MAX_GALLERY_COUNT}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#1557D6] disabled:opacity-60"
               >
-                <Upload size={17} />
-                {imageUploadLoading === "gallery"
-                  ? "Yükleniyor..."
-                  : "Galeriye Foto Ekle"}
+                <Upload size={16} />
+                {imageUploadLoading === "gallery" ? "Yükleniyor..." : "Galeri"}
               </button>
             </div>
-            <p className="mt-3 text-center text-xs font-bold leading-5 text-[#64748B]">
-              JPG, PNG, WEBP · En fazla 15 MB · Galeri sınırı{" "}
-              {MAX_GALLERY_COUNT} fotoğraf.
-            </p>
           </section>
         )}
+
         {canEditPortfolio && (
-          <section className="mt-3 rounded-[28px] border border-[#DDE7F3] bg-white p-4 text-center shadow-[0_14px_36px_rgba(15,23,42,0.055)]">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-700">
-              <Trash2 size={22} />
-            </div>
-            <h2 className="mt-3 text-lg font-black text-[#06194A]">Yönetim</h2>
-            <div className="mt-4 grid gap-2">
+          <section className="mt-3 rounded-[22px] border border-rose-100 bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => router.push(`/stok?edit=${unit.id}`)}
-                className="h-12 w-full rounded-2xl bg-[#EFF6FF] text-sm font-black text-[#1557D6]"
+                className="h-10 w-full rounded-[16px] bg-[#EFF6FF] text-[12px] font-black text-[#1557D6]"
               >
-                Portföyü Güncelle
+                Güncelle
               </button>
               <button
                 onClick={() => {
                   setActionError("");
                   setDeleteOpen(true);
                 }}
-                className="h-12 w-full rounded-2xl bg-rose-50 text-sm font-black text-rose-700"
+                className="h-10 w-full rounded-[16px] bg-rose-50 text-[12px] font-black text-rose-700"
               >
-                Portföyü Sil
+                Sil
               </button>
             </div>
           </section>
         )}
-      
+      </section>
 
       {galleryOpen && galleryImages.length > 0 && (
         <div className="fixed inset-0 z-[10001] bg-[#06194A]/92 p-4 backdrop-blur-xl">
@@ -1292,12 +1243,12 @@ function InfoBox({
   value: string;
 }) {
   return (
-    <div className="flex min-h-[64px] flex-col items-center justify-center rounded-[24px] border border-[#DDE7F3] bg-white p-3 text-center">
+    <div className="flex min-h-[62px] flex-col items-center justify-center border-r border-[#DDE7F3] px-1.5 py-2 text-center last:border-r-0">
       <div className="text-[#1557D6]">{icon}</div>
-      <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#64748B]">
+      <p className="mt-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#64748B]">
         {label}
       </p>
-      <p className="mt-1 line-clamp-2 text-sm font-black text-[#06194A]">
+      <p className="mt-0.5 line-clamp-2 text-[12px] font-black leading-tight text-[#06194A]">
         {value}
       </p>
     </div>
@@ -1328,11 +1279,11 @@ function SectionTitle({
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-3 rounded-2xl bg-[#F7FBFF] px-4 py-3">
-      <span className="text-xs font-black uppercase tracking-wide text-[#64748B]">
+    <div className="flex min-h-[48px] flex-col justify-center rounded-[16px] bg-[#F7FBFF] px-3 py-2 text-center">
+      <span className="text-[9px] font-black uppercase tracking-wide text-[#64748B]">
         {label}
       </span>
-      <span className="text-right text-sm font-black text-[#06194A]">
+      <span className="mt-1 line-clamp-2 text-[12px] font-black leading-tight text-[#06194A]">
         {value}
       </span>
     </div>
@@ -1342,7 +1293,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 function TrustRow({ label, active }: { label: string; active: boolean }) {
   return (
     <div
-      className={`flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-black ${active ? "bg-emerald-50 text-emerald-700" : "bg-[#F7FBFF] text-[#64748B]"}`}
+      className={`flex min-h-[38px] items-center justify-center gap-1 rounded-[14px] px-2 py-2 text-[10px] font-black ${active ? "bg-emerald-50 text-emerald-700" : "bg-[#F7FBFF] text-[#64748B]"}`}
     >
       <span>{label}</span>
       {active ? <CheckCircle2 size={18} /> : <BadgeCheck size={18} />}
@@ -1364,11 +1315,10 @@ function ShareLink({
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[20px] border border-[#DDE7F3] bg-white px-4 text-sm font-black text-[#475569] transition hover:bg-[#EFF6FF] hover:text-[#1557D6]"
+      className="inline-flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-[16px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#475569] transition hover:bg-[#EFF6FF] hover:text-[#1557D6]"
     >
       {icon}
       {label}
-      <ExternalLink size={14} />
     </a>
   );
 }
