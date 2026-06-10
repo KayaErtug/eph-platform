@@ -24,6 +24,7 @@ import { ReferralModule } from './referral/referral.module';
 import { NetworkModule } from './network/network.module';
 import { SystemMessagesModule } from './system-messages/system-messages.module';
 import { PortfolioImagesModule } from './portfolio-images/portfolio-images.module';
+import { PortfolioDocumentsModule } from './portfolio-documents/portfolio-documents.module';
 import { KatilimTalepleriModule } from './katilim-talepleri/katilim-talepleri.module';
 
 import { LinaModule } from './lina/lina.module';
@@ -58,6 +59,7 @@ import { LinaModule } from './lina/lina.module';
     NetworkModule,
     SystemMessagesModule,
     PortfolioImagesModule,
+    PortfolioDocumentsModule,
     KatilimTalepleriModule,
 
     DashboardModule,
