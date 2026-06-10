@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -23,14 +23,25 @@ export default function GirisPage() {
   const setAuth = useAuthStore((s) => s.setAuth);
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rememberEmail, setRememberEmail] = useState(true);
 
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
+
+  useEffect(() => {
+    const rememberedEmail = window.localStorage.getItem("eph_remembered_email");
+
+    if (rememberedEmail) {
+      setValue("email", rememberedEmail);
+      setRememberEmail(true);
+    }
+  }, [setValue]);
 
   const onSubmit = async (data: LoginFormData) => {
     setLoading(true);
@@ -39,6 +50,12 @@ export default function GirisPage() {
     try {
       const response = await api.post("/auth/login", data);
       const result = response.data;
+
+      if (rememberEmail) {
+        window.localStorage.setItem("eph_remembered_email", data.email);
+      } else {
+        window.localStorage.removeItem("eph_remembered_email");
+      }
 
       setAuth(result.user, result.token);
       router.push("/dashboard");
@@ -51,7 +68,7 @@ export default function GirisPage() {
       setServerError(
         message === "Sunucu bağlantısı kurulamadı."
           ? "Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin."
-          : message
+          : message,
       );
     } finally {
       setLoading(false);
@@ -227,6 +244,35 @@ export default function GirisPage() {
           font-size: 13px;
           font-weight: 800;
         }
+
+        .login-remember-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin: -2px 0 18px;
+        }
+        .login-remember-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
+          color: #334155;
+          font-size: 13px;
+          font-weight: 800;
+          cursor: pointer;
+          user-select: none;
+        }
+        .login-remember-label input {
+          width: 17px;
+          height: 17px;
+          accent-color: #1D4ED8;
+        }
+        .login-remember-hint {
+          color: #94A3B8;
+          font-size: 12px;
+          font-weight: 700;
+          white-space: nowrap;
+        }
         .login-input-wrap { position: relative; }
         .login-input-icon {
           position: absolute;
@@ -373,7 +419,9 @@ export default function GirisPage() {
                     <UsersRound size={21} />
                   </div>
                   <strong>B2B çalışma ağı</strong>
-                  <span>Emlak profesyonelleri arasında kontrollü paylaşım.</span>
+                  <span>
+                    Emlak profesyonelleri arasında kontrollü paylaşım.
+                  </span>
                 </div>
 
                 <div className="login-feature">
@@ -405,7 +453,10 @@ export default function GirisPage() {
               <div className="login-mobile-logo">
                 <img src="/LOGO_EPH.png" alt="EPH" />
                 <div>
-                  <div className="login-brand-title" style={{ color: "#0B1F44" }}>
+                  <div
+                    className="login-brand-title"
+                    style={{ color: "#0B1F44" }}
+                  >
                     EPH Platform
                   </div>
                   <div className="login-brand-sub" style={{ color: "#64748B" }}>
@@ -463,17 +514,40 @@ export default function GirisPage() {
                   )}
                 </div>
 
+                <div className="login-remember-row">
+                  <label
+                    className="login-remember-label"
+                    htmlFor="rememberEmail"
+                  >
+                    <input
+                      id="rememberEmail"
+                      type="checkbox"
+                      checked={rememberEmail}
+                      onChange={(event) =>
+                        setRememberEmail(event.target.checked)
+                      }
+                    />
+                    E-posta adresimi hatırla
+                  </label>
+                  <span className="login-remember-hint">Bu cihazda</span>
+                </div>
+
                 {serverError && (
                   <div className="login-server-error">{serverError}</div>
                 )}
 
-                <button type="submit" disabled={loading} className="login-submit">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="login-submit"
+                >
                   {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
                 </button>
               </form>
 
               <div className="login-bottom">
-                Hesabınız yok mu? <Link href="/kayit">Kayıt talebi oluşturun</Link>
+                Hesabınız yok mu?{" "}
+                <Link href="/kayit">Kayıt talebi oluşturun</Link>
               </div>
 
               <div className="login-note">
