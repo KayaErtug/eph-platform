@@ -47,6 +47,7 @@ model User {
   ConversationParticipant ConversationParticipant[]
   customers               Customer[]
   documents               Document[]
+  portfolioAuthorityApprovals PortfolioAuthorityDocument[] @relation("PortfolioAuthorityApprover")
   Message                 Message[]
   NetworkPost             NetworkPost[]
   NetworkPostUpdateLog    NetworkPostUpdateLog[]
@@ -198,8 +199,21 @@ model Unit {
   verifiedAt    DateTime?
   yetkiVerified Boolean    @default(false)
 
+  approvalStatus PortfolioApprovalStatus @default(TASLAK)
+  submittedForApprovalAt DateTime?
+  approvedAt DateTime?
+  rejectedAt DateTime?
+  approvalNote String?
+  isPoolVisible Boolean @default(false)
+  poolPublishedAt DateTime?
+  poolRemovedAt DateTime?
+
   project Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   images  UnitImage[]
+  authorityDocuments PortfolioAuthorityDocument[]
+
+  @@index([approvalStatus])
+  @@index([isPoolVisible])
 }
 
 model UnitImage {
@@ -222,6 +236,36 @@ model UnitImage {
   @@index([unitId])
   @@index([isCover])
   @@index([sortOrder])
+}
+
+model PortfolioAuthorityDocument {
+  id String @id @default(uuid())
+
+  unitId String
+  authorityType PortfolioAuthorityType
+
+  fileUrl String
+  fileName String?
+  mimeType String?
+  sizeBytes Int?
+
+  approved Boolean @default(false)
+  approvedById String?
+  approvedAt DateTime?
+
+  rejectReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  approvedBy User? @relation("PortfolioAuthorityApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@index([unitId])
+  @@index([authorityType])
+  @@index([approved])
+  @@index([approvedById])
+  @@index([createdAt])
 }
 
 model Report {
@@ -837,6 +881,8 @@ enum DavetKoduTuru {
 enum DocumentType {
   VERGI_LEVHASI
   YETKI_BELGESI
+  TAPU
+  KAT_KARSILIGI_SOZLESMESI
   TICARET_SICIL
   KIMLIK
   DIGER
@@ -853,6 +899,23 @@ enum DocumentStatus {
   APPROVED
   REJECTED
 }
+
+enum PortfolioApprovalStatus {
+  TASLAK
+  YETKI_BELGESI_BEKLIYOR
+  INCELEMEDE
+  ONAYLANDI
+  REDDEDILDI
+  HAVUZDA
+}
+
+enum PortfolioAuthorityType {
+  YETKI_BELGESI
+  TAPU
+  KAT_KARSILIGI_SOZLESMESI
+  DIGER_DOGRULAMA_EVRAKI
+}
+
 
 enum UnitStatus {
   SATILIK

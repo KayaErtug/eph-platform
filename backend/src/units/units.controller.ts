@@ -54,6 +54,16 @@ export class UnitsController {
     });
   }
 
+  @Get('pool')
+  findPool(
+    @CurrentUser() user: any,
+    @Query('status') status?: UnitStatus,
+    @Query('type') type?: UnitType,
+    @Query('city') city?: string,
+  ) {
+    return this.unitsService.findPool(user, { status, type, city });
+  }
+
   @Get('project/:projectId')
   findByProject(
     @CurrentUser() user: any,
@@ -83,6 +93,41 @@ export class UnitsController {
     },
   ) {
     return this.unitsService.verifyUnit(id, body);
+  }
+
+  @Post(':id/submit-approval')
+  @UseGuards(RolesGuard)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  submitApproval(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.unitsService.submitApproval(id, user);
+  }
+
+  @Post(':id/approve')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  approve(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
+    return this.unitsService.approve(id, user, body);
+  }
+
+  @Post(':id/reject')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  reject(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
+    return this.unitsService.reject(id, user, body);
+  }
+
+  @Post(':id/send-to-pool')
+  @UseGuards(RolesGuard)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  sendToPool(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.unitsService.sendToPool(id, user);
+  }
+
+  @Post(':id/remove-from-pool')
+  @UseGuards(RolesGuard)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  removeFromPool(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.unitsService.removeFromPool(id, user);
   }
 
   @Patch(':id/status')

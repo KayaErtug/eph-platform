@@ -1,9 +1,15 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Role, UnitStatus, UnitType } from '@prisma/client';
+import {
+  PortfolioApprovalStatus,
+  Role,
+  UnitStatus,
+  UnitType,
+} from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -104,15 +110,33 @@ export class UnitsService {
     };
   }
 
+  private async getUnitWithProjectOrFail(id: string) {
+    const unit = await this.prisma.unit.findUnique({
+      where: { id },
+      include: { project: true },
+    });
+
+    if (!unit) {
+      throw new NotFoundException('Portföy bulunamadı.');
+    }
+
+    return unit;
+  }
+
+  private hasApprovalDocument(unit: {
+    tapuVerified: boolean;
+    yetkiVerified: boolean;
+  }) {
+    return Boolean(unit.tapuVerified || unit.yetkiVerified);
+  }
+
   async create(
     user: CurrentUserPayload,
     projectId: string,
     data: CreateUnitPayload,
   ) {
     const project = await this.prisma.project.findUnique({
-      where: {
-        id: projectId,
-      },
+      where: { id: projectId },
     });
 
     if (!project) {
@@ -135,6 +159,8 @@ export class UnitsService {
         status: data.status || UnitStatus.SATILIK,
         description: data.description,
         projectId,
+        approvalStatus: PortfolioApprovalStatus.TASLAK,
+        isPoolVisible: false,
       },
       include: unitInclude,
     });
@@ -142,14 +168,12 @@ export class UnitsService {
 
   async findOne(user: CurrentUserPayload, id: string) {
     const unit = await this.prisma.unit.findUnique({
-      where: {
-        id,
-      },
+      where: { id },
       include: unitInclude,
     });
 
     if (!unit) {
-      throw new NotFoundException('Birim bulunamadı.');
+      throw new NotFoundException('Portföy bulunamadı.');
     }
 
     this.ensureCanViewUnit(user, unit.project.ownerId);
@@ -163,13 +187,8 @@ export class UnitsService {
     filters?: { status?: UnitStatus; type?: UnitType },
   ) {
     const project = await this.prisma.project.findUnique({
-      where: {
-        id: projectId,
-      },
-      select: {
-        id: true,
-        ownerId: true,
-      },
+      where: { id: projectId },
+      select: { id: true, ownerId: true },
     });
 
     if (!project) {
@@ -215,59 +234,195 @@ export class UnitsService {
         },
       },
       include: unitInclude,
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  async updateStatus(id: string, user: CurrentUserPayload, status: UnitStatus) {
-    const unit = await this.prisma.unit.findUnique({
+  async findPool(
+    user: CurrentUserPayload,
+    filters?: {
+      status?: UnitStatus;
+      type?: UnitType;
+      city?: string;
+    },
+  ) {
+    return this.prisma.unit.findMany({
       where: {
-        id,
+        isPoolVisible: true,
+        approvalStatus: PortfolioApprovalStatus.HAVUZDA,
+        status: filters?.status,
+        type: filters?.type,
+        project: {
+          isActive: true,
+          city: filters?.city
+            ? { contains: filters.city, mode: 'insensitive' }
+            : undefined,
+        },
       },
-      include: {
-        project: true,
-      },
+      include: unitInclude,
+      orderBy: { poolPublishedAt: 'desc' },
     });
+  }
 
-    if (!unit) {
-      throw new NotFoundException('Birim bulunamadı.');
-    }
+  async submitApproval(id: string, user: CurrentUserPayload) {
+    const unit = await this.getUnitWithProjectOrFail(id);
 
     this.ensureCanManageUnit(user, unit.project.ownerId);
 
+    if (!this.hasApprovalDocument(unit)) {
+      return this.prisma.unit.update({
+        where: { id },
+        data: {
+          approvalStatus: PortfolioApprovalStatus.YETKI_BELGESI_BEKLIYOR,
+          isPoolVisible: false,
+          approvalNote:
+            'Havuza gönderebilmek için yetki belgesi, tapu veya ilgili doğrulama evrakı gereklidir.',
+        },
+        include: unitInclude,
+      });
+    }
+
     return this.prisma.unit.update({
-      where: {
-        id,
-      },
+      where: { id },
       data: {
-        status,
+        approvalStatus: PortfolioApprovalStatus.INCELEMEDE,
+        submittedForApprovalAt: new Date(),
+        rejectedAt: null,
+        approvalNote: null,
+        isPoolVisible: false,
       },
       include: unitInclude,
     });
   }
 
-  async update(id: string, user: CurrentUserPayload, data: any) {
-    const unit = await this.prisma.unit.findUnique({
-      where: {
-        id,
-      },
-      include: {
-        project: true,
-      },
-    });
-
-    if (!unit) {
-      throw new NotFoundException('Birim bulunamadı.');
+  async approve(id: string, user: CurrentUserPayload, body?: { note?: string }) {
+    if (!this.isSuperAdmin(user)) {
+      throw new ForbiddenException('Portföy onayı sadece Süper Admin tarafından verilebilir.');
     }
+
+    const unit = await this.getUnitWithProjectOrFail(id);
+
+    if (!this.hasApprovalDocument(unit)) {
+      throw new BadRequestException(
+        'Bu portföyde onay için yeterli doğrulama evrakı bulunmuyor.',
+      );
+    }
+
+    return this.prisma.unit.update({
+      where: { id },
+      data: {
+        approvalStatus: PortfolioApprovalStatus.ONAYLANDI,
+        approvedAt: new Date(),
+        rejectedAt: null,
+        approvalNote: body?.note || null,
+        isVerified: true,
+        verifiedAt: new Date(),
+      },
+      include: unitInclude,
+    });
+  }
+
+  async reject(id: string, user: CurrentUserPayload, body?: { note?: string }) {
+    if (!this.isSuperAdmin(user)) {
+      throw new ForbiddenException('Portföy reddi sadece Süper Admin tarafından yapılabilir.');
+    }
+
+    await this.getUnitWithProjectOrFail(id);
+
+    return this.prisma.unit.update({
+      where: { id },
+      data: {
+        approvalStatus: PortfolioApprovalStatus.REDDEDILDI,
+        rejectedAt: new Date(),
+        approvalNote: body?.note || 'Portföy doğrulama sürecinde reddedildi.',
+        isPoolVisible: false,
+        poolRemovedAt: new Date(),
+      },
+      include: unitInclude,
+    });
+  }
+
+  async sendToPool(id: string, user: CurrentUserPayload) {
+    const unit = await this.getUnitWithProjectOrFail(id);
+
+    this.ensureCanManageUnit(user, unit.project.ownerId);
+
+    if (unit.approvalStatus !== PortfolioApprovalStatus.ONAYLANDI) {
+      throw new BadRequestException(
+        'Sadece onaylanmış portföyler havuza gönderilebilir.',
+      );
+    }
+
+    return this.prisma.unit.update({
+      where: { id },
+      data: {
+        approvalStatus: PortfolioApprovalStatus.HAVUZDA,
+        isPoolVisible: true,
+        poolPublishedAt: new Date(),
+        poolRemovedAt: null,
+      },
+      include: unitInclude,
+    });
+  }
+
+  async removeFromPool(id: string, user: CurrentUserPayload) {
+    const unit = await this.getUnitWithProjectOrFail(id);
+
+    this.ensureCanManageUnit(user, unit.project.ownerId);
+
+    if (!unit.isPoolVisible) {
+      throw new BadRequestException('Bu portföy zaten havuzda değil.');
+    }
+
+    return this.prisma.unit.update({
+      where: { id },
+      data: {
+        approvalStatus: PortfolioApprovalStatus.ONAYLANDI,
+        isPoolVisible: false,
+        poolRemovedAt: new Date(),
+      },
+      include: unitInclude,
+    });
+  }
+
+  async updateStatus(id: string, user: CurrentUserPayload, status: UnitStatus) {
+    const unit = await this.getUnitWithProjectOrFail(id);
 
     this.ensureCanManageUnit(user, unit.project.ownerId);
 
     return this.prisma.unit.update({
-      where: {
-        id,
-      },
+      where: { id },
+      data: { status },
+      include: unitInclude,
+    });
+  }
+
+  async update(id: string, user: CurrentUserPayload, data: any) {
+    const unit = await this.getUnitWithProjectOrFail(id);
+
+    this.ensureCanManageUnit(user, unit.project.ownerId);
+
+    const protectedFields = [
+      'approvalStatus',
+      'isPoolVisible',
+      'submittedForApprovalAt',
+      'approvedAt',
+      'rejectedAt',
+      'approvalNote',
+      'poolPublishedAt',
+      'poolRemovedAt',
+      'isVerified',
+      'verifiedAt',
+    ];
+
+    for (const field of protectedFields) {
+      if (field in data && !this.isSuperAdmin(user)) {
+        delete data[field];
+      }
+    }
+
+    return this.prisma.unit.update({
+      where: { id },
       data,
       include: unitInclude,
     });
@@ -283,13 +438,11 @@ export class UnitsService {
     },
   ) {
     const unit = await this.prisma.unit.findUnique({
-      where: {
-        id,
-      },
+      where: { id },
     });
 
     if (!unit) {
-      throw new NotFoundException('Birim bulunamadı.');
+      throw new NotFoundException('Portföy bulunamadı.');
     }
 
     const isVerified = Boolean(
@@ -299,9 +452,7 @@ export class UnitsService {
     const verifiedAt = isVerified ? new Date() : null;
 
     return this.prisma.unit.update({
-      where: {
-        id,
-      },
+      where: { id },
       data: {
         ...data,
         isVerified,
@@ -312,25 +463,12 @@ export class UnitsService {
   }
 
   async remove(id: string, user: CurrentUserPayload) {
-    const unit = await this.prisma.unit.findUnique({
-      where: {
-        id,
-      },
-      include: {
-        project: true,
-      },
-    });
-
-    if (!unit) {
-      throw new NotFoundException('Birim bulunamadı.');
-    }
+    const unit = await this.getUnitWithProjectOrFail(id);
 
     this.ensureCanManageUnit(user, unit.project.ownerId);
 
     return this.prisma.unit.delete({
-      where: {
-        id,
-      },
+      where: { id },
     });
   }
 }
