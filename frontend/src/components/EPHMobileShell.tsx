@@ -239,7 +239,7 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
               </MenuSection>
 
               <MenuSection title="EPH">
-                <MenuRow icon={<ShoppingBag size={17} />} label="Market" onClick={() => go("/market")} />
+                <MenuRow icon={<ShoppingBag size={17} />} label="Market" onClick={() => go("/ucretlendirme")} />
                 <MenuRow
                   icon={<Star size={17} />}
                   label="Duyurular"
