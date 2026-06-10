@@ -420,7 +420,7 @@ export default function GirisPage() {
                 Portföy, stok ve müşteri yönetimine devam edin.
               </p>
 
-              <form onSubmit={handleSubmit(onSubmit)}>
+              <form onSubmit={handleSubmit(onSubmit)} autoComplete="on">
                 <div className="login-field">
                   <label htmlFor="email">E-posta adresi</label>
                   <div className="login-input-wrap">
@@ -431,7 +431,7 @@ export default function GirisPage() {
                       name="email"
                       type="email"
                       inputMode="email"
-                      autoComplete="email"
+                      autoComplete="username"
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
