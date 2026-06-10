@@ -46,10 +46,6 @@ import {
 import type { Unit } from "@/components/stok/stokTypes";
 import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
-import PortfolioApprovalCard from "@/components/portfolio/PortfolioApprovalCard";
-import PortfolioAuthorityCard from "@/components/portfolio/PortfolioAuthorityCard";
-import PortfolioApprovalTimeline from "@/components/portfolio/PortfolioApprovalTimeline";
-import PortfolioPoolStatusCard from "@/components/portfolio/PortfolioPoolStatusCard";
 
 type DetailUnit = Unit & {
   createdAt?: string;
@@ -690,20 +686,36 @@ export default function StokDetailPage() {
   ) => {
     if (!unit) return;
 
+    const endpointMap: Record<typeof nextStatus, string> = {
+      INCELEMEDE: "mark-reviewing",
+      EKSIK_BILGI_BEKLENIYOR: "request-missing-info",
+      ONAYLANDI: "approve",
+      HAVUZDA: "send-to-pool",
+      REDDEDILDI: "reject",
+    };
+
+    const defaultNotes: Record<typeof nextStatus, string> = {
+      INCELEMEDE: "Portföy incelemeye alındı.",
+      EKSIK_BILGI_BEKLENIYOR:
+        "EPH inceleme ekibi bu portföy için ek bilgi veya belge bekliyor.",
+      ONAYLANDI: "Portföy onaylandı.",
+      HAVUZDA: "Portföy havuza aktarıldı.",
+      REDDEDILDI: "Portföy doğrulama sürecinde reddedildi.",
+    };
+
     setActionError("");
     setApprovalActionLoading(nextStatus);
 
     try {
-      await api.patch(`/units/${unit.id}/approval`, {
-        approvalStatus: nextStatus,
-        isPoolVisible: nextStatus === "HAVUZDA" ? true : undefined,
+      await api.post(`/units/${unit.id}/${endpointMap[nextStatus]}`, {
+        note: defaultNotes[nextStatus],
       });
 
       await fetchUnit();
     } catch (err: any) {
       setActionError(
         err?.response?.data?.message ||
-          "Onay işlemi tamamlanamadı. Backend endpoint bağlantısını kontrol ediniz.",
+          "Onay işlemi tamamlanamadı. Lütfen yetki ve portföy durumunu kontrol ediniz.",
       );
     } finally {
       setApprovalActionLoading("");
@@ -969,98 +981,13 @@ export default function StokDetailPage() {
           </div>
         </section>
 
-        <PortfolioApprovalCard
-          status={unit.approvalStatus}
-          approvalNote={unit.approvalNote}
-          approvedAt={unit.approvedAt}
+        <PortfolioApprovalCenter
+          unit={unit}
+          galleryImageCount={galleryImages.length}
+          canReviewPortfolio={canReviewPortfolio}
+          approvalActionLoading={approvalActionLoading}
+          onApprovalAction={handleApprovalAction}
         />
-
-        <PortfolioAuthorityCard
-          yetkiVerified={Boolean(unit.yetkiVerified || unit.isVerified)}
-          tapuVerified={Boolean(unit.tapuVerified)}
-          photoVerified={Boolean(unit.photoVerified || galleryImages.length > 0)}
-        />
-
-        <PortfolioPoolStatusCard
-          isPoolVisible={Boolean(unit.isPoolVisible || unit.approvalStatus === "HAVUZDA")}
-          poolPublishedAt={unit.poolPublishedAt}
-        />
-
-        <PortfolioApprovalTimeline approvalStatus={unit.approvalStatus} />
-
-        {canReviewPortfolio && (
-          <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-            <div className="flex items-center justify-center gap-2 text-[#1557D6]">
-              <ShieldCheck size={17} />
-              <h2 className="text-[16px] font-black text-[#06194A]">
-                Yönetici Onay İşlemleri
-              </h2>
-            </div>
-
-            <p className="mx-auto mt-2 max-w-[330px] text-[11px] font-semibold leading-5 text-[#64748B]">
-              Bu alan sadece Moderatör, Admin ve Süper Admin rollerine görünür.
-            </p>
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleApprovalAction("INCELEMEDE")}
-                disabled={Boolean(approvalActionLoading)}
-                className="min-h-[42px] rounded-[16px] bg-[#EFF6FF] px-2 text-[11px] font-black text-[#1557D6] disabled:opacity-60"
-              >
-                {approvalActionLoading === "INCELEMEDE"
-                  ? "İşleniyor..."
-                  : "İncelemeye Al"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleApprovalAction("EKSIK_BILGI_BEKLENIYOR")}
-                disabled={Boolean(approvalActionLoading)}
-                className="min-h-[42px] rounded-[16px] bg-amber-50 px-2 text-[11px] font-black text-amber-700 disabled:opacity-60"
-              >
-                {approvalActionLoading === "EKSIK_BILGI_BEKLENIYOR"
-                  ? "İşleniyor..."
-                  : "Eksik Bilgi"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleApprovalAction("ONAYLANDI")}
-                disabled={Boolean(approvalActionLoading)}
-                className="min-h-[42px] rounded-[16px] bg-emerald-50 px-2 text-[11px] font-black text-emerald-700 disabled:opacity-60"
-              >
-                {approvalActionLoading === "ONAYLANDI"
-                  ? "İşleniyor..."
-                  : "Onayla"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleApprovalAction("HAVUZDA")}
-                disabled={Boolean(approvalActionLoading)}
-                className="min-h-[42px] rounded-[16px] bg-[#1557D6] px-2 text-[11px] font-black text-white disabled:opacity-60"
-              >
-                {approvalActionLoading === "HAVUZDA"
-                  ? "İşleniyor..."
-                  : "Havuza Al"}
-              </button>
-            </div>
-
-            {!isApprovalFinal(unit.approvalStatus) && (
-              <button
-                type="button"
-                onClick={() => handleApprovalAction("REDDEDILDI")}
-                disabled={Boolean(approvalActionLoading)}
-                className="mt-2 min-h-[42px] w-full rounded-[16px] bg-rose-50 px-2 text-[11px] font-black text-rose-700 disabled:opacity-60"
-              >
-                {approvalActionLoading === "REDDEDILDI"
-                  ? "İşleniyor..."
-                  : "Reddet"}
-              </button>
-            )}
-          </section>
-        )}
 
         <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
           <div className="flex items-center justify-center gap-2 text-[#1557D6]">
@@ -1401,6 +1328,232 @@ export default function StokDetailPage() {
         data={shareData}
       />
     </main>
+  );
+}
+
+
+function PortfolioApprovalCenter({
+  unit,
+  galleryImageCount,
+  canReviewPortfolio,
+  approvalActionLoading,
+  onApprovalAction,
+}: {
+  unit: DetailUnit;
+  galleryImageCount: number;
+  canReviewPortfolio: boolean;
+  approvalActionLoading: string;
+  onApprovalAction: (
+    nextStatus:
+      | "INCELEMEDE"
+      | "EKSIK_BILGI_BEKLENIYOR"
+      | "ONAYLANDI"
+      | "HAVUZDA"
+      | "REDDEDILDI",
+  ) => void;
+}) {
+  const approvalStatus = String(unit.approvalStatus || "TASLAK");
+  const poolVisible = Boolean(unit.isPoolVisible || approvalStatus === "HAVUZDA");
+
+  const statusConfig: Record<
+    string,
+    {
+      label: string;
+      className: string;
+    }
+  > = {
+    TASLAK: {
+      label: "Taslak",
+      className: "bg-slate-100 text-slate-700",
+    },
+    BELGE_BEKLENIYOR: {
+      label: "Belge Bekleniyor",
+      className: "bg-amber-100 text-amber-700",
+    },
+    INCELEMEYE_GONDERILDI: {
+      label: "İncelemeye Gönderildi",
+      className: "bg-blue-100 text-blue-700",
+    },
+    INCELEMEDE: {
+      label: "İncelemede",
+      className: "bg-indigo-100 text-indigo-700",
+    },
+    EKSIK_BILGI_BEKLENIYOR: {
+      label: "Eksik Bilgi",
+      className: "bg-orange-100 text-orange-700",
+    },
+    ONAYLANDI: {
+      label: "Onaylandı",
+      className: "bg-emerald-100 text-emerald-700",
+    },
+    HAVUZDA: {
+      label: "Havuzda",
+      className: "bg-green-100 text-green-700",
+    },
+    REDDEDILDI: {
+      label: "Reddedildi",
+      className: "bg-rose-100 text-rose-700",
+    },
+  };
+
+  const steps = [
+    { key: "TASLAK", label: "Taslak" },
+    { key: "BELGE_BEKLENIYOR", label: "Belge" },
+    { key: "INCELEMEDE", label: "İnceleme" },
+    { key: "ONAYLANDI", label: "Onay" },
+    { key: "HAVUZDA", label: "Havuz" },
+  ];
+
+  const normalizedStepStatus =
+    approvalStatus === "INCELEMEYE_GONDERILDI" ? "INCELEMEDE" : approvalStatus;
+  const currentStepIndex = steps.findIndex(
+    (step) => step.key === normalizedStepStatus,
+  );
+
+  const summaryItems = [
+    {
+      label: "Yetki",
+      active: Boolean(unit.yetkiVerified || unit.isVerified),
+    },
+    {
+      label: "Tapu",
+      active: Boolean(unit.tapuVerified),
+    },
+    {
+      label: "Foto",
+      active: Boolean(unit.photoVerified || galleryImageCount > 0),
+    },
+    {
+      label: "Havuz",
+      active: poolVisible,
+    },
+  ];
+
+  const currentStatusConfig =
+    statusConfig[approvalStatus] || statusConfig["TASLAK"];
+
+  const buttonBase =
+    "min-h-[38px] rounded-[14px] px-2 text-[10px] font-black disabled:opacity-60";
+
+  return (
+    <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#64748B]">
+            Onay Merkezi
+          </p>
+          <h2 className="mt-0.5 truncate text-[15px] font-black text-[#06194A]">
+            Portföy Kontrol Paneli
+          </h2>
+        </div>
+
+        <span
+          className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black ${currentStatusConfig.className}`}
+        >
+          {currentStatusConfig.label}
+        </span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-4 gap-1.5">
+        {summaryItems.map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-[14px] px-1.5 py-2 text-center ${
+              item.active
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-[#F7FBFF] text-[#64748B]"
+            }`}
+          >
+            <p className="text-[9px] font-black">{item.label}</p>
+            <p className="mt-0.5 text-[10px] font-black">
+              {item.active ? "Var" : "Yok"}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 rounded-[16px] bg-[#F7FBFF] px-2 py-2">
+        <div className="grid grid-cols-5 gap-1">
+          {steps.map((step, index) => {
+            const active = currentStepIndex >= 0 && index <= currentStepIndex;
+
+            return (
+              <div key={step.key} className="text-center">
+                <div
+                  className={`mx-auto h-2.5 w-2.5 rounded-full ${
+                    active ? "bg-[#1557D6]" : "bg-slate-300"
+                  }`}
+                />
+                <p
+                  className={`mt-1 truncate text-[8px] font-black ${
+                    active ? "text-[#1557D6]" : "text-[#94A3B8]"
+                  }`}
+                >
+                  {step.label}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {unit.approvalNote && (
+        <div className="mt-2 rounded-[14px] bg-amber-50 px-3 py-2 text-[11px] font-bold leading-5 text-amber-800">
+          {unit.approvalNote}
+        </div>
+      )}
+
+      {canReviewPortfolio && (
+        <div className="mt-3 grid grid-cols-5 gap-1.5">
+          <button
+            type="button"
+            onClick={() => onApprovalAction("INCELEMEDE")}
+            disabled={Boolean(approvalActionLoading)}
+            className={`${buttonBase} bg-[#EFF6FF] text-[#1557D6]`}
+          >
+            {approvalActionLoading === "INCELEMEDE" ? "..." : "İncele"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onApprovalAction("EKSIK_BILGI_BEKLENIYOR")}
+            disabled={Boolean(approvalActionLoading)}
+            className={`${buttonBase} bg-amber-50 text-amber-700`}
+          >
+            {approvalActionLoading === "EKSIK_BILGI_BEKLENIYOR"
+              ? "..."
+              : "Eksik"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onApprovalAction("ONAYLANDI")}
+            disabled={Boolean(approvalActionLoading)}
+            className={`${buttonBase} bg-emerald-50 text-emerald-700`}
+          >
+            {approvalActionLoading === "ONAYLANDI" ? "..." : "Onay"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onApprovalAction("HAVUZDA")}
+            disabled={Boolean(approvalActionLoading)}
+            className={`${buttonBase} bg-[#1557D6] text-white`}
+          >
+            {approvalActionLoading === "HAVUZDA" ? "..." : "Havuz"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onApprovalAction("REDDEDILDI")}
+            disabled={Boolean(approvalActionLoading)}
+            className={`${buttonBase} bg-rose-50 text-rose-700`}
+          >
+            {approvalActionLoading === "REDDEDILDI" ? "..." : "Red"}
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 
