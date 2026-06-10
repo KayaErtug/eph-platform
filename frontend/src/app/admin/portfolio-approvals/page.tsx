@@ -5,15 +5,29 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  Bell,
   Building2,
+  CalendarDays,
   CheckCircle2,
-  Clock3,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCheck,
+  Eye,
+  FileText,
   FileWarning,
+  Filter,
+  FolderOpen,
   Home,
   Loader2,
+  LogOut,
+  Menu,
+  MoreVertical,
   RefreshCw,
+  Search,
   Send,
+  Settings,
   ShieldCheck,
+  UsersRound,
   XCircle,
 } from "lucide-react";
 
@@ -65,6 +79,13 @@ type ApprovalUnit = {
       memberCode?: string | null;
     };
   };
+  images?: {
+    id?: string;
+    url?: string;
+    supabaseUrl?: string;
+    isCover?: boolean;
+    sortOrder?: number;
+  }[];
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -74,7 +95,7 @@ const STATUS_LABELS: Record<string, string> = {
   INCELEMEDE: "İncelemede",
   EKSIK_BILGI_BEKLENIYOR: "Eksik Bilgi",
   ONAYLANDI: "Onaylandı",
-  HAVUZDA: "Havuzda",
+  HAVUZDA: "Havuza Alındı",
   REDDEDILDI: "Reddedildi",
 };
 
@@ -85,58 +106,34 @@ const FILTERS = [
   "INCELEMEDE",
   "EKSIK_BILGI_BEKLENIYOR",
   "ONAYLANDI",
-  "HAVUZDA",
   "REDDEDILDI",
+  "HAVUZDA",
 ];
 
 const HEADER_THEMES = [
-  {
-    title: "Cumhuriyet",
-    quote:
-      "Ey Türk istikbalinin evladı! İşte, bu ahval ve şerait içinde dahi vazifen, Türk istiklal ve cumhuriyetini kurtarmaktır! Muhtaç olduğun kudret, damarlarındaki asil kanda mevcuttur!",
-    image: "/admin-themes/ataturk.jpg",
-    bg: "from-[#8B0000] via-[#C1121F] to-[#003049]",
-  },
   {
     title: "Turan",
     quote:
       "Vatan ne Türkiye'dir Türklere, ne Türkistan; Vatan büyük ve müebbet bir ülkedir: Türklere Turan.",
     image: "/admin-themes/ziya-gokalp.jpg",
-    bg: "from-[#06194A] via-[#123B7A] to-[#B91C1C]",
+    bg: "from-[#061021] via-[#4B0F18] to-[#0B1325]",
+    accent: "bg-red-700",
   },
   {
-    title: "Türklük",
-    quote: "Türklüğün bedeni Türkiye, ruhu İslamiyet, gayesi Turan'dır.",
-    image: "/admin-themes/ziya-gokalp.jpg",
-    bg: "from-[#0F172A] via-[#1E3A8A] to-[#991B1B]",
-  },
-  {
-    title: "Türkçe",
+    title: "Cumhuriyet",
     quote:
-      "Bugünden sonra divanda, dergahta, bargahta, mecliste ve meydanda Türkçeden başka dil kullanılmayacaktır.",
-    image: "/admin-themes/karamanoglu.jpg",
-    bg: "from-[#7C2D12] via-[#B45309] to-[#991B1B]",
+      "Ey Türk istikbalinin evladı! İşte, bu ahval ve şerait içinde dahi vazifen, Türk istiklal ve cumhuriyetini kurtarmaktır! Muhtaç olduğun kudret, damarlarındaki asil kanda mevcuttur!",
+    image: "/admin-themes/ataturk.jpg",
+    bg: "from-[#0B1325] via-[#7F1D1D] to-[#111827]",
+    accent: "bg-red-700",
   },
   {
-    title: "Dil",
+    title: "İstiklal",
     quote:
-      "Har içinde biten gonca güle minnet eylemem, Arabi, Farisi bilmem; dile minnet eylemem. Sırat-ı Müstakim üzre gözetirim Rahim'i, İblisin talim ettiği yola minnet eylemem.",
-    image: "/admin-themes/kul-nesimi.jpg",
-    bg: "from-[#3F2E1E] via-[#7C2D12] to-[#111827]",
-  },
-  {
-    title: "Fetih",
-    quote:
-      "Onlar korkularından denizi zincirleyecek kadar akıllı ise, biz gemileri karadan yürütebilecek kadar deliyiz.",
-    image: "/admin-themes/fatih.jpg",
-    bg: "from-[#14532D] via-[#166534] to-[#854D0E]",
-  },
-  {
-    title: "Kutlu Yol",
-    quote:
-      "Yufka yüreklilerle çetin yollar aşılmaz; Çünkü bu yol kutludur, gider Tanrı Dağı'na.",
-    image: "/admin-themes/atsiz.jpg",
-    bg: "from-[#312E81] via-[#1E40AF] to-[#7C3AED]",
+      "Hakkıdır hür yaşamış bayrağımın hürriyet; Hakkıdır Hakk'a tapan milletimin istiklal!",
+    image: "/admin-themes/mehmet-akif.jpg",
+    bg: "from-[#111827] via-[#991B1B] to-[#1E3A8A]",
+    accent: "bg-blue-700",
   },
   {
     title: "Orhun",
@@ -144,13 +141,7 @@ const HEADER_THEMES = [
       "Ey Türk! Üstte mavi gök çökmedikçe, altta yağız yer delinmedikçe, senin ilini ve töreni kim bozabilir?",
     image: "/admin-themes/bilge-kagan.jpg",
     bg: "from-[#0F172A] via-[#0F766E] to-[#1E3A8A]",
-  },
-  {
-    title: "İstiklal",
-    quote:
-      "Hakkıdır hür yaşamış bayrağımın hürriyet; Hakkıdır Hakk'a tapan milletimin istiklal!",
-    image: "/admin-themes/mehmet-akif.jpg",
-    bg: "from-[#991B1B] via-[#B91C1C] to-[#1E3A8A]",
+    accent: "bg-emerald-700",
   },
 ];
 
@@ -192,13 +183,13 @@ function ownerName(item: ApprovalUnit) {
 }
 
 function statusClass(status?: string | null) {
-  if (status === "HAVUZDA") return "bg-emerald-100 text-emerald-800";
-  if (status === "ONAYLANDI") return "bg-green-100 text-green-800";
-  if (status === "REDDEDILDI") return "bg-rose-100 text-rose-800";
-  if (status === "EKSIK_BILGI_BEKLENIYOR") return "bg-orange-100 text-orange-800";
-  if (status === "INCELEMEDE") return "bg-blue-100 text-blue-800";
-  if (status === "INCELEMEYE_GONDERILDI") return "bg-indigo-100 text-indigo-800";
-  return "bg-amber-100 text-amber-800";
+  if (status === "HAVUZDA") return "bg-emerald-50 text-emerald-700";
+  if (status === "ONAYLANDI") return "bg-green-50 text-green-700";
+  if (status === "REDDEDILDI") return "bg-rose-50 text-rose-700";
+  if (status === "EKSIK_BILGI_BEKLENIYOR") return "bg-orange-50 text-orange-700";
+  if (status === "INCELEMEDE") return "bg-blue-50 text-blue-700";
+  if (status === "INCELEMEYE_GONDERILDI") return "bg-indigo-50 text-indigo-700";
+  return "bg-amber-50 text-amber-700";
 }
 
 function portfolioCode(id: string) {
@@ -206,14 +197,35 @@ function portfolioCode(id: string) {
   return `EPH-${raw.slice(0, 4).toUpperCase()}-${raw.slice(-4).toUpperCase()}`;
 }
 
+function coverImage(item: ApprovalUnit) {
+  const images = Array.isArray(item.images) ? item.images : [];
+  const sorted = [...images].sort((a, b) => {
+    if (a.isCover !== b.isCover) return a.isCover ? -1 : 1;
+    return Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
+  });
+  return sorted[0]?.supabaseUrl || sorted[0]?.url || "";
+}
+
+function unitKind(item: ApprovalUnit) {
+  const value = String(item.type || "").replaceAll("_", " ").toLocaleLowerCase("tr-TR");
+  if (!value) return "Portföy";
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toLocaleUpperCase("tr-TR") + part.slice(1))
+    .join(" ");
+}
+
 export default function PortfolioApprovalsPage() {
   const router = useRouter();
-  const { user, hasHydrated } = useAuthStore();
+  const { user, hasHydrated, logout } = useAuthStore();
   const [items, setItems] = useState<ApprovalUnit[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("ALL");
+  const [query, setQuery] = useState("");
   const [actionLoading, setActionLoading] = useState("");
   const [error, setError] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
   const theme = getThemeOfHour();
 
   const canAccess = ["MODERATOR", "ADMIN", "SUPER_ADMIN"].includes(
@@ -234,16 +246,14 @@ export default function PortfolioApprovalsPage() {
     }
 
     fetchItems();
-  }, [hasHydrated, user?.id, user?.role, filter]);
+  }, [hasHydrated, user?.id, user?.role]);
 
   const fetchItems = async () => {
     setLoading(true);
     setError("");
 
     try {
-      const response = await api.get(
-        `/units/admin/portfolio-approvals?status=${filter}`,
-      );
+      const response = await api.get("/units/admin/portfolio-approvals?status=ALL");
       setItems(Array.isArray(response.data) ? response.data : []);
     } catch (err: any) {
       setError(
@@ -268,6 +278,32 @@ export default function PortfolioApprovalsPage() {
       pool: items.filter((x) => x.approvalStatus === "HAVUZDA").length,
     };
   }, [items]);
+
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase("tr-TR");
+
+    return items.filter((item) => {
+      const status = String(item.approvalStatus || "");
+      const statusMatch = filter === "ALL" || status === filter;
+      const waitingMatch =
+        filter !== "BELGE_BEKLENIYOR" ||
+        status === "BELGE_BEKLENIYOR";
+
+      const haystack = [
+        portfolioCode(item.id),
+        item.project?.name,
+        item.project?.city,
+        item.project?.district,
+        ownerName(item),
+        unitKind(item),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("tr-TR");
+
+      return statusMatch && waitingMatch && (!q || haystack.includes(q));
+    });
+  }, [items, filter, query]);
 
   const act = async (id: string, action: string) => {
     setActionLoading(`${id}-${action}`);
@@ -319,263 +355,565 @@ export default function PortfolioApprovalsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F7FBFF] pb-28 text-[#172033]">
-      <section className="mx-auto w-full max-w-[430px] px-3 py-3">
-        <div
-          className={`overflow-hidden rounded-[28px] bg-gradient-to-br ${theme.bg} p-4 text-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]`}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <button
-              onClick={() => router.push("/admin")}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/12 text-white backdrop-blur"
-              aria-label="Admin merkezine dön"
+    <main className="min-h-screen bg-[#F5F7FB] text-[#111827]">
+      <div className="lg:flex">
+        <aside className="hidden min-h-screen w-[270px] shrink-0 bg-[#071427] text-white lg:sticky lg:top-0 lg:block">
+          <SidebarContent
+            counts={counts}
+            onLogout={() => {
+              logout();
+              router.push("/giris");
+            }}
+          />
+        </aside>
+
+        {menuOpen && (
+          <div
+            className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-sm lg:hidden"
+            onClick={() => setMenuOpen(false)}
+          >
+            <aside
+              className="h-full w-[84%] max-w-[340px] bg-[#071427] text-white shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
             >
-              <ArrowLeft size={18} />
-            </button>
-
-            <div className="min-w-0 flex-1 text-center">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/70">
-                EPH Yönetim Merkezi
-              </p>
-              <h1 className="mt-1 text-[22px] font-black tracking-[-0.04em]">
-                Portföy Onayları
-              </h1>
-            </div>
-
-            <button
-              onClick={fetchItems}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/12 text-white backdrop-blur"
-              aria-label="Yenile"
-            >
-              <RefreshCw size={17} />
-            </button>
-          </div>
-
-          <div className="mt-4 flex items-center gap-3 rounded-[22px] bg-white/10 p-3 backdrop-blur">
-            <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[20px] bg-white/15">
-              <img
-                src={theme.image}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover"
-                onError={(event) => {
-                  event.currentTarget.style.display = "none";
+              <SidebarContent
+                counts={counts}
+                onLogout={() => {
+                  logout();
+                  router.push("/giris");
                 }}
               />
-              <span className="relative text-2xl">🇹🇷</span>
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-center gap-2">
-                <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-black text-white">
-                  🇹🇷 {theme.title}
-                </span>
-              </div>
-              <p className="mt-2 text-center text-[12px] font-bold leading-5 text-white/92">
-                {theme.quote}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3 grid grid-cols-5 gap-2">
-          <MiniStat label="Toplam" value={counts.total} tone="bg-slate-900 text-white" />
-          <MiniStat label="Bekleyen" value={counts.waiting} tone="bg-amber-100 text-amber-800" />
-          <MiniStat label="İnceleme" value={counts.reviewing} tone="bg-blue-100 text-blue-800" />
-          <MiniStat label="Onay" value={counts.approved} tone="bg-emerald-100 text-emerald-800" />
-          <MiniStat label="Havuz" value={counts.pool} tone="bg-green-100 text-green-800" />
-        </div>
-
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-          {FILTERS.map((key) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className={`h-10 shrink-0 rounded-2xl px-3 text-[11px] font-black ${
-                filter === key
-                  ? "bg-[#06194A] text-white"
-                  : "border border-[#DDE7F3] bg-white text-[#475569]"
-              }`}
-            >
-              {STATUS_LABELS[key]}
-            </button>
-          ))}
-        </div>
-
-        {error && (
-          <div className="mt-3 rounded-[20px] border border-rose-100 bg-rose-50 p-3 text-center text-[12px] font-black text-rose-700">
-            {error}
+            </aside>
           </div>
         )}
 
-        {loading ? (
-          <div className="mt-5 rounded-[24px] border border-[#DDE7F3] bg-white p-8 text-center">
-            <Loader2 className="mx-auto animate-spin text-[#1557D6]" size={30} />
-            <p className="mt-3 text-[12px] font-black text-slate-500">
-              Portföyler yükleniyor
-            </p>
-          </div>
-        ) : items.length === 0 ? (
-          <div className="mt-5 rounded-[24px] border border-dashed border-[#DDE7F3] bg-white p-8 text-center">
-            <ShieldCheck className="mx-auto text-emerald-600" size={34} />
-            <p className="mt-3 text-[14px] font-black text-[#06194A]">
-              Bu filtrede portföy yok.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-3 space-y-3">
-            {items.map((item) => (
-              <article
-                key={item.id}
-                className="rounded-[26px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#64748B]">
-                      {portfolioCode(item.id)}
+        <section className="min-w-0 flex-1">
+          <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-xl lg:px-8">
+            <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setMenuOpen(true)}
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm lg:hidden"
+                  aria-label="Menüyü aç"
+                >
+                  <Menu size={20} />
+                </button>
+                <div>
+                  <h1 className="text-[20px] font-black tracking-[-0.04em] text-[#111827] lg:text-[26px]">
+                    Portföy Onay Merkezi
+                  </h1>
+                  <p className="hidden text-[13px] font-semibold text-slate-500 sm:block">
+                    Portföy başvurularını inceleyin, onaylayın ve yönetin.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm">
+                  <Bell size={18} />
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-black text-white">
+                    3
+                  </span>
+                </button>
+
+                <div className="hidden items-center gap-2 rounded-2xl bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200 sm:flex">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#4C1D95] text-[12px] font-black text-white">
+                    {String(user?.firstName?.[0] || "Y").toUpperCase()}
+                    {String(user?.lastName?.[0] || "K").toUpperCase()}
+                  </span>
+                  <div className="leading-tight">
+                    <p className="text-[12px] font-black text-slate-900">
+                      {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Yönetici"}
                     </p>
-                    <h2 className="mt-1 line-clamp-2 text-[16px] font-black leading-tight text-[#06194A]">
-                      {item.project?.name || "EPH Portföy"}
-                    </h2>
-                    <p className="mt-1 text-[12px] font-bold text-[#64748B]">
-                      {item.project?.district || "İlçe yok"} /{" "}
-                      {item.project?.city || "Şehir yok"}
+                    <p className="text-[11px] font-bold text-slate-500">
+                      {user?.role || "Admin"}
                     </p>
                   </div>
-
-                  <span
-                    className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-black ${statusClass(
-                      item.approvalStatus,
-                    )}`}
-                  >
-                    {STATUS_LABELS[String(item.approvalStatus || "")] ||
-                      "Durum Yok"}
-                  </span>
                 </div>
+              </div>
+            </div>
+          </header>
 
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <Info label="Sahip" value={ownerName(item)} />
-                  <Info label="Fiyat" value={money(item.price, item.priceCurrency)} />
-                  <Info label="Gönderim" value={dateText(item.submittedForApprovalAt || item.updatedAt)} />
-                </div>
+          <div className="mx-auto w-full max-w-[1180px] px-3 py-4 pb-28 lg:px-6 lg:py-7">
+            <section
+              className={`relative overflow-hidden rounded-[28px] bg-gradient-to-br ${theme.bg} text-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]`}
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_30%,rgba(255,255,255,0.16),transparent_28%),radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.12),transparent_25%)]" />
+              <div className="absolute right-[18%] top-1/2 hidden -translate-y-1/2 text-[190px] font-black leading-none text-white/12 lg:block">
+                ★
+              </div>
+              <div className="absolute right-[27%] top-1/2 hidden -translate-y-1/2 text-[230px] font-black leading-none text-white/12 lg:block">
+                ☾
+              </div>
 
-                <div className="mt-3 grid grid-cols-4 gap-2">
-                  <CheckItem label="Yetki" active={Boolean(item.yetkiVerified || item.isVerified)} />
-                  <CheckItem label="Tapu" active={Boolean(item.tapuVerified)} />
-                  <CheckItem label="Foto" active={Boolean(item.photoVerified)} />
-                  <CheckItem label="Havuz" active={Boolean(item.isPoolVisible || item.approvalStatus === "HAVUZDA")} />
-                </div>
+              <div className="relative grid min-h-[210px] gap-4 p-5 lg:grid-cols-[1fr_240px] lg:p-7">
+                <div className="flex flex-col justify-center">
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded-lg ${theme.accent} px-2.5 py-1.5 text-[12px] font-black text-white shadow-lg`}>
+                      TR
+                    </span>
+                    <span className="text-[16px] font-black">{theme.title}</span>
+                  </div>
 
-                {item.approvalNote && (
-                  <p className="mt-3 rounded-[16px] bg-slate-50 p-3 text-center text-[11px] font-bold leading-5 text-slate-600">
-                    {item.approvalNote}
+                  <p className="mt-6 max-w-[720px] text-[20px] font-black leading-8 tracking-[-0.04em] lg:text-[29px] lg:leading-[42px]">
+                    {theme.quote}
                   </p>
-                )}
 
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <ActionButton
-                    label="İncele"
-                    icon={<Clock3 size={15} />}
-                    loading={actionLoading === `${item.id}-review`}
-                    onClick={() => act(item.id, "review")}
-                    className="bg-blue-50 text-blue-700"
-                  />
-                  <ActionButton
-                    label="Eksik Bilgi"
-                    icon={<FileWarning size={15} />}
-                    loading={actionLoading === `${item.id}-missing`}
-                    onClick={() => act(item.id, "missing")}
-                    className="bg-orange-50 text-orange-700"
-                  />
-                  <ActionButton
-                    label="Onayla"
-                    icon={<CheckCircle2 size={15} />}
-                    loading={actionLoading === `${item.id}-approve`}
-                    onClick={() => act(item.id, "approve")}
-                    className="bg-emerald-50 text-emerald-700"
-                  />
-                  <ActionButton
-                    label="Reddet"
-                    icon={<XCircle size={15} />}
-                    loading={actionLoading === `${item.id}-reject`}
-                    onClick={() => act(item.id, "reject")}
-                    className="bg-rose-50 text-rose-700"
-                  />
+                  <div className="mt-5 h-[2px] w-28 rounded-full bg-white/50" />
                 </div>
 
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <ActionButton
-                    label="Havuza Al"
-                    icon={<Send size={15} />}
-                    loading={actionLoading === `${item.id}-pool`}
-                    onClick={() => act(item.id, "pool")}
-                    className="bg-[#1557D6] text-white"
-                  />
+                <div className="hidden items-end justify-end lg:flex">
+                  <div className="relative h-[190px] w-[190px] overflow-hidden rounded-[28px] bg-white/10 ring-1 ring-white/15">
+                    <img
+                      src={theme.image}
+                      alt=""
+                      className="h-full w-full object-cover grayscale"
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                      }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center text-[80px]">
+                      🇹🇷
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                  <Link
-                    href={`/stok/${item.id}`}
-                    className="flex min-h-[42px] items-center justify-center gap-2 rounded-[16px] border border-[#DDE7F3] bg-white px-2 text-[11px] font-black text-[#1557D6]"
+              <div className="absolute bottom-4 right-4 hidden items-center gap-2 rounded-2xl bg-black/30 px-3 py-2 text-[13px] font-black text-white backdrop-blur lg:flex">
+                <ChevronLeft size={17} />
+                1 / {HEADER_THEMES.length}
+                <ChevronRight size={17} />
+              </div>
+            </section>
+
+            <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <StatCard icon={<ClipboardCheck size={22} />} label="Toplam" value={counts.total} sub="Portföy" tone="slate" />
+              <StatCard icon={<FileWarning size={22} />} label="Bekleyen" value={counts.waiting} sub="Portföy" tone="amber" />
+              <StatCard icon={<ShieldCheck size={22} />} label="İnceleme" value={counts.reviewing} sub="Portföy" tone="blue" />
+              <StatCard icon={<CheckCircle2 size={22} />} label="Onay" value={counts.approved} sub="Portföy" tone="green" />
+              <StatCard icon={<Send size={22} />} label="Havuz" value={counts.pool} sub="Portföy" tone="purple" />
+            </section>
+
+            <section className="mt-5 rounded-[24px] border border-slate-200 bg-white p-3 shadow-[0_10px_32px_rgba(15,23,42,0.045)]">
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {FILTERS.map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    className={`h-10 shrink-0 rounded-xl px-3 text-[12px] font-black ${
+                      filter === key
+                        ? "bg-[#071427] text-white shadow-lg shadow-slate-200"
+                        : "border border-slate-200 bg-white text-slate-700"
+                    }`}
                   >
-                    <Building2 size={15} />
-                    Detay
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
+                    {STATUS_LABELS[key]}
+                  </button>
+                ))}
+              </div>
 
-        <Link
-          href="/admin"
-          className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-white text-[12px] font-black text-[#06194A]"
-        >
-          <Home size={16} />
-          Admin Merkezine Dön
-        </Link>
-      </section>
+              <div className="grid gap-2 lg:grid-cols-[1fr_210px_210px_130px]">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Portföy adı, sahip veya kod ara..."
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-center text-[13px] font-bold outline-none focus:border-slate-400 lg:text-left"
+                  />
+                </div>
+
+                <select
+                  value={filter}
+                  onChange={(event) => setFilter(event.target.value)}
+                  className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-center text-[13px] font-black text-slate-700 outline-none focus:border-slate-400"
+                >
+                  {FILTERS.map((key) => (
+                    <option key={key} value={key}>
+                      {STATUS_LABELS[key]}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-center text-[13px] font-black text-slate-700 outline-none focus:border-slate-400"
+                  defaultValue="all"
+                >
+                  <option value="all">Tüm Türler</option>
+                  <option value="arsa">Arsa</option>
+                  <option value="daire">Daire</option>
+                  <option value="villa">Villa</option>
+                </select>
+
+                <button
+                  onClick={fetchItems}
+                  className="flex h-12 items-center justify-center gap-2 rounded-xl bg-[#071427] px-4 text-[13px] font-black text-white"
+                >
+                  <Filter size={17} />
+                  Filtrele
+                </button>
+              </div>
+            </section>
+
+            {error && (
+              <div className="mt-4 rounded-[20px] border border-rose-100 bg-rose-50 p-3 text-center text-[13px] font-black text-rose-700">
+                {error}
+              </div>
+            )}
+
+            {loading ? (
+              <div className="mt-5 rounded-[28px] border border-slate-200 bg-white p-10 text-center shadow-sm">
+                <Loader2 className="mx-auto animate-spin text-[#1557D6]" size={34} />
+                <p className="mt-3 text-[13px] font-black text-slate-500">
+                  Portföyler yükleniyor
+                </p>
+              </div>
+            ) : filteredItems.length === 0 ? (
+              <div className="mt-5 rounded-[28px] border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+                <ShieldCheck className="mx-auto text-emerald-600" size={38} />
+                <p className="mt-3 text-[16px] font-black text-[#06194A]">
+                  Bu filtrede portföy yok.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-5 space-y-4">
+                {filteredItems.map((item) => (
+                  <PortfolioCard
+                    key={item.id}
+                    item={item}
+                    actionLoading={actionLoading}
+                    onAction={act}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-col items-center justify-between gap-3 text-[13px] font-bold text-slate-500 sm:flex-row">
+              <span>Toplam {filteredItems.length} kayıt</span>
+              <div className="flex items-center gap-2">
+                <button className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500">
+                  <ChevronLeft size={18} />
+                </button>
+                <button className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#071427] text-white">
+                  1
+                </button>
+                <button className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500">
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur-xl lg:hidden">
+            <div className="grid grid-cols-5 gap-1">
+              <MobileNav href="/admin" icon={<Home size={21} />} label="Panel" />
+              <MobileNav href="/admin/portfolio-approvals" icon={<CheckCircle2 size={21} />} label="Onaylar" active />
+              <MobileNav href="/admin/system-messages" icon={<FileText size={21} />} label="Mesajlar" />
+              <MobileNav href="/admin" icon={<Settings size={21} />} label="Sistem" />
+              <MobileNav href="/profil" icon={<UsersRound size={21} />} label="Profil" />
+            </div>
+          </nav>
+        </section>
+      </div>
     </main>
   );
 }
 
-function MiniStat({
-  label,
-  value,
-  tone,
+function SidebarContent({
+  counts,
+  onLogout,
 }: {
-  label: string;
-  value: number;
-  tone: string;
+  counts: { total: number; waiting: number; reviewing: number; approved: number; pool: number };
+  onLogout: () => void;
 }) {
   return (
-    <div className={`rounded-[18px] p-2 text-center ${tone}`}>
-      <p className="text-[16px] font-black leading-none">{value}</p>
-      <p className="mt-1 text-[8px] font-black uppercase tracking-wide">
-        {label}
-      </p>
+    <div className="flex min-h-screen flex-col p-5">
+      <Link href="/admin" className="flex items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-red-500/40 bg-red-600/10 text-red-400">
+          <Home size={25} />
+        </div>
+        <div>
+          <p className="text-[26px] font-black leading-none">EPH</p>
+          <p className="mt-1 text-[12px] font-black uppercase tracking-[0.16em] text-slate-400">
+            Yönetim Merkezi
+          </p>
+        </div>
+      </Link>
+
+      <nav className="mt-9 space-y-2">
+        <SidebarItem href="/admin" icon={<Home size={19} />} label="Yönetim Paneli" />
+        <SidebarSection label="Yönetim" />
+        <SidebarItem href="/admin" icon={<UsersRound size={19} />} label="Kullanıcı Yönetimi" />
+        <SidebarItem href="/admin/katilim-talepleri" icon={<ClipboardCheck size={19} />} label="Katılım Talepleri" />
+        <SidebarItem href="/admin/portfolio-approvals" icon={<CheckCircle2 size={19} />} label="Portföy Onayları" active badge={counts.waiting || counts.total} />
+        <SidebarItem href="/admin/referrals" icon={<UsersRound size={19} />} label="Referans Yönetimi" />
+        <SidebarItem href="/admin/system-messages" icon={<FileText size={19} />} label="Sistem Mesajları" />
+        <SidebarSection label="İçerik Yönetimi" />
+        <SidebarItem href="/admin" icon={<Send size={19} />} label="Duyurular" />
+        <SidebarItem href="/admin" icon={<Building2 size={19} />} label="Raporlar" />
+        <SidebarSection label="Sistem" />
+        <SidebarItem href="/admin" icon={<Settings size={19} />} label="Ayarlar" />
+        <SidebarItem href="/admin" icon={<FileText size={19} />} label="Audit Log" />
+      </nav>
+
+      <button
+        onClick={onLogout}
+        className="mt-auto flex min-h-[50px] items-center gap-3 rounded-2xl border border-white/10 px-4 text-[14px] font-black text-red-300 transition hover:bg-red-500/10"
+      >
+        <LogOut size={19} />
+        Çıkış Yap
+      </button>
     </div>
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function SidebarSection({ label }: { label: string }) {
   return (
-    <div className="rounded-[16px] bg-[#F7FBFF] p-2 text-center">
-      <p className="text-[8px] font-black uppercase tracking-wide text-[#64748B]">
-        {label}
-      </p>
-      <p className="mt-1 line-clamp-2 text-[11px] font-black leading-tight text-[#06194A]">
-        {value}
-      </p>
-    </div>
+    <p className="px-2 pt-6 text-[12px] font-black uppercase tracking-[0.18em] text-slate-500">
+      {label}
+    </p>
   );
 }
 
-function CheckItem({ label, active }: { label: string; active: boolean }) {
+function SidebarItem({
+  href,
+  icon,
+  label,
+  active,
+  badge,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  badge?: number;
+}) {
   return (
-    <div
-      className={`rounded-[14px] p-2 text-center text-[10px] font-black ${
-        active ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-500"
+    <Link
+      href={href}
+      className={`flex min-h-[50px] items-center justify-between rounded-2xl px-4 text-[14px] font-black transition ${
+        active
+          ? "bg-red-700 text-white shadow-lg shadow-red-950/20"
+          : "text-slate-200 hover:bg-white/8"
       }`}
     >
-      {label} {active ? "✓" : "—"}
+      <span className="flex items-center gap-3">
+        {icon}
+        {label}
+      </span>
+      {Boolean(badge) && (
+        <span className="rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-black text-white">
+          {badge}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  sub: string;
+  tone: "slate" | "amber" | "blue" | "green" | "purple";
+}) {
+  const toneClass =
+    tone === "amber"
+      ? "bg-amber-500 text-white"
+      : tone === "blue"
+        ? "bg-blue-600 text-white"
+        : tone === "green"
+          ? "bg-emerald-600 text-white"
+          : tone === "purple"
+            ? "bg-purple-600 text-white"
+            : "bg-[#071427] text-white";
+
+  return (
+    <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_10px_32px_rgba(15,23,42,0.055)]">
+      <div className="flex items-center gap-3">
+        <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${toneClass}`}>
+          {icon}
+        </div>
+        <div>
+          <p className="text-[12px] font-black uppercase text-slate-500">
+            {label}
+          </p>
+          <p className="mt-1 text-[31px] font-black leading-none text-slate-950">
+            {value}
+          </p>
+          <p className="mt-1 text-[13px] font-semibold text-slate-500">{sub}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PortfolioCard({
+  item,
+  actionLoading,
+  onAction,
+}: {
+  item: ApprovalUnit;
+  actionLoading: string;
+  onAction: (id: string, action: string) => void;
+}) {
+  const image = coverImage(item);
+
+  return (
+    <article className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_10px_32px_rgba(15,23,42,0.045)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 gap-3">
+          <div className="hidden h-[84px] w-[104px] shrink-0 overflow-hidden rounded-[18px] bg-slate-100 sm:block">
+            {image ? (
+              <img src={image} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-slate-400">
+                <FolderOpen size={28} />
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0">
+            <p className="text-[13px] font-black uppercase tracking-[0.16em] text-slate-400">
+              {portfolioCode(item.id)}
+            </p>
+            <h2 className="mt-1 text-[22px] font-black leading-tight tracking-[-0.04em] text-slate-950">
+              {item.project?.name || unitKind(item)}
+            </h2>
+            <p className="mt-1 text-[15px] font-semibold text-slate-600">
+              {item.project?.district || "İlçe yok"} / {item.project?.city || "Şehir yok"}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-black ${statusClass(
+              item.approvalStatus,
+            )}`}
+          >
+            {STATUS_LABELS[String(item.approvalStatus || "")] || "Durum Yok"}
+          </span>
+          <button className="hidden h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-50 sm:flex">
+            <MoreVertical size={18} />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <InfoCard icon={<UsersRound size={18} />} label="Sahip" value={ownerName(item)} />
+        <InfoCard icon={<span className="text-[17px] font-black">₺</span>} label="Fiyat" value={money(item.price, item.priceCurrency)} />
+        <InfoCard icon={<CalendarDays size={18} />} label="Gönderim" value={dateText(item.submittedForApprovalAt || item.updatedAt)} />
+        <InfoCard icon={<FolderOpen size={18} />} label="Tür" value={unitKind(item)} />
+      </div>
+
+      <div className="mt-3 grid grid-cols-4 gap-3">
+        <DocumentStatus label="Yetki Belgesi" active={Boolean(item.yetkiVerified || item.isVerified)} />
+        <DocumentStatus label="Tapu" active={Boolean(item.tapuVerified)} />
+        <DocumentStatus label="Fotoğraf" active={Boolean(item.photoVerified)} />
+        <DocumentStatus label="Havuz" active={Boolean(item.isPoolVisible || item.approvalStatus === "HAVUZDA")} />
+      </div>
+
+      {item.approvalNote && (
+        <p className="mt-4 rounded-[18px] bg-amber-50 p-4 text-center text-[15px] font-semibold leading-6 text-amber-900">
+          {item.approvalNote}
+        </p>
+      )}
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ActionButton
+          label="İncele"
+          icon={<Eye size={19} />}
+          loading={actionLoading === `${item.id}-review`}
+          onClick={() => onAction(item.id, "review")}
+          className="bg-blue-50 text-blue-700"
+        />
+        <ActionButton
+          label="Eksik Bilgi"
+          icon={<FileWarning size={19} />}
+          loading={actionLoading === `${item.id}-missing`}
+          onClick={() => onAction(item.id, "missing")}
+          className="bg-amber-50 text-amber-700"
+        />
+        <ActionButton
+          label="Onayla"
+          icon={<CheckCircle2 size={19} />}
+          loading={actionLoading === `${item.id}-approve`}
+          onClick={() => onAction(item.id, "approve")}
+          className="bg-emerald-50 text-emerald-700"
+        />
+        <ActionButton
+          label="Reddet"
+          icon={<XCircle size={19} />}
+          loading={actionLoading === `${item.id}-reject`}
+          onClick={() => onAction(item.id, "reject")}
+          className="bg-rose-50 text-rose-700"
+        />
+        <ActionButton
+          label="Havuza Al"
+          icon={<Send size={19} />}
+          loading={actionLoading === `${item.id}-pool`}
+          onClick={() => onAction(item.id, "pool")}
+          className="bg-purple-50 text-purple-700"
+        />
+        <Link
+          href={`/stok/${item.id}`}
+          className="flex min-h-[62px] items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-3 text-[16px] font-black text-slate-900"
+        >
+          <FileText size={19} />
+          Detay
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+function InfoCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.035)]">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-slate-800">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">
+            {label}
+          </p>
+          <p className="mt-1 line-clamp-2 text-[14px] font-black leading-tight text-slate-950">
+            {value}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DocumentStatus({ label, active }: { label: string; active: boolean }) {
+  return (
+    <div className="rounded-[16px] border border-slate-100 bg-white p-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.03)]">
+      <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-500">
+        {label}
+      </p>
+      <span
+        className={`mt-2 inline-flex min-w-[42px] items-center justify-center rounded-full px-3 py-1 text-[13px] font-black ${
+          active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+        }`}
+      >
+        {active ? "✓" : "—"}
+      </span>
     </div>
   );
 }
@@ -598,10 +936,34 @@ function ActionButton({
       type="button"
       onClick={onClick}
       disabled={loading}
-      className={`flex min-h-[42px] items-center justify-center gap-2 rounded-[16px] px-2 text-[11px] font-black disabled:opacity-60 ${className}`}
+      className={`flex min-h-[62px] items-center justify-center gap-2 rounded-[18px] px-3 text-[16px] font-black disabled:opacity-60 ${className}`}
     >
-      {loading ? <Loader2 className="animate-spin" size={15} /> : icon}
+      {loading ? <Loader2 className="animate-spin" size={19} /> : icon}
       {loading ? "İşleniyor" : label}
     </button>
+  );
+}
+
+function MobileNav({
+  href,
+  icon,
+  label,
+  active,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-[10px] font-black ${
+        active ? "bg-[#071427] text-white" : "text-slate-500"
+      }`}
+    >
+      {icon}
+      <span className="mt-1 truncate">{label}</span>
+    </Link>
   );
 }
