@@ -25,11 +25,7 @@ export class UnitsController {
   @Post('project/:projectId')
   @UseGuards(RolesGuard)
   @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
-  create(
-    @CurrentUser() user: any,
-    @Param('projectId') projectId: string,
-    @Body() body: any,
-  ) {
+  create(@CurrentUser() user: any, @Param('projectId') projectId: string, @Body() body: any) {
     return this.unitsService.create(user, projectId, body);
   }
 
@@ -45,32 +41,17 @@ export class UnitsController {
       status,
       type,
       city,
-      isOffMarket:
-        isOffMarket === 'true'
-          ? true
-          : isOffMarket === 'false'
-            ? false
-            : undefined,
+      isOffMarket: isOffMarket === 'true' ? true : isOffMarket === 'false' ? false : undefined,
     });
   }
 
   @Get('pool')
-  findPool(
-    @CurrentUser() user: any,
-    @Query('status') status?: UnitStatus,
-    @Query('type') type?: UnitType,
-    @Query('city') city?: string,
-  ) {
+  findPool(@CurrentUser() user: any, @Query('status') status?: UnitStatus, @Query('type') type?: UnitType, @Query('city') city?: string) {
     return this.unitsService.findPool(user, { status, type, city });
   }
 
   @Get('project/:projectId')
-  findByProject(
-    @CurrentUser() user: any,
-    @Param('projectId') projectId: string,
-    @Query('status') status?: UnitStatus,
-    @Query('type') type?: UnitType,
-  ) {
+  findByProject(@CurrentUser() user: any, @Param('projectId') projectId: string, @Query('status') status?: UnitStatus, @Query('type') type?: UnitType) {
     return this.unitsService.findByProject(user, projectId, { status, type });
   }
 
@@ -100,6 +81,20 @@ export class UnitsController {
   @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
   submitApproval(@Param('id') id: string, @CurrentUser() user: any) {
     return this.unitsService.submitApproval(id, user);
+  }
+
+  @Post(':id/mark-reviewing')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  markReviewing(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
+    return this.unitsService.markReviewing(id, user, body);
+  }
+
+  @Post(':id/request-missing-info')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
+  requestMissingInfo(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
+    return this.unitsService.requestMissingInfo(id, user, body);
   }
 
   @Post(':id/approve')
@@ -133,11 +128,7 @@ export class UnitsController {
   @Patch(':id/status')
   @UseGuards(RolesGuard)
   @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
-  updateStatus(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-    @Body('status') status: UnitStatus,
-  ) {
+  updateStatus(@Param('id') id: string, @CurrentUser() user: any, @Body('status') status: UnitStatus) {
     return this.unitsService.updateStatus(id, user, status);
   }
 

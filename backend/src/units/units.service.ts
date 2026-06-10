@@ -94,6 +94,12 @@ export class UnitsService {
     throw new ForbiddenException('Bu portföy için işlem yetkiniz yok.');
   }
 
+  private ensureSuperAdmin(user: CurrentUserPayload) {
+    if (!this.isSuperAdmin(user)) {
+      throw new ForbiddenException('Bu işlem sadece Süper Admin tarafından yapılabilir.');
+    }
+  }
+
   private getPrivateUnitWhere(user: CurrentUserPayload) {
     if (this.isSuperAdmin(user)) return {};
 
@@ -273,7 +279,7 @@ export class UnitsService {
       return this.prisma.unit.update({
         where: { id },
         data: {
-          approvalStatus: PortfolioApprovalStatus.YETKI_BELGESI_BEKLIYOR,
+          approvalStatus: PortfolioApprovalStatus.BELGE_BEKLENIYOR,
           isPoolVisible: false,
           approvalNote:
             'Havuza gönderebilmek için yetki belgesi, tapu veya ilgili doğrulama evrakı gereklidir.',
@@ -285,7 +291,7 @@ export class UnitsService {
     return this.prisma.unit.update({
       where: { id },
       data: {
-        approvalStatus: PortfolioApprovalStatus.INCELEMEDE,
+        approvalStatus: PortfolioApprovalStatus.INCELEMEYE_GONDERILDI,
         submittedForApprovalAt: new Date(),
         rejectedAt: null,
         approvalNote: null,
@@ -295,10 +301,51 @@ export class UnitsService {
     });
   }
 
+  async markReviewing(
+    id: string,
+    user: CurrentUserPayload,
+    body?: { note?: string },
+  ) {
+    this.ensureSuperAdmin(user);
+
+    await this.getUnitWithProjectOrFail(id);
+
+    return this.prisma.unit.update({
+      where: { id },
+      data: {
+        approvalStatus: PortfolioApprovalStatus.INCELEMEDE,
+        approvalNote: body?.note || null,
+        isPoolVisible: false,
+      },
+      include: unitInclude,
+    });
+  }
+
+  async requestMissingInfo(
+    id: string,
+    user: CurrentUserPayload,
+    body?: { note?: string },
+  ) {
+    this.ensureSuperAdmin(user);
+
+    await this.getUnitWithProjectOrFail(id);
+
+    return this.prisma.unit.update({
+      where: { id },
+      data: {
+        approvalStatus: PortfolioApprovalStatus.EKSIK_BILGI_BEKLENIYOR,
+        approvalNote:
+          body?.note ||
+          'EPH inceleme ekibi bu portföy için ek bilgi veya belge bekliyor.',
+        isPoolVisible: false,
+        poolRemovedAt: new Date(),
+      },
+      include: unitInclude,
+    });
+  }
+
   async approve(id: string, user: CurrentUserPayload, body?: { note?: string }) {
-    if (!this.isSuperAdmin(user)) {
-      throw new ForbiddenException('Portföy onayı sadece Süper Admin tarafından verilebilir.');
-    }
+    this.ensureSuperAdmin(user);
 
     const unit = await this.getUnitWithProjectOrFail(id);
 
@@ -317,15 +364,14 @@ export class UnitsService {
         approvalNote: body?.note || null,
         isVerified: true,
         verifiedAt: new Date(),
+        isPoolVisible: false,
       },
       include: unitInclude,
     });
   }
 
   async reject(id: string, user: CurrentUserPayload, body?: { note?: string }) {
-    if (!this.isSuperAdmin(user)) {
-      throw new ForbiddenException('Portföy reddi sadece Süper Admin tarafından yapılabilir.');
-    }
+    this.ensureSuperAdmin(user);
 
     await this.getUnitWithProjectOrFail(id);
 
