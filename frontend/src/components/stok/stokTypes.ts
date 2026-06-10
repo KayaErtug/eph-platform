@@ -20,6 +20,28 @@ export interface UnitImage {
   updatedAt?: string;
 }
 
+export type PortfolioAuthorityType =
+  | "YETKI_BELGESI"
+  | "TAPU"
+  | "KAT_KARSILIGI_SOZLESMESI"
+  | "DIGER_DOGRULAMA_EVRAKI";
+
+export interface PortfolioAuthorityDocument {
+  id: string;
+  unitId: string;
+  authorityType: PortfolioAuthorityType;
+  fileUrl: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+  approved: boolean;
+  approvedById?: string | null;
+  approvedAt?: string | null;
+  rejectReason?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Unit {
   id: string;
   type: string;
@@ -58,6 +80,7 @@ export interface Unit {
   createdAt?: string;
 
   images?: UnitImage[];
+  authorityDocuments?: PortfolioAuthorityDocument[];
 
   project: {
     id: string;

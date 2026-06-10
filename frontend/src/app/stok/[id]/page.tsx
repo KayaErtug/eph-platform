@@ -43,7 +43,11 @@ import {
   STATUS_LABELS,
   TYPE_LABELS,
 } from "@/components/stok/stokConstants";
-import type { Unit } from "@/components/stok/stokTypes";
+import type {
+  PortfolioAuthorityDocument,
+  PortfolioAuthorityType,
+  Unit,
+} from "@/components/stok/stokTypes";
 import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
 
@@ -64,6 +68,15 @@ type DetailImage = NonNullable<DetailUnit["images"]>[number] & {
 };
 
 const MAX_GALLERY_COUNT = 15;
+const DOCUMENT_LABELS: Record<PortfolioAuthorityType, string> = {
+  YETKI_BELGESI: "Yetki Belgesi",
+  TAPU: "Tapu",
+  KAT_KARSILIGI_SOZLESMESI: "Kat Karşılığı Sözleşmesi",
+  DIGER_DOGRULAMA_EVRAKI: "Diğer Evrak",
+};
+
+const DOCUMENT_ACCEPT = "application/pdf,image/jpeg,image/png,image/webp";
+
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   TRY: "₺",
@@ -236,6 +249,20 @@ function getCurrentShareUrl(unitId?: string) {
   return `${window.location.origin}/stok/${unitId || ""}`;
 }
 
+function findPortfolioDocument(
+  documents: PortfolioAuthorityDocument[],
+  authorityType: PortfolioAuthorityType,
+) {
+  return documents.find((document) => document.authorityType === authorityType);
+}
+
+function formatFileSize(size?: number | null) {
+  const numeric = Number(size || 0);
+  if (!numeric) return "Boyut yok";
+  if (numeric < 1024 * 1024) return `${Math.max(1, Math.round(numeric / 1024))} KB`;
+  return `${(numeric / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function canEditDetailUnit(
   unit?: DetailUnit | null,
   user?: { id?: string | null; role?: string | null } | null,
@@ -309,8 +336,15 @@ export default function StokDetailPage() {
   const [imageUploadLoading, setImageUploadLoading] = useState("");
   const [imageActionLoading, setImageActionLoading] = useState("");
   const [approvalActionLoading, setApprovalActionLoading] = useState("");
+  const [portfolioDocuments, setPortfolioDocuments] = useState<
+    PortfolioAuthorityDocument[]
+  >([]);
+  const [documentUploadLoading, setDocumentUploadLoading] = useState("");
+  const [documentDeleteLoading, setDocumentDeleteLoading] = useState("");
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
+  const yetkiDocumentInputRef = useRef<HTMLInputElement | null>(null);
+  const tapuDocumentInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!unitId) return;
@@ -335,10 +369,24 @@ export default function StokDetailPage() {
       setError("");
       const response = await api.get(`/units/${unitId}`);
       setUnit(response.data);
+      await fetchPortfolioDocuments(String(unitId));
     } catch (err: any) {
       setError(err?.response?.data?.message || "Portföy detayı yüklenemedi.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPortfolioDocuments = async (portfolioId?: string) => {
+    const safePortfolioId = portfolioId || unitId;
+
+    if (!safePortfolioId) return;
+
+    try {
+      const response = await api.get(`/portfolio-documents/${safePortfolioId}`);
+      setPortfolioDocuments(Array.isArray(response.data) ? response.data : []);
+    } catch {
+      setPortfolioDocuments([]);
     }
   };
 
@@ -597,6 +645,127 @@ export default function StokDetailPage() {
     }
   };
 
+  const validateDocumentFile = (file: File) => {
+    const allowedTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+      "application/octet-stream",
+      "",
+    ];
+
+    const fileType = String(file.type || "").toLowerCase();
+    const fileName = String(file.name || "").toLowerCase();
+    const isAllowedType =
+      allowedTypes.includes(fileType) ||
+      /\.(pdf|jpg|jpeg|png|webp)$/i.test(fileName);
+
+    if (!isAllowedType) {
+      return "Sadece PDF, JPG, PNG veya WEBP formatında belge yükleyebilirsiniz.";
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      return `Yüklediğiniz belge çok büyük. Her belge en fazla 15 MB olabilir. Seçilen belge: ${(file.size / (1024 * 1024)).toFixed(1)} MB.`;
+    }
+
+    if (file.size < 2 * 1024) {
+      return "Seçtiğiniz belge çok küçük görünüyor. Lütfen geçerli bir dosya yükleyiniz.";
+    }
+
+    return "";
+  };
+
+  const uploadPortfolioDocument = async (
+    file: File,
+    authorityType: PortfolioAuthorityType,
+  ) => {
+    if (!unit) return;
+
+    const validationError = validateDocumentFile(file);
+
+    if (validationError) {
+      setActionError(validationError);
+      return;
+    }
+
+    const payload = new FormData();
+
+    payload.append("portfolioId", unit.id);
+    payload.append("authorityType", authorityType);
+    payload.append("file", file);
+
+    setDocumentUploadLoading(authorityType);
+    setActionError("");
+
+    try {
+      await api.post("/portfolio-documents/upload", payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      await fetchPortfolioDocuments(unit.id);
+      await fetchUnit();
+    } catch (err: any) {
+      setActionError(
+        err?.response?.data?.message ||
+          "Belge yüklenemedi. Lütfen dosya formatını ve boyutunu kontrol ediniz.",
+      );
+    } finally {
+      setDocumentUploadLoading("");
+    }
+  };
+
+  const handleDocumentUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+    authorityType: PortfolioAuthorityType,
+  ) => {
+    const file = event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file) return;
+
+    await uploadPortfolioDocument(file, authorityType);
+  };
+
+  const handleDeleteDocument = async (documentId?: string) => {
+    if (!unit || !documentId) return;
+
+    setDocumentDeleteLoading(documentId);
+    setActionError("");
+
+    try {
+      await api.delete(`/portfolio-documents/${documentId}`);
+      await fetchPortfolioDocuments(unit.id);
+      await fetchUnit();
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || "Belge silinemedi.");
+    } finally {
+      setDocumentDeleteLoading("");
+    }
+  };
+
+  const handleSubmitApproval = async () => {
+    if (!unit) return;
+
+    setApprovalActionLoading("INCELEMEYE_GONDERILDI");
+    setActionError("");
+
+    try {
+      await api.post(`/units/${unit.id}/submit-approval`);
+      await fetchPortfolioDocuments(unit.id);
+      await fetchUnit();
+    } catch (err: any) {
+      setActionError(
+        err?.response?.data?.message ||
+          "Portföy incelemeye gönderilemedi. Lütfen belge durumunu kontrol ediniz.",
+      );
+    } finally {
+      setApprovalActionLoading("");
+    }
+  };
+
   const getPortfolioShareData = (item: DetailUnit): PortfolioShareData => ({
     id: item.id,
     title: item.project?.name || "EPH Portföy",
@@ -808,6 +977,21 @@ export default function StokDetailPage() {
         onChange={handleGalleryUpload}
       />
 
+      <input
+        ref={yetkiDocumentInputRef}
+        type="file"
+        accept={DOCUMENT_ACCEPT}
+        className="hidden"
+        onChange={(event) => handleDocumentUpload(event, "YETKI_BELGESI")}
+      />
+      <input
+        ref={tapuDocumentInputRef}
+        type="file"
+        accept={DOCUMENT_ACCEPT}
+        className="hidden"
+        onChange={(event) => handleDocumentUpload(event, "TAPU")}
+      />
+
       <section className="mx-auto w-full max-w-[430px] px-3 py-3">
         <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-1">
           <button
@@ -987,6 +1171,19 @@ export default function StokDetailPage() {
           canReviewPortfolio={canReviewPortfolio}
           approvalActionLoading={approvalActionLoading}
           onApprovalAction={handleApprovalAction}
+        />
+
+        <PortfolioDocumentsCenter
+          documents={portfolioDocuments}
+          canEditPortfolio={canEditPortfolio}
+          canReviewPortfolio={canReviewPortfolio}
+          documentUploadLoading={documentUploadLoading}
+          documentDeleteLoading={documentDeleteLoading}
+          approvalActionLoading={approvalActionLoading}
+          onUploadYetki={() => yetkiDocumentInputRef.current?.click()}
+          onUploadTapu={() => tapuDocumentInputRef.current?.click()}
+          onDeleteDocument={handleDeleteDocument}
+          onSubmitApproval={handleSubmitApproval}
         />
 
         <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
@@ -1331,6 +1528,195 @@ export default function StokDetailPage() {
   );
 }
 
+
+
+function PortfolioDocumentsCenter({
+  documents,
+  canEditPortfolio,
+  canReviewPortfolio,
+  documentUploadLoading,
+  documentDeleteLoading,
+  approvalActionLoading,
+  onUploadYetki,
+  onUploadTapu,
+  onDeleteDocument,
+  onSubmitApproval,
+}: {
+  documents: PortfolioAuthorityDocument[];
+  canEditPortfolio: boolean;
+  canReviewPortfolio: boolean;
+  documentUploadLoading: string;
+  documentDeleteLoading: string;
+  approvalActionLoading: string;
+  onUploadYetki: () => void;
+  onUploadTapu: () => void;
+  onDeleteDocument: (documentId?: string) => void;
+  onSubmitApproval: () => void;
+}) {
+  const yetkiDocument = findPortfolioDocument(documents, "YETKI_BELGESI");
+  const tapuDocument = findPortfolioDocument(documents, "TAPU");
+  const hasAnyDocument = Boolean(yetkiDocument || tapuDocument);
+  const submitDisabled = !hasAnyDocument || Boolean(approvalActionLoading);
+
+  return (
+    <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+      <div className="flex items-center justify-center gap-2 text-[#1557D6]">
+        <FileText size={17} />
+        <h2 className="text-center text-[16px] font-black text-[#06194A]">
+          Belge Yükleme Merkezi
+        </h2>
+      </div>
+
+      <p className="mx-auto mt-1 max-w-[320px] text-center text-[11px] font-bold leading-5 text-[#64748B]">
+        Yetki belgesi veya tapu yüklenince portföy incelemeye gönderilebilir.
+      </p>
+
+      <div className="mt-3 grid gap-2">
+        <PortfolioDocumentRow
+          label={DOCUMENT_LABELS.YETKI_BELGESI}
+          description="Yetkili portföy için zorunlu evrak"
+          document={yetkiDocument}
+          canEditPortfolio={canEditPortfolio}
+          uploadLoading={documentUploadLoading === "YETKI_BELGESI"}
+          deleteLoading={documentDeleteLoading === yetkiDocument?.id}
+          onUpload={onUploadYetki}
+          onDelete={() => onDeleteDocument(yetkiDocument?.id)}
+        />
+
+        <PortfolioDocumentRow
+          label={DOCUMENT_LABELS.TAPU}
+          description="Tapu veya mülkiyet doğrulama evrakı"
+          document={tapuDocument}
+          canEditPortfolio={canEditPortfolio}
+          uploadLoading={documentUploadLoading === "TAPU"}
+          deleteLoading={documentDeleteLoading === tapuDocument?.id}
+          onUpload={onUploadTapu}
+          onDelete={() => onDeleteDocument(tapuDocument?.id)}
+        />
+      </div>
+
+      {canEditPortfolio && (
+        <button
+          type="button"
+          onClick={onSubmitApproval}
+          disabled={submitDisabled}
+          className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[16px] bg-[#06194A] px-3 text-[12px] font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
+        >
+          <Send size={16} />
+          {approvalActionLoading === "INCELEMEYE_GONDERILDI"
+            ? "Gönderiliyor..."
+            : "İncelemeye Gönder"}
+        </button>
+      )}
+
+      {canReviewPortfolio && (
+        <div className="mt-3 rounded-[16px] bg-[#F7FBFF] px-3 py-2 text-center text-[11px] font-bold leading-5 text-[#64748B]">
+          Yönetici görünümü aktif. Belgeleri görüntüleyebilir, onay kararını Onay Merkezi üzerinden verebilirsiniz.
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PortfolioDocumentRow({
+  label,
+  description,
+  document,
+  canEditPortfolio,
+  uploadLoading,
+  deleteLoading,
+  onUpload,
+  onDelete,
+}: {
+  label: string;
+  description: string;
+  document?: PortfolioAuthorityDocument;
+  canEditPortfolio: boolean;
+  uploadLoading: boolean;
+  deleteLoading: boolean;
+  onUpload: () => void;
+  onDelete: () => void;
+}) {
+  const hasDocument = Boolean(document?.fileUrl);
+
+  return (
+    <div className="rounded-[18px] border border-[#E8F0FA] bg-[#FBFDFF] p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[13px] font-black text-[#06194A]">{label}</p>
+          <p className="mt-0.5 text-[10px] font-bold leading-4 text-[#64748B]">
+            {description}
+          </p>
+        </div>
+
+        <span
+          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black ${
+            hasDocument
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-amber-50 text-amber-700"
+          }`}
+        >
+          {hasDocument ? "Yüklü" : "Bekliyor"}
+        </span>
+      </div>
+
+      {hasDocument && (
+        <div className="mt-2 rounded-[14px] bg-white px-3 py-2 text-center">
+          <p className="line-clamp-1 text-[11px] font-black text-[#06194A]">
+            {document?.fileName || "Belge"}
+          </p>
+          <p className="mt-0.5 text-[10px] font-bold text-[#64748B]">
+            {formatFileSize(document?.sizeBytes)}
+          </p>
+        </div>
+      )}
+
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        {canEditPortfolio && (
+          <button
+            type="button"
+            onClick={onUpload}
+            disabled={uploadLoading}
+            className="flex min-h-[38px] items-center justify-center gap-1 rounded-[14px] bg-[#1557D6] px-2 text-[10px] font-black text-white disabled:opacity-60"
+          >
+            <Upload size={14} />
+            {uploadLoading ? "..." : hasDocument ? "Yenile" : "Yükle"}
+          </button>
+        )}
+
+        {hasDocument && (
+          <a
+            href={document?.fileUrl}
+            target="_blank"
+            rel="noreferrer"
+            className={`${canEditPortfolio ? "" : "col-span-2"} flex min-h-[38px] items-center justify-center gap-1 rounded-[14px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#1557D6]`}
+          >
+            <ExternalLink size={14} />
+            Gör
+          </a>
+        )}
+
+        {canEditPortfolio && hasDocument && (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={deleteLoading}
+            className="flex min-h-[38px] items-center justify-center gap-1 rounded-[14px] bg-rose-50 px-2 text-[10px] font-black text-rose-700 disabled:opacity-60"
+          >
+            <Trash2 size={14} />
+            {deleteLoading ? "..." : "Sil"}
+          </button>
+        )}
+
+        {!hasDocument && !canEditPortfolio && (
+          <div className="col-span-3 flex min-h-[38px] items-center justify-center rounded-[14px] bg-white px-2 text-[10px] font-black text-[#64748B]">
+            Belge bekleniyor
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function PortfolioApprovalCenter({
   unit,
