@@ -51,6 +51,7 @@ const unitInclude = {
           firstName: true,
           lastName: true,
           role: true,
+          memberCode: true,
         },
       },
     },
@@ -76,12 +77,20 @@ export class UnitsService {
     return user?.role === Role.ADMIN || user?.role === 'ADMIN';
   }
 
+  private isModerator(user?: CurrentUserPayload) {
+    return user?.role === Role.MODERATOR || user?.role === 'MODERATOR';
+  }
+
+  private isApprovalManager(user?: CurrentUserPayload) {
+    return this.isSuperAdmin(user) || this.isAdmin(user) || this.isModerator(user);
+  }
+
   private isOwner(user: CurrentUserPayload, ownerId: string) {
     return Boolean(user?.id && ownerId && user.id === ownerId);
   }
 
   private ensureCanViewUnit(user: CurrentUserPayload, ownerId: string) {
-    if (this.isSuperAdmin(user)) return;
+    if (this.isApprovalManager(user)) return;
     if (this.isOwner(user, ownerId)) return;
 
     throw new ForbiddenException('Bu portföyü görüntüleme yetkiniz yok.');
@@ -94,16 +103,16 @@ export class UnitsService {
     throw new ForbiddenException('Bu portföy için işlem yetkiniz yok.');
   }
 
-  private ensureSuperAdmin(user: CurrentUserPayload) {
-    if (!this.isSuperAdmin(user)) {
-      throw new ForbiddenException('Bu işlem sadece Süper Admin tarafından yapılabilir.');
+  private ensureApprovalManager(user: CurrentUserPayload) {
+    if (!this.isApprovalManager(user)) {
+      throw new ForbiddenException('Bu işlem sadece Moderatör, Admin veya Süper Admin tarafından yapılabilir.');
     }
   }
 
   private getPrivateUnitWhere(user: CurrentUserPayload) {
     if (this.isSuperAdmin(user)) return {};
 
-    if (this.isAdmin(user)) {
+    if (this.isAdmin(user) || this.isModerator(user)) {
       return {
         id: '__ADMIN_PORTFOY_GOREMEZ__',
       };
@@ -187,6 +196,44 @@ export class UnitsService {
     return unit;
   }
 
+  async findPortfolioApprovals(
+    user: CurrentUserPayload,
+    filters?: { status?: string },
+  ) {
+    this.ensureApprovalManager(user);
+
+    const rawStatus = String(filters?.status || '').trim().toUpperCase();
+
+    const approvalStatus =
+      rawStatus && rawStatus !== 'ALL'
+        ? (rawStatus as PortfolioApprovalStatus)
+        : undefined;
+
+    const approvalStatuses: PortfolioApprovalStatus[] = [
+      PortfolioApprovalStatus.BELGE_BEKLENIYOR,
+      PortfolioApprovalStatus.INCELEMEYE_GONDERILDI,
+      PortfolioApprovalStatus.INCELEMEDE,
+      PortfolioApprovalStatus.EKSIK_BILGI_BEKLENIYOR,
+      PortfolioApprovalStatus.ONAYLANDI,
+      PortfolioApprovalStatus.HAVUZDA,
+      PortfolioApprovalStatus.REDDEDILDI,
+    ];
+
+    return this.prisma.unit.findMany({
+      where: {
+        approvalStatus: approvalStatus || {
+          in: approvalStatuses,
+        },
+      },
+      include: unitInclude,
+      orderBy: [
+        { submittedForApprovalAt: 'desc' },
+        { updatedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+    });
+  }
+
   async findByProject(
     user: CurrentUserPayload,
     projectId: string,
@@ -230,7 +277,7 @@ export class UnitsService {
         type: filters?.type,
         isOffMarket: filters?.isOffMarket,
         project: {
-          ...(this.isSuperAdmin(user) || this.isAdmin(user)
+          ...(this.isSuperAdmin(user) || this.isAdmin(user) || this.isModerator(user)
             ? {}
             : { ownerId: user.id }),
           isActive: true,
@@ -306,7 +353,7 @@ export class UnitsService {
     user: CurrentUserPayload,
     body?: { note?: string },
   ) {
-    this.ensureSuperAdmin(user);
+    this.ensureApprovalManager(user);
 
     await this.getUnitWithProjectOrFail(id);
 
@@ -314,7 +361,7 @@ export class UnitsService {
       where: { id },
       data: {
         approvalStatus: PortfolioApprovalStatus.INCELEMEDE,
-        approvalNote: body?.note || null,
+        approvalNote: body?.note || 'Portföy incelemeye alındı.',
         isPoolVisible: false,
       },
       include: unitInclude,
@@ -326,7 +373,7 @@ export class UnitsService {
     user: CurrentUserPayload,
     body?: { note?: string },
   ) {
-    this.ensureSuperAdmin(user);
+    this.ensureApprovalManager(user);
 
     await this.getUnitWithProjectOrFail(id);
 
@@ -345,7 +392,7 @@ export class UnitsService {
   }
 
   async approve(id: string, user: CurrentUserPayload, body?: { note?: string }) {
-    this.ensureSuperAdmin(user);
+    this.ensureApprovalManager(user);
 
     const unit = await this.getUnitWithProjectOrFail(id);
 
@@ -371,7 +418,7 @@ export class UnitsService {
   }
 
   async reject(id: string, user: CurrentUserPayload, body?: { note?: string }) {
-    this.ensureSuperAdmin(user);
+    this.ensureApprovalManager(user);
 
     await this.getUnitWithProjectOrFail(id);
 
@@ -391,7 +438,9 @@ export class UnitsService {
   async sendToPool(id: string, user: CurrentUserPayload) {
     const unit = await this.getUnitWithProjectOrFail(id);
 
-    this.ensureCanManageUnit(user, unit.project.ownerId);
+    if (!this.isApprovalManager(user)) {
+      this.ensureCanManageUnit(user, unit.project.ownerId);
+    }
 
     if (unit.approvalStatus !== PortfolioApprovalStatus.ONAYLANDI) {
       throw new BadRequestException(
@@ -414,7 +463,9 @@ export class UnitsService {
   async removeFromPool(id: string, user: CurrentUserPayload) {
     const unit = await this.getUnitWithProjectOrFail(id);
 
-    this.ensureCanManageUnit(user, unit.project.ownerId);
+    if (!this.isApprovalManager(user)) {
+      this.ensureCanManageUnit(user, unit.project.ownerId);
+    }
 
     if (!unit.isPoolVisible) {
       throw new BadRequestException('Bu portföy zaten havuzda değil.');

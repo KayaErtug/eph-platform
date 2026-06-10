@@ -50,6 +50,13 @@ export class UnitsController {
     return this.unitsService.findPool(user, { status, type, city });
   }
 
+  @Get('admin/portfolio-approvals')
+  @UseGuards(RolesGuard)
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
+  findPortfolioApprovals(@CurrentUser() user: any, @Query('status') status?: string) {
+    return this.unitsService.findPortfolioApprovals(user, { status });
+  }
+
   @Get('project/:projectId')
   findByProject(@CurrentUser() user: any, @Param('projectId') projectId: string, @Query('status') status?: UnitStatus, @Query('type') type?: UnitType) {
     return this.unitsService.findByProject(user, projectId, { status, type });
@@ -85,42 +92,42 @@ export class UnitsController {
 
   @Post(':id/mark-reviewing')
   @UseGuards(RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   markReviewing(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
     return this.unitsService.markReviewing(id, user, body);
   }
 
   @Post(':id/request-missing-info')
   @UseGuards(RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   requestMissingInfo(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
     return this.unitsService.requestMissingInfo(id, user, body);
   }
 
   @Post(':id/approve')
   @UseGuards(RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   approve(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
     return this.unitsService.approve(id, user, body);
   }
 
   @Post(':id/reject')
   @UseGuards(RolesGuard)
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   reject(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
     return this.unitsService.reject(id, user, body);
   }
 
   @Post(':id/send-to-pool')
   @UseGuards(RolesGuard)
-  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   sendToPool(@Param('id') id: string, @CurrentUser() user: any) {
     return this.unitsService.sendToPool(id, user);
   }
 
   @Post(':id/remove-from-pool')
   @UseGuards(RolesGuard)
-  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   removeFromPool(@Param('id') id: string, @CurrentUser() user: any) {
     return this.unitsService.removeFromPool(id, user);
   }
