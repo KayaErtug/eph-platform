@@ -46,6 +46,10 @@ import {
 import type { Unit } from "@/components/stok/stokTypes";
 import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
+import PortfolioApprovalCard from "@/components/portfolio/PortfolioApprovalCard";
+import PortfolioAuthorityCard from "@/components/portfolio/PortfolioAuthorityCard";
+import PortfolioApprovalTimeline from "@/components/portfolio/PortfolioApprovalTimeline";
+import PortfolioPoolStatusCard from "@/components/portfolio/PortfolioPoolStatusCard";
 
 type DetailUnit = Unit & {
   createdAt?: string;
@@ -260,6 +264,17 @@ function canEditDetailUnit(
   return possibleOwnerIds.includes(String(user.id));
 }
 
+function canReviewDetailUnit(user?: { role?: string | null } | null) {
+  const role = String(user?.role || "").toUpperCase();
+  return ["MODERATOR", "ADMIN", "SUPER_ADMIN"].includes(role);
+}
+
+function isApprovalFinal(status?: string) {
+  return ["ONAYLANDI", "HAVUZDA", "REDDEDILDI"].includes(
+    String(status || "").toUpperCase(),
+  );
+}
+
 function makeShareText(unit: DetailUnit) {
   const location = [unit.project?.district, unit.project?.city]
     .filter(Boolean)
@@ -297,6 +312,7 @@ export default function StokDetailPage() {
   const [actionError, setActionError] = useState("");
   const [imageUploadLoading, setImageUploadLoading] = useState("");
   const [imageActionLoading, setImageActionLoading] = useState("");
+  const [approvalActionLoading, setApprovalActionLoading] = useState("");
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -664,6 +680,36 @@ export default function StokDetailPage() {
     }
   };
 
+  const handleApprovalAction = async (
+    nextStatus:
+      | "INCELEMEDE"
+      | "EKSIK_BILGI_BEKLENIYOR"
+      | "ONAYLANDI"
+      | "HAVUZDA"
+      | "REDDEDILDI",
+  ) => {
+    if (!unit) return;
+
+    setActionError("");
+    setApprovalActionLoading(nextStatus);
+
+    try {
+      await api.patch(`/units/${unit.id}/approval`, {
+        approvalStatus: nextStatus,
+        isPoolVisible: nextStatus === "HAVUZDA" ? true : undefined,
+      });
+
+      await fetchUnit();
+    } catch (err: any) {
+      setActionError(
+        err?.response?.data?.message ||
+          "Onay işlemi tamamlanamadı. Backend endpoint bağlantısını kontrol ediniz.",
+      );
+    } finally {
+      setApprovalActionLoading("");
+    }
+  };
+
   const handleGalleryTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
     if (touchStartX == null || galleryImages.length <= 1) return;
     const touchEndX = event.changedTouches[0]?.clientX || 0;
@@ -718,6 +764,7 @@ export default function StokDetailPage() {
 
   const style = statusStyle(unit.status);
   const canEditPortfolio = canEditDetailUnit(unit, user);
+  const canReviewPortfolio = canReviewDetailUnit(user);
   const primaryInfoBoxes = getPrimaryInfoBoxes(unit, verified);
   const safeDescription =
     unit.description || "Bu portföy için açıklama henüz eklenmedi.";
@@ -921,6 +968,99 @@ export default function StokDetailPage() {
             </div>
           </div>
         </section>
+
+        <PortfolioApprovalCard
+          status={unit.approvalStatus}
+          approvalNote={unit.approvalNote}
+          approvedAt={unit.approvedAt}
+        />
+
+        <PortfolioAuthorityCard
+          yetkiVerified={Boolean(unit.yetkiVerified || unit.isVerified)}
+          tapuVerified={Boolean(unit.tapuVerified)}
+          photoVerified={Boolean(unit.photoVerified || galleryImages.length > 0)}
+        />
+
+        <PortfolioPoolStatusCard
+          isPoolVisible={Boolean(unit.isPoolVisible || unit.approvalStatus === "HAVUZDA")}
+          poolPublishedAt={unit.poolPublishedAt}
+        />
+
+        <PortfolioApprovalTimeline approvalStatus={unit.approvalStatus} />
+
+        {canReviewPortfolio && (
+          <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+            <div className="flex items-center justify-center gap-2 text-[#1557D6]">
+              <ShieldCheck size={17} />
+              <h2 className="text-[16px] font-black text-[#06194A]">
+                Yönetici Onay İşlemleri
+              </h2>
+            </div>
+
+            <p className="mx-auto mt-2 max-w-[330px] text-[11px] font-semibold leading-5 text-[#64748B]">
+              Bu alan sadece Moderatör, Admin ve Süper Admin rollerine görünür.
+            </p>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleApprovalAction("INCELEMEDE")}
+                disabled={Boolean(approvalActionLoading)}
+                className="min-h-[42px] rounded-[16px] bg-[#EFF6FF] px-2 text-[11px] font-black text-[#1557D6] disabled:opacity-60"
+              >
+                {approvalActionLoading === "INCELEMEDE"
+                  ? "İşleniyor..."
+                  : "İncelemeye Al"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleApprovalAction("EKSIK_BILGI_BEKLENIYOR")}
+                disabled={Boolean(approvalActionLoading)}
+                className="min-h-[42px] rounded-[16px] bg-amber-50 px-2 text-[11px] font-black text-amber-700 disabled:opacity-60"
+              >
+                {approvalActionLoading === "EKSIK_BILGI_BEKLENIYOR"
+                  ? "İşleniyor..."
+                  : "Eksik Bilgi"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleApprovalAction("ONAYLANDI")}
+                disabled={Boolean(approvalActionLoading)}
+                className="min-h-[42px] rounded-[16px] bg-emerald-50 px-2 text-[11px] font-black text-emerald-700 disabled:opacity-60"
+              >
+                {approvalActionLoading === "ONAYLANDI"
+                  ? "İşleniyor..."
+                  : "Onayla"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleApprovalAction("HAVUZDA")}
+                disabled={Boolean(approvalActionLoading)}
+                className="min-h-[42px] rounded-[16px] bg-[#1557D6] px-2 text-[11px] font-black text-white disabled:opacity-60"
+              >
+                {approvalActionLoading === "HAVUZDA"
+                  ? "İşleniyor..."
+                  : "Havuza Al"}
+              </button>
+            </div>
+
+            {!isApprovalFinal(unit.approvalStatus) && (
+              <button
+                type="button"
+                onClick={() => handleApprovalAction("REDDEDILDI")}
+                disabled={Boolean(approvalActionLoading)}
+                className="mt-2 min-h-[42px] w-full rounded-[16px] bg-rose-50 px-2 text-[11px] font-black text-rose-700 disabled:opacity-60"
+              >
+                {approvalActionLoading === "REDDEDILDI"
+                  ? "İşleniyor..."
+                  : "Reddet"}
+              </button>
+            )}
+          </section>
+        )}
 
         <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
           <div className="flex items-center justify-center gap-2 text-[#1557D6]">
