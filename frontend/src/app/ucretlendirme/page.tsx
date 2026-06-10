@@ -1,14 +1,29 @@
 const membershipPlans = [
   {
-    name: "SILVER",
+    name: "STARTER",
     price: "₺499",
+    period: "/ Ay",
+    subtitle: "Giriş seviyesi kullanım için",
+    popular: false,
+    features: [
+      "10 aktif portföy",
+      "5 forum konusu",
+      "Temel CRM kullanımı",
+      "Mesajlaşma",
+      "Mobil PWA erişimi",
+      "250 kontör",
+    ],
+  },
+  {
+    name: "SILVER",
+    price: "₺999",
     period: "/ Ay",
     subtitle: "Yeni başlayan emlak profesyonelleri için",
     popular: false,
     features: [
       "20 aktif portföy",
       "10 forum konusu",
-      "Temel CRM kullanımı",
+      "CRM kullanımı",
       "Mesajlaşma",
       "Mobil PWA erişimi",
       "500 kontör",
@@ -16,9 +31,9 @@ const membershipPlans = [
   },
   {
     name: "GOLD",
-    price: "₺999",
+    price: "₺1.499",
     period: "/ Ay",
-    subtitle: "Aktif çalışan danışmanlar için",
+    subtitle: "En çok tercih edilen paket",
     popular: true,
     features: [
       "50 aktif portföy",
@@ -31,7 +46,7 @@ const membershipPlans = [
   },
   {
     name: "PREMIUM",
-    price: "₺1.999",
+    price: "₺2.499",
     period: "/ Ay",
     subtitle: "Profesyonel portföy yöneticileri için",
     popular: false,
@@ -46,9 +61,9 @@ const membershipPlans = [
   },
   {
     name: "PLATINUM",
-    price: "₺2.999",
+    price: "₺4.499",
     period: "/ Ay",
-    subtitle: "Maksimum kullanım isteyen ekipler için",
+    subtitle: "Kurumsal ve yoğun kullanım için",
     popular: false,
     features: [
       "200 aktif portföy",
@@ -113,6 +128,16 @@ const faqs = [
     answer:
       "Lina AI, Premium ve Platinum paketlerinde yer alır. Bazı Lina işlemleri kontör ile de kullanılabilir.",
   },
+  {
+    question: "Aboneliğimi istediğim zaman iptal edebilir miyim?",
+    answer:
+      "Evet. Herhangi bir taahhüt olmadan aboneliğinizi sonlandırabilirsiniz.",
+  },
+  {
+    question: "Kontör satın almak zorunlu mu?",
+    answer:
+      "Hayır. Kontör paketleri zorunlu değildir. Üyelik paketleri platform erişimi sağlar; kontörler ek görünürlük, içerik üretimi ve premium işlemler için kullanılır.",
+  },
 ];
 
 export default function UcretlendirmePage() {
@@ -158,7 +183,7 @@ export default function UcretlendirmePage() {
             </p>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {membershipPlans.map((plan) => (
               <article
                 key={plan.name}
@@ -206,7 +231,7 @@ export default function UcretlendirmePage() {
                 </div>
 
                 <button className="mt-5 w-full rounded-2xl bg-[#1557D6] py-3 text-sm font-black text-white">
-                  Yakında Aktif
+                  Ödeme Sistemi Hazırlanıyor
                 </button>
               </article>
             ))}
@@ -241,7 +266,7 @@ export default function UcretlendirmePage() {
                   {pack.price}
                 </p>
                 <button className="mt-5 w-full rounded-2xl border border-[#1557D6] bg-white py-3 text-sm font-black text-[#1557D6]">
-                  Yakında Aktif
+                  Ödeme Sistemi Hazırlanıyor
                 </button>
               </article>
             ))}
@@ -251,12 +276,30 @@ export default function UcretlendirmePage() {
         <section className="mt-12 grid gap-5 lg:grid-cols-[1fr_1.2fr]">
           <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.055)] md:p-8">
             <h2 className="text-center text-2xl font-black tracking-[-0.03em]">
-              Kontör Nerede Kullanılır?
+              Kontör ile Neler Yapabilirsiniz?
             </h2>
             <p className="mt-3 text-center text-sm font-semibold leading-7 text-[#64748B]">
               Kontör sistemi, platformun ana kullanımını engellemez. Sadece
               görünürlük, üretim ve hız sağlayan premium işlemlerde kullanılır.
             </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              {[
+                "Acil Talep",
+                "Vitrine Çıkar",
+                "Portföy Öne Çıkar",
+                "Lina AI",
+                "PDF Portföy",
+                "Sosyal Medya",
+              ].map((item) => (
+                <span
+                  key={item}
+                  className="rounded-2xl bg-[#F8FAFC] px-3 py-2 text-center text-xs font-black text-[#1557D6]"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div className="rounded-[32px] border border-[#DDE7F3] bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.055)] md:p-6">
@@ -286,10 +329,11 @@ export default function UcretlendirmePage() {
           </div>
 
           <div className="mt-6 overflow-x-auto">
-            <table className="w-full min-w-[760px] border-separate border-spacing-y-2 text-sm">
+            <table className="w-full min-w-[880px] border-separate border-spacing-y-2 text-sm">
               <thead>
                 <tr className="text-[#64748B]">
                   <th className="px-4 py-3 text-left">Özellik</th>
+                  <th className="px-4 py-3 text-center">Starter</th>
                   <th className="px-4 py-3 text-center">Silver</th>
                   <th className="px-4 py-3 text-center">Gold</th>
                   <th className="px-4 py-3 text-center">Premium</th>
@@ -298,13 +342,13 @@ export default function UcretlendirmePage() {
               </thead>
               <tbody>
                 {[
-                  ["Aktif Portföy", "20", "50", "100", "200"],
-                  ["Forum Konusu", "10", "30", "Sınırsız", "Sınırsız"],
-                  ["CRM", "✓", "✓", "✓", "✓"],
-                  ["Havuz", "—", "✓", "✓", "✓"],
-                  ["Lina AI", "—", "—", "✓", "✓"],
-                  ["Mesajlaşma", "✓", "✓", "250", "Sınırsız"],
-                  ["Kontör", "500", "1500", "2500", "5000"],
+                  ["Aktif Portföy", "10", "20", "50", "100", "200"],
+                  ["Forum Konusu", "5", "10", "30", "Sınırsız", "Sınırsız"],
+                  ["CRM", "✓", "✓", "✓", "✓", "✓"],
+                  ["Havuz", "—", "—", "✓", "✓", "✓"],
+                  ["Lina AI", "—", "—", "—", "✓", "✓"],
+                  ["Mesajlaşma", "✓", "✓", "✓", "250", "Sınırsız"],
+                  ["Kontör", "250", "500", "1500", "2500", "5000"],
                 ].map((row) => (
                   <tr key={row[0]}>
                     {row.map((cell, index) => (
@@ -378,8 +422,13 @@ export default function UcretlendirmePage() {
             görünürlük, üretim ve hız sağlayan premium araçları destekler.
           </p>
           <button className="mt-6 rounded-2xl bg-white px-7 py-3 text-sm font-black text-[#06194A]">
-            Yakında Aktif
+            Ödeme Sistemi Hazırlanıyor
           </button>
+          <p className="mx-auto mt-5 max-w-3xl text-xs font-semibold leading-6 text-white/55">
+            Abonelikler aylık olarak yenilenir. İptal işlemleri kullanıcı
+            panelinden yapılabilir. İade koşulları hizmet sözleşmesinde
+            belirtilir.
+          </p>
         </section>
       </div>
     </main>
