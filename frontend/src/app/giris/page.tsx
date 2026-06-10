@@ -422,12 +422,19 @@ export default function GirisPage() {
 
               <form onSubmit={handleSubmit(onSubmit)}>
                 <div className="login-field">
-                  <label>E-posta adresi</label>
+                  <label htmlFor="email">E-posta adresi</label>
                   <div className="login-input-wrap">
                     <Mail className="login-input-icon" size={18} />
                     <input
                       {...register("email")}
+                      id="email"
+                      name="email"
                       type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       placeholder="ornek@email.com"
                       className="login-input"
                     />
@@ -438,12 +445,15 @@ export default function GirisPage() {
                 </div>
 
                 <div className="login-field">
-                  <label>Şifre</label>
+                  <label htmlFor="password">Şifre</label>
                   <div className="login-input-wrap">
                     <LockKeyhole className="login-input-icon" size={18} />
                     <input
                       {...register("password")}
+                      id="password"
+                      name="password"
                       type="password"
+                      autoComplete="current-password"
                       placeholder="Şifrenizi yazın"
                       className="login-input"
                     />
