@@ -334,7 +334,7 @@ export class MessagesService {
 
     if (this.isSuperAdmin(userRole) && !this.isConversationParticipant(conversation, userId)) {
       throw new ForbiddenException(
-        'Super Admin görüşmeleri inceleyebilir fakat taraf olmadığı görüşmeye mesaj gönderemez.',
+        'Yazılım Ekibi görüşmeleri inceleyebilir fakat taraf olmadığı görüşmeye mesaj gönderemez.',
       );
     }
 

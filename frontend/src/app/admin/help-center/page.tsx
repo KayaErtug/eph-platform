@@ -13,7 +13,6 @@ import {
   Megaphone,
   MessageCircle,
   Settings,
-  ShieldCheck,
   Sparkles,
   UserPlus,
   UsersRound,
@@ -51,7 +50,7 @@ const guideCards = [
     title: "Referans Yönetimi",
     desc: "Referans kodu oluşturma, pasifleştirme ve takip işlemleri.",
     href: "/admin/referrals",
-    icon: ShieldCheck,
+    icon: UsersRound,
   },
   {
     title: "Sistem Mesajları",
@@ -91,15 +90,6 @@ const guideCards = [
   },
 ];
 
-const rules = [
-  "Çalışmayan buton, boş kart veya sahte yönlendirme bırakılmamalıdır.",
-  "Admin kalıcı silme yapamaz; kalıcı silme yetkisi Yazılım Ekibi / Super Admin’dedir.",
-  "Admin askıya alma işlemi sebep zorunlu olacak şekilde yapılır.",
-  "Turan Banner sadece Moderator, Admin ve Super Admin rollerinde görünür.",
-  "Mobil görünüm önceliklidir; gridlerde son tek kart ortalanmalıdır.",
-  "Açık tema, ultra kompakt yapı ve sade CRM çizgisi korunmalıdır.",
-];
-
 export default function AdminHelpCenterPage() {
   const router = useRouter();
   const { user, hasHydrated } = useAuthStore();
@@ -118,7 +108,7 @@ export default function AdminHelpCenterPage() {
     if (!canAccess) {
       router.push("/admin");
     }
-  }, [hasHydrated, user?.id, user?.role]);
+  }, [hasHydrated, user?.id, user?.role, canAccess, router]);
 
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-[#172033]">
@@ -128,6 +118,7 @@ export default function AdminHelpCenterPage() {
             <Link
               href="/admin"
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm"
+              aria-label="Admin paneline dön"
             >
               <ArrowLeft size={19} />
             </Link>
@@ -145,6 +136,7 @@ export default function AdminHelpCenterPage() {
           <Link
             href="/admin/settings"
             className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm"
+            aria-label="Admin ayarlarına git"
           >
             <Settings size={17} />
           </Link>
@@ -160,7 +152,7 @@ export default function AdminHelpCenterPage() {
             Yönetim Rehberi
           </h2>
           <p className="mx-auto mt-1 max-w-[760px] text-[12px] font-bold leading-5 text-slate-600">
-            Bu merkez admin panelindeki tüm aktif modüllere hızlı erişim sağlar. Her kart gerçek bir ekrana yönlenir.
+            Bu merkez admin panelindeki aktif modüllere hızlı erişim sağlar. Her kart gerçek bir ekrana yönlenir.
           </p>
         </section>
 
@@ -189,35 +181,6 @@ export default function AdminHelpCenterPage() {
               </Link>
             );
           })}
-        </section>
-
-        <section className="mt-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-center">
-            <ShieldCheck className="mx-auto text-emerald-600" size={28} />
-            <h2 className="mt-2 text-[17px] font-black tracking-[-0.04em]">
-              Admin Panel Çalışma Kuralları
-            </h2>
-            <p className="mt-1 text-[12px] font-bold text-slate-500">
-              Bu kurallar panel geliştirme ve kullanım standardıdır.
-            </p>
-          </div>
-
-          <div className="mt-3 grid gap-2 md:grid-cols-2">
-            {rules.map((rule, index) => (
-              <div
-                key={rule}
-                className={`rounded-2xl border border-slate-100 bg-slate-50 p-3 text-center ${
-                  rules.length % 2 === 1 && index === rules.length - 1
-                    ? "md:col-span-2 md:mx-auto md:w-[50%]"
-                    : ""
-                }`}
-              >
-                <p className="text-[12px] font-black leading-5 text-[#172033]">
-                  {index + 1}. {rule}
-                </p>
-              </div>
-            ))}
-          </div>
         </section>
       </div>
     </main>

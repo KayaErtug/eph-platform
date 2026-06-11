@@ -1527,11 +1527,11 @@ export class LinaService {
     const normalizedRole = this.normalizeRole(role);
 
     if (normalizedRole === "ADMIN") {
-      return "Admin rolünde Lina platform düzeni, başvurular, şikayetler, moderasyon ve güvenlik odağıyla çalışır. Admin sınırlarını aşan işlemlerde Super Admin yetkisi gerektiğini belirtir.";
+      return "Admin rolünde Lina platform düzeni, başvurular, şikayetler, moderasyon ve güvenlik odağıyla çalışır. Admin sınırlarını aşan işlemlerde Yazılım Ekibi yetkisi gerektiğini belirtir.";
     }
 
     if (normalizedRole === "SUPER_ADMIN") {
-      return "Super Admin rolünde Lina platform sağlığı, audit log, admin denetimi, güvenlik, KVKK ve büyüme analizine odaklanır. Karar vermez, risk ve öneri sunar.";
+      return "Yazılım Ekibi rolünde Lina platform sağlığı, audit log, admin denetimi, güvenlik, KVKK ve büyüme analizine odaklanır. Karar vermez, risk ve öneri sunar.";
     }
 
     if (normalizedRole === "MODERATOR") {
