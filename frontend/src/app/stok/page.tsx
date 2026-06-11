@@ -30,6 +30,16 @@ import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCa
 import type { LocalPortfolioImage, Project, ProjectFormState, Unit, UnitFormState } from "@/components/stok/stokTypes";
 
 type SortMode = "newest" | "priceDesc" | "priceAsc";
+type CrmCustomerOption = {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  city?: string | null;
+  interestedArea?: string | null;
+};
+
 type MapUnit = Unit & {
   project?: Unit["project"] & {
     latitude?: number | null;
@@ -205,6 +215,7 @@ export default function StokPage() {
   const { user } = useAuthStore();
 
   const [projects, setProjects] = useState<Project[]>([]);
+  const [crmCustomers, setCrmCustomers] = useState<CrmCustomerOption[]>([]);
   const [units, setUnits] = useState<MapUnit[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -233,14 +244,17 @@ export default function StokPage() {
     priceCurrency: "TRY",
     status: "SATILIK",
     description: "",
-  });
+    deedOwnerFullName: "",
+    deedOwnerPhone: "",
+    deedOwnerEmail: "",
+  } as UnitFormState);
   const [coverImage, setCoverImage] = useState<LocalPortfolioImage | null>(null);
   const [galleryImages, setGalleryImages] = useState<LocalPortfolioImage[]>([]);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState(false);
 
-  const canAddUnit = user?.role === "MUTEAHHIT" || user?.role === "INSAAT_FIRMASI" || user?.role === "ADMIN" || user?.role === "EMLAKCI";
+  const canAddUnit = user?.role === "MUTEAHHIT" || user?.role === "INSAAT_FIRMASI" || user?.role === "ADMIN" || user?.role === "EMLAKCI" || user?.role === "SUPER_ADMIN";
 
   useEffect(() => setHydrated(true), []);
 
@@ -256,9 +270,14 @@ export default function StokPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [projectRes, unitRes] = await Promise.all([api.get("/projects"), api.get("/units")]);
+      const [projectRes, unitRes, crmRes] = await Promise.all([
+        api.get("/projects/my"),
+        api.get("/units"),
+        api.get("/crm/customers").catch(() => ({ data: [] })),
+      ]);
       setProjects(projectRes.data || []);
       setUnits(unitRes.data || []);
+      setCrmCustomers(Array.isArray(crmRes.data) ? crmRes.data : []);
     } finally {
       setLoading(false);
     }
@@ -335,7 +354,10 @@ export default function StokPage() {
       priceCurrency: "TRY",
       status: "SATILIK",
       description: "",
-    });
+      deedOwnerFullName: "",
+      deedOwnerPhone: "",
+      deedOwnerEmail: "",
+    } as UnitFormState);
     setFormError("");
     setFormSuccess(false);
     resetSelectedImages();
@@ -384,8 +406,10 @@ export default function StokPage() {
         return;
       }
 
-      if (!coverImage) {
-        setFormError("Kapak fotoğrafı zorunludur.");
+      const selectedCoverImage = coverImage || galleryImages[0] || null;
+
+      if (!selectedCoverImage || galleryImages.length === 0) {
+        setFormError("En az 1 galeri fotoğrafı ekleyiniz.");
         setFormLoading(false);
         return;
       }
@@ -402,6 +426,9 @@ export default function StokPage() {
         priceCurrency: unitForm.priceCurrency || "TRY",
         status: unitForm.status,
         description: unitForm.description || undefined,
+        deedOwnerFullName: String((unitForm as any).deedOwnerFullName || "").trim() || undefined,
+        deedOwnerPhone: String((unitForm as any).deedOwnerPhone || "").trim() || undefined,
+        deedOwnerEmail: String((unitForm as any).deedOwnerEmail || "").trim() || undefined,
       });
 
       const createdUnitId = unitRes.data?.id;
@@ -412,11 +439,16 @@ export default function StokPage() {
         return;
       }
 
-      await uploadPortfolioImage(createdUnitId, coverImage.file, true, 0);
-
-      if (galleryImages.length > 0) {
-        await Promise.all(galleryImages.map((image, index) => uploadPortfolioImage(createdUnitId, image.file, false, index + 1)));
-      }
+      await Promise.all(
+        galleryImages.map((image, index) =>
+          uploadPortfolioImage(
+            createdUnitId,
+            image.file,
+            image.id === selectedCoverImage.id,
+            index,
+          ),
+        ),
+      );
 
       setFormSuccess(true);
       await fetchData();
@@ -603,6 +635,7 @@ export default function StokPage() {
         open={showModal}
         onClose={() => setShowModal(false)}
         projects={projects}
+        crmCustomers={crmCustomers}
         selectedProjectId={selectedProjectId}
         setSelectedProjectId={setSelectedProjectId}
         projectForm={projectForm}

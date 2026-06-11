@@ -199,6 +199,10 @@ model Unit {
   verifiedAt    DateTime?
   yetkiVerified Boolean    @default(false)
 
+  deedOwnerFullName String?
+  deedOwnerPhone    String?
+  deedOwnerEmail    String?
+
   approvalStatus PortfolioApprovalStatus @default(TASLAK)
   submittedForApprovalAt DateTime?
   approvedAt DateTime?
@@ -914,6 +918,7 @@ enum PortfolioApprovalStatus {
 enum PortfolioAuthorityType {
   YETKI_BELGESI
   TAPU
+  TAPU_SAHIBI_KIMLIK
   KAT_KARSILIGI_SOZLESMESI
   DIGER_DOGRULAMA_EVRAKI
 }

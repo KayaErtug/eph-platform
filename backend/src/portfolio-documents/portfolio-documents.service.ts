@@ -75,6 +75,7 @@ export class PortfolioDocumentsService {
       ![
         PortfolioAuthorityType.YETKI_BELGESI,
         PortfolioAuthorityType.TAPU,
+        PortfolioAuthorityType.TAPU_SAHIBI_KIMLIK,
         PortfolioAuthorityType.KAT_KARSILIGI_SOZLESMESI,
         PortfolioAuthorityType.DIGER_DOGRULAMA_EVRAKI,
       ].includes(authorityType)

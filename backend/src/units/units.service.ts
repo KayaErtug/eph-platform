@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ActivityType,
+  CustomerStatus,
   PortfolioApprovalStatus,
   Role,
   UnitStatus,
@@ -30,6 +32,9 @@ type CreateUnitPayload = {
   price: number;
   status?: UnitStatus;
   description?: string;
+  deedOwnerFullName?: string;
+  deedOwnerPhone?: string;
+  deedOwnerEmail?: string;
 };
 
 const unitInclude = {
@@ -147,6 +152,157 @@ export class UnitsService {
     return Boolean(unit.tapuVerified || unit.yetkiVerified);
   }
 
+  private cleanText(value?: string | null) {
+    const text = String(value || '').trim();
+    return text || undefined;
+  }
+
+  private normalizePhone(value?: string | null) {
+    const text = String(value || '').trim();
+    return text || undefined;
+  }
+
+  private splitFullName(fullName?: string | null) {
+    const cleanName = this.cleanText(fullName);
+
+    if (!cleanName) {
+      return { firstName: 'Tapu Sahibi', lastName: 'Bilinmiyor' };
+    }
+
+    const parts = cleanName.split(/\s+/).filter(Boolean);
+
+    if (parts.length === 1) {
+      return { firstName: parts[0], lastName: 'Bilinmiyor' };
+    }
+
+    return {
+      firstName: parts.slice(0, -1).join(' '),
+      lastName: parts.slice(-1).join(' '),
+    };
+  }
+
+  private async syncDeedOwnerToCrm(input: {
+    ownerId: string;
+    unitId: string;
+    project: {
+      name?: string | null;
+      city?: string | null;
+      district?: string | null;
+      address?: string | null;
+    };
+    unit: {
+      type?: UnitType | string | null;
+      status?: UnitStatus | string | null;
+      price?: number | null;
+      area?: number | null;
+      deedOwnerFullName?: string | null;
+      deedOwnerPhone?: string | null;
+      deedOwnerEmail?: string | null;
+    };
+  }) {
+    const fullName = this.cleanText(input.unit.deedOwnerFullName);
+    const phone = this.normalizePhone(input.unit.deedOwnerPhone);
+    const email = this.cleanText(input.unit.deedOwnerEmail);
+
+    if (!fullName || (!phone && !email)) return;
+
+    const { firstName, lastName } = this.splitFullName(fullName);
+    const portfolioNo = `EPH-${input.unitId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase()}-${input.unitId.replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase()}`;
+    const location = [input.project.address, input.project.district, input.project.city]
+      .filter(Boolean)
+      .join(' / ');
+    const note = [
+      'Bu kişi, portföy girişi sırasında tapu sahibi olarak otomatik CRM kaydına işlendi.',
+      `Bağlı Portföy: ${portfolioNo}`,
+      `Portföy ID: ${input.unitId}`,
+      input.project.name ? `Portföy/Proje: ${input.project.name}` : '',
+      location ? `Konum: ${location}` : '',
+      input.unit.type ? `Mülk Tipi: ${input.unit.type}` : '',
+      input.unit.status ? `Durum: ${input.unit.status}` : '',
+      input.unit.area ? `m²: ${input.unit.area}` : '',
+      input.unit.price ? `Fiyat: ${input.unit.price}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const existing = await this.prisma.customer.findFirst({
+      where: {
+        ownerId: input.ownerId,
+        OR: [
+          phone ? { phone } : undefined,
+          email ? { email } : undefined,
+        ].filter(Boolean) as any[],
+      },
+    });
+
+    if (existing) {
+      const existingTags = Array.isArray(existing.tags) ? existing.tags : [];
+      const nextTags = Array.from(
+        new Set([...existingTags, 'PORTFOY_TAPU_SAHIBI', `PORTFOY_${input.unitId}`]),
+      );
+
+      await this.prisma.customer.update({
+        where: { id: existing.id },
+        data: {
+          firstName: existing.firstName || firstName,
+          lastName: existing.lastName || lastName,
+          phone: existing.phone || phone,
+          email: existing.email || email,
+          city: existing.city || input.project.city || undefined,
+          interestedArea:
+            existing.interestedArea ||
+            [input.project.district, input.project.address].filter(Boolean).join(' / ') ||
+            undefined,
+          interestedType: existing.interestedType || String(input.unit.type || ''),
+          source: existing.source || 'PORTFOY_TAPU_SAHIBI',
+          notes: [existing.notes, note].filter(Boolean).join('\n\n---\n\n'),
+          tags: nextTags,
+          updatedAt: new Date(),
+        },
+      });
+
+      await this.prisma.activity.create({
+        data: {
+          customerId: existing.id,
+          userId: input.ownerId,
+          type: ActivityType.NOT,
+          note: `Tapu sahibi bilgisi portföy ile eşleştirildi. Portföy ID: ${input.unitId}`,
+        },
+      });
+
+      return;
+    }
+
+    const customer = await this.prisma.customer.create({
+      data: {
+        ownerId: input.ownerId,
+        firstName,
+        lastName,
+        phone,
+        email,
+        city: input.project.city || undefined,
+        interestedArea:
+          [input.project.district, input.project.address].filter(Boolean).join(' / ') ||
+          undefined,
+        interestedType: String(input.unit.type || '') || undefined,
+        budget: input.unit.price || undefined,
+        source: 'PORTFOY_TAPU_SAHIBI',
+        status: CustomerStatus.YENI_LEAD,
+        tags: ['PORTFOY_TAPU_SAHIBI', `PORTFOY_${input.unitId}`],
+        notes: note,
+      },
+    });
+
+    await this.prisma.activity.create({
+      data: {
+        customerId: customer.id,
+        userId: input.ownerId,
+        type: ActivityType.NOT,
+        note: `Tapu sahibi portföy girişinden otomatik CRM kaydı olarak oluşturuldu. Portföy ID: ${input.unitId}`,
+      },
+    });
+  }
+
   async create(
     user: CurrentUserPayload,
     projectId: string,
@@ -162,25 +318,37 @@ export class UnitsService {
 
     this.ensureCanManageUnit(user, project.ownerId);
 
-    return this.prisma.unit.create({
+    const createdUnit = await this.prisma.unit.create({
       data: {
         type: data.type,
         floor: data.floor,
         floorLabel: data.floorLabel,
         totalFloors: data.totalFloors,
         priceCurrency: data.priceCurrency || 'TRY',
-        number: data.number,
+        number: data.number || '',
         roomCount: data.roomCount,
         area: data.area,
         price: data.price,
         status: data.status || UnitStatus.SATILIK,
         description: data.description,
+        deedOwnerFullName: this.cleanText(data.deedOwnerFullName),
+        deedOwnerPhone: this.normalizePhone(data.deedOwnerPhone),
+        deedOwnerEmail: this.cleanText(data.deedOwnerEmail),
         projectId,
         approvalStatus: PortfolioApprovalStatus.TASLAK,
         isPoolVisible: false,
       },
       include: unitInclude,
     });
+
+    await this.syncDeedOwnerToCrm({
+      ownerId: project.ownerId,
+      unitId: createdUnit.id,
+      project,
+      unit: createdUnit,
+    });
+
+    return createdUnit;
   }
 
   async findOne(user: CurrentUserPayload, id: string) {
@@ -520,11 +688,34 @@ export class UnitsService {
       }
     }
 
-    return this.prisma.unit.update({
+    const updatedUnit = await this.prisma.unit.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        deedOwnerFullName:
+          'deedOwnerFullName' in data
+            ? this.cleanText(data.deedOwnerFullName)
+            : undefined,
+        deedOwnerPhone:
+          'deedOwnerPhone' in data
+            ? this.normalizePhone(data.deedOwnerPhone)
+            : undefined,
+        deedOwnerEmail:
+          'deedOwnerEmail' in data
+            ? this.cleanText(data.deedOwnerEmail)
+            : undefined,
+      },
       include: unitInclude,
     });
+
+    await this.syncDeedOwnerToCrm({
+      ownerId: unit.project.ownerId,
+      unitId: updatedUnit.id,
+      project: unit.project,
+      unit: updatedUnit,
+    });
+
+    return updatedUnit;
   }
 
   async verifyUnit(

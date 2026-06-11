@@ -341,7 +341,6 @@ export default function StokDetailPage() {
   >([]);
   const [documentUploadLoading, setDocumentUploadLoading] = useState("");
   const [documentDeleteLoading, setDocumentDeleteLoading] = useState("");
-  const coverInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const yetkiDocumentInputRef = useRef<HTMLInputElement | null>(null);
   const tapuDocumentInputRef = useRef<HTMLInputElement | null>(null);
@@ -520,18 +519,6 @@ export default function StokDetailPage() {
     } finally {
       setImageUploadLoading("");
     }
-  };
-
-  const handleCoverUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-
-    event.target.value = "";
-
-    if (!file) return;
-
-    await uploadPortfolioImage(file, true, 0);
   };
 
   const handleGalleryUpload = async (
@@ -962,13 +949,6 @@ export default function StokDetailPage() {
   return (
     <main className="min-h-screen bg-[#F7FBFF] pb-28 text-[#27364F]">
       <input
-        ref={coverInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={handleCoverUpload}
-      />
-      <input
         ref={galleryInputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
@@ -1355,29 +1335,128 @@ export default function StokDetailPage() {
                 Fotoğraf Yönetimi
               </h2>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => coverInputRef.current?.click()}
-                disabled={imageUploadLoading === "cover"}
-                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] bg-[#1557D6] px-3 text-[12px] font-black text-white disabled:opacity-60"
-              >
-                <Camera size={16} />
-                {imageUploadLoading === "cover" ? "Yükleniyor..." : "Kapak"}
-              </button>
-              <button
-                type="button"
-                onClick={() => galleryInputRef.current?.click()}
-                disabled={
-                  imageUploadLoading === "gallery" ||
-                  galleryImages.length >= MAX_GALLERY_COUNT
-                }
-                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#1557D6] disabled:opacity-60"
-              >
-                <Upload size={16} />
-                {imageUploadLoading === "gallery" ? "Yükleniyor..." : "Galeri"}
-              </button>
-            </div>
+
+            <p className="mx-auto mt-1 max-w-[320px] text-center text-[11px] font-bold leading-5 text-[#64748B]">
+              Fotoğrafları galeriye ekleyin. Kapak görseli galeriden seçilir; ayrı kapak yükleme yoktur.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => galleryInputRef.current?.click()}
+              disabled={
+                imageUploadLoading === "gallery" ||
+                galleryImages.length >= MAX_GALLERY_COUNT
+              }
+              className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[16px] bg-[#1557D6] px-3 text-[12px] font-black text-white disabled:opacity-60"
+            >
+              <Upload size={16} />
+              {imageUploadLoading === "gallery"
+                ? "Fotoğraf yükleniyor..."
+                : `Fotoğraf Ekle (${galleryImages.length}/${MAX_GALLERY_COUNT})`}
+            </button>
+
+            {galleryImages.length === 0 ? (
+              <div className="mt-3 rounded-[18px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] px-3 py-4 text-center text-[11px] font-bold leading-5 text-[#64748B]">
+                Bu portföyde henüz fotoğraf yok. İlk eklenen fotoğraf otomatik kapak görseli olarak kullanılacaktır.
+              </div>
+            ) : (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {galleryImages.map((photo, index) => {
+                  const loadingCover = imageActionLoading === `cover-${photo.id}`;
+                  const loadingDelete = imageActionLoading === `delete-${photo.id}`;
+                  const loadingMove = imageActionLoading === `move-${photo.id}`;
+                  const deleteDisabled = Boolean(
+                    loadingDelete ||
+                      loadingMove ||
+                      loadingCover ||
+                      (photo.isCover && galleryImages.length > 1),
+                  );
+
+                  return (
+                    <div
+                      key={photo.id || photo.displayUrl}
+                      className={`overflow-hidden rounded-[18px] border bg-[#FBFDFF] text-left ${
+                        photo.isCover
+                          ? "border-emerald-200 ring-2 ring-emerald-50"
+                          : "border-[#DDE7F3]"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setActivePhoto(index)}
+                        className="relative h-[104px] w-full overflow-hidden bg-[#EEF5FF]"
+                      >
+                        <img
+                          src={photo.displayUrl}
+                          alt={`Portföy fotoğrafı ${index + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                        <span
+                          className={`absolute left-2 top-2 rounded-full px-2 py-1 text-[9px] font-black text-white ${
+                            photo.isCover ? "bg-emerald-600" : "bg-[#06194A]/80"
+                          }`}
+                        >
+                          {photo.isCover ? "Kapak" : `Foto ${index + 1}`}
+                        </span>
+                      </button>
+
+                      <div className="p-2">
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleSetCoverImage(photo.id)}
+                            disabled={Boolean(photo.isCover || loadingCover || loadingMove || loadingDelete)}
+                            className="min-h-[34px] rounded-[12px] bg-emerald-50 px-2 text-[10px] font-black text-emerald-700 disabled:bg-slate-100 disabled:text-slate-400"
+                          >
+                            {loadingCover ? "..." : photo.isCover ? "Kapak" : "Kapak Yap"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (photo.isCover && galleryImages.length > 1) {
+                                setActionError("Kapak fotoğrafını silmeden önce başka bir fotoğrafı kapak yapın.");
+                                return;
+                              }
+                              if (confirm("Bu fotoğraf silinsin mi?")) handleDeleteImage(photo.id);
+                            }}
+                            disabled={deleteDisabled && !(photo.isCover && galleryImages.length > 1)}
+                            className="min-h-[34px] rounded-[12px] bg-rose-50 px-2 text-[10px] font-black text-rose-700 disabled:bg-slate-100 disabled:text-slate-400"
+                          >
+                            {loadingDelete ? "..." : "Sil"}
+                          </button>
+                        </div>
+
+                        <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveImage(photo.id, "up")}
+                            disabled={index === 0 || loadingMove}
+                            className="min-h-[30px] rounded-[12px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#1557D6] disabled:opacity-40"
+                          >
+                            ↑ Sola
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveImage(photo.id, "down")}
+                            disabled={index === galleryImages.length - 1 || loadingMove}
+                            className="min-h-[30px] rounded-[12px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#1557D6] disabled:opacity-40"
+                          >
+                            Sağa ↓
+                          </button>
+                        </div>
+
+                        {photo.isCover && (
+                          <p className="mt-1.5 text-center text-[9px] font-black text-emerald-700">
+                            Listede ve paylaşım kartında bu görsel kullanılır.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         )}
 

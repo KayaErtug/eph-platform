@@ -22,10 +22,21 @@ import {
 import type { LocalPortfolioImage, Project, ProjectFormState, UnitFormState } from "./stokTypes";
 import GoogleGeoPicker from "./GoogleGeoPicker";
 
+type CrmCustomerOption = {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  city?: string | null;
+  interestedArea?: string | null;
+};
+
 interface Props {
   open: boolean;
   onClose: () => void;
   projects: Project[];
+  crmCustomers?: CrmCustomerOption[];
   selectedProjectId: string;
   setSelectedProjectId: (value: string) => void;
   projectForm: ProjectFormState;
@@ -242,7 +253,7 @@ function getNumberLabel(type: string) {
   if (isIndustrialType(type)) return "Blok / Kapı / Tesis No *";
   if (isCommercialType(type)) return "Bağımsız Bölüm / Kapı No *";
   if (isVillaType(type)) return "Villa / Kapı No *";
-  return "Daire / Bölüm No *";
+  return "Daire / Bölüm No";
 }
 
 function getNumberPlaceholder(type: string) {
@@ -444,6 +455,7 @@ export default function StokCreateModal({
   open,
   onClose,
   projects,
+  crmCustomers = [],
   selectedProjectId,
   setSelectedProjectId,
   projectForm,
@@ -459,7 +471,6 @@ export default function StokCreateModal({
   setGalleryImages,
   onSubmit,
 }: Props) {
-  const coverInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   const [imageError, setImageError] = useState("");
@@ -470,6 +481,7 @@ export default function StokCreateModal({
   const [placeOptions, setPlaceOptions] = useState<LocationOption[]>([]);
   const [locationLoading, setLocationLoading] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState("");
+  const [selectedCrmCustomerId, setSelectedCrmCustomerId] = useState("");
   const [mainCategory, setMainCategory] = useState("KONUT");
 
   const selectedCurrency = String(unitForm.priceCurrency || "TRY");
@@ -479,6 +491,9 @@ export default function StokCreateModal({
   const bedCount = String((unitForm as any).bedCount || "");
   const openArea = String((unitForm as any).openArea || "");
   const closedArea = String((unitForm as any).closedArea || "");
+  const deedOwnerFullName = String((unitForm as any).deedOwnerFullName || "");
+  const deedOwnerPhone = String((unitForm as any).deedOwnerPhone || "");
+  const deedOwnerEmail = String((unitForm as any).deedOwnerEmail || "");
   const selectedSubCategory = getSubCategoryFromType(unitForm.type);
   const subCategoryOptions = CATEGORY_OPTIONS[mainCategory] || CATEGORY_OPTIONS.KONUT;
   const roomOptions = isTouristicType(unitForm.type)
@@ -497,8 +512,8 @@ export default function StokCreateModal({
   const showClosedAreaField = shouldShowClosedAreaField(unitForm.type);
 
   const totalSelectedImages = useMemo(() => {
-    return (coverImage ? 1 : 0) + galleryImages.length;
-  }, [coverImage, galleryImages.length]);
+    return galleryImages.length;
+  }, [galleryImages.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -648,29 +663,6 @@ export default function StokCreateModal({
     previewUrl: URL.createObjectURL(file),
   });
 
-  const handleCoverChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    setImageError("");
-
-    if (!file) return;
-
-    setCheckingImages(true);
-    const error = await validateFiles([file]);
-    setCheckingImages(false);
-
-    if (error) {
-      setImageError(error);
-      event.target.value = "";
-      return;
-    }
-
-    if (coverImage?.previewUrl) URL.revokeObjectURL(coverImage.previewUrl);
-
-    setCoverImage(createLocalImage(file));
-    event.target.value = "";
-  };
-
   const handleGalleryChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
 
@@ -700,7 +692,15 @@ export default function StokCreateModal({
 
     const newImages = acceptedFiles.map(createLocalImage);
 
-    setGalleryImages((current) => [...current, ...newImages]);
+    setGalleryImages((current) => {
+      const nextImages = [...current, ...newImages];
+
+      if (!coverImage && nextImages.length > 0) {
+        setCoverImage(nextImages[0]);
+      }
+
+      return nextImages;
+    });
 
     if (files.length > remaining) {
       setImageError(
@@ -711,17 +711,23 @@ export default function StokCreateModal({
     event.target.value = "";
   };
 
-  const removeCoverImage = () => {
-    if (coverImage?.previewUrl) URL.revokeObjectURL(coverImage.previewUrl);
-    setCoverImage(null);
-  };
-
   const removeGalleryImage = (id: string) => {
     setGalleryImages((current) => {
       const removed = current.find((image) => image.id === id);
+      const nextImages = current.filter((image) => image.id !== id);
+
+      if (coverImage?.id === id) {
+        setCoverImage(nextImages[0] || null);
+      }
+
       if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
-      return current.filter((image) => image.id !== id);
+
+      return nextImages;
     });
+  };
+
+  const makeCoverImage = (image: LocalPortfolioImage) => {
+    setCoverImage(image);
   };
 
   const setProjectField = (key: keyof ProjectFormState, value: string) => {
@@ -734,6 +740,32 @@ export default function StokCreateModal({
 
   const setUnitField = (key: keyof UnitFormState | string, value: string) => {
     setUnitForm((current) => ({ ...current, [key]: value } as UnitFormState));
+  };
+
+  const handleCrmCustomerSelect = (customerId: string) => {
+    setSelectedCrmCustomerId(customerId);
+
+    if (!customerId) return;
+
+    const customer = crmCustomers.find((item) => item.id === customerId);
+
+    if (!customer) return;
+
+    const fullName = [customer.firstName, customer.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    setUnitForm((current) => ({
+      ...(current as any),
+      deedOwnerFullName: fullName || (current as any).deedOwnerFullName || "",
+      deedOwnerPhone: customer.phone || (current as any).deedOwnerPhone || "",
+      deedOwnerEmail: customer.email || (current as any).deedOwnerEmail || "",
+    } as UnitFormState));
+
+    if (!projectForm.city && customer.city) {
+      setProjectForm((current) => ({ ...current, city: customer.city || current.city }));
+    }
   };
 
   const validateSmartForm = () => {
@@ -1216,63 +1248,82 @@ export default function StokCreateModal({
             </div>
           </div>
 
-          <div className="stock-form-block">
 
+          <div className="stock-form-block">
             <div className="stock-form-grid">
               <div className="stock-form-field full">
-                <span>Kapak Fotoğrafı * (1 adet)</span>
-                <small className="stock-upload-hint">JPG / PNG / WEBP · min. 800×600 px · önerilen 1920×1080 · maks. 15 MB</small>
-
-                <input
-                  ref={coverInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleCoverChange}
-                  style={{ display: "none" }}
-                />
-
-                <button
-                  type="button"
-                  className="stock-save-btn"
-                  onClick={() => coverInputRef.current?.click()}
-                  disabled={checkingImages}
-                >
-                  {checkingImages ? "Görsel kontrol ediliyor..." : "Kapak Fotoğrafı Seç"}
-                </button>
-
-                {coverImage ? (
-                  <div className="mt-4 overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF]">
-                    <img
-                      src={coverImage.previewUrl}
-                      alt="Kapak fotoğrafı önizleme"
-                      className="h-56 w-full object-cover"
-                    />
-
-                    <div className="flex items-center justify-between gap-3 p-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-black text-[#06194A]">
-                          {coverImage.file.name}
-                        </p>
-                        <p className="text-xs font-bold text-[#64748B]">
-                          {formatFileSize(coverImage.file.size)}
-                        </p>
-                      </div>
-
-                      <button type="button" className="stock-cancel-btn" onClick={removeCoverImage}>
-                        Sil
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-4 rounded-[24px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center text-sm font-bold text-[#64748B]">
-                    Kapak fotoğrafı kartta ve detay sayfasında ana görsel olur.
-                  </div>
-                )}
+                <span>Tapu Sahibi Bilgileri</span>
+                <p className="mt-1 text-xs font-bold leading-5 text-[#64748B]">
+                  Bu bilgiler mahremdir. Sadece portföy sahibi ve Yazılım Ekibi görebilir. Portföy kaydedilince CRM kaydı otomatik oluşturulur veya mevcut CRM kaydıyla eşleştirilir.
+                </p>
               </div>
 
+              {crmCustomers.length > 0 && (
+                <label className="stock-form-field full">
+                  <span>CRM’den Tapu Sahibi Seç</span>
+                  <select
+                    value={selectedCrmCustomerId}
+                    onChange={(e) => handleCrmCustomerSelect(e.target.value)}
+                  >
+                    <option value="">CRM kaydı seçmeden devam et</option>
+                    {crmCustomers.map((customer) => {
+                      const fullName = [customer.firstName, customer.lastName]
+                        .filter(Boolean)
+                        .join(" ")
+                        .trim() || "İsimsiz CRM Kaydı";
+                      const meta = [customer.phone, customer.email].filter(Boolean).join(" · ");
+
+                      return (
+                        <option key={customer.id} value={customer.id}>
+                          {fullName}{meta ? ` (${meta})` : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <small className="stock-upload-hint">
+                    Kendi CRM kayıtlarınızdan seçim yaparsanız ad, telefon ve e-posta otomatik dolar.
+                  </small>
+                </label>
+              )}
+
+              <label className="stock-form-field">
+                <span>Tapu Sahibi Ad Soyad</span>
+                <input
+                  value={deedOwnerFullName}
+                  onChange={(e) => setUnitField("deedOwnerFullName", e.target.value)}
+                  onBlur={(e) => setUnitField("deedOwnerFullName", normalizeTurkishText(e.target.value))}
+                  placeholder="Örn: Ahmet Yılmaz"
+                />
+              </label>
+
+              <label className="stock-form-field">
+                <span>Tapu Sahibi Telefon</span>
+                <input
+                  value={deedOwnerPhone}
+                  onChange={(e) => setUnitField("deedOwnerPhone", e.target.value)}
+                  placeholder="Örn: 05xx xxx xx xx"
+                />
+              </label>
+
+              <label className="stock-form-field full">
+                <span>Tapu Sahibi E-posta</span>
+                <input
+                  type="email"
+                  value={deedOwnerEmail}
+                  onChange={(e) => setUnitField("deedOwnerEmail", e.target.value)}
+                  placeholder="Örn: tapusahibi@email.com"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="stock-form-block">
+            <div className="stock-form-grid">
               <div className="stock-form-field full">
-                <span>Galeri Fotoğrafları ({galleryImages.length}/{MAX_GALLERY_COUNT})</span>
-                <small className="stock-upload-hint">JPG / PNG / WEBP · min. 800×600 px · önerilen 1920×1080 · maks. 15 MB</small>
+                <span>Galeriye Fotoğraf Ekle * ({galleryImages.length}/{MAX_GALLERY_COUNT})</span>
+                <small className="stock-upload-hint">
+                  JPG / PNG / WEBP · min. 800×600 px · önerilen 1920×1080 · maks. 15 MB
+                </small>
 
                 <input
                   ref={galleryInputRef}
@@ -1289,54 +1340,81 @@ export default function StokCreateModal({
                   onClick={() => galleryInputRef.current?.click()}
                   disabled={galleryImages.length >= MAX_GALLERY_COUNT || checkingImages}
                 >
-                  {checkingImages ? "Görseller kontrol ediliyor..." : "Galeri Fotoğrafı Seç"}
+                  {checkingImages ? "Görseller kontrol ediliyor..." : "Galeriye Fotoğraf Ekle"}
                 </button>
 
                 <p className="mt-2 text-xs font-bold text-[#64748B]">
-                  JPG, PNG, WEBP desteklenir. Her görsel en fazla 15 MB olmalıdır.
+                  İlk eklenen fotoğraf otomatik kapak olur. İsterseniz başka bir görseli “Kapak Yap” olarak seçebilirsiniz.
                 </p>
 
                 {galleryImages.length > 0 ? (
                   <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
-                    {galleryImages.map((image, index) => (
-                      <div
-                        key={image.id}
-                        className="overflow-hidden rounded-[20px] border border-[#DDE7F3] bg-[#F7FBFF]"
-                      >
-                        <div className="relative h-28">
-                          <img
-                            src={image.previewUrl}
-                            alt={`Galeri fotoğrafı ${index + 1}`}
-                            className="absolute inset-0 h-full w-full object-cover"
-                          />
+                    {galleryImages.map((image, index) => {
+                      const isCover = coverImage?.id === image.id;
 
-                          <span className="absolute left-2 top-2 rounded-full bg-white/92 px-2 py-1 text-[10px] font-black text-[#06194A]">
-                            {index + 1}
-                          </span>
+                      return (
+                        <div
+                          key={image.id}
+                          className={`overflow-hidden rounded-[20px] border bg-[#F7FBFF] ${
+                            isCover ? "border-emerald-400 ring-2 ring-emerald-100" : "border-[#DDE7F3]"
+                          }`}
+                        >
+                          <div className="relative h-28">
+                            <img
+                              src={image.previewUrl}
+                              alt={`Galeri fotoğrafı ${index + 1}`}
+                              className="absolute inset-0 h-full w-full object-cover"
+                            />
+
+                            <span className="absolute left-2 top-2 rounded-full bg-white/92 px-2 py-1 text-[10px] font-black text-[#06194A]">
+                              {index + 1}
+                            </span>
+
+                            {isCover && (
+                              <span className="absolute bottom-2 left-2 rounded-full bg-emerald-600 px-2 py-1 text-[10px] font-black text-white">
+                                Kapak
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="p-2">
+                            <p className="truncate text-xs font-black text-[#06194A]">
+                              {image.file.name}
+                            </p>
+                            <p className="text-[10px] font-bold text-[#64748B]">
+                              {formatFileSize(image.file.size)}
+                            </p>
+
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                className={`rounded-xl px-2 py-2 text-[11px] font-black ${
+                                  isCover
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : "bg-blue-50 text-[#1557D6]"
+                                }`}
+                                onClick={() => makeCoverImage(image)}
+                                disabled={isCover}
+                              >
+                                {isCover ? "Kapak" : "Kapak Yap"}
+                              </button>
+
+                              <button
+                                type="button"
+                                className="rounded-xl bg-rose-50 px-2 py-2 text-[11px] font-black text-rose-700"
+                                onClick={() => removeGalleryImage(image.id)}
+                              >
+                                Sil
+                              </button>
+                            </div>
+                          </div>
                         </div>
-
-                        <div className="p-2">
-                          <p className="truncate text-xs font-black text-[#06194A]">
-                            {image.file.name}
-                          </p>
-                          <p className="text-[10px] font-bold text-[#64748B]">
-                            {formatFileSize(image.file.size)}
-                          </p>
-
-                          <button
-                            type="button"
-                            className="mt-2 w-full rounded-xl bg-rose-50 px-3 py-2 text-xs font-black text-rose-700"
-                            onClick={() => removeGalleryImage(image.id)}
-                          >
-                            Sil
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="mt-4 rounded-[24px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center text-sm font-bold text-[#64748B]">
-                    Galeri fotoğrafları detay sayfasında gösterilir.
+                    En az 1 fotoğraf ekleyiniz. Kapak fotoğrafını galeri içinden seçebilirsiniz.
                   </div>
                 )}
               </div>
@@ -1354,7 +1432,7 @@ export default function StokCreateModal({
                   </div>
                   <div>
                     <b>Toplam</b>
-                    <strong>{totalSelectedImages}/16</strong>
+                    <strong>{totalSelectedImages}/{MAX_GALLERY_COUNT}</strong>
                   </div>
                 </div>
               </div>
