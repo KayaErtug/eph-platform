@@ -68,6 +68,49 @@ type VisitItem = {
   };
 };
 
+type RecentAction = {
+  id: string;
+  action?: string | null;
+  entityType?: string | null;
+  description?: string | null;
+  createdAt?: string | null;
+  actor?: {
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    role?: string | null;
+  } | null;
+  targetUser?: {
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    role?: string | null;
+  } | null;
+};
+
+type DashboardSummary = {
+  auditSummary?: {
+    canView?: boolean;
+    totalLogs?: number;
+    todayLogs?: number;
+    lastActionAt?: string | null;
+    topAction?: string | null;
+  };
+  recentActions?: RecentAction[];
+  announcementCount?: number;
+  announcementSummary?: {
+    total?: number;
+    active?: number;
+    passive?: number;
+  };
+  systemMessageCount?: number;
+  systemMessageSummary?: {
+    total?: number;
+    today?: number;
+    recipientTotal?: number;
+  };
+};
+
 type StatTone = "blue" | "orange" | "green" | "purple" | "cyan" | "rose" | "gray";
 
 type StatCardItem = {
@@ -108,6 +151,50 @@ function timeText() {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "-";
+
+  return date.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function actionLabel(value?: string | null) {
+  const map: Record<string, string> = {
+    USER_APPROVED: "Kullanıcı onaylandı",
+    USER_DELETED: "Kullanıcı silindi",
+    USER_ROLE_CHANGED: "Rol değiştirildi",
+    USER_CREATED: "Kullanıcı oluşturuldu",
+    USER_SUSPENDED_BY_ADMIN: "Admin askıya aldı",
+    USER_SUSPENDED_BY_SOFTWARE_TEAM: "Yazılım Ekibi askıya aldı",
+    APPLICATION_DELETED: "Başvuru silindi",
+    REFERRAL_INVITATION_CREATED: "Referans daveti oluşturuldu",
+    REFERRAL_INVITATION_DELETED: "Referans daveti silindi",
+    USER_MEMBER_CODE_ASSIGNED: "Üye numarası atandı",
+    MISSING_MEMBER_CODES_ASSIGNED: "Toplu üye numarası atandı",
+    ANNOUNCEMENT_CREATED: "Duyuru oluşturuldu",
+    ANNOUNCEMENT_UPDATED: "Duyuru güncellendi",
+    ANNOUNCEMENT_DELETED: "Duyuru silindi",
+  };
+
+  const clean = String(value || "").trim();
+
+  return map[clean] || clean || "İşlem";
+}
+
+function fullName(user?: RecentAction["actor"]) {
+  if (!user) return "Sistem";
+  const name = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+  return name || user.email || "Sistem";
 }
 
 function toneClasses(tone: StatTone) {
@@ -160,6 +247,7 @@ export default function AdminPage() {
   const [approvalItems, setApprovalItems] = useState<ApprovalUnit[]>([]);
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [visits, setVisits] = useState<VisitItem[]>([]);
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -180,18 +268,20 @@ export default function AdminPage() {
     }
 
     fetchDashboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasHydrated, user?.id, user?.role]);
 
   const fetchDashboard = async () => {
     setLoading(true);
 
     try {
-      const [statsResult, approvalsResult, applicationsResult, visitsResult] =
+      const [statsResult, approvalsResult, applicationsResult, visitsResult, summaryResult] =
         await Promise.allSettled([
           api.get("/admin/stats"),
           api.get("/units/admin/portfolio-approvals?status=ALL"),
           api.get("/admin/applications?status=all"),
           api.get("/visits"),
+          api.get("/admin/dashboard-summary"),
         ]);
 
       if (statsResult.status === "fulfilled") {
@@ -216,6 +306,10 @@ export default function AdminPage() {
 
       if (visitsResult.status === "fulfilled") {
         setVisits(Array.isArray(visitsResult.value.data) ? visitsResult.value.data : []);
+      }
+
+      if (summaryResult.status === "fulfilled") {
+        setDashboardSummary(summaryResult.value.data || null);
       }
     } finally {
       setLoading(false);
@@ -345,7 +439,7 @@ export default function AdminPage() {
       href: "/admin/system-messages",
       icon: <MessageCircle size={30} />,
       tone: "green",
-      count: 0,
+      count: dashboardSummary?.systemMessageCount || 0,
       countTone: "purple",
     },
     {
@@ -354,6 +448,8 @@ export default function AdminPage() {
       href: "/admin/announcements",
       icon: <Megaphone size={30} />,
       tone: "rose",
+      count: dashboardSummary?.announcementCount || 0,
+      countTone: "rose",
       isNew: true,
     },
     {
@@ -380,6 +476,8 @@ export default function AdminPage() {
       href: "/admin/audit-log",
       icon: <FileText size={30} />,
       tone: "orange",
+      count: dashboardSummary?.auditSummary?.totalLogs || 0,
+      countTone: "orange",
       isNew: true,
     },
     {
@@ -416,18 +514,49 @@ export default function AdminPage() {
       icon: <UsersRound size={22} />,
     },
     {
-      title: "Aktif Kullanıcı",
-      value: activeUsers,
-      sub: "Son 20 dakika",
-      tone: "green" as StatTone,
-      icon: <UsersRound size={22} />,
+      title: "Duyuru",
+      value: dashboardSummary?.announcementSummary?.active || 0,
+      sub: "Aktif duyuru",
+      tone: "rose" as StatTone,
+      icon: <Megaphone size={22} />,
     },
     {
-      title: "Son Güncelleme",
-      value: todayText(),
-      sub: timeText(),
-      tone: "rose" as StatTone,
-      icon: <CalendarDays size={22} />,
+      title: "Sistem Mesajı",
+      value: dashboardSummary?.systemMessageSummary?.total || 0,
+      sub: "Toplam mesaj",
+      tone: "green" as StatTone,
+      icon: <MessageCircle size={22} />,
+    },
+  ];
+
+  const auditMiniCards: StatCardItem[] = [
+    {
+      label: "Bugün",
+      value: dashboardSummary?.auditSummary?.todayLogs || 0,
+      sub: "İşlem",
+      tone: "orange",
+      icon: <Activity size={20} />,
+    },
+    {
+      label: "Toplam",
+      value: dashboardSummary?.auditSummary?.totalLogs || 0,
+      sub: "Audit Log",
+      tone: "blue",
+      icon: <FileText size={20} />,
+    },
+    {
+      label: "En Sık",
+      value: actionLabel(dashboardSummary?.auditSummary?.topAction).slice(0, 13),
+      sub: "İşlem tipi",
+      tone: "purple",
+      icon: <ShieldCheck size={20} />,
+    },
+    {
+      label: "Son",
+      value: formatDateTime(dashboardSummary?.auditSummary?.lastActionAt),
+      sub: "İşlem",
+      tone: "green",
+      icon: <CalendarDays size={20} />,
     },
   ];
 
@@ -627,6 +756,103 @@ export default function AdminPage() {
               ))}
             </section>
 
+            <section className="mt-3 grid gap-2 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-[15px] font-black tracking-[-0.03em] text-[#06194A]">
+                      Audit Log Özeti
+                    </h2>
+                    <p className="text-[11px] font-semibold text-slate-500">
+                      Yönetici işlem yoğunluğu
+                    </p>
+                  </div>
+                  <Link
+                    href="/admin/audit-log"
+                    className="rounded-full bg-orange-100 px-3 py-1 text-[11px] font-black text-orange-700"
+                  >
+                    İncele
+                  </Link>
+                </div>
+
+                {dashboardSummary?.auditSummary?.canView === false ? (
+                  <div className="rounded-2xl bg-slate-50 p-4 text-center">
+                    <p className="text-[13px] font-black text-slate-700">
+                      Audit Log görünümü yalnızca Yazılım Ekibi içindir.
+                    </p>
+                    <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                      Admin ve Moderatör rolleri için kayıt özeti gizlenir.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {auditMiniCards.map((item) => (
+                      <AdminStatCard key={item.label} item={item} compact />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-[15px] font-black tracking-[-0.03em] text-[#06194A]">
+                      Son İşlemler
+                    </h2>
+                    <p className="text-[11px] font-semibold text-slate-500">
+                      En güncel yönetim hareketleri
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-black text-blue-700">
+                    {dashboardSummary?.recentActions?.length || 0} kayıt
+                  </span>
+                </div>
+
+                {dashboardSummary?.auditSummary?.canView === false ? (
+                  <div className="rounded-2xl bg-slate-50 p-4 text-center">
+                    <p className="text-[13px] font-black text-slate-700">
+                      Son işlemler yalnızca Yazılım Ekibi tarafından görüntülenebilir.
+                    </p>
+                  </div>
+                ) : dashboardSummary?.recentActions?.length ? (
+                  <div className="space-y-2">
+                    {dashboardSummary.recentActions.slice(0, 6).map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex min-h-[58px] items-center gap-3 rounded-2xl bg-slate-50 px-3 py-2"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+                          <FileText size={17} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13px] font-black text-[#06194A]">
+                            {actionLabel(item.action)}
+                          </p>
+                          <p className="truncate text-[11px] font-semibold text-slate-500">
+                            {item.description || `${fullName(item.actor)} işlem yaptı`}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-[10px] font-black text-slate-500">
+                            {formatDateTime(item.createdAt)}
+                          </p>
+                          <p className="text-[10px] font-semibold text-slate-400">
+                            {item.entityType || "Kayıt"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl bg-slate-50 p-4 text-center">
+                    <p className="text-[13px] font-black text-slate-700">
+                      Henüz işlem kaydı yok.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
+
             <section className="mt-4 hidden grid-cols-5 gap-3 text-center text-[14px] font-black text-blue-700 lg:grid">
               <InfoPill icon={<CheckCircle2 size={19} />} label="Açık & Sade Tasarım" />
               <InfoPill icon={<ClipboardCheck size={19} />} label="Aktif Modül Linkleri" />
@@ -749,21 +975,27 @@ function SideNavItem({
   );
 }
 
-function AdminStatCard({ item }: { item: StatCardItem }) {
+function AdminStatCard({
+  item,
+  compact = false,
+}: {
+  item: StatCardItem;
+  compact?: boolean;
+}) {
   const tone = toneClasses(item.tone);
 
   return (
-    <div className="min-h-[86px] rounded-2xl bg-white p-2.5 text-center shadow-sm ring-1 ring-slate-200/70 lg:min-h-[116px] lg:p-4">
-      <div className={`mx-auto flex h-10 w-10 items-center justify-center rounded-2xl ${tone.box} lg:h-12 lg:w-12`}>
+    <div className={`${compact ? "min-h-[86px] p-2.5" : "min-h-[86px] p-2.5 lg:min-h-[116px] lg:p-4"} rounded-2xl bg-white text-center shadow-sm ring-1 ring-slate-200/70`}>
+      <div className={`${compact ? "h-9 w-9" : "h-10 w-10 lg:h-12 lg:w-12"} mx-auto flex items-center justify-center rounded-2xl ${tone.box}`}>
         {item.icon}
       </div>
-      <p className={`mt-2 text-[10px] font-black uppercase leading-tight ${tone.text} lg:text-[12px]`}>
+      <p className={`${compact ? "text-[10px]" : "text-[10px] lg:text-[12px]"} mt-2 font-black uppercase leading-tight ${tone.text}`}>
         {item.label}
       </p>
-      <p className="mt-1 text-[23px] font-black leading-none text-[#06194A] lg:text-[31px]">
+      <p className={`${compact ? "text-[18px]" : "text-[23px] lg:text-[31px]"} mt-1 truncate font-black leading-none text-[#06194A]`}>
         {item.value}
       </p>
-      <p className="mt-1 text-[10px] font-semibold text-slate-600 lg:text-[13px]">
+      <p className={`${compact ? "text-[10px]" : "text-[10px] lg:text-[13px]"} mt-1 truncate font-semibold text-slate-600`}>
         {item.sub}
       </p>
     </div>

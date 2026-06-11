@@ -52,6 +52,11 @@ export class AdminController {
     return this.adminService.getStats();
   }
 
+  @Get("dashboard-summary")
+  getDashboardSummary(@Req() request: AdminRequest) {
+    return this.adminService.getDashboardSummary(this.extractActor(request));
+  }
+
   @Get("users")
   getUsers(
     @Query("filter") filter?: "pending" | "approved" | "all",

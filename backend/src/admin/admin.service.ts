@@ -236,7 +236,6 @@ export class AdminService {
     }
   }
 
-
   private readonly ilPlakaKodlari: Record<string, string> = {
     ADANA: "01",
     ADIYAMAN: "02",
@@ -590,6 +589,142 @@ export class AdminService {
       totalReferralCandidates,
       activeReferralCandidates,
       byRole: byRole.map((r) => ({ role: r.role, count: r._count.role })),
+    };
+  }
+
+  async getDashboardSummary(actor?: AdminActor) {
+    const role = String(actor?.role || "").toUpperCase();
+    const canViewAudit = role === Role.SUPER_ADMIN;
+
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const [
+      announcementTotal,
+      announcementActive,
+      announcementPassive,
+      systemMessageTotal,
+      systemMessageToday,
+      systemMessageRecipients,
+    ] = await Promise.all([
+      this.prisma.platformAnnouncement.count(),
+      this.prisma.platformAnnouncement.count({ where: { isActive: true } }),
+      this.prisma.platformAnnouncement.count({ where: { isActive: false } }),
+      this.prisma.systemMessage.count(),
+      this.prisma.systemMessage.count({ where: { createdAt: { gte: startOfToday } } }),
+      this.prisma.systemMessage.aggregate({
+        _sum: {
+          recipientCount: true,
+        },
+      }),
+    ]);
+
+    if (!canViewAudit) {
+      return {
+        auditSummary: {
+          canView: false,
+          totalLogs: 0,
+          todayLogs: 0,
+          lastActionAt: null,
+          topAction: null,
+        },
+        recentActions: [],
+        announcementCount: announcementActive,
+        announcementSummary: {
+          total: announcementTotal,
+          active: announcementActive,
+          passive: announcementPassive,
+        },
+        systemMessageCount: systemMessageTotal,
+        systemMessageSummary: {
+          total: systemMessageTotal,
+          today: systemMessageToday,
+          recipientTotal: systemMessageRecipients._sum.recipientCount || 0,
+        },
+      };
+    }
+
+    const [
+      totalLogs,
+      todayLogs,
+      lastAction,
+      topActionResult,
+      recentActions,
+    ] = await Promise.all([
+      this.prisma.adminActionLog.count(),
+      this.prisma.adminActionLog.count({ where: { createdAt: { gte: startOfToday } } }),
+      this.prisma.adminActionLog.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
+      this.prisma.adminActionLog.groupBy({
+        by: ["action"],
+        _count: { action: true },
+        orderBy: { _count: { action: "desc" } },
+        take: 1,
+      }),
+      this.prisma.adminActionLog.findMany({
+        take: 10,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          action: true,
+          entityType: true,
+          entityId: true,
+          description: true,
+          createdAt: true,
+          actor: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              role: true,
+              memberCode: true,
+              profileImageUrl: true,
+            },
+          },
+          targetUser: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              role: true,
+              memberCode: true,
+              profileImageUrl: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      auditSummary: {
+        canView: true,
+        totalLogs,
+        todayLogs,
+        lastActionAt: lastAction?.createdAt || null,
+        topAction: topActionResult[0]?.action || null,
+      },
+      recentActions: recentActions.map((item) => ({
+        ...item,
+        actor: this.maskSoftwareTeamNestedUser(item.actor, actor),
+        targetUser: this.maskSoftwareTeamNestedUser(item.targetUser, actor),
+      })),
+      announcementCount: announcementActive,
+      announcementSummary: {
+        total: announcementTotal,
+        active: announcementActive,
+        passive: announcementPassive,
+      },
+      systemMessageCount: systemMessageTotal,
+      systemMessageSummary: {
+        total: systemMessageTotal,
+        today: systemMessageToday,
+        recipientTotal: systemMessageRecipients._sum.recipientCount || 0,
+      },
     };
   }
 

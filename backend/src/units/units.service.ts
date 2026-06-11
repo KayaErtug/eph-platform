@@ -90,7 +90,7 @@ export class UnitsService {
   }
 
   private ensureCanViewUnit(user: CurrentUserPayload, ownerId: string) {
-    if (this.isApprovalManager(user)) return;
+    if (this.isSuperAdmin(user)) return;
     if (this.isOwner(user, ownerId)) return;
 
     throw new ForbiddenException('Bu portföyü görüntüleme yetkiniz yok.');
@@ -105,7 +105,9 @@ export class UnitsService {
 
   private ensureApprovalManager(user: CurrentUserPayload) {
     if (!this.isApprovalManager(user)) {
-      throw new ForbiddenException('Bu işlem sadece Moderatör, Admin veya Süper Admin tarafından yapılabilir.');
+      throw new ForbiddenException(
+        'Bu işlem sadece Moderatör, Admin veya Yazılım Ekibi tarafından yapılabilir.',
+      );
     }
   }
 
