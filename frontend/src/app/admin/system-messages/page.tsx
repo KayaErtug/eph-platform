@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { getRoleDisplayName } from "@/lib/role-labels";
+import AdminFlagBanner from "@/components/admin/AdminFlagBanner";
 
 type RecipientMode = "SINGLE" | "MULTIPLE" | "ROLE" | "CITY" | "CITY_ROLE" | "ALL";
 
@@ -491,8 +492,9 @@ export default function SystemMessagesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 p-6 text-white">
-      <div className="mx-auto max-w-7xl">
+    <main className="min-h-screen bg-slate-950 text-white">
+      <AdminFlagBanner />
+      <div className="mx-auto max-w-7xl p-6">
         <div className="mb-8 flex flex-col gap-4 text-center md:flex-row md:items-center md:justify-between md:text-left">
           <div>
             <h1 className="text-4xl font-black">Kurumsal İletişim Merkezi</h1>

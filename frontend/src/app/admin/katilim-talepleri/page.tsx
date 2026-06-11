@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import api from "@/lib/api";
 import { getRoleDisplayName } from "@/lib/role-labels";
+import AdminFlagBanner from "@/components/admin/AdminFlagBanner";
 
 type ApplicationStatus = "PENDING" | "APPROVED" | "REJECTED" | "INVITED" | "REGISTERED" | string;
 
@@ -396,15 +397,7 @@ export default function AdminKatilimTalepleriPage() {
 
   return (
     <main className="applications-page">
-      <section className="flag-banner" aria-label="Türk Bayrağı ve Ziya Gökalp alıntısı">
-        <img src="/admin-bayrak.jpg" alt="Türk Bayrağı" />
-        <div className="banner-overlay" />
-        <div className="banner-quote">
-          <p>Vatan ne Türkiye'dir Türklere, ne Türkistan.</p>
-          <p>Vatan büyük ve müebbet bir ülkedir: Turan.</p>
-          <span>— Ziya Gökalp</span>
-        </div>
-      </section>
+      <AdminFlagBanner />
 
       <section className="page-shell">
         <header className="page-head">

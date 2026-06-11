@@ -33,6 +33,7 @@ import {
 
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
+import AdminFlagBanner from "@/components/admin/AdminFlagBanner";
 
 type PortfolioApprovalStatus =
   | "BELGE_BEKLENIYOR"
@@ -435,56 +436,7 @@ export default function PortfolioApprovalsPage() {
           </header>
 
           <div className="mx-auto w-full max-w-[1180px] px-3 py-4 pb-28 lg:px-6 lg:py-7">
-            <section
-              className={`relative overflow-hidden rounded-[28px] bg-gradient-to-br ${theme.bg} text-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]`}
-            >
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_30%,rgba(255,255,255,0.16),transparent_28%),radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.12),transparent_25%)]" />
-              <div className="absolute right-[18%] top-1/2 hidden -translate-y-1/2 text-[190px] font-black leading-none text-white/12 lg:block">
-                ★
-              </div>
-              <div className="absolute right-[27%] top-1/2 hidden -translate-y-1/2 text-[230px] font-black leading-none text-white/12 lg:block">
-                ☾
-              </div>
-
-              <div className="relative grid min-h-[210px] gap-4 p-5 lg:grid-cols-[1fr_240px] lg:p-7">
-                <div className="flex flex-col justify-center">
-                  <div className="flex items-center gap-2">
-                    <span className={`rounded-lg ${theme.accent} px-2.5 py-1.5 text-[12px] font-black text-white shadow-lg`}>
-                      TR
-                    </span>
-                    <span className="text-[16px] font-black">{theme.title}</span>
-                  </div>
-
-                  <p className="mt-6 max-w-[720px] text-[20px] font-black leading-8 tracking-[-0.04em] lg:text-[29px] lg:leading-[42px]">
-                    {theme.quote}
-                  </p>
-
-                  <div className="mt-5 h-[2px] w-28 rounded-full bg-white/50" />
-                </div>
-
-                <div className="hidden items-end justify-end lg:flex">
-                  <div className="relative h-[190px] w-[190px] overflow-hidden rounded-[28px] bg-white/10 ring-1 ring-white/15">
-                    <img
-                      src={theme.image}
-                      alt=""
-                      className="h-full w-full object-cover grayscale"
-                      onError={(event) => {
-                        event.currentTarget.style.display = "none";
-                      }}
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center text-[80px]">
-                      🇹🇷
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="absolute bottom-4 right-4 hidden items-center gap-2 rounded-2xl bg-black/30 px-3 py-2 text-[13px] font-black text-white backdrop-blur lg:flex">
-                <ChevronLeft size={17} />
-                1 / {HEADER_THEMES.length}
-                <ChevronRight size={17} />
-              </div>
-            </section>
+            <AdminFlagBanner className="rounded-[10px]" />
 
             <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <StatCard icon={<ClipboardCheck size={22} />} label="Toplam" value={counts.total} sub="Portföy" tone="slate" />

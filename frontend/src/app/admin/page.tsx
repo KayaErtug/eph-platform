@@ -29,6 +29,7 @@ import {
 
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
+import AdminFlagBanner from "@/components/admin/AdminFlagBanner";
 
 type Stats = {
   totalUsers?: number;
@@ -656,51 +657,7 @@ export default function AdminPage() {
               </p>
             </section>
 
-            <section className="relative mb-2 h-[20px] overflow-hidden rounded-[8px] bg-[#06194A] text-white shadow-[0_8px_22px_rgba(6,25,74,0.14)] md:h-[40px] md:rounded-[12px]">
-              <div className="absolute inset-0 bg-gradient-to-r from-[#06194A] via-[#071D4E] to-[#06194A]" />
-              <div className="absolute right-7 top-1/2 h-[14px] w-[28px] -translate-y-1/2 overflow-hidden rounded-[3px] bg-red-700 md:right-16 md:h-[24px] md:w-[48px]">
-                <div className="absolute inset-0 bg-gradient-to-r from-red-800 to-red-600" />
-                <div className="absolute left-[7px] top-1/2 h-[9px] w-[9px] -translate-y-1/2 rounded-full bg-white md:left-[13px] md:h-[16px] md:w-[16px]" />
-                <div className="absolute left-[10px] top-1/2 h-[7px] w-[7px] -translate-y-1/2 rounded-full bg-red-700 md:left-[18px] md:h-[12px] md:w-[12px]" />
-                <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-[7px] leading-none text-white md:left-[31px] md:text-[12px]">
-                  ★
-                </div>
-              </div>
-
-              <div className="relative flex h-full items-center gap-1.5 px-2.5 md:gap-3 md:px-4">
-                <div className="shrink-0 text-[14px] font-black leading-none text-[#FFB000] md:text-[22px]">
-                  “
-                </div>
-
-                <div
-                  className={`min-w-0 flex-1 truncate pr-14 text-[8.5px] font-black leading-none tracking-[-0.02em] text-white transition-opacity duration-300 md:pr-28 md:text-[15px] ${
-                    quoteVisible ? "opacity-100" : "opacity-0"
-                  }`}
-                >
-                  {highlightQuote(currentQuote.text, currentQuote.highlights)}
-                </div>
-
-                <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 md:right-4 md:gap-1.5">
-                  {TURAN_QUOTES.map((_, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      onClick={() => {
-                        setQuoteVisible(false);
-                        window.setTimeout(() => {
-                          setQuoteIndex(index);
-                          setQuoteVisible(true);
-                        }, 200);
-                      }}
-                      className={`h-1 w-1 rounded-full md:h-1.5 md:w-1.5 ${
-                        quoteIndex === index ? "bg-red-500" : "bg-white/25"
-                      }`}
-                      aria-label={`Turan sözü ${index + 1}`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </section>
+            <AdminFlagBanner className="mb-2 rounded-[8px] md:rounded-[12px]" />
 
             <section className="mb-3 grid grid-cols-5 gap-2">
               {statCards.map((item) => (
