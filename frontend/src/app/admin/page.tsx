@@ -11,12 +11,13 @@ import {
   CheckCircle2,
   ClipboardCheck,
   FileText,
+  HelpCircle,
   Home,
   Loader2,
   LogOut,
+  Megaphone,
   Menu,
   MessageCircle,
-  Palette,
   RefreshCw,
   Search,
   Settings,
@@ -88,41 +89,6 @@ type ModuleCardItem = {
   isNew?: boolean;
 };
 
-const TURAN_QUOTES = [
-  {
-    text: "Muhtaç olduğun kudret, damarlarındaki asil kanda mevcuttur!",
-    highlights: ["asil kanda"],
-  },
-  {
-    text: "VATAN ne Türkiyedir Türklere, ne Türkistan, VATAN Büyük ve Müebbet bir ülkedir. TÜRKLERE TURAN",
-    highlights: ["TÜRKLERE TURAN"],
-  },
-  {
-    text: "Bugünden sonra divanda, dergahta, bargahta, mecliste ve meydanda Türkçeden başka dil kullanılmayacaktır.",
-    highlights: ["Türkçeden başka dil"],
-  },
-  {
-    text: "Har içinde biten gonca güle minnet eylemem, Arabi, Farisi bilmem; dile minnet eylemem. Sırat-ı Müstakim üzre gözetirim Rahim'i, İblisin talim ettiği yola minnet eylemem.",
-    highlights: ["dile minnet eylemem"],
-  },
-  {
-    text: "Yufka yüreklilerle çetin yollar aşılmaz; Çünkü bu yol kutludur, gider Tanrı Dağı'na.",
-    highlights: ["Tanrı Dağı'na"],
-  },
-];
-
-function getRandomQuoteIndex(current: number) {
-  if (TURAN_QUOTES.length <= 1) return 0;
-
-  let next = current;
-
-  while (next === current) {
-    next = Math.floor(Math.random() * TURAN_QUOTES.length);
-  }
-
-  return next;
-}
-
 function getInitials(firstName?: string | null, lastName?: string | null) {
   const first = String(firstName || "").trim().charAt(0);
   const last = String(lastName || "").trim().charAt(0);
@@ -145,83 +111,45 @@ function timeText() {
 }
 
 function toneClasses(tone: StatTone) {
-  const map: Record<StatTone, { box: string; text: string; badge: string; glow: string }> = {
+  const map: Record<StatTone, { box: string; text: string; badge: string }> = {
     blue: {
       box: "bg-blue-100 text-blue-700",
       text: "text-blue-700",
       badge: "bg-blue-600 text-white",
-      glow: "shadow-blue-100",
     },
     orange: {
       box: "bg-orange-100 text-orange-600",
       text: "text-orange-600",
       badge: "bg-orange-500 text-white",
-      glow: "shadow-orange-100",
     },
     green: {
       box: "bg-green-100 text-green-600",
       text: "text-green-600",
       badge: "bg-green-600 text-white",
-      glow: "shadow-green-100",
     },
     purple: {
       box: "bg-violet-100 text-violet-700",
       text: "text-violet-700",
       badge: "bg-violet-600 text-white",
-      glow: "shadow-violet-100",
     },
     cyan: {
       box: "bg-cyan-100 text-cyan-600",
       text: "text-cyan-600",
       badge: "bg-cyan-500 text-white",
-      glow: "shadow-cyan-100",
     },
     rose: {
       box: "bg-rose-100 text-rose-600",
       text: "text-rose-600",
       badge: "bg-rose-500 text-white",
-      glow: "shadow-rose-100",
     },
     gray: {
       box: "bg-slate-100 text-slate-600",
       text: "text-slate-600",
       badge: "bg-slate-500 text-white",
-      glow: "shadow-slate-100",
     },
   };
 
   return map[tone];
-}
-
-function highlightQuote(text: string, highlights: string[]) {
-  let result: ReactNode[] = [text];
-
-  highlights.forEach((highlight) => {
-    result = result.flatMap((part, index) => {
-      if (typeof part !== "string") return [part];
-
-      const pieces = part.split(highlight);
-      if (pieces.length === 1) return [part];
-
-      return pieces.flatMap((piece, pieceIndex) => {
-        const nodes: ReactNode[] = [];
-
-        if (piece) nodes.push(piece);
-
-        if (pieceIndex < pieces.length - 1) {
-          nodes.push(
-            <span key={`${highlight}-${index}-${pieceIndex}`} className="text-[#FFB000]">
-              {highlight}
-            </span>,
-          );
-        }
-
-        return nodes;
-      });
-    });
-  });
-
-  return result;
 }
 
 export default function AdminPage() {
@@ -234,8 +162,6 @@ export default function AdminPage() {
   const [visits, setVisits] = useState<VisitItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [quoteIndex, setQuoteIndex] = useState(0);
-  const [quoteVisible, setQuoteVisible] = useState(true);
 
   const role = String(user?.role || "").toUpperCase();
   const canAccess = ["ADMIN", "SUPER_ADMIN", "MODERATOR"].includes(role);
@@ -255,19 +181,6 @@ export default function AdminPage() {
 
     fetchDashboard();
   }, [hasHydrated, user?.id, user?.role]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setQuoteVisible(false);
-
-      window.setTimeout(() => {
-        setQuoteIndex((current) => getRandomQuoteIndex(current));
-        setQuoteVisible(true);
-      }, 350);
-    }, 60000);
-
-    return () => window.clearInterval(timer);
-  }, []);
 
   const fetchDashboard = async () => {
     setLoading(true);
@@ -317,10 +230,8 @@ export default function AdminPage() {
           String(item.approvalStatus || ""),
         ),
       ).length,
-      reviewing: approvalItems.filter((item) => item.approvalStatus === "INCELEMEDE")
-        .length,
-      approved: approvalItems.filter((item) => item.approvalStatus === "ONAYLANDI")
-        .length,
+      reviewing: approvalItems.filter((item) => item.approvalStatus === "INCELEMEDE").length,
+      approved: approvalItems.filter((item) => item.approvalStatus === "ONAYLANDI").length,
       pool: approvalItems.filter(
         (item) => item.approvalStatus === "HAVUZDA" || item.isPoolVisible,
       ).length,
@@ -411,8 +322,26 @@ export default function AdminPage() {
       countTone: "gray",
     },
     {
+      title: "Kullanıcı Yönetimi",
+      desc: "Kullanıcıları görüntüleyin, onaylayın ve yönetin",
+      href: "/admin/users",
+      icon: <UsersRound size={30} />,
+      tone: "purple",
+      count: stats?.pendingUsers || 0,
+      countTone: "gray",
+    },
+    {
+      title: "Referans Yönetimi",
+      desc: "Referans kodlarını oluşturun ve yönetin",
+      href: "/admin/referrals",
+      icon: <UserPlus size={30} />,
+      tone: "cyan",
+      count: stats?.totalInvitations || 0,
+      countTone: "cyan",
+    },
+    {
       title: "Sistem Mesajları",
-      desc: "Tüm mesajları ve bildirimleri yönetin",
+      desc: "Kullanıcı iletişimi ve sistem bildirimleri",
       href: "/admin/system-messages",
       icon: <MessageCircle size={30} />,
       tone: "green",
@@ -420,22 +349,45 @@ export default function AdminPage() {
       countTone: "purple",
     },
     {
-      title: "Kullanıcı Yönetimi",
-      desc: "Kullanıcıları görüntüleyin ve rollerini yönetin",
-      href: "/admin",
-      icon: <UsersRound size={30} />,
-      tone: "purple",
-      count: stats?.pendingUsers || 0,
-      countTone: "gray",
+      title: "Duyurular",
+      desc: "Platform duyurularını hazırlayın ve yayınlayın",
+      href: "/admin/announcements",
+      icon: <Megaphone size={30} />,
+      tone: "rose",
+      isNew: true,
     },
     {
-      title: "Trafik Merkezi",
-      desc: "Ziyaretçi ve trafik analizlerini görüntüleyin",
-      href: "/admin",
+      title: "Raporlar",
+      desc: "Trafik, kullanıcı ve işlem raporlarını inceleyin",
+      href: "/admin/reports",
       icon: <Activity size={30} />,
       tone: "cyan",
       count: activeUsers,
       countTone: "cyan",
+    },
+    {
+      title: "Ayarlar",
+      desc: "Platform yönetim ayarlarını düzenleyin",
+      href: "/admin/settings",
+      icon: <Settings size={30} />,
+      tone: "gray",
+      count: 0,
+      countTone: "blue",
+    },
+    {
+      title: "Audit Log",
+      desc: "Yönetici işlem kayıtlarını görüntüleyin",
+      href: "/admin/audit-log",
+      icon: <FileText size={30} />,
+      tone: "orange",
+      isNew: true,
+    },
+    {
+      title: "Yardım Merkezi",
+      desc: "Admin kullanım notları ve destek merkezi",
+      href: "/admin/help-center",
+      icon: <HelpCircle size={30} />,
+      tone: "blue",
     },
     {
       title: "Lina Merkezi",
@@ -445,23 +397,6 @@ export default function AdminPage() {
       tone: "purple",
       count: 0,
       countTone: "rose",
-    },
-    {
-      title: "Tema Yönetimi",
-      desc: "Sistem temalarını özelleştirin",
-      href: "/admin",
-      icon: <Palette size={30} />,
-      tone: "rose",
-      isNew: true,
-    },
-    {
-      title: "Sistem Ayarları",
-      desc: "Platform ayarlarını yönetin",
-      href: "/admin",
-      icon: <Settings size={30} />,
-      tone: "gray",
-      count: 0,
-      countTone: "blue",
     },
   ];
 
@@ -474,11 +409,11 @@ export default function AdminPage() {
       icon: <Activity size={22} />,
     },
     {
-      title: "Sunucu Yükü",
-      value: "%23",
-      sub: "Normal",
-      tone: "cyan" as StatTone,
-      icon: <ShieldCheck size={22} />,
+      title: "Kullanıcı",
+      value: stats?.totalUsers || 0,
+      sub: "Toplam kayıt",
+      tone: "purple" as StatTone,
+      icon: <UsersRound size={22} />,
     },
     {
       title: "Aktif Kullanıcı",
@@ -495,8 +430,6 @@ export default function AdminPage() {
       icon: <CalendarDays size={22} />,
     },
   ];
-
-  const currentQuote = TURAN_QUOTES[quoteIndex];
 
   if (!hasHydrated || loading) {
     return (
@@ -527,6 +460,7 @@ export default function AdminPage() {
               <button
                 onClick={() => setMenuOpen(false)}
                 className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white/10 text-white"
+                aria-label="Menüyü kapat"
               >
                 <X size={18} />
               </button>
@@ -548,14 +482,17 @@ export default function AdminPage() {
             pendingApplications={pendingApplications}
           />
 
-          <div className="mt-6 rounded-2xl border border-white/15 px-4 py-3">
+          <Link
+            href="/admin/help-center"
+            className="mt-6 flex rounded-2xl border border-white/15 px-4 py-3 transition hover:bg-white/10"
+          >
             <div className="flex items-center gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-full border border-white/30 text-[13px] font-black">
                 ?
               </span>
               <span className="text-[13px] font-black">Yardım Merkezi</span>
             </div>
-          </div>
+          </Link>
 
           <div className="mt-auto hidden pt-8 lg:block">
             <div className="flex items-center gap-3 rounded-2xl bg-white/5 p-3">
@@ -565,8 +502,7 @@ export default function AdminPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-black">
-                  {[user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
-                    "Yönetici"}
+                  {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Yönetici"}
                 </p>
                 <p className="text-[11px] font-bold text-white/60">
                   {user?.role || "ADMIN"}
@@ -583,6 +519,7 @@ export default function AdminPage() {
                 <button
                   onClick={() => setMenuOpen(true)}
                   className="flex h-10 w-10 items-center justify-center rounded-2xl text-[#06194A]"
+                  aria-label="Menüyü aç"
                 >
                   <Menu size={24} />
                 </button>
@@ -607,25 +544,33 @@ export default function AdminPage() {
               </div>
 
               <div className="flex min-w-0 items-center gap-2">
-                <button className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#06194A] shadow-sm ring-1 ring-slate-200">
+                <Link
+                  href="/admin/portfolio-approvals"
+                  className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#06194A] shadow-sm ring-1 ring-slate-200"
+                  aria-label="Portföy onay bildirimleri"
+                >
                   <Bell size={19} />
                   {portfolioCounts.waiting > 0 && (
                     <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white">
                       {portfolioCounts.waiting}
                     </span>
                   )}
-                </button>
+                </Link>
 
-                <div className="hidden h-10 min-w-[260px] items-center gap-2 rounded-2xl bg-white px-3 shadow-sm ring-1 ring-slate-200 md:flex">
+                <Link
+                  href="/admin/users"
+                  className="hidden h-10 min-w-[260px] items-center gap-2 rounded-2xl bg-white px-3 shadow-sm ring-1 ring-slate-200 md:flex"
+                >
                   <Search size={17} className="text-slate-400" />
                   <span className="text-[13px] font-semibold text-slate-400">
-                    Ara (Portföy, Kullanıcı, Belge...)
+                    Kullanıcı ve kayıt ara
                   </span>
-                </div>
+                </Link>
 
                 <button
                   onClick={fetchDashboard}
                   className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#06194A] shadow-sm ring-1 ring-slate-200 sm:flex"
+                  aria-label="Yenile"
                 >
                   <RefreshCw size={17} />
                 </button>
@@ -640,6 +585,7 @@ export default function AdminPage() {
                     router.push("/giris");
                   }}
                   className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#06194A] shadow-sm ring-1 ring-slate-200 lg:flex"
+                  aria-label="Çıkış yap"
                 >
                   <LogOut size={17} />
                 </button>
@@ -648,7 +594,7 @@ export default function AdminPage() {
           </header>
 
           <div className="mx-auto w-full max-w-[1240px] px-3 py-3 pb-8 lg:px-6 lg:py-5">
-            <section className="mb-3 lg:hidden">
+            <section className="mb-3 text-center lg:hidden">
               <h1 className="text-[19px] font-black tracking-[-0.04em]">
                 Hoş geldiniz, {user?.firstName || "Yönetici"}
               </h1>
@@ -665,39 +611,28 @@ export default function AdminPage() {
               ))}
             </section>
 
-            <section className="grid grid-cols-2 gap-2 md:grid-cols-4">
-              {moduleCards.map((item) => (
-                <AdminModuleCard key={item.title} item={item} />
+            <section className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-5">
+              {moduleCards.map((item, index) => (
+                <AdminModuleCard
+                  key={item.title}
+                  item={item}
+                  centeredLast={moduleCards.length % 2 === 1 && index === moduleCards.length - 1}
+                />
               ))}
             </section>
 
-            <section className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-5">
+            <section className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
               {systemCards.map((item) => (
                 <SystemMiniCard key={item.title} item={item} />
               ))}
-
-              <Link
-                href="/admin"
-                className="col-span-2 flex min-h-[72px] items-center gap-3 rounded-2xl bg-[#06194A] p-3 text-white shadow-sm md:col-span-2 xl:col-span-1"
-              >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600">
-                  <Sparkles size={22} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[15px] font-black">Hızlı İşlemler</p>
-                  <p className="text-[12px] font-semibold text-white/72">
-                    Sık kullanılan işlemler
-                  </p>
-                </div>
-              </Link>
             </section>
 
             <section className="mt-4 hidden grid-cols-5 gap-3 text-center text-[14px] font-black text-blue-700 lg:grid">
               <InfoPill icon={<CheckCircle2 size={19} />} label="Açık & Sade Tasarım" />
-              <InfoPill icon={<ClipboardCheck size={19} />} label="Hızlı Erişim Grid Kartlar" />
+              <InfoPill icon={<ClipboardCheck size={19} />} label="Aktif Modül Linkleri" />
               <InfoPill icon={<Home size={19} />} label="Mobil Uyumlu Tek Ekran" />
-              <InfoPill icon={<Settings size={19} />} label="Modern İkonlar" />
-              <InfoPill icon={<ShieldCheck size={19} />} label="Koyu Lacivert + Beyaz" />
+              <InfoPill icon={<Settings size={19} />} label="Yönetim Merkezi" />
+              <InfoPill icon={<ShieldCheck size={19} />} label="Yetki Kontrollü" />
             </section>
 
             <p className="mt-4 hidden text-center text-[12px] font-semibold text-slate-400 lg:block">
@@ -740,7 +675,7 @@ function SideNav({
       <SideNavItem href="/admin" icon={<Home size={19} />} label="Yönetim Paneli" active />
 
       <SideLabel label="Yönetim" />
-      <SideNavItem href="/admin" icon={<UsersRound size={19} />} label="Kullanıcı Yönetimi" />
+      <SideNavItem href="/admin/users" icon={<UsersRound size={19} />} label="Kullanıcı Yönetimi" />
       <SideNavItem
         href="/admin/katilim-talepleri"
         icon={<UserPlus size={19} />}
@@ -754,16 +689,17 @@ function SideNav({
         badge={portfolioCount}
         danger
       />
-      <SideNavItem href="/admin" icon={<UsersRound size={19} />} label="Referans Yönetimi" />
+      <SideNavItem href="/admin/referrals" icon={<UsersRound size={19} />} label="Referans Yönetimi" />
       <SideNavItem href="/admin/system-messages" icon={<MessageCircle size={19} />} label="Sistem Mesajları" />
 
       <SideLabel label="İçerik Yönetimi" />
-      <SideNavItem href="/admin" icon={<Bell size={19} />} label="Duyurular" />
-      <SideNavItem href="/admin" icon={<Activity size={19} />} label="Raporlar" />
+      <SideNavItem href="/admin/announcements" icon={<Bell size={19} />} label="Duyurular" />
+      <SideNavItem href="/admin/reports" icon={<Activity size={19} />} label="Raporlar" />
 
       <SideLabel label="Sistem" />
-      <SideNavItem href="/admin" icon={<Settings size={19} />} label="Ayarlar" />
-      <SideNavItem href="/admin" icon={<FileText size={19} />} label="Audit Log" />
+      <SideNavItem href="/admin/settings" icon={<Settings size={19} />} label="Ayarlar" />
+      <SideNavItem href="/admin/audit-log" icon={<FileText size={19} />} label="Audit Log" />
+      <SideNavItem href="/admin/help-center" icon={<HelpCircle size={19} />} label="Yardım Merkezi" />
     </nav>
   );
 }
@@ -834,14 +770,22 @@ function AdminStatCard({ item }: { item: StatCardItem }) {
   );
 }
 
-function AdminModuleCard({ item }: { item: ModuleCardItem }) {
+function AdminModuleCard({
+  item,
+  centeredLast,
+}: {
+  item: ModuleCardItem;
+  centeredLast?: boolean;
+}) {
   const tone = toneClasses(item.tone);
   const countTone = item.countTone ? toneClasses(item.countTone) : null;
 
   return (
     <Link
       href={item.href}
-      className="relative flex min-h-[112px] items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70 transition active:scale-[0.99] lg:min-h-[128px] lg:p-4"
+      className={`relative flex min-h-[112px] items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70 transition active:scale-[0.99] lg:min-h-[128px] lg:p-4 ${
+        centeredLast ? "max-md:col-span-2 max-md:mx-auto max-md:w-[50%]" : ""
+      }`}
     >
       <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${tone.box} lg:h-16 lg:w-16`}>
         {item.icon}
