@@ -5,26 +5,23 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Activity,
-  AlertTriangle,
   ArrowRight,
   Bell,
   CheckCircle2,
   ClipboardCheck,
-  Database,
-  Eye,
   FileText,
-  Gauge,
   Home,
+  Loader2,
   LogOut,
-  Menu,
-  MessageSquareText,
+  MessageCircle,
   Palette,
   RefreshCw,
+  Search,
   Settings,
   ShieldCheck,
   Sparkles,
-  UserCheck,
-  X,
+  UserPlus,
+  UsersRound,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -41,6 +38,17 @@ type Stats = {
   byRole?: { role: string; count: number }[];
 };
 
+type ApprovalUnit = {
+  id: string;
+  approvalStatus?: string | null;
+  isPoolVisible?: boolean;
+};
+
+type ApplicationItem = {
+  id: string;
+  status?: string | null;
+};
+
 type VisitItem = {
   id?: string;
   userId?: string;
@@ -55,40 +63,120 @@ type VisitItem = {
   };
 };
 
-type UnitItem = {
-  id: string;
-  approvalStatus?: string | null;
-  isPoolVisible?: boolean;
-};
-
-type ApplicationItem = {
-  id: string;
-  status: string;
-};
-
-type AdminCard = {
+type ModuleCard = {
   title: string;
-  desc: string;
+  description: string;
   href: string;
   icon: ReactNode;
-  stat?: string | number;
-  badge?: string;
-  tone: "blue" | "emerald" | "amber" | "purple" | "rose" | "slate";
+  badge: string;
+  accent: "amber" | "blue" | "green" | "gray" | "purple" | "red";
+  muted?: boolean;
 };
 
-function getRoleLabel(role?: string | null) {
-  const value = String(role || "").toUpperCase();
+const NAV_ITEMS = [
+  {
+    label: "Genel Bakış",
+    href: "/admin",
+    icon: <Home size={16} />,
+    active: true,
+  },
+  {
+    label: "Portföy Onayları",
+    href: "/admin/portfolio-approvals",
+    icon: <ClipboardCheck size={16} />,
+    badgeKey: "portfolio",
+  },
+  {
+    label: "Katılım Talepleri",
+    href: "/admin/katilim-talepleri",
+    icon: <UserPlus size={16} />,
+    badgeKey: "applications",
+  },
+  {
+    label: "Sistem Mesajları",
+    href: "/admin/system-messages",
+    icon: <MessageCircle size={16} />,
+  },
+];
 
-  const labels: Record<string, string> = {
-    SUPER_ADMIN: "Süper Admin",
-    ADMIN: "Admin",
-    MODERATOR: "Moderatör",
-    EMLAKCI: "Emlakçı",
-    MUTEAHHIT: "Müteahhit",
-    INSAAT_FIRMASI: "İnşaat Firması",
+const TOOL_ITEMS = [
+  {
+    label: "Trafik Merkezi",
+    href: "/admin",
+    icon: <Activity size={16} />,
+  },
+  {
+    label: "Lina Merkezi",
+    href: "/lina",
+    icon: <Sparkles size={16} />,
+  },
+  {
+    label: "Tema Yönetimi",
+    href: "/admin",
+    icon: <Palette size={16} />,
+  },
+];
+
+const SYSTEM_ITEMS = [
+  {
+    label: "Sistem Ayarları",
+    href: "/admin",
+    icon: <Settings size={16} />,
+  },
+  {
+    label: "Ana Sayfa",
+    href: "/dashboard",
+    icon: <Home size={16} />,
+  },
+];
+
+const TURAN_QUOTES = [
+  {
+    text: "Muhtaç olduğun kudret, damarlarındaki asil kanda mevcuttur!",
+    highlights: ["asil kanda"],
+  },
+  {
+    text: "VATAN ne Türkiyedir Türklere, ne Türkistan, VATAN Büyük ve Müebbet bir ülkedir. TÜRKLERE TURAN",
+    highlights: ["TÜRKLERE TURAN"],
+  },
+  {
+    text: "Bugünden sonra divanda, dergahta, bargahta, mecliste ve meydanda Türkçeden başka dil kullanılmayacaktır.",
+    highlights: ["Türkçeden başka dil"],
+  },
+  {
+    text: "Har içinde biten gonca güle minnet eylemem, Arabi, Farisi bilmem; dile minnet eylemem.",
+    highlights: ["dile minnet eylemem"],
+  },
+  {
+    text: "Yufka yüreklilerle çetin yollar aşılmaz; Çünkü bu yol kutludur, gider Tanrı Dağı'na.",
+    highlights: ["Tanrı Dağı'na"],
+  },
+];
+
+function accentClasses(accent: ModuleCard["accent"]) {
+  const map: Record<ModuleCard["accent"], string> = {
+    amber: "bg-[#FAEEDA] text-[#854F0B]",
+    blue: "bg-[#E6F1FB] text-[#185FA5]",
+    green: "bg-[#EAF3DE] text-[#3B6D11]",
+    gray: "bg-[#F1EFE8] text-[#5F5E5A]",
+    purple: "bg-[#EEEDFE] text-[#534AB7]",
+    red: "bg-[#FCEBEB] text-[#A32D2D]",
   };
 
-  return labels[value] || value || "Yönetici";
+  return map[accent];
+}
+
+function pillClasses(accent: ModuleCard["accent"]) {
+  const map: Record<ModuleCard["accent"], string> = {
+    amber: "bg-[#FAEEDA] text-[#854F0B]",
+    blue: "bg-[#E6F1FB] text-[#185FA5]",
+    green: "bg-[#EAF3DE] text-[#3B6D11]",
+    gray: "bg-[#F1EFE8] text-[#5F5E5A]",
+    purple: "bg-[#EEEDFE] text-[#534AB7]",
+    red: "bg-[#FCEBEB] text-[#A32D2D]",
+  };
+
+  return map[accent];
 }
 
 function getInitials(firstName?: string | null, lastName?: string | null) {
@@ -97,64 +185,77 @@ function getInitials(firstName?: string | null, lastName?: string | null) {
   return `${first}${last}`.toLocaleUpperCase("tr-TR") || "EP";
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "Tarih yok";
-
-  return new Date(value).toLocaleString("tr-TR", {
+function formatDate(value = new Date()) {
+  return value.toLocaleString("tr-TR", {
     day: "2-digit",
     month: "short",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
 }
 
-function toneClasses(tone: AdminCard["tone"]) {
-  const map: Record<AdminCard["tone"], string> = {
-    blue: "from-blue-600 to-indigo-700 text-white shadow-blue-950/20",
-    emerald: "from-emerald-600 to-teal-700 text-white shadow-emerald-950/20",
-    amber: "from-amber-500 to-orange-700 text-white shadow-amber-950/20",
-    purple: "from-violet-600 to-fuchsia-700 text-white shadow-purple-950/20",
-    rose: "from-rose-600 to-red-700 text-white shadow-rose-950/20",
-    slate: "from-slate-800 to-slate-950 text-white shadow-slate-950/20",
-  };
+function visitTime(value?: string | null) {
+  if (!value) return "—";
 
-  return map[tone];
+  return new Date(value).toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-function presenceLabel(value?: string | null) {
-  if (!value) return "Offline";
+function highlightQuote(text: string, highlights: string[]) {
+  let parts: ReactNode[] = [text];
 
-  const diff = Date.now() - new Date(value).getTime();
+  highlights.forEach((highlight) => {
+    parts = parts.flatMap((part, index) => {
+      if (typeof part !== "string") return [part];
 
-  if (diff < 1000 * 60 * 5) return "Online";
-  if (diff < 1000 * 60 * 20) return "Away";
+      const split = part.split(highlight);
 
-  return "Offline";
+      if (split.length === 1) return [part];
+
+      return split.flatMap((piece, pieceIndex) => {
+        const nodes: ReactNode[] = [];
+
+        if (piece) nodes.push(piece);
+
+        if (pieceIndex < split.length - 1) {
+          nodes.push(
+            <span
+              key={`${highlight}-${index}-${pieceIndex}`}
+              className="font-medium text-[#C8922A]"
+            >
+              {highlight}
+            </span>,
+          );
+        }
+
+        return nodes;
+      });
+    });
+  });
+
+  return parts;
 }
 
 export default function AdminPage() {
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user, hasHydrated, logout } = useAuthStore();
 
-  const [hydrated, setHydrated] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [units, setUnits] = useState<UnitItem[]>([]);
+  const [approvalItems, setApprovalItems] = useState<ApprovalUnit[]>([]);
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [visits, setVisits] = useState<VisitItem[]>([]);
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [quoteIndex, setQuoteIndex] = useState(0);
+  const [quoteVisible, setQuoteVisible] = useState(true);
 
   const role = String(user?.role || "").toUpperCase();
   const canAccess = ["ADMIN", "SUPER_ADMIN", "MODERATOR"].includes(role);
-  const isSuperAdmin = role === "SUPER_ADMIN";
 
   useEffect(() => {
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
+    if (!hasHydrated) return;
 
     if (!user) {
       router.push("/giris");
@@ -167,14 +268,26 @@ export default function AdminPage() {
     }
 
     fetchDashboard();
-  }, [hydrated, user?.id, user?.role]);
+  }, [hasHydrated, user?.id, user?.role]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setQuoteVisible(false);
+
+      window.setTimeout(() => {
+        setQuoteIndex((current) => (current + 1) % TURAN_QUOTES.length);
+        setQuoteVisible(true);
+      }, 400);
+    }, 60000);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   const fetchDashboard = async () => {
     setLoading(true);
-    setError("");
 
     try {
-      const [statsResult, unitsResult, applicationsResult, visitsResult] =
+      const [statsResult, approvalsResult, applicationsResult, visitsResult] =
         await Promise.allSettled([
           api.get("/admin/stats"),
           api.get("/units/admin/portfolio-approvals?status=ALL"),
@@ -182,427 +295,577 @@ export default function AdminPage() {
           api.get("/visits"),
         ]);
 
-      if (statsResult.status === "fulfilled") setStats(statsResult.value.data || null);
-      if (unitsResult.status === "fulfilled") setUnits(Array.isArray(unitsResult.value.data) ? unitsResult.value.data : []);
-      if (applicationsResult.status === "fulfilled") setApplications(Array.isArray(applicationsResult.value.data) ? applicationsResult.value.data : []);
-      if (visitsResult.status === "fulfilled") setVisits(Array.isArray(visitsResult.value.data) ? visitsResult.value.data : []);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Yönetim merkezi bilgileri yüklenemedi.");
+      if (statsResult.status === "fulfilled") {
+        setStats(statsResult.value.data || null);
+      }
+
+      if (approvalsResult.status === "fulfilled") {
+        setApprovalItems(
+          Array.isArray(approvalsResult.value.data)
+            ? approvalsResult.value.data
+            : [],
+        );
+      }
+
+      if (applicationsResult.status === "fulfilled") {
+        setApplications(
+          Array.isArray(applicationsResult.value.data)
+            ? applicationsResult.value.data
+            : [],
+        );
+      }
+
+      if (visitsResult.status === "fulfilled") {
+        setVisits(Array.isArray(visitsResult.value.data) ? visitsResult.value.data : []);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const portfolioCounts = useMemo(() => {
-    const waiting = units.filter((item) =>
-      ["BELGE_BEKLENIYOR", "INCELEMEYE_GONDERILDI"].includes(String(item.approvalStatus || "")),
-    ).length;
-
-    const reviewing = units.filter((item) => item.approvalStatus === "INCELEMEDE").length;
-    const approved = units.filter((item) => item.approvalStatus === "ONAYLANDI").length;
-    const pool = units.filter((item) => item.approvalStatus === "HAVUZDA" || item.isPoolVisible).length;
-
-    return { total: units.length, waiting, reviewing, approved, pool };
-  }, [units]);
+    return {
+      total: approvalItems.length,
+      waiting: approvalItems.filter((item) =>
+        ["BELGE_BEKLENIYOR", "INCELEMEYE_GONDERILDI"].includes(
+          String(item.approvalStatus || ""),
+        ),
+      ).length,
+      reviewing: approvalItems.filter(
+        (item) => item.approvalStatus === "INCELEMEDE",
+      ).length,
+      approved: approvalItems.filter(
+        (item) => item.approvalStatus === "ONAYLANDI",
+      ).length,
+      pool: approvalItems.filter(
+        (item) => item.approvalStatus === "HAVUZDA" || item.isPoolVisible,
+      ).length,
+    };
+  }, [approvalItems]);
 
   const pendingApplications = useMemo(() => {
-    return applications.filter((item) => String(item.status || "").toUpperCase() === "PENDING").length;
+    return applications.filter(
+      (item) => String(item.status || "").toUpperCase() === "PENDING",
+    ).length;
   }, [applications]);
 
-  const trafficCounts = useMemo(() => {
+  const onlineUsers = useMemo(() => {
     const latestByUser = new Map<string, VisitItem>();
 
-    for (const visit of visits) {
+    visits.forEach((visit) => {
       const id = visit.user?.id || visit.userId;
-      if (!id) continue;
+      if (!id) return;
 
       const current = latestByUser.get(id);
       const currentTime = new Date(current?.createdAt || 0).getTime();
-      const nextTime = new Date(visit.createdAt || 0).getTime();
+      const visitTimeValue = new Date(visit.createdAt || 0).getTime();
 
-      if (!current || nextTime > currentTime) latestByUser.set(id, visit);
-    }
+      if (!current || visitTimeValue > currentTime) latestByUser.set(id, visit);
+    });
 
-    const rows = Array.from(latestByUser.values());
-
-    return {
-      total: rows.length,
-      online: rows.filter((item) => presenceLabel(item.createdAt) === "Online").length,
-      away: rows.filter((item) => presenceLabel(item.createdAt) === "Away").length,
-    };
+    return Array.from(latestByUser.values()).filter((visit) => {
+      if (!visit.createdAt) return false;
+      return Date.now() - new Date(visit.createdAt).getTime() < 1000 * 60 * 5;
+    }).length;
   }, [visits]);
-
-  const cards: AdminCard[] = [
-    {
-      title: "Portföy Onayları",
-      desc: "Belgeli portföyleri incele, onayla ve havuza al.",
-      href: "/admin/portfolio-approvals",
-      icon: <ClipboardCheck size={24} />,
-      stat: portfolioCounts.waiting,
-      badge: "Bekleyen",
-      tone: "blue",
-    },
-    {
-      title: "Katılım Talepleri",
-      desc: "Yeni üyelik başvurularını ve referanslı talepleri yönet.",
-      href: "/admin/katilim-talepleri",
-      icon: <UserCheck size={24} />,
-      stat: pendingApplications || stats?.pendingApplications || 0,
-      badge: "Başvuru",
-      tone: "emerald",
-    },
-    {
-      title: "Sistem Mesajları",
-      desc: "Üyelere duyuru, uyarı ve bilgilendirme gönder.",
-      href: "/admin/system-messages",
-      icon: <MessageSquareText size={24} />,
-      stat: "Aktif",
-      badge: "Mesaj",
-      tone: "purple",
-    },
-    {
-      title: "Kullanıcı Yönetimi",
-      desc: "Üyeleri, rollerini ve onay durumlarını kontrol et.",
-      href: "/admin#users",
-      icon: <ShieldCheck size={24} />,
-      stat: stats?.pendingUsers || 0,
-      badge: "Bekleyen Üye",
-      tone: "amber",
-    },
-    {
-      title: "Trafik Merkezi",
-      desc: "Online kullanıcıları, ziyaretleri ve canlı hareketi izle.",
-      href: "/admin#traffic",
-      icon: <Activity size={24} />,
-      stat: trafficCounts.online,
-      badge: "Online",
-      tone: "slate",
-    },
-    {
-      title: "Lina Merkezi",
-      desc: "Lina AI durumunu, talepleri ve yönlendirmeleri takip et.",
-      href: "/lina",
-      icon: <Sparkles size={24} />,
-      stat: "AI",
-      badge: "Asistan",
-      tone: "rose",
-    },
-    {
-      title: "Tema Yönetimi",
-      desc: "Turan Theme ve ilerideki tema ayarlarını yönet.",
-      href: isSuperAdmin ? "/admin/themes" : "/admin",
-      icon: <Palette size={24} />,
-      stat: isSuperAdmin ? "Açık" : "Kilitli",
-      badge: "SUPER_ADMIN",
-      tone: "slate",
-    },
-    {
-      title: "Sistem Ayarları",
-      desc: "Platform ayarları, güvenlik ve bakım notları.",
-      href: isSuperAdmin ? "/admin/settings" : "/admin",
-      icon: <Settings size={24} />,
-      stat: isSuperAdmin ? "Yetkili" : "Sınırlı",
-      badge: "Ayar",
-      tone: "blue",
-    },
-  ];
 
   const latestVisits = useMemo(() => {
     return [...visits]
-      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-      .slice(0, 5);
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt || 0).getTime() -
+          new Date(a.createdAt || 0).getTime(),
+      )
+      .slice(0, 3);
   }, [visits]);
 
-  if (!hydrated || loading) {
+  const moduleCards: ModuleCard[] = [
+    {
+      title: "Portföy Onayları",
+      description: "Belgeli portföyleri incele ve onayla.",
+      href: "/admin/portfolio-approvals",
+      icon: <ClipboardCheck size={16} />,
+      badge: `${portfolioCounts.waiting} bekleyen`,
+      accent: "amber",
+    },
+    {
+      title: "Katılım Talepleri",
+      description: "Yeni üyelik başvurularını yönet.",
+      href: "/admin/katilim-talepleri",
+      icon: <UserPlus size={16} />,
+      badge: pendingApplications ? `${pendingApplications} başvuru` : "Başvuru yok",
+      accent: "blue",
+    },
+    {
+      title: "Sistem Mesajları",
+      description: "Üyelere duyuru ve uyarı gönder.",
+      href: "/admin/system-messages",
+      icon: <MessageCircle size={16} />,
+      badge: "Aktif",
+      accent: "green",
+    },
+    {
+      title: "Kullanıcı Yönetimi",
+      description: "Üye rolleri ve onay durumları.",
+      href: "/admin",
+      icon: <UsersRound size={16} />,
+      badge: `${stats?.pendingUsers || 0} bekleyen`,
+      accent: "gray",
+      muted: true,
+    },
+    {
+      title: "Lina Merkezi",
+      description: "AI asistan durum ve talepleri.",
+      href: "/lina",
+      icon: <Sparkles size={16} />,
+      badge: "Asistan",
+      accent: "purple",
+    },
+    {
+      title: "Tema Yönetimi",
+      description: "Turan Theme ayarları.",
+      href: "/admin",
+      icon: <Palette size={16} />,
+      badge: "Kilitli",
+      accent: "gray",
+      muted: true,
+    },
+  ];
+
+  const currentQuote = TURAN_QUOTES[quoteIndex];
+
+  if (!hasHydrated || loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#071427] text-white">
+      <main className="flex min-h-screen items-center justify-center bg-[#F7F6F3] text-[#2C2C2A]">
         <div className="text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-white" />
-          <p className="mt-5 text-[12px] font-black uppercase tracking-[0.24em] text-white/60">EPH Yönetim Merkezi Açılıyor</p>
+          <Loader2 className="mx-auto animate-spin text-[#2C2C2A]" size={30} />
+          <p className="mt-4 text-[12px] font-medium text-[#888780]">
+            EPH Yönetim Merkezi açılıyor
+          </p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#071427] text-white">
-      {menuOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm lg:hidden" onClick={() => setMenuOpen(false)}>
-          <aside className="h-full w-[84%] max-w-[340px] bg-[#0B1B33] p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <AdminBrand />
-              <button onClick={() => setMenuOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white">
-                <X size={18} />
-              </button>
+    <main className="flex h-screen overflow-hidden bg-[#F7F6F3] text-[#2C2C2A]">
+      <aside className="hidden h-screen w-[200px] shrink-0 border-r border-black/10 bg-white px-3 py-4 md:block">
+        <AdminLogo />
+
+        <nav className="mt-6 space-y-1">
+          {NAV_ITEMS.map((item) => (
+            <NavItem
+              key={item.label}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+              active={item.active}
+              badge={
+                item.badgeKey === "portfolio"
+                  ? portfolioCounts.waiting
+                  : item.badgeKey === "applications"
+                    ? pendingApplications
+                    : undefined
+              }
+            />
+          ))}
+
+          <NavSection label="Araçlar" />
+
+          {TOOL_ITEMS.map((item) => (
+            <NavItem
+              key={item.label}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+            />
+          ))}
+
+          <NavSection label="Sistem" />
+
+          {SYSTEM_ITEMS.map((item) => (
+            <NavItem
+              key={item.label}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+            />
+          ))}
+        </nav>
+      </aside>
+
+      <section className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-black/10 bg-white px-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#5F5E5A] md:hidden">
+              <Home size={16} />
+            </button>
+
+            <div className="min-w-0 truncate text-[14px] font-medium">
+              Genel Bakış
             </div>
-
-            <div className="mt-6 space-y-2">
-              <SideLink href="/admin" icon={<Gauge size={18} />} label="Yönetim Merkezi" active />
-              <SideLink href="/admin/portfolio-approvals" icon={<ClipboardCheck size={18} />} label="Portföy Onayları" />
-              <SideLink href="/admin/katilim-talepleri" icon={<UserCheck size={18} />} label="Katılım Talepleri" />
-              <SideLink href="/admin/system-messages" icon={<MessageSquareText size={18} />} label="Sistem Mesajları" />
-              <SideLink href="/dashboard" icon={<Home size={18} />} label="Ana Sayfa" />
+            <span className="text-[#B4B2A9]">—</span>
+            <div className="hidden text-[12px] text-[#B4B2A9] sm:block">
+              {formatDate()}
             </div>
-          </aside>
-        </div>
-      )}
-
-      <div className="lg:flex">
-        <aside className="hidden min-h-screen w-[280px] shrink-0 border-r border-white/10 bg-[#061225] p-5 lg:sticky lg:top-0 lg:block">
-          <AdminBrand />
-
-          <nav className="mt-8 space-y-2">
-            <SideLink href="/admin" icon={<Gauge size={18} />} label="Yönetim Merkezi" active />
-            <SideLink href="/admin/portfolio-approvals" icon={<ClipboardCheck size={18} />} label="Portföy Onayları" badge={portfolioCounts.waiting} />
-            <SideLink href="/admin/katilim-talepleri" icon={<UserCheck size={18} />} label="Katılım Talepleri" badge={pendingApplications || stats?.pendingApplications || 0} />
-            <SideLink href="/admin/system-messages" icon={<MessageSquareText size={18} />} label="Sistem Mesajları" />
-            <SideLink href="/admin#traffic" icon={<Activity size={18} />} label="Trafik Merkezi" />
-            <SideLink href="/lina" icon={<Sparkles size={18} />} label="Lina Merkezi" />
-            <SideLink href="/dashboard" icon={<Home size={18} />} label="Ana Sayfa" />
-          </nav>
-
-          <div className="mt-8 rounded-[26px] border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">Sistem Durumu</p>
-            <div className="mt-3 flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-              <span className="text-[13px] font-black text-white">Aktif</span>
-            </div>
-            <p className="mt-2 text-[12px] font-semibold leading-5 text-white/50">Backend, frontend ve PWA canlı ortamda çalışıyor.</p>
           </div>
-        </aside>
 
-        <section className="min-w-0 flex-1">
-          <header className="sticky top-0 z-40 border-b border-white/10 bg-[#071427]/92 px-4 py-3 backdrop-blur-xl lg:px-7">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <button onClick={() => setMenuOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white lg:hidden">
-                  <Menu size={20} />
-                </button>
+          <div className="flex items-center gap-2">
+            <button className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#5F5E5A]">
+              <Bell size={15} />
+              {portfolioCounts.waiting > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#2C2C2A] px-1 text-[10px] font-medium text-white">
+                  {portfolioCounts.waiting}
+                </span>
+              )}
+            </button>
 
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-sky-300">Admin V2</p>
-                  <h1 className="truncate text-[20px] font-black tracking-[-0.04em] text-white sm:text-[24px]">Yönetim Merkezi</h1>
-                </div>
+            <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#5F5E5A]">
+              <Search size={15} />
+            </button>
+
+            <button
+              onClick={fetchDashboard}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#5F5E5A]"
+            >
+              <RefreshCw size={15} />
+            </button>
+
+            <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[#D3D1C7] text-[11px] font-medium text-[#444441]">
+              {getInitials(user?.firstName, user?.lastName)}
+            </div>
+
+            <button
+              onClick={() => {
+                logout();
+                router.push("/giris");
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-black/10 bg-white text-[#5F5E5A]"
+            >
+              <LogOut size={15} />
+            </button>
+          </div>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5">
+          <section className="mb-4 rounded-[10px] border-l-[3px] border-l-[#C8922A] bg-[#1C1B18] px-5 py-[13px]">
+            <div className="flex min-h-[22px] items-center gap-3">
+              <div className="shrink-0 text-[22px] leading-none text-[#C8922A]">
+                ❝
               </div>
 
-              <div className="flex items-center gap-2">
-                <button onClick={fetchDashboard} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white">
-                  <RefreshCw size={18} />
-                </button>
+              <div
+                className={`min-w-0 flex-1 truncate text-[13px] font-normal leading-[1.4] text-[#E8E6E0] transition-opacity duration-300 ${
+                  quoteVisible ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                {highlightQuote(currentQuote.text, currentQuote.highlights)}
+              </div>
 
-                <button className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white">
-                  <Bell size={18} />
-                  {portfolioCounts.waiting > 0 && (
-                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-black text-white">{portfolioCounts.waiting}</span>
-                  )}
-                </button>
+              <div className="relative h-[22px] w-8 shrink-0 overflow-hidden rounded-[3px] bg-[#C0392B] text-center text-[14px] leading-[22px] text-white">
+                ☽
+              </div>
 
-                <button onClick={() => { logout(); router.push("/giris"); }} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-rose-400/30 bg-rose-500/10 text-rose-200">
-                  <LogOut size={18} />
-                </button>
+              <div className="flex shrink-0 items-center gap-1">
+                {TURAN_QUOTES.map((_, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => {
+                      setQuoteVisible(false);
+                      window.setTimeout(() => {
+                        setQuoteIndex(index);
+                        setQuoteVisible(true);
+                      }, 200);
+                    }}
+                    className={`h-[6px] w-[6px] rounded-full ${
+                      quoteIndex === index
+                        ? "bg-[#C8922A]"
+                        : "bg-[#C8922A]/30"
+                    }`}
+                    aria-label={`Söz ${index + 1}`}
+                  />
+                ))}
               </div>
             </div>
-          </header>
+          </section>
 
-          <div className="px-3 py-4 pb-28 lg:px-7 lg:py-7">
-            {error && <div className="mb-4 rounded-[22px] border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-center text-[13px] font-black text-rose-100">{error}</div>}
+          <section className="grid gap-[10px] sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label="Bekleyen Portföy"
+              value={portfolioCounts.waiting}
+              sub="İnceleme bekliyor"
+              dot="bg-[#A32D2D]"
+            />
+            <StatCard
+              label="Online Kullanıcı"
+              value={onlineUsers}
+              sub="Şu an aktif"
+              dot="bg-[#3B6D11]"
+            />
+            <StatCard
+              label="Başvuru"
+              value={pendingApplications}
+              sub={pendingApplications ? "İşlem bekliyor" : "Bekleyen yok"}
+            />
+            <StatCard
+              label="Toplam Üye"
+              value={stats?.totalUsers || 0}
+              sub="Kayıtlı kullanıcı"
+            />
+          </section>
 
-            <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_20%_15%,rgba(59,130,246,0.28),transparent_30%),linear-gradient(135deg,#0B1B33,#071427_55%,#020617)] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] lg:p-7">
-              <div className="absolute -right-12 -top-16 h-48 w-48 rounded-full bg-blue-500/20 blur-3xl" />
-              <div className="absolute -bottom-24 left-16 h-56 w-56 rounded-full bg-emerald-500/10 blur-3xl" />
+          <section className="mt-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-[13px] font-medium text-[#2C2C2A]">
+                Modüller
+              </h2>
+              <Link
+                href="/admin/portfolio-approvals"
+                className="inline-flex items-center gap-1 text-[12px] text-[#888780]"
+              >
+                Tümünü gör <ArrowRight size={13} />
+              </Link>
+            </div>
 
-              <div className="relative grid gap-5 lg:grid-cols-[1fr_320px] lg:items-center">
-                <div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                    <ShieldCheck size={15} className="text-emerald-300" />
-                    <span className="text-[11px] font-black uppercase tracking-[0.16em] text-white/70">Premium Yönetim Paneli</span>
-                  </div>
+            <div className="grid gap-[10px] md:grid-cols-2 xl:grid-cols-3">
+              {moduleCards.map((card) => (
+                <ModuleCard key={card.title} card={card} />
+              ))}
+            </div>
+          </section>
 
-                  <h2 className="mt-4 max-w-3xl text-[28px] font-black leading-none tracking-[-0.06em] text-white sm:text-[38px] lg:text-[48px]">EPH yönetimi artık daha sade, hızlı ve kontrollü.</h2>
-
-                  <p className="mt-4 max-w-2xl text-[14px] font-semibold leading-6 text-white/62">Portföy onayları, katılım talepleri, sistem mesajları ve canlı trafik tek merkezden yönetilir.</p>
-
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    <Link href="/admin/portfolio-approvals" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-2xl bg-white px-4 text-[13px] font-black text-[#071427]">
-                      Portföy Onaylarına Git <ArrowRight size={17} />
-                    </Link>
-
-                    <Link href="/dashboard" className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 text-[13px] font-black text-white">Ana Sayfa</Link>
-                  </div>
-                </div>
-
-                <div className="rounded-[28px] border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#071427] text-[17px] font-black">{getInitials(user?.firstName, user?.lastName)}</div>
-                    <div className="min-w-0">
-                      <p className="truncate text-[16px] font-black text-white">{[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Yönetici"}</p>
-                      <p className="mt-0.5 text-[12px] font-bold text-white/50">{getRoleLabel(user?.role)}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <MiniMetric label="Bekleyen Portföy" value={portfolioCounts.waiting} />
-                    <MiniMetric label="Online" value={trafficCounts.online} />
-                    <MiniMetric label="Başvuru" value={pendingApplications || stats?.pendingApplications || 0} />
-                    <MiniMetric label="Toplam Üye" value={stats?.totalUsers || 0} />
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:mt-6">
-              <QuickStat icon={<ClipboardCheck size={19} />} label="Portföy" value={portfolioCounts.total} />
-              <QuickStat icon={<AlertTriangle size={19} />} label="Bekleyen" value={portfolioCounts.waiting} />
-              <QuickStat icon={<CheckCircle2 size={19} />} label="Onaylı" value={portfolioCounts.approved} />
-              <QuickStat icon={<Database size={19} />} label="Havuz" value={portfolioCounts.pool} />
-            </section>
-
-            <section className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {cards.map((card) => <AdminActionCard key={card.title} card={card} />)}
-            </section>
-
-            <section className="mt-4 grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
-              <div className="rounded-[28px] border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-300">Approval</p>
-                    <h2 className="mt-1 text-[18px] font-black text-white">Portföy Onay Özeti</h2>
-                  </div>
-
-                  <Link href="/admin/portfolio-approvals" className="inline-flex h-10 items-center justify-center rounded-2xl bg-white px-3 text-[12px] font-black text-[#071427]">Aç</Link>
-                </div>
-
-                <div className="mt-4 grid gap-2 sm:grid-cols-5">
-                  <StatusBox label="Toplam" value={portfolioCounts.total} />
-                  <StatusBox label="Bekleyen" value={portfolioCounts.waiting} />
-                  <StatusBox label="İnceleme" value={portfolioCounts.reviewing} />
-                  <StatusBox label="Onay" value={portfolioCounts.approved} />
-                  <StatusBox label="Havuz" value={portfolioCounts.pool} />
-                </div>
+          <section className="mt-4 grid gap-[10px] xl:grid-cols-2">
+            <div className="rounded-[10px] border border-black/10 bg-white p-4">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h2 className="text-[13px] font-medium text-[#2C2C2A]">
+                  Son Hareketler
+                </h2>
+                <span className="text-[10px] text-[#B4B2A9]">
+                  Canlı trafik
+                </span>
               </div>
 
-              <div className="rounded-[28px] border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">Canlı Trafik</p>
-                    <h2 className="mt-1 text-[18px] font-black text-white">Son Hareketler</h2>
+              <div>
+                {latestVisits.length === 0 ? (
+                  <div className="py-8 text-center text-[12px] text-[#888780]">
+                    Henüz hareket görünmüyor.
                   </div>
-                  <Eye size={20} className="text-white/50" />
-                </div>
-
-                <div className="mt-4 space-y-2">
-                  {latestVisits.length === 0 ? (
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-4 text-center text-[12px] font-bold text-white/50">Henüz trafik kaydı görünmüyor.</div>
-                  ) : (
-                    latestVisits.map((visit, index) => (
-                      <div key={`${visit.id || visit.userId || "visit"}-${index}`} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
-                        <div className="min-w-0">
-                          <p className="truncate text-[12px] font-black text-white">{[visit.user?.firstName, visit.user?.lastName].filter(Boolean).join(" ") || "Ziyaretçi"}</p>
-                          <p className="mt-0.5 truncate text-[11px] font-semibold text-white/42">{visit.page || "Sayfa bilgisi yok"}</p>
-                        </div>
-                        <span className="shrink-0 text-[10px] font-bold text-white/40">{formatDate(visit.createdAt)}</span>
+                ) : (
+                  latestVisits.map((visit, index) => (
+                    <div
+                      key={`${visit.id || visit.userId || index}`}
+                      className={`flex items-center gap-3 py-3 ${
+                        index !== latestVisits.length - 1
+                          ? "border-b border-black/10"
+                          : ""
+                      }`}
+                    >
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#F1EFE8] text-[10px] font-medium text-[#5F5E5A]">
+                        {getInitials(visit.user?.firstName, visit.user?.lastName)}
                       </div>
-                    ))
-                  )}
-                </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[12px] font-medium text-[#2C2C2A]">
+                          {[visit.user?.firstName, visit.user?.lastName]
+                            .filter(Boolean)
+                            .join(" ") || "Ziyaretçi"}
+                        </p>
+                        <p className="truncate text-[11px] text-[#888780]">
+                          {visit.page || "/admin"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-[10px] text-[#B4B2A9]">
+                        {visitTime(visit.createdAt)}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
-            </section>
-          </div>
-
-          <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#071427]/95 px-2 py-2 backdrop-blur-xl lg:hidden">
-            <div className="grid grid-cols-5 gap-1">
-              <MobileNav href="/admin" icon={<Gauge size={20} />} label="Panel" active />
-              <MobileNav href="/admin/portfolio-approvals" icon={<ClipboardCheck size={20} />} label="Onay" />
-              <MobileNav href="/admin/katilim-talepleri" icon={<UserCheck size={20} />} label="Katılım" />
-              <MobileNav href="/admin/system-messages" icon={<FileText size={20} />} label="Mesaj" />
-              <MobileNav href="/dashboard" icon={<Home size={20} />} label="Ana" />
             </div>
-          </nav>
-        </section>
-      </div>
+
+            <div className="rounded-[10px] border border-black/10 bg-white p-4">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="text-[13px] font-medium text-[#2C2C2A]">
+                  Portföy Onay Özeti
+                </h2>
+                <span className="text-[10px] text-[#B4B2A9]">
+                  Approval
+                </span>
+              </div>
+
+              <div className="grid grid-cols-5">
+                <ApprovalMini label="Toplam" value={portfolioCounts.total} />
+                <ApprovalMini
+                  label="Bekleyen"
+                  value={portfolioCounts.waiting}
+                  className="text-[#854F0B]"
+                />
+                <ApprovalMini label="İnceleme" value={portfolioCounts.reviewing} />
+                <ApprovalMini
+                  label="Onaylı"
+                  value={portfolioCounts.approved}
+                  className="text-[#3B6D11]"
+                />
+                <ApprovalMini label="Havuz" value={portfolioCounts.pool} />
+              </div>
+
+              <div className="mt-4 border-t border-black/10 pt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] text-[#888780]">
+                    Sistem durumu
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#3B6D11]">
+                    <span className="h-[6px] w-[6px] rounded-full bg-[#3B6D11]" />
+                    Aktif
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] text-[#B4B2A9]">
+                  Backend, frontend ve PWA canlı ortamda çalışıyor.
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
     </main>
   );
 }
 
-function AdminBrand() {
+function AdminLogo() {
   return (
     <Link href="/admin" className="flex items-center gap-3">
-      <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-white text-[16px] font-black text-[#071427] shadow-lg shadow-black/20">EPH</div>
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#2C2C2A] text-[11px] font-medium text-white">
+        EPH
+      </div>
       <div>
-        <p className="text-[16px] font-black tracking-[-0.04em] text-white">EPH Admin</p>
-        <p className="text-[11px] font-bold text-white/42">Yönetim Merkezi</p>
+        <p className="text-[13px] font-medium text-[#2C2C2A]">
+          EPH Admin
+        </p>
+        <p className="text-[11px] text-[#888780]">
+          Yönetim Merkezi
+        </p>
       </div>
     </Link>
   );
 }
 
-function SideLink({ href, icon, label, active, badge }: { href: string; icon: ReactNode; label: string; active?: boolean; badge?: number }) {
+function NavSection({ label }: { label: string }) {
   return (
-    <Link href={href} className={`flex min-h-[46px] items-center justify-between gap-3 rounded-2xl px-3 text-[13px] font-black transition ${active ? "bg-white text-[#071427]" : "text-white/66 hover:bg-white/10 hover:text-white"}`}>
-      <span className="flex items-center gap-3">{icon}{label}</span>
-      {Boolean(badge) && <span className={`flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[10px] font-black ${active ? "bg-[#071427] text-white" : "bg-rose-600 text-white"}`}>{badge}</span>}
-    </Link>
-  );
-}
-
-function MiniMetric({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-3 text-center">
-      <p className="text-[19px] font-black text-white">{value}</p>
-      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/42">{label}</p>
-    </div>
-  );
-}
-
-function QuickStat({ icon, label, value }: { icon: ReactNode; label: string; value: number | string }) {
-  return (
-    <div className="rounded-[22px] border border-white/10 bg-white/[0.06] p-3 backdrop-blur">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#071427]">{icon}</div>
-        <p className="text-[26px] font-black tracking-[-0.05em] text-white">{value}</p>
-      </div>
-      <p className="mt-2 text-center text-[11px] font-black uppercase tracking-[0.14em] text-white/45">{label}</p>
-    </div>
-  );
-}
-
-function AdminActionCard({ card }: { card: AdminCard }) {
-  return (
-    <Link href={card.href} className={`group relative overflow-hidden rounded-[28px] bg-gradient-to-br ${toneClasses(card.tone)} p-4 shadow-[0_18px_46px_rgba(0,0,0,0.22)] transition hover:-translate-y-0.5`}>
-      <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/16 blur-2xl transition group-hover:bg-white/24" />
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/18 ring-1 ring-white/18">{card.icon}</div>
-        <div className="rounded-full bg-black/18 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/80">{card.badge}</div>
-      </div>
-      <div className="relative mt-6">
-        <div className="flex items-end justify-between gap-3">
-          <h3 className="text-[18px] font-black leading-tight tracking-[-0.04em]">{card.title}</h3>
-          <span className="text-[25px] font-black leading-none tracking-[-0.05em]">{card.stat}</span>
-        </div>
-        <p className="mt-2 min-h-[42px] text-[12px] font-semibold leading-5 text-white/72">{card.desc}</p>
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-[12px] font-black text-white">Aç</span>
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#071427] transition group-hover:translate-x-1"><ArrowRight size={17} /></span>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function StatusBox({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 text-center">
-      <p className="text-[24px] font-black tracking-[-0.05em] text-white">{value}</p>
-      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/42">{label}</p>
-    </div>
-  );
-}
-
-function MobileNav({ href, icon, label, active }: { href: string; icon: ReactNode; label: string; active?: boolean }) {
-  return (
-    <Link href={href} className={`flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl text-[10px] font-black ${active ? "bg-white text-[#071427]" : "text-white/55 hover:bg-white/10 hover:text-white"}`}>
-      {icon}
+    <div className="px-2 pt-[14px] text-[10px] font-medium uppercase tracking-[0.12em] text-[#B4B2A9]">
       {label}
+    </div>
+  );
+}
+
+function NavItem({
+  href,
+  icon,
+  label,
+  active,
+  badge,
+}: {
+  href: string;
+  icon: ReactNode;
+  label: string;
+  active?: boolean;
+  badge?: number;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex h-9 items-center justify-between gap-2 rounded-lg px-[10px] text-[13px] transition ${
+        active
+          ? "bg-[#F1EFE8] font-medium text-[#2C2C2A]"
+          : "text-[#5F5E5A] hover:bg-[#F7F6F3]"
+      }`}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        {icon}
+        <span className="truncate">{label}</span>
+      </span>
+
+      {Boolean(badge) && (
+        <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#2C2C2A] px-1 text-[10px] font-medium text-white">
+          {badge}
+        </span>
+      )}
     </Link>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  dot,
+}: {
+  label: string;
+  value: number | string;
+  sub: string;
+  dot?: string;
+}) {
+  return (
+    <div className="rounded-[10px] border border-black/10 bg-white px-4 py-[14px]">
+      <p className="text-[11px] text-[#B4B2A9]">{label}</p>
+      <p className="mt-2 text-[22px] font-medium leading-none text-[#2C2C2A]">
+        {value}
+      </p>
+      <p
+        className={`mt-2 flex items-center gap-1.5 text-[11px] ${
+          dot ? "text-[#888780]" : "text-[#B4B2A9]"
+        }`}
+      >
+        {dot && <span className={`h-[6px] w-[6px] rounded-full ${dot}`} />}
+        {sub}
+      </p>
+    </div>
+  );
+}
+
+function ModuleCard({ card }: { card: ModuleCard }) {
+  return (
+    <Link
+      href={card.href}
+      className={`rounded-[10px] border border-black/10 bg-white px-4 py-[14px] transition hover:border-[#888780] ${
+        card.muted ? "opacity-55" : ""
+      }`}
+    >
+      <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${accentClasses(card.accent)}`}>
+        {card.icon}
+      </div>
+
+      <h3 className="mt-[10px] text-[13px] font-medium text-[#2C2C2A]">
+        {card.title}
+      </h3>
+
+      <p className="mt-1 min-h-[34px] text-[11px] leading-[1.4] text-[#888780]">
+        {card.description}
+      </p>
+
+      <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] ${pillClasses(card.accent)}`}>
+        {card.badge}
+      </span>
+    </Link>
+  );
+}
+
+function ApprovalMini({
+  label,
+  value,
+  className = "text-[#2C2C2A]",
+}: {
+  label: string;
+  value: number;
+  className?: string;
+}) {
+  return (
+    <div className="border-r border-black/10 px-2 text-center last:border-r-0">
+      <p className={`text-[18px] font-medium leading-none ${className}`}>
+        {value}
+      </p>
+      <p className="mt-2 text-[10px] text-[#B4B2A9]">
+        {label}
+      </p>
+    </div>
   );
 }
