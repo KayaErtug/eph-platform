@@ -1,8 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useAuthStore } from "@/store/auth.store";
 
-const TURAN_QUOTES = [
+type AdminFlagBannerProps = {
+  className?: string;
+};
+
+type QuoteItem = {
+  text: string;
+  highlights: string[];
+};
+
+const ADMIN_ROLES = ["MODERATOR", "ADMIN", "SUPER_ADMIN"];
+
+const TURAN_QUOTES: QuoteItem[] = [
   {
     text: "Muhtaç olduğun kudret, damarlarındaki asil kanda mevcuttur!",
     highlights: ["asil kanda"],
@@ -37,24 +49,28 @@ function getRandomQuoteIndex(current: number) {
   return next;
 }
 
-function highlightQuote(text: string, highlights: string[]) {
-  let result: ReactNode[] = [text];
+function highlightText(text: string, highlights: string[]) {
+  let parts: ReactNode[] = [text];
 
   highlights.forEach((highlight) => {
-    result = result.flatMap((part, index) => {
+    parts = parts.flatMap((part, index) => {
       if (typeof part !== "string") return [part];
 
-      const pieces = part.split(highlight);
-      if (pieces.length === 1) return [part];
+      const split = part.split(highlight);
 
-      return pieces.flatMap((piece, pieceIndex) => {
+      if (split.length === 1) return [part];
+
+      return split.flatMap((piece, pieceIndex) => {
         const nodes: ReactNode[] = [];
 
         if (piece) nodes.push(piece);
 
-        if (pieceIndex < pieces.length - 1) {
+        if (pieceIndex < split.length - 1) {
           nodes.push(
-            <span key={`${highlight}-${index}-${pieceIndex}`} className="text-[#ffd166]">
+            <span
+              key={`${highlight}-${index}-${pieceIndex}`}
+              className="text-[#FFD35A]"
+            >
               {highlight}
             </span>,
           );
@@ -65,77 +81,93 @@ function highlightQuote(text: string, highlights: string[]) {
     });
   });
 
-  return result;
+  return parts;
 }
 
-export default function AdminFlagBanner({ className = "" }: { className?: string }) {
+export default function AdminFlagBanner({ className = "" }: AdminFlagBannerProps) {
+  const { user } = useAuthStore();
   const [quoteIndex, setQuoteIndex] = useState(0);
-  const [quoteVisible, setQuoteVisible] = useState(true);
+  const [visible, setVisible] = useState(true);
+
+  const role = String(user?.role || "").toUpperCase();
+  const canSeeBanner = ADMIN_ROLES.includes(role);
 
   useEffect(() => {
+    if (!canSeeBanner) return;
+
     const timer = window.setInterval(() => {
-      setQuoteVisible(false);
+      setVisible(false);
 
       window.setTimeout(() => {
         setQuoteIndex((current) => getRandomQuoteIndex(current));
-        setQuoteVisible(true);
-      }, 320);
+        setVisible(true);
+      }, 260);
     }, 60000);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [canSeeBanner]);
 
-  const currentQuote = useMemo(() => TURAN_QUOTES[quoteIndex], [quoteIndex]);
+  const quote = useMemo(() => TURAN_QUOTES[quoteIndex], [quoteIndex]);
+
+  if (!canSeeBanner) return null;
 
   return (
     <section
-      className={`relative h-[20px] w-full overflow-hidden bg-[#06194A] md:h-[40px] ${className}`}
-      aria-label="Turan tema bannerı"
+      className={`relative w-full overflow-hidden border-y border-red-900/20 bg-red-700 ${className}`}
+      aria-label="Turan Köşesi"
     >
-      <img
-        src="/admin-bayrak.jpg"
-        alt="Türk Bayrağı"
-        className="absolute inset-0 h-full w-full object-cover"
-      />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/10 via-[#06194A]/50 to-[#06194A]/94" />
-      <div className="absolute inset-y-0 right-0 w-[46%] bg-gradient-to-l from-white/12 to-transparent" />
+      <div className="relative h-[40px] md:h-[80px]">
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,#8B0000_0%,#C41212_42%,#A10808_100%)]" />
 
-      <div className="relative flex h-full items-center gap-1.5 px-2 text-white md:gap-3 md:px-4">
-        <span className="shrink-0 text-[11px] font-black leading-none text-[#ffd166] md:text-[20px]">❝</span>
+        <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_20%_50%,rgba(255,255,255,0.26),transparent_26%),radial-gradient(circle_at_80%_45%,rgba(255,255,255,0.18),transparent_30%)]" />
 
-        <div
-          className={`min-w-0 flex-1 truncate pr-12 text-[8.5px] font-black leading-none tracking-[-0.02em] text-white transition-opacity duration-300 md:pr-24 md:text-[15px] ${
-            quoteVisible ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          {highlightQuote(currentQuote.text, currentQuote.highlights)}
+        <div className="absolute left-3 top-1/2 hidden h-10 w-10 -translate-y-1/2 rounded-full bg-white md:block" />
+        <div className="absolute left-7 top-1/2 hidden h-8 w-8 -translate-y-1/2 rounded-full bg-red-700 md:block" />
+        <div className="absolute left-[70px] top-1/2 hidden -translate-y-1/2 text-[22px] text-white md:block">
+          ★
         </div>
 
-        <div className="absolute right-7 top-1/2 h-[12px] w-[22px] -translate-y-1/2 overflow-hidden rounded-[2px] bg-red-700 md:right-14 md:h-[23px] md:w-[42px]">
-          <div className="absolute inset-0 bg-gradient-to-r from-red-800 to-red-600" />
-          <div className="absolute left-[5px] top-1/2 h-[7px] w-[7px] -translate-y-1/2 rounded-full bg-white md:left-[10px] md:h-[14px] md:w-[14px]" />
-          <div className="absolute left-[7px] top-1/2 h-[6px] w-[6px] -translate-y-1/2 rounded-full bg-red-700 md:left-[14px] md:h-[11px] md:w-[11px]" />
-          <div className="absolute left-[14px] top-1/2 -translate-y-1/2 text-[6px] leading-none text-white md:left-[27px] md:text-[11px]">★</div>
+        <div className="absolute left-2 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white md:hidden" />
+        <div className="absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-red-700 md:hidden" />
+        <div className="absolute left-9 top-1/2 -translate-y-1/2 text-[11px] text-white md:hidden">
+          ★
         </div>
 
-        <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-[3px] md:right-3 md:gap-1">
-          {TURAN_QUOTES.map((_, index) => (
-            <button
-              key={index}
-              type="button"
-              onClick={() => {
-                setQuoteVisible(false);
-                window.setTimeout(() => {
-                  setQuoteIndex(index);
-                  setQuoteVisible(true);
-                }, 180);
-              }}
-              className={`h-[3px] w-[3px] rounded-full md:h-1.5 md:w-1.5 ${
-                quoteIndex === index ? "bg-[#ffd166]" : "bg-white/32"
-              }`}
-              aria-label={`Turan sözü ${index + 1}`}
-            />
-          ))}
+        <div className="pointer-events-none absolute right-0 top-0 h-full w-[42px] border-l border-yellow-300/50 bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.08)_0px,rgba(255,255,255,0.08)_4px,rgba(7,26,57,0.42)_4px,rgba(7,26,57,0.42)_8px)] md:w-[64px]" />
+
+        <div className="relative z-10 flex h-full items-center gap-2 pl-[66px] pr-[48px] md:pl-[128px] md:pr-[76px]">
+          <div className="hidden shrink-0 text-[24px] font-black leading-none text-[#FFD35A] md:block">
+            “
+          </div>
+
+          <p
+            className={`min-w-0 flex-1 truncate text-[10px] font-black leading-none tracking-[-0.02em] text-white transition-opacity duration-300 md:text-[18px] ${
+              visible ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            {highlightText(quote.text, quote.highlights)}
+          </p>
+
+          <div className="hidden shrink-0 items-center gap-1.5 md:flex">
+            {TURAN_QUOTES.map((_, index) => (
+              <button
+                key={index}
+                type="button"
+                onClick={() => {
+                  setVisible(false);
+
+                  window.setTimeout(() => {
+                    setQuoteIndex(index);
+                    setVisible(true);
+                  }, 180);
+                }}
+                className={`h-2 w-2 rounded-full ${
+                  index === quoteIndex ? "bg-[#FFD35A]" : "bg-white/35"
+                }`}
+                aria-label={`Turan sözü ${index + 1}`}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </section>
