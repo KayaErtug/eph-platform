@@ -90,30 +90,37 @@ type ModuleCardItem = {
 const TURAN_QUOTES = [
   {
     text: "Muhtaç olduğun kudret, damarlarındaki asil kanda mevcuttur!",
-    author: "Mustafa Kemal Atatürk",
     highlights: ["asil kanda"],
   },
   {
     text: "VATAN ne Türkiyedir Türklere, ne Türkistan, VATAN Büyük ve Müebbet bir ülkedir. TÜRKLERE TURAN",
-    author: "Ziya Gökalp",
     highlights: ["TÜRKLERE TURAN"],
   },
   {
     text: "Bugünden sonra divanda, dergahta, bargahta, mecliste ve meydanda Türkçeden başka dil kullanılmayacaktır.",
-    author: "Karamanoğlu Mehmet Bey",
     highlights: ["Türkçeden başka dil"],
   },
   {
-    text: "Har içinde biten gonca güle minnet eylemem, Arabi, Farisi bilmem; dile minnet eylemem.",
-    author: "Muhsin Yazıcıoğlu",
+    text: "Har içinde biten gonca güle minnet eylemem, Arabi, Farisi bilmem; dile minnet eylemem. Sırat-ı Müstakim üzre gözetirim Rahim'i, İblisin talim ettiği yola minnet eylemem.",
     highlights: ["dile minnet eylemem"],
   },
   {
     text: "Yufka yüreklilerle çetin yollar aşılmaz; Çünkü bu yol kutludur, gider Tanrı Dağı'na.",
-    author: "Turan Yolu",
     highlights: ["Tanrı Dağı'na"],
   },
 ];
+
+function getRandomQuoteIndex(current: number) {
+  if (TURAN_QUOTES.length <= 1) return 0;
+
+  let next = current;
+
+  while (next === current) {
+    next = Math.floor(Math.random() * TURAN_QUOTES.length);
+  }
+
+  return next;
+}
 
 function getInitials(firstName?: string | null, lastName?: string | null) {
   const first = String(firstName || "").trim().charAt(0);
@@ -253,7 +260,7 @@ export default function AdminPage() {
       setQuoteVisible(false);
 
       window.setTimeout(() => {
-        setQuoteIndex((current) => (current + 1) % TURAN_QUOTES.length);
+        setQuoteIndex((current) => getRandomQuoteIndex(current));
         setQuoteVisible(true);
       }, 350);
     }, 60000);
@@ -649,36 +656,31 @@ export default function AdminPage() {
               </p>
             </section>
 
-            <section className="relative mb-3 overflow-hidden rounded-[15px] bg-[#06194A] px-4 py-4 text-white shadow-[0_16px_40px_rgba(6,25,74,0.20)] lg:rounded-[18px] lg:px-7 lg:py-5">
-              <div className="absolute inset-y-0 right-0 w-[38%] bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.10),transparent_58%)]" />
-              <div className="absolute right-4 top-1/2 hidden h-[66px] w-[118px] -translate-y-1/2 overflow-hidden rounded-xl bg-red-700 shadow-lg md:block">
+            <section className="relative mb-2 h-[20px] overflow-hidden rounded-[8px] bg-[#06194A] text-white shadow-[0_8px_22px_rgba(6,25,74,0.14)] md:h-[40px] md:rounded-[12px]">
+              <div className="absolute inset-0 bg-gradient-to-r from-[#06194A] via-[#071D4E] to-[#06194A]" />
+              <div className="absolute right-7 top-1/2 h-[14px] w-[28px] -translate-y-1/2 overflow-hidden rounded-[3px] bg-red-700 md:right-16 md:h-[24px] md:w-[48px]">
                 <div className="absolute inset-0 bg-gradient-to-r from-red-800 to-red-600" />
-                <div className="absolute left-8 top-1/2 h-10 w-10 -translate-y-1/2 rounded-full bg-white" />
-                <div className="absolute left-11 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full bg-red-700" />
-                <div className="absolute left-[70px] top-1/2 -translate-y-1/2 text-[22px] text-white">
+                <div className="absolute left-[7px] top-1/2 h-[9px] w-[9px] -translate-y-1/2 rounded-full bg-white md:left-[13px] md:h-[16px] md:w-[16px]" />
+                <div className="absolute left-[10px] top-1/2 h-[7px] w-[7px] -translate-y-1/2 rounded-full bg-red-700 md:left-[18px] md:h-[12px] md:w-[12px]" />
+                <div className="absolute left-[18px] top-1/2 -translate-y-1/2 text-[7px] leading-none text-white md:left-[31px] md:text-[12px]">
                   ★
                 </div>
               </div>
 
-              <div className="relative flex min-h-[92px] items-center gap-3 md:min-h-[72px]">
-                <div className="shrink-0 self-start pt-1 text-[32px] font-black leading-none text-[#FFB000]">
+              <div className="relative flex h-full items-center gap-1.5 px-2.5 md:gap-3 md:px-4">
+                <div className="shrink-0 text-[14px] font-black leading-none text-[#FFB000] md:text-[22px]">
                   “
                 </div>
 
                 <div
-                  className={`min-w-0 max-w-[760px] transition-opacity duration-300 ${
+                  className={`min-w-0 flex-1 truncate pr-14 text-[8.5px] font-black leading-none tracking-[-0.02em] text-white transition-opacity duration-300 md:pr-28 md:text-[15px] ${
                     quoteVisible ? "opacity-100" : "opacity-0"
                   }`}
                 >
-                  <p className="text-[18px] font-black leading-7 tracking-[-0.04em] lg:text-[20px]">
-                    {highlightQuote(currentQuote.text, currentQuote.highlights)}
-                  </p>
-                  <p className="mt-2 font-serif text-[16px] italic text-white/80">
-                    {currentQuote.author}
-                  </p>
+                  {highlightQuote(currentQuote.text, currentQuote.highlights)}
                 </div>
 
-                <div className="ml-auto hidden shrink-0 items-center gap-1.5 md:flex">
+                <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 md:right-4 md:gap-1.5">
                   {TURAN_QUOTES.map((_, index) => (
                     <button
                       key={index}
@@ -690,31 +692,13 @@ export default function AdminPage() {
                           setQuoteVisible(true);
                         }, 200);
                       }}
-                      className={`h-2.5 w-2.5 rounded-full ${
+                      className={`h-1 w-1 rounded-full md:h-1.5 md:w-1.5 ${
                         quoteIndex === index ? "bg-red-500" : "bg-white/25"
                       }`}
+                      aria-label={`Turan sözü ${index + 1}`}
                     />
                   ))}
                 </div>
-              </div>
-
-              <div className="relative mt-2 flex justify-center gap-1.5 md:hidden">
-                {TURAN_QUOTES.map((_, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => {
-                      setQuoteVisible(false);
-                      window.setTimeout(() => {
-                        setQuoteIndex(index);
-                        setQuoteVisible(true);
-                      }, 200);
-                    }}
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      quoteIndex === index ? "bg-[#FFB000]" : "bg-white/25"
-                    }`}
-                  />
-                ))}
               </div>
             </section>
 
