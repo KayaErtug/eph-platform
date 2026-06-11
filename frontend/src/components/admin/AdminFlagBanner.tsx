@@ -113,35 +113,32 @@ export default function AdminFlagBanner({ className = "" }: AdminFlagBannerProps
 
   return (
     <section
-      className={`relative w-full overflow-hidden border-y border-red-900/20 bg-red-700 ${className}`}
+      className={`relative w-full overflow-hidden bg-red-700 ${className}`}
       aria-label="Turan Köşesi"
     >
       <div className="relative h-[40px] md:h-[80px]">
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,#8B0000_0%,#C41212_42%,#A10808_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,#B00000_0%,#D41313_42%,#A00000_100%)]" />
+        <div className="absolute inset-0 opacity-35 bg-[radial-gradient(circle_at_24%_40%,rgba(255,255,255,0.20),transparent_26%),radial-gradient(circle_at_64%_50%,rgba(255,255,255,0.16),transparent_32%)]" />
 
-        <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_20%_50%,rgba(255,255,255,0.26),transparent_26%),radial-gradient(circle_at_80%_45%,rgba(255,255,255,0.18),transparent_30%)]" />
-
-        <div className="absolute left-3 top-1/2 hidden h-10 w-10 -translate-y-1/2 rounded-full bg-white md:block" />
-        <div className="absolute left-7 top-1/2 hidden h-8 w-8 -translate-y-1/2 rounded-full bg-red-700 md:block" />
-        <div className="absolute left-[70px] top-1/2 hidden -translate-y-1/2 text-[22px] text-white md:block">
-          ★
+        <div className="absolute left-0 top-0 z-10 flex h-full w-[74px] items-center justify-center md:w-[160px]">
+          <div className="relative h-[28px] w-[54px] md:h-[56px] md:w-[108px]">
+            <div className="absolute left-0 top-1/2 h-[26px] w-[26px] -translate-y-1/2 rounded-full bg-white md:h-[52px] md:w-[52px]" />
+            <div className="absolute left-[10px] top-1/2 h-[20px] w-[20px] -translate-y-1/2 rounded-full bg-[#D41313] md:left-[20px] md:h-[40px] md:w-[40px]" />
+            <div className="absolute left-[34px] top-1/2 -translate-y-1/2 text-[13px] leading-none text-white md:left-[68px] md:text-[26px]">
+              ★
+            </div>
+          </div>
         </div>
 
-        <div className="absolute left-2 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white md:hidden" />
-        <div className="absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-red-700 md:hidden" />
-        <div className="absolute left-9 top-1/2 -translate-y-1/2 text-[11px] text-white md:hidden">
-          ★
-        </div>
+        <div className="pointer-events-none absolute right-0 top-0 h-full w-[42px] border-l border-yellow-300/55 bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.12)_0px,rgba(255,255,255,0.12)_4px,rgba(7,26,57,0.42)_4px,rgba(7,26,57,0.42)_8px)] md:w-[64px]" />
 
-        <div className="pointer-events-none absolute right-0 top-0 h-full w-[42px] border-l border-yellow-300/50 bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.08)_0px,rgba(255,255,255,0.08)_4px,rgba(7,26,57,0.42)_4px,rgba(7,26,57,0.42)_8px)] md:w-[64px]" />
-
-        <div className="relative z-10 flex h-full items-center gap-2 pl-[66px] pr-[48px] md:pl-[128px] md:pr-[76px]">
-          <div className="hidden shrink-0 text-[24px] font-black leading-none text-[#FFD35A] md:block">
+        <div className="relative z-20 flex h-full items-center gap-2 pl-[82px] pr-[48px] md:pl-[180px] md:pr-[84px]">
+          <div className="hidden shrink-0 text-[25px] font-black leading-none text-[#FFD35A] md:block">
             “
           </div>
 
           <p
-            className={`min-w-0 flex-1 truncate text-[10px] font-black leading-none tracking-[-0.02em] text-white transition-opacity duration-300 md:text-[18px] ${
+            className={`min-w-0 flex-1 truncate text-[10px] font-black leading-none tracking-[-0.02em] text-white transition-opacity duration-300 md:text-[19px] ${
               visible ? "opacity-100" : "opacity-0"
             }`}
           >
