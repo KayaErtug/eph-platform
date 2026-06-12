@@ -23,11 +23,22 @@ import {
   Edit3,
   ExternalLink,
   FileText,
+  BedDouble,
+  Car,
+  Flame,
+  Factory,
   Home,
   Image as ImageIcon,
+  Landmark,
   MapPin,
   Maximize2,
   MessageCircle,
+  Ruler,
+  Star,
+  Truck,
+  Utensils,
+  Waves,
+  Zap,
   Send,
   Share2,
   ShieldCheck,
@@ -159,48 +170,179 @@ function typeLabel(type?: string) {
   return TYPE_LABELS[type || ""] || type || "Mülk tipi yok";
 }
 
+function normalizeDetailType(value?: string) {
+  return String(value || "")
+    .toLocaleUpperCase("tr-TR")
+    .replaceAll("İ", "I")
+    .replaceAll("Ğ", "G")
+    .replaceAll("Ü", "U")
+    .replaceAll("Ş", "S")
+    .replaceAll("Ö", "O")
+    .replaceAll("Ç", "C");
+}
+
+function detailTypeHasKeyword(type: string | undefined, keywords: string[]) {
+  const value = normalizeDetailType(type);
+  return keywords.some((keyword) => value.includes(keyword));
+}
+
 function isLandDetailType(type?: string) {
-  const value = String(type || "").toLocaleUpperCase("tr-TR");
+  const value = normalizeDetailType(type);
   return (
     ["ARSA", "TARLA", "BAG", "BAHCE", "ZEYTINLIK"].includes(value) ||
     value.includes("ARSA")
   );
 }
 
-function getPrimaryInfoBoxes(unit: DetailUnit, verified: boolean) {
+function isIndustrialDetailType(type?: string) {
+  return detailTypeHasKeyword(type, [
+    "FABRIKA",
+    "ATOLYE",
+    "URETIM",
+    "SANAYI",
+    "DEPO",
+    "ANTREPO",
+    "LOJISTIK",
+  ]);
+}
+
+function isTouristicDetailType(type?: string) {
+  return detailTypeHasKeyword(type, [
+    "OTEL",
+    "PANSIYON",
+    "MOTEL",
+    "TURISTIK",
+    "TATIL",
+    "KAMP",
+  ]);
+}
+
+function isCommercialDetailType(type?: string) {
+  return detailTypeHasKeyword(type, [
+    "DUKKAN",
+    "MAGAZA",
+    "OFIS",
+    "BURO",
+    "PLAZA",
+    "SHOWROOM",
+    "RESTAURANT",
+    "RESTORAN",
+    "KAFE",
+    "HOME_OFFICE",
+  ]);
+}
+
+function getDetailValue(unit: DetailUnit, keys: string[], fallback = "—") {
+  const source = unit as any;
+
+  for (const key of keys) {
+    const value = source?.[key];
+
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return String(value);
+    }
+  }
+
+  return fallback;
+}
+
+function formatAreaValue(value?: number | string | null, fallback = "—") {
+  const numeric = Number(value || 0);
+  if (!numeric) return fallback;
+  return `${numeric.toLocaleString("tr-TR")} m²`;
+}
+
+function getAuthorityKind(unit: DetailUnit, documents: PortfolioAuthorityDocument[]) {
+  const approvedDocument = documents.find((document) => document.approved) || documents[0];
+
+  if (approvedDocument?.authorityType === "YETKI_BELGESI") return "Yetki Belgesi";
+  if (approvedDocument?.authorityType === "TAPU") return "Tapu Sahibi";
+  if (approvedDocument?.authorityType === "TAPU_SAHIBI_KIMLIK") return "Kimlik Evrakı";
+  if (approvedDocument?.authorityType === "KAT_KARSILIGI_SOZLESMESI") return "Kat Karşılığı";
+  if (approvedDocument?.authorityType === "DIGER_DOGRULAMA_EVRAKI") return "Diğer Evrak";
+
+  if (unit.yetkiVerified || unit.isVerified) return "Yetki Belgesi";
+  if (unit.tapuVerified) return "Tapu Sahibi";
+
+  return "Kontrol";
+}
+
+function getPrimaryInfoBoxes(
+  unit: DetailUnit,
+  verified: boolean,
+  documents: PortfolioAuthorityDocument[],
+) {
+  const authorityKind = getAuthorityKind(unit, documents);
+  const authorityValue = verified ? authorityKind : "Kontrol";
+  const heatingValue = getDetailValue(unit, ["heating", "heatingType", "isinma", "heatingSystem"], "Eklenmedi");
+  const parkingValue = getDetailValue(unit, ["parking", "parkingType", "otopark"], "Eklenmedi");
+  const buildingAgeValue = getDetailValue(unit, ["buildingAge", "buildingAgeLabel", "age"], "Eklenmedi");
+  const totalFloorsValue = unit.totalFloors ? `${unit.totalFloors} Kat` : "Eklenmedi";
+  const floorValue = unit.floorLabel || (unit.floor != null ? `${unit.floor}. Kat` : "Eklenmedi");
+
+  if (isIndustrialDetailType(unit.type)) {
+    return [
+      { icon: <Factory size={18} />, label: "Kapalı Alan", value: formatAreaValue(unit.area) },
+      { icon: <Ruler size={18} />, label: "Açık Alan", value: getDetailValue(unit, ["openArea"], "Eklenmedi") },
+      { icon: <Factory size={18} />, label: "Üretim", value: getDetailValue(unit, ["productionArea", "usageType"], "Eklenmedi") },
+      { icon: <Zap size={18} />, label: "Trafo", value: getDetailValue(unit, ["transformerPower", "electricPower"], "Eklenmedi") },
+      { icon: <Truck size={18} />, label: "Yükleme", value: getDetailValue(unit, ["loadingArea", "truckEntrance"], "Eklenmedi") },
+      { icon: <Building2 size={18} />, label: "Tavan", value: getDetailValue(unit, ["ceilingHeight"], "Eklenmedi") },
+      { icon: <Flame size={18} />, label: "Isıtma", value: heatingValue },
+      { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
+    ];
+  }
+
+  if (isTouristicDetailType(unit.type)) {
+    return [
+      { icon: <BedDouble size={18} />, label: "Oda", value: unit.roomCount || getDetailValue(unit, ["roomTotal"], "—") },
+      { icon: <BedDouble size={18} />, label: "Yatak", value: getDetailValue(unit, ["bedCount"], "Eklenmedi") },
+      { icon: <Waves size={18} />, label: "Havuz", value: getDetailValue(unit, ["pool", "hasPool"], "Eklenmedi") },
+      { icon: <Star size={18} />, label: "Sınıf", value: getDetailValue(unit, ["hotelClass", "starRating"], "Eklenmedi") },
+      { icon: <Utensils size={18} />, label: "Restoran", value: getDetailValue(unit, ["restaurant", "hasRestaurant"], "Eklenmedi") },
+      { icon: <Car size={18} />, label: "Otopark", value: parkingValue },
+      { icon: <Maximize2 size={18} />, label: "Alan", value: formatAreaValue(unit.area) },
+      { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
+    ];
+  }
+
   if (isLandDetailType(unit.type)) {
     return [
-      { icon: <Home size={18} />, label: "Parsel", value: unit.number || "—" },
-      {
-        icon: <Maximize2 size={18} />,
-        label: "Alan",
-        value: unit.area ? `${unit.area} m²` : "—",
-      },
-      { icon: <Building2 size={18} />, label: "Emsal", value: "1.50" },
-      { icon: <ShieldCheck size={18} />, label: "İmar", value: "Konut" },
+      { icon: <Maximize2 size={18} />, label: "Alan", value: formatAreaValue(unit.area) },
+      { icon: <Landmark size={18} />, label: "İmar", value: getDetailValue(unit, ["zoningStatus", "imarDurumu"], "Eklenmedi") },
+      { icon: <Home size={18} />, label: "Ada / Parsel", value: unit.number || "—" },
+      { icon: <Ruler size={18} />, label: "Emsal", value: getDetailValue(unit, ["kaks", "emsal"], "Eklenmedi") },
+      { icon: <Building2 size={18} />, label: "Kat İzni", value: getDetailValue(unit, ["allowedFloors", "katIzni"], "Eklenmedi") },
+      { icon: <MapPin size={18} />, label: "Cephe", value: getDetailValue(unit, ["frontage", "yolaCephe"], "Eklenmedi") },
+      { icon: <Zap size={18} />, label: "Altyapı", value: getDetailValue(unit, ["infrastructure", "altyapi"], "Eklenmedi") },
+      { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
+    ];
+  }
+
+  if (isCommercialDetailType(unit.type)) {
+    return [
+      { icon: <Maximize2 size={18} />, label: "m²", value: formatAreaValue(unit.area) },
+      { icon: <Building2 size={18} />, label: "Kat", value: floorValue },
+      { icon: <Home size={18} />, label: "Cephe", value: getDetailValue(unit, ["frontage", "cephe"], "Eklenmedi") },
+      { icon: <MapPin size={18} />, label: "Cadde", value: getDetailValue(unit, ["streetStatus", "cadde"], "Eklenmedi") },
+      { icon: <Car size={18} />, label: "Otopark", value: parkingValue },
+      { icon: <Flame size={18} />, label: "Isınma", value: heatingValue },
+      { icon: <Building2 size={18} />, label: "Depo", value: getDetailValue(unit, ["warehouse", "storageArea"], "Eklenmedi") },
+      { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
     ];
   }
 
   return [
-    { icon: <Home size={18} />, label: "Oda", value: unit.roomCount || "—" },
-    {
-      icon: <Maximize2 size={18} />,
-      label: "Alan",
-      value: unit.area ? `${unit.area} m²` : "—",
-    },
-    {
-      icon: <Building2 size={18} />,
-      label: "Kat",
-      value: formatFloorInfo(unit),
-    },
-    {
-      icon: <ShieldCheck size={18} />,
-      label: "Yetki",
-      value: verified ? "Yetkili" : "Kontrol",
-    },
+    { icon: <BedDouble size={18} />, label: "Oda Sayısı", value: unit.roomCount || "—" },
+    { icon: <Maximize2 size={18} />, label: "Brüt m²", value: formatAreaValue(unit.area) },
+    { icon: <Building2 size={18} />, label: "Bulunduğu Kat", value: floorValue },
+    { icon: <Building2 size={18} />, label: "Bina Yaşı", value: buildingAgeValue },
+    { icon: <Building2 size={18} />, label: "Toplam Kat", value: totalFloorsValue },
+    { icon: <Flame size={18} />, label: "Isınma", value: heatingValue },
+    { icon: <Car size={18} />, label: "Otopark", value: parkingValue },
+    { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
   ];
 }
-
 function unitTitle(unit?: DetailUnit | null) {
   if (!unit) return "Portföy Detayı";
   const projectName = unit.project?.name || "EPH Portföy";
@@ -934,7 +1076,7 @@ export default function StokDetailPage() {
   const style = statusStyle(unit.status);
   const canEditPortfolio = canEditDetailUnit(unit, user);
   const canReviewPortfolio = canReviewDetailUnit(user);
-  const primaryInfoBoxes = getPrimaryInfoBoxes(unit, verified);
+  const primaryInfoBoxes = getPrimaryInfoBoxes(unit, verified, portfolioDocuments);
   const safeDescription =
     unit.description || "Bu portföy için açıklama henüz eklenmedi.";
   const shortDescription =
@@ -1121,7 +1263,7 @@ export default function StokDetailPage() {
               <span className="min-w-0 truncate">{locationText}</span>
             </div>
 
-            <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#DDE7F3] bg-[#FBFDFF]">
+            <div className="mt-3 grid grid-cols-4 gap-1.5 rounded-[18px] border border-[#DDE7F3] bg-[#F7FBFF] p-1.5">
               {primaryInfoBoxes.map((item) => (
                 <InfoBox
                   key={item.label}
@@ -2032,13 +2174,21 @@ function InfoBox({
   label: string;
   value: string;
 }) {
+  const passive = value === "—" || value === "Eklenmedi" || value === "Kontrol";
+
   return (
-    <div className="flex min-h-[62px] flex-col items-center justify-center border-r border-[#DDE7F3] px-1.5 py-2 text-center last:border-r-0">
-      <div className="text-[#1557D6]">{icon}</div>
-      <p className="mt-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#64748B]">
+    <div
+      className={`flex min-h-[74px] flex-col items-center justify-center rounded-[14px] border px-1 py-2 text-center shadow-[0_6px_14px_rgba(15,23,42,0.035)] ${
+        passive
+          ? "border-[#E8F0FA] bg-white text-[#64748B]"
+          : "border-[#DBEAFE] bg-white text-[#06194A]"
+      }`}
+    >
+      <div className={passive ? "text-[#94A3B8]" : "text-[#1557D6]"}>{icon}</div>
+      <p className="mt-1 text-[7.5px] font-black uppercase leading-3 tracking-[0.08em] text-[#64748B]">
         {label}
       </p>
-      <p className="mt-0.5 line-clamp-2 text-[12px] font-black leading-tight text-[#06194A]">
+      <p className="mt-0.5 line-clamp-2 text-[11px] font-black leading-tight">
         {value}
       </p>
     </div>
