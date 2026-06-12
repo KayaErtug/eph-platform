@@ -26,7 +26,7 @@ type CreateUnitPayload = {
   floorLabel?: string;
   totalFloors?: number;
   priceCurrency?: string;
-  number: string;
+  number?: string;
   roomCount?: string;
   area?: number;
   price: number;
@@ -325,7 +325,7 @@ export class UnitsService {
         floorLabel: data.floorLabel,
         totalFloors: data.totalFloors,
         priceCurrency: data.priceCurrency || 'TRY',
-        number: data.number || '',
+        number: this.cleanText(data.number),
         roomCount: data.roomCount,
         area: data.area,
         price: data.price,

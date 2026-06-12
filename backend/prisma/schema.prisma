@@ -184,7 +184,7 @@ model Unit {
   floorLabel    String?
   totalFloors   Int?
   priceCurrency String?    @default("TRY")
-  number        String
+  number        String?
   roomCount     String?
   area          Float?
   price         Float
