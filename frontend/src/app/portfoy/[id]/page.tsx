@@ -439,7 +439,7 @@ function getPortfolioNo(unit: DetailUnit) {
 
 function getCurrentShareUrl(unitId?: string) {
   if (typeof window === "undefined") return "";
-  return `${window.location.origin}/stok/${unitId || ""}`;
+  return `${window.location.origin}/portfoy/${unitId || ""}`;
 }
 
 function findPortfolioDocument(
@@ -1019,7 +1019,7 @@ export default function StokDetailPage() {
     try {
       setActionLoading(true);
       await api.delete(`/units/${unit.id}`);
-      router.push("/stok");
+      router.push("/portfoy");
     } catch (err: any) {
       setActionError(err?.response?.data?.message || "Portföy silinemedi.");
       setActionLoading(false);
@@ -1114,7 +1114,7 @@ export default function StokDetailPage() {
             {error || "Bu portföye ait detay bilgisi alınamadı."}
           </p>
           <button
-            onClick={() => router.push("/stok")}
+            onClick={() => router.push("/portfoy")}
             className="mt-5 rounded-2xl bg-[#1557D6] px-5 py-3 text-sm font-black text-white"
           >
             Portföy Merkezine Dön
@@ -1169,7 +1169,7 @@ export default function StokDetailPage() {
       <section className="mx-auto w-full max-w-[430px] px-3 py-3">
         <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-1">
           <button
-            onClick={() => router.push("/stok")}
+            onClick={() => router.push("/portfoy")}
             className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#06194A] shadow-[0_8px_18px_rgba(15,23,42,0.05)]"
           >
             <ArrowLeft size={16} />
@@ -1177,7 +1177,7 @@ export default function StokDetailPage() {
           </button>
           {canEditPortfolio && (
             <button
-              onClick={() => router.push(`/stok?edit=${unit.id}`)}
+              onClick={() => router.push(`/portfoy?edit=${unit.id}`)}
               className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#1557D6] shadow-[0_8px_18px_rgba(15,23,42,0.05)]"
             >
               <Edit3 size={15} />
@@ -1680,7 +1680,7 @@ export default function StokDetailPage() {
           <section className="mt-3 rounded-[22px] border border-rose-100 bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => router.push(`/stok?edit=${unit.id}`)}
+                onClick={() => router.push(`/portfoy?edit=${unit.id}`)}
                 className="h-10 w-full rounded-[16px] bg-[#EFF6FF] text-[12px] font-black text-[#1557D6]"
               >
                 Güncelle
