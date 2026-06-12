@@ -247,6 +247,8 @@ export default function StokPage() {
     deedOwnerFullName: "",
     deedOwnerPhone: "",
     deedOwnerEmail: "",
+    deedOwnerIdFrontFile: null,
+    deedOwnerIdBackFile: null,
   } as UnitFormState);
   const [coverImage, setCoverImage] = useState<LocalPortfolioImage | null>(null);
   const [galleryImages, setGalleryImages] = useState<LocalPortfolioImage[]>([]);
@@ -357,6 +359,8 @@ export default function StokPage() {
       deedOwnerFullName: "",
       deedOwnerPhone: "",
       deedOwnerEmail: "",
+      deedOwnerIdFrontFile: null,
+      deedOwnerIdBackFile: null,
     } as UnitFormState);
     setFormError("");
     setFormSuccess(false);
@@ -371,6 +375,16 @@ export default function StokPage() {
     payload.append("file", file);
 
     return api.post("/portfolio-images/upload", payload, { headers: { "Content-Type": "multipart/form-data" } });
+  };
+
+  const uploadAuthorityDocument = async (unitId: string, file: File, documentSide: "KIMLIK_ON" | "KIMLIK_ARKA") => {
+    const payload = new FormData();
+    payload.append("portfolioId", unitId);
+    payload.append("authorityType", "TAPU_SAHIBI_KIMLIK");
+    payload.append("documentSide", documentSide);
+    payload.append("file", file);
+
+    return api.post("/portfolio-images/authority/upload", payload, { headers: { "Content-Type": "multipart/form-data" } });
   };
 
   const handleSubmit = async () => {
@@ -449,6 +463,22 @@ export default function StokPage() {
           ),
         ),
       );
+
+      const identityUploads: Promise<any>[] = [];
+      const deedOwnerIdFrontFile = (unitForm as any).deedOwnerIdFrontFile as File | null | undefined;
+      const deedOwnerIdBackFile = (unitForm as any).deedOwnerIdBackFile as File | null | undefined;
+
+      if (deedOwnerIdFrontFile) {
+        identityUploads.push(uploadAuthorityDocument(createdUnitId, deedOwnerIdFrontFile, "KIMLIK_ON"));
+      }
+
+      if (deedOwnerIdBackFile) {
+        identityUploads.push(uploadAuthorityDocument(createdUnitId, deedOwnerIdBackFile, "KIMLIK_ARKA"));
+      }
+
+      if (identityUploads.length > 0) {
+        await Promise.all(identityUploads);
+      }
 
       setFormSuccess(true);
       await fetchData();

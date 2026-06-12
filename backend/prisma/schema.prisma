@@ -258,6 +258,7 @@ model PortfolioAuthorityDocument {
   approvedAt DateTime?
 
   rejectReason String?
+  documentSide String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -269,6 +270,7 @@ model PortfolioAuthorityDocument {
   @@index([authorityType])
   @@index([approved])
   @@index([approvedById])
+  @@index([documentSide])
   @@index([createdAt])
 }
 

@@ -23,6 +23,7 @@ export interface UnitImage {
 export type PortfolioAuthorityType =
   | "YETKI_BELGESI"
   | "TAPU"
+  | "TAPU_SAHIBI_KIMLIK"
   | "KAT_KARSILIGI_SOZLESMESI"
   | "DIGER_DOGRULAMA_EVRAKI";
 
@@ -38,6 +39,7 @@ export interface PortfolioAuthorityDocument {
   approvedById?: string | null;
   approvedAt?: string | null;
   rejectReason?: string | null;
+  documentSide?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

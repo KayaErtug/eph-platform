@@ -22,6 +22,86 @@ export class PortfolioImagesController {
     private readonly portfolioImagesService: PortfolioImagesService,
   ) {}
 
+
+  @Get('authority/:portfolioId')
+  @UseGuards(JwtAuthGuard)
+  getAuthorityDocuments(
+    @CurrentUser() user: any,
+    @Param('portfolioId') portfolioId: string,
+  ) {
+    return this.portfolioImagesService.getAuthorityDocuments({
+      userId: user.id,
+      userRole: user.role,
+      portfolioId,
+    });
+  }
+
+  @Post('authority/upload')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 15 * 1024 * 1024 },
+    }),
+  )
+  uploadAuthorityDocument(
+    @CurrentUser() user: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('portfolioId') portfolioId: string,
+    @Body('authorityType') authorityType: any,
+    @Body('documentSide') documentSide?: string,
+  ) {
+    return this.portfolioImagesService.uploadAuthorityDocument({
+      userId: user.id,
+      userRole: user.role,
+      portfolioId,
+      authorityType,
+      documentSide,
+      file,
+    });
+  }
+
+  @Put('authority/:documentId/approve')
+  @UseGuards(JwtAuthGuard)
+  approveAuthorityDocument(
+    @CurrentUser() user: any,
+    @Param('documentId') documentId: string,
+  ) {
+    return this.portfolioImagesService.approveAuthorityDocument({
+      userId: user.id,
+      userRole: user.role,
+      documentId,
+    });
+  }
+
+  @Put('authority/:documentId/reject')
+  @UseGuards(JwtAuthGuard)
+  rejectAuthorityDocument(
+    @CurrentUser() user: any,
+    @Param('documentId') documentId: string,
+    @Body('rejectReason') rejectReason?: string,
+  ) {
+    return this.portfolioImagesService.rejectAuthorityDocument({
+      userId: user.id,
+      userRole: user.role,
+      documentId,
+      rejectReason,
+    });
+  }
+
+  @Delete('authority/:documentId')
+  @UseGuards(JwtAuthGuard)
+  deleteAuthorityDocument(
+    @CurrentUser() user: any,
+    @Param('documentId') documentId: string,
+  ) {
+    return this.portfolioImagesService.deleteAuthorityDocument({
+      userId: user.id,
+      userRole: user.role,
+      documentId,
+    });
+  }
+
   @Get(':portfolioId')
   @UseGuards(JwtAuthGuard)
   getPortfolioImages(@Param('portfolioId') portfolioId: string) {

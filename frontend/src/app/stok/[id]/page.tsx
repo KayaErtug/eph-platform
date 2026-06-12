@@ -71,6 +71,7 @@ const MAX_GALLERY_COUNT = 15;
 const DOCUMENT_LABELS: Record<PortfolioAuthorityType, string> = {
   YETKI_BELGESI: "Yetki Belgesi",
   TAPU: "Tapu",
+  TAPU_SAHIBI_KIMLIK: "Tapu Sahibi Kimlik Belgesi",
   KAT_KARSILIGI_SOZLESMESI: "Kat Karşılığı Sözleşmesi",
   DIGER_DOGRULAMA_EVRAKI: "Diğer Evrak",
 };

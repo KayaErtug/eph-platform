@@ -69,6 +69,16 @@ const ACCEPTED_IMAGE_TYPES = [
   "application/octet-stream",
 ];
 
+const ACCEPTED_DOCUMENT_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+];
+
+const MAX_DOCUMENT_SIZE = 15 * 1024 * 1024;
+
 
 const TOURISTIC_BED_COUNT_VALUE_OPTIONS = [
   { value: "10", label: "1-10 arası" },
@@ -376,6 +386,14 @@ function isAcceptedImage(file: File) {
   return ACCEPTED_IMAGE_TYPES.includes(type);
 }
 
+function isAcceptedDocument(file: File) {
+  const type = String(file.type || "").toLowerCase();
+
+  if (!type) return true;
+
+  return ACCEPTED_DOCUMENT_TYPES.includes(type);
+}
+
 function normalizeTurkishText(value: string) {
   return value
     .trim()
@@ -496,6 +514,8 @@ export default function StokCreateModal({
   const deedOwnerFullName = String((unitForm as any).deedOwnerFullName || "");
   const deedOwnerPhone = String((unitForm as any).deedOwnerPhone || "");
   const deedOwnerEmail = String((unitForm as any).deedOwnerEmail || "");
+  const deedOwnerIdFrontFile = (unitForm as any).deedOwnerIdFrontFile as File | null | undefined;
+  const deedOwnerIdBackFile = (unitForm as any).deedOwnerIdBackFile as File | null | undefined;
   const selectedSubCategory = getSubCategoryFromType(unitForm.type);
   const subCategoryOptions = CATEGORY_OPTIONS[mainCategory] || CATEGORY_OPTIONS.KONUT;
   const roomOptions = isTouristicType(unitForm.type)
@@ -762,6 +782,33 @@ export default function StokCreateModal({
 
   const setUnitField = (key: keyof UnitFormState | string, value: string) => {
     setUnitForm((current) => ({ ...current, [key]: value } as UnitFormState));
+  };
+
+  const setUnitFileField = (key: string, file: File | null) => {
+    setUnitForm((current) => ({ ...current, [key]: file } as UnitFormState));
+  };
+
+  const handleIdentityDocumentChange = (key: "deedOwnerIdFrontFile" | "deedOwnerIdBackFile", file?: File) => {
+    setImageError("");
+
+    if (!file) {
+      setUnitFileField(key, null);
+      return;
+    }
+
+    if (!isAcceptedDocument(file)) {
+      setImageError("Kimlik belgesi JPG, PNG, WEBP veya PDF formatında olmalıdır.");
+      setUnitFileField(key, null);
+      return;
+    }
+
+    if (file.size > MAX_DOCUMENT_SIZE) {
+      setImageError(`Kimlik belgesi 15 MB sınırını aşıyor. Seçilen belge: ${formatFileSize(file.size)}.`);
+      setUnitFileField(key, null);
+      return;
+    }
+
+    setUnitFileField(key, file);
   };
 
   const handleCrmCustomerSelect = (customerId: string) => {
@@ -1345,6 +1392,55 @@ export default function StokCreateModal({
                   onChange={(e) => setUnitField("deedOwnerEmail", e.target.value)}
                   placeholder="Örn: tapusahibi@email.com"
                 />
+              </label>
+
+              <div className="stock-form-field full">
+                <span>Tapu Sahibi Kimlik Belgesi</span>
+                <p className="mt-1 text-xs font-bold leading-5 text-[#64748B]">
+                  Kimlik belgeleri mahrem evraktır. Sadece portföy sahibi ve Yazılım Ekibi görebilir. Admin ve Moderatör görüntüleyemez.
+                </p>
+              </div>
+
+              <label className="stock-form-field">
+                <span>Kimlik Ön Yüz</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  onChange={(e) => handleIdentityDocumentChange("deedOwnerIdFrontFile", e.target.files?.[0])}
+                />
+                <small className="stock-upload-hint">
+                  {deedOwnerIdFrontFile ? `Seçildi: ${deedOwnerIdFrontFile.name} (${formatFileSize(deedOwnerIdFrontFile.size)})` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
+                </small>
+                {deedOwnerIdFrontFile && (
+                  <button
+                    type="button"
+                    className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-black text-rose-700"
+                    onClick={() => setUnitFileField("deedOwnerIdFrontFile", null)}
+                  >
+                    Ön yüzü kaldır
+                  </button>
+                )}
+              </label>
+
+              <label className="stock-form-field">
+                <span>Kimlik Arka Yüz</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  onChange={(e) => handleIdentityDocumentChange("deedOwnerIdBackFile", e.target.files?.[0])}
+                />
+                <small className="stock-upload-hint">
+                  {deedOwnerIdBackFile ? `Seçildi: ${deedOwnerIdBackFile.name} (${formatFileSize(deedOwnerIdBackFile.size)})` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
+                </small>
+                {deedOwnerIdBackFile && (
+                  <button
+                    type="button"
+                    className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-black text-rose-700"
+                    onClick={() => setUnitFileField("deedOwnerIdBackFile", null)}
+                  >
+                    Arka yüzü kaldır
+                  </button>
+                )}
               </label>
             </div>
           </div>
