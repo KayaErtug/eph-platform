@@ -190,6 +190,91 @@ const FEATURE_OPTIONS = ["Asansör", "Kapalı Otopark", "Güvenlik", "Site İçe
 
 const TAGS = ["Yatırımcı", "Acil Alıcı", "Nakit Hazır", "Takas", "Yüksek Bütçe", "Sıcak Lead", "Soğuk Lead"];
 
+const LOCATION_DATA: Record<string, Record<string, string[]>> = {
+  "Adana": {
+    "Çukurova": ["Beyazevler", "Güzelyalı", "Huzurevleri", "Toros"],
+    "Seyhan": ["Cemalpaşa", "Gazipaşa", "Reşatbey", "Ziyapaşa"],
+    "Yüreğir": ["Atakent", "Cumhuriyet", "Kazım Karabekir", "Yavuzlar"],
+  },
+  "Ankara": {
+    "Çankaya": ["Ayrancı", "Bahçelievler", "Çukurambar", "Oran", "Yaşamkent"],
+    "Etimesgut": ["Bağlıca", "Eryaman", "Göksu", "Yapracık"],
+    "Keçiören": ["Aktepe", "Etlik", "Ovacık", "Şenlik"],
+    "Yenimahalle": ["Batıkent", "Demetevler", "İvedik", "Macunköy"],
+  },
+  "Antalya": {
+    "Kepez": ["Ahatlı", "Dokuma", "Gülveren", "Varsak"],
+    "Konyaaltı": ["Altınkum", "Hurma", "Liman", "Uncalı"],
+    "Muratpaşa": ["Fener", "Lara", "Meydan", "Şirinyalı"],
+  },
+  "Aydın": {
+    "Efeler": ["Adnan Menderes", "Cumhuriyet", "Güzelhisar", "Mimar Sinan"],
+    "Karpuzlu": ["Merkez", "Tekeler", "Yahşiler"],
+    "Kuşadası": ["Davutlar", "Güzelçamlı", "Kadınlar Denizi", "Türkmen"],
+    "Nazilli": ["Altıntaş", "Yeni", "Yıldıztepe"],
+  },
+  "Balıkesir": {
+    "Altıeylül": ["Bahçelievler", "Gündoğan", "Plevne", "Yıldız"],
+    "Bandırma": ["17 Eylül", "Levent", "Paşabayır", "Sunullah"],
+    "Edremit": ["Akçay", "Altınoluk", "Güre", "Zeytinli"],
+    "Karesi": ["Atatürk", "Eski Kuyumcular", "Maltepe", "Toygar"],
+  },
+  "Bursa": {
+    "Mudanya": ["Bademli", "Güzelyalı", "Halitpaşa", "Tirilye"],
+    "Nilüfer": ["Ataevler", "Beşevler", "Görükle", "Özlüce"],
+    "Osmangazi": ["Çekirge", "Demirtaş", "Heykel", "Soğanlı"],
+    "Yıldırım": ["Davutdede", "Ertuğrulgazi", "Mimar Sinan", "Setbaşı"],
+  },
+  "Denizli": {
+    "Merkezefendi": ["Adalet", "Bahçelievler", "Gümüşçay", "Kayalar", "Merkezefendi", "Sırakapılar", "Üçler"],
+    "Pamukkale": ["Akköy", "Asmalıevler", "Bağbaşı", "Çamlaraltı", "Deliktaş", "Dokuzkavaklar", "Kınıklı", "Yunusemre"],
+    "Buldan": ["Cumhuriyet", "Dört Eylül", "Gölbaşı", "Kurtuluş", "Yenicekent"],
+    "Sarayköy": ["Atatürk", "Bala", "Cumhuriyet", "Turan"],
+  },
+  "İstanbul": {
+    "Ataşehir": ["Atatürk", "Barbaros", "İçerenköy", "Kayışdağı", "Küçükbakkalköy"],
+    "Bakırköy": ["Ataköy", "Cevizlik", "Florya", "Yeşilköy"],
+    "Beşiktaş": ["Akat", "Etiler", "Levent", "Ortaköy", "Ulus"],
+    "Kadıköy": ["Bostancı", "Caddebostan", "Erenköy", "Fenerbahçe", "Suadiye"],
+    "Ümraniye": ["Atakent", "Çakmak", "Dudullu", "Şerifali"],
+  },
+  "İzmir": {
+    "Bornova": ["Atatürk", "Erzene", "Kazımdirik", "Özkanlar"],
+    "Çiğli": ["Ataşehir", "Aydınlıkevler", "Balatçık", "Evka-5"],
+    "Karşıyaka": ["Bostanlı", "Mavişehir", "Şemikler", "Yalı", "Yeni Şafak"],
+    "Konak": ["Alsancak", "Göztepe", "Güzelyalı", "Karantina"],
+  },
+  "Kocaeli": {
+    "Başiskele": ["Barbaros", "Kullar", "Seymen", "Yuvacık"],
+    "Gebze": ["Arapçeşme", "Barış", "Hacıhalil", "Osman Yılmaz"],
+    "İzmit": ["Alikahya", "Bekirdere", "Yahyakaptan", "Yenişehir"],
+  },
+  "Manisa": {
+    "Akhisar": ["Hürriyet", "Paşa", "Ragıpbey", "Reşatbey"],
+    "Salihli": ["Atatürk", "Kurtuluş", "Sağlık", "Yörük"],
+    "Yunusemre": ["Güzelyurt", "Laleli", "Muradiye", "Uncubozköy"],
+    "Şehzadeler": ["Arda", "Nişancıpaşa", "Peker", "Utku"],
+  },
+  "Muğla": {
+    "Bodrum": ["Bitez", "Gümüşlük", "Konacık", "Ortakent", "Yalıkavak"],
+    "Fethiye": ["Akarca", "Çalış", "Foça", "Ölüdeniz"],
+    "Menteşe": ["Emirbeyazıt", "Kötekli", "Muslihittin", "Orhaniye"],
+  },
+};
+
+const CITY_OPTIONS = Object.keys(LOCATION_DATA).sort((a, b) => a.localeCompare(b, "tr"));
+
+function districtOptions(city?: string) {
+  if (!city || !LOCATION_DATA[city]) return [];
+  return Object.keys(LOCATION_DATA[city]).sort((a, b) => a.localeCompare(b, "tr"));
+}
+
+function neighborhoodOptions(city?: string, district?: string) {
+  if (!city || !district || !LOCATION_DATA[city]?.[district]) return [];
+  return LOCATION_DATA[city][district].sort((a, b) => a.localeCompare(b, "tr"));
+}
+
+
 function money(value?: number) {
   if (!value) return "—";
   return `${value.toLocaleString("tr-TR")} ₺`;
@@ -1043,9 +1128,57 @@ function InterestsTab({ customer, interestForm, setInterestForm, interestLoading
       <FormSection title="Yeni İlgi Bölgesi / Talep Profili">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Başlık"><input className="premium-input" placeholder="Örn: Bostanlı 3+1 yatırım" value={interestForm.title} onChange={(event) => setInterestForm((current) => ({ ...current, title: event.target.value }))} /></Field>
-          <Field label="İl"><input className="premium-input" value={interestForm.city} onChange={(event) => setInterestForm((current) => ({ ...current, city: event.target.value }))} /></Field>
-          <Field label="İlçe"><input className="premium-input" value={interestForm.district} onChange={(event) => setInterestForm((current) => ({ ...current, district: event.target.value }))} /></Field>
-          <Field label="Mahalle / Muhit"><input className="premium-input" value={interestForm.neighborhood} onChange={(event) => setInterestForm((current) => ({ ...current, neighborhood: event.target.value }))} /></Field>
+          <Field label="İl">
+            <select
+              className="premium-input"
+              value={interestForm.city}
+              onChange={(event) =>
+                setInterestForm((current) => ({
+                  ...current,
+                  city: event.target.value,
+                  district: "",
+                  neighborhood: "",
+                }))
+              }
+            >
+              <option value="">İl seçiniz</option>
+              {CITY_OPTIONS.map((city) => (
+                <option key={city} value={city}>{city}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="İlçe">
+            <select
+              className="premium-input"
+              value={interestForm.district}
+              disabled={!interestForm.city}
+              onChange={(event) =>
+                setInterestForm((current) => ({
+                  ...current,
+                  district: event.target.value,
+                  neighborhood: "",
+                }))
+              }
+            >
+              <option value="">İlçe seçiniz</option>
+              {districtOptions(interestForm.city).map((district) => (
+                <option key={district} value={district}>{district}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Mahalle / Muhit">
+            <select
+              className="premium-input"
+              value={interestForm.neighborhood}
+              disabled={!interestForm.city || !interestForm.district}
+              onChange={(event) => setInterestForm((current) => ({ ...current, neighborhood: event.target.value }))}
+            >
+              <option value="">Mahalle / muhit seçiniz</option>
+              {neighborhoodOptions(interestForm.city, interestForm.district).map((neighborhood) => (
+                <option key={neighborhood} value={neighborhood}>{neighborhood}</option>
+              ))}
+            </select>
+          </Field>
           <Field label="Min Bütçe"><input className="premium-input" type="number" value={interestForm.minBudget} onChange={(event) => setInterestForm((current) => ({ ...current, minBudget: event.target.value }))} /></Field>
           <Field label="Max Bütçe"><input className="premium-input" type="number" value={interestForm.maxBudget} onChange={(event) => setInterestForm((current) => ({ ...current, maxBudget: event.target.value }))} /></Field>
           <Field label="Min m²"><input className="premium-input" type="number" value={interestForm.minArea} onChange={(event) => setInterestForm((current) => ({ ...current, minArea: event.target.value }))} /></Field>
