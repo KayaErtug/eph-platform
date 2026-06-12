@@ -1,4 +1,4 @@
-﻿-- CreateEnum
+-- CreateEnum
 CREATE TYPE "CustomerRole" AS ENUM ('ALICI', 'SATICI', 'KIRACI', 'MAL_SAHIBI', 'YATIRIMCI', 'MUTEAHHIT', 'INSAAT_FIRMASI', 'ARSA_SAHIBI');
 
 -- CreateEnum
