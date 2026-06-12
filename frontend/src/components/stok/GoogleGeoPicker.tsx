@@ -190,6 +190,42 @@ export default function GoogleGeoPicker({
     });
   };
 
+
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setError("Bu cihaz konum servisini desteklemiyor.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        reverseGeocode(lat, lng);
+
+        if (mapRef.current) {
+          mapRef.current.setCenter({ lat, lng });
+          mapRef.current.setZoom(18);
+        }
+
+        setLoading(false);
+      },
+      () => {
+        setLoading(false);
+        setError("Konum alınamadı. Lütfen cihazınızda konum izni veriniz.");
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      },
+    );
+  };
+
   useEffect(() => {
     if (!open) return;
 
@@ -339,6 +375,14 @@ export default function GoogleGeoPicker({
                   Bul
                 </button>
               </div>
+
+              <button
+                type="button"
+                onClick={getCurrentLocation}
+                className="w-full rounded-[18px] bg-emerald-600 px-4 py-3 text-[13px] font-black text-white"
+              >
+                📍 Şu Anki Konumum
+              </button>
 
               {error && <div className="rounded-[18px] border border-rose-100 bg-rose-50 px-3 py-2 text-center text-[12px] font-black text-rose-700">{error}</div>}
 
