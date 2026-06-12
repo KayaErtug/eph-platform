@@ -334,6 +334,68 @@ type AreaRule = {
   label: string;
 };
 
+
+type FeatureOption = {
+  key: string;
+  label: string;
+  group: "general" | "residential" | "commercial" | "land" | "industrial";
+};
+
+const FEATURE_OPTIONS: FeatureOption[] = [
+  { key: "ASANSOR", label: "Asansör", group: "general" },
+  { key: "KAPALI_OTOPARK", label: "Kapalı Otopark", group: "general" },
+  { key: "ACIK_OTOPARK", label: "Açık Otopark", group: "general" },
+  { key: "GUVENLIK", label: "Güvenlik", group: "general" },
+  { key: "SITE_ICERISINDE", label: "Site İçerisinde", group: "general" },
+  { key: "JENERATOR", label: "Jeneratör", group: "general" },
+  { key: "YANGIN_MERDIVENI", label: "Yangın Merdiveni", group: "general" },
+  { key: "KAMERA_SISTEMI", label: "Kamera Sistemi", group: "general" },
+  { key: "SU_DEPOSU", label: "Su Deposu", group: "general" },
+  { key: "HIDROFOR", label: "Hidrofor", group: "general" },
+  { key: "FIBER_INTERNET", label: "Fiber İnternet", group: "general" },
+  { key: "EBEVEYN_BANYOSU", label: "Ebeveyn Banyosu", group: "residential" },
+  { key: "BALKON", label: "Balkon", group: "residential" },
+  { key: "TERAS", label: "Teras", group: "residential" },
+  { key: "KILER", label: "Kiler", group: "residential" },
+  { key: "GIYINME_ODASI", label: "Giyinme Odası", group: "residential" },
+  { key: "ANKASTRE_MUTFAK", label: "Ankastre Mutfak", group: "residential" },
+  { key: "AKILLI_EV", label: "Akıllı Ev Sistemi", group: "residential" },
+  { key: "SOMINE", label: "Şömine", group: "residential" },
+  { key: "KLIMA", label: "Klima", group: "residential" },
+  { key: "ISI_YALITIMI", label: "Isı Yalıtımı", group: "residential" },
+  { key: "SES_YALITIMI", label: "Ses Yalıtımı", group: "residential" },
+  { key: "DENIZ_MANZARASI", label: "Deniz Manzarası", group: "residential" },
+  { key: "DOGA_MANZARASI", label: "Doğa Manzarası", group: "residential" },
+  { key: "SEHIR_MANZARASI", label: "Şehir Manzarası", group: "residential" },
+  { key: "YUKLEME_RAMPASI", label: "Yükleme Rampası", group: "industrial" },
+  { key: "TIR_GIRISI", label: "TIR Girişi", group: "industrial" },
+  { key: "VINC_SISTEMI", label: "Vinç Sistemi", group: "industrial" },
+  { key: "SANAYI_ELEKTRIGI", label: "Sanayi Elektriği", group: "industrial" },
+  { key: "FORKLIFT_ALANI", label: "Forklift Alanı", group: "industrial" },
+  { key: "DEPOLAMA_ALANI", label: "Depolama Alanı", group: "industrial" },
+  { key: "YANGIN_SONDURME_SISTEMI", label: "Yangın Söndürme Sistemi", group: "industrial" },
+  { key: "YOLU_ACIK", label: "Yolu Açık", group: "land" },
+  { key: "KADASTRO_YOLU", label: "Kadastro Yolu Var", group: "land" },
+  { key: "ELEKTRIK_VAR", label: "Elektrik Var", group: "land" },
+  { key: "SU_VAR", label: "Su Var", group: "land" },
+  { key: "SONDAJ_VAR", label: "Sondaj Var", group: "land" },
+  { key: "CEVRILI", label: "Çevrili", group: "land" },
+  { key: "KOSE_PARSEL", label: "Köşe Parsel", group: "land" },
+  { key: "IFRAZLI", label: "İfrazlı", group: "land" },
+  { key: "HISSELI", label: "Hisseli", group: "land" },
+];
+
+function getFeatureOptionsForType(type: string) {
+  const groups = new Set<FeatureOption["group"]>(["general"]);
+
+  if (isResidentialDetailType(type) || isVillaType(type) || isTouristicType(type)) groups.add("residential");
+  if (isIndustrialType(type)) groups.add("industrial");
+  if (isCommercialType(type)) groups.add("commercial");
+  if (isLandType(type)) groups.add("land");
+
+  return FEATURE_OPTIONS.filter((option) => groups.has(option.group));
+}
+
 const AREA_RULES: AreaRule[] = [
   {
     keywords: ["DAIRE", "REZIDANS", "APART", "STUDYO", "LOFT", "PENTHOUSE"],
@@ -549,6 +611,7 @@ export default function StokCreateModal({
   const [mainCategory, setMainCategory] = useState("KONUT");
   const [geoPickerOpen, setGeoPickerOpen] = useState(false);
   const [galleryPickerActive, setGalleryPickerActive] = useState(false);
+  const [featuresOpen, setFeaturesOpen] = useState(false);
 
   const selectedCurrency = String(unitForm.priceCurrency || "TRY");
   const selectedFloorLabel = String((unitForm as any).floorLabel || "");
@@ -562,6 +625,8 @@ export default function StokCreateModal({
   const deedOwnerEmail = String((unitForm as any).deedOwnerEmail || "");
   const deedOwnerIdFrontFile = (unitForm as any).deedOwnerIdFrontFile as File | null | undefined;
   const deedOwnerIdBackFile = (unitForm as any).deedOwnerIdBackFile as File | null | undefined;
+  const selectedFeatures = Array.isArray((unitForm as any).features) ? ((unitForm as any).features as string[]) : [];
+  const featureOptions = getFeatureOptionsForType(unitForm.type);
   const selectedSubCategory = getSubCategoryFromType(unitForm.type);
   const subCategoryOptions = CATEGORY_OPTIONS[mainCategory] || CATEGORY_OPTIONS.KONUT;
   const roomOptions = isTouristicType(unitForm.type)
@@ -832,6 +897,18 @@ export default function StokCreateModal({
 
   const setUnitFileField = (key: string, file: File | null) => {
     setUnitForm((current) => ({ ...current, [key]: file } as UnitFormState));
+  };
+
+  const toggleFeature = (featureKey: string) => {
+    setUnitForm((current) => {
+      const currentFeatures = Array.isArray((current as any).features) ? ((current as any).features as string[]) : [];
+      const exists = currentFeatures.includes(featureKey);
+      const nextFeatures = exists
+        ? currentFeatures.filter((item) => item !== featureKey)
+        : [...currentFeatures, featureKey];
+
+      return { ...current, features: nextFeatures } as UnitFormState;
+    });
   };
 
   const handleIdentityDocumentChange = (key: "deedOwnerIdFrontFile" | "deedOwnerIdBackFile", file?: File) => {
@@ -1381,6 +1458,63 @@ export default function StokCreateModal({
             </div>
           </div>
 
+
+          <div className="stock-form-block">
+            <div className="stock-form-grid">
+              <div className="stock-form-field full">
+                <button
+                  type="button"
+                  onClick={() => setFeaturesOpen((current) => !current)}
+                  className="flex min-h-[54px] w-full items-center justify-between gap-3 rounded-[20px] border border-[#DDE7F3] bg-gradient-to-r from-[#F8FAFC] to-white px-4 text-left shadow-[0_12px_28px_rgba(15,23,42,0.06)]"
+                >
+                  <span>
+                    <b className="block text-[14px] font-black text-[#06194A]">Ek Özellikler</b>
+                    <small className="mt-1 block text-[11px] font-bold text-[#64748B]">
+                      {selectedFeatures.length > 0 ? `${selectedFeatures.length} özellik seçildi` : "İstersen portföyün öne çıkan özelliklerini seç"}
+                    </small>
+                  </span>
+                  <span className={`rounded-full px-3 py-1.5 text-[11px] font-black ${featuresOpen ? "bg-[#1557D6] text-white" : "bg-[#EFF6FF] text-[#1557D6]"}`}>
+                    {featuresOpen ? "Gizle" : "Göster"}
+                  </span>
+                </button>
+              </div>
+
+              {featuresOpen && (
+                <div className="stock-form-field full">
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                    {featureOptions.map((feature) => {
+                      const checked = selectedFeatures.includes(feature.key);
+
+                      return (
+                        <button
+                          key={feature.key}
+                          type="button"
+                          onClick={() => toggleFeature(feature.key)}
+                          className={`flex min-h-[44px] items-center justify-center rounded-[16px] border px-2 text-center text-[11px] font-black shadow-[0_8px_18px_rgba(15,23,42,0.05)] transition active:scale-[0.99] ${
+                            checked
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-[#DDE7F3] bg-white text-[#475569]"
+                          }`}
+                        >
+                          {checked ? "☑ " : "☐ "}{feature.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {selectedFeatures.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setUnitField("features", [] as any)}
+                      className="mx-auto mt-3 flex min-h-[34px] items-center justify-center rounded-xl bg-rose-50 px-3 py-2 text-center text-[11px] font-black text-rose-700"
+                    >
+                      Seçimleri Temizle
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className="stock-form-block">
             <div className="stock-form-grid">

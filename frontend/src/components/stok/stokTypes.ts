@@ -61,6 +61,7 @@ export interface Unit {
 
   status: string;
   description?: string;
+  features?: string[];
 
   isVerified?: boolean;
   isOffMarket?: boolean;
@@ -135,6 +136,7 @@ export interface UnitFormState {
 
   status: string;
   description: string;
+  features?: string[];
 }
 
 export interface ProjectFormState {

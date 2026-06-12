@@ -36,6 +36,7 @@ type CreateUnitPayload = {
   deedOwnerFullName?: string;
   deedOwnerPhone?: string;
   deedOwnerEmail?: string;
+  features?: string[];
 };
 
 const unitInclude = {
@@ -151,6 +152,62 @@ export class UnitsService {
     yetkiVerified: boolean;
   }) {
     return Boolean(unit.tapuVerified || unit.yetkiVerified);
+  }
+
+  private normalizeFeatures(value?: unknown) {
+    if (!Array.isArray(value)) return [];
+
+    const allowed = new Set([
+      'ASANSOR',
+      'KAPALI_OTOPARK',
+      'ACIK_OTOPARK',
+      'GUVENLIK',
+      'SITE_ICERISINDE',
+      'JENERATOR',
+      'YANGIN_MERDIVENI',
+      'KAMERA_SISTEMI',
+      'SU_DEPOSU',
+      'HIDROFOR',
+      'FIBER_INTERNET',
+      'EBEVEYN_BANYOSU',
+      'BALKON',
+      'TERAS',
+      'KILER',
+      'GIYINME_ODASI',
+      'ANKASTRE_MUTFAK',
+      'AKILLI_EV',
+      'SOMINE',
+      'KLIMA',
+      'ISI_YALITIMI',
+      'SES_YALITIMI',
+      'DENIZ_MANZARASI',
+      'DOGA_MANZARASI',
+      'SEHIR_MANZARASI',
+      'YUKLEME_RAMPASI',
+      'TIR_GIRISI',
+      'VINC_SISTEMI',
+      'SANAYI_ELEKTRIGI',
+      'FORKLIFT_ALANI',
+      'DEPOLAMA_ALANI',
+      'YANGIN_SONDURME_SISTEMI',
+      'YOLU_ACIK',
+      'KADASTRO_YOLU',
+      'ELEKTRIK_VAR',
+      'SU_VAR',
+      'SONDAJ_VAR',
+      'CEVRILI',
+      'KOSE_PARSEL',
+      'IFRAZLI',
+      'HISSELI',
+    ]);
+
+    return Array.from(
+      new Set(
+        value
+          .map((item) => String(item || '').trim().toUpperCase())
+          .filter((item) => allowed.has(item)),
+      ),
+    );
   }
 
   private cleanText(value?: string | null) {
@@ -376,6 +433,7 @@ export class UnitsService {
         deedOwnerFullName: this.cleanText(data.deedOwnerFullName),
         deedOwnerPhone: this.normalizePhone(data.deedOwnerPhone),
         deedOwnerEmail: this.cleanText(data.deedOwnerEmail),
+        features: this.normalizeFeatures(data.features),
         projectId,
         approvalStatus: PortfolioApprovalStatus.TASLAK,
         isPoolVisible: false,
@@ -745,6 +803,10 @@ export class UnitsService {
         deedOwnerEmail:
           'deedOwnerEmail' in data
             ? this.cleanText(data.deedOwnerEmail)
+            : undefined,
+        features:
+          'features' in data
+            ? this.normalizeFeatures(data.features)
             : undefined,
       },
       include: unitInclude,

@@ -90,6 +90,56 @@ const DOCUMENT_LABELS: Record<PortfolioAuthorityType, string> = {
 const DOCUMENT_ACCEPT = "application/pdf,image/jpeg,image/png,image/webp";
 
 
+const FEATURE_LABELS: Record<string, string> = {
+  ASANSOR: "Asansör",
+  KAPALI_OTOPARK: "Kapalı Otopark",
+  ACIK_OTOPARK: "Açık Otopark",
+  GUVENLIK: "Güvenlik",
+  SITE_ICERISINDE: "Site İçerisinde",
+  JENERATOR: "Jeneratör",
+  YANGIN_MERDIVENI: "Yangın Merdiveni",
+  KAMERA_SISTEMI: "Kamera Sistemi",
+  SU_DEPOSU: "Su Deposu",
+  HIDROFOR: "Hidrofor",
+  FIBER_INTERNET: "Fiber İnternet",
+  EBEVEYN_BANYOSU: "Ebeveyn Banyosu",
+  BALKON: "Balkon",
+  TERAS: "Teras",
+  KILER: "Kiler",
+  GIYINME_ODASI: "Giyinme Odası",
+  ANKASTRE_MUTFAK: "Ankastre Mutfak",
+  AKILLI_EV: "Akıllı Ev Sistemi",
+  SOMINE: "Şömine",
+  KLIMA: "Klima",
+  ISI_YALITIMI: "Isı Yalıtımı",
+  SES_YALITIMI: "Ses Yalıtımı",
+  DENIZ_MANZARASI: "Deniz Manzarası",
+  DOGA_MANZARASI: "Doğa Manzarası",
+  SEHIR_MANZARASI: "Şehir Manzarası",
+  YUKLEME_RAMPASI: "Yükleme Rampası",
+  TIR_GIRISI: "TIR Girişi",
+  VINC_SISTEMI: "Vinç Sistemi",
+  SANAYI_ELEKTRIGI: "Sanayi Elektriği",
+  FORKLIFT_ALANI: "Forklift Alanı",
+  DEPOLAMA_ALANI: "Depolama Alanı",
+  YANGIN_SONDURME_SISTEMI: "Yangın Söndürme Sistemi",
+  YOLU_ACIK: "Yolu Açık",
+  KADASTRO_YOLU: "Kadastro Yolu Var",
+  ELEKTRIK_VAR: "Elektrik Var",
+  SU_VAR: "Su Var",
+  SONDAJ_VAR: "Sondaj Var",
+  CEVRILI: "Çevrili",
+  KOSE_PARSEL: "Köşe Parsel",
+  IFRAZLI: "İfrazlı",
+  HISSELI: "Hisseli",
+};
+
+function getFeatureLabels(features?: string[] | null) {
+  if (!Array.isArray(features)) return [];
+  return features.map((feature) => FEATURE_LABELS[feature] || feature).filter(Boolean);
+}
+
+
 const CURRENCY_SYMBOLS: Record<string, string> = {
   TRY: "₺",
   USD: "$",
@@ -537,6 +587,7 @@ export default function StokDetailPage() {
   const activeGalleryImage =
     galleryImages[activePhoto]?.displayUrl || coverImage || "";
   const verified = isUnitVerified(unit);
+  const featureLabels = useMemo(() => getFeatureLabels((unit as any)?.features), [unit]);
   const portfolioScore = useMemo(() => calculatePortfolioScore(unit), [unit]);
   const portfolioScoreLabel = useMemo(
     () => getPortfolioScoreLabel(portfolioScore),
@@ -1404,6 +1455,28 @@ export default function StokDetailPage() {
             </button>
           </div>
         </section>
+
+
+        {featureLabels.length > 0 && (
+          <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+            <div className="flex items-center justify-center gap-2 text-[#1557D6]">
+              <CheckCircle2 size={17} />
+              <h2 className="text-center text-[16px] font-black text-[#06194A]">
+                Ek Özellikler
+              </h2>
+            </div>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              {featureLabels.map((feature) => (
+                <span
+                  key={feature}
+                  className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[11px] font-black text-emerald-700 shadow-[0_8px_18px_rgba(5,150,105,0.08)]"
+                >
+                  ✓ {feature}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
           <div className="flex items-center gap-2 text-[#1557D6]">
