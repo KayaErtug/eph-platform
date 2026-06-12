@@ -400,11 +400,11 @@ export default function StokPage() {
 
       const numericPrice = parseFormattedNumber(unitForm.price);
 
-      if (!unitForm.number || !unitForm.area || !numericPrice) {
-        setFormError("Birim numarası, alan ve fiyat zorunludur.");
-        setFormLoading(false);
-        return;
-      }
+      if (!unitForm.area || !numericPrice) {
+  	setFormError("Alan ve fiyat zorunludur.");
+  	setFormLoading(false);
+  	return;
+	}
 
       const selectedCoverImage = coverImage || galleryImages[0] || null;
 
