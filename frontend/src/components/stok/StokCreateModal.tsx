@@ -385,6 +385,79 @@ const FEATURE_OPTIONS: FeatureOption[] = [
   { key: "HISSELI", label: "Hisseli", group: "land" },
 ];
 
+
+function getFeatureIcon(key: string) {
+  const icons: Record<string, string> = {
+    ASANSOR: "↕",
+    KAPALI_OTOPARK: "▣",
+    ACIK_OTOPARK: "▢",
+    GUVENLIK: "◇",
+    SITE_ICERISINDE: "⌂",
+    JENERATOR: "⚡",
+    YANGIN_MERDIVENI: "↗",
+    KAMERA_SISTEMI: "◉",
+    SU_DEPOSU: "≈",
+    HIDROFOR: "⇡",
+    FIBER_INTERNET: "⌁",
+    EBEVEYN_BANYOSU: "◌",
+    BALKON: "▤",
+    TERAS: "▱",
+    KILER: "▦",
+    GIYINME_ODASI: "◫",
+    ANKASTRE_MUTFAK: "◈",
+    AKILLI_EV: "✦",
+    SOMINE: "♨",
+    KLIMA: "❄",
+    ISI_YALITIMI: "☀",
+    SES_YALITIMI: "◍",
+    DENIZ_MANZARASI: "≈",
+    DOGA_MANZARASI: "♧",
+    SEHIR_MANZARASI: "▥",
+    YUKLEME_RAMPASI: "⇅",
+    TIR_GIRISI: "▰",
+    VINC_SISTEMI: "⚙",
+    SANAYI_ELEKTRIGI: "⚡",
+    FORKLIFT_ALANI: "▣",
+    DEPOLAMA_ALANI: "▦",
+    YANGIN_SONDURME_SISTEMI: "◉",
+    YOLU_ACIK: "═",
+    KADASTRO_YOLU: "⌖",
+    ELEKTRIK_VAR: "⚡",
+    SU_VAR: "≈",
+    SONDAJ_VAR: "◌",
+    CEVRILI: "□",
+    KOSE_PARSEL: "⌟",
+    IFRAZLI: "◇",
+    HISSELI: "◫",
+  };
+
+  return icons[key] || "✓";
+}
+
+function getFeatureGroupTitle(group: FeatureOption["group"]) {
+  const labels: Record<FeatureOption["group"], string> = {
+    general: "Genel",
+    residential: "Konut",
+    commercial: "Ticari",
+    land: "Arsa / Arazi",
+    industrial: "Sanayi",
+  };
+
+  return labels[group] || "Özellik";
+}
+
+function getFeatureGroupTone(group: FeatureOption["group"]) {
+  const tones: Record<FeatureOption["group"], string> = {
+    general: "from-blue-50 to-white text-[#1557D6] border-blue-100",
+    residential: "from-violet-50 to-white text-violet-700 border-violet-100",
+    commercial: "from-amber-50 to-white text-amber-700 border-amber-100",
+    land: "from-emerald-50 to-white text-emerald-700 border-emerald-100",
+    industrial: "from-slate-100 to-white text-slate-700 border-slate-200",
+  };
+
+  return tones[group] || tones.general;
+}
+
 function getFeatureOptionsForType(type: string) {
   const groups = new Set<FeatureOption["group"]>(["general"]);
 
@@ -1465,15 +1538,25 @@ export default function StokCreateModal({
                 <button
                   type="button"
                   onClick={() => setFeaturesOpen((current) => !current)}
-                  className="flex min-h-[54px] w-full items-center justify-between gap-3 rounded-[20px] border border-[#DDE7F3] bg-gradient-to-r from-[#F8FAFC] to-white px-4 text-left shadow-[0_12px_28px_rgba(15,23,42,0.06)]"
+                  className={`relative flex min-h-[64px] w-full items-center justify-between gap-3 overflow-hidden rounded-[24px] border px-4 text-left shadow-[0_18px_38px_rgba(21,87,214,0.12)] transition active:scale-[0.99] ${
+                    featuresOpen
+                      ? "border-[#BFD3F7] bg-gradient-to-r from-[#EFF6FF] via-white to-emerald-50"
+                      : "border-[#DDE7F3] bg-gradient-to-r from-white via-[#F8FAFC] to-[#EFF6FF]"
+                  }`}
                 >
-                  <span>
-                    <b className="block text-[14px] font-black text-[#06194A]">Ek Özellikler</b>
-                    <small className="mt-1 block text-[11px] font-bold text-[#64748B]">
-                      {selectedFeatures.length > 0 ? `${selectedFeatures.length} özellik seçildi` : "İstersen portföyün öne çıkan özelliklerini seç"}
-                    </small>
+                  <span className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#1557D6]/8" />
+                  <span className="relative flex min-w-0 items-center gap-3">
+                    <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-[18px] font-black shadow-[0_10px_22px_rgba(21,87,214,0.16)] ${featuresOpen ? "bg-[#1557D6] text-white" : "bg-white text-[#1557D6]"}`}>
+                      ✦
+                    </span>
+                    <span className="min-w-0">
+                      <b className="block text-[14px] font-black tracking-[-0.02em] text-[#06194A]">Ek Özellikler</b>
+                      <small className="mt-0.5 block text-[11px] font-bold leading-4 text-[#64748B]">
+                        {selectedFeatures.length > 0 ? `${selectedFeatures.length} özellik seçildi · Portföy kartında rozet olarak görünür` : "Asansör, otopark, güvenlik ve özel avantajları seç"}
+                      </small>
+                    </span>
                   </span>
-                  <span className={`rounded-full px-3 py-1.5 text-[11px] font-black ${featuresOpen ? "bg-[#1557D6] text-white" : "bg-[#EFF6FF] text-[#1557D6]"}`}>
+                  <span className={`relative shrink-0 rounded-full px-4 py-2 text-[11px] font-black shadow-[0_10px_22px_rgba(21,87,214,0.14)] ${featuresOpen ? "bg-[#06194A] text-white" : "bg-[#1557D6] text-white"}`}>
                     {featuresOpen ? "Gizle" : "Göster"}
                   </span>
                 </button>
@@ -1481,36 +1564,61 @@ export default function StokCreateModal({
 
               {featuresOpen && (
                 <div className="stock-form-field full">
-                  <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                    {featureOptions.map((feature) => {
-                      const checked = selectedFeatures.includes(feature.key);
+                  <div className="rounded-[26px] border border-[#DDE7F3] bg-gradient-to-b from-white to-[#F8FAFC] p-3 shadow-[0_18px_44px_rgba(15,23,42,0.07)]">
+                    <div className="mb-3 flex items-center justify-between gap-2 rounded-[20px] bg-[#06194A] px-3 py-2 text-white shadow-[0_14px_30px_rgba(6,25,74,0.18)]">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Öne Çıkanlar</p>
+                        <p className="mt-0.5 text-[12px] font-black leading-4">Seçilenler portföy detayında premium rozet olarak görünür.</p>
+                      </div>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-white/12 text-[13px] font-black">
+                        {selectedFeatures.length}/{featureOptions.length}
+                      </span>
+                    </div>
 
-                      return (
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                      {featureOptions.map((feature) => {
+                        const checked = selectedFeatures.includes(feature.key);
+
+                        return (
+                          <button
+                            key={feature.key}
+                            type="button"
+                            onClick={() => toggleFeature(feature.key)}
+                            className={`group relative flex min-h-[58px] items-center justify-center overflow-hidden rounded-[18px] border px-2.5 text-center text-[11px] font-black shadow-[0_10px_22px_rgba(15,23,42,0.06)] transition active:scale-[0.98] ${
+                              checked
+                                ? "border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-emerald-100 text-emerald-800 ring-1 ring-emerald-100"
+                                : "border-[#DDE7F3] bg-white text-[#475569] hover:border-[#BFD3F7] hover:bg-[#F8FAFC]"
+                            }`}
+                          >
+                            <span className={`absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black ${checked ? "bg-emerald-600 text-white" : "bg-[#F1F5F9] text-[#94A3B8]"}`}>
+                              {checked ? "✓" : "+"}
+                            </span>
+                            <span className="flex flex-col items-center justify-center gap-1.5">
+                              <span className={`flex h-7 w-7 items-center justify-center rounded-[12px] border bg-gradient-to-br text-[13px] font-black ${checked ? "border-emerald-200 from-white to-emerald-50 text-emerald-700" : getFeatureGroupTone(feature.group)}`}>
+                                {getFeatureIcon(feature.key)}
+                              </span>
+                              <span className="line-clamp-2 leading-tight">{feature.label}</span>
+                              <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.10em] ${checked ? "bg-emerald-600/10 text-emerald-700" : "bg-[#F1F5F9] text-[#64748B]"}`}>
+                                {getFeatureGroupTitle(feature.group)}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {selectedFeatures.length > 0 && (
+                      <div className="mt-3 flex items-center justify-center">
                         <button
-                          key={feature.key}
                           type="button"
-                          onClick={() => toggleFeature(feature.key)}
-                          className={`flex min-h-[44px] items-center justify-center rounded-[16px] border px-2 text-center text-[11px] font-black shadow-[0_8px_18px_rgba(15,23,42,0.05)] transition active:scale-[0.99] ${
-                            checked
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-[#DDE7F3] bg-white text-[#475569]"
-                          }`}
+                          onClick={() => setUnitField("features", [] as any)}
+                          className="flex min-h-[38px] items-center justify-center rounded-[14px] bg-rose-50 px-4 py-2 text-center text-[11px] font-black text-rose-700 shadow-[0_10px_22px_rgba(225,29,72,0.08)] transition active:scale-[0.98]"
                         >
-                          {checked ? "☑ " : "☐ "}{feature.label}
+                          Seçimleri Temizle
                         </button>
-                      );
-                    })}
+                      </div>
+                    )}
                   </div>
-
-                  {selectedFeatures.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setUnitField("features", [] as any)}
-                      className="mx-auto mt-3 flex min-h-[34px] items-center justify-center rounded-xl bg-rose-50 px-3 py-2 text-center text-[11px] font-black text-rose-700"
-                    >
-                      Seçimleri Temizle
-                    </button>
-                  )}
                 </div>
               )}
             </div>
@@ -1519,8 +1627,8 @@ export default function StokCreateModal({
           <div className="stock-form-block">
             <div className="stock-form-grid">
               <div className="stock-form-field full">
-                <span>Tapu Sahibi Bilgileri</span>
-                <p className="mt-1 text-xs font-bold leading-5 text-[#64748B]">
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-[#EFF6FF] to-white px-3 py-2 text-[#06194A] shadow-[0_10px_22px_rgba(21,87,214,0.08)]">👤 Tapu Sahibi Bilgileri</span>
+                <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
                   Bu bilgiler mahremdir. Sadece portföy sahibi ve Yazılım Ekibi görebilir. Portföy kaydedilince CRM kaydı otomatik oluşturulur veya mevcut CRM kaydıyla eşleştirilir.
                 </p>
               </div>
@@ -1591,8 +1699,8 @@ export default function StokCreateModal({
               </label>
 
               <div className="stock-form-field full">
-                <span>Tapu Sahibi Kimlik Belgesi</span>
-                <p className="mt-1 text-xs font-bold leading-5 text-[#64748B]">
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-amber-50 to-white px-3 py-2 text-[#06194A] shadow-[0_10px_22px_rgba(245,158,11,0.08)]">🔐 Tapu Sahibi Kimlik Belgesi</span>
+                <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
                   Kimlik belgeleri mahrem evraktır. Sadece portföy sahibi ve Yazılım Ekibi görebilir. Admin ve Moderatör görüntüleyemez.
                 </p>
               </div>
@@ -1644,8 +1752,8 @@ export default function StokCreateModal({
           <div className="stock-form-block">
             <div className="stock-form-grid">
               <div className="stock-form-field full">
-                <span>Galeriye Fotoğraf Ekle * ({galleryImages.length}/{MAX_GALLERY_COUNT})</span>
-                <small className="stock-upload-hint">
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-[#EFF6FF] to-white px-3 py-2 text-[#06194A] shadow-[0_10px_22px_rgba(21,87,214,0.08)]">🖼 Galeriye Fotoğraf Ekle * ({galleryImages.length}/{MAX_GALLERY_COUNT})</span>
+                <small className="stock-upload-hint block text-center">
                   JPG / PNG / WEBP · min. 800×600 px · önerilen 1920×1080 · maks. 15 MB
                 </small>
 
