@@ -490,6 +490,8 @@ export default function StokCreateModal({
   onSubmit,
 }: Props) {
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
+  const deedOwnerIdFrontInputRef = useRef<HTMLInputElement | null>(null);
+  const deedOwnerIdBackInputRef = useRef<HTMLInputElement | null>(null);
 
   const [imageError, setImageError] = useState("");
   const [localError, setLocalError] = useState("");
@@ -1401,47 +1403,79 @@ export default function StokCreateModal({
                 </p>
               </div>
 
-              <label className="stock-form-field">
+              <div className="stock-form-field">
                 <span>Kimlik Ön Yüz</span>
                 <input
+                  ref={deedOwnerIdFrontInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp,application/pdf"
+                  className="hidden"
                   onChange={(e) => handleIdentityDocumentChange("deedOwnerIdFrontFile", e.target.files?.[0])}
                 />
-                <small className="stock-upload-hint">
+
+                <button
+                  type="button"
+                  onClick={() => deedOwnerIdFrontInputRef.current?.click()}
+                  className={`mt-2 flex min-h-[52px] w-full items-center justify-center rounded-[18px] border px-4 text-center text-[13px] font-black shadow-[0_12px_26px_rgba(21,87,214,0.14)] transition active:scale-[0.99] ${
+                    deedOwnerIdFrontFile
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-[#BFD3F7] bg-gradient-to-r from-[#EFF6FF] to-white text-[#1557D6]"
+                  }`}
+                >
+                  {deedOwnerIdFrontFile ? "Ön Yüz Seçildi" : "Ön Yüz Belgesi Seç"}
+                </button>
+
+                <small className="stock-upload-hint block text-center">
                   {deedOwnerIdFrontFile ? `Seçildi: ${deedOwnerIdFrontFile.name} (${formatFileSize(deedOwnerIdFrontFile.size)})` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
                 </small>
+
                 {deedOwnerIdFrontFile && (
                   <button
                     type="button"
-                    className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-black text-rose-700"
+                    className="mx-auto mt-2 flex min-h-[34px] items-center justify-center rounded-xl bg-rose-50 px-3 py-2 text-center text-[11px] font-black text-rose-700 shadow-[0_8px_18px_rgba(225,29,72,0.08)]"
                     onClick={() => setUnitFileField("deedOwnerIdFrontFile", null)}
                   >
                     Ön yüzü kaldır
                   </button>
                 )}
-              </label>
+              </div>
 
-              <label className="stock-form-field">
+              <div className="stock-form-field">
                 <span>Kimlik Arka Yüz</span>
                 <input
+                  ref={deedOwnerIdBackInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp,application/pdf"
+                  className="hidden"
                   onChange={(e) => handleIdentityDocumentChange("deedOwnerIdBackFile", e.target.files?.[0])}
                 />
-                <small className="stock-upload-hint">
+
+                <button
+                  type="button"
+                  onClick={() => deedOwnerIdBackInputRef.current?.click()}
+                  className={`mt-2 flex min-h-[52px] w-full items-center justify-center rounded-[18px] border px-4 text-center text-[13px] font-black shadow-[0_12px_26px_rgba(5,150,105,0.14)] transition active:scale-[0.99] ${
+                    deedOwnerIdBackFile
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-emerald-200 bg-gradient-to-r from-emerald-50 to-white text-emerald-700"
+                  }`}
+                >
+                  {deedOwnerIdBackFile ? "Arka Yüz Seçildi" : "Arka Yüz Belgesi Seç"}
+                </button>
+
+                <small className="stock-upload-hint block text-center">
                   {deedOwnerIdBackFile ? `Seçildi: ${deedOwnerIdBackFile.name} (${formatFileSize(deedOwnerIdBackFile.size)})` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
                 </small>
+
                 {deedOwnerIdBackFile && (
                   <button
                     type="button"
-                    className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-black text-rose-700"
+                    className="mx-auto mt-2 flex min-h-[34px] items-center justify-center rounded-xl bg-rose-50 px-3 py-2 text-center text-[11px] font-black text-rose-700 shadow-[0_8px_18px_rgba(225,29,72,0.08)]"
                     onClick={() => setUnitFileField("deedOwnerIdBackFile", null)}
                   >
                     Arka yüzü kaldır
                   </button>
                 )}
-              </label>
+              </div>
             </div>
           </div>
 
