@@ -408,6 +408,52 @@ function normalizeTurkishText(value: string) {
     .replace(/\s+/g, " ");
 }
 
+function formatPhoneInput(value: string) {
+  const onlyDigits = value.replace(/\D/g, "").slice(0, 11);
+
+  if (!onlyDigits) return "";
+
+  const normalized = onlyDigits.startsWith("90") && onlyDigits.length > 10
+    ? `0${onlyDigits.slice(2)}`.slice(0, 11)
+    : onlyDigits;
+
+  const digits = normalized.startsWith("0") ? normalized : `0${normalized}`.slice(0, 11);
+  const parts = [
+    digits.slice(0, 4),
+    digits.slice(4, 7),
+    digits.slice(7, 9),
+    digits.slice(9, 11),
+  ].filter(Boolean);
+
+  return parts.join(" ");
+}
+
+function getPhoneDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function isValidTurkishPhone(value: string) {
+  const digits = getPhoneDigits(value);
+
+  if (!digits) return true;
+  if (digits.length === 11 && digits.startsWith("05")) return true;
+  if (digits.length === 10 && digits.startsWith("5")) return true;
+
+  return false;
+}
+
+function normalizeEmailInput(value: string) {
+  return value.trim().toLocaleLowerCase("tr-TR").replace(/\s+/g, "");
+}
+
+function isValidEmail(value: string) {
+  const email = normalizeEmailInput(value);
+
+  if (!email) return true;
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
 function formatPriceInput(value: string) {
   const onlyDigits = value.replace(/\D/g, "");
   if (!onlyDigits) return "";
@@ -490,8 +536,6 @@ export default function StokCreateModal({
   onSubmit,
 }: Props) {
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
-  const deedOwnerIdFrontInputRef = useRef<HTMLInputElement | null>(null);
-  const deedOwnerIdBackInputRef = useRef<HTMLInputElement | null>(null);
 
   const [imageError, setImageError] = useState("");
   const [localError, setLocalError] = useState("");
@@ -830,8 +874,8 @@ export default function StokCreateModal({
     setUnitForm((current) => ({
       ...(current as any),
       deedOwnerFullName: fullName || (current as any).deedOwnerFullName || "",
-      deedOwnerPhone: customer.phone || (current as any).deedOwnerPhone || "",
-      deedOwnerEmail: customer.email || (current as any).deedOwnerEmail || "",
+      deedOwnerPhone: customer.phone ? formatPhoneInput(customer.phone) : (current as any).deedOwnerPhone || "",
+      deedOwnerEmail: customer.email ? normalizeEmailInput(customer.email) : (current as any).deedOwnerEmail || "",
     } as UnitFormState));
 
     if (!projectForm.city && customer.city) {
@@ -879,6 +923,14 @@ export default function StokCreateModal({
 
     if (showClosedAreaField && !closedArea.trim()) {
       return "Kapalı alan zorunludur.";
+    }
+
+    if (deedOwnerPhone && !isValidTurkishPhone(deedOwnerPhone)) {
+      return "Tapu sahibi telefonu geçerli formatta olmalıdır. Örn: 0542 852 41 41";
+    }
+
+    if (deedOwnerEmail && !isValidEmail(deedOwnerEmail)) {
+      return "Tapu sahibi e-posta adresi geçerli formatta olmalıdır. Örn: isim@mail.com";
     }
 
     if (descriptionLength > MAX_DESCRIPTION_LENGTH) {
@@ -1380,9 +1432,13 @@ export default function StokCreateModal({
               <label className="stock-form-field">
                 <span>Tapu Sahibi Telefon</span>
                 <input
+                  type="tel"
+                  inputMode="tel"
                   value={deedOwnerPhone}
-                  onChange={(e) => setUnitField("deedOwnerPhone", e.target.value)}
-                  placeholder="Örn: 05xx xxx xx xx"
+                  onChange={(e) => setUnitField("deedOwnerPhone", formatPhoneInput(e.target.value))}
+                  onBlur={(e) => setUnitField("deedOwnerPhone", formatPhoneInput(e.target.value))}
+                  maxLength={14}
+                  placeholder="Örn: 0542 852 41 41"
                 />
               </label>
 
@@ -1390,8 +1446,12 @@ export default function StokCreateModal({
                 <span>Tapu Sahibi E-posta</span>
                 <input
                   type="email"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   value={deedOwnerEmail}
-                  onChange={(e) => setUnitField("deedOwnerEmail", e.target.value)}
+                  onChange={(e) => setUnitField("deedOwnerEmail", normalizeEmailInput(e.target.value))}
+                  onBlur={(e) => setUnitField("deedOwnerEmail", normalizeEmailInput(e.target.value))}
                   placeholder="Örn: tapusahibi@email.com"
                 />
               </label>
@@ -1403,79 +1463,47 @@ export default function StokCreateModal({
                 </p>
               </div>
 
-              <div className="stock-form-field">
+              <label className="stock-form-field">
                 <span>Kimlik Ön Yüz</span>
                 <input
-                  ref={deedOwnerIdFrontInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp,application/pdf"
-                  className="hidden"
                   onChange={(e) => handleIdentityDocumentChange("deedOwnerIdFrontFile", e.target.files?.[0])}
                 />
-
-                <button
-                  type="button"
-                  onClick={() => deedOwnerIdFrontInputRef.current?.click()}
-                  className={`mt-2 flex min-h-[52px] w-full items-center justify-center rounded-[18px] border px-4 text-center text-[13px] font-black shadow-[0_12px_26px_rgba(21,87,214,0.14)] transition active:scale-[0.99] ${
-                    deedOwnerIdFrontFile
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      : "border-[#BFD3F7] bg-gradient-to-r from-[#EFF6FF] to-white text-[#1557D6]"
-                  }`}
-                >
-                  {deedOwnerIdFrontFile ? "Ön Yüz Seçildi" : "Ön Yüz Belgesi Seç"}
-                </button>
-
-                <small className="stock-upload-hint block text-center">
+                <small className="stock-upload-hint">
                   {deedOwnerIdFrontFile ? `Seçildi: ${deedOwnerIdFrontFile.name} (${formatFileSize(deedOwnerIdFrontFile.size)})` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
                 </small>
-
                 {deedOwnerIdFrontFile && (
                   <button
                     type="button"
-                    className="mx-auto mt-2 flex min-h-[34px] items-center justify-center rounded-xl bg-rose-50 px-3 py-2 text-center text-[11px] font-black text-rose-700 shadow-[0_8px_18px_rgba(225,29,72,0.08)]"
+                    className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-black text-rose-700"
                     onClick={() => setUnitFileField("deedOwnerIdFrontFile", null)}
                   >
                     Ön yüzü kaldır
                   </button>
                 )}
-              </div>
+              </label>
 
-              <div className="stock-form-field">
+              <label className="stock-form-field">
                 <span>Kimlik Arka Yüz</span>
                 <input
-                  ref={deedOwnerIdBackInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp,application/pdf"
-                  className="hidden"
                   onChange={(e) => handleIdentityDocumentChange("deedOwnerIdBackFile", e.target.files?.[0])}
                 />
-
-                <button
-                  type="button"
-                  onClick={() => deedOwnerIdBackInputRef.current?.click()}
-                  className={`mt-2 flex min-h-[52px] w-full items-center justify-center rounded-[18px] border px-4 text-center text-[13px] font-black shadow-[0_12px_26px_rgba(5,150,105,0.14)] transition active:scale-[0.99] ${
-                    deedOwnerIdBackFile
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      : "border-emerald-200 bg-gradient-to-r from-emerald-50 to-white text-emerald-700"
-                  }`}
-                >
-                  {deedOwnerIdBackFile ? "Arka Yüz Seçildi" : "Arka Yüz Belgesi Seç"}
-                </button>
-
-                <small className="stock-upload-hint block text-center">
+                <small className="stock-upload-hint">
                   {deedOwnerIdBackFile ? `Seçildi: ${deedOwnerIdBackFile.name} (${formatFileSize(deedOwnerIdBackFile.size)})` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
                 </small>
-
                 {deedOwnerIdBackFile && (
                   <button
                     type="button"
-                    className="mx-auto mt-2 flex min-h-[34px] items-center justify-center rounded-xl bg-rose-50 px-3 py-2 text-center text-[11px] font-black text-rose-700 shadow-[0_8px_18px_rgba(225,29,72,0.08)]"
+                    className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-black text-rose-700"
                     onClick={() => setUnitFileField("deedOwnerIdBackFile", null)}
                   >
                     Arka yüzü kaldır
                   </button>
                 )}
-              </div>
+              </label>
             </div>
           </div>
 
