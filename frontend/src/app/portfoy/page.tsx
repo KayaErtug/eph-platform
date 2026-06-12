@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Bell,
@@ -250,7 +250,7 @@ function makeWhatsappLocationText(unit: MapUnit) {
     .join("\n");
 }
 
-export default function StokPage() {
+function StokPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -1240,5 +1240,15 @@ function PortfolioMap({
         </div>
       )}
     </div>
+  );
+}
+
+
+
+export default function StokPage() {
+  return (
+    <Suspense fallback={null}>
+      <StokPageInner />
+    </Suspense>
   );
 }
