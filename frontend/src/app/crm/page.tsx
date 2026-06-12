@@ -191,6 +191,208 @@ const FEATURE_OPTIONS = ["Asansör", "Kapalı Otopark", "Güvenlik", "Site İçe
 
 const TAGS = ["Yatırımcı", "Acil Alıcı", "Nakit Hazır", "Takas", "Yüksek Bütçe", "Sıcak Lead", "Soğuk Lead"];
 
+type GeoOption = {
+  id: string;
+  name: string;
+};
+
+const TURKIYE_API_BASE_URL = "https://turkiyeapi.dev/api/v1";
+
+const TURKIYE_KKTC_CITIES = [
+  "Adana",
+  "Adıyaman",
+  "Afyonkarahisar",
+  "Ağrı",
+  "Amasya",
+  "Ankara",
+  "Antalya",
+  "Artvin",
+  "Aydın",
+  "Balıkesir",
+  "Bilecik",
+  "Bingöl",
+  "Bitlis",
+  "Bolu",
+  "Burdur",
+  "Bursa",
+  "Çanakkale",
+  "Çankırı",
+  "Çorum",
+  "Denizli",
+  "Diyarbakır",
+  "Edirne",
+  "Elazığ",
+  "Erzincan",
+  "Erzurum",
+  "Eskişehir",
+  "Gaziantep",
+  "Giresun",
+  "Gümüşhane",
+  "Hakkari",
+  "Hatay",
+  "Isparta",
+  "Mersin",
+  "İstanbul",
+  "İzmir",
+  "Kars",
+  "Kastamonu",
+  "Kayseri",
+  "Kırklareli",
+  "Kırşehir",
+  "Kocaeli",
+  "Konya",
+  "Kütahya",
+  "Malatya",
+  "Manisa",
+  "Kahramanmaraş",
+  "Mardin",
+  "Muğla",
+  "Muş",
+  "Nevşehir",
+  "Niğde",
+  "Ordu",
+  "Rize",
+  "Sakarya",
+  "Samsun",
+  "Siirt",
+  "Sinop",
+  "Sivas",
+  "Tekirdağ",
+  "Tokat",
+  "Trabzon",
+  "Tunceli",
+  "Şanlıurfa",
+  "Uşak",
+  "Van",
+  "Yozgat",
+  "Zonguldak",
+  "Aksaray",
+  "Bayburt",
+  "Karaman",
+  "Kırıkkale",
+  "Batman",
+  "Şırnak",
+  "Bartın",
+  "Ardahan",
+  "Iğdır",
+  "Yalova",
+  "Karabük",
+  "Kilis",
+  "Osmaniye",
+  "Düzce",
+  "Lefkoşa",
+  "Girne",
+  "Gazimağusa",
+  "İskele",
+  "Güzelyurt",
+  "Lefke",
+];
+
+const KKTC_CITIES = new Set(["Lefkoşa", "Girne", "Gazimağusa", "İskele", "Güzelyurt", "Lefke"]);
+
+const FALLBACK_PROVINCE_OPTIONS = TURKIYE_KKTC_CITIES.map((city) => ({
+  id: city,
+  name: city,
+})).sort((a, b) => a.name.localeCompare(b.name, "tr"));
+
+function uniqueSortedGeoOptions(options: GeoOption[]) {
+  const seen = new Set<string>();
+
+  return options
+    .filter((option) => option.name.trim())
+    .filter((option) => {
+      const key = option.name.toLocaleLowerCase("tr-TR");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "tr"));
+}
+
+function readGeoPayloadItems(payload: any): any[] {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.result)) return payload.result;
+  if (Array.isArray(payload?.results)) return payload.results;
+  if (Array.isArray(payload?.provinces)) return payload.provinces;
+  if (Array.isArray(payload?.districts)) return payload.districts;
+  if (Array.isArray(payload?.neighborhoods)) return payload.neighborhoods;
+  return [];
+}
+
+function readGeoOptionName(item: any) {
+  return String(
+    item?.name ||
+      item?.province ||
+      item?.provinceName ||
+      item?.district ||
+      item?.districtName ||
+      item?.neighborhood ||
+      item?.neighborhoodName ||
+      item?.mahalle ||
+      item?.mahalleAdi ||
+      item?.title ||
+      "",
+  ).trim();
+}
+
+function readGeoOptionId(item: any, fallbackName: string) {
+  return String(item?.id || item?.code || item?.plateNumber || item?.plate || fallbackName).trim();
+}
+
+function normalizeGeoOptions(payload: any) {
+  const items = readGeoPayloadItems(payload);
+
+  return uniqueSortedGeoOptions(
+    items
+      .map((item) => {
+        const name = readGeoOptionName(item);
+        return { id: readGeoOptionId(item, name), name };
+      })
+      .filter((item) => item.name),
+  );
+}
+
+async function fetchGeoOptions(path: string, params: Record<string, string | number | undefined>) {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && String(value).trim()) {
+      searchParams.set(key, String(value));
+    }
+  });
+
+  const response = await fetch(`${TURKIYE_API_BASE_URL}${path}?${searchParams.toString()}`, {
+    cache: "force-cache",
+  });
+
+  if (!response.ok) {
+    throw new Error("Coğrafi veri yüklenemedi.");
+  }
+
+  return normalizeGeoOptions(await response.json());
+}
+
+function ensureSelectedOption(options: GeoOption[], selectedValue: string) {
+  if (!selectedValue) return options;
+  if (options.some((option) => option.name === selectedValue)) return options;
+  return uniqueSortedGeoOptions([{ id: selectedValue, name: selectedValue }, ...options]);
+}
+
+function fallbackDistrictOptions(city: string): GeoOption[] {
+  if (!city) return [];
+  if (KKTC_CITIES.has(city)) return [{ id: "Merkez", name: "Merkez" }];
+  return [];
+}
+
+function fallbackNeighborhoodOptions(city: string, district: string): GeoOption[] {
+  if (!city || !district) return [];
+  if (KKTC_CITIES.has(city)) return [{ id: "Merkez", name: "Merkez" }];
+  return [];
+}
+
+
 function money(value?: number) {
   if (!value) return "—";
   return `${value.toLocaleString("tr-TR")} ₺`;
@@ -313,10 +515,100 @@ export default function CrmPage() {
   const [activityForm, setActivityForm] = useState({ type: "TELEFON", note: "" });
   const [taskForm, setTaskForm] = useState({ title: "", dueDate: "" });
   const [interestForm, setInterestForm] = useState(emptyInterestForm());
+  const [provinceOptions, setProvinceOptions] = useState<GeoOption[]>(FALLBACK_PROVINCE_OPTIONS);
+  const [districtOptionsList, setDistrictOptionsList] = useState<GeoOption[]>([]);
+  const [neighborhoodOptionsList, setNeighborhoodOptionsList] = useState<GeoOption[]>([]);
+  const [provinceLoading, setProvinceLoading] = useState(false);
+  const [districtLoading, setDistrictLoading] = useState(false);
+  const [neighborhoodLoading, setNeighborhoodLoading] = useState(false);
 
   useEffect(() => {
     setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    setProvinceLoading(true);
+
+    fetchGeoOptions("/provinces", { limit: 100, sort: "name" })
+      .then((options) => {
+        if (!active) return;
+        const mergedOptions = uniqueSortedGeoOptions([...options, ...FALLBACK_PROVINCE_OPTIONS]);
+        setProvinceOptions(mergedOptions.length ? mergedOptions : FALLBACK_PROVINCE_OPTIONS);
+      })
+      .catch(() => {
+        if (active) setProvinceOptions(FALLBACK_PROVINCE_OPTIONS);
+      })
+      .finally(() => {
+        if (active) setProvinceLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    setDistrictOptionsList([]);
+    setNeighborhoodOptionsList([]);
+
+    if (!interestForm.city) return;
+
+    const fallbackOptions = fallbackDistrictOptions(interestForm.city);
+    setDistrictLoading(true);
+
+    fetchGeoOptions("/districts", { province: interestForm.city, limit: 1000, sort: "name" })
+      .then((options) => {
+        if (!active) return;
+        const mergedOptions = uniqueSortedGeoOptions([...options, ...fallbackOptions]);
+        setDistrictOptionsList(ensureSelectedOption(mergedOptions, interestForm.district));
+      })
+      .catch(() => {
+        if (active) setDistrictOptionsList(ensureSelectedOption(fallbackOptions, interestForm.district));
+      })
+      .finally(() => {
+        if (active) setDistrictLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [interestForm.city]);
+
+  useEffect(() => {
+    let active = true;
+
+    setNeighborhoodOptionsList([]);
+
+    if (!interestForm.city || !interestForm.district) return;
+
+    const fallbackOptions = fallbackNeighborhoodOptions(interestForm.city, interestForm.district);
+    setNeighborhoodLoading(true);
+
+    fetchGeoOptions("/neighborhoods", {
+      province: interestForm.city,
+      district: interestForm.district,
+      limit: 5000,
+      sort: "name",
+    })
+      .then((options) => {
+        if (!active) return;
+        const mergedOptions = uniqueSortedGeoOptions([...options, ...fallbackOptions]);
+        setNeighborhoodOptionsList(ensureSelectedOption(mergedOptions, interestForm.neighborhood));
+      })
+      .catch(() => {
+        if (active) setNeighborhoodOptionsList(ensureSelectedOption(fallbackOptions, interestForm.neighborhood));
+      })
+      .finally(() => {
+        if (active) setNeighborhoodLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [interestForm.city, interestForm.district]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -567,6 +859,12 @@ export default function CrmPage() {
           onAddInterest={handleAddInterest}
           onDeleteInterest={handleDeleteInterest}
           onDeleteCustomerProperty={handleDeleteCustomerProperty}
+          provinceOptions={provinceOptions}
+          districtOptions={districtOptionsList}
+          neighborhoodOptions={neighborhoodOptionsList}
+          provinceLoading={provinceLoading}
+          districtLoading={districtLoading}
+          neighborhoodLoading={neighborhoodLoading}
         />
       )}
 
@@ -934,6 +1232,12 @@ function CustomerDetailModal({
   onAddInterest,
   onDeleteInterest,
   onDeleteCustomerProperty,
+  provinceOptions,
+  districtOptions,
+  neighborhoodOptions,
+  provinceLoading,
+  districtLoading,
+  neighborhoodLoading,
 }: {
   customer: Customer;
   onClose: () => void;
@@ -954,6 +1258,12 @@ function CustomerDetailModal({
   onAddInterest: () => void;
   onDeleteInterest: (interestId: string) => void;
   onDeleteCustomerProperty: (propertyId: string) => void;
+  provinceOptions: GeoOption[];
+  districtOptions: GeoOption[];
+  neighborhoodOptions: GeoOption[];
+  provinceLoading: boolean;
+  districtLoading: boolean;
+  neighborhoodLoading: boolean;
 }) {
   const stage = stageInfo(customer.status);
   const [activeTab, setActiveTab] = useState<"genel" | "roller" | "ilgiler" | "gayrimenkuller" | "aktiviteler" | "gorevler">("genel");
@@ -1001,7 +1311,22 @@ function CustomerDetailModal({
         <div className="space-y-6 p-5">
           {activeTab === "genel" && <GeneralTab customer={customer} />}
           {activeTab === "roller" && <RolesTab customer={customer} onUpdateRoles={onUpdateRoles} />}
-          {activeTab === "ilgiler" && <InterestsTab customer={customer} interestForm={interestForm} setInterestForm={setInterestForm} interestLoading={interestLoading} onAddInterest={onAddInterest} onDeleteInterest={onDeleteInterest} />}
+          {activeTab === "ilgiler" && (
+            <InterestsTab
+              customer={customer}
+              interestForm={interestForm}
+              setInterestForm={setInterestForm}
+              interestLoading={interestLoading}
+              onAddInterest={onAddInterest}
+              onDeleteInterest={onDeleteInterest}
+              provinceOptions={provinceOptions}
+              districtOptions={districtOptions}
+              neighborhoodOptions={neighborhoodOptions}
+              provinceLoading={provinceLoading}
+              districtLoading={districtLoading}
+              neighborhoodLoading={neighborhoodLoading}
+            />
+          )}
           {activeTab === "gayrimenkuller" && <PropertiesTab customer={customer} onDeleteCustomerProperty={onDeleteCustomerProperty} />}
           {activeTab === "aktiviteler" && <ActivitiesTab customer={customer} activityForm={activityForm} setActivityForm={setActivityForm} activityLoading={activityLoading} onAddActivity={onAddActivity} />}
           {activeTab === "gorevler" && <TasksTab customer={customer} taskForm={taskForm} setTaskForm={setTaskForm} taskLoading={taskLoading} onAddTask={onAddTask} onTaskDone={onTaskDone} />}
@@ -1061,7 +1386,33 @@ function RolesTab({ customer, onUpdateRoles }: { customer: Customer; onUpdateRol
   );
 }
 
-function InterestsTab({ customer, interestForm, setInterestForm, interestLoading, onAddInterest, onDeleteInterest }: { customer: Customer; interestForm: ReturnType<typeof emptyInterestForm>; setInterestForm: React.Dispatch<React.SetStateAction<ReturnType<typeof emptyInterestForm>>>; interestLoading: boolean; onAddInterest: () => void; onDeleteInterest: (interestId: string) => void }) {
+function InterestsTab({
+  customer,
+  interestForm,
+  setInterestForm,
+  interestLoading,
+  onAddInterest,
+  onDeleteInterest,
+  provinceOptions,
+  districtOptions,
+  neighborhoodOptions,
+  provinceLoading,
+  districtLoading,
+  neighborhoodLoading,
+}: {
+  customer: Customer;
+  interestForm: ReturnType<typeof emptyInterestForm>;
+  setInterestForm: React.Dispatch<React.SetStateAction<ReturnType<typeof emptyInterestForm>>>;
+  interestLoading: boolean;
+  onAddInterest: () => void;
+  onDeleteInterest: (interestId: string) => void;
+  provinceOptions: GeoOption[];
+  districtOptions: GeoOption[];
+  neighborhoodOptions: GeoOption[];
+  provinceLoading: boolean;
+  districtLoading: boolean;
+  neighborhoodLoading: boolean;
+}) {
   return (
     <div className="space-y-6">
       <section className="rounded-[26px] border border-blue-100 bg-blue-50/60 p-4 text-center">
@@ -1074,19 +1425,73 @@ function InterestsTab({ customer, interestForm, setInterestForm, interestLoading
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Başlık"><input className="premium-input" placeholder="Örn: Bostanlı 3+1 yatırım" value={interestForm.title} onChange={(event) => setInterestForm((current) => ({ ...current, title: event.target.value }))} /></Field>
 
+          <Field label={provinceLoading ? "İl yükleniyor..." : "İl"}>
+            <select
+              className="premium-input"
+              value={interestForm.city}
+              onChange={(event) =>
+                setInterestForm((current) => ({
+                  ...current,
+                  city: event.target.value,
+                  district: "",
+                  neighborhood: "",
+                }))
+              }
+            >
+              <option value="">İl seçiniz</option>
+              {ensureSelectedOption(provinceOptions, interestForm.city).map((province) => (
+                <option key={province.id || province.name} value={province.name}>{province.name}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label={districtLoading ? "İlçe yükleniyor..." : "İlçe"}>
+            <select
+              className="premium-input"
+              value={interestForm.district}
+              disabled={!interestForm.city || districtLoading}
+              onChange={(event) =>
+                setInterestForm((current) => ({
+                  ...current,
+                  district: event.target.value,
+                  neighborhood: "",
+                }))
+              }
+            >
+              <option value="">İlçe seçiniz</option>
+              {ensureSelectedOption(districtOptions, interestForm.district).map((district) => (
+                <option key={district.id || district.name} value={district.name}>{district.name}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label={neighborhoodLoading ? "Mahalle / Muhit yükleniyor..." : "Mahalle / Muhit"}>
+            <select
+              className="premium-input"
+              value={interestForm.neighborhood}
+              disabled={!interestForm.city || !interestForm.district || neighborhoodLoading}
+              onChange={(event) => setInterestForm((current) => ({ ...current, neighborhood: event.target.value }))}
+            >
+              <option value="">Mahalle / muhit seçiniz</option>
+              {ensureSelectedOption(neighborhoodOptions, interestForm.neighborhood).map((neighborhood) => (
+                <option key={neighborhood.id || neighborhood.name} value={neighborhood.name}>{neighborhood.name}</option>
+              ))}
+            </select>
+          </Field>
+
           <div className="sm:col-span-2">
-            <Field label="Bölge / Muhit">
+            <Field label="Haritadan Bölge İşaretle">
               <GoogleGeoPicker
                 city={interestForm.city}
                 district={interestForm.district}
                 address={interestForm.neighborhood}
                 title="Talep Bölgesi"
-                subtitle="Bölge seçilmeden Lina konum eşleşmesini sağlıklı yapamaz."
-                buttonLabel="Bölge Seç"
+                subtitle="İstersen yukarıdan manuel seç, istersen haritadan işaretle."
+                buttonLabel="Haritadan Seç"
                 modalTitle="CRM Talep Bölgesi"
                 modalSubtitle="Adres, mahalle veya muhit ara; doğru noktayı seç; Lina eşleşmesi için kaydet."
                 selectedLabel="Seçilen Talep Bölgesi"
-                emptyText="Haritada bölge seçin veya adres / mahalle arayın."
+                emptyText="Manuel seçim yapabilir veya haritadan bölge işaretleyebilirsin."
                 confirmMessageTitle="Bu bölgeyi müşteri talep profiline eklemek istediğinizden emin misiniz?"
                 onChange={(location) =>
                   setInterestForm((current) => ({
