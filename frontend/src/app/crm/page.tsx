@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import api from "@/lib/api";
+import GoogleGeoPicker from "@/components/stok/GoogleGeoPicker";
 import { useAuthStore } from "@/store/auth.store";
 
 interface Customer {
@@ -189,91 +190,6 @@ const ROOM_OPTIONS = ["1+1", "2+1", "3+1", "4+1", "5+1", "Villa", "Stüdyo"];
 const FEATURE_OPTIONS = ["Asansör", "Kapalı Otopark", "Güvenlik", "Site İçerisinde", "Yerden Isıtma", "Jeneratör", "Havuz", "Spa", "Köşe Parsel"];
 
 const TAGS = ["Yatırımcı", "Acil Alıcı", "Nakit Hazır", "Takas", "Yüksek Bütçe", "Sıcak Lead", "Soğuk Lead"];
-
-const LOCATION_DATA: Record<string, Record<string, string[]>> = {
-  "Adana": {
-    "Çukurova": ["Beyazevler", "Güzelyalı", "Huzurevleri", "Toros"],
-    "Seyhan": ["Cemalpaşa", "Gazipaşa", "Reşatbey", "Ziyapaşa"],
-    "Yüreğir": ["Atakent", "Cumhuriyet", "Kazım Karabekir", "Yavuzlar"],
-  },
-  "Ankara": {
-    "Çankaya": ["Ayrancı", "Bahçelievler", "Çukurambar", "Oran", "Yaşamkent"],
-    "Etimesgut": ["Bağlıca", "Eryaman", "Göksu", "Yapracık"],
-    "Keçiören": ["Aktepe", "Etlik", "Ovacık", "Şenlik"],
-    "Yenimahalle": ["Batıkent", "Demetevler", "İvedik", "Macunköy"],
-  },
-  "Antalya": {
-    "Kepez": ["Ahatlı", "Dokuma", "Gülveren", "Varsak"],
-    "Konyaaltı": ["Altınkum", "Hurma", "Liman", "Uncalı"],
-    "Muratpaşa": ["Fener", "Lara", "Meydan", "Şirinyalı"],
-  },
-  "Aydın": {
-    "Efeler": ["Adnan Menderes", "Cumhuriyet", "Güzelhisar", "Mimar Sinan"],
-    "Karpuzlu": ["Merkez", "Tekeler", "Yahşiler"],
-    "Kuşadası": ["Davutlar", "Güzelçamlı", "Kadınlar Denizi", "Türkmen"],
-    "Nazilli": ["Altıntaş", "Yeni", "Yıldıztepe"],
-  },
-  "Balıkesir": {
-    "Altıeylül": ["Bahçelievler", "Gündoğan", "Plevne", "Yıldız"],
-    "Bandırma": ["17 Eylül", "Levent", "Paşabayır", "Sunullah"],
-    "Edremit": ["Akçay", "Altınoluk", "Güre", "Zeytinli"],
-    "Karesi": ["Atatürk", "Eski Kuyumcular", "Maltepe", "Toygar"],
-  },
-  "Bursa": {
-    "Mudanya": ["Bademli", "Güzelyalı", "Halitpaşa", "Tirilye"],
-    "Nilüfer": ["Ataevler", "Beşevler", "Görükle", "Özlüce"],
-    "Osmangazi": ["Çekirge", "Demirtaş", "Heykel", "Soğanlı"],
-    "Yıldırım": ["Davutdede", "Ertuğrulgazi", "Mimar Sinan", "Setbaşı"],
-  },
-  "Denizli": {
-    "Merkezefendi": ["Adalet", "Bahçelievler", "Gümüşçay", "Kayalar", "Merkezefendi", "Sırakapılar", "Üçler"],
-    "Pamukkale": ["Akköy", "Asmalıevler", "Bağbaşı", "Çamlaraltı", "Deliktaş", "Dokuzkavaklar", "Kınıklı", "Yunusemre"],
-    "Buldan": ["Cumhuriyet", "Dört Eylül", "Gölbaşı", "Kurtuluş", "Yenicekent"],
-    "Sarayköy": ["Atatürk", "Bala", "Cumhuriyet", "Turan"],
-  },
-  "İstanbul": {
-    "Ataşehir": ["Atatürk", "Barbaros", "İçerenköy", "Kayışdağı", "Küçükbakkalköy"],
-    "Bakırköy": ["Ataköy", "Cevizlik", "Florya", "Yeşilköy"],
-    "Beşiktaş": ["Akat", "Etiler", "Levent", "Ortaköy", "Ulus"],
-    "Kadıköy": ["Bostancı", "Caddebostan", "Erenköy", "Fenerbahçe", "Suadiye"],
-    "Ümraniye": ["Atakent", "Çakmak", "Dudullu", "Şerifali"],
-  },
-  "İzmir": {
-    "Bornova": ["Atatürk", "Erzene", "Kazımdirik", "Özkanlar"],
-    "Çiğli": ["Ataşehir", "Aydınlıkevler", "Balatçık", "Evka-5"],
-    "Karşıyaka": ["Bostanlı", "Mavişehir", "Şemikler", "Yalı", "Yeni Şafak"],
-    "Konak": ["Alsancak", "Göztepe", "Güzelyalı", "Karantina"],
-  },
-  "Kocaeli": {
-    "Başiskele": ["Barbaros", "Kullar", "Seymen", "Yuvacık"],
-    "Gebze": ["Arapçeşme", "Barış", "Hacıhalil", "Osman Yılmaz"],
-    "İzmit": ["Alikahya", "Bekirdere", "Yahyakaptan", "Yenişehir"],
-  },
-  "Manisa": {
-    "Akhisar": ["Hürriyet", "Paşa", "Ragıpbey", "Reşatbey"],
-    "Salihli": ["Atatürk", "Kurtuluş", "Sağlık", "Yörük"],
-    "Yunusemre": ["Güzelyurt", "Laleli", "Muradiye", "Uncubozköy"],
-    "Şehzadeler": ["Arda", "Nişancıpaşa", "Peker", "Utku"],
-  },
-  "Muğla": {
-    "Bodrum": ["Bitez", "Gümüşlük", "Konacık", "Ortakent", "Yalıkavak"],
-    "Fethiye": ["Akarca", "Çalış", "Foça", "Ölüdeniz"],
-    "Menteşe": ["Emirbeyazıt", "Kötekli", "Muslihittin", "Orhaniye"],
-  },
-};
-
-const CITY_OPTIONS = Object.keys(LOCATION_DATA).sort((a, b) => a.localeCompare(b, "tr"));
-
-function districtOptions(city?: string) {
-  if (!city || !LOCATION_DATA[city]) return [];
-  return Object.keys(LOCATION_DATA[city]).sort((a, b) => a.localeCompare(b, "tr"));
-}
-
-function neighborhoodOptions(city?: string, district?: string) {
-  if (!city || !district || !LOCATION_DATA[city]?.[district]) return [];
-  return LOCATION_DATA[city][district].sort((a, b) => a.localeCompare(b, "tr"));
-}
-
 
 function money(value?: number) {
   if (!value) return "—";
@@ -617,7 +533,7 @@ export default function CrmPage() {
 
   if (!hydrated || loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F7FBFF] text-[#06194A]">
+      <main className="eph-v4-shell flex min-h-screen items-center justify-center bg-[#F4F8FF] text-[#06194A]">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="animate-spin text-[#1557D6]" size={34} />
           <p className="text-xs font-black uppercase tracking-[0.26em] text-slate-500">CRM verileri yükleniyor</p>
@@ -627,7 +543,7 @@ export default function CrmPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F7FBFF] text-[#27364F]">
+    <main className="eph-v4-shell min-h-screen bg-[#F4F8FF] text-[#27364F]">
       {showAddModal && <AddCustomerModal form={form} setForm={setForm} formLoading={formLoading} onSubmit={handleAddCustomer} onClose={() => setShowAddModal(false)} />}
 
       {selectedCustomer && (
@@ -772,8 +688,8 @@ export default function CrmPage() {
         .premium-input {
           width: 100%;
           border-radius: 18px;
-          border: 1px solid #e2e8f0;
-          background: #f8fafc;
+          border: 2px solid #c7d6e8;
+          background: #eef3f8;
           padding: 12px 14px;
           font-size: 14px;
           font-weight: 700;
@@ -785,6 +701,35 @@ export default function CrmPage() {
           border-color: #1d4ed8;
           background: #ffffff;
           box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.08);
+        }
+
+        .eph-v4-shell .premium-input {
+          border-color: #c7d6e8;
+          background: #eef3f8;
+        }
+
+        .eph-v4-shell .premium-input:disabled {
+          background: #e6eef9;
+          color: #64748b;
+          cursor: not-allowed;
+        }
+
+        .eph-v4-shell .border,
+        .eph-v4-shell .border-slate-100,
+        .eph-v4-shell .border-slate-200,
+        .eph-v4-shell .border-blue-100,
+        .eph-v4-shell .border-red-200 {
+          border-width: 1.5px;
+          border-color: #c7d6e8;
+        }
+
+        .eph-v4-shell .bg-\[\#F8FAFC\] {
+          background-color: #f8fafc;
+        }
+
+        .eph-v4-shell .bg-blue-50\/60,
+        .eph-v4-shell .bg-\[\#EFF6FF\] {
+          border-color: #c7d6e8;
         }
       `}</style>
     </main>
@@ -1128,57 +1073,38 @@ function InterestsTab({ customer, interestForm, setInterestForm, interestLoading
       <FormSection title="Yeni İlgi Bölgesi / Talep Profili">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Başlık"><input className="premium-input" placeholder="Örn: Bostanlı 3+1 yatırım" value={interestForm.title} onChange={(event) => setInterestForm((current) => ({ ...current, title: event.target.value }))} /></Field>
-          <Field label="İl">
-            <select
-              className="premium-input"
-              value={interestForm.city}
-              onChange={(event) =>
-                setInterestForm((current) => ({
-                  ...current,
-                  city: event.target.value,
-                  district: "",
-                  neighborhood: "",
-                }))
-              }
-            >
-              <option value="">İl seçiniz</option>
-              {CITY_OPTIONS.map((city) => (
-                <option key={city} value={city}>{city}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="İlçe">
-            <select
-              className="premium-input"
-              value={interestForm.district}
-              disabled={!interestForm.city}
-              onChange={(event) =>
-                setInterestForm((current) => ({
-                  ...current,
-                  district: event.target.value,
-                  neighborhood: "",
-                }))
-              }
-            >
-              <option value="">İlçe seçiniz</option>
-              {districtOptions(interestForm.city).map((district) => (
-                <option key={district} value={district}>{district}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Mahalle / Muhit">
-            <select
-              className="premium-input"
-              value={interestForm.neighborhood}
-              disabled={!interestForm.city || !interestForm.district}
-              onChange={(event) => setInterestForm((current) => ({ ...current, neighborhood: event.target.value }))}
-            >
-              <option value="">Mahalle / muhit seçiniz</option>
-              {neighborhoodOptions(interestForm.city, interestForm.district).map((neighborhood) => (
-                <option key={neighborhood} value={neighborhood}>{neighborhood}</option>
-              ))}
-            </select>
-          </Field>
+
+          <div className="sm:col-span-2">
+            <Field label="Bölge / Muhit">
+              <GoogleGeoPicker
+                city={interestForm.city}
+                district={interestForm.district}
+                address={interestForm.neighborhood}
+                title="Talep Bölgesi"
+                subtitle="Bölge seçilmeden Lina konum eşleşmesini sağlıklı yapamaz."
+                buttonLabel="Bölge Seç"
+                modalTitle="CRM Talep Bölgesi"
+                modalSubtitle="Adres, mahalle veya muhit ara; doğru noktayı seç; Lina eşleşmesi için kaydet."
+                selectedLabel="Seçilen Talep Bölgesi"
+                emptyText="Haritada bölge seçin veya adres / mahalle arayın."
+                confirmMessageTitle="Bu bölgeyi müşteri talep profiline eklemek istediğinizden emin misiniz?"
+                onChange={(location) =>
+                  setInterestForm((current) => ({
+                    ...current,
+                    city: location.city || current.city,
+                    district: location.district || current.district,
+                    neighborhood: location.address || current.neighborhood,
+                  }))
+                }
+              />
+            </Field>
+
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <MiniCounter label="İl" value={interestForm.city || "Seçilmedi"} />
+              <MiniCounter label="İlçe" value={interestForm.district || "Seçilmedi"} />
+              <MiniCounter label="Mahalle" value={interestForm.neighborhood || "Seçilmedi"} />
+            </div>
+          </div>
           <Field label="Min Bütçe"><input className="premium-input" type="number" value={interestForm.minBudget} onChange={(event) => setInterestForm((current) => ({ ...current, minBudget: event.target.value }))} /></Field>
           <Field label="Max Bütçe"><input className="premium-input" type="number" value={interestForm.maxBudget} onChange={(event) => setInterestForm((current) => ({ ...current, maxBudget: event.target.value }))} /></Field>
           <Field label="Min m²"><input className="premium-input" type="number" value={interestForm.minArea} onChange={(event) => setInterestForm((current) => ({ ...current, minArea: event.target.value }))} /></Field>

@@ -23,6 +23,14 @@ type GoogleGeoPickerProps = {
   placeId?: string;
   onChange: (location: GoogleGeoLocation) => void;
   onOpenChange?: (open: boolean) => void;
+  title?: string;
+  subtitle?: string;
+  buttonLabel?: string;
+  modalTitle?: string;
+  modalSubtitle?: string;
+  selectedLabel?: string;
+  emptyText?: string;
+  confirmMessageTitle?: string;
 };
 
 type GoogleNamespace = any;
@@ -131,6 +139,14 @@ export default function GoogleGeoPicker({
   placeId,
   onChange,
   onOpenChange,
+  title = "Konum Doğrulama",
+  subtitle = "Haritadan pin seçilmeden portföy haritada görünmez.",
+  buttonLabel = "Konum Seç",
+  modalTitle = "Portföy Konumu",
+  modalSubtitle = "Adresle ara, haritada pini sürükle, sonra doğrula.",
+  selectedLabel = "Seçilen Konum",
+  emptyText = "Haritada bir noktaya dokunun veya pini sürükleyin.",
+  confirmMessageTitle = "Bu konumu portföyünüze eklemek istediğinizden emin misiniz?",
 }: GoogleGeoPickerProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
@@ -374,7 +390,7 @@ export default function GoogleGeoPicker({
     }
 
     const ok = window.confirm(
-      `Bu konumu portföyünüze eklemek istediğinizden emin misiniz?\n\n${pendingLocation.mapAddress}\n${pendingLocation.latitude.toFixed(6)}, ${pendingLocation.longitude.toFixed(6)}`,
+      `${confirmMessageTitle}\n\n${pendingLocation.mapAddress}\n${pendingLocation.latitude.toFixed(6)}, ${pendingLocation.longitude.toFixed(6)}`,
     );
 
     if (!ok) return;
@@ -387,14 +403,14 @@ export default function GoogleGeoPicker({
     <div className="rounded-[24px] border border-[#DDE7F3] bg-[#F8FBFF] p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1 text-left">
-          <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#1557D6]">Konum Doğrulama</p>
+          <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#1557D6]">{title}</p>
           <p className="mt-1 text-[13px] font-extrabold leading-5 text-[#06194A]">{selectedLocationText}</p>
           {latitude && longitude ? (
             <p className="mt-1 text-[11px] font-bold text-[#64748B]">
               {latitude.toFixed(6)}, {longitude.toFixed(6)}
             </p>
           ) : (
-            <p className="mt-1 text-[11px] font-bold text-amber-700">Haritadan pin seçilmeden portföy haritada görünmez.</p>
+            <p className="mt-1 text-[11px] font-bold text-amber-700">{subtitle}</p>
           )}
         </div>
 
@@ -404,7 +420,7 @@ export default function GoogleGeoPicker({
           className="inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-[18px] bg-[#1557D6] px-3 text-[12px] font-black text-white"
         >
           <MapPin size={16} />
-          Konum Seç
+          {buttonLabel}
         </button>
       </div>
 
@@ -413,8 +429,8 @@ export default function GoogleGeoPicker({
           <section className="flex max-h-[94dvh] w-full max-w-[430px] flex-col overflow-hidden rounded-[30px] border border-white bg-white shadow-[0_24px_70px_rgba(15,23,42,0.24)]">
             <div className="flex items-center justify-between border-b border-[#E2EAF5] px-4 py-3">
               <div className="min-w-0 flex-1 text-center">
-                <h3 className="text-[19px] font-black tracking-[-0.04em] text-[#06194A]">Portföy Konumu</h3>
-                <p className="text-[11px] font-bold text-[#64748B]">Adresle ara, haritada pini sürükle, sonra doğrula.</p>
+                <h3 className="text-[19px] font-black tracking-[-0.04em] text-[#06194A]">{modalTitle}</h3>
+                <p className="text-[11px] font-bold text-[#64748B]">{modalSubtitle}</p>
               </div>
               <button type="button" onClick={() => setOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F1F5FB] text-[#06194A]">
                 <X size={19} />
@@ -458,9 +474,9 @@ export default function GoogleGeoPicker({
               </div>
 
               <div className="rounded-[22px] border border-[#DDE7F3] bg-[#F8FBFF] p-3 text-center">
-                <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#1557D6]">Seçilen Konum</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#1557D6]">{selectedLabel}</p>
                 <p className="mt-1 text-[13px] font-extrabold leading-5 text-[#06194A]">
-                  {pendingLocation?.mapAddress || "Haritada bir noktaya dokunun veya pini sürükleyin."}
+                  {pendingLocation?.mapAddress || emptyText}
                 </p>
                 {pendingLocation && (
                   <p className="mt-1 text-[11px] font-bold text-[#64748B]">
