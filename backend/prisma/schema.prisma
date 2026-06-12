@@ -511,7 +511,8 @@ model Customer {
   interestedType  String?
   source          String?
   status          CustomerStatus @default(YENI_LEAD)
-  tags            String[]
+  roles           CustomerRole[] @default([])
+  tags            String[]       @default([])
   notes           String?
   lastContactedAt DateTime?
   createdAt       DateTime       @default(now())
@@ -521,6 +522,12 @@ model Customer {
   owner      User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   tasks      Task[]
   properties CustomerProperty[]
+  interests  CustomerInterest[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([city])
+  @@index([updatedAt])
 }
 
 
@@ -540,6 +547,46 @@ model CustomerProperty {
   @@index([customerId])
   @@index([unitId])
   @@index([relationType])
+  @@index([createdAt])
+}
+
+
+model CustomerInterest {
+  id           String                   @id @default(uuid())
+  customerId   String
+
+  title        String?
+  city         String?
+  district     String?
+  neighborhood String?
+
+  propertyTypes UnitType[]              @default([])
+  statuses      UnitStatus[]            @default([])
+
+  minBudget     Float?
+  maxBudget     Float?
+  priceCurrency String                  @default("TRY")
+  minArea       Float?
+  maxArea       Float?
+  roomCounts    String[]                @default([])
+  features      String[]                @default([])
+
+  purchaseIntent CustomerPurchaseIntent @default(BELIRSIZ)
+  priority       CustomerInterestPriority @default(NORMAL)
+
+  notes         String?
+  isActive      Boolean                 @default(true)
+  lastMatchedAt DateTime?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([city, district, neighborhood])
+  @@index([isActive])
+  @@index([priority])
+  @@index([purchaseIntent])
   @@index([createdAt])
 }
 
@@ -1093,6 +1140,34 @@ enum CustomerStatus {
   PAZARLIK
   KAPANDI
   KAYBEDILDI
+}
+
+
+enum CustomerRole {
+  ALICI
+  SATICI
+  KIRACI
+  MAL_SAHIBI
+  YATIRIMCI
+  MUTEAHHIT
+  INSAAT_FIRMASI
+  ARSA_SAHIBI
+}
+
+enum CustomerPurchaseIntent {
+  BELIRSIZ
+  SATIN_ALMA
+  KIRALAMA
+  YATIRIM
+  ARSA_GELISTIRME
+  KAT_KARSILIGI
+}
+
+enum CustomerInterestPriority {
+  DUSUK
+  NORMAL
+  YUKSEK
+  ACIL
 }
 
 
