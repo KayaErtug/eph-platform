@@ -19,6 +19,7 @@ type GoogleGeoPickerProps = {
   mapAddress?: string;
   placeId?: string;
   onChange: (location: GoogleGeoLocation) => void;
+  onOpenChange?: (open: boolean) => void;
 };
 
 type GoogleNamespace = any;
@@ -85,6 +86,7 @@ export default function GoogleGeoPicker({
   mapAddress,
   placeId,
   onChange,
+  onOpenChange,
 }: GoogleGeoPickerProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
@@ -110,6 +112,10 @@ export default function GoogleGeoPicker({
 
   const searchAddress = useMemo(() => normalizeAddress([address, district, city, "Türkiye"]), [address, city, district]);
   const selectedLocationText = mapAddress || pendingLocation?.mapAddress || "Henüz harita konumu seçilmedi.";
+
+  useEffect(() => {
+    onOpenChange?.(open);
+  }, [open, onOpenChange]);
 
   const updateMarker = (location: GoogleGeoLocation, zoom = 17) => {
     if (!window.google?.maps || !mapRef.current) return;
@@ -350,8 +356,8 @@ export default function GoogleGeoPicker({
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#06194A]/55 px-2 py-3 backdrop-blur-sm">
-          <section className="relative flex h-[92dvh] w-full max-w-[430px] flex-col overflow-hidden rounded-[30px] border border-white bg-white shadow-[0_24px_70px_rgba(15,23,42,0.24)]">
+        <div className="fixed inset-0 z-[99999] flex items-end justify-center bg-[#06194A]/45 px-2 pb-2 backdrop-blur-sm">
+          <section className="flex max-h-[94dvh] w-full max-w-[430px] flex-col overflow-hidden rounded-[30px] border border-white bg-white shadow-[0_24px_70px_rgba(15,23,42,0.24)]">
             <div className="flex items-center justify-between border-b border-[#E2EAF5] px-4 py-3">
               <div className="min-w-0 flex-1 text-center">
                 <h3 className="text-[19px] font-black tracking-[-0.04em] text-[#06194A]">Portföy Konumu</h3>
@@ -362,7 +368,7 @@ export default function GoogleGeoPicker({
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 pb-5">
+            <div className="space-y-3 overflow-y-auto p-3 pb-4">
               <div className="flex items-center gap-2 rounded-[20px] border border-[#DDE7F3] bg-white px-3 py-2">
                 <Search size={17} className="text-[#64748B]" />
                 <input
@@ -411,13 +417,13 @@ export default function GoogleGeoPicker({
               </div>
             </div>
 
-            <div className="sticky bottom-0 z-20 grid grid-cols-2 gap-2 border-t border-[#E2EAF5] bg-white p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-12px_30px_rgba(15,23,42,0.08)]">
+            <div className="grid grid-cols-2 gap-2 border-t border-[#E2EAF5] bg-white p-3">
               <button type="button" onClick={() => setOpen(false)} className="min-h-[48px] rounded-[20px] border border-[#DDE7F3] bg-white text-[13px] font-black text-[#06194A]">
-                Kapat
+                Tekrar Seç
               </button>
               <button type="button" onClick={handleConfirm} className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[20px] bg-[#1557D6] text-[13px] font-black text-white">
                 <CheckCircle2 size={18} />
-                Konumu Kaydet
+                Evet, Kaydet
               </button>
             </div>
           </section>

@@ -483,6 +483,8 @@ export default function StokCreateModal({
   const [selectedPlace, setSelectedPlace] = useState("");
   const [selectedCrmCustomerId, setSelectedCrmCustomerId] = useState("");
   const [mainCategory, setMainCategory] = useState("KONUT");
+  const [geoPickerOpen, setGeoPickerOpen] = useState(false);
+  const [galleryPickerActive, setGalleryPickerActive] = useState(false);
 
   const selectedCurrency = String(unitForm.priceCurrency || "TRY");
   const selectedFloorLabel = String((unitForm as any).floorLabel || "");
@@ -619,6 +621,20 @@ export default function StokCreateModal({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!galleryPickerActive || typeof window === "undefined") return;
+
+    const clearGalleryPickerActive = () => {
+      window.setTimeout(() => setGalleryPickerActive(false), 300);
+    };
+
+    window.addEventListener("focus", clearGalleryPickerActive);
+
+    return () => {
+      window.removeEventListener("focus", clearGalleryPickerActive);
+    };
+  }, [galleryPickerActive]);
+
   if (!open) return null;
 
   const validateFiles = async (files: File[]) => {
@@ -667,6 +683,7 @@ export default function StokCreateModal({
     const files = Array.from(event.target.files || []);
 
     setImageError("");
+    setGalleryPickerActive(false);
 
     if (files.length === 0) return;
 
@@ -983,6 +1000,7 @@ export default function StokCreateModal({
                       longitude={Number((projectForm as any).longitude || 0) || null}
                       mapAddress={String((projectForm as any).mapAddress || "")}
                       placeId={String((projectForm as any).placeId || "")}
+                      onOpenChange={setGeoPickerOpen}
                       onChange={(location) => {
                         setProjectForm((current) => ({
                           ...(current as any),
@@ -1337,7 +1355,10 @@ export default function StokCreateModal({
                 <button
                   type="button"
                   className="stock-save-btn"
-                  onClick={() => galleryInputRef.current?.click()}
+                  onClick={() => {
+                    setGalleryPickerActive(true);
+                    galleryInputRef.current?.click();
+                  }}
                   disabled={galleryImages.length >= MAX_GALLERY_COUNT || checkingImages}
                 >
                   {checkingImages ? "Görseller kontrol ediliyor..." : "Galeriye Fotoğraf Ekle"}
@@ -1440,19 +1461,21 @@ export default function StokCreateModal({
           </div>
         </div>
 
-        <div className="stock-modal-v2-foot stock-modal-v10-foot">
-          <button className="stock-cancel-btn" onClick={onClose}>
-            İptal
-          </button>
+        {!geoPickerOpen && !galleryPickerActive && !checkingImages && (
+          <div className="stock-modal-v2-foot stock-modal-v10-foot">
+            <button className="stock-cancel-btn" onClick={onClose}>
+              İptal
+            </button>
 
-          <button
-            className="stock-save-btn"
-            onClick={handleSubmit}
-            disabled={formLoading || checkingImages}
-          >
-            {formLoading ? "Kaydediliyor..." : "Portföyü Kaydet"}
-          </button>
-        </div>
+            <button
+              className="stock-save-btn"
+              onClick={handleSubmit}
+              disabled={formLoading || checkingImages}
+            >
+              {formLoading ? "Kaydediliyor..." : "Portföyü Kaydet"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
