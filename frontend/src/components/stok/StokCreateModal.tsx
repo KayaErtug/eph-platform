@@ -685,7 +685,12 @@ export default function StokCreateModal({
     setImageError("");
     setGalleryPickerActive(false);
 
-    if (files.length === 0) return;
+    if (files.length === 0) {
+      setGalleryPickerActive(false);
+      return;
+    }
+
+    setGalleryPickerActive(false);
 
     const remaining = MAX_GALLERY_COUNT - galleryImages.length;
 
@@ -864,7 +869,7 @@ export default function StokCreateModal({
       >
         <button className="stock-modal-v10-close" onClick={onClose} aria-label="Kapat">×</button>
 
-        <div className="stock-modal-v2-body stock-modal-v10-body">
+        <div className="stock-modal-v2-body stock-modal-v10-body" style={{ paddingBottom: "118px" }}>
           {formSuccess && <div className="stock-form-success">Portföy başarıyla eklendi.</div>}
           {formError && <div className="stock-form-error">{formError}</div>}
           {localError && <div className="stock-form-error">{localError}</div>}
@@ -1002,8 +1007,17 @@ export default function StokCreateModal({
                       placeId={String((projectForm as any).placeId || "")}
                       onOpenChange={setGeoPickerOpen}
                       onChange={(location) => {
+                        const nextAddress = String((location as any).address || "").trim();
+
+                        if (nextAddress) {
+                          setSelectedPlace(nextAddress);
+                        }
+
                         setProjectForm((current) => ({
                           ...(current as any),
+                          city: String((location as any).city || current.city || "").trim(),
+                          district: String((location as any).district || current.district || "").trim(),
+                          address: nextAddress || current.address || location.mapAddress,
                           latitude: location.latitude,
                           longitude: location.longitude,
                           mapAddress: location.mapAddress,

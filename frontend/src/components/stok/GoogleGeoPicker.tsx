@@ -8,6 +8,9 @@ type GoogleGeoLocation = {
   longitude: number;
   mapAddress: string;
   placeId?: string;
+  city?: string;
+  district?: string;
+  address?: string;
 };
 
 type GoogleGeoPickerProps = {
@@ -76,6 +79,47 @@ function normalizeAddress(parts: Array<string | null | undefined>) {
     .filter(Boolean)
     .join(", ");
 }
+
+function getAddressComponent(result: any, types: string[]) {
+  const components = Array.isArray(result?.address_components)
+    ? result.address_components
+    : [];
+
+  const found = components.find((component: any) => {
+    const componentTypes = Array.isArray(component?.types) ? component.types : [];
+    return types.some((type) => componentTypes.includes(type));
+  });
+
+  return String(found?.long_name || "").trim();
+}
+
+function getLocationPartsFromGoogleResult(result: any) {
+  if (!result) {
+    return {
+      city: "",
+      district: "",
+      address: "",
+    };
+  }
+
+  const city = getAddressComponent(result, ["administrative_area_level_1"]);
+  const district =
+    getAddressComponent(result, ["administrative_area_level_2"]) ||
+    getAddressComponent(result, ["locality"]);
+  const neighborhood =
+    getAddressComponent(result, ["neighborhood"]) ||
+    getAddressComponent(result, ["sublocality_level_1"]) ||
+    getAddressComponent(result, ["sublocality"]) ||
+    getAddressComponent(result, ["administrative_area_level_4"]) ||
+    getAddressComponent(result, ["route"]);
+
+  return {
+    city,
+    district,
+    address: neighborhood,
+  };
+}
+
 
 export default function GoogleGeoPicker({
   city,
@@ -156,11 +200,13 @@ export default function GoogleGeoPicker({
 
     geocoderRef.current.geocode({ location: { lat, lng } }, (results: any[], status: string) => {
       const firstResult = Array.isArray(results) ? results[0] : null;
+      const locationParts = getLocationPartsFromGoogleResult(firstResult);
       const nextLocation = {
         latitude: lat,
         longitude: lng,
         mapAddress: firstResult?.formatted_address || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
         placeId: firstResult?.place_id || "",
+        ...locationParts,
       };
 
       setPendingLocation(nextLocation);
@@ -184,11 +230,13 @@ export default function GoogleGeoPicker({
         return;
       }
 
+      const locationParts = getLocationPartsFromGoogleResult(firstResult);
       const nextLocation = {
         latitude: location.lat(),
         longitude: location.lng(),
         mapAddress: firstResult.formatted_address || searchAddress,
         placeId: firstResult.place_id || "",
+        ...locationParts,
       };
 
       setPendingLocation(nextLocation);
@@ -267,7 +315,7 @@ export default function GoogleGeoPicker({
         if (autocompleteInputRef.current) {
           autocompleteRef.current = new window.google.maps.places.Autocomplete(autocompleteInputRef.current, {
             componentRestrictions: { country: "tr" },
-            fields: ["formatted_address", "geometry", "place_id", "name"],
+            fields: ["formatted_address", "geometry", "place_id", "name", "address_components"],
           });
 
           autocompleteRef.current.addListener("place_changed", () => {
@@ -276,11 +324,13 @@ export default function GoogleGeoPicker({
 
             if (!location) return;
 
+            const locationParts = getLocationPartsFromGoogleResult(place);
             const nextLocation = {
               latitude: location.lat(),
               longitude: location.lng(),
               mapAddress: place.formatted_address || place.name || searchAddress,
               placeId: place.place_id || "",
+              ...locationParts,
             };
 
             setPendingLocation(nextLocation);
@@ -295,6 +345,9 @@ export default function GoogleGeoPicker({
               longitude,
               mapAddress: mapAddress || searchAddress,
               placeId: placeId || "",
+              city,
+              district,
+              address,
             },
             17,
           );
