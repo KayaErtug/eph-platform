@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   ActivityType,
+  CustomerPropertyRelation,
   CustomerStatus,
   PortfolioApprovalStatus,
   Role,
@@ -181,6 +182,33 @@ export class UnitsService {
     };
   }
 
+
+  private async linkCustomerProperty(input: {
+    customerId: string;
+    unitId: string;
+    relationType: CustomerPropertyRelation;
+    notes?: string;
+  }) {
+    await this.prisma.customerProperty.upsert({
+      where: {
+        customerId_unitId_relationType: {
+          customerId: input.customerId,
+          unitId: input.unitId,
+          relationType: input.relationType,
+        },
+      },
+      update: {
+        notes: input.notes || undefined,
+      },
+      create: {
+        customerId: input.customerId,
+        unitId: input.unitId,
+        relationType: input.relationType,
+        notes: input.notes || undefined,
+      },
+    });
+  }
+
   private async syncDeedOwnerToCrm(input: {
     ownerId: string;
     unitId: string;
@@ -270,6 +298,13 @@ export class UnitsService {
         },
       });
 
+      await this.linkCustomerProperty({
+        customerId: existing.id,
+        unitId: input.unitId,
+        relationType: CustomerPropertyRelation.TAPU_SAHIBI,
+        notes: 'Portföy girişi sırasında tapu sahibi olarak eşleştirildi.',
+      });
+
       return;
     }
 
@@ -300,6 +335,13 @@ export class UnitsService {
         type: ActivityType.NOT,
         note: `Tapu sahibi portföy girişinden otomatik CRM kaydı olarak oluşturuldu. Portföy ID: ${input.unitId}`,
       },
+    });
+
+    await this.linkCustomerProperty({
+      customerId: customer.id,
+      unitId: input.unitId,
+      relationType: CustomerPropertyRelation.TAPU_SAHIBI,
+      notes: 'Portföy girişi sırasında tapu sahibi olarak otomatik oluşturuldu.',
     });
   }
 

@@ -215,6 +215,7 @@ model Unit {
   project Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   images  UnitImage[]
   authorityDocuments PortfolioAuthorityDocument[]
+  customerProperties CustomerProperty[]
 
   @@index([approvalStatus])
   @@index([isPoolVisible])
@@ -518,6 +519,27 @@ model Customer {
   activities Activity[]
   owner      User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   tasks      Task[]
+  properties CustomerProperty[]
+}
+
+
+model CustomerProperty {
+  id           String                   @id @default(uuid())
+  customerId   String
+  unitId       String
+  relationType CustomerPropertyRelation
+  notes        String?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  unit     Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, unitId, relationType])
+  @@index([customerId])
+  @@index([unitId])
+  @@index([relationType])
+  @@index([createdAt])
 }
 
 model Activity {
@@ -1070,6 +1092,23 @@ enum CustomerStatus {
   PAZARLIK
   KAPANDI
   KAYBEDILDI
+}
+
+
+enum CustomerPropertyRelation {
+  TAPU_SAHIBI
+  SATICI
+  ALICI_ADAYI
+  KIRACI
+  KIRAYA_VEREN
+  MUTEAHHIT
+  INSAAT_FIRMASI
+  YATIRIMCI
+  ORTAK_MALIK
+  VEKIL
+  MIRASCI
+  ARSA_SAHIBI
+  KAT_KARSILIGI_ARSA_SAHIBI
 }
 
 enum ActivityType {
