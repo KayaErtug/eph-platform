@@ -196,9 +196,10 @@ type GeoOption = {
   name: string;
 };
 
-const TURKIYE_API_BASE_URL = "https://turkiyeapi.dev/api/v1";
+const TURKIYE_API_BASE_URL = "https://api.turkiyeapi.dev/v1";
+const KKTC_PROVINCE_NAME = "K.K.T.C.";
 
-const TURKIYE_KKTC_CITIES = [
+const TURKIYE_PROVINCES = [
   "Adana",
   "Adıyaman",
   "Afyonkarahisar",
@@ -280,33 +281,52 @@ const TURKIYE_KKTC_CITIES = [
   "Kilis",
   "Osmaniye",
   "Düzce",
-  "Lefkoşa",
-  "Girne",
-  "Gazimağusa",
-  "İskele",
-  "Güzelyurt",
-  "Lefke",
 ];
 
-const KKTC_CITIES = new Set(["Lefkoşa", "Girne", "Gazimağusa", "İskele", "Güzelyurt", "Lefke"]);
+const KKTC_DISTRICTS: GeoOption[] = [
+  { id: "Lefkoşa", name: "Lefkoşa" },
+  { id: "Girne", name: "Girne" },
+  { id: "Gazimağusa", name: "Gazimağusa" },
+  { id: "İskele", name: "İskele" },
+  { id: "Güzelyurt", name: "Güzelyurt" },
+  { id: "Lefke", name: "Lefke" },
+];
 
-const FALLBACK_PROVINCE_OPTIONS = TURKIYE_KKTC_CITIES.map((city) => ({
-  id: city,
-  name: city,
-})).sort((a, b) => a.name.localeCompare(b.name, "tr"));
+const KKTC_PLACES: Record<string, GeoOption[]> = {
+  Lefkoşa: [{ id: "Merkez", name: "Merkez" }],
+  Girne: [{ id: "Merkez", name: "Merkez" }],
+  Gazimağusa: [{ id: "Merkez", name: "Merkez" }],
+  İskele: [{ id: "Merkez", name: "Merkez" }],
+  Güzelyurt: [{ id: "Merkez", name: "Merkez" }],
+  Lefke: [{ id: "Merkez", name: "Merkez" }],
+};
+
+const FALLBACK_PROVINCE_OPTIONS: GeoOption[] = [
+  { id: "KKTC", name: KKTC_PROVINCE_NAME },
+  ...TURKIYE_PROVINCES.map((city) => ({ id: city, name: city })),
+];
+
+function sortGeoOptions(options: GeoOption[]) {
+  return [...options].sort((a, b) => {
+    if (a.name === KKTC_PROVINCE_NAME) return -1;
+    if (b.name === KKTC_PROVINCE_NAME) return 1;
+    return a.name.localeCompare(b.name, "tr");
+  });
+}
 
 function uniqueSortedGeoOptions(options: GeoOption[]) {
   const seen = new Set<string>();
 
-  return options
-    .filter((option) => option.name.trim())
-    .filter((option) => {
-      const key = option.name.toLocaleLowerCase("tr-TR");
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .sort((a, b) => a.name.localeCompare(b.name, "tr"));
+  return sortGeoOptions(
+    options
+      .filter((option) => option.name.trim())
+      .filter((option) => {
+        const key = option.name.toLocaleLowerCase("tr-TR");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }),
+  );
 }
 
 function readGeoPayloadItems(payload: any): any[] {
@@ -318,6 +338,8 @@ function readGeoPayloadItems(payload: any): any[] {
   if (Array.isArray(payload?.provinces)) return payload.provinces;
   if (Array.isArray(payload?.districts)) return payload.districts;
   if (Array.isArray(payload?.neighborhoods)) return payload.neighborhoods;
+  if (Array.isArray(payload?.villages)) return payload.villages;
+  if (Array.isArray(payload?.towns)) return payload.towns;
   return [];
 }
 
@@ -330,6 +352,10 @@ function readGeoOptionName(item: any) {
       item?.districtName ||
       item?.neighborhood ||
       item?.neighborhoodName ||
+      item?.village ||
+      item?.villageName ||
+      item?.town ||
+      item?.townName ||
       item?.mahalle ||
       item?.mahalleAdi ||
       item?.title ||
@@ -338,7 +364,15 @@ function readGeoOptionName(item: any) {
 }
 
 function readGeoOptionId(item: any, fallbackName: string) {
-  return String(item?.id || item?.code || item?.plateNumber || item?.plate || fallbackName).trim();
+  return String(
+    item?.id ||
+      item?.code ||
+      item?.plateNumber ||
+      item?.plate ||
+      item?.districtId ||
+      item?.provinceId ||
+      fallbackName,
+  ).trim();
 }
 
 function normalizeGeoOptions(payload: any) {
@@ -354,6 +388,16 @@ function normalizeGeoOptions(payload: any) {
   );
 }
 
+async function fetchGeoUrl(url: string) {
+  const response = await fetch(url, { cache: "force-cache" });
+
+  if (!response.ok) {
+    throw new Error("Coğrafi veri yüklenemedi.");
+  }
+
+  return normalizeGeoOptions(await response.json());
+}
+
 async function fetchGeoOptions(path: string, params: Record<string, string | number | undefined>) {
   const searchParams = new URLSearchParams();
 
@@ -363,15 +407,7 @@ async function fetchGeoOptions(path: string, params: Record<string, string | num
     }
   });
 
-  const response = await fetch(`${TURKIYE_API_BASE_URL}${path}?${searchParams.toString()}`, {
-    cache: "force-cache",
-  });
-
-  if (!response.ok) {
-    throw new Error("Coğrafi veri yüklenemedi.");
-  }
-
-  return normalizeGeoOptions(await response.json());
+  return fetchGeoUrl(`${TURKIYE_API_BASE_URL}${path}?${searchParams.toString()}`);
 }
 
 function ensureSelectedOption(options: GeoOption[], selectedValue: string) {
@@ -380,18 +416,48 @@ function ensureSelectedOption(options: GeoOption[], selectedValue: string) {
   return uniqueSortedGeoOptions([{ id: selectedValue, name: selectedValue }, ...options]);
 }
 
-function fallbackDistrictOptions(city: string): GeoOption[] {
+async function fetchProvinceOptions() {
+  try {
+    const apiOptions = await fetchGeoOptions("/provinces", { limit: 100, sort: "name" });
+    return uniqueSortedGeoOptions([...FALLBACK_PROVINCE_OPTIONS, ...apiOptions]);
+  } catch {
+    return FALLBACK_PROVINCE_OPTIONS;
+  }
+}
+
+async function fetchDistrictOptionsForCity(city: string) {
   if (!city) return [];
-  if (KKTC_CITIES.has(city)) return [{ id: "Merkez", name: "Merkez" }];
-  return [];
+  if (city === KKTC_PROVINCE_NAME || city === "KKTC") return KKTC_DISTRICTS;
+
+  return fetchGeoOptions("/districts", {
+    province: city,
+    limit: 1000,
+    sort: "name",
+  });
 }
 
-function fallbackNeighborhoodOptions(city: string, district: string): GeoOption[] {
+async function fetchPlaceOptionsForDistrict(city: string, district: string, districtId?: string) {
   if (!city || !district) return [];
-  if (KKTC_CITIES.has(city)) return [{ id: "Merkez", name: "Merkez" }];
-  return [];
-}
+  if (city === KKTC_PROVINCE_NAME || city === "KKTC") return KKTC_PLACES[district] || [{ id: "Merkez", name: "Merkez" }];
 
+  const provinceQuery = `province=${encodeURIComponent(city)}`;
+  const districtQuery = districtId
+    ? `districtId=${encodeURIComponent(districtId)}`
+    : `district=${encodeURIComponent(district)}`;
+  const baseQuery = `${provinceQuery}&${districtQuery}&sort=name`;
+
+  const [neighborhoodPayload, villagePayload, townPayload] = await Promise.allSettled([
+    fetchGeoUrl(`${TURKIYE_API_BASE_URL}/neighborhoods?${baseQuery}`),
+    fetchGeoUrl(`${TURKIYE_API_BASE_URL}/villages?${baseQuery}`),
+    fetchGeoUrl(`${TURKIYE_API_BASE_URL}/towns?${baseQuery}`),
+  ]);
+
+  const neighborhoods = neighborhoodPayload.status === "fulfilled" ? neighborhoodPayload.value : [];
+  const villages = villagePayload.status === "fulfilled" ? villagePayload.value : [];
+  const towns = townPayload.status === "fulfilled" ? townPayload.value : [];
+
+  return uniqueSortedGeoOptions([...neighborhoods, ...villages, ...towns]);
+}
 
 function money(value?: number) {
   if (!value) return "—";
@@ -530,11 +596,10 @@ export default function CrmPage() {
     let active = true;
     setProvinceLoading(true);
 
-    fetchGeoOptions("/provinces", { limit: 100, sort: "name" })
+    fetchProvinceOptions()
       .then((options) => {
         if (!active) return;
-        const mergedOptions = uniqueSortedGeoOptions([...options, ...FALLBACK_PROVINCE_OPTIONS]);
-        setProvinceOptions(mergedOptions.length ? mergedOptions : FALLBACK_PROVINCE_OPTIONS);
+        setProvinceOptions(options.length ? options : FALLBACK_PROVINCE_OPTIONS);
       })
       .catch(() => {
         if (active) setProvinceOptions(FALLBACK_PROVINCE_OPTIONS);
@@ -556,17 +621,15 @@ export default function CrmPage() {
 
     if (!interestForm.city) return;
 
-    const fallbackOptions = fallbackDistrictOptions(interestForm.city);
     setDistrictLoading(true);
 
-    fetchGeoOptions("/districts", { province: interestForm.city, limit: 1000, sort: "name" })
+    fetchDistrictOptionsForCity(interestForm.city)
       .then((options) => {
         if (!active) return;
-        const mergedOptions = uniqueSortedGeoOptions([...options, ...fallbackOptions]);
-        setDistrictOptionsList(ensureSelectedOption(mergedOptions, interestForm.district));
+        setDistrictOptionsList(ensureSelectedOption(options, interestForm.district));
       })
       .catch(() => {
-        if (active) setDistrictOptionsList(ensureSelectedOption(fallbackOptions, interestForm.district));
+        if (active) setDistrictOptionsList(ensureSelectedOption([], interestForm.district));
       })
       .finally(() => {
         if (active) setDistrictLoading(false);
@@ -575,7 +638,7 @@ export default function CrmPage() {
     return () => {
       active = false;
     };
-  }, [interestForm.city]);
+  }, [interestForm.city, interestForm.district]);
 
   useEffect(() => {
     let active = true;
@@ -584,22 +647,16 @@ export default function CrmPage() {
 
     if (!interestForm.city || !interestForm.district) return;
 
-    const fallbackOptions = fallbackNeighborhoodOptions(interestForm.city, interestForm.district);
+    const selectedDistrict = districtOptionsList.find((district) => district.name === interestForm.district);
     setNeighborhoodLoading(true);
 
-    fetchGeoOptions("/neighborhoods", {
-      province: interestForm.city,
-      district: interestForm.district,
-      limit: 5000,
-      sort: "name",
-    })
+    fetchPlaceOptionsForDistrict(interestForm.city, interestForm.district, selectedDistrict?.id)
       .then((options) => {
         if (!active) return;
-        const mergedOptions = uniqueSortedGeoOptions([...options, ...fallbackOptions]);
-        setNeighborhoodOptionsList(ensureSelectedOption(mergedOptions, interestForm.neighborhood));
+        setNeighborhoodOptionsList(ensureSelectedOption(options, interestForm.neighborhood));
       })
       .catch(() => {
-        if (active) setNeighborhoodOptionsList(ensureSelectedOption(fallbackOptions, interestForm.neighborhood));
+        if (active) setNeighborhoodOptionsList(ensureSelectedOption([], interestForm.neighborhood));
       })
       .finally(() => {
         if (active) setNeighborhoodLoading(false);
@@ -608,7 +665,7 @@ export default function CrmPage() {
     return () => {
       active = false;
     };
-  }, [interestForm.city, interestForm.district]);
+  }, [interestForm.city, interestForm.district, interestForm.neighborhood, districtOptionsList]);
 
   useEffect(() => {
     if (!hydrated) return;
