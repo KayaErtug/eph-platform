@@ -295,7 +295,7 @@ export default function MessageDetailPage() {
         <header className="shrink-0 border-b border-[#DDE7F3] bg-white px-2.5 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.035)]">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => router.push("/messages")}
+              onClick={() => router.push("/havuz")}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-[#F7FBFF] text-[#06194A]"
               aria-label="Mesajlara dön"
             >
@@ -377,8 +377,8 @@ export default function MessageDetailPage() {
           )}
         </div>
 
-        <footer className="shrink-0 border-t border-[#DDE7F3] bg-white px-2.5 py-2">
-          <div className="flex items-end gap-2">
+        <footer className="shrink-0 border-t border-[#DDE7F3] bg-white px-1.5 py-2">
+          <div className="flex w-full items-end gap-1.5">
             <textarea
               value={message}
               onChange={(event) => setMessage(event.target.value)}
@@ -392,7 +392,7 @@ export default function MessageDetailPage() {
               rows={1}
               placeholder="Mesaj yaz..."
               style={{ fontSize: "16px" }}
-              className="max-h-[100px] min-h-[46px] flex-1 resize-none rounded-[18px] bg-[#F7FBFF] px-4 py-3 text-[14px] font-semibold leading-[20px] text-[#06194A] outline-none placeholder:text-[#94A3B8]"
+              className="max-h-[120px] min-h-[50px] w-full min-w-0 flex-1 resize-none rounded-[18px] bg-[#F7FBFF] px-4 py-3 text-[14px] font-semibold leading-[20px] text-[#06194A] outline-none placeholder:text-[#94A3B8]"
             />
 
             <button

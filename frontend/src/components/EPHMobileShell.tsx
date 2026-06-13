@@ -1,7 +1,7 @@
 "use client";
 
 import "./EPHMobileShell.css";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -114,10 +114,27 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuthStore();
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showLinaFab, setShowLinaFab] = useState(true);
 
   const showShell = shouldShowShell(pathname);
   const showBottomNav = shouldShowBottomNav(pathname);
   const title = useMemo(() => getTitle(pathname), [pathname]);
+
+
+  useEffect(() => {
+    if (pathname.startsWith("/lina")) {
+      setShowLinaFab(false);
+      return;
+    }
+
+    setShowLinaFab(true);
+
+    const timer = window.setTimeout(() => {
+      setShowLinaFab(false);
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [pathname]);
 
   const go = (href: string) => {
     setMenuOpen(false);
@@ -288,7 +305,7 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {!pathname.startsWith("/lina") && (
+      {!pathname.startsWith("/lina") && showLinaFab && (
         <button
           type="button"
           className="eph-mobile-lina-fab"

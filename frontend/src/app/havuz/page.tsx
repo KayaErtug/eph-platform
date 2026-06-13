@@ -355,7 +355,9 @@ export default function HavuzPage() {
 
       setSelectedAction(null);
     } catch (error) {
+      setSelectedAction(null);
       setErrorMessage(getErrorMessage(error));
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setBusyAction(null);
     }
@@ -459,7 +461,7 @@ export default function HavuzPage() {
         </section>
 
         {errorMessage && (
-          <section className="rounded-[18px] border-2 border-red-200 bg-red-50 p-3 text-[12px] font-black text-red-700">
+          <section className="rounded-[18px] border-2 border-red-300 bg-red-50 p-3 text-center text-[12px] font-black leading-5 text-red-700 shadow-[0_10px_22px_rgba(220,38,38,0.10)]">
             {errorMessage}
           </section>
         )}
@@ -653,8 +655,8 @@ function PoolDetailModal({ unit, onClose }: { unit: Unit; onClose: () => void })
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 px-3 pb-3">
       <section className="w-full max-w-[430px] rounded-[28px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
-        <div className="relative flex items-start justify-end gap-3">
-          <div className="absolute left-1/2 -translate-x-1/2 min-w-0 text-center">
+        <div className="relative min-h-[76px]">
+          <div className="absolute left-1/2 top-0 w-[260px] -translate-x-1/2 text-center">
             <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
               Havuz Detay
             </p>
@@ -666,7 +668,7 @@ function PoolDetailModal({ unit, onClose }: { unit: Unit; onClose: () => void })
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB]"
+            className="absolute right-0 top-0 z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB]"
           >
             <X size={19} />
           </button>
@@ -725,8 +727,8 @@ function PoolActionModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 px-3 pb-3">
       <section className="w-full max-w-[430px] rounded-[28px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
-        <div className="relative flex items-start justify-end gap-3">
-          <div className="absolute left-1/2 -translate-x-1/2 min-w-0 text-center">
+        <div className="relative min-h-[76px]">
+          <div className="absolute left-1/2 top-0 w-[260px] -translate-x-1/2 text-center">
             <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
               Havuz Kontör İşlemi
             </p>
@@ -739,7 +741,7 @@ function PoolActionModal({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB] disabled:opacity-60"
+            className="absolute right-0 top-0 z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB] disabled:opacity-60"
           >
             <X size={19} />
           </button>
