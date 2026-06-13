@@ -653,8 +653,8 @@ function PoolDetailModal({ unit, onClose }: { unit: Unit; onClose: () => void })
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 px-3 pb-3">
       <section className="w-full max-w-[430px] rounded-[28px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+        <div className="relative flex items-start justify-end gap-3">
+          <div className="absolute left-1/2 -translate-x-1/2 min-w-0 text-center">
             <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
               Havuz Detay
             </p>
@@ -725,8 +725,8 @@ function PoolActionModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 px-3 pb-3">
       <section className="w-full max-w-[430px] rounded-[28px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+        <div className="relative flex items-start justify-end gap-3">
+          <div className="absolute left-1/2 -translate-x-1/2 min-w-0 text-center">
             <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
               Havuz Kontör İşlemi
             </p>

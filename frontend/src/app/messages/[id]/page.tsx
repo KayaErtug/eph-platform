@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
-import { ArrowLeft, CheckCheck, LockKeyhole, SendHorizonal, Volume2 } from "lucide-react";
+import { ArrowLeft, CheckCheck, LockKeyhole, SendHorizonal } from "lucide-react";
 
 type PresenceStatus = "online" | "away" | "offline";
 
@@ -320,16 +320,6 @@ export default function MessageDetailPage() {
                 <span className="truncate">{lockedTitle}</span>
               </div>
             </div>
-
-            {!soundEnabled && (
-              <button
-                onClick={enableSound}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-[#F4F0FF] text-[#6D4AFF]"
-                title="Sesi Aç"
-              >
-                <Volume2 size={17} />
-              </button>
-            )}
           </div>
         </header>
 
@@ -402,7 +392,7 @@ export default function MessageDetailPage() {
               rows={1}
               placeholder="Mesaj yaz..."
               style={{ fontSize: "16px" }}
-              className="max-h-[86px] min-h-[42px] flex-1 resize-none rounded-[18px] bg-[#F7FBFF] px-3 py-2.5 text-[13px] font-semibold leading-[20px] text-[#06194A] outline-none placeholder:text-[#94A3B8]"
+              className="max-h-[100px] min-h-[46px] flex-1 resize-none rounded-[18px] bg-[#F7FBFF] px-4 py-3 text-[14px] font-semibold leading-[20px] text-[#06194A] outline-none placeholder:text-[#94A3B8]"
             />
 
             <button
