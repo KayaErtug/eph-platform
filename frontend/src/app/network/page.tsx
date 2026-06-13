@@ -97,13 +97,41 @@ const CATEGORY_IMAGES: Record<string, string> = {
 };
 
 const REQUEST_TABS = [
-  { key: "Tüm Talepler", label: "Tümü", countTone: "bg-blue-100 text-blue-700" },
-  { key: "Portföy Arıyorum", label: "Portföy Arıyorum", countTone: "bg-emerald-100 text-emerald-700" },
-  { key: "Kat Karşılığı Arsa Arıyorum", label: "Kat Karşılığı Arsa Arıyorum", countTone: "bg-orange-100 text-orange-700" },
-  { key: "Bölgesel Satış Ofisi Arıyorum", label: "Bölgesel Satış Ofisi Arıyorum", countTone: "bg-violet-100 text-violet-700" },
-  { key: "İş Ortağı Arıyorum", label: "İş Ortağı Arıyorum", countTone: "bg-blue-100 text-blue-700" },
-  { key: "Yatırımcı Arıyorum", label: "Yatırımcı Arıyorum", countTone: "bg-amber-100 text-amber-700" },
-  { key: "Sektörel İhtiyaçlar", label: "Sektörel İhtiyaçlar", countTone: "bg-purple-100 text-purple-700" },
+  {
+    key: "Tüm Talepler",
+    label: "Tümü",
+    countTone: "bg-blue-100 text-blue-700",
+  },
+  {
+    key: "Portföy Arıyorum",
+    label: "Portföy Arıyorum",
+    countTone: "bg-emerald-100 text-emerald-700",
+  },
+  {
+    key: "Kat Karşılığı Arsa Arıyorum",
+    label: "Kat Karşılığı Arsa Arıyorum",
+    countTone: "bg-orange-100 text-orange-700",
+  },
+  {
+    key: "Bölgesel Satış Ofisi Arıyorum",
+    label: "Bölgesel Satış Ofisi Arıyorum",
+    countTone: "bg-violet-100 text-violet-700",
+  },
+  {
+    key: "İş Ortağı Arıyorum",
+    label: "İş Ortağı Arıyorum",
+    countTone: "bg-blue-100 text-blue-700",
+  },
+  {
+    key: "Yatırımcı Arıyorum",
+    label: "Yatırımcı Arıyorum",
+    countTone: "bg-amber-100 text-amber-700",
+  },
+  {
+    key: "Sektörel İhtiyaçlar",
+    label: "Sektörel İhtiyaçlar",
+    countTone: "bg-purple-100 text-purple-700",
+  },
   { key: "Duyuru", label: "Duyuru", countTone: "bg-red-100 text-red-700" },
   { key: "Diğer", label: "Diğer", countTone: "bg-slate-100 text-slate-700" },
 ] as const;
@@ -164,8 +192,19 @@ const ALL_CATEGORY_OPTIONS: ForumCategoryOption[] = [
 ];
 
 const ROLE_CATEGORY_MAP: Record<string, ForumCategory[]> = {
-  EMLAKCI: ["PORTFOY_ARIYORUM", "KAT_KARSILIGI_ARSA_ARIYORUM", "SEKTOREL_IHTIYACLAR", "KAMPANYA_DUYURU"],
-  MUTEAHHIT: ["BOLGESEL_SATIS_OFISI_ARIYORUM", "KAT_KARSILIGI_ARSA_ARIYORUM", "KAMPANYA_DUYURU", "SEKTOREL_IHTIYACLAR", "DIGER"],
+  EMLAKCI: [
+    "PORTFOY_ARIYORUM",
+    "KAT_KARSILIGI_ARSA_ARIYORUM",
+    "SEKTOREL_IHTIYACLAR",
+    "KAMPANYA_DUYURU",
+  ],
+  MUTEAHHIT: [
+    "BOLGESEL_SATIS_OFISI_ARIYORUM",
+    "KAT_KARSILIGI_ARSA_ARIYORUM",
+    "KAMPANYA_DUYURU",
+    "SEKTOREL_IHTIYACLAR",
+    "DIGER",
+  ],
   INSAAT_FIRMASI: [
     "BOLGESEL_SATIS_OFISI_ARIYORUM",
     "KAT_KARSILIGI_ARSA_ARIYORUM",
@@ -199,8 +238,17 @@ const ROLE_CATEGORY_MAP: Record<string, ForumCategory[]> = {
   ],
 };
 
-const REQUEST_INTENT_OPTIONS = ["Tümü", "Kiralık Arıyorum", "Satılık Arıyorum", "Arıyorum"];
-const CREATE_REQUEST_INTENT_OPTIONS = ["Kiralık Arıyorum", "Satılık Arıyorum", "Arıyorum"];
+const REQUEST_INTENT_OPTIONS = [
+  "Tümü",
+  "Kiralık Arıyorum",
+  "Satılık Arıyorum",
+  "Arıyorum",
+];
+const CREATE_REQUEST_INTENT_OPTIONS = [
+  "Kiralık Arıyorum",
+  "Satılık Arıyorum",
+  "Arıyorum",
+];
 const VALID_OPTIONS = ["3 gün", "7 gün", "15 gün", "30 gün"];
 const URGENCY_OPTIONS = ["Normal", "Acil", "Müşteri Hazır", "Sıcak Talep"];
 const CURRENCY_OPTIONS = ["TRY", "USD", "EUR", "GBP"];
@@ -208,7 +256,10 @@ const CURRENCY_OPTIONS = ["TRY", "USD", "EUR", "GBP"];
 const VISIBILITY_OPTIONS = [
   { label: "Tüm EPH", value: "TUM_EPH" },
   { label: "Sadece emlakçılar", value: "SADECE_EMLAKCILAR" },
-  { label: "Sadece müteahhitler / inşaat firmaları", value: "SADECE_MUTEAHHITLER" },
+  {
+    label: "Sadece müteahhitler / inşaat firmaları",
+    value: "SADECE_MUTEAHHITLER",
+  },
   { label: "Sadece bağlantılarım", value: "SADECE_BAGLANTILARIM" },
 ];
 
@@ -254,10 +305,47 @@ const CITY_OPTIONS = [
 ];
 
 const DISTRICT_OPTIONS_BY_CITY: Record<string, string[]> = {
-  "K.K.T.C.": ["Lefkoşa", "Girne", "Gazimağusa", "Güzelyurt", "İskele", "Lefke"],
-  Denizli: ["Merkezefendi", "Pamukkale", "Acıpayam", "Buldan", "Çal", "Çameli", "Çardak", "Çivril", "Honaz", "Sarayköy", "Tavas"],
-  İstanbul: ["Kadıköy", "Ataşehir", "Üsküdar", "Beşiktaş", "Şişli", "Bakırköy", "Beylikdüzü", "Esenyurt", "Sarıyer"],
-  Ankara: ["Çankaya", "Keçiören", "Yenimahalle", "Etimesgut", "Mamak", "Gölbaşı", "Sincan"],
+  "K.K.T.C.": [
+    "Lefkoşa",
+    "Girne",
+    "Gazimağusa",
+    "Güzelyurt",
+    "İskele",
+    "Lefke",
+  ],
+  Denizli: [
+    "Merkezefendi",
+    "Pamukkale",
+    "Acıpayam",
+    "Buldan",
+    "Çal",
+    "Çameli",
+    "Çardak",
+    "Çivril",
+    "Honaz",
+    "Sarayköy",
+    "Tavas",
+  ],
+  İstanbul: [
+    "Kadıköy",
+    "Ataşehir",
+    "Üsküdar",
+    "Beşiktaş",
+    "Şişli",
+    "Bakırköy",
+    "Beylikdüzü",
+    "Esenyurt",
+    "Sarıyer",
+  ],
+  Ankara: [
+    "Çankaya",
+    "Keçiören",
+    "Yenimahalle",
+    "Etimesgut",
+    "Mamak",
+    "Gölbaşı",
+    "Sincan",
+  ],
   İzmir: ["Konak", "Karşıyaka", "Bornova", "Buca", "Çiğli", "Bayraklı", "Urla"],
   Antalya: ["Muratpaşa", "Konyaaltı", "Kepez", "Alanya", "Manavgat", "Serik"],
 };
@@ -277,7 +365,9 @@ const DEFAULT_FORM: TopicForm = {
 };
 
 function normalizeText(value?: string | null) {
-  return String(value || "").toLocaleLowerCase("tr-TR").trim();
+  return String(value || "")
+    .toLocaleLowerCase("tr-TR")
+    .trim();
 }
 
 function normalizeRole(role?: string | null) {
@@ -296,7 +386,12 @@ function normalizeRole(role?: string | null) {
   if (raw.includes("SUPER")) return "SUPER_ADMIN";
   if (raw.includes("ADMIN")) return "ADMIN";
   if (raw.includes("INSAAT")) return "INSAAT_FIRMASI";
-  if (raw.includes("MUTEAHHIT") || raw.includes("MUTEAHIT") || raw.includes("MUTAAHHIT")) return "MUTEAHHIT";
+  if (
+    raw.includes("MUTEAHHIT") ||
+    raw.includes("MUTEAHIT") ||
+    raw.includes("MUTAAHHIT")
+  )
+    return "MUTEAHHIT";
   if (raw.includes("EMLAK")) return "EMLAKCI";
 
   return raw || "EMLAKCI";
@@ -310,13 +405,29 @@ function getCategoryOption(value?: string | null) {
 
   const text = normalizeText(raw);
 
-  if (text.includes("portföy") || text.includes("portfoy")) return ALL_CATEGORY_OPTIONS[0];
-  if (text.includes("kat") || text.includes("arsa")) return ALL_CATEGORY_OPTIONS[1];
-  if (text.includes("satış") || text.includes("satis") || text.includes("ofis")) return ALL_CATEGORY_OPTIONS[2];
-  if (text.includes("iş ortağı") || text.includes("is ortagi") || text.includes("ortak")) return ALL_CATEGORY_OPTIONS[3];
-  if (text.includes("yatırım") || text.includes("yatirim")) return ALL_CATEGORY_OPTIONS[4];
-  if (text.includes("sektör") || text.includes("sektor") || text.includes("ihtiyaç") || text.includes("ihtiyac")) return ALL_CATEGORY_OPTIONS[5];
-  if (text.includes("duyuru") || text.includes("kampanya")) return ALL_CATEGORY_OPTIONS[7];
+  if (text.includes("portföy") || text.includes("portfoy"))
+    return ALL_CATEGORY_OPTIONS[0];
+  if (text.includes("kat") || text.includes("arsa"))
+    return ALL_CATEGORY_OPTIONS[1];
+  if (text.includes("satış") || text.includes("satis") || text.includes("ofis"))
+    return ALL_CATEGORY_OPTIONS[2];
+  if (
+    text.includes("iş ortağı") ||
+    text.includes("is ortagi") ||
+    text.includes("ortak")
+  )
+    return ALL_CATEGORY_OPTIONS[3];
+  if (text.includes("yatırım") || text.includes("yatirim"))
+    return ALL_CATEGORY_OPTIONS[4];
+  if (
+    text.includes("sektör") ||
+    text.includes("sektor") ||
+    text.includes("ihtiyaç") ||
+    text.includes("ihtiyac")
+  )
+    return ALL_CATEGORY_OPTIONS[5];
+  if (text.includes("duyuru") || text.includes("kampanya"))
+    return ALL_CATEGORY_OPTIONS[7];
 
   return ALL_CATEGORY_OPTIONS[8];
 }
@@ -329,8 +440,10 @@ function categoryFamily(value?: string | null) {
   const category = getCategoryOption(value).value;
 
   if (category === "PORTFOY_ARIYORUM") return "Portföy Arıyorum";
-  if (category === "KAT_KARSILIGI_ARSA_ARIYORUM") return "Kat Karşılığı Arsa Arıyorum";
-  if (category === "BOLGESEL_SATIS_OFISI_ARIYORUM") return "Bölgesel Satış Ofisi Arıyorum";
+  if (category === "KAT_KARSILIGI_ARSA_ARIYORUM")
+    return "Kat Karşılığı Arsa Arıyorum";
+  if (category === "BOLGESEL_SATIS_OFISI_ARIYORUM")
+    return "Bölgesel Satış Ofisi Arıyorum";
   if (category === "IS_ORTAGI_ARIYORUM") return "İş Ortağı Arıyorum";
   if (category === "YATIRIMCI_ARIYORUM") return "Yatırımcı Arıyorum";
   if (category === "SEKTOREL_IHTIYACLAR") return "Sektörel İhtiyaçlar";
@@ -346,15 +459,23 @@ function getCategoryImage(value?: string | null) {
 }
 
 function getRequestIntentFromPost(post: NetworkPost) {
-  const tag = (post.tags || []).find((item) => String(item || "").startsWith("Talep Türü:"));
-  const value = String(tag || "").replace("Talep Türü:", "").trim();
+  const tag = (post.tags || []).find((item) =>
+    String(item || "").startsWith("Talep Türü:"),
+  );
+  const value = String(tag || "")
+    .replace("Talep Türü:", "")
+    .trim();
 
   if (CREATE_REQUEST_INTENT_OPTIONS.includes(value)) return value;
 
-  const text = normalizeText([post.title, post.description, ...(post.tags || [])].join(" "));
+  const text = normalizeText(
+    [post.title, post.description, ...(post.tags || [])].join(" "),
+  );
 
-  if (text.includes("kiralık") || text.includes("kiralik")) return "Kiralık Arıyorum";
-  if (text.includes("satılık") || text.includes("satilik")) return "Satılık Arıyorum";
+  if (text.includes("kiralık") || text.includes("kiralik"))
+    return "Kiralık Arıyorum";
+  if (text.includes("satılık") || text.includes("satilik"))
+    return "Satılık Arıyorum";
 
   return "Arıyorum";
 }
@@ -380,7 +501,10 @@ function tabCount(posts: NetworkPost[], key: string) {
 function formatMoney(value?: string | number | null, currency = "TRY") {
   if (value == null || value === "") return "";
 
-  const numeric = typeof value === "number" ? value : Number(String(value).replace(/\D/g, ""));
+  const numeric =
+    typeof value === "number"
+      ? value
+      : Number(String(value).replace(/\D/g, ""));
 
   if (!numeric) return String(value);
 
@@ -388,7 +512,9 @@ function formatMoney(value?: string | number | null, currency = "TRY") {
 }
 
 function formatBudgetInput(value: string) {
-  const digits = String(value || "").replace(/\D/g, "").slice(0, 13);
+  const digits = String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 13);
 
   if (!digits) return "";
 
@@ -396,8 +522,12 @@ function formatBudgetInput(value: string) {
 }
 
 function budgetCurrencyFromPost(post: NetworkPost) {
-  const tag = (post.tags || []).find((item) => String(item || "").startsWith("Döviz:"));
-  const currency = String(tag || "").replace("Döviz:", "").trim();
+  const tag = (post.tags || []).find((item) =>
+    String(item || "").startsWith("Döviz:"),
+  );
+  const currency = String(tag || "")
+    .replace("Döviz:", "")
+    .trim();
 
   return currency || "TRY";
 }
@@ -439,9 +569,17 @@ function expiresAtFromValidFor(value: string) {
 }
 
 function isHotPost(post: NetworkPost) {
-  const text = normalizeText([post.urgency, post.title, post.description].filter(Boolean).join(" "));
+  const text = normalizeText(
+    [post.urgency, post.title, post.description].filter(Boolean).join(" "),
+  );
 
-  return text.includes("acil") || text.includes("sıcak") || text.includes("sicak") || text.includes("hazır") || text.includes("hazir");
+  return (
+    text.includes("acil") ||
+    text.includes("sıcak") ||
+    text.includes("sicak") ||
+    text.includes("hazır") ||
+    text.includes("hazir")
+  );
 }
 
 function getRoleCategories(role?: string | null) {
@@ -457,21 +595,33 @@ function getDistrictOptions(city: string) {
   return DISTRICT_OPTIONS_BY_CITY[city] || ["Merkez"];
 }
 
-function canManagePost(post: NetworkPost, user?: { id?: string | null; role?: string | null } | null) {
+function canManagePost(
+  post: NetworkPost,
+  user?: { id?: string | null; role?: string | null } | null,
+) {
   const role = normalizeRole(user?.role);
 
-  return Boolean(user?.id && (post.userId === user.id || role === "ADMIN" || role === "SUPER_ADMIN"));
+  return Boolean(
+    user?.id &&
+    (post.userId === user.id || role === "ADMIN" || role === "SUPER_ADMIN"),
+  );
 }
 
 function categoryBadgeClass(value?: string | null) {
   const family = categoryFamily(value);
 
-  if (family === "Kat Karşılığı Arsa Arıyorum") return "border-orange-200 bg-orange-50 text-orange-600";
-  if (family === "Portföy Arıyorum") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (family === "Bölgesel Satış Ofisi Arıyorum") return "border-violet-200 bg-violet-50 text-violet-700";
-  if (family === "İş Ortağı Arıyorum") return "border-blue-200 bg-blue-50 text-blue-700";
-  if (family === "Yatırımcı Arıyorum") return "border-amber-200 bg-amber-50 text-amber-700";
-  if (family === "Sektörel İhtiyaçlar") return "border-purple-200 bg-purple-50 text-purple-700";
+  if (family === "Kat Karşılığı Arsa Arıyorum")
+    return "border-orange-200 bg-orange-50 text-orange-600";
+  if (family === "Portföy Arıyorum")
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (family === "Bölgesel Satış Ofisi Arıyorum")
+    return "border-violet-200 bg-violet-50 text-violet-700";
+  if (family === "İş Ortağı Arıyorum")
+    return "border-blue-200 bg-blue-50 text-blue-700";
+  if (family === "Yatırımcı Arıyorum")
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  if (family === "Sektörel İhtiyaçlar")
+    return "border-purple-200 bg-purple-50 text-purple-700";
   if (family === "Duyuru") return "border-red-200 bg-red-50 text-red-600";
 
   return "border-slate-200 bg-slate-50 text-slate-700";
@@ -509,10 +659,19 @@ function readStoredPostIds(prefix: string) {
   return values;
 }
 
-function MarqueeRow({ children, duration = 34 }: { children: ReactNode; duration?: number }) {
+function MarqueeRow({
+  children,
+  duration = 34,
+}: {
+  children: ReactNode;
+  duration?: number;
+}) {
   return (
     <div className="talep-marquee-viewport overflow-hidden">
-      <div className="talep-marquee-track flex w-max items-center gap-2" style={{ animationDuration: `${duration}s` }}>
+      <div
+        className="talep-marquee-track flex w-max items-center gap-2"
+        style={{ animationDuration: `${duration}s` }}
+      >
         {children}
         {children}
       </div>
@@ -539,9 +698,14 @@ export default function NetworkPage() {
   const [urgencyFilter, setUrgencyFilter] = useState("Tümü");
   const [budgetMaxFilter, setBudgetMaxFilter] = useState("");
   const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
-  const [interestedPostIds, setInterestedPostIds] = useState<Set<string>>(new Set());
+  const [interestedPostIds, setInterestedPostIds] = useState<Set<string>>(
+    new Set(),
+  );
 
-  const roleCategories = useMemo(() => getRoleCategories(user?.role), [user?.role]);
+  const roleCategories = useMemo(
+    () => getRoleCategories(user?.role),
+    [user?.role],
+  );
 
   const fetchPosts = async () => {
     try {
@@ -559,7 +723,9 @@ export default function NetworkPage() {
       ]);
 
       const nextPosts = Array.isArray(postsRes.data) ? postsRes.data : [];
-      const followedItems = Array.isArray(followedRes.data) ? followedRes.data : [];
+      const followedItems = Array.isArray(followedRes.data)
+        ? followedRes.data
+        : [];
       const nextSavedIds = new Set<string>(
         followedItems
           .map((item: { post?: NetworkPost | null }) => item?.post?.id)
@@ -602,7 +768,9 @@ export default function NetworkPage() {
         return String(post.urgency || "Normal") === urgencyFilter;
       })
       .filter((post) => {
-        const budgetMax = Number(String(budgetMaxFilter || "").replace(/\D/g, ""));
+        const budgetMax = Number(
+          String(budgetMaxFilter || "").replace(/\D/g, ""),
+        );
 
         if (!budgetMax) return true;
         if (!post.budget) return false;
@@ -613,7 +781,15 @@ export default function NetworkPage() {
         if (!keyword) return true;
 
         const haystack = normalizeText(
-          [post.title, post.description, post.type, post.city, post.district, post.neighborhood, ...(post.tags || [])]
+          [
+            post.title,
+            post.description,
+            post.type,
+            post.city,
+            post.district,
+            post.neighborhood,
+            ...(post.tags || []),
+          ]
             .filter(Boolean)
             .join(" "),
         );
@@ -623,13 +799,25 @@ export default function NetworkPage() {
       .sort((a, b) => {
         if (isHotPost(a) !== isHotPost(b)) return isHotPost(a) ? -1 : 1;
 
-        return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
+        return String(b.createdAt || "").localeCompare(
+          String(a.createdAt || ""),
+        );
       });
-  }, [budgetMaxFilter, cityFilter, flowFilter, intentFilter, posts, search, urgencyFilter]);
+  }, [
+    budgetMaxFilter,
+    cityFilter,
+    flowFilter,
+    intentFilter,
+    posts,
+    search,
+    urgencyFilter,
+  ]);
 
   const filteredPosts = useMemo(() => {
     if (personalFilter === "MINE") {
-      return baseFilteredPosts.filter((post) => user?.id && post.userId === user.id);
+      return baseFilteredPosts.filter(
+        (post) => user?.id && post.userId === user.id,
+      );
     }
 
     if (personalFilter === "SAVED") {
@@ -641,11 +829,26 @@ export default function NetworkPage() {
     }
 
     return baseFilteredPosts;
-  }, [baseFilteredPosts, interestedPostIds, personalFilter, savedPostIds, user?.id]);
+  }, [
+    baseFilteredPosts,
+    interestedPostIds,
+    personalFilter,
+    savedPostIds,
+    user?.id,
+  ]);
 
-  const mineCount = useMemo(() => posts.filter((post) => user?.id && post.userId === user.id).length, [posts, user?.id]);
-  const savedCount = useMemo(() => posts.filter((post) => savedPostIds.has(post.id)).length, [posts, savedPostIds]);
-  const interestedCount = useMemo(() => posts.filter((post) => interestedPostIds.has(post.id)).length, [posts, interestedPostIds]);
+  const mineCount = useMemo(
+    () => posts.filter((post) => user?.id && post.userId === user.id).length,
+    [posts, user?.id],
+  );
+  const savedCount = useMemo(
+    () => posts.filter((post) => savedPostIds.has(post.id)).length,
+    [posts, savedPostIds],
+  );
+  const interestedCount = useMemo(
+    () => posts.filter((post) => interestedPostIds.has(post.id)).length,
+    [posts, interestedPostIds],
+  );
 
   const personalTabCounts: Record<PersonalTabKey, number> = {
     ALL: posts.length,
@@ -662,7 +865,9 @@ export default function NetworkPage() {
     }
 
     const allowedCategories = getRoleCategories(user.role);
-    const selectedCategory = allowedCategories.find((item) => item.value === form.category);
+    const selectedCategory = allowedCategories.find(
+      (item) => item.value === form.category,
+    );
 
     if (!selectedCategory) {
       alert("Bu rol ile seçilen kategoride talep oluşturamazsınız.");
@@ -740,10 +945,10 @@ export default function NetworkPage() {
     try {
       setDeletingId(post.id);
       await api.delete(`/network/posts/${post.id}`, {
-  	data: {
-    	userId: user?.id,
-  	},
-  });
+        data: {
+          userId: user?.id,
+        },
+      });
       setPosts((current) => current.filter((item) => item.id !== post.id));
       setSavedPostIds((current) => {
         const next = new Set(current);
@@ -811,7 +1016,9 @@ export default function NetworkPage() {
 
       if (Number.isFinite(followerCount)) {
         setPosts((current) =>
-          current.map((item) => (item.id === post.id ? { ...item, followerCount } : item)),
+          current.map((item) =>
+            item.id === post.id ? { ...item, followerCount } : item,
+          ),
         );
       }
     } catch (error: any) {
@@ -836,17 +1043,57 @@ export default function NetworkPage() {
   };
 
   const metrics = [
-    { id: "total", label: "Toplam Talep", value: posts.length, tone: "text-[#1557D6]" },
-    { id: "mine", label: "Taleplerim", value: mineCount, tone: "text-orange-600" },
-    { id: "saved", label: "Kaydettiklerim", value: savedCount, tone: "text-amber-600" },
-    { id: "interested", label: "İlgilendiklerim", value: interestedCount, tone: "text-emerald-600" },
-    { id: "portfoy", label: "Portföy Arıyorum", value: tabCount(posts, "Portföy Arıyorum"), tone: "text-emerald-600" },
-    { id: "kat", label: "Kat Karşılığı", value: tabCount(posts, "Kat Karşılığı Arsa Arıyorum"), tone: "text-orange-600" },
-    { id: "sektorel", label: "Sektörel İhtiyaçlar", value: tabCount(posts, "Sektörel İhtiyaçlar"), tone: "text-violet-600" },
+    {
+      id: "total",
+      label: "Toplam Talep",
+      value: posts.length,
+      tone: "text-[#1557D6]",
+    },
+    {
+      id: "mine",
+      label: "Taleplerim",
+      value: mineCount,
+      tone: "text-orange-600",
+    },
+    {
+      id: "saved",
+      label: "Kaydettiklerim",
+      value: savedCount,
+      tone: "text-amber-600",
+    },
+    {
+      id: "interested",
+      label: "İlgilendiklerim",
+      value: interestedCount,
+      tone: "text-emerald-600",
+    },
+    {
+      id: "portfoy",
+      label: "Portföy Arıyorum",
+      value: tabCount(posts, "Portföy Arıyorum"),
+      tone: "text-emerald-600",
+    },
+    {
+      id: "kat",
+      label: "Kat Karşılığı",
+      value: tabCount(posts, "Kat Karşılığı Arsa Arıyorum"),
+      tone: "text-orange-600",
+    },
+    {
+      id: "sektorel",
+      label: "Sektörel İhtiyaçlar",
+      value: tabCount(posts, "Sektörel İhtiyaçlar"),
+      tone: "text-violet-600",
+    },
   ];
 
   return (
-    <main className="min-h-[calc(100dvh-64px)] bg-[#F4F8FF] px-2 pb-24 pt-2 text-[#06194A] sm:px-3">
+    <main
+      className="min-h-[calc(100dvh-64px)] bg-[#F4F8FF] px-2 pt-2 text-[#06194A] sm:px-3"
+      style={{
+        paddingBottom: "calc(112px + env(safe-area-inset-bottom, 0px))",
+      }}
+    >
       <style jsx global>{`
         @keyframes talepMarqueeFlow {
           0% {
@@ -858,8 +1105,20 @@ export default function NetworkPage() {
         }
 
         .talep-marquee-viewport {
-          mask-image: linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%);
-          -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%);
+          mask-image: linear-gradient(
+            90deg,
+            transparent 0%,
+            black 6%,
+            black 94%,
+            transparent 100%
+          );
+          -webkit-mask-image: linear-gradient(
+            90deg,
+            transparent 0%,
+            black 6%,
+            black 94%,
+            transparent 100%
+          );
         }
 
         .talep-marquee-track {
@@ -884,7 +1143,9 @@ export default function NetworkPage() {
 
       <div className="mx-auto w-full max-w-[430px] space-y-3 overflow-hidden">
         <section className="rounded-[28px] border border-white bg-white/95 px-4 py-4 text-center shadow-[0_16px_44px_rgba(15,23,42,0.08)]">
-          <h1 className="text-center text-[32px] font-black leading-none tracking-[-0.06em] text-[#06194A]">Talep Merkezi</h1>
+          <h1 className="text-center text-[32px] font-black leading-none tracking-[-0.06em] text-[#06194A]">
+            Talep Merkezi
+          </h1>
           <p className="mx-auto mt-2 max-w-[330px] text-center text-[14px] font-extrabold leading-5 text-[#475569]">
             Elinizdekini değil, ihtiyacınızı paylaşın.
           </p>
@@ -902,11 +1163,17 @@ export default function NetworkPage() {
                   type="button"
                   onClick={() => setPersonalFilter(tab.key)}
                   className={`min-h-[58px] rounded-[20px] border px-1.5 py-2 text-center transition active:scale-[0.98] ${
-                    active ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]" : "border-[#E2EAF5] bg-white text-[#06194A]"
+                    active
+                      ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
+                      : "border-[#E2EAF5] bg-white text-[#06194A]"
                   }`}
                 >
-                  <span className="block text-center text-[16px] leading-none">{tab.icon}</span>
-                  <span className="mt-1 block text-center text-[9.5px] font-black leading-[11px]">{tab.label}</span>
+                  <span className="block text-center text-[16px] leading-none">
+                    {tab.icon}
+                  </span>
+                  <span className="mt-1 block text-center text-[9.5px] font-black leading-[11px]">
+                    {tab.label}
+                  </span>
                   <span className="mt-1 inline-flex min-w-[22px] justify-center rounded-full bg-white px-1.5 text-[10px] font-black text-[#1557D6]">
                     {personalTabCounts[tab.key]}
                   </span>
@@ -927,12 +1194,17 @@ export default function NetworkPage() {
                   type="button"
                   onClick={() => setFlowFilter(tab.key)}
                   className={`min-h-[148px] w-[104px] shrink-0 overflow-hidden rounded-[22px] border bg-white text-center shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition active:scale-[0.98] ${
-                    active ? "border-[#1557D6] ring-2 ring-blue-100" : "border-[#E2EAF5]"
+                    active
+                      ? "border-[#1557D6] ring-2 ring-blue-100"
+                      : "border-[#E2EAF5]"
                   }`}
                 >
                   <div className="relative h-[72px] w-full overflow-hidden bg-[#EEF5FF]">
                     <Image
-                      src={CATEGORY_IMAGES[tab.key] || CATEGORY_IMAGES["Tüm Talepler"]}
+                      src={
+                        CATEGORY_IMAGES[tab.key] ||
+                        CATEGORY_IMAGES["Tüm Talepler"]
+                      }
                       alt={tab.label}
                       fill
                       sizes="104px"
@@ -940,9 +1212,13 @@ export default function NetworkPage() {
                     />
                   </div>
                   <div className="flex min-h-[52px] items-center justify-center px-1.5">
-                    <p className="text-center text-[11.5px] font-black leading-[14px] tracking-[-0.02em] text-[#06194A]">{tab.label}</p>
+                    <p className="text-center text-[11.5px] font-black leading-[14px] tracking-[-0.02em] text-[#06194A]">
+                      {tab.label}
+                    </p>
                   </div>
-                  <span className={`mx-auto inline-flex min-h-[24px] min-w-[34px] items-center justify-center rounded-full px-2 text-[13px] font-black ${tab.countTone}`}>
+                  <span
+                    className={`mx-auto inline-flex min-h-[24px] min-w-[34px] items-center justify-center rounded-full px-2 text-[13px] font-black ${tab.countTone}`}
+                  >
                     {tabCount(posts, tab.key)}
                   </span>
                 </button>
@@ -967,11 +1243,15 @@ export default function NetworkPage() {
               type="button"
               onClick={() => setFilterPanelOpen((current) => !current)}
               className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[22px] border px-3 text-[12px] font-black ${
-                cityFilter ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]" : "border-[#DDE7F3] bg-white text-[#06194A]"
+                cityFilter
+                  ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
+                  : "border-[#DDE7F3] bg-white text-[#06194A]"
               }`}
             >
               <MapPin size={16} className="text-[#1557D6]" />
-              <span className="max-w-[92px] truncate">{cityFilter || "Şehir"}</span>
+              <span className="max-w-[92px] truncate">
+                {cityFilter || "Şehir"}
+              </span>
               <ChevronDown size={14} />
             </button>
 
@@ -979,7 +1259,10 @@ export default function NetworkPage() {
               type="button"
               onClick={() => setFilterPanelOpen((current) => !current)}
               className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[22px] border px-3 text-[12px] font-black ${
-                filterPanelOpen || cityFilter || urgencyFilter !== "Tümü" || budgetMaxFilter
+                filterPanelOpen ||
+                cityFilter ||
+                urgencyFilter !== "Tümü" ||
+                budgetMaxFilter
                   ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
                   : "border-[#DDE7F3] bg-white text-[#06194A]"
               }`}
@@ -1018,7 +1301,10 @@ export default function NetworkPage() {
                 >
                   <option value="Tümü">Tümü</option>
                   {URGENCY_OPTIONS.map((item, index) => (
-                    <option key={`filter-urgency-${item}-${index}`} value={item}>
+                    <option
+                      key={`filter-urgency-${item}-${index}`}
+                      value={item}
+                    >
                       {item}
                     </option>
                   ))}
@@ -1031,7 +1317,9 @@ export default function NetworkPage() {
                 <FieldLabel title="Azami Bütçe" />
                 <input
                   value={budgetMaxFilter}
-                  onChange={(event) => setBudgetMaxFilter(formatBudgetInput(event.target.value))}
+                  onChange={(event) =>
+                    setBudgetMaxFilter(formatBudgetInput(event.target.value))
+                  }
                   className="h-11 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-center text-[12px] font-black text-[#06194A] outline-none placeholder:text-[#94A3B8]"
                   placeholder="Örn: 9.000.000"
                 />
@@ -1054,7 +1342,9 @@ export default function NetworkPage() {
 
         <section className="rounded-[26px] border border-white bg-white/95 p-3 shadow-[0_14px_34px_rgba(15,23,42,0.075)]">
           <div className="flex items-center gap-2">
-            <p className="w-[86px] shrink-0 text-center text-[13px] font-black leading-4 text-[#06194A]">Talep Türü</p>
+            <p className="w-[86px] shrink-0 text-center text-[13px] font-black leading-4 text-[#06194A]">
+              Talep Türü
+            </p>
             <select
               value={intentFilter}
               onChange={(event) => setIntentFilter(event.target.value)}
@@ -1078,7 +1368,9 @@ export default function NetworkPage() {
                   type="button"
                   onClick={() => setIntentFilter(active ? "Tümü" : item)}
                   className={`flex h-11 items-center justify-center rounded-[18px] border px-2 text-center text-[11px] font-black leading-3 transition active:scale-[0.98] ${
-                    active ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]" : "border-[#E2EAF5] bg-white text-[#06194A]"
+                    active
+                      ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
+                      : "border-[#E2EAF5] bg-white text-[#06194A]"
                   }`}
                 >
                   {item}
@@ -1091,7 +1383,12 @@ export default function NetworkPage() {
         <section className="-mx-2 overflow-hidden pl-2">
           <MarqueeRow duration={28}>
             {metrics.map((metric, index) => (
-              <MetricBox key={`metric-${metric.id}-${index}`} label={metric.label} value={metric.value} tone={metric.tone} />
+              <MetricBox
+                key={`metric-${metric.id}-${index}`}
+                label={metric.label}
+                value={metric.value}
+                tone={metric.tone}
+              />
             ))}
           </MarqueeRow>
         </section>
@@ -1100,9 +1397,12 @@ export default function NetworkPage() {
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1 text-center">
               <h2 className="text-center text-[22px] font-black tracking-[-0.04em] text-[#06194A]">
-                {PERSONAL_TABS.find((item) => item.key === personalFilter)?.label || "Tüm Talepler"}
+                {PERSONAL_TABS.find((item) => item.key === personalFilter)
+                  ?.label || "Tüm Talepler"}
               </h2>
-              <p className="text-center text-[11px] font-bold text-[#64748B]">{filteredPosts.length} talep listeleniyor</p>
+              <p className="text-center text-[11px] font-bold text-[#64748B]">
+                {filteredPosts.length} talep listeleniyor
+              </p>
             </div>
 
             <button
@@ -1120,12 +1420,20 @@ export default function NetworkPage() {
           {loading ? (
             <div className="flex min-h-[320px] items-center justify-center">
               <div className="text-center">
-                <Loader2 className="mx-auto animate-spin text-[#1557D6]" size={30} />
-                <p className="mt-3 text-center text-[12px] font-black text-[#64748B]">Talep merkezi yükleniyor...</p>
+                <Loader2
+                  className="mx-auto animate-spin text-[#1557D6]"
+                  size={30}
+                />
+                <p className="mt-3 text-center text-[12px] font-black text-[#64748B]">
+                  Talep merkezi yükleniyor...
+                </p>
               </div>
             </div>
           ) : filteredPosts.length === 0 ? (
-            <EmptyForumState activeTab={personalFilter} onCreate={openCreateModal} />
+            <EmptyForumState
+              activeTab={personalFilter}
+              onCreate={openCreateModal}
+            />
           ) : (
             <div>
               {filteredPosts.map((post, index) => {
@@ -1157,7 +1465,8 @@ export default function NetworkPage() {
       <button
         type="button"
         onClick={() => router.push("/lina")}
-        className="fixed bottom-[84px] right-4 z-30 flex h-[76px] w-[76px] flex-col items-center justify-center rounded-full bg-gradient-to-br from-[#7C3AED] to-[#4F46E5] text-white shadow-[0_18px_38px_rgba(79,70,229,0.34)]"
+        className="fixed right-4 z-30 flex h-[76px] w-[76px] flex-col items-center justify-center rounded-full bg-gradient-to-br from-[#7C3AED] to-[#4F46E5] text-white shadow-[0_18px_38px_rgba(79,70,229,0.34)]"
+        style={{ bottom: "calc(84px + env(safe-area-inset-bottom, 0px))" }}
       >
         <Sparkles size={25} fill="white" />
         <span className="mt-1 text-[13px] font-black">Lina</span>
@@ -1181,11 +1490,25 @@ export default function NetworkPage() {
   );
 }
 
-function MetricBox({ label, value, tone }: { label: string; value: number; tone: string }) {
+function MetricBox({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: string;
+}) {
   return (
     <div className="min-h-[76px] w-[104px] shrink-0 rounded-[22px] border border-white bg-white px-1.5 py-3 text-center shadow-[0_12px_28px_rgba(15,23,42,0.07)]">
-      <p className="text-center text-[8.5px] font-black uppercase leading-[12px] tracking-[-0.01em] text-[#06194A]">{label}</p>
-      <p className={`mt-1 text-center text-[25px] font-black leading-none ${tone}`}>{value}</p>
+      <p className="text-center text-[8.5px] font-black uppercase leading-[12px] tracking-[-0.01em] text-[#06194A]">
+        {label}
+      </p>
+      <p
+        className={`mt-1 text-center text-[25px] font-black leading-none ${tone}`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -1215,30 +1538,43 @@ function RequestCard({
 }) {
   const category = categoryLabel(post.type);
   const location = [post.city, post.district].filter(Boolean).join(" / ");
-  const budget = post.budget ? formatMoney(post.budget, budgetCurrencyFromPost(post)) : "Bütçe yok";
+  const budget = post.budget
+    ? formatMoney(post.budget, budgetCurrencyFromPost(post))
+    : "Bütçe yok";
   const remaining = remainingTime(post.expiresAt);
-  const remainingDanger = remaining.includes("3 gün") || remaining.includes("Süre doldu");
+  const remainingDanger =
+    remaining.includes("3 gün") || remaining.includes("Süre doldu");
   const image = getCategoryImage(post.type);
 
   return (
-    <article className="grid min-h-[146px] grid-cols-[82px_1fr_76px] gap-2 border-b border-[#E7EEF8] bg-white px-2.5 py-3 last:border-b-0">
+    <article className="grid min-h-[146px] grid-cols-[82px_minmax(0,1fr)] gap-2 border-b border-[#E7EEF8] bg-white px-2.5 py-3 last:border-b-0">
       <button
         type="button"
         onClick={onOpen}
         className="relative mt-1 h-[72px] w-[82px] overflow-hidden rounded-[16px] bg-[#EEF5FF] shadow-[0_8px_18px_rgba(15,23,42,0.10)]"
       >
-        <Image src={image} alt={category} fill sizes="82px" className="object-cover" />
+        <Image
+          src={image}
+          alt={category}
+          fill
+          sizes="82px"
+          className="object-cover"
+        />
       </button>
 
       <button type="button" onClick={onOpen} className="min-w-0 text-left">
         <div className="flex flex-wrap gap-1">
-          <span className={`inline-flex max-w-full rounded-full border px-2 py-0.5 text-[9px] font-black uppercase leading-4 ${categoryBadgeClass(post.type)}`}>
+          <span
+            className={`inline-flex max-w-full rounded-full border px-2 py-0.5 text-[9px] font-black uppercase leading-4 ${categoryBadgeClass(post.type)}`}
+          >
             <span className="truncate">{category}</span>
           </span>
 
           {isMine && <StatusBadge tone="mine" label="Benim Talebim" />}
           {isSaved && <StatusBadge tone="saved" label="Kaydedildi" />}
-          {isInterested && <StatusBadge tone="interested" label="İlgilenildi" />}
+          {isInterested && (
+            <StatusBadge tone="interested" label="İlgilenildi" />
+          )}
         </div>
 
         <h3 className="mt-1 line-clamp-2 text-left text-[14px] font-black leading-5 tracking-[-0.03em] text-[#06194A]">
@@ -1252,7 +1588,11 @@ function RequestCard({
 
         <div className="mt-1 flex flex-wrap items-center gap-2 text-[10.5px] font-black">
           <span className="text-[#1557D6]">{budget}</span>
-          <span className={remainingDanger ? "text-red-500" : "text-emerald-600"}>• {remaining}</span>
+          <span
+            className={remainingDanger ? "text-red-500" : "text-emerald-600"}
+          >
+            • {remaining}
+          </span>
         </div>
 
         <div className="mt-1 flex items-center gap-2 text-[10px] font-black text-[#64748B]">
@@ -1262,13 +1602,15 @@ function RequestCard({
         </div>
       </button>
 
-      <div className="flex flex-col items-end gap-2">
+      <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 border-t border-[#EEF5FF] pt-2">
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={onToggleSave}
             className={`flex h-9 w-9 items-center justify-center rounded-full border ${
-              isSaved ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]" : "border-[#E2EAF5] bg-white text-[#06194A]"
+              isSaved
+                ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
+                : "border-[#E2EAF5] bg-white text-[#06194A]"
             }`}
           >
             <Bookmark size={17} fill={isSaved ? "currentColor" : "none"} />
@@ -1284,7 +1626,7 @@ function RequestCard({
         </div>
 
         {canManage && (
-          <div className="grid w-[72px] grid-cols-1 gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5">
             <button
               type="button"
               onClick={onEdit}
@@ -1300,7 +1642,11 @@ function RequestCard({
               disabled={deleting}
               className="flex h-9 items-center justify-center gap-1 rounded-[14px] border border-red-100 bg-red-50 text-[10px] font-black text-red-600 disabled:opacity-60"
             >
-              {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+              {deleting ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <Trash2 size={13} />
+              )}
               Sil
             </button>
           </div>
@@ -1310,7 +1656,13 @@ function RequestCard({
   );
 }
 
-function StatusBadge({ label, tone }: { label: string; tone: "mine" | "saved" | "interested" }) {
+function StatusBadge({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: "mine" | "saved" | "interested";
+}) {
   const className =
     tone === "mine"
       ? "bg-orange-50 text-orange-700 border-orange-100"
@@ -1318,10 +1670,22 @@ function StatusBadge({ label, tone }: { label: string; tone: "mine" | "saved" | 
         ? "bg-amber-50 text-amber-700 border-amber-100"
         : "bg-emerald-50 text-emerald-700 border-emerald-100";
 
-  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black leading-4 ${className}`}>{label}</span>;
+  return (
+    <span
+      className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black leading-4 ${className}`}
+    >
+      {label}
+    </span>
+  );
 }
 
-function EmptyForumState({ activeTab, onCreate }: { activeTab: PersonalTabKey; onCreate: () => void }) {
+function EmptyForumState({
+  activeTab,
+  onCreate,
+}: {
+  activeTab: PersonalTabKey;
+  onCreate: () => void;
+}) {
   const title =
     activeTab === "MINE"
       ? "Henüz talebiniz yok"
@@ -1346,8 +1710,12 @@ function EmptyForumState({ activeTab, onCreate }: { activeTab: PersonalTabKey; o
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#EFF6FF] text-[#1557D6]">
           <Bell size={28} />
         </div>
-        <h3 className="mt-4 text-center text-[20px] font-black tracking-[-0.04em] text-[#06194A]">{title}</h3>
-        <p className="mt-2 text-center text-[13px] font-bold leading-5 text-[#64748B]">{text}</p>
+        <h3 className="mt-4 text-center text-[20px] font-black tracking-[-0.04em] text-[#06194A]">
+          {title}
+        </h3>
+        <p className="mt-2 text-center text-[13px] font-bold leading-5 text-[#64748B]">
+          {text}
+        </p>
         <button
           type="button"
           onClick={onCreate}
@@ -1380,13 +1748,17 @@ function TopicModal({
   const safeCategories = useMemo(() => {
     const roleBasedCategories = getRoleCategories(userRole);
     const incomingValues = new Set(categories.map((item) => item.value));
-    const finalList = roleBasedCategories.filter((item) => incomingValues.has(item.value) || categories.length === 0);
+    const finalList = roleBasedCategories.filter(
+      (item) => incomingValues.has(item.value) || categories.length === 0,
+    );
 
     return finalList.length > 0 ? finalList : roleBasedCategories;
   }, [categories, userRole]);
 
   const correctedInitialForm = useMemo(() => {
-    const allowed = safeCategories.some((item) => item.value === initialForm.category);
+    const allowed = safeCategories.some(
+      (item) => item.value === initialForm.category,
+    );
 
     return {
       ...initialForm,
@@ -1395,33 +1767,52 @@ function TopicModal({
   }, [initialForm, safeCategories]);
 
   const [form, setForm] = useState<TopicForm>(correctedInitialForm);
-  const districtOptions = useMemo(() => getDistrictOptions(form.city), [form.city]);
-  const selectedCategory = safeCategories.find((item) => item.value === form.category);
+  const districtOptions = useMemo(
+    () => getDistrictOptions(form.city),
+    [form.city],
+  );
+  const selectedCategory = safeCategories.find(
+    (item) => item.value === form.category,
+  );
 
   const updateForm = (patch: Partial<TopicForm>) => {
     setForm((current) => ({ ...current, ...patch }));
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#06194A]/38 px-2 pb-2 backdrop-blur-sm">
-      <section className="max-h-[92dvh] w-full max-w-[430px] overflow-hidden rounded-[30px] border border-white bg-white shadow-[0_24px_70px_rgba(15,23,42,0.22)]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#06194A]/38 px-2 backdrop-blur-sm"
+      style={{
+        paddingTop: "max(10px, env(safe-area-inset-top, 0px))",
+        paddingBottom: "max(10px, env(safe-area-inset-bottom, 0px))",
+      }}
+    >
+      <section
+        className="flex w-full max-w-[430px] flex-col overflow-hidden rounded-[30px] border border-white bg-white shadow-[0_24px_70px_rgba(15,23,42,0.22)]"
+        style={{ maxHeight: "min(88dvh, 720px)" }}
+      >
         <div className="flex items-center justify-between border-b border-[#E2EAF5] px-4 py-3">
           <div className="min-w-0 flex-1 text-center">
             <h2 className="text-center text-[21px] font-black tracking-[-0.05em] text-[#06194A]">
               {mode === "edit" ? "Talebi Düzenle" : "Yeni Talep Oluştur"}
             </h2>
             <p className="text-center text-[11px] font-bold text-[#64748B]">
-              {normalizeRole(userRole) === "ADMIN" || normalizeRole(userRole) === "SUPER_ADMIN"
+              {normalizeRole(userRole) === "ADMIN" ||
+              normalizeRole(userRole) === "SUPER_ADMIN"
                 ? "Admin yetkisiyle tüm kategoriler açık."
                 : "Sadece rolünüze uygun kategoriler gösteriliyor."}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F1F5FB] text-[#06194A]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F1F5FB] text-[#06194A]"
+          >
             <X size={20} />
           </button>
         </div>
 
-        <div className="max-h-[calc(92dvh-78px)] space-y-3 overflow-y-auto px-4 py-4">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
           <FieldLabel title="Talep Kategorisi" required />
           <div className="grid grid-cols-1 gap-2">
             {safeCategories.map((category, index) => {
@@ -1433,16 +1824,28 @@ function TopicModal({
                   type="button"
                   onClick={() => updateForm({ category: category.value })}
                   className={`rounded-[20px] border p-3 text-left transition active:scale-[0.99] ${
-                    active ? "border-[#1557D6] bg-[#EFF6FF]" : "border-[#E2EAF5] bg-white"
+                    active
+                      ? "border-[#1557D6] bg-[#EFF6FF]"
+                      : "border-[#E2EAF5] bg-white"
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-[16px] bg-[#EEF5FF]">
-                      <Image src={getCategoryImage(category.value)} alt={category.label} fill sizes="48px" className="object-cover" />
+                      <Image
+                        src={getCategoryImage(category.value)}
+                        alt={category.label}
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-left text-[14px] font-black text-[#06194A]">{category.label}</span>
-                      <span className="mt-0.5 block text-left text-[11px] font-bold leading-4 text-[#64748B]">{category.hint}</span>
+                      <span className="block text-left text-[14px] font-black text-[#06194A]">
+                        {category.label}
+                      </span>
+                      <span className="mt-0.5 block text-left text-[11px] font-bold leading-4 text-[#64748B]">
+                        {category.hint}
+                      </span>
                     </span>
                   </div>
                 </button>
@@ -1452,15 +1855,21 @@ function TopicModal({
 
           {selectedCategory && (
             <div className="rounded-[22px] border border-[#DDE7F3] bg-[#F8FBFF] p-3 text-center">
-              <p className="text-center text-[12px] font-black text-[#1557D6]">{selectedCategory.label}</p>
-              <p className="mt-1 text-center text-[11px] font-bold leading-4 text-[#64748B]">{selectedCategory.hint}</p>
+              <p className="text-center text-[12px] font-black text-[#1557D6]">
+                {selectedCategory.label}
+              </p>
+              <p className="mt-1 text-center text-[11px] font-bold leading-4 text-[#64748B]">
+                {selectedCategory.hint}
+              </p>
             </div>
           )}
 
           <FieldLabel title="Talep Türü" required />
           <select
             value={form.requestIntent}
-            onChange={(event) => updateForm({ requestIntent: event.target.value })}
+            onChange={(event) =>
+              updateForm({ requestIntent: event.target.value })
+            }
             className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-black text-[#06194A] outline-none"
           >
             <option value="">Talep türü seçin</option>
@@ -1474,7 +1883,9 @@ function TopicModal({
           <FieldLabel title="Talep Başlığı" required />
           <input
             value={form.title}
-            onChange={(event) => updateForm({ title: event.target.value.slice(0, 80) })}
+            onChange={(event) =>
+              updateForm({ title: event.target.value.slice(0, 80) })
+            }
             className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none placeholder:text-[#94A3B8]"
             placeholder="Örn: Merkezefendi 3+1 daire arıyorum"
           />
@@ -1484,7 +1895,9 @@ function TopicModal({
               <FieldLabel title="İl" />
               <select
                 value={form.city}
-                onChange={(event) => updateForm({ city: event.target.value, district: "" })}
+                onChange={(event) =>
+                  updateForm({ city: event.target.value, district: "" })
+                }
                 className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none"
               >
                 <option value="">İl seçin</option>
@@ -1500,12 +1913,17 @@ function TopicModal({
               <FieldLabel title="İlçe" />
               <select
                 value={form.district}
-                onChange={(event) => updateForm({ district: event.target.value })}
+                onChange={(event) =>
+                  updateForm({ district: event.target.value })
+                }
                 className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none"
               >
                 <option value="">İlçe seçin</option>
                 {districtOptions.map((district, index) => (
-                  <option key={`district-${district}-${index}`} value={district}>
+                  <option
+                    key={`district-${district}-${index}`}
+                    value={district}
+                  >
                     {district}
                   </option>
                 ))}
@@ -1518,7 +1936,9 @@ function TopicModal({
               <FieldLabel title="Bütçe" />
               <input
                 value={form.budget}
-                onChange={(event) => updateForm({ budget: formatBudgetInput(event.target.value) })}
+                onChange={(event) =>
+                  updateForm({ budget: formatBudgetInput(event.target.value) })
+                }
                 className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none placeholder:text-[#94A3B8]"
                 placeholder="9.000.000"
               />
@@ -1528,11 +1948,16 @@ function TopicModal({
               <FieldLabel title="Para" />
               <select
                 value={form.currency}
-                onChange={(event) => updateForm({ currency: event.target.value })}
+                onChange={(event) =>
+                  updateForm({ currency: event.target.value })
+                }
                 className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none"
               >
                 {CURRENCY_OPTIONS.map((currency, index) => (
-                  <option key={`currency-${currency}-${index}`} value={currency}>
+                  <option
+                    key={`currency-${currency}-${index}`}
+                    value={currency}
+                  >
                     {currency}
                   </option>
                 ))}
@@ -1545,7 +1970,9 @@ function TopicModal({
               <FieldLabel title="Aciliyet" />
               <select
                 value={form.urgency}
-                onChange={(event) => updateForm({ urgency: event.target.value })}
+                onChange={(event) =>
+                  updateForm({ urgency: event.target.value })
+                }
                 className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none"
               >
                 {URGENCY_OPTIONS.map((item, index) => (
@@ -1560,7 +1987,9 @@ function TopicModal({
               <FieldLabel title="Süre" />
               <select
                 value={form.validFor}
-                onChange={(event) => updateForm({ validFor: event.target.value })}
+                onChange={(event) =>
+                  updateForm({ validFor: event.target.value })
+                }
                 className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none"
               >
                 {VALID_OPTIONS.map((item, index) => (
@@ -1579,7 +2008,10 @@ function TopicModal({
             className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none"
           >
             {VISIBILITY_OPTIONS.map((item, index) => (
-              <option key={`visibility-${item.value}-${index}`} value={item.value}>
+              <option
+                key={`visibility-${item.value}-${index}`}
+                value={item.value}
+              >
                 {item.label}
               </option>
             ))}
@@ -1588,11 +2020,15 @@ function TopicModal({
           <FieldLabel title="Açıklama" required />
           <textarea
             value={form.detail}
-            onChange={(event) => updateForm({ detail: event.target.value.slice(0, 200) })}
+            onChange={(event) =>
+              updateForm({ detail: event.target.value.slice(0, 200) })
+            }
             className="min-h-[110px] w-full resize-none rounded-[20px] border border-[#DDE7F3] bg-white px-3 py-3 text-[13px] font-bold leading-5 text-[#06194A] outline-none placeholder:text-[#94A3B8]"
             placeholder="Talebinizi kısa, net ve profesyonel şekilde yazın."
           />
-          <p className="text-right text-[11px] font-bold text-[#64748B]">{form.detail.length}/200</p>
+          <p className="text-right text-[11px] font-bold text-[#64748B]">
+            {form.detail.length}/200
+          </p>
 
           <button
             type="button"
@@ -1600,7 +2036,13 @@ function TopicModal({
             onClick={() => onSave(form)}
             className="flex h-13 min-h-[52px] w-full items-center justify-center rounded-[24px] bg-[#1557D6] px-5 text-[14px] font-black text-white shadow-[0_14px_30px_rgba(21,87,214,0.28)] disabled:opacity-70"
           >
-            {saving ? <Loader2 size={20} className="animate-spin" /> : mode === "edit" ? "Talebi Güncelle" : "Talebi Yayınla"}
+            {saving ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : mode === "edit" ? (
+              "Talebi Güncelle"
+            ) : (
+              "Talebi Yayınla"
+            )}
           </button>
         </div>
       </section>
@@ -1608,7 +2050,13 @@ function TopicModal({
   );
 }
 
-function FieldLabel({ title, required = false }: { title: string; required?: boolean }) {
+function FieldLabel({
+  title,
+  required = false,
+}: {
+  title: string;
+  required?: boolean;
+}) {
   return (
     <label className="mb-1 mt-1 block text-left text-[12px] font-black text-[#06194A]">
       {title}
