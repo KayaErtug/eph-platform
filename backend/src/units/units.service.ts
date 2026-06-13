@@ -191,6 +191,42 @@ export class UnitsService {
     return `EPH-${cleaned || '000000'}`;
   }
 
+  private async getOrCreateKontorWallet(userId: string) {
+    let wallet = await this.prisma.kontorCuzdani.findUnique({
+      where: {
+        kullaniciId: userId,
+      },
+    });
+
+    if (!wallet) {
+      wallet = await this.prisma.kontorCuzdani.create({
+        data: {
+          kullaniciId: userId,
+          bakiye: 0,
+          toplamYukleme: 0,
+          toplamHarcama: 0,
+          toplamHediye: 0,
+          aktifMi: true,
+        },
+      });
+    }
+
+    return wallet;
+  }
+
+  async getPoolWallet(user: CurrentUserPayload) {
+    const wallet = await this.getOrCreateKontorWallet(user.id);
+
+    return {
+      ok: true,
+      balance: wallet.bakiye,
+      toplamYukleme: wallet.toplamYukleme,
+      toplamHarcama: wallet.toplamHarcama,
+      toplamHediye: wallet.toplamHediye,
+      aktifMi: wallet.aktifMi,
+    };
+  }
+
   private async spendKontor(input: {
     userId: string;
     amount: number;
@@ -733,7 +769,7 @@ export class UnitsService {
       this.cleanText(body?.message) ||
       `Merhaba, ${ephId} numaralı Havuz portföyü hakkında bilgi almak istiyorum.`;
 
-    await this.spendKontor({
+    const kontorResult = await this.spendKontor({
       userId: user.id,
       amount: 3,
       islemTuru: KontorIslemTuru.HAVUZ_MESAJ,
@@ -819,6 +855,10 @@ export class UnitsService {
       ok: true,
       message: 'Mesaj başlatıldı. 3 kontör harcandı.',
       cost: 3,
+      spent: 3,
+      previousBalance: kontorResult.movement.oncekiBakiye,
+      remainingBalance: kontorResult.wallet.bakiye,
+      balance: kontorResult.wallet.bakiye,
       conversationId: conversation.id,
       url: `/messages/${conversation.id}`,
     };
@@ -835,7 +875,7 @@ export class UnitsService {
     const scoreText = Number(body?.matchScore || 0) > 0 ? ` Uyum: %${Number(body?.matchScore)}.` : '';
     const noteText = this.cleanText(body?.note) ? ` Not: ${this.cleanText(body?.note)}.` : '';
 
-    await this.spendKontor({
+    const kontorResult = await this.spendKontor({
       userId: user.id,
       amount: 10,
       islemTuru: KontorIslemTuru.HAVUZ_ILGILENIYORUM,
@@ -855,6 +895,10 @@ export class UnitsService {
       ok: true,
       message: 'İlgileniyorum bildirimi gönderildi. 10 kontör harcandı.',
       cost: 10,
+      spent: 10,
+      previousBalance: kontorResult.movement.oncekiBakiye,
+      remainingBalance: kontorResult.wallet.bakiye,
+      balance: kontorResult.wallet.bakiye,
     };
   }
 
@@ -869,7 +913,7 @@ export class UnitsService {
     const scoreText = Number(body?.matchScore || 0) > 0 ? ` Uyum: %${Number(body?.matchScore)}.` : '';
     const noteText = this.cleanText(body?.note) ? ` Not: ${this.cleanText(body?.note)}.` : '';
 
-    await this.spendKontor({
+    const kontorResult = await this.spendKontor({
       userId: user.id,
       amount: 20,
       islemTuru: KontorIslemTuru.HAVUZ_ESLESEN_MUSTERIM_VAR,
@@ -889,6 +933,10 @@ export class UnitsService {
       ok: true,
       message: 'Eşleşen müşterim var bildirimi gönderildi. 20 kontör harcandı.',
       cost: 20,
+      spent: 20,
+      previousBalance: kontorResult.movement.oncekiBakiye,
+      remainingBalance: kontorResult.wallet.bakiye,
+      balance: kontorResult.wallet.bakiye,
     };
   }
 

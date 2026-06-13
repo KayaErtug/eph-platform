@@ -72,6 +72,19 @@ type SelectedAction = {
   score: number;
 };
 
+type PoolWallet = {
+  balance?: number;
+  bakiye?: number;
+  aktifMi?: boolean;
+};
+
+type SuccessToast = {
+  title: string;
+  message: string;
+  spent: number;
+  balance: number | null;
+};
+
 const tabs = ["Sana Uygun", "Bölgemdekiler", "Projeler", "Yeni Eklenenler"];
 const categories = ["Tümü", "Satılık", "Kiralık", "Kat Karşılığı", "Proje", "Ticari", "Özel"];
 
@@ -145,6 +158,34 @@ function getErrorMessage(error: unknown) {
   );
 }
 
+function getNumericValue(data: any, keys: string[]) {
+  for (const key of keys) {
+    const value = data?.[key];
+
+    if (Number.isFinite(Number(value))) {
+      return Number(value);
+    }
+  }
+
+  return null;
+}
+
+function getBalanceFromResponse(data: any) {
+  return getNumericValue(data, ["remainingBalance", "balance", "bakiye", "kalanBakiye", "sonrakiBakiye"]);
+}
+
+function getSpentFromResponse(data: any, fallback: number) {
+  return getNumericValue(data, ["spent", "cost", "miktar", "harcananKontor"]) ?? fallback;
+}
+
+function playKontorHarcamaSound() {
+  if (typeof window === "undefined") return;
+
+  const audio = new Audio("/sounds/kontor_harcama.mp3");
+  audio.volume = 0.82;
+  audio.play().catch(() => {});
+}
+
 function calculateMatch(unit: Unit, customers: Customer[]) {
   const unitCity = String(unit.project?.city || "").toLocaleLowerCase("tr-TR");
   const unitDistrict = String(unit.project?.district || "").toLocaleLowerCase("tr-TR");
@@ -212,6 +253,8 @@ export default function HavuzPage() {
   const [detailUnit, setDetailUnit] = useState<Unit | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [successToast, setSuccessToast] = useState<SuccessToast | null>(null);
 
   const builder = isBuilderRole(user?.role);
 
@@ -219,11 +262,22 @@ export default function HavuzPage() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (!successToast) return;
+
+    const timer = window.setTimeout(() => {
+      setSuccessToast(null);
+    }, 3000);
+
+    return () => window.clearTimeout(timer);
+  }, [successToast]);
+
   const fetchData = async () => {
     try {
-      const [unitsRes, customersRes] = await Promise.allSettled([
+      const [unitsRes, customersRes, walletRes] = await Promise.allSettled([
         api.get("/units/pool"),
         api.get("/crm/customers"),
+        api.get("/units/pool/wallet"),
       ]);
 
       setUnits(unitsRes.status === "fulfilled" && Array.isArray(unitsRes.value.data) ? unitsRes.value.data : []);
@@ -232,6 +286,12 @@ export default function HavuzPage() {
           ? customersRes.value.data
           : [],
       );
+
+      if (walletRes.status === "fulfilled") {
+        const wallet = walletRes.value.data as PoolWallet;
+        const balance = Number(wallet?.balance ?? wallet?.bakiye ?? 0);
+        setWalletBalance(Number.isFinite(balance) ? balance : 0);
+      }
     } finally {
       setLoading(false);
     }
@@ -292,6 +352,28 @@ export default function HavuzPage() {
       .slice(0, 12);
   }, [activeTab, builder, category, matchedUnits, search]);
 
+  const showKontorSuccess = (input: { title: string; data: any; fallbackSpent: number }) => {
+    const spent = getSpentFromResponse(input.data, input.fallbackSpent);
+    const responseBalance = getBalanceFromResponse(input.data);
+    const nextBalance = responseBalance ?? (walletBalance === null ? null : Math.max(walletBalance - spent, 0));
+
+    if (nextBalance !== null) {
+      setWalletBalance(nextBalance);
+    }
+
+    playKontorHarcamaSound();
+
+    setSuccessToast({
+      title: input.title,
+      message:
+        nextBalance === null
+          ? `${spent} kontör harcandı.`
+          : `${spent} kontör harcandı. Kalan bakiyen ${nextBalance} kontör.`,
+      spent,
+      balance: nextBalance,
+    });
+  };
+
   const startPoolMessage = async (unit: Unit, score: number) => {
     if (busyAction) return;
 
@@ -308,6 +390,11 @@ export default function HavuzPage() {
           matchScore: score,
         });
         conversationId = getConversationId(response.data);
+        showKontorSuccess({
+          title: "Mesaj Başlatıldı",
+          data: response.data,
+          fallbackSpent: 3,
+        });
       } catch (poolError) {
         const participantId = unit.project?.owner?.id || unit.project?.ownerId;
 
@@ -327,7 +414,9 @@ export default function HavuzPage() {
         }
       }
 
-      router.push(conversationId ? `/messages/${conversationId}` : "/messages");
+      window.setTimeout(() => {
+        router.push(conversationId ? `/messages/${conversationId}` : "/messages");
+      }, 900);
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -345,12 +434,18 @@ export default function HavuzPage() {
     setBusyAction(busyKey);
 
     try {
-      await api.post(`/units/pool/${action.unit.id}/${endpoint}`, {
+      const response = await api.post(`/units/pool/${action.unit.id}/${endpoint}`, {
         matchScore: action.score,
         note:
           action.type === "LEAD"
             ? `${getEphId(action.unit.id)} portföyü için eşleşen müşterim var.`
             : `${getEphId(action.unit.id)} portföyü ile ilgileniyorum.`,
+      });
+
+      showKontorSuccess({
+        title: action.type === "LEAD" ? "Müşterim Var Bildirildi" : "İlgileniyorum Bildirildi",
+        data: response.data,
+        fallbackSpent: action.type === "LEAD" ? 20 : 10,
       });
 
       setSelectedAction(null);
@@ -376,6 +471,8 @@ export default function HavuzPage() {
 
   return (
     <main className="min-h-[calc(100dvh-64px)] bg-[#F4F8FF] px-3 pb-24 pt-3 text-[#1F2937]">
+      {successToast && <KontorSuccessToast toast={successToast} />}
+
       <div className="mx-auto w-full max-w-[430px] space-y-3">
         <section className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
           <div className="flex items-center gap-3">
@@ -395,9 +492,15 @@ export default function HavuzPage() {
               </p>
             </div>
 
-            <div className="rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-2.5 py-2 text-center">
-              <p className="text-[15px] font-black leading-none text-[#2563EB]">{eligibleUnits.length}</p>
-              <p className="mt-1 text-[8px] font-black text-[#64748B]">Yetkili</p>
+            <div className="grid shrink-0 grid-cols-1 gap-1">
+              <div className="rounded-[14px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-2.5 py-1.5 text-center">
+                <p className="text-[14px] font-black leading-none text-[#2563EB]">{eligibleUnits.length}</p>
+                <p className="mt-0.5 text-[8px] font-black text-[#64748B]">Yetkili</p>
+              </div>
+              <div className="rounded-[14px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-2.5 py-1.5 text-center">
+                <p className="text-[14px] font-black leading-none text-[#2563EB]">{walletBalance ?? "-"}</p>
+                <p className="mt-0.5 text-[8px] font-black text-[#64748B]">Kontör</p>
+              </div>
             </div>
           </div>
         </section>
@@ -515,6 +618,32 @@ export default function HavuzPage() {
         />
       )}
     </main>
+  );
+}
+
+function KontorSuccessToast({ toast }: { toast: SuccessToast }) {
+  return (
+    <div className="fixed left-1/2 top-[78px] z-[90] w-[calc(100%-24px)] max-w-[410px] -translate-x-1/2">
+      <section className="relative overflow-hidden rounded-[22px] border-2 border-[#35FF8A] bg-[#021B18] p-3 text-center text-white shadow-[0_0_0_1px_rgba(53,255,138,0.25),0_0_26px_rgba(53,255,138,0.52),0_18px_44px_rgba(15,23,42,0.32)]">
+        <div className="pointer-events-none absolute -left-10 -top-12 h-28 w-28 rounded-full bg-[#35FF8A]/25 blur-2xl" />
+        <div className="pointer-events-none absolute -right-8 -bottom-14 h-32 w-32 rounded-full bg-[#00E5FF]/18 blur-2xl" />
+        <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#35FF8A] to-transparent" />
+
+        <div className="relative mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[#8DFFB5] bg-[#052E26] text-[#8DFFB5] shadow-[0_0_20px_rgba(53,255,138,0.72)]">
+          <CheckCircle2 size={22} />
+        </div>
+
+        <p className="relative mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#8DFFB5] drop-shadow-[0_0_8px_rgba(53,255,138,0.85)]">
+          İşlem Başarılı
+        </p>
+        <h3 className="relative mt-0.5 text-[15px] font-black tracking-[-0.02em] text-white">
+          {toast.title}
+        </h3>
+        <p className="relative mt-1 text-[12px] font-black leading-5 text-[#D9FFE8]">
+          {toast.message}
+        </p>
+      </section>
+    </div>
   );
 }
 

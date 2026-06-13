@@ -45,6 +45,11 @@ export class UnitsController {
     });
   }
 
+  @Get('pool/wallet')
+  findPoolWallet(@CurrentUser() user: any) {
+    return this.unitsService.getPoolWallet(user);
+  }
+
   @Get('pool')
   findPool(
     @CurrentUser() user: any,
