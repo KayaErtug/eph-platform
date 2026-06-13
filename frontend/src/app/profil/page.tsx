@@ -364,7 +364,7 @@ export default function ProfilPage() {
             color="#EA580C"
           />
           <MenuItem
-            href="/market"
+            href="/ucretlendirme"
             icon={<WalletCards size={18} />}
             title="Üyelik ve Paket"
             value={packageName}
