@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   BadgeCheck,
   Building2,
@@ -13,6 +14,7 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
+  Users,
   X,
 } from "lucide-react";
 
@@ -35,10 +37,19 @@ type Unit = {
   createdAt?: string;
   images?: Array<{ url?: string; supabaseUrl?: string; isCover?: boolean }>;
   project?: {
+    id?: string | null;
     name?: string | null;
     city?: string | null;
     district?: string | null;
     address?: string | null;
+    ownerId?: string | null;
+    owner?: {
+      id?: string | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      role?: string | null;
+      memberCode?: string | null;
+    } | null;
   };
 };
 
@@ -120,6 +131,20 @@ function getEphId(id: string) {
   return `EPH-${cleaned || "000000"}`;
 }
 
+function getConversationId(data: any) {
+  return data?.conversationId || data?.conversation?.id || data?.id || data?.data?.conversationId || data?.data?.id || "";
+}
+
+function getErrorMessage(error: unknown) {
+  const anyError = error as any;
+  return (
+    anyError?.response?.data?.message ||
+    anyError?.response?.data?.error ||
+    anyError?.message ||
+    "İşlem tamamlanamadı."
+  );
+}
+
 function calculateMatch(unit: Unit, customers: Customer[]) {
   const unitCity = String(unit.project?.city || "").toLocaleLowerCase("tr-TR");
   const unitDistrict = String(unit.project?.district || "").toLocaleLowerCase("tr-TR");
@@ -175,6 +200,7 @@ function calculateMatch(unit: Unit, customers: Customer[]) {
 }
 
 export default function HavuzPage() {
+  const router = useRouter();
   const { user } = useAuthStore();
   const [units, setUnits] = useState<Unit[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -183,6 +209,9 @@ export default function HavuzPage() {
   const [category, setCategory] = useState("Tümü");
   const [search, setSearch] = useState("");
   const [selectedAction, setSelectedAction] = useState<SelectedAction | null>(null);
+  const [detailUnit, setDetailUnit] = useState<Unit | null>(null);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const builder = isBuilderRole(user?.role);
 
@@ -262,6 +291,75 @@ export default function HavuzPage() {
       })
       .slice(0, 12);
   }, [activeTab, builder, category, matchedUnits, search]);
+
+  const startPoolMessage = async (unit: Unit, score: number) => {
+    if (busyAction) return;
+
+    setErrorMessage("");
+    setBusyAction(`MESSAGE_${unit.id}`);
+
+    try {
+      const message = `Merhaba, ${getEphId(unit.id)} numaralı Havuz portföyü için görüşmek istiyorum.`;
+      let conversationId = "";
+
+      try {
+        const response = await api.post(`/units/pool/${unit.id}/message`, {
+          message,
+          matchScore: score,
+        });
+        conversationId = getConversationId(response.data);
+      } catch (poolError) {
+        const participantId = unit.project?.owner?.id || unit.project?.ownerId;
+
+        if (!participantId) throw poolError;
+
+        const conversationResponse = await api.post("/conversations/start", {
+          participantId,
+          title: `${getEphId(unit.id)} Havuz Görüşmesi`,
+        });
+
+        conversationId = getConversationId(conversationResponse.data);
+
+        if (conversationId) {
+          await api.post(`/conversations/${conversationId}/messages`, {
+            body: message,
+          });
+        }
+      }
+
+      router.push(conversationId ? `/messages/${conversationId}` : "/messages");
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const confirmPoolAction = async (action: SelectedAction) => {
+    if (busyAction) return;
+
+    const endpoint = action.type === "LEAD" ? "matching-customer" : "interest";
+    const busyKey = `${action.type}_${action.unit.id}`;
+
+    setErrorMessage("");
+    setBusyAction(busyKey);
+
+    try {
+      await api.post(`/units/pool/${action.unit.id}/${endpoint}`, {
+        matchScore: action.score,
+        note:
+          action.type === "LEAD"
+            ? `${getEphId(action.unit.id)} portföyü için eşleşen müşterim var.`
+            : `${getEphId(action.unit.id)} portföyü ile ilgileniyorum.`,
+      });
+
+      setSelectedAction(null);
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setBusyAction(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -360,6 +458,12 @@ export default function HavuzPage() {
           </div>
         </section>
 
+        {errorMessage && (
+          <section className="rounded-[18px] border-2 border-red-200 bg-red-50 p-3 text-[12px] font-black text-red-700">
+            {errorMessage}
+          </section>
+        )}
+
         <section className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-[16px] font-black tracking-[-0.03em] text-[#1F2937]">
@@ -374,6 +478,9 @@ export default function HavuzPage() {
                 key={unit.id}
                 unit={unit}
                 match={match}
+                busyAction={busyAction}
+                onDetail={() => setDetailUnit(unit)}
+                onMessage={() => startPoolMessage(unit, match.score)}
                 onAction={(type) => setSelectedAction({ type, unit, score: match.score })}
               />
             ))
@@ -395,56 +502,43 @@ export default function HavuzPage() {
         </section>
       </div>
 
+      {detailUnit && <PoolDetailModal unit={detailUnit} onClose={() => setDetailUnit(null)} />}
+
       {selectedAction && (
         <PoolActionModal
           action={selectedAction}
+          busy={busyAction === `${selectedAction.type}_${selectedAction.unit.id}`}
           onClose={() => setSelectedAction(null)}
+          onConfirm={() => confirmPoolAction(selectedAction)}
         />
       )}
     </main>
   );
 }
 
-function InfoPanel({
-  icon,
-  title,
-  text,
-  tone,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  text: string;
-  tone: "blue" | "slate";
-}) {
-  const blue = tone === "blue";
-
-  return (
-    <section className="min-h-[86px] rounded-[22px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-      <div className={`flex h-8 w-8 items-center justify-center rounded-[14px] ${blue ? "bg-[#EFF6FF] text-[#2563EB]" : "bg-[#F8FAFC] text-[#1F2937]"}`}>
-        {icon}
-      </div>
-      <h3 className="mt-2 text-[13px] font-black text-[#1F2937]">{title}</h3>
-      <p className="mt-0.5 line-clamp-2 text-[10px] font-bold leading-4 text-[#64748B]">{text}</p>
-    </section>
-  );
-}
-
 function PoolUnitCard({
   unit,
   match,
+  busyAction,
+  onDetail,
+  onMessage,
   onAction,
 }: {
   unit: Unit;
   match: { score: number; customer: Customer | null; budgetDiff: number };
+  busyAction: string | null;
+  onDetail: () => void;
+  onMessage: () => void;
   onAction: (type: PoolAction) => void;
 }) {
   const image = getCover(unit);
   const ephId = getEphId(unit.id);
+  const messageBusy = busyAction === `MESSAGE_${unit.id}`;
 
   return (
     <article className="overflow-hidden rounded-[24px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.07)]">
       <div className="grid min-h-[126px] grid-cols-[112px_1fr]">
-        <Link href={`/stok/${unit.id}`} className="relative bg-[#EFF6FF]">
+        <button type="button" onClick={onDetail} className="relative bg-[#EFF6FF] text-left">
           {image ? (
             <img src={image} alt={unit.project?.name || "Portföy"} className="h-full w-full object-cover" />
           ) : (
@@ -456,7 +550,7 @@ function PoolUnitCard({
           <span className="absolute left-1.5 top-1.5 rounded-full border border-white bg-white/95 px-1.5 py-0.5 text-[8px] font-black text-[#2563EB]">
             YETKİLİ
           </span>
-        </Link>
+        </button>
 
         <div className="min-w-0 p-2.5">
           <div className="flex items-start justify-between gap-2">
@@ -508,52 +602,124 @@ function PoolUnitCard({
         </div>
       </section>
 
-      <div className="grid grid-cols-2 gap-1.5 border-t-2 border-[#C7D6E8] bg-[#F8FAFC] p-1.5">
-        <Link
-          href={`/stok/${unit.id}`}
-          className="col-span-2 flex min-h-[34px] items-center justify-center gap-1 rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#1F2937] shadow-[0_6px_14px_rgba(15,23,42,0.035)]"
-        >
-          <Eye size={13} className="text-[#2563EB]" />
-          Detay
-        </Link>
+      <div className="border-t-2 border-[#C7D6E8] bg-[#F8FAFC] p-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={onDetail}
+            className="col-span-2 flex min-h-[34px] items-center justify-center gap-1 rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#1F2937] shadow-[0_6px_14px_rgba(15,23,42,0.035)]"
+          >
+            <Eye size={13} className="text-[#2563EB]" />
+            Havuz Detay
+          </button>
 
-        <Link
-          href="/messages"
-          className="flex min-h-[34px] items-center justify-center gap-1 rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#1F2937] shadow-[0_6px_14px_rgba(15,23,42,0.035)]"
-        >
-          <MessageCircle size={13} className="text-[#2563EB]" />
-          Mesaj 3K
-        </Link>
+          <button
+            type="button"
+            onClick={onMessage}
+            disabled={Boolean(busyAction)}
+            className="flex min-h-[34px] items-center justify-center gap-1 rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#1F2937] shadow-[0_6px_14px_rgba(15,23,42,0.035)] disabled:opacity-60"
+          >
+            <MessageCircle size={13} className="text-[#2563EB]" />
+            {messageBusy ? "Açılıyor" : "Mesaj 3K"}
+          </button>
 
-        <button
-          onClick={() => onAction("INTEREST")}
-          className="min-h-[34px] rounded-[14px] border-2 border-[#2563EB] bg-[#EFF6FF] text-[11px] font-black text-[#1D4ED8] shadow-[0_6px_14px_rgba(37,99,235,0.08)]"
-        >
-          İlgilen 10K
-        </button>
+          <button
+            type="button"
+            onClick={() => onAction("INTEREST")}
+            disabled={Boolean(busyAction)}
+            className="min-h-[34px] rounded-[14px] border-2 border-[#2563EB] bg-[#EFF6FF] text-[11px] font-black text-[#1D4ED8] shadow-[0_6px_14px_rgba(37,99,235,0.08)] disabled:opacity-60"
+          >
+            İlgilen 10K
+          </button>
 
-        <button
-          onClick={() => onAction("LEAD")}
-          className="col-span-2 min-h-[34px] rounded-[14px] border-2 border-[#2563EB] bg-[#2563EB] text-[11px] font-black text-white shadow-[0_8px_18px_rgba(37,99,235,0.16)]"
-        >
-          Müşterim Var 20K
-        </button>
+          <button
+            type="button"
+            onClick={() => onAction("LEAD")}
+            disabled={Boolean(busyAction)}
+            className="col-span-2 min-h-[34px] rounded-[14px] border-2 border-[#2563EB] bg-[#2563EB] text-[11px] font-black text-white shadow-[0_8px_18px_rgba(37,99,235,0.16)] disabled:opacity-60"
+          >
+            <span className="inline-flex items-center justify-center gap-1">
+              <Users size={13} />
+              Müşterim Var 20K
+            </span>
+          </button>
+        </div>
       </div>
     </article>
   );
 }
 
+function PoolDetailModal({ unit, onClose }: { unit: Unit; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 px-3 pb-3">
+      <section className="w-full max-w-[430px] rounded-[28px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+              Havuz Detay
+            </p>
+            <h2 className="mt-1 text-[20px] font-black leading-[1.08] tracking-[-0.045em] text-[#1F2937]">
+              {unit.project?.name || "EPH Portföy"}
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB]"
+          >
+            <X size={19} />
+          </button>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-1.5">
+          <SmallInfo label="EPH ID" value={getEphId(unit.id)} />
+          <SmallInfo label="Fiyat" value={compactMoney(unit.price, unit.priceCurrency)} />
+          <SmallInfo label="Konum" value={getLocation(unit)} />
+          <SmallInfo label="Mahalle" value={getMahalle(unit)} />
+          <SmallInfo label="Tip" value={typeLabel(unit.type)} />
+          <SmallInfo label="Durum" value={typeLabel(unit.status)} />
+          <SmallInfo label="m²" value={unit.area ? `${unit.area.toLocaleString("tr-TR")} m²` : "Belirtilmedi"} />
+          <SmallInfo label="Oda" value={unit.roomCount || "Belirtilmedi"} />
+        </div>
+
+        <div className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+            Açıklama
+          </p>
+          <p className="mt-1.5 text-[12px] font-bold leading-5 text-[#475569]">
+            {unit.description || "Bu Havuz portföyü için açıklama girilmemiş."}
+          </p>
+        </div>
+
+        <div className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+            Mahremiyet
+          </p>
+          <p className="mt-1.5 text-[12px] font-bold leading-5 text-[#475569]">
+            Telefon, e-posta, tapu sahibi ve tam adres bilgileri Havuz detayında gösterilmez.
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function PoolActionModal({
   action,
+  busy,
   onClose,
+  onConfirm,
 }: {
   action: SelectedAction;
+  busy: boolean;
   onClose: () => void;
+  onConfirm: () => void;
 }) {
   const isLead = action.type === "LEAD";
   const title = isLead ? "Müşterim Var Bildirimi" : "İlgileniyorum Bildirimi";
   const creditAmount = isLead ? 20 : 10;
-  const confirmText = isLead ? "20 Kontör Harca ve Müşterim Var Bildir" : "10 Kontör Harca ve İlgilen";
+  const confirmText = isLead ? "20 Kontör Harca ve Bildir" : "10 Kontör Harca ve İlgilen";
   const ephId = getEphId(action.unit.id);
 
   return (
@@ -570,8 +736,10 @@ function PoolActionModal({
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB]"
+            disabled={busy}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB] disabled:opacity-60"
           >
             <X size={19} />
           </button>
@@ -589,33 +757,27 @@ function PoolActionModal({
             İşlem Özeti
           </p>
           <p className="mt-1.5 text-[12px] font-bold leading-5 text-[#475569]">
-            Bu işlem {creditAmount} kontör harcar. Onay sonrası portföy sahibine EPH içi bildirim gönderilecek,
-            işlem kaydı oluşturulacak ve iletişim süreci platform içinde başlatılacaktır.
-          </p>
-        </div>
-
-        <div className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-            Gizlilik Kuralı
-          </p>
-          <p className="mt-1.5 text-[12px] font-bold leading-5 text-[#475569]">
-            Telefon, WhatsApp, e-posta ve tapu sahibi bilgileri paylaşılmaz. İletişim yalnızca EPH mesaj sistemi üzerinden yürür.
+            Bu işlem {creditAmount} kontör harcar. Onay sonrası portföy sahibine bildirim gönderilir ve işlem kaydı oluşturulur.
           </p>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-1.5">
           <button
+            type="button"
             onClick={onClose}
-            className="min-h-[42px] rounded-[16px] border-2 border-[#C7D6E8] bg-white text-[12px] font-black text-[#2563EB]"
+            disabled={busy}
+            className="min-h-[42px] rounded-[16px] border-2 border-[#C7D6E8] bg-white text-[12px] font-black text-[#2563EB] disabled:opacity-60"
           >
             Vazgeç
           </button>
 
           <button
-            onClick={onClose}
-            className="min-h-[42px] rounded-[16px] bg-[#2563EB] text-[12px] font-black text-white"
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className="min-h-[42px] rounded-[16px] bg-[#2563EB] px-2 text-[12px] font-black text-white disabled:opacity-60"
           >
-            {confirmText}
+            {busy ? "İşleniyor..." : confirmText}
           </button>
         </div>
       </section>
