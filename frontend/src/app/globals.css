@@ -45,6 +45,11 @@ html {
   background: var(--eph-bg);
   color: var(--eph-text);
   scroll-behavior: smooth;
+  min-height: 100%;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -56,6 +61,10 @@ body {
   color: var(--eph-text);
   font-family: Arial, Helvetica, sans-serif;
   min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 button,
@@ -165,6 +174,7 @@ body {
 
 .eph-page {
   min-height: 100vh;
+  min-height: 100dvh;
   background:
     radial-gradient(circle at top left, color-mix(in srgb, var(--role-primary) 9%, transparent), transparent 34%),
     radial-gradient(circle at top right, color-mix(in srgb, var(--role-secondary) 9%, transparent), transparent 30%),
@@ -602,35 +612,21 @@ div {
 }
 
 /* =========================================================
-   MOBILE CENTER ALIGN
+   MOBILE CENTER ALIGN — SAFE VERSION
+   Not: Global * / .flex / .grid zorlaması kaldırıldı.
+   Harita, modal, form, drawer ve sticky footer düzenlerini bozmaz.
 ========================================================= */
 
 @media (max-width: 768px) {
-  * {
-    text-align: center !important;
-  }
-
   h1,
   h2,
   h3,
   h4,
   h5,
   h6,
-  p,
-  span,
-  label,
-  small,
-  strong,
-  a,
-  button {
-    margin-left: auto !important;
-    margin-right: auto !important;
-  }
-
-  .flex,
-  .grid {
-    align-items: center !important;
-    justify-content: center !important;
+  .eph-title,
+  .eph-mobile-page-title {
+    text-align: center !important;
   }
 
   input,
@@ -1055,5 +1051,88 @@ div {
 @media (max-width: 430px) {
   .stock-modal-v10-foot {
     padding-bottom: calc(30px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+
+/* =========================================================
+   EPH MOBILE COMPATIBILITY LAYER V1 — GLOBAL
+========================================================= */
+
+:root {
+  --eph-safe-top: env(safe-area-inset-top, 0px);
+  --eph-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --eph-safe-left: env(safe-area-inset-left, 0px);
+  --eph-safe-right: env(safe-area-inset-right, 0px);
+  --eph-vvh: 100dvh;
+  --eph-bottom-nav-space: calc(104px + var(--eph-safe-bottom));
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: var(--eph-vvh, 100dvh);
+  overflow-x: hidden;
+}
+
+#__next,
+.eph-page-dvh {
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: var(--eph-vvh, 100dvh);
+}
+
+.eph-safe-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: var(--eph-vvh, 100dvh);
+  padding-left: var(--eph-safe-left);
+  padding-right: var(--eph-safe-right);
+}
+
+.eph-safe-bottom {
+  padding-bottom: max(12px, var(--eph-safe-bottom));
+}
+
+.eph-bottom-panel {
+  flex-shrink: 0;
+  padding-bottom: max(12px, var(--eph-safe-bottom));
+}
+
+.eph-map-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  height: var(--eph-vvh, 100dvh);
+  overflow: hidden;
+}
+
+.eph-map-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@supports (height: 100svh) {
+  body,
+  .eph-page-dvh,
+  .eph-safe-page,
+  .eph-map-page {
+    min-height: 100svh;
+    min-height: 100dvh;
   }
 }

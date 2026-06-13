@@ -122,6 +122,28 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
 
 
   useEffect(() => {
+    const setViewportVars = () => {
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      const viewportWidth = window.visualViewport?.width || window.innerWidth;
+
+      document.documentElement.style.setProperty("--eph-vvh", `${viewportHeight}px`);
+      document.documentElement.style.setProperty("--eph-vvw", `${viewportWidth}px`);
+    };
+
+    setViewportVars();
+
+    window.addEventListener("resize", setViewportVars);
+    window.visualViewport?.addEventListener("resize", setViewportVars);
+    window.visualViewport?.addEventListener("scroll", setViewportVars);
+
+    return () => {
+      window.removeEventListener("resize", setViewportVars);
+      window.visualViewport?.removeEventListener("resize", setViewportVars);
+      window.visualViewport?.removeEventListener("scroll", setViewportVars);
+    };
+  }, []);
+
+  useEffect(() => {
     if (pathname.startsWith("/lina")) {
       setShowLinaFab(false);
       return;
