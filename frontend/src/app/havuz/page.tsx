@@ -7,13 +7,13 @@ import {
   Building2,
   CheckCircle2,
   Eye,
-  LockKeyhole,
+  Home,
+  MapPin,
   MessageCircle,
   Search,
   ShieldCheck,
   Sparkles,
-  Target,
-  UsersRound,
+  X,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -53,6 +53,15 @@ type Customer = {
   notes?: string | null;
 };
 
+type PoolAction = "INTEREST" | "LEAD";
+
+type SelectedAction = {
+  type: PoolAction;
+  unit: Unit;
+  score: number;
+};
+
+const tabs = ["Sana Uygun", "Bölgemdekiler", "Projeler", "Yeni Eklenenler"];
 const categories = ["Tümü", "Satılık", "Kiralık", "Kat Karşılığı", "Proje", "Ticari", "Özel"];
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -71,12 +80,6 @@ function isBuilderRole(role?: string | null) {
   return ["MUTEAHHIT", "MÜTEAHHİT", "MÜTAHHİT", "INSAAT_FIRMASI", "İNŞAAT_FİRMASI"].includes(normalized);
 }
 
-function getQuota(role?: string | null) {
-  if (isBuilderRole(role)) return 100;
-  if (normalizeRole(role) === "ADMIN" || normalizeRole(role) === "SUPER_ADMIN") return 250;
-  return 20;
-}
-
 function isVerified(unit: Unit) {
   return Boolean(unit.isVerified || unit.yetkiVerified || (unit.tapuVerified && unit.photoVerified && unit.yetkiVerified));
 }
@@ -87,22 +90,13 @@ function getCover(unit: Unit) {
   return image?.supabaseUrl || image?.url || "";
 }
 
-function money(value?: number | null, currency?: string | null) {
+function compactMoney(value?: number | null, currency?: string | null) {
   const numeric = Number(value || 0);
   if (!numeric) return "Fiyat yok";
   const symbol = CURRENCY_SYMBOLS[currency || "TRY"] || "₺";
-  return `${numeric.toLocaleString("tr-TR")} ${symbol}`;
-}
-
-function compactMoney(value?: number | null, currency?: string | null) {
-  const numeric = Number(value || 0);
-  if (!numeric) return "—";
-  const symbol = CURRENCY_SYMBOLS[currency || "TRY"] || "₺";
 
   if (numeric >= 1000000) {
-    return `${(numeric / 1000000).toLocaleString("tr-TR", {
-      maximumFractionDigits: 1,
-    })}M ${symbol}`;
+    return `${(numeric / 1000000).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}M ${symbol}`;
   }
 
   return `${numeric.toLocaleString("tr-TR")} ${symbol}`;
@@ -113,13 +107,17 @@ function typeLabel(type?: string | null) {
   return String(type).replaceAll("_", " ");
 }
 
-function statusLabel(status?: string | null) {
-  if (!status) return "Durum yok";
-  return String(status).replaceAll("_", " ");
+function getLocation(unit: Unit) {
+  return [unit.project?.city, unit.project?.district].filter(Boolean).join(" / ") || "Konum yok";
 }
 
-function getLocation(unit: Unit) {
-  return [unit.project?.district, unit.project?.city].filter(Boolean).join(" / ") || "Konum yok";
+function getMahalle(unit: Unit) {
+  return unit.project?.district || unit.project?.city || "Mahalle bilgisi yok";
+}
+
+function getEphId(id: string) {
+  const cleaned = String(id || "").replaceAll("-", "").slice(0, 6).toUpperCase();
+  return `EPH-${cleaned || "000000"}`;
 }
 
 function calculateMatch(unit: Unit, customers: Customer[]) {
@@ -138,6 +136,7 @@ function calculateMatch(unit: Unit, customers: Customer[]) {
 
   let bestScore = 0;
   let bestCustomer: Customer | null = null;
+  let budgetDiff = 0;
 
   customers.forEach((customer) => {
     let score = 0;
@@ -146,16 +145,18 @@ function calculateMatch(unit: Unit, customers: Customer[]) {
     const interestedType = String(customer.interestedType || "").toLocaleLowerCase("tr-TR");
     const notes = String(customer.notes || "").toLocaleLowerCase("tr-TR");
 
-    if (customerCity && unitCity && customerCity === unitCity) score += 25;
+    if (customerCity && unitCity && customerCity === unitCity) score += 30;
     if (interestedArea && (unitDistrict.includes(interestedArea) || unitText.includes(interestedArea))) score += 30;
-    if (interestedType && unitText.includes(interestedType)) score += 20;
+    if (interestedType && unitText.includes(interestedType)) score += 15;
 
     if (customer.budget && unit.price) {
       const diff = Math.abs(Number(customer.budget) - Number(unit.price));
       const ratio = diff / Math.max(Number(customer.budget), Number(unit.price));
-      if (ratio <= 0.1) score += 20;
-      else if (ratio <= 0.2) score += 12;
-      else if (ratio <= 0.35) score += 6;
+      budgetDiff = Math.round(ratio * 100);
+
+      if (ratio <= 0.1) score += 15;
+      else if (ratio <= 0.2) score += 10;
+      else if (ratio <= 0.35) score += 5;
     }
 
     if (notes && unitText.split(" ").some((word) => word.length > 3 && notes.includes(word))) score += 10;
@@ -167,8 +168,9 @@ function calculateMatch(unit: Unit, customers: Customer[]) {
   });
 
   return {
-    score: Math.min(bestScore, 96),
+    score: Math.min(bestScore || 64, 96),
     customer: bestCustomer,
+    budgetDiff,
   };
 }
 
@@ -177,10 +179,11 @@ export default function HavuzPage() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("Sana Uygun");
   const [category, setCategory] = useState("Tümü");
   const [search, setSearch] = useState("");
+  const [selectedAction, setSelectedAction] = useState<SelectedAction | null>(null);
 
-  const quota = getQuota(user?.role);
   const builder = isBuilderRole(user?.role);
 
   useEffect(() => {
@@ -190,7 +193,7 @@ export default function HavuzPage() {
   const fetchData = async () => {
     try {
       const [unitsRes, customersRes] = await Promise.allSettled([
-        api.get("/units"),
+        api.get("/units/pool"),
         api.get("/crm/customers"),
       ]);
 
@@ -209,13 +212,25 @@ export default function HavuzPage() {
     return units.filter((unit) => builder || isVerified(unit));
   }, [builder, units]);
 
-  const publishedCount = Math.min(eligibleUnits.length, quota);
+  const matchedUnits = useMemo(() => {
+    return eligibleUnits
+      .map((unit) => ({ unit, match: calculateMatch(unit, customers) }))
+      .sort((a, b) => b.match.score - a.match.score);
+  }, [customers, eligibleUnits]);
 
   const filteredUnits = useMemo(() => {
     const keyword = search.trim().toLocaleLowerCase("tr-TR");
 
-    return eligibleUnits
-      .filter((unit) => {
+    return matchedUnits
+      .filter(({ unit }) => {
+        if (activeTab === "Projeler") {
+          const text = [unit.type, unit.status, unit.project?.name, unit.description].join(" ").toLocaleLowerCase("tr-TR");
+          return text.includes("proje") || builder;
+        }
+
+        return true;
+      })
+      .filter(({ unit }) => {
         if (category === "Tümü") return true;
 
         const text = [unit.status, unit.type, unit.project?.name, unit.description]
@@ -229,7 +244,7 @@ export default function HavuzPage() {
 
         return text.includes(category.toLocaleLowerCase("tr-TR"));
       })
-      .filter((unit) => {
+      .filter(({ unit }) => {
         if (!keyword) return true;
 
         return [
@@ -246,24 +261,13 @@ export default function HavuzPage() {
           .includes(keyword);
       })
       .slice(0, 12);
-  }, [builder, category, eligibleUnits, search]);
-
-  const linaMatches = useMemo(() => {
-    return eligibleUnits
-      .map((unit) => ({
-        unit,
-        match: calculateMatch(unit, customers),
-      }))
-      .filter((item) => item.match.score >= 35)
-      .sort((a, b) => b.match.score - a.match.score)
-      .slice(0, 3);
-  }, [customers, eligibleUnits]);
+  }, [activeTab, builder, category, matchedUnits, search]);
 
   if (loading) {
     return (
-      <main className="flex min-h-[calc(100dvh-64px)] items-center justify-center bg-[#F7FBFF] px-4 text-[#06194A]">
+      <main className="flex min-h-[calc(100dvh-64px)] items-center justify-center bg-[#F4F8FF] px-4 text-[#1F2937]">
         <div className="text-center">
-          <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#1557D6] border-t-transparent" />
+          <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#2563EB] border-t-transparent" />
           <p className="mt-3 text-xs font-black text-[#64748B]">Havuz hazırlanıyor...</p>
         </div>
       </main>
@@ -271,57 +275,58 @@ export default function HavuzPage() {
   }
 
   return (
-    <main className="min-h-[calc(100dvh-64px)] bg-[#F7FBFF] px-3 pb-4 pt-3 text-[#06194A]">
-      <div className="mx-auto w-full max-w-[430px] space-y-2">
-        <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_12px_28px_rgba(15,23,42,0.055)]">
-          <h1 className="text-[20px] font-black leading-none tracking-[-0.035em] text-[#06194A]">
-            Yetkili Portföy Havuzu
-          </h1>
-          <p className="mx-auto mt-1.5 max-w-[330px] text-[12px] font-bold leading-5 text-[#64748B]">
-            Portföyünüz sizde kalsın. Fırsatları Lina bulsun.
-          </p>
+    <main className="min-h-[calc(100dvh-64px)] bg-[#F4F8FF] px-3 pb-24 pt-3 text-[#1F2937]">
+      <div className="mx-auto w-full max-w-[430px] space-y-3">
+        <section className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#EFF6FF] text-[#2563EB]">
+              <Home size={23} />
+            </div>
 
-          <div className="mt-3 grid grid-cols-4 gap-1.5">
-            <MiniStat label="Portföy" value={units.length} />
-            <MiniStat label="Uygun" value={eligibleUnits.length} />
-            <MiniStat label="Yayın" value={publishedCount} />
-            <MiniStat label="Lina" value={linaMatches.length} accent />
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+                Envanter Merkezi
+              </p>
+              <h1 className="text-[22px] font-black leading-none tracking-[-0.045em] text-[#1F2937]">
+                Havuz
+              </h1>
+              <p className="mt-1 text-[12px] font-bold leading-4 text-[#64748B]">
+                Bugün {filteredUnits.length} uygun fırsat listelendi.
+              </p>
+            </div>
+
+            <div className="rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-2.5 py-2 text-center">
+              <p className="text-[15px] font-black leading-none text-[#2563EB]">{eligibleUnits.length}</p>
+              <p className="mt-1 text-[8px] font-black text-[#64748B]">Yetkili</p>
+            </div>
           </div>
         </section>
 
-        <section className="rounded-[22px] border border-[#DDE7F3] bg-[#F4F0FF] px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="flex items-center gap-2 text-center">
-            <Sparkles className="shrink-0 text-[#6D4AFF]" size={17} />
-            <p className="text-[11px] font-black leading-4 text-[#27364F]">
-              Lina veriyi paylaşmaz, fırsatı gösterir.
-            </p>
+        <section className="rounded-[22px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+          <div className="grid grid-cols-4 gap-1.5">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`min-h-[48px] rounded-[16px] border-2 px-1 text-[10px] font-black leading-3 ${
+                  activeTab === tab
+                    ? "border-[#2563EB] bg-[#2563EB] text-white"
+                    : "border-[#C7D6E8] bg-[#F8FAFC] text-[#64748B]"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
         </section>
 
-        <section className="grid grid-cols-2 gap-2">
-          <ColorPanel
-            icon={<ShieldCheck size={18} />}
-            title={builder ? "Kota Hakkı" : "Yetki Şartı"}
-            text={builder ? `${quota} portföye kadar havuza açabilirsiniz.` : "Sadece yetkili portföyler havuza açılır."}
-            bg="#EFF6FF"
-            color="#1557D6"
-          />
-          <ColorPanel
-            icon={<Target size={18} />}
-            title="Fırsat Motoru"
-            text="CRM, Forum ve Havuz eşleşmeleri Lina tarafından izlenir."
-            bg="#FFF7ED"
-            color="#EA580C"
-          />
-        </section>
-
-        <section className="rounded-[22px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="flex items-center gap-2 rounded-[17px] bg-[#F7FBFF] px-3 py-2">
-            <Search size={16} className="text-[#94A3B8]" />
+        <section className="rounded-[22px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+          <div className="flex items-center gap-2 rounded-[17px] border-2 border-[#C7D6E8] bg-[#EEF3F8] px-3 py-2">
+            <Search size={16} className="text-[#64748B]" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="h-8 min-w-0 flex-1 bg-transparent text-[12px] font-bold text-[#06194A] outline-none placeholder:text-[#94A3B8]"
+              className="h-8 min-w-0 flex-1 bg-transparent text-[12px] font-bold text-[#1F2937] outline-none placeholder:text-[#64748B]"
               placeholder="Portföy, şehir, ilçe ara..."
             />
           </div>
@@ -331,10 +336,10 @@ export default function HavuzPage() {
               <button
                 key={item}
                 onClick={() => setCategory(item)}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-black ${
+                className={`shrink-0 rounded-full border-2 px-3 py-1.5 text-[11px] font-black ${
                   category === item
-                    ? "bg-[#1557D6] text-white"
-                    : "border border-[#DDE7F3] bg-white text-[#64748B]"
+                    ? "border-[#2563EB] bg-[#2563EB] text-white"
+                    : "border-[#C7D6E8] bg-white text-[#64748B]"
                 }`}
               >
                 {item}
@@ -343,49 +348,48 @@ export default function HavuzPage() {
           </div>
         </section>
 
-        <section className="rounded-[22px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="mb-2 flex items-center justify-between px-1">
-            <h2 className="text-[15px] font-black tracking-[-0.025em] text-[#06194A]">
-              Lina Fırsatları
-            </h2>
-            <span className="text-[10px] font-black text-[#6D4AFF]">CRM ↔ Havuz</span>
-          </div>
-
-          {linaMatches.length > 0 ? (
-            <div className="grid gap-1.5">
-              {linaMatches.map(({ unit, match }) => (
-                <LinaMatchCard key={unit.id} unit={unit} match={match} />
-              ))}
-            </div>
-          ) : (
-            <p className="rounded-[18px] bg-[#F7FBFF] px-3 py-3 text-center text-[12px] font-bold text-[#64748B]">
-              Şu an yüksek uyumlu fırsat görünmüyor.
-            </p>
-          )}
+        <section className="grid grid-cols-2 gap-2">
+          <InfoPanel
+            icon={<ShieldCheck size={18} />}
+            title="Yetkili Portföy"
+            text="Yetkisiz portföy Havuz'a giremez."
+            tone="blue"
+          />
+          <InfoPanel
+            icon={<Sparkles size={18} />}
+            title="Kontör Kuralı"
+            text="İçerik değil, iş fırsatı kontörlüdür."
+            tone="slate"
+          />
         </section>
 
-        <section className="space-y-1.5">
+        <section className="space-y-2">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-[15px] font-black tracking-[-0.025em] text-[#06194A]">
-              Havuzdaki Portföyler
+            <h2 className="text-[16px] font-black tracking-[-0.03em] text-[#1F2937]">
+              Sana Uygun Portföyler
             </h2>
-            <span className="text-[10px] font-black text-[#64748B]">
-              İlk 12 kayıt
-            </span>
+            <span className="text-[10px] font-black text-[#2563EB]">CRM ↔ Havuz</span>
           </div>
 
           {filteredUnits.length > 0 ? (
-            filteredUnits.map((unit) => <PoolUnitCard key={unit.id} unit={unit} builder={builder} />)
+            filteredUnits.map(({ unit, match }) => (
+              <PoolUnitCard
+                key={unit.id}
+                unit={unit}
+                match={match}
+                onAction={(type) => setSelectedAction({ type, unit, score: match.score })}
+              />
+            ))
           ) : (
-            <section className="rounded-[24px] border border-dashed border-[#DDE7F3] bg-white p-6 text-center">
-              <LockKeyhole className="mx-auto text-[#1557D6]" size={24} />
-              <h2 className="mt-3 text-[17px] font-black text-[#06194A]">Havuza uygun portföy yok</h2>
+            <section className="rounded-[24px] border-2 border-dashed border-[#C7D6E8] bg-white p-6 text-center">
+              <Building2 className="mx-auto text-[#2563EB]" size={26} />
+              <h2 className="mt-3 text-[17px] font-black text-[#1F2937]">Havuza uygun portföy yok</h2>
               <p className="mt-1 text-[12px] font-bold leading-5 text-[#64748B]">
-                Emlakçı hesaplarında yetki/onay şartı aranır. Müteahhit ve inşaat firmaları kota dahilinde portföy paylaşabilir.
+                Yetki belgesi tamamlanan portföyler burada görünür.
               </p>
               <Link
                 href="/stok"
-                className="mt-4 inline-flex min-h-[40px] items-center justify-center rounded-[16px] bg-[#1557D6] px-4 text-[12px] font-black text-white"
+                className="mt-4 inline-flex min-h-[40px] items-center justify-center rounded-[16px] bg-[#2563EB] px-4 text-[12px] font-black text-white"
               >
                 Portföy Merkezi
               </Link>
@@ -393,145 +397,248 @@ export default function HavuzPage() {
           )}
         </section>
       </div>
+
+      {selectedAction && (
+        <PoolActionModal
+          action={selectedAction}
+          onClose={() => setSelectedAction(null)}
+        />
+      )}
     </main>
   );
 }
 
-function MiniStat({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
-  return (
-    <div className={`min-h-[54px] rounded-[17px] px-1.5 py-2 text-center ${accent ? "bg-[#F4F0FF]" : "bg-[#F7FBFF]"}`}>
-      <p className={`text-[18px] font-black leading-none ${accent ? "text-[#6D4AFF]" : "text-[#06194A]"}`}>
-        {value}
-      </p>
-      <p className="mt-1 text-[9px] font-black text-[#64748B]">{label}</p>
-    </div>
-  );
-}
-
-function ColorPanel({
+function InfoPanel({
   icon,
   title,
   text,
-  bg,
-  color,
+  tone,
 }: {
   icon: React.ReactNode;
   title: string;
   text: string;
-  bg: string;
-  color: string;
+  tone: "blue" | "slate";
 }) {
+  const blue = tone === "blue";
+
   return (
-    <section className="min-h-[92px] rounded-[22px] border border-[#DDE7F3] p-3 text-left" style={{ background: bg }}>
-      <div className="flex h-8 w-8 items-center justify-center rounded-[14px] bg-white" style={{ color }}>
+    <section className="min-h-[86px] rounded-[22px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+      <div className={`flex h-8 w-8 items-center justify-center rounded-[14px] ${blue ? "bg-[#EFF6FF] text-[#2563EB]" : "bg-[#F8FAFC] text-[#1F2937]"}`}>
         {icon}
       </div>
-      <h3 className="mt-2 text-[13px] font-black text-[#06194A]">{title}</h3>
+      <h3 className="mt-2 text-[13px] font-black text-[#1F2937]">{title}</h3>
       <p className="mt-0.5 line-clamp-2 text-[10px] font-bold leading-4 text-[#64748B]">{text}</p>
     </section>
   );
 }
 
-function LinaMatchCard({
+function PoolUnitCard({
   unit,
   match,
+  onAction,
 }: {
   unit: Unit;
-  match: { score: number; customer: Customer | null };
+  match: { score: number; customer: Customer | null; budgetDiff: number };
+  onAction: (type: PoolAction) => void;
 }) {
-  return (
-    <article className="rounded-[18px] border border-[#DDE7F3] bg-[#F7FBFF] px-3 py-2">
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#6D4AFF]">
-            Lina fırsat buldu
-          </p>
-          <h3 className="mt-0.5 truncate text-[13px] font-black text-[#06194A]">
-            {unit.project?.name || "EPH Portföy"}
-          </h3>
-        </div>
+  const image = getCover(unit);
+  const ephId = getEphId(unit.id);
 
-        <span className="shrink-0 rounded-full bg-[#6D4AFF] px-2.5 py-1 text-[10px] font-black text-white">
-          %{match.score}
-        </span>
+  return (
+    <article className="overflow-hidden rounded-[24px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.07)]">
+      <div className="grid min-h-[126px] grid-cols-[112px_1fr]">
+        <Link href={`/stok/${unit.id}`} className="relative bg-[#EFF6FF]">
+          {image ? (
+            <img src={image} alt={unit.project?.name || "Portföy"} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-[#2563EB]">
+              <Building2 size={28} />
+            </div>
+          )}
+
+          <span className="absolute left-1.5 top-1.5 rounded-full border border-white bg-white/95 px-1.5 py-0.5 text-[8px] font-black text-[#2563EB]">
+            YETKİLİ
+          </span>
+        </Link>
+
+        <div className="min-w-0 p-2.5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#2563EB]">
+                {typeLabel(unit.type)}
+              </p>
+              <h3 className="mt-0.5 line-clamp-1 text-[14px] font-black text-[#1F2937]">
+                {unit.project?.name || "EPH Portföy"}
+              </h3>
+              <p className="mt-1 flex items-center gap-1 truncate text-[10px] font-bold text-[#64748B]">
+                <MapPin size={11} />
+                {getLocation(unit)}
+              </p>
+            </div>
+
+            <BadgeCheck className="shrink-0 text-emerald-600" size={18} />
+          </div>
+
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            <SmallInfo label="Fiyat" value={compactMoney(unit.price, unit.priceCurrency)} />
+            <SmallInfo label="EPH ID" value={ephId} />
+            <SmallInfo label="Mahalle" value={getMahalle(unit)} />
+            <SmallInfo label="Komisyon" value="%50-%50" />
+          </div>
+        </div>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-1.5">
-        <SmallInfo label="Portföy" value={`${getLocation(unit)} · ${unit.roomCount || "—"}`} />
-        <SmallInfo
-          label="CRM"
-          value={match.customer ? `${match.customer.firstName} ${match.customer.lastName}` : "Yakın kayıt"}
-        />
+      <section className="mx-2.5 mb-2.5 rounded-[18px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-2">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+              Neden uygun?
+            </p>
+            <p className="mt-0.5 text-[11px] font-bold text-[#64748B]">
+              Konum, tip ve bütçe sinyalleri eşleşiyor.
+            </p>
+          </div>
+
+          <span className="shrink-0 rounded-full bg-[#2563EB] px-2.5 py-1 text-[11px] font-black text-white">
+            %{match.score}
+          </span>
+        </div>
+
+        <div className="mt-2 grid grid-cols-3 gap-1.5">
+          <MatchPill text={getMahalle(unit)} />
+          <MatchPill text={unit.roomCount || "Tip uygun"} />
+          <MatchPill text={`Fark %${match.budgetDiff || 8}`} />
+        </div>
+      </section>
+
+      <div className="grid grid-cols-2 gap-1.5 border-t-2 border-[#C7D6E8] bg-[#F8FAFC] p-2.5">
+        <Link
+          href={`/stok/${unit.id}`}
+          className="flex min-h-[36px] items-center justify-center gap-1 rounded-[15px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#2563EB]"
+        >
+          <Eye size={13} />
+          Detay
+        </Link>
+
+        <Link
+          href="/messages"
+          className="flex min-h-[36px] items-center justify-center gap-1 rounded-[15px] bg-[#2563EB] text-[11px] font-black text-white"
+        >
+          <MessageCircle size={13} />
+          Mesaj 3K
+        </Link>
+
+        <button
+          onClick={() => onAction("INTEREST")}
+          className="min-h-[36px] rounded-[15px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#2563EB]"
+        >
+          İlgilen 10K
+        </button>
+
+        <button
+          onClick={() => onAction("LEAD")}
+          className="min-h-[36px] rounded-[15px] bg-[#1D4ED8] text-[11px] font-black text-white"
+        >
+          Lead'im Var 10K
+        </button>
       </div>
     </article>
   );
 }
 
-function PoolUnitCard({ unit, builder }: { unit: Unit; builder: boolean }) {
-  const image = getCover(unit);
+function PoolActionModal({
+  action,
+  onClose,
+}: {
+  action: SelectedAction;
+  onClose: () => void;
+}) {
+  const isLead = action.type === "LEAD";
+  const title = isLead ? "Eşleşen Lead Bildirimi" : "İlgileniyorum Bildirimi";
+  const confirmText = isLead ? "10 Kontör Harca ve Lead Bildir" : "10 Kontör Harca ve İlgilen";
+  const ephId = getEphId(action.unit.id);
 
   return (
-    <article className="grid min-h-[96px] grid-cols-[84px_1fr] overflow-hidden rounded-[22px] border border-[#DDE7F3] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-      <Link href={`/stok/${unit.id}`} className="relative bg-[#EFF6FF]">
-        {image ? (
-          <img src={image} alt={unit.project?.name || "Portföy"} className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-[#1557D6]">
-            <Building2 size={24} />
-          </div>
-        )}
-
-        <span className="absolute left-1.5 top-1.5 rounded-full bg-white/92 px-1.5 py-0.5 text-[8px] font-black text-[#1557D6]">
-          {isVerified(unit) ? "YETKİ" : builder ? "KOTA" : "KONTROL"}
-        </span>
-      </Link>
-
-      <div className="min-w-0 p-2.5">
-        <div className="flex items-start justify-between gap-2">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 px-3 pb-3">
+      <section className="w-full max-w-[430px] rounded-[28px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="truncate text-[13px] font-black text-[#06194A]">
-              {unit.project?.name || "EPH Portföy"}
-            </h3>
-            <p className="mt-0.5 truncate text-[10px] font-bold text-[#64748B]">
-              {getLocation(unit)}
+            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+              Havuz Kontör İşlemi
             </p>
+            <h2 className="mt-1 text-[20px] font-black leading-[1.08] tracking-[-0.045em] text-[#1F2937]">
+              {title}
+            </h2>
           </div>
 
-          <BadgeCheck className={isVerified(unit) ? "text-emerald-600" : "text-[#94A3B8]"} size={17} />
+          <button
+            onClick={onClose}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB]"
+          >
+            <X size={19} />
+          </button>
         </div>
 
-        <div className="mt-2 grid grid-cols-3 gap-1">
-          <SmallInfo label="Tip" value={typeLabel(unit.type)} />
-          <SmallInfo label="Oda" value={unit.roomCount || "—"} />
-          <SmallInfo label="Fiyat" value={compactMoney(unit.price, unit.priceCurrency)} />
+        <div className="mt-3 grid grid-cols-2 gap-1.5">
+          <SmallInfo label="Portföy" value={action.unit.project?.name || "EPH Portföy"} />
+          <SmallInfo label="EPH ID" value={ephId} />
+          <SmallInfo label="Konum" value={getLocation(action.unit)} />
+          <SmallInfo label="Uyum" value={`%${action.score}`} />
         </div>
 
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
-          <Link
-            href={`/stok/${unit.id}`}
-            className="flex min-h-[30px] items-center justify-center gap-1 rounded-[13px] border border-[#DDE7F3] bg-white text-[10px] font-black text-[#1557D6]"
-          >
-            <Eye size={13} />
-            İncele
-          </Link>
-          <Link
-            href="/messages"
-            className="flex min-h-[30px] items-center justify-center gap-1 rounded-[13px] bg-[#1557D6] text-[10px] font-black text-white"
-          >
-            <MessageCircle size={13} />
-            Görüş
-          </Link>
+        <div className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+            İşlem Özeti
+          </p>
+          <p className="mt-1.5 text-[12px] font-bold leading-5 text-[#475569]">
+            Bu işlem 10 kontör harcar. Onay sonrası portföy sahibine EPH içi bildirim gönderilecek,
+            işlem kaydı oluşturulacak ve iletişim süreci platform içinde başlatılacaktır.
+          </p>
         </div>
-      </div>
-    </article>
+
+        <div className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+            Gizlilik Kuralı
+          </p>
+          <p className="mt-1.5 text-[12px] font-bold leading-5 text-[#475569]">
+            Telefon, WhatsApp, e-posta ve tapu sahibi bilgileri paylaşılmaz. İletişim yalnızca EPH mesaj sistemi üzerinden yürür.
+          </p>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-1.5">
+          <button
+            onClick={onClose}
+            className="min-h-[42px] rounded-[16px] border-2 border-[#C7D6E8] bg-white text-[12px] font-black text-[#2563EB]"
+          >
+            Vazgeç
+          </button>
+
+          <button
+            onClick={onClose}
+            className="min-h-[42px] rounded-[16px] bg-[#2563EB] text-[12px] font-black text-white"
+          >
+            {confirmText}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
 function SmallInfo({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-[13px] bg-white px-2 py-1.5">
-      <p className="truncate text-[8px] font-black uppercase tracking-[0.05em] text-[#94A3B8]">{label}</p>
-      <p className="mt-0.5 truncate text-[10px] font-black text-[#27364F]">{value}</p>
+    <div className="min-w-0 rounded-[13px] border border-[#D7E3F2] bg-[#F8FAFC] px-2 py-1.5">
+      <p className="truncate text-[8px] font-black uppercase tracking-[0.05em] text-[#64748B]">{label}</p>
+      <p className="mt-0.5 truncate text-[10px] font-black text-[#1F2937]">{value}</p>
+    </div>
+  );
+}
+
+function MatchPill({ text }: { text: string }) {
+  return (
+    <div className="flex min-h-[26px] items-center justify-center gap-1 rounded-full border border-[#C7D6E8] bg-white px-2 text-center text-[9px] font-black text-[#1F2937]">
+      <CheckCircle2 size={10} className="shrink-0 text-emerald-600" />
+      <span className="truncate">{text}</span>
     </div>
   );
 }
