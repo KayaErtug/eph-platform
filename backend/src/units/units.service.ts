@@ -8,11 +8,14 @@ import {
   ActivityType,
   CustomerPropertyRelation,
   CustomerStatus,
+  KontorHareketTuru,
+  KontorIslemTuru,
   PortfolioApprovalStatus,
   Role,
   UnitStatus,
   UnitType,
 } from '@prisma/client';
+import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -37,6 +40,12 @@ type CreateUnitPayload = {
   deedOwnerPhone?: string;
   deedOwnerEmail?: string;
   features?: string[];
+};
+
+type PoolActionPayload = {
+  message?: string;
+  matchScore?: number;
+  note?: string;
 };
 
 const unitInclude = {
@@ -147,6 +156,131 @@ export class UnitsService {
     return unit;
   }
 
+  private async getPoolUnitWithProjectOrFail(id: string) {
+    const unit = await this.prisma.unit.findUnique({
+      where: { id },
+      include: {
+        project: {
+          include: {
+            owner: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!unit) {
+      throw new NotFoundException('Portföy bulunamadı.');
+    }
+
+    if (!unit.isPoolVisible || unit.approvalStatus !== PortfolioApprovalStatus.HAVUZDA) {
+      throw new BadRequestException('Bu portföy şu anda Havuz içinde aktif değil.');
+    }
+
+    return unit;
+  }
+
+  private getEphId(id: string) {
+    const cleaned = String(id || '').replace(/-/g, '').slice(0, 6).toUpperCase();
+    return `EPH-${cleaned || '000000'}`;
+  }
+
+  private async spendKontor(input: {
+    userId: string;
+    amount: number;
+    islemTuru: KontorIslemTuru;
+    aciklama: string;
+    ilgiliKayitTuru: string;
+    ilgiliKayitId: string;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      let wallet = await tx.kontorCuzdani.findUnique({
+        where: {
+          kullaniciId: input.userId,
+        },
+      });
+
+      if (!wallet) {
+        wallet = await tx.kontorCuzdani.create({
+          data: {
+            kullaniciId: input.userId,
+            bakiye: 0,
+            toplamYukleme: 0,
+            toplamHarcama: 0,
+            toplamHediye: 0,
+            aktifMi: true,
+          },
+        });
+      }
+
+      if (!wallet.aktifMi) {
+        throw new BadRequestException('Kontör cüzdanınız aktif değil.');
+      }
+
+      if (wallet.bakiye < input.amount) {
+        throw new BadRequestException(
+          `Bu işlem için ${input.amount} kontör gerekir. Mevcut bakiyeniz ${wallet.bakiye} kontör.`,
+        );
+      }
+
+      const nextBalance = wallet.bakiye - input.amount;
+
+      const updatedWallet = await tx.kontorCuzdani.update({
+        where: {
+          kullaniciId: input.userId,
+        },
+        data: {
+          bakiye: nextBalance,
+          toplamHarcama: {
+            increment: input.amount,
+          },
+        },
+      });
+
+      const movement = await tx.kontorHareketi.create({
+        data: {
+          kullaniciId: input.userId,
+          hareketTuru: KontorHareketTuru.HARCAMA,
+          islemTuru: input.islemTuru,
+          miktar: input.amount,
+          oncekiBakiye: wallet.bakiye,
+          sonrakiBakiye: nextBalance,
+          aciklama: input.aciklama,
+          ilgiliKayitTuru: input.ilgiliKayitTuru,
+          ilgiliKayitId: input.ilgiliKayitId,
+          olusturanId: input.userId,
+        },
+      });
+
+      return {
+        wallet: updatedWallet,
+        movement,
+      };
+    });
+  }
+
+  private async createPoolNotification(input: {
+    ownerId: string;
+    title: string;
+    message: string;
+    unitId: string;
+  }) {
+    return this.prisma.networkNotification.create({
+      data: {
+        userId: input.ownerId,
+        postId: null,
+        title: input.title,
+        message: input.message,
+      },
+    });
+  }
+
   private hasApprovalDocument(unit: {
     tapuVerified: boolean;
     yetkiVerified: boolean;
@@ -238,7 +372,6 @@ export class UnitsService {
       lastName: parts.slice(-1).join(' '),
     };
   }
-
 
   private async linkCustomerProperty(input: {
     customerId: string;
@@ -585,6 +718,178 @@ export class UnitsService {
       include: unitInclude,
       orderBy: { poolPublishedAt: 'desc' },
     });
+  }
+
+  async poolMessage(id: string, user: CurrentUserPayload, body?: PoolActionPayload) {
+    const unit = await this.getPoolUnitWithProjectOrFail(id);
+
+    if (this.isOwner(user, unit.project.ownerId)) {
+      throw new BadRequestException('Kendi portföyünüz için Havuz mesajı başlatamazsınız.');
+    }
+
+    const ephId = this.getEphId(unit.id);
+    const title = `Havuz Mesajı - ${ephId}`;
+    const firstMessage =
+      this.cleanText(body?.message) ||
+      `Merhaba, ${ephId} numaralı Havuz portföyü hakkında bilgi almak istiyorum.`;
+
+    await this.spendKontor({
+      userId: user.id,
+      amount: 3,
+      islemTuru: KontorIslemTuru.HAVUZ_MESAJ,
+      aciklama: `${ephId} için Havuz mesajı başlatıldı.`,
+      ilgiliKayitTuru: 'UNIT',
+      ilgiliKayitId: unit.id,
+    });
+
+    const conversation = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.conversation.findFirst({
+        where: {
+          postId: null,
+          title,
+          ConversationParticipant: {
+            every: {
+              userId: {
+                in: [user.id, unit.project.ownerId],
+              },
+            },
+          },
+        },
+        include: {
+          ConversationParticipant: true,
+        },
+      });
+
+      const activeConversation =
+        existing && existing.ConversationParticipant.length === 2
+          ? existing
+          : await tx.conversation.create({
+              data: {
+                id: randomUUID(),
+                postId: null,
+                title,
+                updatedAt: new Date(),
+                ConversationParticipant: {
+                  create: [
+                    {
+                      id: randomUUID(),
+                      userId: user.id,
+                    },
+                    {
+                      id: randomUUID(),
+                      userId: unit.project.ownerId,
+                    },
+                  ],
+                },
+              },
+              include: {
+                ConversationParticipant: true,
+              },
+            });
+
+      await tx.message.create({
+        data: {
+          id: randomUUID(),
+          conversationId: activeConversation.id,
+          senderId: user.id,
+          body: firstMessage,
+        },
+      });
+
+      await tx.conversation.update({
+        where: {
+          id: activeConversation.id,
+        },
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+
+      return activeConversation;
+    });
+
+    await this.createPoolNotification({
+      ownerId: unit.project.ownerId,
+      unitId: unit.id,
+      title: 'Havuz mesajı başlatıldı',
+      message: `${ephId} numaralı portföyünüz için yeni bir Havuz mesajı var.`,
+    });
+
+    return {
+      ok: true,
+      message: 'Mesaj başlatıldı. 3 kontör harcandı.',
+      cost: 3,
+      conversationId: conversation.id,
+      url: `/messages/${conversation.id}`,
+    };
+  }
+
+  async poolInterest(id: string, user: CurrentUserPayload, body?: PoolActionPayload) {
+    const unit = await this.getPoolUnitWithProjectOrFail(id);
+
+    if (this.isOwner(user, unit.project.ownerId)) {
+      throw new BadRequestException('Kendi portföyünüz için ilgileniyorum bildirimi gönderemezsiniz.');
+    }
+
+    const ephId = this.getEphId(unit.id);
+    const scoreText = Number(body?.matchScore || 0) > 0 ? ` Uyum: %${Number(body?.matchScore)}.` : '';
+    const noteText = this.cleanText(body?.note) ? ` Not: ${this.cleanText(body?.note)}.` : '';
+
+    await this.spendKontor({
+      userId: user.id,
+      amount: 10,
+      islemTuru: KontorIslemTuru.HAVUZ_ILGILENIYORUM,
+      aciklama: `${ephId} için ilgileniyorum bildirimi gönderildi.`,
+      ilgiliKayitTuru: 'UNIT',
+      ilgiliKayitId: unit.id,
+    });
+
+    await this.createPoolNotification({
+      ownerId: unit.project.ownerId,
+      unitId: unit.id,
+      title: 'Portföyünüzle ilgilenen var',
+      message: `${ephId} numaralı Havuz portföyünüz için ilgileniyorum bildirimi alındı.${scoreText}${noteText}`,
+    });
+
+    return {
+      ok: true,
+      message: 'İlgileniyorum bildirimi gönderildi. 10 kontör harcandı.',
+      cost: 10,
+    };
+  }
+
+  async poolMatchingCustomer(id: string, user: CurrentUserPayload, body?: PoolActionPayload) {
+    const unit = await this.getPoolUnitWithProjectOrFail(id);
+
+    if (this.isOwner(user, unit.project.ownerId)) {
+      throw new BadRequestException('Kendi portföyünüz için eşleşen müşterim var bildirimi gönderemezsiniz.');
+    }
+
+    const ephId = this.getEphId(unit.id);
+    const scoreText = Number(body?.matchScore || 0) > 0 ? ` Uyum: %${Number(body?.matchScore)}.` : '';
+    const noteText = this.cleanText(body?.note) ? ` Not: ${this.cleanText(body?.note)}.` : '';
+
+    await this.spendKontor({
+      userId: user.id,
+      amount: 20,
+      islemTuru: KontorIslemTuru.HAVUZ_ESLESEN_MUSTERIM_VAR,
+      aciklama: `${ephId} için eşleşen müşterim var bildirimi gönderildi.`,
+      ilgiliKayitTuru: 'UNIT',
+      ilgiliKayitId: unit.id,
+    });
+
+    await this.createPoolNotification({
+      ownerId: unit.project.ownerId,
+      unitId: unit.id,
+      title: 'Eşleşen müşteri bildirimi',
+      message: `${ephId} numaralı Havuz portföyünüz için eşleşen müşterim var bildirimi alındı.${scoreText}${noteText}`,
+    });
+
+    return {
+      ok: true,
+      message: 'Eşleşen müşterim var bildirimi gönderildi. 20 kontör harcandı.',
+      cost: 20,
+    };
   }
 
   async submitApproval(id: string, user: CurrentUserPayload) {

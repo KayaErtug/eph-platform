@@ -46,8 +46,58 @@ export class UnitsController {
   }
 
   @Get('pool')
-  findPool(@CurrentUser() user: any, @Query('status') status?: UnitStatus, @Query('type') type?: UnitType, @Query('city') city?: string) {
+  findPool(
+    @CurrentUser() user: any,
+    @Query('status') status?: UnitStatus,
+    @Query('type') type?: UnitType,
+    @Query('city') city?: string,
+  ) {
     return this.unitsService.findPool(user, { status, type, city });
+  }
+
+  @Post('pool/:id/message')
+  @UseGuards(RolesGuard)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  poolMessage(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body()
+    body: {
+      message?: string;
+      matchScore?: number;
+    },
+  ) {
+    return this.unitsService.poolMessage(id, user, body);
+  }
+
+  @Post('pool/:id/interest')
+  @UseGuards(RolesGuard)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  poolInterest(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body()
+    body: {
+      matchScore?: number;
+      note?: string;
+    },
+  ) {
+    return this.unitsService.poolInterest(id, user, body);
+  }
+
+  @Post('pool/:id/matching-customer')
+  @UseGuards(RolesGuard)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  poolMatchingCustomer(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body()
+    body: {
+      matchScore?: number;
+      note?: string;
+    },
+  ) {
+    return this.unitsService.poolMatchingCustomer(id, user, body);
   }
 
   @Get('admin/portfolio-approvals')
@@ -58,7 +108,12 @@ export class UnitsController {
   }
 
   @Get('project/:projectId')
-  findByProject(@CurrentUser() user: any, @Param('projectId') projectId: string, @Query('status') status?: UnitStatus, @Query('type') type?: UnitType) {
+  findByProject(
+    @CurrentUser() user: any,
+    @Param('projectId') projectId: string,
+    @Query('status') status?: UnitStatus,
+    @Query('type') type?: UnitType,
+  ) {
     return this.unitsService.findByProject(user, projectId, { status, type });
   }
 
