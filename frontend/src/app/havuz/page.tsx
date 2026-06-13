@@ -782,14 +782,14 @@ function PoolUnitCard({
 
 function PoolDetailModal({ unit, onClose }: { unit: Unit; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 px-3 pb-3">
-      <section className="w-full max-w-[430px] rounded-[28px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
-        <div className="relative min-h-[76px]">
-          <div className="absolute left-1/2 top-0 w-[260px] -translate-x-1/2 text-center">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-[max(10px,env(safe-area-inset-left))] py-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))]">
+      <section className="flex max-h-[min(86dvh,680px)] w-[min(94vw,430px)] flex-col overflow-hidden rounded-[clamp(20px,6vw,28px)] border-2 border-[#C7D6E8] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+        <div className="relative shrink-0 px-[clamp(12px,3.5vw,16px)] pb-2 pt-[clamp(12px,3.5vw,16px)]">
+          <div className="mx-auto w-[min(68vw,270px)] text-center">
+            <p className="text-[clamp(9px,2.4vw,10px)] font-black uppercase tracking-[0.12em] text-[#2563EB]">
               Havuz Detay
             </p>
-            <h2 className="mt-1 text-[20px] font-black leading-[1.08] tracking-[-0.045em] text-[#1F2937]">
+            <h2 className="mt-1 line-clamp-2 text-[clamp(17px,5vw,21px)] font-black leading-[1.05] tracking-[-0.045em] text-[#1F2937]">
               {unit.project?.name || "EPH Portföy"}
             </h2>
           </div>
@@ -797,39 +797,42 @@ function PoolDetailModal({ unit, onClose }: { unit: Unit; onClose: () => void })
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-0 top-0 z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB]"
+            className="absolute right-[clamp(10px,3vw,14px)] top-[clamp(10px,3vw,14px)] z-10 flex h-[clamp(40px,10vw,46px)] w-[clamp(40px,10vw,46px)] shrink-0 items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB] shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
+            aria-label="Kapat"
           >
             <X size={19} />
           </button>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-1.5">
-          <SmallInfo label="EPH ID" value={getEphId(unit.id)} />
-          <SmallInfo label="Fiyat" value={compactMoney(unit.price, unit.priceCurrency)} />
-          <SmallInfo label="Konum" value={getLocation(unit)} />
-          <SmallInfo label="Mahalle" value={getMahalle(unit)} />
-          <SmallInfo label="Tip" value={typeLabel(unit.type)} />
-          <SmallInfo label="Durum" value={typeLabel(unit.status)} />
-          <SmallInfo label="m²" value={unit.area ? `${unit.area.toLocaleString("tr-TR")} m²` : "Belirtilmedi"} />
-          <SmallInfo label="Oda" value={unit.roomCount || "Belirtilmedi"} />
-        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[clamp(10px,3vw,14px)] pb-[clamp(12px,4vw,18px)] [-webkit-overflow-scrolling:touch]">
+          <div className="grid grid-cols-2 gap-[clamp(5px,1.8vw,8px)]">
+            <SmallInfo label="EPH ID" value={getEphId(unit.id)} />
+            <SmallInfo label="Fiyat" value={compactMoney(unit.price, unit.priceCurrency)} />
+            <SmallInfo label="Konum" value={getLocation(unit)} />
+            <SmallInfo label="Mahalle" value={getMahalle(unit)} />
+            <SmallInfo label="Tip" value={typeLabel(unit.type)} />
+            <SmallInfo label="Durum" value={typeLabel(unit.status)} />
+            <SmallInfo label="m²" value={unit.area ? `${unit.area.toLocaleString("tr-TR")} m²` : "Belirtilmedi"} />
+            <SmallInfo label="Oda" value={unit.roomCount || "Belirtilmedi"} />
+          </div>
 
-        <div className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-            Açıklama
-          </p>
-          <p className="mt-1.5 text-[12px] font-bold leading-5 text-[#475569]">
-            {unit.description || "Bu Havuz portföyü için açıklama girilmemiş."}
-          </p>
-        </div>
+          <div className="mt-[clamp(8px,2.5vw,12px)] rounded-[clamp(16px,5vw,20px)] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-[clamp(10px,3vw,14px)]">
+            <p className="text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+              Açıklama
+            </p>
+            <p className="mt-1.5 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
+              {unit.description || "Bu Havuz portföyü için açıklama girilmemiş."}
+            </p>
+          </div>
 
-        <div className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-            Mahremiyet
-          </p>
-          <p className="mt-1.5 text-[12px] font-bold leading-5 text-[#475569]">
-            Telefon, e-posta, tapu sahibi ve tam adres bilgileri Havuz detayında gösterilmez.
-          </p>
+          <div className="mt-[clamp(8px,2.5vw,12px)] rounded-[clamp(16px,5vw,20px)] border-2 border-[#C7D6E8] bg-white p-[clamp(10px,3vw,14px)]">
+            <p className="text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+              Mahremiyet
+            </p>
+            <p className="mt-1.5 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
+              Telefon, e-posta, tapu sahibi ve tam adres bilgileri Havuz detayında gösterilmez.
+            </p>
+          </div>
         </div>
       </section>
     </div>
@@ -854,14 +857,14 @@ function PoolActionModal({
   const ephId = getEphId(action.unit.id);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 px-3 pb-3">
-      <section className="w-full max-w-[430px] rounded-[28px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
-        <div className="relative min-h-[76px]">
-          <div className="absolute left-1/2 top-0 w-[260px] -translate-x-1/2 text-center">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-[max(10px,env(safe-area-inset-left))] py-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))]">
+      <section className="flex max-h-[min(86dvh,620px)] w-[min(94vw,430px)] flex-col overflow-hidden rounded-[clamp(20px,6vw,28px)] border-2 border-[#C7D6E8] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+        <div className="relative shrink-0 px-[clamp(12px,3.5vw,16px)] pb-2 pt-[clamp(12px,3.5vw,16px)]">
+          <div className="mx-auto w-[min(68vw,270px)] text-center">
+            <p className="text-[clamp(9px,2.4vw,10px)] font-black uppercase tracking-[0.12em] text-[#2563EB]">
               Havuz Kontör İşlemi
             </p>
-            <h2 className="mt-1 text-[20px] font-black leading-[1.08] tracking-[-0.045em] text-[#1F2937]">
+            <h2 className="mt-1 line-clamp-2 text-[clamp(17px,5vw,21px)] font-black leading-[1.05] tracking-[-0.045em] text-[#1F2937]">
               {title}
             </h2>
           </div>
@@ -870,34 +873,37 @@ function PoolActionModal({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="absolute right-0 top-0 z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB] disabled:opacity-60"
+            className="absolute right-[clamp(10px,3vw,14px)] top-[clamp(10px,3vw,14px)] z-10 flex h-[clamp(40px,10vw,46px)] w-[clamp(40px,10vw,46px)] shrink-0 items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB] shadow-[0_8px_18px_rgba(15,23,42,0.08)] disabled:opacity-60"
+            aria-label="Kapat"
           >
             <X size={19} />
           </button>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-1.5">
-          <SmallInfo label="Portföy" value={action.unit.project?.name || "EPH Portföy"} />
-          <SmallInfo label="EPH ID" value={ephId} />
-          <SmallInfo label="Konum" value={getLocation(action.unit)} />
-          <SmallInfo label="Uyum" value={`%${action.score}`} />
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[clamp(10px,3vw,14px)] pb-[clamp(10px,3vw,14px)] [-webkit-overflow-scrolling:touch]">
+          <div className="grid grid-cols-2 gap-[clamp(5px,1.8vw,8px)]">
+            <SmallInfo label="Portföy" value={action.unit.project?.name || "EPH Portföy"} />
+            <SmallInfo label="EPH ID" value={ephId} />
+            <SmallInfo label="Konum" value={getLocation(action.unit)} />
+            <SmallInfo label="Uyum" value={`%${action.score}`} />
+          </div>
+
+          <div className="mt-[clamp(8px,2.5vw,12px)] rounded-[clamp(16px,5vw,20px)] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-[clamp(10px,3vw,14px)]">
+            <p className="text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+              İşlem Özeti
+            </p>
+            <p className="mt-1.5 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
+              Bu işlem {creditAmount} kontör harcar. Onay sonrası portföy sahibine bildirim gönderilir ve işlem kaydı oluşturulur.
+            </p>
+          </div>
         </div>
 
-        <div className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-            İşlem Özeti
-          </p>
-          <p className="mt-1.5 text-[12px] font-bold leading-5 text-[#475569]">
-            Bu işlem {creditAmount} kontör harcar. Onay sonrası portföy sahibine bildirim gönderilir ve işlem kaydı oluşturulur.
-          </p>
-        </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-1.5">
+        <div className="grid shrink-0 grid-cols-2 gap-[clamp(6px,2vw,10px)] border-t border-[#D7E3F2] bg-white/95 p-[clamp(10px,3vw,14px)] pb-[max(clamp(12px,3.2vw,16px),env(safe-area-inset-bottom))]">
           <button
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="min-h-[42px] rounded-[16px] border-2 border-[#C7D6E8] bg-white text-[12px] font-black text-[#2563EB] disabled:opacity-60"
+            className="min-h-[clamp(42px,11vw,48px)] rounded-[16px] border-2 border-[#C7D6E8] bg-white px-2 text-[clamp(11px,3vw,12px)] font-black text-[#2563EB] disabled:opacity-60"
           >
             Vazgeç
           </button>
@@ -906,7 +912,7 @@ function PoolActionModal({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className="min-h-[42px] rounded-[16px] bg-[#2563EB] px-2 text-[12px] font-black text-white disabled:opacity-60"
+            className="min-h-[clamp(42px,11vw,48px)] rounded-[16px] bg-[#2563EB] px-2 text-[clamp(11px,3vw,12px)] font-black leading-4 text-white disabled:opacity-60"
           >
             {busy ? "İşleniyor..." : confirmText}
           </button>
