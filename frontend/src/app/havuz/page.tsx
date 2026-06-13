@@ -348,19 +348,16 @@ export default function HavuzPage() {
           </div>
         </section>
 
-        <section className="grid grid-cols-2 gap-2">
-          <InfoPanel
-            icon={<ShieldCheck size={18} />}
-            title="Yetkili Portföy"
-            text="Yetkisiz portföy Havuz'a giremez."
-            tone="blue"
-          />
-          <InfoPanel
-            icon={<Sparkles size={18} />}
-            title="Kontör Kuralı"
-            text="İçerik değil, iş fırsatı kontörlüdür."
-            tone="slate"
-          />
+        <section className="grid grid-cols-2 gap-1.5">
+          <div className="flex min-h-[34px] items-center justify-center gap-1.5 rounded-[15px] border-2 border-[#C7D6E8] bg-white px-2 text-[10px] font-black text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.035)]">
+            <ShieldCheck size={13} className="shrink-0 text-[#2563EB]" />
+            <span className="truncate">Yetkili Portföyler</span>
+          </div>
+
+          <div className="flex min-h-[34px] items-center justify-center gap-1.5 rounded-[15px] border-2 border-[#C7D6E8] bg-white px-2 text-[10px] font-black text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.035)]">
+            <Sparkles size={13} className="shrink-0 text-[#2563EB]" />
+            <span className="truncate">Kontör = İş Fırsatı</span>
+          </div>
         </section>
 
         <section className="space-y-2">
@@ -511,35 +508,35 @@ function PoolUnitCard({
         </div>
       </section>
 
-      <div className="grid grid-cols-2 gap-1.5 border-t-2 border-[#C7D6E8] bg-[#F8FAFC] p-2.5">
+      <div className="grid grid-cols-2 gap-1.5 border-t-2 border-[#C7D6E8] bg-[#F8FAFC] p-1.5">
         <Link
           href={`/stok/${unit.id}`}
-          className="flex min-h-[36px] items-center justify-center gap-1 rounded-[15px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#2563EB]"
+          className="col-span-2 flex min-h-[34px] items-center justify-center gap-1 rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#1F2937] shadow-[0_6px_14px_rgba(15,23,42,0.035)]"
         >
-          <Eye size={13} />
+          <Eye size={13} className="text-[#2563EB]" />
           Detay
         </Link>
 
         <Link
           href="/messages"
-          className="flex min-h-[36px] items-center justify-center gap-1 rounded-[15px] bg-[#2563EB] text-[11px] font-black text-white"
+          className="flex min-h-[34px] items-center justify-center gap-1 rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#1F2937] shadow-[0_6px_14px_rgba(15,23,42,0.035)]"
         >
-          <MessageCircle size={13} />
+          <MessageCircle size={13} className="text-[#2563EB]" />
           Mesaj 3K
         </Link>
 
         <button
           onClick={() => onAction("INTEREST")}
-          className="min-h-[36px] rounded-[15px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#2563EB]"
+          className="min-h-[34px] rounded-[14px] border-2 border-[#2563EB] bg-[#EFF6FF] text-[11px] font-black text-[#1D4ED8] shadow-[0_6px_14px_rgba(37,99,235,0.08)]"
         >
           İlgilen 10K
         </button>
 
         <button
           onClick={() => onAction("LEAD")}
-          className="min-h-[36px] rounded-[15px] bg-[#1D4ED8] text-[11px] font-black text-white"
+          className="col-span-2 min-h-[34px] rounded-[14px] border-2 border-[#2563EB] bg-[#2563EB] text-[11px] font-black text-white shadow-[0_8px_18px_rgba(37,99,235,0.16)]"
         >
-          Lead'im Var 10K
+          Müşterim Var 20K
         </button>
       </div>
     </article>
@@ -554,8 +551,9 @@ function PoolActionModal({
   onClose: () => void;
 }) {
   const isLead = action.type === "LEAD";
-  const title = isLead ? "Eşleşen Lead Bildirimi" : "İlgileniyorum Bildirimi";
-  const confirmText = isLead ? "10 Kontör Harca ve Lead Bildir" : "10 Kontör Harca ve İlgilen";
+  const title = isLead ? "Müşterim Var Bildirimi" : "İlgileniyorum Bildirimi";
+  const creditAmount = isLead ? 20 : 10;
+  const confirmText = isLead ? "20 Kontör Harca ve Müşterim Var Bildir" : "10 Kontör Harca ve İlgilen";
   const ephId = getEphId(action.unit.id);
 
   return (
@@ -591,7 +589,7 @@ function PoolActionModal({
             İşlem Özeti
           </p>
           <p className="mt-1.5 text-[12px] font-bold leading-5 text-[#475569]">
-            Bu işlem 10 kontör harcar. Onay sonrası portföy sahibine EPH içi bildirim gönderilecek,
+            Bu işlem {creditAmount} kontör harcar. Onay sonrası portföy sahibine EPH içi bildirim gönderilecek,
             işlem kaydı oluşturulacak ve iletişim süreci platform içinde başlatılacaktır.
           </p>
         </div>
