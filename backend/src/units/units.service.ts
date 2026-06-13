@@ -39,6 +39,8 @@ type CreateUnitPayload = {
   deedOwnerFullName?: string;
   deedOwnerPhone?: string;
   deedOwnerEmail?: string;
+  availableCreditAmount?: number | string | null;
+  doorAccessInfo?: string | null;
   features?: string[];
 };
 
@@ -390,6 +392,36 @@ export class UnitsService {
     return text || undefined;
   }
 
+  private normalizeOptionalNumber(value?: number | string | null) {
+    if (value === null || value === undefined || value === '') return undefined;
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value) && value > 0 ? value : undefined;
+    }
+
+    const normalized = String(value).replace(/[^0-9]/g, '');
+    if (!normalized) return undefined;
+
+    const numeric = Number(normalized);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : undefined;
+  }
+
+  private canSeeDoorAccessInfo(user: CurrentUserPayload, ownerId?: string | null) {
+    return this.isSuperAdmin(user) || Boolean(ownerId && this.isOwner(user, ownerId));
+  }
+
+  private redactDoorAccessInfo<T extends { doorAccessInfo?: string | null; project?: { ownerId?: string | null } | null }>(
+    user: CurrentUserPayload,
+    unit: T,
+  ): T {
+    if (this.canSeeDoorAccessInfo(user, unit.project?.ownerId)) return unit;
+
+    return {
+      ...unit,
+      doorAccessInfo: null,
+    };
+  }
+
   private splitFullName(fullName?: string | null) {
     const cleanName = this.cleanText(fullName);
 
@@ -602,6 +634,8 @@ export class UnitsService {
         deedOwnerFullName: this.cleanText(data.deedOwnerFullName),
         deedOwnerPhone: this.normalizePhone(data.deedOwnerPhone),
         deedOwnerEmail: this.cleanText(data.deedOwnerEmail),
+        availableCreditAmount: this.normalizeOptionalNumber(data.availableCreditAmount),
+        doorAccessInfo: this.cleanText(data.doorAccessInfo),
         features: this.normalizeFeatures(data.features),
         projectId,
         approvalStatus: PortfolioApprovalStatus.TASLAK,
@@ -632,7 +666,7 @@ export class UnitsService {
 
     this.ensureCanViewUnit(user, unit.project.ownerId);
 
-    return unit;
+    return this.redactDoorAccessInfo(user, unit);
   }
 
   async findPortfolioApprovals(
@@ -658,7 +692,7 @@ export class UnitsService {
       PortfolioApprovalStatus.REDDEDILDI,
     ];
 
-    return this.prisma.unit.findMany({
+    const units = await this.prisma.unit.findMany({
       where: {
         approvalStatus: approvalStatus || {
           in: approvalStatuses,
@@ -671,6 +705,8 @@ export class UnitsService {
         { createdAt: 'desc' },
       ],
     });
+
+    return units.map((unit) => this.redactDoorAccessInfo(user, unit));
   }
 
   async findByProject(
@@ -689,7 +725,7 @@ export class UnitsService {
 
     this.ensureCanViewUnit(user, project.ownerId);
 
-    return this.prisma.unit.findMany({
+    const units = await this.prisma.unit.findMany({
       where: {
         projectId,
         status: filters?.status,
@@ -698,6 +734,8 @@ export class UnitsService {
       include: unitInclude,
       orderBy: [{ floor: 'asc' }, { number: 'asc' }],
     });
+
+    return units.map((unit) => this.redactDoorAccessInfo(user, unit));
   }
 
   async findAll(
@@ -709,7 +747,7 @@ export class UnitsService {
       isOffMarket?: boolean;
     },
   ) {
-    return this.prisma.unit.findMany({
+    const units = await this.prisma.unit.findMany({
       where: {
         ...this.getPrivateUnitWhere(user),
         status: filters?.status,
@@ -728,6 +766,8 @@ export class UnitsService {
       include: unitInclude,
       orderBy: { createdAt: 'desc' },
     });
+
+    return units.map((unit) => this.redactDoorAccessInfo(user, unit));
   }
 
   async findPool(
@@ -738,7 +778,7 @@ export class UnitsService {
       city?: string;
     },
   ) {
-    return this.prisma.unit.findMany({
+    const units = await this.prisma.unit.findMany({
       where: {
         isPoolVisible: true,
         approvalStatus: PortfolioApprovalStatus.HAVUZDA,
@@ -754,6 +794,8 @@ export class UnitsService {
       include: unitInclude,
       orderBy: { poolPublishedAt: 'desc' },
     });
+
+    return units.map((unit) => this.redactDoorAccessInfo(user, unit));
   }
 
   async poolMessage(id: string, user: CurrentUserPayload, body?: PoolActionPayload) {
@@ -1141,10 +1183,12 @@ export class UnitsService {
       }
     }
 
+    const { availableCreditAmount, doorAccessInfo, ...safeData } = data;
+
     const updatedUnit = await this.prisma.unit.update({
       where: { id },
       data: {
-        ...data,
+        ...safeData,
         deedOwnerFullName:
           'deedOwnerFullName' in data
             ? this.cleanText(data.deedOwnerFullName)
@@ -1156,6 +1200,14 @@ export class UnitsService {
         deedOwnerEmail:
           'deedOwnerEmail' in data
             ? this.cleanText(data.deedOwnerEmail)
+            : undefined,
+        availableCreditAmount:
+          'availableCreditAmount' in data
+            ? this.normalizeOptionalNumber(availableCreditAmount)
+            : undefined,
+        doorAccessInfo:
+          'doorAccessInfo' in data
+            ? this.cleanText(doorAccessInfo)
             : undefined,
         features:
           'features' in data

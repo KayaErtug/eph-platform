@@ -296,6 +296,8 @@ function StokPageInner() {
     deedOwnerPhone: "",
     deedOwnerEmail: "",
     features: [],
+    availableCreditAmount: "",
+    doorAccessInfo: "",
   } as UnitFormState);
   const [coverImage, setCoverImage] = useState<LocalPortfolioImage | null>(
     null,
@@ -467,6 +469,8 @@ function StokPageInner() {
       deedOwnerPhone: "",
       deedOwnerEmail: "",
       features: [],
+      availableCreditAmount: "",
+      doorAccessInfo: "",
     } as UnitFormState);
     setFormError("");
     setFormSuccess(false);
@@ -510,6 +514,11 @@ function StokPageInner() {
       features: Array.isArray((unit as any).features)
         ? (unit as any).features
         : [],
+      availableCreditAmount:
+        (unit as any).availableCreditAmount != null
+          ? String(Math.round(Number((unit as any).availableCreditAmount)))
+          : "",
+      doorAccessInfo: (unit as any).doorAccessInfo || "",
     } as UnitFormState);
     setFormError("");
     setFormSuccess(false);
@@ -551,6 +560,8 @@ function StokPageInner() {
         return;
       }
 
+      const numericAvailableCreditAmount = parseFormattedNumber(String((unitForm as any).availableCreditAmount || ""));
+
       const unitPayload = {
         type: unitForm.type,
         floor: unitForm.floor ? parseInt(unitForm.floor, 10) : undefined,
@@ -571,6 +582,9 @@ function StokPageInner() {
           String((unitForm as any).deedOwnerPhone || "").trim() || undefined,
         deedOwnerEmail:
           String((unitForm as any).deedOwnerEmail || "").trim() || undefined,
+        availableCreditAmount: numericAvailableCreditAmount || undefined,
+        doorAccessInfo:
+          String((unitForm as any).doorAccessInfo || "").trim() || undefined,
         features: Array.isArray((unitForm as any).features)
           ? (unitForm as any).features
           : [],
@@ -1065,6 +1079,12 @@ function CompactPortfolioCard({
             </span>
           )}
         </div>
+
+        {(unit as any).availableCreditAmount ? (
+          <p className="mt-0.5 truncate text-[10px] font-black text-[#1557D6]">
+            Kredi: {formatPrice((unit as any).availableCreditAmount, unit.priceCurrency)}
+          </p>
+        ) : null}
 
         <div className="mt-1 flex items-center gap-2 text-[10px] font-bold text-[#64748B]">
           <span className="inline-flex items-center gap-1">

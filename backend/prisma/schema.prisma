@@ -202,6 +202,8 @@ model Unit {
   deedOwnerFullName String?
   deedOwnerPhone    String?
   deedOwnerEmail    String?
+  availableCreditAmount Float?
+  doorAccessInfo String?
   features       String[]  @default([])
 
   approvalStatus PortfolioApprovalStatus @default(TASLAK)
@@ -220,6 +222,7 @@ model Unit {
 
   @@index([approvalStatus])
   @@index([isPoolVisible])
+  @@index([availableCreditAmount])
 }
 
 model UnitImage {

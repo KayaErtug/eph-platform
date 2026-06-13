@@ -696,6 +696,8 @@ export default function StokCreateModal({
   const deedOwnerFullName = String((unitForm as any).deedOwnerFullName || "");
   const deedOwnerPhone = String((unitForm as any).deedOwnerPhone || "");
   const deedOwnerEmail = String((unitForm as any).deedOwnerEmail || "");
+  const availableCreditAmountDisplay = formatPriceInput(String((unitForm as any).availableCreditAmount || ""));
+  const doorAccessInfo = String((unitForm as any).doorAccessInfo || "");
   const deedOwnerIdFrontFile = (unitForm as any).deedOwnerIdFrontFile as File | null | undefined;
   const deedOwnerIdBackFile = (unitForm as any).deedOwnerIdBackFile as File | null | undefined;
   const selectedFeatures = Array.isArray((unitForm as any).features) ? ((unitForm as any).features as string[]) : [];
@@ -1081,6 +1083,16 @@ export default function StokCreateModal({
 
     if (deedOwnerEmail && !isValidEmail(deedOwnerEmail)) {
       return "Tapu sahibi e-posta adresi geçerli formatta olmalıdır. Örn: isim@mail.com";
+    }
+
+    const availableCreditAmount = Number(String((unitForm as any).availableCreditAmount || "").replace(/\D/g, ""));
+
+    if (availableCreditAmount && price && availableCreditAmount > price) {
+      return "Kullanılabilir kredi tutarı satış fiyatından büyük olamaz.";
+    }
+
+    if (doorAccessInfo.length > 500) {
+      return "Kapı erişim bilgisi en fazla 500 karakter olabilir.";
     }
 
     if (descriptionLength > MAX_DESCRIPTION_LENGTH) {
@@ -1516,6 +1528,24 @@ export default function StokCreateModal({
                 />
               </label>
 
+              <div className="stock-form-field full">
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-emerald-50 to-white px-3 py-2 text-[#06194A] shadow-[0_10px_22px_rgba(16,185,129,0.08)]">💳 Finans Bilgileri</span>
+                <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
+                  Kullanılabilir kredi tutarı portföy kartında açık bilgi olarak gösterilir. Boş bırakılırsa ekranda görünmez.
+                </p>
+              </div>
+
+              <label className="stock-form-field full">
+                <span>Kullanılabilir Kredi Tutarı ({getCurrencySymbol(selectedCurrency)})</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={availableCreditAmountDisplay}
+                  onChange={(e) => setUnitField("availableCreditAmount", parseFormattedNumber(e.target.value))}
+                  placeholder="Örn: 1.250.000"
+                />
+              </label>
+
               <label className="stock-form-field full">
                 <span>Açıklama</span>
                 <textarea
@@ -1621,6 +1651,30 @@ export default function StokCreateModal({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          <div className="stock-form-block">
+            <div className="stock-form-grid">
+              <div className="stock-form-field full">
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-slate-100 to-white px-3 py-2 text-[#06194A] shadow-[0_10px_22px_rgba(15,23,42,0.08)]">🔒 Erişim Bilgileri</span>
+                <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
+                  Kapı şifresi, site giriş kodu, kapıcı bilgisi gibi erişim notları mahremdir. Havuzda ve genel görünümde gerçek değer gösterilmez.
+                </p>
+              </div>
+
+              <label className="stock-form-field full">
+                <span>Kapı Erişim Bilgisi</span>
+                <textarea
+                  maxLength={500}
+                  value={doorAccessInfo}
+                  onChange={(e) => setUnitField("doorAccessInfo", e.target.value)}
+                  placeholder="Örn: A Blok kapı şifresi 4455 / Kapıcı Mehmet Bey / Site giriş kodu 9876"
+                />
+                <p className="mt-2 text-center text-xs font-black text-[#64748B]">
+                  Ekranda kullanıcıya: “🔒 Randevulaşma sonrası portföy sahibinden talep ediniz.” şeklinde gösterilir.
+                </p>
+              </label>
             </div>
           </div>
 
