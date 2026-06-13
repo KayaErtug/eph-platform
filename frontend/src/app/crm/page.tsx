@@ -925,8 +925,8 @@ export default function CrmPage() {
         />
       )}
 
-      <section className="mx-auto min-h-screen max-w-7xl px-4 pb-8 pt-5">
-        <header className="mb-5 overflow-hidden rounded-[34px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_18px_42px_rgba(15,23,42,0.075)]">
+      <section className="eph-crm-page mx-auto min-h-screen max-w-7xl px-4 pb-8 pt-5">
+        <header className="eph-crm-hero mb-5 overflow-hidden rounded-[34px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_18px_42px_rgba(15,23,42,0.075)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="text-center">
               <div className="inline-flex items-center gap-2 rounded-full bg-[#EFF6FF] px-3 py-1 text-xs font-black text-[#1557D6]">
@@ -949,7 +949,7 @@ export default function CrmPage() {
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <div className="eph-crm-kpi-grid mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
             <KpiCard title="Toplam Müşteri" value={String(customers.length)} icon={<UsersRound size={19} />} />
             <KpiCard title="Kapanan İşlem" value={String(closedCount)} icon={<CheckCircle2 size={19} />} />
             <KpiCard title="Aktif Lead" value={String(activeCount)} icon={<Target size={19} />} />
@@ -958,7 +958,7 @@ export default function CrmPage() {
           </div>
         </header>
 
-        <section className="mb-5 rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm">
+        <section className="eph-crm-task-center mb-5 rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
             <Clock3 size={24} />
           </div>
@@ -974,7 +974,7 @@ export default function CrmPage() {
           </div>
         </section>
 
-        <section className="mb-5 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+        <section className="eph-crm-filterbar mb-5 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
@@ -1001,13 +1001,13 @@ export default function CrmPage() {
         </section>
 
         {view === "pipeline" ? (
-          <section className="overflow-x-auto pb-4">
-            <div className="flex gap-4">
+          <section className="eph-crm-pipeline overflow-x-auto pb-4">
+            <div className="eph-crm-pipeline-track flex gap-4">
               {PIPELINE_STAGES.map((stage) => {
                 const stageCustomers = (pipeline[stage.key] || []).filter((customer) => filteredCustomers.some((item) => item.id === customer.id));
 
                 return (
-                  <div key={stage.key} className="w-[300px] shrink-0">
+                  <div key={stage.key} className="eph-crm-stage w-[300px] shrink-0">
                     <div className="mb-3 flex items-center justify-between rounded-2xl px-4 py-3" style={{ background: stage.bg }}>
                       <span className="text-xs font-black uppercase tracking-wide" style={{ color: stage.color }}>{stage.label}</span>
                       <span className="text-lg font-black" style={{ color: stage.color }}>{stageCustomers.length}</span>
@@ -1023,7 +1023,7 @@ export default function CrmPage() {
             </div>
           </section>
         ) : (
-          <section className="rounded-[28px] border border-slate-200 bg-white p-3 shadow-sm">
+          <section className="eph-crm-list rounded-[28px] border border-slate-200 bg-white p-3 shadow-sm">
             {filteredCustomers.length === 0 ? (
               <div className="flex h-[320px] flex-col items-center justify-center text-center">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#EFF6FF] text-[#1557D6]"><UsersRound size={30} /></div>
@@ -1086,6 +1086,171 @@ export default function CrmPage() {
         .eph-v4-shell .bg-\[\#EFF6FF\] {
           border-color: #c7d6e8;
         }
+
+        @media (max-width: 768px) {
+          .eph-crm-page {
+            padding-left: 12px;
+            padding-right: 12px;
+            padding-top: 12px;
+            padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+          }
+
+          .eph-crm-hero {
+            border-radius: 26px;
+            padding: 14px;
+          }
+
+          .eph-crm-hero h1 {
+            margin-top: 8px;
+            font-size: 27px;
+            line-height: 1.05;
+          }
+
+          .eph-crm-hero p {
+            font-size: 12px;
+            line-height: 1.55;
+          }
+
+          .eph-crm-kpi-grid {
+            gap: 8px;
+          }
+
+          .eph-crm-kpi-grid > div {
+            border-radius: 20px;
+            padding: 10px 8px;
+          }
+
+          .eph-crm-kpi-grid > div:last-child:nth-child(odd) {
+            grid-column: 1 / -1;
+            width: calc(50% - 4px);
+            justify-self: center;
+          }
+
+          .eph-crm-kpi-grid p:first-of-type {
+            font-size: 9px;
+            line-height: 1.2;
+          }
+
+          .eph-crm-kpi-grid p:last-of-type {
+            font-size: 20px;
+          }
+
+          .eph-crm-task-center {
+            border-radius: 24px;
+            padding: 14px;
+          }
+
+          .eph-crm-task-center h2 {
+            font-size: 20px;
+            line-height: 1.15;
+          }
+
+          .eph-crm-filterbar {
+            border-radius: 24px;
+            padding: 12px;
+          }
+
+          .eph-crm-filterbar input {
+            height: 46px;
+            font-size: 12px;
+            padding-left: 42px;
+            padding-right: 10px;
+          }
+
+          .eph-crm-filterbar .grid.grid-cols-3 {
+            gap: 8px;
+          }
+
+          .eph-crm-filterbar button {
+            height: 46px;
+            border-radius: 16px;
+            padding-left: 8px;
+            padding-right: 8px;
+            font-size: 11px;
+          }
+
+          .eph-crm-pipeline {
+            margin-left: -12px;
+            margin-right: -12px;
+            padding-left: 12px;
+            padding-right: 12px;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          .eph-crm-pipeline-track {
+            gap: 10px;
+          }
+
+          .eph-crm-stage {
+            width: min(84vw, 300px);
+            scroll-snap-align: start;
+          }
+
+          .eph-crm-customer-card,
+          .eph-crm-list-row {
+            border-radius: 20px;
+            padding: 12px;
+          }
+
+          .eph-crm-list {
+            border-radius: 24px;
+            padding: 10px;
+          }
+
+          .eph-crm-modal-overlay {
+            align-items: flex-end;
+            padding: 0;
+            background: rgba(6, 25, 74, 0.5);
+          }
+
+          .eph-crm-modal-panel {
+            width: 100%;
+            max-width: none;
+            max-height: min(92dvh, var(--eph-vvh, 92vh));
+            border-radius: 26px 26px 0 0;
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+          }
+
+          .eph-crm-detail-panel {
+            max-height: min(94dvh, var(--eph-vvh, 94vh));
+          }
+
+          .eph-crm-modal-header {
+            padding: 14px 14px 12px;
+            text-align: center;
+          }
+
+          .eph-crm-modal-header > div:first-child,
+          .eph-crm-modal-header .flex > div:first-child {
+            min-width: 0;
+            flex: 1;
+            text-align: center;
+          }
+
+          .eph-crm-modal-header h2 {
+            font-size: 22px;
+            line-height: 1.1;
+          }
+
+          .eph-crm-modal-body {
+            padding: 14px;
+            padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+            gap: 14px;
+          }
+
+          .eph-crm-modal-body .grid {
+            gap: 10px;
+          }
+
+          .premium-input {
+            min-height: 46px;
+            border-radius: 16px;
+            padding: 11px 12px;
+            font-size: 13px;
+          }
+        }
       `}</style>
     </main>
   );
@@ -1120,7 +1285,7 @@ function CustomerCard({ customer, onClick }: { customer: Customer; onClick: () =
   const nextTaskSoon = isTaskSoon(nextTask?.dueDate);
 
   return (
-    <button onClick={onClick} className="w-full rounded-[24px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
+    <button onClick={onClick} className="eph-crm-customer-card w-full rounded-[24px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-[16px] font-black text-[#06194A]">{customer.firstName} {customer.lastName}</h3>
@@ -1159,7 +1324,7 @@ function CustomerListRow({ customer, onClick }: { customer: Customer; onClick: (
   const nextTaskSoon = isTaskSoon(nextTask?.dueDate);
 
   return (
-    <button onClick={onClick} className="w-full rounded-[22px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
+    <button onClick={onClick} className="eph-crm-list-row w-full rounded-[22px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -1214,9 +1379,9 @@ function MiniCounter({ label, value }: { label: string; value: string }) {
 
 function AddCustomerModal({ form, setForm, formLoading, onSubmit, onClose }: { form: any; setForm: React.Dispatch<React.SetStateAction<any>>; formLoading: boolean; onSubmit: () => void; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#06194A]/60 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[32px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white p-5">
+    <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-center justify-center bg-[#06194A]/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="eph-crm-modal-panel max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[32px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="eph-crm-modal-header sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white p-5">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-[#1557D6]">CRM V2</p>
             <h2 className="mt-1 text-[25px] font-black tracking-tight text-[#06194A]">Yeni Müşteri Ekle</h2>
@@ -1225,7 +1390,7 @@ function AddCustomerModal({ form, setForm, formLoading, onSubmit, onClose }: { f
           <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><X size={20} /></button>
         </div>
 
-        <div className="space-y-6 p-5">
+        <div className="eph-crm-modal-body space-y-6 p-5">
           <FormSection title="Temel Bilgiler">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Ad *"><input className="premium-input" value={form.firstName} onChange={(event) => setForm((current: any) => ({ ...current, firstName: event.target.value }))} /></Field>
@@ -1335,9 +1500,9 @@ function CustomerDetailModal({
   ] as const;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#06194A]/60 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[32px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="sticky top-0 z-10 border-b border-slate-200 bg-white p-5">
+    <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-center justify-center bg-[#06194A]/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="eph-crm-modal-panel eph-crm-detail-panel max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[32px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="eph-crm-modal-header sticky top-0 z-10 border-b border-slate-200 bg-white p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-[26px] font-black tracking-tight text-[#06194A]">{customer.firstName} {customer.lastName}</h2>
@@ -1365,7 +1530,7 @@ function CustomerDetailModal({
           </div>
         </div>
 
-        <div className="space-y-6 p-5">
+        <div className="eph-crm-modal-body space-y-6 p-5">
           {activeTab === "genel" && <GeneralTab customer={customer} />}
           {activeTab === "roller" && <RolesTab customer={customer} onUpdateRoles={onUpdateRoles} />}
           {activeTab === "ilgiler" && (
