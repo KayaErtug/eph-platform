@@ -37,6 +37,8 @@ type Role =
   | "ADMIN"
   | "SUPER_ADMIN";
 
+type Capability = "TEAM_LEADER" | "OFFICE_OWNER";
+
 type UserRestriction = {
   id: string;
   type: string;
@@ -71,6 +73,33 @@ type AdminUser = {
   nominationQuota?: number;
   referralCode?: string | null;
   createdAt?: string;
+  capabilities?: {
+    id: string;
+    capability: Capability;
+    createdAt?: string;
+    createdBy?: {
+      firstName?: string | null;
+      lastName?: string | null;
+      role?: string | null;
+    } | null;
+  }[];
+  office?: {
+    id: string;
+    name: string;
+    slug?: string | null;
+    city?: string | null;
+    district?: string | null;
+  } | null;
+  teamMemberships?: {
+    id: string;
+    joinedAt?: string;
+    team?: {
+      id: string;
+      name: string;
+      leaderId?: string | null;
+      office?: { id: string; name: string } | null;
+    } | null;
+  }[];
   documents?: {
     id: string;
     type: string;
@@ -98,6 +127,24 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "MODERATOR", label: "Moderatör" },
   { value: "ADMIN", label: "Admin" },
   { value: "SUPER_ADMIN", label: "Yazılım Ekibi" },
+];
+
+const CAPABILITY_LABELS: Record<Capability, string> = {
+  TEAM_LEADER: "Takım Lideri",
+  OFFICE_OWNER: "Ofis Sahibi",
+};
+
+const CAPABILITY_OPTIONS: { value: Capability; label: string; description: string }[] = [
+  {
+    value: "TEAM_LEADER",
+    label: "Takım Lideri",
+    description: "Kendi CRM'i + Takım Yönetimi ekranına erişir.",
+  },
+  {
+    value: "OFFICE_OWNER",
+    label: "Ofis Sahibi",
+    description: "Ofis, takım ve organizasyon yönetimi yetkisi alır.",
+  },
 ];
 
 const EMPTY_CREATE_FORM = {
@@ -131,6 +178,16 @@ function dateText(value?: string | null) {
 
 function roleLabel(role?: string | null) {
   return ROLE_LABELS[String(role || "")] || String(role || "Rol yok");
+}
+
+function capabilityLabel(capability?: string | null) {
+  return CAPABILITY_LABELS[capability as Capability] || String(capability || "Ek yetki yok");
+}
+
+function userCapabilities(user?: AdminUser | null): Capability[] {
+  return (user?.capabilities || [])
+    .map((item) => item.capability)
+    .filter((item): item is Capability => item === "TEAM_LEADER" || item === "OFFICE_OWNER");
 }
 
 function activeRestriction(user: AdminUser) {
@@ -170,8 +227,10 @@ export default function AdminUsersPage() {
   const [suspendDuration, setSuspendDuration] = useState("ONE_HOUR");
 
   const [roleUser, setRoleUser] = useState<AdminUser | null>(null);
+  const [capabilityUser, setCapabilityUser] = useState<AdminUser | null>(null);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [nextRole, setNextRole] = useState<Role>("EMLAKCI");
+  const [nextCapabilities, setNextCapabilities] = useState<Capability[]>([]);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -336,6 +395,34 @@ export default function AdminUsersPage() {
       await loadUsers(filter);
     } catch (err: any) {
       setError(err?.response?.data?.message || "Rol değiştirilemedi.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function submitCapabilityChange() {
+    if (!capabilityUser) return;
+
+    if (!isSuperAdmin) {
+      setError("Ek yetki yönetimi sadece Yazılım Ekibi tarafından yapılabilir.");
+      return;
+    }
+
+    setBusyKey(`${capabilityUser.id}-capability`);
+    setError("");
+    setSuccess("");
+
+    try {
+      await api.patch(`/admin/users/${capabilityUser.id}/capabilities`, {
+        capabilities: nextCapabilities,
+      });
+
+      setSuccess(`${fullName(capabilityUser)} ek yetkileri güncellendi.`);
+      setCapabilityUser(null);
+      setNextCapabilities([]);
+      await loadUsers(filter);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Ek yetkiler güncellenemedi.");
     } finally {
       setBusyKey("");
     }
@@ -607,6 +694,10 @@ export default function AdminUsersPage() {
                   setRoleUser(target);
                   setNextRole(String(target.role || "EMLAKCI") as Role);
                 }}
+                onCapability={(target) => {
+                  setCapabilityUser(target);
+                  setNextCapabilities(userCapabilities(target));
+                }}
                 onDelete={deleteUser}
                 onMemberCode={assignMemberCode}
                 onCopy={copyText}
@@ -621,6 +712,15 @@ export default function AdminUsersPage() {
           <div className="rounded-2xl bg-slate-50 p-3 text-center">
             <p className="text-[16px] font-black text-[#172033]">{fullName(selectedUser)}</p>
             <p className="mt-1 text-[12px] font-bold text-slate-500">{roleLabel(selectedUser.role)}</p>
+            <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+              {userCapabilities(selectedUser).length ? (
+                userCapabilities(selectedUser).map((capability) => (
+                  <MiniPill key={capability} label={capabilityLabel(capability)} />
+                ))
+              ) : (
+                <MiniPill label="Ek yetki yok" />
+              )}
+            </div>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -773,6 +873,74 @@ export default function AdminUsersPage() {
           </button>
         </Modal>
       ) : null}
+
+      {capabilityUser ? (
+        <Modal title="Ek Yetki Yönetimi" onClose={() => setCapabilityUser(null)}>
+          <div className="rounded-2xl bg-slate-50 p-3 text-center">
+            <p className="text-[15px] font-black text-[#172033]">{fullName(capabilityUser)}</p>
+            <p className="mt-1 text-[12px] font-bold text-slate-500">
+              Temel rol: {roleLabel(capabilityUser.role)}
+            </p>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {CAPABILITY_OPTIONS.map((item) => {
+              const checked = nextCapabilities.includes(item.value);
+
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() =>
+                    setNextCapabilities((current) =>
+                      current.includes(item.value)
+                        ? current.filter((capability) => capability !== item.value)
+                        : [...current, item.value],
+                    )
+                  }
+                  className={`w-full rounded-2xl border p-3 text-left transition ${
+                    checked
+                      ? "border-blue-200 bg-blue-50 text-blue-800"
+                      : "border-slate-200 bg-white text-slate-700"
+                  }`}
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block text-[13px] font-black">{item.label}</span>
+                      <span className="mt-1 block text-[11px] font-bold text-slate-500">
+                        {item.description}
+                      </span>
+                    </span>
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[12px] font-black ${
+                        checked
+                          ? "border-blue-600 bg-blue-600 text-white"
+                          : "border-slate-300 bg-white text-transparent"
+                      }`}
+                    >
+                      ✓
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 p-3 text-center text-[12px] font-black text-amber-700">
+            Takım Lideri ve Ofis Sahibi birer rol değil, Emlakçı rolünün üzerine eklenen organizasyon yetkisidir.
+          </div>
+
+          <button
+            type="button"
+            onClick={submitCapabilityChange}
+            disabled={busyKey === `${capabilityUser.id}-capability`}
+            className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1557D6] text-[14px] font-black text-white disabled:opacity-60"
+          >
+            {busyKey === `${capabilityUser.id}-capability` ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
+            Ek Yetkileri Kaydet
+          </button>
+        </Modal>
+      ) : null}
     </main>
   );
 }
@@ -828,6 +996,7 @@ function UserCard({
   onDetail,
   onSuspend,
   onRole,
+  onCapability,
   onDelete,
   onMemberCode,
   onCopy,
@@ -841,6 +1010,7 @@ function UserCard({
   onDetail: (item: AdminUser) => void;
   onSuspend: (item: AdminUser) => void;
   onRole: (item: AdminUser) => void;
+  onCapability: (item: AdminUser) => void;
   onDelete: (item: AdminUser) => void;
   onMemberCode: (item: AdminUser) => void;
   onCopy: (value?: string | null) => void;
@@ -890,6 +1060,11 @@ function UserCard({
 
           <div className="mt-2 flex flex-wrap gap-1.5">
             <MiniPill label={item.memberCode ? `Üye No: ${item.memberCode}` : "Üye No yok"} />
+            {userCapabilities(item).map((capability) => (
+              <MiniPill key={capability} label={capabilityLabel(capability)} />
+            ))}
+            {item.office?.name ? <MiniPill label={`Ofis: ${item.office.name}`} /> : null}
+            {item.teamMemberships?.[0]?.team?.name ? <MiniPill label={`Takım: ${item.teamMemberships[0].team.name}`} /> : null}
             {restriction ? <MiniPill label="Askıda" danger /> : null}
           </div>
         </div>
@@ -949,6 +1124,15 @@ function UserCard({
           onClick={() => onRole(item)}
           disabled={!isSuperAdmin || isSelf}
           className="bg-blue-50 text-blue-700"
+        />
+
+        <ActionButton
+          label="Ek Yetki"
+          icon={<ShieldCheck size={16} />}
+          loading={busyKey === `${item.id}-capability`}
+          onClick={() => onCapability(item)}
+          disabled={!isSuperAdmin || isSelf || isSystemUser}
+          className="bg-indigo-50 text-indigo-700"
         />
 
         <ActionButton

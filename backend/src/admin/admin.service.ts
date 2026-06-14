@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { MailService } from "../mail.service";
-import { Role } from "@prisma/client";
+import { Capability, Role } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 
 type AdminActor = {
@@ -234,6 +234,24 @@ export class AdminService {
     if (!this.isSoftwareTeam(actor)) {
       throw new ForbiddenException("Bu işlem sadece Yazılım Ekibi tarafından yapılabilir.");
     }
+  }
+
+
+  private normalizeCapabilities(capabilities?: Array<Capability | string>): Capability[] {
+    const values = Array.isArray(capabilities) ? capabilities : [];
+    const normalized = values
+      .map((item) => String(item || "").trim().toUpperCase())
+      .filter(Boolean);
+
+    const unique = Array.from(new Set(normalized));
+
+    unique.forEach((item) => {
+      if (!Object.values(Capability).includes(item as Capability)) {
+        throw new BadRequestException("Geçersiz ek yetki.");
+      }
+    });
+
+    return unique as Capability[];
   }
 
   private readonly ilPlakaKodlari: Record<string, string> = {
@@ -915,6 +933,52 @@ export class AdminService {
             createdAt: true,
           },
         },
+        capabilities: {
+          select: {
+            id: true,
+            capability: true,
+            createdAt: true,
+            createdBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+        office: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            city: true,
+            district: true,
+          },
+        },
+        teamMemberships: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            joinedAt: true,
+            team: {
+              select: {
+                id: true,
+                name: true,
+                leaderId: true,
+                office: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+          take: 1,
+        },
         restrictions: {
           where: {
             isActive: true,
@@ -944,13 +1008,143 @@ export class AdminService {
       orderBy: { createdAt: "desc" },
     });
 
-    return users.map((user) => ({
-      ...this.maskSoftwareTeamUserForActor(user, actor),
-      restrictions: (user.restrictions || []).map((restriction) => ({
-        ...restriction,
-        createdBy: this.maskSoftwareTeamNestedUser(restriction.createdBy, actor),
-      })),
-    }));
+    return users.map((user) => {
+      const maskedUser = this.maskSoftwareTeamUserForActor(user, actor);
+
+      return {
+        ...maskedUser,
+        capabilities: (user.capabilities || []).map((capability) => ({
+          ...capability,
+          createdBy: this.maskSoftwareTeamNestedUser(capability.createdBy, actor),
+        })),
+        restrictions: (user.restrictions || []).map((restriction) => ({
+          ...restriction,
+          createdBy: this.maskSoftwareTeamNestedUser(restriction.createdBy, actor),
+        })),
+      };
+    });
+  }
+
+  async updateUserCapabilities(
+    id: string,
+    capabilities: Array<Capability | string>,
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    const actorId = this.getActorId(actor);
+    const normalizedCapabilities = this.normalizeCapabilities(capabilities);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        capabilities: {
+          select: { capability: true },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException("Kullanıcı bulunamadı.");
+    }
+
+    if (user.role === Role.SUPER_ADMIN) {
+      throw new BadRequestException("Yazılım Ekibi hesabına organizasyon ek yetkisi atanamaz.");
+    }
+
+    const currentCapabilities = user.capabilities.map((item) => item.capability);
+    const capabilitiesToAdd = normalizedCapabilities.filter(
+      (capability) => !currentCapabilities.includes(capability),
+    );
+    const capabilitiesToRemove = currentCapabilities.filter(
+      (capability) => !normalizedCapabilities.includes(capability),
+    );
+
+    await this.prisma.$transaction([
+      ...(capabilitiesToRemove.length
+        ? [
+            this.prisma.userCapability.deleteMany({
+              where: {
+                userId: id,
+                capability: { in: capabilitiesToRemove },
+              },
+            }),
+          ]
+        : []),
+      ...capabilitiesToAdd.map((capability) =>
+        this.prisma.userCapability.upsert({
+          where: {
+            userId_capability: {
+              userId: id,
+              capability,
+            },
+          },
+          update: {
+            createdById: actorId,
+          },
+          create: {
+            userId: id,
+            capability,
+            createdById: actorId,
+          },
+        }),
+      ),
+    ]);
+
+    const updated = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        profileImageUrl: true,
+        role: true,
+        isApproved: true,
+        capabilities: {
+          select: {
+            id: true,
+            capability: true,
+            createdAt: true,
+            createdBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    await this.logAdminAction({
+      actor,
+      targetUserId: id,
+      action: "USER_CAPABILITIES_UPDATED",
+      entityType: "UserCapability",
+      entityId: id,
+      description: `${user.email} kullanıcısının organizasyon ek yetkileri güncellendi.`,
+      metadata: {
+        oldCapabilities: currentCapabilities,
+        newCapabilities: normalizedCapabilities,
+        added: capabilitiesToAdd,
+        removed: capabilitiesToRemove,
+      },
+    });
+
+    return {
+      success: true,
+      message: "Ek yetkiler güncellendi.",
+      user: updated,
+    };
   }
 
   async approveUser(id: string, actor?: AdminActor) {

@@ -15,7 +15,7 @@ import { AdminService } from "./admin.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
-import { Role } from "@prisma/client";
+import { Capability, Role } from "@prisma/client";
 
 type AdminRequestUser = {
   id?: string;
@@ -126,6 +126,19 @@ export class AdminController {
   @Patch("users/:id/member-code")
   assignMemberCodeToUser(@Param("id") id: string, @Req() request: AdminRequest) {
     return this.adminService.assignMemberCodeToUser(id, this.extractActor(request));
+  }
+
+  @Patch("users/:id/capabilities")
+  updateUserCapabilities(
+    @Param("id") id: string,
+    @Body() body: { capabilities?: Array<Capability | string> },
+    @Req() request: AdminRequest,
+  ) {
+    return this.adminService.updateUserCapabilities(
+      id,
+      body.capabilities || [],
+      this.extractActor(request),
+    );
   }
 
   @Get("referrals")
