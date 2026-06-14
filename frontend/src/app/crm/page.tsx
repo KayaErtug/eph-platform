@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   BriefcaseBusiness,
+  Bell,
   Building2,
   CalendarDays,
+  ChevronRight,
   CheckCircle2,
   Clock3,
   FileText,
@@ -14,6 +16,7 @@ import {
   ListFilter,
   Loader2,
   MapPin,
+  Menu,
   Mic,
   Phone,
   PhoneCall,
@@ -1163,38 +1166,52 @@ export default function CrmPage() {
         )}
 
         <section className="eph-crm-page mx-auto min-h-screen max-w-7xl px-3 pb-8 pt-3 md:px-4 md:pt-5">
-          <header className="mb-3 rounded-[26px] border border-[#C7D6E8] bg-white p-3 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
-            <div className="text-center">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#2563EB]">Rol Bazlı CRM</p>
-              <h1 className="mt-1 text-[24px] font-black leading-tight tracking-tight text-[#1F2937] md:text-[34px]">CRM Müteahhit</h1>
-              <p className="mx-auto mt-1 max-w-xl text-[12px] font-bold leading-5 text-[#64748B]">
-                {activeProjectCount} proje • {Math.max(totalIndependentSectionCount, customers.length)} bağımsız bölüm • {customers.length} bağlantı
-              </p>
+          <header className="mb-3 rounded-[26px] border border-[#C7D6E8] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
+            <div className="grid grid-cols-[44px_1fr_96px] items-center gap-2">
+              <button type="button" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                <Menu size={22} />
+              </button>
+
+              <div className="min-w-0 text-center">
+                <h1 className="truncate text-[25px] font-black leading-tight tracking-tight text-[#1F2937] md:text-[34px]">CRM Müteahhit</h1>
+                <p className="mx-auto mt-0.5 max-w-xl truncate text-[12px] font-bold leading-5 text-[#64748B]">
+                  {activeProjectCount} Proje • {Math.max(totalIndependentSectionCount, customers.length)} Bağımsız Bölüm
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2">
+                <button type="button" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                  <Search size={20} />
+                </button>
+                <button type="button" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                  <Bell size={20} />
+                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white">7</span>
+                </button>
+              </div>
             </div>
           </header>
 
-          <section className="mb-3 overflow-hidden rounded-[26px] border border-[#C7D6E8] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
-            <div className="flex items-center justify-between gap-2 text-left">
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-[#EFF6FF] text-[#2563EB]">
-                  <Sparkles size={21} />
+          <section className="mb-3 overflow-hidden rounded-[26px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
+            <div className="rounded-[24px] border border-[#B7E4C7] bg-gradient-to-r from-[#ECFDF5] via-white to-[#F8FAFC] p-3 shadow-[0_10px_26px_rgba(22,163,74,0.08)]">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-[#DCFCE7] text-emerald-700">
+                    <Sparkles size={21} />
+                  </div>
+                  <h2 className="truncate text-[17px] font-black leading-tight text-[#1F2937]">Lina Öneriyor</h2>
                 </div>
-                <div className="min-w-0">
-                  <h2 className="text-[17px] font-black leading-tight text-[#1F2937]">Lina Öneriyor</h2>
-                  <p className="text-[11px] font-bold text-[#64748B]">Proje, alıcı ve tapu takibi</p>
-                </div>
+                <ChevronRight size={22} className="shrink-0 text-emerald-700" />
               </div>
-              <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black text-[#2563EB]">Akıllı CRM</span>
-            </div>
 
-            <div className="mt-3 grid gap-2">
-              <DeveloperLinaRow icon={<Flame size={18} />} text="Kaya Residence'ta 3 alıcı adayı 5 gündür bekliyor." />
-              <DeveloperLinaRow icon={<Clock3 size={18} />} text="Ali Kaya ile tapu devri süreci takip bekliyor." />
-              <DeveloperLinaRow icon={<Target size={18} />} text="Merkez Lofts'ta kalan stok kritik seviyeye yaklaştı." />
+              <div className="grid gap-2 md:grid-cols-3">
+                <DeveloperLinaRow icon={<Flame size={18} />} text="Kaya Residence'ta 3 alıcı 5 gündür bekliyor." />
+                <DeveloperLinaRow icon={<Clock3 size={18} />} text="Ali Kaya tapu devri bekliyor." />
+                <DeveloperLinaRow icon={<Target size={18} />} text="Merkez Lofts'ta stok kritik seviyede." />
+              </div>
             </div>
           </section>
 
-          <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
+          <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2 shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
             <div className="grid grid-cols-4 gap-2">
               <DeveloperStatCard title="Aktif Proje" value={String(activeProjectCount)} subtitle="Devam eden" icon={<Building2 size={18} />} />
               <DeveloperStatCard title="Toplam BB" value={String(Math.max(totalIndependentSectionCount, customers.length))} subtitle="Bağımsız bölüm" icon={<Home size={18} />} />
@@ -1229,8 +1246,9 @@ export default function CrmPage() {
                 { key: "PORTFOY_ORTAGI", label: "Portföy Ortakları", count: customers.filter((customer) => (customer.roles || []).includes("MUTEAHHIT") || (customer.roles || []).includes("INSAAT_FIRMASI")).length, icon: <BriefcaseBusiness size={20} /> },
                 { key: "ALT_YUKLENICI", label: "Alt Yükleniciler", count: developerCustomers.filter((customer) => String(customer.profession || "").toLocaleLowerCase("tr-TR").includes("yüklenici")).length, icon: <Wrench size={20} /> },
                 { key: "YATIRIMCI", label: "Yatırımcılar", count: customers.filter((customer) => (customer.roles || []).includes("YATIRIMCI")).length, icon: <WalletCards size={20} /> },
-              ].map((segment, index) => {
-                const gridClass = index === 3 ? "col-span-3" : index === 4 ? "col-span-3" : "col-span-2";
+                { key: "DIGER", label: "Diğer Kayıtlar", count: customers.filter((customer) => !(customer.roles || []).some((role) => ["ALICI", "ARSA_SAHIBI", "MAL_SAHIBI", "MUTEAHHIT", "INSAAT_FIRMASI", "YATIRIMCI"].includes(role))).length, icon: <ListFilter size={20} /> },
+              ].map((segment) => {
+                const gridClass = "col-span-2";
                 return (
                   <button
                     key={segment.key}
@@ -1247,9 +1265,9 @@ export default function CrmPage() {
           </section>
 
           <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h2 className="text-[16px] font-black text-[#1F2937]">Bağlantılarım</h2>
-              <div className="grid grid-cols-4 gap-1 rounded-2xl bg-[#F8FAFC] p-1">
+            <div className="mb-2 text-center">
+              <h2 className="text-[17px] font-black uppercase tracking-[0.08em] text-[#1F2937]">Bağlantılarım</h2>
+              <div className="mx-auto mt-2 grid max-w-[360px] grid-cols-4 gap-1 rounded-2xl bg-[#F8FAFC] p-1">
                 {[
                   { key: "today", label: "Bugün" },
                   { key: "7", label: "7 Gün" },
@@ -1269,9 +1287,10 @@ export default function CrmPage() {
           </section>
 
           <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h2 className="text-[16px] font-black text-[#1F2937]">Satılan Daire Raporu</h2>
-              <span className="rounded-full bg-[#ECFDF5] px-3 py-1 text-[10px] font-black text-emerald-700">CRM Kaydı görünür</span>
+            <div className="mb-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+              <span />
+              <h2 className="text-center text-[17px] font-black uppercase tracking-[0.08em] text-[#1F2937]">Satılan Daire Raporu</h2>
+              <span className="justify-self-end rounded-full bg-[#ECFDF5] px-3 py-1 text-[10px] font-black text-emerald-700">CRM Kaydı görünür</span>
             </div>
             <div className="space-y-2">
               {soldCustomers.map((customer) => {
@@ -1754,23 +1773,23 @@ export default function CrmPage() {
 
 function DeveloperLinaRow({ icon, text }: { icon: ReactNode; text: string }) {
   return (
-    <button type="button" className="flex w-full items-center justify-between gap-3 rounded-[18px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 py-2 text-left shadow-[0_6px_16px_rgba(15,23,42,0.035)]">
+    <button type="button" className="flex w-full items-center justify-between gap-3 rounded-[18px] border border-[#C7D6E8] bg-white px-3 py-2 text-left shadow-[0_6px_16px_rgba(15,23,42,0.04)]">
       <span className="flex min-w-0 items-center gap-2 text-sm font-black text-[#1F2937]">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[#2563EB]">{icon}</span>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#F8FAFC] text-emerald-700">{icon}</span>
         <span className="line-clamp-2">{text}</span>
       </span>
-      <span className="shrink-0 text-[#64748B]">›</span>
+      <ChevronRight size={17} className="shrink-0 text-[#64748B]" />
     </button>
   );
 }
 
 function DeveloperStatCard({ title, value, subtitle, icon }: { title: string; value: string; subtitle: string; icon: ReactNode }) {
   return (
-    <button type="button" className="flex min-h-[96px] flex-col items-center justify-center rounded-[20px] border border-[#C7D6E8] bg-white px-2 py-3 text-center shadow-[0_8px_22px_rgba(15,23,42,0.055)]">
-      <span className="mb-1 flex h-9 w-9 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#2563EB]">{icon}</span>
-      <span className="line-clamp-2 min-h-[28px] text-center text-[10px] font-black leading-[14px] text-[#1F2937]">{title}</span>
-      <span className="mt-1 text-[22px] font-black leading-none text-[#1F2937]">{value}</span>
-      <span className="mt-1 line-clamp-1 text-[10px] font-bold text-[#64748B]">{subtitle}</span>
+    <button type="button" className="flex min-h-[84px] flex-col items-center justify-center rounded-[20px] border-2 border-[#C7D6E8] bg-white px-2 py-2 text-center shadow-[0_12px_26px_rgba(15,23,42,0.09)]">
+      <span className="mb-1 flex h-8 w-8 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#2563EB]">{icon}</span>
+      <span className="line-clamp-2 min-h-[24px] text-center text-[10px] font-black leading-[12px] text-[#1F2937]">{title}</span>
+      <span className="mt-0.5 text-[21px] font-black leading-none text-[#1F2937]">{value}</span>
+      <span className="mt-0.5 line-clamp-1 text-[9px] font-bold text-[#64748B]">{subtitle}</span>
     </button>
   );
 }
@@ -1788,9 +1807,9 @@ function DeveloperActionButton({ title, icon, tone, onClick }: { title: string; 
     <button
       type="button"
       onClick={onClick}
-      className={`flex min-h-[82px] flex-col items-center justify-center rounded-[20px] bg-gradient-to-br px-2 py-3 text-center text-white ${toneClass}`}
+      className={`flex min-h-[84px] flex-col items-center justify-center rounded-[22px] bg-gradient-to-br px-3 py-3 text-center text-white ring-1 ring-white/40 ${toneClass}`}
     >
-      <span className="mb-1 flex h-9 w-9 items-center justify-center rounded-2xl bg-white/16">{icon}</span>
+      <span className="mb-1.5 flex h-9 w-9 items-center justify-center rounded-2xl bg-white/18">{icon}</span>
       <span className="line-clamp-2 text-center text-[11px] font-black leading-[15px]">{title}</span>
     </button>
   );
