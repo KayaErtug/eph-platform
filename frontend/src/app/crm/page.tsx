@@ -598,6 +598,9 @@ export default function CrmPage() {
   const [view, setView] = useState<"pipeline" | "list">("list");
   const [timeRange, setTimeRange] = useState<"today" | "7" | "15" | "30">("today");
   const [roleFilter, setRoleFilter] = useState<string>("TUMU");
+  const [quickFilter, setQuickFilter] = useState<"TUMU" | "EKSIK" | "SICAK">("TUMU");
+  const [showQuickNoteModal, setShowQuickNoteModal] = useState(false);
+  const [quickPickMode, setQuickPickMode] = useState<"GORUSME" | "GOREV" | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -897,6 +900,63 @@ export default function CrmPage() {
     setInterestForm(emptyInterestForm());
   };
 
+  const showAllCustomers = () => {
+    setQuickFilter("TUMU");
+    setRoleFilter("TUMU");
+    setSearch("");
+    setView("list");
+  };
+
+  const showIncompleteCustomers = () => {
+    setQuickFilter("EKSIK");
+    setRoleFilter("TUMU");
+    setSearch("");
+    setView("list");
+  };
+
+  const showWarmLeadCustomers = () => {
+    setQuickFilter("SICAK");
+    setRoleFilter("TUMU");
+    setSearch("");
+    setView("list");
+  };
+
+  const handleRoleFilterChange = (role: string) => {
+    setQuickFilter("TUMU");
+    setRoleFilter(role);
+    setView("list");
+  };
+
+  const handleOpenCustomerForAction = async (customerId: string) => {
+    const mode = quickPickMode;
+    setQuickPickMode(null);
+    await openCustomer(customerId);
+
+    if (mode === "GORUSME") {
+      setActivityForm({ type: "TELEFON", note: "Görüşme notu: " });
+    }
+
+    if (mode === "GOREV") {
+      setTaskForm({ title: "Takip görüşmesi", dueDate: "" });
+    }
+  };
+
+  const handleSaveQuickNote = async (customerId: string, note: string) => {
+    if (!customerId || !note.trim()) return;
+    setActivityLoading(true);
+
+    try {
+      await api.post(`/crm/customers/${customerId}/activities`, { type: "NOT", note: note.trim() });
+      setShowQuickNoteModal(false);
+      await fetchAll();
+      if (selectedCustomer?.id === customerId) {
+        await refreshSelectedCustomer(customerId);
+      }
+    } finally {
+      setActivityLoading(false);
+    }
+  };
+
   const roleTabs = useMemo(
     () => [
       { key: "ALICI", label: "Alıcılar", icon: <UsersRound size={16} />, tone: "blue" },
@@ -912,6 +972,18 @@ export default function CrmPage() {
     const keyword = search.toLowerCase().trim();
 
     return customers.filter((customer) => {
+      const hasContact = Boolean(customer.phone || customer.email);
+      const hasRole = Boolean(customer.roles?.length);
+      const hasNeedProfile = Boolean(customer._count?.interests || customer.interests?.length || customer.interestedArea || customer.interestedType);
+      const isIncomplete = !hasContact || !hasRole || !hasNeedProfile;
+
+      const lastTouch = customer.lastContactedAt || getLatestActivity(customer)?.createdAt || customer.updatedAt;
+      const warmDiffHours = lastTouch ? (Date.now() - new Date(lastTouch).getTime()) / (1000 * 60 * 60) : 0;
+      const isWarm = !["KAPANDI", "KAYBEDILDI"].includes(customer.status) && warmDiffHours >= 48;
+
+      if (quickFilter === "EKSIK" && !isIncomplete) return false;
+      if (quickFilter === "SICAK" && !isWarm) return false;
+
       const roleMatched = roleFilter === "TUMU" || (customer.roles || []).includes(roleFilter);
       if (!roleMatched) return false;
       if (!keyword) return true;
@@ -934,7 +1006,7 @@ export default function CrmPage() {
         .toLowerCase()
         .includes(keyword);
     });
-  }, [customers, search, roleFilter]);
+  }, [customers, search, roleFilter, quickFilter]);
 
   const allTasks = customers.flatMap((customer) =>
     (customer.tasks || []).map((task) => ({ ...task, customerName: `${customer.firstName} ${customer.lastName}`, customerId: customer.id })),
@@ -1004,6 +1076,8 @@ export default function CrmPage() {
     <main className="eph-v4-shell min-h-screen bg-[#F4F8FF] text-[#27364F]">
       {showAddModal && <AddCustomerModal form={form} setForm={setForm} formLoading={formLoading} provinceOptions={provinceOptions} provinceLoading={provinceLoading} onSubmit={handleAddCustomer} onClose={() => setShowAddModal(false)} />}
       {showCreditModal && <CreditCalculatorModal selectedCustomer={selectedCustomer} saving={activityLoading} onSave={handleSaveCreditCalculation} onClose={() => setShowCreditModal(false)} />}
+      {showQuickNoteModal && <QuickNoteModal customers={customers} saving={activityLoading} onSave={handleSaveQuickNote} onClose={() => setShowQuickNoteModal(false)} />}
+      {quickPickMode && <QuickPickCustomerModal mode={quickPickMode} customers={customers} onSelect={handleOpenCustomerForAction} onClose={() => setQuickPickMode(null)} />}
 
       {selectedCustomer && (
         <CustomerDetailModal
@@ -1052,19 +1126,19 @@ export default function CrmPage() {
           </div>
 
           <div className="eph-crm-top-grid mt-3 grid grid-cols-5 gap-1.5">
-            <TopCrmCard title="Toplam Kayıt" value={String(customers.length)} icon={<UsersRound size={16} />} />
-            <TopCrmCard title="Eksik Bilgili" value={String(incompleteCount)} icon={<Target size={16} />} />
-            <TopCrmCard title="Hızlı Not" value="Sesli Not" icon={<FileText size={16} />} onClick={() => setView("list")} />
+            <TopCrmCard title="Toplam Kayıt" value={String(customers.length)} icon={<UsersRound size={16} />} onClick={showAllCustomers} />
+            <TopCrmCard title="Eksik Bilgili" value={String(incompleteCount)} icon={<Target size={16} />} onClick={showIncompleteCustomers} />
+            <TopCrmCard title="Hızlı Not" value="Sesli Not" icon={<FileText size={16} />} onClick={() => setShowQuickNoteModal(true)} />
             <TopCrmCard title="Akbank Kredi" value="Hesapla" icon={<WalletCards size={16} />} onClick={() => setShowCreditModal(true)} highlight />
             <TopCrmCard title="Yeni Kayıt" value="Ekle" icon={<Plus size={16} />} onClick={() => setShowAddModal(true)} />
           </div>
 
-          <CrmSmartBand todayTasks={todayTasks.length} plannedCalls={plannedCallsToday} overdueTasks={overdueTasks.length} warmLeadCount={warmLeadCustomers.length} onShowCustomers={() => setView("list")} onAddCustomer={() => setShowAddModal(true)} />
+          <CrmSmartBand todayTasks={todayTasks.length} plannedCalls={plannedCallsToday} overdueTasks={overdueTasks.length} warmLeadCount={warmLeadCustomers.length} onShowCustomers={showWarmLeadCustomers} onAddCustomer={() => setShowAddModal(true)} />
 
           <div className="mt-3 grid grid-cols-4 gap-2">
-            <QuickActionCard icon={<Flame size={18} />} title="Sıcak Lead" subtitle="Liste" onClick={() => setView("list")} />
-            <QuickActionCard icon={<PhoneCall size={18} />} title="Görüşme" subtitle="Müşteri seç" onClick={() => setView("list")} />
-            <QuickActionCard icon={<Clock3 size={18} />} title="Görev" subtitle="Müşteri seç" onClick={() => setView("list")} />
+            <QuickActionCard icon={<Flame size={18} />} title="Sıcak Lead" subtitle="Liste" onClick={showWarmLeadCustomers} />
+            <QuickActionCard icon={<PhoneCall size={18} />} title="Görüşme" subtitle="Müşteri seç" onClick={() => setQuickPickMode("GORUSME")} />
+            <QuickActionCard icon={<Clock3 size={18} />} title="Görev" subtitle="Müşteri seç" onClick={() => setQuickPickMode("GOREV")} />
             <QuickActionCard icon={<ListFilter size={18} />} title={view === "pipeline" ? "Liste" : "Pipeline"} subtitle="Görünüm" onClick={() => setView(view === "pipeline" ? "list" : "pipeline")} />
           </div>
         </header>
@@ -1122,13 +1196,19 @@ export default function CrmPage() {
                     icon={tab.icon}
                     active={roleFilter === tab.key}
                     tone={tab.tone}
-                    onClick={() => setRoleFilter(tab.key)}
+                    onClick={() => handleRoleFilterChange(tab.key)}
                   />
                 </div>
               );
             })}
           </div>
         </section>
+
+        {quickFilter !== "TUMU" && (
+          <button type="button" onClick={showAllCustomers} className="mb-3 flex w-full items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white px-3 py-2 text-xs font-black text-[#1557D6] shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+            {quickFilter === "EKSIK" ? "Eksik bilgili kayıtlar gösteriliyor" : "Sıcak lead listesi gösteriliyor"} • Filtreyi temizle
+          </button>
+        )}
 
         <section className="eph-crm-filterbar mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
           <div className="flex gap-2">
@@ -1695,6 +1775,94 @@ function MortgageResult({ title, value, tone = "blue" }: { title: string; value:
   );
 }
 
+
+
+function QuickNoteModal({
+  customers,
+  saving,
+  onSave,
+  onClose,
+}: {
+  customers: Customer[];
+  saving: boolean;
+  onSave: (customerId: string, note: string) => void;
+  onClose: () => void;
+}) {
+  const [customerId, setCustomerId] = useState(customers[0]?.id || "");
+  const [note, setNote] = useState("");
+
+  return (
+    <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/60 p-0 backdrop-blur-sm md:items-center md:p-4" onClick={onClose}>
+      <div className="eph-crm-modal-panel flex w-full max-w-lg flex-col overflow-hidden rounded-t-[30px] border border-[#C7D6E8] bg-white shadow-2xl md:rounded-[30px]" onClick={(event) => event.stopPropagation()}>
+        <div className="border-b border-[#C7D6E8] px-4 py-4 text-center">
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1557D6]">CRM Hızlı Not</p>
+          <h2 className="mt-1 text-[22px] font-black text-[#06194A]">Sesli / Yazılı Not</h2>
+          <button type="button" onClick={onClose} className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#F8FAFC] text-slate-500"><X size={18} /></button>
+        </div>
+
+        <div className="space-y-3 px-4 py-4">
+          <Field label="Müşteri">
+            <select className="premium-input" value={customerId} onChange={(event) => setCustomerId(event.target.value)}>
+              {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.firstName} {customer.lastName}</option>)}
+            </select>
+          </Field>
+
+          <Field label="Not">
+            <textarea className="premium-input min-h-[120px] resize-none" placeholder="Görüşme notu, sesli not metni veya hızlı hatırlatma..." value={note} onChange={(event) => setNote(event.target.value)} />
+          </Field>
+
+          <button type="button" disabled={!customerId || !note.trim() || saving} onClick={() => onSave(customerId, note)} className="flex h-12 w-full items-center justify-center rounded-2xl bg-[#2563EB] text-sm font-black text-white disabled:opacity-50">
+            {saving ? "Kaydediliyor..." : "CRM Kaydına İşle"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuickPickCustomerModal({
+  mode,
+  customers,
+  onSelect,
+  onClose,
+}: {
+  mode: "GORUSME" | "GOREV";
+  customers: Customer[];
+  onSelect: (customerId: string) => void;
+  onClose: () => void;
+}) {
+  const title = mode === "GORUSME" ? "Görüşme Ekle" : "Görev Ekle";
+  const description = mode === "GORUSME" ? "Müşteri seçilince detay açılır ve görüşme notu hazır gelir." : "Müşteri seçilince detay açılır ve takip görevi hazır gelir.";
+
+  return (
+    <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/60 p-0 backdrop-blur-sm md:items-center md:p-4" onClick={onClose}>
+      <div className="eph-crm-modal-panel flex max-h-[86dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[30px] border border-[#C7D6E8] bg-white shadow-2xl md:rounded-[30px]" onClick={(event) => event.stopPropagation()}>
+        <div className="border-b border-[#C7D6E8] px-4 py-4 text-center">
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1557D6]">CRM Hızlı İşlem</p>
+          <h2 className="mt-1 text-[22px] font-black text-[#06194A]">{title}</h2>
+          <p className="mx-auto mt-1 max-w-sm text-xs font-bold leading-5 text-[#64748B]">{description}</p>
+          <button type="button" onClick={onClose} className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#F8FAFC] text-slate-500"><X size={18} /></button>
+        </div>
+
+        <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
+          {customers.length === 0 ? (
+            <div className="rounded-[22px] border border-dashed border-[#C7D6E8] bg-[#F8FAFC] p-6 text-center text-sm font-bold text-[#64748B]">Önce müşteri ekleyiniz.</div>
+          ) : (
+            customers.map((customer) => (
+              <button key={customer.id} type="button" onClick={() => onSelect(customer.id)} className="flex w-full items-center justify-between gap-3 rounded-[20px] border border-[#C7D6E8] bg-white px-3 py-3 text-left shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-black text-[#06194A]">{customer.firstName} {customer.lastName}</span>
+                  <span className="mt-0.5 block truncate text-xs font-bold text-[#64748B]">{[customer.phone, customer.city, roleLabel(customer.roles?.[0])].filter(Boolean).join(" • ")}</span>
+                </span>
+                <span className="shrink-0 text-xs font-black text-[#1557D6]">Seç →</span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function TopCrmCard({
   title,
