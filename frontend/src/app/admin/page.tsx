@@ -252,6 +252,7 @@ export default function AdminPage() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const role = String(user?.role || "").toUpperCase();
+  const isSuperAdmin = role === "SUPER_ADMIN";
   const canAccess = ["ADMIN", "SUPER_ADMIN", "MODERATOR"].includes(role);
 
   useEffect(() => {
@@ -452,6 +453,20 @@ export default function AdminPage() {
       countTone: "rose",
       isNew: true,
     },
+    ...(isSuperAdmin
+      ? [
+          {
+            title: "Turan Yönetimi",
+            desc: "Gizli Turan sözleri ve banner yönetimi",
+            href: "/admin/turan",
+            icon: <Sparkles size={30} />,
+            tone: "rose" as StatTone,
+            count: 0,
+            countTone: "rose" as StatTone,
+            isNew: true,
+          },
+        ]
+      : []),
     {
       title: "Raporlar",
       desc: "Trafik, kullanıcı ve işlem raporlarını inceleyin",
@@ -598,6 +613,7 @@ export default function AdminPage() {
             <SideNav
               portfolioCount={portfolioCounts.waiting}
               pendingApplications={pendingApplications}
+              isSuperAdmin={isSuperAdmin}
             />
           </aside>
         </div>
@@ -609,6 +625,7 @@ export default function AdminPage() {
           <SideNav
             portfolioCount={portfolioCounts.waiting}
             pendingApplications={pendingApplications}
+            isSuperAdmin={isSuperAdmin}
           />
 
           <Link
@@ -892,9 +909,11 @@ function AdminBrand({ compact = false }: { compact?: boolean }) {
 function SideNav({
   portfolioCount,
   pendingApplications,
+  isSuperAdmin,
 }: {
   portfolioCount: number;
   pendingApplications: number;
+  isSuperAdmin: boolean;
 }) {
   return (
     <nav className="mt-8 space-y-1">
@@ -920,6 +939,9 @@ function SideNav({
 
       <SideLabel label="İçerik Yönetimi" />
       <SideNavItem href="/admin/announcements" icon={<Bell size={19} />} label="Duyurular" />
+      {isSuperAdmin ? (
+        <SideNavItem href="/admin/turan" icon={<Sparkles size={19} />} label="Turan Yönetimi" />
+      ) : null}
       <SideNavItem href="/admin/reports" icon={<Activity size={19} />} label="Raporlar" />
 
       <SideLabel label="Sistem" />

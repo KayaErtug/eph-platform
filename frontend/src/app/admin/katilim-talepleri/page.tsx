@@ -256,6 +256,7 @@ export default function AdminKatilimTalepleriPage() {
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [currentRole, setCurrentRole] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   async function loadApplications(selectedStatus = status) {
     setLoading(true);
@@ -411,7 +412,7 @@ export default function AdminKatilimTalepleriPage() {
           </div>
 
           <div className="head-actions">
-            <button type="button" aria-label="Filtreler">
+            <button type="button" aria-label="Filtreler" onClick={() => setFiltersOpen((value) => !value)}>
               <Filter size={19} />
             </button>
             <button type="button" aria-label="Yenile" onClick={() => loadApplications(status)}>
@@ -460,34 +461,41 @@ export default function AdminKatilimTalepleriPage() {
             />
           </label>
 
-          <button className="filter-square" type="button" aria-label="Gelişmiş filtreler">
+          <button
+            className={`filter-square ${filtersOpen ? "active" : ""}`}
+            type="button"
+            aria-label="Gelişmiş filtreler"
+            onClick={() => setFiltersOpen((value) => !value)}
+          >
             <SlidersHorizontal size={21} />
           </button>
 
-          <select value={type} onChange={(event) => setType(event.target.value)}>
-            <option value="all">Tüm Türler</option>
-            <option value="referansli">Referanslı</option>
-            <option value="referanssiz">Referanssız</option>
-            <option value="pilot">Pilot</option>
-          </select>
+          <div className={`advanced-filters ${filtersOpen ? "open" : ""}`}>
+            <select value={type} onChange={(event) => setType(event.target.value)}>
+              <option value="all">Tüm Türler</option>
+              <option value="referansli">Referanslı</option>
+              <option value="referanssiz">Referanssız</option>
+              <option value="pilot">Pilot</option>
+            </select>
 
-          <select value={role} onChange={(event) => setRole(event.target.value)}>
-            <option value="all">Tüm Roller</option>
-            <option value="EMLAKCI">Emlakçı</option>
-            <option value="MUTEAHHIT">Müteahhit</option>
-            <option value="INSAAT_FIRMASI">İnşaat Firması</option>
-            <option value="MODERATOR">Moderatör</option>
-            <option value="ADMIN">Admin</option>
-          </select>
+            <select value={role} onChange={(event) => setRole(event.target.value)}>
+              <option value="all">Tüm Roller</option>
+              <option value="EMLAKCI">Emlakçı</option>
+              <option value="MUTEAHHIT">Müteahhit</option>
+              <option value="INSAAT_FIRMASI">İnşaat Firması</option>
+              <option value="MODERATOR">Moderatör</option>
+              <option value="ADMIN">Admin</option>
+            </select>
 
-          <select value={status} onChange={(event) => handleStatusFilter(event.target.value)}>
-            <option value="all">Tüm Durumlar</option>
-            <option value="PENDING">Bekliyor</option>
-            <option value="APPROVED">Onaylandı</option>
-            <option value="REJECTED">Reddedildi</option>
-            <option value="INVITED">Davet Edildi</option>
-            <option value="REGISTERED">Kayıt Tamamlandı</option>
-          </select>
+            <select value={status} onChange={(event) => handleStatusFilter(event.target.value)}>
+              <option value="all">Tüm Durumlar</option>
+              <option value="PENDING">Bekliyor</option>
+              <option value="APPROVED">Onaylandı</option>
+              <option value="REJECTED">Reddedildi</option>
+              <option value="INVITED">Davet Edildi</option>
+              <option value="REGISTERED">Kayıt Tamamlandı</option>
+            </select>
+          </div>
         </section>
 
         {error ? <div className="error-box">{error}</div> : null}
@@ -514,11 +522,6 @@ export default function AdminKatilimTalepleriPage() {
                         </span>
                       </div>
 
-                      <p className="contact-line">
-                        <span>{item.applicantEmail}</span>
-                        <b>•</b>
-                        <span>{item.applicantPhone}</span>
-                      </p>
 
                       <p className="meta-line">
                         <BriefcaseBusiness size={14} />
@@ -526,8 +529,6 @@ export default function AdminKatilimTalepleriPage() {
                         <b>•</b>
                         <MapPin size={14} />
                         <span>{item.district || "-"} / {item.city || "-"}</span>
-                        <b>•</b>
-                        <span>{formatDate(item.createdAt)}</span>
                       </p>
 
                       <div className="info-row">
@@ -605,23 +606,78 @@ export default function AdminKatilimTalepleriPage() {
               </div>
             </div>
 
-            <div className="detail-grid">
-              <div>
-                <span>Referans</span>
-                <strong>{getReferenceLabel(selected)}</strong>
-              </div>
-              <div>
-                <span>Profil Durumu</span>
-                <strong>{getCompletionText(selected)}</strong>
-              </div>
-              <div>
-                <span>Karar Durumu</span>
-                <strong>{getDecision(selected).label}</strong>
-              </div>
-              <div>
-                <span>Başvuru Tarihi</span>
-                <strong>{formatDate(selected.createdAt)}</strong>
-              </div>
+            <div className="detail-sections">
+              <section className="detail-section">
+                <h3>Profil Özeti</h3>
+                <div className="detail-grid compact">
+                  <div>
+                    <span>Rol</span>
+                    <strong>{getRoleDisplayName(selected.requestedRole)}</strong>
+                  </div>
+                  <div>
+                    <span>Profil Durumu</span>
+                    <strong>{getCompletionText(selected)}</strong>
+                  </div>
+                  <div>
+                    <span>Karar</span>
+                    <strong>{getDecision(selected).label}</strong>
+                  </div>
+                  <div>
+                    <span>Risk</span>
+                    <strong>{selected.isRisky ? selected.riskNote || "Risk kontrolü gerekli" : "Düşük"}</strong>
+                  </div>
+                </div>
+              </section>
+
+              <section className="detail-section">
+                <h3>İletişim Bilgisi</h3>
+                <div className="detail-grid compact">
+                  <div>
+                    <span>E-posta</span>
+                    <strong>{selected.applicantEmail || "-"}</strong>
+                  </div>
+                  <div>
+                    <span>Telefon</span>
+                    <strong>{selected.applicantPhone || "-"}</strong>
+                  </div>
+                </div>
+              </section>
+
+              <section className="detail-section">
+                <h3>Başvuru Bilgisi</h3>
+                <div className="detail-grid compact">
+                  <div>
+                    <span>Şehir</span>
+                    <strong>{selected.city || "-"}</strong>
+                  </div>
+                  <div>
+                    <span>İlçe</span>
+                    <strong>{selected.district || "-"}</strong>
+                  </div>
+                  <div>
+                    <span>Tarih</span>
+                    <strong>{formatDate(selected.createdAt)}</strong>
+                  </div>
+                  <div>
+                    <span>Durum</span>
+                    <strong>{statusLabels[selected.status] || selected.status}</strong>
+                  </div>
+                </div>
+              </section>
+
+              <section className="detail-section">
+                <h3>Referans Bilgisi</h3>
+                <div className="detail-grid compact">
+                  <div>
+                    <span>Referans</span>
+                    <strong>{getReferenceLabel(selected)}</strong>
+                  </div>
+                  <div>
+                    <span>Başvuru Türü</span>
+                    <strong>{selected.basvuruTuru || (selected.pilotBasvuruMu ? "Pilot" : "Standart")}</strong>
+                  </div>
+                </div>
+              </section>
             </div>
 
             <label className="note-box">
@@ -951,6 +1007,23 @@ export default function AdminKatilimTalepleriPage() {
           border-radius: 20px;
         }
 
+        .filter-square.active {
+          color: #1557d6;
+          border-color: #bfdbfe;
+          background: #eff6ff;
+        }
+
+        .advanced-filters {
+          grid-column: 1 / -1;
+          display: none;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .advanced-filters.open {
+          display: grid;
+        }
+
         .filters select {
           grid-column: 1 / -1;
           padding: 0 22px;
@@ -1209,7 +1282,7 @@ export default function AdminKatilimTalepleriPage() {
 
         .detail-modal {
           width: min(680px, 100%);
-          max-height: calc(100vh - 36px);
+          max-height: calc(100dvh - 36px - env(safe-area-inset-bottom, 0px));
           overflow: auto;
           background: white;
           border-radius: 28px;
@@ -1247,6 +1320,28 @@ export default function AdminKatilimTalepleriPage() {
           margin: 5px 0 0;
           color: #64748b;
           font-weight: 700;
+        }
+
+        .detail-sections {
+          display: grid;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+
+        .detail-section {
+          border: 1px solid #dbe5f1;
+          border-radius: 20px;
+          background: #ffffff;
+          padding: 12px;
+        }
+
+        .detail-section h3 {
+          margin: 0 0 10px;
+          text-align: center;
+          color: #06194a;
+          font-size: 13px;
+          font-weight: 900;
+          letter-spacing: -0.02em;
         }
 
         .detail-grid {
@@ -1472,7 +1567,12 @@ export default function AdminKatilimTalepleriPage() {
 
           .filters select {
             padding: 0 18px;
-            font-size: 17px;
+            font-size: 15px;
+          }
+
+          .advanced-filters {
+            grid-template-columns: 1fr;
+            gap: 8px;
           }
 
           .application-list {
@@ -1536,6 +1636,7 @@ export default function AdminKatilimTalepleriPage() {
           }
 
           .decision-line {
+            align-items: stretch;
             justify-content: space-between;
             gap: 10px;
             padding-left: 50px;
@@ -1558,9 +1659,43 @@ export default function AdminKatilimTalepleriPage() {
             border-radius: 14px;
           }
 
+          .detail-modal {
+            width: 100%;
+            max-height: calc(100dvh - 18px - env(safe-area-inset-bottom, 0px));
+            border-radius: 24px 24px 0 0;
+            padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+          }
+
+          .modal-backdrop {
+            align-items: end;
+            padding: 0 8px env(safe-area-inset-bottom, 0px);
+          }
+
           .detail-grid,
           .modal-actions {
             grid-template-columns: 1fr;
+          }
+
+          .modal-actions {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .primary-button {
+            order: 1;
+          }
+
+          .danger-button {
+            order: 2;
+          }
+
+          .secondary-button {
+            order: 3;
+            grid-column: 1 / -1;
+          }
+
+          .delete-button {
+            order: 4;
+            grid-column: 1 / -1;
           }
         }
       `}</style>

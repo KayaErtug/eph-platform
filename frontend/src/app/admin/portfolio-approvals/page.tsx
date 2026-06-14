@@ -90,13 +90,13 @@ const STATUS_LABELS: Record<string, string> = {
   INCELEMEDE: "İncelemede",
   EKSIK_BILGI_BEKLENIYOR: "Eksik Bilgi",
   ONAYLANDI: "Onaylandı",
-  HAVUZDA: "Havuza Alındı",
-  REDDEDILDI: "Reddedildi",
+  HAVUZDA: "Havuz",
+  REDDEDILDI: "Red",
+  WAITING: "Onaylanacak",
 };
 
 const FILTERS = [
-  "ALL",
-  "BELGE_BEKLENIYOR",
+  "WAITING",
   "INCELEMEYE_GONDERILDI",
   "INCELEMEDE",
   "EKSIK_BILGI_BEKLENIYOR",
@@ -104,6 +104,31 @@ const FILTERS = [
   "REDDEDILDI",
   "HAVUZDA",
 ];
+
+const SELECT_FILTERS = ["ALL", ...FILTERS];
+
+function effectiveApprovalStatus(item: ApprovalUnit) {
+  if (item.isPoolVisible || item.approvalStatus === "HAVUZDA") return "HAVUZDA";
+  return String(item.approvalStatus || "BELGE_BEKLENIYOR");
+}
+
+function isWaitingApprovalStatus(status: string) {
+  return [
+    "BELGE_BEKLENIYOR",
+    "INCELEMEYE_GONDERILDI",
+    "INCELEMEDE",
+    "EKSIK_BILGI_BEKLENIYOR",
+  ].includes(status);
+}
+
+function matchesApprovalFilter(item: ApprovalUnit, filter: string) {
+  const status = effectiveApprovalStatus(item);
+
+  if (filter === "ALL") return true;
+  if (filter === "WAITING") return isWaitingApprovalStatus(status);
+
+  return status === filter;
+}
 
 function normalize(value?: string | null) {
   return String(value || "").trim().toLocaleLowerCase("tr-TR");
@@ -182,7 +207,7 @@ export default function PortfolioApprovalsPage() {
 
   const [items, setItems] = useState<ApprovalUnit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("ALL");
+  const [filter, setFilter] = useState("WAITING");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [query, setQuery] = useState("");
   const [actionLoading, setActionLoading] = useState("");
@@ -236,13 +261,11 @@ export default function PortfolioApprovalsPage() {
   const counts = useMemo(() => {
     return {
       total: items.length,
-      waiting: items.filter((item) =>
-        ["BELGE_BEKLENIYOR", "INCELEMEYE_GONDERILDI"].includes(String(item.approvalStatus || "")),
-      ).length,
-      reviewing: items.filter((item) => item.approvalStatus === "INCELEMEDE").length,
-      approved: items.filter((item) => item.approvalStatus === "ONAYLANDI").length,
-      pool: items.filter((item) => item.approvalStatus === "HAVUZDA" || item.isPoolVisible).length,
-      rejected: items.filter((item) => item.approvalStatus === "REDDEDILDI").length,
+      waiting: items.filter((item) => isWaitingApprovalStatus(effectiveApprovalStatus(item))).length,
+      reviewing: items.filter((item) => effectiveApprovalStatus(item) === "INCELEMEDE").length,
+      approved: items.filter((item) => effectiveApprovalStatus(item) === "ONAYLANDI").length,
+      pool: items.filter((item) => effectiveApprovalStatus(item) === "HAVUZDA").length,
+      rejected: items.filter((item) => effectiveApprovalStatus(item) === "REDDEDILDI").length,
     };
   }, [items]);
 
@@ -250,8 +273,7 @@ export default function PortfolioApprovalsPage() {
     const q = normalize(query);
 
     return items.filter((item) => {
-      const status = String(item.approvalStatus || "");
-      const statusMatch = filter === "ALL" || status === filter;
+      const statusMatch = matchesApprovalFilter(item, filter);
       const typeMatch = typeFilter === "ALL" || item.type === typeFilter;
 
       const haystack = normalize(
@@ -297,7 +319,22 @@ export default function PortfolioApprovalsPage() {
         await api.post(`/units/${id}/approve`, {
           note: "Portföy admin onay merkezinden onaylandı.",
         });
-        setSuccess("Portföy onaylandı.");
+        setItems((current) =>
+          current.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  approvalStatus: "ONAYLANDI",
+                  isVerified: true,
+                  yetkiVerified: true,
+                  isPoolVisible: false,
+                  approvedAt: new Date().toISOString(),
+                  approvalNote: "Portföy admin onay merkezinden onaylandı.",
+                }
+              : item,
+          ),
+        );
+        setSuccess("Portföy onaylandı. Onaylanacak listesinden çıkarıldı.");
       }
 
       if (action === "reject") {
@@ -309,6 +346,18 @@ export default function PortfolioApprovalsPage() {
 
       if (action === "pool") {
         await api.post(`/units/${id}/send-to-pool`);
+        setItems((current) =>
+          current.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  approvalStatus: "HAVUZDA",
+                  isPoolVisible: true,
+                  poolPublishedAt: new Date().toISOString(),
+                }
+              : item,
+          ),
+        );
         setSuccess("Portföy havuza alındı.");
       }
 
@@ -351,7 +400,7 @@ export default function PortfolioApprovalsPage() {
                 Portföy Onayları
               </h1>
               <p className="truncate text-[11px] font-bold text-slate-500">
-                Yetki belgeli portföyleri incele, onayla ve havuza al
+                Mobil onay, belge ve havuz merkezi
               </p>
             </div>
           </div>
@@ -385,7 +434,7 @@ export default function PortfolioApprovalsPage() {
       <div className="mx-auto w-full max-w-[1180px] px-3 py-3 pb-24">
         <AdminFlagBanner className="mb-2 rounded-[8px]" />
 
-        <section className="grid grid-cols-2 gap-2 md:grid-cols-6">
+        <section className="grid grid-cols-3 gap-2 md:grid-cols-6">
           <StatCard icon={<ClipboardCheck size={18} />} label="Toplam" value={counts.total} tone="slate" />
           <StatCard icon={<FileWarning size={18} />} label="Bekleyen" value={counts.waiting} tone="amber" />
           <StatCard icon={<ShieldCheck size={18} />} label="İnceleme" value={counts.reviewing} tone="blue" />
@@ -395,13 +444,13 @@ export default function PortfolioApprovalsPage() {
         </section>
 
         <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-          <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
+          <div className="mb-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
             {FILTERS.map((key) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setFilter(key)}
-                className={`h-10 shrink-0 rounded-xl px-3 text-[12px] font-black ${
+                className={`h-10 rounded-xl px-2 text-[11px] font-black sm:text-[12px] ${
                   filter === key
                     ? "bg-[#172033] text-white"
                     : "border border-slate-200 bg-white text-slate-700"
@@ -412,7 +461,7 @@ export default function PortfolioApprovalsPage() {
             ))}
           </div>
 
-          <div className="grid gap-2 md:grid-cols-[1fr_180px_180px_110px]">
+          <div className="grid gap-2 md:grid-cols-[1fr_170px_170px_auto]">
             <label className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
               <input
@@ -428,7 +477,7 @@ export default function PortfolioApprovalsPage() {
               onChange={(event) => setFilter(event.target.value)}
               className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-center text-[12px] font-black text-slate-700 outline-none"
             >
-              {FILTERS.map((key) => (
+              {SELECT_FILTERS.map((key) => (
                 <option key={key} value={key}>
                   {STATUS_LABELS[key]}
                 </option>
@@ -558,102 +607,119 @@ function PortfolioCard({
   onAction: (id: string, action: string) => void;
 }) {
   const image = coverImage(item);
+  const currentStatus = effectiveApprovalStatus(item);
+  const isPool = currentStatus === "HAVUZDA";
+  const isFinalApproved = currentStatus === "ONAYLANDI";
+  const isRejected = currentStatus === "REDDEDILDI";
+  const isWaitingAction = isWaitingApprovalStatus(currentStatus);
 
   return (
-    <article className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="flex items-start gap-3">
-        <div className="h-[82px] w-[96px] shrink-0 overflow-hidden rounded-2xl bg-slate-100">
+    <article className="rounded-3xl border border-slate-200 bg-white p-2.5 shadow-sm">
+      <div className="flex items-start gap-2.5">
+        <div className="h-[74px] w-[84px] shrink-0 overflow-hidden rounded-2xl bg-slate-100 sm:h-[86px] sm:w-[104px]">
           {image ? (
             <img src={image} alt="" className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-slate-400">
-              <FolderOpen size={26} />
+              <FolderOpen size={25} />
             </div>
           )}
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-1.5">
             <div className="min-w-0">
-              <p className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+              <p className="truncate text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
                 {portfolioCode(item.id)}
               </p>
-              <h2 className="line-clamp-2 text-[16px] font-black tracking-[-0.04em] text-[#172033]">
+              <h2 className="line-clamp-2 text-[15px] font-black leading-[1.05] tracking-[-0.04em] text-[#172033]">
                 {item.project?.name || unitKind(item)}
               </h2>
-              <p className="mt-1 truncate text-[12px] font-bold text-slate-500">
-                {item.project?.district || "İlçe yok"} / {item.project?.city || "Şehir yok"}
+              <p className="mt-1 truncate text-[11px] font-bold text-slate-500">
+                {unitKind(item)} • {item.project?.district || "İlçe yok"} / {item.project?.city || "Şehir yok"}
+              </p>
+              <p className="mt-1 truncate text-[12px] font-black text-[#1557D6]">
+                {money(item.price, item.priceCurrency)}
               </p>
             </div>
 
-            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ${statusClass(item.approvalStatus)}`}>
-              {STATUS_LABELS[String(item.approvalStatus || "")] || "Durum Yok"}
+            <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black ${statusClass(item.approvalStatus)}`}>
+              {STATUS_LABELS[currentStatus] || "Durum Yok"}
             </span>
           </div>
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-        <InfoCard icon={<UsersRound size={16} />} label="Sahip" value={ownerName(item)} />
-        <InfoCard icon={<span className="text-[14px] font-black">₺</span>} label="Fiyat" value={money(item.price, item.priceCurrency)} />
-        <InfoCard icon={<CalendarDays size={16} />} label="Gönderim" value={dateText(item.submittedForApprovalAt || item.updatedAt)} />
-        <InfoCard icon={<FolderOpen size={16} />} label="Tür" value={unitKind(item)} />
+      <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+        <InfoCard icon={<UsersRound size={15} />} label="Sahip" value={ownerName(item)} />
+        <InfoCard icon={<CalendarDays size={15} />} label="Gönderim" value={dateText(item.submittedForApprovalAt || item.updatedAt)} />
+        <InfoCard icon={<FolderOpen size={15} />} label="Tür" value={unitKind(item)} />
+        <InfoCard icon={<span className="text-[13px] font-black">₺</span>} label="Fiyat" value={money(item.price, item.priceCurrency)} />
       </div>
 
-      <div className="mt-2 grid grid-cols-4 gap-2">
+      <div className="mt-2 grid grid-cols-4 gap-1.5">
         <DocumentStatus label="Yetki" active={Boolean(item.yetkiVerified || item.isVerified)} />
         <DocumentStatus label="Tapu" active={Boolean(item.tapuVerified)} />
         <DocumentStatus label="Foto" active={Boolean(item.photoVerified)} />
-        <DocumentStatus label="Havuz" active={Boolean(item.isPoolVisible || item.approvalStatus === "HAVUZDA")} />
+        <DocumentStatus label="Havuz" active={isPool} />
       </div>
 
-      {item.approvalNote ? (
-        <p className="mt-2 rounded-2xl bg-amber-50 p-3 text-center text-[12px] font-bold leading-5 text-amber-800">
+      {isFinalApproved ? (
+        <p className="mt-2 rounded-2xl bg-emerald-50 p-2.5 text-center text-[11px] font-black leading-4 text-emerald-800">
+          ✅ Portföy onaylandı. Artık yalnızca Onaylandı veya Havuz filtrelerinde takip edilir.
+        </p>
+      ) : item.approvalNote ? (
+        <p className="mt-2 line-clamp-2 rounded-2xl bg-amber-50 p-2.5 text-center text-[11px] font-bold leading-4 text-amber-800">
           {item.approvalNote}
         </p>
       ) : null}
 
-      <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-6">
+      <div className="mt-2 grid grid-cols-3 gap-1.5 md:grid-cols-6">
         <ActionButton
           label="İncele"
-          icon={<Eye size={16} />}
+          icon={<Eye size={15} />}
           loading={actionLoading === `${item.id}-review`}
+          disabled={!isWaitingAction}
           onClick={() => onAction(item.id, "review")}
           className="bg-blue-50 text-blue-700"
         />
         <ActionButton
           label="Eksik"
-          icon={<FileWarning size={16} />}
+          icon={<FileWarning size={15} />}
           loading={actionLoading === `${item.id}-missing`}
+          disabled={!isWaitingAction}
           onClick={() => onAction(item.id, "missing")}
           className="bg-amber-50 text-amber-700"
         />
         <ActionButton
-          label="Onayla"
-          icon={<CheckCircle2 size={16} />}
+          label={isFinalApproved ? "Onaylandı" : "Onay"}
+          icon={<CheckCircle2 size={15} />}
           loading={actionLoading === `${item.id}-approve`}
+          disabled={!isWaitingAction || isFinalApproved}
           onClick={() => onAction(item.id, "approve")}
           className="bg-emerald-50 text-emerald-700"
         />
         <ActionButton
-          label="Reddet"
-          icon={<XCircle size={16} />}
+          label={isRejected ? "Reddedildi" : "Red"}
+          icon={<XCircle size={15} />}
           loading={actionLoading === `${item.id}-reject`}
+          disabled={!isWaitingAction || isRejected}
           onClick={() => onAction(item.id, "reject")}
           className="bg-rose-50 text-rose-700"
         />
         <ActionButton
-          label="Havuz"
-          icon={<Send size={16} />}
+          label={isPool ? "Havuzda" : isFinalApproved ? "Sahip Yayınlar" : "Havuz"}
+          icon={<Send size={15} />}
           loading={actionLoading === `${item.id}-pool`}
+          disabled
           onClick={() => onAction(item.id, "pool")}
           className="bg-purple-50 text-purple-700"
         />
         <Link
           href={`/stok/${item.id}`}
-          className="flex min-h-[42px] items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700"
+          className="flex min-h-[40px] items-center justify-center gap-1 rounded-2xl border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-700"
         >
-          <FileText size={16} />
+          <FileText size={15} />
           Detay
         </Link>
       </div>
@@ -671,14 +737,14 @@ function InfoCard({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-2 text-center">
-      <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-xl bg-white text-slate-700">
+    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-1.5 text-center">
+      <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-xl bg-white text-slate-700">
         {icon}
       </div>
-      <p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+      <p className="mt-1 text-[8px] font-black uppercase tracking-[0.1em] text-slate-400">
         {label}
       </p>
-      <p className="mt-1 truncate text-[11px] font-black text-[#172033]">
+      <p className="mt-0.5 line-clamp-2 break-words text-[10px] font-black leading-4 text-[#172033]">
         {value}
       </p>
     </div>
@@ -687,12 +753,12 @@ function InfoCard({
 
 function DocumentStatus({ label, active }: { label: string; active: boolean }) {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-2 text-center">
-      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">
+    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-1.5 text-center">
+      <p className="text-[8px] font-black uppercase tracking-[0.1em] text-slate-500">
         {label}
       </p>
       <span
-        className={`mt-1 inline-flex min-w-[34px] items-center justify-center rounded-full px-2 py-1 text-[11px] font-black ${
+        className={`mt-1 inline-flex min-w-[30px] items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-black ${
           active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
         }`}
       >
@@ -706,12 +772,14 @@ function ActionButton({
   label,
   icon,
   loading,
+  disabled = false,
   onClick,
   className,
 }: {
   label: string;
   icon: React.ReactNode;
   loading: boolean;
+  disabled?: boolean;
   onClick: () => void;
   className: string;
 }) {
@@ -719,8 +787,8 @@ function ActionButton({
     <button
       type="button"
       onClick={onClick}
-      disabled={loading}
-      className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-2xl px-2 text-[12px] font-black disabled:opacity-60 ${className}`}
+      disabled={loading || disabled}
+      className={`flex min-h-[40px] items-center justify-center gap-1 rounded-2xl px-1.5 text-[11px] font-black disabled:opacity-60 ${className}`}
     >
       {loading ? <Loader2 className="animate-spin" size={16} /> : icon}
       {loading ? "..." : label}

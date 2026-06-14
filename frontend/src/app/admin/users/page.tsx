@@ -9,6 +9,7 @@ import {
   Ban,
   CheckCircle2,
   ClipboardCopy,
+  Eye,
   FileText,
   Filter,
   KeyRound,
@@ -169,6 +170,7 @@ export default function AdminUsersPage() {
   const [suspendDuration, setSuspendDuration] = useState("ONE_HOUR");
 
   const [roleUser, setRoleUser] = useState<AdminUser | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [nextRole, setNextRole] = useState<Role>("EMLAKCI");
 
   useEffect(() => {
@@ -462,7 +464,7 @@ export default function AdminUsersPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex max-w-[172px] flex-wrap items-center justify-end gap-2 sm:max-w-none sm:flex-nowrap">
             {isSuperAdmin ? (
               <button
                 type="button"
@@ -498,6 +500,18 @@ export default function AdminUsersPage() {
 
       <div className="mx-auto w-full max-w-[1180px] px-3 py-3 pb-20">
         <AdminFlagBanner className="mb-2 rounded-[8px]" />
+
+        {isSuperAdmin ? (
+          <button
+            type="button"
+            onClick={assignMissingMemberCodes}
+            disabled={busyKey === "missing-member-codes"}
+            className="mb-2 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-3 text-[12px] font-black text-blue-700 disabled:opacity-60 sm:hidden"
+          >
+            {busyKey === "missing-member-codes" ? <Loader2 className="animate-spin" size={16} /> : <KeyRound size={16} />}
+            Eksik Üye Numaralarını Oluştur
+          </button>
+        ) : null}
 
         <section className="grid grid-cols-2 gap-2 md:grid-cols-5">
           <MetricCard label="Toplam" value={counts.total} icon={<UsersRound size={18} />} tone="blue" />
@@ -583,6 +597,7 @@ export default function AdminUsersPage() {
                 isSuperAdmin={isSuperAdmin}
                 busyKey={busyKey}
                 onApprove={approveUser}
+                onDetail={(target) => setSelectedUser(target)}
                 onSuspend={(target) => {
                   setSuspendUser(target);
                   setSuspendReason("");
@@ -600,6 +615,32 @@ export default function AdminUsersPage() {
           </section>
         )}
       </div>
+
+      {selectedUser ? (
+        <Modal title="Kullanıcı Detayı" onClose={() => setSelectedUser(null)}>
+          <div className="rounded-2xl bg-slate-50 p-3 text-center">
+            <p className="text-[16px] font-black text-[#172033]">{fullName(selectedUser)}</p>
+            <p className="mt-1 text-[12px] font-bold text-slate-500">{roleLabel(selectedUser.role)}</p>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <DetailBox label="E-posta" value={selectedUser.email} onCopy={() => copyText(selectedUser.email)} />
+            <DetailBox label="Telefon" value={selectedUser.phone || "Yok"} onCopy={() => copyText(selectedUser.phone)} />
+            <DetailBox label="Şehir" value={selectedUser.city ? `${selectedUser.city}${selectedUser.district ? ` / ${selectedUser.district}` : ""}` : "Yok"} />
+            <DetailBox label="Üye No" value={selectedUser.memberCode || "Yok"} onCopy={() => copyText(selectedUser.memberCode)} />
+            <DetailBox label="Referans" value={selectedUser.referralCode || "Yok"} onCopy={() => copyText(selectedUser.referralCode)} />
+            <DetailBox label="Kayıt" value={dateText(selectedUser.createdAt)} />
+          </div>
+
+          {activeRestriction(selectedUser) ? (
+            <div className="mt-3 rounded-2xl border border-rose-100 bg-rose-50 p-3 text-center">
+              <p className="text-[11px] font-black uppercase tracking-[0.1em] text-rose-600">Aktif Askı</p>
+              <p className="mt-1 text-[12px] font-bold text-rose-700">{activeRestriction(selectedUser)?.reason}</p>
+              <p className="mt-1 text-[11px] font-bold text-rose-500">Bitiş: {dateText(activeRestriction(selectedUser)?.endsAt)}</p>
+            </div>
+          ) : null}
+        </Modal>
+      ) : null}
 
       {createOpen ? (
         <Modal title="Yeni Kullanıcı Oluştur" onClose={() => setCreateOpen(false)}>
@@ -784,6 +825,7 @@ function UserCard({
   isSuperAdmin,
   busyKey,
   onApprove,
+  onDetail,
   onSuspend,
   onRole,
   onDelete,
@@ -796,6 +838,7 @@ function UserCard({
   isSuperAdmin: boolean;
   busyKey: string;
   onApprove: (item: AdminUser) => void;
+  onDetail: (item: AdminUser) => void;
   onSuspend: (item: AdminUser) => void;
   onRole: (item: AdminUser) => void;
   onDelete: (item: AdminUser) => void;
@@ -833,7 +876,7 @@ function UserCard({
               <h2 className="truncate text-[15px] font-black tracking-[-0.03em] text-[#172033]">
                 {fullName(item)}
               </h2>
-              <p className="truncate text-[11px] font-bold text-slate-500">{item.email}</p>
+              <p className="truncate text-[11px] font-bold text-slate-500">{roleLabel(item.role)} • {item.city || "Şehir yok"}</p>
             </div>
 
             <span
@@ -846,18 +889,15 @@ function UserCard({
           </div>
 
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <MiniPill label={roleLabel(item.role)} />
-            <MiniPill label={item.city ? `${item.city}${item.district ? ` / ${item.district}` : ""}` : "Şehir yok"} />
+            <MiniPill label={item.memberCode ? `Üye No: ${item.memberCode}` : "Üye No yok"} />
             {restriction ? <MiniPill label="Askıda" danger /> : null}
           </div>
         </div>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <InfoBox label="Üye No" value={item.memberCode || "Yok"} onCopy={() => onCopy(item.memberCode)} />
-        <InfoBox label="Telefon" value={item.phone || "Yok"} onCopy={() => onCopy(item.phone)} />
         <InfoBox label="Kayıt" value={dateText(item.createdAt)} />
-        <InfoBox label="Referans" value={item.referralCode || "Yok"} onCopy={() => onCopy(item.referralCode)} />
+        <InfoBox label="Durum" value={item.isApproved ? "Onaylı" : "Bekliyor"} />
       </div>
 
       {restriction ? (
@@ -875,6 +915,14 @@ function UserCard({
       ) : null}
 
       <div className="mt-3 grid grid-cols-2 gap-2">
+        <ActionButton
+          label="Detay"
+          icon={<Eye size={16} />}
+          loading={false}
+          onClick={() => onDetail(item)}
+          className="bg-slate-100 text-slate-700"
+        />
+
         {!item.isApproved ? (
           <ActionButton
             label="Onayla"
@@ -1018,6 +1066,33 @@ function Input({
   );
 }
 
+function DetailBox({
+  label,
+  value,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  onCopy?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      disabled={!onCopy || value === "Yok"}
+      className="min-h-[66px] rounded-2xl border border-slate-100 bg-slate-50 p-3 text-center disabled:cursor-default"
+    >
+      <span className="block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+        {label}
+      </span>
+      <span className="mt-1 flex items-center justify-center gap-1 break-all text-[12px] font-black text-[#172033]">
+        {value}
+        {onCopy && value !== "Yok" ? <ClipboardCopy size={12} className="shrink-0 text-slate-400" /> : null}
+      </span>
+    </button>
+  );
+}
+
 function Modal({
   title,
   children,
@@ -1028,10 +1103,10 @@ function Modal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:items-center">
-      <section className="w-full max-w-[520px] rounded-3xl bg-white p-4 shadow-2xl">
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/50 p-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] backdrop-blur-sm sm:items-center">
+      <section className="max-h-[calc(100dvh-24px-env(safe-area-inset-bottom,0px))] w-full max-w-[520px] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-[18px] font-black tracking-[-0.04em] text-[#172033]">
+          <h2 className="flex-1 text-center text-[18px] font-black tracking-[-0.04em] text-[#172033]">
             {title}
           </h2>
           <button

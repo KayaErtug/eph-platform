@@ -290,8 +290,13 @@ export default function MessageDetailPage() {
   const displayName = otherSender ? `${otherSender.firstName} ${otherSender.lastName}`.trim() : "EPH Mesajlaşma";
 
   return (
-    <main className="fixed inset-x-0 top-[64px] bottom-[76px] z-[82] bg-[#F7FBFF] text-[#06194A] md:bottom-0">
-      <section className="mx-auto flex h-full w-full max-w-[430px] flex-col overflow-hidden border-x border-[#DDE7F3] bg-[#F7FBFF]">
+    <main className="fixed inset-x-0 top-[64px] bottom-0 z-[82] bg-[#F7FBFF] text-[#06194A]">
+      <section
+  className="mx-auto flex h-full w-full max-w-[430px] flex-col overflow-hidden border-x border-[#DDE7F3] bg-[#F7FBFF]"
+  style={{
+    minHeight: "100dvh",
+  }}
+>
         <header className="shrink-0 border-b border-[#DDE7F3] bg-white px-2.5 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.035)]">
           <div className="flex items-center gap-2">
             <button
@@ -377,7 +382,12 @@ export default function MessageDetailPage() {
           )}
         </div>
 
-        <footer className="shrink-0 border-t border-[#DDE7F3] bg-white px-1.5 py-2">
+        <footer
+  className="shrink-0 border-t border-[#DDE7F3] bg-white px-1.5 py-2"
+  style={{
+    paddingBottom: "max(12px, env(safe-area-inset-bottom))",
+  }}
+>
           <div className="flex w-full items-end gap-1.5">
             <textarea
               value={message}

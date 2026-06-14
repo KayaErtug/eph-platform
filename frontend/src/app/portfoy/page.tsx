@@ -14,6 +14,7 @@ import {
   MapPin,
   Navigation,
   Plus,
+  Send,
   Search,
   Share2,
   SlidersHorizontal,
@@ -271,6 +272,7 @@ function StokPageInner() {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
   const [deletingUnitId, setDeletingUnitId] = useState("");
+  const [poolActionUnitId, setPoolActionUnitId] = useState("");
   const [editingUnit, setEditingUnit] = useState<MapUnit | null>(null);
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -742,6 +744,38 @@ function StokPageInner() {
     }
   };
 
+
+  const handleSendToPool = async (unit: MapUnit) => {
+    if ((unit as any).approvalStatus !== "ONAYLANDI") {
+      alert("Sadece onaylanmış portföyler havuza gönderilebilir.");
+      return;
+    }
+
+    try {
+      setPoolActionUnitId(unit.id);
+      await api.post(`/units/${unit.id}/send-to-pool`);
+      await fetchData();
+      alert("Portföy havuza gönderildi.");
+    } catch (error: any) {
+      alert(error?.response?.data?.message || "Portföy havuza gönderilemedi.");
+    } finally {
+      setPoolActionUnitId("");
+    }
+  };
+
+  const handleRemoveFromPool = async (unit: MapUnit) => {
+    try {
+      setPoolActionUnitId(unit.id);
+      await api.post(`/units/${unit.id}/remove-from-pool`);
+      await fetchData();
+      alert("Portföy havuzdan kaldırıldı. Onaylı durumda kalır, istediğiniz zaman tekrar havuza gönderebilirsiniz.");
+    } catch (error: any) {
+      alert(error?.response?.data?.message || "Portföy havuzdan kaldırılamadı.");
+    } finally {
+      setPoolActionUnitId("");
+    }
+  };
+
   const handleWhatsappLocation = (unit: MapUnit) => {
     const text = encodeURIComponent(makeWhatsappLocationText(unit));
     window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
@@ -918,10 +952,13 @@ function StokPageInner() {
                 unit={unit}
                 selected={mapSelectedUnitId === unit.id}
                 deleting={deletingUnitId === unit.id}
+                poolBusy={poolActionUnitId === unit.id}
                 onOpen={() => router.push(`/portfoy/${unit.id}`)}
                 onUpdate={() => openEditModal(unit)}
                 onShare={() => handlePortfolioShare(unit)}
                 onDelete={() => handleDeleteUnit(unit)}
+                onSendToPool={() => handleSendToPool(unit)}
+                onRemoveFromPool={() => handleRemoveFromPool(unit)}
                 onWhatsappLocation={() => handleWhatsappLocation(unit)}
               />
             ))
@@ -997,19 +1034,25 @@ function CompactPortfolioCard({
   unit,
   selected,
   deleting,
+  poolBusy,
   onOpen,
   onUpdate,
   onShare,
   onDelete,
+  onSendToPool,
+  onRemoveFromPool,
   onWhatsappLocation,
 }: {
   unit: MapUnit;
   selected: boolean;
   deleting: boolean;
+  poolBusy: boolean;
   onOpen: () => void;
   onUpdate: () => void;
   onShare: () => void;
   onDelete: () => void;
+  onSendToPool: () => void;
+  onRemoveFromPool: () => void;
   onWhatsappLocation: () => void;
 }) {
   const image = getUnitCoverImage(unit) || "/LOGO_EPH.png";
@@ -1023,6 +1066,10 @@ function CompactPortfolioCard({
   const hasLocation = Boolean(
     unit.project?.latitude && unit.project?.longitude,
   );
+  const approvalStatus = String((unit as any).approvalStatus || "");
+  const isPoolVisible = Boolean((unit as any).isPoolVisible);
+  const canSendToPool = approvalStatus === "ONAYLANDI" && !isPoolVisible;
+  const canRemoveFromPool = approvalStatus === "HAVUZDA" || isPoolVisible;
 
   return (
     <article
@@ -1136,6 +1183,33 @@ function CompactPortfolioCard({
           )}
         </button>
       </div>
+      {(canSendToPool || canRemoveFromPool) && (
+        <div className="col-span-3 grid grid-cols-1 gap-1.5 border-t border-[#E7EEF8] pt-2">
+          {canSendToPool ? (
+            <button
+              type="button"
+              onClick={onSendToPool}
+              disabled={poolBusy}
+              className="flex min-h-[38px] items-center justify-center gap-2 rounded-[16px] bg-emerald-600 px-3 text-[11px] font-black text-white shadow-[0_10px_22px_rgba(5,150,105,0.18)] disabled:opacity-60"
+            >
+              {poolBusy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              Havuza Gönder
+            </button>
+          ) : null}
+
+          {canRemoveFromPool ? (
+            <button
+              type="button"
+              onClick={onRemoveFromPool}
+              disabled={poolBusy}
+              className="flex min-h-[38px] items-center justify-center gap-2 rounded-[16px] border border-amber-200 bg-amber-50 px-3 text-[11px] font-black text-amber-800 disabled:opacity-60"
+            >
+              {poolBusy ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+              Havuzdan Kaldır
+            </button>
+          ) : null}
+        </div>
+      )}
     </article>
   );
 }

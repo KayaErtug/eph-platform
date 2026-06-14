@@ -345,6 +345,21 @@ model AdminActionLog {
   @@index([createdAt])
 }
 
+
+model TuranQuote {
+  id        String   @id @default(uuid())
+  text      String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@index([createdAt])
+}
+
 model PlatformAnnouncement {
   id          String               @id @default(uuid())
   createdById String

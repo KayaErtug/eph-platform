@@ -28,6 +28,7 @@ import { PortfolioDocumentsModule } from './portfolio-documents/portfolio-docume
 import { KatilimTalepleriModule } from './katilim-talepleri/katilim-talepleri.module';
 
 import { LinaModule } from './lina/lina.module';
+import { TuranModule } from './turan/turan.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { LinaModule } from './lina/lina.module';
     ReferralModule,
 
     LinaModule,
+    TuranModule,
   ],
 })
 export class AppModule {}
