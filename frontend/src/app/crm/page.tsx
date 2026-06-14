@@ -1796,21 +1796,27 @@ function DeveloperStatCard({ title, value, subtitle, icon }: { title: string; va
 
 function DeveloperActionButton({ title, icon, tone, onClick }: { title: string; icon: ReactNode; tone: "blue" | "pistachio" | "leaf" | "pink" | "navy"; onClick: () => void }) {
   const toneClass = {
-    blue: "from-[#2563EB] to-[#1D4ED8] shadow-[0_14px_24px_rgba(37,99,235,0.26)]",
-    pistachio: "from-[#84CC16] to-[#65A30D] shadow-[0_14px_24px_rgba(101,163,13,0.26)]",
-    leaf: "from-[#22C55E] to-[#16A34A] shadow-[0_14px_24px_rgba(22,163,74,0.26)]",
-    pink: "from-[#EC4899] to-[#DB2777] shadow-[0_14px_24px_rgba(219,39,119,0.25)]",
-    navy: "from-[#1E40AF] to-[#0F172A] shadow-[0_14px_24px_rgba(30,64,175,0.25)]",
+    blue: "from-[#2563EB] to-[#1D4ED8] shadow-[0_16px_28px_rgba(37,99,235,0.28)]",
+    pistachio: "from-[#84CC16] to-[#65A30D] shadow-[0_16px_28px_rgba(101,163,13,0.28)]",
+    leaf: "from-[#22C55E] to-[#16A34A] shadow-[0_16px_28px_rgba(22,163,74,0.28)]",
+    pink: "from-[#EC4899] to-[#DB2777] shadow-[0_16px_28px_rgba(219,39,119,0.28)]",
+    navy: "from-[#1E40AF] to-[#0F172A] shadow-[0_16px_28px_rgba(30,64,175,0.28)]",
   }[tone];
+
+  const labelLines = title.split(" ").filter(Boolean);
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex min-h-[84px] flex-col items-center justify-center rounded-[22px] bg-gradient-to-br px-3 py-3 text-center text-white ring-1 ring-white/40 ${toneClass}`}
+      className={`flex min-h-[104px] flex-col items-center justify-center rounded-[22px] bg-gradient-to-br px-2.5 py-3.5 text-center text-white ring-1 ring-white/40 ${toneClass}`}
     >
-      <span className="mb-1.5 flex h-9 w-9 items-center justify-center rounded-2xl bg-white/18">{icon}</span>
-      <span className="line-clamp-2 text-center text-[11px] font-black leading-[15px]">{title}</span>
+      <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/18">{icon}</span>
+      <span className="flex min-h-[42px] w-full flex-col items-center justify-center text-center text-[10.5px] font-black leading-[14px] tracking-[-0.01em]">
+        {labelLines.map((line) => (
+          <span key={line} className="block whitespace-nowrap text-center">{line}</span>
+        ))}
+      </span>
     </button>
   );
 }
