@@ -1128,9 +1128,14 @@ function CompactPortfolioCard({
         </div>
 
         {(unit as any).availableCreditAmount ? (
-          <p className="mt-0.5 truncate text-[10px] font-black text-[#1557D6]">
-            Kredi: {formatPrice((unit as any).availableCreditAmount, unit.priceCurrency)}
-          </p>
+          <div className="mt-1 rounded-[12px] border border-blue-100 bg-[#EFF6FF] px-2 py-1 text-center">
+            <p className="text-[8.5px] font-black uppercase tracking-[0.08em] text-[#1557D6]">
+              Kullanılabilir Kredi
+            </p>
+            <p className="mt-0.5 truncate text-[11px] font-black leading-tight text-[#06194A]">
+              {formatPrice((unit as any).availableCreditAmount, unit.priceCurrency)}
+            </p>
+          </div>
         ) : null}
 
         <div className="mt-1 flex items-center gap-2 text-[10px] font-bold text-[#64748B]">

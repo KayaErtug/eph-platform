@@ -480,6 +480,30 @@ function canEditDetailUnit(
   return possibleOwnerIds.includes(String(user.id));
 }
 
+function canViewDoorAccessInfo(
+  unit?: DetailUnit | null,
+  user?: { id?: string | null; role?: string | null } | null,
+) {
+  const role = String(user?.role || "").toUpperCase();
+
+  if (!unit || !user?.id) return false;
+  if (role === "SUPER_ADMIN") return true;
+
+  const possibleOwnerIds = [
+    (unit as any)?.userId,
+    (unit as any)?.ownerId,
+    (unit as any)?.createdById,
+    (unit as any)?.project?.userId,
+    (unit as any)?.project?.ownerId,
+    (unit as any)?.project?.createdById,
+    (unit as any)?.project?.owner?.id,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value));
+
+  return possibleOwnerIds.includes(String(user.id));
+}
+
 function canReviewDetailUnit(user?: { role?: string | null } | null) {
   const role = String(user?.role || "").toUpperCase();
   return ["MODERATOR", "ADMIN", "SUPER_ADMIN"].includes(role);
@@ -524,6 +548,7 @@ export default function StokDetailPage() {
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [doorAccessVisible, setDoorAccessVisible] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
   const [imageUploadLoading, setImageUploadLoading] = useState("");
@@ -602,6 +627,7 @@ export default function StokDetailPage() {
 
   useEffect(() => {
     setActivePhoto(0);
+    setDoorAccessVisible(false);
   }, [unit?.id]);
 
   useEffect(() => {
@@ -1127,6 +1153,9 @@ export default function StokDetailPage() {
   const style = statusStyle(unit.status);
   const canEditPortfolio = canEditDetailUnit(unit, user);
   const canReviewPortfolio = canReviewDetailUnit(user);
+  const canSeeDoorAccessInfo = canViewDoorAccessInfo(unit, user);
+  const availableCreditAmount = Number((unit as any)?.availableCreditAmount || 0);
+  const doorAccessInfo = String((unit as any)?.doorAccessInfo || "").trim();
   const primaryInfoBoxes = getPrimaryInfoBoxes(unit, verified, portfolioDocuments);
   const safeDescription =
     unit.description || "Bu portföy için açıklama henüz eklenmedi.";
@@ -1336,6 +1365,47 @@ export default function StokDetailPage() {
                 {verified ? "Doğrulanmış" : "Kontrol"}
               </span>
             </div>
+
+            <div className="mt-2 grid grid-cols-1 gap-2">
+              <div className="rounded-[18px] border border-blue-100 bg-[#EFF6FF] px-3 py-3 text-center">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1557D6]">
+                  Kullanılabilir Kredi
+                </p>
+                <p className="mt-1 text-[17px] font-black leading-tight text-[#06194A]">
+                  {availableCreditAmount
+                    ? formatMoney(availableCreditAmount, unit.priceCurrency)
+                    : "Bilgi girilmedi"}
+                </p>
+              </div>
+
+              <div className="rounded-[18px] border border-amber-100 bg-amber-50 px-3 py-3 text-center">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-700">
+                  Kapı Erişim Bilgisi
+                </p>
+                {!canSeeDoorAccessInfo ? (
+                  <p className="mx-auto mt-1 max-w-[320px] text-[12px] font-black leading-5 text-amber-800">
+                    🔒 Randevulaşma sonrası portföy sahibinden talep ediniz.
+                  </p>
+                ) : !doorAccessInfo ? (
+                  <p className="mt-1 text-[12px] font-black text-amber-800">
+                    Bilgi girilmedi
+                  </p>
+                ) : (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setDoorAccessVisible((current) => !current)}
+                      className="inline-flex min-h-[34px] items-center justify-center rounded-[14px] bg-white px-3 text-[11px] font-black text-amber-800 shadow-sm"
+                    >
+                      {doorAccessVisible ? "Gizle" : "Görüntüle"}
+                    </button>
+                    <p className="mx-auto mt-2 max-w-[340px] rounded-[14px] bg-white px-3 py-2 text-[12px] font-black leading-5 text-[#06194A] shadow-sm">
+                      {doorAccessVisible ? doorAccessInfo : "••••••••••••"}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1367,7 +1437,7 @@ export default function StokDetailPage() {
               Açıklama
             </h2>
           </div>
-          <p className="mt-2 whitespace-pre-line text-left text-[12px] font-semibold leading-5 text-[#475569]">
+          <p className="mt-2 whitespace-pre-line break-words text-left text-[12px] font-semibold leading-5 text-[#475569]">
             {visibleDescription}
             {safeDescription.length > 140 && (
               <button
