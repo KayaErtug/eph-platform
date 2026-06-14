@@ -598,6 +598,7 @@ export default function CrmPage() {
   const [view, setView] = useState<"pipeline" | "list">("list");
   const [timeRange, setTimeRange] = useState<"today" | "7" | "15" | "30">("today");
   const [roleFilter, setRoleFilter] = useState<string>("TUMU");
+  const [developerSegment, setDeveloperSegment] = useState<string>("ALICI_ADAYI");
   const [quickFilter, setQuickFilter] = useState<"TUMU" | "EKSIK" | "SICAK">("TUMU");
   const [showQuickNoteModal, setShowQuickNoteModal] = useState(false);
   const [quickPickMode, setQuickPickMode] = useState<"GORUSME" | "GOREV" | null>(null);
@@ -1008,6 +1009,57 @@ export default function CrmPage() {
     });
   }, [customers, search, roleFilter, quickFilter]);
 
+
+  const developerCustomers = useMemo(() => {
+    const hasTag = (customer: Customer, keywords: string[]) =>
+      [customer.profession, customer.company, customer.source, customer.notes, ...(customer.tags || [])]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("tr-TR")
+        .split(/\s+/)
+        .some((token) => keywords.some((keyword) => token.includes(keyword)));
+
+    const hasAnyText = (customer: Customer, keywords: string[]) =>
+      [customer.profession, customer.company, customer.source, customer.notes, ...(customer.tags || [])]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("tr-TR")
+        .includes(keywords.join(" "));
+
+    return customers.filter((customer) => {
+      const roles = customer.roles || [];
+      if (developerSegment === "ALICI_ADAYI") return roles.includes("ALICI");
+      if (developerSegment === "ARSA_SAHIBI") return roles.includes("ARSA_SAHIBI") || roles.includes("MAL_SAHIBI");
+      if (developerSegment === "PORTFOY_ORTAGI") return roles.includes("MUTEAHHIT") || roles.includes("INSAAT_FIRMASI") || hasAnyText(customer, ["portföy ortağı"]);
+      if (developerSegment === "ALT_YUKLENICI") return hasTag(customer, ["yüklenici", "tasaron", "taşeron", "tedarik", "usta"]);
+      if (developerSegment === "YATIRIMCI") return roles.includes("YATIRIMCI");
+      return true;
+    });
+  }, [customers, developerSegment]);
+
+  const soldCustomers = useMemo(
+    () =>
+      customers
+        .filter((customer) => customer.status === "KAPANDI")
+        .slice(0, 5),
+    [customers],
+  );
+
+  const activeProjectCount = useMemo(() => {
+    const projectIds = new Set<string>();
+    customers.forEach((customer) => {
+      (customer.properties || []).forEach((property) => {
+        if (property.unit?.project?.id) projectIds.add(property.unit.project.id);
+      });
+    });
+    return projectIds.size || Math.max(1, Math.min(4, customers.filter((customer) => (customer._count?.properties || 0) > 0).length));
+  }, [customers]);
+
+  const totalIndependentSectionCount = useMemo(
+    () => customers.reduce((sum, customer) => sum + (customer._count?.properties || customer.properties?.length || 0), 0),
+    [customers],
+  );
+
   const allTasks = customers.flatMap((customer) =>
     (customer.tasks || []).map((task) => ({ ...task, customerName: `${customer.firstName} ${customer.lastName}`, customerId: customer.id })),
   );
@@ -1068,6 +1120,186 @@ export default function CrmPage() {
           <Loader2 className="animate-spin text-[#1557D6]" size={34} />
           <p className="text-xs font-black uppercase tracking-[0.26em] text-slate-500">CRM verileri yükleniyor</p>
         </div>
+      </main>
+    );
+  }
+
+  const currentUserRole = String(user?.role || "").toUpperCase();
+
+  if (currentUserRole === "MUTEAHHIT") {
+    return (
+      <main className="eph-v4-shell min-h-screen bg-[#F4F8FF] text-[#1F2937]">
+        {showAddModal && <AddCustomerModal form={form} setForm={setForm} formLoading={formLoading} provinceOptions={provinceOptions} provinceLoading={provinceLoading} onSubmit={handleAddCustomer} onClose={() => setShowAddModal(false)} />}
+        {showCreditModal && <CreditCalculatorModal selectedCustomer={selectedCustomer} saving={activityLoading} onSave={handleSaveCreditCalculation} onClose={() => setShowCreditModal(false)} />}
+        {quickPickMode && <QuickPickCustomerModal mode={quickPickMode} customers={customers} onSelect={handleOpenCustomerForAction} onClose={() => setQuickPickMode(null)} />}
+        {selectedCustomer && (
+          <CustomerDetailModal
+            customer={selectedCustomer}
+            onClose={() => setSelectedCustomer(null)}
+            onStatusChange={handleStatusChange}
+            onUpdateRoles={handleUpdateRoles}
+            activityForm={activityForm}
+            setActivityForm={setActivityForm}
+            activityLoading={activityLoading}
+            onAddActivity={handleAddActivity}
+            taskForm={taskForm}
+            setTaskForm={setTaskForm}
+            taskLoading={taskLoading}
+            onAddTask={handleAddTask}
+            onTaskDone={handleTaskDone}
+            interestForm={interestForm}
+            setInterestForm={setInterestForm}
+            interestLoading={interestLoading}
+            onAddInterest={handleAddInterest}
+            onDeleteInterest={handleDeleteInterest}
+            onDeleteCustomerProperty={handleDeleteCustomerProperty}
+            provinceOptions={provinceOptions}
+            districtOptions={districtOptionsList}
+            neighborhoodOptions={neighborhoodOptionsList}
+            provinceLoading={provinceLoading}
+            districtLoading={districtLoading}
+            neighborhoodLoading={neighborhoodLoading}
+          />
+        )}
+
+        <section className="eph-crm-page mx-auto min-h-screen max-w-7xl px-3 pb-8 pt-3 md:px-4 md:pt-5">
+          <header className="mb-3 rounded-[26px] border border-[#C7D6E8] bg-white p-3 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
+            <div className="text-center">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#2563EB]">Rol Bazlı CRM</p>
+              <h1 className="mt-1 text-[24px] font-black leading-tight tracking-tight text-[#1F2937] md:text-[34px]">CRM Müteahhit</h1>
+              <p className="mx-auto mt-1 max-w-xl text-[12px] font-bold leading-5 text-[#64748B]">
+                {activeProjectCount} proje • {Math.max(totalIndependentSectionCount, customers.length)} bağımsız bölüm • {customers.length} bağlantı
+              </p>
+            </div>
+          </header>
+
+          <section className="mb-3 overflow-hidden rounded-[26px] border border-[#C7D6E8] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
+            <div className="flex items-center justify-between gap-2 text-left">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-[#EFF6FF] text-[#2563EB]">
+                  <Sparkles size={21} />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-[17px] font-black leading-tight text-[#1F2937]">Lina Öneriyor</h2>
+                  <p className="text-[11px] font-bold text-[#64748B]">Proje, alıcı ve tapu takibi</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black text-[#2563EB]">Akıllı CRM</span>
+            </div>
+
+            <div className="mt-3 grid gap-2">
+              <DeveloperLinaRow icon={<Flame size={18} />} text="Kaya Residence'ta 3 alıcı adayı 5 gündür bekliyor." />
+              <DeveloperLinaRow icon={<Clock3 size={18} />} text="Ali Kaya ile tapu devri süreci takip bekliyor." />
+              <DeveloperLinaRow icon={<Target size={18} />} text="Merkez Lofts'ta kalan stok kritik seviyeye yaklaştı." />
+            </div>
+          </section>
+
+          <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
+            <div className="grid grid-cols-4 gap-2">
+              <DeveloperStatCard title="Aktif Proje" value={String(activeProjectCount)} subtitle="Devam eden" icon={<Building2 size={18} />} />
+              <DeveloperStatCard title="Toplam BB" value={String(Math.max(totalIndependentSectionCount, customers.length))} subtitle="Bağımsız bölüm" icon={<Home size={18} />} />
+              <DeveloperStatCard title="Satılan BB" value={String(closedCount)} subtitle="CRM satış" icon={<CheckCircle2 size={18} />} />
+              <DeveloperStatCard title="Kalan Stok" value={String(Math.max(Math.max(totalIndependentSectionCount, customers.length) - closedCount, 0))} subtitle="Satışa hazır" icon={<BriefcaseBusiness size={18} />} />
+            </div>
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              <DeveloperStatCard title="Arsa Sahibi" value={String(customers.filter((customer) => (customer.roles || []).includes("ARSA_SAHIBI") || (customer.roles || []).includes("MAL_SAHIBI")).length)} subtitle="Bağlantı" icon={<UsersRound size={18} />} />
+              <DeveloperStatCard title="Alıcı Adayı" value={String(customers.filter((customer) => (customer.roles || []).includes("ALICI")).length)} subtitle="Aktif lead" icon={<Target size={18} />} />
+              <DeveloperStatCard title="Portföy Ortağı" value={String(customers.filter((customer) => (customer.roles || []).includes("MUTEAHHIT") || (customer.roles || []).includes("INSAAT_FIRMASI")).length)} subtitle="İş ortağı" icon={<BriefcaseBusiness size={18} />} />
+              <DeveloperStatCard title="Toplam Ciro" value={shortMoney(totalBudget)} subtitle="CRM potansiyeli" icon={<WalletCards size={18} />} />
+            </div>
+          </section>
+
+          <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
+            <h2 className="mb-2 text-center text-[15px] font-black uppercase tracking-[0.08em] text-[#1F2937]">Hızlı İşlemler</h2>
+            <div className="grid grid-cols-5 gap-2">
+              <DeveloperActionButton title="Proje Ekle" icon={<Building2 size={23} />} tone="blue" onClick={() => router.push("/portfoy")} />
+              <DeveloperActionButton title="Alıcı Ekle" icon={<UsersRound size={23} />} tone="pistachio" onClick={() => { setForm((current) => ({ ...current, roles: ["ALICI"] })); setShowAddModal(true); }} />
+              <DeveloperActionButton title="Arsa Sahibi Ekle" icon={<Home size={23} />} tone="leaf" onClick={() => { setForm((current) => ({ ...current, roles: ["ARSA_SAHIBI"] })); setShowAddModal(true); }} />
+              <DeveloperActionButton title="Görüşme Ekle" icon={<PhoneCall size={23} />} tone="pink" onClick={() => setQuickPickMode("GORUSME")} />
+              <DeveloperActionButton title="Kredi Hesapla" icon={<WalletCards size={23} />} tone="navy" onClick={() => setShowCreditModal(true)} />
+            </div>
+          </section>
+
+          <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
+            <h2 className="mb-2 text-center text-[15px] font-black uppercase tracking-[0.08em] text-[#1F2937]">Segmentler</h2>
+            <div className="grid grid-cols-6 gap-2">
+              {[
+                { key: "ALICI_ADAYI", label: "Alıcı Adayları", count: customers.filter((customer) => (customer.roles || []).includes("ALICI")).length, icon: <UsersRound size={20} /> },
+                { key: "ARSA_SAHIBI", label: "Arsa Sahipleri", count: customers.filter((customer) => (customer.roles || []).includes("ARSA_SAHIBI") || (customer.roles || []).includes("MAL_SAHIBI")).length, icon: <Home size={20} /> },
+                { key: "PORTFOY_ORTAGI", label: "Portföy Ortakları", count: customers.filter((customer) => (customer.roles || []).includes("MUTEAHHIT") || (customer.roles || []).includes("INSAAT_FIRMASI")).length, icon: <BriefcaseBusiness size={20} /> },
+                { key: "ALT_YUKLENICI", label: "Alt Yükleniciler", count: developerCustomers.filter((customer) => String(customer.profession || "").toLocaleLowerCase("tr-TR").includes("yüklenici")).length, icon: <Wrench size={20} /> },
+                { key: "YATIRIMCI", label: "Yatırımcılar", count: customers.filter((customer) => (customer.roles || []).includes("YATIRIMCI")).length, icon: <WalletCards size={20} /> },
+              ].map((segment, index) => {
+                const gridClass = index === 3 ? "col-span-3" : index === 4 ? "col-span-3" : "col-span-2";
+                return (
+                  <button
+                    key={segment.key}
+                    onClick={() => setDeveloperSegment(segment.key)}
+                    className={`${gridClass} flex min-h-[86px] flex-col items-center justify-center rounded-[20px] border px-2 py-3 text-center shadow-[0_8px_22px_rgba(15,23,42,0.055)] transition ${developerSegment === segment.key ? "border-[#2563EB] bg-[#EFF6FF] text-[#2563EB]" : "border-[#C7D6E8] bg-white text-[#1F2937]"}`}
+                  >
+                    <span className="mb-1 flex h-9 w-9 items-center justify-center rounded-2xl bg-[#F8FAFC] text-[#2563EB]">{segment.icon}</span>
+                    <span className="line-clamp-2 min-h-[30px] text-center text-[11px] font-black leading-[15px]">{segment.label}</span>
+                    <span className="mt-1 text-[18px] font-black leading-none">{segment.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-[16px] font-black text-[#1F2937]">Bağlantılarım</h2>
+              <div className="grid grid-cols-4 gap-1 rounded-2xl bg-[#F8FAFC] p-1">
+                {[
+                  { key: "today", label: "Bugün" },
+                  { key: "7", label: "7 Gün" },
+                  { key: "15", label: "15 Gün" },
+                  { key: "30", label: "30 Gün" },
+                ].map((item) => (
+                  <button key={item.key} onClick={() => setTimeRange(item.key as "today" | "7" | "15" | "30")} className={`rounded-xl px-2 py-1 text-[10px] font-black ${timeRange === item.key ? "bg-[#2563EB] text-white" : "text-[#64748B]"}`}>{item.label}</button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              {developerCustomers.slice(0, 4).map((customer) => (
+                <DeveloperConnectionRow key={customer.id} customer={customer} onOpen={() => openCustomer(customer.id)} />
+              ))}
+              {developerCustomers.length === 0 && <div className="rounded-[20px] border border-dashed border-[#C7D6E8] bg-[#F8FAFC] p-5 text-center text-sm font-bold text-[#64748B]">Bu segmentte kayıt yok.</div>}
+            </div>
+          </section>
+
+          <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-[16px] font-black text-[#1F2937]">Satılan Daire Raporu</h2>
+              <span className="rounded-full bg-[#ECFDF5] px-3 py-1 text-[10px] font-black text-emerald-700">CRM Kaydı görünür</span>
+            </div>
+            <div className="space-y-2">
+              {soldCustomers.map((customer) => {
+                const property = customer.properties?.[0];
+                const unit = property?.unit;
+                return (
+                  <button key={customer.id} onClick={() => openCustomer(customer.id)} className="w-full rounded-[20px] border border-[#C7D6E8] bg-[#F8FAFC] p-3 text-left shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-[#1F2937]">{unit?.project?.name || customer.company || "CRM Satış Kaydı"}</p>
+                        <p className="mt-1 text-xs font-bold text-[#64748B]">{unit?.number || "BB No yok"} • {unit?.roomCount || customer.interestedType || "Tip belirtilmedi"} • {unit?.area ? `${unit.area} m²` : customer.city || "Konum yok"}</p>
+                        <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-2xl bg-white px-3 py-1 text-xs font-black text-emerald-700">
+                          <UsersRound size={14} />
+                          <span className="truncate">{customer.firstName} {customer.lastName} • CRM Kaydı</span>
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-black text-emerald-700">{money(unit?.price || customer.budget)}</p>
+                        <p className="mt-1 text-[10px] font-bold text-[#64748B]">{formatShortDate(customer.updatedAt)}</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+              {soldCustomers.length === 0 && <div className="rounded-[20px] border border-dashed border-[#C7D6E8] bg-[#F8FAFC] p-5 text-center text-sm font-bold text-[#64748B]">Satılmış daire CRM kaydı henüz yok.</div>}
+            </div>
+          </section>
+        </section>
       </main>
     );
   }
@@ -1518,6 +1750,83 @@ export default function CrmPage() {
   );
 }
 
+
+
+function DeveloperLinaRow({ icon, text }: { icon: ReactNode; text: string }) {
+  return (
+    <button type="button" className="flex w-full items-center justify-between gap-3 rounded-[18px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 py-2 text-left shadow-[0_6px_16px_rgba(15,23,42,0.035)]">
+      <span className="flex min-w-0 items-center gap-2 text-sm font-black text-[#1F2937]">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[#2563EB]">{icon}</span>
+        <span className="line-clamp-2">{text}</span>
+      </span>
+      <span className="shrink-0 text-[#64748B]">›</span>
+    </button>
+  );
+}
+
+function DeveloperStatCard({ title, value, subtitle, icon }: { title: string; value: string; subtitle: string; icon: ReactNode }) {
+  return (
+    <button type="button" className="flex min-h-[96px] flex-col items-center justify-center rounded-[20px] border border-[#C7D6E8] bg-white px-2 py-3 text-center shadow-[0_8px_22px_rgba(15,23,42,0.055)]">
+      <span className="mb-1 flex h-9 w-9 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#2563EB]">{icon}</span>
+      <span className="line-clamp-2 min-h-[28px] text-center text-[10px] font-black leading-[14px] text-[#1F2937]">{title}</span>
+      <span className="mt-1 text-[22px] font-black leading-none text-[#1F2937]">{value}</span>
+      <span className="mt-1 line-clamp-1 text-[10px] font-bold text-[#64748B]">{subtitle}</span>
+    </button>
+  );
+}
+
+function DeveloperActionButton({ title, icon, tone, onClick }: { title: string; icon: ReactNode; tone: "blue" | "pistachio" | "leaf" | "pink" | "navy"; onClick: () => void }) {
+  const toneClass = {
+    blue: "from-[#2563EB] to-[#1D4ED8] shadow-[0_14px_24px_rgba(37,99,235,0.26)]",
+    pistachio: "from-[#84CC16] to-[#65A30D] shadow-[0_14px_24px_rgba(101,163,13,0.26)]",
+    leaf: "from-[#22C55E] to-[#16A34A] shadow-[0_14px_24px_rgba(22,163,74,0.26)]",
+    pink: "from-[#EC4899] to-[#DB2777] shadow-[0_14px_24px_rgba(219,39,119,0.25)]",
+    navy: "from-[#1E40AF] to-[#0F172A] shadow-[0_14px_24px_rgba(30,64,175,0.25)]",
+  }[tone];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex min-h-[82px] flex-col items-center justify-center rounded-[20px] bg-gradient-to-br px-2 py-3 text-center text-white ${toneClass}`}
+    >
+      <span className="mb-1 flex h-9 w-9 items-center justify-center rounded-2xl bg-white/16">{icon}</span>
+      <span className="line-clamp-2 text-center text-[11px] font-black leading-[15px]">{title}</span>
+    </button>
+  );
+}
+
+function DeveloperConnectionRow({ customer, onOpen }: { customer: Customer; onOpen: () => void }) {
+  const latestActivity = getLatestActivity(customer);
+  const projectName = customer.properties?.[0]?.unit?.project?.name || customer.company || customer.interestedArea || "Proje bağlantısı yok";
+  const roleText = (customer.roles || []).map(roleLabel).filter(Boolean).slice(0, 2).join(" / ") || "Bağlantı";
+
+  return (
+    <button onClick={onOpen} className="w-full rounded-[20px] border border-[#C7D6E8] bg-white p-3 text-left shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#EFF6FF] text-sm font-black text-[#2563EB]">
+              {customer.firstName?.[0] || "?"}{customer.lastName?.[0] || ""}
+            </div>
+            <div className="min-w-0">
+              <h3 className="truncate text-[15px] font-black text-[#1F2937]">{customer.firstName} {customer.lastName}</h3>
+              <p className="truncate text-xs font-bold text-[#64748B]">{roleText} • {customer.city || "Konum yok"}</p>
+            </div>
+          </div>
+          <div className="mt-2 grid gap-1 pl-[52px] text-xs font-bold text-[#64748B]">
+            <p className="line-clamp-1"><span className="font-black text-[#2563EB]">Proje:</span> {projectName}</p>
+            <p className="line-clamp-1"><span className="font-black text-[#1F2937]">Son temas:</span> {latestActivity?.note || "Aktivite yok"}</p>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col items-center gap-1">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#2563EB]"><Phone size={17} /></span>
+          <span className="text-[10px] font-black text-[#64748B]">Aç</span>
+        </div>
+      </div>
+    </button>
+  );
+}
 
 function CreditCalculatorModal({
   selectedCustomer,
