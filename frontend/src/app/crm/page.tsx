@@ -34,6 +34,7 @@ import api from "@/lib/api";
 import GoogleGeoPicker from "@/components/stok/GoogleGeoPicker";
 import { useAuthStore } from "@/store/auth.store";
 import CrmInsaatFirmasiPanel from "./components/CrmInsaatFirmasiPanel";
+import CrmTakimLideriPanel from "./components/CrmTakimLideriPanel";
 
 interface Customer {
   id: string;
@@ -613,6 +614,7 @@ export default function CrmPage() {
   const [taskLoading, setTaskLoading] = useState(false);
   const [interestLoading, setInterestLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [teamLeaderView, setTeamLeaderView] = useState<"personal" | "team">("team");
 
   const [form, setForm] = useState({
     firstName: "",
@@ -1129,6 +1131,16 @@ export default function CrmPage() {
 
   const currentUserRole = String(user?.role || "").toUpperCase();
 
+  if (currentUserRole === "TAKIM_LIDERI" && teamLeaderView === "team") {
+    return (
+      <main className="min-h-[100dvh] bg-[#F4F8FF] text-[#1F2937]">
+        <section className="mx-auto w-full max-w-7xl px-3 pt-3 sm:px-5 lg:px-6">
+          <TeamLeaderModeSwitch activeView={teamLeaderView} onChange={setTeamLeaderView} />
+        </section>
+        <CrmTakimLideriPanel />
+      </main>
+    );
+  }
 
   if (currentUserRole === "INSAAT_FIRMASI") {
     return <CrmInsaatFirmasiPanel />;
@@ -1369,6 +1381,10 @@ export default function CrmPage() {
       )}
 
       <section className="eph-crm-page mx-auto min-h-screen max-w-7xl px-3 pb-8 pt-3 md:px-4 md:pt-5">
+        {currentUserRole === "TAKIM_LIDERI" && (
+          <TeamLeaderModeSwitch activeView={teamLeaderView} onChange={setTeamLeaderView} />
+        )}
+
         <header className="eph-crm-compact-head mb-3 overflow-hidden rounded-[26px] border border-[#C7D6E8] bg-white p-3 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07)] md:p-4">
           <div className="flex items-center justify-center gap-2">
             <div className="inline-flex items-center gap-2 rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#1557D6]">
@@ -3210,5 +3226,52 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <span className="mb-2 block text-center text-xs font-black text-slate-500">{label}</span>
       {children}
     </label>
+  );
+}
+
+
+function TeamLeaderModeSwitch({
+  activeView,
+  onChange,
+}: {
+  activeView: "personal" | "team";
+  onChange: (view: "personal" | "team") => void;
+}) {
+  return (
+    <section className="mb-3 rounded-[26px] border border-[#C7D6E8] bg-white p-2 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
+      <div className="grid grid-cols-2 gap-2 rounded-[22px] bg-[#EEF3F8] p-1">
+        <button
+          type="button"
+          onClick={() => onChange("personal")}
+          className={`min-h-[44px] rounded-[18px] px-3 py-2 text-center text-xs font-black transition ${
+            activeView === "personal"
+              ? "bg-white text-[#2563EB] shadow-[0_8px_20px_rgba(15,23,42,0.08)]"
+              : "text-[#64748B]"
+          }`}
+        >
+          Benim
+          <br />
+          CRM’im
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onChange("team")}
+          className={`min-h-[44px] rounded-[18px] px-3 py-2 text-center text-xs font-black transition ${
+            activeView === "team"
+              ? "bg-white text-[#2563EB] shadow-[0_8px_20px_rgba(15,23,42,0.08)]"
+              : "text-[#64748B]"
+          }`}
+        >
+          Takım
+          <br />
+          Yönetimi
+        </button>
+      </div>
+
+      <p className="mt-2 text-center text-[11px] font-bold leading-4 text-[#64748B]">
+        Takım lideri kendi CRM’ini tam görür; takım arkadaşlarının CRM detaylarını göremez.
+      </p>
+    </section>
   );
 }
