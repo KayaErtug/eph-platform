@@ -33,6 +33,7 @@ import {
 import api from "@/lib/api";
 import GoogleGeoPicker from "@/components/stok/GoogleGeoPicker";
 import { useAuthStore } from "@/store/auth.store";
+import CrmInsaatFirmasiPanel from "./components/CrmInsaatFirmasiPanel";
 
 interface Customer {
   id: string;
@@ -1127,6 +1128,11 @@ export default function CrmPage() {
   }
 
   const currentUserRole = String(user?.role || "").toUpperCase();
+
+
+  if (currentUserRole === "INSAAT_FIRMASI") {
+    return <CrmInsaatFirmasiPanel />;
+  }
 
   if (currentUserRole === "MUTEAHHIT") {
     return (
