@@ -820,6 +820,19 @@ export default function CrmPage() {
     }
   };
 
+  const handleSaveCreditCalculation = async (note: string) => {
+    if (!selectedCustomer) return;
+    setActivityLoading(true);
+
+    try {
+      await api.post(`/crm/customers/${selectedCustomer.id}/activities`, { type: "NOT", note });
+      await refreshSelectedCustomer(selectedCustomer.id);
+      await fetchAll();
+    } finally {
+      setActivityLoading(false);
+    }
+  };
+
   const handleAddTask = async () => {
     if (!selectedCustomer || !taskForm.title) return;
     setTaskLoading(true);
@@ -990,7 +1003,7 @@ export default function CrmPage() {
   return (
     <main className="eph-v4-shell min-h-screen bg-[#F4F8FF] text-[#27364F]">
       {showAddModal && <AddCustomerModal form={form} setForm={setForm} formLoading={formLoading} provinceOptions={provinceOptions} provinceLoading={provinceLoading} onSubmit={handleAddCustomer} onClose={() => setShowAddModal(false)} />}
-      {showCreditModal && <CreditCalculatorModal onClose={() => setShowCreditModal(false)} />}
+      {showCreditModal && <CreditCalculatorModal selectedCustomer={selectedCustomer} saving={activityLoading} onSave={handleSaveCreditCalculation} onClose={() => setShowCreditModal(false)} />}
 
       {selectedCustomer && (
         <CustomerDetailModal
@@ -1426,44 +1439,241 @@ export default function CrmPage() {
 }
 
 
-function CreditCalculatorModal({ onClose }: { onClose: () => void }) {
-  const [propertyValue, setPropertyValue] = useState("5000000");
+function CreditCalculatorModal({
+  selectedCustomer,
+  saving,
+  onSave,
+  onClose,
+}: {
+  selectedCustomer: Customer | null;
+  saving: boolean;
+  onSave: (note: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [propertyValue, setPropertyValue] = useState("4000000");
   const [downPayment, setDownPayment] = useState("1000000");
   const [months, setMonths] = useState("120");
-  const [monthlyRate, setMonthlyRate] = useState("3.05");
+  const [monthlyRate, setMonthlyRate] = useState("2.89");
+  const [saved, setSaved] = useState(false);
 
-  const principal = Math.max(Number(onlyDigits(propertyValue)) - Number(onlyDigits(downPayment)), 0);
+  const propertyAmount = Number(onlyDigits(propertyValue));
+  const downPaymentAmount = Number(onlyDigits(downPayment));
+  const principal = Math.max(propertyAmount - downPaymentAmount, 0);
   const n = Math.max(Number(months) || 0, 1);
   const r = Math.max(Number(monthlyRate.replace(",", ".")) || 0, 0) / 100;
   const monthlyPayment = r > 0 ? (principal * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1) : principal / n;
   const totalPayment = monthlyPayment * n;
   const totalInterest = Math.max(totalPayment - principal, 0);
+  const downPaymentRate = propertyAmount > 0 ? Math.round((downPaymentAmount / propertyAmount) * 100) : 0;
+
+  const handleSave = async () => {
+    if (!selectedCustomer || saving) return;
+
+    const note = [
+      "Konut kredisi hesaplama notu:",
+      `Konut Değeri: ${money(propertyAmount)}`,
+      `Peşinat: ${money(downPaymentAmount)}`,
+      `Kullanılacak Kredi: ${money(principal)}`,
+      `Vade: ${n} Ay`,
+      `Tahmini Aylık Faiz: %${monthlyRate}`,
+      `Tahmini Aylık Taksit: ${money(Math.round(monthlyPayment))}`,
+      `Tahmini Toplam Geri Ödeme: ${money(Math.round(totalPayment))}`,
+      `Tahmini Toplam Faiz: ${money(Math.round(totalInterest))}`,
+      "Not: Hesaplama bilgilendirme amaçlıdır; kesin koşullar banka değerlendirmesine göre değişebilir.",
+    ].join("\n");
+
+    await onSave(note);
+    setSaved(true);
+  };
 
   return (
-    <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/60 p-0 backdrop-blur-sm md:items-center md:p-4" onClick={onClose}>
-      <div className="eph-crm-modal-panel flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-[30px] border border-[#C7D6E8] bg-white shadow-2xl md:rounded-[30px]" onClick={(event) => event.stopPropagation()}>
-        <div className="sticky top-0 z-10 border-b border-[#C7D6E8] bg-white/95 px-4 py-4 text-center backdrop-blur">
-          <button type="button" onClick={onClose} className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#F8FAFC] text-slate-500">
+    <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-end justify-center bg-[#1F2937]/45 p-0 backdrop-blur-sm md:items-center md:p-4" onClick={onClose}>
+      <div
+        className="eph-crm-modal-panel flex h-[min(92dvh,860px)] w-full max-w-2xl flex-col overflow-hidden rounded-t-[30px] border border-[#C7D6E8] bg-white shadow-[0_-18px_48px_rgba(31,41,55,0.18)] md:h-auto md:max-h-[90dvh] md:rounded-[30px]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="sticky top-0 z-20 border-b border-[#C7D6E8] bg-white/95 px-4 pb-4 pt-[calc(14px+env(safe-area-inset-top,0px))] text-center backdrop-blur">
+          <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-[#C7D6E8] md:hidden" />
+          <button type="button" onClick={onClose} className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#F8FAFC] text-[#64748B] shadow-sm">
             <X size={18} />
           </button>
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6D28D9]">CRM Kredi Aracı</p>
-          <h2 className="mt-1 text-[22px] font-black text-[#06194A]">Konut Kredisi Hesapla</h2>
-          <p className="mx-auto mt-1 max-w-md text-xs font-bold leading-5 text-slate-500">Akbank güncel oranı entegrasyon fazında API ile bağlanacak. Şimdilik oran manuel girilir.</p>
-        </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-[calc(24px+env(safe-area-inset-bottom,0px))]">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Field label="Gayrimenkul Değeri"><input className="premium-input" inputMode="numeric" value={formatBudgetInput(propertyValue)} onChange={(event) => setPropertyValue(onlyDigits(event.target.value))} /></Field>
-            <Field label="Peşinat"><input className="premium-input" inputMode="numeric" value={formatBudgetInput(downPayment)} onChange={(event) => setDownPayment(onlyDigits(event.target.value))} /></Field>
-            <Field label="Vade"><input className="premium-input" inputMode="numeric" value={months} onChange={(event) => setMonths(onlyDigits(event.target.value))} /></Field>
-            <Field label="Aylık Faiz (%)"><input className="premium-input" inputMode="decimal" value={monthlyRate} onChange={(event) => setMonthlyRate(event.target.value)} /></Field>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[22px] border border-[#C7D6E8] bg-[#F8FAFC] text-center shadow-[0_8px_22px_rgba(15,23,42,0.06)]">
+            <span className="text-[25px] font-black leading-none text-[#D71920]">A</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <CreditResult title="Kullanılacak Kredi" value={money(principal)} />
-            <CreditResult title="Aylık Taksit" value={money(Math.round(monthlyPayment))} />
-            <CreditResult title="Toplam Ödeme" value={money(Math.round(totalPayment))} />
-            <CreditResult title="Toplam Faiz" value={money(Math.round(totalInterest))} />
+          <h2 className="mx-auto mt-3 max-w-[280px] text-[24px] font-black leading-tight tracking-tight text-[#1F2937] md:max-w-none md:text-[28px]">
+            Akbank Konut Kredisi Hesaplayıcı
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-xs font-bold leading-5 text-[#64748B]">
+            Bu hesaplama tahmini bilgilendirme amaçlıdır. Kesin oran ve ödeme planı bankanın güncel koşullarına göre değişebilir.
+          </p>
+        </div>
+
+        <div className="flex-1 space-y-4 overflow-y-auto p-4 pb-[calc(22px+env(safe-area-inset-bottom,0px))]">
+          <section className="rounded-[24px] border border-[#C7D6E8] bg-white p-3 shadow-[0_10px_28px_rgba(15,23,42,0.055)]">
+            <MortgageInputRow
+              icon={<Home size={21} />}
+              title="Konut Değeri"
+              helper="500.000 ₺ - 20.000.000 ₺"
+              value={propertyValue}
+              onChange={setPropertyValue}
+              suffix="₺"
+            />
+
+            <div className="my-3 h-px bg-[#E5EDF7]" />
+
+            <MortgageInputRow
+              icon={<WalletCards size={21} />}
+              title="Peşinat Tutarı"
+              helper={`Peşinat oranı: %${downPaymentRate}`}
+              value={downPayment}
+              onChange={setDownPayment}
+              suffix="₺"
+            />
+
+            <div className="my-3 h-px bg-[#E5EDF7]" />
+
+            <div className="grid grid-cols-[48px_1fr] gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#2563EB]">
+                <CalendarDays size={21} />
+              </div>
+              <div className="min-w-0">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="min-w-0 text-left">
+                    <p className="text-sm font-black text-[#1F2937]">Vade</p>
+                    <p className="text-[11px] font-bold text-[#64748B]">12 - 240 ay</p>
+                  </div>
+                  <select
+                    className="h-11 min-w-[148px] rounded-2xl border border-[#C7D6E8] bg-[#EEF3F8] px-3 text-center text-sm font-black text-[#1F2937] outline-none focus:border-[#2563EB]"
+                    value={months}
+                    onChange={(event) => setMonths(event.target.value)}
+                  >
+                    {[12, 24, 36, 48, 60, 84, 120, 180, 240].map((month) => (
+                      <option key={month} value={String(month)}>{month} Ay</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[60, 120, 180].map((month) => (
+                    <button
+                      key={month}
+                      type="button"
+                      onClick={() => setMonths(String(month))}
+                      className={`h-9 rounded-2xl border text-[11px] font-black ${months === String(month) ? "border-[#2563EB] bg-[#2563EB] text-white" : "border-[#C7D6E8] bg-[#F8FAFC] text-[#64748B]"}`}
+                    >
+                      {month} Ay
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="my-3 h-px bg-[#E5EDF7]" />
+
+            <div className="grid grid-cols-[48px_1fr] gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#2563EB]">
+                <Target size={21} />
+              </div>
+              <div className="min-w-0">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="text-left">
+                    <p className="text-sm font-black text-[#1F2937]">Tahmini Aylık Faiz</p>
+                    <p className="text-[11px] font-bold text-[#64748B]">Manuel güncellenebilir</p>
+                  </div>
+                  <div className="relative w-[128px]">
+                    <input
+                      className="h-11 w-full rounded-2xl border border-[#C7D6E8] bg-[#EEF3F8] pl-3 pr-8 text-center text-sm font-black text-[#1F2937] outline-none focus:border-[#2563EB]"
+                      inputMode="decimal"
+                      value={monthlyRate}
+                      onChange={(event) => setMonthlyRate(event.target.value)}
+                    />
+                    <span className="absolute right-3 top-3 text-sm font-black text-[#64748B]">%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-[20px] border border-[#C7D6E8] bg-[#F8FAFC] px-4 py-3 shadow-[0_8px_20px_rgba(15,23,42,0.035)]">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-left">
+                  <p className="text-xs font-black uppercase tracking-wide text-[#64748B]">Kredi Tutarı</p>
+                  <p className="mt-0.5 text-[11px] font-bold text-[#64748B]">Konut değeri - peşinat</p>
+                </div>
+                <p className="shrink-0 text-[21px] font-black text-[#2563EB]">{money(principal)}</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-[#C7D6E8] bg-white p-3 shadow-[0_10px_28px_rgba(15,23,42,0.055)]">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-left text-sm font-black text-[#1F2937]">Hesaplama Sonucu</h3>
+              <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black text-[#2563EB]">Tahmini</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <MortgageResult title="Aylık Taksit" value={money(Math.round(monthlyPayment))} />
+              <MortgageResult title="Toplam Ödeme" value={money(Math.round(totalPayment))} tone="green" />
+              <MortgageResult title="Faiz Oranı" value={`%${monthlyRate}`} tone="purple" />
+            </div>
+
+            <div className="mt-3 rounded-[20px] bg-[#F8FAFC] px-3 py-3 text-left">
+              <p className="text-xs font-black text-[#1F2937]">Bilgilendirme</p>
+              <p className="mt-1 text-[11px] font-bold leading-5 text-[#64748B]">
+                Hesaplama yalnızca hızlı satış görüşmesi için tahmini sonuç üretir. Masraf, sigorta, ekspertiz ve banka onay koşulları dahil değildir.
+              </p>
+            </div>
+          </section>
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!selectedCustomer || saving}
+            className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-[22px] border px-4 text-center text-sm font-black shadow-[0_10px_24px_rgba(15,23,42,0.055)] ${selectedCustomer ? "border-[#2563EB] bg-white text-[#2563EB]" : "border-[#C7D6E8] bg-[#F8FAFC] text-[#64748B]"}`}
+          >
+            {saving ? <Loader2 className="animate-spin" size={18} /> : <UsersRound size={18} />}
+            {selectedCustomer ? (saved ? "CRM Kaydına İşlendi" : "CRM Kaydına İşle") : "Müşteri seçince CRM kaydına işlenir"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MortgageInputRow({
+  icon,
+  title,
+  helper,
+  value,
+  onChange,
+  suffix,
+}: {
+  icon: ReactNode;
+  title: string;
+  helper: string;
+  value: string;
+  onChange: (value: string) => void;
+  suffix: string;
+}) {
+  return (
+    <div className="grid grid-cols-[48px_1fr] gap-3">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#2563EB]">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="min-w-0 text-left">
+            <p className="text-sm font-black text-[#1F2937]">{title}</p>
+            <p className="text-[11px] font-bold text-[#64748B]">{helper}</p>
+          </div>
+          <div className="relative w-[164px] max-w-[56%]">
+            <input
+              className="h-11 w-full rounded-2xl border border-[#C7D6E8] bg-[#EEF3F8] pl-3 pr-8 text-right text-sm font-black text-[#1F2937] outline-none focus:border-[#2563EB]"
+              inputMode="numeric"
+              value={formatBudgetInput(value).replace(" TL", "")}
+              onChange={(event) => onChange(onlyDigits(event.target.value))}
+            />
+            <span className="absolute right-3 top-3 text-sm font-black text-[#64748B]">{suffix}</span>
           </div>
         </div>
       </div>
@@ -1471,14 +1681,20 @@ function CreditCalculatorModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function CreditResult({ title, value }: { title: string; value: string }) {
+function MortgageResult({ title, value, tone = "blue" }: { title: string; value: string; tone?: "blue" | "green" | "purple" }) {
+  const toneClass = tone === "green" ? "text-emerald-600 bg-emerald-50" : tone === "purple" ? "text-violet-700 bg-violet-50" : "text-[#2563EB] bg-[#EFF6FF]";
+
   return (
-    <div className="rounded-[18px] border border-[#C7D6E8] bg-[#F8FAFC] p-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
-      <p className="text-[10px] font-black uppercase leading-4 text-slate-500">{title}</p>
-      <p className="mt-1 text-sm font-black leading-tight text-[#06194A]">{value}</p>
+    <div className="min-w-0 rounded-[20px] border border-[#C7D6E8] bg-white p-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.04)]">
+      <div className={`mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl ${toneClass}`}>
+        <WalletCards size={18} />
+      </div>
+      <p className="min-h-[28px] text-[10px] font-black uppercase leading-[1.25] text-[#64748B]">{title}</p>
+      <p className="mt-1 break-words text-[15px] font-black leading-tight text-[#1F2937]">{value}</p>
     </div>
   );
 }
+
 
 function TopCrmCard({
   title,
