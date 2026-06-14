@@ -7,6 +7,7 @@ import {
   Activity,
   ArrowRight,
   Bell,
+  Building2,
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
@@ -424,6 +425,16 @@ export default function AdminPage() {
       tone: "purple",
       count: stats?.pendingUsers || 0,
       countTone: "gray",
+    },
+    {
+      title: "Organizasyon Yönetimi",
+      desc: "Ofisleri, takımları, liderleri ve üyeleri yönetin",
+      href: "/admin/organization",
+      icon: <Building2 size={30} />,
+      tone: "green",
+      count: "V1",
+      countTone: "green",
+      isNew: true,
     },
     {
       title: "Referans Yönetimi",
@@ -921,6 +932,7 @@ function SideNav({
 
       <SideLabel label="Yönetim" />
       <SideNavItem href="/admin/users" icon={<UsersRound size={19} />} label="Kullanıcı Yönetimi" />
+      <SideNavItem href="/admin/organization" icon={<Building2 size={19} />} label="Organizasyon Yönetimi" />
       <SideNavItem
         href="/admin/katilim-talepleri"
         icon={<UserPlus size={19} />}

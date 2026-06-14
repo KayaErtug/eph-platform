@@ -26,6 +26,7 @@ import { SystemMessagesModule } from './system-messages/system-messages.module';
 import { PortfolioImagesModule } from './portfolio-images/portfolio-images.module';
 import { PortfolioDocumentsModule } from './portfolio-documents/portfolio-documents.module';
 import { KatilimTalepleriModule } from './katilim-talepleri/katilim-talepleri.module';
+import { OrganizationModule } from './organization/organization.module';
 
 import { LinaModule } from './lina/lina.module';
 import { TuranModule } from './turan/turan.module';
@@ -62,6 +63,7 @@ import { TuranModule } from './turan/turan.module';
     PortfolioImagesModule,
     PortfolioDocumentsModule,
     KatilimTalepleriModule,
+    OrganizationModule,
 
     DashboardModule,
 
