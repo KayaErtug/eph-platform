@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   BriefcaseBusiness,
-  Bell,
   Building2,
   CalendarDays,
   ChevronRight,
@@ -1167,40 +1166,43 @@ export default function CrmPage() {
 
         <section className="eph-crm-page mx-auto min-h-screen max-w-7xl px-3 pb-8 pt-3 md:px-4 md:pt-5">
           <header className="mb-3 rounded-[26px] border border-[#C7D6E8] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
-            <div className="grid grid-cols-[44px_1fr_96px] items-center gap-2">
-              <button type="button" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+            <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard")}
+                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.06)]"
+                aria-label="Ana sayfaya git"
+              >
                 <Menu size={22} />
               </button>
 
               <div className="min-w-0 text-center">
-                <h1 className="truncate text-[25px] font-black leading-tight tracking-tight text-[#1F2937] md:text-[34px]">CRM Müteahhit</h1>
-                <p className="mx-auto mt-0.5 max-w-xl truncate text-[12px] font-bold leading-5 text-[#64748B]">
+                <h1 className="truncate text-center text-[25px] font-black leading-tight tracking-tight text-[#1F2937] md:text-[34px]">CRM Müteahhit</h1>
+                <p className="mx-auto mt-0.5 max-w-xl truncate text-center text-[12px] font-bold leading-5 text-[#64748B]">
                   {activeProjectCount} Proje • {Math.max(totalIndependentSectionCount, customers.length)} Bağımsız Bölüm
                 </p>
               </div>
 
-              <div className="flex items-center justify-end gap-2">
-                <button type="button" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                  <Search size={20} />
-                </button>
-                <button type="button" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-                  <Bell size={20} />
-                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white">7</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => document.getElementById("crm-search-input")?.focus()}
+                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.06)]"
+                aria-label="CRM içinde ara"
+              >
+                <Search size={20} />
+              </button>
             </div>
           </header>
 
           <section className="mb-3 overflow-hidden rounded-[26px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
             <div className="rounded-[24px] border border-[#B7E4C7] bg-gradient-to-r from-[#ECFDF5] via-white to-[#F8FAFC] p-3 shadow-[0_10px_26px_rgba(22,163,74,0.08)]">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-[#DCFCE7] text-emerald-700">
-                    <Sparkles size={21} />
-                  </div>
-                  <h2 className="truncate text-[17px] font-black leading-tight text-[#1F2937]">Lina Öneriyor</h2>
+              <div className="relative mb-3 flex items-center justify-center gap-3 text-center">
+                <span className="h-px w-16 rounded-full bg-emerald-600/55" />
+                <div className="flex min-w-0 items-center justify-center gap-2 text-emerald-700">
+                  <Sparkles size={21} className="shrink-0" />
+                  <h2 className="truncate text-center text-[18px] font-black leading-tight text-emerald-700">Lina Öneriyor</h2>
                 </div>
-                <ChevronRight size={22} className="shrink-0 text-emerald-700" />
+                <span className="h-px w-16 rounded-full bg-emerald-600/55" />
               </div>
 
               <div className="grid gap-2 md:grid-cols-3">
@@ -1465,7 +1467,7 @@ export default function CrmPage() {
           <div className="flex gap-2">
             <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-3 text-slate-400" size={17} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Müşteri ara..." className="h-11 w-full rounded-2xl border border-[#C7D6E8] bg-[#F8FAFC] pl-10 pr-3 text-sm font-bold text-slate-700 outline-none focus:border-[#1557D6]" />
+              <input id="crm-search-input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Müşteri ara..." className="h-11 w-full rounded-2xl border border-[#C7D6E8] bg-[#F8FAFC] pl-10 pr-3 text-sm font-bold text-slate-700 outline-none focus:border-[#1557D6]" />
             </div>
 
             <button type="button" onClick={() => alert("Sesli arama tarayıcı desteği kontrol ediliyor. Bu özellik CRM V1.2 fazında aktif edilecek.")} className="flex h-11 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white text-[#06194A]">
@@ -1773,12 +1775,10 @@ export default function CrmPage() {
 
 function DeveloperLinaRow({ icon, text }: { icon: ReactNode; text: string }) {
   return (
-    <button type="button" className="flex w-full items-center justify-between gap-3 rounded-[18px] border border-[#C7D6E8] bg-white px-3 py-2 text-left shadow-[0_6px_16px_rgba(15,23,42,0.04)]">
-      <span className="flex min-w-0 items-center gap-2 text-sm font-black text-[#1F2937]">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#F8FAFC] text-emerald-700">{icon}</span>
-        <span className="line-clamp-2">{text}</span>
-      </span>
-      <ChevronRight size={17} className="shrink-0 text-[#64748B]" />
+    <button type="button" className="grid w-full grid-cols-[42px_1fr_18px] items-center gap-2 rounded-[18px] border border-[#C7D6E8] bg-white px-3 py-2 text-left shadow-[0_6px_16px_rgba(15,23,42,0.04)]">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center justify-self-center rounded-2xl bg-[#F8FAFC] text-emerald-700">{icon}</span>
+      <span className="line-clamp-2 min-w-0 text-sm font-black text-[#1F2937]">{text}</span>
+      <ChevronRight size={17} className="shrink-0 justify-self-end text-[#64748B]" />
     </button>
   );
 }
