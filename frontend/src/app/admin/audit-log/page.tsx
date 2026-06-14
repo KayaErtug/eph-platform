@@ -298,14 +298,21 @@ export default function AdminAuditLogPage() {
             <DetailRow label="Hedef" value={userName(selected.targetUser)} />
             <DetailRow label="Tarih" value={dateTime(selected.createdAt)} />
             <DetailRow label="IP" value={selected.ipAddress || "-"} />
-            <DetailRow label="UserAgent" value={selected.userAgent || "-"} />
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-center">
+              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                UserAgent
+              </p>
+              <pre className="mt-1 max-h-[96px] overflow-auto whitespace-pre-wrap break-all text-left text-[11px] font-black leading-4 text-[#172033]">
+                {selected.userAgent || "-"}
+              </pre>
+            </div>
           </div>
 
           <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-950 p-3">
             <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
               Metadata
             </p>
-            <pre className="max-h-[260px] overflow-auto whitespace-pre-wrap break-words text-[11px] font-bold leading-5 text-slate-100">
+            <pre className="max-h-[260px] overflow-auto whitespace-pre-wrap break-all text-[11px] font-bold leading-5 text-slate-100">
               {formatJson(selected.metadata)}
             </pre>
           </div>
@@ -320,7 +327,7 @@ function AuditCard({ item, onDetail }: { item: AuditLogItem; onDetail: () => voi
     <article className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="truncate text-[14px] font-black tracking-[-0.03em] text-[#172033]">
+          <h2 className="line-clamp-2 break-words text-[14px] font-black tracking-[-0.03em] text-[#172033]">
             {item.action}
           </h2>
           <p className="mt-1 line-clamp-2 text-[12px] font-bold leading-5 text-slate-500">
@@ -328,7 +335,7 @@ function AuditCard({ item, onDetail }: { item: AuditLogItem; onDetail: () => voi
           </p>
         </div>
 
-        <span className="shrink-0 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700">
+        <span className="max-w-[120px] shrink-0 truncate rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700">
           {item.entityType}
         </span>
       </div>
@@ -402,7 +409,7 @@ function InfoBox({
         {icon}
         {label}
       </span>
-      <span className="mt-1 block truncate text-[11px] font-black text-[#172033]">
+      <span className="mt-1 block line-clamp-2 break-words text-[11px] font-black leading-4 text-[#172033]">
         {value}
       </span>
     </div>
@@ -433,7 +440,7 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:items-center">
-      <section className="w-full max-w-[640px] rounded-3xl bg-white p-4 shadow-2xl">
+      <section className="max-h-[90dvh] w-full max-w-[640px] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-[18px] font-black tracking-[-0.04em] text-[#172033]">
             {title}

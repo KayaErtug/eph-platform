@@ -1136,6 +1136,35 @@ export default function CrmPage() {
           border-color: #c7d6e8;
         }
 
+
+
+        .eph-v4-shell,
+        .eph-v4-shell * {
+          min-width: 0;
+        }
+
+        .eph-crm-customer-card,
+        .eph-crm-list-row,
+        .eph-crm-modal-panel,
+        .eph-crm-modal-body,
+        .eph-crm-task-center,
+        .eph-crm-filterbar,
+        .eph-crm-list {
+          max-width: 100%;
+          overflow-wrap: anywhere;
+        }
+
+        .eph-crm-modal-body p,
+        .eph-crm-modal-body span,
+        .eph-crm-modal-body div,
+        .eph-crm-customer-card p,
+        .eph-crm-customer-card span,
+        .eph-crm-list-row p,
+        .eph-crm-list-row span {
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+
         @media (max-width: 768px) {
           .eph-crm-page {
             padding-left: 12px;
@@ -1334,14 +1363,14 @@ function CustomerCard({ customer, onClick }: { customer: Customer; onClick: () =
   const nextTaskSoon = isTaskSoon(nextTask?.dueDate);
 
   return (
-    <button onClick={onClick} className="eph-crm-customer-card w-full rounded-[24px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-[16px] font-black text-[#06194A]">{customer.firstName} {customer.lastName}</h3>
-          {customer.phone && <p className="mt-1 flex items-center gap-1 text-xs font-bold text-slate-500"><Phone size={13} />{customer.phone}</p>}
+    <button onClick={onClick} className="eph-crm-customer-card w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
+      <div className="mb-3 flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="line-clamp-2 break-words text-[16px] font-black leading-tight text-[#06194A]">{customer.firstName} {customer.lastName}</h3>
+          {customer.phone && <p className="mt-1 flex min-w-0 items-center gap-1 text-xs font-bold text-slate-500"><Phone size={13} className="shrink-0" /><span className="min-w-0 truncate">{customer.phone}</span></p>}
         </div>
 
-        <span className="rounded-full px-2 py-1 text-[10px] font-black" style={{ background: stage.bg, color: stage.color }}>{stage.label}</span>
+        <span className="shrink-0 rounded-full px-2 py-1 text-[10px] font-black" style={{ background: stage.bg, color: stage.color }}>{stage.label}</span>
       </div>
 
       <div className="flex flex-wrap gap-1">
@@ -1349,7 +1378,7 @@ function CustomerCard({ customer, onClick }: { customer: Customer; onClick: () =
         {!customer.roles?.length && <RolePill role="BELIRSIZ" label="Rol Yok" />}
       </div>
 
-      <p className="mt-3 text-[18px] font-black text-[#1557D6]">{money(customer.budget)}</p>
+      <p className="mt-3 break-words text-[18px] font-black leading-tight text-[#1557D6]">{money(customer.budget)}</p>
 
       <div className="mt-3 grid gap-2">
         <InsightBox title="Son Aktivite" badge={activityTypeLabel(latestActivity?.type)} text={latestActivity?.note || "Henüz aktivite yok"} />
@@ -1373,16 +1402,16 @@ function CustomerListRow({ customer, onClick }: { customer: Customer; onClick: (
   const nextTaskSoon = isTaskSoon(nextTask?.dueDate);
 
   return (
-    <button onClick={onClick} className="eph-crm-list-row w-full rounded-[22px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
+    <button onClick={onClick} className="eph-crm-list-row w-full max-w-full overflow-hidden rounded-[22px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-[16px] font-black text-[#06194A]">{customer.firstName} {customer.lastName}</h3>
+            <h3 className="min-w-0 break-words text-[16px] font-black leading-tight text-[#06194A]">{customer.firstName} {customer.lastName}</h3>
             <span className="shrink-0 rounded-full px-3 py-1 text-[10px] font-black" style={{ background: stage.bg, color: stage.color }}>{stage.label}</span>
             {(customer.roles || []).slice(0, 3).map((role) => <RolePill key={role} role={role} />)}
           </div>
 
-          <p className="mt-1 truncate text-xs font-bold text-slate-500">{[customer.phone, customer.city, money(customer.budget)].filter(Boolean).join(" · ")}</p>
+          <p className="mt-1 line-clamp-2 break-words text-xs font-bold leading-5 text-slate-500">{[customer.phone, customer.city, money(customer.budget)].filter(Boolean).join(" · ")}</p>
 
           <div className="mt-3 grid gap-2 md:grid-cols-2">
             <InsightBox title="Son Aktivite" badge={activityTypeLabel(latestActivity?.type)} text={latestActivity?.note || "Aktivite yok"} />
@@ -1402,17 +1431,17 @@ function CustomerListRow({ customer, onClick }: { customer: Customer; onClick: (
 }
 
 function RolePill({ role, label }: { role: string; label?: string }) {
-  return <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700">{label || roleLabel(role)}</span>;
+  return <span className="max-w-full break-words rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-black leading-4 text-blue-700">{label || roleLabel(role)}</span>;
 }
 
 function InsightBox({ title, badge, text, urgent }: { title: string; badge: string; text: string; urgent?: boolean }) {
   return (
-    <div className={`rounded-2xl p-3 ${urgent ? "bg-red-50" : "bg-[#F8FAFC]"}`}>
+    <div className={`min-w-0 overflow-hidden rounded-2xl p-3 ${urgent ? "bg-red-50" : "bg-[#F8FAFC]"}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className={`text-[10px] font-black uppercase tracking-wide ${urgent ? "text-red-500" : "text-slate-400"}`}>{title}</span>
-        <span className={`rounded-full bg-white px-2 py-1 text-[9px] font-black ${urgent ? "text-red-600" : "text-slate-500"}`}>{badge}</span>
+        <span className={`min-w-0 truncate text-[10px] font-black uppercase tracking-wide ${urgent ? "text-red-500" : "text-slate-400"}`}>{title}</span>
+        <span className={`max-w-[52%] shrink-0 truncate rounded-full bg-white px-2 py-1 text-[9px] font-black ${urgent ? "text-red-600" : "text-slate-500"}`}>{badge}</span>
       </div>
-      <p className={`mt-2 line-clamp-2 text-xs font-bold leading-5 ${urgent ? "text-red-700" : "text-slate-600"}`}>{text}</p>
+      <p className={`mt-2 line-clamp-2 break-words text-xs font-bold leading-5 ${urgent ? "text-red-700" : "text-slate-600"}`}>{text}</p>
     </div>
   );
 }
@@ -1420,8 +1449,8 @@ function InsightBox({ title, badge, text, urgent }: { title: string; badge: stri
 function MiniCounter({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-[#F8FAFC] px-2 py-2 text-center">
-      <p className="truncate text-sm font-black text-[#06194A]">{value}</p>
-      <p className="text-[9px] font-black uppercase text-slate-400">{label}</p>
+      <p className="line-clamp-2 break-words text-sm font-black leading-tight text-[#06194A]">{value}</p>
+      <p className="mt-0.5 truncate text-[9px] font-black uppercase text-slate-400">{label}</p>
     </div>
   );
 }
@@ -1754,9 +1783,9 @@ function CustomerDetailModal({
       <div className="eph-crm-modal-panel eph-crm-detail-panel max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[32px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="eph-crm-modal-header sticky top-0 z-10 border-b border-slate-200 bg-white p-5">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-[26px] font-black tracking-tight text-[#06194A]">{customer.firstName} {customer.lastName}</h2>
-              <p className="mt-1 text-sm font-bold text-slate-500">{[customer.phone, customer.city].filter(Boolean).join(" · ")}</p>
+            <div className="min-w-0 flex-1">
+              <h2 className="line-clamp-2 break-words text-[26px] font-black leading-tight tracking-tight text-[#06194A]">{customer.firstName} {customer.lastName}</h2>
+              <p className="mt-1 line-clamp-2 break-words text-sm font-bold leading-5 text-slate-500">{[customer.phone, customer.city].filter(Boolean).join(" · ")}</p>
             </div>
 
             <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><X size={20} /></button>
@@ -1766,7 +1795,7 @@ function CustomerDetailModal({
             <select className="premium-input" style={{ color: stage.color }} value={customer.status} onChange={(event) => onStatusChange(customer.id, event.target.value)}>
               {PIPELINE_STAGES.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
             </select>
-            <div className="rounded-2xl bg-blue-50 px-4 py-3 text-center text-xs font-black text-blue-700">
+            <div className="min-w-0 rounded-2xl bg-blue-50 px-4 py-3 text-center text-xs font-black text-blue-700">
               Lina Talep Profili: {(customer.interests || []).filter((item) => item.isActive).length}
             </div>
           </div>
@@ -1822,7 +1851,7 @@ function GeneralTab({ customer }: { customer: Customer }) {
         ].map((item) => (
           <div key={item.label} className="rounded-2xl bg-[#F8FAFC] p-4 text-center">
             <p className="text-xs font-black uppercase tracking-wide text-slate-400">{item.label}</p>
-            <p className="mt-2 text-sm font-black text-[#06194A]">{item.value}</p>
+            <p className="mt-2 break-words text-sm font-black leading-5 text-[#06194A]">{item.value}</p>
           </div>
         ))}
       </div>
@@ -1835,13 +1864,13 @@ function GeneralTab({ customer }: { customer: Customer }) {
 
       {customer.tags?.length > 0 && (
         <FormSection title="Etiketler">
-          <div className="flex flex-wrap justify-center gap-2">{customer.tags.map((tag) => <span key={tag} className="rounded-full border border-slate-200 px-3 py-2 text-xs font-black text-slate-500">{tag}</span>)}</div>
+          <div className="flex flex-wrap justify-center gap-2">{customer.tags.map((tag) => <span key={tag} className="max-w-full break-words rounded-full border border-slate-200 px-3 py-2 text-xs font-black leading-4 text-slate-500">{tag}</span>)}</div>
         </FormSection>
       )}
 
       {customer.notes && (
         <FormSection title="Not">
-          <div className="rounded-2xl bg-[#F8FAFC] p-4 text-sm font-semibold leading-6 text-slate-600">{customer.notes}</div>
+          <div className="rounded-2xl bg-[#F8FAFC] p-4 text-sm font-semibold leading-6 text-slate-600 break-words whitespace-pre-line">{customer.notes}</div>
         </FormSection>
       )}
     </>
@@ -2018,10 +2047,10 @@ function InterestsTab({
 function InterestCard({ interest, onDelete }: { interest: CustomerInterest; onDelete: () => void }) {
   return (
     <div className={`rounded-[24px] border p-4 ${interest.isActive ? "border-blue-100 bg-white" : "border-slate-200 bg-slate-50 opacity-70"}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-black text-[#06194A]">{interest.title || "Talep Profili"}</p>
-          <p className="mt-1 flex flex-wrap items-center gap-1 text-xs font-bold text-slate-500"><MapPin size={13} />{[interest.city, interest.district, interest.neighborhood].filter(Boolean).join(" / ") || "Bölge belirtilmedi"}</p>
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 break-words text-sm font-black leading-tight text-[#06194A]">{interest.title || "Talep Profili"}</p>
+          <p className="mt-1 flex min-w-0 flex-wrap items-center gap-1 text-xs font-bold leading-5 text-slate-500"><MapPin size={13} className="shrink-0" /><span className="min-w-0 break-words">{[interest.city, interest.district, interest.neighborhood].filter(Boolean).join(" / ") || "Bölge belirtilmedi"}</span></p>
         </div>
         <button onClick={onDelete} className="flex h-9 w-9 items-center justify-center rounded-2xl bg-red-50 text-red-600"><Trash2 size={16} /></button>
       </div>
@@ -2039,7 +2068,7 @@ function InterestCard({ interest, onDelete }: { interest: CustomerInterest; onDe
         {(interest.features || []).map((item) => <Chip key={item}>{item}</Chip>)}
       </div>
 
-      {interest.notes && <p className="mt-3 rounded-2xl bg-[#F8FAFC] p-3 text-xs font-semibold leading-5 text-slate-600">{interest.notes}</p>}
+      {interest.notes && <p className="mt-3 whitespace-pre-line break-words rounded-2xl bg-[#F8FAFC] p-3 text-xs font-semibold leading-5 text-slate-600">{interest.notes}</p>}
     </div>
   );
 }
@@ -2060,10 +2089,10 @@ function PropertyCard({ property, onDelete }: { property: CustomerProperty; onDe
 
   return (
     <div className="rounded-[24px] border border-slate-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="flex items-center gap-2 text-sm font-black text-[#06194A]"><Home size={17} />{project?.name || "Portföy"}</p>
-          <p className="mt-1 text-xs font-bold text-slate-500">{[project?.city, project?.district, unit?.number ? `No: ${unit.number}` : null].filter(Boolean).join(" / ")}</p>
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="flex min-w-0 items-center gap-2 text-sm font-black text-[#06194A]"><Home size={17} className="shrink-0" /><span className="line-clamp-2 break-words">{project?.name || "Portföy"}</span></p>
+          <p className="mt-1 line-clamp-2 break-words text-xs font-bold leading-5 text-slate-500">{[project?.city, project?.district, unit?.number ? `No: ${unit.number}` : null].filter(Boolean).join(" / ")}</p>
         </div>
         <button onClick={onDelete} className="flex h-9 w-9 items-center justify-center rounded-2xl bg-red-50 text-red-600"><Trash2 size={16} /></button>
       </div>
@@ -2075,7 +2104,7 @@ function PropertyCard({ property, onDelete }: { property: CustomerProperty; onDe
         <MiniCounter label="Fiyat" value={money(unit?.price)} />
       </div>
 
-      {property.notes && <p className="mt-3 rounded-2xl bg-[#F8FAFC] p-3 text-xs font-semibold leading-5 text-slate-600">{property.notes}</p>}
+      {property.notes && <p className="mt-3 whitespace-pre-line break-words rounded-2xl bg-[#F8FAFC] p-3 text-xs font-semibold leading-5 text-slate-600">{property.notes}</p>}
     </div>
   );
 }
@@ -2093,7 +2122,7 @@ function ActivitiesTab({ customer, activityForm, setActivityForm, activityLoadin
         {customer.activities?.length ? customer.activities.map((activity) => (
           <div key={activity.id} className="rounded-2xl bg-[#F8FAFC] p-4">
             <p className="text-xs font-black uppercase tracking-wide text-[#1557D6]">{activityTypeLabel(activity.type)}</p>
-            <p className="mt-2 text-sm font-semibold text-[#06194A]">{activity.note}</p>
+            <p className="mt-2 whitespace-pre-line break-words text-sm font-semibold leading-6 text-[#06194A]">{activity.note}</p>
             <p className="mt-2 text-xs font-bold text-slate-400">{formatDateTime(activity.createdAt)}</p>
           </div>
         )) : <EmptyBox text="Henüz aktivite yok" />}
@@ -2115,9 +2144,9 @@ function TasksTab({ customer, taskForm, setTaskForm, taskLoading, onAddTask, onT
         {customer.tasks?.length ? customer.tasks.map((task) => {
           const soon = isTaskSoon(task.dueDate);
           return (
-            <button key={task.id} onClick={() => task.status !== "TAMAMLANDI" && onTaskDone(task.id)} className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left ${soon ? "border-red-200 bg-red-50" : "border-slate-200 bg-white"}`}>
-              <div>
-                <p className={`text-sm font-black ${task.status === "TAMAMLANDI" ? "text-slate-400 line-through" : "text-[#06194A]"}`}>{task.title}</p>
+            <button key={task.id} onClick={() => task.status !== "TAMAMLANDI" && onTaskDone(task.id)} className={`flex w-full min-w-0 items-center justify-between gap-3 rounded-2xl border p-4 text-left ${soon ? "border-red-200 bg-red-50" : "border-slate-200 bg-white"}`}>
+              <div className="min-w-0 flex-1">
+                <p className={`break-words text-sm font-black leading-5 ${task.status === "TAMAMLANDI" ? "text-slate-400 line-through" : "text-[#06194A]"}`}>{task.title}</p>
                 {task.dueDate && <p className={`mt-2 text-xs font-black ${soon ? "text-red-600" : "text-slate-400"}`}>{formatDateTime(task.dueDate)}</p>}
               </div>
               {task.status === "TAMAMLANDI" && <CheckCircle2 size={20} className="text-emerald-600" />}
@@ -2154,11 +2183,11 @@ function ChoiceBlock({ title, children }: { title: string; children: ReactNode }
 }
 
 function Chip({ children }: { children: ReactNode }) {
-  return <span className="rounded-full border border-slate-200 bg-[#F8FAFC] px-3 py-1 text-[11px] font-black text-slate-600">{children}</span>;
+  return <span className="max-w-full break-words rounded-full border border-slate-200 bg-[#F8FAFC] px-3 py-1 text-[11px] font-black leading-4 text-slate-600">{children}</span>;
 }
 
 function EmptyBox({ text }: { text: string }) {
-  return <div className="rounded-2xl bg-[#F8FAFC] p-4 text-center text-sm font-bold text-slate-400">{text}</div>;
+  return <div className="rounded-2xl bg-[#F8FAFC] p-4 text-center text-sm font-bold leading-6 text-slate-400 break-words">{text}</div>;
 }
 
 function FormSection({ title, children }: { title: string; children: ReactNode }) {

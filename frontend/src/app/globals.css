@@ -1136,3 +1136,112 @@ a {
     min-height: 100dvh;
   }
 }
+
+
+/* ============================================
+   EPH GLOBAL OVERFLOW SAFETY V1.1
+   src/app/globals.css — en alta ekle
+   ============================================ */
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+video,
+canvas,
+svg,
+iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+button,
+a,
+p,
+span,
+strong,
+small,
+label,
+div,
+h1,
+h2,
+h3,
+h4,
+input,
+textarea,
+select {
+  min-width: 0;
+}
+
+button,
+a,
+p,
+span,
+strong,
+small,
+label,
+h1,
+h2,
+h3,
+h4 {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+pre,
+code {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+}
+
+[class*="card"],
+[class*="modal"],
+[class*="form"],
+[class*="field"],
+[class*="document"],
+[class*="upload"],
+[class*="file"],
+[class*="portfolio"],
+[class*="stock"] {
+  max-width: 100%;
+  min-width: 0;
+}
+
+[class*="document"] span,
+[class*="upload"] span,
+[class*="file"] span,
+[class*="stock-upload"] span,
+[class*="portfolio"] span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[class*="document"] *,
+[class*="upload"] *,
+[class*="file"] *,
+[class*="stock-upload"] *,
+[class*="portfolio"] * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}

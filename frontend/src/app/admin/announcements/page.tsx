@@ -562,7 +562,7 @@ export default function AdminAnnouncementsPage() {
             <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
               İçerik
             </p>
-            <p className="mt-2 whitespace-pre-wrap text-[13px] font-bold leading-6 text-[#172033]">
+            <p className="mt-2 whitespace-pre-wrap break-words text-[13px] font-bold leading-6 text-[#172033]">
               {detail.content}
             </p>
           </div>
@@ -690,7 +690,7 @@ function InfoBox({
         {icon}
         {label}
       </span>
-      <span className="mt-1 block truncate text-[11px] font-black text-[#172033]">
+      <span className="mt-1 block line-clamp-2 break-words text-[11px] font-black leading-4 text-[#172033]">
         {value}
       </span>
     </div>
@@ -775,7 +775,7 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:items-center">
-      <section className="w-full max-w-[620px] rounded-3xl bg-white p-4 shadow-2xl">
+      <section className="max-h-[90dvh] w-full max-w-[620px] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-[18px] font-black tracking-[-0.04em] text-[#172033]">
             {title}

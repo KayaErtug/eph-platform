@@ -131,6 +131,12 @@ function typeLabel(type?: string | null) {
   return String(type).replaceAll("_", " ");
 }
 
+function limitText(value?: string | number | null, max = 60) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  return text.length > max ? `${text.slice(0, max).trim()}…` : text;
+}
+
 function getLocation(unit: Unit) {
   return [unit.project?.city, unit.project?.district].filter(Boolean).join(" / ") || "Konum yok";
 }
@@ -564,8 +570,8 @@ export default function HavuzPage() {
         </section>
 
         {errorMessage && (
-          <section className="rounded-[18px] border-2 border-red-300 bg-red-50 p-3 text-center text-[12px] font-black leading-5 text-red-700 shadow-[0_10px_22px_rgba(220,38,38,0.10)]">
-            {errorMessage}
+          <section className="rounded-[18px] border-2 border-red-300 bg-red-50 p-3 text-center text-[12px] font-black leading-5 text-red-700 shadow-[0_10px_22px_rgba(220,38,38,0.10)] break-words [overflow-wrap:anywhere]">
+            {limitText(errorMessage, 180)}
           </section>
         )}
 
@@ -639,8 +645,8 @@ function KontorSuccessToast({ toast }: { toast: SuccessToast }) {
         <h3 className="relative mt-0.5 text-[15px] font-black tracking-[-0.02em] text-white">
           {toast.title}
         </h3>
-        <p className="relative mt-1 text-[12px] font-black leading-5 text-[#D9FFE8]">
-          {toast.message}
+        <p className="relative mt-1 text-[12px] font-black leading-5 text-[#D9FFE8] break-words [overflow-wrap:anywhere]">
+          {limitText(toast.message, 120)}
         </p>
       </section>
     </div>
@@ -686,15 +692,15 @@ function PoolUnitCard({
         <div className="min-w-0 p-2.5">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#2563EB]">
-                {typeLabel(unit.type)}
+              <p className="line-clamp-1 text-[9px] font-black uppercase tracking-[0.1em] text-[#2563EB] break-words [overflow-wrap:anywhere]">
+                {limitText(typeLabel(unit.type), 32)}
               </p>
-              <h3 className="mt-0.5 line-clamp-1 text-[14px] font-black text-[#1F2937]">
-                {unit.project?.name || "EPH Portföy"}
+              <h3 className="mt-0.5 line-clamp-2 text-[14px] font-black leading-[1.12] text-[#1F2937] break-words [overflow-wrap:anywhere]">
+                {limitText(unit.project?.name || "EPH Portföy", 60)}
               </h3>
-              <p className="mt-1 flex items-center gap-1 truncate text-[10px] font-bold text-[#64748B]">
-                <MapPin size={11} />
-                {getLocation(unit)}
+              <p className="mt-1 flex min-w-0 items-start gap-1 text-[10px] font-bold leading-3 text-[#64748B]">
+                <MapPin size={11} className="mt-0.5 shrink-0" />
+                <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">{limitText(getLocation(unit), 42)}</span>
               </p>
             </div>
 
@@ -727,8 +733,8 @@ function PoolUnitCard({
         </div>
 
         <div className="mt-2 grid grid-cols-3 gap-1.5">
-          <MatchPill text={getMahalle(unit)} />
-          <MatchPill text={unit.roomCount || "Tip uygun"} />
+          <MatchPill text={limitText(getMahalle(unit), 34)} />
+          <MatchPill text={limitText(unit.roomCount || "Tip uygun", 24)} />
           <MatchPill text={`Fark %${match.budgetDiff || 8}`} />
         </div>
       </section>
@@ -789,8 +795,8 @@ function PoolDetailModal({ unit, onClose }: { unit: Unit; onClose: () => void })
             <p className="text-[clamp(9px,2.4vw,10px)] font-black uppercase tracking-[0.12em] text-[#2563EB]">
               Havuz Detay
             </p>
-            <h2 className="mt-1 line-clamp-2 text-[clamp(17px,5vw,21px)] font-black leading-[1.05] tracking-[-0.045em] text-[#1F2937]">
-              {unit.project?.name || "EPH Portföy"}
+            <h2 className="mt-1 line-clamp-2 text-[clamp(17px,5vw,21px)] font-black leading-[1.05] tracking-[-0.045em] text-[#1F2937] break-words [overflow-wrap:anywhere]">
+              {limitText(unit.project?.name || "EPH Portföy", 72)}
             </h2>
           </div>
 
@@ -820,7 +826,7 @@ function PoolDetailModal({ unit, onClose }: { unit: Unit; onClose: () => void })
             <p className="text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
               Açıklama
             </p>
-            <p className="mt-1.5 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
+            <p className="mt-1.5 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
               {unit.description || "Bu Havuz portföyü için açıklama girilmemiş."}
             </p>
           </div>
@@ -829,7 +835,7 @@ function PoolDetailModal({ unit, onClose }: { unit: Unit; onClose: () => void })
             <p className="text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
               Mahremiyet
             </p>
-            <p className="mt-1.5 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
+            <p className="mt-1.5 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
               Telefon, e-posta, tapu sahibi ve tam adres bilgileri Havuz detayında gösterilmez.
             </p>
           </div>
@@ -864,8 +870,8 @@ function PoolActionModal({
             <p className="text-[clamp(9px,2.4vw,10px)] font-black uppercase tracking-[0.12em] text-[#2563EB]">
               Havuz Kontör İşlemi
             </p>
-            <h2 className="mt-1 line-clamp-2 text-[clamp(17px,5vw,21px)] font-black leading-[1.05] tracking-[-0.045em] text-[#1F2937]">
-              {title}
+            <h2 className="mt-1 line-clamp-2 text-[clamp(17px,5vw,21px)] font-black leading-[1.05] tracking-[-0.045em] text-[#1F2937] break-words [overflow-wrap:anywhere]">
+              {limitText(title, 56)}
             </h2>
           </div>
 
@@ -892,7 +898,7 @@ function PoolActionModal({
             <p className="text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
               İşlem Özeti
             </p>
-            <p className="mt-1.5 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
+            <p className="mt-1.5 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
               Bu işlem {creditAmount} kontör harcar. Onay sonrası portföy sahibine bildirim gönderilir ve işlem kaydı oluşturulur.
             </p>
           </div>
@@ -925,17 +931,17 @@ function PoolActionModal({
 function SmallInfo({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-[13px] border border-[#D7E3F2] bg-[#F8FAFC] px-2 py-1.5">
-      <p className="truncate text-[8px] font-black uppercase tracking-[0.05em] text-[#64748B]">{label}</p>
-      <p className="mt-0.5 truncate text-[10px] font-black text-[#1F2937]">{value}</p>
+      <p className="line-clamp-1 text-[8px] font-black uppercase tracking-[0.05em] text-[#64748B] break-words [overflow-wrap:anywhere]">{limitText(label, 22)}</p>
+      <p className="mt-0.5 line-clamp-2 text-[10px] font-black leading-[1.15] text-[#1F2937] break-words [overflow-wrap:anywhere]">{limitText(value, 46)}</p>
     </div>
   );
 }
 
 function MatchPill({ text }: { text: string }) {
   return (
-    <div className="flex min-h-[26px] items-center justify-center gap-1 rounded-full border border-[#C7D6E8] bg-white px-2 text-center text-[9px] font-black text-[#1F2937]">
+    <div className="flex min-h-[30px] min-w-0 items-center justify-center gap-1 rounded-full border border-[#C7D6E8] bg-white px-2 text-center text-[9px] font-black leading-[1.05] text-[#1F2937]">
       <CheckCircle2 size={10} className="shrink-0 text-emerald-600" />
-      <span className="truncate">{text}</span>
+      <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">{limitText(text, 34)}</span>
     </div>
   );
 }

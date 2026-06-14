@@ -172,7 +172,7 @@ export default function AdminHelpCenterPage() {
                 <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
                   <Icon size={24} />
                 </span>
-                <h3 className="mt-3 text-[14px] font-black tracking-[-0.03em] text-[#172033]">
+                <h3 className="mt-3 line-clamp-2 break-words text-[14px] font-black leading-4 tracking-[-0.03em] text-[#172033]">
                   {item.title}
                 </h3>
                 <p className="mt-1 line-clamp-2 text-[11px] font-bold leading-4 text-slate-500">

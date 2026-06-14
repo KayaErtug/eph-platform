@@ -207,7 +207,7 @@ export default function AdminReportsPage() {
               <h1 className="truncate text-[19px] font-black tracking-[-0.04em]">
                 Raporlar
               </h1>
-              <p className="truncate text-[11px] font-bold text-slate-500">
+              <p className="line-clamp-2 break-words text-[11px] font-bold leading-4 text-slate-500">
                 Trafik, kullanıcı ve sayfa performansı
               </p>
             </div>
@@ -383,8 +383,8 @@ function RowCard({
   return (
     <article className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
       <div className="min-w-0">
-        <p className="truncate text-[13px] font-black text-[#172033]">{title}</p>
-        <p className="truncate text-[11px] font-bold text-slate-500">{subtitle}</p>
+        <p className="line-clamp-2 break-words text-[13px] font-black leading-4 text-[#172033]">{title}</p>
+        <p className="line-clamp-2 break-words text-[11px] font-bold leading-4 text-slate-500">{subtitle}</p>
       </div>
       <span className="flex h-9 min-w-9 items-center justify-center rounded-xl bg-white px-2 text-[14px] font-black text-blue-700 shadow-sm">
         {value}
@@ -396,10 +396,10 @@ function RowCard({
 function VisitCard({ item }: { item: VisitItem }) {
   return (
     <article className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-center">
-      <p className="truncate text-[13px] font-black text-[#172033]">
+      <p className="line-clamp-2 break-words text-[13px] font-black leading-4 text-[#172033]">
         {userName(item.user)}
       </p>
-      <p className="mt-1 truncate text-[11px] font-bold text-slate-500">
+      <p className="mt-1 line-clamp-2 break-words text-[11px] font-bold leading-4 text-slate-500">
         {roleLabel(item.user?.role)}
       </p>
 
@@ -419,7 +419,7 @@ function MiniInfo({ label, value }: { label: string; value: string }) {
       <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
         {label}
       </p>
-      <p className="mt-1 truncate text-[11px] font-black text-[#172033]">
+      <p className="mt-1 line-clamp-2 break-words text-[11px] font-black leading-4 text-[#172033]">
         {value}
       </p>
     </div>
