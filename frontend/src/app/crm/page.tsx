@@ -4,14 +4,17 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   BriefcaseBusiness,
+  CalendarDays,
   CheckCircle2,
   Clock3,
   FileText,
+  Flame,
   Home,
   ListFilter,
   Loader2,
   MapPin,
   Phone,
+  PhoneCall,
   Plus,
   Search,
   Sparkles,
@@ -589,7 +592,9 @@ export default function CrmPage() {
   const [pipeline, setPipeline] = useState<Record<string, Customer[]>>({});
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
-  const [view, setView] = useState<"pipeline" | "list">("pipeline");
+  const [view, setView] = useState<"pipeline" | "list">("list");
+  const [timeRange, setTimeRange] = useState<"today" | "7" | "15" | "30">("today");
+  const [roleFilter, setRoleFilter] = useState<string>("TUMU");
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [formLoading, setFormLoading] = useState(false);
@@ -875,12 +880,27 @@ export default function CrmPage() {
     setInterestForm(emptyInterestForm());
   };
 
+  const roleTabs = useMemo(
+    () => [
+      { key: "ALICI", label: "Alıcılar" },
+      { key: "SATICI", label: "Satıcılar" },
+      { key: "KIRACI", label: "Kiracılar" },
+      { key: "MAL_SAHIBI", label: "Mal Sahipleri" },
+      { key: "YATIRIMCI", label: "Yatırımcılar" },
+      { key: "TUMU", label: "Tümü" },
+    ],
+    [],
+  );
+
   const filteredCustomers = useMemo(() => {
     const keyword = search.toLowerCase().trim();
-    if (!keyword) return customers;
 
-    return customers.filter((customer) =>
-      [
+    return customers.filter((customer) => {
+      const roleMatched = roleFilter === "TUMU" || (customer.roles || []).includes(roleFilter);
+      if (!roleMatched) return false;
+      if (!keyword) return true;
+
+      return [
         customer.firstName,
         customer.lastName,
         customer.phone,
@@ -896,9 +916,9 @@ export default function CrmPage() {
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
-        .includes(keyword),
-    );
-  }, [customers, search]);
+        .includes(keyword);
+    });
+  }, [customers, search, roleFilter]);
 
   const allTasks = customers.flatMap((customer) =>
     (customer.tasks || []).map((task) => ({ ...task, customerName: `${customer.firstName} ${customer.lastName}`, customerId: customer.id })),
@@ -924,10 +944,28 @@ export default function CrmPage() {
     .sort((a, b) => new Date(a.dueDate || "").getTime() - new Date(b.dueDate || "").getTime())
     .slice(0, 5);
 
+  const plannedCallsToday = todayTasks.filter((task) => task.title.toLocaleLowerCase("tr-TR").includes("görüş")).length;
+  const warmLeadCustomers = customers.filter((customer) => {
+    if (["KAPANDI", "KAYBEDILDI"].includes(customer.status)) return false;
+    const lastTouch = customer.lastContactedAt || getLatestActivity(customer)?.createdAt || customer.updatedAt;
+    if (!lastTouch) return false;
+    const diffHours = (Date.now() - new Date(lastTouch).getTime()) / (1000 * 60 * 60);
+    return diffHours >= 48;
+  });
+
+  const selectedRangeDays = timeRange === "today" ? 1 : Number(timeRange);
+  const rangeStart = new Date();
+  rangeStart.setDate(rangeStart.getDate() - selectedRangeDays + 1);
+  rangeStart.setHours(0, 0, 0, 0);
+
+  const rangeCustomers = customers.filter((customer) => new Date(customer.updatedAt).getTime() >= rangeStart.getTime());
+  const rangeClosedCount = rangeCustomers.filter((customer) => customer.status === "KAPANDI").length;
+  const rangeActiveCount = rangeCustomers.filter((customer) => !["KAPANDI", "KAYBEDILDI"].includes(customer.status)).length;
+  const targetRate = rangeActiveCount + rangeClosedCount > 0 ? Math.round((rangeClosedCount / (rangeActiveCount + rangeClosedCount)) * 100) : 0;
+
   const totalBudget = customers.reduce((sum, customer) => sum + (customer.budget || 0), 0);
   const closedCount = customers.filter((customer) => customer.status === "KAPANDI").length;
   const activeCount = customers.filter((customer) => !["KAPANDI", "KAYBEDILDI"].includes(customer.status)).length;
-  const interestCount = customers.reduce((sum, customer) => sum + (customer._count?.interests || customer.interests?.length || 0), 0);
 
   if (!hydrated || loading) {
     return (
@@ -974,97 +1012,130 @@ export default function CrmPage() {
         />
       )}
 
-      <section className="eph-crm-page mx-auto min-h-screen max-w-7xl px-4 pb-8 pt-5">
-        <header className="eph-crm-hero mb-5 overflow-hidden rounded-[34px] border border-[#DDE7F3] bg-white p-5 text-center shadow-[0_18px_42px_rgba(15,23,42,0.075)]">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 rounded-full bg-[#EFF6FF] px-3 py-1 text-xs font-black text-[#1557D6]">
-                <BriefcaseBusiness size={14} />
-                Müşteri İlişkileri V2
-              </div>
-
-              <h1 className="mt-3 text-[31px] font-black tracking-tight text-[#06194A] md:text-[42px]">CRM Merkezi</h1>
-
-              <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-[#64748B]">
-                Müşteri rolleri, talep profilleri, ilgi bölgeleri ve gayrimenkul ilişkilerini tek ekrandan yönet.
-              </p>
+      <section className="eph-crm-page mx-auto min-h-screen max-w-7xl px-3 pb-8 pt-3 md:px-4 md:pt-5">
+        <header className="eph-crm-compact-head mb-3 overflow-hidden rounded-[26px] border border-[#C7D6E8] bg-white p-3 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07)] md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#1557D6]">
+              <BriefcaseBusiness size={13} />
+              CRM V1.1
             </div>
-
-            <div className="flex justify-center gap-2 lg:justify-end">
-              <button onClick={() => setShowAddModal(true)} className="flex h-12 items-center gap-2 rounded-2xl bg-[#1557D6] px-4 text-sm font-black text-white">
-                <Plus size={18} />
-                Müşteri Ekle
-              </button>
-            </div>
+            <button onClick={() => setShowAddModal(true)} className="flex h-10 items-center gap-2 rounded-2xl bg-[#1557D6] px-3 text-xs font-black text-white shadow-[0_8px_18px_rgba(37,99,235,0.25)]">
+              <Plus size={16} />
+              Müşteri
+            </button>
           </div>
 
-          <div className="eph-crm-kpi-grid mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <KpiCard title="Toplam Müşteri" value={String(customers.length)} icon={<UsersRound size={19} />} />
-            <KpiCard title="Kapanan İşlem" value={String(closedCount)} icon={<CheckCircle2 size={19} />} />
-            <KpiCard title="Aktif Lead" value={String(activeCount)} icon={<Target size={19} />} />
-            <KpiCard title="Talep Profili" value={String(interestCount)} icon={<Sparkles size={19} />} />
-            <KpiCard title="Toplam Bütçe" value={shortMoney(totalBudget)} icon={<WalletCards size={19} />} />
+          <div className="mt-2 text-center">
+            <h1 className="text-[23px] font-black leading-tight tracking-tight text-[#06194A] md:text-[32px]">CRM Merkezi</h1>
+            <p className="mx-auto mt-1 max-w-xl text-[11px] font-bold leading-5 text-[#64748B] md:text-sm">
+              {customers.length} müşteri • {activeCount} aktif lead • {shortMoney(totalBudget)} toplam bütçe
+            </p>
+          </div>
+
+          <div className="eph-crm-kpi-grid mt-3 grid grid-cols-4 gap-2">
+            <KpiCard title="Müşteri" value={String(customers.length)} icon={<UsersRound size={17} />} />
+            <KpiCard title="Aktif Lead" value={String(activeCount)} icon={<Target size={17} />} />
+            <KpiCard title="Kapandı" value={String(closedCount)} icon={<CheckCircle2 size={17} />} />
+            <KpiCard title="Bütçe" value={shortMoney(totalBudget)} icon={<WalletCards size={17} />} />
+          </div>
+
+          <ReminderBand todayTasks={todayTasks.length} plannedCalls={plannedCallsToday} overdueTasks={overdueTasks.length} />
+
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            <QuickActionCard icon={<Plus size={18} />} title="Müşteri" subtitle="Ekle" onClick={() => setShowAddModal(true)} />
+            <QuickActionCard icon={<PhoneCall size={18} />} title="Görüşme" subtitle="Müşteri seç" onClick={() => setView("list")} />
+            <QuickActionCard icon={<Clock3 size={18} />} title="Görev" subtitle="Müşteri seç" onClick={() => setView("list")} />
+            <QuickActionCard icon={<ListFilter size={18} />} title={view === "pipeline" ? "Liste" : "Pipeline"} subtitle="Görünüm" onClick={() => setView(view === "pipeline" ? "list" : "pipeline")} />
           </div>
         </header>
 
-        <section className="eph-crm-task-center mb-5 rounded-[30px] border border-slate-200 bg-white p-5 text-center shadow-sm">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-            <Clock3 size={24} />
+        <section className="eph-crm-time-panel mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { key: "today", label: "Bugün" },
+              { key: "7", label: "7 Gün" },
+              { key: "15", label: "15 Gün" },
+              { key: "30", label: "30 Gün" },
+            ].map((item) => (
+              <button
+                key={item.key}
+                onClick={() => setTimeRange(item.key as "today" | "7" | "15" | "30")}
+                className={`flex h-10 items-center justify-center gap-1 rounded-2xl text-[11px] font-black transition ${timeRange === item.key ? "bg-[#1557D6] text-white shadow-[0_8px_18px_rgba(37,99,235,0.2)]" : "bg-[#F8FAFC] text-slate-600"}`}
+              >
+                <CalendarDays size={14} />
+                {item.label}
+              </button>
+            ))}
           </div>
 
-          <h2 className="mt-4 text-2xl font-black text-[#06194A]">CRM Görev Alarm Merkezi</h2>
-
-          <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">Bugünkü, geciken ve yaklaşan müşteri görevlerini hızlıca takip et.</p>
-
-          <div className="mt-5 grid gap-3 lg:grid-cols-3">
-            <TaskSummaryCard title="Bugünkü İşlerim" value={String(todayTasks.length)} description={todayTasks[0] ? `${todayTasks[0].customerName}: ${todayTasks[0].title}` : "Bugün için planlı görev yok."} tone="blue" />
-            <TaskSummaryCard title="Geciken Görevler" value={String(overdueTasks.length)} description={overdueTasks[0] ? `${overdueTasks[0].customerName}: ${overdueTasks[0].title}` : "Geciken görev yok."} tone="red" />
-            <TaskSummaryCard title="Yaklaşan Görevler" value={String(upcomingTasks.length)} description={upcomingTasks[0] ? `${upcomingTasks[0].customerName}: ${upcomingTasks[0].title}` : "Yaklaşan görev yok."} tone="green" />
+          <div className="mt-2 rounded-2xl bg-[#F8FAFC] px-3 py-2 text-center text-[11px] font-black text-slate-600">
+            Bu ay: <span className="text-[#1557D6]">{rangeClosedCount} kapandı</span> • <span className="text-emerald-600">{rangeActiveCount} aktif</span> • Hedef: <span className="text-[#06194A]">%{targetRate}</span>
           </div>
         </section>
 
-        <section className="eph-crm-filterbar mb-5 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Müşteri, telefon, şehir, rol veya ilgi bölgesi ara..." className="h-12 w-full rounded-2xl border border-slate-200 bg-[#F8FAFC] pl-11 pr-4 text-center text-sm font-bold text-slate-700 outline-none focus:border-[#1557D6] lg:text-left" />
+        {warmLeadCustomers.length > 0 && (
+          <button
+            onClick={() => {
+              setView("list");
+              setRoleFilter("TUMU");
+            }}
+            className="eph-crm-hotlead-card mb-3 flex w-full items-center justify-between gap-3 rounded-[22px] border border-orange-200 bg-[#FFF7ED] px-4 py-3 text-left shadow-[0_8px_24px_rgba(234,88,12,0.08)]"
+          >
+            <span className="flex min-w-0 items-center gap-2 text-sm font-black text-orange-700">
+              <Flame size={18} className="shrink-0" />
+              <span className="line-clamp-2">{warmLeadCustomers.length} müşteri 48 saattir bekliyor</span>
+            </span>
+            <span className="shrink-0 text-xs font-black text-orange-600">Görüntüle →</span>
+          </button>
+        )}
+
+        <section className="eph-crm-segments mb-3 overflow-x-auto pb-1">
+          <div className="flex min-w-max gap-2">
+            {roleTabs.map((tab) => {
+              const count = tab.key === "TUMU" ? customers.length : customers.filter((customer) => (customer.roles || []).includes(tab.key)).length;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setRoleFilter(tab.key)}
+                  className={`h-10 rounded-2xl border px-3 text-xs font-black transition ${roleFilter === tab.key ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]" : "border-[#C7D6E8] bg-white text-slate-600"}`}
+                >
+                  {tab.label} <span className="text-[10px] opacity-70">({count})</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="eph-crm-filterbar mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
+          <div className="flex gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search className="absolute left-3 top-3 text-slate-400" size={17} />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Müşteri ara..." className="h-11 w-full rounded-2xl border border-[#C7D6E8] bg-[#F8FAFC] pl-10 pr-3 text-sm font-bold text-slate-700 outline-none focus:border-[#1557D6]" />
             </div>
 
-            <div className="grid grid-cols-3 gap-2 lg:flex">
-              <button onClick={() => setView("pipeline")} className={`flex h-12 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black ${view === "pipeline" ? "bg-[#1557D6] text-white" : "border border-slate-200 bg-white text-slate-500"}`}>
-                <ListFilter size={17} />
-                Pipeline
-              </button>
-
-              <button onClick={() => setView("list")} className={`flex h-12 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black ${view === "list" ? "bg-[#1557D6] text-white" : "border border-slate-200 bg-white text-slate-500"}`}>
-                <FileText size={17} />
-                Liste
-              </button>
-
-              <button onClick={() => setShowAddModal(true)} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#06194A] px-4 text-sm font-black text-white">
-                <Plus size={18} />
-                Ekle
-              </button>
-            </div>
+            <button onClick={() => setView(view === "pipeline" ? "list" : "pipeline")} className="flex h-11 shrink-0 items-center justify-center gap-1 rounded-2xl border border-[#C7D6E8] bg-white px-3 text-xs font-black text-[#06194A]">
+              {view === "pipeline" ? <FileText size={16} /> : <ListFilter size={16} />}
+              {view === "pipeline" ? "Liste" : "Pipeline"}
+            </button>
           </div>
         </section>
 
         {view === "pipeline" ? (
           <section className="eph-crm-pipeline overflow-x-auto pb-4">
-            <div className="eph-crm-pipeline-track flex gap-4">
+            <div className="eph-crm-pipeline-track flex gap-3">
               {PIPELINE_STAGES.map((stage) => {
                 const stageCustomers = (pipeline[stage.key] || []).filter((customer) => filteredCustomers.some((item) => item.id === customer.id));
 
                 return (
-                  <div key={stage.key} className="eph-crm-stage w-[300px] shrink-0">
-                    <div className="mb-3 flex items-center justify-between rounded-2xl px-4 py-3" style={{ background: stage.bg }}>
-                      <span className="text-xs font-black uppercase tracking-wide" style={{ color: stage.color }}>{stage.label}</span>
-                      <span className="text-lg font-black" style={{ color: stage.color }}>{stageCustomers.length}</span>
+                  <div key={stage.key} className="eph-crm-stage w-[280px] shrink-0">
+                    <div className="mb-2 flex items-center justify-between rounded-2xl px-3 py-2" style={{ background: stage.bg }}>
+                      <span className="text-[11px] font-black uppercase tracking-wide" style={{ color: stage.color }}>{stage.label}</span>
+                      <span className="text-base font-black" style={{ color: stage.color }}>{stageCustomers.length}</span>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {stageCustomers.map((customer) => <CustomerCard key={customer.id} customer={customer} onClick={() => openCustomer(customer.id)} />)}
-                      {stageCustomers.length === 0 && <div className="rounded-[22px] border border-dashed border-slate-200 bg-white p-6 text-center text-sm font-bold text-slate-400">Boş</div>}
+                      {stageCustomers.length === 0 && <div className="rounded-[20px] border border-dashed border-slate-200 bg-white p-5 text-center text-sm font-bold text-slate-400">Boş</div>}
                     </div>
                   </div>
                 );
@@ -1072,11 +1143,11 @@ export default function CrmPage() {
             </div>
           </section>
         ) : (
-          <section className="eph-crm-list rounded-[28px] border border-slate-200 bg-white p-3 shadow-sm">
+          <section className="eph-crm-list rounded-[24px] border border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
             {filteredCustomers.length === 0 ? (
-              <div className="flex h-[320px] flex-col items-center justify-center text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#EFF6FF] text-[#1557D6]"><UsersRound size={30} /></div>
-                <div className="text-[20px] font-black text-[#06194A]">Müşteri bulunamadı</div>
+              <div className="flex h-[240px] flex-col items-center justify-center text-center">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]"><UsersRound size={26} /></div>
+                <div className="text-lg font-black text-[#06194A]">Müşteri bulunamadı</div>
                 <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">Yeni müşteri ekleyebilir veya arama filtresini temizleyebilirsin.</p>
               </div>
             ) : (
@@ -1163,6 +1234,15 @@ export default function CrmPage() {
         .eph-crm-list-row span {
           overflow-wrap: anywhere;
           word-break: break-word;
+        }
+
+        .eph-crm-segments {
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+        }
+
+        .eph-crm-segments::-webkit-scrollbar {
+          display: none;
         }
 
         @media (max-width: 768px) {
@@ -1334,24 +1414,33 @@ export default function CrmPage() {
   );
 }
 
-function TaskSummaryCard({ title, value, description, tone }: { title: string; value: string; description: string; tone: "blue" | "red" | "green" }) {
-  const style = tone === "red" ? "bg-red-50 text-red-700" : tone === "green" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700";
 
+function ReminderBand({ todayTasks, plannedCalls, overdueTasks }: { todayTasks: number; plannedCalls: number; overdueTasks: number }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white p-4 text-center">
-      <div className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl ${style}`}><span className="text-xl font-black">{value}</span></div>
-      <h3 className="mt-3 text-sm font-black text-[#06194A]">{title}</h3>
-      <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{description}</p>
+    <div className="mt-3 flex min-h-9 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-[#F8FAFC] px-3 py-2 text-center text-[11px] font-black leading-5 text-[#06194A]">
+      <span className="line-clamp-2">
+        ⏰ Bugün {todayTasks} görev var <span className="text-slate-400">•</span> {plannedCalls} görüşme planlandı <span className="text-slate-400">•</span> {overdueTasks} takip süresi doldu
+      </span>
     </div>
+  );
+}
+
+function QuickActionCard({ icon, title, subtitle, onClick }: { icon: ReactNode; title: string; subtitle: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="min-w-0 rounded-[20px] border border-[#C7D6E8] bg-[#F8FAFC] px-2 py-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)] transition hover:border-[#1557D6] hover:bg-white">
+      <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-sm">{icon}</div>
+      <p className="mt-2 truncate text-[11px] font-black leading-tight text-[#06194A]">{title}</p>
+      <p className="mt-0.5 truncate text-[10px] font-black leading-tight text-slate-400">{subtitle}</p>
+    </button>
   );
 }
 
 function KpiCard({ title, value, icon }: { title: string; value: string; icon: ReactNode }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-[#F8FAFC] p-4 text-center">
-      <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">{icon}</div>
-      <p className="text-xs font-black uppercase tracking-wide text-slate-400">{title}</p>
-      <p className="mt-2 text-[25px] font-black text-[#06194A]">{value}</p>
+    <div className="min-w-0 rounded-[20px] border border-[#C7D6E8] bg-[#F8FAFC] px-2 py-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+      <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-sm">{icon}</div>
+      <p className="truncate text-[10px] font-black uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="mt-1 truncate text-[18px] font-black leading-tight text-[#06194A] md:text-[22px]">{value}</p>
     </div>
   );
 }
