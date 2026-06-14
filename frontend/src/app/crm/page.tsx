@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   BriefcaseBusiness,
+  Building2,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -13,6 +14,7 @@ import {
   ListFilter,
   Loader2,
   MapPin,
+  Mic,
   Phone,
   PhoneCall,
   Plus,
@@ -22,6 +24,7 @@ import {
   Trash2,
   UsersRound,
   WalletCards,
+  Wrench,
   X,
 } from "lucide-react";
 
@@ -882,12 +885,14 @@ export default function CrmPage() {
 
   const roleTabs = useMemo(
     () => [
-      { key: "ALICI", label: "Alıcılar" },
-      { key: "SATICI", label: "Satıcılar" },
-      { key: "KIRACI", label: "Kiracılar" },
-      { key: "MAL_SAHIBI", label: "Mal Sahipleri" },
-      { key: "YATIRIMCI", label: "Yatırımcılar" },
-      { key: "TUMU", label: "Tümü" },
+      { key: "ALICI", label: "Alıcılar", icon: <UsersRound size={16} />, tone: "blue" },
+      { key: "SATICI", label: "Satıcılar", icon: <WalletCards size={16} />, tone: "green" },
+      { key: "KIRACI", label: "Kiracılar", icon: <Wrench size={16} />, tone: "orange" },
+      { key: "MAL_SAHIBI", label: "Mal Sahipleri", icon: <Home size={16} />, tone: "purple" },
+      { key: "YATIRIMCI", label: "Yatırımcılar", icon: <Target size={16} />, tone: "red" },
+      { key: "MUTEAHHIT", label: "Müteahhitler", icon: <Building2 size={16} />, tone: "sky" },
+      { key: "ARSA_SAHIBI", label: "Arsa Sahipleri", icon: <MapPin size={16} />, tone: "emerald" },
+      { key: "TUMU", label: "Tümü", icon: <UsersRound size={16} />, tone: "blue" },
     ],
     [],
   );
@@ -1039,7 +1044,7 @@ export default function CrmPage() {
             <KpiCard title="Bütçe" value={shortMoney(totalBudget)} icon={<WalletCards size={17} />} />
           </div>
 
-          <ReminderBand todayTasks={todayTasks.length} plannedCalls={plannedCallsToday} overdueTasks={overdueTasks.length} />
+          <CrmSmartBand todayTasks={todayTasks.length} plannedCalls={plannedCallsToday} overdueTasks={overdueTasks.length} warmLeadCount={warmLeadCustomers.length} onShowCustomers={() => setView("list")} onAddCustomer={() => setShowAddModal(true)} />
 
           <div className="mt-3 grid grid-cols-4 gap-2">
             <QuickActionCard icon={<Plus size={18} />} title="Müşteri" subtitle="Ekle" onClick={() => setShowAddModal(true)} />
@@ -1089,18 +1094,20 @@ export default function CrmPage() {
           </button>
         )}
 
-        <section className="eph-crm-segments mb-3 overflow-x-auto pb-1">
-          <div className="flex min-w-max gap-2">
+        <section className="eph-crm-segments mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
+          <div className="grid grid-cols-2 gap-2 min-[390px]:grid-cols-4">
             {roleTabs.map((tab) => {
               const count = tab.key === "TUMU" ? customers.length : customers.filter((customer) => (customer.roles || []).includes(tab.key)).length;
               return (
-                <button
+                <RoleSegmentButton
                   key={tab.key}
+                  label={tab.label}
+                  count={count}
+                  icon={tab.icon}
+                  active={roleFilter === tab.key}
+                  tone={tab.tone}
                   onClick={() => setRoleFilter(tab.key)}
-                  className={`h-10 rounded-2xl border px-3 text-xs font-black transition ${roleFilter === tab.key ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]" : "border-[#C7D6E8] bg-white text-slate-600"}`}
-                >
-                  {tab.label} <span className="text-[10px] opacity-70">({count})</span>
-                </button>
+                />
               );
             })}
           </div>
@@ -1112,6 +1119,10 @@ export default function CrmPage() {
               <Search className="absolute left-3 top-3 text-slate-400" size={17} />
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Müşteri ara..." className="h-11 w-full rounded-2xl border border-[#C7D6E8] bg-[#F8FAFC] pl-10 pr-3 text-sm font-bold text-slate-700 outline-none focus:border-[#1557D6]" />
             </div>
+
+            <button type="button" onClick={() => alert("Sesli arama tarayıcı desteği kontrol ediliyor. Bu özellik CRM V1.2 fazında aktif edilecek.")} className="flex h-11 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white text-[#06194A]">
+              <Mic size={18} />
+            </button>
 
             <button onClick={() => setView(view === "pipeline" ? "list" : "pipeline")} className="flex h-11 shrink-0 items-center justify-center gap-1 rounded-2xl border border-[#C7D6E8] bg-white px-3 text-xs font-black text-[#06194A]">
               {view === "pipeline" ? <FileText size={16} /> : <ListFilter size={16} />}
@@ -1237,12 +1248,8 @@ export default function CrmPage() {
         }
 
         .eph-crm-segments {
-          -webkit-overflow-scrolling: touch;
-          scrollbar-width: none;
-        }
-
-        .eph-crm-segments::-webkit-scrollbar {
-          display: none;
+          max-width: 100%;
+          overflow: hidden;
         }
 
         @media (max-width: 768px) {
@@ -1415,13 +1422,106 @@ export default function CrmPage() {
 }
 
 
-function ReminderBand({ todayTasks, plannedCalls, overdueTasks }: { todayTasks: number; plannedCalls: number; overdueTasks: number }) {
+function CrmSmartBand({
+  todayTasks,
+  plannedCalls,
+  overdueTasks,
+  warmLeadCount,
+  onShowCustomers,
+  onAddCustomer,
+}: {
+  todayTasks: number;
+  plannedCalls: number;
+  overdueTasks: number;
+  warmLeadCount: number;
+  onShowCustomers: () => void;
+  onAddCustomer: () => void;
+}) {
+  const hasWork = todayTasks > 0 || plannedCalls > 0 || overdueTasks > 0;
+
+  if (hasWork) {
+    return (
+      <div className="mt-3 flex min-h-9 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-[#F8FAFC] px-3 py-2 text-center text-[11px] font-black leading-5 text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+        <span className="line-clamp-2">
+          ⏰ Bugün {todayTasks} görev <span className="text-slate-400">•</span> {plannedCalls} görüşme <span className="text-slate-400">•</span> {overdueTasks} takip gecikti
+        </span>
+      </div>
+    );
+  }
+
   return (
-    <div className="mt-3 flex min-h-9 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-[#F8FAFC] px-3 py-2 text-center text-[11px] font-black leading-5 text-[#06194A]">
-      <span className="line-clamp-2">
-        ⏰ Bugün {todayTasks} görev var <span className="text-slate-400">•</span> {plannedCalls} görüşme planlandı <span className="text-slate-400">•</span> {overdueTasks} takip süresi doldu
-      </span>
+    <div className="mt-3 rounded-[22px] border border-[#D8CCFF] bg-white px-3 py-3 text-left shadow-[0_10px_28px_rgba(109,40,217,0.09)]">
+      <div className="flex items-start gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#F5F3FF] text-[#6D28D9] shadow-sm">
+          <Sparkles size={21} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-sm font-black text-[#6D28D9]">Lina'dan Öneri</p>
+            <span className="rounded-full bg-[#F5F3FF] px-2 py-1 text-[9px] font-black text-[#6D28D9]">Akıllı CRM</span>
+          </div>
+
+          <p className="mt-1 text-[12px] font-bold leading-5 text-[#06194A]">
+            Bugün planlanmış göreviniz yok. {warmLeadCount > 0 ? `${warmLeadCount} sıcak lead bekliyor; önce onları arayabilirsiniz.` : "Yeni müşteri ekleyip sıcak lead listenizi güçlendirebilirsiniz."}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" onClick={onShowCustomers} className="flex h-10 items-center justify-center gap-2 rounded-2xl border border-[#D8CCFF] bg-white px-2 text-[11px] font-black text-[#6D28D9]">
+          <PhoneCall size={15} />
+          Sıcak Lead'ler
+        </button>
+        <button type="button" onClick={onAddCustomer} className="flex h-10 items-center justify-center gap-2 rounded-2xl border border-[#D8CCFF] bg-white px-2 text-[11px] font-black text-[#6D28D9]">
+          <Plus size={15} />
+          Yeni Müşteri
+        </button>
+      </div>
     </div>
+  );
+}
+
+function segmentToneClasses(tone?: string, active?: boolean) {
+  if (active) return "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]";
+
+  if (tone === "green") return "border-[#C7D6E8] bg-white text-emerald-700";
+  if (tone === "orange") return "border-[#C7D6E8] bg-white text-orange-700";
+  if (tone === "purple") return "border-[#C7D6E8] bg-white text-purple-700";
+  if (tone === "red") return "border-[#C7D6E8] bg-white text-red-600";
+  if (tone === "sky") return "border-[#C7D6E8] bg-white text-sky-700";
+  if (tone === "emerald") return "border-[#C7D6E8] bg-white text-emerald-700";
+
+  return "border-[#C7D6E8] bg-white text-[#1557D6]";
+}
+
+function RoleSegmentButton({
+  label,
+  count,
+  icon,
+  active,
+  tone,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  icon: ReactNode;
+  active: boolean;
+  tone?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex min-h-[54px] min-w-0 items-center gap-2 rounded-[18px] border px-2.5 py-2 text-left shadow-[0_7px_18px_rgba(15,23,42,0.045)] transition ${segmentToneClasses(tone, active)}`}
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#F8FAFC] shadow-sm">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[12px] font-black leading-tight text-[#06194A]">{label}</span>
+        <span className="mt-0.5 block text-[11px] font-black leading-none opacity-75">({count})</span>
+      </span>
+    </button>
   );
 }
 
