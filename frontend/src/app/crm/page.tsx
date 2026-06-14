@@ -599,6 +599,7 @@ export default function CrmPage() {
   const [timeRange, setTimeRange] = useState<"today" | "7" | "15" | "30">("today");
   const [roleFilter, setRoleFilter] = useState<string>("TUMU");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showCreditModal, setShowCreditModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -888,11 +889,8 @@ export default function CrmPage() {
       { key: "ALICI", label: "Alıcılar", icon: <UsersRound size={16} />, tone: "blue" },
       { key: "SATICI", label: "Satıcılar", icon: <WalletCards size={16} />, tone: "green" },
       { key: "KIRACI", label: "Kiracılar", icon: <Wrench size={16} />, tone: "orange" },
-      { key: "MAL_SAHIBI", label: "Mal Sahipleri", icon: <Home size={16} />, tone: "purple" },
-      { key: "YATIRIMCI", label: "Yatırımcılar", icon: <Target size={16} />, tone: "red" },
       { key: "MUTEAHHIT", label: "Müteahhitler", icon: <Building2 size={16} />, tone: "sky" },
-      { key: "ARSA_SAHIBI", label: "Arsa Sahipleri", icon: <MapPin size={16} />, tone: "emerald" },
-      { key: "TUMU", label: "Tümü", icon: <UsersRound size={16} />, tone: "blue" },
+      { key: "INSAAT_FIRMASI", label: "İnşaat Firmaları", icon: <Home size={16} />, tone: "purple" },
     ],
     [],
   );
@@ -971,6 +969,12 @@ export default function CrmPage() {
   const totalBudget = customers.reduce((sum, customer) => sum + (customer.budget || 0), 0);
   const closedCount = customers.filter((customer) => customer.status === "KAPANDI").length;
   const activeCount = customers.filter((customer) => !["KAPANDI", "KAYBEDILDI"].includes(customer.status)).length;
+  const incompleteCount = customers.filter((customer) => {
+    const hasContact = Boolean(customer.phone || customer.email);
+    const hasRole = Boolean(customer.roles?.length);
+    const hasNeedProfile = Boolean(customer._count?.interests || customer.interests?.length || customer.interestedArea || customer.interestedType);
+    return !hasContact || !hasRole || !hasNeedProfile;
+  }).length;
 
   if (!hydrated || loading) {
     return (
@@ -986,6 +990,7 @@ export default function CrmPage() {
   return (
     <main className="eph-v4-shell min-h-screen bg-[#F4F8FF] text-[#27364F]">
       {showAddModal && <AddCustomerModal form={form} setForm={setForm} formLoading={formLoading} provinceOptions={provinceOptions} provinceLoading={provinceLoading} onSubmit={handleAddCustomer} onClose={() => setShowAddModal(false)} />}
+      {showCreditModal && <CreditCalculatorModal onClose={() => setShowCreditModal(false)} />}
 
       {selectedCustomer && (
         <CustomerDetailModal
@@ -1019,15 +1024,11 @@ export default function CrmPage() {
 
       <section className="eph-crm-page mx-auto min-h-screen max-w-7xl px-3 pb-8 pt-3 md:px-4 md:pt-5">
         <header className="eph-crm-compact-head mb-3 overflow-hidden rounded-[26px] border border-[#C7D6E8] bg-white p-3 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07)] md:p-4">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-center gap-2">
             <div className="inline-flex items-center gap-2 rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#1557D6]">
               <BriefcaseBusiness size={13} />
               CRM V1.1
             </div>
-            <button onClick={() => setShowAddModal(true)} className="flex h-10 items-center gap-2 rounded-2xl bg-[#1557D6] px-3 text-xs font-black text-white shadow-[0_8px_18px_rgba(37,99,235,0.25)]">
-              <Plus size={16} />
-              Müşteri
-            </button>
           </div>
 
           <div className="mt-2 text-center">
@@ -1037,17 +1038,18 @@ export default function CrmPage() {
             </p>
           </div>
 
-          <div className="eph-crm-kpi-grid mt-3 grid grid-cols-4 gap-2">
-            <KpiCard title="Müşteri" value={String(customers.length)} icon={<UsersRound size={17} />} />
-            <KpiCard title="Aktif Lead" value={String(activeCount)} icon={<Target size={17} />} />
-            <KpiCard title="Kapandı" value={String(closedCount)} icon={<CheckCircle2 size={17} />} />
-            <KpiCard title="Bütçe" value={shortMoney(totalBudget)} icon={<WalletCards size={17} />} />
+          <div className="eph-crm-top-grid mt-3 grid grid-cols-5 gap-1.5">
+            <TopCrmCard title="Toplam Kayıt" value={String(customers.length)} icon={<UsersRound size={16} />} />
+            <TopCrmCard title="Eksik Bilgili" value={String(incompleteCount)} icon={<Target size={16} />} />
+            <TopCrmCard title="Hızlı Not" value="Sesli Not" icon={<FileText size={16} />} onClick={() => setView("list")} />
+            <TopCrmCard title="Akbank Kredi" value="Hesapla" icon={<WalletCards size={16} />} onClick={() => setShowCreditModal(true)} highlight />
+            <TopCrmCard title="Yeni Kayıt" value="Ekle" icon={<Plus size={16} />} onClick={() => setShowAddModal(true)} />
           </div>
 
           <CrmSmartBand todayTasks={todayTasks.length} plannedCalls={plannedCallsToday} overdueTasks={overdueTasks.length} warmLeadCount={warmLeadCustomers.length} onShowCustomers={() => setView("list")} onAddCustomer={() => setShowAddModal(true)} />
 
           <div className="mt-3 grid grid-cols-4 gap-2">
-            <QuickActionCard icon={<Plus size={18} />} title="Müşteri" subtitle="Ekle" onClick={() => setShowAddModal(true)} />
+            <QuickActionCard icon={<Flame size={18} />} title="Sıcak Lead" subtitle="Liste" onClick={() => setView("list")} />
             <QuickActionCard icon={<PhoneCall size={18} />} title="Görüşme" subtitle="Müşteri seç" onClick={() => setView("list")} />
             <QuickActionCard icon={<Clock3 size={18} />} title="Görev" subtitle="Müşteri seç" onClick={() => setView("list")} />
             <QuickActionCard icon={<ListFilter size={18} />} title={view === "pipeline" ? "Liste" : "Pipeline"} subtitle="Görünüm" onClick={() => setView(view === "pipeline" ? "list" : "pipeline")} />
@@ -1094,20 +1096,22 @@ export default function CrmPage() {
           </button>
         )}
 
-        <section className="eph-crm-segments mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
-          <div className="grid grid-cols-2 gap-2 min-[390px]:grid-cols-4">
-            {roleTabs.map((tab) => {
-              const count = tab.key === "TUMU" ? customers.length : customers.filter((customer) => (customer.roles || []).includes(tab.key)).length;
+        <section className="eph-crm-segments mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
+          <div className="grid grid-cols-6 gap-2">
+            {roleTabs.map((tab, index) => {
+              const count = customers.filter((customer) => (customer.roles || []).includes(tab.key)).length;
+              const gridClass = index === 3 ? "col-span-2 col-start-2" : "col-span-2";
               return (
-                <RoleSegmentButton
-                  key={tab.key}
-                  label={tab.label}
-                  count={count}
-                  icon={tab.icon}
-                  active={roleFilter === tab.key}
-                  tone={tab.tone}
-                  onClick={() => setRoleFilter(tab.key)}
-                />
+                <div key={tab.key} className={gridClass}>
+                  <RoleSegmentButton
+                    label={tab.label}
+                    count={count}
+                    icon={tab.icon}
+                    active={roleFilter === tab.key}
+                    tone={tab.tone}
+                    onClick={() => setRoleFilter(tab.key)}
+                  />
+                </div>
               );
             })}
           </div>
@@ -1422,6 +1426,96 @@ export default function CrmPage() {
 }
 
 
+function CreditCalculatorModal({ onClose }: { onClose: () => void }) {
+  const [propertyValue, setPropertyValue] = useState("5000000");
+  const [downPayment, setDownPayment] = useState("1000000");
+  const [months, setMonths] = useState("120");
+  const [monthlyRate, setMonthlyRate] = useState("3.05");
+
+  const principal = Math.max(Number(onlyDigits(propertyValue)) - Number(onlyDigits(downPayment)), 0);
+  const n = Math.max(Number(months) || 0, 1);
+  const r = Math.max(Number(monthlyRate.replace(",", ".")) || 0, 0) / 100;
+  const monthlyPayment = r > 0 ? (principal * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1) : principal / n;
+  const totalPayment = monthlyPayment * n;
+  const totalInterest = Math.max(totalPayment - principal, 0);
+
+  return (
+    <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/60 p-0 backdrop-blur-sm md:items-center md:p-4" onClick={onClose}>
+      <div className="eph-crm-modal-panel flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-[30px] border border-[#C7D6E8] bg-white shadow-2xl md:rounded-[30px]" onClick={(event) => event.stopPropagation()}>
+        <div className="sticky top-0 z-10 border-b border-[#C7D6E8] bg-white/95 px-4 py-4 text-center backdrop-blur">
+          <button type="button" onClick={onClose} className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#F8FAFC] text-slate-500">
+            <X size={18} />
+          </button>
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6D28D9]">CRM Kredi Aracı</p>
+          <h2 className="mt-1 text-[22px] font-black text-[#06194A]">Konut Kredisi Hesapla</h2>
+          <p className="mx-auto mt-1 max-w-md text-xs font-bold leading-5 text-slate-500">Akbank güncel oranı entegrasyon fazında API ile bağlanacak. Şimdilik oran manuel girilir.</p>
+        </div>
+
+        <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-[calc(24px+env(safe-area-inset-bottom,0px))]">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Field label="Gayrimenkul Değeri"><input className="premium-input" inputMode="numeric" value={formatBudgetInput(propertyValue)} onChange={(event) => setPropertyValue(onlyDigits(event.target.value))} /></Field>
+            <Field label="Peşinat"><input className="premium-input" inputMode="numeric" value={formatBudgetInput(downPayment)} onChange={(event) => setDownPayment(onlyDigits(event.target.value))} /></Field>
+            <Field label="Vade"><input className="premium-input" inputMode="numeric" value={months} onChange={(event) => setMonths(onlyDigits(event.target.value))} /></Field>
+            <Field label="Aylık Faiz (%)"><input className="premium-input" inputMode="decimal" value={monthlyRate} onChange={(event) => setMonthlyRate(event.target.value)} /></Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <CreditResult title="Kullanılacak Kredi" value={money(principal)} />
+            <CreditResult title="Aylık Taksit" value={money(Math.round(monthlyPayment))} />
+            <CreditResult title="Toplam Ödeme" value={money(Math.round(totalPayment))} />
+            <CreditResult title="Toplam Faiz" value={money(Math.round(totalInterest))} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CreditResult({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded-[18px] border border-[#C7D6E8] bg-[#F8FAFC] p-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+      <p className="text-[10px] font-black uppercase leading-4 text-slate-500">{title}</p>
+      <p className="mt-1 text-sm font-black leading-tight text-[#06194A]">{value}</p>
+    </div>
+  );
+}
+
+function TopCrmCard({
+  title,
+  value,
+  icon,
+  onClick,
+  highlight,
+}: {
+  title: string;
+  value: string;
+  icon: ReactNode;
+  onClick?: () => void;
+  highlight?: boolean;
+}) {
+  const className = `min-w-0 rounded-[18px] border px-1.5 py-2 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)] transition ${
+    highlight ? "border-[#8B5CF6] bg-white text-[#6D28D9]" : "border-[#C7D6E8] bg-[#F8FAFC] text-[#1557D6]"
+  }`;
+
+  const content = (
+    <>
+      <div className="mx-auto mb-1.5 flex h-8 w-8 items-center justify-center rounded-2xl bg-white shadow-sm">{icon}</div>
+      <p className="mx-auto min-h-[24px] max-w-full text-[8px] font-black uppercase leading-[1.15] text-slate-500">{title}</p>
+      <p className="mt-1 text-[12px] font-black leading-tight text-[#06194A]">{value}</p>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={className}>
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
+}
+
 function CrmSmartBand({
   todayTasks,
   plannedCalls,
@@ -1514,13 +1608,11 @@ function RoleSegmentButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex min-h-[54px] min-w-0 items-center gap-2 rounded-[18px] border px-2.5 py-2 text-left shadow-[0_7px_18px_rgba(15,23,42,0.045)] transition ${segmentToneClasses(tone, active)}`}
+      className={`flex min-h-[78px] w-full min-w-0 flex-col items-center justify-center rounded-[20px] border px-2.5 py-3 text-center shadow-[0_9px_24px_rgba(15,23,42,0.07)] transition ${segmentToneClasses(tone, active)}`}
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#F8FAFC] shadow-sm">{icon}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[12px] font-black leading-tight text-[#06194A]">{label}</span>
-        <span className="mt-0.5 block text-[11px] font-black leading-none opacity-75">({count})</span>
-      </span>
+      <span className="mb-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#F8FAFC] shadow-sm">{icon}</span>
+      <span className="block w-full min-w-0 text-center text-[10.5px] font-black leading-[1.15] text-[#06194A]">{label}</span>
+      <span className="mt-1 block text-center text-[12px] font-black leading-none opacity-75">({count})</span>
     </button>
   );
 }
