@@ -22,6 +22,9 @@ import {
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import AdminFlagBanner from "@/components/admin/AdminFlagBanner";
+import OrganizationTree from "@/components/organization/OrganizationTree";
+import OfficeEditModal from "@/components/organization/OfficeEditModal";
+import TeamEditModal from "@/components/organization/TeamEditModal";
 
 type Capability = "TEAM_LEADER" | "OFFICE_OWNER";
 
@@ -84,6 +87,18 @@ type Summary = {
   memberCount?: number;
 };
 
+type OfficeForm = {
+  name: string;
+  city: string;
+  district: string;
+  ownerUserId: string;
+};
+
+type TeamForm = {
+  name: string;
+  leaderId: string;
+};
+
 const EMPTY_OFFICE = {
   name: "",
   city: "",
@@ -137,9 +152,16 @@ export default function AdminOrganizationPage() {
 
   const [officeOpen, setOfficeOpen] = useState(false);
   const [officeForm, setOfficeForm] = useState(EMPTY_OFFICE);
+  const [editingOffice, setEditingOffice] = useState<Office | null>(null);
+  const [officeEditForm, setOfficeEditForm] = useState<OfficeForm>(EMPTY_OFFICE);
 
   const [teamOpen, setTeamOpen] = useState(false);
   const [teamForm, setTeamForm] = useState(EMPTY_TEAM);
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [teamEditForm, setTeamEditForm] = useState<TeamForm>({
+    name: "",
+    leaderId: "",
+  });
 
   const [leaderTeam, setLeaderTeam] = useState<Team | null>(null);
   const [nextLeaderId, setNextLeaderId] = useState("");
@@ -241,6 +263,81 @@ export default function AdminOrganizationPage() {
     }
   }
 
+  function openOfficeEdit(office: Office) {
+    setError("");
+    setSuccess("");
+    setEditingOffice(office);
+    setOfficeEditForm({
+      name: office.name || "",
+      city: office.city || "",
+      district: office.district || "",
+      ownerUserId: office.ownerUserId || "",
+    });
+  }
+
+  async function saveOfficeEdit() {
+    if (!editingOffice) return;
+
+    if (!officeEditForm.name.trim()) {
+      setError("Ofis adı zorunludur.");
+      return;
+    }
+
+    setBusyKey(`office-save-${editingOffice.id}`);
+    setError("");
+    setSuccess("");
+
+    try {
+      await api.patch(`/organization/offices/${editingOffice.id}`, {
+        name: officeEditForm.name.trim(),
+        city: officeEditForm.city.trim() || null,
+        district: officeEditForm.district.trim() || null,
+        ownerUserId: officeEditForm.ownerUserId || null,
+      });
+
+      setSuccess("Ofis bilgileri güncellendi.");
+      setEditingOffice(null);
+      setOfficeEditForm(EMPTY_OFFICE);
+      await loadAll();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Ofis güncellenemedi.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function toggleOfficeActive() {
+    if (!editingOffice) return;
+
+    const nextActive = editingOffice.isActive === false;
+    const confirmed = window.confirm(
+      nextActive
+        ? `${editingOffice.name} ofisi aktife alınacak. Emin misiniz?`
+        : `${editingOffice.name} ofisi pasife alınacak. Emin misiniz?`,
+    );
+
+    if (!confirmed) return;
+
+    setBusyKey(`office-toggle-${editingOffice.id}`);
+    setError("");
+    setSuccess("");
+
+    try {
+      await api.patch(`/organization/offices/${editingOffice.id}`, {
+        isActive: nextActive,
+      });
+
+      setSuccess(nextActive ? "Ofis aktife alındı." : "Ofis pasife alındı.");
+      setEditingOffice(null);
+      setOfficeEditForm(EMPTY_OFFICE);
+      await loadAll();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Ofis durumu güncellenemedi.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
   async function createTeam() {
     if (!teamForm.officeId) {
       setError("Ofis seçimi zorunludur.");
@@ -269,6 +366,82 @@ export default function AdminOrganizationPage() {
       await loadAll();
     } catch (err: any) {
       setError(err?.response?.data?.message || "Takım oluşturulamadı.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  function openTeamEdit(team: Team) {
+    setError("");
+    setSuccess("");
+    setEditingTeam(team);
+    setTeamEditForm({
+      name: team.name || "",
+      leaderId: team.leaderId || "",
+    });
+  }
+
+  async function saveTeamEdit() {
+    if (!editingTeam) return;
+
+    if (!teamEditForm.name.trim()) {
+      setError("Takım adı zorunludur.");
+      return;
+    }
+
+    setBusyKey(`team-save-${editingTeam.id}`);
+    setError("");
+    setSuccess("");
+
+    try {
+      await api.patch(`/organization/teams/${editingTeam.id}`, {
+        name: teamEditForm.name.trim(),
+      });
+
+      if ((editingTeam.leaderId || "") !== (teamEditForm.leaderId || "")) {
+        await api.patch(`/organization/teams/${editingTeam.id}/leader`, {
+          leaderId: teamEditForm.leaderId || null,
+        });
+      }
+
+      setSuccess("Takım bilgileri güncellendi.");
+      setEditingTeam(null);
+      setTeamEditForm({ name: "", leaderId: "" });
+      await loadAll();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Takım güncellenemedi.");
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function toggleTeamActive() {
+    if (!editingTeam) return;
+
+    const nextActive = editingTeam.isActive === false;
+    const confirmed = window.confirm(
+      nextActive
+        ? `${editingTeam.name} takımı aktife alınacak. Emin misiniz?`
+        : `${editingTeam.name} takımı pasife alınacak. Emin misiniz?`,
+    );
+
+    if (!confirmed) return;
+
+    setBusyKey(`team-toggle-${editingTeam.id}`);
+    setError("");
+    setSuccess("");
+
+    try {
+      await api.patch(`/organization/teams/${editingTeam.id}`, {
+        isActive: nextActive,
+      });
+
+      setSuccess(nextActive ? "Takım aktife alındı." : "Takım pasife alındı.");
+      setEditingTeam(null);
+      setTeamEditForm({ name: "", leaderId: "" });
+      await loadAll();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Takım durumu güncellenemedi.");
     } finally {
       setBusyKey("");
     }
@@ -445,6 +618,8 @@ export default function AdminOrganizationPage() {
           </div>
         ) : null}
 
+        <OrganizationTree offices={filteredOffices} teams={filteredTeams} query={query} />
+
         <section className="grid gap-3 lg:grid-cols-[0.85fr_1.15fr]">
           <Panel title="Ofisler" actionText={`${filteredOffices.length} kayıt`}>
             <div className="space-y-2">
@@ -472,6 +647,13 @@ export default function AdminOrganizationPage() {
                           <MiniStat label="Takım" value={office._count?.teams || office.teams?.length || 0} />
                           <MiniStat label="Üye" value={office._count?.users || 0} />
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => openOfficeEdit(office)}
+                          className="mt-2 flex min-h-[38px] w-full items-center justify-center rounded-2xl border border-[#2563EB] bg-white px-3 text-center text-[12px] font-black text-[#2563EB]"
+                        >
+                          Düzenle / Durum Yönet
+                        </button>
                       </div>
                     </div>
                   </article>
@@ -540,6 +722,13 @@ export default function AdminOrganizationPage() {
                             className="min-h-[38px] rounded-2xl bg-[#2563EB] px-3 text-[12px] font-black text-white"
                           >
                             Üye Ekle / Taşı
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openTeamEdit(team)}
+                            className="min-h-[38px] rounded-2xl border border-[#1F2937] bg-white px-3 text-[12px] font-black text-[#1F2937]"
+                          >
+                            Düzenle / Durum Yönet
                           </button>
                         </div>
 
@@ -610,6 +799,22 @@ export default function AdminOrganizationPage() {
         </Modal>
       ) : null}
 
+      {editingOffice ? (
+        <OfficeEditModal
+          office={editingOffice}
+          form={officeEditForm}
+          users={users}
+          busyKey={busyKey}
+          onChange={setOfficeEditForm}
+          onClose={() => {
+            setEditingOffice(null);
+            setOfficeEditForm(EMPTY_OFFICE);
+          }}
+          onSave={saveOfficeEdit}
+          onToggleActive={toggleOfficeActive}
+        />
+      ) : null}
+
       {teamOpen ? (
         <Modal title="Takım Oluştur" onClose={() => setTeamOpen(false)}>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -639,6 +844,22 @@ export default function AdminOrganizationPage() {
             Takımı Kaydet
           </button>
         </Modal>
+      ) : null}
+
+      {editingTeam ? (
+        <TeamEditModal
+          team={editingTeam}
+          form={teamEditForm}
+          users={users}
+          busyKey={busyKey}
+          onChange={setTeamEditForm}
+          onClose={() => {
+            setEditingTeam(null);
+            setTeamEditForm({ name: "", leaderId: "" });
+          }}
+          onSave={saveTeamEdit}
+          onToggleActive={toggleTeamActive}
+        />
       ) : null}
 
       {leaderTeam ? (
