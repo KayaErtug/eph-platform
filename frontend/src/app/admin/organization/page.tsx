@@ -25,6 +25,7 @@ import AdminFlagBanner from "@/components/admin/AdminFlagBanner";
 import OrganizationTree from "@/components/organization/OrganizationTree";
 import OfficeEditModal from "@/components/organization/OfficeEditModal";
 import TeamEditModal from "@/components/organization/TeamEditModal";
+import TeamKpiCards from "@/components/organization/TeamKpiCards";
 
 type Capability = "TEAM_LEADER" | "OFFICE_OWNER";
 
@@ -701,6 +702,8 @@ export default function AdminOrganizationPage() {
                             </div>
                           </div>
                         </div>
+
+                        <TeamKpiCards teamId={team.id} />
 
                         <div className="mt-3 flex flex-wrap gap-2">
                           <button
