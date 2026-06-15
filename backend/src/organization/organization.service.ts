@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Capability, Role } from '@prisma/client';
+import { Capability, PortfolioApprovalStatus, Role } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -403,6 +403,103 @@ export class OrganizationService {
         _count: { select: { members: { where: { isActive: true } } } },
       },
     });
+  }
+
+  async getTeamKpi(teamId: string) {
+    const team = await this.prisma.team.findUnique({
+      where: { id: teamId },
+      select: {
+        id: true,
+        name: true,
+        isActive: true,
+        office: { select: { id: true, name: true } },
+        members: {
+          where: { isActive: true },
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+    if (!team) {
+      throw new NotFoundException('Takım bulunamadı.');
+    }
+
+    const memberIds = team.members.map((member) => member.userId);
+    const memberCount = memberIds.length;
+
+    if (!memberIds.length) {
+      return {
+        teamId: team.id,
+        teamName: team.name,
+        officeId: team.office.id,
+        officeName: team.office.name,
+        memberCount: 0,
+        portfolioCount: 0,
+        authorizedPortfolioCount: 0,
+        poolPortfolioCount: 0,
+        performanceScore: team.isActive ? 10 : 0,
+      };
+    }
+
+    const [portfolioCount, authorizedPortfolioCount, poolPortfolioCount] = await Promise.all([
+      this.prisma.unit.count({
+        where: {
+          project: {
+            ownerId: {
+              in: memberIds,
+            },
+          },
+        },
+      }),
+      this.prisma.unit.count({
+        where: {
+          approvalStatus: {
+            in: [PortfolioApprovalStatus.ONAYLANDI, PortfolioApprovalStatus.HAVUZDA],
+          },
+          project: {
+            ownerId: {
+              in: memberIds,
+            },
+          },
+        },
+      }),
+      this.prisma.unit.count({
+        where: {
+          isPoolVisible: true,
+          project: {
+            ownerId: {
+              in: memberIds,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const authorizedScore = portfolioCount
+      ? Math.min(authorizedPortfolioCount / portfolioCount, 1) * 40
+      : 0;
+    const poolScore = portfolioCount ? Math.min(poolPortfolioCount / portfolioCount, 1) * 30 : 0;
+    const memberScore = Math.min(memberCount / 10, 1) * 20;
+    const activeScore = team.isActive ? 10 : 0;
+
+    const performanceScore = Math.max(
+      0,
+      Math.min(100, Math.round(authorizedScore + poolScore + memberScore + activeScore)),
+    );
+
+    return {
+      teamId: team.id,
+      teamName: team.name,
+      officeId: team.office.id,
+      officeName: team.office.name,
+      memberCount,
+      portfolioCount,
+      authorizedPortfolioCount,
+      poolPortfolioCount,
+      performanceScore,
+    };
   }
 
   async createTeam(

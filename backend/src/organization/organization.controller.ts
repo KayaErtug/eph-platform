@@ -97,6 +97,11 @@ export class OrganizationController {
     return this.organizationService.getTeams();
   }
 
+  @Get('teams/:id/kpi')
+  getTeamKpi(@Param('id') id: string) {
+    return this.organizationService.getTeamKpi(id);
+  }
+
   @Post('teams')
   createTeam(
     @Body()
