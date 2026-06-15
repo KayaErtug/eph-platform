@@ -26,6 +26,7 @@ import OrganizationTree from "@/components/organization/OrganizationTree";
 import OfficeEditModal from "@/components/organization/OfficeEditModal";
 import TeamEditModal from "@/components/organization/TeamEditModal";
 import TeamKpiCards from "@/components/organization/TeamKpiCards";
+import OfficeKpiCards from "@/components/organization/OfficeKpiCards";
 
 type Capability = "TEAM_LEADER" | "OFFICE_OWNER";
 
@@ -648,6 +649,7 @@ export default function AdminOrganizationPage() {
                           <MiniStat label="Takım" value={office._count?.teams || office.teams?.length || 0} />
                           <MiniStat label="Üye" value={office._count?.users || 0} />
                         </div>
+                        <OfficeKpiCards officeId={office.id} />
                         <button
                           type="button"
                           onClick={() => openOfficeEdit(office)}

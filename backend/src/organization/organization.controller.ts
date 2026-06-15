@@ -8,14 +8,14 @@ import {
   Post,
   Req,
   UseGuards,
-} from '@nestjs/common';
-import { Request } from 'express';
-import { Role } from '@prisma/client';
+} from "@nestjs/common";
+import { Request } from "express";
+import { Role } from "@prisma/client";
 
-import { OrganizationService } from './organization.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { OrganizationService } from "./organization.service";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
 
 type OrganizationRequestUser = {
   id?: string;
@@ -29,7 +29,7 @@ type OrganizationRequest = Request & {
   user?: OrganizationRequestUser;
 };
 
-@Controller('organization')
+@Controller("organization")
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.SUPER_ADMIN)
 export class OrganizationController {
@@ -41,28 +41,33 @@ export class OrganizationController {
       role: request.user?.role,
       email: request.user?.email,
       ipAddress:
-        request.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
+        request.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() ||
         request.socket.remoteAddress,
-      userAgent: request.headers['user-agent'],
+      userAgent: request.headers["user-agent"],
     };
   }
 
-  @Get('summary')
+  @Get("summary")
   getSummary() {
     return this.organizationService.getSummary();
   }
 
-  @Get('users')
+  @Get("users")
   getOrganizationUsers() {
     return this.organizationService.getOrganizationUsers();
   }
 
-  @Get('offices')
+  @Get("offices")
   getOffices() {
     return this.organizationService.getOffices();
   }
 
-  @Post('offices')
+  @Get("offices/:id/kpi")
+  getOfficeKpi(@Param("id") id: string) {
+    return this.organizationService.getOfficeKpi(id);
+  }
+
+  @Post("offices")
   createOffice(
     @Body()
     body: {
@@ -73,12 +78,15 @@ export class OrganizationController {
     },
     @Req() request: OrganizationRequest,
   ) {
-    return this.organizationService.createOffice(body, this.extractActor(request));
+    return this.organizationService.createOffice(
+      body,
+      this.extractActor(request),
+    );
   }
 
-  @Patch('offices/:id')
+  @Patch("offices/:id")
   updateOffice(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body()
     body: {
       name?: string;
@@ -89,20 +97,24 @@ export class OrganizationController {
     },
     @Req() request: OrganizationRequest,
   ) {
-    return this.organizationService.updateOffice(id, body, this.extractActor(request));
+    return this.organizationService.updateOffice(
+      id,
+      body,
+      this.extractActor(request),
+    );
   }
 
-  @Get('teams')
+  @Get("teams")
   getTeams() {
     return this.organizationService.getTeams();
   }
 
-  @Get('teams/:id/kpi')
-  getTeamKpi(@Param('id') id: string) {
+  @Get("teams/:id/kpi")
+  getTeamKpi(@Param("id") id: string) {
     return this.organizationService.getTeamKpi(id);
   }
 
-  @Post('teams')
+  @Post("teams")
   createTeam(
     @Body()
     body: {
@@ -112,12 +124,15 @@ export class OrganizationController {
     },
     @Req() request: OrganizationRequest,
   ) {
-    return this.organizationService.createTeam(body, this.extractActor(request));
+    return this.organizationService.createTeam(
+      body,
+      this.extractActor(request),
+    );
   }
 
-  @Patch('teams/:id')
+  @Patch("teams/:id")
   updateTeam(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body()
     body: {
       name?: string;
@@ -125,33 +140,49 @@ export class OrganizationController {
     },
     @Req() request: OrganizationRequest,
   ) {
-    return this.organizationService.updateTeam(id, body, this.extractActor(request));
+    return this.organizationService.updateTeam(
+      id,
+      body,
+      this.extractActor(request),
+    );
   }
 
-  @Patch('teams/:id/leader')
+  @Patch("teams/:id/leader")
   setTeamLeader(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() body: { leaderId?: string | null },
     @Req() request: OrganizationRequest,
   ) {
-    return this.organizationService.setTeamLeader(id, body.leaderId || null, this.extractActor(request));
+    return this.organizationService.setTeamLeader(
+      id,
+      body.leaderId || null,
+      this.extractActor(request),
+    );
   }
 
-  @Post('teams/:id/members')
+  @Post("teams/:id/members")
   addTeamMember(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() body: { userId?: string },
     @Req() request: OrganizationRequest,
   ) {
-    return this.organizationService.addTeamMember(id, body.userId || '', this.extractActor(request));
+    return this.organizationService.addTeamMember(
+      id,
+      body.userId || "",
+      this.extractActor(request),
+    );
   }
 
-  @Delete('teams/:id/members/:userId')
+  @Delete("teams/:id/members/:userId")
   removeTeamMember(
-    @Param('id') id: string,
-    @Param('userId') userId: string,
+    @Param("id") id: string,
+    @Param("userId") userId: string,
     @Req() request: OrganizationRequest,
   ) {
-    return this.organizationService.removeTeamMember(id, userId, this.extractActor(request));
+    return this.organizationService.removeTeamMember(
+      id,
+      userId,
+      this.extractActor(request),
+    );
   }
 }
