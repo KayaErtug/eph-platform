@@ -27,6 +27,8 @@ import { PortfolioImagesModule } from './portfolio-images/portfolio-images.modul
 import { PortfolioDocumentsModule } from './portfolio-documents/portfolio-documents.module';
 import { KatilimTalepleriModule } from './katilim-talepleri/katilim-talepleri.module';
 import { OrganizationModule } from './organization/organization.module';
+import { TeamLeaderCrmModule } from './team-leader-crm/team-leader-crm.module';
+import { OfficeOwnerCrmModule } from './office-owner-crm/office-owner-crm.module';
 
 import { LinaModule } from './lina/lina.module';
 import { TuranModule } from './turan/turan.module';
@@ -64,6 +66,8 @@ import { TuranModule } from './turan/turan.module';
     PortfolioDocumentsModule,
     KatilimTalepleriModule,
     OrganizationModule,
+    TeamLeaderCrmModule,
+    OfficeOwnerCrmModule,
 
     DashboardModule,
 
