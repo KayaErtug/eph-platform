@@ -196,7 +196,7 @@ function asNumber(value: unknown) {
 }
 
 function getBalance(wallet: KontorWalletResponse) {
-  return asNumber(wallet.balance ?? wallet.bakiye);
+  return asNumber(wallet.bakiye ?? wallet.balance);
 }
 
 function getWalletStatusLabel(active?: boolean) {
