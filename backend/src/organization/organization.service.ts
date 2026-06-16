@@ -230,6 +230,72 @@ export class OrganizationService {
     });
   }
 
+
+  private ratioScore(total: number, good: number, maxScore: number) {
+    if (total <= 0) return 0;
+    return Math.min(Math.max(good / total, 0), 1) * maxScore;
+  }
+
+  private calculatePortfolioQualityScore(input: {
+    portfolioCount: number;
+    missingPhotoCount: number;
+    missingDocumentCount: number;
+    missingLocationCount: number;
+    unauthorizedPortfolioCount: number;
+  }) {
+    const portfolioCount = Math.max(0, Number(input.portfolioCount || 0));
+
+    if (portfolioCount <= 0) return 0;
+
+    const missingPhotoCount = Math.max(0, Number(input.missingPhotoCount || 0));
+    const missingDocumentCount = Math.max(0, Number(input.missingDocumentCount || 0));
+    const missingLocationCount = Math.max(0, Number(input.missingLocationCount || 0));
+    const unauthorizedPortfolioCount = Math.max(
+      0,
+      Number(input.unauthorizedPortfolioCount || 0),
+    );
+
+    const photoScore = this.ratioScore(
+      portfolioCount,
+      portfolioCount - missingPhotoCount,
+      25,
+    );
+    const documentScore = this.ratioScore(
+      portfolioCount,
+      portfolioCount - missingDocumentCount,
+      30,
+    );
+    const locationScore = this.ratioScore(
+      portfolioCount,
+      portfolioCount - missingLocationCount,
+      20,
+    );
+    const authorizationScore = this.ratioScore(
+      portfolioCount,
+      portfolioCount - unauthorizedPortfolioCount,
+      25,
+    );
+
+    return Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(
+          photoScore + documentScore + locationScore + authorizationScore,
+        ),
+      ),
+    );
+  }
+
+  private emptyQualityCenter() {
+    return {
+      missingPhotoCount: 0,
+      missingDocumentCount: 0,
+      missingLocationCount: 0,
+      unauthorizedPortfolioCount: 0,
+    };
+  }
+
   async getSummary() {
     const [
       officeCount,
@@ -353,6 +419,8 @@ export class OrganizationService {
     const memberCount = userIds.length;
 
     if (!userIds.length) {
+      const qualityCenter = this.emptyQualityCenter();
+
       return {
         officeId: office.id,
         officeName: office.name,
@@ -362,49 +430,101 @@ export class OrganizationService {
         authorizedPortfolioCount: 0,
         poolPortfolioCount: 0,
         performanceScore: office.isActive ? 10 : 0,
+        qualityScore: 0,
+        qualityCenter,
+        quality: qualityCenter,
       };
     }
 
-    const [portfolioCount, authorizedPortfolioCount, poolPortfolioCount] =
-      await Promise.all([
-        this.prisma.unit.count({
-          where: {
-            project: {
-              ownerId: { in: userIds },
-            },
-          },
-        }),
-        this.prisma.unit.count({
-          where: {
-            approvalStatus: {
-              in: [
-                PortfolioApprovalStatus.ONAYLANDI,
-                PortfolioApprovalStatus.HAVUZDA,
-              ],
-            },
-            project: {
-              ownerId: { in: userIds },
-            },
-          },
-        }),
-        this.prisma.unit.count({
-          where: {
-            isPoolVisible: true,
-            project: {
-              ownerId: { in: userIds },
-            },
-          },
-        }),
-      ]);
+    const portfolioWhere = {
+      project: {
+        ownerId: { in: userIds },
+      },
+    };
 
-    const teamScore = Math.min(activeTeamCount / 10, 1) * 20;
-    const memberScore = Math.min(memberCount / 80, 1) * 20;
+    const [
+      portfolioCount,
+      authorizedPortfolioCount,
+      poolPortfolioCount,
+      missingPhotoCount,
+      missingDocumentCount,
+      missingLocationCount,
+      unauthorizedPortfolioCount,
+    ] = await Promise.all([
+      this.prisma.unit.count({
+        where: portfolioWhere,
+      }),
+      this.prisma.unit.count({
+        where: {
+          ...portfolioWhere,
+          approvalStatus: {
+            in: [
+              PortfolioApprovalStatus.ONAYLANDI,
+              PortfolioApprovalStatus.HAVUZDA,
+            ],
+          },
+        },
+      }),
+      this.prisma.unit.count({
+        where: {
+          ...portfolioWhere,
+          isPoolVisible: true,
+        },
+      }),
+      this.prisma.unit.count({
+        where: {
+          ...portfolioWhere,
+          images: { none: {} },
+        },
+      }),
+      this.prisma.unit.count({
+        where: {
+          ...portfolioWhere,
+          authorityDocuments: { none: {} },
+        },
+      }),
+      this.prisma.unit.count({
+        where: {
+          project: {
+            ownerId: { in: userIds },
+            OR: [{ latitude: null }, { longitude: null }],
+          },
+        },
+      }),
+      this.prisma.unit.count({
+        where: {
+          ...portfolioWhere,
+          approvalStatus: {
+            notIn: [
+              PortfolioApprovalStatus.ONAYLANDI,
+              PortfolioApprovalStatus.HAVUZDA,
+            ],
+          },
+        },
+      }),
+    ]);
+
+    const qualityCenter = {
+      missingPhotoCount,
+      missingDocumentCount,
+      missingLocationCount,
+      unauthorizedPortfolioCount,
+    };
+
+    const qualityScore = this.calculatePortfolioQualityScore({
+      portfolioCount,
+      ...qualityCenter,
+    });
+
+    const teamScore = Math.min(activeTeamCount / 10, 1) * 15;
+    const memberScore = Math.min(memberCount / 80, 1) * 15;
     const authorizedScore = portfolioCount
-      ? Math.min(authorizedPortfolioCount / portfolioCount, 1) * 30
+      ? Math.min(authorizedPortfolioCount / portfolioCount, 1) * 25
       : 0;
     const poolScore = portfolioCount
-      ? Math.min(poolPortfolioCount / portfolioCount, 1) * 20
+      ? Math.min(poolPortfolioCount / portfolioCount, 1) * 15
       : 0;
+    const qualityPerformanceScore = qualityScore * 0.2;
     const activeScore = office.isActive ? 10 : 0;
 
     const performanceScore = Math.max(
@@ -412,7 +532,12 @@ export class OrganizationService {
       Math.min(
         100,
         Math.round(
-          teamScore + memberScore + authorizedScore + poolScore + activeScore,
+          teamScore +
+            memberScore +
+            authorizedScore +
+            poolScore +
+            qualityPerformanceScore +
+            activeScore,
         ),
       ),
     );
@@ -426,6 +551,9 @@ export class OrganizationService {
       authorizedPortfolioCount,
       poolPortfolioCount,
       performanceScore,
+      qualityScore,
+      qualityCenter,
+      quality: qualityCenter,
     };
   }
 
@@ -630,6 +758,8 @@ export class OrganizationService {
     const memberCount = memberIds.length;
 
     if (!memberIds.length) {
+      const qualityCenter = this.emptyQualityCenter();
+
       return {
         teamId: team.id,
         teamName: team.name,
@@ -640,61 +770,115 @@ export class OrganizationService {
         authorizedPortfolioCount: 0,
         poolPortfolioCount: 0,
         performanceScore: team.isActive ? 10 : 0,
+        qualityScore: 0,
+        qualityCenter,
+        quality: qualityCenter,
       };
     }
 
-    const [portfolioCount, authorizedPortfolioCount, poolPortfolioCount] =
-      await Promise.all([
-        this.prisma.unit.count({
-          where: {
-            project: {
-              ownerId: {
-                in: memberIds,
-              },
-            },
+    const portfolioWhere = {
+      project: {
+        ownerId: {
+          in: memberIds,
+        },
+      },
+    };
+
+    const [
+      portfolioCount,
+      authorizedPortfolioCount,
+      poolPortfolioCount,
+      missingPhotoCount,
+      missingDocumentCount,
+      missingLocationCount,
+      unauthorizedPortfolioCount,
+    ] = await Promise.all([
+      this.prisma.unit.count({
+        where: portfolioWhere,
+      }),
+      this.prisma.unit.count({
+        where: {
+          ...portfolioWhere,
+          approvalStatus: {
+            in: [
+              PortfolioApprovalStatus.ONAYLANDI,
+              PortfolioApprovalStatus.HAVUZDA,
+            ],
           },
-        }),
-        this.prisma.unit.count({
-          where: {
-            approvalStatus: {
-              in: [
-                PortfolioApprovalStatus.ONAYLANDI,
-                PortfolioApprovalStatus.HAVUZDA,
-              ],
-            },
-            project: {
-              ownerId: {
-                in: memberIds,
-              },
-            },
+        },
+      }),
+      this.prisma.unit.count({
+        where: {
+          ...portfolioWhere,
+          isPoolVisible: true,
+        },
+      }),
+      this.prisma.unit.count({
+        where: {
+          ...portfolioWhere,
+          images: { none: {} },
+        },
+      }),
+      this.prisma.unit.count({
+        where: {
+          ...portfolioWhere,
+          authorityDocuments: { none: {} },
+        },
+      }),
+      this.prisma.unit.count({
+        where: {
+          project: {
+            ownerId: { in: memberIds },
+            OR: [{ latitude: null }, { longitude: null }],
           },
-        }),
-        this.prisma.unit.count({
-          where: {
-            isPoolVisible: true,
-            project: {
-              ownerId: {
-                in: memberIds,
-              },
-            },
+        },
+      }),
+      this.prisma.unit.count({
+        where: {
+          ...portfolioWhere,
+          approvalStatus: {
+            notIn: [
+              PortfolioApprovalStatus.ONAYLANDI,
+              PortfolioApprovalStatus.HAVUZDA,
+            ],
           },
-        }),
-      ]);
+        },
+      }),
+    ]);
+
+    const qualityCenter = {
+      missingPhotoCount,
+      missingDocumentCount,
+      missingLocationCount,
+      unauthorizedPortfolioCount,
+    };
+
+    const qualityScore = this.calculatePortfolioQualityScore({
+      portfolioCount,
+      ...qualityCenter,
+    });
 
     const authorizedScore = portfolioCount
-      ? Math.min(authorizedPortfolioCount / portfolioCount, 1) * 40
+      ? Math.min(authorizedPortfolioCount / portfolioCount, 1) * 35
       : 0;
     const poolScore = portfolioCount
-      ? Math.min(poolPortfolioCount / portfolioCount, 1) * 30
+      ? Math.min(poolPortfolioCount / portfolioCount, 1) * 25
       : 0;
-    const memberScore = Math.min(memberCount / 10, 1) * 20;
+    const memberScore = Math.min(memberCount / 10, 1) * 15;
+    const qualityPerformanceScore = qualityScore * 0.15;
     const activeScore = team.isActive ? 10 : 0;
 
     const performanceScore = Math.max(
       0,
       Math.min(
         100,
-        Math.round(authorizedScore + poolScore + memberScore + activeScore),
+        Math.round(
+          authorizedScore +
+            poolScore +
+            memberScore +
+            qualityPerformanceScore +
+            activeScore,
+        ),
       ),
     );
 
@@ -708,6 +892,9 @@ export class OrganizationService {
       authorizedPortfolioCount,
       poolPortfolioCount,
       performanceScore,
+      qualityScore,
+      qualityCenter,
+      quality: qualityCenter,
     };
   }
 

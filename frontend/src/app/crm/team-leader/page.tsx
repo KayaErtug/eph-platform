@@ -58,6 +58,7 @@ type TeamLeaderDashboard = {
     missingDocumentCount?: number;
     missingLocationCount?: number;
     unauthorizedPortfolioCount?: number;
+    qualityScore?: number;
   } | null;
   members?: TeamLeaderMember[];
   reports?: {
@@ -86,6 +87,7 @@ const fallbackDashboard: TeamLeaderDashboard = {
     missingDocumentCount: 0,
     missingLocationCount: 0,
     unauthorizedPortfolioCount: 0,
+    qualityScore: 100,
   },
   reports: {
     thisWeek: 0,
@@ -114,6 +116,35 @@ function initials(member?: TeamLeaderMember | null) {
     .map((item) => item.charAt(0))
     .join("")
     .toLocaleUpperCase("tr-TR") || "TL";
+}
+
+function calculateQualityScore(params: {
+  portfolioCount: number;
+  missingPhotoCount: number;
+  missingDocumentCount: number;
+  missingLocationCount: number;
+  unauthorizedPortfolioCount: number;
+}) {
+  const portfolioCount = Math.max(0, params.portfolioCount);
+
+  if (portfolioCount === 0) return 100;
+
+  const missingTotal =
+    Math.max(0, params.missingPhotoCount) +
+    Math.max(0, params.missingDocumentCount) +
+    Math.max(0, params.missingLocationCount) +
+    Math.max(0, params.unauthorizedPortfolioCount);
+
+  const penalty = Math.min(100, Math.round((missingTotal / Math.max(portfolioCount, 1)) * 25));
+  return Math.max(0, Math.min(100, 100 - penalty));
+}
+
+function qualityLevel(score: number) {
+  if (score >= 90) return { label: "Mükemmel", tone: "emerald" as const };
+  if (score >= 75) return { label: "Çok İyi", tone: "blue" as const };
+  if (score >= 60) return { label: "İyi", tone: "cyan" as const };
+  if (score >= 40) return { label: "Geliştirilmeli", tone: "amber" as const };
+  return { label: "Riskli", tone: "red" as const };
 }
 
 export default function TeamLeaderCrmDashboardPage() {
@@ -172,6 +203,15 @@ export default function TeamLeaderCrmDashboardPage() {
       numberValue(quality.unauthorizedPortfolioCount)
     );
   }, [quality]);
+
+  const qualityScore = numberValue(quality.qualityScore) || calculateQualityScore({
+    portfolioCount: numberValue(kpi.portfolioCount),
+    missingPhotoCount: numberValue(quality.missingPhotoCount),
+    missingDocumentCount: numberValue(quality.missingDocumentCount),
+    missingLocationCount: numberValue(quality.missingLocationCount),
+    unauthorizedPortfolioCount: numberValue(quality.unauthorizedPortfolioCount),
+  });
+  const qualityStatus = qualityLevel(qualityScore);
 
   if (!hasHydrated || loading) {
     return (
@@ -253,15 +293,16 @@ export default function TeamLeaderCrmDashboardPage() {
         <section className="grid gap-3 lg:grid-cols-[0.95fr_1.05fr]">
           <Panel title="Hızlı İşlemler" actionText="4 aksiyon">
             <div className="grid grid-cols-2 gap-2">
-              <ActionCard title="Danışman Ekle" desc="Takıma yeni üye ata" icon={<UserPlus size={19} />} />
-              <ActionCard title="Portföy Kalitesi" desc="Eksikleri incele" icon={<CheckCircle2 size={19} />} />
-              <ActionCard title="Takım Raporu" desc="Haftalık özeti gör" icon={<BarChart3 size={19} />} />
-              <ActionCard title="Takım Mesajları" desc="Ofis içi iletişim" icon={<MessageCircle size={19} />} />
+              <ActionCard title="Danışman Ekle" desc="Takım yönetimine git" icon={<UserPlus size={19} />} href="/admin/organization" />
+              <ActionCard title="Portföy Kalitesi" desc="Portföyleri incele" icon={<CheckCircle2 size={19} />} href="/portfoy" />
+              <ActionCard title="Takım Raporu" desc="Rapor merkezine git" icon={<BarChart3 size={19} />} href="/admin/reports" />
+              <ActionCard title="Takım Mesajları" desc="Mesajları aç" icon={<MessageCircle size={19} />} href="/messages" />
             </div>
           </Panel>
 
           <Panel title="Takım Kalite Merkezi" actionText={qualityTotal ? `${qualityTotal} uyarı` : "Temiz"}>
-            <div className="grid grid-cols-2 gap-2">
+            <QualityScoreCard score={qualityScore} level={qualityStatus.label} tone={qualityStatus.tone} />
+            <div className="mt-2 grid grid-cols-2 gap-2">
               <QualityCard label="Eksik Fotoğraf" value={numberValue(quality.missingPhotoCount)} />
               <QualityCard label="Eksik Belge" value={numberValue(quality.missingDocumentCount)} />
               <QualityCard label="Eksik Konum" value={numberValue(quality.missingLocationCount)} />
@@ -347,12 +388,11 @@ function KpiCard({ label, value, icon }: { label: string; value: number | string
   );
 }
 
-function ActionCard({ title, desc, icon }: { title: string; desc: string; icon: React.ReactNode }) {
+function ActionCard({ title, desc, icon, href }: { title: string; desc: string; icon: React.ReactNode; href: string }) {
   return (
-    <button
-      type="button"
-      onClick={() => window.alert("Bu aksiyon Paket-6 sonrası gerçek iş akışına bağlanacak.")}
-      className="min-h-[96px] rounded-3xl border border-[#C7D6E8] bg-[#F8FAFC] p-3 text-left shadow-sm"
+    <Link
+      href={href}
+      className="min-h-[96px] rounded-3xl border border-[#C7D6E8] bg-[#F8FAFC] p-3 text-left shadow-sm transition active:scale-[0.98]"
     >
       <div className="flex items-start gap-2">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#2563EB] shadow-sm">{icon}</span>
@@ -362,7 +402,28 @@ function ActionCard({ title, desc, icon }: { title: string; desc: string; icon: 
         </span>
         <ChevronRight className="shrink-0 text-slate-400" size={16} />
       </div>
-    </button>
+    </Link>
+  );
+}
+
+function QualityScoreCard({ score, level, tone }: { score: number; level: string; tone: "emerald" | "blue" | "cyan" | "amber" | "red" }) {
+  const toneClass = {
+    emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
+    blue: "border-blue-100 bg-blue-50 text-blue-700",
+    cyan: "border-cyan-100 bg-cyan-50 text-cyan-700",
+    amber: "border-amber-100 bg-amber-50 text-amber-700",
+    red: "border-red-100 bg-red-50 text-red-700",
+  }[tone];
+
+  return (
+    <article className={`rounded-3xl border p-3 text-center ${toneClass}`}>
+      <div className="flex items-center justify-center gap-2">
+        <CheckCircle2 size={20} />
+        <p className="text-[12px] font-black uppercase tracking-[0.08em]">Takım Kalite Skoru</p>
+      </div>
+      <p className="mt-2 text-[26px] font-black tracking-[-0.04em]">{score}/100</p>
+      <p className="mt-1 text-[12px] font-black">{level}</p>
+    </article>
   );
 }
 

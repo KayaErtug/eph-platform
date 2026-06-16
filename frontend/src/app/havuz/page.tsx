@@ -31,6 +31,8 @@ type Unit = {
   priceCurrency?: string | null;
   description?: string | null;
   isVerified?: boolean;
+  isPoolVisible?: boolean;
+  approvalStatus?: string | null;
   tapuVerified?: boolean;
   photoVerified?: boolean;
   yetkiVerified?: boolean;
@@ -70,6 +72,11 @@ type SelectedAction = {
   type: PoolAction;
   unit: Unit;
   score: number;
+};
+
+type DetailSelection = {
+  unit: Unit;
+  match: { score: number; customer: Customer | null; budgetDiff: number };
 };
 
 type PoolWallet = {
@@ -192,6 +199,105 @@ function playKontorHarcamaSound() {
   audio.play().catch(() => {});
 }
 
+function calculatePoolQualityScore(unit: Unit) {
+  const imageCount = Array.isArray(unit.images) ? unit.images.length : 0;
+  const hasPhoto = imageCount > 0 || Boolean(unit.photoVerified);
+  const hasDocument = Boolean(unit.tapuVerified || unit.yetkiVerified || unit.isVerified);
+  const hasLocation = Boolean(unit.project?.city && unit.project?.district);
+  const hasAuthorization = Boolean(unit.yetkiVerified || unit.isVerified);
+  const approvalStatus = String(unit.approvalStatus || "").toUpperCase();
+  const isPoolReady =
+    Boolean(unit.isPoolVisible) ||
+    approvalStatus === "HAVUZDA" ||
+    approvalStatus === "ONAYLANDI" ||
+    (hasPhoto && hasDocument && hasLocation && hasAuthorization);
+
+  const score =
+    (hasPhoto ? 25 : 0) +
+    (hasDocument ? 25 : 0) +
+    (hasLocation ? 20 : 0) +
+    (hasAuthorization ? 15 : 0) +
+    (isPoolReady ? 15 : 0);
+
+  return Math.max(0, Math.min(100, score));
+}
+
+function getPoolQualityLabel(score: number) {
+  if (score >= 90) return "Mükemmel";
+  if (score >= 75) return "Çok İyi";
+  if (score >= 60) return "İyi";
+  if (score >= 40) return "Geliştirilmeli";
+  return "Riskli";
+}
+
+function getPoolQualityTone(score: number) {
+  if (score >= 90) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (score >= 75) return "border-blue-200 bg-blue-50 text-blue-700";
+  if (score >= 60) return "border-cyan-200 bg-cyan-50 text-cyan-700";
+  if (score >= 40) return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-red-200 bg-red-50 text-red-700";
+}
+
+function calculateHavuzTrustIndex(unit: Unit, matchScore: number) {
+  const hasTapu = Boolean(unit.tapuVerified || unit.isVerified);
+  const hasYetki = Boolean(unit.yetkiVerified || unit.isVerified);
+  const hasPhoto = Boolean(unit.photoVerified || (Array.isArray(unit.images) && unit.images.length > 0));
+  const crmMatch = Math.max(0, Math.min(100, Number(matchScore || 0))) >= 75;
+
+  const score =
+    (hasTapu ? 25 : 0) +
+    (hasYetki ? 25 : 0) +
+    (hasPhoto ? 25 : 0) +
+    Math.round((Math.max(0, Math.min(100, Number(matchScore || 0))) / 100) * 25);
+
+  return {
+    score: Math.max(0, Math.min(100, score)),
+    checks: [
+      { label: "Tapu", active: hasTapu },
+      { label: "Yetki", active: hasYetki },
+      { label: "Fotoğraf", active: hasPhoto },
+      { label: "CRM Uyum", active: crmMatch },
+    ],
+  };
+}
+
+function getTrustIndexLabel(score: number) {
+  if (score >= 90) return "Çok Güvenli";
+  if (score >= 75) return "Güvenli";
+  if (score >= 60) return "Takip Edilebilir";
+  if (score >= 40) return "Kontrol Gerekli";
+  return "Riskli";
+}
+
+function getTrustIndexTone(score: number) {
+  if (score >= 90) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (score >= 75) return "border-blue-200 bg-blue-50 text-blue-700";
+  if (score >= 60) return "border-cyan-200 bg-cyan-50 text-cyan-700";
+  if (score >= 40) return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-red-200 bg-red-50 text-red-700";
+}
+
+function hasEphApproval(unit: Unit) {
+  return Boolean(unit.isVerified || (unit.tapuVerified && unit.yetkiVerified));
+}
+
+function getTrustBadges(unit: Unit, matchScore: number) {
+  const qualityScore = calculatePoolQualityScore(unit);
+  const badges: Array<{ label: string; className: string }> = [];
+
+  if (hasEphApproval(unit)) {
+    badges.push({ label: "EPH Onaylı", className: "border-emerald-200 bg-emerald-50 text-emerald-700" });
+  }
+
+  if (matchScore >= 80) {
+    badges.push({ label: "Havuza Hazır", className: "border-blue-200 bg-blue-50 text-blue-700" });
+  }
+
+  badges.push({ label: getPoolQualityLabel(qualityScore), className: getPoolQualityTone(qualityScore) });
+
+  return badges.slice(0, 3);
+}
+
 function calculateMatch(unit: Unit, customers: Customer[]) {
   const unitCity = String(unit.project?.city || "").toLocaleLowerCase("tr-TR");
   const unitDistrict = String(unit.project?.district || "").toLocaleLowerCase("tr-TR");
@@ -256,7 +362,7 @@ export default function HavuzPage() {
   const [category, setCategory] = useState("Tümü");
   const [search, setSearch] = useState("");
   const [selectedAction, setSelectedAction] = useState<SelectedAction | null>(null);
-  const [detailUnit, setDetailUnit] = useState<Unit | null>(null);
+  const [detailSelection, setDetailSelection] = useState<DetailSelection | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
@@ -590,7 +696,7 @@ export default function HavuzPage() {
                 unit={unit}
                 match={match}
                 busyAction={busyAction}
-                onDetail={() => setDetailUnit(unit)}
+                onDetail={() => setDetailSelection({ unit, match })}
                 onMessage={() => startPoolMessage(unit, match.score)}
                 onAction={(type) => setSelectedAction({ type, unit, score: match.score })}
               />
@@ -613,7 +719,13 @@ export default function HavuzPage() {
         </section>
       </div>
 
-      {detailUnit && <PoolDetailModal unit={detailUnit} onClose={() => setDetailUnit(null)} />}
+      {detailSelection && (
+        <PoolDetailModal
+          unit={detailSelection.unit}
+          match={detailSelection.match}
+          onClose={() => setDetailSelection(null)}
+        />
+      )}
 
       {selectedAction && (
         <PoolActionModal
@@ -671,6 +783,15 @@ function PoolUnitCard({
   const image = getCover(unit);
   const ephId = getEphId(unit.id);
   const messageBusy = busyAction === `MESSAGE_${unit.id}`;
+  const qualityScore = calculatePoolQualityScore(unit);
+  const qualityLabel = getPoolQualityLabel(qualityScore);
+  const qualityTone = getPoolQualityTone(qualityScore);
+  const trustBadges = getTrustBadges(unit, match.score);
+  const trustIndex = calculateHavuzTrustIndex(unit, match.score);
+  const trustIndexLabel = getTrustIndexLabel(trustIndex.score);
+  const trustIndexTone = getTrustIndexTone(trustIndex.score);
+  const hasPhoto = Array.isArray(unit.images) && unit.images.length > 0;
+  const hasLocation = Boolean(unit.project?.city && unit.project?.district);
 
   return (
     <article className="overflow-hidden rounded-[24px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.07)]">
@@ -684,9 +805,16 @@ function PoolUnitCard({
             </div>
           )}
 
-          <span className="absolute left-1.5 top-1.5 rounded-full border border-white bg-white/95 px-1.5 py-0.5 text-[8px] font-black text-[#2563EB]">
-            YETKİLİ
-          </span>
+          <div className="absolute left-1.5 top-1.5 flex max-w-[104px] flex-col gap-1">
+            {trustBadges.map((badge) => (
+              <span
+                key={badge.label}
+                className={`w-fit rounded-full border px-1.5 py-0.5 text-[7.5px] font-black leading-none shadow-sm ${badge.className}`}
+              >
+                {badge.label}
+              </span>
+            ))}
+          </div>
         </button>
 
         <div className="min-w-0 p-2.5">
@@ -715,6 +843,51 @@ function PoolUnitCard({
           </div>
         </div>
       </div>
+
+      <section className="mx-2.5 mb-2 rounded-[18px] border-2 border-[#C7D6E8] bg-white p-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+              Portföy Kalitesi
+            </p>
+            <p className="mt-0.5 text-[11px] font-bold text-[#64748B]">
+              Belge, fotoğraf, konum ve havuz hazırlığı
+            </p>
+          </div>
+          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-black ${qualityTone}`}>
+            {qualityScore}/100 · {qualityLabel}
+          </span>
+        </div>
+
+        <div className="mt-2 grid grid-cols-3 gap-1.5">
+          <TrustPill active={Boolean(unit.yetkiVerified || unit.isVerified)} text="Yetki" />
+          <TrustPill active={hasPhoto} text="Fotoğraf" />
+          <TrustPill active={hasLocation} text="Konum" />
+        </div>
+      </section>
+
+      <section className="mx-2.5 mb-2 rounded-[18px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+              Havuz Güven Endeksi
+            </p>
+            <p className="mt-0.5 text-[11px] font-bold text-[#64748B]">
+              Tapu, yetki, fotoğraf ve CRM uyumu
+            </p>
+          </div>
+
+          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-black ${trustIndexTone}`}>
+            {trustIndex.score}/100 · {trustIndexLabel}
+          </span>
+        </div>
+
+        <div className="mt-2 grid grid-cols-4 gap-1.5">
+          {trustIndex.checks.map((check) => (
+            <TrustIndexPill key={check.label} active={check.active} text={check.label} />
+          ))}
+        </div>
+      </section>
 
       <section className="mx-2.5 mb-2.5 rounded-[18px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-2">
         <div className="flex items-center justify-between gap-2">
@@ -786,7 +959,23 @@ function PoolUnitCard({
   );
 }
 
-function PoolDetailModal({ unit, onClose }: { unit: Unit; onClose: () => void }) {
+function PoolDetailModal({
+  unit,
+  match,
+  onClose,
+}: {
+  unit: Unit;
+  match: { score: number; customer: Customer | null; budgetDiff: number };
+  onClose: () => void;
+}) {
+  const qualityScore = calculatePoolQualityScore(unit);
+  const qualityLabel = getPoolQualityLabel(qualityScore);
+  const qualityTone = getPoolQualityTone(qualityScore);
+  const trustIndex = calculateHavuzTrustIndex(unit, match.score);
+  const trustIndexLabel = getTrustIndexLabel(trustIndex.score);
+  const trustIndexTone = getTrustIndexTone(trustIndex.score);
+  const trustBadges = getTrustBadges(unit, match.score);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-[max(10px,env(safe-area-inset-left))] py-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))]">
       <section className="flex max-h-[min(86dvh,680px)] w-[min(94vw,430px)] flex-col overflow-hidden rounded-[clamp(20px,6vw,28px)] border-2 border-[#C7D6E8] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
@@ -820,6 +1009,79 @@ function PoolDetailModal({ unit, onClose }: { unit: Unit; onClose: () => void })
             <SmallInfo label="Durum" value={typeLabel(unit.status)} />
             <SmallInfo label="m²" value={unit.area ? `${unit.area.toLocaleString("tr-TR")} m²` : "Belirtilmedi"} />
             <SmallInfo label="Oda" value={unit.roomCount || "Belirtilmedi"} />
+          </div>
+
+          <div className="mt-[clamp(8px,2.5vw,12px)] rounded-[clamp(16px,5vw,20px)] border-2 border-[#C7D6E8] bg-white p-[clamp(10px,3vw,14px)]">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+                  Portföy Kalitesi
+                </p>
+                <p className="mt-1 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
+                  Belge, fotoğraf, konum ve havuz hazırlığı skoru.
+                </p>
+              </div>
+              <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[clamp(10px,2.8vw,11px)] font-black ${qualityTone}`}>
+                {qualityScore}/100 · {qualityLabel}
+              </span>
+            </div>
+
+            <div className="mt-2 grid grid-cols-3 gap-1.5">
+              <TrustPill active={Boolean(unit.yetkiVerified || unit.isVerified)} text="Yetki" />
+              <TrustPill active={Boolean(unit.photoVerified || getCover(unit))} text="Fotoğraf" />
+              <TrustPill active={Boolean(unit.project?.city && unit.project?.district)} text="Konum" />
+            </div>
+          </div>
+
+          <div className="mt-[clamp(8px,2.5vw,12px)] rounded-[clamp(16px,5vw,20px)] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-[clamp(10px,3vw,14px)]">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+                  Havuz Güven Endeksi
+                </p>
+                <p className="mt-1 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
+                  Tapu, yetki, fotoğraf ve CRM uyumu birlikte değerlendirilir.
+                </p>
+              </div>
+              <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[clamp(10px,2.8vw,11px)] font-black ${trustIndexTone}`}>
+                {trustIndex.score}/100 · {trustIndexLabel}
+              </span>
+            </div>
+
+            <div className="mt-2 grid grid-cols-4 gap-1.5">
+              {trustIndex.checks.map((check) => (
+                <TrustIndexPill key={check.label} active={check.active} text={check.label} />
+              ))}
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
+              {trustBadges.map((badge) => (
+                <span key={badge.label} className={`rounded-full border px-2 py-1 text-[9px] font-black ${badge.className}`}>
+                  {badge.label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-[clamp(8px,2.5vw,12px)] rounded-[clamp(16px,5vw,20px)] border-2 border-[#C7D6E8] bg-white p-[clamp(10px,3vw,14px)]">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+                  CRM Eşleşme Özeti
+                </p>
+                <p className="mt-1 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
+                  Bu portföy müşteri talep profillerinle karşılaştırıldı.
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full bg-[#2563EB] px-2.5 py-1 text-[clamp(10px,2.8vw,11px)] font-black text-white">
+                %{match.score}
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-1.5">
+              <MatchPill text={limitText(getMahalle(unit), 34)} />
+              <MatchPill text={limitText(unit.roomCount || "Tip uygun", 24)} />
+              <MatchPill text={`Fark %${match.budgetDiff || 8}`} />
+            </div>
           </div>
 
           <div className="mt-[clamp(8px,2.5vw,12px)] rounded-[clamp(16px,5vw,20px)] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-[clamp(10px,3vw,14px)]">
@@ -933,6 +1195,40 @@ function SmallInfo({ label, value }: { label: string; value: string }) {
     <div className="min-w-0 rounded-[13px] border border-[#D7E3F2] bg-[#F8FAFC] px-2 py-1.5">
       <p className="line-clamp-1 text-[8px] font-black uppercase tracking-[0.05em] text-[#64748B] break-words [overflow-wrap:anywhere]">{limitText(label, 22)}</p>
       <p className="mt-0.5 line-clamp-2 text-[10px] font-black leading-[1.15] text-[#1F2937] break-words [overflow-wrap:anywhere]">{limitText(value, 46)}</p>
+    </div>
+  );
+}
+
+function TrustPill({ active, text }: { active: boolean; text: string }) {
+  return (
+    <div
+      className={`flex min-h-[28px] min-w-0 items-center justify-center gap-1 rounded-full border px-2 text-center text-[9px] font-black leading-[1.05] ${
+        active
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-amber-200 bg-amber-50 text-amber-700"
+      }`}
+    >
+      <CheckCircle2 size={10} className="shrink-0" />
+      <span className="line-clamp-1 min-w-0 break-words [overflow-wrap:anywhere]">
+        {active ? text : `${text} Eksik`}
+      </span>
+    </div>
+  );
+}
+
+function TrustIndexPill({ active, text }: { active: boolean; text: string }) {
+  return (
+    <div
+      className={`flex min-h-[30px] min-w-0 items-center justify-center gap-1 rounded-full border px-1.5 text-center text-[8.5px] font-black leading-[1.05] ${
+        active
+          ? "border-emerald-200 bg-white text-emerald-700"
+          : "border-amber-200 bg-white text-amber-700"
+      }`}
+    >
+      {active ? <CheckCircle2 size={10} className="shrink-0" /> : <X size={10} className="shrink-0" />}
+      <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">
+        {text}
+      </span>
     </div>
   );
 }

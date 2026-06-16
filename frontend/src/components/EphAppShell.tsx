@@ -24,8 +24,9 @@ import {
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuthStore } from "@/store/auth.store";
+import api from "@/lib/api";
 
 type EphAppShellProps = {
   title: string;
@@ -68,7 +69,9 @@ const baseDrawerItems: MenuItem[] = [
   { label: "Mesajlar", href: "/messages", icon: MessageCircle },
   { label: "Bildirimler", href: "/notification-settings", icon: Bell },
   { label: "Profilim", href: "/profil", icon: UserCircle2 },
-  { label: "Üyeliğim", href: "/profil", icon: CreditCard },
+  { label: "Kontör Cüzdanım", href: "/kontor", icon: WalletCards },
+  
+  { label: "Üyeliğim", href: "/uyelik", icon: CreditCard },
   { label: "Ayarlar", href: "/notification-settings", icon: Settings },
   { label: "Yardım Merkezi", href: "/platform-anayasasi", icon: HelpCircle },
 ];
@@ -153,11 +156,41 @@ function getDrawerItems(role?: string | null) {
   return baseDrawerItems;
 }
 
+function getKontorBadgeStyle(balance: number) {
+  if (balance <= 0) {
+    return {
+      borderColor: "#FECACA",
+      backgroundColor: "#FEF2F2",
+      color: "#DC2626",
+    };
+  }
+
+  if (balance < 100) {
+    return {
+      borderColor: "#FDE68A",
+      backgroundColor: "#FFFBEB",
+      color: "#B45309",
+    };
+  }
+
+  return {
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EFF6FF",
+    color: "#2563EB",
+  };
+}
+
+function readKontorBalance(data: any) {
+  const numeric = Number(data?.balance ?? data?.bakiye ?? 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
 export default function EphAppShell({ title, children }: EphAppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [kontorBalance, setKontorBalance] = useState(0);
 
   const theme = getRoleTheme(user?.role);
 
@@ -168,6 +201,32 @@ export default function EphAppShell({ title, children }: EphAppShellProps) {
   const drawerItems = useMemo(() => {
     return getDrawerItems(user?.role);
   }, [user?.role]);
+
+  useEffect(() => {
+    let alive = true;
+
+    async function loadKontorBalance() {
+      if (!user?.id) {
+        setKontorBalance(0);
+        return;
+      }
+
+      try {
+        const response = await api.get(`/units/pool/wallet?t=${Date.now()}`);
+        if (alive) setKontorBalance(readKontorBalance(response.data));
+      } catch {
+        if (alive) setKontorBalance(0);
+      }
+    }
+
+    loadKontorBalance();
+
+    return () => {
+      alive = false;
+    };
+  }, [user?.id]);
+
+  const kontorBadgeStyle = getKontorBadgeStyle(kontorBalance);
 
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -218,6 +277,31 @@ export default function EphAppShell({ title, children }: EphAppShellProps) {
           </div>
 
           <div className="flex shrink-0 items-center justify-end gap-1.5">
+            <Link
+              href="/kontor"
+              className="hidden h-10 items-center gap-1.5 rounded-2xl border px-2.5 text-[11px] font-black shadow-sm transition hover:bg-white sm:flex md:h-11"
+              style={kontorBadgeStyle}
+              aria-label="Kontör cüzdanı"
+            >
+              <WalletCards size={17} />
+              <span>{kontorBalance}</span>
+              <span className="hidden md:inline">kontör</span>
+            </Link>
+
+            <Link
+              href="/kontor"
+              className="flex h-10 w-10 items-center justify-center rounded-2xl border shadow-sm transition hover:bg-white sm:hidden"
+              style={kontorBadgeStyle}
+              aria-label="Kontör cüzdanı"
+            >
+              <span className="relative">
+                <WalletCards size={18} />
+                <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[8px] font-black">
+                  {kontorBalance > 99 ? "99+" : kontorBalance}
+                </span>
+              </span>
+            </Link>
+
             <Link
               href="/notification-settings"
               className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] text-[#172033] transition hover:bg-white md:h-11 md:w-11"

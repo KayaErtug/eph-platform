@@ -29,6 +29,7 @@ import { KatilimTalepleriModule } from './katilim-talepleri/katilim-talepleri.mo
 import { OrganizationModule } from './organization/organization.module';
 import { TeamLeaderCrmModule } from './team-leader-crm/team-leader-crm.module';
 import { OfficeOwnerCrmModule } from './office-owner-crm/office-owner-crm.module';
+import { KontorModule } from './kontor/kontor.module';
 
 import { LinaModule } from './lina/lina.module';
 import { TuranModule } from './turan/turan.module';
@@ -68,6 +69,7 @@ import { TuranModule } from './turan/turan.module';
     OrganizationModule,
     TeamLeaderCrmModule,
     OfficeOwnerCrmModule,
+    KontorModule,
 
     DashboardModule,
 

@@ -45,6 +45,11 @@ export class UnitsController {
     });
   }
 
+  @Get('quality-summary')
+  findQualitySummary(@CurrentUser() user: any) {
+    return this.unitsService.getQualitySummary(user);
+  }
+
   @Get('pool/wallet')
   findPoolWallet(@CurrentUser() user: any) {
     return this.unitsService.getPoolWallet(user);

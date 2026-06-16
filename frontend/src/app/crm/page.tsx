@@ -591,6 +591,43 @@ function emptyInterestForm() {
   };
 }
 
+function readUserCapabilityKeys(user: unknown) {
+  const source = user as any;
+  const rawCapabilities = [
+    source?.capabilities,
+    source?.userCapabilities,
+    source?.capabilityKeys,
+    source?.permissions,
+  ].flatMap((item) => (Array.isArray(item) ? item : []));
+
+  return rawCapabilities
+    .map((item) => {
+      if (typeof item === "string") return item;
+      return (
+        item?.key ||
+        item?.name ||
+        item?.code ||
+        item?.type ||
+        item?.capability ||
+        item?.capabilityKey ||
+        item?.capability?.key ||
+        item?.capability?.name ||
+        ""
+      );
+    })
+    .map((item) => String(item).trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function userHasCapability(user: unknown, acceptedKeys: string[]) {
+  const normalizedAcceptedKeys = acceptedKeys.map((item) => item.toUpperCase());
+  const role = String((user as any)?.role || "").toUpperCase();
+  const capabilityKeys = readUserCapabilityKeys(user);
+
+  return normalizedAcceptedKeys.includes(role) || capabilityKeys.some((item) => normalizedAcceptedKeys.includes(item));
+}
+
+
 export default function CrmPage() {
   const { user } = useAuthStore();
   const router = useRouter();
@@ -1130,6 +1167,31 @@ export default function CrmPage() {
   }
 
   const currentUserRole = String(user?.role || "").toUpperCase();
+  const hasTeamLeaderDashboardAccess = userHasCapability(user, ["TEAM_LEADER", "TAKIM_LIDERI"]);
+  const hasOfficeOwnerDashboardAccess = userHasCapability(user, ["OFFICE_OWNER", "OFIS_SAHIBI"]);
+
+  const crmDashboardCards = [
+    hasTeamLeaderDashboardAccess
+      ? {
+          key: "team-leader",
+          title: "Takım Lideri",
+          subtitle: "Takım yönetimi",
+          desc: "Danışman performansı, takım kalitesi ve takım raporları.",
+          href: "/crm/team-leader",
+          icon: <UsersRound size={18} />,
+        }
+      : null,
+    hasOfficeOwnerDashboardAccess
+      ? {
+          key: "office-owner",
+          title: "Ofis Sahibi",
+          subtitle: "Ofis yönetimi",
+          desc: "Ofis KPI, takım liderleri, portföy kalitesi ve ofis raporları.",
+          href: "/crm/office-owner",
+          icon: <Building2 size={18} />,
+        }
+      : null,
+  ].filter(Boolean) as { key: string; title: string; subtitle: string; desc: string; href: string; icon: ReactNode }[];
 
   if (currentUserRole === "TAKIM_LIDERI" && teamLeaderView === "team") {
     return (
@@ -1409,6 +1471,27 @@ export default function CrmPage() {
           </div>
 
           <CrmSmartBand todayTasks={todayTasks.length} plannedCalls={plannedCallsToday} overdueTasks={overdueTasks.length} warmLeadCount={warmLeadCustomers.length} onShowCustomers={showWarmLeadCustomers} onAddCustomer={() => setShowAddModal(true)} />
+
+          {crmDashboardCards.length > 0 && (
+            <section className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {crmDashboardCards.map((card) => (
+                <button
+                  key={card.key}
+                  type="button"
+                  onClick={() => router.push(card.href)}
+                  className="grid min-h-[86px] grid-cols-[42px_1fr_18px] items-center gap-2 rounded-[22px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 py-3 text-left shadow-[0_8px_20px_rgba(15,23,42,0.045)] transition hover:border-[#1557D6] hover:bg-white active:scale-[0.99]"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-sm">{card.icon}</span>
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-black leading-tight text-[#06194A]">{card.title}</span>
+                    <span className="mt-0.5 block text-[11px] font-black leading-tight text-[#1557D6]">{card.subtitle}</span>
+                    <span className="mt-1 block text-[11px] font-bold leading-4 text-[#64748B]">{card.desc}</span>
+                  </span>
+                  <ChevronRight size={17} className="shrink-0 justify-self-end text-[#64748B]" />
+                </button>
+              ))}
+            </section>
+          )}
 
           <div className="mt-3 grid grid-cols-4 gap-2">
             <QuickActionCard icon={<Flame size={18} />} title="Sıcak Lead" subtitle="Liste" onClick={showWarmLeadCustomers} />

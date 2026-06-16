@@ -326,6 +326,110 @@ export class UnitsService {
     return Boolean(unit.tapuVerified || unit.yetkiVerified);
   }
 
+  private hasPortfolioPhoto(unit: {
+    photoVerified?: boolean | null;
+    images?: Array<unknown>;
+  }) {
+    return Boolean(unit.photoVerified || (Array.isArray(unit.images) && unit.images.length > 0));
+  }
+
+  private hasPortfolioLocation(unit: {
+    project?: {
+      city?: string | null;
+      district?: string | null;
+      address?: string | null;
+      latitude?: number | string | null;
+      longitude?: number | string | null;
+    } | null;
+  }) {
+    const project = unit.project;
+    if (!project) return false;
+
+    const hasCoordinates = Boolean(Number(project.latitude || 0) && Number(project.longitude || 0));
+    const hasTextLocation = Boolean(project.city && project.district && project.address);
+
+    return hasCoordinates || hasTextLocation;
+  }
+
+  private calculateUnitQualityScore(unit: {
+    tapuVerified: boolean;
+    yetkiVerified: boolean;
+    photoVerified?: boolean | null;
+    approvalStatus?: PortfolioApprovalStatus | string | null;
+    isPoolVisible?: boolean | null;
+    images?: Array<unknown>;
+    project?: {
+      city?: string | null;
+      district?: string | null;
+      address?: string | null;
+      latitude?: number | string | null;
+      longitude?: number | string | null;
+    } | null;
+  }) {
+    const hasPhoto = this.hasPortfolioPhoto(unit);
+    const hasDocument = this.hasApprovalDocument(unit);
+    const hasLocation = this.hasPortfolioLocation(unit);
+    const isAuthorized =
+      unit.approvalStatus === PortfolioApprovalStatus.ONAYLANDI ||
+      unit.approvalStatus === PortfolioApprovalStatus.HAVUZDA ||
+      Boolean(unit.yetkiVerified || unit.tapuVerified);
+    const isPoolReady =
+      unit.approvalStatus === PortfolioApprovalStatus.ONAYLANDI ||
+      unit.approvalStatus === PortfolioApprovalStatus.HAVUZDA ||
+      Boolean(unit.isPoolVisible);
+
+    const photoScore = hasPhoto ? 25 : 0;
+    const documentScore = hasDocument ? 25 : 0;
+    const locationScore = hasLocation ? 20 : 0;
+    const authorizationScore = isAuthorized ? 15 : 0;
+    const poolReadinessScore = isPoolReady ? 15 : 0;
+
+    const score = photoScore + documentScore + locationScore + authorizationScore + poolReadinessScore;
+
+    return Math.max(0, Math.min(100, score));
+  }
+
+  private getQualityLevel(score: number) {
+    if (score >= 90) return 'Mükemmel';
+    if (score >= 75) return 'Çok İyi';
+    if (score >= 60) return 'İyi';
+    if (score >= 40) return 'Geliştirilmeli';
+    return 'Riskli';
+  }
+
+  private getPortfolioQualitySnapshot(unit: any) {
+    const qualityScore = this.calculateUnitQualityScore(unit);
+    const hasPhoto = this.hasPortfolioPhoto(unit);
+    const hasDocument = this.hasApprovalDocument(unit);
+    const hasLocation = this.hasPortfolioLocation(unit);
+    const isPoolReady =
+      unit.approvalStatus === PortfolioApprovalStatus.ONAYLANDI ||
+      unit.approvalStatus === PortfolioApprovalStatus.HAVUZDA ||
+      Boolean(unit.isPoolVisible);
+
+    return {
+      id: unit.id,
+      portfolioNo: this.getEphId(unit.id),
+      title: unit.project?.name || 'EPH Portföy',
+      city: unit.project?.city || null,
+      district: unit.project?.district || null,
+      status: unit.status,
+      approvalStatus: unit.approvalStatus,
+      isPoolVisible: Boolean(unit.isPoolVisible),
+      qualityScore,
+      qualityLevel: this.getQualityLevel(qualityScore),
+      hasPhoto,
+      hasDocument,
+      hasLocation,
+      isPoolReady,
+      missing: {
+        photo: !hasPhoto,
+        document: !hasDocument,
+        location: !hasLocation,
+      },
+    };
+  }
+
   private normalizeFeatures(value?: unknown) {
     if (!Array.isArray(value)) return [];
 
@@ -1259,6 +1363,66 @@ export class UnitsService {
       },
       include: unitInclude,
     });
+  }
+
+  async getQualitySummary(user: CurrentUserPayload) {
+    const units = await this.prisma.unit.findMany({
+      where: {
+        ...this.getPrivateUnitWhere(user),
+        project: {
+          ...(this.isSuperAdmin(user) || this.isAdmin(user) || this.isModerator(user)
+            ? {}
+            : { ownerId: user.id }),
+          isActive: true,
+        },
+      },
+      include: unitInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const snapshots = units.map((unit) => this.getPortfolioQualitySnapshot(unit));
+    const totalPortfolioCount = snapshots.length;
+    const averageQualityScore = totalPortfolioCount
+      ? Math.round(
+          snapshots.reduce((sum, item) => sum + item.qualityScore, 0) /
+            totalPortfolioCount,
+        )
+      : 0;
+
+    const qualityPortfolioCount = snapshots.filter((item) => item.qualityScore >= 75).length;
+    const riskyPortfolioCount = snapshots.filter((item) => item.qualityScore < 40).length;
+    const poolReadyCount = snapshots.filter((item) => item.isPoolReady).length;
+    const missingPhotoCount = snapshots.filter((item) => item.missing.photo).length;
+    const missingDocumentCount = snapshots.filter((item) => item.missing.document).length;
+    const missingLocationCount = snapshots.filter((item) => item.missing.location).length;
+    const unauthorizedPortfolioCount = snapshots.filter(
+      (item) =>
+        item.approvalStatus !== PortfolioApprovalStatus.ONAYLANDI &&
+        item.approvalStatus !== PortfolioApprovalStatus.HAVUZDA,
+    ).length;
+
+    const byQualityDesc = [...snapshots].sort((a, b) => b.qualityScore - a.qualityScore);
+    const byQualityAsc = [...snapshots].sort((a, b) => a.qualityScore - b.qualityScore);
+
+    return {
+      totalPortfolioCount,
+      qualityPortfolioCount,
+      riskyPortfolioCount,
+      poolReadyCount,
+      averageQualityScore,
+      missingPhotoCount,
+      missingDocumentCount,
+      missingLocationCount,
+      unauthorizedPortfolioCount,
+      lists: {
+        topQuality: byQualityDesc.slice(0, 5),
+        risky: byQualityAsc.filter((item) => item.qualityScore < 60).slice(0, 5),
+        missingPhotos: snapshots.filter((item) => item.missing.photo).slice(0, 5),
+        missingDocuments: snapshots.filter((item) => item.missing.document).slice(0, 5),
+        missingLocations: snapshots.filter((item) => item.missing.location).slice(0, 5),
+        poolReady: snapshots.filter((item) => item.isPoolReady).slice(0, 5),
+      },
+    };
   }
 
   async remove(id: string, user: CurrentUserPayload) {

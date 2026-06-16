@@ -8,40 +8,35 @@ datasource db {
 }
 
 model User {
-  id              String  @id @default(uuid())
-  email           String  @unique
-  phone           String  @unique
-  passwordHash    String
-  firstName       String
-  lastName        String
-  profileImageUrl String?
-  role            Role
-  isVerified      Boolean @default(false)
-  isApproved      Boolean @default(false)
-  adminVisible    Boolean @default(true)
-
-  hesapTuru        KullaniciHesapTuru @default(GERCEK)
-  pilotKullaniciMi Boolean            @default(false)
-
-  memberCode  String?   @unique
-  memberSince DateTime?
-  trustScore  Int       @default(70)
-  riskLevel   RiskLevel @default(DUSUK)
-
-  city          String?
-  district      String?
-  cityPlateCode String?
-
-  officeId String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  nominationPoints Int     @default(0)
-  nominationQuota  Int     @default(10)
-  referralCode     String? @unique
-
+  id                          String                       @id @default(uuid())
+  email                       String                       @unique
+  phone                       String                       @unique
+  passwordHash                String
+  firstName                   String
+  lastName                    String
+  role                        Role
+  isVerified                  Boolean                      @default(false)
+  isApproved                  Boolean                      @default(false)
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  nominationPoints            Int                          @default(0)
+  nominationQuota             Int                          @default(10)
+  referralCode                String?                      @unique
+  adminVisible                Boolean                      @default(true)
+  profileImageUrl             String?
+  memberCode                  String?                      @unique
+  memberSince                 DateTime?
+  riskLevel                   RiskLevel                    @default(DUSUK)
+  trustScore                  Int                          @default(70)
+  city                        String?
+  cityPlateCode               String?
+  district                    String?
+  hesapTuru                   KullaniciHesapTuru           @default(GERCEK)
+  pilotKullaniciMi            Boolean                      @default(false)
+  officeId                    String?
   activities                  Activity[]
+  adminActionLogs             AdminActionLog[]             @relation("AdminActionActor")
+  adminActionTargets          AdminActionLog[]             @relation("AdminActionTarget")
   applications                Application[]
   reviewedApplications        Application[]                @relation("ApplicationReviewer")
   auditLogs                   AuditLog[]                   @relation("AuditActor")
@@ -49,38 +44,34 @@ model User {
   ConversationParticipant     ConversationParticipant[]
   customers                   Customer[]
   documents                   Document[]
-  portfolioAuthorityApprovals PortfolioAuthorityDocument[] @relation("PortfolioAuthorityApprover")
-  Message                     Message[]
-  NetworkPost                 NetworkPost[]
-  NetworkPostUpdateLog        NetworkPostUpdateLog[]
-  NetworkPostFollower         NetworkPostFollower[]
-  NetworkPostView             NetworkPostView[]
-  NetworkNotification         NetworkNotification[]
-  nominations                 Nomination[]
-  projects                    Project[]
-  tasks                       Task[]
-  visits                      UserVisit[]
-  pushSubscriptions           PushSubscription[]
-  linaPreference              LinaPreference?
   linaPortfolioSessions       LinaPortfolioSession[]
-
-  superAdminProfile    SUPER_ADMIN?
-  reportsCreated       Report[]               @relation("ReportReporter")
-  reportsResolved      Report[]               @relation("ReportResolver")
-  restrictions         UserRestriction[]      @relation("RestrictedUser")
-  restrictionsCreated  UserRestriction[]      @relation("RestrictionCreator")
-  adminActionLogs      AdminActionLog[]       @relation("AdminActionActor")
-  adminActionTargets   AdminActionLog[]       @relation("AdminActionTarget")
-  announcementsCreated PlatformAnnouncement[] @relation("AnnouncementCreator")
-  systemMessagesSent   SystemMessage[]        @relation("SystemMessageSender")
-  systemMessagesInbox  SystemMessage[]        @relation("SystemMessageTargetUser")
-
-  office              Office?          @relation("OfficeUsers", fields: [officeId], references: [id], onDelete: SetNull)
-  ownedOffices        Office[]         @relation("OfficeOwner")
-  ledTeams            Team[]           @relation("TeamLeader")
-  teamMemberships     TeamMember[]
-  capabilities        UserCapability[] @relation("UserCapabilities")
-  capabilitiesCreated UserCapability[] @relation("CapabilityCreator")
+  linaPreference              LinaPreference?
+  Message                     Message[]
+  NetworkNotification         NetworkNotification[]
+  NetworkPost                 NetworkPost[]
+  NetworkPostFollower         NetworkPostFollower[]
+  NetworkPostUpdateLog        NetworkPostUpdateLog[]
+  NetworkPostView             NetworkPostView[]
+  nominations                 Nomination[]
+  ownedOffices                Office[]                     @relation("OfficeOwner")
+  announcementsCreated        PlatformAnnouncement[]       @relation("AnnouncementCreator")
+  portfolioAuthorityApprovals PortfolioAuthorityDocument[] @relation("PortfolioAuthorityApprover")
+  projects                    Project[]
+  pushSubscriptions           PushSubscription[]
+  reportsCreated              Report[]                     @relation("ReportReporter")
+  reportsResolved             Report[]                     @relation("ReportResolver")
+  superAdminProfile           SUPER_ADMIN?
+  systemMessagesSent          SystemMessage[]              @relation("SystemMessageSender")
+  systemMessagesInbox         SystemMessage[]              @relation("SystemMessageTargetUser")
+  tasks                       Task[]
+  ledTeams                    Team[]                       @relation("TeamLeader")
+  teamMemberships             TeamMember[]
+  office                      Office?                      @relation("OfficeUsers", fields: [officeId], references: [id])
+  capabilitiesCreated         UserCapability[]             @relation("CapabilityCreator")
+  capabilities                UserCapability[]             @relation("UserCapabilities")
+  restrictionsCreated         UserRestriction[]            @relation("RestrictionCreator")
+  restrictions                UserRestriction[]            @relation("RestrictedUser")
+  visits                      UserVisit[]
 
   @@index([officeId])
 }
@@ -93,8 +84,7 @@ model SUPER_ADMIN {
   permissions String[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Office {
@@ -107,10 +97,9 @@ model Office {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  owner User?  @relation("OfficeOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  users User[] @relation("OfficeUsers")
-  teams Team[]
+  owner       User?    @relation("OfficeOwner", fields: [ownerUserId], references: [id])
+  teams       Team[]
+  users       User[]   @relation("OfficeUsers")
 
   @@index([ownerUserId])
   @@index([city, district])
@@ -118,17 +107,16 @@ model Office {
 }
 
 model Team {
-  id        String   @id @default(uuid())
+  id        String       @id @default(uuid())
   officeId  String
   name      String
   leaderId  String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  office  Office       @relation(fields: [officeId], references: [id], onDelete: Cascade)
-  leader  User?        @relation("TeamLeader", fields: [leaderId], references: [id], onDelete: SetNull)
-  members TeamMember[]
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  leader    User?        @relation("TeamLeader", fields: [leaderId], references: [id])
+  office    Office       @relation(fields: [officeId], references: [id], onDelete: Cascade)
+  members   TeamMember[]
 
   @@unique([officeId, name])
   @@index([officeId])
@@ -145,9 +133,8 @@ model TeamMember {
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-
-  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([teamId, userId])
   @@index([teamId])
@@ -162,9 +149,8 @@ model UserCapability {
   createdById String?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
-
-  user      User  @relation("UserCapabilities", fields: [userId], references: [id], onDelete: Cascade)
-  createdBy User? @relation("CapabilityCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy   User?      @relation("CapabilityCreator", fields: [createdById], references: [id])
+  user        User       @relation("UserCapabilities", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, capability])
   @@index([userId])
@@ -173,34 +159,29 @@ model UserCapability {
 }
 
 model Invitation {
-  id        String           @id @default(uuid())
-  code      String           @unique
-  role      Role
-  status    InvitationStatus @default(PENDING)
-  maxUses   Int              @default(1)
-  usedCount Int              @default(0)
-  expiresAt DateTime
-
-  davetKoduTuru DavetKoduTuru @default(REFERANSLI_BASVURU)
-  adayEposta    String?
-  adayAdSoyad   String?
-  adayTelefon   String?
-  pilotDavetiMi Boolean       @default(false)
-
+  id                   String            @id @default(uuid())
+  code                 String            @unique
+  role                 Role
+  status               InvitationStatus  @default(PENDING)
+  maxUses              Int               @default(1)
+  usedCount            Int               @default(0)
+  expiresAt            DateTime
+  createdAt            DateTime          @default(now())
+  adayAdSoyad          String?
+  adayEposta           String?
+  adayTelefon          String?
+  davetKoduTuru        DavetKoduTuru     @default(REFERANSLI_BASVURU)
+  epostaGonderildiMi   Boolean           @default(false)
+  epostaGonderimTarihi DateTime?
+  epostaHataMesaji     String?
+  iptalEdenKullaniciId String?
+  iptalSebebi          String?
+  iptalTarihi          DateTime?
   olusturanKullaniciId String?
   olusturanRol         Role?
   onayYetkiSeviyesi    OnayYetkiSeviyesi @default(MODERATOR_ADMIN_SUPER_ADMIN)
-
-  epostaGonderildiMi   Boolean   @default(false)
-  epostaGonderimTarihi DateTime?
-  epostaHataMesaji     String?
-
-  iptalEdenKullaniciId String?
-  iptalTarihi          DateTime?
-  iptalSebebi          String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  pilotDavetiMi        Boolean           @default(false)
+  updatedAt            DateTime          @updatedAt
 
   @@index([role])
   @@index([status])
@@ -235,8 +216,7 @@ model Document {
   fileName  String
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Project {
@@ -246,65 +226,61 @@ model Project {
   city        String
   district    String
   address     String
-  latitude    Float?
-  longitude   Float?
-  mapAddress  String?
-  placeId     String?
   ownerId     String
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  owner User   @relation(fields: [ownerId], references: [id])
-  units Unit[]
+  latitude    Float?
+  longitude   Float?
+  mapAddress  String?
+  placeId     String?
+  owner       User     @relation(fields: [ownerId], references: [id])
+  units       Unit[]
 
   @@index([latitude, longitude])
   @@index([city, district])
 }
 
 model Unit {
-  id            String     @id @default(uuid())
-  projectId     String
-  type          UnitType   @default(DAIRE)
-  floor         Int?
-  floorLabel    String?
-  totalFloors   Int?
-  priceCurrency String?    @default("TRY")
-  number        String?
-  roomCount     String?
-  area          Float?
-  price         Float
-  status        UnitStatus @default(SATILIK)
-  description   String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  isOffMarket   Boolean    @default(false)
-  isVerified    Boolean    @default(false)
-  photoVerified Boolean    @default(false)
-  tapuVerified  Boolean    @default(false)
-  verifiedAt    DateTime?
-  yetkiVerified Boolean    @default(false)
-
-  deedOwnerFullName     String?
-  deedOwnerPhone        String?
-  deedOwnerEmail        String?
-  availableCreditAmount Float?
-  doorAccessInfo        String?
-  features              String[] @default([])
-
-  approvalStatus         PortfolioApprovalStatus @default(TASLAK)
-  submittedForApprovalAt DateTime?
-  approvedAt             DateTime?
-  rejectedAt             DateTime?
+  id                     String                       @id @default(uuid())
+  projectId              String
+  type                   UnitType                     @default(DAIRE)
+  floor                  Int?
+  number                 String?
+  roomCount              String?
+  area                   Float?
+  price                  Float
+  status                 UnitStatus                   @default(SATILIK)
+  description            String?
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
+  isOffMarket            Boolean                      @default(false)
+  isVerified             Boolean                      @default(false)
+  photoVerified          Boolean                      @default(false)
+  tapuVerified           Boolean                      @default(false)
+  verifiedAt             DateTime?
+  yetkiVerified          Boolean                      @default(false)
+  floorLabel             String?
+  priceCurrency          String?                      @default("TRY")
+  totalFloors            Int?
   approvalNote           String?
-  isPoolVisible          Boolean                 @default(false)
+  approvalStatus         PortfolioApprovalStatus      @default(TASLAK)
+  approvedAt             DateTime?
+  isPoolVisible          Boolean                      @default(false)
   poolPublishedAt        DateTime?
   poolRemovedAt          DateTime?
-
-  project            Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  images             UnitImage[]
-  authorityDocuments PortfolioAuthorityDocument[]
-  customerProperties CustomerProperty[]
+  rejectedAt             DateTime?
+  submittedForApprovalAt DateTime?
+  deedOwnerEmail         String?
+  deedOwnerFullName      String?
+  deedOwnerPhone         String?
+  features               String[]                     @default([])
+  availableCreditAmount  Float?
+  doorAccessInfo         String?
+  customerProperties     CustomerProperty[]
+  authorityDocuments     PortfolioAuthorityDocument[]
+  project                Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  images                 UnitImage[]
 
   @@index([approvalStatus])
   @@index([isPoolVisible])
@@ -325,8 +301,7 @@ model UnitImage {
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
-  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  unit         Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
   @@index([unitId])
   @@index([isCover])
@@ -334,28 +309,22 @@ model UnitImage {
 }
 
 model PortfolioAuthorityDocument {
-  id String @id @default(uuid())
-
+  id            String                 @id @default(uuid())
   unitId        String
   authorityType PortfolioAuthorityType
-
-  fileUrl   String
-  fileName  String?
-  mimeType  String?
-  sizeBytes Int?
-
-  approved     Boolean   @default(false)
-  approvedById String?
-  approvedAt   DateTime?
-
-  rejectReason String?
-  documentSide String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  unit       Unit  @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  approvedBy User? @relation("PortfolioAuthorityApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  fileUrl       String
+  fileName      String?
+  mimeType      String?
+  sizeBytes     Int?
+  approved      Boolean                @default(false)
+  approvedById  String?
+  approvedAt    DateTime?
+  rejectReason  String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  documentSide  String?
+  approvedBy    User?                  @relation("PortfolioAuthorityApprover", fields: [approvedById], references: [id])
+  unit          Unit                   @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
   @@index([unitId])
   @@index([authorityType])
@@ -379,9 +348,8 @@ model Report {
   resolutionNote String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-
-  reporter   User  @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  resolvedBy User? @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  reporter       User         @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedBy     User?        @relation("ReportResolver", fields: [resolvedById], references: [id])
 
   @@index([reporterId])
   @@index([targetUserId])
@@ -401,9 +369,8 @@ model UserRestriction {
   liftedNote  String?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
-
-  user      User @relation("RestrictedUser", fields: [userId], references: [id], onDelete: Cascade)
-  createdBy User @relation("RestrictionCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy   User            @relation("RestrictionCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  user        User            @relation("RestrictedUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([isActive])
@@ -421,9 +388,8 @@ model AdminActionLog {
   ipAddress    String?
   userAgent    String?
   createdAt    DateTime @default(now())
-
-  actor      User? @relation("AdminActionActor", fields: [actorId], references: [id], onDelete: SetNull)
-  targetUser User? @relation("AdminActionTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  actor        User?    @relation("AdminActionActor", fields: [actorId], references: [id])
+  targetUser   User?    @relation("AdminActionTarget", fields: [targetUserId], references: [id])
 
   @@index([actorId])
   @@index([targetUserId])
@@ -456,39 +422,33 @@ model PlatformAnnouncement {
   endsAt      DateTime?
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
-
-  createdBy User @relation("AnnouncementCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy   User                 @relation("AnnouncementCreator", fields: [createdById], references: [id], onDelete: Cascade)
 
   @@index([isActive])
   @@index([audience])
 }
 
 model SystemMessage {
-  id                String                  @id @default(uuid())
-  senderId          String
-  visibleSenderName String                  @default("EPH Admin")
-  targetType        SystemMessageTargetType
-  targetUserId      String?
-  targetRole        Role?
-
+  id                   String                  @id @default(uuid())
+  senderId             String
+  visibleSenderName    String                  @default("EPH Admin")
+  targetType           SystemMessageTargetType
+  targetUserId         String?
+  targetRole           Role?
+  category             SystemMessageCategory
+  customCategory       String?
+  title                String
+  body                 String
+  isRead               Boolean                 @default(false)
+  readAt               DateTime?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  recipientCount       Int                     @default(0)
   targetCities         String[]
   targetCityPlateCodes String[]
   targetRoles          String[]
-
-  recipientCount Int @default(0)
-
-  category SystemMessageCategory
-
-  customCategory String?
-  title          String
-  body           String
-  isRead         Boolean   @default(false)
-  readAt         DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  sender     User  @relation("SystemMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-  targetUser User? @relation("SystemMessageTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  sender               User                    @relation("SystemMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  targetUser           User?                   @relation("SystemMessageTargetUser", fields: [targetUserId], references: [id])
 
   @@index([senderId])
   @@index([targetUserId])
@@ -511,66 +471,54 @@ model Nomination {
   adminNote      String?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
-
-  nominator User @relation(fields: [nominatorId], references: [id], onDelete: Cascade)
+  nominator      User             @relation(fields: [nominatorId], references: [id], onDelete: Cascade)
 }
 
 model Application {
-  id             String  @id @default(uuid())
-  applicantName  String
-  applicantEmail String
-  applicantPhone String
-  requestedRole  Role
-  message        String?
-
-  basvuruTuru    BasvuruTuru @default(REFERANSSIZ)
-  pilotBasvuruMu Boolean     @default(false)
-
-  referralCode         String?
-  invitationId         String?
-  referrerId           String?
-  referansliMi         Boolean @default(false)
-  referansDogrulandiMi Boolean @default(false)
-  referansOlusturanId  String?
-
-  status        ApplicationStatus @default(PENDING)
-  adminNote     String?
-  moderatorNote String?
-  profession    String?
-  city          String?
-  district      String?
-
-  onayYetkiSeviyesi OnayYetkiSeviyesi @default(ADMIN_SUPER_ADMIN)
-  onaylayanRol      Role?
-
-  ipAddress String?
-  userAgent String?
-  isVip     Boolean @default(false)
-  isRisky   Boolean @default(false)
-  riskNote  String?
-
-  platformAccepted      Boolean   @default(false)
-  kvkkAccepted          Boolean   @default(false)
-  privacyAccepted       Boolean   @default(false)
-  userAgreementAccepted Boolean   @default(false)
+  id                    String            @id @default(uuid())
+  applicantName         String
+  applicantEmail        String
+  applicantPhone        String
+  requestedRole         Role
+  message               String?
+  referralCode          String?
+  referrerId            String?
+  status                ApplicationStatus @default(PENDING)
+  adminNote             String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  city                  String?
+  ipAddress             String?
+  isRisky               Boolean           @default(false)
+  isVip                 Boolean           @default(false)
+  kvkkAccepted          Boolean           @default(false)
   legalAcceptedAt       DateTime?
-
-  reviewedAt   DateTime?
-  reviewedById String?
-
-  rejectedAt   DateTime?
-  rejectedById String?
-  rejectReason String?
-
-  epostaGonderildiMi   Boolean   @default(false)
-  epostaGonderimTarihi DateTime?
-  epostaHataMesaji     String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  referrer   User? @relation(fields: [referrerId], references: [id])
-  reviewedBy User? @relation("ApplicationReviewer", fields: [reviewedById], references: [id])
+  platformAccepted      Boolean           @default(false)
+  privacyAccepted       Boolean           @default(false)
+  profession            String?
+  reviewedAt            DateTime?
+  reviewedById          String?
+  riskNote              String?
+  userAgent             String?
+  userAgreementAccepted Boolean           @default(false)
+  basvuruTuru           BasvuruTuru       @default(REFERANSSIZ)
+  district              String?
+  epostaGonderildiMi    Boolean           @default(false)
+  epostaGonderimTarihi  DateTime?
+  epostaHataMesaji      String?
+  invitationId          String?
+  moderatorNote         String?
+  onayYetkiSeviyesi     OnayYetkiSeviyesi @default(ADMIN_SUPER_ADMIN)
+  onaylayanRol          Role?
+  pilotBasvuruMu        Boolean           @default(false)
+  referansDogrulandiMi  Boolean           @default(false)
+  referansOlusturanId   String?
+  referansliMi          Boolean           @default(false)
+  rejectReason          String?
+  rejectedAt            DateTime?
+  rejectedById          String?
+  referrer              User?             @relation(fields: [referrerId], references: [id])
+  reviewedBy            User?             @relation("ApplicationReviewer", fields: [reviewedById], references: [id])
 
   @@index([applicantEmail])
   @@index([requestedRole])
@@ -600,7 +548,7 @@ model Lead {
 }
 
 model Customer {
-  id              String         @id @default(uuid())
+  id              String             @id @default(uuid())
   ownerId         String
   firstName       String
   lastName        String
@@ -613,19 +561,18 @@ model Customer {
   interestedArea  String?
   interestedType  String?
   source          String?
-  status          CustomerStatus @default(YENI_LEAD)
-  roles           CustomerRole[] @default([])
-  tags            String[]       @default([])
+  status          CustomerStatus     @default(YENI_LEAD)
+  tags            String[]           @default([])
   notes           String?
   lastContactedAt DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-
-  activities Activity[]
-  owner      User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  tasks      Task[]
-  properties CustomerProperty[]
-  interests  CustomerInterest[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  roles           CustomerRole[]     @default([])
+  activities      Activity[]
+  owner           User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  interests       CustomerInterest[]
+  properties      CustomerProperty[]
+  tasks           Task[]
 
   @@index([ownerId])
   @@index([status])
@@ -641,9 +588,8 @@ model CustomerProperty {
   notes        String?
   createdAt    DateTime                 @default(now())
   updatedAt    DateTime                 @updatedAt
-
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  unit     Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  customer     Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  unit         Unit                     @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
   @@unique([customerId, unitId, relationType])
   @@index([customerId])
@@ -653,35 +599,29 @@ model CustomerProperty {
 }
 
 model CustomerInterest {
-  id         String @id @default(uuid())
-  customerId String
-
-  title        String?
-  city         String?
-  district     String?
-  neighborhood String?
-
-  propertyTypes UnitType[]   @default([])
-  statuses      UnitStatus[] @default([])
-
-  minBudget     Float?
-  maxBudget     Float?
-  priceCurrency String   @default("TRY")
-  minArea       Float?
-  maxArea       Float?
-  roomCounts    String[] @default([])
-  features      String[] @default([])
-
+  id             String                   @id @default(uuid())
+  customerId     String
+  title          String?
+  city           String?
+  district       String?
+  neighborhood   String?
+  propertyTypes  UnitType[]               @default([])
+  statuses       UnitStatus[]             @default([])
+  minBudget      Float?
+  maxBudget      Float?
+  priceCurrency  String                   @default("TRY")
+  minArea        Float?
+  maxArea        Float?
+  roomCounts     String[]                 @default([])
+  features       String[]                 @default([])
   purchaseIntent CustomerPurchaseIntent   @default(BELIRSIZ)
   priority       CustomerInterestPriority @default(NORMAL)
-
-  notes         String?
-  isActive      Boolean   @default(true)
-  lastMatchedAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  notes          String?
+  isActive       Boolean                  @default(true)
+  lastMatchedAt  DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  customer       Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
   @@index([city, district, neighborhood])
@@ -698,9 +638,8 @@ model Activity {
   type       ActivityType
   note       String
   createdAt  DateTime     @default(now())
-
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customer   Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Task {
@@ -712,9 +651,8 @@ model Task {
   status     TaskStatus @default(BEKLIYOR)
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
-
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UserVisit {
@@ -724,49 +662,45 @@ model UserVisit {
   ip        String?
   userAgent String?
   createdAt DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
 }
 
 model Conversation {
-  id        String             @id
-  postId    String?
-  title     String
-  status    ConversationStatus @default(ACTIVE)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime
-
+  id                      String                    @id
+  postId                  String?
+  title                   String
+  status                  ConversationStatus        @default(ACTIVE)
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
   NetworkPost             NetworkPost?              @relation(fields: [postId], references: [id])
   ConversationParticipant ConversationParticipant[]
   Message                 Message[]
 }
 
 model ConversationParticipant {
-  id             String    @id
+  id             String       @id
   conversationId String
   userId         String
-  createdAt      DateTime  @default(now())
+  createdAt      DateTime     @default(now())
   lastReadAt     DateTime?
-
-  Conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  User         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  User           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, userId])
 }
 
 model Message {
-  id             String   @id
+  id             String       @id
   conversationId String
   senderId       String
   body           String
-  createdAt      DateTime @default(now())
-
-  Conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  User         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  Conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  User           User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
 }
 
 model NetworkPost {
-  id           String            @id
+  id           String                 @id
   userId       String
   type         String
   title        String
@@ -776,52 +710,48 @@ model NetworkPost {
   neighborhood String?
   budget       Float?
   urgency      String?
-  visibility   NetworkVisibility @default(TUM_EPH)
+  visibility   NetworkVisibility      @default(TUM_EPH)
   tags         String[]
   expiresAt    DateTime
-  isActive     Boolean           @default(true)
-  createdAt    DateTime          @default(now())
+  isActive     Boolean                @default(true)
+  createdAt    DateTime               @default(now())
   updatedAt    DateTime
-
   Conversation Conversation[]
-  updateLogs   NetworkPostUpdateLog[]
-  followers    NetworkPostFollower[]
-  views        NetworkPostView[]
   User         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  followers    NetworkPostFollower[]
+  updateLogs   NetworkPostUpdateLog[]
+  views        NetworkPostView[]
 }
 
 model NetworkPostUpdateLog {
-  id        String   @id @default(uuid())
+  id        String      @id @default(uuid())
   postId    String
   userId    String
   summary   String
   changes   Json
-  createdAt DateTime @default(now())
-
-  post NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+  post      NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model NetworkPostFollower {
-  id        String   @id @default(uuid())
+  id        String      @id @default(uuid())
   postId    String
   userId    String
-  createdAt DateTime @default(now())
-
-  post NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+  post      NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
 }
 
 model NetworkPostView {
-  id        String   @id @default(uuid())
+  id        String      @id @default(uuid())
   postId    String
   userId    String?
-  createdAt DateTime @default(now())
-
-  post NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime    @default(now())
+  post      NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User?       @relation(fields: [userId], references: [id])
 
   @@index([postId])
   @@index([userId])
@@ -836,8 +766,7 @@ model NetworkNotification {
   message   String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([isRead])
@@ -851,69 +780,55 @@ model PushSubscription {
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model LinaPreference {
-  id     String @id @default(uuid())
-  userId String @unique
-
-  voiceEnabled                 Boolean @default(false)
-  dashboardVoiceSummaryEnabled Boolean @default(false)
-  crmVoiceReminderEnabled      Boolean @default(false)
-  networkVoiceSummaryEnabled   Boolean @default(false)
-  poolVoiceSummaryEnabled      Boolean @default(false)
-
-  quietHoursEnabled Boolean @default(true)
-  quietHoursStart   String  @default("22:00")
-  quietHoursEnd     String  @default("08:00")
-
-  urgentVoiceEnabled Boolean @default(false)
-
-  summaryStyle String @default("normal")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                           String   @id @default(uuid())
+  userId                       String   @unique
+  voiceEnabled                 Boolean  @default(false)
+  dashboardVoiceSummaryEnabled Boolean  @default(false)
+  crmVoiceReminderEnabled      Boolean  @default(false)
+  networkVoiceSummaryEnabled   Boolean  @default(false)
+  poolVoiceSummaryEnabled      Boolean  @default(false)
+  quietHoursEnabled            Boolean  @default(true)
+  quietHoursStart              String   @default("22:00")
+  quietHoursEnd                String   @default("08:00")
+  urgentVoiceEnabled           Boolean  @default(false)
+  summaryStyle                 String   @default("normal")
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+  user                         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model LinaPortfolioSession {
-  id     String @id @default(uuid())
-  userId String
-
-  mode        String  @default("PORTFOLIO_CREATE")
-  sessionType String  @default("PORTFOLIO_DRAFT")
-  title       String?
-
-  propertyType    String?
-  transactionType String?
-  step            String  @default("TRANSACTION_TYPE")
-
-  city         String?
-  district     String?
-  neighborhood String?
-
+  id                 String    @id @default(uuid())
+  userId             String
+  mode               String    @default("PORTFOLIO_CREATE")
+  sessionType        String    @default("PORTFOLIO_DRAFT")
+  title              String?
+  propertyType       String?
+  transactionType    String?
+  step               String    @default("TRANSACTION_TYPE")
+  city               String?
+  district           String?
+  neighborhood       String?
   roomCount          String?
   squareMeter        Float?
   floor              String?
   buildingFloorCount Int?
   price              Float?
-  currency           String  @default("TRY")
-
-  status             String @default("DRAFT")
-  confirmationStatus String @default("WAITING")
+  currency           String    @default("TRY")
+  status             String    @default("DRAFT")
+  confirmationStatus String    @default("WAITING")
   stateJson          Json?
-
-  lastActivityAt DateTime  @default(now())
-  expiresAt      DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastActivityAt     DateTime  @default(now())
+  expiresAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, status])
@@ -934,634 +849,8 @@ model AuditLog {
   ipAddress    String?
   userAgent    String?
   createdAt    DateTime    @default(now())
-
-  actor      User? @relation("AuditActor", fields: [actorId], references: [id])
-  targetUser User? @relation("AuditTargetUser", fields: [targetUserId], references: [id])
-}
-
-enum Role {
-  EMLAKCI
-  MUTEAHHIT
-  INSAAT_FIRMASI
-  MODERATOR
-  ADMIN
-  SUPER_ADMIN
-}
-
-enum Capability {
-  TEAM_LEADER
-  OFFICE_OWNER
-}
-
-enum RiskLevel {
-  DUSUK
-  ORTA
-  YUKSEK
-  KRITIK
-}
-
-enum ReportStatus {
-  ACIK
-  INCELENIYOR
-  COZULDU
-  REDDEDILDI
-}
-
-enum RestrictionType {
-  GIRIS_ENGELI
-  PAYLASIM_ENGELI
-  MESAJ_ENGELI
-  ILAN_ENGELI
-  GECICI_ASKI
-  KALICI_ASKI
-}
-
-enum AnnouncementAudience {
-  TUM_UYELER
-  EMLAKCILAR
-  MUTEAHHITLER
-  INSAAT_FIRMALARI
-  ADMINLER
-}
-
-enum SystemMessageTargetType {
-  TEK_KULLANICI
-  COKLU_KULLANICI
-
-  TUM_KULLANICILAR
-
-  EMLAKCILAR
-  MUTEAHHITLER
-  INSAAT_FIRMALARI
-
-  ADMINLER
-  SUPER_ADMINLER
-
-  SEHIRLER
-  SEHIRLER_VE_ROLLER
-
-  OZEL_GRUP
-}
-
-enum SystemMessageCategory {
-  BILGILENDIRME
-  SIKAYET_YANITI
-  ONERI_YANITI
-  UYARI
-  DUYURU
-  HESAP_ISLEMI
-  ILAN_ISLEMI
-  UYELIK_PAKET_ISLEMI
-  EVRAK_DOGRULAMA_ISLEMI
-  NETWORK_ISLEMI
-  GUVENLIK_BILDIRIMI
-  BAKIM_TEKNIK_BILGILENDIRME
-  ODEME_FATURA_BILGILENDIRMESI
-  KURAL_IHLALI_BILDIRIMI
-  DESTEK_YANITI
-  DIGER
-}
-
-enum InvitationStatus {
-  PENDING
-  USED
-  EXPIRED
-  REVOKED
-}
-
-enum BasvuruTuru {
-  REFERANSSIZ
-  REFERANSLI
-  PILOT
-}
-
-enum OnayYetkiSeviyesi {
-  MODERATOR_ADMIN_SUPER_ADMIN
-  ADMIN_SUPER_ADMIN
-  SUPER_ADMIN
-}
-
-enum DavetKoduTuru {
-  REFERANSLI_BASVURU
-  PILOT_DAVETI
-  YONETICI_DAVETI
-}
-
-enum DocumentType {
-  VERGI_LEVHASI
-  YETKI_BELGESI
-  TAPU
-  KAT_KARSILIGI_SOZLESMESI
-  TICARET_SICIL
-  KIMLIK
-  DIGER
-  MYK_BELGESI
-  IMZA_SIRKULERI
-  FAALIYET_BELGESI
-  IS_BITIRME_BELGESI
-  YAMBIS_BELGESI
-  REFERANS_PROJE
-}
-
-enum DocumentStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-enum PortfolioApprovalStatus {
-  TASLAK
-  BELGE_BEKLENIYOR
-  INCELEMEYE_GONDERILDI
-  INCELEMEDE
-  EKSIK_BILGI_BEKLENIYOR
-  ONAYLANDI
-  HAVUZDA
-  REDDEDILDI
-}
-
-enum PortfolioAuthorityType {
-  YETKI_BELGESI
-  TAPU
-  TAPU_SAHIBI_KIMLIK
-  KAT_KARSILIGI_SOZLESMESI
-  DIGER_DOGRULAMA_EVRAKI
-}
-
-enum UnitStatus {
-  SATILIK
-  KIRALIK
-  GUNLUK_KIRALIK
-  DEVREN_SATILIK
-  DEVREN_KIRALIK
-  ON_SATIS
-  PROJE_ASAMASI
-  YAKINDA_SATISTA
-  INSAAT_HALINDE
-  TESLIME_HAZIR
-  HEMEN_TESLIM
-  INSAAT_PROJESI
-  KAT_KARSILIGI
-  HASILAT_PAYLASIMLI
-  REZERVE
-  SATILDI
-  KIRALANDII
-  PASIF
-}
-
-enum UnitType {
-  DAIRE
-  REZIDANS
-  VILLA
-  YAZLIK
-  VILLA_TERAS
-  VILLA_GARDEN
-  DUBLEKS_VILLA
-  TRIPLEKS_VILLA
-  MUSTAK_EV
-  KOY_EVI
-  TAS_EV
-  AHSAP_EV
-  PREFABRIK_EV
-  CELIK_KONSTRUKSIYON
-  TINY_HOUSE
-  BUNGALOV
-  DAG_EVI
-  YAYLA_EVI
-  GOL_EVI
-  BAG_EVI
-  CIFTLIK_EVI
-  HOBI_BAHCESI_EVI
-  MAGARA_EV
-  KOSK_YALI
-  YALI
-  YALI_DAIRESI
-  KONAK
-  PENTHOUSE
-  LOFT
-  LOFT_DUBLEKS
-  MARINA_RESIDENCE
-  GOLF_RESIDENCE
-  SAHIL_RESIDENCE
-  DAG_RESIDENCE
-  SKY_RESIDENCE
-  OZEL_HAVUZLU_VILLA
-  OZEL_ISKELELI_VILLA
-  AKILLI_VILLA
-  ULTRA_LUKS_VILLA
-  DUKKAN_MAGAZA
-  OFIS_BURO
-  FABRIKA_URETIM_TESISI
-  ATOLYE
-  TICARI_ISLETME
-  HOME_OFFICE
-  PLAZA_KATI
-  SHOWROOM
-  IS_HANI_KATI
-  IS_MERKEZI
-  PAYLASIMLI_OFIS
-  DEPO_ANTREPO
-  LOJISTIK_MERKEZI
-  FABRIKA_ATOLYE
-  URETIM_TESISI
-  AKARYAKIT_ISTASYONU
-  OTEL_PANSIYON
-  APART_OTEL
-  OTEL
-  BUTIK_OTEL
-  MOTEL
-  PANSIYON
-  KAMP_YERI
-  TATIL_KOYU
-  RESTORAN
-  KAFE
-  DUGUN_SALONU
-  SPOR_TESISI
-  OKUL_EGITIM_TESISI
-  HASTANE_SAGLIK_TESISI
-  KOMPLE_BINA
-  ARSA
-  KONUT_ARSASI
-  VILLA_ARSASI
-  TICARI_ARSA
-  SANAYI_ARSASI
-  TURIZM_IMARLI_ARSA
-  TARLA
-  BAHCE
-  BAG
-  ZEYTINLIK
-  MEYVE_BAHCESI
-  SERA
-  BESI_CIFTLIGI
-  ORMAN_ARAZISI
-  ADA
-  DEVRE_MULK
-  TURISTIK_TESIS
-  KONUT_PROJESI
-  VILLA_PROJESI
-  REZIDANS_PROJESI
-  KARMA_PROJE
-  AVM_PROJESI
-  TICARI_PROJE
-}
-
-enum NominationStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  INVITED
-  REGISTERED
-}
-
-enum ApplicationStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  INVITED
-  REGISTERED
-  GORUSME_PLANLANDI
-  EVRAK_BEKLENIYOR
-}
-
-enum CustomerStatus {
-  YENI_LEAD
-  ILK_GORUSME
-  PORTFOLYO_GONDERILDI
-  YER_GOSTERIMI
-  TEKLIF_SURECI
-  PAZARLIK
-  KAPANDI
-  KAYBEDILDI
-}
-
-enum CustomerRole {
-  ALICI
-  SATICI
-  KIRACI
-  MAL_SAHIBI
-  YATIRIMCI
-  MUTEAHHIT
-  INSAAT_FIRMASI
-  ARSA_SAHIBI
-}
-
-enum CustomerPurchaseIntent {
-  BELIRSIZ
-  SATIN_ALMA
-  KIRALAMA
-  YATIRIM
-  ARSA_GELISTIRME
-  KAT_KARSILIGI
-}
-
-enum CustomerInterestPriority {
-  DUSUK
-  NORMAL
-  YUKSEK
-  ACIL
-}
-
-enum CustomerPropertyRelation {
-  TAPU_SAHIBI
-  SATICI
-  ALICI_ADAYI
-  KIRACI
-  KIRAYA_VEREN
-  MUTEAHHIT
-  INSAAT_FIRMASI
-  YATIRIMCI
-  ORTAK_MALIK
-  VEKIL
-  MIRASCI
-  ARSA_SAHIBI
-  KAT_KARSILIGI_ARSA_SAHIBI
-}
-
-enum ActivityType {
-  TELEFON
-  WHATSAPP
-  EMAIL
-  YER_GOSTERIMI
-  TEKLIF
-  NOT
-  DIGER
-}
-
-enum TaskStatus {
-  BEKLIYOR
-  TAMAMLANDI
-  IPTAL
-}
-
-enum ConversationStatus {
-  ACTIVE
-  ARCHIVED
-}
-
-enum NetworkVisibility {
-  TUM_EPH
-  SADECE_EMLAKCILAR
-  SADECE_MUTEAHHITLER
-  SADECE_BAGLANTILARIM
-}
-
-enum AuditAction {
-  LOGIN
-  LOGOUT
-  VIEW_USER
-  VIEW_APPLICATION
-  APPROVE_APPLICATION
-  REJECT_APPLICATION
-  UPDATE_APPLICATION_STATUS
-  UPDATE_APPLICATION_NOTE
-  UPDATE_USER_ROLE
-  UPDATE_USER_PACKAGE
-  SUSPEND_USER
-  VIEW_AUDIT_LOG
-  VIEW_SENSITIVE_DATA_ATTEMPT
-  SYSTEM_SECURITY_ACTION
-  TECHNICAL_SUPPORT_ACCESS
-}
-
-// ======================================================
-// EPH PLATFORM - LINA V5 FINAL EK SCHEMA
-// Not: Model adlarında Türkçe anlam korunmuştur; teknik güvenlik için Türkçe karakter kullanılmamıştır.
-// ======================================================
-
-enum KullaniciHesapTuru {
-  GERCEK
-  PILOT
-  TEST
-  SISTEM
-}
-
-enum UyelikPaketKodu {
-  DENEME
-  STARTER
-  SILVER
-  GOLD
-  PREMIUM
-  PLATINIUM
-  KURUMSAL
-}
-
-enum UyelikDurumu {
-  AKTIF
-  PASIF
-  SURESI_DOLDU
-  IPTAL
-}
-
-enum KontorHareketTuru {
-  YUKLEME
-  HARCAMA
-  IADE
-  HEDIYE
-  DUZELTME
-}
-
-enum KontorIslemTuru {
-  FORUM_ACIL_ETIKETI
-  FORUM_SABITLEME
-  FORUM_VITRIN
-
-  HAVUZ_MESAJ
-  HAVUZ_ILGILENIYORUM
-  HAVUZ_ESLESEN_MUSTERIM_VAR
-
-  PORTFOY_ONE_CIKARMA
-  LINA_ILAN_ACIKLAMASI
-  LINA_ILAN_DUZENLEME
-  LINA_SESTEN_ILAN
-  SOSYAL_MEDYA_METNI
-  INSTAGRAM_GONDERISI
-  INSTAGRAM_REELS
-  WHATSAPP_PORTFOY_KARTI
-  PDF_PORTFOY_DOSYASI
-  TOPLU_ISLEM
-  TOPLU_EPOSTA
-  EK_GORUSME_HAKKI
-  DIGER
-}
-
-enum KotaDonemi {
-  GUNLUK
-  AYLIK
-  YILLIK
-}
-
-enum AdminMesajTuru {
-  TEKNIK_BILGILENDIRME
-  KAMPANYA
-  KONTOR_BAKIYE
-  PROFIL_EVRAK
-  PAKET_UYELIK
-  KURAL_GUVENLIK
-  GENEL_DUYURU
-  KISIYE_OZEL_MESAJ
-}
-
-enum DestekTalepDurumu {
-  ACIK
-  ISLENIYOR
-  YANITLANDI
-  KAPANDI
-}
-
-enum LinaKanal {
-  YAZILI
-  SESLI
-  SISTEM
-  PROAKTIF
-  EPOSTA
-}
-
-enum LinaModul {
-  GENEL
-  PORTFOY
-  CRM
-  FORUM
-  HAVUZ
-  GOREV
-  RAPORLAMA
-  PROAKTIF_TARAMA
-  BILGI_KUTUPHANESI
-  DENETIM
-  SES
-  BILDIRIM
-  EPOSTA
-  YETKI
-  KALIBRASYON
-}
-
-enum LinaNiyet {
-  BILGI_ALMA
-  ISLEM_YAPMA
-  PORTFOY_EKLEME
-  PORTFOY_GUNCELLEME
-  MUSTERI_TAKIBI
-  TALEP_OLUSTURMA
-  ESLESME_ARAMA
-  GOREV_OLUSTURMA
-  RAPOR_ISTEME
-  SIKAYET
-  ONERI
-  BELIRSIZ
-}
-
-enum LinaDurum {
-  BEKLIYOR
-  ISLENIYOR
-  TAMAMLANDI
-  REDDEDILDI
-  HATA
-  IPTAL
-}
-
-enum LinaKararSeviyesi {
-  BILGILENDIRME
-  ONERI
-  UYARI
-  AKSIYON
-  KRITIK
-}
-
-enum LinaRiskSeviyesi {
-  YOK
-  DUSUK
-  ORTA
-  YUKSEK
-  KRITIK
-}
-
-enum LinaFirsatSeviyesi {
-  YOK
-  DUSUK
-  ORTA
-  YUKSEK
-  COK_YUKSEK
-}
-
-enum LinaHafizaKatmani {
-  OTURUM
-  ISLEM
-  KULLANICI
-  ROL
-  KURUMSAL
-  BOLGESEL_TERIM
-  SISTEM
-  DENETIM
-}
-
-enum LinaHafizaOnemi {
-  DUSUK
-  ORTA
-  YUKSEK
-  KALICI
-}
-
-enum LinaDenetimTuru {
-  BILGI
-  UYARI
-  HATA
-  YETKI_IHLALI
-  CELISKI
-  RED
-  GUVENLIK
-}
-
-enum LinaOneriDurumu {
-  BEKLIYOR
-  GOSTERILDI
-  ONAYLANDI
-  REDDEDILDI
-  UYGULANDI
-  SURESI_DOLDU
-}
-
-enum LinaGorevOnceligi {
-  DUSUK
-  NORMAL
-  YUKSEK
-  ACIL
-}
-
-enum LinaGorevDurumu {
-  BEKLIYOR
-  DEVAM_EDIYOR
-  TAMAMLANDI
-  IPTAL_EDILDI
-  GECIKTI
-}
-
-enum LinaBilgiTuru {
-  ANAYASA
-  KURAL
-  SSS
-  EGITIM
-  TERIM
-  PROSEDUR
-  SENARYO
-}
-
-enum LinaTerimGuveni {
-  DUSUK
-  ORTA
-  YUKSEK
-  ONAYLI
-}
-
-enum LinaEpostaHesabi {
-  BILDIRIM
-  DESTEK
-  INFO
-}
-
-enum LinaEpostaDurumu {
-  BEKLIYOR
-  GONDERILDI
-  HATA
-  IPTAL
+  actor        User?       @relation("AuditActor", fields: [actorId], references: [id])
+  targetUser   User?       @relation("AuditTargetUser", fields: [targetUserId], references: [id])
 }
 
 model UyelikPaketi {
@@ -2917,4 +2206,617 @@ model LinaOneriBasariKaydi {
   @@index([uygulandiMi])
   @@index([sonucBasariliMi])
   @@index([etkiPuani])
+}
+
+enum Role {
+  EMLAKCI
+  MUTEAHHIT
+  INSAAT_FIRMASI
+  ADMIN
+  SUPER_ADMIN
+  MODERATOR
+}
+
+enum Capability {
+  TEAM_LEADER
+  OFFICE_OWNER
+}
+
+enum RiskLevel {
+  DUSUK
+  ORTA
+  YUKSEK
+  KRITIK
+}
+
+enum ReportStatus {
+  ACIK
+  INCELENIYOR
+  COZULDU
+  REDDEDILDI
+}
+
+enum RestrictionType {
+  GIRIS_ENGELI
+  PAYLASIM_ENGELI
+  MESAJ_ENGELI
+  ILAN_ENGELI
+  GECICI_ASKI
+  KALICI_ASKI
+}
+
+enum AnnouncementAudience {
+  TUM_UYELER
+  EMLAKCILAR
+  MUTEAHHITLER
+  INSAAT_FIRMALARI
+  ADMINLER
+}
+
+enum SystemMessageTargetType {
+  TEK_KULLANICI
+  TUM_KULLANICILAR
+  EMLAKCILAR
+  MUTEAHHITLER
+  INSAAT_FIRMALARI
+  ADMINLER
+  SUPER_ADMINLER
+  OZEL_GRUP
+  COKLU_KULLANICI
+  SEHIRLER
+  SEHIRLER_VE_ROLLER
+}
+
+enum SystemMessageCategory {
+  BILGILENDIRME
+  SIKAYET_YANITI
+  ONERI_YANITI
+  UYARI
+  DUYURU
+  HESAP_ISLEMI
+  ILAN_ISLEMI
+  UYELIK_PAKET_ISLEMI
+  EVRAK_DOGRULAMA_ISLEMI
+  NETWORK_ISLEMI
+  GUVENLIK_BILDIRIMI
+  BAKIM_TEKNIK_BILGILENDIRME
+  ODEME_FATURA_BILGILENDIRMESI
+  KURAL_IHLALI_BILDIRIMI
+  DESTEK_YANITI
+  DIGER
+}
+
+enum InvitationStatus {
+  PENDING
+  USED
+  EXPIRED
+  REVOKED
+}
+
+enum BasvuruTuru {
+  REFERANSSIZ
+  REFERANSLI
+  PILOT
+}
+
+enum OnayYetkiSeviyesi {
+  MODERATOR_ADMIN_SUPER_ADMIN
+  ADMIN_SUPER_ADMIN
+  SUPER_ADMIN
+}
+
+enum DavetKoduTuru {
+  REFERANSLI_BASVURU
+  PILOT_DAVETI
+  YONETICI_DAVETI
+}
+
+enum DocumentType {
+  VERGI_LEVHASI
+  YETKI_BELGESI
+  TICARET_SICIL
+  KIMLIK
+  DIGER
+  MYK_BELGESI
+  IMZA_SIRKULERI
+  FAALIYET_BELGESI
+  IS_BITIRME_BELGESI
+  YAMBIS_BELGESI
+  REFERANS_PROJE
+  TAPU
+  KAT_KARSILIGI_SOZLESMESI
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PortfolioApprovalStatus {
+  TASLAK
+  BELGE_BEKLENIYOR
+  INCELEMEYE_GONDERILDI
+  INCELEMEDE
+  EKSIK_BILGI_BEKLENIYOR
+  ONAYLANDI
+  HAVUZDA
+  REDDEDILDI
+}
+
+enum PortfolioAuthorityType {
+  YETKI_BELGESI
+  TAPU
+  KAT_KARSILIGI_SOZLESMESI
+  DIGER_DOGRULAMA_EVRAKI
+  TAPU_SAHIBI_KIMLIK
+}
+
+enum UnitStatus {
+  SATILIK
+  REZERVE
+  SATILDI
+  PASIF
+  KIRALIK
+  GUNLUK_KIRALIK
+  DEVREN_SATILIK
+  DEVREN_KIRALIK
+  INSAAT_PROJESI
+  KAT_KARSILIGI
+  KIRALANDII
+  ON_SATIS
+  PROJE_ASAMASI
+  YAKINDA_SATISTA
+  INSAAT_HALINDE
+  TESLIME_HAZIR
+  HEMEN_TESLIM
+  HASILAT_PAYLASIMLI
+}
+
+enum UnitType {
+  DAIRE
+  VILLA
+  REZIDANS
+  MUSTAK_EV
+  KOSK_YALI
+  CIFTLIK_EVI
+  PREFABRIK_EV
+  DUKKAN_MAGAZA
+  OFIS_BURO
+  PLAZA_KATI
+  DEPO_ANTREPO
+  FABRIKA_ATOLYE
+  OTEL_PANSIYON
+  DUGUN_SALONU
+  ARSA
+  TARLA
+  BAHCE
+  ZEYTINLIK
+  ADA
+  DEVRE_MULK
+  TURISTIK_TESIS
+  VILLA_TERAS
+  VILLA_GARDEN
+  DUBLEKS_VILLA
+  TRIPLEKS_VILLA
+  KOY_EVI
+  TAS_EV
+  AHSAP_EV
+  CELIK_KONSTRUKSIYON
+  TINY_HOUSE
+  BUNGALOV
+  DAG_EVI
+  YAYLA_EVI
+  GOL_EVI
+  BAG_EVI
+  HOBI_BAHCESI_EVI
+  MAGARA_EV
+  YALI
+  YALI_DAIRESI
+  KONAK
+  PENTHOUSE
+  LOFT
+  LOFT_DUBLEKS
+  MARINA_RESIDENCE
+  GOLF_RESIDENCE
+  SAHIL_RESIDENCE
+  DAG_RESIDENCE
+  SKY_RESIDENCE
+  OZEL_HAVUZLU_VILLA
+  OZEL_ISKELELI_VILLA
+  AKILLI_VILLA
+  ULTRA_LUKS_VILLA
+  HOME_OFFICE
+  SHOWROOM
+  IS_HANI_KATI
+  IS_MERKEZI
+  PAYLASIMLI_OFIS
+  LOJISTIK_MERKEZI
+  URETIM_TESISI
+  AKARYAKIT_ISTASYONU
+  APART_OTEL
+  RESTORAN
+  KAFE
+  SPOR_TESISI
+  OKUL_EGITIM_TESISI
+  HASTANE_SAGLIK_TESISI
+  KOMPLE_BINA
+  KONUT_ARSASI
+  VILLA_ARSASI
+  TICARI_ARSA
+  SANAYI_ARSASI
+  TURIZM_IMARLI_ARSA
+  BAG
+  MEYVE_BAHCESI
+  SERA
+  BESI_CIFTLIGI
+  ORMAN_ARAZISI
+  KONUT_PROJESI
+  VILLA_PROJESI
+  REZIDANS_PROJESI
+  KARMA_PROJE
+  AVM_PROJESI
+  TICARI_PROJE
+  YAZLIK
+  FABRIKA_URETIM_TESISI
+  ATOLYE
+  TICARI_ISLETME
+  OTEL
+  BUTIK_OTEL
+  MOTEL
+  PANSIYON
+  KAMP_YERI
+  TATIL_KOYU
+}
+
+enum NominationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  INVITED
+  REGISTERED
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  INVITED
+  REGISTERED
+  GORUSME_PLANLANDI
+  EVRAK_BEKLENIYOR
+}
+
+enum CustomerStatus {
+  YENI_LEAD
+  ILK_GORUSME
+  PORTFOLYO_GONDERILDI
+  YER_GOSTERIMI
+  TEKLIF_SURECI
+  PAZARLIK
+  KAPANDI
+  KAYBEDILDI
+}
+
+enum CustomerRole {
+  ALICI
+  SATICI
+  KIRACI
+  MAL_SAHIBI
+  YATIRIMCI
+  MUTEAHHIT
+  INSAAT_FIRMASI
+  ARSA_SAHIBI
+}
+
+enum CustomerPurchaseIntent {
+  BELIRSIZ
+  SATIN_ALMA
+  KIRALAMA
+  YATIRIM
+  ARSA_GELISTIRME
+  KAT_KARSILIGI
+}
+
+enum CustomerInterestPriority {
+  DUSUK
+  NORMAL
+  YUKSEK
+  ACIL
+}
+
+enum CustomerPropertyRelation {
+  TAPU_SAHIBI
+  SATICI
+  ALICI_ADAYI
+  KIRACI
+  KIRAYA_VEREN
+  MUTEAHHIT
+  INSAAT_FIRMASI
+  YATIRIMCI
+  ORTAK_MALIK
+  VEKIL
+  MIRASCI
+  ARSA_SAHIBI
+  KAT_KARSILIGI_ARSA_SAHIBI
+}
+
+enum ActivityType {
+  TELEFON
+  WHATSAPP
+  EMAIL
+  YER_GOSTERIMI
+  TEKLIF
+  NOT
+  DIGER
+}
+
+enum TaskStatus {
+  BEKLIYOR
+  TAMAMLANDI
+  IPTAL
+}
+
+enum ConversationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum NetworkVisibility {
+  TUM_EPH
+  SADECE_EMLAKCILAR
+  SADECE_MUTEAHHITLER
+  SADECE_BAGLANTILARIM
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  VIEW_USER
+  VIEW_APPLICATION
+  APPROVE_APPLICATION
+  REJECT_APPLICATION
+  UPDATE_APPLICATION_STATUS
+  UPDATE_APPLICATION_NOTE
+  UPDATE_USER_ROLE
+  UPDATE_USER_PACKAGE
+  SUSPEND_USER
+  VIEW_AUDIT_LOG
+  VIEW_SENSITIVE_DATA_ATTEMPT
+  SYSTEM_SECURITY_ACTION
+  TECHNICAL_SUPPORT_ACCESS
+}
+
+enum KullaniciHesapTuru {
+  GERCEK
+  PILOT
+  TEST
+  SISTEM
+}
+
+enum UyelikPaketKodu {
+  SILVER
+  GOLD
+  PREMIUM
+  PLATINIUM
+  KURUMSAL
+  DENEME
+  STARTER
+}
+
+enum UyelikDurumu {
+  AKTIF
+  PASIF
+  SURESI_DOLDU
+  IPTAL
+}
+
+enum KontorHareketTuru {
+  YUKLEME
+  HARCAMA
+  IADE
+  HEDIYE
+  DUZELTME
+}
+
+enum KontorIslemTuru {
+  FORUM_ACIL_ETIKETI
+  FORUM_SABITLEME
+  FORUM_VITRIN
+  PORTFOY_ONE_CIKARMA
+  LINA_ILAN_ACIKLAMASI
+  LINA_ILAN_DUZENLEME
+  LINA_SESTEN_ILAN
+  SOSYAL_MEDYA_METNI
+  INSTAGRAM_GONDERISI
+  INSTAGRAM_REELS
+  WHATSAPP_PORTFOY_KARTI
+  PDF_PORTFOY_DOSYASI
+  TOPLU_ISLEM
+  TOPLU_EPOSTA
+  EK_GORUSME_HAKKI
+  DIGER
+  HAVUZ_MESAJ
+  HAVUZ_ILGILENIYORUM
+  HAVUZ_ESLESEN_MUSTERIM_VAR
+}
+
+enum KotaDonemi {
+  GUNLUK
+  AYLIK
+  YILLIK
+}
+
+enum AdminMesajTuru {
+  TEKNIK_BILGILENDIRME
+  KAMPANYA
+  KONTOR_BAKIYE
+  PROFIL_EVRAK
+  PAKET_UYELIK
+  KURAL_GUVENLIK
+  GENEL_DUYURU
+  KISIYE_OZEL_MESAJ
+}
+
+enum DestekTalepDurumu {
+  ACIK
+  ISLENIYOR
+  YANITLANDI
+  KAPANDI
+}
+
+enum LinaKanal {
+  YAZILI
+  SESLI
+  SISTEM
+  PROAKTIF
+  EPOSTA
+}
+
+enum LinaModul {
+  GENEL
+  PORTFOY
+  CRM
+  FORUM
+  HAVUZ
+  GOREV
+  RAPORLAMA
+  PROAKTIF_TARAMA
+  BILGI_KUTUPHANESI
+  DENETIM
+  SES
+  BILDIRIM
+  EPOSTA
+  YETKI
+  KALIBRASYON
+}
+
+enum LinaNiyet {
+  BILGI_ALMA
+  ISLEM_YAPMA
+  PORTFOY_EKLEME
+  PORTFOY_GUNCELLEME
+  MUSTERI_TAKIBI
+  TALEP_OLUSTURMA
+  ESLESME_ARAMA
+  GOREV_OLUSTURMA
+  RAPOR_ISTEME
+  SIKAYET
+  ONERI
+  BELIRSIZ
+}
+
+enum LinaDurum {
+  BEKLIYOR
+  ISLENIYOR
+  TAMAMLANDI
+  REDDEDILDI
+  HATA
+  IPTAL
+}
+
+enum LinaKararSeviyesi {
+  BILGILENDIRME
+  ONERI
+  UYARI
+  AKSIYON
+  KRITIK
+}
+
+enum LinaRiskSeviyesi {
+  YOK
+  DUSUK
+  ORTA
+  YUKSEK
+  KRITIK
+}
+
+enum LinaFirsatSeviyesi {
+  YOK
+  DUSUK
+  ORTA
+  YUKSEK
+  COK_YUKSEK
+}
+
+enum LinaHafizaKatmani {
+  OTURUM
+  ISLEM
+  KULLANICI
+  ROL
+  KURUMSAL
+  BOLGESEL_TERIM
+  SISTEM
+  DENETIM
+}
+
+enum LinaHafizaOnemi {
+  DUSUK
+  ORTA
+  YUKSEK
+  KALICI
+}
+
+enum LinaDenetimTuru {
+  BILGI
+  UYARI
+  HATA
+  YETKI_IHLALI
+  CELISKI
+  RED
+  GUVENLIK
+}
+
+enum LinaOneriDurumu {
+  BEKLIYOR
+  GOSTERILDI
+  ONAYLANDI
+  REDDEDILDI
+  UYGULANDI
+  SURESI_DOLDU
+}
+
+enum LinaGorevOnceligi {
+  DUSUK
+  NORMAL
+  YUKSEK
+  ACIL
+}
+
+enum LinaGorevDurumu {
+  BEKLIYOR
+  DEVAM_EDIYOR
+  TAMAMLANDI
+  IPTAL_EDILDI
+  GECIKTI
+}
+
+enum LinaBilgiTuru {
+  ANAYASA
+  KURAL
+  SSS
+  EGITIM
+  TERIM
+  PROSEDUR
+  SENARYO
+}
+
+enum LinaTerimGuveni {
+  DUSUK
+  ORTA
+  YUKSEK
+  ONAYLI
+}
+
+enum LinaEpostaHesabi {
+  BILDIRIM
+  DESTEK
+  INFO
+}
+
+enum LinaEpostaDurumu {
+  BEKLIYOR
+  GONDERILDI
+  HATA
+  IPTAL
 }

@@ -208,6 +208,51 @@ function isUnitVerified(unit?: Unit | null) {
   );
 }
 
+function getPortfolioQuality(unit?: MapUnit | null) {
+  const imageCount = getUnitImages(unit as Unit).length;
+  const hasPhoto = imageCount > 0 || Boolean((unit as any)?.photoVerified);
+  const hasDocument = Boolean(
+    (unit as any)?.tapuVerified ||
+      (unit as any)?.yetkiVerified ||
+      (unit as any)?.isVerified,
+  );
+  const hasLocation = Boolean(unit?.project?.latitude && unit?.project?.longitude);
+  const hasAuthority = Boolean((unit as any)?.yetkiVerified || (unit as any)?.isVerified);
+  const approvalStatus = String((unit as any)?.approvalStatus || "");
+  const isPoolReady =
+    approvalStatus === "ONAYLANDI" ||
+    approvalStatus === "HAVUZDA" ||
+    Boolean((unit as any)?.isPoolVisible);
+
+  const score =
+    (hasPhoto ? 25 : 0) +
+    (hasDocument ? 25 : 0) +
+    (hasLocation ? 20 : 0) +
+    (hasAuthority ? 15 : 0) +
+    (isPoolReady ? 15 : 0);
+
+  const label =
+    score >= 90
+      ? "Mükemmel"
+      : score >= 75
+        ? "Çok İyi"
+        : score >= 60
+          ? "İyi"
+          : score >= 40
+            ? "Geliştirilmeli"
+            : "Riskli";
+
+  return {
+    score,
+    label,
+    hasPhoto,
+    hasDocument,
+    hasLocation,
+    hasAuthority,
+    isPoolReady,
+  };
+}
+
 function formatFloorInfo(
   unit: Pick<Unit, "floor" | "floorLabel" | "totalFloors">,
 ) {
@@ -425,6 +470,30 @@ function StokPageInner() {
         units.length,
     );
   }, [units]);
+  const portfolioQualityStats = useMemo(() => {
+    if (!units.length) {
+      return {
+        averageScore: 0,
+        qualityPortfolioCount: 0,
+        riskyPortfolioCount: 0,
+        poolReadyCount: 0,
+        missingDocumentCount: 0,
+      };
+    }
+
+    const qualities = units.map((unit) => getPortfolioQuality(unit));
+
+    return {
+      averageScore: Math.round(
+        qualities.reduce((sum, quality) => sum + quality.score, 0) / qualities.length,
+      ),
+      qualityPortfolioCount: qualities.filter((quality) => quality.score >= 75).length,
+      riskyPortfolioCount: qualities.filter((quality) => quality.score < 60).length,
+      poolReadyCount: qualities.filter((quality) => quality.isPoolReady).length,
+      missingDocumentCount: qualities.filter((quality) => !quality.hasDocument).length,
+    };
+  }, [units]);
+
   const uniqueCities = useMemo(
     () =>
       Array.from(
@@ -889,6 +958,48 @@ function StokPageInner() {
             <MiniMetric label="Satılık" value={saleCount} tone="blue" />
             <MiniMetric label="Kiralık" value={rentCount} tone="orange" />
           </div>
+
+          <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-[#F8FBFF] p-2">
+            <div className="mb-2 flex items-center justify-between gap-2 px-1">
+              <div className="min-w-0">
+                <h2 className="text-[13px] font-black text-[#06194A]">
+                  Portföy Kalite Merkezi
+                </h2>
+                <p className="text-[10px] font-bold text-[#64748B]">
+                  Fotoğraf, belge, konum ve havuz hazırlığı
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push("/portfoy/quality")}
+                className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-[#1557D6] shadow-sm active:scale-[0.98]"
+              >
+                Detay {portfolioQualityStats.averageScore}/100
+              </button>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              <QualityMiniMetric
+                label="Ortalama"
+                value={`${portfolioQualityStats.averageScore}`}
+                tone="blue"
+              />
+              <QualityMiniMetric
+                label="Kaliteli"
+                value={portfolioQualityStats.qualityPortfolioCount}
+                tone="green"
+              />
+              <QualityMiniMetric
+                label="Riskli"
+                value={portfolioQualityStats.riskyPortfolioCount}
+                tone="orange"
+              />
+              <QualityMiniMetric
+                label="Hazır"
+                value={portfolioQualityStats.poolReadyCount}
+                tone="slate"
+              />
+            </div>
+          </section>
         </section>
 
         <button
@@ -1030,6 +1141,42 @@ function MiniMetric({
   );
 }
 
+function QualityMiniMetric({
+  label,
+  value,
+  tone = "slate",
+}: {
+  label: string;
+  value: string | number;
+  tone?: "slate" | "green" | "blue" | "orange";
+}) {
+  const toneClass =
+    tone === "green"
+      ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+      : tone === "blue"
+        ? "border-blue-100 bg-blue-50 text-[#1557D6]"
+        : tone === "orange"
+          ? "border-orange-100 bg-orange-50 text-orange-700"
+          : "border-slate-200 bg-white text-[#06194A]";
+
+  return (
+    <article className={`rounded-[16px] border px-1.5 py-2 text-center ${toneClass}`}>
+      <p className="text-[15px] font-black leading-none">{value}</p>
+      <p className="mt-1 text-[8.5px] font-black">{label}</p>
+    </article>
+  );
+}
+
+function QualityFlag({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span
+      className={`rounded-full px-1.5 py-0.5 ${ok ? "bg-emerald-50 text-emerald-700" : "bg-orange-50 text-orange-700"}`}
+    >
+      {ok ? "✓" : "!"} {label}
+    </span>
+  );
+}
+
 function CompactPortfolioCard({
   unit,
   selected,
@@ -1070,6 +1217,7 @@ function CompactPortfolioCard({
   const isPoolVisible = Boolean((unit as any).isPoolVisible);
   const canSendToPool = approvalStatus === "ONAYLANDI" && !isPoolVisible;
   const canRemoveFromPool = approvalStatus === "HAVUZDA" || isPoolVisible;
+  const quality = getPortfolioQuality(unit);
 
   return (
     <article
@@ -1125,6 +1273,24 @@ function CompactPortfolioCard({
               Yetkili
             </span>
           )}
+        </div>
+
+        <div className="mt-1 rounded-[14px] border border-[#DDE7F3] bg-[#F8FBFF] px-2 py-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[9px] font-black text-[#64748B]">
+              Kalite
+            </span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[9px] font-black ${quality.score >= 75 ? "bg-emerald-50 text-emerald-700" : quality.score >= 60 ? "bg-blue-50 text-[#1557D6]" : "bg-orange-50 text-orange-700"}`}
+            >
+              {quality.score}/100 · {quality.label}
+            </span>
+          </div>
+          <div className="mt-1 grid grid-cols-3 gap-1 text-center text-[8.5px] font-black">
+            <QualityFlag ok={quality.hasPhoto} label="Foto" />
+            <QualityFlag ok={quality.hasDocument} label="Belge" />
+            <QualityFlag ok={quality.hasLocation} label="Konum" />
+          </div>
         </div>
 
         {(unit as any).availableCreditAmount ? (
