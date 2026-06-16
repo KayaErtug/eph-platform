@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { CrmService } from './crm.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -62,6 +62,11 @@ export class CrmController {
   @Post('customers/:id/interests')
   addCustomerInterest(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
     return this.crmService.addCustomerInterest(id, user.id, user.role, body);
+  }
+
+  @Get('interests/:id/matches')
+  getCustomerInterestMatches(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.crmService.getCustomerInterestMatches(id, user.id, user.role);
   }
 
   @Patch('interests/:id')

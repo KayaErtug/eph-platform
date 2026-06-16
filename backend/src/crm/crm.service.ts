@@ -453,6 +453,154 @@ export class CrmService {
       where: { id: customerPropertyId },
     });
   }
+   
+
+
+    private getMatchLevel(score: number) {
+    if (score >= 90) return 'Mükemmel';
+    if (score >= 75) return 'Çok Güçlü';
+    if (score >= 60) return 'Güçlü';
+    if (score >= 40) return 'Uygun';
+    return 'Zayıf';
+  }
+
+  async getCustomerInterestMatches(
+    interestId: string,
+    userId: string,
+    userRole: Role,
+  ) {
+    const interest = await this.findInterestForAccess(
+      interestId,
+      userId,
+      userRole,
+    );
+
+    const poolUnits = await this.prisma.unit.findMany({
+      where: {
+        isPoolVisible: true,
+      },
+      include: {
+        project: true,
+        images: {
+          where: {
+            isCover: true,
+          },
+          take: 1,
+        },
+      },
+      orderBy: {
+        poolPublishedAt: 'desc',
+      },
+    });
+
+    const results = poolUnits.map((unit) => {
+      let score = 0;
+      const reasons: string[] = [];
+
+      if (
+        interest.city &&
+        unit.project?.city &&
+        interest.city.toLowerCase() === unit.project.city.toLowerCase()
+      ) {
+        score += 20;
+        reasons.push('Aynı il');
+      }
+
+      if (
+        interest.district &&
+        unit.project?.district &&
+        interest.district.toLowerCase() ===
+          unit.project.district.toLowerCase()
+      ) {
+        score += 20;
+        reasons.push('Aynı ilçe');
+      }
+
+      if (
+        Array.isArray(interest.propertyTypes) &&
+        interest.propertyTypes.length > 0 &&
+        interest.propertyTypes.includes(unit.type)
+      ) {
+        score += 10;
+        reasons.push('Mülk tipi uyumlu');
+      }
+
+      if (
+        Array.isArray(interest.statuses) &&
+        interest.statuses.length > 0 &&
+        interest.statuses.includes(unit.status)
+      ) {
+        score += 10;
+        reasons.push('Portföy durumu uyumlu');
+      }
+
+      if (
+        interest.minBudget &&
+        interest.maxBudget &&
+        unit.price >= interest.minBudget &&
+        unit.price <= interest.maxBudget
+      ) {
+        score += 10;
+        reasons.push('Bütçe aralığında');
+      }
+
+      if (
+        interest.minArea &&
+        interest.maxArea &&
+        unit.area &&
+        unit.area >= interest.minArea &&
+        unit.area <= interest.maxArea
+      ) {
+        score += 5;
+        reasons.push('m² uyumlu');
+      }
+
+      if (
+        Array.isArray(interest.roomCounts) &&
+        interest.roomCounts.length > 0 &&
+        unit.roomCount &&
+        interest.roomCounts.includes(unit.roomCount)
+      ) {
+        score += 3;
+        reasons.push('Oda sayısı uyumlu');
+      }
+
+      const featureMatches =
+        Array.isArray(interest.features) &&
+        Array.isArray(unit.features)
+          ? interest.features.filter((f) =>
+              unit.features.includes(f),
+            ).length
+          : 0;
+
+      if (featureMatches > 0) {
+        score += 2;
+        reasons.push(
+          `${featureMatches} ortak özellik bulundu`,
+        );
+      }
+
+      return {
+        unitId: unit.id,
+        projectName: unit.project?.name,
+        city: unit.project?.city,
+        district: unit.project?.district,
+        price: unit.price,
+        roomCount: unit.roomCount,
+        area: unit.area,
+        coverImage:
+          unit.images?.[0]?.url || null,
+        matchScore: Math.min(score, 100),
+        matchLevel: this.getMatchLevel(score),
+        matchReasons: reasons,
+      };
+    });
+
+    return results.sort(
+      (a, b) => b.matchScore - a.matchScore,
+    );
+  }
+
 
   async getPipeline(userId: string, userRole: Role) {
     const customers = await this.prisma.customer.findMany({

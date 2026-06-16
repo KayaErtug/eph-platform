@@ -128,6 +128,24 @@ interface CustomerProperty {
   };
 }
 
+interface HavuzMatch {
+  unitId: string;
+  projectName?: string;
+  city?: string;
+  district?: string;
+  neighborhood?: string;
+  type?: string;
+  status?: string;
+  price?: number;
+  roomCount?: string;
+  area?: number;
+  coverImage?: string | null;
+  matchScore: number;
+  matchLevel: string;
+  matchReasons: string[];
+  yetkiVerified?: boolean;
+}
+
 const PIPELINE_STAGES = [
   { key: "YENI_LEAD", label: "Yeni Lead", color: "#0284C7", bg: "#E0F2FE" },
   { key: "ILK_GORUSME", label: "İlk Görüşme", color: "#7C3AED", bg: "#F5F3FF" },
@@ -2871,13 +2889,14 @@ function CustomerDetailModal({
   neighborhoodLoading: boolean;
 }) {
   const stage = stageInfo(customer.status);
-  const [activeTab, setActiveTab] = useState<"genel" | "roller" | "ilgiler" | "gayrimenkuller" | "aktiviteler" | "gorevler">("genel");
+  const [activeTab, setActiveTab] = useState<"genel" | "roller" | "ilgiler" | "gayrimenkuller" | "havuz" | "aktiviteler" | "gorevler">("genel");
 
   const tabs = [
     { key: "genel", label: "Genel" },
     { key: "roller", label: "Roller" },
     { key: "ilgiler", label: "İlgi Bölgeleri" },
     { key: "gayrimenkuller", label: "Gayrimenkuller" },
+    { key: "havuz", label: "Havuz Eşleşmeleri" },
     { key: "aktiviteler", label: "Aktivite" },
     { key: "gorevler", label: "Görev" },
   ] as const;
@@ -2904,7 +2923,7 @@ function CustomerDetailModal({
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2 md:grid-cols-6">
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-7">
             {tabs.map((tab) => (
               <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`rounded-2xl px-2 py-3 text-[11px] font-black ${activeTab === tab.key ? "bg-[#1557D6] text-white" : "bg-[#F8FAFC] text-slate-500"}`}>
                 {tab.label}
@@ -2933,6 +2952,7 @@ function CustomerDetailModal({
             />
           )}
           {activeTab === "gayrimenkuller" && <PropertiesTab customer={customer} onDeleteCustomerProperty={onDeleteCustomerProperty} />}
+          {activeTab === "havuz" && <HavuzMatchesTab customer={customer} />}
           {activeTab === "aktiviteler" && <ActivitiesTab customer={customer} activityForm={activityForm} setActivityForm={setActivityForm} activityLoading={activityLoading} onAddActivity={onAddActivity} />}
           {activeTab === "gorevler" && <TasksTab customer={customer} taskForm={taskForm} setTaskForm={setTaskForm} taskLoading={taskLoading} onAddTask={onAddTask} onTaskDone={onTaskDone} />}
         </div>
@@ -3174,6 +3194,202 @@ function InterestCard({ interest, onDelete }: { interest: CustomerInterest; onDe
 
       {interest.notes && <p className="mt-3 whitespace-pre-line break-words rounded-2xl bg-[#F8FAFC] p-3 text-xs font-semibold leading-5 text-slate-600">{interest.notes}</p>}
     </div>
+  );
+}
+
+
+function HavuzMatchesTab({ customer }: { customer: Customer }) {
+  const activeInterests = (customer.interests || []).filter((interest) => interest.isActive);
+  const [selectedInterestId, setSelectedInterestId] = useState(activeInterests[0]?.id || "");
+  const [matches, setMatches] = useState<HavuzMatch[]>([]);
+  const [loadingMatches, setLoadingMatches] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    const firstInterestId = activeInterests[0]?.id || "";
+    setSelectedInterestId((current) => current || firstInterestId);
+  }, [activeInterests]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!selectedInterestId) {
+      setMatches([]);
+      return;
+    }
+
+    setLoadingMatches(true);
+    setErrorMessage("");
+
+    api
+      .get(`/crm/interests/${selectedInterestId}/matches`)
+      .then((response) => {
+        if (!active) return;
+        setMatches(Array.isArray(response.data) ? response.data : []);
+      })
+      .catch(() => {
+        if (!active) return;
+        setMatches([]);
+        setErrorMessage("Havuz eşleşmeleri yüklenemedi.");
+      })
+      .finally(() => {
+        if (active) setLoadingMatches(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedInterestId]);
+
+  const selectedInterest = activeInterests.find((interest) => interest.id === selectedInterestId);
+  const strongMatches = matches.filter((match) => match.matchScore >= 75).length;
+  const mediumMatches = matches.filter((match) => match.matchScore >= 40 && match.matchScore < 75).length;
+  const weakMatches = matches.filter((match) => match.matchScore < 40).length;
+
+  if (!activeInterests.length) {
+    return (
+      <FormSection title="Havuz Eşleşmeleri">
+        <section className="rounded-[26px] border border-dashed border-[#C7D6E8] bg-[#F8FAFC] p-5 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-sm">
+            <Home size={22} />
+          </div>
+          <h3 className="mt-3 text-center text-lg font-black text-[#06194A]">Talep profili gerekiyor</h3>
+          <p className="mx-auto mt-2 max-w-xl text-center text-sm font-bold leading-6 text-[#64748B]">
+            Havuz eşleşmesi için önce İlgi Bölgeleri sekmesinden müşterinin aradığı bölge, bütçe ve portföy tipini kaydedin.
+          </p>
+        </section>
+      </FormSection>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-[26px] border border-[#C7D6E8] bg-white p-4 text-center shadow-[0_10px_28px_rgba(15,23,42,0.055)]">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
+          <Home size={23} />
+        </div>
+        <h3 className="mt-3 text-center text-lg font-black text-[#06194A]">Havuz Eşleşmeleri</h3>
+        <p className="mx-auto mt-2 max-w-2xl text-center text-sm font-semibold leading-6 text-[#64748B]">
+          CRM talebindeki bölge, bütçe, portföy tipi ve özelliklere göre havuzdaki uygun portföyler listelenir.
+        </p>
+
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_120px_120px_120px]">
+          <select
+            className="premium-input text-center"
+            value={selectedInterestId}
+            onChange={(event) => setSelectedInterestId(event.target.value)}
+          >
+            {activeInterests.map((interest) => (
+              <option key={interest.id} value={interest.id}>
+                {interest.title || [interest.city, interest.district, interest.neighborhood].filter(Boolean).join(" / ") || "Talep Profili"}
+              </option>
+            ))}
+          </select>
+          <MiniCounter label="Toplam" value={String(matches.length)} />
+          <MiniCounter label="Güçlü" value={String(strongMatches)} />
+          <MiniCounter label="Uygun" value={String(mediumMatches + weakMatches)} />
+        </div>
+
+        {selectedInterest && (
+          <div className="mt-3 rounded-2xl bg-[#F8FAFC] px-3 py-2 text-center text-xs font-black leading-5 text-[#64748B]">
+            {[selectedInterest.city, selectedInterest.district, selectedInterest.neighborhood].filter(Boolean).join(" / ") || "Bölge yok"}
+            {selectedInterest.minBudget || selectedInterest.maxBudget ? ` • ${money(selectedInterest.minBudget)} - ${money(selectedInterest.maxBudget)}` : ""}
+          </div>
+        )}
+      </section>
+
+      {loadingMatches && (
+        <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[26px] border border-[#C7D6E8] bg-white p-6 text-center">
+          <Loader2 className="animate-spin text-[#1557D6]" size={28} />
+          <p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-[#64748B]">Eşleşmeler yükleniyor</p>
+        </div>
+      )}
+
+      {!loadingMatches && errorMessage && <EmptyBox text={errorMessage} />}
+
+      {!loadingMatches && !errorMessage && matches.length === 0 && (
+        <EmptyBox text="Bu talep profiline uygun havuz portföyü bulunamadı." />
+      )}
+
+      {!loadingMatches && !errorMessage && matches.length > 0 && (
+        <div className="space-y-3">
+          {matches.map((match) => (
+            <HavuzMatchCard key={match.unitId} match={match} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HavuzMatchCard({ match }: { match: HavuzMatch }) {
+  const scoreTone = match.matchScore >= 75 ? "text-emerald-700 bg-emerald-50" : match.matchScore >= 40 ? "text-amber-700 bg-amber-50" : "text-slate-600 bg-[#F8FAFC]";
+  const title = match.projectName || "Havuz Portföyü";
+  const location = [match.city, match.district, match.neighborhood].filter(Boolean).join(" / ") || "Konum belirtilmedi";
+  const detailUrl = `/havuz/${match.unitId}`;
+
+  return (
+    <article className="overflow-hidden rounded-[26px] border border-[#C7D6E8] bg-white shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
+      {match.coverImage && (
+        <div className="h-36 w-full overflow-hidden bg-[#F8FAFC]">
+          <img src={match.coverImage} alt={title} className="h-full w-full object-cover" />
+        </div>
+      )}
+
+      <div className="space-y-3 p-4">
+        <div className="grid grid-cols-[1fr_auto] items-start gap-3">
+          <div className="min-w-0">
+            <p className="line-clamp-2 break-words text-[15px] font-black leading-tight text-[#06194A]">{title}</p>
+            <p className="mt-1 flex min-w-0 items-center justify-center gap-1 text-center text-xs font-bold leading-5 text-[#64748B] sm:justify-start sm:text-left">
+              <MapPin size={13} className="shrink-0" />
+              <span className="min-w-0 break-words">{location}</span>
+            </p>
+          </div>
+
+          <div className={`shrink-0 rounded-2xl px-3 py-2 text-center ${scoreTone}`}>
+            <p className="text-[18px] font-black leading-none">{match.matchScore}</p>
+            <p className="mt-0.5 text-[9px] font-black uppercase leading-none">/100</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <MiniCounter label="Seviye" value={match.matchLevel || "—"} />
+          <MiniCounter label="Fiyat" value={money(match.price)} />
+          <MiniCounter label="Oda" value={match.roomCount || "—"} />
+          <MiniCounter label="m²" value={match.area ? `${match.area}` : "—"} />
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
+          {match.type && <Chip>{optionLabel(PROPERTY_TYPE_OPTIONS, match.type)}</Chip>}
+          {match.status && <Chip>{optionLabel(UNIT_STATUS_OPTIONS, match.status)}</Chip>}
+          <Chip>{match.yetkiVerified ? "Yetki doğrulandı" : "Havuz portföyü"}</Chip>
+        </div>
+
+        {match.matchReasons?.length > 0 && (
+          <div className="rounded-2xl bg-[#F8FAFC] p-3">
+            <p className="text-center text-[10px] font-black uppercase tracking-wide text-[#1557D6]">Neden uygun?</p>
+            <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+              {match.matchReasons.slice(0, 5).map((reason) => (
+                <span key={reason} className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black leading-4 text-[#64748B] shadow-sm">
+                  {reason}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => {
+            window.location.href = detailUrl;
+          }}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#1557D6] px-4 text-sm font-black text-white shadow-[0_10px_24px_rgba(21,87,214,0.18)]"
+        >
+          Detay Gör
+          <ChevronRight size={17} />
+        </button>
+      </div>
+    </article>
   );
 }
 
