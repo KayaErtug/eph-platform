@@ -1291,6 +1291,39 @@ export default function StokCreateModal({
                   </div>
                 </>
               )}
+
+              {selectedProjectId && (
+                  <div className="stock-form-field full">
+                    <GoogleGeoPicker
+                      city={projectForm.city}
+                      district={projectForm.district}
+                      address={projectForm.address}
+                      latitude={Number((projectForm as any).latitude || 0) || null}
+                      longitude={Number((projectForm as any).longitude || 0) || null}
+                      mapAddress={String((projectForm as any).mapAddress || "")}
+                      placeId={String((projectForm as any).placeId || "")}
+                      onOpenChange={setGeoPickerOpen}
+                      onChange={(location) => {
+                        const nextAddress = String((location as any).address || "").trim();
+
+                        if (nextAddress) {
+                          setSelectedPlace(nextAddress);
+                        }
+
+                        setProjectForm((current) => ({
+                          ...(current as any),
+                          city: String((location as any).city || current.city || "").trim(),
+                          district: String((location as any).district || current.district || "").trim(),
+                          address: nextAddress || current.address || location.mapAddress,
+                          latitude: location.latitude,
+                          longitude: location.longitude,
+                          mapAddress: location.mapAddress,
+                          placeId: location.placeId || "",
+                        }));
+                      }}
+                    />
+                  </div>
+              )}
             </div>
           </div>
 

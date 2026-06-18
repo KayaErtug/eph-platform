@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  ArrowLeft,
   Bell,
   Building2,
   ChevronDown,
@@ -17,7 +18,6 @@ import {
   Send,
   Search,
   Share2,
-  SlidersHorizontal,
   Trash2,
   X,
 } from "lucide-react";
@@ -864,15 +864,17 @@ function StokPageInner() {
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#F7FBFF] pb-28 text-[#06194A]">
+    <main className="min-h-screen overflow-x-hidden bg-[#F7FBFF] pb-36 text-[#06194A]">
       <div className="mx-auto w-full max-w-[430px] overflow-x-hidden px-3 pt-3">
         <section className="rounded-[28px] border border-[#DDE7F3] bg-white p-3 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
           <div className="flex items-center justify-between gap-3">
             <button
               type="button"
-              className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#F8FBFF] text-[#06194A]"
+              onClick={() => router.back()}
+              className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#F8FBFF] text-[#06194A] active:scale-[0.98]"
+              aria-label="Geri dön"
             >
-              <SlidersHorizontal size={20} />
+              <ArrowLeft size={20} />
             </button>
             <div className="text-center">
               <h1 className="text-[22px] font-black tracking-[-0.05em] text-[#06194A]">
@@ -884,7 +886,9 @@ function StokPageInner() {
             </div>
             <button
               type="button"
-              className="relative flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#F8FBFF] text-[#06194A]"
+              onClick={() => router.push("/messages")}
+              className="relative flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#F8FBFF] text-[#06194A] active:scale-[0.98]"
+              aria-label="Mesajlar"
             >
               <Bell size={20} />
               <span className="absolute right-2 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-black text-white">

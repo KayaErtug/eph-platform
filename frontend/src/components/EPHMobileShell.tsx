@@ -31,7 +31,7 @@ import { useAuthStore } from "@/store/auth.store";
 const MAIN_ROUTES = [
   "/dashboard",
   "/crm",
-  "/stok",
+  "/portfoy",
   "/network",
   "/havuz",
   "/forum",
@@ -40,7 +40,7 @@ const MAIN_ROUTES = [
 
 function getTitle(pathname: string) {
   if (pathname.startsWith("/crm")) return "CRM";
-  if (pathname.startsWith("/stok")) return "PORTFÖY";
+  if (pathname.startsWith("/portfoy")) return "PORTFÖY";
   if (pathname.startsWith("/forum") || pathname.startsWith("/network")) return "FORUM";
   if (pathname.startsWith("/havuz")) return "HAVUZ";
   if (pathname.startsWith("/messages")) return "MESAJLAR";
@@ -262,7 +262,7 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
               <MenuSection title="Operasyon Merkezi">
                 <MenuRow icon={<Home size={17} />} label="Anasayfa" onClick={() => go("/dashboard")} />
                 <MenuRow icon={<UsersRound size={17} />} label="CRM" onClick={() => go("/crm")} />
-                <MenuRow icon={<Building2 size={17} />} label="Portföy" onClick={() => go("/stok")} />
+                <MenuRow icon={<Building2 size={17} />} label="Portföy" onClick={() => go("/portfoy")} />
                 <MenuRow icon={<MessageSquare size={17} />} label="Forum" onClick={() => go("/network")} />
                 <MenuRow icon={<Target size={17} />} label="Havuz" onClick={() => go("/havuz")} />
                 <MenuRow icon={<Bell size={17} />} label="Mesajlar" badge="Yeni" onClick={() => go("/messages")} />
@@ -397,8 +397,8 @@ function EPHMobileBottomNav({ pathname }: { pathname: string }) {
         label="CRM"
       />
       <BottomItem
-        href="/stok"
-        active={pathname.startsWith("/stok")}
+        href="/portfoy"
+        active={pathname.startsWith("/portfoy")}
         icon={<Building2 size={25} strokeWidth={2.35} />}
         label="Portföy"
       />
