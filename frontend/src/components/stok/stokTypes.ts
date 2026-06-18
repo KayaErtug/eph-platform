@@ -53,6 +53,8 @@ export interface Unit {
   totalFloors?: number;
 
   number: string;
+  adaNo?: string;
+  parselNo?: string;
   roomCount?: string;
   area?: number;
 
@@ -127,6 +129,8 @@ export interface UnitFormState {
   totalFloors?: string;
 
   number: string;
+  adaNo: string;
+  parselNo: string;
   roomCount: string;
   area: string;
 

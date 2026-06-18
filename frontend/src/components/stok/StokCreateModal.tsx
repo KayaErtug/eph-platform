@@ -216,6 +216,14 @@ function isLandType(type: string) {
   return typeHasKeyword(type, LAND_TYPE_KEYWORDS);
 }
 
+function sanitizeAdaNo(value: string) {
+  return String(value || '').replace(/\D/g, '').slice(0, 6);
+}
+
+function sanitizeParselNo(value: string) {
+  return String(value || '').replace(/\D/g, '').slice(0, 4);
+}
+
 function isIndustrialType(type: string) {
   return typeHasKeyword(type, INDUSTRIAL_TYPE_KEYWORDS);
 }
@@ -694,6 +702,8 @@ export default function StokCreateModal({
   const openArea = String((unitForm as any).openArea || "");
   const closedArea = String((unitForm as any).closedArea || "");
   const deedOwnerFullName = String((unitForm as any).deedOwnerFullName || "");
+  const adaNo = String((unitForm as any).adaNo || "");
+  const parselNo = String((unitForm as any).parselNo || "");
   const deedOwnerPhone = String((unitForm as any).deedOwnerPhone || "");
   const deedOwnerEmail = String((unitForm as any).deedOwnerEmail || "");
   const availableCreditAmountDisplay = formatPriceInput(String((unitForm as any).availableCreditAmount || ""));
@@ -1057,10 +1067,25 @@ export default function StokCreateModal({
     const area = Number(unitForm.area || 0);
     const price = Number(unitForm.price || 0);
     const number = String(unitForm.number || "").trim();
+    const cleanAdaNo = sanitizeAdaNo(adaNo);
+    const cleanParselNo = sanitizeParselNo(parselNo);
     const rule = getAreaRule(unitForm.type);
 
     if (area && (area < rule.min || area > rule.max)) {
       return `${rule.label} metrekare değeri mantıksız görünüyor. ${rule.min.toLocaleString("tr-TR")} m² ile ${rule.max.toLocaleString("tr-TR")} m² arasında bir değer giriniz veya bilgiyi kontrol ediniz.`;
+    }
+
+    if (adaNo && adaNo !== cleanAdaNo) {
+      return "Ada No sadece rakamlardan oluşmalı ve en fazla 6 hane olmalıdır.";
+    }
+
+    if (parselNo && parselNo !== cleanParselNo) {
+      return "Parsel No sadece rakamlardan oluşmalı ve en fazla 4 hane olmalıdır.";
+    }
+
+    if (isLandType(unitForm.type)) {
+      if (!cleanAdaNo) return "Arsa, tarla ve arazi türlerinde Ada No zorunludur.";
+      if (!cleanParselNo) return "Arsa, tarla ve arazi türlerinde Parsel No zorunludur.";
     }
 
     if (!isLandType(unitForm.type) && /^\d{5,}$/.test(number)) {
@@ -1365,6 +1390,8 @@ export default function StokCreateModal({
                       floorLabel: "",
                       totalFloors: "",
                       number: "",
+                      adaNo: "",
+                      parselNo: "",
                     } as UnitFormState));
                     setLocalError("");
                   }}
@@ -1393,6 +1420,8 @@ export default function StokCreateModal({
                       floorLabel: "",
                       totalFloors: "",
                       number: "",
+                      adaNo: "",
+                      parselNo: "",
                     } as UnitFormState));
                     setLocalError("");
                   }}
@@ -1546,13 +1575,39 @@ export default function StokCreateModal({
               )}
 
               <label className="stock-form-field">
-                <span>{getNumberLabel(unitForm.type)}</span>
+                <span>Ada No{isLandType(unitForm.type) ? " *" : ""}</span>
                 <input
-                  value={unitForm.number}
-                  onChange={(e) => setUnitField("number", e.target.value)}
-                  placeholder={getNumberPlaceholder(unitForm.type)}
+                  type="text"
+                  inputMode="numeric"
+                  value={adaNo}
+                  onChange={(e) => setUnitField("adaNo", sanitizeAdaNo(e.target.value))}
+                  placeholder="Örn: 4752"
+                  maxLength={6}
                 />
               </label>
+
+              <label className="stock-form-field">
+                <span>Parsel No{isLandType(unitForm.type) ? " *" : ""}</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={parselNo}
+                  onChange={(e) => setUnitField("parselNo", sanitizeParselNo(e.target.value))}
+                  placeholder="Örn: 11"
+                  maxLength={4}
+                />
+              </label>
+
+              {!isLandType(unitForm.type) && (
+                <label className="stock-form-field">
+                  <span>{getNumberLabel(unitForm.type)}</span>
+                  <input
+                    value={unitForm.number}
+                    onChange={(e) => setUnitField("number", e.target.value)}
+                    placeholder={getNumberPlaceholder(unitForm.type)}
+                  />
+                </label>
+              )}
 
               <label className="stock-form-field">
                 <span>Para Birimi *</span>

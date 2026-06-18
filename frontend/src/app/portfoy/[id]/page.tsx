@@ -296,6 +296,19 @@ function getDetailValue(unit: DetailUnit, keys: string[], fallback = "—") {
   return fallback;
 }
 
+function formatAdaParselValue(unit?: DetailUnit | null) {
+  const adaNo = String((unit as any)?.adaNo || "").trim();
+  const parselNo = String((unit as any)?.parselNo || "").trim();
+  const legacyNumber = String((unit as any)?.number || "").trim();
+
+  if (adaNo && parselNo) return `${adaNo} / ${parselNo}`;
+  if (adaNo) return `Ada ${adaNo}`;
+  if (parselNo) return `Parsel ${parselNo}`;
+  if (legacyNumber) return legacyNumber;
+
+  return "—";
+}
+
 function formatAreaValue(value?: number | string | null, fallback = "—") {
   const numeric = Number(value || 0);
   if (!numeric) return fallback;
@@ -360,7 +373,7 @@ function getPrimaryInfoBoxes(
     return [
       { icon: <Maximize2 size={18} />, label: "Alan", value: formatAreaValue(unit.area) },
       { icon: <Landmark size={18} />, label: "İmar", value: getDetailValue(unit, ["zoningStatus", "imarDurumu"], "Eklenmedi") },
-      { icon: <Home size={18} />, label: "Ada / Parsel", value: unit.number || "—" },
+      { icon: <Home size={18} />, label: "Ada / Parsel", value: formatAdaParselValue(unit) },
       { icon: <Ruler size={18} />, label: "Emsal", value: getDetailValue(unit, ["kaks", "emsal"], "Eklenmedi") },
       { icon: <Building2 size={18} />, label: "Kat İzni", value: getDetailValue(unit, ["allowedFloors", "katIzni"], "Eklenmedi") },
       { icon: <MapPin size={18} />, label: "Cephe", value: getDetailValue(unit, ["frontage", "yolaCephe"], "Eklenmedi") },
@@ -1462,17 +1475,17 @@ export default function StokDetailPage() {
                 "noopener,noreferrer",
               )
             }
-            className="flex w-full items-center justify-between gap-3 border-b border-[#E8F0FA] px-3 py-2.5 text-left"
+            className="flex w-full flex-col items-center justify-center gap-2 border-b border-[#E8F0FA] px-3 py-3 text-center"
           >
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#64748B]">
+            <div className="min-w-0 text-center">
+              <p className="text-center text-[10px] font-black uppercase tracking-[0.18em] text-[#64748B]">
                 Konum
               </p>
-              <p className="mt-0.5 truncate text-[13px] font-black text-[#06194A]">
+              <p className="mt-0.5 truncate text-center text-[13px] font-black text-[#06194A]">
                 {locationText}
               </p>
             </div>
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-[14px] bg-[#EFF6FF] px-2.5 py-1.5 text-[11px] font-black text-[#1557D6]">
+            <span className="inline-flex shrink-0 items-center justify-center gap-1 rounded-[14px] bg-[#EFF6FF] px-2.5 py-1.5 text-center text-[11px] font-black text-[#1557D6]">
               Haritada Aç <ExternalLink size={12} />
             </span>
           </button>
@@ -1549,9 +1562,9 @@ export default function StokDetailPage() {
         )}
 
         <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="flex items-center gap-2 text-[#1557D6]">
+          <div className="flex items-center justify-center gap-2 text-center text-[#1557D6]">
             <Building2 size={17} />
-            <h2 className="text-[16px] font-black text-[#06194A]">Detaylar</h2>
+            <h2 className="text-center text-[16px] font-black text-[#06194A]">Detaylar</h2>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <InfoRow label="Portföy" value={unit.project?.name || "—"} />
@@ -1561,7 +1574,7 @@ export default function StokDetailPage() {
               label={
                 isLandDetailType(unit.type) ? "Ada / Parsel" : "Bağımsız Bölüm"
               }
-              value={unit.number || "—"}
+              value={isLandDetailType(unit.type) ? formatAdaParselValue(unit) : unit.number || "—"}
             />
             <InfoRow label="Kayıt" value={formatDate(unit.createdAt)} />
           </div>
@@ -2187,19 +2200,19 @@ function PortfolioApprovalCenter({
     "min-h-[38px] rounded-[14px] px-2 text-[10px] font-black disabled:opacity-60";
 
   return (
-    <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#64748B]">
+    <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+      <div className="flex flex-col items-center justify-center gap-2 text-center">
+        <div className="min-w-0 text-center">
+          <p className="text-center text-[9px] font-black uppercase tracking-[0.18em] text-[#64748B]">
             Onay Merkezi
           </p>
-          <h2 className="mt-0.5 truncate text-[15px] font-black text-[#06194A]">
+          <h2 className="mt-0.5 truncate text-center text-[15px] font-black text-[#06194A]">
             Portföy Kontrol Paneli
           </h2>
         </div>
 
         <span
-          className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black ${currentStatusConfig.className}`}
+          className={`inline-flex shrink-0 items-center justify-center rounded-full px-3 py-1.5 text-center text-[10px] font-black ${currentStatusConfig.className}`}
         >
           {currentStatusConfig.label}
         </span>

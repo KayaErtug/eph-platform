@@ -247,6 +247,8 @@ model Unit {
   type                   UnitType                     @default(DAIRE)
   floor                  Int?
   number                 String?
+  adaNo                  String?
+  parselNo               String?
   roomCount              String?
   area                   Float?
   price                  Float

@@ -175,6 +175,33 @@ const categories = [
   "Özel",
 ];
 
+const POOL_CARD_STYLES = [
+  {
+    frame: "border-[#2563EB] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] shadow-[0_16px_34px_rgba(37,99,235,0.16)]",
+    strip: "bg-[#2563EB]",
+    imageBg: "bg-[#EFF6FF]",
+    soft: "bg-[#F8FBFF]",
+  },
+  {
+    frame: "border-emerald-400 bg-gradient-to-br from-white via-[#F8FFFB] to-emerald-50 shadow-[0_16px_34px_rgba(16,185,129,0.15)]",
+    strip: "bg-emerald-500",
+    imageBg: "bg-emerald-50",
+    soft: "bg-[#F7FFFB]",
+  },
+  {
+    frame: "border-amber-400 bg-gradient-to-br from-white via-[#FFFDF7] to-amber-50 shadow-[0_16px_34px_rgba(245,158,11,0.16)]",
+    strip: "bg-amber-500",
+    imageBg: "bg-amber-50",
+    soft: "bg-[#FFFDF7]",
+  },
+  {
+    frame: "border-violet-400 bg-gradient-to-br from-white via-[#FBFAFF] to-violet-50 shadow-[0_16px_34px_rgba(139,92,246,0.14)]",
+    strip: "bg-violet-500",
+    imageBg: "bg-violet-50",
+    soft: "bg-[#FBFAFF]",
+  },
+];
+
 const CURRENCY_SYMBOLS: Record<string, string> = {
   TRY: "₺",
   USD: "$",
@@ -1064,20 +1091,21 @@ export default function HavuzPage() {
           </section>
         )}
 
-        <section className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-[16px] font-black tracking-[-0.03em] text-[#1F2937]">
+        <section className="space-y-4">
+          <div className="px-1 text-center">
+            <h2 className="text-center text-[18px] font-black tracking-[-0.03em] text-[#1F2937]">
               Sana Uygun Portföyler
             </h2>
-            <span className="text-[10px] font-black text-[#2563EB]">
+            <p className="mt-1 text-center text-[10px] font-black text-[#2563EB]">
               CRM ↔ Havuz
-            </span>
+            </p>
           </div>
 
           {displayedUnits.length > 0 ? (
-            displayedUnits.map(({ unit, match }) => (
+            displayedUnits.map(({ unit, match }, index) => (
               <PoolUnitCard
                 key={unit.id}
+                index={index}
                 unit={unit}
                 match={match}
                 busyAction={busyAction}
@@ -1505,6 +1533,7 @@ function KontorSuccessToast({ toast }: { toast: SuccessToast }) {
 }
 
 function PoolUnitCard({
+  index,
   unit,
   match,
   busyAction,
@@ -1512,6 +1541,7 @@ function PoolUnitCard({
   onMessage,
   onAction,
 }: {
+  index: number;
   unit: Unit;
   match: { score: number; customer: Customer | null; budgetDiff: number };
   busyAction: string | null;
@@ -1531,20 +1561,23 @@ function PoolUnitCard({
   const trustIndexTone = getTrustIndexTone(trustIndex.score);
   const hasPhoto = Array.isArray(unit.images) && unit.images.length > 0;
   const hasLocation = Boolean(unit.project?.city && unit.project?.district);
+  const cardStyle = POOL_CARD_STYLES[index % POOL_CARD_STYLES.length];
 
   return (
     <article
       onClick={onDetail}
-      className="cursor-pointer overflow-hidden rounded-[24px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.07)] active:scale-[0.995]"
+      className={`relative cursor-pointer overflow-hidden rounded-[26px] border-[3px] ${cardStyle.frame} active:scale-[0.995]`}
     >
-      <div className="grid min-h-[126px] grid-cols-[112px_1fr]">
+      <div className={`absolute inset-x-0 top-0 h-1.5 ${cardStyle.strip}`} />
+
+      <div className="grid min-h-[126px] grid-cols-[112px_1fr] pt-1.5">
         <button
           type="button"
           onClick={(event) => {
             event.stopPropagation();
             onDetail();
           }}
-          className="relative bg-[#EFF6FF] text-left"
+          className={`relative text-left ${cardStyle.imageBg}`}
         >
           {image ? (
             <img
@@ -1571,23 +1604,23 @@ function PoolUnitCard({
         </button>
 
         <div className="min-w-0 p-2.5">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="line-clamp-1 text-[9px] font-black uppercase tracking-[0.1em] text-[#2563EB] break-words [overflow-wrap:anywhere]">
+          <div className="relative min-h-[58px]">
+            <div className="min-w-0 px-6 text-center">
+              <p className="line-clamp-1 text-center text-[9px] font-black uppercase tracking-[0.1em] text-[#2563EB] break-words [overflow-wrap:anywhere]">
                 {limitText(typeLabel(unit.type), 32)}
               </p>
-              <h3 className="mt-0.5 line-clamp-2 text-[14px] font-black leading-[1.12] text-[#1F2937] break-words [overflow-wrap:anywhere]">
+              <h3 className="mx-auto mt-0.5 line-clamp-2 max-w-[210px] text-center text-[14px] font-black leading-[1.12] text-[#1F2937] break-words [overflow-wrap:anywhere]">
                 {limitText(unit.project?.name || "EPH Portföy", 60)}
               </h3>
-              <p className="mt-1 flex min-w-0 items-start gap-1 text-[10px] font-bold leading-3 text-[#64748B]">
-                <MapPin size={11} className="mt-0.5 shrink-0" />
+              <p className="mt-1 flex min-w-0 items-center justify-center gap-1 text-center text-[10px] font-bold leading-3 text-[#64748B]">
+                <MapPin size={11} className="shrink-0" />
                 <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">
                   {limitText(getLocation(unit), 42)}
                 </span>
               </p>
             </div>
 
-            <BadgeCheck className="shrink-0 text-emerald-600" size={18} />
+            <BadgeCheck className="absolute right-0 top-0 shrink-0 text-emerald-600" size={18} />
           </div>
 
           <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -1602,18 +1635,16 @@ function PoolUnitCard({
         </div>
       </div>
 
-      <section className="mx-2.5 mb-2 rounded-[18px] border-2 border-[#C7D6E8] bg-white p-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-              Portföy Kalitesi
-            </p>
-            <p className="mt-0.5 text-[11px] font-bold text-[#64748B]">
-              Belge, fotoğraf, konum ve havuz hazırlığı
-            </p>
-          </div>
+      <section className={`mx-2.5 mb-2 rounded-[18px] border-2 border-[#C7D6E8] ${cardStyle.soft} p-2`}>
+        <div className="text-center">
+          <p className="text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+            Portföy Kalitesi
+          </p>
+          <p className="mx-auto mt-0.5 max-w-[260px] text-center text-[11px] font-bold leading-4 text-[#64748B]">
+            Belge, fotoğraf, konum ve havuz hazırlığı
+          </p>
           <span
-            className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-black ${qualityTone}`}
+            className={`mt-2 inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-center text-[11px] font-black ${qualityTone}`}
           >
             {qualityScore}/100 · {qualityLabel}
           </span>
@@ -1629,19 +1660,17 @@ function PoolUnitCard({
         </div>
       </section>
 
-      <section className="mx-2.5 mb-2 rounded-[18px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-              Havuz Güven Endeksi
-            </p>
-            <p className="mt-0.5 text-[11px] font-bold text-[#64748B]">
-              Tapu, yetki, fotoğraf ve CRM uyumu
-            </p>
-          </div>
+      <section className={`mx-2.5 mb-2 rounded-[18px] border-2 border-[#C7D6E8] ${cardStyle.soft} p-2`}>
+        <div className="text-center">
+          <p className="text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+            Havuz Güven Endeksi
+          </p>
+          <p className="mx-auto mt-0.5 max-w-[260px] text-center text-[11px] font-bold leading-4 text-[#64748B]">
+            Tapu, yetki, fotoğraf ve CRM uyumu
+          </p>
 
           <span
-            className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-black ${trustIndexTone}`}
+            className={`mt-2 inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-center text-[11px] font-black ${trustIndexTone}`}
           >
             {trustIndex.score}/100 · {trustIndexLabel}
           </span>
@@ -1658,18 +1687,16 @@ function PoolUnitCard({
         </div>
       </section>
 
-      <section className="mx-2.5 mb-2.5 rounded-[18px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-2">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-              Neden uygun?
-            </p>
-            <p className="mt-0.5 text-[11px] font-bold text-[#64748B]">
-              Konum, tip ve bütçe sinyalleri eşleşiyor.
-            </p>
-          </div>
+      <section className={`mx-2.5 mb-2.5 rounded-[18px] border-2 border-[#C7D6E8] ${cardStyle.soft} p-2`}>
+        <div className="text-center">
+          <p className="text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+            Neden uygun?
+          </p>
+          <p className="mx-auto mt-0.5 max-w-[260px] text-center text-[11px] font-bold leading-4 text-[#64748B]">
+            Konum, tip ve bütçe sinyalleri eşleşiyor.
+          </p>
 
-          <span className="shrink-0 rounded-full bg-[#2563EB] px-2.5 py-1 text-[11px] font-black text-white">
+          <span className="mt-2 inline-flex items-center justify-center rounded-full bg-[#2563EB] px-2.5 py-1 text-center text-[11px] font-black text-white">
             %{match.score}
           </span>
         </div>
@@ -1681,7 +1708,7 @@ function PoolUnitCard({
         </div>
       </section>
 
-      <div className="border-t-2 border-[#C7D6E8] bg-[#F8FAFC] p-1.5">
+      <div className={`border-t-2 border-[#C7D6E8] ${cardStyle.soft} p-1.5`}>
         <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
@@ -1803,17 +1830,15 @@ function PoolDetailModal({
           </div>
 
           <div className="mt-[clamp(8px,2.5vw,12px)] rounded-[clamp(16px,5vw,20px)] border-2 border-[#C7D6E8] bg-white p-[clamp(10px,3vw,14px)]">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-                  Portföy Kalitesi
-                </p>
-                <p className="mt-1 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
-                  Belge, fotoğraf, konum ve havuz hazırlığı skoru.
-                </p>
-              </div>
+            <div className="text-center">
+              <p className="text-center text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+                Portföy Kalitesi
+              </p>
+              <p className="mx-auto mt-1 max-w-[280px] text-center text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
+                Belge, fotoğraf, konum ve havuz hazırlığı skoru.
+              </p>
               <span
-                className={`shrink-0 rounded-full border px-2.5 py-1 text-[clamp(10px,2.8vw,11px)] font-black ${qualityTone}`}
+                className={`mt-2 inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-center text-[clamp(10px,2.8vw,11px)] font-black ${qualityTone}`}
               >
                 {qualityScore}/100 · {qualityLabel}
               </span>
@@ -1836,17 +1861,15 @@ function PoolDetailModal({
           </div>
 
           <div className="mt-[clamp(8px,2.5vw,12px)] rounded-[clamp(16px,5vw,20px)] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-[clamp(10px,3vw,14px)]">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-                  Havuz Güven Endeksi
-                </p>
-                <p className="mt-1 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
-                  Tapu, yetki, fotoğraf ve CRM uyumu birlikte değerlendirilir.
-                </p>
-              </div>
+            <div className="text-center">
+              <p className="text-center text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+                Havuz Güven Endeksi
+              </p>
+              <p className="mx-auto mt-1 max-w-[280px] text-center text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
+                Tapu, yetki, fotoğraf ve CRM uyumu birlikte değerlendirilir.
+              </p>
               <span
-                className={`shrink-0 rounded-full border px-2.5 py-1 text-[clamp(10px,2.8vw,11px)] font-black ${trustIndexTone}`}
+                className={`mt-2 inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-center text-[clamp(10px,2.8vw,11px)] font-black ${trustIndexTone}`}
               >
                 {trustIndex.score}/100 · {trustIndexLabel}
               </span>
@@ -1875,16 +1898,14 @@ function PoolDetailModal({
           </div>
 
           <div className="mt-[clamp(8px,2.5vw,12px)] rounded-[clamp(16px,5vw,20px)] border-2 border-[#C7D6E8] bg-white p-[clamp(10px,3vw,14px)]">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-                  CRM Eşleşme Özeti
-                </p>
-                <p className="mt-1 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
-                  Bu portföy müşteri talep profillerinle karşılaştırıldı.
-                </p>
-              </div>
-              <span className="shrink-0 rounded-full bg-[#2563EB] px-2.5 py-1 text-[clamp(10px,2.8vw,11px)] font-black text-white">
+            <div className="text-center">
+              <p className="text-center text-[clamp(9px,2.5vw,10px)] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+                CRM Eşleşme Özeti
+              </p>
+              <p className="mx-auto mt-1 max-w-[280px] text-center text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569]">
+                Bu portföy müşteri talep profillerinle karşılaştırıldı.
+              </p>
+              <span className="mt-2 inline-flex items-center justify-center rounded-full bg-[#2563EB] px-2.5 py-1 text-center text-[clamp(10px,2.8vw,11px)] font-black text-white">
                 %{match.score}
               </span>
             </div>

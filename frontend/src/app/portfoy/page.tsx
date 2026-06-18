@@ -95,6 +95,37 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   GBP: "£",
 };
 
+const PORTFOLIO_CARD_STYLES = [
+  {
+    frame:
+      "border-[#2563EB] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] shadow-[0_16px_34px_rgba(37,99,235,0.16)]",
+    imageBg: "bg-[#EFF6FF]",
+    soft: "bg-[#F8FBFF]",
+    strip: "bg-[#2563EB]",
+  },
+  {
+    frame:
+      "border-emerald-400 bg-gradient-to-br from-white via-[#F8FFFB] to-emerald-50 shadow-[0_16px_34px_rgba(16,185,129,0.15)]",
+    imageBg: "bg-emerald-50",
+    soft: "bg-[#F7FFFB]",
+    strip: "bg-emerald-500",
+  },
+  {
+    frame:
+      "border-amber-400 bg-gradient-to-br from-white via-[#FFFDF7] to-amber-50 shadow-[0_16px_34px_rgba(245,158,11,0.16)]",
+    imageBg: "bg-amber-50",
+    soft: "bg-[#FFFDF7]",
+    strip: "bg-amber-500",
+  },
+  {
+    frame:
+      "border-violet-400 bg-gradient-to-br from-white via-[#FBFAFF] to-violet-50 shadow-[0_16px_34px_rgba(139,92,246,0.14)]",
+    imageBg: "bg-violet-50",
+    soft: "bg-[#FBFAFF]",
+    strip: "bg-violet-500",
+  },
+];
+
 const DEFAULT_CENTER = { lat: 37.783, lng: 29.096 };
 
 declare global {
@@ -204,7 +235,7 @@ function getUnitCoverImage(unit?: Unit | null) {
 function isUnitVerified(unit?: Unit | null) {
   return Boolean(
     unit?.isVerified ||
-      (unit?.tapuVerified && unit?.photoVerified && unit?.yetkiVerified),
+    (unit?.tapuVerified && unit?.photoVerified && unit?.yetkiVerified),
   );
 }
 
@@ -213,11 +244,15 @@ function getPortfolioQuality(unit?: MapUnit | null) {
   const hasPhoto = imageCount > 0 || Boolean((unit as any)?.photoVerified);
   const hasDocument = Boolean(
     (unit as any)?.tapuVerified ||
-      (unit as any)?.yetkiVerified ||
-      (unit as any)?.isVerified,
+    (unit as any)?.yetkiVerified ||
+    (unit as any)?.isVerified,
   );
-  const hasLocation = Boolean(unit?.project?.latitude && unit?.project?.longitude);
-  const hasAuthority = Boolean((unit as any)?.yetkiVerified || (unit as any)?.isVerified);
+  const hasLocation = Boolean(
+    unit?.project?.latitude && unit?.project?.longitude,
+  );
+  const hasAuthority = Boolean(
+    (unit as any)?.yetkiVerified || (unit as any)?.isVerified,
+  );
   const approvalStatus = String((unit as any)?.approvalStatus || "");
   const isPoolReady =
     approvalStatus === "ONAYLANDI" ||
@@ -334,6 +369,8 @@ function StokPageInner() {
     floorLabel: "",
     totalFloors: "",
     number: "",
+    adaNo: "",
+    parselNo: "",
     roomCount: "3+1",
     area: "",
     price: "",
@@ -503,12 +540,16 @@ function StokPageInner() {
 
     return {
       averageScore: Math.round(
-        qualities.reduce((sum, quality) => sum + quality.score, 0) / qualities.length,
+        qualities.reduce((sum, quality) => sum + quality.score, 0) /
+          qualities.length,
       ),
-      qualityPortfolioCount: qualities.filter((quality) => quality.score >= 75).length,
-      riskyPortfolioCount: qualities.filter((quality) => quality.score < 60).length,
+      qualityPortfolioCount: qualities.filter((quality) => quality.score >= 75)
+        .length,
+      riskyPortfolioCount: qualities.filter((quality) => quality.score < 60)
+        .length,
       poolReadyCount: qualities.filter((quality) => quality.isPoolReady).length,
-      missingDocumentCount: qualities.filter((quality) => !quality.hasDocument).length,
+      missingDocumentCount: qualities.filter((quality) => !quality.hasDocument)
+        .length,
     };
   }, [units]);
 
@@ -548,6 +589,8 @@ function StokPageInner() {
       floorLabel: "",
       totalFloors: "",
       number: "",
+      adaNo: "",
+      parselNo: "",
       roomCount: "3+1",
       area: "",
       price: "",
@@ -591,6 +634,8 @@ function StokPageInner() {
       floorLabel: unit.floorLabel || "",
       totalFloors: unit.totalFloors != null ? String(unit.totalFloors) : "",
       number: unit.number || "",
+      adaNo: (unit as any).adaNo || "",
+      parselNo: (unit as any).parselNo || "",
       roomCount: unit.roomCount || "",
       area: unit.area != null ? String(unit.area) : "",
       price: unit.price != null ? String(Math.round(Number(unit.price))) : "",
@@ -649,7 +694,9 @@ function StokPageInner() {
         return;
       }
 
-      const numericAvailableCreditAmount = parseFormattedNumber(String((unitForm as any).availableCreditAmount || ""));
+      const numericAvailableCreditAmount = parseFormattedNumber(
+        String((unitForm as any).availableCreditAmount || ""),
+      );
 
       const unitPayload = {
         type: unitForm.type,
@@ -659,6 +706,8 @@ function StokPageInner() {
           ? parseInt(unitForm.totalFloors, 10)
           : undefined,
         number: unitForm.number,
+        adaNo: String((unitForm as any).adaNo || "").trim() || undefined,
+        parselNo: String((unitForm as any).parselNo || "").trim() || undefined,
         roomCount: unitForm.roomCount || undefined,
         area: parseFloat(unitForm.area),
         price: numericPrice,
@@ -831,7 +880,6 @@ function StokPageInner() {
     }
   };
 
-
   const handleSendToPool = async (unit: MapUnit) => {
     if ((unit as any).approvalStatus !== "ONAYLANDI") {
       alert("Sadece onaylanmış portföyler havuza gönderilebilir.");
@@ -855,9 +903,13 @@ function StokPageInner() {
       setPoolActionUnitId(unit.id);
       await api.post(`/units/${unit.id}/remove-from-pool`);
       await fetchData();
-      alert("Portföy havuzdan kaldırıldı. Onaylı durumda kalır, istediğiniz zaman tekrar havuza gönderebilirsiniz.");
+      alert(
+        "Portföy havuzdan kaldırıldı. Onaylı durumda kalır, istediğiniz zaman tekrar havuza gönderebilirsiniz.",
+      );
     } catch (error: any) {
-      alert(error?.response?.data?.message || "Portföy havuzdan kaldırılamadı.");
+      alert(
+        error?.response?.data?.message || "Portföy havuzdan kaldırılamadı.",
+      );
     } finally {
       setPoolActionUnitId("");
     }
@@ -981,20 +1033,18 @@ function StokPageInner() {
             <MiniMetric label="Kiralık" value={rentCount} tone="orange" />
           </div>
 
-          <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-[#F8FBFF] p-2">
-            <div className="mb-2 flex items-center justify-between gap-2 px-1">
-              <div className="min-w-0">
-                <h2 className="text-[13px] font-black text-[#06194A]">
-                  Portföy Kalite Merkezi
-                </h2>
-                <p className="text-[10px] font-bold text-[#64748B]">
-                  Fotoğraf, belge, konum ve havuz hazırlığı
-                </p>
-              </div>
+          <section className="mt-3 rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FBFF] p-2 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+            <div className="mb-2 px-1 text-center">
+              <h2 className="text-center text-[14px] font-black text-[#06194A]">
+                Portföy Kalite Merkezi
+              </h2>
+              <p className="mx-auto mt-1 max-w-[290px] text-center text-[10px] font-bold leading-4 text-[#64748B]">
+                Fotoğraf, belge, konum ve havuz hazırlığı
+              </p>
               <button
                 type="button"
                 onClick={() => router.push("/portfoy/quality")}
-                className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-[#1557D6] shadow-sm active:scale-[0.98]"
+                className="mt-2 inline-flex min-h-[28px] items-center justify-center rounded-full bg-white px-3 py-1 text-center text-[10px] font-black text-[#1557D6] shadow-sm active:scale-[0.98]"
               >
                 Detay {portfolioQualityStats.averageScore}/100
               </button>
@@ -1049,7 +1099,11 @@ function StokPageInner() {
             />
 
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-2 text-[12px] font-black text-[#64748B]">
-              <span>{showMapPins ? `${mapUnits.length} pinli portföy` : "Pinler gizli"}</span>
+              <span>
+                {showMapPins
+                  ? `${mapUnits.length} pinli portföy`
+                  : "Pinler gizli"}
+              </span>
               <button
                 type="button"
                 onClick={() => setShowMapPins((current) => !current)}
@@ -1057,7 +1111,9 @@ function StokPageInner() {
               >
                 {showMapPins ? "Pinleri Gizle" : "Pinleri Göster"}
               </button>
-              <span className="text-right">{missingLocationCount} konumsuz kayıt</span>
+              <span className="text-right">
+                {missingLocationCount} konumsuz kayıt
+              </span>
             </div>
 
             {selectedMapUnit ? (
@@ -1070,7 +1126,11 @@ function StokPageInner() {
                     {selectedMapUnit.project?.name || "Seçili Portföy"}
                   </h3>
                   <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
-                    {[selectedMapUnit.project?.address, selectedMapUnit.project?.district, selectedMapUnit.project?.city]
+                    {[
+                      selectedMapUnit.project?.address,
+                      selectedMapUnit.project?.district,
+                      selectedMapUnit.project?.city,
+                    ]
                       .filter(Boolean)
                       .join(" / ") || "Konum bilgisi yok"}
                   </p>
@@ -1078,7 +1138,10 @@ function StokPageInner() {
                   <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[18px] border border-[#E2EAF5] bg-[#F8FBFF]">
                     <MiniMetric
                       label="Fiyat"
-                      value={formatCompactPrice(selectedMapUnit.price, selectedMapUnit.priceCurrency)}
+                      value={formatCompactPrice(
+                        selectedMapUnit.price,
+                        selectedMapUnit.priceCurrency,
+                      )}
                       tone="green"
                     />
                     <MiniMetric
@@ -1088,7 +1151,11 @@ function StokPageInner() {
                     />
                     <MiniMetric
                       label="Alan"
-                      value={selectedMapUnit.area ? `${selectedMapUnit.area} m²` : "—"}
+                      value={
+                        selectedMapUnit.area
+                          ? `${selectedMapUnit.area} m²`
+                          : "—"
+                      }
                       tone="orange"
                     />
                   </div>
@@ -1103,7 +1170,9 @@ function StokPageInner() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => router.push(`/portfoy/${selectedMapUnit.id}`)}
+                      onClick={() =>
+                        router.push(`/portfoy/${selectedMapUnit.id}`)
+                      }
                       className="min-h-[44px] rounded-[18px] bg-[#1557D6] px-3 text-[12px] font-black text-white active:scale-[0.98]"
                     >
                       Portföyü Aç
@@ -1118,20 +1187,22 @@ function StokPageInner() {
                   Pinli gösterilecek konumlu portföy yok.
                 </p>
                 <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
-                  Portföy güncelleme ekranından harita konumu seçildiğinde burada pin olarak görünür.
+                  Portföy güncelleme ekranından harita konumu seçildiğinde
+                  burada pin olarak görünür.
                 </p>
               </div>
             )}
 
             {missingLocationCount > 0 && (
               <div className="border-t border-[#E2EAF5] bg-amber-50 px-3 py-2 text-center text-[11px] font-black leading-4 text-amber-700">
-                {missingLocationCount} portföyde harita konumu yok. Güncelle ekranından konum seçilirse pinli haritada görünür.
+                {missingLocationCount} portföyde harita konumu yok. Güncelle
+                ekranından konum seçilirse pinli haritada görünür.
               </div>
             )}
           </section>
         )}
 
-        <section className="mt-3 space-y-2">
+        <section className="mt-4 space-y-4">
           <div className="flex items-center justify-between px-1">
             <p className="text-[13px] font-black text-[#64748B]">
               {filteredUnits.length} portföy listeleniyor
@@ -1157,9 +1228,10 @@ function StokPageInner() {
               </p>
             </div>
           ) : (
-            filteredUnits.map((unit) => (
+            filteredUnits.map((unit, index) => (
               <CompactPortfolioCard
                 key={unit.id}
+                index={index}
                 unit={unit}
                 selected={mapSelectedUnitId === unit.id}
                 deleting={deletingUnitId === unit.id}
@@ -1260,7 +1332,9 @@ function QualityMiniMetric({
           : "border-slate-200 bg-white text-[#06194A]";
 
   return (
-    <article className={`rounded-[16px] border px-1.5 py-2 text-center ${toneClass}`}>
+    <article
+      className={`rounded-[16px] border px-1.5 py-2 text-center ${toneClass}`}
+    >
       <p className="text-[15px] font-black leading-none">{value}</p>
       <p className="mt-1 text-[8.5px] font-black">{label}</p>
     </article>
@@ -1278,6 +1352,7 @@ function QualityFlag({ ok, label }: { ok: boolean; label: string }) {
 }
 
 function CompactPortfolioCard({
+  index,
   unit,
   selected,
   deleting,
@@ -1290,6 +1365,7 @@ function CompactPortfolioCard({
   onRemoveFromPool,
   onWhatsappLocation,
 }: {
+  index: number;
   unit: MapUnit;
   selected: boolean;
   deleting: boolean;
@@ -1318,15 +1394,17 @@ function CompactPortfolioCard({
   const canSendToPool = approvalStatus === "ONAYLANDI" && !isPoolVisible;
   const canRemoveFromPool = approvalStatus === "HAVUZDA" || isPoolVisible;
   const quality = getPortfolioQuality(unit);
+  const cardStyle = PORTFOLIO_CARD_STYLES[index % PORTFOLIO_CARD_STYLES.length];
 
   return (
     <article
-      className={`grid min-h-[112px] w-full max-w-full grid-cols-[82px_minmax(0,1fr)_34px] gap-2 overflow-hidden rounded-[22px] border bg-white p-2 shadow-[0_10px_26px_rgba(15,23,42,0.045)] ${selected ? "border-[#1557D6] ring-2 ring-blue-100" : "border-[#DDE7F3]"}`}
+      className={`relative grid min-h-[112px] w-full max-w-full grid-cols-[82px_minmax(0,1fr)_34px] gap-2 overflow-hidden rounded-[26px] border-[3px] p-2 ${selected ? "border-[#1557D6] ring-4 ring-blue-100" : cardStyle.frame}`}
     >
+      <div className={`absolute inset-x-0 top-0 h-1.5 ${cardStyle.strip}`} />
       <button
         type="button"
         onClick={onOpen}
-        className="relative h-[96px] overflow-hidden rounded-[18px] bg-[#EEF5FF]"
+        className={`relative h-[96px] overflow-hidden rounded-[18px] ${cardStyle.imageBg}`}
       >
         <img
           src={image}
@@ -1343,26 +1421,26 @@ function CompactPortfolioCard({
         </span>
       </button>
 
-      <button type="button" onClick={onOpen} className="min-w-0 text-left">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-[15px] font-black tracking-[-0.03em] text-[#06194A]">
+      <button type="button" onClick={onOpen} className="min-w-0 text-center">
+        <div className="flex items-start justify-center gap-2 text-center">
+          <div className="min-w-0 flex-1 text-center">
+            <h2 className="truncate text-center text-[15px] font-black tracking-[-0.03em] text-[#06194A]">
               {unit.project?.name || "EPH Portföy"}
             </h2>
-            <p className="mt-0.5 truncate text-[11px] font-bold text-[#64748B]">
+            <p className="mt-0.5 truncate text-center text-[11px] font-bold text-[#64748B]">
               {location}
             </p>
           </div>
           <Heart size={18} className="shrink-0 text-[#94A3B8]" />
         </div>
 
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-black text-[#06194A]">
+        <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center text-[11px] font-black text-[#06194A]">
           {unit.roomCount && <span>{unit.roomCount}</span>}
           {unit.area && <span>{unit.area} m²</span>}
           <span>{formatFloorInfo(unit)}</span>
         </div>
 
-        <div className="mt-1 flex items-center justify-between gap-2">
+        <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-center">
           <p
             className={`text-[15px] font-black ${unit.status === "KIRALIK" ? "text-[#1557D6]" : "text-emerald-600"}`}
           >
@@ -1375,13 +1453,15 @@ function CompactPortfolioCard({
           )}
         </div>
 
-        <div className="mt-1 rounded-[14px] border border-[#DDE7F3] bg-[#F8FBFF] px-2 py-1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[9px] font-black text-[#64748B]">
+        <div
+          className={`mt-1 rounded-[14px] border-2 border-[#C7D6E8] ${cardStyle.soft} px-2 py-1`}
+        >
+          <div className="text-center">
+            <span className="block text-center text-[9px] font-black text-[#64748B]">
               Kalite
             </span>
             <span
-              className={`rounded-full px-2 py-0.5 text-[9px] font-black ${quality.score >= 75 ? "bg-emerald-50 text-emerald-700" : quality.score >= 60 ? "bg-blue-50 text-[#1557D6]" : "bg-orange-50 text-orange-700"}`}
+              className={`mt-1 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-center text-[9px] font-black ${quality.score >= 75 ? "bg-emerald-50 text-emerald-700" : quality.score >= 60 ? "bg-blue-50 text-[#1557D6]" : "bg-orange-50 text-orange-700"}`}
             >
               {quality.score}/100 · {quality.label}
             </span>
@@ -1399,12 +1479,15 @@ function CompactPortfolioCard({
               Kullanılabilir Kredi
             </p>
             <p className="mt-0.5 truncate text-[11px] font-black leading-tight text-[#06194A]">
-              {formatPrice((unit as any).availableCreditAmount, unit.priceCurrency)}
+              {formatPrice(
+                (unit as any).availableCreditAmount,
+                unit.priceCurrency,
+              )}
             </p>
           </div>
         ) : null}
 
-        <div className="mt-1 flex items-center gap-2 text-[10px] font-bold text-[#64748B]">
+        <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-center text-[10px] font-bold text-[#64748B]">
           <span className="inline-flex items-center gap-1">
             <Eye size={12} /> Aç
           </span>
@@ -1463,7 +1546,11 @@ function CompactPortfolioCard({
               disabled={poolBusy}
               className="flex min-h-[38px] items-center justify-center gap-2 rounded-[16px] bg-emerald-600 px-3 text-[11px] font-black text-white shadow-[0_10px_22px_rgba(5,150,105,0.18)] disabled:opacity-60"
             >
-              {poolBusy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              {poolBusy ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Send size={14} />
+              )}
               Havuza Gönder
             </button>
           ) : null}
@@ -1475,7 +1562,11 @@ function CompactPortfolioCard({
               disabled={poolBusy}
               className="flex min-h-[38px] items-center justify-center gap-2 rounded-[16px] border border-amber-200 bg-amber-50 px-3 text-[11px] font-black text-amber-800 disabled:opacity-60"
             >
-              {poolBusy ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+              {poolBusy ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <X size={14} />
+              )}
               Havuzdan Kaldır
             </button>
           ) : null}
@@ -1568,7 +1659,10 @@ function PortfolioMap({
 
       if (!lat || !lng) return;
 
-      const priceText = formatCompactPrice(unit.price, unit.priceCurrency).replace(" ₺", "₺");
+      const priceText = formatCompactPrice(
+        unit.price,
+        unit.priceCurrency,
+      ).replace(" ₺", "₺");
       const pinColor = unit.status === "KIRALIK" ? "#1557D6" : "#059669";
       const isSelected = selectedUnitId === unit.id;
       const overlay = new window.google.maps.OverlayView();
@@ -1607,7 +1701,9 @@ function PortfolioMap({
       overlay.draw = function draw() {
         if (!element) return;
         const projection = overlay.getProjection();
-        const point = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(lat, lng));
+        const point = projection.fromLatLngToDivPixel(
+          new window.google.maps.LatLng(lat, lng),
+        );
         if (!point) return;
         element.style.left = `${point.x}px`;
         element.style.top = `${point.y}px`;
@@ -1648,8 +1744,6 @@ function PortfolioMap({
     </div>
   );
 }
-
-
 
 export default function StokPage() {
   return (

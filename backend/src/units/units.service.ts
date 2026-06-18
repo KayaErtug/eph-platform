@@ -31,6 +31,8 @@ type CreateUnitPayload = {
   totalFloors?: number;
   priceCurrency?: string;
   number?: string;
+  adaNo?: string;
+  parselNo?: string;
   roomCount?: string;
   area?: number;
   price: number;
@@ -510,6 +512,87 @@ export class UnitsService {
     return Number.isFinite(numeric) && numeric > 0 ? numeric : undefined;
   }
 
+  private isLandUnitType(type?: UnitType | string | null) {
+    const normalized = String(type || '')
+      .trim()
+      .toLocaleUpperCase('tr-TR')
+      .replaceAll('İ', 'I')
+      .replaceAll('Ğ', 'G')
+      .replaceAll('Ü', 'U')
+      .replaceAll('Ş', 'S')
+      .replaceAll('Ö', 'O')
+      .replaceAll('Ç', 'C');
+
+    return [
+      'ARSA',
+      'ARAZI',
+      'ARAZİ',
+      'TARLA',
+      'BAG',
+      'BAĞ',
+      'BAHCE',
+      'BAHÇE',
+      'ZEYTINLIK',
+      'ZEYTİNLİK',
+      'CIFTLIK',
+      'ÇIFTLIK',
+      'IMARLI_ARSA',
+      'İMARLI_ARSA',
+      'KONUT_ARSASI',
+      'VILLA_ARSASI',
+      'VİLLA_ARSASI',
+      'TICARI_ARSA',
+      'TİCARİ_ARSA',
+      'SANAYI_ARSASI',
+      'SANAYİ_ARSASI',
+      'TURIZM_IMARLI_ARSA',
+      'TURİZM_İMARLI_ARSA',
+    ].some((keyword) => normalized.includes(keyword));
+  }
+
+  private normalizeAdaNo(value?: string | null) {
+    const text = String(value || '').trim();
+    if (!text) return undefined;
+
+    if (!/^\d{1,6}$/.test(text)) {
+      throw new BadRequestException('Ada No sadece rakamlardan oluşmalı ve en fazla 6 hane olmalıdır.');
+    }
+
+    return text;
+  }
+
+  private normalizeParselNo(value?: string | null) {
+    const text = String(value || '').trim();
+    if (!text) return undefined;
+
+    if (!/^\d{1,4}$/.test(text)) {
+      throw new BadRequestException('Parsel No sadece rakamlardan oluşmalı ve en fazla 4 hane olmalıdır.');
+    }
+
+    return text;
+  }
+
+  private validateAdaParselForUnit(input: {
+    type?: UnitType | string | null;
+    adaNo?: string | null;
+    parselNo?: string | null;
+  }) {
+    const adaNo = this.normalizeAdaNo(input.adaNo);
+    const parselNo = this.normalizeParselNo(input.parselNo);
+
+    if (this.isLandUnitType(input.type)) {
+      if (!adaNo) {
+        throw new BadRequestException('Arsa, tarla ve arazi türlerinde Ada No zorunludur.');
+      }
+
+      if (!parselNo) {
+        throw new BadRequestException('Arsa, tarla ve arazi türlerinde Parsel No zorunludur.');
+      }
+    }
+
+    return { adaNo, parselNo };
+  }
+
   private canSeeDoorAccessInfo(user: CurrentUserPayload, ownerId?: string | null) {
     return this.isSuperAdmin(user) || Boolean(ownerId && this.isOwner(user, ownerId));
   }
@@ -722,6 +805,12 @@ export class UnitsService {
 
     this.ensureCanManageUnit(user, project.ownerId);
 
+    const adaParsel = this.validateAdaParselForUnit({
+      type: data.type,
+      adaNo: data.adaNo,
+      parselNo: data.parselNo,
+    });
+
     const createdUnit = await this.prisma.unit.create({
       data: {
         type: data.type,
@@ -730,6 +819,8 @@ export class UnitsService {
         totalFloors: data.totalFloors,
         priceCurrency: data.priceCurrency || 'TRY',
         number: this.cleanText(data.number),
+        adaNo: adaParsel.adaNo,
+        parselNo: adaParsel.parselNo,
         roomCount: data.roomCount,
         area: data.area,
         price: data.price,
@@ -1288,11 +1379,21 @@ export class UnitsService {
     }
 
     const { availableCreditAmount, doorAccessInfo, ...safeData } = data;
+    const nextType = 'type' in data ? data.type : unit.type;
+    const nextAdaNo = 'adaNo' in data ? data.adaNo : (unit as any).adaNo;
+    const nextParselNo = 'parselNo' in data ? data.parselNo : (unit as any).parselNo;
+    const adaParsel = this.validateAdaParselForUnit({
+      type: nextType,
+      adaNo: nextAdaNo,
+      parselNo: nextParselNo,
+    });
 
     const updatedUnit = await this.prisma.unit.update({
       where: { id },
       data: {
         ...safeData,
+        adaNo: adaParsel.adaNo,
+        parselNo: adaParsel.parselNo,
         deedOwnerFullName:
           'deedOwnerFullName' in data
             ? this.cleanText(data.deedOwnerFullName)
