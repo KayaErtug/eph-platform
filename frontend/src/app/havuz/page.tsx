@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -9,8 +10,11 @@ import {
   CheckCircle2,
   Eye,
   Home,
+  List,
+  Map as MapIcon,
   MapPin,
   MessageCircle,
+  Navigation,
   Search,
   ShieldCheck,
   Sparkles,
@@ -44,6 +48,10 @@ type Unit = {
     city?: string | null;
     district?: string | null;
     address?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    mapAddress?: string | null;
+    placeId?: string | null;
     ownerId?: string | null;
     owner?: {
       id?: string | null;
@@ -90,6 +98,72 @@ type SuccessToast = {
   message: string;
   spent: number;
   balance: number | null;
+};
+
+
+type ViewMode = "LIST" | "MAP";
+
+type PoolMapItem = {
+  unit: Unit;
+  match: { score: number; customer: Customer | null; budgetDiff: number };
+  lat: number;
+  lng: number;
+  isApprox: boolean;
+  locationLabel: string;
+};
+
+declare global {
+  interface Window {
+    google?: any;
+    ephHavuzGoogleMapsReady?: Promise<void>;
+  }
+}
+
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+const DEFAULT_MAP_CENTER = { lat: 39.0, lng: 35.0 };
+
+const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
+  ADANA: { lat: 37.0, lng: 35.3213 },
+  ANKARA: { lat: 39.9334, lng: 32.8597 },
+  ANTALYA: { lat: 36.8969, lng: 30.7133 },
+  AYDIN: { lat: 37.845, lng: 27.8396 },
+  BALIKESIR: { lat: 39.6484, lng: 27.8826 },
+  BURSA: { lat: 40.1885, lng: 29.061 },
+  DENIZLI: { lat: 37.783, lng: 29.0963 },
+  ESKISEHIR: { lat: 39.7767, lng: 30.5206 },
+  ISTANBUL: { lat: 41.0082, lng: 28.9784 },
+  IZMIR: { lat: 38.4237, lng: 27.1428 },
+  KAYSERI: { lat: 38.7205, lng: 35.4826 },
+  KOCAELI: { lat: 40.8533, lng: 29.8815 },
+  KONYA: { lat: 37.8746, lng: 32.4932 },
+  MANISA: { lat: 38.614, lng: 27.4296 },
+  MUGLA: { lat: 37.2153, lng: 28.3636 },
+  SAKARYA: { lat: 40.7569, lng: 30.3781 },
+  TEKIRDAG: { lat: 40.978, lng: 27.511 },
+};
+
+const DISTRICT_COORDS: Record<string, { lat: number; lng: number }> = {
+  "DENIZLI/PAMUKKALE": { lat: 37.9167, lng: 29.1167 },
+  "DENIZLI/MERKEZEFENDI": { lat: 37.7833, lng: 29.0833 },
+  "DENIZLI/ACIPAYAM": { lat: 37.4239, lng: 29.3494 },
+  "DENIZLI/CIVRIL": { lat: 38.3014, lng: 29.7386 },
+  "DENIZLI/TAVAS": { lat: 37.5736, lng: 29.0708 },
+  "DENIZLI/SARAYKOY": { lat: 37.9245, lng: 28.9252 },
+  "DENIZLI/BULDAN": { lat: 38.0451, lng: 28.8307 },
+  "KAYSERI/KOCASINAN": { lat: 38.9571, lng: 35.2481 },
+  "KAYSERI/MELIKGAZI": { lat: 38.7205, lng: 35.4826 },
+  "KAYSERI/TALAS": { lat: 38.6908, lng: 35.5538 },
+  "KAYSERI/DEVELI": { lat: 38.3906, lng: 35.4922 },
+  "KAYSERI/HACILAR": { lat: 38.6469, lng: 35.4493 },
+  "ISTANBUL/KADIKOY": { lat: 40.9903, lng: 29.0291 },
+  "ISTANBUL/ESENYURT": { lat: 41.0343, lng: 28.6801 },
+  "ISTANBUL/BEYLIKDUZU": { lat: 41.0011, lng: 28.6419 },
+  "ISTANBUL/UMRANIYE": { lat: 41.0164, lng: 29.1248 },
+  "IZMIR/BORNOVA": { lat: 38.4697, lng: 27.2211 },
+  "IZMIR/KARSIYAKA": { lat: 38.4647, lng: 27.1128 },
+  "IZMIR/BUCA": { lat: 38.3841, lng: 27.1774 },
+  "ANKARA/CANKAYA": { lat: 39.9179, lng: 32.8627 },
+  "ANKARA/KECIOREN": { lat: 39.9781, lng: 32.8663 },
 };
 
 const tabs = ["Sana Uygun", "Bölgemdekiler", "Projeler", "Yeni Eklenenler"];
@@ -142,6 +216,94 @@ function limitText(value?: string | number | null, max = 60) {
   const text = String(value ?? "").trim();
   if (!text) return "";
   return text.length > max ? `${text.slice(0, max).trim()}…` : text;
+}
+
+
+function normalizeMapKey(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLocaleUpperCase("tr-TR")
+    .replaceAll("İ", "I")
+    .replaceAll("Ğ", "G")
+    .replaceAll("Ü", "U")
+    .replaceAll("Ş", "S")
+    .replaceAll("Ö", "O")
+    .replaceAll("Ç", "C");
+}
+
+function getStableJitter(seed: string, index: number) {
+  const source = `${seed || "EPH"}-${index}`;
+  let hash = 0;
+
+  for (let i = 0; i < source.length; i += 1) {
+    hash = (hash * 31 + source.charCodeAt(i)) % 9973;
+  }
+
+  const latOffset = ((hash % 19) - 9) * 0.0028;
+  const lngOffset = (((Math.floor(hash / 19) % 19) - 9) * 0.0032);
+
+  return { latOffset, lngOffset };
+}
+
+function getApproxCoordinate(unit: Unit, index: number) {
+  const city = normalizeMapKey(unit.project?.city);
+  const district = normalizeMapKey(unit.project?.district);
+  const districtKey = city && district ? `${city}/${district}` : "";
+  const base = DISTRICT_COORDS[districtKey] || CITY_COORDS[city] || DEFAULT_MAP_CENTER;
+  const jitter = getStableJitter(unit.id, index);
+
+  return {
+    lat: Number((base.lat + jitter.latOffset).toFixed(6)),
+    lng: Number((base.lng + jitter.lngOffset).toFixed(6)),
+  };
+}
+
+function getPoolMapPoint(input: { unit: Unit; match: { score: number; customer: Customer | null; budgetDiff: number }; index: number }): PoolMapItem {
+  const directLat = Number(input.unit.project?.latitude || 0);
+  const directLng = Number(input.unit.project?.longitude || 0);
+  const hasDirectCoordinate = Boolean(directLat && directLng);
+  const approx = hasDirectCoordinate ? { lat: directLat, lng: directLng } : getApproxCoordinate(input.unit, input.index);
+
+  return {
+    unit: input.unit,
+    match: input.match,
+    lat: approx.lat,
+    lng: approx.lng,
+    isApprox: !hasDirectCoordinate,
+    locationLabel: getLocation(input.unit),
+  };
+}
+
+function loadHavuzGoogleMapsScript() {
+  if (typeof window === "undefined") return Promise.reject(new Error("Tarayıcı ortamı bulunamadı."));
+  if (window.google?.maps) return Promise.resolve();
+  if (window.ephHavuzGoogleMapsReady) return window.ephHavuzGoogleMapsReady;
+
+  if (!GOOGLE_MAPS_API_KEY) {
+    return Promise.reject(new Error("Google Maps API anahtarı tanımlı değil."));
+  }
+
+  window.ephHavuzGoogleMapsReady = new Promise<void>((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>('script[data-eph-havuz-google-maps="true"], script[data-eph-portfolio-google-maps="true"]');
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve());
+      existingScript.addEventListener("error", () => reject(new Error("Google Maps yüklenemedi.")));
+      if (window.google?.maps) resolve();
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&language=tr&region=TR`;
+    script.async = true;
+    script.defer = true;
+    script.dataset.ephHavuzGoogleMaps = "true";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Google Maps yüklenemedi."));
+    document.head.appendChild(script);
+  });
+
+  return window.ephHavuzGoogleMapsReady;
 }
 
 function getLocation(unit: Unit) {
@@ -367,6 +529,8 @@ export default function HavuzPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [successToast, setSuccessToast] = useState<SuccessToast | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("LIST");
+  const [selectedMapUnitId, setSelectedMapUnitId] = useState("");
 
   const builder = isBuilderRole(user?.role);
 
@@ -419,7 +583,7 @@ export default function HavuzPage() {
       .sort((a, b) => b.match.score - a.match.score);
   }, [customers, eligibleUnits]);
 
-  const filteredUnits = useMemo(() => {
+  const filteredPoolItems = useMemo(() => {
     const keyword = search.trim().toLocaleLowerCase("tr-TR");
 
     return matchedUnits
@@ -452,6 +616,7 @@ export default function HavuzPage() {
           unit.project?.name,
           unit.project?.city,
           unit.project?.district,
+          unit.project?.address,
           unit.type,
           unit.status,
           unit.roomCount,
@@ -460,9 +625,14 @@ export default function HavuzPage() {
           .join(" ")
           .toLocaleLowerCase("tr-TR")
           .includes(keyword);
-      })
-      .slice(0, 12);
+      });
   }, [activeTab, builder, category, matchedUnits, search]);
+
+  const displayedUnits = useMemo(() => filteredPoolItems.slice(0, 12), [filteredPoolItems]);
+
+  const poolMapItems = useMemo(() => {
+    return filteredPoolItems.map(({ unit, match }, index) => getPoolMapPoint({ unit, match, index }));
+  }, [filteredPoolItems]);
 
   const showKontorSuccess = (input: { title: string; data: any; fallbackSpent: number }) => {
     const spent = getSpentFromResponse(input.data, input.fallbackSpent);
@@ -600,7 +770,7 @@ export default function HavuzPage() {
                 Havuz
               </h1>
               <p className="mt-1 text-[12px] font-bold leading-4 text-[#64748B]">
-                Bugün {filteredUnits.length} uygun fırsat listelendi.
+                Bugün {filteredPoolItems.length} uygun fırsat listelendi.
               </p>
             </div>
 
@@ -663,6 +833,45 @@ export default function HavuzPage() {
           </div>
         </section>
 
+        <section className="rounded-[22px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() => setViewMode("LIST")}
+              className={`flex min-h-[42px] items-center justify-center gap-2 rounded-[16px] border-2 text-[12px] font-black ${
+                viewMode === "LIST"
+                  ? "border-[#2563EB] bg-[#2563EB] text-white"
+                  : "border-[#C7D6E8] bg-[#F8FAFC] text-[#64748B]"
+              }`}
+            >
+              <List size={15} /> Liste
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("MAP")}
+              className={`flex min-h-[42px] items-center justify-center gap-2 rounded-[16px] border-2 text-[12px] font-black ${
+                viewMode === "MAP"
+                  ? "border-[#2563EB] bg-[#2563EB] text-white"
+                  : "border-[#C7D6E8] bg-[#F8FAFC] text-[#64748B]"
+              }`}
+            >
+              <MapIcon size={15} /> Harita
+            </button>
+          </div>
+        </section>
+
+        {viewMode === "MAP" && (
+          <PoolMapSection
+            items={poolMapItems}
+            selectedUnitId={selectedMapUnitId}
+            onSelectUnit={setSelectedMapUnitId}
+            busyAction={busyAction}
+            onDetail={(unit, match) => setDetailSelection({ unit, match })}
+            onMessage={(unit, match) => startPoolMessage(unit, match.score)}
+            onAction={(type, unit, match) => setSelectedAction({ type, unit, score: match.score })}
+          />
+        )}
+
         <section className="grid grid-cols-2 gap-1.5">
           <div className="flex min-h-[34px] items-center justify-center gap-1.5 rounded-[15px] border-2 border-[#C7D6E8] bg-white px-2 text-[10px] font-black text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.035)]">
             <ShieldCheck size={13} className="shrink-0 text-[#2563EB]" />
@@ -689,8 +898,8 @@ export default function HavuzPage() {
             <span className="text-[10px] font-black text-[#2563EB]">CRM ↔ Havuz</span>
           </div>
 
-          {filteredUnits.length > 0 ? (
-            filteredUnits.map(({ unit, match }) => (
+          {displayedUnits.length > 0 ? (
+            displayedUnits.map(({ unit, match }) => (
               <PoolUnitCard
                 key={unit.id}
                 unit={unit}
@@ -736,6 +945,237 @@ export default function HavuzPage() {
         />
       )}
     </main>
+  );
+}
+
+
+function PoolMapSection({
+  items,
+  selectedUnitId,
+  busyAction,
+  onSelectUnit,
+  onDetail,
+  onMessage,
+  onAction,
+}: {
+  items: PoolMapItem[];
+  selectedUnitId: string;
+  busyAction: string | null;
+  onSelectUnit: (unitId: string) => void;
+  onDetail: (unit: Unit, match: { score: number; customer: Customer | null; budgetDiff: number }) => void;
+  onMessage: (unit: Unit, match: { score: number; customer: Customer | null; budgetDiff: number }) => void;
+  onAction: (type: PoolAction, unit: Unit, match: { score: number; customer: Customer | null; budgetDiff: number }) => void;
+}) {
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markerRefs = useRef<any[]>([]);
+  const [mapError, setMapError] = useState("");
+  const [mapReady, setMapReady] = useState(false);
+  const selectedItem = items.find((item) => item.unit.id === selectedUnitId) || items[0] || null;
+  const exactCount = items.filter((item) => !item.isApprox).length;
+  const approxCount = items.filter((item) => item.isApprox).length;
+
+  useEffect(() => {
+    let alive = true;
+
+    setMapError("");
+    setMapReady(false);
+
+    loadHavuzGoogleMapsScript()
+      .then(() => {
+        if (!alive || !mapRef.current || !window.google?.maps) return;
+
+        const center = items[0] ? { lat: items[0].lat, lng: items[0].lng } : DEFAULT_MAP_CENTER;
+
+        if (!mapInstanceRef.current) {
+          mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
+            center,
+            zoom: items.length > 1 ? 10 : 12,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            clickableIcons: false,
+            gestureHandling: "greedy",
+          });
+        }
+
+        setMapReady(true);
+      })
+      .catch((error) => {
+        if (!alive) return;
+        setMapError(error?.message || "Harita yüklenemedi.");
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [items.length]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const googleMaps = window.google?.maps;
+
+    if (!map || !googleMaps) return;
+
+    markerRefs.current.forEach((marker) => marker.setMap(null));
+    markerRefs.current = [];
+
+    const bounds = new googleMaps.LatLngBounds();
+
+    items.forEach((item) => {
+      const marker = new googleMaps.Marker({
+        map,
+        position: { lat: item.lat, lng: item.lng },
+        title: `${item.unit.project?.name || "EPH Portföy"} • ${compactMoney(item.unit.price, item.unit.priceCurrency)}`,
+        label: {
+          text: compactMoney(item.unit.price, item.unit.priceCurrency),
+          color: "#06194A",
+          fontSize: "11px",
+          fontWeight: "900",
+        },
+        optimized: true,
+      });
+
+      marker.addListener("click", () => {
+        onSelectUnit(item.unit.id);
+        map.panTo({ lat: item.lat, lng: item.lng });
+        map.setZoom(Math.max(map.getZoom() || 11, 12));
+      });
+
+      markerRefs.current.push(marker);
+      bounds.extend({ lat: item.lat, lng: item.lng });
+    });
+
+    if (items.length > 1) {
+      map.fitBounds(bounds, 44);
+    } else if (items.length === 1) {
+      map.setCenter({ lat: items[0].lat, lng: items[0].lng });
+      map.setZoom(13);
+    } else {
+      map.setCenter(DEFAULT_MAP_CENTER);
+      map.setZoom(6);
+    }
+  }, [items, onSelectUnit]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !selectedItem) return;
+    map.panTo({ lat: selectedItem.lat, lng: selectedItem.lng });
+  }, [selectedItem?.unit.id]);
+
+  return (
+    <section className="overflow-hidden rounded-[24px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.07)]">
+      <div className="flex items-center justify-between gap-2 border-b-2 border-[#C7D6E8] bg-[#F8FAFC] px-3 py-2">
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-black tracking-[-0.03em] text-[#1F2937]">Havuz Haritası</h2>
+          <p className="mt-0.5 text-[10px] font-bold leading-4 text-[#64748B]">
+            Pinler fiyatlıdır. Yaklaşık pinler il/ilçe merkezinden üretilir.
+          </p>
+        </div>
+        <div className="shrink-0 rounded-[15px] border-2 border-[#C7D6E8] bg-white px-2.5 py-1.5 text-center">
+          <p className="text-[15px] font-black leading-none text-[#2563EB]">{items.length}</p>
+          <p className="mt-0.5 text-[8px] font-black text-[#64748B]">Pin</p>
+        </div>
+      </div>
+
+      <div className="relative h-[360px] w-full bg-[#EEF3F8]">
+        <div ref={mapRef} className="h-full w-full" />
+
+        {!mapReady && !mapError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#EEF3F8] text-center">
+            <div>
+              <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#2563EB] border-t-transparent" />
+              <p className="mt-3 text-[12px] font-black text-[#64748B]">Havuz haritası yükleniyor...</p>
+            </div>
+          </div>
+        )}
+
+        {mapError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#EEF3F8] px-4 text-center">
+            <div className="rounded-[22px] border-2 border-amber-200 bg-amber-50 p-4 text-[12px] font-black leading-5 text-amber-700">
+              {mapError}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 border-t-2 border-[#C7D6E8] bg-white text-center text-[11px] font-black text-[#64748B]">
+        <div className="border-r border-[#E2EAF5] px-2 py-2">
+          <span className="text-[#2563EB]">{exactCount}</span> gerçek konum
+        </div>
+        <div className="px-2 py-2">
+          <span className="text-orange-600">{approxCount}</span> yaklaşık konum
+        </div>
+      </div>
+
+      {selectedItem ? (
+        <div className="border-t-2 border-[#C7D6E8] bg-[#F8FAFC] p-2.5">
+          <div className="rounded-[20px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+                  {selectedItem.isApprox ? "Yaklaşık Pin" : "Gerçek Pin"} • {getEphId(selectedItem.unit.id)}
+                </p>
+                <h3 className="mt-1 line-clamp-2 text-[15px] font-black leading-[1.12] text-[#1F2937] break-words [overflow-wrap:anywhere]">
+                  {limitText(selectedItem.unit.project?.name || "EPH Portföy", 70)}
+                </h3>
+                <p className="mt-1 flex min-w-0 items-start justify-center gap-1 text-[11px] font-bold leading-4 text-[#64748B]">
+                  <MapPin size={12} className="mt-0.5 shrink-0" />
+                  <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">{limitText(selectedItem.locationLabel, 48)}</span>
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full bg-[#2563EB] px-2.5 py-1 text-[11px] font-black text-white">
+                {compactMoney(selectedItem.unit.price, selectedItem.unit.priceCurrency)}
+              </span>
+            </div>
+
+            <div className="mt-2 grid grid-cols-3 gap-1.5">
+              <SmallInfo label="Tip" value={typeLabel(selectedItem.unit.type)} />
+              <SmallInfo label="Oda" value={selectedItem.unit.roomCount || "—"} />
+              <SmallInfo label="Uyum" value={`%${selectedItem.match.score}`} />
+            </div>
+
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => onDetail(selectedItem.unit, selectedItem.match)}
+                className="flex min-h-[36px] items-center justify-center gap-1 rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#1F2937]"
+              >
+                <Navigation size={13} className="text-[#2563EB]" /> Havuz Detay
+              </button>
+              <button
+                type="button"
+                onClick={() => onMessage(selectedItem.unit, selectedItem.match)}
+                disabled={Boolean(busyAction)}
+                className="flex min-h-[36px] items-center justify-center gap-1 rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#1F2937] disabled:opacity-60"
+              >
+                <MessageCircle size={13} className="text-[#2563EB]" /> Mesaj 3K
+              </button>
+              <button
+                type="button"
+                onClick={() => onAction("INTEREST", selectedItem.unit, selectedItem.match)}
+                disabled={Boolean(busyAction)}
+                className="min-h-[36px] rounded-[14px] border-2 border-[#2563EB] bg-[#EFF6FF] text-[11px] font-black text-[#1D4ED8] disabled:opacity-60"
+              >
+                İlgilen 10K
+              </button>
+              <button
+                type="button"
+                onClick={() => onAction("LEAD", selectedItem.unit, selectedItem.match)}
+                disabled={Boolean(busyAction)}
+                className="min-h-[36px] rounded-[14px] border-2 border-[#2563EB] bg-[#2563EB] text-[11px] font-black text-white disabled:opacity-60"
+              >
+                Müşterim Var 20K
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="border-t-2 border-[#C7D6E8] bg-[#F8FAFC] p-4 text-center text-[12px] font-black text-[#64748B]">
+          Haritada gösterilecek havuz portföyü bulunamadı.
+        </div>
+      )}
+    </section>
   );
 }
 
