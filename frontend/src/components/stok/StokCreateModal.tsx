@@ -55,7 +55,7 @@ interface Props {
 
 const MAX_GALLERY_COUNT = 15;
 const MAX_FILE_SIZE = 15 * 1024 * 1024;
-const MIN_FILE_SIZE = 30 * 1024;
+const MIN_FILE_SIZE = 5 * 1024;
 const MIN_IMAGE_WIDTH = 800;
 const MIN_IMAGE_HEIGHT = 600;
 const MAX_DESCRIPTION_LENGTH = 500;
@@ -862,16 +862,31 @@ export default function StokCreateModal({
       return `Seçtiğiniz görsel dosyası çok küçük görünüyor. Lütfen daha kaliteli bir görsel yükleyiniz. (${tooSmall.name})`;
     }
 
+    return "";
+  };
+
+  const getImageQualityWarning = async (files: File[]) => {
+    const lowResolutionFiles: string[] = [];
+    const unreadableFiles: string[] = [];
+
     for (const file of files) {
       try {
         const dimensions = await getImageDimensions(file);
 
         if (dimensions.width < MIN_IMAGE_WIDTH || dimensions.height < MIN_IMAGE_HEIGHT) {
-          return `Yüklediğiniz görselin çözünürlüğü düşük. En az ${MIN_IMAGE_WIDTH}x${MIN_IMAGE_HEIGHT} piksel önerilir. (${file.name})`;
+          lowResolutionFiles.push(file.name);
         }
       } catch {
-        return `Görsel okunamadı. Lütfen farklı bir JPG, PNG veya WEBP dosyası seçiniz. (${file.name})`;
+        unreadableFiles.push(file.name);
       }
+    }
+
+    if (lowResolutionFiles.length > 0) {
+      return `Uyarı: ${lowResolutionFiles.length} görselin çözünürlüğü düşük olabilir. Yüklemeyi engellemedik, ancak daha kaliteli fotoğraf kullanmanız önerilir. (${lowResolutionFiles.slice(0, 3).join(", ")}${lowResolutionFiles.length > 3 ? ", ..." : ""})`;
+    }
+
+    if (unreadableFiles.length > 0) {
+      return `Uyarı: ${unreadableFiles.length} görselin ön izlemesi tarayıcıda okunamadı. HEIC/HEIF veya cihaz kaynaklı olabilir; yüklemeyi engellemedik. (${unreadableFiles.slice(0, 3).join(", ")}${unreadableFiles.length > 3 ? ", ..." : ""})`;
     }
 
     return "";
@@ -910,6 +925,7 @@ export default function StokCreateModal({
 
     setCheckingImages(true);
     const error = await validateFiles(acceptedFiles);
+    const qualityWarning = error ? "" : await getImageQualityWarning(acceptedFiles);
     setCheckingImages(false);
 
     if (error) {
@@ -934,6 +950,8 @@ export default function StokCreateModal({
       setImageError(
         `En fazla ${MAX_GALLERY_COUNT} galeri fotoğrafı yükleyebilirsiniz. Fazla seçilen görseller eklenmedi.`,
       );
+    } else if (qualityWarning) {
+      setImageError(qualityWarning);
     }
 
     event.target.value = "";
