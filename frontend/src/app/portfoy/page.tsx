@@ -46,6 +46,11 @@ type CrmCustomerOption = {
   interestedArea?: string | null;
 };
 
+type Conversation = {
+  id: string;
+  unreadCount?: number;
+};
+
 type MapUnit = Unit & {
   project?: Unit["project"] & {
     latitude?: number | null;
@@ -355,6 +360,7 @@ function StokPageInner() {
   const [deletingUnitId, setDeletingUnitId] = useState("");
   const [poolActionUnitId, setPoolActionUnitId] = useState("");
   const [editingUnit, setEditingUnit] = useState<MapUnit | null>(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [projectForm, setProjectForm] = useState<ProjectFormState>({
@@ -426,14 +432,23 @@ function StokPageInner() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [projectRes, unitRes, crmRes] = await Promise.all([
+      const [projectRes, unitRes, crmRes, conversationsRes] = await Promise.all([
         api.get("/projects/my"),
         api.get("/units"),
         api.get("/crm/customers").catch(() => ({ data: [] })),
+        user?.id ? api.get(`/conversations?userId=${user.id}`).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
       ]);
       setProjects(projectRes.data || []);
       setUnits(unitRes.data || []);
       setCrmCustomers(Array.isArray(crmRes.data) ? crmRes.data : []);
+
+      const conversations = Array.isArray(conversationsRes.data)
+        ? (conversationsRes.data as Conversation[])
+        : [];
+
+      setUnreadMessages(
+        conversations.reduce((sum, conversation) => sum + (conversation.unreadCount || 0), 0),
+      );
     } finally {
       setLoading(false);
     }
@@ -922,7 +937,7 @@ function StokPageInner() {
 
   if (!hydrated || loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F7FBFF] text-[#06194A]">
+      <main className="flex min-h-[100dvh] items-center justify-center overflow-y-auto bg-[#F7FBFF] text-[#06194A]">
         <div className="text-center">
           <Loader2 className="mx-auto animate-spin text-[#1557D6]" size={32} />
           <p className="mt-3 text-[12px] font-black text-[#64748B]">
@@ -934,7 +949,7 @@ function StokPageInner() {
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#F7FBFF] pb-36 text-[#06194A]">
+    <main className="min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#F7FBFF] pb-[calc(144px+env(safe-area-inset-bottom))] text-[#06194A]">
       <div className="mx-auto w-full max-w-[430px] overflow-x-hidden px-3 pt-3">
         <section className="rounded-[28px] border border-[#DDE7F3] bg-white p-3 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
           <div className="flex items-center justify-between gap-3">
@@ -961,9 +976,11 @@ function StokPageInner() {
               aria-label="Mesajlar"
             >
               <Bell size={20} />
-              <span className="absolute right-2 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-black text-white">
-                3
-              </span>
+              {unreadMessages > 0 && (
+                <span className="absolute right-2 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">
+                  {unreadMessages > 99 ? "99+" : unreadMessages}
+                </span>
+              )}
             </button>
           </div>
 
@@ -1424,10 +1441,10 @@ function CompactPortfolioCard({
       <button type="button" onClick={onOpen} className="min-w-0 text-center">
         <div className="flex items-start justify-center gap-2 text-center">
           <div className="min-w-0 flex-1 text-center">
-            <h2 className="truncate text-center text-[15px] font-black tracking-[-0.03em] text-[#06194A]">
+            <h2 className="break-words text-center text-[15px] font-black leading-[18px] tracking-[-0.03em] text-[#06194A]">
               {unit.project?.name || "EPH Portföy"}
             </h2>
-            <p className="mt-0.5 truncate text-center text-[11px] font-bold text-[#64748B]">
+            <p className="mt-0.5 break-words text-center text-[11px] font-bold leading-4 text-[#64748B]">
               {location}
             </p>
           </div>
@@ -1478,7 +1495,7 @@ function CompactPortfolioCard({
             <p className="text-[8.5px] font-black uppercase tracking-[0.08em] text-[#1557D6]">
               Kullanılabilir Kredi
             </p>
-            <p className="mt-0.5 truncate text-[11px] font-black leading-tight text-[#06194A]">
+            <p className="mt-0.5 break-words text-[11px] font-black leading-tight text-[#06194A]">
               {formatPrice(
                 (unit as any).availableCreditAmount,
                 unit.priceCurrency,

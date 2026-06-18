@@ -257,10 +257,8 @@ function typeLabel(type?: string | null) {
   return String(type).replaceAll("_", " ");
 }
 
-function limitText(value?: string | number | null, max = 60) {
-  const text = String(value ?? "").trim();
-  if (!text) return "";
-  return text.length > max ? `${text.slice(0, max).trim()}…` : text;
+function limitText(value?: string | number | null, _max = 60) {
+  return String(value ?? "").trim();
 }
 
 function normalizeMapKey(value?: string | null) {
@@ -943,24 +941,24 @@ export default function HavuzPage() {
   }
 
   return (
-    <main className="min-h-[calc(100dvh-64px)] bg-[#F4F8FF] px-3 pb-24 pt-3 text-[#1F2937]">
+    <main className="min-h-[calc(100dvh-64px)] overflow-y-auto bg-[#F4F8FF] px-3 pb-[calc(104px+env(safe-area-inset-bottom,0px))] pt-3 text-[#1F2937]">
       {successToast && <KontorSuccessToast toast={successToast} />}
 
       <div className="mx-auto w-full max-w-[430px] space-y-3">
         <section className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
-          <div className="flex items-center gap-3">
+          <div className="grid grid-cols-[54px_1fr_54px] items-center gap-2 text-center">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#EFF6FF] text-[#2563EB]">
               <Home size={23} />
             </div>
 
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+            <div className="min-w-0 text-center">
+              <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
                 Envanter Merkezi
               </p>
-              <h1 className="text-[22px] font-black leading-none tracking-[-0.045em] text-[#1F2937]">
+              <h1 className="text-center text-[22px] font-black leading-none tracking-[-0.045em] text-[#1F2937]">
                 Havuz
               </h1>
-              <p className="mt-1 text-[12px] font-bold leading-4 text-[#64748B]">
+              <p className="mx-auto mt-1 max-w-[260px] text-center text-[12px] font-bold leading-4 text-[#64748B]">
                 Bugün {filteredPoolItems.length} uygun fırsat listelendi.
               </p>
             </div>
@@ -987,7 +985,7 @@ export default function HavuzPage() {
         </section>
 
         <section className="rounded-[22px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-4 gap-2">
             {tabs.map((tab) => (
               <button
                 key={tab}
@@ -1033,7 +1031,7 @@ export default function HavuzPage() {
         </section>
 
         <section className="rounded-[22px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setViewMode("LIST")}
@@ -1073,15 +1071,15 @@ export default function HavuzPage() {
           />
         )}
 
-        <section className="grid grid-cols-2 gap-1.5">
+        <section className="grid grid-cols-2 gap-2">
           <div className="flex min-h-[34px] items-center justify-center gap-1.5 rounded-[15px] border-2 border-[#C7D6E8] bg-white px-2 text-[10px] font-black text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.035)]">
             <ShieldCheck size={13} className="shrink-0 text-[#2563EB]" />
-            <span className="truncate">Yetkili Portföyler</span>
+            <span className="break-words text-center leading-3">Yetkili Portföyler</span>
           </div>
 
           <div className="flex min-h-[34px] items-center justify-center gap-1.5 rounded-[15px] border-2 border-[#C7D6E8] bg-white px-2 text-[10px] font-black text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.035)]">
             <Sparkles size={13} className="shrink-0 text-[#2563EB]" />
-            <span className="truncate">Kontör = İş Fırsatı</span>
+            <span className="break-words text-center leading-3">Kontör = İş Fırsatı</span>
           </div>
         </section>
 
@@ -1370,7 +1368,7 @@ function PoolMapSection({
                       map.setZoom(Math.max(map.getZoom() || 11, 12));
                     }
                   }}
-                  className={`pointer-events-auto absolute -translate-x-1/2 -translate-y-full whitespace-nowrap border-2 border-white px-2.5 text-[10px] font-black leading-none text-white shadow-[0_12px_24px_rgba(15,23,42,0.32)] active:scale-95 ${
+                  className={`pointer-events-auto absolute -translate-x-1/2 -translate-y-full border-2 border-white px-2.5 text-[10px] font-black leading-none text-white shadow-[0_12px_24px_rgba(15,23,42,0.32)] active:scale-95 ${
                     isSelected
                       ? "z-[70] min-h-[34px] rounded-[999px_999px_999px_8px] bg-[#1D4ED8] ring-4 ring-blue-200"
                       : item.isApprox
@@ -1419,13 +1417,13 @@ function PoolMapSection({
       {selectedItem ? (
         <div className="border-t-2 border-[#C7D6E8] bg-[#F8FAFC] p-2.5">
           <div className="rounded-[20px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
+            <div className="text-center">
+              <div className="min-w-0 text-center">
                 <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
                   {selectedItem.isApprox ? "Yaklaşık Pin" : "Gerçek Pin"} •{" "}
                   {getEphId(selectedItem.unit.id)}
                 </p>
-                <h3 className="mt-1 line-clamp-2 text-[15px] font-black leading-[1.12] text-[#1F2937] break-words [overflow-wrap:anywhere]">
+                <h3 className="mt-1 text-[15px] font-black leading-[1.12] text-[#1F2937] break-words [overflow-wrap:anywhere]">
                   {limitText(
                     selectedItem.unit.project?.name || "EPH Portföy",
                     70,
@@ -1433,12 +1431,12 @@ function PoolMapSection({
                 </h3>
                 <p className="mt-1 flex min-w-0 items-start justify-center gap-1 text-[11px] font-bold leading-4 text-[#64748B]">
                   <MapPin size={12} className="mt-0.5 shrink-0" />
-                  <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">
+                  <span className="min-w-0 break-words [overflow-wrap:anywhere]">
                     {limitText(selectedItem.locationLabel, 48)}
                   </span>
                 </p>
               </div>
-              <span className="shrink-0 rounded-full bg-[#2563EB] px-2.5 py-1 text-[11px] font-black text-white">
+              <span className="mt-2 inline-flex items-center justify-center rounded-full bg-[#2563EB] px-2.5 py-1 text-center text-[11px] font-black text-white">
                 {compactMoney(
                   selectedItem.unit.price,
                   selectedItem.unit.priceCurrency,
@@ -1446,7 +1444,7 @@ function PoolMapSection({
               </span>
             </div>
 
-            <div className="mt-2 grid grid-cols-3 gap-1.5">
+            <div className="mt-2 grid grid-cols-3 gap-2">
               <SmallInfo
                 label="Tip"
                 value={typeLabel(selectedItem.unit.type)}
@@ -1458,7 +1456,7 @@ function PoolMapSection({
               <SmallInfo label="Uyum" value={`%${selectedItem.match.score}`} />
             </div>
 
-            <div className="mt-2 grid grid-cols-2 gap-1.5">
+            <div className="mt-2 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => onDetail(selectedItem.unit, selectedItem.match)}
@@ -1606,15 +1604,15 @@ function PoolUnitCard({
         <div className="min-w-0 p-2.5">
           <div className="relative min-h-[58px]">
             <div className="min-w-0 px-6 text-center">
-              <p className="line-clamp-1 text-center text-[9px] font-black uppercase tracking-[0.1em] text-[#2563EB] break-words [overflow-wrap:anywhere]">
+              <p className="text-center text-[9px] font-black uppercase tracking-[0.1em] text-[#2563EB] break-words [overflow-wrap:anywhere]">
                 {limitText(typeLabel(unit.type), 32)}
               </p>
-              <h3 className="mx-auto mt-0.5 line-clamp-2 max-w-[210px] text-center text-[14px] font-black leading-[1.12] text-[#1F2937] break-words [overflow-wrap:anywhere]">
+              <h3 className="mx-auto mt-0.5 max-w-[210px] text-center text-[14px] font-black leading-[1.12] text-[#1F2937] break-words [overflow-wrap:anywhere]">
                 {limitText(unit.project?.name || "EPH Portföy", 60)}
               </h3>
               <p className="mt-1 flex min-w-0 items-center justify-center gap-1 text-center text-[10px] font-bold leading-3 text-[#64748B]">
                 <MapPin size={11} className="shrink-0" />
-                <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">
+                <span className="min-w-0 break-words [overflow-wrap:anywhere]">
                   {limitText(getLocation(unit), 42)}
                 </span>
               </p>
@@ -1623,7 +1621,7 @@ function PoolUnitCard({
             <BadgeCheck className="absolute right-0 top-0 shrink-0 text-emerald-600" size={18} />
           </div>
 
-          <div className="mt-2 grid grid-cols-2 gap-1.5">
+          <div className="mt-2 grid grid-cols-2 gap-2">
             <SmallInfo
               label="Fiyat"
               value={compactMoney(unit.price, unit.priceCurrency)}
@@ -1650,7 +1648,7 @@ function PoolUnitCard({
           </span>
         </div>
 
-        <div className="mt-2 grid grid-cols-3 gap-1.5">
+        <div className="mt-2 grid grid-cols-3 gap-2">
           <TrustPill
             active={Boolean(unit.yetkiVerified || unit.isVerified)}
             text="Yetki"
@@ -1676,7 +1674,7 @@ function PoolUnitCard({
           </span>
         </div>
 
-        <div className="mt-2 grid grid-cols-4 gap-1.5">
+        <div className="mt-2 grid grid-cols-4 gap-2">
           {trustIndex.checks.map((check) => (
             <TrustIndexPill
               key={check.label}
@@ -1701,7 +1699,7 @@ function PoolUnitCard({
           </span>
         </div>
 
-        <div className="mt-2 grid grid-cols-3 gap-1.5">
+        <div className="mt-2 grid grid-cols-3 gap-2">
           <MatchPill text={limitText(getMahalle(unit), 34)} />
           <MatchPill text={limitText(unit.roomCount || "Tip uygun", 24)} />
           <MatchPill text={`Fark %${match.budgetDiff || 8}`} />
@@ -1709,7 +1707,7 @@ function PoolUnitCard({
       </section>
 
       <div className={`border-t-2 border-[#C7D6E8] ${cardStyle.soft} p-1.5`}>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={(event) => {
@@ -1792,7 +1790,7 @@ function PoolDetailModal({
             <p className="text-[clamp(9px,2.4vw,10px)] font-black uppercase tracking-[0.12em] text-[#2563EB]">
               Havuz Detay
             </p>
-            <h2 className="mt-1 line-clamp-2 text-[clamp(17px,5vw,21px)] font-black leading-[1.05] tracking-[-0.045em] text-[#1F2937] break-words [overflow-wrap:anywhere]">
+            <h2 className="mt-1 text-[clamp(17px,5vw,21px)] font-black leading-[1.05] tracking-[-0.045em] text-[#1F2937] break-words [overflow-wrap:anywhere]">
               {limitText(unit.project?.name || "EPH Portföy", 72)}
             </h2>
           </div>
@@ -1808,7 +1806,7 @@ function PoolDetailModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[clamp(10px,3vw,14px)] pb-[clamp(12px,4vw,18px)] [-webkit-overflow-scrolling:touch]">
-          <div className="grid grid-cols-2 gap-[clamp(5px,1.8vw,8px)]">
+          <div className="grid grid-cols-2 gap-2">
             <SmallInfo label="EPH ID" value={getEphId(unit.id)} />
             <SmallInfo
               label="Fiyat"
@@ -1844,7 +1842,7 @@ function PoolDetailModal({
               </span>
             </div>
 
-            <div className="mt-2 grid grid-cols-3 gap-1.5">
+            <div className="mt-2 grid grid-cols-3 gap-2">
               <TrustPill
                 active={Boolean(unit.yetkiVerified || unit.isVerified)}
                 text="Yetki"
@@ -1875,7 +1873,7 @@ function PoolDetailModal({
               </span>
             </div>
 
-            <div className="mt-2 grid grid-cols-4 gap-1.5">
+            <div className="mt-2 grid grid-cols-4 gap-2">
               {trustIndex.checks.map((check) => (
                 <TrustIndexPill
                   key={check.label}
@@ -1909,7 +1907,7 @@ function PoolDetailModal({
                 %{match.score}
               </span>
             </div>
-            <div className="mt-2 grid grid-cols-3 gap-1.5">
+            <div className="mt-2 grid grid-cols-3 gap-2">
               <MatchPill text={limitText(getMahalle(unit), 34)} />
               <MatchPill text={limitText(unit.roomCount || "Tip uygun", 24)} />
               <MatchPill text={`Fark %${match.budgetDiff || 8}`} />
@@ -1968,7 +1966,7 @@ function PoolActionModal({
             <p className="text-[clamp(9px,2.4vw,10px)] font-black uppercase tracking-[0.12em] text-[#2563EB]">
               Havuz Kontör İşlemi
             </p>
-            <h2 className="mt-1 line-clamp-2 text-[clamp(17px,5vw,21px)] font-black leading-[1.05] tracking-[-0.045em] text-[#1F2937] break-words [overflow-wrap:anywhere]">
+            <h2 className="mt-1 text-[clamp(17px,5vw,21px)] font-black leading-[1.05] tracking-[-0.045em] text-[#1F2937] break-words [overflow-wrap:anywhere]">
               {limitText(title, 56)}
             </h2>
           </div>
@@ -1985,7 +1983,7 @@ function PoolActionModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[clamp(10px,3vw,14px)] pb-[clamp(10px,3vw,14px)] [-webkit-overflow-scrolling:touch]">
-          <div className="grid grid-cols-2 gap-[clamp(5px,1.8vw,8px)]">
+          <div className="grid grid-cols-2 gap-2">
             <SmallInfo
               label="Portföy"
               value={action.unit.project?.name || "EPH Portföy"}
@@ -2032,11 +2030,11 @@ function PoolActionModal({
 
 function SmallInfo({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-[13px] border border-[#D7E3F2] bg-[#F8FAFC] px-2 py-1.5">
-      <p className="line-clamp-1 text-[8px] font-black uppercase tracking-[0.05em] text-[#64748B] break-words [overflow-wrap:anywhere]">
+    <div className="min-w-0 rounded-[14px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-2.5 py-2 text-center">
+      <p className="text-center text-[8px] font-black uppercase tracking-[0.05em] text-[#64748B] break-words [overflow-wrap:anywhere]">
         {limitText(label, 22)}
       </p>
-      <p className="mt-0.5 line-clamp-2 text-[10px] font-black leading-[1.15] text-[#1F2937] break-words [overflow-wrap:anywhere]">
+      <p className="mt-0.5 text-center text-[10px] font-black leading-[1.2] text-[#1F2937] break-words [overflow-wrap:anywhere]">
         {limitText(value, 46)}
       </p>
     </div>
@@ -2053,7 +2051,7 @@ function TrustPill({ active, text }: { active: boolean; text: string }) {
       }`}
     >
       <CheckCircle2 size={10} className="shrink-0" />
-      <span className="line-clamp-1 min-w-0 break-words [overflow-wrap:anywhere]">
+      <span className="min-w-0 break-words [overflow-wrap:anywhere]">
         {active ? text : `${text} Eksik`}
       </span>
     </div>
@@ -2074,7 +2072,7 @@ function TrustIndexPill({ active, text }: { active: boolean; text: string }) {
       ) : (
         <X size={10} className="shrink-0" />
       )}
-      <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">
+      <span className="min-w-0 break-words [overflow-wrap:anywhere]">
         {text}
       </span>
     </div>
@@ -2085,7 +2083,7 @@ function MatchPill({ text }: { text: string }) {
   return (
     <div className="flex min-h-[30px] min-w-0 items-center justify-center gap-1 rounded-full border border-[#C7D6E8] bg-white px-2 text-center text-[9px] font-black leading-[1.05] text-[#1F2937]">
       <CheckCircle2 size={10} className="shrink-0 text-emerald-600" />
-      <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">
+      <span className="min-w-0 break-words [overflow-wrap:anywhere]">
         {limitText(text, 34)}
       </span>
     </div>

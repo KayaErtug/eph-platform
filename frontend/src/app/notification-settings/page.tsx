@@ -336,19 +336,19 @@ export default function NotificationSettingsPage() {
 
   if (!mounted) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F7FBFF]">
+      <main className="flex min-h-[100dvh] items-center justify-center bg-[#F7FBFF]">
         <div className="h-9 w-9 animate-spin rounded-full border-2 border-[#1557D6] border-t-transparent" />
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#F7FBFF] pb-20 text-[#06194A]">
-      <header className="sticky top-0 z-40 border-b border-[#DDE7F3] bg-[#F7FBFF]/95 backdrop-blur-xl">
+    <main className="min-h-[100dvh] bg-[#F7FBFF] overflow-y-auto pb-[calc(92px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] text-[#06194A]">
+      <header className="sticky top-0 z-40 border-b border-[#C7D6E8] bg-[#F7FBFF]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[460px] items-center justify-between px-4 py-3">
           <Link
             href="/profil"
-            className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#06194A] shadow-sm"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-[#C7D6E8] bg-white text-[#06194A] shadow-sm"
             aria-label="Profile dön"
           >
             <ArrowLeft size={18} />
@@ -361,7 +361,7 @@ export default function NotificationSettingsPage() {
 
           <Link
             href="/messages"
-            className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-white text-[#1557D6] shadow-sm"
+            className="relative flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-[#C7D6E8] bg-white text-[#1557D6] shadow-sm"
             aria-label="Mesajlar"
           >
             <Bell size={18} />
@@ -379,7 +379,7 @@ export default function NotificationSettingsPage() {
           </div>
         )}
 
-        <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-4 shadow-[0_16px_44px_rgba(15,23,42,0.08)]">
+        <section className="rounded-[30px] border-2 border-[#C7D6E8] bg-white p-4 shadow-[0_16px_44px_rgba(15,23,42,0.08)]">
           <div className="grid grid-cols-[1.1fr_0.9fr_0.9fr_0.9fr] items-stretch gap-2">
             <button
               type="button"
@@ -424,7 +424,7 @@ export default function NotificationSettingsPage() {
             />
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[#DDE7F3] pt-3">
+          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[#C7D6E8] pt-3">
             <button
               type="button"
               onClick={testBrowserNotification}
@@ -437,7 +437,7 @@ export default function NotificationSettingsPage() {
             <button
               type="button"
               onClick={testSelectedSound}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-[#DDE7F3] bg-white px-3 text-xs font-black text-[#1557D6] shadow-sm"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border-2 border-[#C7D6E8] bg-white px-3 text-xs font-black text-[#1557D6] shadow-sm"
             >
               <Play size={16} />
               Ses Testi
@@ -445,14 +445,14 @@ export default function NotificationSettingsPage() {
           </div>
         </section>
 
-        <section className="mt-4 rounded-[30px] border border-[#DDE7F3] bg-white p-4 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        <section className="mt-4 rounded-[30px] border-2 border-[#C7D6E8] bg-white p-4 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
+          <div className="mb-3 text-center">
+            <div className="flex items-center justify-center gap-2">
               <Music2 size={18} className="text-[#1557D6]" />
-              <h2 className="text-base font-black">Bildirim Sesi</h2>
+              <h2 className="text-center text-base font-black">Bildirim Sesi</h2>
             </div>
 
-            <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[11px] font-black text-[#1557D6]">
+            <span className="mt-2 inline-flex max-w-full items-center justify-center rounded-full bg-[#EFF6FF] px-3 py-1 text-center text-[11px] font-black leading-4 text-[#1557D6]">
               {selectedSoundItem.label}
             </span>
           </div>
@@ -466,10 +466,10 @@ export default function NotificationSettingsPage() {
                   key={sound.id}
                   type="button"
                   onClick={() => saveSoundChoice(sound)}
-                  className={`rounded-[24px] border p-3 text-center transition ${
+                  className={`min-h-[116px] rounded-[24px] border p-3 text-center transition ${
                     active
                       ? "border-[#1557D6] bg-[#EFF6FF]"
-                      : "border-[#DDE7F3] bg-[#F8FAFC] hover:bg-white"
+                      : "border-[#C7D6E8] bg-[#F8FAFC] hover:bg-white"
                   }`}
                   aria-label={sound.label}
                 >
@@ -481,13 +481,13 @@ export default function NotificationSettingsPage() {
                     {sound.id === "off" ? <VolumeX size={19} /> : <Bell size={18} />}
                   </span>
                   <span
-                    className={`mt-2 block truncate text-xs font-black ${
+                    className={`mt-2 block break-words text-xs font-black leading-4 ${
                       active ? "text-[#1557D6]" : "text-[#06194A]"
                     }`}
                   >
                     {sound.label}
                   </span>
-                  <span className="mt-0.5 block truncate text-[10px] font-bold text-[#64748B]">
+                  <span className="mt-0.5 block break-words text-[10px] font-bold leading-3 text-[#64748B]">
                     {sound.description}
                   </span>
                 </button>
@@ -496,17 +496,17 @@ export default function NotificationSettingsPage() {
           </div>
         </section>
 
-        <section className="mt-4 rounded-[30px] border border-[#DDE7F3] bg-white p-4 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        <section className="mt-4 rounded-[30px] border-2 border-[#C7D6E8] bg-white p-4 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
+          <div className="mb-3 text-center">
+            <div className="flex items-center justify-center gap-2">
               <Radio size={18} className="text-[#1557D6]" />
-              <h2 className="text-base font-black">Bildirim Türleri</h2>
+              <h2 className="text-center text-base font-black">Bildirim Türleri</h2>
             </div>
 
             <button
               type="button"
               onClick={toggleAllPreferences}
-              className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[11px] font-black text-[#1557D6]"
+              className="mt-2 rounded-full bg-[#EFF6FF] px-3 py-1 text-[11px] font-black text-[#1557D6]"
             >
               Tümünü Yönet
             </button>
@@ -547,10 +547,10 @@ export default function NotificationSettingsPage() {
           </div>
         </section>
 
-        <section className="mt-4 rounded-[30px] border border-[#DDE7F3] bg-white p-4 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
-          <div className="mb-3 flex items-center gap-2">
+        <section className="mt-4 rounded-[30px] border-2 border-[#C7D6E8] bg-white p-4 shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
+          <div className="mb-3 flex items-center justify-center gap-2 text-center">
             <Sparkles size={18} className="text-[#1557D6]" />
-            <h2 className="text-base font-black">Durum Merkezi</h2>
+            <h2 className="text-center text-base font-black">Durum Merkezi</h2>
           </div>
 
           <div className="grid gap-2">
@@ -610,7 +610,7 @@ function StatusMini({
         {icon}
       </div>
       <p className="mt-2 text-[10px] font-bold text-[#64748B]">{label}</p>
-      <p className={`max-w-full truncate text-[11px] font-black ${active ? "text-[#16A34A]" : "text-[#06194A]"}`}>
+      <p className={`max-w-full break-words text-[11px] font-black leading-4 ${active ? "text-[#16A34A]" : "text-[#06194A]"}`}>
         {value}
       </p>
       {active && <CheckCircle2 size={14} className="mt-1 text-[#16A34A]" />}
@@ -635,11 +635,11 @@ function PreferenceRow({
     <button
       type="button"
       onClick={onClick}
-      className={`flex min-h-14 items-center justify-between gap-2 rounded-[22px] border border-[#DDE7F3] bg-[#F8FAFC] px-3 text-left ${
+      className={`flex min-h-14 items-center justify-between gap-2 rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-3 text-left ${
         wide ? "col-span-2" : ""
       }`}
     >
-      <span className="flex min-w-0 items-center gap-2">
+      <span className="flex min-w-0 flex-1 items-center gap-2">
         <span
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${
             active ? "bg-[#EFF6FF] text-[#1557D6]" : "bg-white text-[#64748B]"
@@ -647,7 +647,7 @@ function PreferenceRow({
         >
           {icon}
         </span>
-        <span className="truncate text-sm font-black text-[#06194A]">{label}</span>
+        <span className="break-words text-sm font-black leading-4 text-[#06194A]">{label}</span>
       </span>
 
       <span
@@ -675,8 +675,8 @@ function StatusLine({
   active: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[22px] bg-[#F8FAFC] px-4 py-3">
-      <span className="text-sm font-black text-[#06194A]">{label}</span>
+    <div className="flex flex-col items-center justify-center gap-2 rounded-[22px] bg-[#F8FAFC] px-4 py-3 text-center sm:flex-row sm:justify-between">
+      <span className="break-words text-center text-sm font-black text-[#06194A]">{label}</span>
       <span
         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${
           active ? "bg-[#ECFDF5] text-[#16A34A]" : "bg-[#F1F5F9] text-[#64748B]"

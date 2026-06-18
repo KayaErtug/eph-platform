@@ -1175,7 +1175,7 @@ export default function CrmPage() {
 
   if (!hydrated || loading) {
     return (
-      <main className="eph-v4-shell flex min-h-screen items-center justify-center bg-[#F4F8FF] text-[#06194A]">
+      <main className="eph-v4-shell flex min-h-[100dvh] items-center justify-center bg-[#F4F8FF] text-[#06194A]">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="animate-spin text-[#1557D6]" size={34} />
           <p className="text-xs font-black uppercase tracking-[0.26em] text-slate-500">CRM verileri yükleniyor</p>
@@ -1228,7 +1228,7 @@ export default function CrmPage() {
 
   if (currentUserRole === "MUTEAHHIT") {
     return (
-      <main className="eph-v4-shell min-h-screen bg-[#F4F8FF] text-[#1F2937]">
+      <main className="eph-v4-shell min-h-[100dvh] bg-[#F4F8FF] text-[#1F2937]">
         {showAddModal && <AddCustomerModal form={form} setForm={setForm} formLoading={formLoading} provinceOptions={provinceOptions} provinceLoading={provinceLoading} onSubmit={handleAddCustomer} onClose={() => setShowAddModal(false)} />}
         {showCreditModal && <CreditCalculatorModal selectedCustomer={selectedCustomer} saving={activityLoading} onSave={handleSaveCreditCalculation} onClose={() => setShowCreditModal(false)} />}
         {quickPickMode && <QuickPickCustomerModal mode={quickPickMode} customers={customers} onSelect={handleOpenCustomerForAction} onClose={() => setQuickPickMode(null)} />}
@@ -1262,21 +1262,21 @@ export default function CrmPage() {
           />
         )}
 
-        <section className="eph-crm-page mx-auto min-h-screen max-w-7xl px-3 pb-8 pt-3 md:px-4 md:pt-5">
-          <header className="mb-3 rounded-[26px] border border-[#C7D6E8] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
+        <section className="eph-crm-page mx-auto min-h-[100dvh] max-w-7xl px-3 pb-8 pt-3 md:px-4 md:pt-5">
+          <header className="mb-3 rounded-[26px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
             <div className="grid grid-cols-[44px_1fr_44px] items-center gap-2">
               <button
                 type="button"
                 onClick={() => router.push("/dashboard")}
-                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.06)]"
+                className="flex h-11 w-11 items-center justify-center rounded-2xl border-2 border-[#C7D6E8] bg-white text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.06)]"
                 aria-label="Ana sayfaya git"
               >
                 <Menu size={22} />
               </button>
 
               <div className="min-w-0 text-center">
-                <h1 className="truncate text-center text-[25px] font-black leading-tight tracking-tight text-[#1F2937] md:text-[34px]">CRM Müteahhit</h1>
-                <p className="mx-auto mt-0.5 max-w-xl truncate text-center text-[12px] font-bold leading-5 text-[#64748B]">
+                <h1 className="break-words text-center text-[25px] font-black leading-tight tracking-tight text-[#1F2937] md:text-[34px]">CRM Müteahhit</h1>
+                <p className="mx-auto mt-0.5 max-w-xl break-words text-center text-[12px] font-bold leading-5 text-[#64748B]">
                   {activeProjectCount} Proje • {Math.max(totalIndependentSectionCount, customers.length)} Bağımsız Bölüm
                 </p>
               </div>
@@ -1284,7 +1284,7 @@ export default function CrmPage() {
               <button
                 type="button"
                 onClick={() => document.getElementById("crm-search-input")?.focus()}
-                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.06)]"
+                className="flex h-11 w-11 items-center justify-center rounded-2xl border-2 border-[#C7D6E8] bg-white text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.06)]"
                 aria-label="CRM içinde ara"
               >
                 <Search size={20} />
@@ -1292,13 +1292,13 @@ export default function CrmPage() {
             </div>
           </header>
 
-          <section className="mb-3 overflow-hidden rounded-[26px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
+          <section className="mb-3 overflow-hidden rounded-[26px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
             <div className="rounded-[24px] border border-[#B7E4C7] bg-gradient-to-r from-[#ECFDF5] via-white to-[#F8FAFC] p-3 shadow-[0_10px_26px_rgba(22,163,74,0.08)]">
               <div className="relative mb-3 flex items-center justify-center gap-3 text-center">
                 <span className="h-px w-16 rounded-full bg-emerald-600/55" />
                 <div className="flex min-w-0 items-center justify-center gap-2 text-emerald-700">
                   <Sparkles size={21} className="shrink-0" />
-                  <h2 className="truncate text-center text-[18px] font-black leading-tight text-emerald-700">Lina Öneriyor</h2>
+                  <h2 className="break-words text-center text-[18px] font-black leading-tight text-emerald-700">Lina Öneriyor</h2>
                 </div>
                 <span className="h-px w-16 rounded-full bg-emerald-600/55" />
               </div>
@@ -1311,7 +1311,7 @@ export default function CrmPage() {
             </div>
           </section>
 
-          <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2 shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
+          <section className="mb-3 rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
             <div className="grid grid-cols-4 gap-2">
               <DeveloperStatCard title="Aktif Proje" value={String(activeProjectCount)} subtitle="Devam eden" icon={<Building2 size={18} />} />
               <DeveloperStatCard title="Toplam BB" value={String(Math.max(totalIndependentSectionCount, customers.length))} subtitle="Bağımsız bölüm" icon={<Home size={18} />} />
@@ -1326,7 +1326,7 @@ export default function CrmPage() {
             </div>
           </section>
 
-          <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
+          <section className="mb-3 rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
             <h2 className="mb-2 text-center text-[15px] font-black uppercase tracking-[0.08em] text-[#1F2937]">Hızlı İşlemler</h2>
             <div className="grid grid-cols-5 gap-2">
               <DeveloperActionButton title="Proje Ekle" icon={<Building2 size={23} />} tone="blue" onClick={() => router.push("/portfoy")} />
@@ -1337,7 +1337,7 @@ export default function CrmPage() {
             </div>
           </section>
 
-          <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
+          <section className="mb-3 rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
             <h2 className="mb-2 text-center text-[15px] font-black uppercase tracking-[0.08em] text-[#1F2937]">Segmentler</h2>
             <div className="grid grid-cols-6 gap-2">
               {[
@@ -1356,7 +1356,7 @@ export default function CrmPage() {
                     className={`${gridClass} flex min-h-[86px] flex-col items-center justify-center rounded-[20px] border px-2 py-3 text-center shadow-[0_8px_22px_rgba(15,23,42,0.055)] transition ${developerSegment === segment.key ? "border-[#2563EB] bg-[#EFF6FF] text-[#2563EB]" : "border-[#C7D6E8] bg-white text-[#1F2937]"}`}
                   >
                     <span className="mb-1 flex h-9 w-9 items-center justify-center rounded-2xl bg-[#F8FAFC] text-[#2563EB]">{segment.icon}</span>
-                    <span className="line-clamp-2 min-h-[30px] text-center text-[11px] font-black leading-[15px]">{segment.label}</span>
+                    <span className="break-words min-h-[30px] text-center text-[11px] font-black leading-[15px]">{segment.label}</span>
                     <span className="mt-1 text-[18px] font-black leading-none">{segment.count}</span>
                   </button>
                 );
@@ -1364,7 +1364,7 @@ export default function CrmPage() {
             </div>
           </section>
 
-          <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
+          <section className="mb-3 rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
             <div className="mb-2 text-center">
               <h2 className="text-[17px] font-black uppercase tracking-[0.08em] text-[#1F2937]">Bağlantılarım</h2>
               <div className="mx-auto mt-2 grid max-w-[360px] grid-cols-4 gap-1 rounded-2xl bg-[#F8FAFC] p-1">
@@ -1382,11 +1382,11 @@ export default function CrmPage() {
               {developerCustomers.slice(0, 4).map((customer) => (
                 <DeveloperConnectionRow key={customer.id} customer={customer} onOpen={() => openCustomer(customer.id)} />
               ))}
-              {developerCustomers.length === 0 && <div className="rounded-[20px] border border-dashed border-[#C7D6E8] bg-[#F8FAFC] p-5 text-center text-sm font-bold text-[#64748B]">Bu segmentte kayıt yok.</div>}
+              {developerCustomers.length === 0 && <div className="rounded-[20px] border-2 border-dashed border-[#C7D6E8] bg-[#F8FAFC] p-5 text-center text-sm font-bold text-[#64748B]">Bu segmentte kayıt yok.</div>}
             </div>
           </section>
 
-          <section className="mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
+          <section className="mb-3 rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
             <div className="mb-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
               <span />
               <h2 className="text-center text-[17px] font-black uppercase tracking-[0.08em] text-[#1F2937]">Satılan Daire Raporu</h2>
@@ -1397,14 +1397,14 @@ export default function CrmPage() {
                 const property = customer.properties?.[0];
                 const unit = property?.unit;
                 return (
-                  <button key={customer.id} onClick={() => openCustomer(customer.id)} className="w-full rounded-[20px] border border-[#C7D6E8] bg-[#F8FAFC] p-3 text-left shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+                  <button key={customer.id} onClick={() => openCustomer(customer.id)} className="w-full rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-black text-[#1F2937]">{unit?.project?.name || customer.company || "CRM Satış Kaydı"}</p>
                         <p className="mt-1 text-xs font-bold text-[#64748B]">{unit?.number || "BB No yok"} • {unit?.roomCount || customer.interestedType || "Tip belirtilmedi"} • {unit?.area ? `${unit.area} m²` : customer.city || "Konum yok"}</p>
                         <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-2xl bg-white px-3 py-1 text-xs font-black text-emerald-700">
                           <UsersRound size={14} />
-                          <span className="truncate">{customer.firstName} {customer.lastName} • CRM Kaydı</span>
+                          <span className="break-words">{customer.firstName} {customer.lastName} • CRM Kaydı</span>
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
@@ -1415,7 +1415,7 @@ export default function CrmPage() {
                   </button>
                 );
               })}
-              {soldCustomers.length === 0 && <div className="rounded-[20px] border border-dashed border-[#C7D6E8] bg-[#F8FAFC] p-5 text-center text-sm font-bold text-[#64748B]">Satılmış daire CRM kaydı henüz yok.</div>}
+              {soldCustomers.length === 0 && <div className="rounded-[20px] border-2 border-dashed border-[#C7D6E8] bg-[#F8FAFC] p-5 text-center text-sm font-bold text-[#64748B]">Satılmış daire CRM kaydı henüz yok.</div>}
             </div>
           </section>
         </section>
@@ -1424,7 +1424,7 @@ export default function CrmPage() {
   }
 
   return (
-    <main className="eph-v4-shell min-h-screen bg-[#F4F8FF] text-[#27364F]">
+    <main className="eph-v4-shell min-h-[100dvh] bg-[#F4F8FF] text-[#27364F]">
       {showAddModal && <AddCustomerModal form={form} setForm={setForm} formLoading={formLoading} provinceOptions={provinceOptions} provinceLoading={provinceLoading} onSubmit={handleAddCustomer} onClose={() => setShowAddModal(false)} />}
       {showCreditModal && <CreditCalculatorModal selectedCustomer={selectedCustomer} saving={activityLoading} onSave={handleSaveCreditCalculation} onClose={() => setShowCreditModal(false)} />}
       {showQuickNoteModal && <QuickNoteModal customers={customers} saving={activityLoading} onSave={handleSaveQuickNote} onClose={() => setShowQuickNoteModal(false)} />}
@@ -1460,12 +1460,12 @@ export default function CrmPage() {
         />
       )}
 
-      <section className="eph-crm-page mx-auto min-h-screen max-w-7xl px-3 pb-8 pt-3 md:px-4 md:pt-5">
+      <section className="eph-crm-page mx-auto min-h-[100dvh] max-w-7xl px-3 pb-8 pt-3 md:px-4 md:pt-5">
         {currentUserRole === "TAKIM_LIDERI" && (
           <TeamLeaderModeSwitch activeView={teamLeaderView} onChange={setTeamLeaderView} />
         )}
 
-        <header className="eph-crm-compact-head mb-3 overflow-hidden rounded-[26px] border border-[#C7D6E8] bg-white p-3 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07)] md:p-4">
+        <header className="eph-crm-compact-head mb-3 overflow-hidden rounded-[26px] border-2 border-[#C7D6E8] bg-white p-3 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07)] md:p-4">
           <div className="flex items-center justify-center gap-2">
             <div className="inline-flex items-center gap-2 rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#1557D6]">
               <BriefcaseBusiness size={13} />
@@ -1497,7 +1497,7 @@ export default function CrmPage() {
                   key={card.key}
                   type="button"
                   onClick={() => router.push(card.href)}
-                  className="grid min-h-[86px] grid-cols-[42px_1fr_18px] items-center gap-2 rounded-[22px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 py-3 text-left shadow-[0_8px_20px_rgba(15,23,42,0.045)] transition hover:border-[#1557D6] hover:bg-white active:scale-[0.99]"
+                  className="grid min-h-[86px] grid-cols-[42px_1fr_18px] items-center gap-2 rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-3 py-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)] transition hover:border-[#1557D6] hover:bg-white active:scale-[0.99]"
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-sm">{card.icon}</span>
                   <span className="min-w-0">
@@ -1519,7 +1519,7 @@ export default function CrmPage() {
           </div>
         </header>
 
-        <section className="eph-crm-time-panel mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
+        <section className="eph-crm-time-panel mb-3 rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
           <div className="grid grid-cols-4 gap-2">
             {[
               { key: "today", label: "Bugün" },
@@ -1549,17 +1549,17 @@ export default function CrmPage() {
               setView("list");
               setRoleFilter("TUMU");
             }}
-            className="eph-crm-hotlead-card mb-3 flex w-full items-center justify-between gap-3 rounded-[22px] border border-orange-200 bg-[#FFF7ED] px-4 py-3 text-left shadow-[0_8px_24px_rgba(234,88,12,0.08)]"
+            className="eph-crm-hotlead-card mb-3 flex w-full items-center justify-between gap-3 rounded-[22px] border-2 border-[#FED7AA] bg-[#FFF7ED] px-4 py-3 text-center shadow-[0_8px_24px_rgba(234,88,12,0.08)]"
           >
             <span className="flex min-w-0 items-center gap-2 text-sm font-black text-orange-700">
               <Flame size={18} className="shrink-0" />
-              <span className="line-clamp-2">{warmLeadCustomers.length} müşteri 48 saattir bekliyor</span>
+              <span className="break-words">{warmLeadCustomers.length} müşteri 48 saattir bekliyor</span>
             </span>
             <span className="shrink-0 text-xs font-black text-orange-600">Görüntüle →</span>
           </button>
         )}
 
-        <section className="eph-crm-segments mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
+        <section className="eph-crm-segments mb-3 rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
           <div className="grid grid-cols-6 gap-2">
             {roleTabs.map((tab, index) => {
               const count = customers.filter((customer) => (customer.roles || []).includes(tab.key)).length;
@@ -1581,23 +1581,23 @@ export default function CrmPage() {
         </section>
 
         {quickFilter !== "TUMU" && (
-          <button type="button" onClick={showAllCustomers} className="mb-3 flex w-full items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white px-3 py-2 text-xs font-black text-[#1557D6] shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+          <button type="button" onClick={showAllCustomers} className="mb-3 flex w-full items-center justify-center rounded-2xl border-2 border-[#C7D6E8] bg-white px-3 py-2 text-xs font-black text-[#1557D6] shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
             {quickFilter === "EKSIK" ? "Eksik bilgili kayıtlar gösteriliyor" : "Sıcak lead listesi gösteriliyor"} • Filtreyi temizle
           </button>
         )}
 
-        <section className="eph-crm-filterbar mb-3 rounded-[24px] border border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
+        <section className="eph-crm-filterbar mb-3 rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
           <div className="flex gap-2">
             <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-3 text-slate-400" size={17} />
-              <input id="crm-search-input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Müşteri ara..." className="h-11 w-full rounded-2xl border border-[#C7D6E8] bg-[#F8FAFC] pl-10 pr-3 text-sm font-bold text-slate-700 outline-none focus:border-[#1557D6]" />
+              <input id="crm-search-input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Müşteri ara..." className="h-11 w-full rounded-2xl border-2 border-[#C7D6E8] bg-[#F8FAFC] pl-10 pr-3 text-sm font-bold text-slate-700 outline-none focus:border-[#1557D6]" />
             </div>
 
-            <button type="button" onClick={() => alert("Sesli arama tarayıcı desteği kontrol ediliyor. Bu özellik CRM V1.2 fazında aktif edilecek.")} className="flex h-11 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-white text-[#06194A]">
+            <button type="button" onClick={() => alert("Sesli arama tarayıcı desteği kontrol ediliyor. Bu özellik CRM V1.2 fazında aktif edilecek.")} className="flex h-11 w-12 shrink-0 items-center justify-center rounded-2xl border-2 border-[#C7D6E8] bg-white text-[#06194A]">
               <Mic size={18} />
             </button>
 
-            <button onClick={() => setView(view === "pipeline" ? "list" : "pipeline")} className="flex h-11 shrink-0 items-center justify-center gap-1 rounded-2xl border border-[#C7D6E8] bg-white px-3 text-xs font-black text-[#06194A]">
+            <button onClick={() => setView(view === "pipeline" ? "list" : "pipeline")} className="flex h-11 shrink-0 items-center justify-center gap-1 rounded-2xl border-2 border-[#C7D6E8] bg-white px-3 text-xs font-black text-[#06194A]">
               {view === "pipeline" ? <FileText size={16} /> : <ListFilter size={16} />}
               {view === "pipeline" ? "Liste" : "Pipeline"}
             </button>
@@ -1619,7 +1619,7 @@ export default function CrmPage() {
 
                     <div className="space-y-2">
                       {stageCustomers.map((customer) => <CustomerCard key={customer.id} customer={customer} onClick={() => openCustomer(customer.id)} />)}
-                      {stageCustomers.length === 0 && <div className="rounded-[20px] border border-dashed border-slate-200 bg-white p-5 text-center text-sm font-bold text-slate-400">Boş</div>}
+                      {stageCustomers.length === 0 && <div className="rounded-[20px] border-2 border-dashed border-[#C7D6E8] bg-white p-5 text-center text-sm font-bold text-slate-400">Boş</div>}
                     </div>
                   </div>
                 );
@@ -1627,7 +1627,7 @@ export default function CrmPage() {
             </div>
           </section>
         ) : (
-          <section className="eph-crm-list rounded-[24px] border border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
+          <section className="eph-crm-list rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
             {filteredCustomers.length === 0 ? (
               <div className="flex h-[240px] flex-col items-center justify-center text-center">
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]"><UsersRound size={26} /></div>
@@ -1898,9 +1898,9 @@ export default function CrmPage() {
 
 function DeveloperLinaRow({ icon, text }: { icon: ReactNode; text: string }) {
   return (
-    <button type="button" className="grid w-full grid-cols-[42px_1fr_18px] items-center gap-2 rounded-[18px] border border-[#C7D6E8] bg-white px-3 py-2 text-left shadow-[0_6px_16px_rgba(15,23,42,0.04)]">
+    <button type="button" className="grid w-full grid-cols-[42px_1fr_18px] items-center gap-2 rounded-[18px] border-2 border-[#C7D6E8] bg-white px-3 py-2 text-center shadow-[0_6px_16px_rgba(15,23,42,0.04)]">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center justify-self-center rounded-2xl bg-[#F8FAFC] text-emerald-700">{icon}</span>
-      <span className="line-clamp-2 min-w-0 text-sm font-black text-[#1F2937]">{text}</span>
+      <span className="break-words min-w-0 text-sm font-black text-[#1F2937]">{text}</span>
       <ChevronRight size={17} className="shrink-0 justify-self-end text-[#64748B]" />
     </button>
   );
@@ -1910,9 +1910,9 @@ function DeveloperStatCard({ title, value, subtitle, icon }: { title: string; va
   return (
     <button type="button" className="flex min-h-[84px] flex-col items-center justify-center rounded-[20px] border-2 border-[#C7D6E8] bg-white px-2 py-2 text-center shadow-[0_12px_26px_rgba(15,23,42,0.09)]">
       <span className="mb-1 flex h-8 w-8 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#2563EB]">{icon}</span>
-      <span className="line-clamp-2 min-h-[24px] text-center text-[10px] font-black leading-[12px] text-[#1F2937]">{title}</span>
+      <span className="break-words min-h-[24px] text-center text-[10px] font-black leading-[12px] text-[#1F2937]">{title}</span>
       <span className="mt-0.5 text-[21px] font-black leading-none text-[#1F2937]">{value}</span>
-      <span className="mt-0.5 line-clamp-1 text-[9px] font-bold text-[#64748B]">{subtitle}</span>
+      <span className="mt-0.5 break-words text-[9px] font-bold text-[#64748B]">{subtitle}</span>
     </button>
   );
 }
@@ -1950,7 +1950,7 @@ function DeveloperConnectionRow({ customer, onOpen }: { customer: Customer; onOp
   const roleText = (customer.roles || []).map(roleLabel).filter(Boolean).slice(0, 2).join(" / ") || "Bağlantı";
 
   return (
-    <button onClick={onOpen} className="w-full rounded-[20px] border border-[#C7D6E8] bg-white p-3 text-left shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+    <button onClick={onOpen} className="w-full rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -1958,13 +1958,13 @@ function DeveloperConnectionRow({ customer, onOpen }: { customer: Customer; onOp
               {customer.firstName?.[0] || "?"}{customer.lastName?.[0] || ""}
             </div>
             <div className="min-w-0">
-              <h3 className="truncate text-[15px] font-black text-[#1F2937]">{customer.firstName} {customer.lastName}</h3>
-              <p className="truncate text-xs font-bold text-[#64748B]">{roleText} • {customer.city || "Konum yok"}</p>
+              <h3 className="break-words text-[15px] font-black text-[#1F2937]">{customer.firstName} {customer.lastName}</h3>
+              <p className="break-words text-xs font-bold text-[#64748B]">{roleText} • {customer.city || "Konum yok"}</p>
             </div>
           </div>
           <div className="mt-2 grid gap-1 pl-[52px] text-xs font-bold text-[#64748B]">
-            <p className="line-clamp-1"><span className="font-black text-[#2563EB]">Proje:</span> {projectName}</p>
-            <p className="line-clamp-1"><span className="font-black text-[#1F2937]">Son temas:</span> {latestActivity?.note || "Aktivite yok"}</p>
+            <p className="break-words"><span className="font-black text-[#2563EB]">Proje:</span> {projectName}</p>
+            <p className="break-words"><span className="font-black text-[#1F2937]">Son temas:</span> {latestActivity?.note || "Aktivite yok"}</p>
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-center gap-1">
@@ -2026,7 +2026,7 @@ function CreditCalculatorModal({
   return (
     <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-end justify-center bg-[#1F2937]/45 p-0 backdrop-blur-sm md:items-center md:p-4" onClick={onClose}>
       <div
-        className="eph-crm-modal-panel flex h-[min(92dvh,860px)] w-full max-w-2xl flex-col overflow-hidden rounded-t-[30px] border border-[#C7D6E8] bg-white shadow-[0_-18px_48px_rgba(31,41,55,0.18)] md:h-auto md:max-h-[90dvh] md:rounded-[30px]"
+        className="eph-crm-modal-panel flex h-[min(92dvh,860px)] w-full max-w-2xl flex-col overflow-hidden rounded-t-[30px] border-2 border-[#C7D6E8] bg-white shadow-[0_-18px_48px_rgba(31,41,55,0.18)] md:h-auto md:max-h-[90dvh] md:rounded-[30px]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="sticky top-0 z-20 border-b border-[#C7D6E8] bg-white/95 px-4 pb-4 pt-[calc(14px+env(safe-area-inset-top,0px))] text-center backdrop-blur">
@@ -2035,7 +2035,7 @@ function CreditCalculatorModal({
             <X size={18} />
           </button>
 
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[22px] border border-[#C7D6E8] bg-[#F8FAFC] text-center shadow-[0_8px_22px_rgba(15,23,42,0.06)]">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-center shadow-[0_8px_22px_rgba(15,23,42,0.06)]">
             <span className="text-[25px] font-black leading-none text-[#D71920]">A</span>
           </div>
 
@@ -2048,7 +2048,7 @@ function CreditCalculatorModal({
         </div>
 
         <div className="flex-1 space-y-4 overflow-y-auto p-4 pb-[calc(22px+env(safe-area-inset-bottom,0px))]">
-          <section className="rounded-[24px] border border-[#C7D6E8] bg-white p-3 shadow-[0_10px_28px_rgba(15,23,42,0.055)]">
+          <section className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_10px_28px_rgba(15,23,42,0.055)]">
             <MortgageInputRow
               icon={<Home size={21} />}
               title="Konut Değeri"
@@ -2082,7 +2082,7 @@ function CreditCalculatorModal({
                     <p className="text-[11px] font-bold text-[#64748B]">12 - 240 ay</p>
                   </div>
                   <select
-                    className="h-11 min-w-[148px] rounded-2xl border border-[#C7D6E8] bg-[#EEF3F8] px-3 text-center text-sm font-black text-[#1F2937] outline-none focus:border-[#2563EB]"
+                    className="h-11 min-w-[148px] rounded-2xl border-2 border-[#C7D6E8] bg-[#EEF3F8] px-3 text-center text-sm font-black text-[#1F2937] outline-none focus:border-[#2563EB]"
                     value={months}
                     onChange={(event) => setMonths(event.target.value)}
                   >
@@ -2120,7 +2120,7 @@ function CreditCalculatorModal({
                   </div>
                   <div className="relative w-[128px]">
                     <input
-                      className="h-11 w-full rounded-2xl border border-[#C7D6E8] bg-[#EEF3F8] pl-3 pr-8 text-center text-sm font-black text-[#1F2937] outline-none focus:border-[#2563EB]"
+                      className="h-11 w-full rounded-2xl border-2 border-[#C7D6E8] bg-[#EEF3F8] pl-3 pr-8 text-center text-sm font-black text-[#1F2937] outline-none focus:border-[#2563EB]"
                       inputMode="decimal"
                       value={monthlyRate}
                       onChange={(event) => setMonthlyRate(event.target.value)}
@@ -2131,7 +2131,7 @@ function CreditCalculatorModal({
               </div>
             </div>
 
-            <div className="mt-4 rounded-[20px] border border-[#C7D6E8] bg-[#F8FAFC] px-4 py-3 shadow-[0_8px_20px_rgba(15,23,42,0.035)]">
+            <div className="mt-4 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-4 py-3 shadow-[0_8px_20px_rgba(15,23,42,0.035)]">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-left">
                   <p className="text-xs font-black uppercase tracking-wide text-[#64748B]">Kredi Tutarı</p>
@@ -2142,7 +2142,7 @@ function CreditCalculatorModal({
             </div>
           </section>
 
-          <section className="rounded-[24px] border border-[#C7D6E8] bg-white p-3 shadow-[0_10px_28px_rgba(15,23,42,0.055)]">
+          <section className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_10px_28px_rgba(15,23,42,0.055)]">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="text-left text-sm font-black text-[#1F2937]">Hesaplama Sonucu</h3>
               <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black text-[#2563EB]">Tahmini</span>
@@ -2205,7 +2205,7 @@ function MortgageInputRow({
           </div>
           <div className="relative w-[164px] max-w-[56%]">
             <input
-              className="h-11 w-full rounded-2xl border border-[#C7D6E8] bg-[#EEF3F8] pl-3 pr-8 text-right text-sm font-black text-[#1F2937] outline-none focus:border-[#2563EB]"
+              className="h-11 w-full rounded-2xl border-2 border-[#C7D6E8] bg-[#EEF3F8] pl-3 pr-8 text-right text-sm font-black text-[#1F2937] outline-none focus:border-[#2563EB]"
               inputMode="numeric"
               value={formatBudgetInput(value).replace(" TL", "")}
               onChange={(event) => onChange(onlyDigits(event.target.value))}
@@ -2222,7 +2222,7 @@ function MortgageResult({ title, value, tone = "blue" }: { title: string; value:
   const toneClass = tone === "green" ? "text-emerald-600 bg-emerald-50" : tone === "purple" ? "text-violet-700 bg-violet-50" : "text-[#2563EB] bg-[#EFF6FF]";
 
   return (
-    <div className="min-w-0 rounded-[20px] border border-[#C7D6E8] bg-white p-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.04)]">
+    <div className="min-w-0 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.04)]">
       <div className={`mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl ${toneClass}`}>
         <WalletCards size={18} />
       </div>
@@ -2250,7 +2250,7 @@ function QuickNoteModal({
 
   return (
     <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/60 p-0 backdrop-blur-sm md:items-center md:p-4" onClick={onClose}>
-      <div className="eph-crm-modal-panel flex w-full max-w-lg flex-col overflow-hidden rounded-t-[30px] border border-[#C7D6E8] bg-white shadow-2xl md:rounded-[30px]" onClick={(event) => event.stopPropagation()}>
+      <div className="eph-crm-modal-panel flex w-full max-w-lg flex-col overflow-hidden rounded-t-[30px] border-2 border-[#C7D6E8] bg-white shadow-2xl md:rounded-[30px]" onClick={(event) => event.stopPropagation()}>
         <div className="border-b border-[#C7D6E8] px-4 py-4 text-center">
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1557D6]">CRM Hızlı Not</p>
           <h2 className="mt-1 text-[22px] font-black text-[#06194A]">Sesli / Yazılı Not</h2>
@@ -2293,7 +2293,7 @@ function QuickPickCustomerModal({
 
   return (
     <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/60 p-0 backdrop-blur-sm md:items-center md:p-4" onClick={onClose}>
-      <div className="eph-crm-modal-panel flex max-h-[86dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[30px] border border-[#C7D6E8] bg-white shadow-2xl md:rounded-[30px]" onClick={(event) => event.stopPropagation()}>
+      <div className="eph-crm-modal-panel flex max-h-[86dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[30px] border-2 border-[#C7D6E8] bg-white shadow-2xl md:rounded-[30px]" onClick={(event) => event.stopPropagation()}>
         <div className="border-b border-[#C7D6E8] px-4 py-4 text-center">
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1557D6]">CRM Hızlı İşlem</p>
           <h2 className="mt-1 text-[22px] font-black text-[#06194A]">{title}</h2>
@@ -2303,13 +2303,13 @@ function QuickPickCustomerModal({
 
         <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
           {customers.length === 0 ? (
-            <div className="rounded-[22px] border border-dashed border-[#C7D6E8] bg-[#F8FAFC] p-6 text-center text-sm font-bold text-[#64748B]">Önce müşteri ekleyiniz.</div>
+            <div className="rounded-[22px] border-2 border-dashed border-[#C7D6E8] bg-[#F8FAFC] p-6 text-center text-sm font-bold text-[#64748B]">Önce müşteri ekleyiniz.</div>
           ) : (
             customers.map((customer) => (
-              <button key={customer.id} type="button" onClick={() => onSelect(customer.id)} className="flex w-full items-center justify-between gap-3 rounded-[20px] border border-[#C7D6E8] bg-white px-3 py-3 text-left shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+              <button key={customer.id} type="button" onClick={() => onSelect(customer.id)} className="flex w-full items-center justify-between gap-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white px-3 py-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-black text-[#06194A]">{customer.firstName} {customer.lastName}</span>
-                  <span className="mt-0.5 block truncate text-xs font-bold text-[#64748B]">{[customer.phone, customer.city, roleLabel(customer.roles?.[0])].filter(Boolean).join(" • ")}</span>
+                  <span className="block break-words text-sm font-black text-[#06194A]">{customer.firstName} {customer.lastName}</span>
+                  <span className="mt-0.5 block break-words text-xs font-bold text-[#64748B]">{[customer.phone, customer.city, roleLabel(customer.roles?.[0])].filter(Boolean).join(" • ")}</span>
                 </span>
                 <span className="shrink-0 text-xs font-black text-[#1557D6]">Seç →</span>
               </button>
@@ -2376,8 +2376,8 @@ function CrmSmartBand({
 
   if (hasWork) {
     return (
-      <div className="mt-3 flex min-h-9 items-center justify-center rounded-2xl border border-[#C7D6E8] bg-[#F8FAFC] px-3 py-2 text-center text-[11px] font-black leading-5 text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
-        <span className="line-clamp-2">
+      <div className="mt-3 flex min-h-9 items-center justify-center rounded-2xl border-2 border-[#C7D6E8] bg-[#F8FAFC] px-3 py-2 text-center text-[11px] font-black leading-5 text-[#06194A] shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+        <span className="break-words">
           ⏰ Bugün {todayTasks} görev <span className="text-slate-400">•</span> {plannedCalls} görüşme <span className="text-slate-400">•</span> {overdueTasks} takip gecikti
         </span>
       </div>
@@ -2385,7 +2385,7 @@ function CrmSmartBand({
   }
 
   return (
-    <div className="mt-3 rounded-[22px] border border-[#D8CCFF] bg-white px-3 py-3 text-left shadow-[0_10px_28px_rgba(109,40,217,0.09)]">
+    <div className="mt-3 rounded-[22px] border-2 border-[#D8CCFF] bg-white px-3 py-3 text-center shadow-[0_10px_28px_rgba(109,40,217,0.09)]">
       <div className="flex items-start gap-3">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#F5F3FF] text-[#6D28D9] shadow-sm">
           <Sparkles size={21} />
@@ -2393,7 +2393,7 @@ function CrmSmartBand({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-sm font-black text-[#6D28D9]">Lina'dan Öneri</p>
+            <p className="break-words text-sm font-black text-[#6D28D9]">Lina'dan Öneri</p>
             <span className="rounded-full bg-[#F5F3FF] px-2 py-1 text-[9px] font-black text-[#6D28D9]">Akıllı CRM</span>
           </div>
 
@@ -2404,11 +2404,11 @@ function CrmSmartBand({
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <button type="button" onClick={onShowCustomers} className="flex h-10 items-center justify-center gap-2 rounded-2xl border border-[#D8CCFF] bg-white px-2 text-[11px] font-black text-[#6D28D9]">
+        <button type="button" onClick={onShowCustomers} className="flex h-10 items-center justify-center gap-2 rounded-2xl border-2 border-[#D8CCFF] bg-white px-2 text-[11px] font-black text-[#6D28D9]">
           <PhoneCall size={15} />
           Sıcak Lead'ler
         </button>
-        <button type="button" onClick={onAddCustomer} className="flex h-10 items-center justify-center gap-2 rounded-2xl border border-[#D8CCFF] bg-white px-2 text-[11px] font-black text-[#6D28D9]">
+        <button type="button" onClick={onAddCustomer} className="flex h-10 items-center justify-center gap-2 rounded-2xl border-2 border-[#D8CCFF] bg-white px-2 text-[11px] font-black text-[#6D28D9]">
           <Plus size={15} />
           Yeni Müşteri
         </button>
@@ -2460,20 +2460,20 @@ function RoleSegmentButton({
 
 function QuickActionCard({ icon, title, subtitle, onClick }: { icon: ReactNode; title: string; subtitle: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="min-w-0 rounded-[20px] border border-[#C7D6E8] bg-[#F8FAFC] px-2 py-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)] transition hover:border-[#1557D6] hover:bg-white">
+    <button onClick={onClick} className="min-w-0 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-2 py-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)] transition hover:border-[#1557D6] hover:bg-white">
       <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-sm">{icon}</div>
-      <p className="mt-2 truncate text-[11px] font-black leading-tight text-[#06194A]">{title}</p>
-      <p className="mt-0.5 truncate text-[10px] font-black leading-tight text-slate-400">{subtitle}</p>
+      <p className="mt-2 break-words text-[11px] font-black leading-tight text-[#06194A]">{title}</p>
+      <p className="mt-0.5 break-words text-[10px] font-black leading-tight text-slate-400">{subtitle}</p>
     </button>
   );
 }
 
 function KpiCard({ title, value, icon }: { title: string; value: string; icon: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-[20px] border border-[#C7D6E8] bg-[#F8FAFC] px-2 py-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+    <div className="min-w-0 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-2 py-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
       <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-sm">{icon}</div>
-      <p className="truncate text-[10px] font-black uppercase tracking-wide text-slate-400">{title}</p>
-      <p className="mt-1 truncate text-[18px] font-black leading-tight text-[#06194A] md:text-[22px]">{value}</p>
+      <p className="break-words text-[10px] font-black uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="mt-1 break-words text-[18px] font-black leading-tight text-[#06194A] md:text-[22px]">{value}</p>
     </div>
   );
 }
@@ -2485,11 +2485,11 @@ function CustomerCard({ customer, onClick }: { customer: Customer; onClick: () =
   const nextTaskSoon = isTaskSoon(nextTask?.dueDate);
 
   return (
-    <button onClick={onClick} className="eph-crm-customer-card w-full max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
+    <button onClick={onClick} className="eph-crm-customer-card w-full max-w-full overflow-hidden rounded-[24px] border-2 border-[#C7D6E8] bg-white p-4 text-center transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
       <div className="mb-3 flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="line-clamp-2 break-words text-[16px] font-black leading-tight text-[#06194A]">{customer.firstName} {customer.lastName}</h3>
-          {customer.phone && <p className="mt-1 flex min-w-0 items-center gap-1 text-xs font-bold text-slate-500"><Phone size={13} className="shrink-0" /><span className="min-w-0 truncate">{customer.phone}</span></p>}
+          <h3 className="break-words break-words text-[16px] font-black leading-tight text-[#06194A]">{customer.firstName} {customer.lastName}</h3>
+          {customer.phone && <p className="mt-1 flex min-w-0 items-center gap-1 text-xs font-bold text-slate-500"><Phone size={13} className="shrink-0" /><span className="min-w-0 break-words">{customer.phone}</span></p>}
         </div>
 
         <span className="shrink-0 rounded-full px-2 py-1 text-[10px] font-black" style={{ background: stage.bg, color: stage.color }}>{stage.label}</span>
@@ -2524,7 +2524,7 @@ function CustomerListRow({ customer, onClick }: { customer: Customer; onClick: (
   const nextTaskSoon = isTaskSoon(nextTask?.dueDate);
 
   return (
-    <button onClick={onClick} className="eph-crm-list-row w-full max-w-full overflow-hidden rounded-[22px] border border-slate-200 bg-white p-4 text-left transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
+    <button onClick={onClick} className="eph-crm-list-row w-full max-w-full overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white p-4 text-center transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -2533,7 +2533,7 @@ function CustomerListRow({ customer, onClick }: { customer: Customer; onClick: (
             {(customer.roles || []).slice(0, 3).map((role) => <RolePill key={role} role={role} />)}
           </div>
 
-          <p className="mt-1 line-clamp-2 break-words text-xs font-bold leading-5 text-slate-500">{[customer.phone, customer.city, money(customer.budget)].filter(Boolean).join(" · ")}</p>
+          <p className="mt-1 break-words break-words text-xs font-bold leading-5 text-slate-500">{[customer.phone, customer.city, money(customer.budget)].filter(Boolean).join(" · ")}</p>
 
           <div className="mt-3 grid gap-2 md:grid-cols-2">
             <InsightBox title="Son Aktivite" badge={activityTypeLabel(latestActivity?.type)} text={latestActivity?.note || "Aktivite yok"} />
@@ -2553,17 +2553,17 @@ function CustomerListRow({ customer, onClick }: { customer: Customer; onClick: (
 }
 
 function RolePill({ role, label }: { role: string; label?: string }) {
-  return <span className="max-w-full break-words rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-black leading-4 text-blue-700">{label || roleLabel(role)}</span>;
+  return <span className="max-w-full break-words rounded-full border-2 border-[#C7D6E8] bg-blue-50 px-2 py-1 text-[10px] font-black leading-4 text-blue-700">{label || roleLabel(role)}</span>;
 }
 
 function InsightBox({ title, badge, text, urgent }: { title: string; badge: string; text: string; urgent?: boolean }) {
   return (
     <div className={`min-w-0 overflow-hidden rounded-2xl p-3 ${urgent ? "bg-red-50" : "bg-[#F8FAFC]"}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className={`min-w-0 truncate text-[10px] font-black uppercase tracking-wide ${urgent ? "text-red-500" : "text-slate-400"}`}>{title}</span>
-        <span className={`max-w-[52%] shrink-0 truncate rounded-full bg-white px-2 py-1 text-[9px] font-black ${urgent ? "text-red-600" : "text-slate-500"}`}>{badge}</span>
+        <span className={`min-w-0 break-words text-[10px] font-black uppercase tracking-wide ${urgent ? "text-red-500" : "text-slate-400"}`}>{title}</span>
+        <span className={`max-w-[52%] shrink-0 break-words rounded-full bg-white px-2 py-1 text-[9px] font-black ${urgent ? "text-red-600" : "text-slate-500"}`}>{badge}</span>
       </div>
-      <p className={`mt-2 line-clamp-2 break-words text-xs font-bold leading-5 ${urgent ? "text-red-700" : "text-slate-600"}`}>{text}</p>
+      <p className={`mt-2 break-words break-words text-xs font-bold leading-5 ${urgent ? "text-red-700" : "text-slate-600"}`}>{text}</p>
     </div>
   );
 }
@@ -2571,8 +2571,8 @@ function InsightBox({ title, badge, text, urgent }: { title: string; badge: stri
 function MiniCounter({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-[#F8FAFC] px-2 py-2 text-center">
-      <p className="line-clamp-2 break-words text-sm font-black leading-tight text-[#06194A]">{value}</p>
-      <p className="mt-0.5 truncate text-[9px] font-black uppercase text-slate-400">{label}</p>
+      <p className="break-words break-words text-sm font-black leading-tight text-[#06194A]">{value}</p>
+      <p className="mt-0.5 break-words text-[9px] font-black uppercase text-slate-400">{label}</p>
     </div>
   );
 }
@@ -2675,7 +2675,7 @@ function AddCustomerModal({
   return (
     <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/60 p-0 backdrop-blur-sm md:items-center md:p-4" onClick={onClose}>
       <div
-        className="eph-crm-modal-panel flex h-[min(94dvh,820px)] w-full max-w-3xl flex-col overflow-hidden rounded-t-[30px] border border-slate-200 bg-white shadow-2xl md:h-auto md:max-h-[92dvh] md:rounded-[32px]"
+        className="eph-crm-modal-panel flex h-[min(94dvh,820px)] w-full max-w-3xl flex-col overflow-hidden rounded-t-[30px] border-2 border-[#C7D6E8] bg-white shadow-2xl md:h-auto md:max-h-[92dvh] md:rounded-[32px]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="eph-crm-modal-header sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 pb-4 pt-[calc(14px+env(safe-area-inset-top,0px))] backdrop-blur md:p-5">
@@ -2697,7 +2697,7 @@ function AddCustomerModal({
 
         <div className="eph-crm-modal-body flex-1 space-y-5 overflow-y-auto px-4 py-5 md:px-5">
           <FormSection title="1. Temel Bilgiler">
-            <div className="rounded-[24px] border border-slate-200 bg-[#F8FAFC] p-3 md:p-4">
+            <div className="rounded-[24px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3 md:p-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <Field label="Ad *"><input className="premium-input" placeholder="Örn. Ahmet" value={form.firstName} onChange={(event) => setField("firstName", event.target.value)} /></Field>
                 <Field label="Soyad *"><input className="premium-input" placeholder="Örn. Yılmaz" value={form.lastName} onChange={(event) => setField("lastName", event.target.value)} /></Field>
@@ -2718,14 +2718,14 @@ function AddCustomerModal({
           </FormSection>
 
           <FormSection title="2. Müşteri Rolleri">
-            <div className="rounded-[24px] border border-slate-200 bg-white p-3 md:p-4">
+            <div className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-3 md:p-4">
               <p className="mb-3 text-center text-xs font-bold leading-5 text-slate-500">Bir müşteri aynı anda alıcı, satıcı, yatırımcı veya mal sahibi olabilir.</p>
               <MultiOptionGrid options={CUSTOMER_ROLES} value={form.roles} onChange={(roles) => setForm((current: any) => ({ ...current, roles }))} />
             </div>
           </FormSection>
 
           <FormSection title="3. İlgi & Bütçe">
-            <div className="rounded-[24px] border border-slate-200 bg-[#F8FAFC] p-3 md:p-4">
+            <div className="rounded-[24px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3 md:p-4">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <Field label="Bütçe">
                   <input
@@ -2771,7 +2771,7 @@ function AddCustomerModal({
                 </Field>
               </div>
 
-              <div className="mt-3 rounded-2xl border border-blue-100 bg-white px-3 py-2 text-center text-xs font-black text-slate-500">
+              <div className="mt-3 rounded-2xl border-2 border-[#C7D6E8] bg-white px-3 py-2 text-center text-xs font-black text-slate-500">
                 Seçili bölge: <span className="text-[#1557D6]">{form.interestedArea || "Henüz seçilmedi"}</span>
               </div>
 
@@ -2812,7 +2812,7 @@ function AddCustomerModal({
           </FormSection>
 
           <FormSection title="4. Etiketler">
-            <div className="rounded-[24px] border border-slate-200 bg-white p-3 md:p-4">
+            <div className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-3 md:p-4">
               <MultiOptionGrid options={TAGS.map((tag) => ({ key: tag, label: tag }))} value={form.tags} onChange={(tags) => setForm((current: any) => ({ ...current, tags }))} />
             </div>
           </FormSection>
@@ -2827,7 +2827,7 @@ function AddCustomerModal({
             <button onClick={onSubmit} disabled={formLoading || !form.firstName || !form.lastName} className="flex h-12 items-center justify-center rounded-2xl bg-[#1557D6] px-4 text-sm font-black text-white disabled:opacity-50">
               {formLoading ? "Kaydediliyor..." : "Müşteri Ekle"}
             </button>
-            <button onClick={onClose} className="flex h-12 items-center justify-center rounded-2xl border border-slate-200 px-5 text-sm font-black text-slate-500">İptal</button>
+            <button onClick={onClose} className="flex h-12 items-center justify-center rounded-2xl border-2 border-[#C7D6E8] px-5 text-sm font-black text-slate-500">İptal</button>
           </div>
         </div>
       </div>
@@ -2903,12 +2903,12 @@ function CustomerDetailModal({
 
   return (
     <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-center justify-center bg-[#06194A]/60 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="eph-crm-modal-panel eph-crm-detail-panel max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[32px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <div className="eph-crm-modal-panel eph-crm-detail-panel max-h-[92dvh] w-full max-w-4xl overflow-y-auto rounded-[32px] border-2 border-[#C7D6E8] bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="eph-crm-modal-header sticky top-0 z-10 border-b border-slate-200 bg-white p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <h2 className="line-clamp-2 break-words text-[26px] font-black leading-tight tracking-tight text-[#06194A]">{customer.firstName} {customer.lastName}</h2>
-              <p className="mt-1 line-clamp-2 break-words text-sm font-bold leading-5 text-slate-500">{[customer.phone, customer.city].filter(Boolean).join(" · ")}</p>
+              <h2 className="break-words break-words text-[26px] font-black leading-tight tracking-tight text-[#06194A]">{customer.firstName} {customer.lastName}</h2>
+              <p className="mt-1 break-words break-words text-sm font-bold leading-5 text-slate-500">{[customer.phone, customer.city].filter(Boolean).join(" · ")}</p>
             </div>
 
             <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><X size={20} /></button>
@@ -2988,7 +2988,7 @@ function GeneralTab({ customer }: { customer: Customer }) {
 
       {customer.tags?.length > 0 && (
         <FormSection title="Etiketler">
-          <div className="flex flex-wrap justify-center gap-2">{customer.tags.map((tag) => <span key={tag} className="max-w-full break-words rounded-full border border-slate-200 px-3 py-2 text-xs font-black leading-4 text-slate-500">{tag}</span>)}</div>
+          <div className="flex flex-wrap justify-center gap-2">{customer.tags.map((tag) => <span key={tag} className="max-w-full break-words rounded-full border-2 border-[#C7D6E8] px-3 py-2 text-xs font-black leading-4 text-slate-500">{tag}</span>)}</div>
         </FormSection>
       )}
 
@@ -3040,7 +3040,7 @@ function InterestsTab({
 }) {
   return (
     <div className="space-y-6">
-      <section className="rounded-[26px] border border-blue-100 bg-blue-50/60 p-4 text-center">
+      <section className="rounded-[26px] border-2 border-[#C7D6E8] bg-blue-50/60 p-4 text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-blue-700"><Sparkles size={22} /></div>
         <h3 className="mt-3 text-lg font-black text-[#06194A]">Lina Talep Profili</h3>
         <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">Müşterinin aradığı bölge, bütçe, mülk tipi ve özellikleri burada tutulur. İleride havuza uygun portföy düştüğünde Lina bu profillerden eşleşme üretecek.</p>
@@ -3173,7 +3173,7 @@ function InterestCard({ interest, onDelete }: { interest: CustomerInterest; onDe
     <div className={`rounded-[24px] border p-4 ${interest.isActive ? "border-blue-100 bg-white" : "border-slate-200 bg-slate-50 opacity-70"}`}>
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 break-words text-sm font-black leading-tight text-[#06194A]">{interest.title || "Talep Profili"}</p>
+          <p className="break-words break-words text-sm font-black leading-tight text-[#06194A]">{interest.title || "Talep Profili"}</p>
           <p className="mt-1 flex min-w-0 flex-wrap items-center gap-1 text-xs font-bold leading-5 text-slate-500"><MapPin size={13} className="shrink-0" /><span className="min-w-0 break-words">{[interest.city, interest.district, interest.neighborhood].filter(Boolean).join(" / ") || "Bölge belirtilmedi"}</span></p>
         </div>
         <button onClick={onDelete} className="flex h-9 w-9 items-center justify-center rounded-2xl bg-red-50 text-red-600"><Trash2 size={16} /></button>
@@ -3249,7 +3249,7 @@ function HavuzMatchesTab({ customer }: { customer: Customer }) {
   if (!activeInterests.length) {
     return (
       <FormSection title="Havuz Eşleşmeleri">
-        <section className="rounded-[26px] border border-dashed border-[#C7D6E8] bg-[#F8FAFC] p-5 text-center">
+        <section className="rounded-[26px] border-2 border-dashed border-[#C7D6E8] bg-[#F8FAFC] p-5 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-sm">
             <Home size={22} />
           </div>
@@ -3264,7 +3264,7 @@ function HavuzMatchesTab({ customer }: { customer: Customer }) {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-[26px] border border-[#C7D6E8] bg-white p-4 text-center shadow-[0_10px_28px_rgba(15,23,42,0.055)]">
+      <section className="rounded-[26px] border-2 border-[#C7D6E8] bg-white p-4 text-center shadow-[0_10px_28px_rgba(15,23,42,0.055)]">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
           <Home size={23} />
         </div>
@@ -3299,7 +3299,7 @@ function HavuzMatchesTab({ customer }: { customer: Customer }) {
       </section>
 
       {loadingMatches && (
-        <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[26px] border border-[#C7D6E8] bg-white p-6 text-center">
+        <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[26px] border-2 border-[#C7D6E8] bg-white p-6 text-center">
           <Loader2 className="animate-spin text-[#1557D6]" size={28} />
           <p className="mt-3 text-xs font-black uppercase tracking-[0.18em] text-[#64748B]">Eşleşmeler yükleniyor</p>
         </div>
@@ -3329,7 +3329,7 @@ function HavuzMatchCard({ match }: { match: HavuzMatch }) {
   const detailUrl = `/havuz/${match.unitId}`;
 
   return (
-    <article className="overflow-hidden rounded-[26px] border border-[#C7D6E8] bg-white shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
+    <article className="overflow-hidden rounded-[26px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
       {match.coverImage && (
         <div className="h-36 w-full overflow-hidden bg-[#F8FAFC]">
           <img src={match.coverImage} alt={title} className="h-full w-full object-cover" />
@@ -3339,7 +3339,7 @@ function HavuzMatchCard({ match }: { match: HavuzMatch }) {
       <div className="space-y-3 p-4">
         <div className="grid grid-cols-[1fr_auto] items-start gap-3">
           <div className="min-w-0">
-            <p className="line-clamp-2 break-words text-[15px] font-black leading-tight text-[#06194A]">{title}</p>
+            <p className="break-words break-words text-[15px] font-black leading-tight text-[#06194A]">{title}</p>
             <p className="mt-1 flex min-w-0 items-center justify-center gap-1 text-center text-xs font-bold leading-5 text-[#64748B] sm:justify-start sm:text-left">
               <MapPin size={13} className="shrink-0" />
               <span className="min-w-0 break-words">{location}</span>
@@ -3408,11 +3408,11 @@ function PropertyCard({ property, onDelete }: { property: CustomerProperty; onDe
   const project = unit?.project;
 
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+    <div className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-4">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="flex min-w-0 items-center gap-2 text-sm font-black text-[#06194A]"><Home size={17} className="shrink-0" /><span className="line-clamp-2 break-words">{project?.name || "Portföy"}</span></p>
-          <p className="mt-1 line-clamp-2 break-words text-xs font-bold leading-5 text-slate-500">{[project?.city, project?.district, unit?.number ? `No: ${unit.number}` : null].filter(Boolean).join(" / ")}</p>
+          <p className="flex min-w-0 items-center gap-2 text-sm font-black text-[#06194A]"><Home size={17} className="shrink-0" /><span className="break-words break-words">{project?.name || "Portföy"}</span></p>
+          <p className="mt-1 break-words break-words text-xs font-bold leading-5 text-slate-500">{[project?.city, project?.district, unit?.number ? `No: ${unit.number}` : null].filter(Boolean).join(" / ")}</p>
         </div>
         <button onClick={onDelete} className="flex h-9 w-9 items-center justify-center rounded-2xl bg-red-50 text-red-600"><Trash2 size={16} /></button>
       </div>
@@ -3503,7 +3503,7 @@ function ChoiceBlock({ title, children }: { title: string; children: ReactNode }
 }
 
 function Chip({ children }: { children: ReactNode }) {
-  return <span className="max-w-full break-words rounded-full border border-slate-200 bg-[#F8FAFC] px-3 py-1 text-[11px] font-black leading-4 text-slate-600">{children}</span>;
+  return <span className="max-w-full break-words rounded-full border-2 border-[#C7D6E8] bg-[#F8FAFC] px-3 py-1 text-[11px] font-black leading-4 text-slate-600">{children}</span>;
 }
 
 function EmptyBox({ text }: { text: string }) {
@@ -3537,7 +3537,7 @@ function TeamLeaderModeSwitch({
   onChange: (view: "personal" | "team") => void;
 }) {
   return (
-    <section className="mb-3 rounded-[26px] border border-[#C7D6E8] bg-white p-2 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
+    <section className="mb-3 rounded-[26px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_10px_30px_rgba(15,23,42,0.07)]">
       <div className="grid grid-cols-2 gap-2 rounded-[22px] bg-[#EEF3F8] p-1">
         <button
           type="button"

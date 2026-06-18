@@ -116,16 +116,6 @@ function roleLabel(role?: string | null) {
   return "Gayrimenkul Danışmanı";
 }
 
-function isAdminRole(role?: string | null) {
-  const normalizedRole = normalizeRole(role);
-  return normalizedRole === "ADMIN" || normalizedRole === "SUPER_ADMIN";
-}
-
-function isModeratorOrAbove(role?: string | null) {
-  const normalizedRole = normalizeRole(role);
-  return normalizedRole === "MODERATOR" || normalizedRole === "ADMIN" || normalizedRole === "SUPER_ADMIN";
-}
-
 function getFirstName(user?: { firstName?: string | null; email?: string | null } | null) {
   return user?.firstName?.trim() || user?.email?.split("@")[0] || "EPH Üyesi";
 }
@@ -197,6 +187,21 @@ function endOfToday() {
   return date;
 }
 
+function centeredGridItemClass(index: number, total: number) {
+  const columns = 4;
+  const remainder = total % columns;
+
+  if (remainder === 1 && index === total - 1) {
+    return "col-span-2 col-start-2";
+  }
+
+  if (remainder === 2 && index === total - 2) {
+    return "col-start-2";
+  }
+
+  return "";
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -206,8 +211,7 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [crmCustomers, setCrmCustomers] = useState<CrmDashboardCustomer[]>([]);
   const [featuredPosts, setFeaturedPosts] = useState<FeaturedNetworkPost[]>([]);
-  const [networkNotifications, setNetworkNotifications] =
-    useState<NetworkNotificationResponse>({ unreadCount: 0, items: [] });
+  const [networkNotifications, setNetworkNotifications] = useState<NetworkNotificationResponse>({ unreadCount: 0, items: [] });
   const [unreadMessages, setUnreadMessages] = useState(0);
 
   const firstName = getFirstName(user);
@@ -237,9 +241,7 @@ export default function DashboardPage() {
         await Promise.allSettled([
           api.get("/dashboard/summary"),
           user?.id ? api.get(`/conversations?userId=${user.id}`) : Promise.resolve({ data: [] }),
-          user?.id
-            ? api.get(`/network/notifications?userId=${user.id}`)
-            : Promise.resolve({ data: { unreadCount: 0, items: [] } }),
+          user?.id ? api.get(`/network/notifications?userId=${user.id}`) : Promise.resolve({ data: { unreadCount: 0, items: [] } }),
           api.get("/network/posts/featured"),
           api.get("/crm/customers"),
         ]);
@@ -452,7 +454,7 @@ export default function DashboardPage() {
 
   if (!hydrated || loading) {
     return (
-      <main className="flex min-h-[calc(100dvh-74px)] items-center justify-center bg-[#F7FBFF] px-4">
+      <main className="flex min-h-[calc(100dvh-74px)] items-center justify-center bg-[#F4F8FF] px-4">
         <div className="flex flex-col items-center gap-4 text-center text-[#27364F]">
           <Loader2 className="animate-spin text-[#1557D6]" size={30} />
           <p className="text-sm font-black">Dashboard hazırlanıyor...</p>
@@ -462,9 +464,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-[calc(100dvh-74px)] bg-[#F7FBFF] px-3 pb-24 pt-2 text-[#06194A]">
+    <main className="min-h-[calc(100dvh-74px)] bg-[#F4F8FF] px-3 pb-24 pt-2 text-[#06194A]">
       <div className="mx-auto w-full max-w-[430px] space-y-2.5">
-        <section className="rounded-[26px] border border-[#DDE7F3] bg-white px-4 py-4 text-center shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
+        <section className="rounded-[26px] border-2 border-[#C7D6E8] bg-white px-4 py-4 text-center shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
           <p className="mx-auto inline-flex min-h-[26px] items-center justify-center rounded-full bg-[#EFF6FF] px-4 text-[11px] font-black text-[#1557D6]">
             {roleName}
           </p>
@@ -477,7 +479,7 @@ export default function DashboardPage() {
             {dashboardSummaryText}
           </p>
 
-          <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-[20px] border border-[#DDE7F3] bg-[#FBFDFF]">
+          <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-[#FBFDFF]">
             <HeroStat label="Görev" value={todayTaskCount} />
             <HeroStat label="Mesaj" value={unreadMessages} />
             <HeroStat label="Talep" value={visibleForumRequests.length} />
@@ -535,12 +537,7 @@ export default function DashboardPage() {
         </SectionBlock>
 
         <section className="grid grid-cols-2 gap-2">
-          <CompactInfoCard
-            href="/lina"
-            icon={<Bot size={14} />}
-            title="Lina"
-            desc="Asistan"
-          />
+          <CompactInfoCard href="/lina" icon={<Bot size={14} />} title="Lina" desc="Asistan" />
 
           <CompactInfoCard
             href="/messages"
@@ -556,7 +553,7 @@ export default function DashboardPage() {
 
 function HeroStat({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="min-h-[58px] px-2 py-2.5 text-center [&:not(:last-child)]:border-r [&:not(:last-child)]:border-[#DDE7F3]">
+    <div className="min-h-[58px] px-2 py-2.5 text-center [&:not(:last-child)]:border-r-2 [&:not(:last-child)]:border-[#C7D6E8]">
       <p className="text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#64748B]">
         {label}
       </p>
@@ -569,7 +566,7 @@ function HeroStat({ label, value }: { label: string; value: number | string }) {
 
 function QuickAccessCenter({ items }: { items: QuickAccessItem[] }) {
   return (
-    <section className="rounded-[24px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_12px_26px_rgba(15,23,42,0.055)]">
+    <section className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_12px_26px_rgba(15,23,42,0.055)]">
       <div className="mb-2 text-center">
         <p className="text-center text-[9px] font-black uppercase tracking-[0.22em] text-[#1557D6]">
           Hızlı Erişim
@@ -580,28 +577,32 @@ function QuickAccessCenter({ items }: { items: QuickAccessItem[] }) {
       </div>
 
       <div className="grid grid-cols-4 gap-1.5">
-        {items.map((item) => (
-          <QuickAccessCard key={`${item.href}-${item.label}`} item={item} />
+        {items.map((item, index) => (
+          <QuickAccessCard
+            key={`${item.href}-${item.label}`}
+            item={item}
+            className={centeredGridItemClass(index, items.length)}
+          />
         ))}
       </div>
     </section>
   );
 }
 
-function QuickAccessCard({ item }: { item: QuickAccessItem }) {
+function QuickAccessCard({ item, className }: { item: QuickAccessItem; className?: string }) {
   return (
     <Link
       href={item.href}
-      className="flex min-h-[72px] flex-col items-center justify-center rounded-[18px] border border-[#DDE7F3] bg-[#FBFDFF] px-1.5 py-2 text-center transition active:scale-[0.98] hover:border-[#1557D6]/40 hover:bg-[#EFF6FF]"
+      className={`flex min-h-[76px] flex-col items-center justify-center rounded-[18px] border-2 border-[#C7D6E8] bg-[#FBFDFF] px-1.5 py-2 text-center transition active:scale-[0.98] hover:border-[#1557D6]/60 hover:bg-[#EFF6FF] ${className || ""}`}
     >
       <span className="flex h-7 w-7 items-center justify-center rounded-[12px] bg-[#EFF6FF] text-[#1557D6]">
         {item.icon}
       </span>
-      <span className="mt-1 line-clamp-2 min-h-[26px] text-center text-[9.5px] font-black leading-[13px] text-[#06194A]">
-        {item.label}
+      <span className="mt-1 flex min-h-[28px] w-full items-center justify-center text-center text-[9.5px] font-black leading-[13px] text-[#06194A]">
+        <span className="break-words text-center">{item.label}</span>
       </span>
-      <span className="mt-0.5 inline-flex min-h-[16px] items-center justify-center rounded-full bg-white px-1.5 text-center text-[8px] font-black leading-none text-[#1557D6]">
-        {item.desc}
+      <span className="mt-0.5 inline-flex min-h-[17px] max-w-full items-center justify-center rounded-full bg-white px-1.5 text-center text-[8px] font-black leading-[10px] text-[#1557D6]">
+        <span className="break-words text-center">{item.desc}</span>
       </span>
     </Link>
   );
@@ -621,7 +622,7 @@ function SectionBlock({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[22px] border border-[#DDE7F3] bg-white p-2.5 shadow-[0_12px_26px_rgba(15,23,42,0.055)]">
+    <section className="rounded-[22px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_12px_26px_rgba(15,23,42,0.055)]">
       <div className="mb-2 grid grid-cols-[34px_1fr_54px] items-center gap-2">
         <span className="flex h-8 w-8 items-center justify-center rounded-[13px] bg-[#EFF6FF] text-[#1557D6]">
           {icon}
@@ -646,7 +647,7 @@ function UrgentTaskCard({ task }: { task: DashboardTask }) {
   return (
     <Link
       href="/crm"
-      className="grid min-h-[72px] grid-cols-[48px_1fr] items-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-[#FBFDFF] p-2.5"
+      className="grid min-h-[72px] grid-cols-[48px_1fr] items-center gap-2 rounded-[18px] border-2 border-[#C7D6E8] bg-[#FBFDFF] p-2.5"
     >
       <div className="flex h-10 w-10 flex-col items-center justify-center rounded-[14px] bg-[#FFF7ED] text-[#EA580C]">
         <Clock3 size={15} />
@@ -657,10 +658,10 @@ function UrgentTaskCard({ task }: { task: DashboardTask }) {
         <p className="text-left text-[10px] font-black text-[#1557D6]">
           {formatTaskDate(task.dueDate)}
         </p>
-        <h3 className="mt-0.5 line-clamp-1 text-left text-[14px] font-black text-[#06194A]">
+        <h3 className="mt-0.5 break-words text-left text-[14px] font-black leading-[17px] text-[#06194A]">
           {task.title}
         </h3>
-        <p className="mt-0.5 line-clamp-1 text-left text-[11px] font-bold text-[#64748B]">
+        <p className="mt-0.5 break-words text-left text-[11px] font-bold leading-4 text-[#64748B]">
           {task.customerName}
           {task.customerPhone ? ` · ${task.customerPhone}` : ""}
         </p>
@@ -679,16 +680,16 @@ function ForumRequestCard({ post }: { post: FeaturedNetworkPost }) {
     : "Talep";
 
   return (
-    <Link href={`/network/${post.id}`} className="block min-h-[96px] rounded-[18px] border border-[#DDE7F3] bg-[#FBFDFF] p-2.5">
+    <Link href={`/network/${post.id}`} className="block min-h-[96px] rounded-[18px] border-2 border-[#C7D6E8] bg-[#FBFDFF] p-2.5">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1 text-left">
-          <p className="line-clamp-1 text-left text-[9px] font-black uppercase tracking-[0.12em] text-[#1557D6]">
+          <p className="break-words text-left text-[9px] font-black uppercase tracking-[0.12em] text-[#1557D6]">
             {categoryText}
           </p>
-          <h3 className="mt-0.5 line-clamp-1 text-left text-[14px] font-black text-[#06194A]">
+          <h3 className="mt-0.5 break-words text-left text-[14px] font-black leading-[17px] text-[#06194A]">
             {post.title}
           </h3>
-          <p className="mt-0.5 line-clamp-1 text-left text-[11px] font-bold text-[#64748B]">
+          <p className="mt-0.5 break-words text-left text-[11px] font-bold leading-4 text-[#64748B]">
             {location || "Konum bilgisi yok"}
           </p>
         </div>
@@ -700,10 +701,10 @@ function ForumRequestCard({ post }: { post: FeaturedNetworkPost }) {
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">
-        <p className="line-clamp-1 text-left text-[11px] font-black text-[#1557D6]">
+        <p className="break-words text-left text-[11px] font-black text-[#1557D6]">
           {formatBudget(post.budget)}
         </p>
-        <span className="inline-flex min-h-[28px] items-center justify-center rounded-full bg-[#1557D6] px-3 text-[10px] font-black text-white">
+        <span className="inline-flex min-h-[28px] shrink-0 items-center justify-center rounded-full bg-[#1557D6] px-3 text-[10px] font-black text-white">
           İncele
         </span>
       </div>
@@ -721,7 +722,7 @@ function SummaryMiniCard({
   rows: Array<[string, string]>;
 }) {
   return (
-    <section className="min-h-[108px] rounded-[20px] border border-[#DDE7F3] bg-white p-2.5 text-center shadow-[0_10px_24px_rgba(15,23,42,0.055)]">
+    <section className="min-h-[108px] rounded-[20px] border-2 border-[#C7D6E8] bg-white p-2.5 text-center shadow-[0_10px_24px_rgba(15,23,42,0.055)]">
       <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-[13px] bg-[#EFF6FF] text-[#1557D6]">
         {icon}
       </div>
@@ -731,8 +732,8 @@ function SummaryMiniCard({
       <div className="mt-1.5 grid gap-1">
         {rows.map(([label, value]) => (
           <div key={label} className="grid grid-cols-[1fr_auto] items-center gap-2">
-            <span className="text-left text-[10px] font-bold text-[#64748B]">{label}</span>
-            <span className="text-right text-[12px] font-black text-[#06194A]">{value}</span>
+            <span className="break-words text-left text-[10px] font-bold text-[#64748B]">{label}</span>
+            <span className="break-words text-right text-[12px] font-black text-[#06194A]">{value}</span>
           </div>
         ))}
       </div>
@@ -744,20 +745,20 @@ function PoolSuggestionCard() {
   return (
     <Link
       href="/havuz"
-      className="grid min-h-[72px] grid-cols-[46px_1fr] items-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-[#FBFDFF] p-2.5"
+      className="grid min-h-[72px] grid-cols-[46px_1fr] items-center gap-2 rounded-[18px] border-2 border-[#C7D6E8] bg-[#FBFDFF] p-2.5"
     >
       <div className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-[#EFF6FF] text-[#1557D6]">
         <Target size={18} />
       </div>
 
       <div className="min-w-0 text-left">
-        <p className="text-left text-[10px] font-black uppercase tracking-[0.12em] text-[#1557D6]">
+        <p className="break-words text-left text-[10px] font-black uppercase tracking-[0.12em] text-[#1557D6]">
           Yetkili Portföy
         </p>
-        <h3 className="mt-0.5 line-clamp-1 text-left text-[14px] font-black text-[#06194A]">
+        <h3 className="mt-0.5 break-words text-left text-[14px] font-black leading-[17px] text-[#06194A]">
           Lina eşleştirme bekliyor
         </h3>
-        <p className="mt-0.5 line-clamp-1 text-left text-[11px] font-bold text-[#64748B]">
+        <p className="mt-0.5 break-words text-left text-[11px] font-bold leading-4 text-[#64748B]">
           Size uygun portföyler burada listelenecek.
         </p>
       </div>
@@ -779,7 +780,7 @@ function CompactInfoCard({
   return (
     <Link
       href={href}
-      className="min-h-[78px] rounded-[20px] border border-[#DDE7F3] bg-white p-2.5 text-center shadow-[0_10px_24px_rgba(15,23,42,0.055)]"
+      className="min-h-[82px] rounded-[20px] border-2 border-[#C7D6E8] bg-white p-2.5 text-center shadow-[0_10px_24px_rgba(15,23,42,0.055)]"
     >
       <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-[12px] bg-[#EFF6FF] text-[#1557D6]">
         {icon}
@@ -787,7 +788,7 @@ function CompactInfoCard({
 
       <h3 className="mt-1.5 text-center text-[13px] font-black text-[#06194A]">{title}</h3>
 
-      <p className="mt-0.5 line-clamp-1 text-center text-[10px] font-bold leading-4 text-[#64748B]">
+      <p className="mt-0.5 break-words text-center text-[10px] font-bold leading-4 text-[#64748B]">
         {desc}
       </p>
     </Link>
@@ -796,7 +797,7 @@ function CompactInfoCard({
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-[18px] border border-[#DDE7F3] bg-[#FBFDFF] px-3 py-3">
+    <div className="rounded-[18px] border-2 border-[#C7D6E8] bg-[#FBFDFF] px-3 py-3">
       <p className="text-center text-[12px] font-bold leading-5 text-[#64748B]">{text}</p>
     </div>
   );

@@ -588,7 +588,7 @@ export default function AdminPage() {
 
   if (!hasHydrated || loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F8FAFF] text-[#06194A]">
+      <main className="flex min-h-[100dvh] items-center justify-center bg-[#F4F8FF] text-[#06194A]">
         <div className="text-center">
           <Loader2 className="mx-auto animate-spin text-[#1557D6]" size={30} />
           <p className="mt-4 text-[12px] font-black uppercase tracking-[0.2em] text-slate-400">
@@ -600,7 +600,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F8FAFF] text-[#06194A]">
+    <main className="min-h-[100dvh] overflow-y-auto bg-[#F4F8FF] pb-[env(safe-area-inset-bottom)] text-[#06194A]">
       {menuOpen && (
         <div
           className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-sm lg:hidden"
@@ -658,7 +658,7 @@ export default function AdminPage() {
                 <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#071A39] bg-green-400" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-black">
+                <p className="break-words text-[13px] font-black leading-4">
                   {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Yönetici"}
                 </p>
                 <p className="text-[11px] font-bold text-white/60">
@@ -670,7 +670,7 @@ export default function AdminPage() {
         </aside>
 
         <section className="min-w-0 flex-1">
-          <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 px-3 py-2.5 backdrop-blur-xl lg:px-6">
+          <header className="sticky top-0 z-40 border-b-2 border-[#C7D6E8] bg-white/95 px-3 py-2.5 backdrop-blur-xl lg:px-6">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <button
@@ -682,7 +682,7 @@ export default function AdminPage() {
                 </button>
 
                 <div className="hidden min-w-0 lg:block">
-                  <h1 className="truncate text-[23px] font-black tracking-[-0.04em]">
+                  <h1 className="break-words text-[23px] font-black tracking-[-0.04em]">
                     EPH Yönetim Merkezi
                   </h1>
                 </div>
@@ -768,13 +768,9 @@ export default function AdminPage() {
               ))}
             </section>
 
-            <section className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-5">
-              {moduleCards.map((item, index) => (
-                <AdminModuleCard
-                  key={item.title}
-                  item={item}
-                  centeredLast={moduleCards.length % 2 === 1 && index === moduleCards.length - 1}
-                />
+            <section className="flex flex-wrap justify-center gap-2">
+              {moduleCards.map((item) => (
+                <AdminModuleCard key={item.title} item={item} />
               ))}
             </section>
 
@@ -785,19 +781,17 @@ export default function AdminPage() {
             </section>
 
             <section className="mt-3 grid gap-2 lg:grid-cols-[0.9fr_1.1fr]">
-              <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div>
-                    <h2 className="text-[15px] font-black tracking-[-0.03em] text-[#06194A]">
-                      Audit Log Özeti
-                    </h2>
-                    <p className="text-[11px] font-semibold text-slate-500">
-                      Yönetici işlem yoğunluğu
-                    </p>
-                  </div>
+              <div className="rounded-2xl bg-white p-3 shadow-sm border-2 border-[#C7D6E8]">
+                <div className="mb-3 text-center">
+                  <h2 className="text-center text-[15px] font-black tracking-[-0.03em] text-[#06194A]">
+                    Audit Log Özeti
+                  </h2>
+                  <p className="mt-1 text-center text-[11px] font-semibold text-slate-500">
+                    Yönetici işlem yoğunluğu
+                  </p>
                   <Link
                     href="/admin/audit-log"
-                    className="rounded-full bg-orange-100 px-3 py-1 text-[11px] font-black text-orange-700"
+                    className="mt-2 inline-flex min-h-[28px] items-center justify-center rounded-full bg-orange-100 px-3 py-1 text-center text-[11px] font-black text-orange-700"
                   >
                     İncele
                   </Link>
@@ -821,17 +815,15 @@ export default function AdminPage() {
                 )}
               </div>
 
-              <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div>
-                    <h2 className="text-[15px] font-black tracking-[-0.03em] text-[#06194A]">
-                      Son İşlemler
-                    </h2>
-                    <p className="text-[11px] font-semibold text-slate-500">
-                      En güncel yönetim hareketleri
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-black text-blue-700">
+              <div className="rounded-2xl bg-white p-3 shadow-sm border-2 border-[#C7D6E8]">
+                <div className="mb-3 text-center">
+                  <h2 className="text-center text-[15px] font-black tracking-[-0.03em] text-[#06194A]">
+                    Son İşlemler
+                  </h2>
+                  <p className="mt-1 text-center text-[11px] font-semibold text-slate-500">
+                    En güncel yönetim hareketleri
+                  </p>
+                  <span className="mt-2 inline-flex min-h-[28px] items-center justify-center rounded-full bg-blue-100 px-3 py-1 text-center text-[11px] font-black text-blue-700">
                     {dashboardSummary?.recentActions?.length || 0} kayıt
                   </span>
                 </div>
@@ -847,20 +839,20 @@ export default function AdminPage() {
                     {dashboardSummary.recentActions.slice(0, 6).map((item) => (
                       <div
                         key={item.id}
-                        className="flex min-h-[58px] items-center gap-3 rounded-2xl bg-slate-50 px-3 py-2"
+                        className="grid min-h-[72px] grid-cols-[40px_1fr] gap-3 rounded-2xl bg-slate-50 px-3 py-2 text-center md:grid-cols-[40px_1fr_86px] md:text-left"
                       >
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
                           <FileText size={17} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[13px] font-black text-[#06194A]">
+                          <p className="break-words text-center text-[13px] font-black leading-4 text-[#06194A] md:text-left">
                             {actionLabel(item.action)}
                           </p>
-                          <p className="truncate text-[11px] font-semibold text-slate-500">
+                          <p className="mt-0.5 break-words text-center text-[11px] font-semibold leading-4 text-slate-500 md:text-left">
                             {item.description || `${fullName(item.actor)} işlem yaptı`}
                           </p>
                         </div>
-                        <div className="shrink-0 text-right">
+                        <div className="col-span-2 text-center md:col-span-1 md:text-right">
                           <p className="text-[10px] font-black text-slate-500">
                             {formatDateTime(item.createdAt)}
                           </p>
@@ -999,7 +991,7 @@ function SideNavItem({
       }`}
     >
       {icon}
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="min-w-0 flex-1 break-words leading-4">{label}</span>
       {Boolean(badge) && (
         <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-blue-600 px-2 text-[11px] font-black text-white">
           {badge}
@@ -1019,47 +1011,39 @@ function AdminStatCard({
   const tone = toneClasses(item.tone);
 
   return (
-    <div className={`${compact ? "min-h-[86px] p-2.5" : "min-h-[86px] p-2.5 lg:min-h-[116px] lg:p-4"} rounded-2xl bg-white text-center shadow-sm ring-1 ring-slate-200/70`}>
+    <div className={`${compact ? "min-h-[86px] p-2.5" : "min-h-[86px] p-2.5 lg:min-h-[116px] lg:p-4"} rounded-2xl bg-white text-center shadow-sm border-2 border-[#C7D6E8]`}>
       <div className={`${compact ? "h-9 w-9" : "h-10 w-10 lg:h-12 lg:w-12"} mx-auto flex items-center justify-center rounded-2xl ${tone.box}`}>
         {item.icon}
       </div>
       <p className={`${compact ? "text-[10px]" : "text-[10px] lg:text-[12px]"} mt-2 font-black uppercase leading-tight ${tone.text}`}>
         {item.label}
       </p>
-      <p className={`${compact ? "text-[18px]" : "text-[23px] lg:text-[31px]"} mt-1 truncate font-black leading-none text-[#06194A]`}>
+      <p className={`${compact ? "text-[18px]" : "text-[23px] lg:text-[31px]"} mt-1 break-words font-black leading-tight text-[#06194A]`}>
         {item.value}
       </p>
-      <p className={`${compact ? "text-[10px]" : "text-[10px] lg:text-[13px]"} mt-1 truncate font-semibold text-slate-600`}>
+      <p className={`${compact ? "text-[10px]" : "text-[10px] lg:text-[13px]"} mt-1 break-words font-semibold leading-tight text-slate-600`}>
         {item.sub}
       </p>
     </div>
   );
 }
 
-function AdminModuleCard({
-  item,
-  centeredLast,
-}: {
-  item: ModuleCardItem;
-  centeredLast?: boolean;
-}) {
+function AdminModuleCard({ item }: { item: ModuleCardItem }) {
   const tone = toneClasses(item.tone);
   const countTone = item.countTone ? toneClasses(item.countTone) : null;
 
   return (
     <Link
       href={item.href}
-      className={`relative flex min-h-[112px] items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70 transition active:scale-[0.99] lg:min-h-[128px] lg:p-4 ${
-        centeredLast ? "max-md:col-span-2 max-md:mx-auto max-md:w-[50%]" : ""
-      }`}
+      className="relative flex min-h-[122px] w-[calc(50%_-_4px)] items-center gap-3 rounded-2xl bg-white p-3 text-center shadow-sm border-2 border-[#C7D6E8] transition active:scale-[0.99] md:w-[calc(25%_-_6px)] lg:min-h-[138px] lg:p-4 xl:w-[calc(20%_-_7px)]"
     >
       <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${tone.box} lg:h-16 lg:w-16`}>
         {item.icon}
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-start gap-2">
-          <h3 className="text-[14px] font-black leading-tight tracking-[-0.03em] text-[#06194A] lg:text-[16px]">
+        <div className="flex flex-col items-center justify-center gap-1 text-center">
+          <h3 className="break-words text-center text-[14px] font-black leading-tight tracking-[-0.03em] text-[#06194A] lg:text-[16px]">
             {item.title}
           </h3>
           {item.isNew && (
@@ -1068,7 +1052,7 @@ function AdminModuleCard({
             </span>
           )}
         </div>
-        <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-slate-600 lg:text-[13px] lg:leading-5">
+        <p className="mt-1 break-words text-center text-[11px] font-semibold leading-4 text-slate-600 lg:text-[13px] lg:leading-5">
           {item.desc}
         </p>
       </div>
@@ -1102,16 +1086,16 @@ function SystemMiniCard({
   const tone = toneClasses(item.tone);
 
   return (
-    <div className="flex min-h-[78px] items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/70">
+    <div className="flex min-h-[78px] items-center gap-3 rounded-2xl bg-white p-3 shadow-sm border-2 border-[#C7D6E8]">
       <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${tone.box}`}>
         {item.icon}
       </div>
       <div className="min-w-0">
         <p className="text-[11px] font-semibold text-slate-500">{item.title}</p>
-        <p className={`truncate text-[17px] font-black leading-tight ${item.title === "Sistem Durumu" ? "text-green-700" : "text-[#06194A]"}`}>
+        <p className={`break-words text-[17px] font-black leading-tight ${item.title === "Sistem Durumu" ? "text-green-700" : "text-[#06194A]"}`}>
           {item.value}
         </p>
-        <p className={`truncate text-[11px] font-semibold ${item.title === "Sistem Durumu" ? "text-green-600" : "text-slate-500"}`}>
+        <p className={`break-words text-[11px] font-semibold leading-4 ${item.title === "Sistem Durumu" ? "text-green-600" : "text-slate-500"}`}>
           {item.sub}
         </p>
       </div>
@@ -1121,7 +1105,7 @@ function SystemMiniCard({
 
 function InfoPill({ icon, label }: { icon: ReactNode; label: string }) {
   return (
-    <div className="flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-white px-3 shadow-sm ring-1 ring-slate-200/70">
+    <div className="flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-white px-3 shadow-sm border-2 border-[#C7D6E8]">
       {icon}
       <span>{label}</span>
     </div>
