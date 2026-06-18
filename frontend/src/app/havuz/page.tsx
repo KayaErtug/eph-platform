@@ -1,6 +1,5 @@
 "use client";
 
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -100,7 +99,6 @@ type SuccessToast = {
   balance: number | null;
 };
 
-
 type ViewMode = "LIST" | "MAP";
 
 type PoolMapItem = {
@@ -167,7 +165,15 @@ const DISTRICT_COORDS: Record<string, { lat: number; lng: number }> = {
 };
 
 const tabs = ["Sana Uygun", "Bölgemdekiler", "Projeler", "Yeni Eklenenler"];
-const categories = ["Tümü", "Satılık", "Kiralık", "Kat Karşılığı", "Proje", "Ticari", "Özel"];
+const categories = [
+  "Tümü",
+  "Satılık",
+  "Kiralık",
+  "Kat Karşılığı",
+  "Proje",
+  "Ticari",
+  "Özel",
+];
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   TRY: "₺",
@@ -177,16 +183,28 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 };
 
 function normalizeRole(role?: string | null) {
-  return String(role || "").toLocaleUpperCase("tr-TR").trim();
+  return String(role || "")
+    .toLocaleUpperCase("tr-TR")
+    .trim();
 }
 
 function isBuilderRole(role?: string | null) {
   const normalized = normalizeRole(role);
-  return ["MUTEAHHIT", "MÜTEAHHİT", "MÜTAHHİT", "INSAAT_FIRMASI", "İNŞAAT_FİRMASI"].includes(normalized);
+  return [
+    "MUTEAHHIT",
+    "MÜTEAHHİT",
+    "MÜTAHHİT",
+    "INSAAT_FIRMASI",
+    "İNŞAAT_FİRMASI",
+  ].includes(normalized);
 }
 
 function isVerified(unit: Unit) {
-  return Boolean(unit.isVerified || unit.yetkiVerified || (unit.tapuVerified && unit.photoVerified && unit.yetkiVerified));
+  return Boolean(
+    unit.isVerified ||
+    unit.yetkiVerified ||
+    (unit.tapuVerified && unit.photoVerified && unit.yetkiVerified),
+  );
 }
 
 function getCover(unit: Unit) {
@@ -218,7 +236,6 @@ function limitText(value?: string | number | null, max = 60) {
   return text.length > max ? `${text.slice(0, max).trim()}…` : text;
 }
 
-
 function normalizeMapKey(value?: string | null) {
   return String(value || "")
     .trim()
@@ -240,7 +257,7 @@ function getStableJitter(seed: string, index: number) {
   }
 
   const latOffset = ((hash % 19) - 9) * 0.0028;
-  const lngOffset = (((Math.floor(hash / 19) % 19) - 9) * 0.0032);
+  const lngOffset = ((Math.floor(hash / 19) % 19) - 9) * 0.0032;
 
   return { latOffset, lngOffset };
 }
@@ -249,7 +266,8 @@ function getApproxCoordinate(unit: Unit, index: number) {
   const city = normalizeMapKey(unit.project?.city);
   const district = normalizeMapKey(unit.project?.district);
   const districtKey = city && district ? `${city}/${district}` : "";
-  const base = DISTRICT_COORDS[districtKey] || CITY_COORDS[city] || DEFAULT_MAP_CENTER;
+  const base =
+    DISTRICT_COORDS[districtKey] || CITY_COORDS[city] || DEFAULT_MAP_CENTER;
   const jitter = getStableJitter(unit.id, index);
 
   return {
@@ -258,11 +276,17 @@ function getApproxCoordinate(unit: Unit, index: number) {
   };
 }
 
-function getPoolMapPoint(input: { unit: Unit; match: { score: number; customer: Customer | null; budgetDiff: number }; index: number }): PoolMapItem {
+function getPoolMapPoint(input: {
+  unit: Unit;
+  match: { score: number; customer: Customer | null; budgetDiff: number };
+  index: number;
+}): PoolMapItem {
   const directLat = Number(input.unit.project?.latitude || 0);
   const directLng = Number(input.unit.project?.longitude || 0);
   const hasDirectCoordinate = Boolean(directLat && directLng);
-  const approx = hasDirectCoordinate ? { lat: directLat, lng: directLng } : getApproxCoordinate(input.unit, input.index);
+  const approx = hasDirectCoordinate
+    ? { lat: directLat, lng: directLng }
+    : getApproxCoordinate(input.unit, input.index);
 
   return {
     unit: input.unit,
@@ -274,8 +298,35 @@ function getPoolMapPoint(input: { unit: Unit; match: { score: number; customer: 
   };
 }
 
+function getOverlayPinPosition(item: PoolMapItem, items: PoolMapItem[]) {
+  if (!items.length) return { left: 50, top: 50 };
+
+  const lats = items
+    .map((entry) => entry.lat)
+    .filter((value) => Number.isFinite(value));
+  const lngs = items
+    .map((entry) => entry.lng)
+    .filter((value) => Number.isFinite(value));
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  const latRange = Math.max(maxLat - minLat, 0.02);
+  const lngRange = Math.max(maxLng - minLng, 0.02);
+  const seed = getStableJitter(item.unit.id, 1);
+
+  const left = 7 + ((item.lng - minLng) / lngRange) * 86 + seed.lngOffset * 24;
+  const top = 12 + ((maxLat - item.lat) / latRange) * 76 + seed.latOffset * 24;
+
+  return {
+    left: Math.max(5, Math.min(95, left)),
+    top: Math.max(8, Math.min(88, top)),
+  };
+}
+
 function loadHavuzGoogleMapsScript() {
-  if (typeof window === "undefined") return Promise.reject(new Error("Tarayıcı ortamı bulunamadı."));
+  if (typeof window === "undefined")
+    return Promise.reject(new Error("Tarayıcı ortamı bulunamadı."));
   if (window.google?.maps) return Promise.resolve();
   if (window.ephHavuzGoogleMapsReady) return window.ephHavuzGoogleMapsReady;
 
@@ -284,11 +335,15 @@ function loadHavuzGoogleMapsScript() {
   }
 
   window.ephHavuzGoogleMapsReady = new Promise<void>((resolve, reject) => {
-    const existingScript = document.querySelector<HTMLScriptElement>('script[data-eph-havuz-google-maps="true"], script[data-eph-portfolio-google-maps="true"]');
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[data-eph-havuz-google-maps="true"], script[data-eph-portfolio-google-maps="true"]',
+    );
 
     if (existingScript) {
       existingScript.addEventListener("load", () => resolve());
-      existingScript.addEventListener("error", () => reject(new Error("Google Maps yüklenemedi.")));
+      existingScript.addEventListener("error", () =>
+        reject(new Error("Google Maps yüklenemedi.")),
+      );
       if (window.google?.maps) resolve();
       return;
     }
@@ -307,7 +362,10 @@ function loadHavuzGoogleMapsScript() {
 }
 
 function getLocation(unit: Unit) {
-  return [unit.project?.city, unit.project?.district].filter(Boolean).join(" / ") || "Konum yok";
+  return (
+    [unit.project?.city, unit.project?.district].filter(Boolean).join(" / ") ||
+    "Konum yok"
+  );
 }
 
 function getMahalle(unit: Unit) {
@@ -315,12 +373,22 @@ function getMahalle(unit: Unit) {
 }
 
 function getEphId(id: string) {
-  const cleaned = String(id || "").replaceAll("-", "").slice(0, 6).toUpperCase();
+  const cleaned = String(id || "")
+    .replaceAll("-", "")
+    .slice(0, 6)
+    .toUpperCase();
   return `EPH-${cleaned || "000000"}`;
 }
 
 function getConversationId(data: any) {
-  return data?.conversationId || data?.conversation?.id || data?.id || data?.data?.conversationId || data?.data?.id || "";
+  return (
+    data?.conversationId ||
+    data?.conversation?.id ||
+    data?.id ||
+    data?.data?.conversationId ||
+    data?.data?.id ||
+    ""
+  );
 }
 
 function getErrorMessage(error: unknown) {
@@ -346,11 +414,20 @@ function getNumericValue(data: any, keys: string[]) {
 }
 
 function getBalanceFromResponse(data: any) {
-  return getNumericValue(data, ["remainingBalance", "balance", "bakiye", "kalanBakiye", "sonrakiBakiye"]);
+  return getNumericValue(data, [
+    "remainingBalance",
+    "balance",
+    "bakiye",
+    "kalanBakiye",
+    "sonrakiBakiye",
+  ]);
 }
 
 function getSpentFromResponse(data: any, fallback: number) {
-  return getNumericValue(data, ["spent", "cost", "miktar", "harcananKontor"]) ?? fallback;
+  return (
+    getNumericValue(data, ["spent", "cost", "miktar", "harcananKontor"]) ??
+    fallback
+  );
 }
 
 function playKontorHarcamaSound() {
@@ -364,7 +441,9 @@ function playKontorHarcamaSound() {
 function calculatePoolQualityScore(unit: Unit) {
   const imageCount = Array.isArray(unit.images) ? unit.images.length : 0;
   const hasPhoto = imageCount > 0 || Boolean(unit.photoVerified);
-  const hasDocument = Boolean(unit.tapuVerified || unit.yetkiVerified || unit.isVerified);
+  const hasDocument = Boolean(
+    unit.tapuVerified || unit.yetkiVerified || unit.isVerified,
+  );
   const hasLocation = Boolean(unit.project?.city && unit.project?.district);
   const hasAuthorization = Boolean(unit.yetkiVerified || unit.isVerified);
   const approvalStatus = String(unit.approvalStatus || "").toUpperCase();
@@ -403,14 +482,19 @@ function getPoolQualityTone(score: number) {
 function calculateHavuzTrustIndex(unit: Unit, matchScore: number) {
   const hasTapu = Boolean(unit.tapuVerified || unit.isVerified);
   const hasYetki = Boolean(unit.yetkiVerified || unit.isVerified);
-  const hasPhoto = Boolean(unit.photoVerified || (Array.isArray(unit.images) && unit.images.length > 0));
+  const hasPhoto = Boolean(
+    unit.photoVerified ||
+    (Array.isArray(unit.images) && unit.images.length > 0),
+  );
   const crmMatch = Math.max(0, Math.min(100, Number(matchScore || 0))) >= 75;
 
   const score =
     (hasTapu ? 25 : 0) +
     (hasYetki ? 25 : 0) +
     (hasPhoto ? 25 : 0) +
-    Math.round((Math.max(0, Math.min(100, Number(matchScore || 0))) / 100) * 25);
+    Math.round(
+      (Math.max(0, Math.min(100, Number(matchScore || 0))) / 100) * 25,
+    );
 
   return {
     score: Math.max(0, Math.min(100, score)),
@@ -448,21 +532,32 @@ function getTrustBadges(unit: Unit, matchScore: number) {
   const badges: Array<{ label: string; className: string }> = [];
 
   if (hasEphApproval(unit)) {
-    badges.push({ label: "EPH Onaylı", className: "border-emerald-200 bg-emerald-50 text-emerald-700" });
+    badges.push({
+      label: "EPH Onaylı",
+      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    });
   }
 
   if (matchScore >= 80) {
-    badges.push({ label: "Havuza Hazır", className: "border-blue-200 bg-blue-50 text-blue-700" });
+    badges.push({
+      label: "Havuza Hazır",
+      className: "border-blue-200 bg-blue-50 text-blue-700",
+    });
   }
 
-  badges.push({ label: getPoolQualityLabel(qualityScore), className: getPoolQualityTone(qualityScore) });
+  badges.push({
+    label: getPoolQualityLabel(qualityScore),
+    className: getPoolQualityTone(qualityScore),
+  });
 
   return badges.slice(0, 3);
 }
 
 function calculateMatch(unit: Unit, customers: Customer[]) {
   const unitCity = String(unit.project?.city || "").toLocaleLowerCase("tr-TR");
-  const unitDistrict = String(unit.project?.district || "").toLocaleLowerCase("tr-TR");
+  const unitDistrict = String(unit.project?.district || "").toLocaleLowerCase(
+    "tr-TR",
+  );
   const unitText = [
     unit.project?.name,
     unit.project?.city,
@@ -481,17 +576,27 @@ function calculateMatch(unit: Unit, customers: Customer[]) {
   customers.forEach((customer) => {
     let score = 0;
     const customerCity = String(customer.city || "").toLocaleLowerCase("tr-TR");
-    const interestedArea = String(customer.interestedArea || "").toLocaleLowerCase("tr-TR");
-    const interestedType = String(customer.interestedType || "").toLocaleLowerCase("tr-TR");
+    const interestedArea = String(
+      customer.interestedArea || "",
+    ).toLocaleLowerCase("tr-TR");
+    const interestedType = String(
+      customer.interestedType || "",
+    ).toLocaleLowerCase("tr-TR");
     const notes = String(customer.notes || "").toLocaleLowerCase("tr-TR");
 
     if (customerCity && unitCity && customerCity === unitCity) score += 30;
-    if (interestedArea && (unitDistrict.includes(interestedArea) || unitText.includes(interestedArea))) score += 30;
+    if (
+      interestedArea &&
+      (unitDistrict.includes(interestedArea) ||
+        unitText.includes(interestedArea))
+    )
+      score += 30;
     if (interestedType && unitText.includes(interestedType)) score += 15;
 
     if (customer.budget && unit.price) {
       const diff = Math.abs(Number(customer.budget) - Number(unit.price));
-      const ratio = diff / Math.max(Number(customer.budget), Number(unit.price));
+      const ratio =
+        diff / Math.max(Number(customer.budget), Number(unit.price));
       budgetDiff = Math.round(ratio * 100);
 
       if (ratio <= 0.1) score += 15;
@@ -499,7 +604,13 @@ function calculateMatch(unit: Unit, customers: Customer[]) {
       else if (ratio <= 0.35) score += 5;
     }
 
-    if (notes && unitText.split(" ").some((word) => word.length > 3 && notes.includes(word))) score += 10;
+    if (
+      notes &&
+      unitText
+        .split(" ")
+        .some((word) => word.length > 3 && notes.includes(word))
+    )
+      score += 10;
 
     if (score > bestScore) {
       bestScore = score;
@@ -523,8 +634,11 @@ export default function HavuzPage() {
   const [activeTab, setActiveTab] = useState("Sana Uygun");
   const [category, setCategory] = useState("Tümü");
   const [search, setSearch] = useState("");
-  const [selectedAction, setSelectedAction] = useState<SelectedAction | null>(null);
-  const [detailSelection, setDetailSelection] = useState<DetailSelection | null>(null);
+  const [selectedAction, setSelectedAction] = useState<SelectedAction | null>(
+    null,
+  );
+  const [detailSelection, setDetailSelection] =
+    useState<DetailSelection | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
@@ -556,9 +670,14 @@ export default function HavuzPage() {
         api.get("/units/pool/wallet"),
       ]);
 
-      setUnits(unitsRes.status === "fulfilled" && Array.isArray(unitsRes.value.data) ? unitsRes.value.data : []);
+      setUnits(
+        unitsRes.status === "fulfilled" && Array.isArray(unitsRes.value.data)
+          ? unitsRes.value.data
+          : [],
+      );
       setCustomers(
-        customersRes.status === "fulfilled" && Array.isArray(customersRes.value.data)
+        customersRes.status === "fulfilled" &&
+          Array.isArray(customersRes.value.data)
           ? customersRes.value.data
           : [],
       );
@@ -589,7 +708,14 @@ export default function HavuzPage() {
     return matchedUnits
       .filter(({ unit }) => {
         if (activeTab === "Projeler") {
-          const text = [unit.type, unit.status, unit.project?.name, unit.description].join(" ").toLocaleLowerCase("tr-TR");
+          const text = [
+            unit.type,
+            unit.status,
+            unit.project?.name,
+            unit.description,
+          ]
+            .join(" ")
+            .toLocaleLowerCase("tr-TR");
           return text.includes("proje") || builder;
         }
 
@@ -598,14 +724,31 @@ export default function HavuzPage() {
       .filter(({ unit }) => {
         if (category === "Tümü") return true;
 
-        const text = [unit.status, unit.type, unit.project?.name, unit.description]
+        const text = [
+          unit.status,
+          unit.type,
+          unit.project?.name,
+          unit.description,
+        ]
           .join(" ")
           .toLocaleLowerCase("tr-TR");
 
-        if (category === "Kat Karşılığı") return text.includes("kat") || text.includes("arsa");
+        if (category === "Kat Karşılığı")
+          return text.includes("kat") || text.includes("arsa");
         if (category === "Proje") return text.includes("proje") || builder;
-        if (category === "Ticari") return text.includes("dukkan") || text.includes("dükkan") || text.includes("magaza") || text.includes("mağaza");
-        if (category === "Özel") return text.includes("villa") || text.includes("turistik") || text.includes("özel");
+        if (category === "Ticari")
+          return (
+            text.includes("dukkan") ||
+            text.includes("dükkan") ||
+            text.includes("magaza") ||
+            text.includes("mağaza")
+          );
+        if (category === "Özel")
+          return (
+            text.includes("villa") ||
+            text.includes("turistik") ||
+            text.includes("özel")
+          );
 
         return text.includes(category.toLocaleLowerCase("tr-TR"));
       })
@@ -628,16 +771,27 @@ export default function HavuzPage() {
       });
   }, [activeTab, builder, category, matchedUnits, search]);
 
-  const displayedUnits = useMemo(() => filteredPoolItems.slice(0, 12), [filteredPoolItems]);
+  const displayedUnits = useMemo(
+    () => filteredPoolItems.slice(0, 12),
+    [filteredPoolItems],
+  );
 
   const poolMapItems = useMemo(() => {
-    return filteredPoolItems.map(({ unit, match }, index) => getPoolMapPoint({ unit, match, index }));
+    return filteredPoolItems.map(({ unit, match }, index) =>
+      getPoolMapPoint({ unit, match, index }),
+    );
   }, [filteredPoolItems]);
 
-  const showKontorSuccess = (input: { title: string; data: any; fallbackSpent: number }) => {
+  const showKontorSuccess = (input: {
+    title: string;
+    data: any;
+    fallbackSpent: number;
+  }) => {
     const spent = getSpentFromResponse(input.data, input.fallbackSpent);
     const responseBalance = getBalanceFromResponse(input.data);
-    const nextBalance = responseBalance ?? (walletBalance === null ? null : Math.max(walletBalance - spent, 0));
+    const nextBalance =
+      responseBalance ??
+      (walletBalance === null ? null : Math.max(walletBalance - spent, 0));
 
     if (nextBalance !== null) {
       setWalletBalance(nextBalance);
@@ -697,7 +851,9 @@ export default function HavuzPage() {
       }
 
       window.setTimeout(() => {
-        router.push(conversationId ? `/messages/${conversationId}` : "/messages");
+        router.push(
+          conversationId ? `/messages/${conversationId}` : "/messages",
+        );
       }, 900);
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -716,16 +872,22 @@ export default function HavuzPage() {
     setBusyAction(busyKey);
 
     try {
-      const response = await api.post(`/units/pool/${action.unit.id}/${endpoint}`, {
-        matchScore: action.score,
-        note:
-          action.type === "LEAD"
-            ? `${getEphId(action.unit.id)} portföyü için eşleşen müşterim var.`
-            : `${getEphId(action.unit.id)} portföyü ile ilgileniyorum.`,
-      });
+      const response = await api.post(
+        `/units/pool/${action.unit.id}/${endpoint}`,
+        {
+          matchScore: action.score,
+          note:
+            action.type === "LEAD"
+              ? `${getEphId(action.unit.id)} portföyü için eşleşen müşterim var.`
+              : `${getEphId(action.unit.id)} portföyü ile ilgileniyorum.`,
+        },
+      );
 
       showKontorSuccess({
-        title: action.type === "LEAD" ? "Müşterim Var Bildirildi" : "İlgileniyorum Bildirildi",
+        title:
+          action.type === "LEAD"
+            ? "Müşterim Var Bildirildi"
+            : "İlgileniyorum Bildirildi",
         data: response.data,
         fallbackSpent: action.type === "LEAD" ? 20 : 10,
       });
@@ -745,7 +907,9 @@ export default function HavuzPage() {
       <main className="flex min-h-[calc(100dvh-64px)] items-center justify-center bg-[#F4F8FF] px-4 text-[#1F2937]">
         <div className="text-center">
           <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#2563EB] border-t-transparent" />
-          <p className="mt-3 text-xs font-black text-[#64748B]">Havuz hazırlanıyor...</p>
+          <p className="mt-3 text-xs font-black text-[#64748B]">
+            Havuz hazırlanıyor...
+          </p>
         </div>
       </main>
     );
@@ -776,12 +940,20 @@ export default function HavuzPage() {
 
             <div className="grid shrink-0 grid-cols-1 gap-1">
               <div className="rounded-[14px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-2.5 py-1.5 text-center">
-                <p className="text-[14px] font-black leading-none text-[#2563EB]">{eligibleUnits.length}</p>
-                <p className="mt-0.5 text-[8px] font-black text-[#64748B]">Yetkili</p>
+                <p className="text-[14px] font-black leading-none text-[#2563EB]">
+                  {eligibleUnits.length}
+                </p>
+                <p className="mt-0.5 text-[8px] font-black text-[#64748B]">
+                  Yetkili
+                </p>
               </div>
               <div className="rounded-[14px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-2.5 py-1.5 text-center">
-                <p className="text-[14px] font-black leading-none text-[#2563EB]">{walletBalance ?? "-"}</p>
-                <p className="mt-0.5 text-[8px] font-black text-[#64748B]">Kontör</p>
+                <p className="text-[14px] font-black leading-none text-[#2563EB]">
+                  {walletBalance ?? "-"}
+                </p>
+                <p className="mt-0.5 text-[8px] font-black text-[#64748B]">
+                  Kontör
+                </p>
               </div>
             </div>
           </div>
@@ -868,7 +1040,9 @@ export default function HavuzPage() {
             busyAction={busyAction}
             onDetail={(unit, match) => setDetailSelection({ unit, match })}
             onMessage={(unit, match) => startPoolMessage(unit, match.score)}
-            onAction={(type, unit, match) => setSelectedAction({ type, unit, score: match.score })}
+            onAction={(type, unit, match) =>
+              setSelectedAction({ type, unit, score: match.score })
+            }
           />
         )}
 
@@ -895,7 +1069,9 @@ export default function HavuzPage() {
             <h2 className="text-[16px] font-black tracking-[-0.03em] text-[#1F2937]">
               Sana Uygun Portföyler
             </h2>
-            <span className="text-[10px] font-black text-[#2563EB]">CRM ↔ Havuz</span>
+            <span className="text-[10px] font-black text-[#2563EB]">
+              CRM ↔ Havuz
+            </span>
           </div>
 
           {displayedUnits.length > 0 ? (
@@ -907,13 +1083,17 @@ export default function HavuzPage() {
                 busyAction={busyAction}
                 onDetail={() => setDetailSelection({ unit, match })}
                 onMessage={() => startPoolMessage(unit, match.score)}
-                onAction={(type) => setSelectedAction({ type, unit, score: match.score })}
+                onAction={(type) =>
+                  setSelectedAction({ type, unit, score: match.score })
+                }
               />
             ))
           ) : (
             <section className="rounded-[24px] border-2 border-dashed border-[#C7D6E8] bg-white p-6 text-center">
               <Building2 className="mx-auto text-[#2563EB]" size={26} />
-              <h2 className="mt-3 text-[17px] font-black text-[#1F2937]">Havuza uygun portföy yok</h2>
+              <h2 className="mt-3 text-[17px] font-black text-[#1F2937]">
+                Havuza uygun portföy yok
+              </h2>
               <p className="mt-1 text-[12px] font-bold leading-5 text-[#64748B]">
                 Yetki belgesi tamamlanan portföyler burada görünür.
               </p>
@@ -939,7 +1119,9 @@ export default function HavuzPage() {
       {selectedAction && (
         <PoolActionModal
           action={selectedAction}
-          busy={busyAction === `${selectedAction.type}_${selectedAction.unit.id}`}
+          busy={
+            busyAction === `${selectedAction.type}_${selectedAction.unit.id}`
+          }
           onClose={() => setSelectedAction(null)}
           onConfirm={() => confirmPoolAction(selectedAction)}
         />
@@ -947,7 +1129,6 @@ export default function HavuzPage() {
     </main>
   );
 }
-
 
 function PoolMapSection({
   items,
@@ -962,16 +1143,27 @@ function PoolMapSection({
   selectedUnitId: string;
   busyAction: string | null;
   onSelectUnit: (unitId: string) => void;
-  onDetail: (unit: Unit, match: { score: number; customer: Customer | null; budgetDiff: number }) => void;
-  onMessage: (unit: Unit, match: { score: number; customer: Customer | null; budgetDiff: number }) => void;
-  onAction: (type: PoolAction, unit: Unit, match: { score: number; customer: Customer | null; budgetDiff: number }) => void;
+  onDetail: (
+    unit: Unit,
+    match: { score: number; customer: Customer | null; budgetDiff: number },
+  ) => void;
+  onMessage: (
+    unit: Unit,
+    match: { score: number; customer: Customer | null; budgetDiff: number },
+  ) => void;
+  onAction: (
+    type: PoolAction,
+    unit: Unit,
+    match: { score: number; customer: Customer | null; budgetDiff: number },
+  ) => void;
 }) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerRefs = useRef<any[]>([]);
   const [mapError, setMapError] = useState("");
   const [mapReady, setMapReady] = useState(false);
-  const selectedItem = items.find((item) => item.unit.id === selectedUnitId) || items[0] || null;
+  const selectedItem =
+    items.find((item) => item.unit.id === selectedUnitId) || items[0] || null;
   const exactCount = items.filter((item) => !item.isApprox).length;
   const approxCount = items.filter((item) => item.isApprox).length;
 
@@ -985,7 +1177,9 @@ function PoolMapSection({
       .then(() => {
         if (!alive || !mapRef.current || !window.google?.maps) return;
 
-        const center = items[0] ? { lat: items[0].lat, lng: items[0].lng } : DEFAULT_MAP_CENTER;
+        const center = items[0]
+          ? { lat: items[0].lat, lng: items[0].lng }
+          : DEFAULT_MAP_CENTER;
 
         if (!mapInstanceRef.current) {
           mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
@@ -1023,7 +1217,10 @@ function PoolMapSection({
     const bounds = new googleMaps.LatLngBounds();
 
     items.forEach((item) => {
-      const priceText = compactMoney(item.unit.price, item.unit.priceCurrency).replace(" ₺", "₺");
+      const priceText = compactMoney(
+        item.unit.price,
+        item.unit.priceCurrency,
+      ).replace(" ₺", "₺");
       const isSelected = selectedUnitId === item.unit.id;
       const pinColor = item.isApprox ? "#F97316" : "#2563EB";
       const overlay = new googleMaps.OverlayView();
@@ -1066,7 +1263,9 @@ function PoolMapSection({
       overlay.draw = function draw() {
         if (!element) return;
         const projection = overlay.getProjection();
-        const point = projection.fromLatLngToDivPixel(new googleMaps.LatLng(item.lat, item.lng));
+        const point = projection.fromLatLngToDivPixel(
+          new googleMaps.LatLng(item.lat, item.lng),
+        );
         if (!point) return;
         element.style.left = `${point.x}px`;
         element.style.top = `${point.y}px`;
@@ -1103,25 +1302,70 @@ function PoolMapSection({
     <section className="overflow-hidden rounded-[24px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.07)]">
       <div className="flex items-center justify-between gap-2 border-b-2 border-[#C7D6E8] bg-[#F8FAFC] px-3 py-2">
         <div className="min-w-0">
-          <h2 className="text-[15px] font-black tracking-[-0.03em] text-[#1F2937]">Havuz Haritası</h2>
+          <h2 className="text-[15px] font-black tracking-[-0.03em] text-[#1F2937]">
+            Havuz Haritası
+          </h2>
           <p className="mt-0.5 text-[10px] font-bold leading-4 text-[#64748B]">
             Pinler fiyatlıdır. Yaklaşık pinler il/ilçe merkezinden üretilir.
           </p>
         </div>
         <div className="shrink-0 rounded-[15px] border-2 border-[#C7D6E8] bg-white px-2.5 py-1.5 text-center">
-          <p className="text-[15px] font-black leading-none text-[#2563EB]">{items.length}</p>
+          <p className="text-[15px] font-black leading-none text-[#2563EB]">
+            {items.length}
+          </p>
           <p className="mt-0.5 text-[8px] font-black text-[#64748B]">Pin</p>
         </div>
       </div>
 
-      <div className="relative h-[360px] w-full bg-[#EEF3F8]">
+      <div className="relative h-[360px] w-full overflow-hidden bg-[#EEF3F8]">
         <div ref={mapRef} className="h-full w-full" />
+
+        {mapReady && !mapError && items.length > 0 && (
+          <div className="pointer-events-none absolute inset-0 z-[45]">
+            {items.map((item) => {
+              const position = getOverlayPinPosition(item, items);
+              const isSelected = selectedItem?.unit.id === item.unit.id;
+              const priceText = compactMoney(
+                item.unit.price,
+                item.unit.priceCurrency,
+              ).replace(" ₺", "₺");
+
+              return (
+                <button
+                  key={item.unit.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectUnit(item.unit.id);
+                    const map = mapInstanceRef.current;
+                    if (map) {
+                      map.panTo({ lat: item.lat, lng: item.lng });
+                      map.setZoom(Math.max(map.getZoom() || 11, 12));
+                    }
+                  }}
+                  className={`pointer-events-auto absolute -translate-x-1/2 -translate-y-full whitespace-nowrap border-2 border-white px-2.5 text-[10px] font-black leading-none text-white shadow-[0_12px_24px_rgba(15,23,42,0.32)] active:scale-95 ${
+                    isSelected
+                      ? "z-[70] min-h-[34px] rounded-[999px_999px_999px_8px] bg-[#1D4ED8] ring-4 ring-blue-200"
+                      : item.isApprox
+                        ? "z-[55] min-h-[30px] rounded-[999px_999px_999px_8px] bg-orange-500"
+                        : "z-[60] min-h-[30px] rounded-[999px_999px_999px_8px] bg-[#2563EB]"
+                  }`}
+                  style={{ left: `${position.left}%`, top: `${position.top}%` }}
+                  title={`${item.unit.project?.name || "EPH Portföy"} • ${priceText}`}
+                >
+                  {priceText}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {!mapReady && !mapError && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#EEF3F8] text-center">
             <div>
               <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#2563EB] border-t-transparent" />
-              <p className="mt-3 text-[12px] font-black text-[#64748B]">Havuz haritası yükleniyor...</p>
+              <p className="mt-3 text-[12px] font-black text-[#64748B]">
+                Havuz haritası yükleniyor...
+              </p>
             </div>
           </div>
         )}
@@ -1150,24 +1394,39 @@ function PoolMapSection({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-                  {selectedItem.isApprox ? "Yaklaşık Pin" : "Gerçek Pin"} • {getEphId(selectedItem.unit.id)}
+                  {selectedItem.isApprox ? "Yaklaşık Pin" : "Gerçek Pin"} •{" "}
+                  {getEphId(selectedItem.unit.id)}
                 </p>
                 <h3 className="mt-1 line-clamp-2 text-[15px] font-black leading-[1.12] text-[#1F2937] break-words [overflow-wrap:anywhere]">
-                  {limitText(selectedItem.unit.project?.name || "EPH Portföy", 70)}
+                  {limitText(
+                    selectedItem.unit.project?.name || "EPH Portföy",
+                    70,
+                  )}
                 </h3>
                 <p className="mt-1 flex min-w-0 items-start justify-center gap-1 text-[11px] font-bold leading-4 text-[#64748B]">
                   <MapPin size={12} className="mt-0.5 shrink-0" />
-                  <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">{limitText(selectedItem.locationLabel, 48)}</span>
+                  <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">
+                    {limitText(selectedItem.locationLabel, 48)}
+                  </span>
                 </p>
               </div>
               <span className="shrink-0 rounded-full bg-[#2563EB] px-2.5 py-1 text-[11px] font-black text-white">
-                {compactMoney(selectedItem.unit.price, selectedItem.unit.priceCurrency)}
+                {compactMoney(
+                  selectedItem.unit.price,
+                  selectedItem.unit.priceCurrency,
+                )}
               </span>
             </div>
 
             <div className="mt-2 grid grid-cols-3 gap-1.5">
-              <SmallInfo label="Tip" value={typeLabel(selectedItem.unit.type)} />
-              <SmallInfo label="Oda" value={selectedItem.unit.roomCount || "—"} />
+              <SmallInfo
+                label="Tip"
+                value={typeLabel(selectedItem.unit.type)}
+              />
+              <SmallInfo
+                label="Oda"
+                value={selectedItem.unit.roomCount || "—"}
+              />
               <SmallInfo label="Uyum" value={`%${selectedItem.match.score}`} />
             </div>
 
@@ -1189,7 +1448,9 @@ function PoolMapSection({
               </button>
               <button
                 type="button"
-                onClick={() => onAction("INTEREST", selectedItem.unit, selectedItem.match)}
+                onClick={() =>
+                  onAction("INTEREST", selectedItem.unit, selectedItem.match)
+                }
                 disabled={Boolean(busyAction)}
                 className="min-h-[36px] rounded-[14px] border-2 border-[#2563EB] bg-[#EFF6FF] text-[11px] font-black text-[#1D4ED8] disabled:opacity-60"
               >
@@ -1197,7 +1458,9 @@ function PoolMapSection({
               </button>
               <button
                 type="button"
-                onClick={() => onAction("LEAD", selectedItem.unit, selectedItem.match)}
+                onClick={() =>
+                  onAction("LEAD", selectedItem.unit, selectedItem.match)
+                }
                 disabled={Boolean(busyAction)}
                 className="min-h-[36px] rounded-[14px] border-2 border-[#2563EB] bg-[#2563EB] text-[11px] font-black text-white disabled:opacity-60"
               >
@@ -1270,11 +1533,25 @@ function PoolUnitCard({
   const hasLocation = Boolean(unit.project?.city && unit.project?.district);
 
   return (
-    <article className="overflow-hidden rounded-[24px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.07)]">
+    <article
+      onClick={onDetail}
+      className="cursor-pointer overflow-hidden rounded-[24px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.07)] active:scale-[0.995]"
+    >
       <div className="grid min-h-[126px] grid-cols-[112px_1fr]">
-        <button type="button" onClick={onDetail} className="relative bg-[#EFF6FF] text-left">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDetail();
+          }}
+          className="relative bg-[#EFF6FF] text-left"
+        >
           {image ? (
-            <img src={image} alt={unit.project?.name || "Portföy"} className="h-full w-full object-cover" />
+            <img
+              src={image}
+              alt={unit.project?.name || "Portföy"}
+              className="h-full w-full object-cover"
+            />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-[#2563EB]">
               <Building2 size={28} />
@@ -1304,7 +1581,9 @@ function PoolUnitCard({
               </h3>
               <p className="mt-1 flex min-w-0 items-start gap-1 text-[10px] font-bold leading-3 text-[#64748B]">
                 <MapPin size={11} className="mt-0.5 shrink-0" />
-                <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">{limitText(getLocation(unit), 42)}</span>
+                <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">
+                  {limitText(getLocation(unit), 42)}
+                </span>
               </p>
             </div>
 
@@ -1312,7 +1591,10 @@ function PoolUnitCard({
           </div>
 
           <div className="mt-2 grid grid-cols-2 gap-1.5">
-            <SmallInfo label="Fiyat" value={compactMoney(unit.price, unit.priceCurrency)} />
+            <SmallInfo
+              label="Fiyat"
+              value={compactMoney(unit.price, unit.priceCurrency)}
+            />
             <SmallInfo label="EPH ID" value={ephId} />
             <SmallInfo label="Mahalle" value={getMahalle(unit)} />
             <SmallInfo label="Komisyon" value="%50-%50" />
@@ -1330,13 +1612,18 @@ function PoolUnitCard({
               Belge, fotoğraf, konum ve havuz hazırlığı
             </p>
           </div>
-          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-black ${qualityTone}`}>
+          <span
+            className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-black ${qualityTone}`}
+          >
             {qualityScore}/100 · {qualityLabel}
           </span>
         </div>
 
         <div className="mt-2 grid grid-cols-3 gap-1.5">
-          <TrustPill active={Boolean(unit.yetkiVerified || unit.isVerified)} text="Yetki" />
+          <TrustPill
+            active={Boolean(unit.yetkiVerified || unit.isVerified)}
+            text="Yetki"
+          />
           <TrustPill active={hasPhoto} text="Fotoğraf" />
           <TrustPill active={hasLocation} text="Konum" />
         </div>
@@ -1353,14 +1640,20 @@ function PoolUnitCard({
             </p>
           </div>
 
-          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-black ${trustIndexTone}`}>
+          <span
+            className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-black ${trustIndexTone}`}
+          >
             {trustIndex.score}/100 · {trustIndexLabel}
           </span>
         </div>
 
         <div className="mt-2 grid grid-cols-4 gap-1.5">
           {trustIndex.checks.map((check) => (
-            <TrustIndexPill key={check.label} active={check.active} text={check.label} />
+            <TrustIndexPill
+              key={check.label}
+              active={check.active}
+              text={check.label}
+            />
           ))}
         </div>
       </section>
@@ -1392,7 +1685,10 @@ function PoolUnitCard({
         <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
-            onClick={onDetail}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDetail();
+            }}
             className="col-span-2 flex min-h-[34px] items-center justify-center gap-1 rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#1F2937] shadow-[0_6px_14px_rgba(15,23,42,0.035)]"
           >
             <Eye size={13} className="text-[#2563EB]" />
@@ -1401,7 +1697,10 @@ function PoolUnitCard({
 
           <button
             type="button"
-            onClick={onMessage}
+            onClick={(event) => {
+              event.stopPropagation();
+              onMessage();
+            }}
             disabled={Boolean(busyAction)}
             className="flex min-h-[34px] items-center justify-center gap-1 rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#1F2937] shadow-[0_6px_14px_rgba(15,23,42,0.035)] disabled:opacity-60"
           >
@@ -1411,7 +1710,10 @@ function PoolUnitCard({
 
           <button
             type="button"
-            onClick={() => onAction("INTEREST")}
+            onClick={(event) => {
+              event.stopPropagation();
+              onAction("INTEREST");
+            }}
             disabled={Boolean(busyAction)}
             className="min-h-[34px] rounded-[14px] border-2 border-[#2563EB] bg-[#EFF6FF] text-[11px] font-black text-[#1D4ED8] shadow-[0_6px_14px_rgba(37,99,235,0.08)] disabled:opacity-60"
           >
@@ -1420,7 +1722,10 @@ function PoolUnitCard({
 
           <button
             type="button"
-            onClick={() => onAction("LEAD")}
+            onClick={(event) => {
+              event.stopPropagation();
+              onAction("LEAD");
+            }}
             disabled={Boolean(busyAction)}
             className="col-span-2 min-h-[34px] rounded-[14px] border-2 border-[#2563EB] bg-[#2563EB] text-[11px] font-black text-white shadow-[0_8px_18px_rgba(37,99,235,0.16)] disabled:opacity-60"
           >
@@ -1478,12 +1783,22 @@ function PoolDetailModal({
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[clamp(10px,3vw,14px)] pb-[clamp(12px,4vw,18px)] [-webkit-overflow-scrolling:touch]">
           <div className="grid grid-cols-2 gap-[clamp(5px,1.8vw,8px)]">
             <SmallInfo label="EPH ID" value={getEphId(unit.id)} />
-            <SmallInfo label="Fiyat" value={compactMoney(unit.price, unit.priceCurrency)} />
+            <SmallInfo
+              label="Fiyat"
+              value={compactMoney(unit.price, unit.priceCurrency)}
+            />
             <SmallInfo label="Konum" value={getLocation(unit)} />
             <SmallInfo label="Mahalle" value={getMahalle(unit)} />
             <SmallInfo label="Tip" value={typeLabel(unit.type)} />
             <SmallInfo label="Durum" value={typeLabel(unit.status)} />
-            <SmallInfo label="m²" value={unit.area ? `${unit.area.toLocaleString("tr-TR")} m²` : "Belirtilmedi"} />
+            <SmallInfo
+              label="m²"
+              value={
+                unit.area
+                  ? `${unit.area.toLocaleString("tr-TR")} m²`
+                  : "Belirtilmedi"
+              }
+            />
             <SmallInfo label="Oda" value={unit.roomCount || "Belirtilmedi"} />
           </div>
 
@@ -1497,15 +1812,26 @@ function PoolDetailModal({
                   Belge, fotoğraf, konum ve havuz hazırlığı skoru.
                 </p>
               </div>
-              <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[clamp(10px,2.8vw,11px)] font-black ${qualityTone}`}>
+              <span
+                className={`shrink-0 rounded-full border px-2.5 py-1 text-[clamp(10px,2.8vw,11px)] font-black ${qualityTone}`}
+              >
                 {qualityScore}/100 · {qualityLabel}
               </span>
             </div>
 
             <div className="mt-2 grid grid-cols-3 gap-1.5">
-              <TrustPill active={Boolean(unit.yetkiVerified || unit.isVerified)} text="Yetki" />
-              <TrustPill active={Boolean(unit.photoVerified || getCover(unit))} text="Fotoğraf" />
-              <TrustPill active={Boolean(unit.project?.city && unit.project?.district)} text="Konum" />
+              <TrustPill
+                active={Boolean(unit.yetkiVerified || unit.isVerified)}
+                text="Yetki"
+              />
+              <TrustPill
+                active={Boolean(unit.photoVerified || getCover(unit))}
+                text="Fotoğraf"
+              />
+              <TrustPill
+                active={Boolean(unit.project?.city && unit.project?.district)}
+                text="Konum"
+              />
             </div>
           </div>
 
@@ -1519,20 +1845,29 @@ function PoolDetailModal({
                   Tapu, yetki, fotoğraf ve CRM uyumu birlikte değerlendirilir.
                 </p>
               </div>
-              <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[clamp(10px,2.8vw,11px)] font-black ${trustIndexTone}`}>
+              <span
+                className={`shrink-0 rounded-full border px-2.5 py-1 text-[clamp(10px,2.8vw,11px)] font-black ${trustIndexTone}`}
+              >
                 {trustIndex.score}/100 · {trustIndexLabel}
               </span>
             </div>
 
             <div className="mt-2 grid grid-cols-4 gap-1.5">
               {trustIndex.checks.map((check) => (
-                <TrustIndexPill key={check.label} active={check.active} text={check.label} />
+                <TrustIndexPill
+                  key={check.label}
+                  active={check.active}
+                  text={check.label}
+                />
               ))}
             </div>
 
             <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
               {trustBadges.map((badge) => (
-                <span key={badge.label} className={`rounded-full border px-2 py-1 text-[9px] font-black ${badge.className}`}>
+                <span
+                  key={badge.label}
+                  className={`rounded-full border px-2 py-1 text-[9px] font-black ${badge.className}`}
+                >
                   {badge.label}
                 </span>
               ))}
@@ -1565,7 +1900,8 @@ function PoolDetailModal({
               Açıklama
             </p>
             <p className="mt-1.5 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
-              {unit.description || "Bu Havuz portföyü için açıklama girilmemiş."}
+              {unit.description ||
+                "Bu Havuz portföyü için açıklama girilmemiş."}
             </p>
           </div>
 
@@ -1574,7 +1910,8 @@ function PoolDetailModal({
               Mahremiyet
             </p>
             <p className="mt-1.5 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
-              Telefon, e-posta, tapu sahibi ve tam adres bilgileri Havuz detayında gösterilmez.
+              Telefon, e-posta, tapu sahibi ve tam adres bilgileri Havuz
+              detayında gösterilmez.
             </p>
           </div>
         </div>
@@ -1597,7 +1934,9 @@ function PoolActionModal({
   const isLead = action.type === "LEAD";
   const title = isLead ? "Müşterim Var Bildirimi" : "İlgileniyorum Bildirimi";
   const creditAmount = isLead ? 20 : 10;
-  const confirmText = isLead ? "20 Kontör Harca ve Bildir" : "10 Kontör Harca ve İlgilen";
+  const confirmText = isLead
+    ? "20 Kontör Harca ve Bildir"
+    : "10 Kontör Harca ve İlgilen";
   const ephId = getEphId(action.unit.id);
 
   return (
@@ -1626,7 +1965,10 @@ function PoolActionModal({
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[clamp(10px,3vw,14px)] pb-[clamp(10px,3vw,14px)] [-webkit-overflow-scrolling:touch]">
           <div className="grid grid-cols-2 gap-[clamp(5px,1.8vw,8px)]">
-            <SmallInfo label="Portföy" value={action.unit.project?.name || "EPH Portföy"} />
+            <SmallInfo
+              label="Portföy"
+              value={action.unit.project?.name || "EPH Portföy"}
+            />
             <SmallInfo label="EPH ID" value={ephId} />
             <SmallInfo label="Konum" value={getLocation(action.unit)} />
             <SmallInfo label="Uyum" value={`%${action.score}`} />
@@ -1637,7 +1979,8 @@ function PoolActionModal({
               İşlem Özeti
             </p>
             <p className="mt-1.5 text-[clamp(11px,3.1vw,12px)] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
-              Bu işlem {creditAmount} kontör harcar. Onay sonrası portföy sahibine bildirim gönderilir ve işlem kaydı oluşturulur.
+              Bu işlem {creditAmount} kontör harcar. Onay sonrası portföy
+              sahibine bildirim gönderilir ve işlem kaydı oluşturulur.
             </p>
           </div>
         </div>
@@ -1669,8 +2012,12 @@ function PoolActionModal({
 function SmallInfo({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-[13px] border border-[#D7E3F2] bg-[#F8FAFC] px-2 py-1.5">
-      <p className="line-clamp-1 text-[8px] font-black uppercase tracking-[0.05em] text-[#64748B] break-words [overflow-wrap:anywhere]">{limitText(label, 22)}</p>
-      <p className="mt-0.5 line-clamp-2 text-[10px] font-black leading-[1.15] text-[#1F2937] break-words [overflow-wrap:anywhere]">{limitText(value, 46)}</p>
+      <p className="line-clamp-1 text-[8px] font-black uppercase tracking-[0.05em] text-[#64748B] break-words [overflow-wrap:anywhere]">
+        {limitText(label, 22)}
+      </p>
+      <p className="mt-0.5 line-clamp-2 text-[10px] font-black leading-[1.15] text-[#1F2937] break-words [overflow-wrap:anywhere]">
+        {limitText(value, 46)}
+      </p>
     </div>
   );
 }
@@ -1701,7 +2048,11 @@ function TrustIndexPill({ active, text }: { active: boolean; text: string }) {
           : "border-amber-200 bg-white text-amber-700"
       }`}
     >
-      {active ? <CheckCircle2 size={10} className="shrink-0" /> : <X size={10} className="shrink-0" />}
+      {active ? (
+        <CheckCircle2 size={10} className="shrink-0" />
+      ) : (
+        <X size={10} className="shrink-0" />
+      )}
       <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">
         {text}
       </span>
@@ -1713,7 +2064,9 @@ function MatchPill({ text }: { text: string }) {
   return (
     <div className="flex min-h-[30px] min-w-0 items-center justify-center gap-1 rounded-full border border-[#C7D6E8] bg-white px-2 text-center text-[9px] font-black leading-[1.05] text-[#1F2937]">
       <CheckCircle2 size={10} className="shrink-0 text-emerald-600" />
-      <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">{limitText(text, 34)}</span>
+      <span className="line-clamp-2 min-w-0 break-words [overflow-wrap:anywhere]">
+        {limitText(text, 34)}
+      </span>
     </div>
   );
 }
