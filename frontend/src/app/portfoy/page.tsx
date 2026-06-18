@@ -309,6 +309,7 @@ function StokPageInner() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  const [showMapPins, setShowMapPins] = useState(true);
   const [mapSelectedUnitId, setMapSelectedUnitId] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
@@ -1043,12 +1044,20 @@ function StokPageInner() {
             <PortfolioMap
               units={mapUnits}
               selectedUnitId={selectedMapUnit?.id || ""}
+              showPins={showMapPins}
               onSelectUnit={(unitId) => setMapSelectedUnitId(unitId)}
             />
 
-            <div className="flex items-center justify-between px-3 py-2 text-[12px] font-black text-[#64748B]">
-              <span>{mapUnits.length} pinli portföy</span>
-              <span>{missingLocationCount} konumsuz kayıt</span>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-2 text-[12px] font-black text-[#64748B]">
+              <span>{showMapPins ? `${mapUnits.length} pinli portföy` : "Pinler gizli"}</span>
+              <button
+                type="button"
+                onClick={() => setShowMapPins((current) => !current)}
+                className="min-h-[34px] rounded-[14px] border border-[#DDE7F3] bg-[#F8FBFF] px-3 text-[11px] font-black text-[#1557D6] shadow-sm active:scale-[0.98]"
+              >
+                {showMapPins ? "Pinleri Gizle" : "Pinleri Göster"}
+              </button>
+              <span className="text-right">{missingLocationCount} konumsuz kayıt</span>
             </div>
 
             {selectedMapUnit ? (
@@ -1479,10 +1488,12 @@ function CompactPortfolioCard({
 function PortfolioMap({
   units,
   selectedUnitId,
+  showPins,
   onSelectUnit,
 }: {
   units: MapUnit[];
   selectedUnitId: string;
+  showPins: boolean;
   onSelectUnit: (unitId: string) => void;
 }) {
   const mapRef = useRef<HTMLDivElement | null>(null);
@@ -1539,43 +1550,82 @@ function PortfolioMap({
 
     const bounds = new window.google.maps.LatLngBounds();
 
+    if (!showPins) {
+      if (units.length > 0) {
+        units.forEach((unit) => {
+          const lat = Number(unit.project?.latitude || 0);
+          const lng = Number(unit.project?.longitude || 0);
+          if (lat && lng) bounds.extend({ lat, lng });
+        });
+        if (!bounds.isEmpty()) googleMapRef.current.fitBounds(bounds, 56);
+      }
+      return;
+    }
+
     units.forEach((unit) => {
       const lat = Number(unit.project?.latitude || 0);
       const lng = Number(unit.project?.longitude || 0);
 
       if (!lat || !lng) return;
 
-      const marker = new window.google.maps.Marker({
-        position: { lat, lng },
-        map: googleMapRef.current,
-        label: {
-          text: formatCompactPrice(unit.price, unit.priceCurrency).replace(
-            " ₺",
-            "₺",
-          ),
-          color: "white",
-          fontWeight: "900",
-          fontSize: "11px",
-        },
-        icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          scale: selectedUnitId === unit.id ? 18 : 15,
-          fillColor: unit.status === "KIRALIK" ? "#1557D6" : "#059669",
-          fillOpacity: 1,
-          strokeColor: "#ffffff",
-          strokeWeight: 2,
-        },
-        title: unit.project?.name || "EPH Portföy",
-      });
+      const priceText = formatCompactPrice(unit.price, unit.priceCurrency).replace(" ₺", "₺");
+      const pinColor = unit.status === "KIRALIK" ? "#1557D6" : "#059669";
+      const isSelected = selectedUnitId === unit.id;
+      const overlay = new window.google.maps.OverlayView();
+      let element: HTMLButtonElement | null = null;
 
-      marker.addListener("click", () => onSelectUnit(unit.id));
-      markersRef.current.push(marker);
+      overlay.onAdd = function onAdd() {
+        element = document.createElement("button");
+        element.type = "button";
+        element.title = unit.project?.name || "EPH Portföy";
+        element.textContent = priceText;
+        element.style.position = "absolute";
+        element.style.transform = "translate(-50%, -100%)";
+        element.style.minWidth = isSelected ? "78px" : "64px";
+        element.style.minHeight = isSelected ? "34px" : "30px";
+        element.style.padding = "0 9px";
+        element.style.borderRadius = "999px 999px 999px 6px";
+        element.style.border = "2px solid #ffffff";
+        element.style.background = pinColor;
+        element.style.color = "#ffffff";
+        element.style.fontSize = isSelected ? "12px" : "11px";
+        element.style.fontWeight = "900";
+        element.style.lineHeight = "1";
+        element.style.boxShadow = "0 12px 22px rgba(15,23,42,0.28)";
+        element.style.zIndex = isSelected ? "30" : "20";
+        element.style.cursor = "pointer";
+        element.style.whiteSpace = "nowrap";
+        element.style.display = "flex";
+        element.style.alignItems = "center";
+        element.style.justifyContent = "center";
+        element.style.pointerEvents = "auto";
+        element.addEventListener("click", () => onSelectUnit(unit.id));
+        const panes = overlay.getPanes();
+        panes?.overlayMouseTarget.appendChild(element);
+      };
+
+      overlay.draw = function draw() {
+        if (!element) return;
+        const projection = overlay.getProjection();
+        const point = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(lat, lng));
+        if (!point) return;
+        element.style.left = `${point.x}px`;
+        element.style.top = `${point.y}px`;
+      };
+
+      overlay.onRemove = function onRemove() {
+        if (element?.parentNode) element.parentNode.removeChild(element);
+        element = null;
+      };
+
+      overlay.setMap(googleMapRef.current);
+      markersRef.current.push(overlay);
       bounds.extend({ lat, lng });
     });
 
     if (units.length > 0 && !bounds.isEmpty())
       googleMapRef.current.fitBounds(bounds, 56);
-  }, [onSelectUnit, selectedUnitId, units]);
+  }, [onSelectUnit, selectedUnitId, showPins, units]);
 
   return (
     <div className="relative h-[360px] bg-[#EEF5FF]">

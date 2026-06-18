@@ -1023,26 +1023,62 @@ function PoolMapSection({
     const bounds = new googleMaps.LatLngBounds();
 
     items.forEach((item) => {
-      const marker = new googleMaps.Marker({
-        map,
-        position: { lat: item.lat, lng: item.lng },
-        title: `${item.unit.project?.name || "EPH Portföy"} • ${compactMoney(item.unit.price, item.unit.priceCurrency)}`,
-        label: {
-          text: compactMoney(item.unit.price, item.unit.priceCurrency),
-          color: "#06194A",
-          fontSize: "11px",
-          fontWeight: "900",
-        },
-        optimized: true,
-      });
+      const priceText = compactMoney(item.unit.price, item.unit.priceCurrency).replace(" ₺", "₺");
+      const isSelected = selectedUnitId === item.unit.id;
+      const pinColor = item.isApprox ? "#F97316" : "#2563EB";
+      const overlay = new googleMaps.OverlayView();
+      let element: HTMLButtonElement | null = null;
 
-      marker.addListener("click", () => {
-        onSelectUnit(item.unit.id);
-        map.panTo({ lat: item.lat, lng: item.lng });
-        map.setZoom(Math.max(map.getZoom() || 11, 12));
-      });
+      overlay.onAdd = function onAdd() {
+        element = document.createElement("button");
+        element.type = "button";
+        element.title = `${item.unit.project?.name || "EPH Portföy"} • ${priceText}`;
+        element.textContent = priceText;
+        element.style.position = "absolute";
+        element.style.transform = "translate(-50%, -100%)";
+        element.style.minWidth = isSelected ? "80px" : "66px";
+        element.style.minHeight = isSelected ? "34px" : "30px";
+        element.style.padding = "0 9px";
+        element.style.borderRadius = "999px 999px 999px 6px";
+        element.style.border = "2px solid #ffffff";
+        element.style.background = pinColor;
+        element.style.color = "#ffffff";
+        element.style.fontSize = isSelected ? "12px" : "11px";
+        element.style.fontWeight = "900";
+        element.style.lineHeight = "1";
+        element.style.boxShadow = "0 12px 22px rgba(15,23,42,0.28)";
+        element.style.zIndex = isSelected ? "40" : "25";
+        element.style.cursor = "pointer";
+        element.style.whiteSpace = "nowrap";
+        element.style.display = "flex";
+        element.style.alignItems = "center";
+        element.style.justifyContent = "center";
+        element.style.pointerEvents = "auto";
+        element.addEventListener("click", () => {
+          onSelectUnit(item.unit.id);
+          map.panTo({ lat: item.lat, lng: item.lng });
+          map.setZoom(Math.max(map.getZoom() || 11, 12));
+        });
+        const panes = overlay.getPanes();
+        panes?.overlayMouseTarget.appendChild(element);
+      };
 
-      markerRefs.current.push(marker);
+      overlay.draw = function draw() {
+        if (!element) return;
+        const projection = overlay.getProjection();
+        const point = projection.fromLatLngToDivPixel(new googleMaps.LatLng(item.lat, item.lng));
+        if (!point) return;
+        element.style.left = `${point.x}px`;
+        element.style.top = `${point.y}px`;
+      };
+
+      overlay.onRemove = function onRemove() {
+        if (element?.parentNode) element.parentNode.removeChild(element);
+        element = null;
+      };
+
+      overlay.setMap(map);
+      markerRefs.current.push(overlay);
       bounds.extend({ lat: item.lat, lng: item.lng });
     });
 
@@ -1055,7 +1091,7 @@ function PoolMapSection({
       map.setCenter(DEFAULT_MAP_CENTER);
       map.setZoom(6);
     }
-  }, [items, onSelectUnit]);
+  }, [items, onSelectUnit, selectedUnitId]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
