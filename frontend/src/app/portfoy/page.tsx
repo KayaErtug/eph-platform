@@ -444,6 +444,23 @@ function StokPageInner() {
     );
   }, [filteredUnits]);
 
+  const selectedMapUnit = useMemo(() => {
+    if (!mapUnits.length) return null;
+
+    return (
+      mapUnits.find((unit) => unit.id === mapSelectedUnitId) ||
+      mapUnits[0] ||
+      null
+    );
+  }, [mapSelectedUnitId, mapUnits]);
+
+  const missingLocationCount = useMemo(() => {
+    return filteredUnits.filter(
+      (unit) =>
+        !Number(unit.project?.latitude) || !Number(unit.project?.longitude),
+    ).length;
+  }, [filteredUnits]);
+
   const activeCount = useMemo(
     () => units.filter((unit) => hotStatuses.includes(unit.status)).length,
     [units],
@@ -1025,13 +1042,83 @@ function StokPageInner() {
           <section className="mt-3 overflow-hidden rounded-[26px] border border-[#DDE7F3] bg-white shadow-[0_18px_42px_rgba(15,23,42,0.08)]">
             <PortfolioMap
               units={mapUnits}
-              selectedUnitId={mapSelectedUnitId}
+              selectedUnitId={selectedMapUnit?.id || ""}
               onSelectUnit={(unitId) => setMapSelectedUnitId(unitId)}
             />
+
             <div className="flex items-center justify-between px-3 py-2 text-[12px] font-black text-[#64748B]">
-              <span>{mapUnits.length} konumlu portföy</span>
-              <span>Sırala: En Yeni</span>
+              <span>{mapUnits.length} pinli portföy</span>
+              <span>{missingLocationCount} konumsuz kayıt</span>
             </div>
+
+            {selectedMapUnit ? (
+              <div className="border-t border-[#E2EAF5] bg-[#F8FBFF] p-3">
+                <div className="rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+                  <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#EAF2FF] text-[#1557D6]">
+                    <MapPin size={19} />
+                  </div>
+                  <h3 className="text-[14px] font-black leading-5 text-[#06194A]">
+                    {selectedMapUnit.project?.name || "Seçili Portföy"}
+                  </h3>
+                  <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
+                    {[selectedMapUnit.project?.address, selectedMapUnit.project?.district, selectedMapUnit.project?.city]
+                      .filter(Boolean)
+                      .join(" / ") || "Konum bilgisi yok"}
+                  </p>
+
+                  <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[18px] border border-[#E2EAF5] bg-[#F8FBFF]">
+                    <MiniMetric
+                      label="Fiyat"
+                      value={formatCompactPrice(selectedMapUnit.price, selectedMapUnit.priceCurrency)}
+                      tone="green"
+                    />
+                    <MiniMetric
+                      label="Oda"
+                      value={selectedMapUnit.roomCount || "—"}
+                      tone="blue"
+                    />
+                    <MiniMetric
+                      label="Alan"
+                      value={selectedMapUnit.area ? `${selectedMapUnit.area} m²` : "—"}
+                      tone="orange"
+                    />
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleWhatsappLocation(selectedMapUnit)}
+                      className="min-h-[44px] rounded-[18px] border border-emerald-100 bg-emerald-50 px-3 text-[12px] font-black text-emerald-700 active:scale-[0.98]"
+                    >
+                      Konumu Paylaş
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/portfoy/${selectedMapUnit.id}`)}
+                      className="min-h-[44px] rounded-[18px] bg-[#1557D6] px-3 text-[12px] font-black text-white active:scale-[0.98]"
+                    >
+                      Portföyü Aç
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="border-t border-[#E2EAF5] bg-[#F8FBFF] p-4 text-center">
+                <MapPin className="mx-auto text-[#1557D6]" size={26} />
+                <p className="mt-2 text-[12px] font-black text-[#06194A]">
+                  Pinli gösterilecek konumlu portföy yok.
+                </p>
+                <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
+                  Portföy güncelleme ekranından harita konumu seçildiğinde burada pin olarak görünür.
+                </p>
+              </div>
+            )}
+
+            {missingLocationCount > 0 && (
+              <div className="border-t border-[#E2EAF5] bg-amber-50 px-3 py-2 text-center text-[11px] font-black leading-4 text-amber-700">
+                {missingLocationCount} portföyde harita konumu yok. Güncelle ekranından konum seçilirse pinli haritada görünür.
+              </div>
+            )}
           </section>
         )}
 
