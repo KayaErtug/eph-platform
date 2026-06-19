@@ -2,9 +2,6 @@
 
 import { useMemo, useState } from "react";
 import {
-  Download,
-  FileText,
-  Image,
   ImageIcon,
   MessageCircle,
   Send,
@@ -14,9 +11,8 @@ import PortfolioShareCard, {
   type PortfolioShareData,
 } from "./PortfolioShareCard";
 import PortfolioShareStory from "./PortfolioShareStory";
-import PortfolioSharePdf from "./PortfolioSharePdf";
 
-type ShareMode = "whatsapp" | "story" | "pdf";
+type ShareMode = "whatsapp" | "story";
 
 type CanvasSize = {
   width: number;
@@ -25,7 +21,6 @@ type CanvasSize = {
 
 function getCanvasSize(mode: ShareMode): CanvasSize {
   if (mode === "story") return { width: 390, height: 760 };
-  if (mode === "pdf") return { width: 794, height: 1123 };
   return { width: 390, height: 840 };
 }
 
@@ -38,6 +33,72 @@ function truncateText(text: string, maxLength: number) {
   if (text.length <= maxLength) return text;
   return `${text.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
 }
+
+function getLinaMarketingLabels(data: PortfolioShareData) {
+  const source = [
+    data.title,
+    data.location,
+    data.shortDescription,
+    data.longDescription,
+    ...(data.features || []).map((feature) => feature.label),
+  ]
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
+
+  const hasAny = (keywords: string[]) =>
+    keywords.some((keyword) => source.includes(keyword));
+
+  if (hasAny(["arsa", "arazi", "tarla", "parsel", "imar", "bağ", "bahçe"])) {
+    return [
+      "İmarlı",
+      "Yolu Açık",
+      "Elektrik Var",
+      "Su Var",
+      "Kadastro Yolu",
+      "Köşe Parsel",
+      "Yatırıma Uygun",
+      "Gelişen Bölge",
+    ];
+  }
+
+  if (hasAny(["fabrika", "depo", "sanayi", "üretim", "lojistik", "antrepo"])) {
+    return [
+      "Tır Girişi",
+      "Yükleme Rampası",
+      "Sanayi Elektriği",
+      "Yüksek Tavan",
+      "Geniş Depolama",
+      "Lojistik Avantaj",
+      "Güvenlik",
+      "Forklift Alanı",
+    ];
+  }
+
+  if (hasAny(["dükkan", "mağaza", "ofis", "büro", "plaza", "showroom", "ticari"])) {
+    return [
+      "Cadde Üzeri",
+      "Yüksek Tabela Değeri",
+      "Otopark",
+      "Yoğun Yaya Trafiği",
+      "Kurumsal Kiracıya Uygun",
+      "Geniş Vitrin",
+      "Merkezi Konum",
+      "Hızlı Ulaşım",
+    ];
+  }
+
+  return [
+    "Kapalı Otopark",
+    "7/24 Güvenlik",
+    "Açık Yüzme Havuzu",
+    "Kapalı Yüzme Havuzu",
+    "Fitness Merkezi",
+    "Hamam & Sauna",
+    "Elektrikli Araç Şarjı",
+    "Akıllı Ev Sistemi",
+  ];
+}
+
 
 function drawRoundRect(
   ctx: CanvasRenderingContext2D,
@@ -322,14 +383,14 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
   ctx.fillRect(0, 0, width, height);
 
   ctx.fillStyle = "#FFFFFF";
-  drawRoundRect(ctx, 0, 0, width, height, mode === "pdf" ? 0 : 34);
+  drawRoundRect(ctx, 0, 0, width, height, 34);
   ctx.fill();
 
-  const padding = mode === "pdf" ? 42 : 16;
-  const coverHeight = mode === "pdf" ? 360 : mode === "story" ? 360 : 250;
+  const padding = 16;
+  const coverHeight = mode === "story" ? 360 : 250;
   const coverWidth = width - padding * 2;
   const coverX = padding;
-  const coverY = mode === "pdf" ? 42 : 16;
+  const coverY = 16;
 
   const safeImage = await loadSafeImage(data.coverImage);
 
@@ -365,18 +426,18 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
     coverX + 18,
     coverY + coverHeight - 58,
     coverWidth - 36,
-    mode === "pdf" ? 34 : 27,
+    27,
     2,
-    mode === "pdf" ? "900 31px Arial" : "900 25px Arial",
+    "900 25px Arial",
     "#FFFFFF",
   );
 
   const bodyY = coverY + coverHeight + 18;
-  const bodyX = padding + (mode === "pdf" ? 24 : 8);
+  const bodyX = padding + 8;
   const bodyWidth = width - bodyX * 2;
 
   ctx.fillStyle = "#F7FBFF";
-  drawRoundRect(ctx, bodyX, bodyY, bodyWidth, mode === "pdf" ? 142 : 108, 26);
+  drawRoundRect(ctx, bodyX, bodyY, bodyWidth, 108, 26);
   ctx.fill();
   ctx.strokeStyle = "#DDE7F3";
   ctx.lineWidth = 1;
@@ -389,7 +450,7 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
     width / 2,
     bodyY + 42,
     bodyWidth - 28,
-    mode === "pdf" ? "900 38px Arial" : "900 31px Arial",
+    "900 31px Arial",
     "#06194A",
     "center",
   );
@@ -397,7 +458,7 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
     ctx,
     normalizeText(data.location, "Konum bilgisi yok"),
     width / 2,
-    bodyY + (mode === "pdf" ? 91 : 80),
+    bodyY + 80,
     bodyWidth - 28,
     18,
     2,
@@ -406,10 +467,10 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
     "center",
   );
 
-  const infoY = bodyY + (mode === "pdf" ? 162 : 128);
-  const infoGap = mode === "pdf" ? 12 : 8;
+  const infoY = bodyY + 128;
+  const infoGap = 8;
   const infoBoxWidth = (bodyWidth - infoGap * 3) / 4;
-  const infoBoxHeight = mode === "pdf" ? 88 : 74;
+  const infoBoxHeight = 74;
 
   const infoItems = [
     ["ODA", normalizeText(data.roomCount)],
@@ -431,18 +492,7 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
   });
 
   const featureY = infoY + infoBoxHeight + 16;
-  const features = data.features?.length ? data.features : [];
-  const featureItems = features.slice(0, 8).map((item) => item.label);
-  const defaultFeatureItems = [
-    "Site İçerisinde",
-    "Güvenlik",
-    "Kapalı Otopark",
-    "Açık Havuz",
-    "Fitness",
-    "Akıllı Ev",
-    "Sosyal Tesis",
-    "Merkezi Konum",
-  ];
+  const featureItems = getLinaMarketingLabels(data);
 
   for (let index = 0; index < 8; index += 1) {
     const col = index % 2;
@@ -450,7 +500,7 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
     const boxWidth = (bodyWidth - 10) / 2;
     const x = bodyX + col * (boxWidth + 10);
     const y = featureY + row * 42;
-    const text = featureItems[index] || defaultFeatureItems[index];
+    const text = featureItems[index] || "Premium Yaşam";
 
     ctx.fillStyle = "#FFFFFF";
     drawRoundRect(ctx, x, y, boxWidth, 34, 16);
@@ -465,7 +515,7 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
   const descY = featureY + 178;
 
   ctx.fillStyle = "#FFFFFF";
-  drawRoundRect(ctx, bodyX, descY, bodyWidth, mode === "pdf" ? 98 : 76, 24);
+  drawRoundRect(ctx, bodyX, descY, bodyWidth, 76, 24);
   ctx.fill();
   ctx.strokeStyle = "#DDE7F3";
   ctx.stroke();
@@ -478,12 +528,12 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
     descY + 16,
     bodyWidth - 36,
     19,
-    mode === "pdf" ? 3 : 2,
-    mode === "pdf" ? "800 15px Arial" : "800 13px Arial",
+    2,
+    "800 13px Arial",
     "#475569",
   );
 
-  const advisorY = descY + (mode === "pdf" ? 120 : 96);
+  const advisorY = descY + 96;
 
   ctx.fillStyle = "#FFFFFF";
   drawRoundRect(ctx, bodyX, advisorY, bodyWidth, 72, 24);
@@ -510,14 +560,6 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
     "800 11px Arial",
     "#64748B",
   );
-
-  ctx.fillStyle = "#F7FBFF";
-  drawRoundRect(ctx, bodyX + bodyWidth - 74, advisorY + 12, 52, 48, 16);
-  ctx.fill();
-  ctx.strokeStyle = "#DDE7F3";
-  ctx.stroke();
-  drawText(ctx, "QR", bodyX + bodyWidth - 48, advisorY + 22, 40, "900 10px Arial", "#1557D6", "center");
-  drawText(ctx, "KOD", bodyX + bodyWidth - 48, advisorY + 36, 40, "900 10px Arial", "#1557D6", "center");
 
   const footerY = Math.min(height - 78, advisorY + 96);
 
@@ -549,9 +591,9 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
   ctx.translate(width / 2, height / 2 - 12);
   ctx.rotate((-28 * Math.PI) / 180);
   ctx.globalAlpha = 0.035;
-  drawText(ctx, "EMLAK", 0, -56, width + 120, mode === "pdf" ? "900 72px Arial" : "900 54px Arial", "#06194A", "center");
-  drawText(ctx, "PORTFÖY", 0, 0, width + 120, mode === "pdf" ? "900 72px Arial" : "900 54px Arial", "#06194A", "center");
-  drawText(ctx, "HAVUZU", 0, 56, width + 120, mode === "pdf" ? "900 72px Arial" : "900 54px Arial", "#06194A", "center");
+  drawText(ctx, "EMLAK", 0, -56, width + 120, "900 54px Arial", "#06194A", "center");
+  drawText(ctx, "PORTFÖY", 0, 0, width + 120, "900 54px Arial", "#06194A", "center");
+  drawText(ctx, "HAVUZU", 0, 56, width + 120, "900 54px Arial", "#06194A", "center");
   ctx.restore();
 
   return await new Promise<Blob>((resolve, reject) => {
@@ -601,32 +643,11 @@ export default function PortfolioShareModal({
 
   const renderPreview = () => {
     if (mode === "story") return <PortfolioShareStory data={data} />;
-    if (mode === "pdf") return <PortfolioSharePdf data={data} />;
     return <PortfolioShareCard data={data} />;
   };
 
   const getBlobFromPreview = async () => {
     return await drawShareCanvas(data, mode);
-  };
-
-  const handleDownload = async () => {
-    setBusy(true);
-
-    try {
-      const blob = await getBlobFromPreview();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-
-      link.href = url;
-      link.download = `${filename}-${mode}.png`;
-      link.click();
-
-      URL.revokeObjectURL(url);
-    } catch (error: any) {
-      alert(error?.message || "Kart indirilemedi.");
-    } finally {
-      setBusy(false);
-    }
   };
 
   const handleShare = async () => {
@@ -663,10 +684,6 @@ export default function PortfolioShareModal({
     } finally {
       setBusy(false);
     }
-  };
-
-  const handlePrintPdf = () => {
-    window.print();
   };
 
   return (
@@ -716,13 +733,6 @@ export default function PortfolioShareModal({
                 onClick={() => setMode("story")}
               />
 
-              <ModeButton
-                active={mode === "pdf"}
-                icon={<FileText size={18} />}
-                title="PDF Broşür"
-                note="Tek sayfalık broşür görünümü"
-                onClick={() => setMode("pdf")}
-              />
             </div>
 
             <div className="mt-5 rounded-[24px] border border-[#DDE7F3] bg-[#F7FBFF] p-4">
@@ -748,30 +758,10 @@ export default function PortfolioShareModal({
                 <Send size={17} />
                 {busy ? "Hazırlanıyor..." : "Paylaş"}
               </button>
-
-              <button
-                onClick={handleDownload}
-                disabled={busy}
-                className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[20px] border border-[#DDE7F3] bg-white px-5 py-3 text-sm font-black text-[#1557D6] transition hover:bg-[#EFF6FF] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Download size={17} />
-                Görsel İndir
-              </button>
-
-              {mode === "pdf" && (
-                <button
-                  onClick={handlePrintPdf}
-                  className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[20px] border border-[#DDE7F3] bg-white px-5 py-3 text-sm font-black text-[#475569] transition hover:bg-[#EFF6FF] hover:text-[#1557D6]"
-                >
-                  <Image size={17} />
-                  PDF Yazdır / Kaydet
-                </button>
-              )}
             </div>
 
             <p className="mt-4 text-center text-xs font-bold leading-5 text-[#64748B]">
-              Not: Bazı masaüstü tarayıcılar doğrudan WhatsApp görsel paylaşımını
-              desteklemeyebilir. Bu durumda kart indirilir.
+              Lina, portföy bilgilerine göre müşteri odaklı paylaşım kartı üretir.
             </p>
           </aside>
 
@@ -783,17 +773,17 @@ export default function PortfolioShareModal({
                 </p>
 
                 <h3 className="mt-1 text-xl font-black tracking-[-0.04em] text-[#06194A]">
-                  {mode === "whatsapp"
-                    ? "WhatsApp Kartı"
-                    : mode === "story"
-                      ? "Instagram Hikâye"
-                      : "PDF Broşür"}
+                  {mode === "whatsapp" ? "WhatsApp Kartı" : "Instagram Hikâye"}
                 </h3>
               </div>
             </div>
 
-            <div className="max-h-[78vh] max-w-full overflow-auto rounded-[24px] bg-[#EEF5FF] p-3">
-              <div className="origin-top scale-[0.86] sm:scale-100">{renderPreview()}</div>
+            <div className="max-h-[78vh] max-w-full overflow-y-auto overflow-x-hidden rounded-[24px] bg-[#EEF5FF] p-3">
+              <div className="mx-auto flex w-full max-w-[390px] justify-center">
+                <div className="w-[390px] origin-top scale-[0.82] sm:scale-100">
+                  {renderPreview()}
+                </div>
+              </div>
             </div>
           </section>
         </div>
