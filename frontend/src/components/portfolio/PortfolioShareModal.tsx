@@ -24,9 +24,9 @@ type CanvasSize = {
 };
 
 function getCanvasSize(mode: ShareMode): CanvasSize {
-  if (mode === "story") return { width: 390, height: 694 };
+  if (mode === "story") return { width: 390, height: 760 };
   if (mode === "pdf") return { width: 794, height: 1123 };
-  return { width: 390, height: 760 };
+  return { width: 390, height: 840 };
 }
 
 function normalizeText(value?: string | null, fallback = "—") {
@@ -432,27 +432,37 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
 
   const featureY = infoY + infoBoxHeight + 16;
   const features = data.features?.length ? data.features : [];
-  const featureItems = features.slice(0, 4).map((item) => item.label);
+  const featureItems = features.slice(0, 8).map((item) => item.label);
+  const defaultFeatureItems = [
+    "Site İçerisinde",
+    "Güvenlik",
+    "Kapalı Otopark",
+    "Açık Havuz",
+    "Fitness",
+    "Akıllı Ev",
+    "Sosyal Tesis",
+    "Merkezi Konum",
+  ];
 
-  for (let index = 0; index < 4; index += 1) {
+  for (let index = 0; index < 8; index += 1) {
     const col = index % 2;
     const row = Math.floor(index / 2);
     const boxWidth = (bodyWidth - 10) / 2;
     const x = bodyX + col * (boxWidth + 10);
-    const y = featureY + row * 48;
-    const text = featureItems[index] || ["Lina Kartı", "Portföy Kaydı", "Güvenli Paylaşım", "EPH Kontrol"][index];
+    const y = featureY + row * 42;
+    const text = featureItems[index] || defaultFeatureItems[index];
 
     ctx.fillStyle = "#FFFFFF";
-    drawRoundRect(ctx, x, y, boxWidth, 38, 17);
+    drawRoundRect(ctx, x, y, boxWidth, 34, 16);
     ctx.fill();
     ctx.strokeStyle = "#DDE7F3";
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    drawText(ctx, truncateText(text, 24), x + boxWidth / 2, y + 12, boxWidth - 16, "900 12px Arial", "#27364F", "center");
+    drawText(ctx, truncateText(text, 24), x + boxWidth / 2, y + 10, boxWidth - 16, "900 11px Arial", "#27364F", "center");
   }
 
-  const descY = featureY + 106;
+  const descY = featureY + 178;
 
   ctx.fillStyle = "#FFFFFF";
   drawRoundRect(ctx, bodyX, descY, bodyWidth, mode === "pdf" ? 98 : 76, 24);
@@ -509,36 +519,39 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
   drawText(ctx, "QR", bodyX + bodyWidth - 48, advisorY + 22, 40, "900 10px Arial", "#1557D6", "center");
   drawText(ctx, "KOD", bodyX + bodyWidth - 48, advisorY + 36, 40, "900 10px Arial", "#1557D6", "center");
 
-  const footerY = Math.min(height - 58, advisorY + 96);
+  const footerY = Math.min(height - 78, advisorY + 96);
 
   ctx.fillStyle = "#06194A";
-  drawRoundRect(ctx, padding, footerY, width - padding * 2, 42, 18);
+  drawRoundRect(ctx, padding, footerY, width - padding * 2, 56, 18);
   ctx.fill();
   drawText(
     ctx,
-    normalizeText(data.portfolioNo, "EPH-PORTFOY"),
+    normalizeText(data.consultantName, "EPH Danışmanı"),
     width / 2,
-    footerY + 14,
+    footerY + 12,
     width - padding * 2 - 24,
-    "900 11px Arial",
+    "900 14px Arial",
     "#FFFFFF",
+    "center",
+  );
+  drawText(
+    ctx,
+    normalizeText(data.consultantPhone, "Telefon bilgisi"),
+    width / 2,
+    footerY + 32,
+    width - padding * 2 - 24,
+    "800 11px Arial",
+    "rgba(255,255,255,0.78)",
     "center",
   );
 
   ctx.save();
-  ctx.translate(width / 2, height / 2);
+  ctx.translate(width / 2, height / 2 - 12);
   ctx.rotate((-28 * Math.PI) / 180);
-  ctx.globalAlpha = 0.055;
-  drawText(
-    ctx,
-    "EPH PORTFÖY HAVUZU",
-    0,
-    0,
-    width + 120,
-    mode === "pdf" ? "900 72px Arial" : "900 52px Arial",
-    "#06194A",
-    "center",
-  );
+  ctx.globalAlpha = 0.035;
+  drawText(ctx, "EMLAK", 0, -56, width + 120, mode === "pdf" ? "900 72px Arial" : "900 54px Arial", "#06194A", "center");
+  drawText(ctx, "PORTFÖY", 0, 0, width + 120, mode === "pdf" ? "900 72px Arial" : "900 54px Arial", "#06194A", "center");
+  drawText(ctx, "HAVUZU", 0, 56, width + 120, mode === "pdf" ? "900 72px Arial" : "900 54px Arial", "#06194A", "center");
   ctx.restore();
 
   return await new Promise<Blob>((resolve, reject) => {
@@ -657,10 +670,10 @@ export default function PortfolioShareModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[10000] overflow-y-auto bg-[#06194A]/60 p-4 backdrop-blur-xl">
-      <div className="mx-auto flex min-h-full max-w-7xl items-center justify-center">
-        <div className="grid w-full gap-4 rounded-[34px] border border-white/20 bg-[#F7FBFF] p-4 shadow-[0_30px_120px_rgba(15,23,42,0.30)] lg:grid-cols-[420px_1fr] lg:p-5">
-          <aside className="rounded-[30px] border border-[#DDE7F3] bg-white p-5">
+    <div className="fixed inset-0 z-[10000] overflow-y-auto overflow-x-hidden bg-[#06194A]/60 px-3 py-4 backdrop-blur-xl">
+      <div className="mx-auto flex min-h-full w-full max-w-7xl items-start justify-center">
+        <div className="grid w-full min-w-0 max-w-full gap-4 rounded-[28px] border border-white/20 bg-[#F7FBFF] p-3 shadow-[0_30px_120px_rgba(15,23,42,0.30)] lg:grid-cols-[420px_1fr] lg:p-5">
+          <aside className="min-w-0 rounded-[26px] border border-[#DDE7F3] bg-white p-4 lg:p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
@@ -762,7 +775,7 @@ export default function PortfolioShareModal({
             </p>
           </aside>
 
-          <section className="rounded-[30px] border border-[#DDE7F3] bg-white p-4">
+          <section className="min-w-0 rounded-[26px] border border-[#DDE7F3] bg-white p-3 lg:p-4">
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1557D6]">
@@ -779,8 +792,8 @@ export default function PortfolioShareModal({
               </div>
             </div>
 
-            <div className="max-h-[78vh] overflow-auto rounded-[26px] bg-[#EEF5FF] p-4">
-              <div className="origin-top">{renderPreview()}</div>
+            <div className="max-h-[78vh] max-w-full overflow-auto rounded-[24px] bg-[#EEF5FF] p-3">
+              <div className="origin-top scale-[0.86] sm:scale-100">{renderPreview()}</div>
             </div>
           </section>
         </div>
@@ -805,7 +818,7 @@ function ModeButton({
   return (
     <button
       onClick={onClick}
-      className={`flex min-h-[70px] items-center gap-3 rounded-[22px] border px-4 text-left transition ${
+      className={`flex min-h-[70px] min-w-0 items-center gap-3 rounded-[22px] border px-4 text-left transition ${
         active
           ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
           : "border-[#DDE7F3] bg-white text-[#475569] hover:bg-[#F7FBFF]"
