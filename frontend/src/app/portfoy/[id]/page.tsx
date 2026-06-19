@@ -330,82 +330,125 @@ function getAuthorityKind(unit: DetailUnit, documents: PortfolioAuthorityDocumen
   return "Kontrol";
 }
 
+type PrimaryInfoBox = {
+  icon: ReactNode;
+  label: string;
+  value: string;
+};
+
+function isDisplayableDetailValue(value?: string | number | null) {
+  const normalized = String(value ?? "").trim();
+
+  if (!normalized) return false;
+
+  const blockedValues = [
+    "—",
+    "-",
+    "Eklenmedi",
+    "Kontrol",
+    "Belirsiz",
+    "Bilgi yok",
+    "Bilgi girilmedi",
+    "Kat bilgisi yok",
+  ];
+
+  return !blockedValues.some(
+    (blocked) =>
+      normalized.toLocaleLowerCase("tr-TR") ===
+      blocked.toLocaleLowerCase("tr-TR"),
+  );
+}
+
+function cleanInfoBoxes(items: PrimaryInfoBox[]) {
+  return items.filter((item) => isDisplayableDetailValue(item.value));
+}
+
+function getAuthorityDisplayValue(
+  unit: DetailUnit,
+  verified: boolean,
+  documents: PortfolioAuthorityDocument[],
+) {
+  if (!verified && !documents.length) return "";
+  const authorityKind = getAuthorityKind(unit, documents);
+  return isDisplayableDetailValue(authorityKind) ? authorityKind : "";
+}
+
 function getPrimaryInfoBoxes(
   unit: DetailUnit,
   verified: boolean,
   documents: PortfolioAuthorityDocument[],
 ) {
-  const authorityKind = getAuthorityKind(unit, documents);
-  const authorityValue = verified ? authorityKind : "Kontrol";
-  const heatingValue = getDetailValue(unit, ["heating", "heatingType", "isinma", "heatingSystem"], "Eklenmedi");
-  const parkingValue = getDetailValue(unit, ["parking", "parkingType", "otopark"], "Eklenmedi");
-  const buildingAgeValue = getDetailValue(unit, ["buildingAge", "buildingAgeLabel", "age"], "Eklenmedi");
-  const totalFloorsValue = unit.totalFloors ? `${unit.totalFloors} Kat` : "Eklenmedi";
-  const floorValue = unit.floorLabel || (unit.floor != null ? `${unit.floor}. Kat` : "Eklenmedi");
+  const authorityValue = getAuthorityDisplayValue(unit, verified, documents);
+  const heatingValue = getDetailValue(unit, ["heating", "heatingType", "isinma", "heatingSystem"], "");
+  const parkingValue = getDetailValue(unit, ["parking", "parkingType", "otopark"], "");
+  const buildingAgeValue = getDetailValue(unit, ["buildingAge", "buildingAgeLabel", "age"], "");
+  const totalFloorsValue = unit.totalFloors ? `${unit.totalFloors} Kat` : "";
+  const floorValue = unit.floorLabel || (unit.floor != null ? `${unit.floor}. Kat` : "");
 
   if (isIndustrialDetailType(unit.type)) {
-    return [
-      { icon: <Factory size={18} />, label: "Kapalı Alan", value: formatAreaValue(unit.area) },
-      { icon: <Ruler size={18} />, label: "Açık Alan", value: getDetailValue(unit, ["openArea"], "Eklenmedi") },
-      { icon: <Factory size={18} />, label: "Üretim", value: getDetailValue(unit, ["productionArea", "usageType"], "Eklenmedi") },
-      { icon: <Zap size={18} />, label: "Trafo", value: getDetailValue(unit, ["transformerPower", "electricPower"], "Eklenmedi") },
-      { icon: <Truck size={18} />, label: "Yükleme", value: getDetailValue(unit, ["loadingArea", "truckEntrance"], "Eklenmedi") },
-      { icon: <Building2 size={18} />, label: "Tavan", value: getDetailValue(unit, ["ceilingHeight"], "Eklenmedi") },
+    return cleanInfoBoxes([
+      { icon: <Factory size={18} />, label: "Kapalı Alan", value: formatAreaValue(unit.area, "") },
+      { icon: <Ruler size={18} />, label: "Açık Alan", value: getDetailValue(unit, ["openArea"], "") },
+      { icon: <Factory size={18} />, label: "Üretim", value: getDetailValue(unit, ["productionArea", "usageType"], "") },
+      { icon: <Zap size={18} />, label: "Trafo", value: getDetailValue(unit, ["transformerPower", "electricPower"], "") },
+      { icon: <Truck size={18} />, label: "Yükleme", value: getDetailValue(unit, ["loadingArea", "truckEntrance"], "") },
+      { icon: <Building2 size={18} />, label: "Tavan", value: getDetailValue(unit, ["ceilingHeight"], "") },
       { icon: <Flame size={18} />, label: "Isıtma", value: heatingValue },
       { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
-    ];
+    ]);
   }
 
   if (isTouristicDetailType(unit.type)) {
-    return [
-      { icon: <BedDouble size={18} />, label: "Oda", value: unit.roomCount || getDetailValue(unit, ["roomTotal"], "—") },
-      { icon: <BedDouble size={18} />, label: "Yatak", value: getDetailValue(unit, ["bedCount"], "Eklenmedi") },
-      { icon: <Waves size={18} />, label: "Havuz", value: getDetailValue(unit, ["pool", "hasPool"], "Eklenmedi") },
-      { icon: <Star size={18} />, label: "Sınıf", value: getDetailValue(unit, ["hotelClass", "starRating"], "Eklenmedi") },
-      { icon: <Utensils size={18} />, label: "Restoran", value: getDetailValue(unit, ["restaurant", "hasRestaurant"], "Eklenmedi") },
+    return cleanInfoBoxes([
+      { icon: <BedDouble size={18} />, label: "Oda", value: unit.roomCount || getDetailValue(unit, ["roomTotal"], "") },
+      { icon: <BedDouble size={18} />, label: "Yatak", value: getDetailValue(unit, ["bedCount"], "") },
+      { icon: <Waves size={18} />, label: "Havuz", value: getDetailValue(unit, ["pool", "hasPool"], "") },
+      { icon: <Star size={18} />, label: "Sınıf", value: getDetailValue(unit, ["hotelClass", "starRating"], "") },
+      { icon: <Utensils size={18} />, label: "Restoran", value: getDetailValue(unit, ["restaurant", "hasRestaurant"], "") },
       { icon: <Car size={18} />, label: "Otopark", value: parkingValue },
-      { icon: <Maximize2 size={18} />, label: "Alan", value: formatAreaValue(unit.area) },
+      { icon: <Maximize2 size={18} />, label: "Alan", value: formatAreaValue(unit.area, "") },
       { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
-    ];
+    ]);
   }
 
   if (isLandDetailType(unit.type)) {
-    return [
-      { icon: <Maximize2 size={18} />, label: "Alan", value: formatAreaValue(unit.area) },
-      { icon: <Landmark size={18} />, label: "İmar", value: getDetailValue(unit, ["zoningStatus", "imarDurumu"], "Eklenmedi") },
+    return cleanInfoBoxes([
+      { icon: <Maximize2 size={18} />, label: "Alan", value: formatAreaValue(unit.area, "") },
+      { icon: <Landmark size={18} />, label: "İmar", value: getDetailValue(unit, ["zoningStatus", "imarDurumu"], "") },
       { icon: <Home size={18} />, label: "Ada / Parsel", value: formatAdaParselValue(unit) },
-      { icon: <Ruler size={18} />, label: "Emsal", value: getDetailValue(unit, ["kaks", "emsal"], "Eklenmedi") },
-      { icon: <Building2 size={18} />, label: "Kat İzni", value: getDetailValue(unit, ["allowedFloors", "katIzni"], "Eklenmedi") },
-      { icon: <MapPin size={18} />, label: "Cephe", value: getDetailValue(unit, ["frontage", "yolaCephe"], "Eklenmedi") },
-      { icon: <Zap size={18} />, label: "Altyapı", value: getDetailValue(unit, ["infrastructure", "altyapi"], "Eklenmedi") },
+      { icon: <Ruler size={18} />, label: "Emsal", value: getDetailValue(unit, ["kaks", "emsal"], "") },
+      { icon: <Building2 size={18} />, label: "Kat İzni", value: getDetailValue(unit, ["allowedFloors", "katIzni"], "") },
+      { icon: <MapPin size={18} />, label: "Cephe", value: getDetailValue(unit, ["frontage", "yolaCephe"], "") },
+      { icon: <Zap size={18} />, label: "Altyapı", value: getDetailValue(unit, ["infrastructure", "altyapi"], "") },
       { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
-    ];
+    ]);
   }
 
   if (isCommercialDetailType(unit.type)) {
-    return [
-      { icon: <Maximize2 size={18} />, label: "m²", value: formatAreaValue(unit.area) },
+    return cleanInfoBoxes([
+      { icon: <Maximize2 size={18} />, label: "m²", value: formatAreaValue(unit.area, "") },
       { icon: <Building2 size={18} />, label: "Kat", value: floorValue },
-      { icon: <Home size={18} />, label: "Cephe", value: getDetailValue(unit, ["frontage", "cephe"], "Eklenmedi") },
-      { icon: <MapPin size={18} />, label: "Cadde", value: getDetailValue(unit, ["streetStatus", "cadde"], "Eklenmedi") },
+      { icon: <Home size={18} />, label: "Cephe", value: getDetailValue(unit, ["frontage", "cephe"], "") },
+      { icon: <MapPin size={18} />, label: "Cadde", value: getDetailValue(unit, ["streetStatus", "cadde"], "") },
       { icon: <Car size={18} />, label: "Otopark", value: parkingValue },
       { icon: <Flame size={18} />, label: "Isınma", value: heatingValue },
-      { icon: <Building2 size={18} />, label: "Depo", value: getDetailValue(unit, ["warehouse", "storageArea"], "Eklenmedi") },
+      { icon: <Building2 size={18} />, label: "Depo", value: getDetailValue(unit, ["warehouse", "storageArea"], "") },
       { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
-    ];
+    ]);
   }
 
-  return [
-    { icon: <BedDouble size={18} />, label: "Oda Sayısı", value: unit.roomCount || "—" },
-    { icon: <Maximize2 size={18} />, label: "Brüt m²", value: formatAreaValue(unit.area) },
+  return cleanInfoBoxes([
+    { icon: <BedDouble size={18} />, label: "Oda Sayısı", value: unit.roomCount || "" },
+    { icon: <Maximize2 size={18} />, label: "Brüt m²", value: formatAreaValue(unit.area, "") },
     { icon: <Building2 size={18} />, label: "Bulunduğu Kat", value: floorValue },
     { icon: <Building2 size={18} />, label: "Bina Yaşı", value: buildingAgeValue },
     { icon: <Building2 size={18} />, label: "Toplam Kat", value: totalFloorsValue },
     { icon: <Flame size={18} />, label: "Isınma", value: heatingValue },
     { icon: <Car size={18} />, label: "Otopark", value: parkingValue },
     { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
-  ];
+  ]);
 }
+
 function unitTitle(unit?: DetailUnit | null) {
   if (!unit) return "Portföy Detayı";
   const projectName = unit.project?.name || "EPH Portföy";
@@ -1181,6 +1224,17 @@ export default function StokDetailPage() {
     : shortDescription;
   const encodedShareText = encodeURIComponent(makeShareText(unit));
   const encodedShareUrl = encodeURIComponent(shareUrl);
+  const consultantPhone = String(
+    (unit as any)?.consultantPhone ||
+      (unit as any)?.ownerPhone ||
+      (unit as any)?.phone ||
+      "",
+  ).trim();
+  const cleanConsultantPhone = consultantPhone.replace(/\D/g, "");
+  const telHref = cleanConsultantPhone ? `tel:${cleanConsultantPhone}` : "";
+  const whatsappHref = cleanConsultantPhone
+    ? `https://wa.me/${cleanConsultantPhone.startsWith("90") ? cleanConsultantPhone : `90${cleanConsultantPhone}`}`
+    : "";
 
   return (
     <main className="min-h-[100dvh] overflow-y-auto bg-[#F7FBFF] pb-[calc(112px+env(safe-area-inset-bottom))] text-[#27364F]">
@@ -1208,249 +1262,122 @@ export default function StokDetailPage() {
         onChange={(event) => handleDocumentUpload(event, "TAPU")}
       />
 
-      <section className="mx-auto w-full max-w-[430px] px-3 py-3">
-        <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-1">
-          <button
-            onClick={() => router.push("/portfoy")}
-            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#06194A] shadow-[0_8px_18px_rgba(15,23,42,0.05)]"
-          >
-            <ArrowLeft size={16} />
-            Geri
-          </button>
-          {canEditPortfolio && (
-            <button
-              onClick={() => router.push(`/portfoy?edit=${unit.id}`)}
-              className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#1557D6] shadow-[0_8px_18px_rgba(15,23,42,0.05)]"
-            >
-              <Edit3 size={15} />
-              Güncelle
-            </button>
-          )}
-          <button
-            onClick={handleCopyLink}
-            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#475569] shadow-[0_8px_18px_rgba(15,23,42,0.05)]"
-          >
-            <Copy size={15} />
-            {copied ? "Kopyalandı" : "Link"}
-          </button>
-          <button
-            onClick={handleOpenShareModal}
-            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] bg-[#1557D6] px-3 text-[12px] font-black text-white shadow-[0_12px_24px_rgba(21,87,214,0.22)]"
-          >
-            <Share2 size={15} />
-            Paylaş
-          </button>
-        </div>
-
+      <section className="mx-auto w-full max-w-[430px] overflow-hidden bg-[#F4F8FF] pb-5">
         {actionError && (
-          <div className="mb-2 rounded-[18px] border border-rose-100 bg-rose-50 px-3 py-2 text-center text-[12px] font-black leading-5 text-rose-700">
+          <div className="mx-3 mt-3 rounded-[18px] border border-rose-100 bg-rose-50 px-3 py-2 text-center text-[12px] font-black leading-5 text-rose-700">
             {actionError}
           </div>
         )}
 
-        <section className="overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.07)]">
+        <section className="relative mb-[154px] h-[520px] overflow-visible bg-[#06194A]">
           <button
             type="button"
             onClick={() => galleryImages.length > 0 && setGalleryOpen(true)}
-            className="group relative block h-[190px] w-full overflow-hidden bg-[#06194A] text-left"
+            className="absolute inset-0 block h-full w-full overflow-hidden text-center"
+            aria-label="Portföy fotoğraflarını aç"
           >
             {activeGalleryImage ? (
               <img
                 src={activeGalleryImage}
                 alt={unitTitle(unit)}
-                className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]"
+                className="absolute inset-0 h-full w-full object-cover"
               />
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.18),transparent_28%),linear-gradient(135deg,#06194A,#1557D6)]">
-                <div className="rounded-[20px] border border-white/18 bg-white/12 px-4 py-3 text-center backdrop-blur">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70">
-                    Fotoğraf Eklenmedi
-                  </p>
-                  <p className="mt-1 text-[11px] font-bold text-white/85">
-                    Kapak görseli bekleniyor.
+              <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.20),transparent_30%),linear-gradient(135deg,#06194A,#1557D6)]">
+                <div className="rounded-[22px] border border-white/20 bg-white/15 px-5 py-4 text-center backdrop-blur">
+                  <ImageIcon className="mx-auto text-white/80" size={28} />
+                  <p className="mt-2 text-[11px] font-black uppercase tracking-[0.20em] text-white/80">
+                    Fotoğraf bekleniyor
                   </p>
                 </div>
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/72 via-[#06194A]/10 to-[#06194A]/10" />
-            <div className="absolute left-2 top-2 flex items-center gap-1.5">
-              <span
-                className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-black shadow-lg"
-                style={{
-                  color: style.color,
-                  background: style.bg,
-                  borderColor: style.border,
-                }}
-              >
-                <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ background: style.dot }}
-                />
-                {statusLabel(unit.status)}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/18 bg-black/35 px-2.5 py-1 text-[10px] font-black text-white backdrop-blur">
-                <Camera size={12} />
-                {galleryImages.length}/{MAX_GALLERY_COUNT}
-              </span>
-            </div>
-            <div className="absolute bottom-2 left-2 right-2">
-              <p className="break-words text-[18px] font-black leading-tight tracking-[-0.04em] text-white drop-shadow">
-                {unitTitle(unit)}
-              </p>
-              <div className="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-white/90">
-                <MapPin size={13} />
-                <span className="break-words">{fullAddress}</span>
-              </div>
-            </div>
+            <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/12 to-black/78" />
           </button>
 
-          {galleryImages.length > 0 && (
-            <div className="border-b border-[#E8F0FA] bg-white px-2.5 py-2">
-              <div className="flex gap-2 overflow-x-auto pb-0.5">
-                {galleryImages.slice(0, 8).map((photo, index) => (
-                  <button
-                    key={photo.id || photo.displayUrl}
-                    type="button"
-                    onClick={() => setActivePhoto(index)}
-                    className={`relative h-[46px] w-[58px] shrink-0 overflow-hidden rounded-[12px] border ${activePhoto === index ? "border-[#1557D6] ring-2 ring-blue-100" : "border-[#DDE7F3]"}`}
-                  >
-                    <img
-                      src={photo.displayUrl}
-                      alt={`Portföy fotoğrafı ${index + 1}`}
-                      className="h-full w-full object-cover"
-                    />
-                    {photo.isCover && (
-                      <span className="absolute left-1 top-1 rounded-full bg-[#1557D6] px-1.5 py-0.5 text-[8px] font-black text-white">
-                        Kapak
-                      </span>
-                    )}
-                  </button>
-                ))}
-                {galleryImages.length > 8 && (
-                  <button
-                    type="button"
-                    onClick={() => setGalleryOpen(true)}
-                    className="flex h-[46px] w-[58px] shrink-0 items-center justify-center rounded-[12px] border border-[#DDE7F3] bg-[#06194A] text-[12px] font-black text-white"
-                  >
-                    +{galleryImages.length - 8}
-                  </button>
-                )}
-              </div>
+          <div className="pointer-events-none absolute inset-x-0 top-[calc(16px+env(safe-area-inset-top))] z-20 flex items-center justify-between px-5">
+            <button
+              type="button"
+              onClick={() => router.push("/portfoy")}
+              className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#06194A] shadow-[0_12px_30px_rgba(15,23,42,0.22)] active:scale-[0.98]"
+              aria-label="Geri"
+            >
+              <ArrowLeft size={22} />
+            </button>
+            <div className="pointer-events-auto flex items-center gap-2">
+              {canEditPortfolio && (
+                <button
+                  type="button"
+                  onClick={() => router.push(`/portfoy?edit=${unit.id}`)}
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#1557D6] shadow-[0_12px_30px_rgba(15,23,42,0.22)] active:scale-[0.98]"
+                  aria-label="Güncelle"
+                >
+                  <Edit3 size={20} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#06194A] shadow-[0_12px_30px_rgba(15,23,42,0.22)] active:scale-[0.98]"
+                aria-label="Link kopyala"
+              >
+                <Copy size={19} />
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenShareModal}
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#06194A] shadow-[0_12px_30px_rgba(15,23,42,0.22)] active:scale-[0.98]"
+                aria-label="Paylaş"
+              >
+                <Share2 size={20} />
+              </button>
             </div>
-          )}
+          </div>
 
-          <div className="p-3">
-            <div className="text-center">
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#64748B]">
-                  Fiyat
-                </p>
-                <p className="mt-0.5 text-[30px] font-black leading-none tracking-[-0.06em] text-[#06194A]">
-                  {formatMoney(unit.price, unit.priceCurrency)}
-                </p>
-              </div>
-            </div>
+          <div className="absolute inset-x-4 bottom-[122px] z-10 flex flex-col items-center text-center text-white">
+            <span
+              className="inline-flex min-h-[32px] items-center justify-center rounded-full px-5 text-[13px] font-black uppercase tracking-[0.04em] shadow-[0_14px_32px_rgba(21,87,214,0.32)]"
+              style={{ background: style.color, color: "#FFFFFF" }}
+            >
+              {statusLabel(unit.status)}
+            </span>
+            <h1 className="mt-4 max-w-[350px] break-words text-center text-[26px] font-black leading-[30px] tracking-[-0.045em] drop-shadow-[0_8px_18px_rgba(0,0,0,0.45)]">
+              {unit.project?.name || unitTitle(unit)}
+            </h1>
+            <p className="mt-3 max-w-[330px] break-words text-center text-[16px] font-bold leading-[23px] text-white/95 drop-shadow-[0_6px_14px_rgba(0,0,0,0.42)]">
+              {fullAddress}
+            </p>
+            <p className="mt-4 text-center text-[37px] font-black leading-none tracking-[-0.07em] text-[#6EA0FF] drop-shadow-[0_8px_18px_rgba(0,0,0,0.50)]">
+              {formatMoney(unit.price, unit.priceCurrency)}
+            </p>
+            <button
+              type="button"
+              onClick={() => galleryImages.length > 0 && setGalleryOpen(true)}
+              className="mt-5 inline-flex min-h-[34px] items-center justify-center gap-2 rounded-full bg-black/42 px-5 text-[13px] font-black text-white shadow-[0_10px_20px_rgba(0,0,0,0.25)] backdrop-blur-md active:scale-[0.98]"
+            >
+              <Camera size={16} />
+              {galleryImages.length} / {MAX_GALLERY_COUNT}
+            </button>
+          </div>
 
-            <div className="mt-2 flex items-center justify-center gap-1.5 text-[12px] font-black text-[#27364F]">
-              <MapPin size={15} className="shrink-0 text-[#1557D6]" />
-              <span className="min-w-0 break-words">{locationText}</span>
-            </div>
-
-            <div className="mt-3 grid grid-cols-4 gap-1.5 rounded-[18px] border border-[#DDE7F3] bg-[#F7FBFF] p-1.5">
-              {primaryInfoBoxes.map((item) => (
+          <div className="absolute -bottom-[138px] left-5 right-5 z-20 overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-white shadow-[0_22px_45px_rgba(15,23,42,0.16)]">
+            <div className="grid grid-cols-4">
+              {primaryInfoBoxes.slice(0, 8).map((item, index) => (
                 <InfoBox
                   key={item.label}
                   icon={item.icon}
                   label={item.label}
                   value={item.value}
+                  index={index}
                 />
               ))}
-            </div>
-
-            <div className="mt-2 flex items-center justify-between gap-2 rounded-[16px] border border-[#DDE7F3] bg-white px-3 py-2 text-[11px] font-black">
-              <span className="min-w-0 break-words text-[#64748B]">
-                {getPortfolioNo(unit)}
-              </span>
-              <span
-                className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 ${verified ? "bg-emerald-50 text-emerald-700" : "bg-[#F7FBFF] text-[#64748B]"}`}
-              >
-                <ShieldCheck size={13} />
-                {verified ? "Doğrulanmış" : "Kontrol"}
-              </span>
-            </div>
-
-            <div className="mt-2 grid grid-cols-1 gap-2">
-              <div className="rounded-[18px] border border-blue-100 bg-[#EFF6FF] px-3 py-3 text-center">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1557D6]">
-                  Kullanılabilir Kredi
-                </p>
-                <p className="mt-1 text-[17px] font-black leading-tight text-[#06194A]">
-                  {availableCreditAmount
-                    ? formatMoney(availableCreditAmount, unit.priceCurrency)
-                    : "Bilgi girilmedi"}
-                </p>
-              </div>
-
-              <div className="rounded-[18px] border border-amber-100 bg-amber-50 px-3 py-3 text-center">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-700">
-                  Kapı Erişim Bilgisi
-                </p>
-                {!canSeeDoorAccessInfo ? (
-                  <p className="mx-auto mt-1 max-w-[320px] text-[12px] font-black leading-5 text-amber-800">
-                    🔒 Randevulaşma sonrası portföy sahibinden talep ediniz.
-                  </p>
-                ) : !doorAccessInfo ? (
-                  <p className="mt-1 text-[12px] font-black text-amber-800">
-                    Bilgi girilmedi
-                  </p>
-                ) : (
-                  <div className="mt-2">
-                    <button
-                      type="button"
-                      onClick={() => setDoorAccessVisible((current) => !current)}
-                      className="inline-flex min-h-[34px] items-center justify-center rounded-[14px] bg-white px-3 text-[11px] font-black text-amber-800 shadow-sm"
-                    >
-                      {doorAccessVisible ? "Gizle" : "Görüntüle"}
-                    </button>
-                    <p className="mx-auto mt-2 max-w-[340px] rounded-[14px] bg-white px-3 py-2 text-[12px] font-black leading-5 text-[#06194A] shadow-sm">
-                      {doorAccessVisible ? doorAccessInfo : "••••••••••••"}
-                    </p>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         </section>
 
-        <PortfolioApprovalCenter
-          unit={unit}
-          galleryImageCount={galleryImages.length}
-          canReviewPortfolio={canReviewPortfolio}
-          approvalActionLoading={approvalActionLoading}
-          onApprovalAction={handleApprovalAction}
-        />
-
-        <PortfolioDocumentsCenter
-          documents={portfolioDocuments}
-          canEditPortfolio={canEditPortfolio}
-          canReviewPortfolio={canReviewPortfolio}
-          documentUploadLoading={documentUploadLoading}
-          documentDeleteLoading={documentDeleteLoading}
-          approvalActionLoading={approvalActionLoading}
-          onUploadYetki={() => yetkiDocumentInputRef.current?.click()}
-          onUploadTapu={() => tapuDocumentInputRef.current?.click()}
-          onDeleteDocument={handleDeleteDocument}
-          onSubmitApproval={handleSubmitApproval}
-        />
-
-        <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="flex items-center justify-center gap-2 text-[#1557D6]">
-            <FileText size={17} />
-            <h2 className="text-center text-[16px] font-black text-[#06194A]">
-              Açıklama
-            </h2>
-          </div>
-          <p className="mt-2 whitespace-pre-line break-words text-left text-[12px] font-semibold leading-5 text-[#475569]">
+        <section className="mx-5 rounded-[24px] border border-[#DDE7F3] bg-white px-5 py-5 text-center shadow-[0_16px_34px_rgba(15,23,42,0.07)]">
+          <CenteredSectionTitle icon={<Home size={19} />} title="Açıklama" />
+          <p className="mx-auto mt-4 max-w-[330px] whitespace-pre-line break-words text-center text-[14px] font-semibold leading-6 text-[#1F2937]">
             {visibleDescription}
             {safeDescription.length > 140 && (
               <button
@@ -1464,54 +1391,111 @@ export default function StokDetailPage() {
           </p>
         </section>
 
-        <section className="mt-3 overflow-hidden rounded-[22px] border border-[#DDE7F3] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <button
-            type="button"
-            onClick={() =>
-              hasProjectCoordinates &&
-              window.open(
-                `https://www.google.com/maps?q=${mapQuery}`,
-                "_blank",
-                "noopener,noreferrer",
-              )
-            }
-            className="flex w-full flex-col items-center justify-center gap-2 border-b border-[#E8F0FA] px-3 py-3 text-center"
-          >
-            <div className="min-w-0 text-center">
-              <p className="text-center text-[10px] font-black uppercase tracking-[0.18em] text-[#64748B]">
-                Konum
-              </p>
-              <p className="mt-0.5 break-words text-center text-[13px] font-black leading-5 text-[#06194A]">
-                {locationText}
-              </p>
-            </div>
-            <span className="inline-flex shrink-0 items-center justify-center gap-1 rounded-[14px] bg-[#EFF6FF] px-2.5 py-1.5 text-center text-[11px] font-black text-[#1557D6]">
+        <section className="mx-5 mt-4 overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-white p-0 text-center shadow-[0_16px_34px_rgba(15,23,42,0.07)]">
+          <div className="px-5 py-5 text-center">
+            <CenteredSectionTitle icon={<MapPin size={20} />} title="Konum" />
+            <p className="mx-auto mt-3 max-w-[320px] break-words text-center text-[13px] font-bold leading-5 text-[#1F2937]">
+              {locationText}
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                window.open(
+                  `https://www.google.com/maps?q=${mapQuery}`,
+                  "_blank",
+                  "noopener,noreferrer",
+                )
+              }
+              className="mx-auto mt-3 inline-flex min-h-[32px] items-center justify-center gap-1 rounded-full bg-[#EFF6FF] px-4 text-[11px] font-black text-[#1557D6] active:scale-[0.98]"
+            >
               Haritada Aç <ExternalLink size={12} />
-            </span>
-          </button>
+            </button>
+          </div>
           <iframe
             title="Portföy haritası"
             src={`https://www.google.com/maps?q=${mapQuery}&z=${hasProjectCoordinates ? 17 : 14}&output=embed`}
-            className="h-[135px] w-full border-0"
+            className="h-[150px] w-full border-0"
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
           />
         </section>
 
-        <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="flex items-center justify-center gap-2 text-[#1557D6]">
-            <Share2 size={17} />
-            <h2 className="text-center text-[16px] font-black text-[#06194A]">
-              Paylaş
-            </h2>
+        {featureLabels.length > 0 && (
+          <section className="mx-5 mt-4 rounded-[24px] border border-[#DDE7F3] bg-white px-4 py-5 text-center shadow-[0_16px_34px_rgba(15,23,42,0.07)]">
+            <CenteredSectionTitle icon={<Star size={19} />} title="Öne Çıkan Özellikler" />
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              {featureLabels.slice(0, 10).map((feature) => (
+                <span
+                  key={feature}
+                  className="inline-flex min-h-[34px] items-center justify-center rounded-[13px] bg-[#EEF3F8] px-3 text-[12px] font-bold text-[#06194A] shadow-[inset_0_0_0_1px_rgba(199,214,232,0.70)]"
+                >
+                  <CheckCircle2 size={15} className="mr-1.5 text-[#1557D6]" />
+                  {feature}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className="mx-5 mt-4 rounded-[24px] border border-[#DDE7F3] bg-white px-5 py-5 shadow-[0_16px_34px_rgba(15,23,42,0.07)]">
+          <div className="grid grid-cols-[72px_1fr] items-center gap-4">
+            <div className="flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full bg-[#EFF6FF] text-[#1557D6]">
+              <CircleUserRound size={38} />
+            </div>
+            <div className="min-w-0 text-left">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <p className="min-w-0 break-words text-[19px] font-black leading-6 tracking-[-0.04em] text-[#06194A]">
+                  {ownerName || "EPH Danışmanı"}
+                </p>
+                <BadgeCheck size={18} className="shrink-0 text-[#1557D6]" />
+              </div>
+              <p className="mt-1 break-words text-[13px] font-bold leading-5 text-[#64748B]">
+                {unit.project?.owner?.role || "EPH Gayrimenkul Danışmanı"}
+              </p>
+              <p className="mt-2 text-[12px] font-black text-[#06194A]">
+                <span className="text-amber-500">★</span> 4.9 Güven Profili
+              </p>
+            </div>
           </div>
-          <button
-            onClick={handleNativeShare}
-            className="mx-auto mt-2 block rounded-[14px] bg-[#EFF6FF] px-3 py-1.5 text-[11px] font-black text-[#1557D6]"
-          >
-            Cihazdan
-          </button>
-          <div className="mt-3 grid grid-cols-4 gap-2">
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Link
+              href="/messages"
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] bg-[#EAF2FF] text-[13px] font-black text-[#1557D6] active:scale-[0.98]"
+            >
+              <MessageCircle size={18} /> Mesaj
+            </Link>
+            <button
+              type="button"
+              onClick={handleOpenShareModal}
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] bg-[#EAF2FF] text-[13px] font-black text-[#1557D6] active:scale-[0.98]"
+            >
+              <Share2 size={18} /> Kart
+            </button>
+            {telHref && (
+              <a
+                href={telHref}
+                className="flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] bg-[#EAF2FF] text-[13px] font-black text-[#1557D6] active:scale-[0.98]"
+              >
+                <MessageCircle size={18} /> Ara
+              </a>
+            )}
+            {whatsappHref && (
+              <a
+                href={whatsappHref}
+                target="_blank"
+                rel="noreferrer"
+                className="flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] bg-emerald-500 text-[13px] font-black text-white active:scale-[0.98]"
+              >
+                <MessageCircle size={18} /> WhatsApp
+              </a>
+            )}
+          </div>
+        </section>
+
+        <section className="mx-5 mt-4 rounded-[24px] border border-[#DDE7F3] bg-white px-5 py-5 text-center shadow-[0_16px_34px_rgba(15,23,42,0.07)]">
+          <CenteredSectionTitle icon={<Share2 size={19} />} title="Paylaş" />
+          <div className="mt-4 grid grid-cols-4 gap-2">
             <ShareLink
               href={`https://wa.me/?text=${encodedShareText}`}
               label="WhatsApp"
@@ -1523,257 +1507,41 @@ export default function StokDetailPage() {
               icon={<Send size={17} />}
             />
             <button
+              type="button"
               onClick={handleCopyLink}
-              className="inline-flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-[16px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#475569]"
+              className="inline-flex min-h-[50px] flex-col items-center justify-center gap-1 rounded-[16px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#475569] active:scale-[0.98]"
             >
               <Copy size={17} />
               {copied ? "Kopyalandı" : "Link"}
             </button>
             <button
+              type="button"
               onClick={handleOpenShareModal}
-              className="inline-flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-[16px] bg-[#1557D6] px-2 text-[10px] font-black text-white"
+              className="inline-flex min-h-[50px] flex-col items-center justify-center gap-1 rounded-[16px] bg-[#1557D6] px-2 text-[10px] font-black text-white active:scale-[0.98]"
             >
               <Share2 size={17} />
-              Kart / QR
-            </button>
-          </div>
-        </section>
-
-
-        {featureLabels.length > 0 && (
-          <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-            <div className="flex items-center justify-center gap-2 text-[#1557D6]">
-              <CheckCircle2 size={17} />
-              <h2 className="text-center text-[16px] font-black text-[#06194A]">
-                Ek Özellikler
-              </h2>
-            </div>
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
-              {featureLabels.map((feature) => (
-                <span
-                  key={feature}
-                  className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[11px] font-black text-emerald-700 shadow-[0_8px_18px_rgba(5,150,105,0.08)]"
-                >
-                  ✓ {feature}
-                </span>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="flex items-center justify-center gap-2 text-center text-[#1557D6]">
-            <Building2 size={17} />
-            <h2 className="text-center text-[16px] font-black text-[#06194A]">Detaylar</h2>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <InfoRow label="Portföy" value={unit.project?.name || "—"} />
-            <InfoRow label="Mülk Tipi" value={typeLabel(unit.type)} />
-            <InfoRow label="Durum" value={statusLabel(unit.status)} />
-            <InfoRow
-              label={
-                isLandDetailType(unit.type) ? "Ada / Parsel" : "Bağımsız Bölüm"
-              }
-              value={isLandDetailType(unit.type) ? formatAdaParselValue(unit) : unit.number || "—"}
-            />
-            <InfoRow label="Kayıt" value={formatDate(unit.createdAt)} />
-          </div>
-        </section>
-
-        <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[#EFF6FF] text-[#1557D6]">
-              <CircleUserRound size={22} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="break-words text-[13px] font-black leading-5 text-[#06194A]">
-                {ownerName || "Kullanıcı bilgisi yok"}
-              </p>
-              <p className="mt-0.5 break-words text-[11px] font-bold leading-4 text-[#64748B]">
-                {unit.project?.owner?.role || "Danışman / Sahip"}
-              </p>
-            </div>
-            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700">
-              Güven
-            </span>
-          </div>
-
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <TrustRow label="Tapu" active={Boolean(unit.tapuVerified)} />
-            <TrustRow
-              label="Fotoğraf"
-              active={Boolean(unit.photoVerified || galleryImages.length > 0)}
-            />
-            <TrustRow
-              label="Yetki"
-              active={Boolean(unit.yetkiVerified || unit.isVerified)}
-            />
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Link
-              href="/messages"
-              className="flex h-10 items-center justify-center gap-2 rounded-[16px] bg-[#06194A] text-[12px] font-black text-white"
-            >
-              <MessageCircle size={16} /> Mesaj
-            </Link>
-            <button
-              onClick={handleOpenShareModal}
-              className="flex h-10 items-center justify-center gap-2 rounded-[16px] border border-[#DDE7F3] bg-white text-[12px] font-black text-[#1557D6]"
-            >
-              <Share2 size={16} /> Kart
+              Kart
             </button>
           </div>
         </section>
 
         {canEditPortfolio && (
-          <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-            <div className="flex items-center justify-center gap-2 text-[#1557D6]">
-              <Camera size={17} />
-              <h2 className="text-[16px] font-black text-[#06194A]">
-                Fotoğraf Yönetimi
-              </h2>
-            </div>
-
-            <p className="mx-auto mt-1 max-w-[320px] text-center text-[11px] font-bold leading-5 text-[#64748B]">
-              Fotoğrafları galeriye ekleyin. Kapak görseli galeriden seçilir; ayrı kapak yükleme yoktur.
-            </p>
-
-            <button
-              type="button"
-              onClick={() => galleryInputRef.current?.click()}
-              disabled={
-                imageUploadLoading === "gallery" ||
-                galleryImages.length >= MAX_GALLERY_COUNT
-              }
-              className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[16px] bg-[#1557D6] px-3 text-[12px] font-black text-white disabled:opacity-60"
-            >
-              <Upload size={16} />
-              {imageUploadLoading === "gallery"
-                ? "Fotoğraf yükleniyor..."
-                : `Fotoğraf Ekle (${galleryImages.length}/${MAX_GALLERY_COUNT})`}
-            </button>
-
-            {galleryImages.length === 0 ? (
-              <div className="mt-3 rounded-[18px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] px-3 py-4 text-center text-[11px] font-bold leading-5 text-[#64748B]">
-                Bu portföyde henüz fotoğraf yok. İlk eklenen fotoğraf otomatik kapak görseli olarak kullanılacaktır.
-              </div>
-            ) : (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {galleryImages.map((photo, index) => {
-                  const loadingCover = imageActionLoading === `cover-${photo.id}`;
-                  const loadingDelete = imageActionLoading === `delete-${photo.id}`;
-                  const loadingMove = imageActionLoading === `move-${photo.id}`;
-                  const deleteDisabled = Boolean(
-                    loadingDelete ||
-                      loadingMove ||
-                      loadingCover ||
-                      (photo.isCover && galleryImages.length > 1),
-                  );
-
-                  return (
-                    <div
-                      key={photo.id || photo.displayUrl}
-                      className={`overflow-hidden rounded-[18px] border bg-[#FBFDFF] text-left ${
-                        photo.isCover
-                          ? "border-emerald-200 ring-2 ring-emerald-50"
-                          : "border-[#DDE7F3]"
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setActivePhoto(index)}
-                        className="relative h-[104px] w-full overflow-hidden bg-[#EEF5FF]"
-                      >
-                        <img
-                          src={photo.displayUrl}
-                          alt={`Portföy fotoğrafı ${index + 1}`}
-                          className="h-full w-full object-cover"
-                        />
-                        <span
-                          className={`absolute left-2 top-2 rounded-full px-2 py-1 text-[9px] font-black text-white ${
-                            photo.isCover ? "bg-emerald-600" : "bg-[#06194A]/80"
-                          }`}
-                        >
-                          {photo.isCover ? "Kapak" : `Foto ${index + 1}`}
-                        </span>
-                      </button>
-
-                      <div className="p-2">
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleSetCoverImage(photo.id)}
-                            disabled={Boolean(photo.isCover || loadingCover || loadingMove || loadingDelete)}
-                            className="min-h-[34px] rounded-[12px] bg-emerald-50 px-2 text-[10px] font-black text-emerald-700 disabled:bg-slate-100 disabled:text-slate-400"
-                          >
-                            {loadingCover ? "..." : photo.isCover ? "Kapak" : "Kapak Yap"}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (photo.isCover && galleryImages.length > 1) {
-                                setActionError("Kapak fotoğrafını silmeden önce başka bir fotoğrafı kapak yapın.");
-                                return;
-                              }
-                              if (confirm("Bu fotoğraf silinsin mi?")) handleDeleteImage(photo.id);
-                            }}
-                            disabled={deleteDisabled && !(photo.isCover && galleryImages.length > 1)}
-                            className="min-h-[34px] rounded-[12px] bg-rose-50 px-2 text-[10px] font-black text-rose-700 disabled:bg-slate-100 disabled:text-slate-400"
-                          >
-                            {loadingDelete ? "..." : "Sil"}
-                          </button>
-                        </div>
-
-                        <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleMoveImage(photo.id, "up")}
-                            disabled={index === 0 || loadingMove}
-                            className="min-h-[30px] rounded-[12px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#1557D6] disabled:opacity-40"
-                          >
-                            ↑ Sola
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleMoveImage(photo.id, "down")}
-                            disabled={index === galleryImages.length - 1 || loadingMove}
-                            className="min-h-[30px] rounded-[12px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#1557D6] disabled:opacity-40"
-                          >
-                            Sağa ↓
-                          </button>
-                        </div>
-
-                        {photo.isCover && (
-                          <p className="mt-1.5 text-center text-[9px] font-black text-emerald-700">
-                            Listede ve paylaşım kartında bu görsel kullanılır.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        )}
-
-        {canEditPortfolio && (
-          <section className="mt-3 rounded-[22px] border border-rose-100 bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+          <section className="mx-5 mt-4 rounded-[24px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_16px_34px_rgba(15,23,42,0.07)]">
             <div className="grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={() => router.push(`/portfoy?edit=${unit.id}`)}
-                className="h-10 w-full rounded-[16px] bg-[#EFF6FF] text-[12px] font-black text-[#1557D6]"
+                className="min-h-[46px] rounded-[16px] bg-[#EFF6FF] text-[12px] font-black text-[#1557D6] active:scale-[0.98]"
               >
                 Güncelle
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setActionError("");
                   setDeleteOpen(true);
                 }}
-                className="h-10 w-full rounded-[16px] bg-rose-50 text-[12px] font-black text-rose-700"
+                className="min-h-[46px] rounded-[16px] bg-rose-50 text-[12px] font-black text-rose-700 active:scale-[0.98]"
               >
                 Sil
               </button>
@@ -1803,7 +1571,7 @@ export default function StokDetailPage() {
               </button>
             </div>
             <div
-              className="relative min-h-0 flex-1 overflow-hidden rounded-[32px] bg-black"
+              className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[32px] bg-transparent"
               onTouchStart={(event) =>
                 setTouchStartX(event.touches[0]?.clientX || null)
               }
@@ -1812,7 +1580,7 @@ export default function StokDetailPage() {
               <img
                 src={activeGalleryImage}
                 alt="Büyük portföy fotoğrafı"
-                className="h-full w-full object-contain"
+                className="max-h-[calc(100dvh-190px)] w-full rounded-[24px] object-contain"
               />
               {galleryImages.length > 1 && (
                 <>
@@ -2118,6 +1886,8 @@ function PortfolioApprovalCenter({
 }) {
   const approvalStatus = String(unit.approvalStatus || "TASLAK");
   const poolVisible = Boolean(unit.isPoolVisible || approvalStatus === "HAVUZDA");
+  const score = calculatePortfolioScore(unit);
+  const scoreLabel = getPortfolioScoreLabel(score);
 
   const statusConfig: Record<
     string,
@@ -2160,20 +1930,6 @@ function PortfolioApprovalCenter({
     },
   };
 
-  const steps = [
-    { key: "TASLAK", label: "Taslak" },
-    { key: "BELGE_BEKLENIYOR", label: "Belge" },
-    { key: "INCELEMEDE", label: "İnceleme" },
-    { key: "ONAYLANDI", label: "Onay" },
-    { key: "HAVUZDA", label: "Havuz" },
-  ];
-
-  const normalizedStepStatus =
-    approvalStatus === "INCELEMEYE_GONDERILDI" ? "INCELEMEDE" : approvalStatus;
-  const currentStepIndex = steps.findIndex(
-    (step) => step.key === normalizedStepStatus,
-  );
-
   const summaryItems = [
     {
       label: "Yetki",
@@ -2184,7 +1940,7 @@ function PortfolioApprovalCenter({
       active: Boolean(unit.tapuVerified),
     },
     {
-      label: "Foto",
+      label: "Fotoğraf",
       active: Boolean(unit.photoVerified || galleryImageCount > 0),
     },
     {
@@ -2200,19 +1956,16 @@ function PortfolioApprovalCenter({
     "min-h-[38px] rounded-[14px] px-2 text-[10px] font-black disabled:opacity-60";
 
   return (
-    <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-      <div className="flex flex-col items-center justify-center gap-2 text-center">
-        <div className="min-w-0 text-center">
-          <p className="text-center text-[9px] font-black uppercase tracking-[0.18em] text-[#64748B]">
-            Onay Merkezi
-          </p>
-          <h2 className="mt-0.5 break-words text-center text-[15px] font-black leading-[18px] text-[#06194A]">
-            Portföy Kontrol Paneli
-          </h2>
-        </div>
-
+    <section className="mt-3 rounded-[22px] border border-[#C7D6E8] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.055)]">
+      <div className="flex flex-col items-center justify-center gap-1 text-center">
+        <p className="text-center text-[10px] font-black uppercase tracking-[0.20em] text-[#1557D6]">
+          Portföy Kalitesi
+        </p>
+        <h2 className="break-words text-center text-[18px] font-black leading-[22px] text-[#06194A]">
+          {score}/100 · {scoreLabel}
+        </h2>
         <span
-          className={`inline-flex shrink-0 items-center justify-center rounded-full px-3 py-1.5 text-center text-[10px] font-black ${currentStatusConfig.className}`}
+          className={`mt-1 inline-flex shrink-0 items-center justify-center rounded-full px-3 py-1.5 text-center text-[10px] font-black ${currentStatusConfig.className}`}
         >
           {currentStatusConfig.label}
         </span>
@@ -2222,10 +1975,10 @@ function PortfolioApprovalCenter({
         {summaryItems.map((item) => (
           <div
             key={item.label}
-            className={`rounded-[14px] px-1.5 py-2 text-center ${
+            className={`rounded-[14px] border px-1.5 py-2 text-center ${
               item.active
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-[#F7FBFF] text-[#64748B]"
+                ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+                : "border-[#E8F0FA] bg-[#F7FBFF] text-[#64748B]"
             }`}
           >
             <p className="text-[9px] font-black">{item.label}</p>
@@ -2234,31 +1987,6 @@ function PortfolioApprovalCenter({
             </p>
           </div>
         ))}
-      </div>
-
-      <div className="mt-3 rounded-[16px] bg-[#F7FBFF] px-2 py-2">
-        <div className="grid grid-cols-5 gap-1">
-          {steps.map((step, index) => {
-            const active = currentStepIndex >= 0 && index <= currentStepIndex;
-
-            return (
-              <div key={step.key} className="text-center">
-                <div
-                  className={`mx-auto h-2.5 w-2.5 rounded-full ${
-                    active ? "bg-[#1557D6]" : "bg-slate-300"
-                  }`}
-                />
-                <p
-                  className={`mt-1 break-words text-[8px] font-black leading-3 ${
-                    active ? "text-[#1557D6]" : "text-[#94A3B8]"
-                  }`}
-                >
-                  {step.label}
-                </p>
-              </div>
-            );
-          })}
-        </div>
       </div>
 
       {unit.approvalNote && (
@@ -2325,28 +2053,48 @@ function InfoBox({
   icon,
   label,
   value,
+  index,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
+  index?: number;
 }) {
-  const passive = value === "—" || value === "Eklenmedi" || value === "Kontrol";
+  const rightBorder = index == null || index % 4 !== 3;
+  const bottomBorder = index == null || index < 4;
 
   return (
     <div
-      className={`flex min-h-[74px] flex-col items-center justify-center rounded-[14px] border px-1 py-2 text-center shadow-[0_6px_14px_rgba(15,23,42,0.035)] ${
-        passive
-          ? "border-[#E8F0FA] bg-white text-[#64748B]"
-          : "border-[#DBEAFE] bg-white text-[#06194A]"
-      }`}
+      className={`flex min-h-[86px] flex-col items-center justify-center px-1.5 py-3 text-center text-[#06194A] ${rightBorder ? "border-r border-[#DDE7F3]" : ""} ${bottomBorder ? "border-b border-[#DDE7F3]" : ""}`}
     >
-      <div className={passive ? "text-[#94A3B8]" : "text-[#1557D6]"}>{icon}</div>
-      <p className="mt-1 text-[7.5px] font-black uppercase leading-3 tracking-[0.08em] text-[#64748B]">
-        {label}
-      </p>
-      <p className="mt-0.5 break-words text-[11px] font-black leading-tight">
+      <div className="text-[#1557D6] [&_svg]:h-[22px] [&_svg]:w-[22px]">{icon}</div>
+      <p className="mt-2 break-words text-[18px] font-black leading-[20px] tracking-[-0.04em]">
         {value}
       </p>
+      <p className="mt-1 break-words text-[9px] font-black uppercase leading-3 tracking-[0.06em] text-[#64748B]">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function CenteredSectionTitle({
+  icon,
+  title,
+}: {
+  icon: ReactNode;
+  title: string;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-3 text-center">
+      <span className="h-px min-w-[42px] flex-1 bg-[#DDE7F3]" />
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1557D6] text-white shadow-[0_10px_20px_rgba(21,87,214,0.22)]">
+        {icon}
+      </span>
+      <h2 className="shrink-0 text-center text-[18px] font-black uppercase tracking-[0.02em] text-[#06194A]">
+        {title}
+      </h2>
+      <span className="h-px min-w-[42px] flex-1 bg-[#DDE7F3]" />
     </div>
   );
 }
