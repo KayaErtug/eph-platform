@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   useEffect,
@@ -83,54 +83,54 @@ const DOCUMENT_LABELS: Record<PortfolioAuthorityType, string> = {
   YETKI_BELGESI: "Yetki Belgesi",
   TAPU: "Tapu",
   TAPU_SAHIBI_KIMLIK: "Tapu Sahibi Kimlik Belgesi",
-  KAT_KARSILIGI_SOZLESMESI: "Kat Karşılığı Sözleşmesi",
-  DIGER_DOGRULAMA_EVRAKI: "Diğer Evrak",
+  KAT_KARSILIGI_SOZLESMESI: "Kat KarÅŸÄ±lÄ±ÄŸÄ± SÃ¶zleÅŸmesi",
+  DIGER_DOGRULAMA_EVRAKI: "DiÄŸer Evrak",
 };
 
 const DOCUMENT_ACCEPT = "application/pdf,image/jpeg,image/png,image/webp";
 
 
 const FEATURE_LABELS: Record<string, string> = {
-  ASANSOR: "Asansör",
-  KAPALI_OTOPARK: "Kapalı Otopark",
-  ACIK_OTOPARK: "Açık Otopark",
-  GUVENLIK: "Güvenlik",
-  SITE_ICERISINDE: "Site İçerisinde",
-  JENERATOR: "Jeneratör",
-  YANGIN_MERDIVENI: "Yangın Merdiveni",
+  ASANSOR: "AsansÃ¶r",
+  KAPALI_OTOPARK: "KapalÄ± Otopark",
+  ACIK_OTOPARK: "AÃ§Ä±k Otopark",
+  GUVENLIK: "GÃ¼venlik",
+  SITE_ICERISINDE: "Site Ä°Ã§erisinde",
+  JENERATOR: "JeneratÃ¶r",
+  YANGIN_MERDIVENI: "YangÄ±n Merdiveni",
   KAMERA_SISTEMI: "Kamera Sistemi",
   SU_DEPOSU: "Su Deposu",
   HIDROFOR: "Hidrofor",
-  FIBER_INTERNET: "Fiber İnternet",
+  FIBER_INTERNET: "Fiber Ä°nternet",
   EBEVEYN_BANYOSU: "Ebeveyn Banyosu",
   BALKON: "Balkon",
   TERAS: "Teras",
   KILER: "Kiler",
-  GIYINME_ODASI: "Giyinme Odası",
+  GIYINME_ODASI: "Giyinme OdasÄ±",
   ANKASTRE_MUTFAK: "Ankastre Mutfak",
-  AKILLI_EV: "Akıllı Ev Sistemi",
-  SOMINE: "Şömine",
+  AKILLI_EV: "AkÄ±llÄ± Ev Sistemi",
+  SOMINE: "ÅÃ¶mine",
   KLIMA: "Klima",
-  ISI_YALITIMI: "Isı Yalıtımı",
-  SES_YALITIMI: "Ses Yalıtımı",
-  DENIZ_MANZARASI: "Deniz Manzarası",
-  DOGA_MANZARASI: "Doğa Manzarası",
-  SEHIR_MANZARASI: "Şehir Manzarası",
-  YUKLEME_RAMPASI: "Yükleme Rampası",
-  TIR_GIRISI: "TIR Girişi",
-  VINC_SISTEMI: "Vinç Sistemi",
-  SANAYI_ELEKTRIGI: "Sanayi Elektriği",
-  FORKLIFT_ALANI: "Forklift Alanı",
-  DEPOLAMA_ALANI: "Depolama Alanı",
-  YANGIN_SONDURME_SISTEMI: "Yangın Söndürme Sistemi",
-  YOLU_ACIK: "Yolu Açık",
+  ISI_YALITIMI: "IsÄ± YalÄ±tÄ±mÄ±",
+  SES_YALITIMI: "Ses YalÄ±tÄ±mÄ±",
+  DENIZ_MANZARASI: "Deniz ManzarasÄ±",
+  DOGA_MANZARASI: "DoÄŸa ManzarasÄ±",
+  SEHIR_MANZARASI: "Åehir ManzarasÄ±",
+  YUKLEME_RAMPASI: "YÃ¼kleme RampasÄ±",
+  TIR_GIRISI: "TIR GiriÅŸi",
+  VINC_SISTEMI: "VinÃ§ Sistemi",
+  SANAYI_ELEKTRIGI: "Sanayi ElektriÄŸi",
+  FORKLIFT_ALANI: "Forklift AlanÄ±",
+  DEPOLAMA_ALANI: "Depolama AlanÄ±",
+  YANGIN_SONDURME_SISTEMI: "YangÄ±n SÃ¶ndÃ¼rme Sistemi",
+  YOLU_ACIK: "Yolu AÃ§Ä±k",
   KADASTRO_YOLU: "Kadastro Yolu Var",
   ELEKTRIK_VAR: "Elektrik Var",
   SU_VAR: "Su Var",
   SONDAJ_VAR: "Sondaj Var",
-  CEVRILI: "Çevrili",
-  KOSE_PARSEL: "Köşe Parsel",
-  IFRAZLI: "İfrazlı",
+  CEVRILI: "Ã‡evrili",
+  KOSE_PARSEL: "KÃ¶ÅŸe Parsel",
+  IFRAZLI: "Ä°frazlÄ±",
   HISSELI: "Hisseli",
 };
 
@@ -149,10 +149,10 @@ function unitHasFeature(unit: DetailUnit, codes: string[]) {
 
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
-  TRY: "₺",
+  TRY: "â‚º",
   USD: "$",
-  EUR: "€",
-  GBP: "£",
+  EUR: "â‚¬",
+  GBP: "Â£",
 };
 
 function getUnitImages(unit?: DetailUnit | null) {
@@ -185,7 +185,7 @@ function getUnitCoverImage(unit?: DetailUnit | null) {
 function formatMoney(value?: number, currency?: string) {
   const numeric = Number(value || 0);
   if (!numeric) return "Fiyat belirtilmedi";
-  const symbol = CURRENCY_SYMBOLS[currency || "TRY"] || "₺";
+  const symbol = CURRENCY_SYMBOLS[currency || "TRY"] || "â‚º";
   return `${numeric.toLocaleString("tr-TR")} ${symbol}`;
 }
 
@@ -196,7 +196,7 @@ function formatFloorInfo(
   const floorText =
     unit.floorLabel ||
     (unit.floor != null ? `${unit.floor}. Kat` : "Kat bilgisi yok");
-  const totalText = unit.totalFloors ? `${unit.totalFloors} Katlı` : "";
+  const totalText = unit.totalFloors ? `${unit.totalFloors} KatlÄ±` : "";
   return totalText ? `${floorText} / ${totalText}` : floorText;
 }
 
@@ -225,18 +225,18 @@ function statusLabel(status?: string) {
 }
 
 function typeLabel(type?: string) {
-  return TYPE_LABELS[type || ""] || type || "Mülk tipi yok";
+  return TYPE_LABELS[type || ""] || type || "MÃ¼lk tipi yok";
 }
 
 function normalizeDetailType(value?: string) {
   return String(value || "")
     .toLocaleUpperCase("tr-TR")
-    .replaceAll("İ", "I")
-    .replaceAll("Ğ", "G")
-    .replaceAll("Ü", "U")
-    .replaceAll("Ş", "S")
-    .replaceAll("Ö", "O")
-    .replaceAll("Ç", "C");
+    .replaceAll("Ä°", "I")
+    .replaceAll("Ä", "G")
+    .replaceAll("Ãœ", "U")
+    .replaceAll("Å", "S")
+    .replaceAll("Ã–", "O")
+    .replaceAll("Ã‡", "C");
 }
 
 function detailTypeHasKeyword(type: string | undefined, keywords: string[]) {
@@ -290,7 +290,7 @@ function isCommercialDetailType(type?: string) {
   ]);
 }
 
-function getDetailValue(unit: DetailUnit, keys: string[], fallback = "—") {
+function getDetailValue(unit: DetailUnit, keys: string[], fallback = "â€”") {
   const source = unit as any;
 
   for (const key of keys) {
@@ -314,13 +314,13 @@ function formatAdaParselValue(unit?: DetailUnit | null) {
   if (parselNo) return `Parsel ${parselNo}`;
   if (legacyNumber) return legacyNumber;
 
-  return "—";
+  return "â€”";
 }
 
-function formatAreaValue(value?: number | string | null, fallback = "—") {
+function formatAreaValue(value?: number | string | null, fallback = "â€”") {
   const numeric = Number(value || 0);
   if (!numeric) return fallback;
-  return `${numeric.toLocaleString("tr-TR")} m²`;
+  return `${numeric.toLocaleString("tr-TR")} mÂ²`;
 }
 
 function getAuthorityKind(unit: DetailUnit, documents: PortfolioAuthorityDocument[]) {
@@ -328,9 +328,9 @@ function getAuthorityKind(unit: DetailUnit, documents: PortfolioAuthorityDocumen
 
   if (approvedDocument?.authorityType === "YETKI_BELGESI") return "Yetki Belgesi";
   if (approvedDocument?.authorityType === "TAPU") return "Tapu Sahibi";
-  if (approvedDocument?.authorityType === "TAPU_SAHIBI_KIMLIK") return "Kimlik Evrakı";
-  if (approvedDocument?.authorityType === "KAT_KARSILIGI_SOZLESMESI") return "Kat Karşılığı";
-  if (approvedDocument?.authorityType === "DIGER_DOGRULAMA_EVRAKI") return "Diğer Evrak";
+  if (approvedDocument?.authorityType === "TAPU_SAHIBI_KIMLIK") return "Kimlik EvrakÄ±";
+  if (approvedDocument?.authorityType === "KAT_KARSILIGI_SOZLESMESI") return "Kat KarÅŸÄ±lÄ±ÄŸÄ±";
+  if (approvedDocument?.authorityType === "DIGER_DOGRULAMA_EVRAKI") return "DiÄŸer Evrak";
 
   if (unit.yetkiVerified || unit.isVerified) return "Yetki Belgesi";
   if (unit.tapuVerified) return "Tapu Sahibi";
@@ -350,7 +350,7 @@ function isDisplayableDetailValue(value?: string | number | null) {
   if (!normalized) return false;
 
   const blockedValues = [
-    "—",
+    "â€”",
     "-",
     "Eklenmedi",
     "Kontrol",
@@ -395,14 +395,14 @@ function getPrimaryInfoBoxes(
 
   if (isIndustrialDetailType(unit.type)) {
     return cleanInfoBoxes([
-      { icon: <Factory size={18} />, label: "Kapalı Alan", value: formatAreaValue(unit.area, "") },
-      { icon: <Ruler size={18} />, label: "Açık Alan", value: getDetailValue(unit, ["openArea"], "") },
-      { icon: <Factory size={18} />, label: "Üretim", value: getDetailValue(unit, ["productionArea", "usageType"], "") },
+      { icon: <Factory size={18} />, label: "KapalÄ± Alan", value: formatAreaValue(unit.area, "") },
+      { icon: <Ruler size={18} />, label: "AÃ§Ä±k Alan", value: getDetailValue(unit, ["openArea"], "") },
+      { icon: <Factory size={18} />, label: "Ãœretim", value: getDetailValue(unit, ["productionArea", "usageType"], "") },
       { icon: <Zap size={18} />, label: "Trafo", value: getDetailValue(unit, ["transformerPower", "electricPower"], "") },
-      { icon: <Truck size={18} />, label: "Yükleme", value: getDetailValue(unit, ["loadingArea", "truckEntrance"], "") },
+      { icon: <Truck size={18} />, label: "YÃ¼kleme", value: getDetailValue(unit, ["loadingArea", "truckEntrance"], "") },
       { icon: <Building2 size={18} />, label: "Tavan", value: getDetailValue(unit, ["ceilingHeight"], "") },
-      { icon: <Flame size={18} />, label: "Isıtma", value: heatingValue },
-      { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
+      { icon: <Flame size={18} />, label: "IsÄ±tma", value: heatingValue },
+      { icon: <ShieldCheck size={18} />, label: "Yetki TÃ¼rÃ¼", value: authorityValue },
     ]);
   }
 
@@ -411,37 +411,37 @@ function getPrimaryInfoBoxes(
       { icon: <BedDouble size={18} />, label: "Oda", value: unit.roomCount || getDetailValue(unit, ["roomTotal"], "") },
       { icon: <BedDouble size={18} />, label: "Yatak", value: getDetailValue(unit, ["bedCount"], "") },
       { icon: <Waves size={18} />, label: "Havuz", value: getDetailValue(unit, ["pool", "hasPool"], "") },
-      { icon: <Star size={18} />, label: "Sınıf", value: getDetailValue(unit, ["hotelClass", "starRating"], "") },
+      { icon: <Star size={18} />, label: "SÄ±nÄ±f", value: getDetailValue(unit, ["hotelClass", "starRating"], "") },
       { icon: <Utensils size={18} />, label: "Restoran", value: getDetailValue(unit, ["restaurant", "hasRestaurant"], "") },
       { icon: <Car size={18} />, label: "Otopark", value: parkingValue },
       { icon: <Maximize2 size={18} />, label: "Alan", value: formatAreaValue(unit.area, "") },
-      { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
+      { icon: <ShieldCheck size={18} />, label: "Yetki TÃ¼rÃ¼", value: authorityValue },
     ]);
   }
 
   if (isLandDetailType(unit.type)) {
     return cleanInfoBoxes([
       { icon: <Maximize2 size={18} />, label: "Alan", value: formatAreaValue(unit.area, "") },
-      { icon: <Landmark size={18} />, label: "İmar", value: getDetailValue(unit, ["zoningStatus", "imarDurumu"], "") },
+      { icon: <Landmark size={18} />, label: "Ä°mar", value: getDetailValue(unit, ["zoningStatus", "imarDurumu"], "") },
       { icon: <Home size={18} />, label: "Ada / Parsel", value: formatAdaParselValue(unit) },
       { icon: <Ruler size={18} />, label: "Emsal", value: getDetailValue(unit, ["kaks", "emsal"], "") },
-      { icon: <Building2 size={18} />, label: "Kat İzni", value: getDetailValue(unit, ["allowedFloors", "katIzni"], "") },
+      { icon: <Building2 size={18} />, label: "Kat Ä°zni", value: getDetailValue(unit, ["allowedFloors", "katIzni"], "") },
       { icon: <MapPin size={18} />, label: "Cephe", value: getDetailValue(unit, ["frontage", "yolaCephe"], "") },
-      { icon: <Zap size={18} />, label: "Altyapı", value: getDetailValue(unit, ["infrastructure", "altyapi"], "") },
-      { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
+      { icon: <Zap size={18} />, label: "AltyapÄ±", value: getDetailValue(unit, ["infrastructure", "altyapi"], "") },
+      { icon: <ShieldCheck size={18} />, label: "Yetki TÃ¼rÃ¼", value: authorityValue },
     ]);
   }
 
   if (isCommercialDetailType(unit.type)) {
     return cleanInfoBoxes([
-      { icon: <Maximize2 size={18} />, label: "m²", value: formatAreaValue(unit.area, "") },
+      { icon: <Maximize2 size={18} />, label: "mÂ²", value: formatAreaValue(unit.area, "") },
       { icon: <Building2 size={18} />, label: "Kat", value: floorValue },
       { icon: <Home size={18} />, label: "Cephe", value: getDetailValue(unit, ["frontage", "cephe"], "") },
       { icon: <MapPin size={18} />, label: "Cadde", value: getDetailValue(unit, ["streetStatus", "cadde"], "") },
       { icon: <Car size={18} />, label: "Otopark", value: parkingValue },
-      { icon: <Flame size={18} />, label: "Isınma", value: heatingValue },
+      { icon: <Flame size={18} />, label: "IsÄ±nma", value: heatingValue },
       { icon: <Building2 size={18} />, label: "Depo", value: getDetailValue(unit, ["warehouse", "storageArea"], "") },
-      { icon: <ShieldCheck size={18} />, label: "Yetki Türü", value: authorityValue },
+      { icon: <ShieldCheck size={18} />, label: "Yetki TÃ¼rÃ¼", value: authorityValue },
     ]);
   }
 
@@ -453,9 +453,9 @@ function getPrimaryInfoBoxes(
   const smartParkingValue =
     parkingValue ||
     (unitHasFeature(unit, ["KAPALI_OTOPARK"])
-      ? "Kapalı"
+      ? "KapalÄ±"
       : unitHasFeature(unit, ["ACIK_OTOPARK"])
-        ? "Açık"
+        ? "AÃ§Ä±k"
         : "");
   const bathroomValue = getDetailValue(
     unit,
@@ -464,25 +464,25 @@ function getPrimaryInfoBoxes(
   );
 
   return cleanInfoBoxes([
-    { icon: <BedDouble size={20} />, label: "Oda Sayısı", value: unit.roomCount || "" },
-    { icon: <Maximize2 size={20} />, label: "Brüt Alan", value: formatAreaValue(unit.area, "") },
-    { icon: <Building2 size={20} />, label: "Bulunduğu Kat", value: floorValue },
-    { icon: <Building2 size={20} />, label: "Bina Yaşı", value: buildingAgeValue },
+    { icon: <BedDouble size={20} />, label: "Oda SayÄ±sÄ±", value: unit.roomCount || "" },
+    { icon: <Maximize2 size={20} />, label: "BrÃ¼t Alan", value: formatAreaValue(unit.area, "") },
+    { icon: <Building2 size={20} />, label: "BulunduÄŸu Kat", value: floorValue },
+    { icon: <Building2 size={20} />, label: "Bina YaÅŸÄ±", value: buildingAgeValue },
     { icon: <Waves size={20} />, label: "Banyo", value: bathroomValue },
     { icon: <Home size={20} />, label: "Balkon", value: balconyValue },
     { icon: <Car size={20} />, label: "Otopark", value: smartParkingValue },
-    { icon: <Flame size={20} />, label: "Isınma", value: heatingValue },
+    { icon: <Flame size={20} />, label: "IsÄ±nma", value: heatingValue },
     { icon: <Building2 size={20} />, label: "Toplam Kat", value: totalFloorsValue },
-    { icon: <ShieldCheck size={20} />, label: "Yetki Türü", value: authorityValue },
+    { icon: <ShieldCheck size={20} />, label: "Yetki TÃ¼rÃ¼", value: authorityValue },
   ]).slice(0, 8);
 }
 
 function unitTitle(unit?: DetailUnit | null) {
-  if (!unit) return "Portföy Detayı";
-  const projectName = unit.project?.name || "EPH Portföy";
+  if (!unit) return "PortfÃ¶y DetayÄ±";
+  const projectName = unit.project?.name || "EPH PortfÃ¶y";
   const room = unit.roomCount ? `${unit.roomCount} ` : "";
   const type = typeLabel(unit.type);
-  return `${projectName} · ${room}${type}`;
+  return `${projectName} Â· ${room}${type}`;
 }
 
 function isUnitVerified(unit?: DetailUnit | null) {
@@ -510,9 +510,9 @@ function calculatePortfolioScore(unit?: DetailUnit | null) {
 
 function getPortfolioScoreLabel(score: number) {
   if (score >= 90) return "Pekiyi";
-  if (score >= 80) return "Çok İyi";
-  if (score >= 70) return "İyi";
-  if (score >= 60) return "Geliştirilebilir";
+  if (score >= 80) return "Ã‡ok Ä°yi";
+  if (score >= 70) return "Ä°yi";
+  if (score >= 60) return "GeliÅŸtirilebilir";
   return "Eksik";
 }
 
@@ -605,13 +605,13 @@ function makeShareText(unit: DetailUnit) {
   return [
     unitTitle(unit),
     location,
-    unit.area ? `${unit.area} m²` : "",
+    unit.area ? `${unit.area} mÂ²` : "",
     unit.roomCount || "",
     formatMoney(unit.price, unit.priceCurrency),
     getCurrentShareUrl(unit.id),
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(" Â· ");
 }
 
 export default function StokDetailPage() {
@@ -672,7 +672,7 @@ export default function StokDetailPage() {
       setUnit(response.data);
       await fetchPortfolioDocuments(String(unitId));
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Portföy detayı yüklenemedi.");
+      setError(err?.response?.data?.message || "PortfÃ¶y detayÄ± yÃ¼klenemedi.");
     } finally {
       setLoading(false);
     }
@@ -727,8 +727,8 @@ export default function StokDetailPage() {
   const calculatedSquareMeterPrice = useMemo(() => {
     const price = Number(unit?.price || 0);
     const area = Number(unit?.area || 0);
-    if (!price || !area) return "—";
-    return `${Math.round(price / area).toLocaleString("tr-TR")} ₺/m²`;
+    if (!price || !area) return "â€”";
+    return `${Math.round(price / area).toLocaleString("tr-TR")} â‚º/mÂ²`;
   }, [unit]);
 
   const locationText =
@@ -772,15 +772,15 @@ export default function StokDetailPage() {
       /\.(jpg|jpeg|png|webp|heic|heif)$/i.test(fileName);
 
     if (!isAllowedType) {
-      return "Sadece JPG, PNG veya WEBP formatında görsel yükleyebilirsiniz.";
+      return "Sadece JPG, PNG veya WEBP formatÄ±nda gÃ¶rsel yÃ¼kleyebilirsiniz.";
     }
 
     if (file.size > 15 * 1024 * 1024) {
-      return `Yüklediğiniz görsel dosyası çok büyük. Her bir görsel en fazla 15 MB olabilir. Seçilen görsel: ${(file.size / (1024 * 1024)).toFixed(1)} MB.`;
+      return `YÃ¼klediÄŸiniz gÃ¶rsel dosyasÄ± Ã§ok bÃ¼yÃ¼k. Her bir gÃ¶rsel en fazla 15 MB olabilir. SeÃ§ilen gÃ¶rsel: ${(file.size / (1024 * 1024)).toFixed(1)} MB.`;
     }
 
     if (file.size < 20 * 1024) {
-      return "Seçtiğiniz görsel çok küçük görünüyor. Lütfen daha kaliteli bir görsel yükleyiniz.";
+      return "SeÃ§tiÄŸiniz gÃ¶rsel Ã§ok kÃ¼Ã§Ã¼k gÃ¶rÃ¼nÃ¼yor. LÃ¼tfen daha kaliteli bir gÃ¶rsel yÃ¼kleyiniz.";
     }
 
     return "";
@@ -819,7 +819,7 @@ export default function StokDetailPage() {
     } catch (err: any) {
       setActionError(
         err?.response?.data?.message ||
-          "Görsel yüklenemedi. Lütfen dosya formatını ve boyutunu kontrol ediniz.",
+          "GÃ¶rsel yÃ¼klenemedi. LÃ¼tfen dosya formatÄ±nÄ± ve boyutunu kontrol ediniz.",
       );
     } finally {
       setImageUploadLoading("");
@@ -839,7 +839,7 @@ export default function StokDetailPage() {
 
     if (remaining <= 0) {
       setActionError(
-        `En fazla ${MAX_GALLERY_COUNT} galeri fotoğrafı yükleyebilirsiniz.`,
+        `En fazla ${MAX_GALLERY_COUNT} galeri fotoÄŸrafÄ± yÃ¼kleyebilirsiniz.`,
       );
       return;
     }
@@ -856,7 +856,7 @@ export default function StokDetailPage() {
 
     if (files.length > remaining) {
       setActionError(
-        `En fazla ${MAX_GALLERY_COUNT} galeri fotoğrafı yükleyebilirsiniz. Fazla seçilen görseller eklenmedi.`,
+        `En fazla ${MAX_GALLERY_COUNT} galeri fotoÄŸrafÄ± yÃ¼kleyebilirsiniz. Fazla seÃ§ilen gÃ¶rseller eklenmedi.`,
       );
     }
   };
@@ -871,7 +871,7 @@ export default function StokDetailPage() {
       await fetchUnit();
     } catch (err: any) {
       setActionError(
-        err?.response?.data?.message || "Kapak fotoğrafı değiştirilemedi.",
+        err?.response?.data?.message || "Kapak fotoÄŸrafÄ± deÄŸiÅŸtirilemedi.",
       );
     } finally {
       setImageActionLoading("");
@@ -887,7 +887,7 @@ export default function StokDetailPage() {
       await api.delete(`/portfolio-images/${imageId}`);
       await fetchUnit();
     } catch (err: any) {
-      setActionError(err?.response?.data?.message || "Fotoğraf silinemedi.");
+      setActionError(err?.response?.data?.message || "FotoÄŸraf silinemedi.");
     } finally {
       setImageActionLoading("");
     }
@@ -930,7 +930,7 @@ export default function StokDetailPage() {
       await fetchUnit();
     } catch (err: any) {
       setActionError(
-        err?.response?.data?.message || "Fotoğraf sıralaması güncellenemedi.",
+        err?.response?.data?.message || "FotoÄŸraf sÄ±ralamasÄ± gÃ¼ncellenemedi.",
       );
     } finally {
       setImageActionLoading("");
@@ -955,15 +955,15 @@ export default function StokDetailPage() {
       /\.(pdf|jpg|jpeg|png|webp)$/i.test(fileName);
 
     if (!isAllowedType) {
-      return "Sadece PDF, JPG, PNG veya WEBP formatında belge yükleyebilirsiniz.";
+      return "Sadece PDF, JPG, PNG veya WEBP formatÄ±nda belge yÃ¼kleyebilirsiniz.";
     }
 
     if (file.size > 15 * 1024 * 1024) {
-      return `Yüklediğiniz belge çok büyük. Her belge en fazla 15 MB olabilir. Seçilen belge: ${(file.size / (1024 * 1024)).toFixed(1)} MB.`;
+      return `YÃ¼klediÄŸiniz belge Ã§ok bÃ¼yÃ¼k. Her belge en fazla 15 MB olabilir. SeÃ§ilen belge: ${(file.size / (1024 * 1024)).toFixed(1)} MB.`;
     }
 
     if (file.size < 2 * 1024) {
-      return "Seçtiğiniz belge çok küçük görünüyor. Lütfen geçerli bir dosya yükleyiniz.";
+      return "SeÃ§tiÄŸiniz belge Ã§ok kÃ¼Ã§Ã¼k gÃ¶rÃ¼nÃ¼yor. LÃ¼tfen geÃ§erli bir dosya yÃ¼kleyiniz.";
     }
 
     return "";
@@ -1001,7 +1001,7 @@ export default function StokDetailPage() {
     } catch (err: any) {
       setActionError(
         err?.response?.data?.message ||
-          "Belge yüklenemedi. Lütfen dosya formatını ve boyutunu kontrol ediniz.",
+          "Belge yÃ¼klenemedi. LÃ¼tfen dosya formatÄ±nÄ± ve boyutunu kontrol ediniz.",
       );
     } finally {
       setDocumentUploadLoading("");
@@ -1051,7 +1051,7 @@ export default function StokDetailPage() {
     } catch (err: any) {
       setActionError(
         err?.response?.data?.message ||
-          "Portföy incelemeye gönderilemedi. Lütfen belge durumunu kontrol ediniz.",
+          "PortfÃ¶y incelemeye gÃ¶nderilemedi. LÃ¼tfen belge durumunu kontrol ediniz.",
       );
     } finally {
       setApprovalActionLoading("");
@@ -1060,13 +1060,13 @@ export default function StokDetailPage() {
 
   const getPortfolioShareData = (item: DetailUnit): PortfolioShareData => ({
     id: item.id,
-    title: item.project?.name || "EPH Portföy",
+    title: item.project?.name || "EPH PortfÃ¶y",
     location: locationText,
     price: item.price
       ? formatMoney(item.price, item.priceCurrency)
       : "Fiyat bilgisi yok",
-    roomCount: item.roomCount || "—",
-    area: item.area ? `${item.area} m²` : "—",
+    roomCount: item.roomCount || "â€”",
+    area: item.area ? `${item.area} mÂ²` : "â€”",
     floor: formatFloorInfo(item),
     authorization:
       item.yetkiVerified || item.isVerified ? "Yetkili" : "Kontrol",
@@ -1074,25 +1074,25 @@ export default function StokDetailPage() {
     consultantName:
       [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
       ownerName ||
-      "EPH Üyesi",
+      "EPH Ãœyesi",
     consultantPhone: "Telefon bilgisi",
     portfolioNo: getPortfolioNo(item),
     score: portfolioScore,
     scoreLabel: portfolioScoreLabel,
     shortDescription:
-      item.description || "Bu portföy için açıklama henüz eklenmedi.",
+      item.description || "Bu portfÃ¶y iÃ§in aÃ§Ä±klama henÃ¼z eklenmedi.",
     longDescription:
-      item.description || "Bu portföy için detaylı açıklama henüz eklenmedi.",
+      item.description || "Bu portfÃ¶y iÃ§in detaylÄ± aÃ§Ä±klama henÃ¼z eklenmedi.",
     features: [
       {
         icon: "security",
         label:
           item.yetkiVerified || item.isVerified
-            ? "Yetkili Portföy"
+            ? "Yetkili PortfÃ¶y"
             : "Yetki Kontrol",
       },
-      { icon: "smart", label: "Lina Kartı" },
-      { icon: "car", label: "Portföy Kaydı" },
+      { icon: "smart", label: "Lina KartÄ±" },
+      { icon: "car", label: "PortfÃ¶y KaydÄ±" },
       { icon: "pool", label: statusLabel(item.status) },
     ],
   });
@@ -1110,7 +1110,7 @@ export default function StokDetailPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      alert("Link kopyalanamadı.");
+      alert("Link kopyalanamadÄ±.");
     }
   };
 
@@ -1132,7 +1132,7 @@ export default function StokDetailPage() {
       await api.delete(`/units/${unit.id}`);
       router.push("/portfoy");
     } catch (err: any) {
-      setActionError(err?.response?.data?.message || "Portföy silinemedi.");
+      setActionError(err?.response?.data?.message || "PortfÃ¶y silinemedi.");
       setActionLoading(false);
     }
   };
@@ -1156,12 +1156,12 @@ export default function StokDetailPage() {
     };
 
     const defaultNotes: Record<typeof nextStatus, string> = {
-      INCELEMEDE: "Portföy incelemeye alındı.",
+      INCELEMEDE: "PortfÃ¶y incelemeye alÄ±ndÄ±.",
       EKSIK_BILGI_BEKLENIYOR:
-        "EPH inceleme ekibi bu portföy için ek bilgi veya belge bekliyor.",
-      ONAYLANDI: "Portföy onaylandı.",
-      HAVUZDA: "Portföy havuza aktarıldı.",
-      REDDEDILDI: "Portföy doğrulama sürecinde reddedildi.",
+        "EPH inceleme ekibi bu portfÃ¶y iÃ§in ek bilgi veya belge bekliyor.",
+      ONAYLANDI: "PortfÃ¶y onaylandÄ±.",
+      HAVUZDA: "PortfÃ¶y havuza aktarÄ±ldÄ±.",
+      REDDEDILDI: "PortfÃ¶y doÄŸrulama sÃ¼recinde reddedildi.",
     };
 
     setActionError("");
@@ -1176,7 +1176,7 @@ export default function StokDetailPage() {
     } catch (err: any) {
       setActionError(
         err?.response?.data?.message ||
-          "Onay işlemi tamamlanamadı. Lütfen yetki ve portföy durumunu kontrol ediniz.",
+          "Onay iÅŸlemi tamamlanamadÄ±. LÃ¼tfen yetki ve portfÃ¶y durumunu kontrol ediniz.",
       );
     } finally {
       setApprovalActionLoading("");
@@ -1206,7 +1206,7 @@ export default function StokDetailPage() {
         <div className="text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#1557D6] border-t-transparent" />
           <p className="mt-4 text-xs font-black uppercase tracking-[0.26em] text-[#64748B]">
-            Portföy detayı yükleniyor
+            PortfÃ¶y detayÄ± yÃ¼kleniyor
           </p>
         </div>
       </main>
@@ -1220,15 +1220,15 @@ export default function StokDetailPage() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600">
             <FileText size={26} />
           </div>
-          <h1 className="mt-4 text-2xl font-black">Portföy bulunamadı</h1>
+          <h1 className="mt-4 text-2xl font-black">PortfÃ¶y bulunamadÄ±</h1>
           <p className="mt-2 text-sm font-semibold leading-6 text-[#64748B]">
-            {error || "Bu portföye ait detay bilgisi alınamadı."}
+            {error || "Bu portfÃ¶ye ait detay bilgisi alÄ±namadÄ±."}
           </p>
           <button
             onClick={() => router.push("/portfoy")}
             className="mt-5 rounded-2xl bg-[#1557D6] px-5 py-3 text-sm font-black text-white"
           >
-            Portföy Merkezine Dön
+            PortfÃ¶y Merkezine DÃ¶n
           </button>
         </section>
       </main>
@@ -1243,7 +1243,7 @@ export default function StokDetailPage() {
   const doorAccessInfo = String((unit as any)?.doorAccessInfo || "").trim();
   const primaryInfoBoxes = getPrimaryInfoBoxes(unit, verified, portfolioDocuments);
   const safeDescription =
-    unit.description || "Bu portföy için açıklama henüz eklenmedi.";
+    unit.description || "Bu portfÃ¶y iÃ§in aÃ§Ä±klama henÃ¼z eklenmedi.";
   const shortDescription =
     safeDescription.length > 140
       ? `${safeDescription.slice(0, 140).trim()}...`
@@ -1299,7 +1299,7 @@ export default function StokDetailPage() {
               }`}
             >
               <Edit3 size={15} />
-              {managementOpen ? "Kapat" : "Güncelle"}
+              {managementOpen ? "Kapat" : "GÃ¼ncelle"}
             </button>
           )}
           <button
@@ -1307,14 +1307,14 @@ export default function StokDetailPage() {
             className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#475569] shadow-[0_8px_18px_rgba(15,23,42,0.05)]"
           >
             <Copy size={15} />
-            {copied ? "Kopyalandı" : "Link"}
+            {copied ? "KopyalandÄ±" : "Link"}
           </button>
           <button
             onClick={handleOpenShareModal}
             className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] bg-[#1557D6] px-3 text-[12px] font-black text-white shadow-[0_12px_24px_rgba(21,87,214,0.22)]"
           >
             <Share2 size={15} />
-            Paylaş
+            PaylaÅŸ
           </button>
         </div>
 
@@ -1340,10 +1340,10 @@ export default function StokDetailPage() {
               <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.18),transparent_28%),linear-gradient(135deg,#06194A,#1557D6)]">
                 <div className="rounded-[20px] border border-white/18 bg-white/12 px-4 py-3 text-center backdrop-blur">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70">
-                    Fotoğraf Eklenmedi
+                    FotoÄŸraf Eklenmedi
                   </p>
                   <p className="mt-1 text-[11px] font-bold text-white/85">
-                    Kapak görseli bekleniyor.
+                    Kapak gÃ¶rseli bekleniyor.
                   </p>
                 </div>
               </div>
@@ -1392,7 +1392,7 @@ export default function StokDetailPage() {
                   >
                     <img
                       src={photo.displayUrl}
-                      alt={`Portföy fotoğrafı ${index + 1}`}
+                      alt={`PortfÃ¶y fotoÄŸrafÄ± ${index + 1}`}
                       className="h-full w-full object-cover"
                     />
                     {photo.isCover && (
@@ -1435,14 +1435,14 @@ export default function StokDetailPage() {
                 className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 ${verified ? "bg-emerald-50 text-emerald-700" : "bg-[#F7FBFF] text-[#64748B]"}`}
               >
                 <ShieldCheck size={13} />
-                {verified ? "Doğrulanmış" : "Kontrol"}
+                {verified ? "DoÄŸrulanmÄ±ÅŸ" : "Kontrol"}
               </span>
             </div>
           </div>
         </section>
 
 <section className="mt-2 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
-          <PremiumSectionHeading icon={<Home size={18} />} title="Açıklama" />
+          <PremiumSectionHeading icon={<Home size={18} />} title="AÃ§Ä±klama" />
           <p className="mx-auto mt-2 max-w-[350px] whitespace-pre-line break-words text-center text-[12px] font-semibold leading-5 text-[#27364F]">
             {visibleDescription}
             {safeDescription.length > 140 && (
@@ -1451,7 +1451,7 @@ export default function StokDetailPage() {
                 onClick={() => setDescriptionExpanded((current) => !current)}
                 className="ml-1 inline font-black text-[#1557D6]"
               >
-                {descriptionExpanded ? "Daha Az" : "Devamı"}
+                {descriptionExpanded ? "Daha Az" : "DevamÄ±"}
               </button>
             )}
           </p>
@@ -1460,7 +1460,7 @@ export default function StokDetailPage() {
         <section className="mt-2 overflow-hidden rounded-[22px] border border-[#DDE7F3] bg-white text-center shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
           <div className="relative">
             <iframe
-              title="Portföy haritası"
+              title="PortfÃ¶y haritasÄ±"
               src={`https://www.google.com/maps?q=${mapQuery}&z=${hasProjectCoordinates ? 17 : 14}&output=embed`}
               className="h-[205px] w-full border-0"
               loading="lazy"
@@ -1478,7 +1478,7 @@ export default function StokDetailPage() {
                 }
                 className="absolute right-3 top-3 inline-flex min-h-[32px] items-center justify-center gap-1 rounded-full bg-white/95 px-3 text-[10px] font-black text-[#1557D6] shadow-[0_10px_20px_rgba(15,23,42,0.16)] backdrop-blur"
               >
-                Aç <ExternalLink size={11} />
+                AÃ§ <ExternalLink size={11} />
               </button>
             )}
           </div>
@@ -1497,7 +1497,7 @@ export default function StokDetailPage() {
         
 
         <section className="mt-2 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
-          <PremiumSectionHeading icon={<Share2 size={18} />} title="Paylaş" compact />
+          <PremiumSectionHeading icon={<Share2 size={18} />} title="PaylaÅŸ" compact />
           <div className="mt-3 grid grid-cols-4 gap-2">
             <ShareLink
               href={`https://wa.me/?text=${encodedShareText}`}
@@ -1514,7 +1514,7 @@ export default function StokDetailPage() {
               className="inline-flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-[16px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#475569]"
             >
               <Copy size={17} />
-              {copied ? "Kopyalandı" : "Link"}
+              {copied ? "KopyalandÄ±" : "Link"}
             </button>
             <button
               onClick={handleOpenShareModal}
@@ -1529,14 +1529,14 @@ export default function StokDetailPage() {
 
         {featureLabels.length > 0 && (
           <section className="mt-2 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
-            <PremiumSectionHeading icon={<Star size={18} />} title="Öne Çıkan Özellikler" />
+            <PremiumSectionHeading icon={<Star size={18} />} title="Ã–ne Ã‡Ä±kan Ã–zellikler" />
             <div className="mt-3 flex flex-wrap justify-center gap-2">
               {featureLabels.map((feature) => (
                 <span
                   key={feature}
                   className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[11px] font-black text-emerald-700 shadow-[0_8px_18px_rgba(5,150,105,0.08)]"
                 >
-                  ✓ {feature}
+                  âœ“ {feature}
                 </span>
               ))}
             </div>
@@ -1551,12 +1551,12 @@ export default function StokDetailPage() {
           </div>
           <div className="mt-2 flex items-center justify-center gap-1.5">
             <h2 className="break-words text-center text-[15px] font-black leading-5 text-[#06194A]">
-              {ownerName || "EPH Danışmanı"}
+              {ownerName || "EPH DanÄ±ÅŸmanÄ±"}
             </h2>
             <BadgeCheck size={17} className="shrink-0 text-[#1557D6]" />
           </div>
           <p className="mt-0.5 text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#64748B]">
-            {unit.project?.owner?.role || "Gayrimenkul Danışmanı"}
+            {unit.project?.owner?.role || "Gayrimenkul DanÄ±ÅŸmanÄ±"}
           </p>
           <div className="mt-3 grid grid-cols-3 gap-2">
             <Link
@@ -1590,7 +1590,7 @@ export default function StokDetailPage() {
             <div className="flex items-center justify-center gap-2 text-[#1557D6]">
               <Camera size={17} />
               <h2 className="text-[16px] font-black text-[#06194A]">
-                Fotoğraf Yönetimi
+                FotoÄŸraf YÃ¶netimi
               </h2>
             </div>
 
@@ -1605,13 +1605,13 @@ export default function StokDetailPage() {
             >
               <Upload size={16} />
               {imageUploadLoading === "gallery"
-                ? "Fotoğraf yükleniyor..."
-                : `Fotoğraf Ekle (${galleryImages.length}/${MAX_GALLERY_COUNT})`}
+                ? "FotoÄŸraf yÃ¼kleniyor..."
+                : `FotoÄŸraf Ekle (${galleryImages.length}/${MAX_GALLERY_COUNT})`}
             </button>
 
             {galleryImages.length === 0 ? (
               <div className="mt-3 rounded-[18px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] px-3 py-4 text-center text-[11px] font-bold leading-5 text-[#64748B]">
-                Bu portföyde henüz fotoğraf yok. İlk eklenen fotoğraf otomatik kapak görseli olarak kullanılacaktır.
+                Bu portfÃ¶yde henÃ¼z fotoÄŸraf yok. Ä°lk eklenen fotoÄŸraf otomatik kapak gÃ¶rseli olarak kullanÄ±lacaktÄ±r.
               </div>
             ) : (
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -1642,7 +1642,7 @@ export default function StokDetailPage() {
                       >
                         <img
                           src={photo.displayUrl}
-                          alt={`Portföy fotoğrafı ${index + 1}`}
+                          alt={`PortfÃ¶y fotoÄŸrafÄ± ${index + 1}`}
                           className="h-full w-full object-cover"
                         />
                         <span
@@ -1669,10 +1669,10 @@ export default function StokDetailPage() {
                             type="button"
                             onClick={() => {
                               if (photo.isCover && galleryImages.length > 1) {
-                                setActionError("Kapak fotoğrafını silmeden önce başka bir fotoğrafı kapak yapın.");
+                                setActionError("Kapak fotoÄŸrafÄ±nÄ± silmeden Ã¶nce baÅŸka bir fotoÄŸrafÄ± kapak yapÄ±n.");
                                 return;
                               }
-                              if (confirm("Bu fotoğraf silinsin mi?")) handleDeleteImage(photo.id);
+                              if (confirm("Bu fotoÄŸraf silinsin mi?")) handleDeleteImage(photo.id);
                             }}
                             disabled={deleteDisabled && !(photo.isCover && galleryImages.length > 1)}
                             className="min-h-[34px] rounded-[12px] bg-rose-50 px-2 text-[10px] font-black text-rose-700 disabled:bg-slate-100 disabled:text-slate-400"
@@ -1688,7 +1688,7 @@ export default function StokDetailPage() {
                             disabled={index === 0 || loadingMove}
                             className="min-h-[30px] rounded-[12px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#1557D6] disabled:opacity-40"
                           >
-                            ↑ Sola
+                            â†‘ Sola
                           </button>
                           <button
                             type="button"
@@ -1696,13 +1696,13 @@ export default function StokDetailPage() {
                             disabled={index === galleryImages.length - 1 || loadingMove}
                             className="min-h-[30px] rounded-[12px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#1557D6] disabled:opacity-40"
                           >
-                            Sağa ↓
+                            SaÄŸa â†“
                           </button>
                         </div>
 
                         {photo.isCover && (
                           <p className="mt-1.5 text-center text-[9px] font-black text-emerald-700">
-                            Listede ve paylaşım kartında bu görsel kullanılır.
+                            Listede ve paylaÅŸÄ±m kartÄ±nda bu gÃ¶rsel kullanÄ±lÄ±r.
                           </p>
                         )}
                       </div>
@@ -1716,6 +1716,7 @@ export default function StokDetailPage() {
 
         {canEditPortfolio && managementOpen && (
           <PortfolioDocumentsCenter
+            unit={unit}
             documents={portfolioDocuments}
             canEditPortfolio={canEditPortfolio}
             canReviewPortfolio={canReviewPortfolio}
@@ -1736,7 +1737,7 @@ export default function StokDetailPage() {
                 onClick={() => setManagementOpen((current) => !current)}
                 className="h-9 w-full rounded-[14px] bg-[#EFF6FF] text-[12px] font-black text-[#1557D6]"
               >
-                {managementOpen ? "Güncellemeyi Kapat" : "Güncellemeyi Aç"}
+                {managementOpen ? "GÃ¼ncellemeyi Kapat" : "GÃ¼ncellemeyi AÃ§"}
               </button>
               <button
                 onClick={() => {
@@ -1758,10 +1759,10 @@ export default function StokDetailPage() {
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-white/60">
-                  Portföy Galerisi
+                  PortfÃ¶y Galerisi
                 </p>
                 <h2 className="mt-1 text-xl font-black text-white">
-                  Fotoğraf {activePhoto + 1} / {galleryImages.length}
+                  FotoÄŸraf {activePhoto + 1} / {galleryImages.length}
                 </h2>
               </div>
               <button
@@ -1781,7 +1782,7 @@ export default function StokDetailPage() {
             >
               <img
                 src={activeGalleryImage}
-                alt="Büyük portföy fotoğrafı"
+                alt="BÃ¼yÃ¼k portfÃ¶y fotoÄŸrafÄ±"
                 className="max-h-[calc(100dvh-190px)] w-full rounded-[24px] object-contain"
               />
               {galleryImages.length > 1 && (
@@ -1793,7 +1794,7 @@ export default function StokDetailPage() {
                       )
                     }
                     className="absolute left-4 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#06194A]"
-                    aria-label="Önceki fotoğraf"
+                    aria-label="Ã–nceki fotoÄŸraf"
                   >
                     <ChevronLeft size={24} />
                   </button>
@@ -1804,7 +1805,7 @@ export default function StokDetailPage() {
                       )
                     }
                     className="absolute right-4 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#06194A]"
-                    aria-label="Sonraki fotoğraf"
+                    aria-label="Sonraki fotoÄŸraf"
                   >
                     <ChevronRight size={24} />
                   </button>
@@ -1820,7 +1821,7 @@ export default function StokDetailPage() {
                 >
                   <img
                     src={photo.displayUrl}
-                    alt={`Küçük fotoğraf ${index + 1}`}
+                    alt={`KÃ¼Ã§Ã¼k fotoÄŸraf ${index + 1}`}
                     className="h-full w-full object-cover"
                   />
                 </button>
@@ -1837,10 +1838,10 @@ export default function StokDetailPage() {
               <FileText size={24} />
             </div>
             <h2 className="mt-4 text-2xl font-black tracking-[-0.04em] text-[#06194A]">
-              Portföyü silmek istiyor musunuz?
+              PortfÃ¶yÃ¼ silmek istiyor musunuz?
             </h2>
             <p className="mt-2 text-sm font-semibold leading-6 text-[#64748B]">
-              Bu portföy kalıcı olarak silinecek. Bu işlem geri alınamaz.
+              Bu portfÃ¶y kalÄ±cÄ± olarak silinecek. Bu iÅŸlem geri alÄ±namaz.
             </p>
             {actionError && (
               <div className="mt-4 rounded-[22px] border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700">
@@ -1853,14 +1854,14 @@ export default function StokDetailPage() {
                 className="min-h-[52px] rounded-[20px] border border-[#DDE7F3] bg-white px-5 py-3 text-sm font-black text-[#475569]"
                 disabled={actionLoading}
               >
-                Vazgeç
+                VazgeÃ§
               </button>
               <button
                 onClick={handleDeleteUnit}
                 className="min-h-[52px] rounded-[20px] bg-rose-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60"
                 disabled={actionLoading}
               >
-                {actionLoading ? "Siliniyor..." : "Evet, Portföyü Sil"}
+                {actionLoading ? "Siliniyor..." : "Evet, PortfÃ¶yÃ¼ Sil"}
               </button>
             </div>
           </div>
@@ -1879,6 +1880,7 @@ export default function StokDetailPage() {
 
 
 function PortfolioDocumentsCenter({
+  unit,
   documents,
   canEditPortfolio,
   canReviewPortfolio,
@@ -1890,6 +1892,7 @@ function PortfolioDocumentsCenter({
   onDeleteDocument,
   onSubmitApproval,
 }: {
+  unit: DetailUnit;
   documents: PortfolioAuthorityDocument[];
   canEditPortfolio: boolean;
   canReviewPortfolio: boolean;
@@ -1904,25 +1907,34 @@ function PortfolioDocumentsCenter({
   const yetkiDocument = findPortfolioDocument(documents, "YETKI_BELGESI");
   const tapuDocument = findPortfolioDocument(documents, "TAPU");
   const hasAnyDocument = Boolean(yetkiDocument || tapuDocument);
-  const submitDisabled = !hasAnyDocument || Boolean(approvalActionLoading);
+  const approvalStatus = String(unit.approvalStatus || "TASLAK").toUpperCase();
+  const isSubmittedForApproval = ["INCELEMEYE_GONDERILDI", "INCELEMEDE"].includes(approvalStatus);
+  const isApprovedForPool = approvalStatus === "ONAYLANDI";
+  const isInPool = approvalStatus === "HAVUZDA";
+  const submitDisabled =
+    !hasAnyDocument ||
+    Boolean(approvalActionLoading) ||
+    isSubmittedForApproval ||
+    isApprovedForPool ||
+    isInPool;
 
   return (
     <section className="mt-3 rounded-[22px] border border-[#DDE7F3] bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
       <div className="flex items-center justify-center gap-2 text-[#1557D6]">
         <FileText size={17} />
         <h2 className="text-center text-[16px] font-black text-[#06194A]">
-          Belge Yükleme Merkezi
+          Belge YÃ¼kleme Merkezi
         </h2>
       </div>
 
       <p className="mx-auto mt-1 max-w-[320px] text-center text-[11px] font-bold leading-5 text-[#64748B]">
-        Yetki belgesi veya tapu yüklenince portföy incelemeye gönderilebilir.
+        Yetki belgesi veya tapu yÃ¼klenince portfÃ¶y incelemeye gÃ¶nderilebilir.
       </p>
 
       <div className="mt-3 grid gap-2">
         <PortfolioDocumentRow
           label={DOCUMENT_LABELS.YETKI_BELGESI}
-          description="Yetkili portföy için zorunlu evrak"
+          description="Yetkili portfÃ¶y iÃ§in zorunlu evrak"
           document={yetkiDocument}
           canEditPortfolio={canEditPortfolio}
           uploadLoading={documentUploadLoading === "YETKI_BELGESI"}
@@ -1933,7 +1945,7 @@ function PortfolioDocumentsCenter({
 
         <PortfolioDocumentRow
           label={DOCUMENT_LABELS.TAPU}
-          description="Tapu veya mülkiyet doğrulama evrakı"
+          description="Tapu veya mÃ¼lkiyet doÄŸrulama evrakÄ±"
           document={tapuDocument}
           canEditPortfolio={canEditPortfolio}
           uploadLoading={documentUploadLoading === "TAPU"}
@@ -1952,14 +1964,14 @@ function PortfolioDocumentsCenter({
         >
           <Send size={16} />
           {approvalActionLoading === "INCELEMEYE_GONDERILDI"
-            ? "Gönderiliyor..."
-            : "İncelemeye Gönder"}
+            ? "GÃ¶nderiliyor..."
+            : "Ä°ncelemeye GÃ¶nder"}
         </button>
       )}
 
       {canReviewPortfolio && (
         <div className="mt-3 rounded-[16px] bg-[#F7FBFF] px-3 py-2 text-center text-[11px] font-bold leading-5 text-[#64748B]">
-          Yönetici görünümü aktif. Belgeleri görüntüleyebilir, onay kararını Onay Merkezi üzerinden verebilirsiniz.
+          YÃ¶netici gÃ¶rÃ¼nÃ¼mÃ¼ aktif. Belgeleri gÃ¶rÃ¼ntÃ¼leyebilir, onay kararÄ±nÄ± Onay Merkezi Ã¼zerinden verebilirsiniz.
         </div>
       )}
     </section>
@@ -2004,7 +2016,7 @@ function PortfolioDocumentRow({
               : "bg-amber-50 text-amber-700"
           }`}
         >
-          {hasDocument ? "Yüklü" : "Bekliyor"}
+          {hasDocument ? "YÃ¼klÃ¼" : "Bekliyor"}
         </span>
       </div>
 
@@ -2028,7 +2040,7 @@ function PortfolioDocumentRow({
             className="flex min-h-[38px] items-center justify-center gap-1 rounded-[14px] bg-[#1557D6] px-2 text-[10px] font-black text-white disabled:opacity-60"
           >
             <Upload size={14} />
-            {uploadLoading ? "..." : hasDocument ? "Yenile" : "Yükle"}
+            {uploadLoading ? "..." : hasDocument ? "Yenile" : "YÃ¼kle"}
           </button>
         )}
 
@@ -2040,7 +2052,7 @@ function PortfolioDocumentRow({
             className={`${canEditPortfolio ? "" : "col-span-2"} flex min-h-[38px] items-center justify-center gap-1 rounded-[14px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#1557D6]`}
           >
             <ExternalLink size={14} />
-            Gör
+            GÃ¶r
           </a>
         )}
 
@@ -2107,11 +2119,11 @@ function PortfolioApprovalCenter({
       className: "bg-amber-100 text-amber-700",
     },
     INCELEMEYE_GONDERILDI: {
-      label: "İncelemeye Gönderildi",
+      label: "Ä°ncelemeye GÃ¶nderildi",
       className: "bg-blue-100 text-blue-700",
     },
     INCELEMEDE: {
-      label: "İncelemede",
+      label: "Ä°ncelemede",
       className: "bg-indigo-100 text-indigo-700",
     },
     EKSIK_BILGI_BEKLENIYOR: {
@@ -2119,7 +2131,7 @@ function PortfolioApprovalCenter({
       className: "bg-orange-100 text-orange-700",
     },
     ONAYLANDI: {
-      label: "Onaylandı",
+      label: "OnaylandÄ±",
       className: "bg-emerald-100 text-emerald-700",
     },
     HAVUZDA: {
@@ -2142,7 +2154,7 @@ function PortfolioApprovalCenter({
       active: Boolean(unit.tapuVerified),
     },
     {
-      label: "Fotoğraf",
+      label: "FotoÄŸraf",
       active: Boolean(unit.photoVerified || galleryImageCount > 0),
     },
     {
@@ -2161,10 +2173,10 @@ function PortfolioApprovalCenter({
     <section className="mt-3 rounded-[22px] border border-[#C7D6E8] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.055)]">
       <div className="flex flex-col items-center justify-center gap-1 text-center">
         <p className="text-center text-[10px] font-black uppercase tracking-[0.20em] text-[#1557D6]">
-          Portföy Kalitesi
+          PortfÃ¶y Kalitesi
         </p>
         <h2 className="break-words text-center text-[18px] font-black leading-[22px] text-[#06194A]">
-          {score}/100 · {scoreLabel}
+          {score}/100 Â· {scoreLabel}
         </h2>
         <span
           className={`mt-1 inline-flex shrink-0 items-center justify-center rounded-full px-3 py-1.5 text-center text-[10px] font-black ${currentStatusConfig.className}`}
@@ -2205,7 +2217,7 @@ function PortfolioApprovalCenter({
             disabled={Boolean(approvalActionLoading)}
             className={`${buttonBase} bg-[#EFF6FF] text-[#1557D6]`}
           >
-            {approvalActionLoading === "INCELEMEDE" ? "..." : "İncele"}
+            {approvalActionLoading === "INCELEMEDE" ? "..." : "Ä°ncele"}
           </button>
 
           <button
@@ -2359,3 +2371,4 @@ function ShareLink({
     </a>
   );
 }
+
