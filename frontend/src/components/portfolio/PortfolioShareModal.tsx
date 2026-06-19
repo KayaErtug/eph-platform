@@ -779,9 +779,11 @@ export default function PortfolioShareModal({
             </div>
 
             <div className="max-h-[78vh] max-w-full overflow-y-auto overflow-x-hidden rounded-[24px] bg-[#EEF5FF] p-3">
-              <div className="mx-auto flex w-full max-w-[390px] justify-center">
-                <div className="w-[390px] origin-top scale-[0.82] sm:scale-100">
-                  {renderPreview()}
+              <div className="mx-auto flex w-full justify-center">
+                <div className="w-[320px] origin-top sm:w-[390px]">
+                  <div className="origin-top-left scale-[0.82] sm:scale-100">
+                    {renderPreview()}
+                  </div>
                 </div>
               </div>
             </div>

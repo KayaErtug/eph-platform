@@ -38,22 +38,81 @@ export type PortfolioShareData = {
   features?: PortfolioShareFeature[];
 };
 
-const defaultFeatures: PortfolioShareFeature[] = [
-  { icon: "pool", label: "Havuz" },
-  { icon: "car", label: "Otopark" },
-  { icon: "heat", label: "Yerden Isıtma" },
-  { icon: "smart", label: "Akıllı Ev" },
-];
+function getLinaMarketingLabels(data: PortfolioShareData) {
+  const source = [
+    data.title,
+    data.location,
+    data.shortDescription,
+    data.longDescription,
+    ...(data.features || []).map((feature) => feature.label),
+  ]
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
 
-function getFeatureIcon(icon: string) {
+  const hasAny = (keywords: string[]) =>
+    keywords.some((keyword) => source.includes(keyword));
+
+  if (hasAny(["arsa", "arazi", "tarla", "parsel", "imar", "bağ", "bahçe"])) {
+    return [
+      "İmarlı",
+      "Yolu Açık",
+      "Elektrik Var",
+      "Su Var",
+      "Kadastro Yolu",
+      "Köşe Parsel",
+      "Yatırıma Uygun",
+      "Gelişen Bölge",
+    ];
+  }
+
+  if (hasAny(["fabrika", "depo", "sanayi", "üretim", "lojistik", "antrepo"])) {
+    return [
+      "Tır Girişi",
+      "Yükleme Rampası",
+      "Sanayi Elektriği",
+      "Yüksek Tavan",
+      "Geniş Depolama",
+      "Lojistik Avantaj",
+      "Güvenlik",
+      "Forklift Alanı",
+    ];
+  }
+
+  if (hasAny(["dükkan", "mağaza", "ofis", "büro", "plaza", "showroom", "ticari"])) {
+    return [
+      "Cadde Üzeri",
+      "Yüksek Tabela Değeri",
+      "Otopark",
+      "Yoğun Yaya Trafiği",
+      "Kurumsal Kiracıya Uygun",
+      "Geniş Vitrin",
+      "Merkezi Konum",
+      "Hızlı Ulaşım",
+    ];
+  }
+
+  return [
+    "Kapalı Otopark",
+    "7/24 Güvenlik",
+    "Açık Yüzme Havuzu",
+    "Kapalı Yüzme Havuzu",
+    "Fitness Merkezi",
+    "Hamam & Sauna",
+    "Elektrikli Araç Şarjı",
+    "Akıllı Ev Sistemi",
+  ];
+}
+
+function getFeatureIcon(label: string) {
   const className = "h-4 w-4";
+  const normalized = label.toLocaleLowerCase("tr-TR");
 
-  if (icon === "pool") return <Waves className={className} />;
-  if (icon === "car") return <Car className={className} />;
-  if (icon === "heat") return <Flame className={className} />;
-  if (icon === "smart") return <Sparkles className={className} />;
-  if (icon === "bath") return <Bath className={className} />;
-  if (icon === "security") return <ShieldCheck className={className} />;
+  if (normalized.includes("havuz")) return <Waves className={className} />;
+  if (normalized.includes("otopark") || normalized.includes("şarj")) return <Car className={className} />;
+  if (normalized.includes("hamam") || normalized.includes("sauna") || normalized.includes("ısı")) return <Flame className={className} />;
+  if (normalized.includes("akıllı")) return <Sparkles className={className} />;
+  if (normalized.includes("banyo")) return <Bath className={className} />;
+  if (normalized.includes("güven")) return <ShieldCheck className={className} />;
 
   return <Home className={className} />;
 }
@@ -63,15 +122,17 @@ export default function PortfolioShareCard({
 }: {
   data: PortfolioShareData;
 }) {
-  const features = data.features?.length ? data.features : defaultFeatures;
+  const marketingLabels = getLinaMarketingLabels(data);
 
   return (
     <div
       data-share-card="whatsapp"
       className="relative mx-auto w-[390px] overflow-hidden rounded-[34px] border border-[#DDE7F3] bg-white shadow-[0_30px_90px_rgba(15,23,42,0.18)]"
     >
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 -rotate-[28deg] whitespace-nowrap text-[54px] font-black tracking-[-0.06em] text-[#06194A]/[0.055]">
-        EPH PORTFÖY HAVUZU
+      <div className="pointer-events-none absolute left-1/2 top-[54%] z-20 -translate-x-1/2 -translate-y-1/2 -rotate-[28deg] whitespace-nowrap text-center font-black tracking-[-0.06em] text-[#06194A]/[0.035]">
+        <div className="text-[54px] leading-[0.95]">EMLAK</div>
+        <div className="text-[54px] leading-[0.95]">PORTFÖY</div>
+        <div className="text-[54px] leading-[0.95]">HAVUZU</div>
       </div>
 
       <div className="relative h-[265px] overflow-hidden bg-[#EFF6FF]">
@@ -92,31 +153,19 @@ export default function PortfolioShareCard({
           Satılık
         </div>
 
-        <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/80">
-              Portföy Kartı
-            </p>
+        <div className="absolute bottom-4 left-4 right-4">
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/80">
+            Portföy Kartı
+          </p>
 
-            <h2 className="mt-1 line-clamp-2 text-2xl font-black leading-tight tracking-[-0.04em] text-white">
-              {data.title}
-            </h2>
-          </div>
-
-          <div className="shrink-0 rounded-[20px] bg-white/95 px-3 py-2 text-center shadow-lg">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#64748B]">
-              Karne
-            </p>
-
-            <p className="text-xl font-black text-[#1557D6]">
-              {data.score || 92}
-            </p>
-          </div>
+          <h2 className="mt-1 line-clamp-2 text-2xl font-black leading-tight tracking-[-0.04em] text-white">
+            {data.title}
+          </h2>
         </div>
       </div>
 
       <div className="relative z-30 p-5">
-        <div className="rounded-[26px] border border-[#DDE7F3] bg-[#F7FBFF] p-4">
+        <div className="rounded-[26px] border border-[#DDE7F3] bg-[#F7FBFF] p-4 text-center">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#64748B]">
             Fiyat
           </p>
@@ -125,7 +174,7 @@ export default function PortfolioShareCard({
             {data.price}
           </p>
 
-          <div className="mt-3 flex items-center gap-2 text-sm font-extrabold text-[#64748B]">
+          <div className="mt-3 flex items-center justify-center gap-2 text-sm font-extrabold text-[#64748B]">
             <MapPin className="h-4 w-4 text-[#1557D6]" />
 
             <span className="line-clamp-1">{data.location}</span>
@@ -133,42 +182,23 @@ export default function PortfolioShareCard({
         </div>
 
         <div className="mt-4 grid grid-cols-4 gap-2">
-          <InfoPill
-            icon={<Home className="h-4 w-4" />}
-            label="Oda"
-            value={data.roomCount}
-          />
-
-          <InfoPill
-            icon={<Maximize2 className="h-4 w-4" />}
-            label="Alan"
-            value={data.area}
-          />
-
-          <InfoPill
-            icon={<Building2 className="h-4 w-4" />}
-            label="Kat"
-            value={data.floor || "—"}
-          />
-
-          <InfoPill
-            icon={<ShieldCheck className="h-4 w-4" />}
-            label="Yetki"
-            value={data.authorization || "Alındı"}
-          />
+          <InfoPill label="Oda" value={data.roomCount} />
+          <InfoPill label="Alan" value={data.area} />
+          <InfoPill label="Kat" value={data.floor || "—"} />
+          <InfoPill label="Yetki" value={data.authorization || "Kontrol"} />
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
-          {features.slice(0, 4).map((feature) => (
+          {marketingLabels.map((label) => (
             <div
-              key={`${feature.icon}-${feature.label}`}
-              className="flex min-h-[44px] items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-xs font-black text-[#27364F]"
+              key={label}
+              className="flex min-h-[42px] items-center justify-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-center text-[11px] font-black text-[#27364F]"
             >
               <span className="text-[#1557D6]">
-                {getFeatureIcon(feature.icon)}
+                {getFeatureIcon(label)}
               </span>
 
-              {feature.label}
+              {label}
             </div>
           ))}
         </div>
@@ -176,35 +206,16 @@ export default function PortfolioShareCard({
         <div className="mt-5 rounded-[24px] border border-[#DDE7F3] bg-white p-4">
           <p className="line-clamp-2 text-sm font-bold leading-6 text-[#475569]">
             {data.shortDescription ||
-              "Site içerisinde, sosyal donatıları güçlü, yerden ısıtmalı ve akıllı ev sistemine sahip yetkili portföy."}
+              "Site içerisinde, sosyal donatıları güçlü, premium yaşam alanı sunan seçkin portföy."}
           </p>
         </div>
 
-        <div className="mt-5 flex items-center justify-between gap-4 border-t border-[#DDE7F3] pt-4">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#64748B]">
-              Danışman
-            </p>
-
-            <p className="mt-1 text-sm font-black text-[#06194A]">
-              {data.consultantName || "EPH Üyesi"}
-            </p>
-
-            <p className="text-xs font-bold text-[#64748B]">
-              {data.consultantPhone || "Telefon bilgisi"}
-            </p>
-          </div>
-
-          <div className="flex h-[70px] w-[70px] items-center justify-center rounded-[20px] border border-[#DDE7F3] bg-[#F7FBFF] text-center text-[10px] font-black leading-3 text-[#1557D6]">
-            QR
-            <br />
-            KOD
-          </div>
-        </div>
-
-        <div className="mt-4 rounded-[18px] bg-[#06194A] px-4 py-3 text-center">
-          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white">
-            {data.portfolioNo || "EPH-PORTFOY"}
+        <div className="mt-5 rounded-[18px] bg-[#06194A] px-4 py-4 text-center">
+          <p className="text-sm font-black text-white">
+            {data.consultantName || "EPH Danışmanı"}
+          </p>
+          <p className="mt-1 text-xs font-bold text-white/75">
+            {data.consultantPhone || "Telefon bilgisi"}
           </p>
         </div>
       </div>
@@ -213,23 +224,19 @@ export default function PortfolioShareCard({
 }
 
 function InfoPill({
-  icon,
   label,
   value,
 }: {
-  icon: React.ReactNode;
   label: string;
   value: string;
 }) {
   return (
     <div className="flex min-h-[74px] flex-col items-center justify-center rounded-[20px] border border-[#DDE7F3] bg-white p-2 text-center">
-      <div className="text-[#1557D6]">{icon}</div>
-
-      <p className="mt-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#64748B]">
+      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#64748B]">
         {label}
       </p>
 
-      <p className="mt-0.5 line-clamp-1 text-xs font-black text-[#06194A]">
+      <p className="mt-1 line-clamp-2 text-xs font-black leading-4 text-[#06194A]">
         {value}
       </p>
     </div>
