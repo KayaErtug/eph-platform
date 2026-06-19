@@ -522,8 +522,7 @@ function getPortfolioNo(unit: DetailUnit) {
 }
 
 function getCurrentShareUrl(unitId?: string) {
-  if (typeof window === "undefined") return "";
-  return `${window.location.origin}/portfoy/${unitId || ""}`;
+  return `https://emlakportfoyhavuzu.com/portfoy/${unitId || ""}`;
 }
 
 function findPortfolioDocument(
