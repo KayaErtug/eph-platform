@@ -1928,7 +1928,13 @@ function PortfolioDocumentsCenter({
       </div>
 
       <p className="mx-auto mt-1 max-w-[320px] text-center text-[11px] font-bold leading-5 text-[#64748B]">
-        Yetki belgesi veya tapu yüklenince portföy incelemeye gönderilebilir.
+        {isSubmittedForApproval
+          ? "Portföy incelemeye gönderildi. Admin onayı bekleniyor."
+          : isApprovedForPool
+            ? "Portföy onaylandı. Portföy listesinden havuza gönderebilirsiniz."
+            : isInPool
+              ? "Portföy havuzda yayında."
+              : "Yetki belgesi veya tapu yüklenince portföy incelemeye gönderilebilir."}
       </p>
 
       <div className="mt-3 grid gap-2">
