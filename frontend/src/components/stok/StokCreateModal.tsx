@@ -1175,7 +1175,7 @@ export default function StokCreateModal({
       >
         <button className="stock-modal-v10-close" onClick={onClose} aria-label="Kapat">×</button>
 
-        <div className="stock-modal-v2-body stock-modal-v10-body" style={{ paddingBottom: "118px" }}>
+        <div className="stock-modal-v2-body stock-modal-v10-body" style={{ paddingBottom: "156px" }}>
           {formSuccess && <div className="stock-form-success">Portföy başarıyla eklendi.</div>}
           {formError && <div className="stock-form-error">{formError}</div>}
           {localError && <div className="stock-form-error">{localError}</div>}
@@ -1943,18 +1943,18 @@ export default function StokCreateModal({
                 </p>
 
                 {galleryImages.length > 0 ? (
-                  <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+                  <div className="mt-4 grid grid-cols-2 gap-3 pb-6 md:grid-cols-3">
                     {galleryImages.map((image, index) => {
                       const isCover = coverImage?.id === image.id;
 
                       return (
                         <div
                           key={image.id}
-                          className={`overflow-hidden rounded-[20px] border bg-[#F7FBFF] ${
+                          className={`overflow-hidden rounded-[20px] border bg-[#F7FBFF] shadow-[0_10px_24px_rgba(15,23,42,0.05)] ${
                             isCover ? "border-emerald-400 ring-2 ring-emerald-100" : "border-[#DDE7F3]"
                           }`}
                         >
-                          <div className="relative h-28">
+                          <div className="relative aspect-[4/3] min-h-[118px] overflow-hidden bg-[#EEF5FF]">
                             <img
                               src={image.previewUrl}
                               alt={`Galeri fotoğrafı ${index + 1}`}
@@ -1972,7 +1972,7 @@ export default function StokCreateModal({
                             )}
                           </div>
 
-                          <div className="p-2">
+                          <div className="p-2.5">
                             <p className="truncate text-xs font-black text-[#06194A]">
                               {image.file.name}
                             </p>
@@ -1980,10 +1980,10 @@ export default function StokCreateModal({
                               {formatFileSize(image.file.size)}
                             </p>
 
-                            <div className="mt-2 grid grid-cols-2 gap-2">
+                            <div className="mt-2 grid grid-cols-1 gap-2">
                               <button
                                 type="button"
-                                className={`rounded-xl px-2 py-2 text-[11px] font-black ${
+                                className={`min-h-[40px] rounded-xl px-2 py-2 text-[12px] font-black ${
                                   isCover
                                     ? "bg-emerald-50 text-emerald-700"
                                     : "bg-blue-50 text-[#1557D6]"
@@ -1996,7 +1996,7 @@ export default function StokCreateModal({
 
                               <button
                                 type="button"
-                                className="rounded-xl bg-rose-50 px-2 py-2 text-[11px] font-black text-rose-700"
+                                className="min-h-[40px] rounded-xl bg-rose-50 px-2 py-2 text-[12px] font-black text-rose-700"
                                 onClick={() => removeGalleryImage(image.id)}
                               >
                                 Sil

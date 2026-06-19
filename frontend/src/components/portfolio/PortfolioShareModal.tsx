@@ -18,6 +18,56 @@ import PortfolioSharePdf from "./PortfolioSharePdf";
 
 type ShareMode = "whatsapp" | "story" | "pdf";
 
+async function imageToDataUrl(src: string) {
+  if (!src) return src;
+  if (src.startsWith("data:")) return src;
+
+  const absoluteUrl = src.startsWith("/")
+    ? `${window.location.origin}${src}`
+    : src;
+
+  const response = await fetch(absoluteUrl, {
+    mode: "cors",
+    credentials: "omit",
+    cache: "force-cache",
+  });
+
+  if (!response.ok) {
+    throw new Error("Kart görseli hazırlanamadı. Fotoğraf kaynağı okunamadı.");
+  }
+
+  const blob = await response.blob();
+
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onloadend = () => resolve(String(reader.result || src));
+    reader.onerror = () => reject(new Error("Görsel dönüştürülemedi."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function inlineImages(root: HTMLElement) {
+  const images = Array.from(root.querySelectorAll("img"));
+
+  await Promise.all(
+    images.map(async (image) => {
+      const src = image.getAttribute("src");
+
+      if (!src) return;
+
+      try {
+        const dataUrl = await imageToDataUrl(src);
+        image.setAttribute("src", dataUrl);
+        image.removeAttribute("crossorigin");
+      } catch {
+        image.setAttribute("src", "/LOGO_EPH.png");
+        image.removeAttribute("crossorigin");
+      }
+    }),
+  );
+}
+
 export default function PortfolioShareModal({
   open,
   onClose,
@@ -66,6 +116,8 @@ export default function PortfolioShareModal({
 
     clonedNode.style.margin = "0";
     clonedNode.style.transform = "none";
+
+    await inlineImages(clonedNode);
 
     const wrapper = document.createElement("div");
 
