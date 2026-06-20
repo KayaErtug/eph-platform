@@ -60,7 +60,6 @@ import type {
   Unit,
 } from "@/components/stok/stokTypes";
 import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
-import EphAuthorityLetterModal from "@/components/authority-letters/EphAuthorityLetterModal";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
 
 type DetailUnit = Unit & {
@@ -628,7 +627,6 @@ export default function StokDetailPage() {
   const [activePhoto, setActivePhoto] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [authorityLetterOpen, setAuthorityLetterOpen] = useState(false);
   const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -656,7 +654,7 @@ export default function StokDetailPage() {
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    if (galleryOpen || shareOpen || deleteOpen || authorityLetterOpen) {
+    if (galleryOpen || shareOpen || deleteOpen) {
       const previousOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => {
@@ -664,7 +662,7 @@ export default function StokDetailPage() {
       };
     }
     document.body.style.overflow = "";
-  }, [galleryOpen, shareOpen, deleteOpen, authorityLetterOpen]);
+  }, [galleryOpen, shareOpen, deleteOpen]);
 
   const fetchUnit = async () => {
     try {
@@ -1443,6 +1441,14 @@ export default function StokDetailPage() {
           </div>
         </section>
 
+        <PortfolioDetailInfoCenter
+          unit={unit}
+          calculatedSquareMeterPrice={calculatedSquareMeterPrice}
+          canSeeDoorAccessInfo={canSeeDoorAccessInfo}
+          doorAccessInfo={doorAccessInfo}
+          availableCreditAmount={availableCreditAmount}
+        />
+
 <section className="mt-2 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
           <PremiumSectionHeading icon={<Home size={18} />} title="Açıklama" />
           <p className="mx-auto mt-2 max-w-[350px] whitespace-pre-line break-words text-center text-[12px] font-semibold leading-5 text-[#27364F]">
@@ -1729,7 +1735,6 @@ export default function StokDetailPage() {
             onUploadTapu={() => tapuDocumentInputRef.current?.click()}
             onDeleteDocument={handleDeleteDocument}
             onSubmitApproval={handleSubmitApproval}
-            onCreateAuthorityLetter={() => setAuthorityLetterOpen(true)}
           />
         )}
 
@@ -1876,26 +1881,128 @@ export default function StokDetailPage() {
         onClose={() => setShareOpen(false)}
         data={shareData}
       />
-      <EphAuthorityLetterModal
-        open={authorityLetterOpen}
-        unitId={unit.id}
-        onClose={() => setAuthorityLetterOpen(false)}
-        onCreated={() => fetchPortfolioDocuments(unit.id)}
-      />
-
-
-
-
-
-
-
-
-
-
     </main>
   );
 }
 
+
+
+function PortfolioDetailInfoCenter({
+  unit,
+  calculatedSquareMeterPrice,
+  canSeeDoorAccessInfo,
+  doorAccessInfo,
+  availableCreditAmount,
+}: {
+  unit: DetailUnit;
+  calculatedSquareMeterPrice: string;
+  canSeeDoorAccessInfo: boolean;
+  doorAccessInfo: string;
+  availableCreditAmount: number;
+}) {
+  const isLand = isLandDetailType(unit.type);
+  const deedOwnerFullName = String((unit as any)?.deedOwnerFullName || "").trim();
+  const deedOwnerPhone = String((unit as any)?.deedOwnerPhone || "").trim();
+  const deedOwnerEmail = String((unit as any)?.deedOwnerEmail || "").trim();
+  const netArea = getDetailValue(unit, ["netArea", "netM2", "netMetrekare"], "");
+  const buildingAge = getDetailValue(unit, ["buildingAge", "buildingAgeLabel", "age"], "");
+  const heating = getDetailValue(unit, ["heating", "heatingType", "isinma", "heatingSystem"], "");
+  const parking = getDetailValue(unit, ["parking", "parkingType", "otopark"], "");
+  const frontage = getDetailValue(unit, ["frontage", "cephe", "yolaCephe"], "");
+  const zoningStatus = getDetailValue(unit, ["zoningStatus", "imarDurumu"], "");
+  const kaks = getDetailValue(unit, ["kaks", "emsal"], "");
+  const allowedFloors = getDetailValue(unit, ["allowedFloors", "katIzni"], "");
+  const infrastructure = getDetailValue(unit, ["infrastructure", "altyapi"], "");
+  const blockNo = getDetailValue(unit, ["blockNo", "blokNo"], "");
+  const siteName = getDetailValue(unit, ["siteName", "siteAdi"], "");
+
+  const baseRows = [
+    { label: "Portföy Tipi", value: typeLabel(unit.type) },
+    { label: "Durum", value: statusLabel(unit.status) },
+    { label: "Fiyat", value: formatMoney(unit.price, unit.priceCurrency) },
+    { label: "m² Fiyatı", value: calculatedSquareMeterPrice },
+    { label: "Brüt Alan", value: formatAreaValue(unit.area) },
+    { label: "Net Alan", value: netArea },
+    { label: "Oda", value: unit.roomCount || "" },
+    { label: "Kat", value: formatFloorInfo(unit) },
+    { label: "Bina Yaşı", value: buildingAge },
+    { label: "Isınma", value: heating },
+    { label: "Otopark", value: parking },
+    { label: "Kayıt Tarihi", value: formatDate(unit.createdAt) },
+  ].filter((item) => isDisplayableDetailValue(item.value));
+
+  const landRows = [
+    { label: "Ada / Parsel", value: formatAdaParselValue(unit) },
+    { label: "Ada No", value: String((unit as any)?.adaNo || "").trim() },
+    { label: "Parsel No", value: String((unit as any)?.parselNo || "").trim() },
+    { label: "İmar Durumu", value: zoningStatus },
+    { label: "Emsal", value: kaks },
+    { label: "Kat İzni", value: allowedFloors },
+    { label: "Cephe", value: frontage },
+    { label: "Altyapı", value: infrastructure },
+  ].filter((item) => isDisplayableDetailValue(item.value));
+
+  const residenceRows = [
+    { label: "Ada / Parsel", value: formatAdaParselValue(unit) },
+    { label: "Blok", value: blockNo },
+    { label: "Site", value: siteName },
+    { label: "Bulunduğu Kat", value: unit.floorLabel || (unit.floor != null ? `${unit.floor}. Kat` : "") },
+    { label: "Toplam Kat", value: unit.totalFloors ? `${unit.totalFloors} Kat` : "" },
+    { label: "Cephe", value: frontage },
+  ].filter((item) => isDisplayableDetailValue(item.value));
+
+  const deedRows = [
+    { label: "Malik", value: deedOwnerFullName },
+    { label: "Telefon", value: deedOwnerPhone },
+    { label: "E-posta", value: deedOwnerEmail },
+    {
+      label: "Krediye Uygun Tutar",
+      value: availableCreditAmount
+        ? `${availableCreditAmount.toLocaleString("tr-TR")} ₺`
+        : "",
+    },
+    {
+      label: "Kapı / Anahtar Notu",
+      value: canSeeDoorAccessInfo ? doorAccessInfo : "",
+    },
+  ].filter((item) => isDisplayableDetailValue(item.value));
+
+  return (
+    <section className="mt-2 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
+      <PremiumSectionHeading icon={<FileText size={18} />} title="Portföy Bilgileri" />
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {baseRows.map((item) => (
+          <InfoRow key={`${item.label}-${item.value}`} label={item.label} value={item.value} />
+        ))}
+      </div>
+
+      <div className="mt-3 rounded-[20px] border border-[#E8F0FA] bg-[#FBFDFF] p-2.5">
+        <p className="text-center text-[12px] font-black text-[#06194A]">
+          {isLand ? "Ada / Parsel ve İmar Bilgileri" : "Konum / Kat / Blok Bilgileri"}
+        </p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {(isLand ? landRows : residenceRows).map((item) => (
+            <InfoRow key={`${item.label}-${item.value}`} label={item.label} value={item.value} />
+          ))}
+        </div>
+      </div>
+
+      {deedRows.length > 0 && (
+        <div className="mt-3 rounded-[20px] border border-[#E8F0FA] bg-[#F8FAFC] p-2.5">
+          <p className="text-center text-[12px] font-black text-[#06194A]">
+            Malik / Erişim Bilgileri
+          </p>
+          <div className="mt-2 grid grid-cols-1 gap-2">
+            {deedRows.map((item) => (
+              <InfoRow key={`${item.label}-${item.value}`} label={item.label} value={item.value} />
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
 
 
 function PortfolioDocumentsCenter({
@@ -1910,7 +2017,6 @@ function PortfolioDocumentsCenter({
   onUploadTapu,
   onDeleteDocument,
   onSubmitApproval,
-  onCreateAuthorityLetter,
 }: {
   unit: DetailUnit;
   documents: PortfolioAuthorityDocument[];
@@ -1923,7 +2029,6 @@ function PortfolioDocumentsCenter({
   onUploadTapu: () => void;
   onDeleteDocument: (documentId?: string) => void;
   onSubmitApproval: () => void;
-  onCreateAuthorityLetter: () => void;
 }) {
   const yetkiDocument = findPortfolioDocument(documents, "YETKI_BELGESI");
   const tapuDocument = findPortfolioDocument(documents, "TAPU");
@@ -1957,20 +2062,6 @@ function PortfolioDocumentsCenter({
               ? "Portföy havuzda yayında."
               : "Yetki belgesi veya tapu yüklenince portföy incelemeye gönderilebilir."}
       </p>
-      
-
-
-      {canEditPortfolio && (
-  <button
-    type="button"
-    onClick={onCreateAuthorityLetter}
-    className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[16px] bg-[#2563EB] px-3 text-[12px] font-black text-white shadow-[0_12px_24px_rgba(37,99,235,0.18)]"
-  >
-    <FileText size={16} />
-    EPH Yetki Belgesi Oluştur
-  </button>
-)}
-
 
       <div className="mt-3 grid gap-2">
         <PortfolioDocumentRow
