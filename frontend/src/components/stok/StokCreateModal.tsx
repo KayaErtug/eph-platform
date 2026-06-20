@@ -13,6 +13,14 @@ import {
   STATUS_LABELS,
   TYPE_LABELS,
 } from "./stokConstants";
+import { getFeatureGroups } from "./stokFeatureGroups";
+import { getFeaturePresetKeys } from "./stokFeaturePresets";
+import {
+  getFieldRule,
+  getSpecialFields,
+  shouldShowField,
+  type PortfolioFieldKey,
+} from "./stokFieldRules";
 import {
   fetchDistrictOptions,
   fetchPlaceOptions,
@@ -78,6 +86,37 @@ const ACCEPTED_DOCUMENT_TYPES = [
 ];
 
 const MAX_DOCUMENT_SIZE = 15 * 1024 * 1024;
+
+const SPECIAL_FIELD_KEYS = [
+  "villaType",
+  "layoutType",
+  "poolType",
+  "summerHouseType",
+  "buildingStyle",
+  "homeType",
+  "accessSeason",
+  "buildingUsage",
+  "plazaClass",
+  "hotelBuildingStatus",
+  "industrialBuildingType",
+  "workshopType",
+  "businessType",
+  "warehouseType",
+  "shopType",
+  "officeType",
+  "stationType",
+  "zoningType",
+  "fieldType",
+  "vineyardType",
+  "gardenType",
+  "oliveGroveType",
+  "projectStatus",
+  "hotelSubType",
+  "pensionType",
+  "campType",
+  "resortType",
+  "periodType",
+];
 
 
 const TOURISTIC_BED_COUNT_VALUE_OPTIONS = [
@@ -283,6 +322,27 @@ function getNumberPlaceholder(type: string) {
 }
 
 
+function getFieldLabel(field: PortfolioFieldKey, type: string, required: boolean) {
+  const requiredMark = required ? " *" : "";
+
+  if (field === "roomCount") return `${getRoomLabel(type)}${requiredMark}`;
+  if (field === "area") return `${getAreaLabel(type).replace(" *", "")}${requiredMark}`;
+  if (field === "openArea") return `Açık Alan (m²)${requiredMark}`;
+  if (field === "closedArea") return `Kapalı Alan (m²)${requiredMark}`;
+  if (field === "bedCount") return `Yatak Sayısı${requiredMark}`;
+  if (field === "buildingAge") return `Bina Yaşı${requiredMark}`;
+  if (field === "floor") return `Bulunduğu Kat${requiredMark}`;
+  if (field === "totalFloors") return `${isVillaType(type) ? "Yapı Kat Sayısı" : "Toplam Kat Sayısı"}${requiredMark}`;
+  if (field === "adaNo") return `Ada No${requiredMark}`;
+  if (field === "parselNo") return `Parsel No${requiredMark}`;
+  if (field === "number") return `${getNumberLabel(type).replace(" *", "")}${requiredMark}`;
+  if (field === "price") return `Fiyat${requiredMark}`;
+  if (field === "description") return `Açıklama${requiredMark}`;
+  if (field === "availableCreditAmount") return `Kullanılabilir Kredi Tutarı${requiredMark}`;
+
+  return `${field}${requiredMark}`;
+}
+
 function getTypeKeyFromCategory(mainCategory: string, subCategory: string) {
   return CATEGORY_TYPE_MAP[mainCategory]?.[subCategory] || "DAIRE";
 }
@@ -346,135 +406,456 @@ type AreaRule = {
 type FeatureOption = {
   key: string;
   label: string;
-  group: "general" | "residential" | "commercial" | "land" | "industrial";
+  group: string;
+  groupLabel: string;
 };
 
-const FEATURE_OPTIONS: FeatureOption[] = [
-  { key: "ASANSOR", label: "Asansör", group: "general" },
-  { key: "KAPALI_OTOPARK", label: "Kapalı Otopark", group: "general" },
-  { key: "ACIK_OTOPARK", label: "Açık Otopark", group: "general" },
-  { key: "GUVENLIK", label: "Güvenlik", group: "general" },
-  { key: "SITE_ICERISINDE", label: "Site İçerisinde", group: "general" },
-  { key: "JENERATOR", label: "Jeneratör", group: "general" },
-  { key: "YANGIN_MERDIVENI", label: "Yangın Merdiveni", group: "general" },
-  { key: "KAMERA_SISTEMI", label: "Kamera Sistemi", group: "general" },
-  { key: "SU_DEPOSU", label: "Su Deposu", group: "general" },
-  { key: "HIDROFOR", label: "Hidrofor", group: "general" },
-  { key: "FIBER_INTERNET", label: "Fiber İnternet", group: "general" },
-  { key: "EBEVEYN_BANYOSU", label: "Ebeveyn Banyosu", group: "residential" },
-  { key: "BALKON", label: "Balkon", group: "residential" },
-  { key: "TERAS", label: "Teras", group: "residential" },
-  { key: "KILER", label: "Kiler", group: "residential" },
-  { key: "GIYINME_ODASI", label: "Giyinme Odası", group: "residential" },
-  { key: "ANKASTRE_MUTFAK", label: "Ankastre Mutfak", group: "residential" },
-  { key: "AKILLI_EV", label: "Akıllı Ev Sistemi", group: "residential" },
-  { key: "SOMINE", label: "Şömine", group: "residential" },
-  { key: "KLIMA", label: "Klima", group: "residential" },
-  { key: "ISI_YALITIMI", label: "Isı Yalıtımı", group: "residential" },
-  { key: "SES_YALITIMI", label: "Ses Yalıtımı", group: "residential" },
-  { key: "DENIZ_MANZARASI", label: "Deniz Manzarası", group: "residential" },
-  { key: "DOGA_MANZARASI", label: "Doğa Manzarası", group: "residential" },
-  { key: "SEHIR_MANZARASI", label: "Şehir Manzarası", group: "residential" },
-  { key: "YUKLEME_RAMPASI", label: "Yükleme Rampası", group: "industrial" },
-  { key: "TIR_GIRISI", label: "TIR Girişi", group: "industrial" },
-  { key: "VINC_SISTEMI", label: "Vinç Sistemi", group: "industrial" },
-  { key: "SANAYI_ELEKTRIGI", label: "Sanayi Elektriği", group: "industrial" },
-  { key: "FORKLIFT_ALANI", label: "Forklift Alanı", group: "industrial" },
-  { key: "DEPOLAMA_ALANI", label: "Depolama Alanı", group: "industrial" },
-  { key: "YANGIN_SONDURME_SISTEMI", label: "Yangın Söndürme Sistemi", group: "industrial" },
-  { key: "YOLU_ACIK", label: "Yolu Açık", group: "land" },
-  { key: "KADASTRO_YOLU", label: "Kadastro Yolu Var", group: "land" },
-  { key: "ELEKTRIK_VAR", label: "Elektrik Var", group: "land" },
-  { key: "SU_VAR", label: "Su Var", group: "land" },
-  { key: "SONDAJ_VAR", label: "Sondaj Var", group: "land" },
-  { key: "CEVRILI", label: "Çevrili", group: "land" },
-  { key: "KOSE_PARSEL", label: "Köşe Parsel", group: "land" },
-  { key: "IFRAZLI", label: "İfrazlı", group: "land" },
-  { key: "HISSELI", label: "Hisseli", group: "land" },
-];
-
-
-function getFeatureIcon(key: string) {
-  const icons: Record<string, string> = {
-    ASANSOR: "↕",
-    KAPALI_OTOPARK: "▣",
-    ACIK_OTOPARK: "▢",
-    GUVENLIK: "◇",
-    SITE_ICERISINDE: "⌂",
-    JENERATOR: "⚡",
-    YANGIN_MERDIVENI: "↗",
-    KAMERA_SISTEMI: "◉",
-    SU_DEPOSU: "≈",
-    HIDROFOR: "⇡",
-    FIBER_INTERNET: "⌁",
-    EBEVEYN_BANYOSU: "◌",
-    BALKON: "▤",
-    TERAS: "▱",
-    KILER: "▦",
-    GIYINME_ODASI: "◫",
-    ANKASTRE_MUTFAK: "◈",
-    AKILLI_EV: "✦",
-    SOMINE: "♨",
-    KLIMA: "❄",
-    ISI_YALITIMI: "☀",
-    SES_YALITIMI: "◍",
-    DENIZ_MANZARASI: "≈",
-    DOGA_MANZARASI: "♧",
-    SEHIR_MANZARASI: "▥",
-    YUKLEME_RAMPASI: "⇅",
-    TIR_GIRISI: "▰",
-    VINC_SISTEMI: "⚙",
-    SANAYI_ELEKTRIGI: "⚡",
-    FORKLIFT_ALANI: "▣",
-    DEPOLAMA_ALANI: "▦",
-    YANGIN_SONDURME_SISTEMI: "◉",
-    YOLU_ACIK: "═",
-    KADASTRO_YOLU: "⌖",
-    ELEKTRIK_VAR: "⚡",
-    SU_VAR: "≈",
-    SONDAJ_VAR: "◌",
-    CEVRILI: "□",
-    KOSE_PARSEL: "⌟",
-    IFRAZLI: "◇",
-    HISSELI: "◫",
-  };
-
-  return icons[key] || "✓";
+function makeFeatureKey(groupKey: string, option: string) {
+  return `${groupKey}:${option}`;
 }
 
-function getFeatureGroupTitle(group: FeatureOption["group"]) {
-  const labels: Record<FeatureOption["group"], string> = {
-    general: "Genel",
-    residential: "Konut",
-    commercial: "Ticari",
-    land: "Arsa / Arazi",
-    industrial: "Sanayi",
+function getFeatureIcon(value: string) {
+  const normalized = normalizeTypeKey(value);
+
+  if (normalized.includes("ASANSOR")) return "↕";
+  if (normalized.includes("OTOPARK") || normalized.includes("ARAC PARK")) return "▣";
+  if (normalized.includes("GUVENLIK")) return "◇";
+  if (normalized.includes("SITE")) return "⌂";
+  if (normalized.includes("JENERATOR") || normalized.includes("ELEKTRIK")) return "⚡";
+  if (normalized.includes("YANGIN")) return "◉";
+  if (normalized.includes("KAMERA")) return "◉";
+  if (normalized.includes("SU") || normalized.includes("SONDAJ") || normalized.includes("KUYU")) return "≈";
+  if (normalized.includes("FIBER") || normalized.includes("INTERNET") || normalized.includes("WI-FI")) return "⌁";
+  if (normalized.includes("BANYO") || normalized.includes("WC") || normalized.includes("DUS")) return "○";
+  if (normalized.includes("BALKON") || normalized.includes("TERAS")) return "▤";
+  if (normalized.includes("KILER") || normalized.includes("DEPO")) return "▦";
+  if (normalized.includes("MUTFAK")) return "◆";
+  if (normalized.includes("AKILLI")) return "✦";
+  if (normalized.includes("SOMINE") || normalized.includes("HAMAM") || normalized.includes("SAUNA") || normalized.includes("SPA")) return "♨";
+  if (normalized.includes("KLIMA") || normalized.includes("SOGUK")) return "❄";
+  if (normalized.includes("YALITIM")) return "☀";
+  if (normalized.includes("DENIZ") || normalized.includes("GOL") || normalized.includes("NEHIR")) return "≈";
+  if (normalized.includes("DOGA") || normalized.includes("DAG") || normalized.includes("ORMAN") || normalized.includes("PARK")) return "♧";
+  if (normalized.includes("SEHIR") || normalized.includes("CADDE") || normalized.includes("MERKEZ")) return "▥";
+  if (normalized.includes("YUKLEME") || normalized.includes("RAMPA")) return "⇅";
+  if (normalized.includes("TIR") || normalized.includes("KAMYON")) return "▰";
+  if (normalized.includes("VINC") || normalized.includes("SANAYI")) return "⚙";
+  if (normalized.includes("YOL")) return "═";
+  if (normalized.includes("TAPU") || normalized.includes("IMAR") || normalized.includes("KADASTRO")) return "⌖";
+  if (normalized.includes("CEPHE") || normalized.includes("KOSE")) return "⌟";
+  if (normalized.includes("HAVUZ")) return "≈";
+  if (normalized.includes("MANZARA")) return "●";
+
+  return "✓";
+}
+
+function getFeatureGroupTitle(group: string) {
+  const labels: Record<string, string> = {
+    interior: "İç Özellikler",
+    exterior: "Dış Özellikler",
+    location: "Muhit",
+    transport: "Ulaşım",
+    front: "Cephe",
+    view: "Manzara",
+    accessibility: "Engelliye / Yaşlıya Uygun",
+    zoning: "Tapu / İmar",
+    landInfrastructure: "Arazi Altyapısı",
+    commercial: "Ticari Değer",
+    tourism: "Turistik Tesis",
+    luxury: "Lüks Özellikler",
   };
 
   return labels[group] || "Özellik";
 }
 
-function getFeatureGroupTone(group: FeatureOption["group"]) {
-  const tones: Record<FeatureOption["group"], string> = {
-    general: "from-blue-50 to-white text-[#1557D6] border-blue-100",
-    residential: "from-violet-50 to-white text-violet-700 border-violet-100",
+function getFeatureGroupTone(group: string) {
+  const tones: Record<string, string> = {
+    interior: "from-violet-50 to-white text-violet-700 border-violet-100",
+    exterior: "from-blue-50 to-white text-[#1557D6] border-blue-100",
+    location: "from-emerald-50 to-white text-emerald-700 border-emerald-100",
+    transport: "from-sky-50 to-white text-sky-700 border-sky-100",
+    front: "from-amber-50 to-white text-amber-700 border-amber-100",
+    view: "from-cyan-50 to-white text-cyan-700 border-cyan-100",
+    accessibility: "from-indigo-50 to-white text-indigo-700 border-indigo-100",
+    zoning: "from-orange-50 to-white text-orange-700 border-orange-100",
+    landInfrastructure: "from-emerald-50 to-white text-emerald-700 border-emerald-100",
     commercial: "from-amber-50 to-white text-amber-700 border-amber-100",
-    land: "from-emerald-50 to-white text-emerald-700 border-emerald-100",
-    industrial: "from-slate-100 to-white text-slate-700 border-slate-200",
+    tourism: "from-fuchsia-50 to-white text-fuchsia-700 border-fuchsia-100",
+    luxury: "from-slate-100 to-white text-slate-700 border-slate-200",
   };
 
-  return tones[group] || tones.general;
+  return tones[group] || "from-blue-50 to-white text-[#1557D6] border-blue-100";
 }
 
-function getFeatureOptionsForType(type: string) {
-  const groups = new Set<FeatureOption["group"]>(["general"]);
 
-  if (isResidentialDetailType(type) || isVillaType(type) || isTouristicType(type)) groups.add("residential");
-  if (isIndustrialType(type)) groups.add("industrial");
-  if (isCommercialType(type)) groups.add("commercial");
-  if (isLandType(type)) groups.add("land");
+const FEATURE_FILTERS = {
+  villa: new Set([
+    "Akıllı Ev",
+    "Alarm (Hırsız)",
+    "Alarm (Yangın)",
+    "Barbekü",
+    "Beyaz Eşya",
+    "Çamaşır Odası",
+    "Çelik Kapı",
+    "Duşakabin",
+    "Ebeveyn Banyosu",
+    "Fiber İnternet",
+    "Giyinme Odası",
+    "Görüntülü Diafon",
+    "Hilton Banyo",
+    "Isıcam",
+    "Jakuzi",
+    "Klima",
+    "Kiler",
+    "Mutfak (Ankastre)",
+    "Mutfak Doğalgazı",
+    "Panjur / Jaluzi",
+    "Parke Zemin",
+    "Şömine",
+    "Teras",
+    "Vestiyer",
+    "Yüz Tanıma & Parmak İzi",
+    "Araç Şarj İstasyonu",
+    "24 Saat Güvenlik",
+    "Bahçe Terası",
+    "Çocuk Oyun Parkı",
+    "Hamam",
+    "Isı Yalıtımı",
+    "Jeneratör",
+    "Kamera Sistemi",
+    "Köpek Parkı",
+    "Müstakil Havuzlu",
+    "Sauna",
+    "Ses Yalıtımı",
+    "Spor Alanı",
+    "Su Deposu",
+    "Yüzme Havuzu (Açık)",
+    "Yüzme Havuzu (Kapalı)",
+    "Özel Havuz",
+    "Sonsuzluk Havuzu",
+    "Doğa İçinde",
+    "Denize Sıfır",
+    "Göle Sıfır",
+    "Park",
+    "Plaj",
+    "Şehir Merkezi",
+    "Anayol",
+    "Cadde",
+    "Sahil",
+    "Asfalt Yol",
+    "Doğu",
+    "Güney",
+    "Köşe Parsel",
+    "Çift Cephe",
+    "Boğaz",
+    "Deniz",
+    "Doğa",
+    "Göl",
+    "Havuz",
+    "Park & Yeşil Alan",
+    "Panoramik",
+    "Özel İskele",
+    "Marina Bağlantısı",
+    "Akıllı Ev Sistemi",
+    "Yerden Isıtma",
+    "Otomatik Panjur",
+    "Sinema Odası",
+    "Hizmetli Odası",
+  ]),
+  land: new Set([
+    "Köy Merkezi",
+    "Köy Yakını",
+    "Doğa İçinde",
+    "Anayol",
+    "Cadde",
+    "Stabilize Yol",
+    "Asfalt Yol",
+    "Köşe Parsel",
+    "Çift Cephe",
+    "Cadde Cepheli",
+    "Doğa",
+    "Göl",
+    "Nehir",
+    "Dağ",
+    "Vadi",
+    "Panoramik",
+    "Müstakil Tapu",
+    "Hisseli Tapu",
+    "İfrazlı",
+    "Tevhidli",
+    "Konut İmarlı",
+    "Villa İmarlı",
+    "Ticari İmarlı",
+    "Sanayi İmarlı",
+    "Turizm İmarlı",
+    "Konut + Ticaret",
+    "İmarsız",
+    "Sit Alanı",
+    "Kat Karşılığına Uygun",
+    "Su Var",
+    "Elektrik Var",
+    "Doğalgaz Yakın",
+    "Sondaj / Kuyu Var",
+    "Sulama Kanalı",
+    "Artezyen",
+    "Damlama Sulama",
+    "Yola Cepheli",
+    "Kadastral Yolu Var",
+    "Çit Çevrili",
+    "Dere Kenarı",
+    "Göl Kenarı",
+    "Tarım Yapılıyor",
+    "Meyve Ağaçları Var",
+    "Zeytin Ağaçları Var",
+  ]),
+  commercial: new Set([
+    "ADSL",
+    "Alarm (Hırsız)",
+    "Alarm (Yangın)",
+    "Çelik Kapı",
+    "Fiber İnternet",
+    "Klima",
+    "Mutfak Doğalgazı",
+    "Spot Aydınlatma",
+    "Yüz Tanıma & Parmak İzi",
+    "Araç Şarj İstasyonu",
+    "24 Saat Güvenlik",
+    "Hidrofor",
+    "Jeneratör",
+    "Kamera Sistemi",
+    "Su Deposu",
+    "Yangın Merdiveni",
+    "Alışveriş Merkezi",
+    "Belediye",
+    "Hastane",
+    "Market",
+    "Şehir Merkezi",
+    "Anayol",
+    "Cadde",
+    "Dolmuş",
+    "E-5",
+    "Metro",
+    "Metrobüs",
+    "Minibüs",
+    "Otobüs Durağı",
+    "TEM",
+    "Tramvay",
+    "Köşe Parsel",
+    "Çift Cephe",
+    "Cadde Cepheli",
+    "Araç Park Yeri",
+    "Giriş / Rampa",
+    "Cadde Üzeri",
+    "Köşe Konum",
+    "Tabela Değeri Yüksek",
+    "Yaya Trafiği Yoğun",
+    "Araç Trafiği Yoğun",
+    "Kiracılı",
+    "Devren",
+    "Depolu",
+    "Bacalı",
+    "WC Var",
+    "Mutfak Var",
+    "Yükleme Alanı",
+    "Tır Girişli",
+    "Rampa Var",
+    "Otopark Var",
+  ]),
+  tourism: new Set([
+    "ADSL",
+    "Beyaz Eşya",
+    "Duşakabin",
+    "Ebeveyn Banyosu",
+    "Fiber İnternet",
+    "Görüntülü Diafon",
+    "Klima",
+    "Mobilya",
+    "Mutfak (Ankastre)",
+    "Teras",
+    "24 Saat Güvenlik",
+    "Buhar Odası",
+    "Çocuk Oyun Parkı",
+    "Hamam",
+    "Jeneratör",
+    "Kamera Sistemi",
+    "Sauna",
+    "Spor Alanı",
+    "Yüzme Havuzu (Açık)",
+    "Yüzme Havuzu (Kapalı)",
+    "Denize Sıfır",
+    "Göle Sıfır",
+    "Plaj",
+    "Şehir Merkezi",
+    "Doğa İçinde",
+    "Havaalanı",
+    "Sahil",
+    "Deniz",
+    "Doğa",
+    "Göl",
+    "Panoramik",
+    "Açık Havuz",
+    "Kapalı Havuz",
+    "Spa",
+    "Restoran",
+    "Bar",
+    "Toplantı Salonu",
+    "Düğün Alanı",
+    "Plaj Kullanımı",
+    "Ruhsatlı",
+    "Sezonluk İşletme",
+    "12 Ay Açık",
+    "Özel Havuz",
+    "Sonsuzluk Havuzu",
+    "Bahçe Terası",
+    "Panoramik Manzara",
+  ]),
+} as const;
 
-  return FEATURE_OPTIONS.filter((option) => groups.has(option.group));
+const GLOBAL_FEATURE_BLOCKLIST = new Set<string>();
+
+const AGRICULTURE_PRECISE_FILTERS = {
+  arsa: new Set([
+    "Köy Yakını",
+    "Doğa İçinde",
+    "Anayol",
+    "Cadde",
+    "Stabilize Yol",
+    "Asfalt Yol",
+    "Köşe Parsel",
+    "Çift Cephe",
+    "Cadde Cepheli",
+    "Müstakil Tapu",
+    "Hisseli Tapu",
+    "İfrazlı",
+    "Tevhidli",
+    "Konut İmarlı",
+    "Villa İmarlı",
+    "Ticari İmarlı",
+    "Sanayi İmarlı",
+    "Turizm İmarlı",
+    "Konut + Ticaret",
+    "İmarsız",
+    "Kat Karşılığına Uygun",
+    "Su Var",
+    "Elektrik Var",
+    "Doğalgaz Yakın",
+    "Yola Cepheli",
+    "Kadastral Yolu Var",
+  ]),
+  tarla: new Set([
+    "Köy Merkezi",
+    "Köy Yakını",
+    "Doğa İçinde",
+    "Stabilize Yol",
+    "Asfalt Yol",
+    "Doğa",
+    "Dağ",
+    "Vadi",
+    "Müstakil Tapu",
+    "Hisseli Tapu",
+    "Su Var",
+    "Elektrik Var",
+    "Sondaj / Kuyu Var",
+    "Sulama Kanalı",
+    "Artezyen",
+    "Damlama Sulama",
+    "Yola Cepheli",
+    "Kadastral Yolu Var",
+    "Çit Çevrili",
+    "Tarım Yapılıyor",
+  ]),
+  bag: new Set([
+    "Köy Merkezi",
+    "Köy Yakını",
+    "Doğa İçinde",
+    "Stabilize Yol",
+    "Asfalt Yol",
+    "Doğa",
+    "Dağ",
+    "Vadi",
+    "Müstakil Tapu",
+    "Hisseli Tapu",
+    "Su Var",
+    "Elektrik Var",
+    "Sondaj / Kuyu Var",
+    "Sulama Kanalı",
+    "Damlama Sulama",
+    "Yola Cepheli",
+    "Kadastral Yolu Var",
+    "Çit Çevrili",
+    "Tarım Yapılıyor",
+  ]),
+  bahce: new Set([
+    "Köy Merkezi",
+    "Köy Yakını",
+    "Doğa İçinde",
+    "Asfalt Yol",
+    "Doğa",
+    "Göl",
+    "Vadi",
+    "Müstakil Tapu",
+    "Hisseli Tapu",
+    "Su Var",
+    "Elektrik Var",
+    "Sondaj / Kuyu Var",
+    "Damlama Sulama",
+    "Yola Cepheli",
+    "Kadastral Yolu Var",
+    "Çit Çevrili",
+    "Meyve Ağaçları Var",
+  ]),
+  zeytinlik: new Set([
+    "Köy Yakını",
+    "Doğa İçinde",
+    "Stabilize Yol",
+    "Asfalt Yol",
+    "Doğa",
+    "Dağ",
+    "Vadi",
+    "Müstakil Tapu",
+    "Hisseli Tapu",
+    "Su Var",
+    "Elektrik Var",
+    "Sondaj / Kuyu Var",
+    "Damlama Sulama",
+    "Yola Cepheli",
+    "Kadastral Yolu Var",
+    "Çit Çevrili",
+    "Zeytin Ağaçları Var",
+  ]),
+} as const;
+
+function getFeatureFilterForType(type: string) {
+  const normalized = normalizeTypeKey(type);
+
+  if (normalized.includes("ZEYTINLIK")) return AGRICULTURE_PRECISE_FILTERS.zeytinlik;
+  if (normalized === "BAG" || normalized.includes("BAG")) return AGRICULTURE_PRECISE_FILTERS.bag;
+  if (normalized.includes("BAHCE")) return AGRICULTURE_PRECISE_FILTERS.bahce;
+  if (normalized.includes("TARLA")) return AGRICULTURE_PRECISE_FILTERS.tarla;
+  if (normalized.includes("ARSA") || normalized.includes("IMARLI")) return AGRICULTURE_PRECISE_FILTERS.arsa;
+
+  if (isLandType(type)) return FEATURE_FILTERS.land;
+  if (isCommercialType(type) || isIndustrialType(type)) return FEATURE_FILTERS.commercial;
+  if (isTouristicType(type)) return FEATURE_FILTERS.tourism;
+  if (isVillaType(type)) return FEATURE_FILTERS.villa;
+
+  return null;
+}
+
+function getFeatureOptionsForType(type: string): FeatureOption[] {
+  const allowedOptions = getFeatureFilterForType(type);
+
+  return getFeatureGroups(getFeaturePresetKeys(type)).flatMap((group) =>
+    group.options
+      .filter((option) => !GLOBAL_FEATURE_BLOCKLIST.has(option))
+      .filter((option) => !allowedOptions || allowedOptions.has(option))
+      .map((option) => ({
+        key: makeFeatureKey(group.key, option),
+        label: option,
+        group: group.key,
+        groupLabel: group.label,
+      })),
+  );
 }
 
 const AREA_RULES: AreaRule[] = [
@@ -693,6 +1074,7 @@ export default function StokCreateModal({
   const [geoPickerOpen, setGeoPickerOpen] = useState(false);
   const [galleryPickerActive, setGalleryPickerActive] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
+  const [expandedFeatureGroups, setExpandedFeatureGroups] = useState<string[]>([]);
 
   const selectedCurrency = String(unitForm.priceCurrency || "TRY");
   const selectedFloorLabel = String((unitForm as any).floorLabel || "");
@@ -710,8 +1092,29 @@ export default function StokCreateModal({
   const doorAccessInfo = String((unitForm as any).doorAccessInfo || "");
   const deedOwnerIdFrontFile = (unitForm as any).deedOwnerIdFrontFile as File | null | undefined;
   const deedOwnerIdBackFile = (unitForm as any).deedOwnerIdBackFile as File | null | undefined;
+  const propertyDeedFile = (unitForm as any).propertyDeedFile as File | null | undefined;
   const selectedFeatures = Array.isArray((unitForm as any).features) ? ((unitForm as any).features as string[]) : [];
-  const featureOptions = getFeatureOptionsForType(unitForm.type);
+  const featureOptions = useMemo(() => getFeatureOptionsForType(unitForm.type), [unitForm.type]);
+  const groupedFeatureOptions = useMemo(() => {
+    const groupMap = new Map<string, { key: string; label: string; options: FeatureOption[] }>();
+
+    featureOptions.forEach((feature) => {
+      const existing = groupMap.get(feature.group);
+
+      if (existing) {
+        existing.options.push(feature);
+        return;
+      }
+
+      groupMap.set(feature.group, {
+        key: feature.group,
+        label: feature.groupLabel || getFeatureGroupTitle(feature.group),
+        options: [feature],
+      });
+    });
+
+    return Array.from(groupMap.values()).filter((group) => group.options.length > 0);
+  }, [featureOptions]);
   const selectedSubCategory = getSubCategoryFromType(unitForm.type);
   const subCategoryOptions = CATEGORY_OPTIONS[mainCategory] || CATEGORY_OPTIONS.KONUT;
   const roomOptions = isTouristicType(unitForm.type)
@@ -721,13 +1124,24 @@ export default function StokCreateModal({
       : ROOM_COUNT_OPTIONS;
   const priceDisplay = formatPriceInput(String(unitForm.price || ""));
   const descriptionLength = unitForm.description.length;
-  const showRoomCountField = shouldShowRoomCountField(unitForm.type);
-  const showBuildingAgeField = shouldShowBuildingAgeField(unitForm.type);
-  const showFloorFields = shouldShowFloorFields(unitForm.type);
-  const showBuildingFloorCount = shouldShowBuildingFloorCount(unitForm.type);
-  const showBedCountField = shouldShowBedCountField(unitForm.type);
-  const showOpenAreaField = shouldShowOpenAreaField(unitForm.type);
-  const showClosedAreaField = shouldShowClosedAreaField(unitForm.type);
+  const fieldRule = getFieldRule(unitForm.type);
+  const specialFields = getSpecialFields(unitForm.type);
+  const isRequiredField = (field: PortfolioFieldKey) => fieldRule.requiredFields.includes(field);
+  const isVisibleField = (field: PortfolioFieldKey) => shouldShowField(unitForm.type, field);
+  const showRoomCountField = isVisibleField("roomCount");
+  const showBuildingAgeField = isVisibleField("buildingAge");
+  const showFloorFields = isVisibleField("floor");
+  const showBuildingFloorCount = isVisibleField("totalFloors");
+  const showBedCountField = isVisibleField("bedCount");
+  const showOpenAreaField = isVisibleField("openArea");
+  const showClosedAreaField = isVisibleField("closedArea");
+  const showAreaField = isVisibleField("area");
+  const showAdaNoField = isVisibleField("adaNo");
+  const showParselNoField = isVisibleField("parselNo");
+  const showNumberField = isVisibleField("number");
+  const showPriceField = isVisibleField("price");
+  const showDescriptionField = isVisibleField("description");
+  const showAvailableCreditAmountField = isVisibleField("availableCreditAmount");
 
   const totalSelectedImages = useMemo(() => {
     return galleryImages.length;
@@ -850,6 +1264,10 @@ export default function StokCreateModal({
       window.removeEventListener("focus", clearGalleryPickerActive);
     };
   }, [galleryPickerActive]);
+
+  useEffect(() => {
+    setExpandedFeatureGroups([]);
+  }, [unitForm.type]);
 
   if (!open) return null;
 
@@ -1014,6 +1432,14 @@ export default function StokCreateModal({
     });
   };
 
+  const toggleFeatureGroup = (groupKey: string) => {
+    setExpandedFeatureGroups((current) =>
+      current.includes(groupKey)
+        ? current.filter((item) => item !== groupKey)
+        : [...current, groupKey],
+    );
+  };
+
   const handleIdentityDocumentChange = (key: "deedOwnerIdFrontFile" | "deedOwnerIdBackFile", file?: File) => {
     setImageError("");
 
@@ -1035,6 +1461,29 @@ export default function StokCreateModal({
     }
 
     setUnitFileField(key, file);
+  };
+
+  const handlePropertyDeedDocumentChange = (file?: File) => {
+    setImageError("");
+
+    if (!file) {
+      setUnitFileField("propertyDeedFile", null);
+      return;
+    }
+
+    if (!isAcceptedDocument(file)) {
+      setImageError("Tapu dosyası JPG, PNG, WEBP veya PDF formatında olmalıdır.");
+      setUnitFileField("propertyDeedFile", null);
+      return;
+    }
+
+    if (file.size > MAX_DOCUMENT_SIZE) {
+      setImageError(`Tapu dosyası 15 MB sınırını aşıyor. Seçilen belge: ${formatFileSize(file.size)}.`);
+      setUnitFileField("propertyDeedFile", null);
+      return;
+    }
+
+    setUnitFileField("propertyDeedFile", file);
   };
 
   const handleCrmCustomerSelect = (customerId: string) => {
@@ -1075,6 +1524,14 @@ export default function StokCreateModal({
       return `${rule.label} metrekare değeri mantıksız görünüyor. ${rule.min.toLocaleString("tr-TR")} m² ile ${rule.max.toLocaleString("tr-TR")} m² arasında bir değer giriniz veya bilgiyi kontrol ediniz.`;
     }
 
+    if (isRequiredField("area") && !area) {
+      return "Alan bilgisi zorunludur.";
+    }
+
+    if (isRequiredField("price") && !price) {
+      return "Fiyat bilgisi zorunludur.";
+    }
+
     if (adaNo && adaNo !== cleanAdaNo) {
       return "Ada No sadece rakamlardan oluşmalı ve en fazla 6 hane olmalıdır.";
     }
@@ -1083,9 +1540,16 @@ export default function StokCreateModal({
       return "Parsel No sadece rakamlardan oluşmalı ve en fazla 4 hane olmalıdır.";
     }
 
-    if (isLandType(unitForm.type)) {
-      if (!cleanAdaNo) return "Arsa, tarla ve arazi türlerinde Ada No zorunludur.";
-      if (!cleanParselNo) return "Arsa, tarla ve arazi türlerinde Parsel No zorunludur.";
+    if (isRequiredField("adaNo") && !cleanAdaNo) {
+      return "Bu portföy tipi için Ada No zorunludur.";
+    }
+
+    if (isRequiredField("parselNo") && !cleanParselNo) {
+      return "Bu portföy tipi için Parsel No zorunludur.";
+    }
+
+    if (isRequiredField("number") && !number) {
+      return "Bağımsız bölüm / kapı numarası zorunludur.";
     }
 
     if (!isLandType(unitForm.type) && /^\d{5,}$/.test(number)) {
@@ -1096,28 +1560,44 @@ export default function StokCreateModal({
       return "Fiyat değeri olağan dışı görünüyor. Lütfen para birimini ve tutarı kontrol ediniz.";
     }
 
-    if (showRoomCountField && !String(unitForm.roomCount || "").trim()) {
+    if (isRequiredField("roomCount") && !String(unitForm.roomCount || "").trim()) {
       return "Oda sayısı zorunludur.";
     }
 
-    if (showBuildingAgeField && !buildingAge) {
+    if (isRequiredField("buildingAge") && !buildingAge) {
       return "Bina yaşı zorunludur.";
     }
 
-    if (showFloorFields && !selectedFloorLabel) {
+    if (isRequiredField("floor") && !selectedFloorLabel) {
       return "Bulunduğu kat zorunludur.";
     }
 
-    if (showBuildingFloorCount && !buildingFloorCount) {
+    if (isRequiredField("totalFloors") && !buildingFloorCount) {
       return "Kat sayısı zorunludur.";
     }
 
-    if (showBedCountField && !bedCount.trim()) {
+    if (isRequiredField("bedCount") && !bedCount.trim()) {
       return "Yatak sayısı zorunludur.";
     }
 
-    if (showClosedAreaField && !closedArea.trim()) {
+    if (isRequiredField("closedArea") && !closedArea.trim()) {
       return "Kapalı alan zorunludur.";
+    }
+
+    if (isRequiredField("openArea") && !openArea.trim()) {
+      return "Açık alan zorunludur.";
+    }
+
+    const missingSpecialField = specialFields.find((field) =>
+      field.required && !String((unitForm as any)[field.key] || "").trim(),
+    );
+
+    if (missingSpecialField) {
+      return `${missingSpecialField.label} zorunludur.`;
+    }
+
+    if (!propertyDeedFile) {
+      return "Bu portföye ait tapu dosyası zorunludur.";
     }
 
     if (deedOwnerPhone && !isValidTurkishPhone(deedOwnerPhone)) {
@@ -1166,6 +1646,8 @@ export default function StokCreateModal({
     onSubmit();
   };
 
+  const footerAlertMessage = localError || formError || imageError || "";
+
   return (
     <div className="stock-modal-v2-backdrop" onClick={onClose}>
       <div
@@ -1181,7 +1663,7 @@ export default function StokCreateModal({
           {localError && <div className="stock-form-error">{localError}</div>}
           {imageError && <div className="stock-form-error">{imageError}</div>}
 
-          <div className="stock-form-block">
+          <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
               {projects.length > 0 && (
                 <label className="stock-form-field full">
@@ -1201,176 +1683,144 @@ export default function StokCreateModal({
               )}
 
               {!selectedProjectId && (
-                <>
-                  <label className="stock-form-field">
-                    <span>Proje Adı *</span>
-                    <input
-                      value={projectForm.name}
-                      onChange={(e) => setProjectField("name", e.target.value)}
-                      onBlur={(e) => setProjectFieldFormatted("name", e.target.value)}
-                    />
-                  </label>
-
-                  <label className="stock-form-field">
-                    <span>Şehir *</span>
-                    <select
-                      value={projectForm.city}
-                      onChange={(e) => {
-                        const nextCity = e.target.value;
-                        setProjectForm((current) => ({
-                          ...current,
-                          city: nextCity,
-                          district: "",
-                          address: "",
-                        }));
-                        setSelectedPlace("");
-                      }}
-                    >
-                      <option value="">Şehir seçiniz</option>
-                      {provinceOptions.map((city) => (
-                        <option key={city.id} value={city.name}>
-                          {city.name}
-                        </option>
-                      ))}
-                    </select>
-                    {locationLoading && (
-                      <p className="mt-2 text-xs font-bold text-[#64748B]">
-                        Konum verisi yükleniyor...
-                      </p>
-                    )}
-                  </label>
-
-                  <label className="stock-form-field">
-                    <span>İlçe *</span>
-                    {districtOptions.length > 0 ? (
-                      <select
-                        value={projectForm.district}
-                        onChange={(e) => {
-                          setProjectField("district", e.target.value);
-                          setProjectField("address", "");
-                          setSelectedPlace("");
-                        }}
-                      >
-                        <option value="">İlçe seçiniz</option>
-                        {districtOptions.map((district) => (
-                          <option key={district.id} value={district.name}>
-                            {district.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        value={projectForm.district}
-                        onChange={(e) => setProjectField("district", e.target.value)}
-                        onBlur={(e) => setProjectFieldFormatted("district", e.target.value)}
-                        placeholder={
-                          locationLoading ? "İlçeler yükleniyor..." : "İlçe yazınız"
-                        }
-                      />
-                    )}
-                  </label>
-
-                  <label className="stock-form-field">
-                    <span>Mahalle / Köy / Mevki *</span>
-                    {placeOptions.length > 0 ? (
-                      <select
-                        value={selectedPlace}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setSelectedPlace(value);
-                          setProjectField("address", value);
-                        }}
-                      >
-                        <option value="">Mahalle / köy seçiniz</option>
-                        {placeOptions.map((place) => (
-                          <option key={place.id} value={place.name}>
-                            {place.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        value={projectForm.address}
-                        onChange={(e) => setProjectField("address", e.target.value)}
-                        onBlur={(e) => setProjectFieldFormatted("address", e.target.value)}
-                        placeholder={
-                          locationLoading
-                            ? "Mahalle / köy verisi yükleniyor..."
-                            : "Mahalle / köy / mevki yazınız"
-                        }
-                      />
-                    )}
-                  </label>
-
-                  <div className="stock-form-field full">
-                    <GoogleGeoPicker
-                      city={projectForm.city}
-                      district={projectForm.district}
-                      address={projectForm.address}
-                      latitude={Number((projectForm as any).latitude || 0) || null}
-                      longitude={Number((projectForm as any).longitude || 0) || null}
-                      mapAddress={String((projectForm as any).mapAddress || "")}
-                      placeId={String((projectForm as any).placeId || "")}
-                      onOpenChange={setGeoPickerOpen}
-                      onChange={(location) => {
-                        const nextAddress = String((location as any).address || "").trim();
-
-                        if (nextAddress) {
-                          setSelectedPlace(nextAddress);
-                        }
-
-                        setProjectForm((current) => ({
-                          ...(current as any),
-                          city: String((location as any).city || current.city || "").trim(),
-                          district: String((location as any).district || current.district || "").trim(),
-                          address: nextAddress || current.address || location.mapAddress,
-                          latitude: location.latitude,
-                          longitude: location.longitude,
-                          mapAddress: location.mapAddress,
-                          placeId: location.placeId || "",
-                        }));
-                      }}
-                    />
-                  </div>
-                </>
+                <label className="stock-form-field full">
+                  <span>Proje Adı *</span>
+                  <input
+                    value={projectForm.name}
+                    onChange={(e) => setProjectField("name", e.target.value)}
+                    onBlur={(e) => setProjectFieldFormatted("name", e.target.value)}
+                  />
+                </label>
               )}
 
-              {selectedProjectId && (
-                  <div className="stock-form-field full">
-                    <GoogleGeoPicker
-                      city={projectForm.city}
-                      district={projectForm.district}
-                      address={projectForm.address}
-                      latitude={Number((projectForm as any).latitude || 0) || null}
-                      longitude={Number((projectForm as any).longitude || 0) || null}
-                      mapAddress={String((projectForm as any).mapAddress || "")}
-                      placeId={String((projectForm as any).placeId || "")}
-                      onOpenChange={setGeoPickerOpen}
-                      onChange={(location) => {
-                        const nextAddress = String((location as any).address || "").trim();
+              <label className="stock-form-field">
+                <span>Şehir *</span>
+                <select
+                  value={projectForm.city}
+                  onChange={(e) => {
+                    const nextCity = e.target.value;
+                    setProjectForm((current) => ({
+                      ...current,
+                      city: nextCity,
+                      district: "",
+                      address: "",
+                    }));
+                    setSelectedPlace("");
+                  }}
+                >
+                  <option value="">Şehir seçiniz</option>
+                  {provinceOptions.map((city) => (
+                    <option key={city.id} value={city.name}>
+                      {city.name}
+                    </option>
+                  ))}
+                </select>
+                {locationLoading && (
+                  <p className="mt-2 text-center text-xs font-bold text-[#64748B]">
+                    Konum verisi yükleniyor...
+                  </p>
+                )}
+              </label>
 
-                        if (nextAddress) {
-                          setSelectedPlace(nextAddress);
-                        }
+              <label className="stock-form-field">
+                <span>İlçe *</span>
+                {districtOptions.length > 0 ? (
+                  <select
+                    value={projectForm.district}
+                    onChange={(e) => {
+                      setProjectField("district", e.target.value);
+                      setProjectField("address", "");
+                      setSelectedPlace("");
+                    }}
+                  >
+                    <option value="">İlçe seçiniz</option>
+                    {districtOptions.map((district) => (
+                      <option key={district.id} value={district.name}>
+                        {district.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={projectForm.district}
+                    onChange={(e) => setProjectField("district", e.target.value)}
+                    onBlur={(e) => setProjectFieldFormatted("district", e.target.value)}
+                    placeholder={
+                      locationLoading ? "İlçeler yükleniyor..." : "İlçe yazınız"
+                    }
+                  />
+                )}
+              </label>
 
-                        setProjectForm((current) => ({
-                          ...(current as any),
-                          city: String((location as any).city || current.city || "").trim(),
-                          district: String((location as any).district || current.district || "").trim(),
-                          address: nextAddress || current.address || location.mapAddress,
-                          latitude: location.latitude,
-                          longitude: location.longitude,
-                          mapAddress: location.mapAddress,
-                          placeId: location.placeId || "",
-                        }));
-                      }}
-                    />
-                  </div>
-              )}
+              <label className="stock-form-field full">
+                <span>Mahalle / Köy / Mevki *</span>
+                {placeOptions.length > 0 ? (
+                  <select
+                    value={selectedPlace || projectForm.address}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedPlace(value);
+                      setProjectField("address", value);
+                    }}
+                  >
+                    <option value="">Mahalle / köy seçiniz</option>
+                    {projectForm.address && !placeOptions.some((place) => place.name === projectForm.address) && (
+                      <option value={projectForm.address}>{projectForm.address}</option>
+                    )}
+                    {placeOptions.map((place) => (
+                      <option key={place.id} value={place.name}>
+                        {place.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={projectForm.address}
+                    onChange={(e) => setProjectField("address", e.target.value)}
+                    onBlur={(e) => setProjectFieldFormatted("address", e.target.value)}
+                    placeholder={
+                      locationLoading
+                        ? "Mahalle / köy verisi yükleniyor..."
+                        : "Mahalle / köy / mevki yazınız"
+                    }
+                  />
+                )}
+              </label>
+
+              <div className="stock-form-field full">
+                <GoogleGeoPicker
+                  city={projectForm.city}
+                  district={projectForm.district}
+                  address={projectForm.address}
+                  latitude={Number((projectForm as any).latitude || 0) || null}
+                  longitude={Number((projectForm as any).longitude || 0) || null}
+                  mapAddress={String((projectForm as any).mapAddress || "")}
+                  placeId={String((projectForm as any).placeId || "")}
+                  onOpenChange={setGeoPickerOpen}
+                  onChange={(location) => {
+                    const nextAddress = String((location as any).address || "").trim();
+
+                    if (nextAddress) {
+                      setSelectedPlace(nextAddress);
+                    }
+
+                    setProjectForm((current) => ({
+                      ...(current as any),
+                      city: String((location as any).city || current.city || "").trim(),
+                      district: String((location as any).district || current.district || "").trim(),
+                      address: nextAddress || current.address || location.mapAddress,
+                      latitude: location.latitude,
+                      longitude: location.longitude,
+                      mapAddress: location.mapAddress,
+                      placeId: location.placeId || "",
+                    }));
+                  }}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="stock-form-block">
+          <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
               <label className="stock-form-field">
                 <span>Mülk Tipi *</span>
@@ -1392,6 +1842,10 @@ export default function StokCreateModal({
                       number: "",
                       adaNo: "",
                       parselNo: "",
+                      openArea: "",
+                      closedArea: "",
+                      bedCount: "",
+                      ...Object.fromEntries(SPECIAL_FIELD_KEYS.map((key) => [key, ""])),
                     } as UnitFormState));
                     setLocalError("");
                   }}
@@ -1422,6 +1876,10 @@ export default function StokCreateModal({
                       number: "",
                       adaNo: "",
                       parselNo: "",
+                      openArea: "",
+                      closedArea: "",
+                      bedCount: "",
+                      ...Object.fromEntries(SPECIAL_FIELD_KEYS.map((key) => [key, ""])),
                     } as UnitFormState));
                     setLocalError("");
                   }}
@@ -1450,7 +1908,7 @@ export default function StokCreateModal({
 
               {showRoomCountField && (
                 <label className="stock-form-field">
-                  <span>{getRoomLabel(unitForm.type)} *</span>
+                  <span>{getFieldLabel("roomCount", unitForm.type, isRequiredField("roomCount"))}</span>
                   <select
                     value={unitForm.roomCount}
                     onChange={(e) => setUnitField("roomCount", e.target.value)}
@@ -1465,19 +1923,21 @@ export default function StokCreateModal({
                 </label>
               )}
 
-              <label className="stock-form-field">
-                <span>{getAreaLabel(unitForm.type)}</span>
-                <input
-                  type="number"
-                  value={unitForm.area}
-                  onChange={(e) => setUnitField("area", e.target.value)}
-                  placeholder="Örn: 190"
-                />
-              </label>
+              {showAreaField && (
+                <label className="stock-form-field">
+                  <span>{getFieldLabel("area", unitForm.type, isRequiredField("area"))}</span>
+                  <input
+                    type="number"
+                    value={unitForm.area}
+                    onChange={(e) => setUnitField("area", e.target.value)}
+                    placeholder="Örn: 190"
+                  />
+                </label>
+              )}
 
               {showOpenAreaField && (
                 <label className="stock-form-field">
-                  <span>Açık Alan (m²) *</span>
+                  <span>{getFieldLabel("openArea", unitForm.type, isRequiredField("openArea"))}</span>
                   <input
                     type="number"
                     value={openArea}
@@ -1489,7 +1949,7 @@ export default function StokCreateModal({
 
               {showClosedAreaField && (
                 <label className="stock-form-field">
-                  <span>Kapalı Alan (m²) *</span>
+                  <span>{getFieldLabel("closedArea", unitForm.type, isRequiredField("closedArea"))}</span>
                   <input
                     type="number"
                     value={closedArea}
@@ -1501,7 +1961,7 @@ export default function StokCreateModal({
 
               {showBedCountField && (
                 <label className="stock-form-field">
-                  <span>Yatak Sayısı *</span>
+                  <span>{getFieldLabel("bedCount", unitForm.type, isRequiredField("bedCount"))}</span>
                   <select
                     value={bedCount}
                     onChange={(e) => setUnitField("bedCount", e.target.value)}
@@ -1518,7 +1978,7 @@ export default function StokCreateModal({
 
               {showBuildingAgeField && (
                 <label className="stock-form-field">
-                  <span>Bina Yaşı *</span>
+                  <span>{getFieldLabel("buildingAge", unitForm.type, isRequiredField("buildingAge"))}</span>
                   <select
                     value={buildingAge}
                     onChange={(e) => setUnitField("buildingAge", e.target.value)}
@@ -1535,7 +1995,7 @@ export default function StokCreateModal({
 
               {showFloorFields && (
                 <label className="stock-form-field">
-                  <span>Bulunduğu Kat *</span>
+                  <span>{getFieldLabel("floor", unitForm.type, isRequiredField("floor"))}</span>
                   <select
                     value={selectedFloorLabel}
                     onChange={(e) => {
@@ -1559,7 +2019,7 @@ export default function StokCreateModal({
 
               {showBuildingFloorCount && (
                 <label className="stock-form-field">
-                  <span>{isVillaType(unitForm.type) ? "Yapı Kat Sayısı *" : "Toplam Kat Sayısı *"}</span>
+                  <span>{getFieldLabel("totalFloors", unitForm.type, isRequiredField("totalFloors"))}</span>
                   <select
                     value={buildingFloorCount}
                     onChange={(e) => setUnitField("totalFloors", e.target.value)}
@@ -1574,33 +2034,62 @@ export default function StokCreateModal({
                 </label>
               )}
 
-              <label className="stock-form-field">
-                <span>Ada No{isLandType(unitForm.type) ? " *" : ""}</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={adaNo}
-                  onChange={(e) => setUnitField("adaNo", sanitizeAdaNo(e.target.value))}
-                  placeholder="Örn: 4752"
-                  maxLength={6}
-                />
-              </label>
+              {specialFields.map((field) => (
+                <label key={field.key} className="stock-form-field">
+                  <span>{field.label}{field.required ? " *" : ""}</span>
+                  <select
+                    value={String((unitForm as any)[field.key] || "")}
+                    onChange={(e) => setUnitField(field.key, e.target.value)}
+                  >
+                    <option value="">Seçiniz</option>
+                    {field.options.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
 
-              <label className="stock-form-field">
-                <span>Parsel No{isLandType(unitForm.type) ? " *" : ""}</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={parselNo}
-                  onChange={(e) => setUnitField("parselNo", sanitizeParselNo(e.target.value))}
-                  placeholder="Örn: 11"
-                  maxLength={4}
-                />
-              </label>
+              {fieldRule.note && (
+                <div className="stock-form-field full">
+                  <p className="rounded-[16px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 py-2 text-center text-xs font-bold leading-5 text-[#64748B]">
+                    {fieldRule.note}
+                  </p>
+                </div>
+              )}
 
-              {!isLandType(unitForm.type) && (
+              {showAdaNoField && (
                 <label className="stock-form-field">
-                  <span>{getNumberLabel(unitForm.type)}</span>
+                  <span>{getFieldLabel("adaNo", unitForm.type, isRequiredField("adaNo"))}</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={adaNo}
+                    onChange={(e) => setUnitField("adaNo", sanitizeAdaNo(e.target.value))}
+                    placeholder="Örn: 4752"
+                    maxLength={6}
+                  />
+                </label>
+              )}
+
+              {showParselNoField && (
+                <label className="stock-form-field">
+                  <span>{getFieldLabel("parselNo", unitForm.type, isRequiredField("parselNo"))}</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={parselNo}
+                    onChange={(e) => setUnitField("parselNo", sanitizeParselNo(e.target.value))}
+                    placeholder="Örn: 11"
+                    maxLength={4}
+                  />
+                </label>
+              )}
+
+              {showNumberField && (
+                <label className="stock-form-field">
+                  <span>{getFieldLabel("number", unitForm.type, isRequiredField("number"))}</span>
                   <input
                     value={unitForm.number}
                     onChange={(e) => setUnitField("number", e.target.value)}
@@ -1609,75 +2098,63 @@ export default function StokCreateModal({
                 </label>
               )}
 
-              <label className="stock-form-field">
-                <span>Para Birimi *</span>
-                <select
-                  value={selectedCurrency}
-                  onChange={(e) => setUnitField("priceCurrency", e.target.value)}
-                >
-                  {CURRENCY_OPTIONS.map((currency) => (
-                    <option key={currency.value} value={currency.value}>
-                      {currency.symbol} {currency.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {showPriceField && (
+                <>
+                  <label className="stock-form-field">
+                    <span>Para Birimi *</span>
+                    <select
+                      value={selectedCurrency}
+                      onChange={(e) => setUnitField("priceCurrency", e.target.value)}
+                    >
+                      {CURRENCY_OPTIONS.map((currency) => (
+                        <option key={currency.value} value={currency.value}>
+                          {currency.symbol} {currency.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-              <label className="stock-form-field full">
-                <span>Fiyat ({getCurrencySymbol(selectedCurrency)}) *</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={priceDisplay}
-                  onChange={(e) => setUnitField("price", parseFormattedNumber(e.target.value))}
-                  placeholder="Örn: 10.500.000"
-                />
-              </label>
+                  <label className="stock-form-field full">
+                    <span>{getFieldLabel("price", unitForm.type, isRequiredField("price"))} ({getCurrencySymbol(selectedCurrency)})</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={priceDisplay}
+                      onChange={(e) => setUnitField("price", parseFormattedNumber(e.target.value))}
+                      placeholder="Örn: 10.500.000"
+                    />
+                  </label>
+                </>
+              )}
 
-              <div className="stock-form-field full">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-emerald-50 to-white px-3 py-2 text-[#06194A] shadow-[0_10px_22px_rgba(16,185,129,0.08)]">💳 Finans Bilgileri</span>
-                <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
-                  Kullanılabilir kredi tutarı portföy kartında açık bilgi olarak gösterilir. Boş bırakılırsa ekranda görünmez.
-                </p>
-              </div>
-
-              <label className="stock-form-field full">
-                <span>Kullanılabilir Kredi Tutarı ({getCurrencySymbol(selectedCurrency)})</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={availableCreditAmountDisplay}
-                  onChange={(e) => setUnitField("availableCreditAmount", parseFormattedNumber(e.target.value))}
-                  placeholder="Örn: 1.250.000"
-                />
-              </label>
-
-              <label className="stock-form-field full">
-                <span>Açıklama</span>
-                <textarea
-                  maxLength={MAX_DESCRIPTION_LENGTH}
-                  value={unitForm.description}
-                  onChange={(e) => setUnitField("description", e.target.value)}
-                  onBlur={(e) => setUnitField("description", normalizeTurkishText(e.target.value))}
-                />
-                <p className={`mt-2 text-xs font-black ${descriptionLength > 450 ? "text-amber-700" : "text-[#64748B]"}`}>
-                  {descriptionLength} / {MAX_DESCRIPTION_LENGTH} karakter
-                </p>
-              </label>
+              {showDescriptionField && (
+                <label className="stock-form-field full">
+                  <span>{getFieldLabel("description", unitForm.type, isRequiredField("description"))}</span>
+                  <textarea
+                    maxLength={MAX_DESCRIPTION_LENGTH}
+                    value={unitForm.description}
+                    onChange={(e) => setUnitField("description", e.target.value)}
+                    onBlur={(e) => setUnitField("description", normalizeTurkishText(e.target.value))}
+                  />
+                  <p className={`mt-2 text-xs font-black ${descriptionLength > 450 ? "text-amber-700" : "text-[#64748B]"}`}>
+                    {descriptionLength} / {MAX_DESCRIPTION_LENGTH} karakter
+                  </p>
+                </label>
+              )}
             </div>
           </div>
 
 
-          <div className="stock-form-block">
+          <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
               <div className="stock-form-field full">
                 <button
                   type="button"
                   onClick={() => setFeaturesOpen((current) => !current)}
-                  className={`relative flex min-h-[64px] w-full items-center justify-between gap-3 overflow-hidden rounded-[24px] border px-4 text-left shadow-[0_18px_38px_rgba(21,87,214,0.12)] transition active:scale-[0.99] ${
+                  className={`relative flex min-h-[64px] w-full items-center justify-between gap-3 overflow-hidden rounded-[24px] border-2 px-4 text-left shadow-[0_18px_42px_rgba(15,23,42,0.12)] transition active:scale-[0.99] ${
                     featuresOpen
-                      ? "border-[#BFD3F7] bg-gradient-to-r from-[#EFF6FF] via-white to-emerald-50"
-                      : "border-[#DDE7F3] bg-gradient-to-r from-white via-[#F8FAFC] to-[#EFF6FF]"
+                      ? "border-[#D6E1F0] bg-white"
+                      : "border-[#D6E1F0] bg-white"
                   }`}
                 >
                   <span className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#1557D6]/8" />
@@ -1688,7 +2165,7 @@ export default function StokCreateModal({
                     <span className="min-w-0">
                       <b className="block text-[14px] font-black tracking-[-0.02em] text-[#06194A]">Ek Özellikler</b>
                       <small className="mt-0.5 block text-[11px] font-bold leading-4 text-[#64748B]">
-                        {selectedFeatures.length > 0 ? `${selectedFeatures.length} özellik seçildi · Portföy kartında rozet olarak görünür` : "Asansör, otopark, güvenlik ve özel avantajları seç"}
+                        {selectedFeatures.length > 0 ? `${selectedFeatures.length} özellik seçildi · Portföy kartında özellik rozeti olarak görünür` : "Bu portföy tipine uygun ek özellikleri seç"}
                       </small>
                     </span>
                   </span>
@@ -1701,44 +2178,72 @@ export default function StokCreateModal({
               {featuresOpen && (
                 <div className="stock-form-field full">
                   <div className="rounded-[26px] border border-[#DDE7F3] bg-gradient-to-b from-white to-[#F8FAFC] p-3 shadow-[0_18px_44px_rgba(15,23,42,0.07)]">
-                    <div className="mb-3 flex items-center justify-between gap-2 rounded-[20px] bg-[#06194A] px-3 py-2 text-white shadow-[0_14px_30px_rgba(6,25,74,0.18)]">
+                    <div className="mb-3 flex items-center justify-between gap-2 rounded-[20px] bg-[#15803D] px-3 py-2 text-white shadow-[0_14px_30px_rgba(21,128,61,0.18)]">
                       <div className="min-w-0">
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Öne Çıkanlar</p>
-                        <p className="mt-0.5 text-[12px] font-black leading-4">Seçilenler portföy detayında premium rozet olarak görünür.</p>
+                        <p className="mt-0.5 text-[12px] font-black leading-4">Seçilenler portföy detayında özellik rozeti olarak görünür.</p>
                       </div>
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-white/12 text-[13px] font-black">
                         {selectedFeatures.length}/{featureOptions.length}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                      {featureOptions.map((feature) => {
-                        const checked = selectedFeatures.includes(feature.key);
+                    <div className="space-y-2">
+                      {groupedFeatureOptions.map((group) => {
+                        const groupOpen = expandedFeatureGroups.includes(group.key);
+                        const selectedInGroup = group.options.filter((feature) => selectedFeatures.includes(feature.key)).length;
 
                         return (
-                          <button
-                            key={feature.key}
-                            type="button"
-                            onClick={() => toggleFeature(feature.key)}
-                            className={`group relative flex min-h-[58px] items-center justify-center overflow-hidden rounded-[18px] border px-2.5 text-center text-[11px] font-black shadow-[0_10px_22px_rgba(15,23,42,0.06)] transition active:scale-[0.98] ${
-                              checked
-                                ? "border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-emerald-100 text-emerald-800 ring-1 ring-emerald-100"
-                                : "border-[#DDE7F3] bg-white text-[#475569] hover:border-[#BFD3F7] hover:bg-[#F8FAFC]"
-                            }`}
-                          >
-                            <span className={`absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black ${checked ? "bg-emerald-600 text-white" : "bg-[#F1F5F9] text-[#94A3B8]"}`}>
-                              {checked ? "✓" : "+"}
-                            </span>
-                            <span className="flex flex-col items-center justify-center gap-1.5">
-                              <span className={`flex h-7 w-7 items-center justify-center rounded-[12px] border bg-gradient-to-br text-[13px] font-black ${checked ? "border-emerald-200 from-white to-emerald-50 text-emerald-700" : getFeatureGroupTone(feature.group)}`}>
-                                {getFeatureIcon(feature.key)}
+                          <div key={group.key} className="overflow-hidden rounded-[20px] border-2 border-[#D6E4F4] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+                            <button
+                              type="button"
+                              onClick={() => toggleFeatureGroup(group.key)}
+                              className={`grid min-h-[62px] w-full grid-cols-[1fr_42px] items-center gap-3 px-4 py-2 text-center transition active:scale-[0.99] ${
+                                groupOpen ? "bg-[#F8FAFC]" : "bg-white"
+                              }`}
+                              aria-expanded={groupOpen}
+                            >
+                              <span className="min-w-0">
+                                <b className="block truncate text-[12px] font-black uppercase tracking-[0.08em] text-[#06194A]">{group.label}</b>
+                                <small className="mt-0.5 block text-[10px] font-bold text-[#64748B]">
+                                  {selectedInGroup > 0 ? `${selectedInGroup} seçili · ${group.options.length} seçenek` : `${group.options.length} seçenek`}
+                                </small>
                               </span>
-                              <span className="line-clamp-2 leading-tight">{feature.label}</span>
-                              <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.10em] ${checked ? "bg-emerald-600/10 text-emerald-700" : "bg-[#F1F5F9] text-[#64748B]"}`}>
-                                {getFeatureGroupTitle(feature.group)}
+
+                              <span className={`flex h-9 w-9 items-center justify-center justify-self-end rounded-[14px] text-[18px] font-black transition ${groupOpen ? "bg-[#06194A] text-white" : "bg-[#EFF6FF] text-[#1557D6]"}`}>
+                                {groupOpen ? "−" : "+"}
                               </span>
-                            </span>
-                          </button>
+                            </button>
+
+                            {groupOpen && (
+                              <div className="grid grid-cols-2 gap-2 border-t-2 border-[#D6E4F4] bg-[#EEF5FF] p-2 md:grid-cols-3">
+                                {group.options.map((feature, index) => {
+                                  const checked = selectedFeatures.includes(feature.key);
+                                  const isLastOdd = group.options.length % 2 === 1 && index === group.options.length - 1;
+
+                                  return (
+                                    <button
+                                      key={feature.key}
+                                      type="button"
+                                      onClick={() => toggleFeature(feature.key)}
+                                      className={`group relative flex min-h-[58px] items-center justify-center overflow-hidden rounded-[18px] border px-2.5 text-center text-[11px] font-black shadow-[0_10px_22px_rgba(15,23,42,0.06)] transition active:scale-[0.98] ${isLastOdd ? "col-span-2 mx-auto w-[calc(50%-0.25rem)] min-w-[136px] md:col-span-1 md:col-start-2 md:w-full" : "w-full"} ${
+                                        checked
+                                          ? "border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-emerald-100 text-emerald-800 ring-1 ring-emerald-100"
+                                          : "border-[#DDE7F3] bg-white text-[#475569] hover:border-[#BFD3F7] hover:bg-white"
+                                      }`}
+                                    >
+                                      <span className={`absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black ${checked ? "bg-emerald-600 text-white" : "bg-[#F1F5F9] text-[#94A3B8]"}`}>
+                                        {checked ? "✓" : "+"}
+                                      </span>
+                                      <span className="flex flex-col items-center justify-center gap-1.5 px-1">
+                                        <span className="line-clamp-2 leading-tight">{feature.label}</span>
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -1760,16 +2265,16 @@ export default function StokCreateModal({
             </div>
           </div>
 
-          <div className="stock-form-block">
+          <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
-              <div className="stock-form-field full">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-slate-100 to-white px-3 py-2 text-[#06194A] shadow-[0_10px_22px_rgba(15,23,42,0.08)]">🔒 Erişim Bilgileri</span>
+              <div className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">🔒 Erişim Bilgileri</span>
                 <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
                   Kapı şifresi, site giriş kodu, kapıcı bilgisi gibi erişim notları mahremdir. Havuzda ve genel görünümde gerçek değer gösterilmez.
                 </p>
               </div>
 
-              <label className="stock-form-field full">
+              <label className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 text-center shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
                 <span>Kapı Erişim Bilgisi</span>
                 <textarea
                   maxLength={500}
@@ -1784,10 +2289,10 @@ export default function StokCreateModal({
             </div>
           </div>
 
-          <div className="stock-form-block">
+          <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
               <div className="stock-form-field full">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-[#EFF6FF] to-white px-3 py-2 text-[#06194A] shadow-[0_10px_22px_rgba(21,87,214,0.08)]">👤 Tapu Sahibi Bilgileri</span>
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">👤 Tapu Sahibi Bilgileri</span>
                 <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
                   Bu bilgiler mahremdir. Sadece portföy sahibi ve Yazılım Ekibi görebilir. Portföy kaydedilince CRM kaydı otomatik oluşturulur veya mevcut CRM kaydıyla eşleştirilir.
                 </p>
@@ -1858,61 +2363,124 @@ export default function StokCreateModal({
                 />
               </label>
 
-              <div className="stock-form-field full">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-amber-50 to-white px-3 py-2 text-[#06194A] shadow-[0_10px_22px_rgba(245,158,11,0.08)]">🔐 Tapu Sahibi Kimlik Belgesi</span>
+              <div className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">📄 Portföy Tapu Dosyası *</span>
                 <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
-                  Kimlik belgeleri mahrem evraktır. Sadece portföy sahibi ve Yazılım Ekibi görebilir. Admin ve Moderatör görüntüleyemez.
+                  Her portföy için tapu dosyası ayrı yüklenir. Kimlik belgesi kişiye aittir; tapu dosyası portföye aittir.
                 </p>
               </div>
 
-              <label className="stock-form-field">
-                <span>Kimlik Ön Yüz</span>
+              <label className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 text-center shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
+                <span>Tapu Dosyası *</span>
                 <input
+                  id="propertyDeedFileInput"
                   type="file"
                   accept="image/jpeg,image/png,image/webp,application/pdf"
-                  onChange={(e) => handleIdentityDocumentChange("deedOwnerIdFrontFile", e.target.files?.[0])}
+                  onChange={(e) => handlePropertyDeedDocumentChange(e.target.files?.[0])}
+                  className="hidden"
                 />
-                <small className="stock-upload-hint">
-                  {deedOwnerIdFrontFile ? `Seçildi: ${deedOwnerIdFrontFile.name} (${formatFileSize(deedOwnerIdFrontFile.size)})` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
+                <label
+                  htmlFor="propertyDeedFileInput"
+                  className="mt-2 flex min-h-[48px] w-full cursor-pointer items-center justify-center rounded-[18px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 text-center text-sm font-black text-[#06194A] shadow-inner transition active:scale-[0.99]"
+                >
+                  {propertyDeedFile ? propertyDeedFile.name : "Tapu dosyası seç"}
+                </label>
+                <small className="stock-upload-hint mt-2 block text-center">
+                  {propertyDeedFile ? `Seçildi · ${formatFileSize(propertyDeedFile.size)}` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
                 </small>
-                {deedOwnerIdFrontFile && (
+                {propertyDeedFile && (
                   <button
                     type="button"
-                    className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-black text-rose-700"
-                    onClick={() => setUnitFileField("deedOwnerIdFrontFile", null)}
+                    className="mx-auto mt-2 flex min-h-[38px] items-center justify-center rounded-xl bg-rose-50 px-4 py-2 text-[11px] font-black text-rose-700"
+                    onClick={() => setUnitFileField("propertyDeedFile", null)}
                   >
-                    Ön yüzü kaldır
+                    Tapu dosyasını kaldır
                   </button>
                 )}
               </label>
 
-              <label className="stock-form-field">
-                <span>Kimlik Arka Yüz</span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,application/pdf"
-                  onChange={(e) => handleIdentityDocumentChange("deedOwnerIdBackFile", e.target.files?.[0])}
-                />
-                <small className="stock-upload-hint">
-                  {deedOwnerIdBackFile ? `Seçildi: ${deedOwnerIdBackFile.name} (${formatFileSize(deedOwnerIdBackFile.size)})` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
-                </small>
-                {deedOwnerIdBackFile && (
-                  <button
-                    type="button"
-                    className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-black text-rose-700"
-                    onClick={() => setUnitFileField("deedOwnerIdBackFile", null)}
-                  >
-                    Arka yüzü kaldır
-                  </button>
-                )}
-              </label>
+              {selectedCrmCustomerId ? (
+                <div className="stock-form-field full rounded-[24px] border-2 border-emerald-200 bg-gradient-to-b from-emerald-50 to-white p-4 text-center shadow-[0_14px_30px_rgba(16,185,129,0.10)]">
+                  <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-white px-3 py-2 text-[#065F46] shadow-[0_10px_22px_rgba(16,185,129,0.08)]">✅ Tapu sahibi CRM’den seçildi</span>
+                  <p className="mt-2 text-xs font-bold leading-5 text-[#64748B]">
+                    Kimlik ön yüz / arka yüz bilgisi kişi kaydında tutulur. Aynı tapu sahibi için tekrar istenmez.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
+                    <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">🔐 Tapu Sahibi Kimlik Belgesi</span>
+                    <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
+                      İlk kez girilen tapu sahibi için kimlik belgesi alınır. CRM’den seçilen kişilerde tekrar istenmez.
+                    </p>
+                  </div>
+
+                  <label className="stock-form-field rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 text-center shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
+                    <span>Kimlik Ön Yüz</span>
+                    <input
+                      id="deedOwnerIdFrontFileInput"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      onChange={(e) => handleIdentityDocumentChange("deedOwnerIdFrontFile", e.target.files?.[0])}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="deedOwnerIdFrontFileInput"
+                      className="mt-2 flex min-h-[48px] w-full cursor-pointer items-center justify-center rounded-[18px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 text-center text-sm font-black text-[#06194A] shadow-inner transition active:scale-[0.99]"
+                    >
+                      {deedOwnerIdFrontFile ? deedOwnerIdFrontFile.name : "Kimlik ön yüz seç"}
+                    </label>
+                    <small className="stock-upload-hint mt-2 block text-center">
+                      {deedOwnerIdFrontFile ? `Seçildi · ${formatFileSize(deedOwnerIdFrontFile.size)}` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
+                    </small>
+                    {deedOwnerIdFrontFile && (
+                      <button
+                        type="button"
+                        className="mx-auto mt-2 flex min-h-[38px] items-center justify-center rounded-xl bg-rose-50 px-4 py-2 text-[11px] font-black text-rose-700"
+                        onClick={() => setUnitFileField("deedOwnerIdFrontFile", null)}
+                      >
+                        Ön yüzü kaldır
+                      </button>
+                    )}
+                  </label>
+
+                  <label className="stock-form-field rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 text-center shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
+                    <span>Kimlik Arka Yüz</span>
+                    <input
+                      id="deedOwnerIdBackFileInput"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      onChange={(e) => handleIdentityDocumentChange("deedOwnerIdBackFile", e.target.files?.[0])}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="deedOwnerIdBackFileInput"
+                      className="mt-2 flex min-h-[48px] w-full cursor-pointer items-center justify-center rounded-[18px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 text-center text-sm font-black text-[#06194A] shadow-inner transition active:scale-[0.99]"
+                    >
+                      {deedOwnerIdBackFile ? deedOwnerIdBackFile.name : "Kimlik arka yüz seç"}
+                    </label>
+                    <small className="stock-upload-hint mt-2 block text-center">
+                      {deedOwnerIdBackFile ? `Seçildi · ${formatFileSize(deedOwnerIdBackFile.size)}` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
+                    </small>
+                    {deedOwnerIdBackFile && (
+                      <button
+                        type="button"
+                        className="mx-auto mt-2 flex min-h-[38px] items-center justify-center rounded-xl bg-rose-50 px-4 py-2 text-[11px] font-black text-rose-700"
+                        onClick={() => setUnitFileField("deedOwnerIdBackFile", null)}
+                      >
+                        Arka yüzü kaldır
+                      </button>
+                    )}
+                  </label>
+                </>
+              )}
             </div>
           </div>
 
-          <div className="stock-form-block">
+          <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
               <div className="stock-form-field full">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-[#EFF6FF] to-white px-3 py-2 text-[#06194A] shadow-[0_10px_22px_rgba(21,87,214,0.08)]">🖼 Galeriye Fotoğraf Ekle * ({galleryImages.length}/{MAX_GALLERY_COUNT})</span>
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">🖼️ Galeriye Fotoğraf Ekle * ({galleryImages.length}/{MAX_GALLERY_COUNT})</span>
                 <small className="stock-upload-hint block text-center">
                   JPG / PNG / WEBP · min. 800×600 px · önerilen 1920×1080 · maks. 15 MB
                 </small>
@@ -2037,6 +2605,12 @@ export default function StokCreateModal({
 
         {!geoPickerOpen && !galleryPickerActive && !checkingImages && (
           <div className="stock-modal-v2-foot stock-modal-v10-foot">
+            {footerAlertMessage && (
+              <div className="col-span-2 mb-2 flex w-full items-center justify-center rounded-[18px] border border-rose-200 bg-rose-50 px-3 py-2 text-center text-[12px] font-black leading-5 text-rose-700 shadow-[0_12px_26px_rgba(225,29,72,0.10)]">
+                {footerAlertMessage}
+              </div>
+            )}
+
             <button className="stock-cancel-btn" onClick={onClose}>
               İptal
             </button>

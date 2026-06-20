@@ -2004,9 +2004,20 @@ function PortfolioDetailInfoCenter({
           {isLand ? "Ada / Parsel ve İmar Bilgileri" : "Konum / Kat / Blok Bilgileri"}
         </p>
         <div className="mt-2 grid grid-cols-2 gap-2">
-          {(isLand ? landRows : residenceRows).map((item) => (
-            <InfoRow key={`${item.label}-${item.value}`} label={item.label} value={item.value} />
-          ))}
+          {(isLand ? landRows : residenceRows).map((item, index, array) => {
+            const isLastOdd = array.length % 2 === 1 && index === array.length - 1;
+
+            return (
+              <div
+                key={`${item.label}-${item.value}`}
+                className={isLastOdd ? "col-span-2 flex justify-center" : ""}
+              >
+                <div className={isLastOdd ? "w-[48%] min-w-[150px] max-w-[210px]" : "w-full"}>
+                  <InfoRow label={item.label} value={item.value} />
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

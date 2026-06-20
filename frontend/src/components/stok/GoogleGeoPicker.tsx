@@ -400,28 +400,28 @@ export default function GoogleGeoPicker({
   };
 
   return (
-    <div className="rounded-[24px] border border-[#DDE7F3] bg-[#F8FBFF] p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 text-left">
+    <div className="rounded-[24px] border-2 border-[#C7D6E8] bg-gradient-to-b from-[#F8FBFF] to-white p-3 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
+      <div className="flex flex-col items-center justify-center gap-3 text-center">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex min-h-[44px] min-w-[142px] items-center justify-center gap-2 rounded-[18px] bg-[#1557D6] px-4 text-[12px] font-black text-white shadow-[0_12px_24px_rgba(21,87,214,0.22)] transition active:scale-[0.98]"
+        >
+          <MapPin size={16} />
+          {buttonLabel}
+        </button>
+
+        <div className="min-w-0 text-center">
           <p className="text-[12px] font-black uppercase tracking-[0.16em] text-[#1557D6]">{title}</p>
-          <p className="mt-1 text-[13px] font-extrabold leading-5 text-[#06194A]">{selectedLocationText}</p>
+          <p className="mx-auto mt-1 max-w-[280px] text-[13px] font-extrabold leading-5 text-[#06194A]">{selectedLocationText}</p>
           {latitude && longitude ? (
             <p className="mt-1 text-[11px] font-bold text-[#64748B]">
               {latitude.toFixed(6)}, {longitude.toFixed(6)}
             </p>
           ) : (
-            <p className="mt-1 text-[11px] font-bold text-amber-700">{subtitle}</p>
+            <p className="mx-auto mt-1 max-w-[280px] text-[11px] font-bold leading-4 text-amber-700">{subtitle}</p>
           )}
         </div>
-
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-[18px] bg-[#1557D6] px-3 text-[12px] font-black text-white"
-        >
-          <MapPin size={16} />
-          {buttonLabel}
-        </button>
       </div>
 
       {open && (
