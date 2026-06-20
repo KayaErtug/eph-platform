@@ -1290,17 +1290,26 @@ export default function StokDetailPage() {
             Geri
           </button>
           {canEditPortfolio && (
-            <button
-              onClick={() => setManagementOpen((current) => !current)}
-              className={`inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border px-3 text-[12px] font-black shadow-[0_8px_18px_rgba(15,23,42,0.05)] ${
-                managementOpen
-                  ? "border-[#1557D6] bg-[#1557D6] text-white"
-                  : "border-[#DDE7F3] bg-white text-[#1557D6]"
-              }`}
-            >
-              <Edit3 size={15} />
-              {managementOpen ? "Kapat" : "Güncelle"}
-            </button>
+            <>
+              <button
+                onClick={() => router.push(`/portfoy?edit=${unit.id}`)}
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#1557D6] shadow-[0_8px_18px_rgba(15,23,42,0.05)]"
+              >
+                <Edit3 size={15} />
+                Güncelle
+              </button>
+              <button
+                onClick={() => setManagementOpen((current) => !current)}
+                className={`inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border px-3 text-[12px] font-black shadow-[0_8px_18px_rgba(15,23,42,0.05)] ${
+                  managementOpen
+                    ? "border-[#1557D6] bg-[#1557D6] text-white"
+                    : "border-[#DDE7F3] bg-white text-[#1557D6]"
+                }`}
+              >
+                <Camera size={15} />
+                {managementOpen ? "Merkezi Kapat" : "Medya / Evrak"}
+              </button>
+            </>
           )}
           <button
             onClick={handleCopyLink}
@@ -1742,10 +1751,10 @@ export default function StokDetailPage() {
           <section className="mt-2 rounded-[20px] border border-rose-100 bg-white p-2 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => setManagementOpen((current) => !current)}
+                onClick={() => router.push(`/portfoy?edit=${unit.id}`)}
                 className="h-9 w-full rounded-[14px] bg-[#EFF6FF] text-[12px] font-black text-[#1557D6]"
               >
-                {managementOpen ? "Güncellemeyi Kapat" : "Güncellemeyi Aç"}
+                Tüm Bilgileri Güncelle
               </button>
               <button
                 onClick={() => {
