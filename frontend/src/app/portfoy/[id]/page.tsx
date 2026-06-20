@@ -60,6 +60,7 @@ import type {
   Unit,
 } from "@/components/stok/stokTypes";
 import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
+import EphAuthorityLetterModal from "@/components/authority-letters/EphAuthorityLetterModal";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
 
 type DetailUnit = Unit & {
@@ -109,13 +110,13 @@ const FEATURE_LABELS: Record<string, string> = {
   GIYINME_ODASI: "Giyinme Odası",
   ANKASTRE_MUTFAK: "Ankastre Mutfak",
   AKILLI_EV: "Akıllı Ev Sistemi",
-  SOMINE: "�?ömine",
+  SOMINE: " ?ömine",
   KLIMA: "Klima",
   ISI_YALITIMI: "Isı Yalıtımı",
   SES_YALITIMI: "Ses Yalıtımı",
   DENIZ_MANZARASI: "Deniz Manzarası",
   DOGA_MANZARASI: "Doğa Manzarası",
-  SEHIR_MANZARASI: "�?ehir Manzarası",
+  SEHIR_MANZARASI: " ?ehir Manzarası",
   YUKLEME_RAMPASI: "Yükleme Rampası",
   TIR_GIRISI: "TIR Girişi",
   VINC_SISTEMI: "Vinç Sistemi",
@@ -232,9 +233,9 @@ function normalizeDetailType(value?: string) {
   return String(value || "")
     .toLocaleUpperCase("tr-TR")
     .replaceAll("İ", "I")
-    .replaceAll("�?", "G")
+    .replaceAll(" ?", "G")
     .replaceAll("Ü", "U")
-    .replaceAll("�?", "S")
+    .replaceAll(" ?", "S")
     .replaceAll("Ö", "O")
     .replaceAll("Ç", "C");
 }
@@ -627,6 +628,7 @@ export default function StokDetailPage() {
   const [activePhoto, setActivePhoto] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [authorityLetterOpen, setAuthorityLetterOpen] = useState(false);
   const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -654,7 +656,7 @@ export default function StokDetailPage() {
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    if (galleryOpen || shareOpen || deleteOpen) {
+    if (galleryOpen || shareOpen || deleteOpen || authorityLetterOpen) {
       const previousOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => {
@@ -662,7 +664,7 @@ export default function StokDetailPage() {
       };
     }
     document.body.style.overflow = "";
-  }, [galleryOpen, shareOpen, deleteOpen]);
+  }, [galleryOpen, shareOpen, deleteOpen, authorityLetterOpen]);
 
   const fetchUnit = async () => {
     try {
@@ -1727,6 +1729,7 @@ export default function StokDetailPage() {
             onUploadTapu={() => tapuDocumentInputRef.current?.click()}
             onDeleteDocument={handleDeleteDocument}
             onSubmitApproval={handleSubmitApproval}
+            onCreateAuthorityLetter={() => setAuthorityLetterOpen(true)}
           />
         )}
 
@@ -1873,6 +1876,22 @@ export default function StokDetailPage() {
         onClose={() => setShareOpen(false)}
         data={shareData}
       />
+      <EphAuthorityLetterModal
+        open={authorityLetterOpen}
+        unitId={unit.id}
+        onClose={() => setAuthorityLetterOpen(false)}
+        onCreated={() => fetchPortfolioDocuments(unit.id)}
+      />
+
+
+
+
+
+
+
+
+
+
     </main>
   );
 }
@@ -1891,6 +1910,7 @@ function PortfolioDocumentsCenter({
   onUploadTapu,
   onDeleteDocument,
   onSubmitApproval,
+  onCreateAuthorityLetter,
 }: {
   unit: DetailUnit;
   documents: PortfolioAuthorityDocument[];
@@ -1903,6 +1923,7 @@ function PortfolioDocumentsCenter({
   onUploadTapu: () => void;
   onDeleteDocument: (documentId?: string) => void;
   onSubmitApproval: () => void;
+  onCreateAuthorityLetter: () => void;
 }) {
   const yetkiDocument = findPortfolioDocument(documents, "YETKI_BELGESI");
   const tapuDocument = findPortfolioDocument(documents, "TAPU");
@@ -1936,6 +1957,20 @@ function PortfolioDocumentsCenter({
               ? "Portföy havuzda yayında."
               : "Yetki belgesi veya tapu yüklenince portföy incelemeye gönderilebilir."}
       </p>
+      
+
+
+      {canEditPortfolio && (
+  <button
+    type="button"
+    onClick={onCreateAuthorityLetter}
+    className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[16px] bg-[#2563EB] px-3 text-[12px] font-black text-white shadow-[0_12px_24px_rgba(37,99,235,0.18)]"
+  >
+    <FileText size={16} />
+    EPH Yetki Belgesi Oluştur
+  </button>
+)}
+
 
       <div className="mt-3 grid gap-2">
         <PortfolioDocumentRow

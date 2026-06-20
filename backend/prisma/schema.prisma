@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -281,6 +282,7 @@ model Unit {
   doorAccessInfo         String?
   customerProperties     CustomerProperty[]
   authorityDocuments     PortfolioAuthorityDocument[]
+  authorityLetters       EPHAuthorityLetter[]
   project                Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   images                 UnitImage[]
 
@@ -2821,4 +2823,34 @@ enum LinaEpostaDurumu {
   GONDERILDI
   HATA
   IPTAL
+}
+
+model EPHAuthorityLetter {
+  id                 String   @id @default(cuid())
+
+  unitId             String
+  unit               Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  authorityNo        String   @unique
+
+  ownerName          String
+  ownerPhone         String?
+  ownerEmail         String?
+
+  authorityType      String
+
+  authorityStartDate DateTime
+  authorityEndDate   DateTime
+
+  status             String   @default("TASLAK")
+
+  pdfUrl             String?
+
+  createdById        String
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([unitId])
+  @@index([status])
 }
