@@ -60,6 +60,7 @@ import type {
   Unit,
 } from "@/components/stok/stokTypes";
 import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
+import EphAuthorityLetterModal from "@/components/authority-letters/EphAuthorityLetterModal";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
 
 type DetailUnit = Unit & {
@@ -627,6 +628,7 @@ export default function StokDetailPage() {
   const [activePhoto, setActivePhoto] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [authorityLetterOpen, setAuthorityLetterOpen] = useState(false);
   const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -654,7 +656,7 @@ export default function StokDetailPage() {
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    if (galleryOpen || shareOpen || deleteOpen) {
+    if (galleryOpen || shareOpen || deleteOpen || authorityLetterOpen) {
       const previousOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => {
@@ -662,7 +664,7 @@ export default function StokDetailPage() {
       };
     }
     document.body.style.overflow = "";
-  }, [galleryOpen, shareOpen, deleteOpen]);
+  }, [galleryOpen, shareOpen, deleteOpen, authorityLetterOpen]);
 
   const fetchUnit = async () => {
     try {
@@ -1292,6 +1294,7 @@ export default function StokDetailPage() {
           {canEditPortfolio && (
             <>
               <button
+                type="button"
                 onClick={() => router.push(`/portfoy?edit=${unit.id}`)}
                 className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#1557D6] shadow-[0_8px_18px_rgba(15,23,42,0.05)]"
               >
@@ -1299,6 +1302,7 @@ export default function StokDetailPage() {
                 Güncelle
               </button>
               <button
+                type="button"
                 onClick={() => setManagementOpen((current) => !current)}
                 className={`inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[16px] border px-3 text-[12px] font-black shadow-[0_8px_18px_rgba(15,23,42,0.05)] ${
                   managementOpen
@@ -1307,7 +1311,7 @@ export default function StokDetailPage() {
                 }`}
               >
                 <Camera size={15} />
-                {managementOpen ? "Merkezi Kapat" : "Medya / Evrak"}
+                {managementOpen ? "Medya Kapat" : "Medya"}
               </button>
             </>
           )}
@@ -1731,7 +1735,7 @@ export default function StokDetailPage() {
           </section>
         )}
 
-        {canEditPortfolio && managementOpen && (
+        {canEditPortfolio && (
           <PortfolioDocumentsCenter
             unit={unit}
             documents={portfolioDocuments}
@@ -1744,6 +1748,7 @@ export default function StokDetailPage() {
             onUploadTapu={() => tapuDocumentInputRef.current?.click()}
             onDeleteDocument={handleDeleteDocument}
             onSubmitApproval={handleSubmitApproval}
+            onCreateAuthorityLetter={() => setAuthorityLetterOpen(true)}
           />
         )}
 
@@ -1751,6 +1756,7 @@ export default function StokDetailPage() {
           <section className="mt-2 rounded-[20px] border border-rose-100 bg-white p-2 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
             <div className="grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={() => router.push(`/portfoy?edit=${unit.id}`)}
                 className="h-9 w-full rounded-[14px] bg-[#EFF6FF] text-[12px] font-black text-[#1557D6]"
               >
@@ -1890,6 +1896,13 @@ export default function StokDetailPage() {
         onClose={() => setShareOpen(false)}
         data={shareData}
       />
+
+      <EphAuthorityLetterModal
+        open={authorityLetterOpen}
+        unitId={unit.id}
+        onClose={() => setAuthorityLetterOpen(false)}
+        onCreated={() => fetchPortfolioDocuments(unit.id)}
+      />
     </main>
   );
 }
@@ -2026,6 +2039,7 @@ function PortfolioDocumentsCenter({
   onUploadTapu,
   onDeleteDocument,
   onSubmitApproval,
+  onCreateAuthorityLetter,
 }: {
   unit: DetailUnit;
   documents: PortfolioAuthorityDocument[];
@@ -2038,6 +2052,7 @@ function PortfolioDocumentsCenter({
   onUploadTapu: () => void;
   onDeleteDocument: (documentId?: string) => void;
   onSubmitApproval: () => void;
+  onCreateAuthorityLetter: () => void;
 }) {
   const yetkiDocument = findPortfolioDocument(documents, "YETKI_BELGESI");
   const tapuDocument = findPortfolioDocument(documents, "TAPU");
@@ -2071,6 +2086,17 @@ function PortfolioDocumentsCenter({
               ? "Portföy havuzda yayında."
               : "Yetki belgesi veya tapu yüklenince portföy incelemeye gönderilebilir."}
       </p>
+
+      {canEditPortfolio && (
+        <button
+          type="button"
+          onClick={onCreateAuthorityLetter}
+          className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[16px] bg-[#2563EB] px-3 text-[12px] font-black text-white shadow-[0_12px_24px_rgba(37,99,235,0.18)]"
+        >
+          <FileText size={16} />
+          EPH Yetki Belgesi Oluştur
+        </button>
+      )}
 
       <div className="mt-3 grid gap-2">
         <PortfolioDocumentRow
