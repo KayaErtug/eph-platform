@@ -1126,7 +1126,7 @@ function PoolMapSection({
       map.setCenter(DEFAULT_MAP_CENTER);
       map.setZoom(6);
     }
-  }, [items, onSelectUnit, selectedUnitId]);
+  }, [items, onSelectUnit, selectedUnitId, mapReady]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
