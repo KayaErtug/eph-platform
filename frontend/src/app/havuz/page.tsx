@@ -1088,67 +1088,21 @@ function PoolMapSection({
     const bounds = new googleMaps.LatLngBounds();
 
     items.forEach((item) => {
-      const priceText = compactMoney(
-        item.unit.price,
-        item.unit.priceCurrency,
-      ).replace(" ₺", "₺");
-      const isSelected = selectedUnitId === item.unit.id;
-      const pinColor = item.isApprox ? "#F97316" : "#2563EB";
-      const overlay = new googleMaps.OverlayView();
-      let element: HTMLButtonElement | null = null;
+      const priceText = compactMoney(item.unit.price, item.unit.priceCurrency);
+      const marker = new googleMaps.Marker({
+        position: { lat: item.lat, lng: item.lng },
+        map,
+        title: `${item.unit.project?.name || "EPH Portföy"} • ${priceText}`,
+        optimized: true,
+      });
 
-      overlay.onAdd = function onAdd() {
-        element = document.createElement("button");
-        element.type = "button";
-        element.title = `${item.unit.project?.name || "EPH Portföy"} • ${priceText}`;
-        element.textContent = priceText;
-        element.style.position = "absolute";
-        element.style.transform = "translate(-50%, -100%)";
-        element.style.minWidth = isSelected ? "80px" : "66px";
-        element.style.minHeight = isSelected ? "34px" : "30px";
-        element.style.padding = "0 9px";
-        element.style.borderRadius = "999px 999px 999px 6px";
-        element.style.border = "2px solid #ffffff";
-        element.style.background = pinColor;
-        element.style.color = "#ffffff";
-        element.style.fontSize = isSelected ? "12px" : "11px";
-        element.style.fontWeight = "900";
-        element.style.lineHeight = "1";
-        element.style.boxShadow = "0 12px 22px rgba(15,23,42,0.28)";
-        element.style.zIndex = isSelected ? "40" : "25";
-        element.style.cursor = "pointer";
-        element.style.whiteSpace = "nowrap";
-        element.style.display = "flex";
-        element.style.alignItems = "center";
-        element.style.justifyContent = "center";
-        element.style.pointerEvents = "auto";
-        element.addEventListener("click", () => {
-          onSelectUnit(item.unit.id);
-          map.panTo({ lat: item.lat, lng: item.lng });
-          map.setZoom(Math.max(map.getZoom() || 11, 12));
-        });
-        const panes = overlay.getPanes();
-        panes?.overlayMouseTarget.appendChild(element);
-      };
+      marker.addListener("click", () => {
+        onSelectUnit(item.unit.id);
+        map.panTo({ lat: item.lat, lng: item.lng });
+        map.setZoom(Math.max(map.getZoom() || 11, 12));
+      });
 
-      overlay.draw = function draw() {
-        if (!element) return;
-        const projection = overlay.getProjection();
-        const point = projection.fromLatLngToDivPixel(
-          new googleMaps.LatLng(item.lat, item.lng),
-        );
-        if (!point) return;
-        element.style.left = `${point.x}px`;
-        element.style.top = `${point.y}px`;
-      };
-
-      overlay.onRemove = function onRemove() {
-        if (element?.parentNode) element.parentNode.removeChild(element);
-        element = null;
-      };
-
-      overlay.setMap(map);
-      markerRefs.current.push(overlay);
+      markerRefs.current.push(marker);
       bounds.extend({ lat: item.lat, lng: item.lng });
     });
 
@@ -1190,45 +1144,6 @@ function PoolMapSection({
 
       <div className="relative h-[360px] w-full overflow-hidden bg-[#EEF3F8]">
         <div ref={mapRef} className="h-full w-full" />
-
-        {mapReady && !mapError && items.length > 0 && (
-          <div className="pointer-events-none absolute inset-0 z-[45]">
-            {items.map((item) => {
-              const position = getOverlayPinPosition(item, items);
-              const isSelected = selectedItem?.unit.id === item.unit.id;
-              const priceText = compactMoney(
-                item.unit.price,
-                item.unit.priceCurrency,
-              ).replace(" ₺", "₺");
-
-              return (
-                <button
-                  key={item.unit.id}
-                  type="button"
-                  onClick={() => {
-                    onSelectUnit(item.unit.id);
-                    const map = mapInstanceRef.current;
-                    if (map) {
-                      map.panTo({ lat: item.lat, lng: item.lng });
-                      map.setZoom(Math.max(map.getZoom() || 11, 12));
-                    }
-                  }}
-                  className={`pointer-events-auto absolute -translate-x-1/2 -translate-y-full border-2 border-white px-2.5 text-[10px] font-black leading-none text-white shadow-[0_12px_24px_rgba(15,23,42,0.32)] active:scale-95 ${
-                    isSelected
-                      ? "z-[70] min-h-[34px] rounded-[999px_999px_999px_8px] bg-[#1D4ED8] ring-4 ring-blue-200"
-                      : item.isApprox
-                        ? "z-[55] min-h-[30px] rounded-[999px_999px_999px_8px] bg-orange-500"
-                        : "z-[60] min-h-[30px] rounded-[999px_999px_999px_8px] bg-[#2563EB]"
-                  }`}
-                  style={{ left: `${position.left}%`, top: `${position.top}%` }}
-                  title={`${item.unit.project?.name || "EPH Portföy"} • ${priceText}`}
-                >
-                  {priceText}
-                </button>
-              );
-            })}
-          </div>
-        )}
 
         {!mapReady && !mapError && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#EEF3F8] text-center">
