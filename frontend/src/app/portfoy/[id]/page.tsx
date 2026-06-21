@@ -62,6 +62,7 @@ import type {
 import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
 import EphAuthorityLetterModal from "@/components/authority-letters/EphAuthorityLetterModal";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
+import LinaDocumentPrecheckPanel from "@/components/lina/LinaDocumentPrecheckPanel";
 
 type DetailUnit = Unit & {
   createdAt?: string;
@@ -539,6 +540,8 @@ function formatFileSize(size?: number | null) {
   if (numeric < 1024 * 1024) return `${Math.max(1, Math.round(numeric / 1024))} KB`;
   return `${(numeric / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+
 
 function canEditDetailUnit(
   unit?: DetailUnit | null,
@@ -2208,6 +2211,7 @@ function PortfolioDocumentRow({
           </p>
         </div>
       )}
+      {hasDocument && <LinaDocumentPrecheckPanel document={document} />}
 
       <div className="mt-2 grid grid-cols-3 gap-2">
         {canEditPortfolio && (
@@ -2255,6 +2259,8 @@ function PortfolioDocumentRow({
     </div>
   );
 }
+
+
 
 function PortfolioApprovalCenter({
   unit,

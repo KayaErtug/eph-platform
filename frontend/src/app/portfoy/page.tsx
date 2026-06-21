@@ -580,10 +580,23 @@ function StokPageInner() {
     [units],
   );
 
+
+  const makeExistingGalleryImages = (unit: MapUnit): LocalPortfolioImage[] => {
+    return getUnitImages(unit as Unit).map((image, index) => ({
+      id: `existing-${image.id}`,
+      previewUrl: image.displayUrl,
+      existing: true,
+      remoteId: image.id,
+      name: image.originalName || `Mevcut fotoğraf ${index + 1}`,
+      size: image.size || 0,
+      isCover: Boolean(image.isCover),
+    }));
+  };
+
   const resetSelectedImages = () => {
-    if (coverImage?.previewUrl) URL.revokeObjectURL(coverImage.previewUrl);
+    if (coverImage?.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(coverImage.previewUrl);
     galleryImages.forEach((image) => {
-      if (image.previewUrl) URL.revokeObjectURL(image.previewUrl);
+      if (image.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(image.previewUrl);
     });
     setCoverImage(null);
     setGalleryImages([]);
@@ -631,6 +644,13 @@ function StokPageInner() {
 
   const openEditModal = (unit: MapUnit) => {
     resetSelectedImages();
+    const existingGalleryImages = makeExistingGalleryImages(unit);
+    setGalleryImages(existingGalleryImages);
+    setCoverImage(
+      existingGalleryImages.find((image) => image.isCover) ||
+        existingGalleryImages[0] ||
+        null,
+    );
     setEditingUnit(unit);
     setSelectedProjectId(unit.project?.id || "");
     setProjectForm({
@@ -745,6 +765,24 @@ function StokPageInner() {
 
       if (editingUnit) {
         await api.patch(`/units/${editingUnit.id}`, unitPayload);
+
+        const selectedCoverImage = coverImage || galleryImages[0] || null;
+        const newGalleryImages = galleryImages.filter((image) => image.file);
+        const existingImageCount = galleryImages.filter((image) => image.existing).length;
+
+        if (newGalleryImages.length > 0) {
+          await Promise.all(
+            newGalleryImages.map((image, index) =>
+              uploadPortfolioImage(
+                editingUnit.id,
+                image.file!,
+                image.id === selectedCoverImage?.id,
+                existingImageCount + index,
+              ),
+            ),
+          );
+        }
+
         setFormSuccess(true);
         await fetchData();
 
@@ -802,14 +840,16 @@ function StokPageInner() {
       }
 
       await Promise.all(
-        galleryImages.map((image, index) =>
-          uploadPortfolioImage(
-            createdUnitId,
-            image.file,
-            image.id === selectedCoverImage.id,
-            index,
+        galleryImages
+          .filter((image) => image.file)
+          .map((image, index) =>
+            uploadPortfolioImage(
+              createdUnitId,
+              image.file!,
+              image.id === selectedCoverImage.id,
+              index,
+            ),
           ),
-        ),
       );
 
       setFormSuccess(true);

@@ -13,6 +13,8 @@ import { LinaVoiceService } from './lina-voice.service';
 import { LinaPortfolioSessionService } from './portfolio/lina-portfolio-session.service';
 import { LinaPortfolioEngineService } from './portfolio/lina-portfolio-engine.service';
 import { LinaGeoService } from './geo/lina-geo.service';
+import { LinaDocumentPrecheckService } from './document/lina-document-precheck.service';
+import { LinaDocumentTkgmService } from './document/lina-document-tkgm.service';
 
 @Module({
   controllers: [LinaController],
@@ -28,6 +30,8 @@ import { LinaGeoService } from './geo/lina-geo.service';
     LinaPortfolioSessionService,
     LinaPortfolioEngineService,
     LinaGeoService,
+    LinaDocumentPrecheckService,
+    LinaDocumentTkgmService,
   ],
   exports: [
     LinaService,
@@ -40,6 +44,8 @@ import { LinaGeoService } from './geo/lina-geo.service';
     LinaPortfolioSessionService,
     LinaPortfolioEngineService,
     LinaGeoService,
+    LinaDocumentPrecheckService,
+    LinaDocumentTkgmService,
   ],
 })
 export class LinaModule {}

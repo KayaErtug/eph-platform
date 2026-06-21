@@ -8,6 +8,7 @@ import { PortfolioApprovalStatus, PortfolioAuthorityType } from '@prisma/client'
 
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../supabase/supabase.service';
+import { LinaDocumentPrecheckService } from '../lina/document/lina-document-precheck.service';
 
 type PortfolioDocumentInput = {
   userId: string;
@@ -43,6 +44,7 @@ export class PortfolioDocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly supabaseService: SupabaseService,
+    private readonly linaDocumentPrecheckService: LinaDocumentPrecheckService,
   ) {}
 
   async getPortfolioDocuments(input: PortfolioDocumentInput) {
@@ -117,6 +119,23 @@ export class PortfolioDocumentsService {
 
     const fileUrl = this.supabaseService.getPublicUrl(this.bucket, path);
 
+    const precheck = await this.linaDocumentPrecheckService.analyze({
+      fileName: file.originalname,
+      mimeType: file.mimetype,
+      buffer: file.buffer,
+      authorityType,
+      portfolioContext: {
+        ownerName: unit.deedOwnerFullName,
+        ownerPhone: unit.deedOwnerPhone,
+        ownerEmail: unit.deedOwnerEmail,
+        city: unit.project?.city,
+        district: unit.project?.district,
+        adaNo: unit.adaNo,
+        parselNo: unit.parselNo,
+        area: unit.area,
+      },
+    });
+
     const existing = await this.prisma.portfolioAuthorityDocument.findFirst({
       where: {
         unitId: portfolioId,
@@ -140,6 +159,13 @@ export class PortfolioDocumentsService {
           approvedById: null,
           approvedAt: null,
           rejectReason: null,
+          documentType: precheck.documentType,
+          ocrQualityScore: precheck.ocrQualityScore,
+          confidenceScore: precheck.confidenceScore,
+          riskLevel: precheck.riskLevel,
+          qrDetected: precheck.qrDetected,
+          linaSummary: precheck.linaSummary,
+          analyzedAt: new Date(),
         },
       });
     } else {
@@ -151,6 +177,13 @@ export class PortfolioDocumentsService {
           fileName: file.originalname,
           mimeType: file.mimetype,
           sizeBytes: file.size,
+          documentType: precheck.documentType,
+          ocrQualityScore: precheck.ocrQualityScore,
+          confidenceScore: precheck.confidenceScore,
+          riskLevel: precheck.riskLevel,
+          qrDetected: precheck.qrDetected,
+          linaSummary: precheck.linaSummary,
+          analyzedAt: new Date(),
         },
       });
     }

@@ -9,6 +9,14 @@ import { EphAuthorityLettersService } from './eph-authority-letters.service';
 export class EphAuthorityLettersController {
   constructor(private readonly service: EphAuthorityLettersService) {}
 
+  @Get('quota')
+  getQuota(@CurrentUser() user: any) {
+    return this.service.getQuota({
+      userId: user.id,
+      userRole: user.role,
+    });
+  }
+
   @Get('portfolio/:unitId')
   findByPortfolio(@CurrentUser() user: any, @Param('unitId') unitId: string) {
     return this.service.findByPortfolio({

@@ -1394,7 +1394,7 @@ export default function StokCreateModal({
         setCoverImage(nextImages[0] || null);
       }
 
-      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
+      if (removed?.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(removed.previewUrl);
 
       return nextImages;
     });
@@ -2542,10 +2542,10 @@ export default function StokCreateModal({
 
                           <div className="p-2.5">
                             <p className="truncate text-xs font-black text-[#06194A]">
-                              {image.file.name}
+                              {image.file?.name || image.name || `Fotoğraf ${index + 1}`}
                             </p>
                             <p className="text-[10px] font-bold text-[#64748B]">
-                              {formatFileSize(image.file.size)}
+                              {image.file?.size ? formatFileSize(image.file.size) : image.size ? formatFileSize(image.size) : image.existing ? "Mevcut fotoğraf" : ""}
                             </p>
 
                             <div className="mt-2 grid grid-cols-1 gap-2">

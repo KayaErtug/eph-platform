@@ -327,6 +327,13 @@ model PortfolioAuthorityDocument {
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
   documentSide  String?
+  documentType      String?
+  ocrQualityScore   Int?
+  confidenceScore   Int?
+  riskLevel         String?
+  qrDetected        Boolean?
+  linaSummary       String?
+  analyzedAt        DateTime?
   approvedBy    User?                  @relation("PortfolioAuthorityApprover", fields: [approvedById], references: [id])
   unit          Unit                   @relation(fields: [unitId], references: [id], onDelete: Cascade)
 

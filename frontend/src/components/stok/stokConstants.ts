@@ -1,5 +1,6 @@
 export const MAIN_CATEGORY_OPTIONS = [
   "KONUT",
+  "BİNA",
   "İŞYERİ",
   "ARAZİ",
   "KONUT PROJELERİ",
@@ -7,7 +8,24 @@ export const MAIN_CATEGORY_OPTIONS = [
 ];
 
 export const CATEGORY_OPTIONS: Record<string, string[]> = {
-  KONUT: ["Daire", "Rezidans", "Villa", "Yazlık", "Müstakil Ev"],
+  KONUT: [
+    "Daire",
+    "Rezidans",
+    "Villa",
+    "Yazlık",
+    "Müstakil Ev",
+    "Köy Evi",
+    "Dağ Evi / Yayla Evi",
+  ],
+
+  BİNA: [
+    "Apartman",
+    "Komple Bina",
+    "İş Hanı",
+    "Plaza Bina",
+    "Rezidans Bina",
+    "Otel Binası",
+  ],
 
   İŞYERİ: [
     "Fabrika & Üretim Tesisi",
@@ -16,6 +34,7 @@ export const CATEGORY_OPTIONS: Record<string, string[]> = {
     "Depo & Antrepo",
     "Dükkan & Mağaza",
     "Ofis",
+    "Benzin İstasyonu",
   ],
 
   ARAZİ: ["Arsa", "Tarla", "Bağ", "Bahçe", "Zeytinlik"],
@@ -24,11 +43,8 @@ export const CATEGORY_OPTIONS: Record<string, string[]> = {
 
   "TURİSTİK TESİS": [
     "Otel",
-    "Apart Otel",
-    "Butik Otel",
-    "Motel",
     "Pansiyon",
-    "Kamp Yeri (Mocamp)",
+    "Kamp Yeri",
     "Tatil Köyü",
     "Devre Mülk",
   ],
@@ -41,6 +57,17 @@ export const CATEGORY_TYPE_MAP: Record<string, Record<string, string>> = {
     Villa: "VILLA",
     Yazlık: "YAZLIK",
     "Müstakil Ev": "MUSTAK_EV",
+    "Köy Evi": "KOY_EVI",
+    "Dağ Evi / Yayla Evi": "DAG_EVI_YAYLA_EVI",
+  },
+
+  BİNA: {
+    Apartman: "APARTMAN",
+    "Komple Bina": "KOMPLE_BINA",
+    "İş Hanı": "IS_HANI",
+    "Plaza Bina": "PLAZA_BINA",
+    "Rezidans Bina": "REZIDANS_BINA",
+    "Otel Binası": "OTEL_BINASI",
   },
 
   İŞYERİ: {
@@ -50,6 +77,7 @@ export const CATEGORY_TYPE_MAP: Record<string, Record<string, string>> = {
     "Depo & Antrepo": "DEPO_ANTREPO",
     "Dükkan & Mağaza": "DUKKAN_MAGAZA",
     Ofis: "OFIS_BURO",
+    "Benzin İstasyonu": "BENZIN_ISTASYONU",
   },
 
   ARAZİ: {
@@ -68,11 +96,8 @@ export const CATEGORY_TYPE_MAP: Record<string, Record<string, string>> = {
 
   "TURİSTİK TESİS": {
     Otel: "OTEL",
-    "Apart Otel": "APART_OTEL",
-    "Butik Otel": "BUTIK_OTEL",
-    Motel: "MOTEL",
     Pansiyon: "PANSIYON",
-    "Kamp Yeri (Mocamp)": "KAMP_YERI",
+    "Kamp Yeri": "KAMP_YERI",
     "Tatil Köyü": "TATIL_KOYU",
     "Devre Mülk": "DEVRE_MULK",
   },
@@ -126,6 +151,15 @@ export const TYPE_LABELS: Record<string, string> = {
   VILLA: "Villa",
   YAZLIK: "Yazlık",
   MUSTAK_EV: "Müstakil Ev",
+  KOY_EVI: "Köy Evi",
+  DAG_EVI_YAYLA_EVI: "Dağ Evi / Yayla Evi",
+
+  APARTMAN: "Apartman",
+  KOMPLE_BINA: "Komple Bina",
+  IS_HANI: "İş Hanı",
+  PLAZA_BINA: "Plaza Bina",
+  REZIDANS_BINA: "Rezidans Bina",
+  OTEL_BINASI: "Otel Binası",
 
   FABRIKA_URETIM_TESISI: "Fabrika & Üretim Tesisi",
   ATOLYE: "Atölye",
@@ -133,6 +167,7 @@ export const TYPE_LABELS: Record<string, string> = {
   DEPO_ANTREPO: "Depo & Antrepo",
   DUKKAN_MAGAZA: "Dükkan & Mağaza",
   OFIS_BURO: "Ofis",
+  BENZIN_ISTASYONU: "Benzin İstasyonu",
 
   ARSA: "Arsa",
   TARLA: "Tarla",
@@ -145,11 +180,8 @@ export const TYPE_LABELS: Record<string, string> = {
   VILLA_PROJESI: "Konut Projesi / Villa",
 
   OTEL: "Otel",
-  APART_OTEL: "Apart Otel",
-  BUTIK_OTEL: "Butik Otel",
-  MOTEL: "Motel",
   PANSIYON: "Pansiyon",
-  KAMP_YERI: "Kamp Yeri (Mocamp)",
+  KAMP_YERI: "Kamp Yeri",
   TATIL_KOYU: "Tatil Köyü",
   DEVRE_MULK: "Devre Mülk",
 };

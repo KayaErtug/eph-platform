@@ -1,7 +1,12 @@
 export type LocalPortfolioImage = {
   id: string;
-  file: File;
+  file?: File;
   previewUrl: string;
+  existing?: boolean;
+  remoteId?: string;
+  name?: string;
+  size?: number;
+  isCover?: boolean;
 };
 
 export interface UnitImage {
