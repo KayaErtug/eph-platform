@@ -67,6 +67,25 @@ type DocumentDefinition = {
   description: string;
 };
 
+type DocumentStatusTone = "uploaded" | "missing" | "waiting";
+
+const REQUIRED_DOCUMENT_TYPES: PortfolioAuthorityType[] = ["YETKI_BELGESI", "TAPU"];
+
+function getDocumentStatus(
+  document: PortfolioDocument | undefined,
+  authorityType: PortfolioAuthorityType,
+): { label: string; tone: DocumentStatusTone } {
+  if (document?.fileUrl) return { label: "Yüklendi", tone: "uploaded" };
+  if (REQUIRED_DOCUMENT_TYPES.includes(authorityType)) return { label: "Eksik", tone: "missing" };
+  return { label: "Bekleniyor", tone: "waiting" };
+}
+
+function getStatusBadgeClass(tone: DocumentStatusTone) {
+  if (tone === "uploaded") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (tone === "missing") return "border-rose-200 bg-rose-50 text-rose-700";
+  return "border-amber-200 bg-amber-50 text-amber-700";
+}
+
 const DOCUMENT_ACCEPT = "application/pdf,image/jpeg,image/png,image/webp";
 
 const DOCUMENTS: DocumentDefinition[] = [
@@ -466,6 +485,7 @@ export default function PortfolioQualityPage() {
             {DOCUMENTS.map((item) => {
               const document = getDocumentByType(documents, item.type);
               const hasFile = Boolean(document?.fileUrl);
+              const status = getDocumentStatus(document, item.type);
               const loadingUpload = documentLoading === item.type;
               const loadingDelete = Boolean(document?.id && deleteLoading === document.id);
 
@@ -479,7 +499,12 @@ export default function PortfolioQualityPage() {
                       {hasFile ? <CheckCircle2 size={20} /> : <FileText size={20} />}
                     </div>
                     <div className="min-w-0 flex-1 text-center">
-                      <p className="break-words text-center text-[15px] font-black text-[#2563EB]">{item.title}</p>
+                      <div className="flex flex-wrap items-center justify-center gap-2 text-center">
+                        <p className="break-words text-center text-[15px] font-black text-[#2563EB]">{item.title}</p>
+                        <span className={`inline-flex min-h-[24px] items-center justify-center rounded-full border px-2.5 text-[10px] font-black ${getStatusBadgeClass(status.tone)}`}>
+                          {status.label}
+                        </span>
+                      </div>
                       <p className="mt-0.5 break-words text-center text-[10.5px] font-bold leading-4 text-[#64748B]">
                         {item.description}
                       </p>
@@ -555,12 +580,12 @@ export default function PortfolioQualityPage() {
             <h2 className="text-center text-[16px] font-black text-[#06194A]">İnceleme Akışı</h2>
           </div>
           <p className="mx-auto mt-1 max-w-[320px] text-center text-[11px] font-bold leading-5 text-[#64748B]">
-            En az bir belge yüklendikten sonra portföyü incelemeye gönderebilirsiniz.
+            Yetki Belgesi veya Tapu yüklendikten sonra portföyü incelemeye gönderebilirsiniz.
           </p>
           <button
             type="button"
             onClick={submitApproval}
-            disabled={!selectedUnit || uploadedCount === 0 || approvalLoading}
+            disabled={!selectedUnit || !documents.some((document) => REQUIRED_DOCUMENT_TYPES.includes(document.authorityType as PortfolioAuthorityType) && document.fileUrl) || approvalLoading}
             className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[18px] bg-[#06194A] px-4 text-[13px] font-black text-white disabled:opacity-50"
           >
             {approvalLoading ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
