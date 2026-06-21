@@ -1089,12 +1089,21 @@ function PoolMapSection({
 
     items.forEach((item) => {
       const priceText = compactMoney(item.unit.price, item.unit.priceCurrency);
+
+
+
       const marker = new googleMaps.Marker({
-        position: { lat: item.lat, lng: item.lng },
-        map,
-        title: `${item.unit.project?.name || "EPH Portföy"} • ${priceText}`,
-        optimized: true,
-      });
+  position: { lat: item.lat, lng: item.lng },
+  map,
+  title: `${item.unit.project?.name || "EPH Portföy"} • ${priceText}`,
+  optimized: true,
+  icon: {
+    url: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+  },
+});
+
+
+
 
       marker.addListener("click", () => {
         onSelectUnit(item.unit.id);
