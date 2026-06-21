@@ -1096,11 +1096,9 @@ function PoolMapSection({
   position: { lat: item.lat, lng: item.lng },
   map,
   title: `${item.unit.project?.name || "EPH Portföy"} • ${priceText}`,
-  optimized: false,
-  zIndex: 9999,
+  optimized: true,
   icon: {
     url: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
-    scaledSize: new googleMaps.Size(40, 40),
   },
 });
 
@@ -1111,6 +1109,7 @@ function PoolMapSection({
         onSelectUnit(item.unit.id);
         map.panTo({ lat: item.lat, lng: item.lng });
         map.setZoom(Math.max(map.getZoom() || 11, 12));
+        onDetail(item.unit, item.match);
       });
 
       markerRefs.current.push(marker);
@@ -1126,7 +1125,7 @@ function PoolMapSection({
       map.setCenter(DEFAULT_MAP_CENTER);
       map.setZoom(6);
     }
-  }, [items, onSelectUnit, selectedUnitId, mapReady]);
+  }, [items, onSelectUnit, selectedUnitId]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
