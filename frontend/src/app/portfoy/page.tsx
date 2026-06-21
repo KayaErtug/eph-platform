@@ -1017,7 +1017,9 @@ function StokPageInner() {
           totalCount={units.length}
           activeCount={activeCount}
           verifiedCount={units.filter((unit) => isUnitVerified(unit)).length}
-          onOpen={() => router.push("/portfoy/quality")}
+          onOpen={() => {
+  		window.location.href = "/portfoy/quality";
+	}}
         />
 
 
