@@ -118,50 +118,6 @@ declare global {
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 const DEFAULT_MAP_CENTER = { lat: 39.0, lng: 35.0 };
 
-const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-  ADANA: { lat: 37.0, lng: 35.3213 },
-  ANKARA: { lat: 39.9334, lng: 32.8597 },
-  ANTALYA: { lat: 36.8969, lng: 30.7133 },
-  AYDIN: { lat: 37.845, lng: 27.8396 },
-  BALIKESIR: { lat: 39.6484, lng: 27.8826 },
-  BURSA: { lat: 40.1885, lng: 29.061 },
-  DENIZLI: { lat: 37.783, lng: 29.0963 },
-  ESKISEHIR: { lat: 39.7767, lng: 30.5206 },
-  ISTANBUL: { lat: 41.0082, lng: 28.9784 },
-  IZMIR: { lat: 38.4237, lng: 27.1428 },
-  KAYSERI: { lat: 38.7205, lng: 35.4826 },
-  KOCAELI: { lat: 40.8533, lng: 29.8815 },
-  KONYA: { lat: 37.8746, lng: 32.4932 },
-  MANISA: { lat: 38.614, lng: 27.4296 },
-  MUGLA: { lat: 37.2153, lng: 28.3636 },
-  SAKARYA: { lat: 40.7569, lng: 30.3781 },
-  TEKIRDAG: { lat: 40.978, lng: 27.511 },
-};
-
-const DISTRICT_COORDS: Record<string, { lat: number; lng: number }> = {
-  "DENIZLI/PAMUKKALE": { lat: 37.9167, lng: 29.1167 },
-  "DENIZLI/MERKEZEFENDI": { lat: 37.7833, lng: 29.0833 },
-  "DENIZLI/ACIPAYAM": { lat: 37.4239, lng: 29.3494 },
-  "DENIZLI/CIVRIL": { lat: 38.3014, lng: 29.7386 },
-  "DENIZLI/TAVAS": { lat: 37.5736, lng: 29.0708 },
-  "DENIZLI/SARAYKOY": { lat: 37.9245, lng: 28.9252 },
-  "DENIZLI/BULDAN": { lat: 38.0451, lng: 28.8307 },
-  "KAYSERI/KOCASINAN": { lat: 38.9571, lng: 35.2481 },
-  "KAYSERI/MELIKGAZI": { lat: 38.7205, lng: 35.4826 },
-  "KAYSERI/TALAS": { lat: 38.6908, lng: 35.5538 },
-  "KAYSERI/DEVELI": { lat: 38.3906, lng: 35.4922 },
-  "KAYSERI/HACILAR": { lat: 38.6469, lng: 35.4493 },
-  "ISTANBUL/KADIKOY": { lat: 40.9903, lng: 29.0291 },
-  "ISTANBUL/ESENYURT": { lat: 41.0343, lng: 28.6801 },
-  "ISTANBUL/BEYLIKDUZU": { lat: 41.0011, lng: 28.6419 },
-  "ISTANBUL/UMRANIYE": { lat: 41.0164, lng: 29.1248 },
-  "IZMIR/BORNOVA": { lat: 38.4697, lng: 27.2211 },
-  "IZMIR/KARSIYAKA": { lat: 38.4647, lng: 27.1128 },
-  "IZMIR/BUCA": { lat: 38.3841, lng: 27.1774 },
-  "ANKARA/CANKAYA": { lat: 39.9179, lng: 32.8627 },
-  "ANKARA/KECIOREN": { lat: 39.9781, lng: 32.8663 },
-};
-
 const categories = [
   "Tümü",
   "Satılık",
@@ -262,18 +218,6 @@ function limitText(value?: string | number | null, _max = 60) {
   return String(value ?? "").trim();
 }
 
-function normalizeMapKey(value?: string | null) {
-  return String(value || "")
-    .trim()
-    .toLocaleUpperCase("tr-TR")
-    .replaceAll("İ", "I")
-    .replaceAll("Ğ", "G")
-    .replaceAll("Ü", "U")
-    .replaceAll("Ş", "S")
-    .replaceAll("Ö", "O")
-    .replaceAll("Ç", "C");
-}
-
 function getStableJitter(seed: string, index: number) {
   const source = `${seed || "EPH"}-${index}`;
   let hash = 0;
@@ -288,38 +232,22 @@ function getStableJitter(seed: string, index: number) {
   return { latOffset, lngOffset };
 }
 
-function getApproxCoordinate(unit: Unit, index: number) {
-  const city = normalizeMapKey(unit.project?.city);
-  const district = normalizeMapKey(unit.project?.district);
-  const districtKey = city && district ? `${city}/${district}` : "";
-  const base =
-    DISTRICT_COORDS[districtKey] || CITY_COORDS[city] || DEFAULT_MAP_CENTER;
-  const jitter = getStableJitter(unit.id, index);
-
-  return {
-    lat: Number((base.lat + jitter.latOffset).toFixed(6)),
-    lng: Number((base.lng + jitter.lngOffset).toFixed(6)),
-  };
-}
-
 function getPoolMapPoint(input: {
   unit: Unit;
   match: { score: number; customer: Customer | null; budgetDiff: number };
-  index: number;
-}): PoolMapItem {
+}): PoolMapItem | null {
   const directLat = Number(input.unit.project?.latitude || 0);
   const directLng = Number(input.unit.project?.longitude || 0);
-  const hasDirectCoordinate = Boolean(directLat && directLng);
-  const approx = hasDirectCoordinate
-    ? { lat: directLat, lng: directLng }
-    : getApproxCoordinate(input.unit, input.index);
+
+  if (!Number.isFinite(directLat) || !Number.isFinite(directLng)) return null;
+  if (!directLat || !directLng) return null;
 
   return {
     unit: input.unit,
     match: input.match,
-    lat: approx.lat,
-    lng: approx.lng,
-    isApprox: !hasDirectCoordinate,
+    lat: directLat,
+    lng: directLng,
+    isApprox: false,
     locationLabel: getLocation(input.unit),
   };
 }
@@ -787,9 +715,9 @@ export default function HavuzPage() {
   );
 
   const poolMapItems = useMemo(() => {
-    return filteredPoolItems.map(({ unit, match }, index) =>
-      getPoolMapPoint({ unit, match, index }),
-    );
+    return filteredPoolItems
+      .map(({ unit, match }) => getPoolMapPoint({ unit, match }))
+      .filter((item): item is PoolMapItem => Boolean(item));
   }, [filteredPoolItems]);
 
   const showKontorSuccess = (input: {
@@ -1045,7 +973,18 @@ export default function HavuzPage() {
         <PoolDetailModal
           unit={detailSelection.unit}
           match={detailSelection.match}
+          busyAction={busyAction}
           onClose={() => setDetailSelection(null)}
+          onMessage={() =>
+            startPoolMessage(detailSelection.unit, detailSelection.match.score)
+          }
+          onAction={(type) =>
+            setSelectedAction({
+              type,
+              unit: detailSelection.unit,
+              score: detailSelection.match.score,
+            })
+          }
         />
       )}
 
@@ -1098,7 +1037,6 @@ function PoolMapSection({
   const selectedItem =
     items.find((item) => item.unit.id === selectedUnitId) || items[0] || null;
   const exactCount = items.filter((item) => !item.isApprox).length;
-  const approxCount = items.filter((item) => item.isApprox).length;
 
   useEffect(() => {
     let alive = true;
@@ -1239,7 +1177,7 @@ function PoolMapSection({
             Havuz Haritası
           </h2>
           <p className="mt-0.5 text-[10px] font-bold leading-4 text-[#64748B]">
-            Pinler fiyatlıdır. Yaklaşık pinler il/ilçe merkezinden üretilir.
+            Sadece gerçek konumu olan portföyler gösterilir.
           </p>
         </div>
         <div className="shrink-0 rounded-[15px] border-2 border-[#C7D6E8] bg-white px-2.5 py-1.5 text-center">
@@ -1317,7 +1255,7 @@ function PoolMapSection({
           <span className="text-[#2563EB]">{exactCount}</span> gerçek konum
         </div>
         <div className="px-2 py-2">
-          <span className="text-orange-600">{approxCount}</span> yaklaşık konum
+          <span className="text-emerald-600">0</span> yaklaşık konum
         </div>
       </div>
 
@@ -1638,22 +1576,31 @@ function PoolUnitCard({
 function PoolDetailModal({
   unit,
   match,
+  busyAction,
   onClose,
+  onMessage,
+  onAction,
 }: {
   unit: Unit;
   match: { score: number; customer: Customer | null; budgetDiff: number };
+  busyAction: string | null;
   onClose: () => void;
+  onMessage: () => void;
+  onAction: (type: PoolAction) => void;
 }) {
   const image = getCover(unit);
   const features = getHighlightFeatures(unit);
   const specs = getPrimarySpecs(unit);
   const imageCount = (Array.isArray(unit.images) ? unit.images.length : 0) || 1;
+  const messageBusy = busyAction === `MESSAGE_${unit.id}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 px-[max(8px,env(safe-area-inset-left))] pt-[max(10px,env(safe-area-inset-top))] pb-[max(8px,env(safe-area-inset-bottom))]">
-      <section className="flex max-h-[min(92dvh,720px)] w-[min(96vw,430px)] flex-col overflow-hidden rounded-t-[30px] rounded-b-[22px] border-2 border-[#C7D6E8] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 px-[max(8px,env(safe-area-inset-left))] pt-[max(10px,env(safe-area-inset-top))] pb-0">
+      <section className="flex max-h-[min(92dvh,720px)] w-[min(96vw,430px)] flex-col overflow-hidden rounded-t-[30px] border-2 border-b-0 border-[#C7D6E8] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
         <div className="relative shrink-0">
-          <div className="h-[178px] bg-[#EEF3F8]">
+          <div className="mx-auto mt-2 h-1.5 w-11 rounded-full bg-[#CBD5E1]" />
+
+          <div className="relative mt-2 h-[150px] overflow-hidden bg-[#EEF3F8]">
             {image ? (
               <img
                 src={image}
@@ -1665,51 +1612,53 @@ function PoolDetailModal({
                 <Building2 size={34} />
               </div>
             )}
+
+            <div className="absolute bottom-2 left-2 rounded-full bg-slate-950/75 px-2.5 py-1 text-[10px] font-black text-white">
+              {imageCount} Fotoğraf
+            </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-[16px] border-2 border-white/70 bg-white/95 text-[#2563EB] shadow-[0_8px_18px_rgba(15,23,42,0.15)]"
+            className="absolute right-3 top-5 flex h-10 w-10 items-center justify-center rounded-[15px] border-2 border-white/70 bg-white/95 text-[#2563EB] shadow-[0_8px_18px_rgba(15,23,42,0.15)]"
             aria-label="Kapat"
           >
-            <X size={19} />
+            <X size={18} />
           </button>
-
-          <div className="absolute bottom-3 left-3 rounded-full bg-slate-950/75 px-3 py-1.5 text-[11px] font-black text-white">
-            {imageCount} Fotoğraf
-          </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3 pt-2 [-webkit-overflow-scrolling:touch]">
-          <div className="grid grid-cols-[1fr_auto] items-start gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#2563EB]">
-                {getTypeChip(unit)}
-              </p>
-              <h2 className="mt-0.5 text-[20px] font-black leading-[1.05] tracking-[-0.045em] text-[#0F172A] break-words [overflow-wrap:anywhere]">
-                {limitText(unit.project?.name || "EPH Portföy", 72)}
-              </h2>
-              <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] font-bold leading-4 text-[#64748B]">
-                <MapPin size={14} className="shrink-0" />
-                <span className="min-w-0 break-words [overflow-wrap:anywhere]">
-                  {getLocation(unit)}
-                </span>
+          <div className="rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#2563EB]">
+                  {getTypeChip(unit)} • {getEphId(unit.id)}
+                </p>
+                <h2 className="mt-1 text-[18px] font-black leading-[1.08] tracking-[-0.045em] text-[#0F172A] break-words [overflow-wrap:anywhere]">
+                  {limitText(unit.project?.name || "EPH Portföy", 72)}
+                </h2>
+                <p className="mt-1.5 flex min-w-0 items-start gap-1.5 text-[12px] font-bold leading-4 text-[#64748B]">
+                  <MapPin size={14} className="mt-0.5 shrink-0" />
+                  <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+                    {getLocation(unit)}
+                  </span>
+                </p>
+              </div>
+
+              <p className="shrink-0 rounded-[16px] bg-[#2563EB] px-3 py-2 text-[15px] font-black leading-none tracking-[-0.04em] text-white">
+                {compactMoney(unit.price, unit.priceCurrency)}
               </p>
             </div>
 
-            <p className="shrink-0 rounded-[16px] bg-[#EFF6FF] px-3 py-2 text-[17px] font-black leading-none tracking-[-0.04em] text-[#1D4ED8]">
-              {compactMoney(unit.price, unit.priceCurrency)}
-            </p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {specs.slice(0, 3).map((spec) => (
+                <SmallInfo key={spec} label="Özellik" value={spec} />
+              ))}
+            </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {specs.slice(0, 3).map((spec) => (
-              <SmallInfo key={spec} label="Özellik" value={spec} />
-            ))}
-          </div>
-
-          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3">
+          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3">
             <p className="text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
               Dikkat Çeken Özellikler
             </p>
@@ -1720,7 +1669,7 @@ function PoolDetailModal({
             </div>
           </section>
 
-          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3">
+          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3">
             <p className="text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
               Meslektaş Havuzu
             </p>
@@ -1730,7 +1679,7 @@ function PoolDetailModal({
             </div>
           </section>
 
-          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3">
+          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3">
             <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
               Açıklama
             </p>
@@ -1740,7 +1689,7 @@ function PoolDetailModal({
             </p>
           </section>
 
-          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3">
+          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3">
             <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
               Mahremiyet
             </p>
@@ -1749,6 +1698,39 @@ function PoolDetailModal({
               detayında gösterilmez.
             </p>
           </section>
+        </div>
+
+        <div className="shrink-0 border-t-2 border-[#C7D6E8] bg-white/95 p-2.5 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-12px_28px_rgba(15,23,42,0.08)]">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onMessage}
+              disabled={Boolean(busyAction)}
+              className="flex min-h-[42px] items-center justify-center gap-1 rounded-[15px] border-2 border-[#C7D6E8] bg-white text-[12px] font-black text-[#1F2937] disabled:opacity-60"
+            >
+              <MessageCircle size={14} className="text-[#2563EB]" />
+              {messageBusy ? "Açılıyor" : "Mesaj 3K"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onAction("INTEREST")}
+              disabled={Boolean(busyAction)}
+              className="min-h-[42px] rounded-[15px] border-2 border-[#2563EB] bg-[#EFF6FF] text-[12px] font-black text-[#1D4ED8] disabled:opacity-60"
+            >
+              İlgilen 10K
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onAction("LEAD")}
+              disabled={Boolean(busyAction)}
+              className="col-span-2 flex min-h-[44px] items-center justify-center gap-1 rounded-[15px] border-2 border-[#2563EB] bg-[#2563EB] text-[12px] font-black text-white disabled:opacity-60"
+            >
+              <Users size={14} />
+              Müşterim Var 20K
+            </button>
+          </div>
         </div>
       </section>
     </div>
