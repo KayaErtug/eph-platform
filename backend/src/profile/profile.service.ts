@@ -30,6 +30,7 @@ export class ProfileService {
       memberCode: true,
       referralCode: true,
       memberSince: true,
+      nominationPoints: true,
       documents: {
         select: {
           id: true,
@@ -45,10 +46,59 @@ export class ProfileService {
   }
 
   async getProfile(userId: string) {
-    return this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: this.profileSelect(),
     });
+
+    if (!user) return null;
+
+    const [wallet, membership] = await Promise.all([
+      this.prisma.kontorCuzdani.findUnique({
+        where: { kullaniciId: userId },
+        select: {
+          bakiye: true,
+          toplamYukleme: true,
+          toplamHarcama: true,
+          toplamHediye: true,
+        },
+      }),
+      this.prisma.kullaniciUyelikPaketi.findFirst({
+        where: { kullaniciId: userId, durum: 'AKTIF' },
+        orderBy: { baslangicTarihi: 'desc' },
+        select: {
+          paketId: true,
+          durum: true,
+          baslangicTarihi: true,
+          bitisTarihi: true,
+          pilotPaketMi: true,
+          testPaketiMi: true,
+        },
+      }),
+    ]);
+
+    const packageInfo = membership
+      ? await this.prisma.uyelikPaketi.findUnique({
+          where: { id: membership.paketId },
+          select: {
+            paketKodu: true,
+            paketAdi: true,
+            aktifPortfoyLimiti: true,
+            verilenKontor: true,
+          },
+        })
+      : null;
+
+    return {
+      ...user,
+      kontorCuzdani: wallet,
+      currentMembership: membership
+        ? {
+            ...membership,
+            paket: packageInfo,
+          }
+        : null,
+    };
   }
 
   async updateProfile(
@@ -85,6 +135,21 @@ export class ProfileService {
 
     if ('lastName' in safeData && !safeData.lastName) {
       throw new BadRequestException('Soyad alanı boş olamaz.');
+    }
+
+    if ('firstName' in safeData && safeData.firstName.length > 20) {
+      throw new BadRequestException('Ad en fazla 20 karakter olabilir.');
+    }
+
+    if ('lastName' in safeData && safeData.lastName.length > 20) {
+      throw new BadRequestException('Soyad en fazla 20 karakter olabilir.');
+    }
+
+    if ('phone' in safeData && safeData.phone) {
+      const phone = String(safeData.phone).trim();
+      if (!/^\+90 5\d{2} \d{3} \d{2} \d{2}$/.test(phone)) {
+        throw new BadRequestException('Telefon formatı +90 5xx xxx xx xx olmalıdır.');
+      }
     }
 
     return this.prisma.user.update({
