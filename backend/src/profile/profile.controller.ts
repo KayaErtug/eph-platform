@@ -1,25 +1,26 @@
 import {
+  Body,
   Controller,
   Get,
+  NotFoundException,
+  Param,
   Patch,
   Post,
-  Body,
+  Res,
+  UploadedFile,
   UseGuards,
   UseInterceptors,
-  UploadedFile,
-  Param,
-  Res,
-  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { Response } from 'express';
-import { ProfileService } from './profile.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { DocumentType } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
+
+import { ProfileService } from './profile.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('profile')
 export class ProfileController {
@@ -53,7 +54,14 @@ export class ProfileController {
   @UseGuards(JwtAuthGuard)
   updateProfile(
     @CurrentUser() user: any,
-    @Body() body: { firstName?: string; lastName?: string; phone?: string },
+    @Body()
+    body: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      city?: string;
+      district?: string;
+    },
   ) {
     return this.profileService.updateProfile(user.id, body);
   }

@@ -1,9 +1,10 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { SupabaseService } from '../supabase/supabase.service';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DocumentType } from '@prisma/client';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+
+import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseService } from '../supabase/supabase.service';
 
 @Injectable()
 export class ProfileService {
@@ -12,52 +13,84 @@ export class ProfileService {
     private supabase: SupabaseService,
   ) {}
 
+  private profileSelect() {
+    return {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      profileImageUrl: true,
+      role: true,
+      isVerified: true,
+      isApproved: true,
+      createdAt: true,
+      city: true,
+      district: true,
+      memberCode: true,
+      referralCode: true,
+      memberSince: true,
+      documents: {
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          fileUrl: true,
+          fileName: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' as const },
+      },
+    };
+  }
+
   async getProfile(userId: string) {
     return this.prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        profileImageUrl: true,
-        role: true,
-        isVerified: true,
-        isApproved: true,
-        createdAt: true,
-        documents: {
-          select: {
-            id: true,
-            type: true,
-            status: true,
-            fileUrl: true,
-            fileName: true,
-            createdAt: true,
-          },
-          orderBy: { createdAt: 'desc' },
-        },
-      },
+      select: this.profileSelect(),
     });
   }
 
   async updateProfile(
     userId: string,
-    data: { firstName?: string; lastName?: string; phone?: string },
+    data: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      city?: string;
+      district?: string;
+    },
   ) {
+    const safeData = {
+      ...(data.firstName !== undefined
+        ? { firstName: String(data.firstName || '').trim() }
+        : {}),
+      ...(data.lastName !== undefined
+        ? { lastName: String(data.lastName || '').trim() }
+        : {}),
+      ...(data.phone !== undefined
+        ? { phone: String(data.phone || '').trim() }
+        : {}),
+      ...(data.city !== undefined
+        ? { city: String(data.city || '').trim() || null }
+        : {}),
+      ...(data.district !== undefined
+        ? { district: String(data.district || '').trim() || null }
+        : {}),
+    };
+
+    if ('firstName' in safeData && !safeData.firstName) {
+      throw new BadRequestException('Ad alanı boş olamaz.');
+    }
+
+    if ('lastName' in safeData && !safeData.lastName) {
+      throw new BadRequestException('Soyad alanı boş olamaz.');
+    }
+
     return this.prisma.user.update({
       where: { id: userId },
-      data,
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        profileImageUrl: true,
-        role: true,
-        isApproved: true,
-      },
+      data: safeData,
+      select: this.profileSelect(),
     });
   }
 
@@ -92,7 +125,6 @@ export class ProfileService {
     );
 
     await fs.mkdir(uploadDir, { recursive: true });
-
     await fs.writeFile(path.join(uploadDir, fileName), file.buffer);
 
     const profileImageUrl = `/api/profile/avatar-file/${fileName}`;
@@ -100,16 +132,7 @@ export class ProfileService {
     return this.prisma.user.update({
       where: { id: userId },
       data: { profileImageUrl },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        profileImageUrl: true,
-        role: true,
-        isApproved: true,
-      },
+      select: this.profileSelect(),
     });
   }
 
