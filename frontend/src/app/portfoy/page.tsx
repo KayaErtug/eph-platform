@@ -1013,6 +1013,13 @@ function StokPageInner() {
             <MiniMetric label="Kiralık" value={rentCount} tone="orange" />
           </div>
 
+        <PortfolioDocumentCenterEntry
+          totalCount={units.length}
+          activeCount={activeCount}
+          verifiedCount={units.filter((unit) => isUnitVerified(unit)).length}
+          onOpen={() => router.push("/portfoy/quality")}
+        />
+
 
         </section>
 
@@ -1252,6 +1259,49 @@ function MiniMetric({
       <p className={`text-[15px] font-black leading-none ${color}`}>{value}</p>
       <p className="mt-1 text-[9px] font-black text-[#64748B]">{label}</p>
     </div>
+  );
+}
+
+function PortfolioDocumentCenterEntry({
+  totalCount,
+  activeCount,
+  verifiedCount,
+  onOpen,
+}: {
+  totalCount: number;
+  activeCount: number;
+  verifiedCount: number;
+  onOpen: () => void;
+}) {
+  const waitingCount = Math.max(0, totalCount - verifiedCount);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="mt-3 w-full rounded-[24px] border border-[#C7D6E8] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] p-3 text-center shadow-[0_14px_32px_rgba(37,99,235,0.12)] active:scale-[0.99]"
+    >
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#1557D6] text-white shadow-[0_10px_22px_rgba(21,87,214,0.24)]">
+        <Building2 size={23} />
+      </div>
+
+      <h2 className="mt-2 text-[17px] font-black tracking-[-0.03em] text-[#06194A]">
+        Belge Yükleme Merkezi
+      </h2>
+      <p className="mx-auto mt-1 max-w-[320px] text-[11px] font-bold leading-[1.45] text-[#64748B]">
+        Yetki belgesi, tapu ve portföy evraklarını tek merkezden yükle, yenile ve incelemeye hazırla.
+      </p>
+
+      <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[18px] border border-[#DDE7F3] bg-white">
+        <MiniMetric label="Toplam" value={totalCount} />
+        <MiniMetric label="Aktif" value={activeCount} tone="blue" />
+        <MiniMetric label="Bekleyen" value={waitingCount} tone="orange" />
+      </div>
+
+      <div className="mt-3 flex min-h-[42px] items-center justify-center rounded-[16px] bg-[#1557D6] px-4 text-[13px] font-black text-white shadow-[0_10px_22px_rgba(21,87,214,0.22)]">
+        Belge Merkezini Aç
+      </div>
+    </button>
   );
 }
 
