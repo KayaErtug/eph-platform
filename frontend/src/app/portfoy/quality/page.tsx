@@ -472,14 +472,14 @@ export default function PortfolioQualityPage() {
               return (
                 <div
                   key={item.type}
-                  className="rounded-[20px] border border-[#DDE7F3] bg-[#F8FAFC] p-3 text-center"
+                  className="rounded-[20px] border-[3px] border-[#2563EB] bg-white p-3 text-center shadow-[0_10px_24px_rgba(37,99,235,0.10)]"
                 >
                   <div className="flex items-start justify-center gap-2 text-center">
                     <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] ${hasFile ? "bg-emerald-50 text-emerald-700" : "bg-white text-[#2563EB]"}`}>
                       {hasFile ? <CheckCircle2 size={20} /> : <FileText size={20} />}
                     </div>
                     <div className="min-w-0 flex-1 text-center">
-                      <p className="break-words text-center text-[13px] font-black text-[#06194A]">{item.title}</p>
+                      <p className="break-words text-center text-[15px] font-black text-[#2563EB]">{item.title}</p>
                       <p className="mt-0.5 break-words text-center text-[10.5px] font-bold leading-4 text-[#64748B]">
                         {item.description}
                       </p>
