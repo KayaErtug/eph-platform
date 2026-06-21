@@ -91,6 +91,7 @@ export class ProfileService {
 
     return {
       ...user,
+      referenceCount: user.nominationPoints,
       kontorCuzdani: wallet,
       currentMembership: membership
         ? {
@@ -152,11 +153,12 @@ export class ProfileService {
       }
     }
 
-    return this.prisma.user.update({
+    await this.prisma.user.update({
       where: { id: userId },
       data: safeData,
-      select: this.profileSelect(),
     });
+
+    return this.getProfile(userId);
   }
 
   async uploadAvatar(userId: string, file: Express.Multer.File) {
@@ -170,8 +172,8 @@ export class ProfileService {
       throw new BadRequestException('Sadece JPG, PNG veya WEBP yüklenebilir.');
     }
 
-    if (file.size > 1024 * 1024) {
-      throw new BadRequestException('Profil fotoğrafı 1MB den büyük olamaz.');
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('Profil fotoğrafı 5MB den büyük olamaz.');
     }
 
     const safeExt =
@@ -194,11 +196,12 @@ export class ProfileService {
 
     const profileImageUrl = `/api/profile/avatar-file/${fileName}`;
 
-    return this.prisma.user.update({
+    await this.prisma.user.update({
       where: { id: userId },
       data: { profileImageUrl },
-      select: this.profileSelect(),
     });
+
+    return this.getProfile(userId);
   }
 
   async uploadDocument(

@@ -15,7 +15,6 @@ import {
   Bell,
   BriefcaseBusiness,
   Building2,
-  CalendarDays,
   Camera,
   ChevronDown,
   ChevronRight,
@@ -63,6 +62,7 @@ type SafeUser = {
   referralCode?: string;
   referenceCode?: string;
   nominationPoints?: number;
+  referenceCount?: number;
   companyName?: string;
   officeName?: string;
   title?: string;
@@ -335,17 +335,6 @@ function getProfileImageUrl(value?: string) {
   if (!value) return "";
   if (value.startsWith("http")) return value;
   return value;
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("tr-TR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
 }
 
 function onlyDigits(value: string) {
@@ -730,7 +719,7 @@ export default function ProfilPage() {
     safeUser?.packageType ||
     safeUser?.plan ||
     safeUser?.membershipType ||
-    (superAdmin ? "Kurucu Erişimi" : "Standart");
+    (superAdmin ? "Kurucu Erişimi" : "Paket Atanmadı");
 
   const referralCode =
     safeUser?.referralCode || safeUser?.referenceCode || "Henüz tanımlı değil";
@@ -748,9 +737,7 @@ export default function ProfilPage() {
     .filter(Boolean)
     .join(" / ");
   const kontorBalance = safeUser?.kontorCuzdani?.bakiye;
-  const membershipStart = formatDate(safeUser?.currentMembership?.baslangicTarihi);
-  const membershipEnd = formatDate(safeUser?.currentMembership?.bitisTarihi);
-  const referenceCount = Number(safeUser?.nominationPoints || 0);
+  const referenceCount = Number(safeUser?.referenceCount ?? safeUser?.nominationPoints ?? 0);
 
   const openEditModal = () => {
     setForm({
@@ -787,8 +774,8 @@ export default function ProfilPage() {
       return;
     }
 
-    if (file.size > 1024 * 1024) {
-      setFormError("Profil fotoğrafı en fazla 1 MB olabilir.");
+    if (file.size > 5 * 1024 * 1024) {
+      setFormError("Profil fotoğrafı en fazla 5 MB olabilir.");
       return;
     }
 
@@ -960,14 +947,9 @@ export default function ProfilPage() {
               value={String(packageName).toLocaleUpperCase("tr-TR")}
             />
             <PremiumLine
-              icon={<CalendarDays size={15} />}
-              label="Başlangıç Tarihi"
-              value={membershipStart}
-            />
-            <PremiumLine
-              icon={<CalendarDays size={15} />}
-              label="Bitiş Tarihi"
-              value={membershipEnd}
+              icon={<Gift size={15} />}
+              label="Referans"
+              value={String(referenceCount)}
               last
             />
           </section>
@@ -975,8 +957,8 @@ export default function ProfilPage() {
 
         <section className="mt-4 grid grid-cols-4 gap-2">
           <ProfileMetric icon={<BriefcaseBusiness size={18} />} value={metrics.portfolioCount} label="Portföy" />
-          <ProfileMetric icon={<Users size={18} />} value={metrics.crmCount} label="CRM Kaydı" />
-          <ProfileMetric icon={<Home size={18} />} value={metrics.poolCount} label="Havuzdaki İlan" />
+          <ProfileMetric icon={<Users size={18} />} value={metrics.crmCount} label="Müşteri" />
+          <ProfileMetric icon={<Home size={18} />} value={metrics.poolCount} label="Havuz" />
           <ProfileMetric icon={<Gift size={18} />} value={String(referenceCount)} label="Referans" />
         </section>
 
@@ -1157,7 +1139,7 @@ export default function ProfilPage() {
                 Fotoğraf Seç
               </button>
               <p className="mt-2 text-[10px] font-bold text-[#64748B]">
-                JPG, PNG veya WEBP · Maksimum 1 MB
+                JPG, PNG veya WEBP · Maksimum 5 MB
               </p>
             </div>
 
