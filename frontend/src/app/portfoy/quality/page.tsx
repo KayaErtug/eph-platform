@@ -26,7 +26,19 @@ type PortfolioAuthorityType =
   | "TAPU"
   | "TAPU_SAHIBI_KIMLIK"
   | "KAT_KARSILIGI_SOZLESMESI"
-  | "DIGER_DOGRULAMA_EVRAKI";
+  | "DIGER_DOGRULAMA_EVRAKI"
+  | "ARSA_TAPUSU"
+  | "YAPI_RUHSATI"
+  | "MIMARI_PROJE"
+  | "ISKAN_BELGESI"
+  | "VERGI_LEVHASI"
+  | "YETKI_BELGELERI"
+  | "OFIS_EVRAKLARI"
+  | "SOZLESMELER"
+  | "PERSONEL_EVRAKLARI"
+  | "TAKIM_EVRAKLARI"
+  | "RAPORLAR"
+  | "PERFORMANS_BELGELERI";
 
 type PortfolioDocument = {
   id?: string;
@@ -65,56 +77,200 @@ type DocumentDefinition = {
   type: PortfolioAuthorityType;
   title: string;
   description: string;
+  required?: boolean;
 };
 
-type DocumentStatusTone = "uploaded" | "missing" | "waiting";
+type DocumentStatusTone = "waiting" | "uploaded" | "reviewing" | "verified";
 
-const REQUIRED_DOCUMENT_TYPES: PortfolioAuthorityType[] = ["YETKI_BELGESI", "TAPU"];
+type RoleDocumentTemplateKey = "EMLAKCI" | "MUTEAHHIT" | "INSAAT_FIRMASI" | "OFIS_SAHIBI" | "TAKIM_LIDERI";
 
 function getDocumentStatus(
   document: PortfolioDocument | undefined,
-  authorityType: PortfolioAuthorityType,
+  unit?: PortfolioUnit | null,
 ): { label: string; tone: DocumentStatusTone } {
-  if (document?.fileUrl) return { label: "Yüklendi", tone: "uploaded" };
-  if (REQUIRED_DOCUMENT_TYPES.includes(authorityType)) return { label: "Eksik", tone: "missing" };
-  return { label: "Bekleniyor", tone: "waiting" };
+  if (!document?.fileUrl) return { label: "Evrak Bekleniyor", tone: "waiting" };
+  if (document?.approved) return { label: "Doğrulandı", tone: "verified" };
+
+  const approvalStatus = String(unit?.approvalStatus || "").toUpperCase();
+  if (["INCELEMEYE_GONDERILDI", "INCELEMEDE", "EKSIK_BILGI_BEKLENIYOR"].includes(approvalStatus)) {
+    return { label: "İncelemede", tone: "reviewing" };
+  }
+
+  return { label: "Yüklendi", tone: "uploaded" };
 }
 
 function getStatusBadgeClass(tone: DocumentStatusTone) {
-  if (tone === "uploaded") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (tone === "missing") return "border-rose-200 bg-rose-50 text-rose-700";
-  return "border-amber-200 bg-amber-50 text-amber-700";
+  if (tone === "verified") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (tone === "reviewing") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (tone === "uploaded") return "border-blue-200 bg-blue-50 text-[#2563EB]";
+  return "border-slate-200 bg-slate-50 text-slate-600";
 }
 
 const DOCUMENT_ACCEPT = "application/pdf,image/jpeg,image/png,image/webp";
 
-const DOCUMENTS: DocumentDefinition[] = [
-  {
-    type: "YETKI_BELGESI",
-    title: "Yetki Belgesi",
-    description: "Portföy temsil yetkisini gösteren belge.",
-  },
-  {
-    type: "TAPU",
-    title: "Tapu",
-    description: "Portföyün tapu veya mülkiyet evrakı.",
-  },
-  {
-    type: "TAPU_SAHIBI_KIMLIK",
-    title: "Tapu Sahibi Kimlik",
-    description: "Tapu sahibine ait kimlik doğrulama evrakı.",
-  },
-  {
-    type: "KAT_KARSILIGI_SOZLESMESI",
-    title: "Kat Karşılığı Sözleşmesi",
-    description: "Kat karşılığı / arsa anlaşması evrakı.",
-  },
-  {
-    type: "DIGER_DOGRULAMA_EVRAKI",
-    title: "Diğer Evrak",
-    description: "Doğrulamaya yardımcı ek belge.",
-  },
-];
+const ROLE_DOCUMENTS: Record<RoleDocumentTemplateKey, DocumentDefinition[]> = {
+  EMLAKCI: [
+    {
+      type: "YETKI_BELGESI",
+      title: "Yetki Belgesi",
+      description: "Portföy temsil yetkisini gösteren belge.",
+      required: true,
+    },
+    {
+      type: "TAPU",
+      title: "Tapu",
+      description: "Portföyün tapu veya mülkiyet evrakı.",
+      required: true,
+    },
+    {
+      type: "TAPU_SAHIBI_KIMLIK",
+      title: "Tapu Sahibi Kimlik",
+      description: "Tapu sahibine ait kimlik doğrulama evrakı.",
+    },
+    {
+      type: "DIGER_DOGRULAMA_EVRAKI",
+      title: "Diğer Evrak",
+      description: "Doğrulamaya yardımcı ek belge.",
+    },
+  ],
+  MUTEAHHIT: [
+    {
+      type: "ARSA_TAPUSU",
+      title: "Arsa Tapusu",
+      description: "Proje arsasına ait tapu evrakı.",
+      required: true,
+    },
+    {
+      type: "YAPI_RUHSATI",
+      title: "Yapı Ruhsatı",
+      description: "İlgili projeye ait resmi yapı ruhsatı.",
+      required: true,
+    },
+    {
+      type: "MIMARI_PROJE",
+      title: "Mimari Proje",
+      description: "Onaylı mimari proje dosyası.",
+    },
+    {
+      type: "KAT_KARSILIGI_SOZLESMESI",
+      title: "Kat Karşılığı Sözleşmesi",
+      description: "Arsa sahibi ile yapılan kat karşılığı sözleşmesi.",
+    },
+    {
+      type: "ISKAN_BELGESI",
+      title: "İskan Belgesi",
+      description: "Yapı kullanım izin belgesi.",
+    },
+    {
+      type: "DIGER_DOGRULAMA_EVRAKI",
+      title: "Diğer Evrak",
+      description: "Projeye ait ek doğrulama evrakı.",
+    },
+  ],
+  INSAAT_FIRMASI: [
+    {
+      type: "VERGI_LEVHASI",
+      title: "Vergi Levhası",
+      description: "Firmaya ait güncel vergi levhası.",
+      required: true,
+    },
+    {
+      type: "YAPI_RUHSATI",
+      title: "Yapı Ruhsatı",
+      description: "Projeye ait resmi yapı ruhsatı.",
+      required: true,
+    },
+    {
+      type: "MIMARI_PROJE",
+      title: "Mimari Proje",
+      description: "Onaylı mimari proje dosyası.",
+    },
+    {
+      type: "ISKAN_BELGESI",
+      title: "İskan Belgesi",
+      description: "Yapı kullanım izin belgesi.",
+    },
+    {
+      type: "DIGER_DOGRULAMA_EVRAKI",
+      title: "Diğer Evrak",
+      description: "Firmaya veya projeye ait ek evrak.",
+    },
+  ],
+  OFIS_SAHIBI: [
+    {
+      type: "YETKI_BELGELERI",
+      title: "Yetki Belgeleri",
+      description: "Ofis ve danışmanlık yetkilerini gösteren belgeler.",
+      required: true,
+    },
+    {
+      type: "OFIS_EVRAKLARI",
+      title: "Ofis Evrakları",
+      description: "Ofis kaydı ve operasyon evrakları.",
+    },
+    {
+      type: "SOZLESMELER",
+      title: "Sözleşmeler",
+      description: "Ofise ait sözleşme dosyaları.",
+    },
+    {
+      type: "PERSONEL_EVRAKLARI",
+      title: "Personel Evrakları",
+      description: "Ofis ekibiyle ilgili personel evrakları.",
+    },
+    {
+      type: "DIGER_DOGRULAMA_EVRAKI",
+      title: "Diğer Evrak",
+      description: "Ofis doğrulamasına yardımcı ek belge.",
+    },
+  ],
+  TAKIM_LIDERI: [
+    {
+      type: "TAKIM_EVRAKLARI",
+      title: "Takım Evrakları",
+      description: "Takım yapısı ve operasyonuna ait evraklar.",
+      required: true,
+    },
+    {
+      type: "RAPORLAR",
+      title: "Raporlar",
+      description: "Takım faaliyet ve takip raporları.",
+    },
+    {
+      type: "PERFORMANS_BELGELERI",
+      title: "Performans Belgeleri",
+      description: "Takım performansına ait değerlendirme belgeleri.",
+    },
+    {
+      type: "DIGER_DOGRULAMA_EVRAKI",
+      title: "Diğer Evrak",
+      description: "Takım doğrulamasına yardımcı ek belge.",
+    },
+  ],
+};
+
+function getUserDocumentTemplateKey(user?: any): RoleDocumentTemplateKey {
+  const role = String(user?.role || "").toUpperCase();
+  const capabilities = Array.isArray(user?.capabilities) ? user.capabilities.map((item: unknown) => String(item).toUpperCase()) : [];
+  const capabilityNames = Array.isArray(user?.userCapabilities)
+    ? user.userCapabilities.map((item: any) => String(item?.capability || item?.name || item).toUpperCase())
+    : [];
+  const allCapabilities = [...capabilities, ...capabilityNames];
+
+  if (allCapabilities.includes("OFFICE_OWNER") || role === "OFIS_SAHIBI" || role === "OFFICE_OWNER") return "OFIS_SAHIBI";
+  if (allCapabilities.includes("TEAM_LEADER") || role === "TAKIM_LIDERI" || role === "TEAM_LEADER") return "TAKIM_LIDERI";
+  if (role === "MUTEAHHIT") return "MUTEAHHIT";
+  if (role === "INSAAT_FIRMASI") return "INSAAT_FIRMASI";
+  return "EMLAKCI";
+}
+
+function getRoleTemplateLabel(templateKey: RoleDocumentTemplateKey) {
+  if (templateKey === "MUTEAHHIT") return "Müteahhit Evrakları";
+  if (templateKey === "INSAAT_FIRMASI") return "İnşaat Firması Evrakları";
+  if (templateKey === "OFIS_SAHIBI") return "Ofis Sahibi Evrakları";
+  if (templateKey === "TAKIM_LIDERI") return "Takım Lideri Evrakları";
+  return "Emlakçı Evrakları";
+}
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   TRY: "₺",
@@ -158,8 +314,27 @@ function getDocumentByType(documents: PortfolioDocument[], type: PortfolioAuthor
   return documents.find((document) => document.authorityType === type);
 }
 
-function getVerifiedCount(documents: PortfolioDocument[]) {
-  return DOCUMENTS.filter((item) => getDocumentByType(documents, item.type)?.fileUrl).length;
+function getVerifiedCount(documents: PortfolioDocument[], documentDefinitions: DocumentDefinition[]) {
+  return documentDefinitions.filter((item) => getDocumentByType(documents, item.type)?.fileUrl).length;
+}
+
+function getRequiredUploadedCount(documents: PortfolioDocument[], documentDefinitions: DocumentDefinition[]) {
+  return documentDefinitions.filter((item) => item.required && getDocumentByType(documents, item.type)?.fileUrl).length;
+}
+
+function getRequiredDocumentCount(documentDefinitions: DocumentDefinition[]) {
+  return documentDefinitions.filter((item) => item.required).length;
+}
+
+function getMissingCriticalLabels(documents: PortfolioDocument[], documentDefinitions: DocumentDefinition[]) {
+  return documentDefinitions.filter(
+    (item) => item.required && !getDocumentByType(documents, item.type)?.fileUrl,
+  ).map((item) => item.title);
+}
+
+function getCompletionPercent(documents: PortfolioDocument[], documentDefinitions: DocumentDefinition[]) {
+  if (!documentDefinitions.length) return 0;
+  return Math.round((getVerifiedCount(documents, documentDefinitions) / documentDefinitions.length) * 100);
 }
 
 function validateDocumentFile(file: File) {
@@ -192,13 +367,7 @@ export default function PortfolioQualityPage() {
   const [deleteLoading, setDeleteLoading] = useState("");
   const [approvalLoading, setApprovalLoading] = useState(false);
 
-  const inputRefs = useRef<Record<PortfolioAuthorityType, HTMLInputElement | null>>({
-    YETKI_BELGESI: null,
-    TAPU: null,
-    TAPU_SAHIBI_KIMLIK: null,
-    KAT_KARSILIGI_SOZLESMESI: null,
-    DIGER_DOGRULAMA_EVRAKI: null,
-  });
+  const inputRefs = useRef<Partial<Record<PortfolioAuthorityType, HTMLInputElement | null>>>({});
 
   useEffect(() => setHydrated(true), []);
 
@@ -248,9 +417,17 @@ export default function PortfolioQualityPage() {
     () => units.find((unit) => unit.id === selectedUnitId) || null,
     [selectedUnitId, units],
   );
+  const documentTemplateKey = getUserDocumentTemplateKey(user);
+  const documentDefinitions = ROLE_DOCUMENTS[documentTemplateKey];
+  const documentTemplateLabel = getRoleTemplateLabel(documentTemplateKey);
 
-  const uploadedCount = getVerifiedCount(documents);
-  const missingCount = Math.max(0, DOCUMENTS.length - uploadedCount);
+  const uploadedCount = getVerifiedCount(documents, documentDefinitions);
+  const requiredDocumentCount = getRequiredDocumentCount(documentDefinitions);
+  const requiredUploadedCount = getRequiredUploadedCount(documents, documentDefinitions);
+  const missingCriticalLabels = getMissingCriticalLabels(documents, documentDefinitions);
+  const completionPercent = getCompletionPercent(documents, documentDefinitions);
+  const hasRequiredDocument = requiredDocumentCount === 0 || requiredUploadedCount === requiredDocumentCount;
+  const documentReadyLabel = hasRequiredDocument ? "İncelemeye Hazır" : "Kritik Evrak Bekleniyor";
 
   const fetchUnits = async () => {
     try {
@@ -389,7 +566,7 @@ export default function PortfolioQualityPage() {
                 Belge Yükleme Merkezi
               </h1>
               <p className="mx-auto mt-1 max-w-[320px] text-center text-[11px] font-bold leading-5 text-[#64748B]">
-                Yetki belgesi, tapu ve doğrulama evraklarını tek merkezden yönet.
+                {documentTemplateLabel} tek merkezden yönetilir.
               </p>
             </div>
             <button
@@ -404,8 +581,24 @@ export default function PortfolioQualityPage() {
 
           <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[18px] border border-[#DDE7F3] bg-white text-center">
             <Metric label="Portföy" value={units.length} />
-            <Metric label="Yüklü" value={uploadedCount} tone="green" />
-            <Metric label="Bekleyen" value={missingCount} tone="orange" />
+            <Metric label="Yüklendi" value={uploadedCount} tone="green" />
+            <Metric label="Hazırlık" value={`%${completionPercent}`} tone={completionPercent >= 80 ? "green" : "orange"} />
+          </div>
+
+          <div className="mt-3 rounded-[18px] border border-[#DDE7F3] bg-[#F8FAFC] p-3 text-center">
+            <div className="flex items-center justify-between gap-2 text-[11px] font-black text-[#64748B]">
+              <span>Evrak Tamamlama</span>
+              <span className={completionPercent >= 80 ? "text-emerald-700" : "text-amber-700"}>%{completionPercent}</span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+              <div
+                className={completionPercent >= 80 ? "h-full rounded-full bg-emerald-500" : "h-full rounded-full bg-amber-500"}
+                style={{ width: `${completionPercent}%` }}
+              />
+            </div>
+            <p className={hasRequiredDocument ? "mt-2 text-[11px] font-black text-emerald-700" : "mt-2 text-[11px] font-black text-rose-700"}>
+              {selectedUnit ? documentReadyLabel : "Önce portföy seçiniz"}
+            </p>
           </div>
         </section>
 
@@ -474,18 +667,43 @@ export default function PortfolioQualityPage() {
         <section className="mt-3 rounded-[24px] border border-[#C7D6E8] bg-white p-3 text-center shadow-[0_12px_28px_rgba(15,23,42,0.05)]">
           <div className="flex items-center justify-center gap-2 text-[#2563EB]">
             <ShieldCheck size={18} />
-            <h2 className="text-center text-[16px] font-black text-[#06194A]">Evraklar</h2>
+            <h2 className="text-center text-[16px] font-black text-[#06194A]">{documentTemplateLabel}</h2>
           </div>
 
           <p className="mx-auto mt-1 max-w-[320px] text-center text-[11px] font-bold leading-5 text-[#64748B]">
             {selectedUnit ? getPortfolioTitle(selectedUnit) : "Portföy seçildiğinde evraklar burada görünür."}
           </p>
 
+          {selectedUnit && (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => router.push(`/portfoy/${selectedUnit.id}`)}
+                className="flex min-h-[38px] items-center justify-center rounded-[14px] border border-[#DDE7F3] bg-white px-3 text-[11px] font-black text-[#2563EB]"
+              >
+                Detaya Git
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`/portfoy?edit=${selectedUnit.id}`)}
+                className="flex min-h-[38px] items-center justify-center rounded-[14px] bg-[#EFF6FF] px-3 text-[11px] font-black text-[#2563EB]"
+              >
+                Güncelle
+              </button>
+            </div>
+          )}
+
+          {selectedUnit && missingCriticalLabels.length > 0 && (
+            <div className="mt-3 rounded-[16px] border border-rose-100 bg-rose-50 px-3 py-2 text-center text-[11px] font-black leading-5 text-rose-700">
+              Evrak bekleniyor: {missingCriticalLabels.join(" + ")}
+            </div>
+          )}
+
           <div className="mt-3 grid gap-2">
-            {DOCUMENTS.map((item) => {
+            {documentDefinitions.map((item) => {
               const document = getDocumentByType(documents, item.type);
               const hasFile = Boolean(document?.fileUrl);
-              const status = getDocumentStatus(document, item.type);
+              const status = getDocumentStatus(document, selectedUnit);
               const loadingUpload = documentLoading === item.type;
               const loadingDelete = Boolean(document?.id && deleteLoading === document.id);
 
@@ -514,11 +732,16 @@ export default function PortfolioQualityPage() {
                   {hasFile && (
                     <div className="mt-2 rounded-[16px] border border-emerald-100 bg-white px-3 py-2 text-center">
                       <p className="break-words text-[11px] font-black text-emerald-700">
-                        {document?.fileName || document?.originalName || "Belge yüklü"}
+                        {document?.fileName || document?.originalName || "Evrak yüklendi"}
                       </p>
                       <p className="mt-0.5 text-[10px] font-bold text-[#64748B]">
                         {formatFileSize(document?.sizeBytes)}
                       </p>
+                      {document?.createdAt && (
+                        <p className="mt-0.5 text-[10px] font-bold text-[#94A3B8]">
+                          Yükleme: {new Date(document.createdAt).toLocaleDateString("tr-TR")}
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -532,7 +755,7 @@ export default function PortfolioQualityPage() {
                     onChange={(event) => handleFileChange(event, item.type)}
                   />
 
-                  <div className="mt-3 grid grid-cols-3 gap-2">
+                  <div className="mt-3 grid grid-cols-4 gap-2">
                     <button
                       type="button"
                       onClick={() => inputRefs.current[item.type]?.click()}
@@ -558,6 +781,19 @@ export default function PortfolioQualityPage() {
                       Aç
                     </a>
 
+                    <a
+                      href={document?.fileUrl || undefined}
+                      download={document?.fileName || document?.originalName || item.title}
+                      aria-disabled={!hasFile}
+                      className={`flex min-h-[40px] items-center justify-center gap-1 rounded-[14px] px-2 text-[11px] font-black ${
+                        hasFile
+                          ? "border border-[#DDE7F3] bg-white text-[#2563EB]"
+                          : "pointer-events-none border border-[#DDE7F3] bg-white text-[#94A3B8]"
+                      }`}
+                    >
+                      İndir
+                    </a>
+
                     <button
                       type="button"
                       onClick={() => deleteDocument(document?.id)}
@@ -580,12 +816,12 @@ export default function PortfolioQualityPage() {
             <h2 className="text-center text-[16px] font-black text-[#06194A]">İnceleme Akışı</h2>
           </div>
           <p className="mx-auto mt-1 max-w-[320px] text-center text-[11px] font-bold leading-5 text-[#64748B]">
-            Yetki Belgesi veya Tapu yüklendikten sonra portföyü incelemeye gönderebilirsiniz.
+            Rolünüze göre tanımlanan zorunlu evraklar tamamlandığında portföyü incelemeye gönderebilirsiniz.
           </p>
           <button
             type="button"
             onClick={submitApproval}
-            disabled={!selectedUnit || !documents.some((document) => REQUIRED_DOCUMENT_TYPES.includes(document.authorityType as PortfolioAuthorityType) && document.fileUrl) || approvalLoading}
+            disabled={!selectedUnit || !hasRequiredDocument || approvalLoading}
             className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[18px] bg-[#06194A] px-4 text-[13px] font-black text-white disabled:opacity-50"
           >
             {approvalLoading ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
