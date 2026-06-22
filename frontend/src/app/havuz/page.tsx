@@ -7,6 +7,8 @@ import {
   BadgeCheck,
   Building2,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   List,
   Map as MapIcon,
@@ -195,6 +197,15 @@ function getCover(unit: Unit) {
   const images = Array.isArray(unit.images) ? unit.images : [];
   const image = images.find((item) => item.isCover) || images[0];
   return image?.supabaseUrl || image?.url || "";
+}
+
+function getUnitImages(unit: Unit) {
+  const images = Array.isArray(unit.images) ? unit.images : [];
+  const normalized = images
+    .map((item) => item.supabaseUrl || item.url || "")
+    .filter(Boolean);
+
+  return Array.from(new Set(normalized));
 }
 
 function compactMoney(value?: number | null, currency?: string | null) {
@@ -1511,6 +1522,32 @@ function getVisiblePortfolioDetails(unit: Unit): PremiumHighlight[] {
   return details.slice(0, 6);
 }
 
+type PremiumSpec = {
+  label: string;
+  value: string;
+  icon: string;
+};
+
+function getPremiumSpecs(unit: Unit): PremiumSpec[] {
+  const specs: PremiumSpec[] = [];
+
+  if (unit.roomCount) {
+    specs.push({ label: "Oda Planı", value: unit.roomCount, icon: "▦" });
+  }
+
+  if (unit.area) {
+    specs.push({
+      label: "Net Alan",
+      value: `${Number(unit.area).toLocaleString("tr-TR")} m²`,
+      icon: "m²",
+    });
+  }
+
+  specs.push({ label: "Portföy", value: typeLabel(unit.type), icon: "⌂" });
+
+  return specs.slice(0, 3);
+}
+
 function getCollaborationOpportunities(unit: Unit): PremiumHighlight[] {
   const text = [unit.type, unit.status, unit.description, unit.project?.name]
     .join(" ")
@@ -1774,21 +1811,43 @@ function PoolDetailModal({
   onMessage: () => void;
   onAction: (type: PoolAction) => void;
 }) {
-  const image = getCover(unit);
-  const specs = getPrimarySpecs(unit);
+  const images = getUnitImages(unit);
+  const fallbackImage = getCover(unit);
+  const galleryImages = images.length ? images : fallbackImage ? [fallbackImage] : [];
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const image = galleryImages[galleryIndex] || galleryImages[0] || "";
+  const specs = getPremiumSpecs(unit);
   const portfolioHighlights = getPremiumPortfolioHighlights(unit);
   const collaborationHighlights = getCollaborationOpportunities(unit);
   const visibleDetails = getVisiblePortfolioDetails(unit);
-  const imageCount = (Array.isArray(unit.images) ? unit.images.length : 0) || 1;
+  const imageCount = galleryImages.length || (Array.isArray(unit.images) ? unit.images.length : 0) || 0;
   const messageBusy = busyAction === `MESSAGE_${unit.id}`;
+
+  useEffect(() => {
+    setGalleryIndex(0);
+  }, [unit.id]);
+
+  const goPrevImage = () => {
+    if (galleryImages.length <= 1) return;
+    setGalleryIndex((current) =>
+      current === 0 ? galleryImages.length - 1 : current - 1,
+    );
+  };
+
+  const goNextImage = () => {
+    if (galleryImages.length <= 1) return;
+    setGalleryIndex((current) =>
+      current === galleryImages.length - 1 ? 0 : current + 1,
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 px-[max(8px,env(safe-area-inset-left))] pt-[max(10px,env(safe-area-inset-top))] pb-0">
-      <section className="flex max-h-[min(92dvh,720px)] w-[min(96vw,430px)] flex-col overflow-hidden rounded-t-[30px] border-2 border-b-0 border-[#C7D6E8] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
-        <div className="relative shrink-0">
+      <section className="flex max-h-[min(94dvh,820px)] w-[min(96vw,430px)] flex-col overflow-hidden rounded-t-[30px] border-2 border-b-0 border-[#C7D6E8] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
+        <div className="relative shrink-0 bg-white">
           <div className="mx-auto mt-2 h-1.5 w-11 rounded-full bg-[#CBD5E1]" />
 
-          <div className="relative mt-2 h-[150px] overflow-hidden bg-[#EEF3F8]">
+          <div className="relative mt-2 h-[260px] overflow-hidden bg-[#EEF3F8] sm:h-[280px]">
             {image ? (
               <img
                 src={image}
@@ -1797,46 +1856,106 @@ function PoolDetailModal({
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-[#2563EB]">
-                <Building2 size={34} />
+                <Building2 size={40} />
               </div>
             )}
 
-            <div className="absolute bottom-2 left-2 rounded-full bg-slate-950/75 px-2.5 py-1 text-[10px] font-black text-white">
-              {imageCount} Fotoğraf
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/20 via-transparent to-slate-950/35" />
+
+            <div className="absolute left-3 top-3 rounded-full bg-slate-950/82 px-3 py-1.5 text-[11px] font-black text-white shadow-[0_8px_18px_rgba(15,23,42,0.22)]">
+              {imageCount || 1} Fotoğraf
             </div>
+
+            {galleryImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={goPrevImage}
+                  className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white/80 bg-white/92 text-[#1F2937] shadow-[0_10px_22px_rgba(15,23,42,0.20)]"
+                  aria-label="Önceki fotoğraf"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  type="button"
+                  onClick={goNextImage}
+                  className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white/80 bg-white/92 text-[#1F2937] shadow-[0_10px_22px_rgba(15,23,42,0.20)]"
+                  aria-label="Sonraki fotoğraf"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </>
+            )}
+
+            {galleryImages.length > 1 && (
+              <div className="absolute inset-x-2 bottom-2 flex gap-1.5 overflow-x-auto pb-0.5">
+                {galleryImages.slice(0, 5).map((item, index) => (
+                  <button
+                    key={`${item}-${index}`}
+                    type="button"
+                    onClick={() => setGalleryIndex(index)}
+                    className={`h-[54px] min-w-[68px] overflow-hidden rounded-[12px] border-2 bg-white shadow-[0_8px_16px_rgba(15,23,42,0.18)] ${
+                      galleryIndex === index ? "border-[#2563EB]" : "border-white/85"
+                    }`}
+                    aria-label={`${index + 1}. fotoğraf`}
+                  >
+                    <img
+                      src={item}
+                      alt={`${unit.project?.name || "Portföy"} ${index + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ))}
+                {galleryImages.length > 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setGalleryIndex(5)}
+                    className="flex h-[54px] min-w-[68px] flex-col items-center justify-center rounded-[12px] border-2 border-white/85 bg-slate-950/78 text-center text-white shadow-[0_8px_16px_rgba(15,23,42,0.18)]"
+                    aria-label="Diğer fotoğraflar"
+                  >
+                    <span className="text-[14px] font-black leading-none">
+                      +{galleryImages.length - 5}
+                    </span>
+                    <span className="mt-0.5 text-[9px] font-black">Daha</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-3 top-5 flex h-10 w-10 items-center justify-center rounded-[15px] border-2 border-white/70 bg-white/95 text-[#2563EB] shadow-[0_8px_18px_rgba(15,23,42,0.15)]"
+            className="absolute right-3 top-5 flex h-11 w-11 items-center justify-center rounded-[16px] border-2 border-white/70 bg-white/95 text-[#2563EB] shadow-[0_8px_18px_rgba(15,23,42,0.15)]"
             aria-label="Kapat"
           >
-            <X size={18} />
+            <X size={19} />
           </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3 pt-2 [-webkit-overflow-scrolling:touch]">
-          <div className="rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3 text-center">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-              {getTypeChip(unit)} • {getEphId(unit.id)}
-            </p>
-            <h2 className="mx-auto mt-1 max-w-[330px] text-center text-[19px] font-black leading-[1.08] tracking-[-0.045em] text-[#0F172A] break-words [overflow-wrap:anywhere]">
-              {limitText(unit.project?.name || "EPH Portföy", 72)}
-            </h2>
-            <p className="mt-1.5 flex min-w-0 items-start justify-center gap-1.5 text-center text-[12px] font-bold leading-4 text-[#64748B]">
-              <MapPin size={14} className="mt-0.5 shrink-0" />
-              <span className="min-w-0 break-words [overflow-wrap:anywhere]">
-                {getLocation(unit)}
-              </span>
-            </p>
-            <p className="mx-auto mt-2 inline-flex items-center justify-center rounded-[16px] bg-[#2563EB] px-4 py-2 text-center text-[15px] font-black leading-none tracking-[-0.04em] text-white">
-              {compactMoney(unit.price, unit.priceCurrency)}
-            </p>
+          <div className="overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-center shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
+            <div className="px-3 pb-3 pt-3">
+              <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+                {getTypeChip(unit)} • {getEphId(unit.id)}
+              </p>
+              <h2 className="mx-auto mt-1 max-w-[340px] text-center text-[19px] font-black leading-[1.08] tracking-[-0.045em] text-[#0F172A] break-words [overflow-wrap:anywhere]">
+                {limitText(unit.project?.name || "EPH Portföy", 72)}
+              </h2>
+              <p className="mt-1.5 flex min-w-0 items-start justify-center gap-1.5 text-center text-[12px] font-bold leading-4 text-[#64748B]">
+                <MapPin size={14} className="mt-0.5 shrink-0" />
+                <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+                  {getLocation(unit)}
+                </span>
+              </p>
+              <p className="mx-auto mt-2 inline-flex min-h-[34px] items-center justify-center rounded-full bg-[#2563EB] px-5 text-center text-[16px] font-black leading-none tracking-[-0.04em] text-white shadow-[0_10px_22px_rgba(37,99,235,0.22)]">
+                {compactMoney(unit.price, unit.priceCurrency)}
+              </p>
+            </div>
 
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {specs.slice(0, 3).map((spec) => (
-                <SmallInfo key={spec} label="Özellik" value={spec} />
+            <div className="grid grid-cols-3 gap-2 border-t-2 border-[#E2EAF5] bg-white p-2.5">
+              {specs.map((spec) => (
+                <PremiumSpecCard key={spec.label} spec={spec} />
               ))}
             </div>
           </div>
@@ -1942,6 +2061,24 @@ function PoolDetailModal({
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function PremiumSpecCard({ spec }: { spec: PremiumSpec }) {
+  return (
+    <div className="flex min-h-[52px] items-center justify-center gap-2 rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-1.5 text-center">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-white text-[13px] font-black text-[#2563EB] shadow-[0_6px_12px_rgba(15,23,42,0.05)]">
+        {spec.icon}
+      </div>
+      <div className="min-w-0 text-center">
+        <p className="text-[8px] font-black uppercase tracking-[0.08em] text-[#64748B]">
+          {spec.label}
+        </p>
+        <p className="mt-0.5 text-[11px] font-black leading-[1.05] text-[#0F172A] break-words [overflow-wrap:anywhere]">
+          {limitText(spec.value, 22)}
+        </p>
+      </div>
     </div>
   );
 }
