@@ -44,6 +44,15 @@ declare global {
 
 const DEFAULT_CENTER = { lat: 37.783, lng: 29.096 };
 
+type MapTypeKey = "roadmap" | "satellite" | "hybrid" | "terrain";
+
+const MAP_TYPE_OPTIONS: Array<{ key: MapTypeKey; label: string; icon: string }> = [
+  { key: "roadmap", label: "Standart", icon: "🗺️" },
+  { key: "satellite", label: "Uydu", icon: "🛰️" },
+  { key: "hybrid", label: "Hibrit", icon: "🌐" },
+  { key: "terrain", label: "Arazi", icon: "🏔️" },
+];
+
 function getMapsApiKey() {
   return process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 }
@@ -169,9 +178,15 @@ export default function GoogleGeoPicker({
         }
       : null,
   );
+  const [selectedMapType, setSelectedMapType] = useState<MapTypeKey>("roadmap");
 
   const searchAddress = useMemo(() => normalizeAddress([address, district, city, "Türkiye"]), [address, city, district]);
   const selectedLocationText = mapAddress || pendingLocation?.mapAddress || "Henüz harita konumu seçilmedi.";
+
+  const handleMapTypeChange = (mapType: MapTypeKey) => {
+    setSelectedMapType(mapType);
+    mapRef.current?.setMapTypeId?.(mapType);
+  };
 
   useEffect(() => {
     onOpenChange?.(open);
@@ -315,6 +330,7 @@ export default function GoogleGeoPicker({
         mapRef.current = new window.google.maps.Map(mapContainerRef.current, {
           center: initialCenter,
           zoom: latitude && longitude ? 17 : 12,
+          mapTypeId: selectedMapType,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
@@ -463,6 +479,27 @@ export default function GoogleGeoPicker({
 
               <div className="relative h-[330px] overflow-hidden rounded-[24px] border border-[#DDE7F3] bg-[#EEF5FF]">
                 <div ref={mapContainerRef} className="h-full w-full" />
+                <div className="absolute left-2 right-2 top-2 z-10 grid grid-cols-4 gap-1 rounded-[18px] border border-white/80 bg-white/92 p-1 shadow-[0_10px_24px_rgba(15,23,42,0.16)] backdrop-blur">
+                  {MAP_TYPE_OPTIONS.map((option) => {
+                    const active = selectedMapType === option.key;
+
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => handleMapTypeChange(option.key)}
+                        className={`flex min-h-[38px] items-center justify-center gap-1 rounded-[14px] px-1 text-[10px] font-black transition active:scale-[0.98] ${
+                          active
+                            ? "bg-[#1557D6] text-white shadow-[0_8px_18px_rgba(21,87,214,0.24)]"
+                            : "bg-[#F8FBFF] text-[#06194A]"
+                        }`}
+                      >
+                        <span aria-hidden="true">{option.icon}</span>
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
                 {(loading || !ready) && (
                   <div className="absolute inset-0 flex items-center justify-center bg-white/72 backdrop-blur-sm">
                     <div className="text-center">
