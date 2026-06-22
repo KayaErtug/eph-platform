@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -61,22 +61,22 @@ type MapUnit = Unit & {
 };
 
 const statusLabels: Record<string, string> = {
-  SATILIK: "SatÄ±lÄ±k",
-  KIRALIK: "KiralÄ±k",
-  GUNLUK_KIRALIK: "GÃ¼nlÃ¼k KiralÄ±k",
-  DEVREN_SATILIK: "Devren SatÄ±lÄ±k",
-  DEVREN_KIRALIK: "Devren KiralÄ±k",
-  ON_SATIS: "Ã–n SatÄ±ÅŸ",
-  PROJE_ASAMASI: "Proje AÅŸamasÄ±",
-  YAKINDA_SATISTA: "YakÄ±nda SatÄ±ÅŸta",
-  INSAAT_HALINDE: "Ä°nÅŸaat Halinde",
+  SATILIK: "Satılık",
+  KIRALIK: "Kiralık",
+  GUNLUK_KIRALIK: "Günlük Kiralık",
+  DEVREN_SATILIK: "Devren Satılık",
+  DEVREN_KIRALIK: "Devren Kiralık",
+  ON_SATIS: "Ön Satış",
+  PROJE_ASAMASI: "Proje Aşaması",
+  YAKINDA_SATISTA: "Yakında Satışta",
+  INSAAT_HALINDE: "İnşaat Halinde",
   HEMEN_TESLIM: "Hemen Teslim",
-  INSAAT_PROJESI: "Ä°nÅŸaat Projesi",
-  KAT_KARSILIGI: "Kat KarÅŸÄ±lÄ±ÄŸÄ±",
-  HASILAT_PAYLASIMLI: "HasÄ±lat PaylaÅŸÄ±mlÄ±",
+  INSAAT_PROJESI: "İnşaat Projesi",
+  KAT_KARSILIGI: "Kat Karşılığı",
+  HASILAT_PAYLASIMLI: "Hasılat Paylaşımlı",
   REZERVE: "Rezerve",
-  SATILDI: "SatÄ±ldÄ±",
-  KIRALANDI: "KiralandÄ±",
+  SATILDI: "Satıldı",
+  KIRALANDI: "Kiralandı",
   PASIF: "Pasif",
 };
 
@@ -94,10 +94,10 @@ const hotStatuses = [
 ];
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
-  TRY: "â‚º",
+  TRY: "₺",
   USD: "$",
-  EUR: "â‚¬",
-  GBP: "Â£",
+  EUR: "€",
+  GBP: "£",
 };
 
 const PORTFOLIO_CARD_STYLES = [
@@ -148,7 +148,7 @@ function getMapsApiKey() {
 
 function loadGoogleMapsScript() {
   if (typeof window === "undefined")
-    return Promise.reject(new Error("TarayÄ±cÄ± ortamÄ± bulunamadÄ±."));
+    return Promise.reject(new Error("Tarayıcı ortamı bulunamadı."));
   if (window.google?.maps) return Promise.resolve();
   if (window.ephPortfolioGoogleMapsReady)
     return window.ephPortfolioGoogleMapsReady;
@@ -156,7 +156,7 @@ function loadGoogleMapsScript() {
   const apiKey = getMapsApiKey();
 
   if (!apiKey)
-    return Promise.reject(new Error("Google Maps API anahtarÄ± tanÄ±mlÄ± deÄŸil."));
+    return Promise.reject(new Error("Google Maps API anahtarı tanımlı değil."));
 
   window.ephPortfolioGoogleMapsReady = new Promise<void>((resolve, reject) => {
     const existingScript = document.querySelector<HTMLScriptElement>(
@@ -166,7 +166,7 @@ function loadGoogleMapsScript() {
     if (existingScript) {
       existingScript.addEventListener("load", () => resolve());
       existingScript.addEventListener("error", () =>
-        reject(new Error("Google Maps yÃ¼klenemedi.")),
+        reject(new Error("Google Maps yüklenemedi.")),
       );
       return;
     }
@@ -177,7 +177,7 @@ function loadGoogleMapsScript() {
     script.defer = true;
     script.dataset.ephPortfolioGoogleMaps = "true";
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Google Maps yÃ¼klenemedi."));
+    script.onerror = () => reject(new Error("Google Maps yüklenemedi."));
     document.head.appendChild(script);
   });
 
@@ -190,7 +190,7 @@ function parseFormattedNumber(value: string) {
 
 function formatPrice(value?: number, currency?: string) {
   const numeric = Number(value || 0);
-  const symbol = CURRENCY_SYMBOLS[currency || "TRY"] || "â‚º";
+  const symbol = CURRENCY_SYMBOLS[currency || "TRY"] || "₺";
 
   if (!numeric) return "Fiyat yok";
 
@@ -199,9 +199,9 @@ function formatPrice(value?: number, currency?: string) {
 
 function formatCompactPrice(value?: number, currency?: string) {
   const numeric = Number(value || 0);
-  const symbol = CURRENCY_SYMBOLS[currency || "TRY"] || "â‚º";
+  const symbol = CURRENCY_SYMBOLS[currency || "TRY"] || "₺";
 
-  if (!numeric) return "â€”";
+  if (!numeric) return "—";
 
   if (numeric >= 1000000) {
     const compact = numeric / 1000000;
@@ -249,7 +249,7 @@ function formatFloorInfo(
 ) {
   const floorText =
     unit.floorLabel || (unit.floor != null ? `${unit.floor}. Kat` : "Kat yok");
-  const totalText = unit.totalFloors ? `${unit.totalFloors} KatlÄ±` : "";
+  const totalText = unit.totalFloors ? `${unit.totalFloors} Katlı` : "";
   return totalText ? `${floorText} / ${totalText}` : floorText;
 }
 
@@ -275,9 +275,9 @@ function makeWhatsappLocationText(unit: MapUnit) {
     .join(" / ");
 
   return [
-    "Merhaba, size EPH Ã¼zerinden portfÃ¶y konumu gÃ¶nderiyorum.",
+    "Merhaba, size EPH üzerinden portföy konumu gönderiyorum.",
     "",
-    `PortfÃ¶y: ${unit.project?.name || "EPH PortfÃ¶y"}`,
+    `Portföy: ${unit.project?.name || "EPH Portföy"}`,
     location ? `Konum: ${location}` : "",
     unit.price ? `Fiyat: ${formatPrice(unit.price, unit.priceCurrency)}` : "",
     "",
@@ -510,7 +510,7 @@ function StokPageInner() {
       previewUrl: image.displayUrl,
       existing: true,
       remoteId: image.id,
-      name: image.originalName || `Mevcut fotoÄŸraf ${index + 1}`,
+      name: image.originalName || `Mevcut fotoğraf ${index + 1}`,
       size: image.size || 0,
       isCover: Boolean(image.isCover),
     }));
@@ -743,7 +743,7 @@ function StokPageInner() {
       const selectedCoverImage = coverImage || galleryImages[0] || null;
 
       if (!selectedCoverImage || galleryImages.length === 0) {
-        setFormError("En az 1 galeri fotoÄŸrafÄ± ekleyiniz.");
+        setFormError("En az 1 galeri fotoğrafı ekleyiniz.");
         setFormLoading(false);
         return;
       }
@@ -756,7 +756,7 @@ function StokPageInner() {
 
       if (!createdUnitId) {
         setFormError(
-          "PortfÃ¶y oluÅŸturuldu ancak gÃ¶rsel yÃ¼kleme iÃ§in unitId alÄ±namadÄ±.",
+          "Portföy oluşturuldu ancak görsel yükleme için unitId alınamadı.",
         );
         setFormLoading(false);
         return;
@@ -782,14 +782,14 @@ function StokPageInner() {
         closeModal();
       }, 700);
     } catch (e: any) {
-      setFormError(e?.response?.data?.message || "Bir hata oluÅŸtu.");
+      setFormError(e?.response?.data?.message || "Bir hata oluştu.");
     } finally {
       setFormLoading(false);
     }
   };
 
   const getPortfolioShareData = (unit: MapUnit): PortfolioShareData => {
-    const title = unit.project?.name || "EPH PortfÃ¶y";
+    const title = unit.project?.name || "EPH Portföy";
     const location =
       [unit.project?.district, unit.project?.city]
         .filter(Boolean)
@@ -802,38 +802,38 @@ function StokPageInner() {
       price: unit.price
         ? formatPrice(unit.price, unit.priceCurrency)
         : "Fiyat bilgisi yok",
-      roomCount: unit.roomCount || "â€”",
-      area: unit.area ? `${unit.area} mÂ²` : "â€”",
+      roomCount: unit.roomCount || "—",
+      area: unit.area ? `${unit.area} m²` : "—",
       floor: formatFloorInfo(unit),
       authorization:
         unit.yetkiVerified || unit.isVerified ? "Yetkili" : "Kontrol",
       coverImage: getUnitCoverImage(unit) || "/LOGO_EPH.png",
       consultantName:
         [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
-        "EPH Ãœyesi",
+        "EPH Üyesi",
       consultantPhone: "Telefon bilgisi",
       portfolioNo: getPortfolioNo(unit),
       score: 86,
-      scoreLabel: "Ã‡ok Ä°yi",
+      scoreLabel: "Çok İyi",
       shortDescription:
         unit.description ||
-        "Yetkili portfÃ¶y statÃ¼sÃ¼nde paylaÅŸÄ±m iÃ§in hazÄ±r gayrimenkul kaydÄ±.",
+        "Yetkili portföy statüsünde paylaşım için hazır gayrimenkul kaydı.",
       longDescription:
         unit.description ||
-        "Bu portfÃ¶y EPH PortfÃ¶y Merkezi Ã¼zerinden hazÄ±rlanmÄ±ÅŸtÄ±r.",
+        "Bu portföy EPH Portföy Merkezi üzerinden hazırlanmıştır.",
       features: [
         {
           icon: "security",
           label:
             unit.yetkiVerified || unit.isVerified
-              ? "Yetkili PortfÃ¶y"
+              ? "Yetkili Portföy"
               : "Yetki Kontrol",
         },
-        { icon: "smart", label: "Lina KartÄ±" },
-        { icon: "car", label: "PortfÃ¶y KaydÄ±" },
+        { icon: "smart", label: "Lina Kartı" },
+        { icon: "car", label: "Portföy Kaydı" },
         {
           icon: "pool",
-          label: statusLabels[unit.status] || unit.status || "PortfÃ¶y",
+          label: statusLabels[unit.status] || unit.status || "Portföy",
         },
       ],
     };
@@ -845,14 +845,14 @@ function StokPageInner() {
   };
 
   const handleDeleteUnit = async (unit: MapUnit) => {
-    if (!confirm("Bu portfÃ¶yÃ¼ silmek istiyor musunuz?")) return;
+    if (!confirm("Bu portföyü silmek istiyor musunuz?")) return;
 
     try {
       setDeletingUnitId(unit.id);
       await api.delete(`/units/${unit.id}`);
       setUnits((current) => current.filter((item) => item.id !== unit.id));
     } catch (error: any) {
-      alert(error?.response?.data?.message || "PortfÃ¶y silinemedi.");
+      alert(error?.response?.data?.message || "Portföy silinemedi.");
     } finally {
       setDeletingUnitId("");
     }
@@ -860,7 +860,7 @@ function StokPageInner() {
 
   const handleSendToPool = async (unit: MapUnit) => {
     if ((unit as any).approvalStatus !== "ONAYLANDI") {
-      alert("Sadece onaylanmÄ±ÅŸ portfÃ¶yler havuza gÃ¶nderilebilir.");
+      alert("Sadece onaylanmış portföyler havuza gönderilebilir.");
       return;
     }
 
@@ -868,9 +868,9 @@ function StokPageInner() {
       setPoolActionUnitId(unit.id);
       await api.post(`/units/${unit.id}/send-to-pool`);
       await fetchData();
-      alert("PortfÃ¶y havuza gÃ¶nderildi.");
+      alert("Portföy havuza gönderildi.");
     } catch (error: any) {
-      alert(error?.response?.data?.message || "PortfÃ¶y havuza gÃ¶nderilemedi.");
+      alert(error?.response?.data?.message || "Portföy havuza gönderilemedi.");
     } finally {
       setPoolActionUnitId("");
     }
@@ -882,11 +882,11 @@ function StokPageInner() {
       await api.post(`/units/${unit.id}/remove-from-pool`);
       await fetchData();
       alert(
-        "PortfÃ¶y havuzdan kaldÄ±rÄ±ldÄ±. OnaylÄ± durumda kalÄ±r, istediÄŸiniz zaman tekrar havuza gÃ¶nderebilirsiniz.",
+        "Portföy havuzdan kaldırıldı. Onaylı durumda kalır, istediğiniz zaman tekrar havuza gönderebilirsiniz.",
       );
     } catch (error: any) {
       alert(
-        error?.response?.data?.message || "PortfÃ¶y havuzdan kaldÄ±rÄ±lamadÄ±.",
+        error?.response?.data?.message || "Portföy havuzdan kaldırılamadı.",
       );
     } finally {
       setPoolActionUnitId("");
@@ -904,7 +904,7 @@ function StokPageInner() {
         <div className="text-center">
           <Loader2 className="mx-auto animate-spin text-[#1557D6]" size={32} />
           <p className="mt-3 text-[12px] font-black text-[#64748B]">
-            PortfÃ¶y merkezi yÃ¼kleniyor...
+            Portföy merkezi yükleniyor...
           </p>
         </div>
       </main>
@@ -920,13 +920,13 @@ function StokPageInner() {
               type="button"
               onClick={() => router.back()}
               className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#F8FBFF] text-[#06194A] active:scale-[0.98]"
-              aria-label="Geri dÃ¶n"
+              aria-label="Geri dön"
             >
               <ArrowLeft size={20} />
             </button>
             <div className="text-center">
               <h1 className="text-[22px] font-black tracking-[-0.05em] text-[#06194A]">
-                PORTFÃ–Y
+                PORTFÖY
               </h1>
               <p className="text-[10px] font-bold text-[#64748B]">
                 Harita + ultra compact liste
@@ -953,7 +953,7 @@ function StokPageInner() {
               onChange={(event) => setCityFilter(event.target.value)}
               className="h-10 rounded-[16px] border border-[#DDE7F3] bg-white px-2 text-center text-[12px] font-black outline-none"
             >
-              <option value="">TÃ¼m Åehirler</option>
+              <option value="">Tüm Şehirler</option>
               {uniqueCities.map((city) => (
                 <option key={city} value={city}>
                   {city}
@@ -965,9 +965,9 @@ function StokPageInner() {
               onChange={(event) => setStatusFilter(event.target.value)}
               className="h-10 rounded-[16px] border border-[#DDE7F3] bg-white px-2 text-center text-[12px] font-black outline-none"
             >
-              <option value="">TÃ¼mÃ¼</option>
-              <option value="SATILIK">SatÄ±lÄ±k</option>
-              <option value="KIRALIK">KiralÄ±k</option>
+              <option value="">Tümü</option>
+              <option value="SATILIK">Satılık</option>
+              <option value="KIRALIK">Kiralık</option>
             </select>
             <button
               type="button"
@@ -982,7 +982,7 @@ function StokPageInner() {
               }
               className="h-10 rounded-[16px] border border-[#DDE7F3] bg-white text-[12px] font-black"
             >
-              SÄ±rala
+              Sırala
             </button>
           </div>
 
@@ -992,7 +992,7 @@ function StokPageInner() {
               ref={searchInputRef}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="PortfÃ¶y, ÅŸehir, ilÃ§e ara..."
+              placeholder="Portföy, şehir, ilçe ara..."
               className="h-8 min-w-0 flex-1 bg-transparent text-[13px] font-bold outline-none placeholder:text-[#94A3B8]"
             />
             {search && (
@@ -1003,14 +1003,14 @@ function StokPageInner() {
           </div>
 
           <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#E2EAF5] bg-white text-center">
-            <MiniMetric label="PortfÃ¶y" value={units.length} />
+            <MiniMetric label="Portföy" value={units.length} />
             <MiniMetric
               label="Ort. Fiyat"
               value={averageValue ? formatCompactPrice(averageValue) : "0"}
               tone="green"
             />
-            <MiniMetric label="SatÄ±lÄ±k" value={saleCount} tone="blue" />
-            <MiniMetric label="KiralÄ±k" value={rentCount} tone="orange" />
+            <MiniMetric label="Satılık" value={saleCount} tone="blue" />
+            <MiniMetric label="Kiralık" value={rentCount} tone="orange" />
           </div>
 
         <PortfolioDocumentCenterEntry
@@ -1032,7 +1032,7 @@ function StokPageInner() {
         >
           <span className="inline-flex items-center gap-2">
             <MapIcon size={19} className="text-[#1557D6]" />{" "}
-            {mapOpen ? "HaritayÄ± Kapat" : "HaritayÄ± GÃ¶ster"}
+            {mapOpen ? "Haritayı Kapat" : "Haritayı Göster"}
           </span>
           <ChevronDown
             size={19}
@@ -1052,7 +1052,7 @@ function StokPageInner() {
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-2 text-[12px] font-black text-[#64748B]">
               <span>
                 {showMapPins
-                  ? `${mapUnits.length} pinli portfÃ¶y`
+                  ? `${mapUnits.length} pinli portföy`
                   : "Pinler gizli"}
               </span>
               <button
@@ -1060,10 +1060,10 @@ function StokPageInner() {
                 onClick={() => setShowMapPins((current) => !current)}
                 className="min-h-[34px] rounded-[14px] border border-[#DDE7F3] bg-[#F8FBFF] px-3 text-[11px] font-black text-[#1557D6] shadow-sm active:scale-[0.98]"
               >
-                {showMapPins ? "Pinleri Gizle" : "Pinleri GÃ¶ster"}
+                {showMapPins ? "Pinleri Gizle" : "Pinleri Göster"}
               </button>
               <span className="text-right">
-                {missingLocationCount} konumsuz kayÄ±t
+                {missingLocationCount} konumsuz kayıt
               </span>
             </div>
 
@@ -1074,7 +1074,7 @@ function StokPageInner() {
                     <MapPin size={19} />
                   </div>
                   <h3 className="text-[14px] font-black leading-5 text-[#06194A]">
-                    {selectedMapUnit.project?.name || "SeÃ§ili PortfÃ¶y"}
+                    {selectedMapUnit.project?.name || "Seçili Portföy"}
                   </h3>
                   <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
                     {[
@@ -1097,15 +1097,15 @@ function StokPageInner() {
                     />
                     <MiniMetric
                       label="Oda"
-                      value={selectedMapUnit.roomCount || "â€”"}
+                      value={selectedMapUnit.roomCount || "—"}
                       tone="blue"
                     />
                     <MiniMetric
                       label="Alan"
                       value={
                         selectedMapUnit.area
-                          ? `${selectedMapUnit.area} mÂ²`
-                          : "â€”"
+                          ? `${selectedMapUnit.area} m²`
+                          : "—"
                       }
                       tone="orange"
                     />
@@ -1117,7 +1117,7 @@ function StokPageInner() {
                       onClick={() => handleWhatsappLocation(selectedMapUnit)}
                       className="min-h-[44px] rounded-[18px] border border-emerald-100 bg-emerald-50 px-3 text-[12px] font-black text-emerald-700 active:scale-[0.98]"
                     >
-                      Konumu PaylaÅŸ
+                      Konumu Paylaş
                     </button>
                     <button
                       type="button"
@@ -1126,7 +1126,7 @@ function StokPageInner() {
                       }
                       className="min-h-[44px] rounded-[18px] bg-[#1557D6] px-3 text-[12px] font-black text-white active:scale-[0.98]"
                     >
-                      PortfÃ¶yÃ¼ AÃ§
+                      Portföyü Aç
                     </button>
                   </div>
                 </div>
@@ -1135,19 +1135,19 @@ function StokPageInner() {
               <div className="border-t border-[#E2EAF5] bg-[#F8FBFF] p-4 text-center">
                 <MapPin className="mx-auto text-[#1557D6]" size={26} />
                 <p className="mt-2 text-[12px] font-black text-[#06194A]">
-                  Pinli gÃ¶sterilecek konumlu portfÃ¶y yok.
+                  Pinli gösterilecek konumlu portföy yok.
                 </p>
                 <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
-                  PortfÃ¶y gÃ¼ncelleme ekranÄ±ndan harita konumu seÃ§ildiÄŸinde
-                  burada pin olarak gÃ¶rÃ¼nÃ¼r.
+                  Portföy güncelleme ekranından harita konumu seçildiğinde
+                  burada pin olarak görünür.
                 </p>
               </div>
             )}
 
             {missingLocationCount > 0 && (
               <div className="border-t border-[#E2EAF5] bg-amber-50 px-3 py-2 text-center text-[11px] font-black leading-4 text-amber-700">
-                {missingLocationCount} portfÃ¶yde harita konumu yok. GÃ¼ncelle
-                ekranÄ±ndan konum seÃ§ilirse pinli haritada gÃ¶rÃ¼nÃ¼r.
+                {missingLocationCount} portföyde harita konumu yok. Güncelle
+                ekranından konum seçilirse pinli haritada görünür.
               </div>
             )}
           </section>
@@ -1156,7 +1156,7 @@ function StokPageInner() {
         <section className="mt-4 space-y-4">
           <div className="flex items-center justify-between px-1">
             <p className="text-[13px] font-black text-[#64748B]">
-              {filteredUnits.length} portfÃ¶y listeleniyor
+              {filteredUnits.length} portföy listeleniyor
             </p>
             <button
               type="button"
@@ -1164,7 +1164,7 @@ function StokPageInner() {
               disabled={!canAddUnit}
               className="inline-flex h-10 items-center gap-1 rounded-[18px] bg-[#1557D6] px-3 text-[12px] font-black text-white disabled:opacity-50"
             >
-              <Plus size={17} /> Yeni PortfÃ¶y
+              <Plus size={17} /> Yeni Portföy
             </button>
           </div>
 
@@ -1172,10 +1172,10 @@ function StokPageInner() {
             <div className="rounded-[26px] border border-[#DDE7F3] bg-white p-6 text-center shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
               <Building2 className="mx-auto text-[#1557D6]" size={34} />
               <h2 className="mt-3 text-[20px] font-black">
-                PortfÃ¶y bulunamadÄ±
+                Portföy bulunamadı
               </h2>
               <p className="mt-2 text-[13px] font-bold leading-5 text-[#64748B]">
-                Filtreleri temizleyin veya yeni portfÃ¶y ekleyin.
+                Filtreleri temizleyin veya yeni portföy ekleyin.
               </p>
             </div>
           ) : (
@@ -1288,10 +1288,10 @@ function PortfolioDocumentCenterEntry({
       </div>
 
       <h2 className="mt-2 text-[17px] font-black tracking-[-0.03em] text-[#06194A]">
-        Belge YÃ¼kleme Merkezi
+        Belge Yükleme Merkezi
       </h2>
       <p className="mx-auto mt-1 max-w-[320px] text-[11px] font-bold leading-[1.45] text-[#64748B]">
-        Yetki belgesi, tapu ve portfÃ¶y evraklarÄ±nÄ± tek merkezden yÃ¼kle, yenile ve incelemeye hazÄ±rla.
+        Yetki belgesi, tapu ve portföy evraklarını tek merkezden yükle, yenile ve incelemeye hazırla.
       </p>
 
       <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[18px] border border-[#DDE7F3] bg-white">
@@ -1301,7 +1301,7 @@ function PortfolioDocumentCenterEntry({
       </div>
 
       <div className="mt-3 flex min-h-[42px] items-center justify-center rounded-[16px] bg-[#1557D6] px-4 text-[13px] font-black text-white shadow-[0_10px_22px_rgba(21,87,214,0.22)]">
-        Belge Merkezini AÃ§
+        Belge Merkezini Aç
       </div>
     </button>
   );
@@ -1335,11 +1335,11 @@ function CompactPortfolioCard({
   onWhatsappLocation: () => void;
 }) {
   const image = getUnitCoverImage(unit) || "/LOGO_EPH.png";
-  const status = statusLabels[unit.status] || unit.status || "PortfÃ¶y";
+  const status = statusLabels[unit.status] || unit.status || "Portföy";
   const location =
     [unit.project?.address, unit.project?.district]
       .filter(Boolean)
-      .join(" Â· ") ||
+      .join(" · ") ||
     unit.project?.city ||
     "Konum yok";
   const hasLocation = Boolean(
@@ -1363,7 +1363,7 @@ function CompactPortfolioCard({
       >
         <img
           src={image}
-          alt={unit.project?.name || "PortfÃ¶y"}
+          alt={unit.project?.name || "Portföy"}
           className="h-full w-full object-cover"
         />
         <span
@@ -1372,7 +1372,7 @@ function CompactPortfolioCard({
           {status}
         </span>
         <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/62 px-1.5 py-0.5 text-[9px] font-black text-white">
-          ğŸ“· {getUnitImages(unit).length}
+          📷 {getUnitImages(unit).length}
         </span>
       </button>
 
@@ -1380,7 +1380,7 @@ function CompactPortfolioCard({
         <div className="flex items-start justify-center gap-2 text-center">
           <div className="min-w-0 flex-1 text-center">
             <h2 className="break-words text-center text-[15px] font-black leading-[18px] tracking-[-0.03em] text-[#06194A]">
-              {unit.project?.name || "EPH PortfÃ¶y"}
+              {unit.project?.name || "EPH Portföy"}
             </h2>
             <p className="mt-0.5 break-words text-center text-[11px] font-bold leading-4 text-[#64748B]">
               {location}
@@ -1391,7 +1391,7 @@ function CompactPortfolioCard({
 
         <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center text-[11px] font-black text-[#06194A]">
           {unit.roomCount && <span>{unit.roomCount}</span>}
-          {unit.area && <span>{unit.area} mÂ²</span>}
+          {unit.area && <span>{unit.area} m²</span>}
           <span>{formatFloorInfo(unit)}</span>
         </div>
 
@@ -1412,7 +1412,7 @@ function CompactPortfolioCard({
         {(unit as any).availableCreditAmount ? (
           <div className="mt-1 rounded-[12px] border border-blue-100 bg-[#EFF6FF] px-2 py-1 text-center">
             <p className="text-[8.5px] font-black uppercase tracking-[0.08em] text-[#1557D6]">
-              KullanÄ±labilir Kredi
+              Kullanılabilir Kredi
             </p>
             <p className="mt-0.5 break-words text-[11px] font-black leading-tight text-[#06194A]">
               {formatPrice(
@@ -1425,10 +1425,10 @@ function CompactPortfolioCard({
 
         <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-center text-[10px] font-bold text-[#64748B]">
           <span className="inline-flex items-center gap-1">
-            <Eye size={12} /> AÃ§
+            <Eye size={12} /> Aç
           </span>
           <span className="inline-flex items-center gap-1">
-            <Edit3 size={12} /> GÃ¼ncelle
+            <Edit3 size={12} /> Güncelle
           </span>
           {hasLocation && (
             <span className="inline-flex items-center gap-1 text-emerald-700">
@@ -1487,7 +1487,7 @@ function CompactPortfolioCard({
               ) : (
                 <Send size={14} />
               )}
-              Havuza GÃ¶nder
+              Havuza Gönder
             </button>
           ) : null}
 
@@ -1503,7 +1503,7 @@ function CompactPortfolioCard({
               ) : (
                 <X size={14} />
               )}
-              Havuzdan KaldÄ±r
+              Havuzdan Kaldır
             </button>
           ) : null}
         </div>
@@ -1557,7 +1557,7 @@ function PortfolioMap({
           gestureHandling: "greedy",
         });
       })
-      .catch((err: Error) => setError(err.message || "Harita yÃ¼klenemedi."))
+      .catch((err: Error) => setError(err.message || "Harita yüklenemedi."))
       .finally(() => {
         if (alive) setLoading(false);
       });
@@ -1595,32 +1595,63 @@ function PortfolioMap({
 
       if (!lat || !lng) return;
 
+      const priceText = formatCompactPrice(
+        unit.price,
+        unit.priceCurrency,
+      ).replace(" ₺", "₺");
+      const pinColor = unit.status === "KIRALIK" ? "#1557D6" : "#059669";
       const isSelected = selectedUnitId === unit.id;
+      const overlay = new window.google.maps.OverlayView();
+      let element: HTMLButtonElement | null = null;
 
-      const svg = `
-        <svg width="48" height="58" viewBox="0 0 48 58" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M24 56C24 56 43 35.6 43 20.5C43 9.73 34.49 1 24 1C13.51 1 5 9.73 5 20.5C5 35.6 24 56 24 56Z" fill="${isSelected ? "#0B3FB3" : "#1557D6"}" stroke="white" stroke-width="3"/>
-          <circle cx="24" cy="21" r="12.5" fill="white"/>
-          <path d="M15.8 22.2L24 15.5L32.2 22.2" stroke="#1557D6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M18.6 21.4V30.2H29.4V21.4" stroke="#1557D6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M22 30.2V25.2H26V30.2" stroke="#1557D6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      `;
+      overlay.onAdd = function onAdd() {
+        element = document.createElement("button");
+        element.type = "button";
+        element.title = unit.project?.name || "EPH Portföy";
+        element.textContent = priceText;
+        element.style.position = "absolute";
+        element.style.transform = "translate(-50%, -100%)";
+        element.style.minWidth = isSelected ? "78px" : "64px";
+        element.style.minHeight = isSelected ? "34px" : "30px";
+        element.style.padding = "0 9px";
+        element.style.borderRadius = "999px 999px 999px 6px";
+        element.style.border = "2px solid #ffffff";
+        element.style.background = pinColor;
+        element.style.color = "#ffffff";
+        element.style.fontSize = isSelected ? "12px" : "11px";
+        element.style.fontWeight = "900";
+        element.style.lineHeight = "1";
+        element.style.boxShadow = "0 12px 22px rgba(15,23,42,0.28)";
+        element.style.zIndex = isSelected ? "30" : "20";
+        element.style.cursor = "pointer";
+        element.style.whiteSpace = "nowrap";
+        element.style.display = "flex";
+        element.style.alignItems = "center";
+        element.style.justifyContent = "center";
+        element.style.pointerEvents = "auto";
+        element.addEventListener("click", () => onSelectUnit(unit.id));
+        const panes = overlay.getPanes();
+        panes?.overlayMouseTarget.appendChild(element);
+      };
 
-      const marker = new window.google.maps.Marker({
-        position: { lat, lng },
-        map: googleMapRef.current,
-        title: unit.project?.name || "EPH PortfÃ¶y",
-        icon: {
-          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-          scaledSize: new window.google.maps.Size(isSelected ? 52 : 44, isSelected ? 62 : 54),
-          anchor: new window.google.maps.Point(isSelected ? 26 : 22, isSelected ? 62 : 54),
-        },
-        zIndex: isSelected ? 30 : 20,
-      });
+      overlay.draw = function draw() {
+        if (!element) return;
+        const projection = overlay.getProjection();
+        const point = projection.fromLatLngToDivPixel(
+          new window.google.maps.LatLng(lat, lng),
+        );
+        if (!point) return;
+        element.style.left = `${point.x}px`;
+        element.style.top = `${point.y}px`;
+      };
 
-      marker.addListener("click", () => onSelectUnit(unit.id));
-      markersRef.current.push(marker);
+      overlay.onRemove = function onRemove() {
+        if (element?.parentNode) element.parentNode.removeChild(element);
+        element = null;
+      };
+
+      overlay.setMap(googleMapRef.current);
+      markersRef.current.push(overlay);
       bounds.extend({ lat, lng });
     });
 
@@ -1641,7 +1672,7 @@ function PortfolioMap({
               />
             )}
             <p className="mt-2 text-[12px] font-black text-[#64748B]">
-              {error || "Google Maps yÃ¼kleniyor..."}
+              {error || "Google Maps yükleniyor..."}
             </p>
           </div>
         </div>
@@ -1657,4 +1688,3 @@ export default function StokPage() {
     </Suspense>
   );
 }
-
