@@ -1900,12 +1900,26 @@ export default function StokDetailPage() {
         data={shareData}
       />
 
+
+
+
+
+
       <EphAuthorityLetterModal
-        open={authorityLetterOpen}
-        unitId={unit.id}
-        onClose={() => setAuthorityLetterOpen(false)}
-        onCreated={() => fetchPortfolioDocuments(unit.id)}
-      />
+  	open={authorityLetterOpen}
+  	unitId={unit.id}
+  	defaultOwnerName={(unit as any)?.deedOwnerFullName || ""}
+  	defaultOwnerPhone={(unit as any)?.deedOwnerPhone || ""}
+  	defaultOwnerEmail={(unit as any)?.deedOwnerEmail || ""}
+  	onClose={() => setAuthorityLetterOpen(false)}
+  	onCreated={() => fetchPortfolioDocuments(unit.id)}
+	/>
+
+
+
+
+
+
     </main>
   );
 }
