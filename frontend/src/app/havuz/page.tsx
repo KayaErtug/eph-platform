@@ -1748,14 +1748,83 @@ function PoolUnitCard({
 }) {
   const image = getCover(unit);
   const ephId = getEphId(unit.id);
-  const features = getHighlightFeatures(unit);
-  const specs = getPrimarySpecs(unit);
-  const imageCount = (Array.isArray(unit.images) ? unit.images.length : 0) || 1;
+  const imageCount = Array.isArray(unit.images) ? unit.images.length : 0;
+  const anyUnit = unit as any;
+  const anyProject = (unit.project || {}) as any;
+
+  const readValue = (keys: string[], fallback = "") => {
+    for (const key of keys) {
+      const value = anyUnit?.[key] ?? anyProject?.[key];
+      if (value !== undefined && value !== null && String(value).trim() !== "") {
+        return String(value).replaceAll("_", " ");
+      }
+    }
+
+    return fallback;
+  };
+
+  const text = [
+    unit.type,
+    unit.status,
+    unit.roomCount,
+    unit.description,
+    unit.project?.name,
+    unit.project?.address,
+  ]
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
+
+  const isLand =
+    text.includes("arsa") ||
+    text.includes("tarla") ||
+    text.includes("bağ") ||
+    text.includes("bag") ||
+    text.includes("bahçe") ||
+    text.includes("bahce") ||
+    getTypeChip(unit).includes("ARSA");
+
+  const primarySpecs = [
+    unit.roomCount || "",
+    unit.area ? `${Number(unit.area).toLocaleString("tr-TR")} m²` : "",
+    isLand ? readValue(["zoningStatus", "imarDurumu"], "İmarlı") : "Portföy",
+  ].filter(Boolean);
+
+  const quickSpecs = isLand
+    ? [
+        { icon: "▵", value: readValue(["roadStatus", "road", "yol"], text.includes("yol") ? "Yol Var" : "Yol") },
+        { icon: "◌", value: readValue(["waterStatus", "water", "su"], text.includes("su") ? "Su" : "Su") },
+        { icon: "⚡", value: readValue(["electricStatus", "electricity", "elektrik"], text.includes("elektrik") ? "Elektrik" : "Elektrik") },
+        { icon: "♨", value: readValue(["gasStatus", "naturalGas", "dogalgaz", "doğalgaz"], text.includes("doğalgaz") || text.includes("dogalgaz") ? "Doğalgaz" : "Doğalgaz") },
+      ]
+    : [
+        { icon: "▦", value: readValue(["floor", "floorNumber", "kat"], text.includes("kat") ? "Kat" : "Kat") },
+        { icon: "☼", value: readValue(["facade", "cephe", "direction"], text.includes("güney") ? "Güney" : text.includes("batı") ? "Batı" : "Cephe") },
+        { icon: "♨", value: readValue(["bathroomCount", "bathrooms", "banyo"], text.includes("banyo") ? "Banyo" : "Banyo") },
+        { icon: "▥", value: readValue(["balcony", "balconyCount", "balkon"], text.includes("balkon") ? "Balkon" : "Balkon") },
+      ];
+
+  const detailRows = isLand
+    ? [
+        ["İmar Durumu", readValue(["zoningStatus", "imarDurumu"], "Konut")],
+        ["TAKS/KAKS", readValue(["taksKaks", "taks", "kaks"], "Belirtilmedi")],
+        ["Cephe", readValue(["frontage", "cepheMetre", "cephe"], "Belirtilmedi")],
+        ["Ada / Parsel", readValue(["adaParsel", "blockParcel"], [readValue(["ada", "block"]), readValue(["parsel", "parcel"])].filter(Boolean).join(" / ") || "Belirtilmedi")],
+      ]
+    : [
+        ["Bina Yaşı", readValue(["buildingAge", "age", "binaYasi"], "Belirtilmedi")],
+        ["Isınma", readValue(["heating", "heatingType", "isinma"], "Belirtilmedi")],
+        ["Aidat", readValue(["dues", "aidat"], "Belirtilmedi")],
+        ["Tapu", readValue(["deedStatus", "titleDeed", "tapuDurumu"], unit.tapuVerified ? "Doğrulandı" : "Belirtilmedi")],
+        ["Kredi", readValue(["creditEligible", "krediDurumu", "availableCreditAmount"], "Uygun")],
+        ["Kullanım", readValue(["usageStatus", "kullanimDurumu"], "Belirtilmedi")],
+      ];
+
+  const highlight = getHighlightFeatures(unit)[0] || "Ortak Çalışmaya Uygun";
 
   return (
     <article
       onClick={onDetail}
-      className="grid h-[156px] cursor-pointer grid-cols-[42%_58%] overflow-hidden rounded-[18px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_22px_rgba(15,23,42,0.06)] active:scale-[0.995]"
+      className="grid min-h-[218px] cursor-pointer grid-cols-[39%_61%] overflow-hidden rounded-[19px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.07)] active:scale-[0.995]"
     >
       <button
         type="button"
@@ -1763,7 +1832,7 @@ function PoolUnitCard({
           event.stopPropagation();
           onDetail();
         }}
-        className="relative h-[156px] overflow-hidden bg-[#EEF3F8] text-left"
+        className="relative min-h-[218px] overflow-hidden bg-[#EEF3F8] text-left"
       >
         {image ? (
           <img
@@ -1773,63 +1842,88 @@ function PoolUnitCard({
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[#2563EB]">
-            <Building2 size={28} />
+            <Building2 size={30} />
           </div>
         )}
 
-        <div className="absolute left-2 top-2 rounded-full bg-white/95 px-2 py-0.5 text-[7.5px] font-black text-emerald-700 shadow-sm">
-          EPH Onaylı
-        </div>
+        {hasEphApproval(unit) && (
+          <div className="absolute left-2 top-2 rounded-full bg-white/95 px-2 py-0.5 text-[7.5px] font-black text-emerald-700 shadow-sm">
+            EPH Onaylı
+          </div>
+        )}
 
-        <div className="absolute bottom-2 left-2 rounded-full bg-slate-950/72 px-2 py-1 text-[8.5px] font-black text-white">
-          {imageCount} Fotoğraf
+        <div className="absolute bottom-2 left-2 rounded-full bg-slate-950/75 px-2 py-1 text-[8.5px] font-black text-white shadow-sm">
+          {imageCount || 1} Fotoğraf
         </div>
       </button>
 
-      <div className="flex min-w-0 flex-col p-2">
-        <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-          {getTypeChip(unit)}
-        </p>
+      <div className="flex min-w-0 flex-col">
+        <div className="min-w-0 px-2.5 pb-1.5 pt-2 text-center">
+          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+            {getTypeChip(unit)}
+          </p>
 
-        <h3 className="mt-0.5 line-clamp-2 text-[13px] font-black leading-[1.05] tracking-[-0.035em] text-[#0F172A] break-words [overflow-wrap:anywhere]">
-          {limitText(unit.project?.name || "EPH Portföy", 54)}
-        </h3>
+          <h3 className="mt-0.5 line-clamp-2 text-[14px] font-black leading-[1.08] tracking-[-0.035em] text-[#0F172A] break-words [overflow-wrap:anywhere]">
+            {limitText(unit.project?.name || "EPH Portföy", 64)}
+          </h3>
 
-        <p className="mt-1 flex min-w-0 items-center gap-1 text-[9px] font-bold leading-3 text-[#64748B]">
-          <MapPin size={10} className="shrink-0" />
-          <span className="min-w-0 truncate">{getLocation(unit)}</span>
-        </p>
-
-        <p className="mt-1.5 text-[16px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">
-          {compactMoney(unit.price, unit.priceCurrency)}
-        </p>
-
-        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1 text-[8.5px] font-black text-[#1F2937]">
-          {specs.slice(0, 3).map((spec) => (
-            <span
-              key={spec}
-              className="rounded-full bg-[#F8FAFC] px-1.5 py-0.5"
-            >
-              {limitText(spec, 14)}
+          <p className="mt-1 flex min-w-0 items-center justify-center gap-1 text-[9.5px] font-bold leading-3 text-[#64748B]">
+            <MapPin size={10} className="shrink-0" />
+            <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+              {limitText(getLocation(unit), 46)}
             </span>
-          ))}
-        </div>
+          </p>
 
-        <div className="mt-1.5 grid grid-cols-1 gap-1">
-          {features.slice(0, 1).map((item) => (
-            <CompactFeaturePill key={item} text={item} />
-          ))}
-        </div>
+          <p className="mt-1.5 text-[17px] font-black leading-none tracking-[-0.045em] text-[#0F172A]">
+            {compactMoney(unit.price, unit.priceCurrency)}
+          </p>
 
-        <div className="mt-auto flex items-end justify-between gap-2 pt-1">
-          <div className="min-w-0">
-            <p className="text-[7px] font-black uppercase tracking-[0.06em] text-[#94A3B8]">
-              EPH ID
-            </p>
-            <p className="truncate text-[9px] font-black text-[#475569]">
-              {ephId}
-            </p>
+          <div className="mt-2 flex min-w-0 flex-wrap items-center justify-center gap-1 text-[9px] font-black text-[#1F2937]">
+            {primarySpecs.map((spec) => (
+              <span key={spec} className="rounded-full bg-[#F8FAFC] px-2 py-0.5">
+                {limitText(spec, 15)}
+              </span>
+            ))}
           </div>
+        </div>
+
+        <div className="grid grid-cols-4 border-y border-[#D7E3F2] bg-[#FBFDFF]">
+          {quickSpecs.map((item) => (
+            <div
+              key={`${item.icon}-${item.value}`}
+              className="flex min-h-[30px] min-w-0 items-center justify-center gap-1 border-r border-[#D7E3F2] px-1 text-center last:border-r-0"
+            >
+              <span className="text-[12px] font-black text-[#2563EB]">{item.icon}</span>
+              <span className="min-w-0 text-[8.5px] font-black leading-[1.05] text-[#475569] break-words [overflow-wrap:anywhere]">
+                {limitText(item.value, 16)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-2 gap-y-1 px-2.5 py-1.5">
+          {detailRows.map(([label, value]) => (
+            <div key={label} className="min-w-0 text-[8.5px] font-black leading-[1.25] text-[#1F2937]">
+              <span className="text-[#475569]">{label}: </span>
+              <span className="text-[#0F172A] break-words [overflow-wrap:anywhere]">
+                {limitText(value, 22)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-auto grid grid-cols-2 border-t border-[#D7E3F2] bg-[#F8FAFC] text-center">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onAction("INTEREST");
+            }}
+            disabled={Boolean(busyAction)}
+            className="flex min-h-[31px] min-w-0 items-center justify-center gap-1 border-r border-[#D7E3F2] px-1 text-[8.8px] font-black text-[#2563EB] disabled:opacity-60"
+          >
+            ☆ İlgilen 10K
+          </button>
 
           <button
             type="button"
@@ -1837,10 +1931,9 @@ function PoolUnitCard({
               event.stopPropagation();
               onDetail();
             }}
-            className="flex min-h-[30px] min-w-[74px] items-center justify-center gap-1 rounded-[12px] bg-[#2563EB] px-2 text-[10px] font-black text-white shadow-[0_8px_18px_rgba(37,99,235,0.16)]"
+            className="flex min-h-[31px] min-w-0 items-center justify-center gap-1 px-1 text-[8.8px] font-black text-[#2563EB]"
           >
-            <Eye size={12} />
-            Detay
+            ✨ {limitText(highlight, 18)}
           </button>
         </div>
       </div>
