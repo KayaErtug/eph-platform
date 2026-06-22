@@ -8,14 +8,12 @@ import {
   Building2,
   CheckCircle2,
   Eye,
-  Home,
   List,
   Map as MapIcon,
   MapPin,
   MessageCircle,
   Navigation,
   Search,
-  ShieldCheck,
   Sparkles,
   Users,
   X,
@@ -120,51 +118,6 @@ declare global {
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 const DEFAULT_MAP_CENTER = { lat: 39.0, lng: 35.0 };
 
-const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-  ADANA: { lat: 37.0, lng: 35.3213 },
-  ANKARA: { lat: 39.9334, lng: 32.8597 },
-  ANTALYA: { lat: 36.8969, lng: 30.7133 },
-  AYDIN: { lat: 37.845, lng: 27.8396 },
-  BALIKESIR: { lat: 39.6484, lng: 27.8826 },
-  BURSA: { lat: 40.1885, lng: 29.061 },
-  DENIZLI: { lat: 37.783, lng: 29.0963 },
-  ESKISEHIR: { lat: 39.7767, lng: 30.5206 },
-  ISTANBUL: { lat: 41.0082, lng: 28.9784 },
-  IZMIR: { lat: 38.4237, lng: 27.1428 },
-  KAYSERI: { lat: 38.7205, lng: 35.4826 },
-  KOCAELI: { lat: 40.8533, lng: 29.8815 },
-  KONYA: { lat: 37.8746, lng: 32.4932 },
-  MANISA: { lat: 38.614, lng: 27.4296 },
-  MUGLA: { lat: 37.2153, lng: 28.3636 },
-  SAKARYA: { lat: 40.7569, lng: 30.3781 },
-  TEKIRDAG: { lat: 40.978, lng: 27.511 },
-};
-
-const DISTRICT_COORDS: Record<string, { lat: number; lng: number }> = {
-  "DENIZLI/PAMUKKALE": { lat: 37.9167, lng: 29.1167 },
-  "DENIZLI/MERKEZEFENDI": { lat: 37.7833, lng: 29.0833 },
-  "DENIZLI/ACIPAYAM": { lat: 37.4239, lng: 29.3494 },
-  "DENIZLI/CIVRIL": { lat: 38.3014, lng: 29.7386 },
-  "DENIZLI/TAVAS": { lat: 37.5736, lng: 29.0708 },
-  "DENIZLI/SARAYKOY": { lat: 37.9245, lng: 28.9252 },
-  "DENIZLI/BULDAN": { lat: 38.0451, lng: 28.8307 },
-  "KAYSERI/KOCASINAN": { lat: 38.9571, lng: 35.2481 },
-  "KAYSERI/MELIKGAZI": { lat: 38.7205, lng: 35.4826 },
-  "KAYSERI/TALAS": { lat: 38.6908, lng: 35.5538 },
-  "KAYSERI/DEVELI": { lat: 38.3906, lng: 35.4922 },
-  "KAYSERI/HACILAR": { lat: 38.6469, lng: 35.4493 },
-  "ISTANBUL/KADIKOY": { lat: 40.9903, lng: 29.0291 },
-  "ISTANBUL/ESENYURT": { lat: 41.0343, lng: 28.6801 },
-  "ISTANBUL/BEYLIKDUZU": { lat: 41.0011, lng: 28.6419 },
-  "ISTANBUL/UMRANIYE": { lat: 41.0164, lng: 29.1248 },
-  "IZMIR/BORNOVA": { lat: 38.4697, lng: 27.2211 },
-  "IZMIR/KARSIYAKA": { lat: 38.4647, lng: 27.1128 },
-  "IZMIR/BUCA": { lat: 38.3841, lng: 27.1774 },
-  "ANKARA/CANKAYA": { lat: 39.9179, lng: 32.8627 },
-  "ANKARA/KECIOREN": { lat: 39.9781, lng: 32.8663 },
-};
-
-const tabs = ["Sana Uygun", "Bölgemdekiler", "Projeler", "Yeni Eklenenler"];
 const categories = [
   "Tümü",
   "Satılık",
@@ -177,25 +130,29 @@ const categories = [
 
 const POOL_CARD_STYLES = [
   {
-    frame: "border-[#2563EB] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] shadow-[0_16px_34px_rgba(37,99,235,0.16)]",
+    frame:
+      "border-[#2563EB] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] shadow-[0_16px_34px_rgba(37,99,235,0.16)]",
     strip: "bg-[#2563EB]",
     imageBg: "bg-[#EFF6FF]",
     soft: "bg-[#F8FBFF]",
   },
   {
-    frame: "border-emerald-400 bg-gradient-to-br from-white via-[#F8FFFB] to-emerald-50 shadow-[0_16px_34px_rgba(16,185,129,0.15)]",
+    frame:
+      "border-emerald-400 bg-gradient-to-br from-white via-[#F8FFFB] to-emerald-50 shadow-[0_16px_34px_rgba(16,185,129,0.15)]",
     strip: "bg-emerald-500",
     imageBg: "bg-emerald-50",
     soft: "bg-[#F7FFFB]",
   },
   {
-    frame: "border-amber-400 bg-gradient-to-br from-white via-[#FFFDF7] to-amber-50 shadow-[0_16px_34px_rgba(245,158,11,0.16)]",
+    frame:
+      "border-amber-400 bg-gradient-to-br from-white via-[#FFFDF7] to-amber-50 shadow-[0_16px_34px_rgba(245,158,11,0.16)]",
     strip: "bg-amber-500",
     imageBg: "bg-amber-50",
     soft: "bg-[#FFFDF7]",
   },
   {
-    frame: "border-violet-400 bg-gradient-to-br from-white via-[#FBFAFF] to-violet-50 shadow-[0_16px_34px_rgba(139,92,246,0.14)]",
+    frame:
+      "border-violet-400 bg-gradient-to-br from-white via-[#FBFAFF] to-violet-50 shadow-[0_16px_34px_rgba(139,92,246,0.14)]",
     strip: "bg-violet-500",
     imageBg: "bg-violet-50",
     soft: "bg-[#FBFAFF]",
@@ -261,18 +218,6 @@ function limitText(value?: string | number | null, _max = 60) {
   return String(value ?? "").trim();
 }
 
-function normalizeMapKey(value?: string | null) {
-  return String(value || "")
-    .trim()
-    .toLocaleUpperCase("tr-TR")
-    .replaceAll("İ", "I")
-    .replaceAll("Ğ", "G")
-    .replaceAll("Ü", "U")
-    .replaceAll("Ş", "S")
-    .replaceAll("Ö", "O")
-    .replaceAll("Ç", "C");
-}
-
 function getStableJitter(seed: string, index: number) {
   const source = `${seed || "EPH"}-${index}`;
   let hash = 0;
@@ -287,38 +232,22 @@ function getStableJitter(seed: string, index: number) {
   return { latOffset, lngOffset };
 }
 
-function getApproxCoordinate(unit: Unit, index: number) {
-  const city = normalizeMapKey(unit.project?.city);
-  const district = normalizeMapKey(unit.project?.district);
-  const districtKey = city && district ? `${city}/${district}` : "";
-  const base =
-    DISTRICT_COORDS[districtKey] || CITY_COORDS[city] || DEFAULT_MAP_CENTER;
-  const jitter = getStableJitter(unit.id, index);
-
-  return {
-    lat: Number((base.lat + jitter.latOffset).toFixed(6)),
-    lng: Number((base.lng + jitter.lngOffset).toFixed(6)),
-  };
-}
-
 function getPoolMapPoint(input: {
   unit: Unit;
   match: { score: number; customer: Customer | null; budgetDiff: number };
-  index: number;
-}): PoolMapItem {
+}): PoolMapItem | null {
   const directLat = Number(input.unit.project?.latitude || 0);
   const directLng = Number(input.unit.project?.longitude || 0);
-  const hasDirectCoordinate = Boolean(directLat && directLng);
-  const approx = hasDirectCoordinate
-    ? { lat: directLat, lng: directLng }
-    : getApproxCoordinate(input.unit, input.index);
+
+  if (!Number.isFinite(directLat) || !Number.isFinite(directLng)) return null;
+  if (!directLat || !directLng) return null;
 
   return {
     unit: input.unit,
     match: input.match,
-    lat: approx.lat,
-    lng: approx.lng,
-    isApprox: !hasDirectCoordinate,
+    lat: directLat,
+    lng: directLng,
+    isApprox: false,
     locationLabel: getLocation(input.unit),
   };
 }
@@ -656,7 +585,6 @@ export default function HavuzPage() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("Sana Uygun");
   const [category, setCategory] = useState("Tümü");
   const [search, setSearch] = useState("");
   const [selectedAction, setSelectedAction] = useState<SelectedAction | null>(
@@ -732,21 +660,6 @@ export default function HavuzPage() {
 
     return matchedUnits
       .filter(({ unit }) => {
-        if (activeTab === "Projeler") {
-          const text = [
-            unit.type,
-            unit.status,
-            unit.project?.name,
-            unit.description,
-          ]
-            .join(" ")
-            .toLocaleLowerCase("tr-TR");
-          return text.includes("proje") || builder;
-        }
-
-        return true;
-      })
-      .filter(({ unit }) => {
         if (category === "Tümü") return true;
 
         const text = [
@@ -794,7 +707,7 @@ export default function HavuzPage() {
           .toLocaleLowerCase("tr-TR")
           .includes(keyword);
       });
-  }, [activeTab, builder, category, matchedUnits, search]);
+  }, [builder, category, matchedUnits, search]);
 
   const displayedUnits = useMemo(
     () => filteredPoolItems.slice(0, 12),
@@ -802,9 +715,9 @@ export default function HavuzPage() {
   );
 
   const poolMapItems = useMemo(() => {
-    return filteredPoolItems.map(({ unit, match }, index) =>
-      getPoolMapPoint({ unit, match, index }),
-    );
+    return filteredPoolItems
+      .map(({ unit, match }) => getPoolMapPoint({ unit, match }))
+      .filter((item): item is PoolMapItem => Boolean(item));
   }, [filteredPoolItems]);
 
   const showKontorSuccess = (input: {
@@ -941,67 +854,10 @@ export default function HavuzPage() {
   }
 
   return (
-    <main className="min-h-[calc(100dvh-64px)] overflow-y-auto bg-[#F4F8FF] px-3 pb-[calc(104px+env(safe-area-inset-bottom,0px))] pt-3 text-[#1F2937]">
+    <main className="min-h-[calc(100dvh-64px)] overflow-y-auto bg-[#F4F8FF] px-3 pb-[calc(104px+env(safe-area-inset-bottom,0px))] pt-2 text-[#1F2937]">
       {successToast && <KontorSuccessToast toast={successToast} />}
 
-      <div className="mx-auto w-full max-w-[430px] space-y-3">
-        <section className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-3 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
-          <div className="grid grid-cols-[54px_1fr_54px] items-center gap-2 text-center">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#EFF6FF] text-[#2563EB]">
-              <Home size={23} />
-            </div>
-
-            <div className="min-w-0 text-center">
-              <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-                Envanter Merkezi
-              </p>
-              <h1 className="text-center text-[22px] font-black leading-none tracking-[-0.045em] text-[#1F2937]">
-                Havuz
-              </h1>
-              <p className="mx-auto mt-1 max-w-[260px] text-center text-[12px] font-bold leading-4 text-[#64748B]">
-                Bugün {filteredPoolItems.length} uygun fırsat listelendi.
-              </p>
-            </div>
-
-            <div className="grid shrink-0 grid-cols-1 gap-1">
-              <div className="rounded-[14px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-2.5 py-1.5 text-center">
-                <p className="text-[14px] font-black leading-none text-[#2563EB]">
-                  {eligibleUnits.length}
-                </p>
-                <p className="mt-0.5 text-[8px] font-black text-[#64748B]">
-                  Yetkili
-                </p>
-              </div>
-              <div className="rounded-[14px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-2.5 py-1.5 text-center">
-                <p className="text-[14px] font-black leading-none text-[#2563EB]">
-                  {walletBalance ?? "-"}
-                </p>
-                <p className="mt-0.5 text-[8px] font-black text-[#64748B]">
-                  Kontör
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-[22px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-          <div className="grid grid-cols-4 gap-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`min-h-[48px] rounded-[16px] border-2 px-1 text-[10px] font-black leading-3 ${
-                  activeTab === tab
-                    ? "border-[#2563EB] bg-[#2563EB] text-white"
-                    : "border-[#C7D6E8] bg-[#F8FAFC] text-[#64748B]"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-        </section>
-
+      <div className="mx-auto w-full max-w-[430px] space-y-2">
         <section className="rounded-[22px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
           <div className="flex items-center gap-2 rounded-[17px] border-2 border-[#C7D6E8] bg-[#EEF3F8] px-3 py-2">
             <Search size={16} className="text-[#64748B]" />
@@ -1071,34 +927,13 @@ export default function HavuzPage() {
           />
         )}
 
-        <section className="grid grid-cols-2 gap-2">
-          <div className="flex min-h-[34px] items-center justify-center gap-1.5 rounded-[15px] border-2 border-[#C7D6E8] bg-white px-2 text-[10px] font-black text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.035)]">
-            <ShieldCheck size={13} className="shrink-0 text-[#2563EB]" />
-            <span className="break-words text-center leading-3">Yetkili Portföyler</span>
-          </div>
-
-          <div className="flex min-h-[34px] items-center justify-center gap-1.5 rounded-[15px] border-2 border-[#C7D6E8] bg-white px-2 text-[10px] font-black text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.035)]">
-            <Sparkles size={13} className="shrink-0 text-[#2563EB]" />
-            <span className="break-words text-center leading-3">Kontör = İş Fırsatı</span>
-          </div>
-        </section>
-
         {errorMessage && (
           <section className="rounded-[18px] border-2 border-red-300 bg-red-50 p-3 text-center text-[12px] font-black leading-5 text-red-700 shadow-[0_10px_22px_rgba(220,38,38,0.10)] break-words [overflow-wrap:anywhere]">
             {limitText(errorMessage, 180)}
           </section>
         )}
 
-        <section className="space-y-4">
-          <div className="px-1 text-center">
-            <h2 className="text-center text-[18px] font-black tracking-[-0.03em] text-[#1F2937]">
-              Sana Uygun Portföyler
-            </h2>
-            <p className="mt-1 text-center text-[10px] font-black text-[#2563EB]">
-              CRM ↔ Havuz
-            </p>
-          </div>
-
+        <section className="space-y-3">
           {displayedUnits.length > 0 ? (
             displayedUnits.map(({ unit, match }, index) => (
               <PoolUnitCard
@@ -1138,7 +973,18 @@ export default function HavuzPage() {
         <PoolDetailModal
           unit={detailSelection.unit}
           match={detailSelection.match}
+          busyAction={busyAction}
           onClose={() => setDetailSelection(null)}
+          onMessage={() =>
+            startPoolMessage(detailSelection.unit, detailSelection.match.score)
+          }
+          onAction={(type) =>
+            setSelectedAction({
+              type,
+              unit: detailSelection.unit,
+              score: detailSelection.match.score,
+            })
+          }
         />
       )}
 
@@ -1190,8 +1036,7 @@ function PoolMapSection({
   const [mapReady, setMapReady] = useState(false);
   const selectedItem =
     items.find((item) => item.unit.id === selectedUnitId) || items[0] || null;
-  const exactCount = items.filter((item) => !item.isApprox).length;
-  const approxCount = items.filter((item) => item.isApprox).length;
+  const exactCount = items.length;
 
   useEffect(() => {
     let alive = true;
@@ -1243,67 +1088,26 @@ function PoolMapSection({
     const bounds = new googleMaps.LatLngBounds();
 
     items.forEach((item) => {
-      const priceText = compactMoney(
-        item.unit.price,
-        item.unit.priceCurrency,
-      ).replace(" ₺", "₺");
-      const isSelected = selectedUnitId === item.unit.id;
-      const pinColor = item.isApprox ? "#F97316" : "#2563EB";
-      const overlay = new googleMaps.OverlayView();
-      let element: HTMLButtonElement | null = null;
+      const marker = new googleMaps.Marker({
+        position: { lat: item.lat, lng: item.lng },
+        map,
+        title: item.unit.project?.name || "EPH Portföy",
+        optimized: false,
+        zIndex: 9999,
+        icon: {
+          url: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+          scaledSize: new googleMaps.Size(38, 38),
+        },
+      });
 
-      overlay.onAdd = function onAdd() {
-        element = document.createElement("button");
-        element.type = "button";
-        element.title = `${item.unit.project?.name || "EPH Portföy"} • ${priceText}`;
-        element.textContent = priceText;
-        element.style.position = "absolute";
-        element.style.transform = "translate(-50%, -100%)";
-        element.style.minWidth = isSelected ? "80px" : "66px";
-        element.style.minHeight = isSelected ? "34px" : "30px";
-        element.style.padding = "0 9px";
-        element.style.borderRadius = "999px 999px 999px 6px";
-        element.style.border = "2px solid #ffffff";
-        element.style.background = pinColor;
-        element.style.color = "#ffffff";
-        element.style.fontSize = isSelected ? "12px" : "11px";
-        element.style.fontWeight = "900";
-        element.style.lineHeight = "1";
-        element.style.boxShadow = "0 12px 22px rgba(15,23,42,0.28)";
-        element.style.zIndex = isSelected ? "40" : "25";
-        element.style.cursor = "pointer";
-        element.style.whiteSpace = "nowrap";
-        element.style.display = "flex";
-        element.style.alignItems = "center";
-        element.style.justifyContent = "center";
-        element.style.pointerEvents = "auto";
-        element.addEventListener("click", () => {
-          onSelectUnit(item.unit.id);
-          map.panTo({ lat: item.lat, lng: item.lng });
-          map.setZoom(Math.max(map.getZoom() || 11, 12));
-        });
-        const panes = overlay.getPanes();
-        panes?.overlayMouseTarget.appendChild(element);
-      };
+      marker.addListener("click", () => {
+        onSelectUnit(item.unit.id);
+        map.panTo({ lat: item.lat, lng: item.lng });
+        map.setZoom(Math.max(map.getZoom() || 11, 12));
+        onDetail(item.unit, item.match);
+      });
 
-      overlay.draw = function draw() {
-        if (!element) return;
-        const projection = overlay.getProjection();
-        const point = projection.fromLatLngToDivPixel(
-          new googleMaps.LatLng(item.lat, item.lng),
-        );
-        if (!point) return;
-        element.style.left = `${point.x}px`;
-        element.style.top = `${point.y}px`;
-      };
-
-      overlay.onRemove = function onRemove() {
-        if (element?.parentNode) element.parentNode.removeChild(element);
-        element = null;
-      };
-
-      overlay.setMap(map);
-      markerRefs.current.push(overlay);
+      markerRefs.current.push(marker);
       bounds.extend({ lat: item.lat, lng: item.lng });
     });
 
@@ -1316,7 +1120,7 @@ function PoolMapSection({
       map.setCenter(DEFAULT_MAP_CENTER);
       map.setZoom(6);
     }
-  }, [items, onSelectUnit, selectedUnitId]);
+  }, [items, onSelectUnit, selectedUnitId, mapReady]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -1332,7 +1136,7 @@ function PoolMapSection({
             Havuz Haritası
           </h2>
           <p className="mt-0.5 text-[10px] font-bold leading-4 text-[#64748B]">
-            Pinler fiyatlıdır. Yaklaşık pinler il/ilçe merkezinden üretilir.
+            Sadece gerçek koordinatı olan portföyler gösterilir.
           </p>
         </div>
         <div className="shrink-0 rounded-[15px] border-2 border-[#C7D6E8] bg-white px-2.5 py-1.5 text-center">
@@ -1345,45 +1149,6 @@ function PoolMapSection({
 
       <div className="relative h-[360px] w-full overflow-hidden bg-[#EEF3F8]">
         <div ref={mapRef} className="h-full w-full" />
-
-        {mapReady && !mapError && items.length > 0 && (
-          <div className="pointer-events-none absolute inset-0 z-[45]">
-            {items.map((item) => {
-              const position = getOverlayPinPosition(item, items);
-              const isSelected = selectedItem?.unit.id === item.unit.id;
-              const priceText = compactMoney(
-                item.unit.price,
-                item.unit.priceCurrency,
-              ).replace(" ₺", "₺");
-
-              return (
-                <button
-                  key={item.unit.id}
-                  type="button"
-                  onClick={() => {
-                    onSelectUnit(item.unit.id);
-                    const map = mapInstanceRef.current;
-                    if (map) {
-                      map.panTo({ lat: item.lat, lng: item.lng });
-                      map.setZoom(Math.max(map.getZoom() || 11, 12));
-                    }
-                  }}
-                  className={`pointer-events-auto absolute -translate-x-1/2 -translate-y-full border-2 border-white px-2.5 text-[10px] font-black leading-none text-white shadow-[0_12px_24px_rgba(15,23,42,0.32)] active:scale-95 ${
-                    isSelected
-                      ? "z-[70] min-h-[34px] rounded-[999px_999px_999px_8px] bg-[#1D4ED8] ring-4 ring-blue-200"
-                      : item.isApprox
-                        ? "z-[55] min-h-[30px] rounded-[999px_999px_999px_8px] bg-orange-500"
-                        : "z-[60] min-h-[30px] rounded-[999px_999px_999px_8px] bg-[#2563EB]"
-                  }`}
-                  style={{ left: `${position.left}%`, top: `${position.top}%` }}
-                  title={`${item.unit.project?.name || "EPH Portföy"} • ${priceText}`}
-                >
-                  {priceText}
-                </button>
-              );
-            })}
-          </div>
-        )}
 
         {!mapReady && !mapError && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#EEF3F8] text-center">
@@ -1405,13 +1170,8 @@ function PoolMapSection({
         )}
       </div>
 
-      <div className="grid grid-cols-2 border-t-2 border-[#C7D6E8] bg-white text-center text-[11px] font-black text-[#64748B]">
-        <div className="border-r border-[#E2EAF5] px-2 py-2">
-          <span className="text-[#2563EB]">{exactCount}</span> gerçek konum
-        </div>
-        <div className="px-2 py-2">
-          <span className="text-orange-600">{approxCount}</span> yaklaşık konum
-        </div>
+      <div className="border-t-2 border-[#C7D6E8] bg-white px-2 py-2 text-center text-[11px] font-black text-[#64748B]">
+        <span className="text-[#2563EB]">{exactCount}</span> gerçek konum gösteriliyor
       </div>
 
       {selectedItem ? (
@@ -1420,8 +1180,7 @@ function PoolMapSection({
             <div className="text-center">
               <div className="min-w-0 text-center">
                 <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-                  {selectedItem.isApprox ? "Yaklaşık Pin" : "Gerçek Pin"} •{" "}
-                  {getEphId(selectedItem.unit.id)}
+                  Gerçek Konum • {getEphId(selectedItem.unit.id)}
                 </p>
                 <h3 className="mt-1 text-[15px] font-black leading-[1.12] text-[#1F2937] break-words [overflow-wrap:anywhere]">
                   {limitText(
@@ -1453,7 +1212,10 @@ function PoolMapSection({
                 label="Oda"
                 value={selectedItem.unit.roomCount || "—"}
               />
-              <SmallInfo label="EPH ID" value={getEphId(selectedItem.unit.id)} />
+              <SmallInfo
+                label="EPH ID"
+                value={getEphId(selectedItem.unit.id)}
+              />
             </div>
 
             <div className="mt-2 grid grid-cols-2 gap-2">
@@ -1530,7 +1292,6 @@ function KontorSuccessToast({ toast }: { toast: SuccessToast }) {
   );
 }
 
-
 function getHighlightFeatures(unit: Unit) {
   const text = [
     unit.type,
@@ -1547,16 +1308,254 @@ function getHighlightFeatures(unit: Unit) {
 
   if (text.includes("deniz")) features.push("Deniz Manzaralı");
   if (text.includes("havuz")) features.push("Yüzme Havuzu");
-  if (text.includes("bahçe") || text.includes("bahce")) features.push("Geniş Bahçe");
-  if (text.includes("otopark") || text.includes("garaj")) features.push("Otopark");
-  if (text.includes("güvenlik") || text.includes("guvenlik")) features.push("Güvenlikli");
+  if (text.includes("bahçe") || text.includes("bahce"))
+    features.push("Geniş Bahçe");
+  if (text.includes("otopark") || text.includes("garaj"))
+    features.push("Otopark");
+  if (text.includes("güvenlik") || text.includes("guvenlik"))
+    features.push("Güvenlikli");
   if (text.includes("site")) features.push("Site İçerisinde");
-  if (text.includes("yatırım") || text.includes("yatirim")) features.push("Yatırıma Uygun");
-  if (text.includes("merkez") || unit.project?.district) features.push("Merkezi Konum");
+  if (text.includes("yatırım") || text.includes("yatirim"))
+    features.push("Yatırıma Uygun");
+  if (text.includes("merkez") || unit.project?.district)
+    features.push("Merkezi Konum");
 
   return Array.from(new Set(features)).slice(0, 3).length
     ? Array.from(new Set(features)).slice(0, 3)
     : ["Merkezi Konum", "Yatırıma Uygun", "Ortak Çalışmaya Uygun"];
+}
+
+
+type PremiumHighlight = {
+  icon: string;
+  title: string;
+  text: string;
+};
+
+function getPremiumPortfolioHighlights(unit: Unit): PremiumHighlight[] {
+  const text = [
+    unit.type,
+    unit.status,
+    unit.roomCount,
+    unit.description,
+    unit.project?.name,
+    unit.project?.address,
+  ]
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
+  const highlights: PremiumHighlight[] = [];
+
+  if (unit.project?.district || unit.project?.city) {
+    highlights.push({
+      icon: "📍",
+      title: "Konum Avantajı",
+      text: getLocation(unit),
+    });
+  }
+
+  if (unit.area) {
+    highlights.push({
+      icon: "📐",
+      title: "Net Kullanım Alanı",
+      text: `${Number(unit.area).toLocaleString("tr-TR")} m²`,
+    });
+  }
+
+  if (unit.roomCount) {
+    highlights.push({
+      icon: "🏡",
+      title: "Kullanım Planı",
+      text: unit.roomCount,
+    });
+  }
+
+  if (text.includes("yatırım") || text.includes("yatirim")) {
+    highlights.push({
+      icon: "💰",
+      title: "Yatırım Potansiyeli",
+      text: "Al-sat ve uzun vadeli değer için uygun",
+    });
+  }
+
+  if (text.includes("merkez") || unit.project?.district) {
+    highlights.push({
+      icon: "🎯",
+      title: "Talep Gören Bölge",
+      text: "Bölge odaklı müşteri eşleştirmesine uygun",
+    });
+  }
+
+  if (text.includes("otopark") || text.includes("garaj")) {
+    highlights.push({
+      icon: "🚗",
+      title: "Otopark Avantajı",
+      text: "Araç kullanımına uygun portföy",
+    });
+  }
+
+  if (text.includes("bahçe") || text.includes("bahce")) {
+    highlights.push({
+      icon: "🌿",
+      title: "Açık Alan Kullanımı",
+      text: "Bahçe ve dış yaşam beklentisine uygun",
+    });
+  }
+
+  if (text.includes("deniz")) {
+    highlights.push({
+      icon: "🌅",
+      title: "Manzara Değeri",
+      text: "Vitrin etkisi yüksek portföy",
+    });
+  }
+
+  if (text.includes("havuz")) {
+    highlights.push({
+      icon: "🏊",
+      title: "Sosyal Donatı",
+      text: "Havuz beklentisi olan müşteriye uygun",
+    });
+  }
+
+  if (text.includes("güvenlik") || text.includes("guvenlik") || text.includes("site")) {
+    highlights.push({
+      icon: "🛡️",
+      title: "Site Yaşamı",
+      text: "Güvenli yaşam beklentisine uygun",
+    });
+  }
+
+  const fallback: PremiumHighlight[] = [
+    {
+      icon: "🤝",
+      title: "İş Birliğine Uygun",
+      text: "Meslektaş paylaşımına açık portföy",
+    },
+    {
+      icon: "🔑",
+      title: "Satışa Hazır Sunum",
+      text: "Havuz görüşmesi için sade ve net bilgi",
+    },
+    {
+      icon: "📌",
+      title: "Envanter Değeri",
+      text: "Bölge portföy havuzunu güçlendirir",
+    },
+    {
+      icon: "🏡",
+      title: "Kullanıma Hazır",
+      text: "Hemen görüşmeye uygun durumda",
+    },
+    {
+      icon: "📈",
+      title: "Yatırım Potansiyeli",
+      text: "Talep oluşturabilecek portföy",
+    },
+    {
+      icon: "⚡",
+      title: "Hızlı Değerlendirme",
+      text: "Saha görüşmesi için net özet",
+    },
+  ];
+
+  return Array.from(
+    new Map([...highlights, ...fallback].map((item) => [item.title, item])).values(),
+  ).slice(0, 9);
+}
+
+function getVisiblePortfolioDetails(unit: Unit): PremiumHighlight[] {
+  const details: PremiumHighlight[] = [];
+
+  details.push({
+    icon: "🏷️",
+    title: "Portföy Tipi",
+    text: typeLabel(unit.type),
+  });
+
+  if (unit.status) {
+    details.push({
+      icon: "📌",
+      title: "İşlem Türü",
+      text: String(unit.status).replaceAll("_", " "),
+    });
+  }
+
+  if (unit.roomCount) {
+    details.push({
+      icon: "🏠",
+      title: "Oda Planı",
+      text: unit.roomCount,
+    });
+  }
+
+  if (unit.area) {
+    details.push({
+      icon: "📐",
+      title: "Alan",
+      text: `${Number(unit.area).toLocaleString("tr-TR")} m²`,
+    });
+  }
+
+  details.push({
+    icon: "📍",
+    title: "Bölge",
+    text: getLocation(unit),
+  });
+
+  details.push({
+    icon: "🧾",
+    title: "EPH ID",
+    text: getEphId(unit.id),
+  });
+
+  return details.slice(0, 6);
+}
+
+function getCollaborationOpportunities(unit: Unit): PremiumHighlight[] {
+  const text = [unit.type, unit.status, unit.description, unit.project?.name]
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
+  const opportunities: PremiumHighlight[] = [
+    {
+      icon: "🤝",
+      title: "Ortak Çalışmaya Açık",
+      text: "Meslektaş görüşmesi başlatılabilir",
+    },
+    {
+      icon: "📣",
+      title: "Paylaşıma Uygun",
+      text: "Havuz içinde iş fırsatı oluşturur",
+    },
+  ];
+
+  if (text.includes("arsa") || text.includes("kat karşılığı") || text.includes("kat karsiligi")) {
+    opportunities.push({
+      icon: "🏗️",
+      title: "Proje Fırsatı",
+      text: "Müteahhit ve arsa çalışmasına uygun",
+    });
+  } else if (
+    text.includes("ticari") ||
+    text.includes("dükkan") ||
+    text.includes("dukkan") ||
+    text.includes("ofis") ||
+    text.includes("mağaza") ||
+    text.includes("magaza")
+  ) {
+    opportunities.push({
+      icon: "🏢",
+      title: "Ticari Potansiyel",
+      text: "Kurumsal müşteriyle değerlendirilebilir",
+    });
+  } else {
+    opportunities.push({
+      icon: "🏠",
+      title: "Alıcı Adayına Uygun",
+      text: "Konut arayan müşteriyle değerlendirilebilir",
+    });
+  }
+
+  return opportunities.slice(0, 3);
 }
 
 function getPrimarySpecs(unit: Unit) {
@@ -1580,7 +1579,12 @@ function getTypeChip(unit: Unit) {
   const label = typeLabel(unit.type).toLocaleUpperCase("tr-TR");
   if (label.includes("ARSA")) return "ARSA";
   if (label.includes("VİLLA") || label.includes("VILLA")) return "VİLLA";
-  if (label.includes("DÜKKAN") || label.includes("TİCAR") || label.includes("MAGAZA")) return "TİCARİ";
+  if (
+    label.includes("DÜKKAN") ||
+    label.includes("TİCAR") ||
+    label.includes("MAGAZA")
+  )
+    return "TİCARİ";
   if (label.includes("PROJE")) return "PROJE";
   if (label.includes("KİRA")) return "KİRALIK";
   return label.length > 16 ? "PORTFÖY" : label || "PORTFÖY";
@@ -1597,6 +1601,44 @@ function CompactFeaturePill({ text }: { text: string }) {
   );
 }
 
+
+function PremiumHighlightCard({
+  item,
+  compact = false,
+  dense = false,
+}: {
+  item: PremiumHighlight;
+  compact?: boolean;
+  dense?: boolean;
+}) {
+  return (
+    <div
+      className={`flex min-w-0 items-center gap-2 rounded-[17px] border-2 border-[#D7E3F2] bg-white p-2 text-center shadow-[0_7px_16px_rgba(15,23,42,0.035)] ${
+        compact
+          ? "min-h-[58px] text-left"
+          : dense
+            ? "min-h-[92px] flex-col justify-center"
+            : "min-h-[78px] flex-col justify-center"
+      }`}
+    >
+      <span
+        className={`flex shrink-0 items-center justify-center rounded-[14px] bg-[#EFF6FF] text-center ${
+          compact ? "h-9 w-9 text-[18px]" : dense ? "h-9 w-9 text-[18px]" : "h-10 w-10 text-[20px]"
+        }`}
+      >
+        {item.icon}
+      </span>
+      <div className="min-w-0 text-center">
+        <p className={`${dense ? "text-[9.5px]" : "text-[11px]"} font-black leading-[1.12] tracking-[-0.02em] text-[#1F2937] break-words [overflow-wrap:anywhere]`}>
+          {limitText(item.title, dense ? 24 : 36)}
+        </p>
+        <p className={`${dense ? "mt-1 text-[8.5px] leading-3" : "mt-0.5 text-[9.5px] leading-4"} font-bold text-[#64748B] break-words [overflow-wrap:anywhere]`}>
+          {limitText(item.text, dense ? 42 : 54)}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function PoolUnitCard({
   index,
@@ -1619,11 +1661,12 @@ function PoolUnitCard({
   const ephId = getEphId(unit.id);
   const features = getHighlightFeatures(unit);
   const specs = getPrimarySpecs(unit);
+  const imageCount = (Array.isArray(unit.images) ? unit.images.length : 0) || 1;
 
   return (
     <article
       onClick={onDetail}
-      className="grid min-h-[184px] cursor-pointer grid-cols-[40%_60%] overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.07)] active:scale-[0.995]"
+      className="grid h-[156px] cursor-pointer grid-cols-[42%_58%] overflow-hidden rounded-[18px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_22px_rgba(15,23,42,0.06)] active:scale-[0.995]"
     >
       <button
         type="button"
@@ -1631,7 +1674,7 @@ function PoolUnitCard({
           event.stopPropagation();
           onDetail();
         }}
-        className="relative min-h-[184px] overflow-hidden bg-[#EEF3F8] text-left"
+        className="relative h-[156px] overflow-hidden bg-[#EEF3F8] text-left"
       >
         {image ? (
           <img
@@ -1645,55 +1688,56 @@ function PoolUnitCard({
           </div>
         )}
 
-        <div className="absolute left-2 top-2 rounded-full bg-white/95 px-2 py-1 text-[8px] font-black text-emerald-700 shadow-sm">
+        <div className="absolute left-2 top-2 rounded-full bg-white/95 px-2 py-0.5 text-[7.5px] font-black text-emerald-700 shadow-sm">
           EPH Onaylı
         </div>
 
-        <div className="absolute bottom-2 left-2 rounded-full bg-slate-950/70 px-2 py-1 text-[9px] font-black text-white">
-          {(Array.isArray(unit.images) ? unit.images.length : 0) || 1} Fotoğraf
+        <div className="absolute bottom-2 left-2 rounded-full bg-slate-950/72 px-2 py-1 text-[8.5px] font-black text-white">
+          {imageCount} Fotoğraf
         </div>
       </button>
 
-      <div className="flex min-w-0 flex-col p-2.5">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-            {getTypeChip(unit)}
-          </p>
+      <div className="flex min-w-0 flex-col p-2">
+        <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+          {getTypeChip(unit)}
+        </p>
 
-          <h3 className="mt-0.5 line-clamp-2 text-[15px] font-black leading-[1.05] tracking-[-0.035em] text-[#0F172A] break-words [overflow-wrap:anywhere]">
-            {limitText(unit.project?.name || "EPH Portföy", 58)}
-          </h3>
+        <h3 className="mt-0.5 line-clamp-2 text-[13px] font-black leading-[1.05] tracking-[-0.035em] text-[#0F172A] break-words [overflow-wrap:anywhere]">
+          {limitText(unit.project?.name || "EPH Portföy", 54)}
+        </h3>
 
-          <p className="mt-1 flex min-w-0 items-center gap-1 text-[10px] font-bold leading-3 text-[#64748B]">
-            <MapPin size={11} className="shrink-0" />
-            <span className="min-w-0 truncate">{getLocation(unit)}</span>
-          </p>
+        <p className="mt-1 flex min-w-0 items-center gap-1 text-[9px] font-bold leading-3 text-[#64748B]">
+          <MapPin size={10} className="shrink-0" />
+          <span className="min-w-0 truncate">{getLocation(unit)}</span>
+        </p>
 
-          <p className="mt-2 text-[17px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">
-            {compactMoney(unit.price, unit.priceCurrency)}
-          </p>
-        </div>
+        <p className="mt-1.5 text-[16px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">
+          {compactMoney(unit.price, unit.priceCurrency)}
+        </p>
 
-        <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[9.5px] font-black text-[#1F2937]">
-          {specs.map((spec) => (
-            <span key={spec} className="rounded-full bg-[#F8FAFC] px-2 py-1">
-              {limitText(spec, 16)}
+        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1 text-[8.5px] font-black text-[#1F2937]">
+          {specs.slice(0, 3).map((spec) => (
+            <span
+              key={spec}
+              className="rounded-full bg-[#F8FAFC] px-1.5 py-0.5"
+            >
+              {limitText(spec, 14)}
             </span>
           ))}
         </div>
 
-        <div className="mt-2 grid grid-cols-1 gap-1.5">
-          {features.slice(0, 2).map((item) => (
+        <div className="mt-1.5 grid grid-cols-1 gap-1">
+          {features.slice(0, 1).map((item) => (
             <CompactFeaturePill key={item} text={item} />
           ))}
         </div>
 
-        <div className="mt-auto flex items-end justify-between gap-2 pt-2">
+        <div className="mt-auto flex items-end justify-between gap-2 pt-1">
           <div className="min-w-0">
-            <p className="text-[8px] font-black uppercase tracking-[0.06em] text-[#94A3B8]">
+            <p className="text-[7px] font-black uppercase tracking-[0.06em] text-[#94A3B8]">
               EPH ID
             </p>
-            <p className="truncate text-[10px] font-black text-[#475569]">
+            <p className="truncate text-[9px] font-black text-[#475569]">
               {ephId}
             </p>
           </div>
@@ -1704,9 +1748,9 @@ function PoolUnitCard({
               event.stopPropagation();
               onDetail();
             }}
-            className="flex min-h-[34px] min-w-[94px] items-center justify-center gap-1 rounded-[14px] bg-[#2563EB] px-3 text-[11px] font-black text-white shadow-[0_8px_18px_rgba(37,99,235,0.18)]"
+            className="flex min-h-[30px] min-w-[74px] items-center justify-center gap-1 rounded-[12px] bg-[#2563EB] px-2 text-[10px] font-black text-white shadow-[0_8px_18px_rgba(37,99,235,0.16)]"
           >
-            <Eye size={13} />
+            <Eye size={12} />
             Detay
           </button>
         </div>
@@ -1715,26 +1759,36 @@ function PoolUnitCard({
   );
 }
 
-
-
 function PoolDetailModal({
   unit,
   match,
+  busyAction,
   onClose,
+  onMessage,
+  onAction,
 }: {
   unit: Unit;
   match: { score: number; customer: Customer | null; budgetDiff: number };
+  busyAction: string | null;
   onClose: () => void;
+  onMessage: () => void;
+  onAction: (type: PoolAction) => void;
 }) {
   const image = getCover(unit);
-  const features = getHighlightFeatures(unit);
   const specs = getPrimarySpecs(unit);
+  const portfolioHighlights = getPremiumPortfolioHighlights(unit);
+  const collaborationHighlights = getCollaborationOpportunities(unit);
+  const visibleDetails = getVisiblePortfolioDetails(unit);
+  const imageCount = (Array.isArray(unit.images) ? unit.images.length : 0) || 1;
+  const messageBusy = busyAction === `MESSAGE_${unit.id}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-[max(10px,env(safe-area-inset-left))] py-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))]">
-      <section className="flex max-h-[min(88dvh,680px)] w-[min(94vw,430px)] flex-col overflow-hidden rounded-[28px] border-2 border-[#C7D6E8] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 px-[max(8px,env(safe-area-inset-left))] pt-[max(10px,env(safe-area-inset-top))] pb-0">
+      <section className="flex max-h-[min(92dvh,720px)] w-[min(96vw,430px)] flex-col overflow-hidden rounded-t-[30px] border-2 border-b-0 border-[#C7D6E8] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
         <div className="relative shrink-0">
-          <div className="h-[230px] bg-[#EEF3F8]">
+          <div className="mx-auto mt-2 h-1.5 w-11 rounded-full bg-[#CBD5E1]" />
+
+          <div className="relative mt-2 h-[150px] overflow-hidden bg-[#EEF3F8]">
             {image ? (
               <img
                 src={image}
@@ -1746,94 +1800,151 @@ function PoolDetailModal({
                 <Building2 size={34} />
               </div>
             )}
+
+            <div className="absolute bottom-2 left-2 rounded-full bg-slate-950/75 px-2.5 py-1 text-[10px] font-black text-white">
+              {imageCount} Fotoğraf
+            </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-[16px] border-2 border-white/70 bg-white/95 text-[#2563EB] shadow-[0_8px_18px_rgba(15,23,42,0.15)]"
+            className="absolute right-3 top-5 flex h-10 w-10 items-center justify-center rounded-[15px] border-2 border-white/70 bg-white/95 text-[#2563EB] shadow-[0_8px_18px_rgba(15,23,42,0.15)]"
             aria-label="Kapat"
           >
-            <X size={19} />
+            <X size={18} />
           </button>
-
-          <div className="absolute bottom-3 left-3 rounded-full bg-slate-950/75 px-3 py-1.5 text-[11px] font-black text-white">
-            {(Array.isArray(unit.images) ? unit.images.length : 0) || 1} Fotoğraf
-          </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-4 [-webkit-overflow-scrolling:touch]">
-          <p className="text-[11px] font-black uppercase tracking-[0.1em] text-[#2563EB]">
-            {getTypeChip(unit)}
-          </p>
-          <h2 className="mt-1 text-[23px] font-black leading-[1.05] tracking-[-0.05em] text-[#0F172A] break-words [overflow-wrap:anywhere]">
-            {limitText(unit.project?.name || "EPH Portföy", 72)}
-          </h2>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3 pt-2 [-webkit-overflow-scrolling:touch]">
+          <div className="rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+              {getTypeChip(unit)} • {getEphId(unit.id)}
+            </p>
+            <h2 className="mx-auto mt-1 max-w-[330px] text-center text-[19px] font-black leading-[1.08] tracking-[-0.045em] text-[#0F172A] break-words [overflow-wrap:anywhere]">
+              {limitText(unit.project?.name || "EPH Portföy", 72)}
+            </h2>
+            <p className="mt-1.5 flex min-w-0 items-start justify-center gap-1.5 text-center text-[12px] font-bold leading-4 text-[#64748B]">
+              <MapPin size={14} className="mt-0.5 shrink-0" />
+              <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+                {getLocation(unit)}
+              </span>
+            </p>
+            <p className="mx-auto mt-2 inline-flex items-center justify-center rounded-[16px] bg-[#2563EB] px-4 py-2 text-center text-[15px] font-black leading-none tracking-[-0.04em] text-white">
+              {compactMoney(unit.price, unit.priceCurrency)}
+            </p>
 
-          <p className="mt-2 flex min-w-0 items-center gap-1.5 text-[13px] font-bold leading-4 text-[#64748B]">
-            <MapPin size={15} className="shrink-0" />
-            <span className="min-w-0 break-words [overflow-wrap:anywhere]">
-              {getLocation(unit)}
-            </span>
-          </p>
-
-          <p className="mt-3 text-[27px] font-black leading-none tracking-[-0.05em] text-[#0F172A]">
-            {compactMoney(unit.price, unit.priceCurrency)}
-          </p>
-
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {specs.map((spec) => (
-              <SmallInfo key={spec} label="Özellik" value={spec} />
-            ))}
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {specs.slice(0, 3).map((spec) => (
+                <SmallInfo key={spec} label="Özellik" value={spec} />
+              ))}
+            </div>
           </div>
 
-          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3">
-            <p className="text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-              Dikkat Çeken Özellikler
-            </p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {features.map((item) => (
-                <CompactFeaturePill key={item} text={item} />
+          <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
+            <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+                Portföy Özeti
+              </p>
+              <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
+                Bu portföyün sahada öne çıkan kısa satış notları
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 p-2.5">
+              {portfolioHighlights.map((item) => (
+                <PremiumHighlightCard key={item.title} item={item} dense />
               ))}
             </div>
           </section>
 
-          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3">
-            <p className="text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-              Meslektaş Havuzu
-            </p>
-            <p className="mt-1 text-center text-[12px] font-bold leading-5 text-[#64748B]">
-              Bu portföy iş birliği ve paylaşım için havuzda.
-            </p>
-            <div className="mt-2 grid grid-cols-1 gap-2">
-              <MatchPill text="Portföy Paylaşımına Açık" />
-              <MatchPill text="Ortak Çalışmaya Uygun" />
+          <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FAFC] shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
+            <div className="border-b-2 border-[#E2EAF5] bg-white px-3 py-2.5 text-center">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+                İş Birliği Fırsatı
+              </p>
+              <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
+                Havuz mantığına uygun meslektaş çalışma başlıkları
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 p-2.5">
+              {collaborationHighlights.map((item) => (
+                <PremiumHighlightCard key={item.title} item={item} dense />
+              ))}
             </div>
           </section>
 
-          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-              Açıklama
+          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3 text-center">
+            <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+              Portföy Notu
             </p>
-            <p className="mt-1.5 text-[12px] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
-              {unit.description || "Bu Havuz portföyü için açıklama girilmemiş."}
+            <p className="mx-auto mt-1.5 max-w-[360px] text-center text-[12px] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
+              {unit.description ||
+                "Bu Havuz portföyü için açıklama girilmemiş."}
             </p>
           </section>
 
-          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-              Mahremiyet
+          <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
+            <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+                Portföy Detayları
+              </p>
+              <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
+                Havuzda gösterilebilen güvenli portföy bilgileri
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 p-2.5">
+              {visibleDetails.map((item) => (
+                <PremiumHighlightCard key={item.title} item={item} dense />
+              ))}
+            </div>
+          </section>
+
+          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3 text-center">
+            <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+              Havuz Bilgisi
             </p>
-            <p className="mt-1.5 text-[12px] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
-              Telefon, e-posta, tapu sahibi ve tam adres bilgileri Havuz detayında gösterilmez.
+            <p className="mx-auto mt-1.5 max-w-[350px] text-center text-[12px] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
+              Portföy sahibiyle görüşme başlatılabilir. İletişim ve tam adres bilgileri yalnızca yetkili görüşme akışında paylaşılır.
             </p>
           </section>
+        </div>
+
+        <div className="shrink-0 border-t-2 border-[#C7D6E8] bg-white/95 p-2.5 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-12px_28px_rgba(15,23,42,0.08)]">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onMessage}
+              disabled={Boolean(busyAction)}
+              className="flex min-h-[42px] items-center justify-center gap-1 rounded-[15px] border-2 border-[#C7D6E8] bg-white text-[12px] font-black text-[#1F2937] disabled:opacity-60"
+            >
+              <MessageCircle size={14} className="text-[#2563EB]" />
+              {messageBusy ? "Açılıyor" : "Mesaj 3K"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onAction("INTEREST")}
+              disabled={Boolean(busyAction)}
+              className="min-h-[42px] rounded-[15px] border-2 border-[#2563EB] bg-[#EFF6FF] text-[12px] font-black text-[#1D4ED8] disabled:opacity-60"
+            >
+              İlgilen 10K
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onAction("LEAD")}
+              disabled={Boolean(busyAction)}
+              className="col-span-2 flex min-h-[44px] items-center justify-center gap-1 rounded-[15px] border-2 border-[#2563EB] bg-[#2563EB] text-[12px] font-black text-white disabled:opacity-60"
+            >
+              <Users size={14} />
+              Müşterim Var 20K
+            </button>
+          </div>
         </div>
       </section>
     </div>
   );
 }
-
 
 function PoolActionModal({
   action,
@@ -1886,7 +1997,10 @@ function PoolActionModal({
             />
             <SmallInfo label="EPH ID" value={ephId} />
             <SmallInfo label="Konum" value={getLocation(action.unit)} />
-            <SmallInfo label="İşlem" value={isLead ? "Müşterim Var" : "İlgileniyorum"} />
+            <SmallInfo
+              label="İşlem"
+              value={isLead ? "Müşterim Var" : "İlgileniyorum"}
+            />
           </div>
 
           <div className="mt-[clamp(8px,2.5vw,12px)] rounded-[clamp(16px,5vw,20px)] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-[clamp(10px,3vw,14px)]">
