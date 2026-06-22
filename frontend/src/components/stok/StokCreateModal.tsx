@@ -1615,7 +1615,7 @@ export default function StokCreateModal({
     }
 
     if (doorAccessInfo.length > 500) {
-      return "Kapı erişim bilgisi en fazla 500 karakter olabilir.";
+      return "Ziyaret ve erişim notları en fazla 500 karakter olabilir.";
     }
 
     if (descriptionLength > MAX_DESCRIPTION_LENGTH) {
@@ -2268,19 +2268,19 @@ export default function StokCreateModal({
           <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
               <div className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">🔒 Erişim Bilgileri</span>
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">🔒 Ziyaret ve Erişim Bilgileri</span>
                 <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
-                  Kapı şifresi, site giriş kodu, kapıcı bilgisi gibi erişim notları mahremdir. Havuzda ve genel görünümde gerçek değer gösterilmez.
+                  Ziyaret saati, randevu bilgisi, yol tarifi veya erişim notları burada tutulur. Havuzda ve genel görünümde gerçek değer gösterilmez.
                 </p>
               </div>
 
               <label className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 text-center shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                <span>Kapı Erişim Bilgisi</span>
+                <span>Ziyaret ve Erişim Notları</span>
                 <textarea
                   maxLength={500}
                   value={doorAccessInfo}
                   onChange={(e) => setUnitField("doorAccessInfo", e.target.value)}
-                  placeholder="Örn: A Blok kapı şifresi 4455 / Kapıcı Mehmet Bey / Site giriş kodu 9876"
+                  placeholder="Ziyaret ve erişimle ilgili bilinmesi gereken bilgileri yazın..."
                 />
                 <p className="mt-2 text-center text-xs font-black text-[#64748B]">
                   Ekranda kullanıcıya: “🔒 Randevulaşma sonrası portföy sahibinden talep ediniz.” şeklinde gösterilir.
