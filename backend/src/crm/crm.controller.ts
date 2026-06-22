@@ -9,6 +9,12 @@ import { ActivityType, CustomerPropertyRelation, CustomerStatus } from '@prisma/
 export class CrmController {
   constructor(private readonly crmService: CrmService) {}
 
+
+  @Get('admin-summary')
+  getAdminSummary(@CurrentUser() user: any) {
+    return this.crmService.getAdminSummary(user.role);
+  }
+
   @Get('customers')
   getCustomers(@CurrentUser() user: any) {
     return this.crmService.getCustomers(user.id, user.role);

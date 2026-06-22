@@ -602,6 +602,63 @@ export class CrmService {
   }
 
 
+
+  async getAdminSummary(userRole: Role) {
+    const normalizedRole = String(userRole || '').toUpperCase();
+
+
+
+
+    const allowedRoles = ['ADMIN', 'SUPER_ADMIN', 'MODERATOR'];
+
+     if (!allowedRoles.includes(normalizedRole)) {
+
+
+
+      throw new ForbiddenException('CRM yönetim özetine erişim yetkiniz yok.');
+    }
+
+    const [
+      totalCustomers,
+      activeCustomers,
+      closedDeals,
+      lostDeals,
+      pendingTasks,
+      totalTasks,
+      totalActivities,
+      totalInterests,
+      totalCustomerProperties,
+    ] = await Promise.all([
+      this.prisma.customer.count(),
+      this.prisma.customer.count({
+        where: {
+          status: {
+            notIn: [CustomerStatus.KAPANDI, CustomerStatus.KAYBEDILDI],
+          },
+        },
+      }),
+      this.prisma.customer.count({ where: { status: CustomerStatus.KAPANDI } }),
+      this.prisma.customer.count({ where: { status: CustomerStatus.KAYBEDILDI } }),
+      this.prisma.task.count({ where: { status: TaskStatus.BEKLIYOR } }),
+      this.prisma.task.count(),
+      this.prisma.activity.count(),
+      this.prisma.customerInterest.count({ where: { isActive: true } }),
+      this.prisma.customerProperty.count(),
+    ]);
+
+    return {
+      totalCustomers,
+      activeCustomers,
+      closedDeals,
+      lostDeals,
+      pendingTasks,
+      totalTasks,
+      totalActivities,
+      totalInterests,
+      totalCustomerProperties,
+    };
+  }
+
   async getPipeline(userId: string, userRole: Role) {
     const customers = await this.prisma.customer.findMany({
       where: this.getCustomerWhere(userId, userRole),
