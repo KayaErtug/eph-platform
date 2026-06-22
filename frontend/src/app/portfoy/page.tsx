@@ -1528,12 +1528,14 @@ function PortfolioMap({
   const markersRef = useRef<any[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     let alive = true;
 
     setLoading(true);
     setError("");
+    setMapReady(false);
 
     loadGoogleMapsScript()
       .then(() => {
@@ -1556,6 +1558,8 @@ function PortfolioMap({
           fullscreenControl: false,
           gestureHandling: "greedy",
         });
+
+        setMapReady(true);
       })
       .catch((err: Error) => setError(err.message || "Harita yüklenemedi."))
       .finally(() => {
@@ -1566,26 +1570,27 @@ function PortfolioMap({
       alive = false;
       markersRef.current.forEach((marker) => marker.setMap?.(null));
       markersRef.current = [];
+      googleMapRef.current = null;
+      setMapReady(false);
     };
   }, []);
 
   useEffect(() => {
-    if (!googleMapRef.current || !window.google?.maps) return;
+    if (!mapReady || !googleMapRef.current || !window.google?.maps) return;
 
     markersRef.current.forEach((marker) => marker.setMap?.(null));
     markersRef.current = [];
 
     const bounds = new window.google.maps.LatLngBounds();
 
+    units.forEach((unit) => {
+      const lat = Number(unit.project?.latitude || 0);
+      const lng = Number(unit.project?.longitude || 0);
+      if (lat && lng) bounds.extend({ lat, lng });
+    });
+
     if (!showPins) {
-      if (units.length > 0) {
-        units.forEach((unit) => {
-          const lat = Number(unit.project?.latitude || 0);
-          const lng = Number(unit.project?.longitude || 0);
-          if (lat && lng) bounds.extend({ lat, lng });
-        });
-        if (!bounds.isEmpty()) googleMapRef.current.fitBounds(bounds, 56);
-      }
+      if (!bounds.isEmpty()) googleMapRef.current.fitBounds(bounds, 56);
       return;
     }
 
@@ -1594,22 +1599,6 @@ function PortfolioMap({
       const lng = Number(unit.project?.longitude || 0);
 
       if (!lat || !lng) return;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
       const isSelected = selectedUnitId === unit.id;
       const fill = isSelected ? "#0B3FB3" : "#1557D6";
@@ -1643,29 +1632,10 @@ function PortfolioMap({
 
       marker.addListener("click", () => onSelectUnit(unit.id));
       markersRef.current.push(marker);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      bounds.extend({ lat, lng });
     });
 
-    if (units.length > 0 && !bounds.isEmpty())
-      googleMapRef.current.fitBounds(bounds, 56);
-  }, [onSelectUnit, selectedUnitId, showPins, units]);
+    if (!bounds.isEmpty()) googleMapRef.current.fitBounds(bounds, 56);
+  }, [mapReady, onSelectUnit, selectedUnitId, showPins, units]);
 
   return (
     <div className="relative h-[360px] bg-[#EEF5FF]">
