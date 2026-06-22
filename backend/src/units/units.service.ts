@@ -83,6 +83,9 @@ const unitInclude = {
       { createdAt: 'asc' as const },
     ],
   },
+  authorityDocuments: {
+    orderBy: { createdAt: 'desc' as const },
+  },
 };
 
 @Injectable()

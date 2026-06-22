@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -59,6 +59,11 @@ interface Props {
   galleryImages: LocalPortfolioImage[];
   setGalleryImages: React.Dispatch<React.SetStateAction<LocalPortfolioImage[]>>;
   onSubmit: () => void;
+  existingDocumentStatus?: {
+    propertyDeed?: boolean;
+    deedOwnerIdFront?: boolean;
+    deedOwnerIdBack?: boolean;
+  };
 }
 
 const MAX_GALLERY_COUNT = 15;
@@ -120,28 +125,28 @@ const SPECIAL_FIELD_KEYS = [
 
 
 const TOURISTIC_BED_COUNT_VALUE_OPTIONS = [
-  { value: "10", label: "1-10 arası" },
-  { value: "50", label: "11-50 arası" },
-  { value: "250", label: "51-250 arası" },
-  { value: "500", label: "251-500 arası" },
-  { value: "1000", label: "501-1000 arası" },
+  { value: "10", label: "1-10 arasÄ±" },
+  { value: "50", label: "11-50 arasÄ±" },
+  { value: "250", label: "51-250 arasÄ±" },
+  { value: "500", label: "251-500 arasÄ±" },
+  { value: "1000", label: "501-1000 arasÄ±" },
   { value: "1001", label: "1000+" },
 ];
 
 const CURRENCY_OPTIONS = [
-  { value: "TRY", label: "Türk Lirası", symbol: "₺" },
-  { value: "USD", label: "Amerikan Doları", symbol: "$" },
-  { value: "EUR", label: "Euro", symbol: "€" },
-  { value: "GBP", label: "İngiliz Sterlini", symbol: "£" },
+  { value: "TRY", label: "TÃ¼rk LirasÄ±", symbol: "â‚º" },
+  { value: "USD", label: "Amerikan DolarÄ±", symbol: "$" },
+  { value: "EUR", label: "Euro", symbol: "â‚¬" },
+  { value: "GBP", label: "Ä°ngiliz Sterlini", symbol: "Â£" },
 ];
 
 const FLOOR_LABEL_OPTIONS = [
   "Kot -1",
   "Bodrum",
-  "Yarı Bodrum",
+  "YarÄ± Bodrum",
   "Zemin Kat",
-  "Yüksek Giriş",
-  "Bahçe Katı",
+  "YÃ¼ksek GiriÅŸ",
+  "BahÃ§e KatÄ±",
 
   "1. Kat",
   "2. Kat",
@@ -159,8 +164,8 @@ const FLOOR_LABEL_OPTIONS = [
   "14. Kat",
   "15. Kat",
 
-  "Çatı Katı",
-  "Teras Katı",
+  "Ã‡atÄ± KatÄ±",
+  "Teras KatÄ±",
   "Penthouse",
 ];
 
@@ -186,51 +191,51 @@ const VILLA_TYPE_KEYWORDS = ["VILLA", "KOSK", "YALI", "KONAK", "MUSTAKIL"];
 
 const LAND_QUALITY_OPTIONS = [
   "Tarla",
-  "Bağ",
-  "Bahçe",
+  "BaÄŸ",
+  "BahÃ§e",
   "Zeytinlik",
-  "Meyve Bahçesi",
+  "Meyve BahÃ§esi",
   "Hisseli Parsel",
-  "Müstakil Parsel",
-  "Köy Yerleşik Alanı",
-  "İmarlı Arsa",
-  "Konut İmarlı Arsa",
-  "Villa İmarlı Arsa",
-  "Ticari İmarlı Arsa",
-  "Sanayi İmarlı Arsa",
-  "Turizm İmarlı Arsa",
+  "MÃ¼stakil Parsel",
+  "KÃ¶y YerleÅŸik AlanÄ±",
+  "Ä°marlÄ± Arsa",
+  "Konut Ä°marlÄ± Arsa",
+  "Villa Ä°marlÄ± Arsa",
+  "Ticari Ä°marlÄ± Arsa",
+  "Sanayi Ä°marlÄ± Arsa",
+  "Turizm Ä°marlÄ± Arsa",
   "Yola Cepheli",
   "Kadastro Yolu Var",
   "Su Var",
   "Elektrik Var",
   "Sondaj / Kuyu Var",
-  "Çiftlik Kurulumuna Uygun",
+  "Ã‡iftlik Kurulumuna Uygun",
 ];
 
 const INDUSTRIAL_USAGE_OPTIONS = [
   "Depo",
   "Antrepo",
   "Fabrika",
-  "Atölye",
-  "Üretim Tesisi",
+  "AtÃ¶lye",
+  "Ãœretim Tesisi",
   "Lojistik Merkezi",
-  "Soğuk Hava Deposu",
-  "Yükleme Rampalı",
-  "Tır Girişine Uygun",
-  "Sanayi Elektriği Var",
+  "SoÄŸuk Hava Deposu",
+  "YÃ¼kleme RampalÄ±",
+  "TÄ±r GiriÅŸine Uygun",
+  "Sanayi ElektriÄŸi Var",
 ];
 
 const COMMERCIAL_USAGE_OPTIONS = [
-  "Cadde Üzeri",
-  "Dükkan",
-  "Mağaza",
+  "Cadde Ãœzeri",
+  "DÃ¼kkan",
+  "MaÄŸaza",
   "Ofis",
   "Home Office",
   "Plaza Ofis",
   "Restoran",
   "Kafe",
   "Otel / Pansiyon",
-  "Tabela Değeri Yüksek",
+  "Tabela DeÄŸeri YÃ¼ksek",
   "Depolu",
   "WC / Mutfak Var",
 ];
@@ -238,12 +243,12 @@ const COMMERCIAL_USAGE_OPTIONS = [
 function normalizeTypeKey(value: string) {
   return String(value || "")
     .toLocaleUpperCase("tr-TR")
-    .replaceAll("İ", "I")
-    .replaceAll("Ğ", "G")
-    .replaceAll("Ü", "U")
-    .replaceAll("Ş", "S")
-    .replaceAll("Ö", "O")
-    .replaceAll("Ç", "C");
+    .replaceAll("Ä°", "I")
+    .replaceAll("Ä", "G")
+    .replaceAll("Ãœ", "U")
+    .replaceAll("Å", "S")
+    .replaceAll("Ã–", "O")
+    .replaceAll("Ã‡", "C");
 }
 
 function typeHasKeyword(type: string, keywords: string[]) {
@@ -284,41 +289,41 @@ function shouldShowBuildingFloorCount(type: string) {
 }
 
 function getRoomLabel(type: string) {
-  if (isTouristicType(type)) return "Oda Sayısı";
-  if (isOfficeDetailType(type)) return "Oda Sayısı";
-  if (isResidentialDetailType(type)) return "Oda Sayısı";
-  return "Oda Sayısı";
+  if (isTouristicType(type)) return "Oda SayÄ±sÄ±";
+  if (isOfficeDetailType(type)) return "Oda SayÄ±sÄ±";
+  if (isResidentialDetailType(type)) return "Oda SayÄ±sÄ±";
+  return "Oda SayÄ±sÄ±";
 }
 
 function getRoomPlaceholder(type: string) {
-  if (isTouristicType(type)) return "Örn: 12 oda, 24 oda, 40 oda";
-  if (isOfficeDetailType(type)) return "Örn: 1+1, 2+1, 4+2";
-  return "Örn: 3+1, 4+1, 5+2";
+  if (isTouristicType(type)) return "Ã–rn: 12 oda, 24 oda, 40 oda";
+  if (isOfficeDetailType(type)) return "Ã–rn: 1+1, 2+1, 4+2";
+  return "Ã–rn: 3+1, 4+1, 5+2";
 }
 
 function getAreaLabel(type: string) {
-  if (isLandType(type)) return "Arazi Alanı (m²) *";
-  if (isIndustrialType(type)) return "Kapalı / Kullanım Alanı (m²) *";
-  if (isCommercialType(type)) return "Kullanım Alanı (m²) *";
-  if (type === "KAMP_YERI") return "Açık Alan (m²) *";
-  if (type === "TATIL_KOYU") return "Toplam Alan (m²) *";
-  return "Alan (m²) *";
+  if (isLandType(type)) return "Arazi AlanÄ± (mÂ²) *";
+  if (isIndustrialType(type)) return "KapalÄ± / KullanÄ±m AlanÄ± (mÂ²) *";
+  if (isCommercialType(type)) return "KullanÄ±m AlanÄ± (mÂ²) *";
+  if (type === "KAMP_YERI") return "AÃ§Ä±k Alan (mÂ²) *";
+  if (type === "TATIL_KOYU") return "Toplam Alan (mÂ²) *";
+  return "Alan (mÂ²) *";
 }
 
 function getNumberLabel(type: string) {
-  if (isLandType(type)) return "Ada / Parsel / Kayıt No *";
-  if (isIndustrialType(type)) return "Blok / Kapı / Tesis No *";
-  if (isCommercialType(type)) return "Bağımsız Bölüm / Kapı No *";
-  if (isVillaType(type)) return "Villa / Kapı No *";
-  return "Daire / Bölüm No";
+  if (isLandType(type)) return "Ada / Parsel / KayÄ±t No *";
+  if (isIndustrialType(type)) return "Blok / KapÄ± / Tesis No *";
+  if (isCommercialType(type)) return "BaÄŸÄ±msÄ±z BÃ¶lÃ¼m / KapÄ± No *";
+  if (isVillaType(type)) return "Villa / KapÄ± No *";
+  return "Daire / BÃ¶lÃ¼m No";
 }
 
 function getNumberPlaceholder(type: string) {
-  if (isLandType(type)) return "Örn: Ada 123 / Parsel 45";
-  if (isIndustrialType(type)) return "Örn: A Blok, Kapı 12, Tesis 3";
-  if (isCommercialType(type)) return "Örn: Dükkan 4, Ofis 12, Plaza 8";
-  if (isVillaType(type)) return "Örn: Villa 6, A-12, Kapı 3";
-  return "Örn: 6, A-12, B Blok 3";
+  if (isLandType(type)) return "Ã–rn: Ada 123 / Parsel 45";
+  if (isIndustrialType(type)) return "Ã–rn: A Blok, KapÄ± 12, Tesis 3";
+  if (isCommercialType(type)) return "Ã–rn: DÃ¼kkan 4, Ofis 12, Plaza 8";
+  if (isVillaType(type)) return "Ã–rn: Villa 6, A-12, KapÄ± 3";
+  return "Ã–rn: 6, A-12, B Blok 3";
 }
 
 
@@ -327,18 +332,18 @@ function getFieldLabel(field: PortfolioFieldKey, type: string, required: boolean
 
   if (field === "roomCount") return `${getRoomLabel(type)}${requiredMark}`;
   if (field === "area") return `${getAreaLabel(type).replace(" *", "")}${requiredMark}`;
-  if (field === "openArea") return `Açık Alan (m²)${requiredMark}`;
-  if (field === "closedArea") return `Kapalı Alan (m²)${requiredMark}`;
-  if (field === "bedCount") return `Yatak Sayısı${requiredMark}`;
-  if (field === "buildingAge") return `Bina Yaşı${requiredMark}`;
-  if (field === "floor") return `Bulunduğu Kat${requiredMark}`;
-  if (field === "totalFloors") return `${isVillaType(type) ? "Yapı Kat Sayısı" : "Toplam Kat Sayısı"}${requiredMark}`;
+  if (field === "openArea") return `AÃ§Ä±k Alan (mÂ²)${requiredMark}`;
+  if (field === "closedArea") return `KapalÄ± Alan (mÂ²)${requiredMark}`;
+  if (field === "bedCount") return `Yatak SayÄ±sÄ±${requiredMark}`;
+  if (field === "buildingAge") return `Bina YaÅŸÄ±${requiredMark}`;
+  if (field === "floor") return `BulunduÄŸu Kat${requiredMark}`;
+  if (field === "totalFloors") return `${isVillaType(type) ? "YapÄ± Kat SayÄ±sÄ±" : "Toplam Kat SayÄ±sÄ±"}${requiredMark}`;
   if (field === "adaNo") return `Ada No${requiredMark}`;
   if (field === "parselNo") return `Parsel No${requiredMark}`;
   if (field === "number") return `${getNumberLabel(type).replace(" *", "")}${requiredMark}`;
   if (field === "price") return `Fiyat${requiredMark}`;
-  if (field === "description") return `Açıklama${requiredMark}`;
-  if (field === "availableCreditAmount") return `Kullanılabilir Kredi Tutarı${requiredMark}`;
+  if (field === "description") return `AÃ§Ä±klama${requiredMark}`;
+  if (field === "availableCreditAmount") return `KullanÄ±labilir Kredi TutarÄ±${requiredMark}`;
 
   return `${field}${requiredMark}`;
 }
@@ -364,7 +369,7 @@ function getSubCategoryFromType(type: string) {
 
 function isResidentialDetailType(type: string) {
   const mainCategory = getMainCategoryFromType(type);
-  return mainCategory === "KONUT" || mainCategory === "KONUT PROJELERİ";
+  return mainCategory === "KONUT" || mainCategory === "KONUT PROJELERÄ°";
 }
 
 function isOfficeDetailType(type: string) {
@@ -372,7 +377,7 @@ function isOfficeDetailType(type: string) {
 }
 
 function isTouristicType(type: string) {
-  return getMainCategoryFromType(type) === "TURİSTİK TESİS";
+  return getMainCategoryFromType(type) === "TURÄ°STÄ°K TESÄ°S";
 }
 
 function shouldShowRoomCountField(type: string) {
@@ -417,55 +422,55 @@ function makeFeatureKey(groupKey: string, option: string) {
 function getFeatureIcon(value: string) {
   const normalized = normalizeTypeKey(value);
 
-  if (normalized.includes("ASANSOR")) return "↕";
-  if (normalized.includes("OTOPARK") || normalized.includes("ARAC PARK")) return "▣";
-  if (normalized.includes("GUVENLIK")) return "◇";
-  if (normalized.includes("SITE")) return "⌂";
-  if (normalized.includes("JENERATOR") || normalized.includes("ELEKTRIK")) return "⚡";
-  if (normalized.includes("YANGIN")) return "◉";
-  if (normalized.includes("KAMERA")) return "◉";
-  if (normalized.includes("SU") || normalized.includes("SONDAJ") || normalized.includes("KUYU")) return "≈";
-  if (normalized.includes("FIBER") || normalized.includes("INTERNET") || normalized.includes("WI-FI")) return "⌁";
-  if (normalized.includes("BANYO") || normalized.includes("WC") || normalized.includes("DUS")) return "○";
-  if (normalized.includes("BALKON") || normalized.includes("TERAS")) return "▤";
-  if (normalized.includes("KILER") || normalized.includes("DEPO")) return "▦";
-  if (normalized.includes("MUTFAK")) return "◆";
-  if (normalized.includes("AKILLI")) return "✦";
-  if (normalized.includes("SOMINE") || normalized.includes("HAMAM") || normalized.includes("SAUNA") || normalized.includes("SPA")) return "♨";
-  if (normalized.includes("KLIMA") || normalized.includes("SOGUK")) return "❄";
-  if (normalized.includes("YALITIM")) return "☀";
-  if (normalized.includes("DENIZ") || normalized.includes("GOL") || normalized.includes("NEHIR")) return "≈";
-  if (normalized.includes("DOGA") || normalized.includes("DAG") || normalized.includes("ORMAN") || normalized.includes("PARK")) return "♧";
-  if (normalized.includes("SEHIR") || normalized.includes("CADDE") || normalized.includes("MERKEZ")) return "▥";
-  if (normalized.includes("YUKLEME") || normalized.includes("RAMPA")) return "⇅";
-  if (normalized.includes("TIR") || normalized.includes("KAMYON")) return "▰";
-  if (normalized.includes("VINC") || normalized.includes("SANAYI")) return "⚙";
-  if (normalized.includes("YOL")) return "═";
-  if (normalized.includes("TAPU") || normalized.includes("IMAR") || normalized.includes("KADASTRO")) return "⌖";
-  if (normalized.includes("CEPHE") || normalized.includes("KOSE")) return "⌟";
-  if (normalized.includes("HAVUZ")) return "≈";
-  if (normalized.includes("MANZARA")) return "●";
+  if (normalized.includes("ASANSOR")) return "â†•";
+  if (normalized.includes("OTOPARK") || normalized.includes("ARAC PARK")) return "â–£";
+  if (normalized.includes("GUVENLIK")) return "â—‡";
+  if (normalized.includes("SITE")) return "âŒ‚";
+  if (normalized.includes("JENERATOR") || normalized.includes("ELEKTRIK")) return "âš¡";
+  if (normalized.includes("YANGIN")) return "â—‰";
+  if (normalized.includes("KAMERA")) return "â—‰";
+  if (normalized.includes("SU") || normalized.includes("SONDAJ") || normalized.includes("KUYU")) return "â‰ˆ";
+  if (normalized.includes("FIBER") || normalized.includes("INTERNET") || normalized.includes("WI-FI")) return "âŒ";
+  if (normalized.includes("BANYO") || normalized.includes("WC") || normalized.includes("DUS")) return "â—‹";
+  if (normalized.includes("BALKON") || normalized.includes("TERAS")) return "â–¤";
+  if (normalized.includes("KILER") || normalized.includes("DEPO")) return "â–¦";
+  if (normalized.includes("MUTFAK")) return "â—†";
+  if (normalized.includes("AKILLI")) return "âœ¦";
+  if (normalized.includes("SOMINE") || normalized.includes("HAMAM") || normalized.includes("SAUNA") || normalized.includes("SPA")) return "â™¨";
+  if (normalized.includes("KLIMA") || normalized.includes("SOGUK")) return "â„";
+  if (normalized.includes("YALITIM")) return "â˜€";
+  if (normalized.includes("DENIZ") || normalized.includes("GOL") || normalized.includes("NEHIR")) return "â‰ˆ";
+  if (normalized.includes("DOGA") || normalized.includes("DAG") || normalized.includes("ORMAN") || normalized.includes("PARK")) return "â™§";
+  if (normalized.includes("SEHIR") || normalized.includes("CADDE") || normalized.includes("MERKEZ")) return "â–¥";
+  if (normalized.includes("YUKLEME") || normalized.includes("RAMPA")) return "â‡…";
+  if (normalized.includes("TIR") || normalized.includes("KAMYON")) return "â–°";
+  if (normalized.includes("VINC") || normalized.includes("SANAYI")) return "âš™";
+  if (normalized.includes("YOL")) return "â•";
+  if (normalized.includes("TAPU") || normalized.includes("IMAR") || normalized.includes("KADASTRO")) return "âŒ–";
+  if (normalized.includes("CEPHE") || normalized.includes("KOSE")) return "âŒŸ";
+  if (normalized.includes("HAVUZ")) return "â‰ˆ";
+  if (normalized.includes("MANZARA")) return "â—";
 
-  return "✓";
+  return "âœ“";
 }
 
 function getFeatureGroupTitle(group: string) {
   const labels: Record<string, string> = {
-    interior: "İç Özellikler",
-    exterior: "Dış Özellikler",
+    interior: "Ä°Ã§ Ã–zellikler",
+    exterior: "DÄ±ÅŸ Ã–zellikler",
     location: "Muhit",
-    transport: "Ulaşım",
+    transport: "UlaÅŸÄ±m",
     front: "Cephe",
     view: "Manzara",
-    accessibility: "Engelliye / Yaşlıya Uygun",
-    zoning: "Tapu / İmar",
-    landInfrastructure: "Arazi Altyapısı",
-    commercial: "Ticari Değer",
+    accessibility: "Engelliye / YaÅŸlÄ±ya Uygun",
+    zoning: "Tapu / Ä°mar",
+    landInfrastructure: "Arazi AltyapÄ±sÄ±",
+    commercial: "Ticari DeÄŸer",
     tourism: "Turistik Tesis",
-    luxury: "Lüks Özellikler",
+    luxury: "LÃ¼ks Ã–zellikler",
   };
 
-  return labels[group] || "Özellik";
+  return labels[group] || "Ã–zellik";
 }
 
 function getFeatureGroupTone(group: string) {
@@ -490,223 +495,223 @@ function getFeatureGroupTone(group: string) {
 
 const FEATURE_FILTERS = {
   villa: new Set([
-    "Akıllı Ev",
-    "Alarm (Hırsız)",
-    "Alarm (Yangın)",
-    "Barbekü",
-    "Beyaz Eşya",
-    "Çamaşır Odası",
-    "Çelik Kapı",
-    "Duşakabin",
+    "AkÄ±llÄ± Ev",
+    "Alarm (HÄ±rsÄ±z)",
+    "Alarm (YangÄ±n)",
+    "BarbekÃ¼",
+    "Beyaz EÅŸya",
+    "Ã‡amaÅŸÄ±r OdasÄ±",
+    "Ã‡elik KapÄ±",
+    "DuÅŸakabin",
     "Ebeveyn Banyosu",
-    "Fiber İnternet",
-    "Giyinme Odası",
-    "Görüntülü Diafon",
+    "Fiber Ä°nternet",
+    "Giyinme OdasÄ±",
+    "GÃ¶rÃ¼ntÃ¼lÃ¼ Diafon",
     "Hilton Banyo",
-    "Isıcam",
+    "IsÄ±cam",
     "Jakuzi",
     "Klima",
     "Kiler",
     "Mutfak (Ankastre)",
-    "Mutfak Doğalgazı",
+    "Mutfak DoÄŸalgazÄ±",
     "Panjur / Jaluzi",
     "Parke Zemin",
-    "Şömine",
+    "ÅÃ¶mine",
     "Teras",
     "Vestiyer",
-    "Yüz Tanıma & Parmak İzi",
-    "Araç Şarj İstasyonu",
-    "24 Saat Güvenlik",
-    "Bahçe Terası",
-    "Çocuk Oyun Parkı",
+    "YÃ¼z TanÄ±ma & Parmak Ä°zi",
+    "AraÃ§ Åarj Ä°stasyonu",
+    "24 Saat GÃ¼venlik",
+    "BahÃ§e TerasÄ±",
+    "Ã‡ocuk Oyun ParkÄ±",
     "Hamam",
-    "Isı Yalıtımı",
-    "Jeneratör",
+    "IsÄ± YalÄ±tÄ±mÄ±",
+    "JeneratÃ¶r",
     "Kamera Sistemi",
-    "Köpek Parkı",
-    "Müstakil Havuzlu",
+    "KÃ¶pek ParkÄ±",
+    "MÃ¼stakil Havuzlu",
     "Sauna",
-    "Ses Yalıtımı",
-    "Spor Alanı",
+    "Ses YalÄ±tÄ±mÄ±",
+    "Spor AlanÄ±",
     "Su Deposu",
-    "Yüzme Havuzu (Açık)",
-    "Yüzme Havuzu (Kapalı)",
-    "Özel Havuz",
+    "YÃ¼zme Havuzu (AÃ§Ä±k)",
+    "YÃ¼zme Havuzu (KapalÄ±)",
+    "Ã–zel Havuz",
     "Sonsuzluk Havuzu",
-    "Doğa İçinde",
-    "Denize Sıfır",
-    "Göle Sıfır",
+    "DoÄŸa Ä°Ã§inde",
+    "Denize SÄ±fÄ±r",
+    "GÃ¶le SÄ±fÄ±r",
     "Park",
     "Plaj",
-    "Şehir Merkezi",
+    "Åehir Merkezi",
     "Anayol",
     "Cadde",
     "Sahil",
     "Asfalt Yol",
-    "Doğu",
-    "Güney",
-    "Köşe Parsel",
-    "Çift Cephe",
-    "Boğaz",
+    "DoÄŸu",
+    "GÃ¼ney",
+    "KÃ¶ÅŸe Parsel",
+    "Ã‡ift Cephe",
+    "BoÄŸaz",
     "Deniz",
-    "Doğa",
-    "Göl",
+    "DoÄŸa",
+    "GÃ¶l",
     "Havuz",
-    "Park & Yeşil Alan",
+    "Park & YeÅŸil Alan",
     "Panoramik",
-    "Özel İskele",
-    "Marina Bağlantısı",
-    "Akıllı Ev Sistemi",
-    "Yerden Isıtma",
+    "Ã–zel Ä°skele",
+    "Marina BaÄŸlantÄ±sÄ±",
+    "AkÄ±llÄ± Ev Sistemi",
+    "Yerden IsÄ±tma",
     "Otomatik Panjur",
-    "Sinema Odası",
-    "Hizmetli Odası",
+    "Sinema OdasÄ±",
+    "Hizmetli OdasÄ±",
   ]),
   land: new Set([
-    "Köy Merkezi",
-    "Köy Yakını",
-    "Doğa İçinde",
+    "KÃ¶y Merkezi",
+    "KÃ¶y YakÄ±nÄ±",
+    "DoÄŸa Ä°Ã§inde",
     "Anayol",
     "Cadde",
     "Stabilize Yol",
     "Asfalt Yol",
-    "Köşe Parsel",
-    "Çift Cephe",
+    "KÃ¶ÅŸe Parsel",
+    "Ã‡ift Cephe",
     "Cadde Cepheli",
-    "Doğa",
-    "Göl",
+    "DoÄŸa",
+    "GÃ¶l",
     "Nehir",
-    "Dağ",
+    "DaÄŸ",
     "Vadi",
     "Panoramik",
-    "Müstakil Tapu",
+    "MÃ¼stakil Tapu",
     "Hisseli Tapu",
-    "İfrazlı",
+    "Ä°frazlÄ±",
     "Tevhidli",
-    "Konut İmarlı",
-    "Villa İmarlı",
-    "Ticari İmarlı",
-    "Sanayi İmarlı",
-    "Turizm İmarlı",
+    "Konut Ä°marlÄ±",
+    "Villa Ä°marlÄ±",
+    "Ticari Ä°marlÄ±",
+    "Sanayi Ä°marlÄ±",
+    "Turizm Ä°marlÄ±",
     "Konut + Ticaret",
-    "İmarsız",
-    "Sit Alanı",
-    "Kat Karşılığına Uygun",
+    "Ä°marsÄ±z",
+    "Sit AlanÄ±",
+    "Kat KarÅŸÄ±lÄ±ÄŸÄ±na Uygun",
     "Su Var",
     "Elektrik Var",
-    "Doğalgaz Yakın",
+    "DoÄŸalgaz YakÄ±n",
     "Sondaj / Kuyu Var",
-    "Sulama Kanalı",
+    "Sulama KanalÄ±",
     "Artezyen",
     "Damlama Sulama",
     "Yola Cepheli",
     "Kadastral Yolu Var",
-    "Çit Çevrili",
-    "Dere Kenarı",
-    "Göl Kenarı",
-    "Tarım Yapılıyor",
-    "Meyve Ağaçları Var",
-    "Zeytin Ağaçları Var",
+    "Ã‡it Ã‡evrili",
+    "Dere KenarÄ±",
+    "GÃ¶l KenarÄ±",
+    "TarÄ±m YapÄ±lÄ±yor",
+    "Meyve AÄŸaÃ§larÄ± Var",
+    "Zeytin AÄŸaÃ§larÄ± Var",
   ]),
   commercial: new Set([
     "ADSL",
-    "Alarm (Hırsız)",
-    "Alarm (Yangın)",
-    "Çelik Kapı",
-    "Fiber İnternet",
+    "Alarm (HÄ±rsÄ±z)",
+    "Alarm (YangÄ±n)",
+    "Ã‡elik KapÄ±",
+    "Fiber Ä°nternet",
     "Klima",
-    "Mutfak Doğalgazı",
-    "Spot Aydınlatma",
-    "Yüz Tanıma & Parmak İzi",
-    "Araç Şarj İstasyonu",
-    "24 Saat Güvenlik",
+    "Mutfak DoÄŸalgazÄ±",
+    "Spot AydÄ±nlatma",
+    "YÃ¼z TanÄ±ma & Parmak Ä°zi",
+    "AraÃ§ Åarj Ä°stasyonu",
+    "24 Saat GÃ¼venlik",
     "Hidrofor",
-    "Jeneratör",
+    "JeneratÃ¶r",
     "Kamera Sistemi",
     "Su Deposu",
-    "Yangın Merdiveni",
-    "Alışveriş Merkezi",
+    "YangÄ±n Merdiveni",
+    "AlÄ±ÅŸveriÅŸ Merkezi",
     "Belediye",
     "Hastane",
     "Market",
-    "Şehir Merkezi",
+    "Åehir Merkezi",
     "Anayol",
     "Cadde",
-    "Dolmuş",
+    "DolmuÅŸ",
     "E-5",
     "Metro",
-    "Metrobüs",
-    "Minibüs",
-    "Otobüs Durağı",
+    "MetrobÃ¼s",
+    "MinibÃ¼s",
+    "OtobÃ¼s DuraÄŸÄ±",
     "TEM",
     "Tramvay",
-    "Köşe Parsel",
-    "Çift Cephe",
+    "KÃ¶ÅŸe Parsel",
+    "Ã‡ift Cephe",
     "Cadde Cepheli",
-    "Araç Park Yeri",
-    "Giriş / Rampa",
-    "Cadde Üzeri",
-    "Köşe Konum",
-    "Tabela Değeri Yüksek",
-    "Yaya Trafiği Yoğun",
-    "Araç Trafiği Yoğun",
-    "Kiracılı",
+    "AraÃ§ Park Yeri",
+    "GiriÅŸ / Rampa",
+    "Cadde Ãœzeri",
+    "KÃ¶ÅŸe Konum",
+    "Tabela DeÄŸeri YÃ¼ksek",
+    "Yaya TrafiÄŸi YoÄŸun",
+    "AraÃ§ TrafiÄŸi YoÄŸun",
+    "KiracÄ±lÄ±",
     "Devren",
     "Depolu",
-    "Bacalı",
+    "BacalÄ±",
     "WC Var",
     "Mutfak Var",
-    "Yükleme Alanı",
-    "Tır Girişli",
+    "YÃ¼kleme AlanÄ±",
+    "TÄ±r GiriÅŸli",
     "Rampa Var",
     "Otopark Var",
   ]),
   tourism: new Set([
     "ADSL",
-    "Beyaz Eşya",
-    "Duşakabin",
+    "Beyaz EÅŸya",
+    "DuÅŸakabin",
     "Ebeveyn Banyosu",
-    "Fiber İnternet",
-    "Görüntülü Diafon",
+    "Fiber Ä°nternet",
+    "GÃ¶rÃ¼ntÃ¼lÃ¼ Diafon",
     "Klima",
     "Mobilya",
     "Mutfak (Ankastre)",
     "Teras",
-    "24 Saat Güvenlik",
-    "Buhar Odası",
-    "Çocuk Oyun Parkı",
+    "24 Saat GÃ¼venlik",
+    "Buhar OdasÄ±",
+    "Ã‡ocuk Oyun ParkÄ±",
     "Hamam",
-    "Jeneratör",
+    "JeneratÃ¶r",
     "Kamera Sistemi",
     "Sauna",
-    "Spor Alanı",
-    "Yüzme Havuzu (Açık)",
-    "Yüzme Havuzu (Kapalı)",
-    "Denize Sıfır",
-    "Göle Sıfır",
+    "Spor AlanÄ±",
+    "YÃ¼zme Havuzu (AÃ§Ä±k)",
+    "YÃ¼zme Havuzu (KapalÄ±)",
+    "Denize SÄ±fÄ±r",
+    "GÃ¶le SÄ±fÄ±r",
     "Plaj",
-    "Şehir Merkezi",
-    "Doğa İçinde",
-    "Havaalanı",
+    "Åehir Merkezi",
+    "DoÄŸa Ä°Ã§inde",
+    "HavaalanÄ±",
     "Sahil",
     "Deniz",
-    "Doğa",
-    "Göl",
+    "DoÄŸa",
+    "GÃ¶l",
     "Panoramik",
-    "Açık Havuz",
-    "Kapalı Havuz",
+    "AÃ§Ä±k Havuz",
+    "KapalÄ± Havuz",
     "Spa",
     "Restoran",
     "Bar",
-    "Toplantı Salonu",
-    "Düğün Alanı",
-    "Plaj Kullanımı",
-    "Ruhsatlı",
-    "Sezonluk İşletme",
-    "12 Ay Açık",
-    "Özel Havuz",
+    "ToplantÄ± Salonu",
+    "DÃ¼ÄŸÃ¼n AlanÄ±",
+    "Plaj KullanÄ±mÄ±",
+    "RuhsatlÄ±",
+    "Sezonluk Ä°ÅŸletme",
+    "12 Ay AÃ§Ä±k",
+    "Ã–zel Havuz",
     "Sonsuzluk Havuzu",
-    "Bahçe Terası",
+    "BahÃ§e TerasÄ±",
     "Panoramik Manzara",
   ]),
 } as const;
@@ -715,85 +720,85 @@ const GLOBAL_FEATURE_BLOCKLIST = new Set<string>();
 
 const AGRICULTURE_PRECISE_FILTERS = {
   arsa: new Set([
-    "Köy Yakını",
-    "Doğa İçinde",
+    "KÃ¶y YakÄ±nÄ±",
+    "DoÄŸa Ä°Ã§inde",
     "Anayol",
     "Cadde",
     "Stabilize Yol",
     "Asfalt Yol",
-    "Köşe Parsel",
-    "Çift Cephe",
+    "KÃ¶ÅŸe Parsel",
+    "Ã‡ift Cephe",
     "Cadde Cepheli",
-    "Müstakil Tapu",
+    "MÃ¼stakil Tapu",
     "Hisseli Tapu",
-    "İfrazlı",
+    "Ä°frazlÄ±",
     "Tevhidli",
-    "Konut İmarlı",
-    "Villa İmarlı",
-    "Ticari İmarlı",
-    "Sanayi İmarlı",
-    "Turizm İmarlı",
+    "Konut Ä°marlÄ±",
+    "Villa Ä°marlÄ±",
+    "Ticari Ä°marlÄ±",
+    "Sanayi Ä°marlÄ±",
+    "Turizm Ä°marlÄ±",
     "Konut + Ticaret",
-    "İmarsız",
-    "Kat Karşılığına Uygun",
+    "Ä°marsÄ±z",
+    "Kat KarÅŸÄ±lÄ±ÄŸÄ±na Uygun",
     "Su Var",
     "Elektrik Var",
-    "Doğalgaz Yakın",
+    "DoÄŸalgaz YakÄ±n",
     "Yola Cepheli",
     "Kadastral Yolu Var",
   ]),
   tarla: new Set([
-    "Köy Merkezi",
-    "Köy Yakını",
-    "Doğa İçinde",
+    "KÃ¶y Merkezi",
+    "KÃ¶y YakÄ±nÄ±",
+    "DoÄŸa Ä°Ã§inde",
     "Stabilize Yol",
     "Asfalt Yol",
-    "Doğa",
-    "Dağ",
+    "DoÄŸa",
+    "DaÄŸ",
     "Vadi",
-    "Müstakil Tapu",
+    "MÃ¼stakil Tapu",
     "Hisseli Tapu",
     "Su Var",
     "Elektrik Var",
     "Sondaj / Kuyu Var",
-    "Sulama Kanalı",
+    "Sulama KanalÄ±",
     "Artezyen",
     "Damlama Sulama",
     "Yola Cepheli",
     "Kadastral Yolu Var",
-    "Çit Çevrili",
-    "Tarım Yapılıyor",
+    "Ã‡it Ã‡evrili",
+    "TarÄ±m YapÄ±lÄ±yor",
   ]),
   bag: new Set([
-    "Köy Merkezi",
-    "Köy Yakını",
-    "Doğa İçinde",
+    "KÃ¶y Merkezi",
+    "KÃ¶y YakÄ±nÄ±",
+    "DoÄŸa Ä°Ã§inde",
     "Stabilize Yol",
     "Asfalt Yol",
-    "Doğa",
-    "Dağ",
+    "DoÄŸa",
+    "DaÄŸ",
     "Vadi",
-    "Müstakil Tapu",
+    "MÃ¼stakil Tapu",
     "Hisseli Tapu",
     "Su Var",
     "Elektrik Var",
     "Sondaj / Kuyu Var",
-    "Sulama Kanalı",
+    "Sulama KanalÄ±",
     "Damlama Sulama",
     "Yola Cepheli",
     "Kadastral Yolu Var",
-    "Çit Çevrili",
-    "Tarım Yapılıyor",
+    "Ã‡it Ã‡evrili",
+    "TarÄ±m YapÄ±lÄ±yor",
   ]),
   bahce: new Set([
-    "Köy Merkezi",
-    "Köy Yakını",
-    "Doğa İçinde",
+    "KÃ¶y Merkezi",
+    "KÃ¶y YakÄ±nÄ±",
+    "DoÄŸa Ä°Ã§inde",
     "Asfalt Yol",
-    "Doğa",
-    "Göl",
+    "DoÄŸa",
+    "GÃ¶l",
     "Vadi",
-    "Müstakil Tapu",
+    "MÃ¼stakil Tapu",
     "Hisseli Tapu",
     "Su Var",
     "Elektrik Var",
@@ -801,18 +806,18 @@ const AGRICULTURE_PRECISE_FILTERS = {
     "Damlama Sulama",
     "Yola Cepheli",
     "Kadastral Yolu Var",
-    "Çit Çevrili",
-    "Meyve Ağaçları Var",
+    "Ã‡it Ã‡evrili",
+    "Meyve AÄŸaÃ§larÄ± Var",
   ]),
   zeytinlik: new Set([
-    "Köy Yakını",
-    "Doğa İçinde",
+    "KÃ¶y YakÄ±nÄ±",
+    "DoÄŸa Ä°Ã§inde",
     "Stabilize Yol",
     "Asfalt Yol",
-    "Doğa",
-    "Dağ",
+    "DoÄŸa",
+    "DaÄŸ",
     "Vadi",
-    "Müstakil Tapu",
+    "MÃ¼stakil Tapu",
     "Hisseli Tapu",
     "Su Var",
     "Elektrik Var",
@@ -820,8 +825,8 @@ const AGRICULTURE_PRECISE_FILTERS = {
     "Damlama Sulama",
     "Yola Cepheli",
     "Kadastral Yolu Var",
-    "Çit Çevrili",
-    "Zeytin Ağaçları Var",
+    "Ã‡it Ã‡evrili",
+    "Zeytin AÄŸaÃ§larÄ± Var",
   ]),
 } as const;
 
@@ -869,19 +874,19 @@ const AREA_RULES: AreaRule[] = [
     keywords: ["VILLA", "KOSK", "YALI", "KONAK", "MUSTAKIL"],
     min: 50,
     max: 5000,
-    label: "Villa / köşk / yalı",
+    label: "Villa / kÃ¶ÅŸk / yalÄ±",
   },
   {
     keywords: ["DUKKAN", "MAGAZA", "OFIS", "HOME_OFFICE", "PLAZA", "TICARI"],
     min: 10,
     max: 10000,
-    label: "Dükkan / ofis / ticari alan",
+    label: "DÃ¼kkan / ofis / ticari alan",
   },
   {
     keywords: ["DEPO", "FABRIKA", "SANAYI", "ATOLYE", "IMALATHANE", "LOJISTIK"],
     min: 50,
     max: 100000,
-    label: "Depo / fabrika / sanayi alanı",
+    label: "Depo / fabrika / sanayi alanÄ±",
   },
   {
     keywords: ["ARSA", "IMARLI", "KONUT_IMARLI", "TICARI_IMARLI"],
@@ -893,7 +898,7 @@ const AREA_RULES: AreaRule[] = [
     keywords: ["TARLA", "BAG", "BAHCE", "ZEYTINLIK", "CIFTLIK"],
     min: 100,
     max: 10000000,
-    label: "Tarla / bağ / bahçe",
+    label: "Tarla / baÄŸ / bahÃ§e",
   },
 ];
 
@@ -989,7 +994,7 @@ function parseFormattedNumber(value: string) {
 }
 
 function getCurrencySymbol(value?: string) {
-  return CURRENCY_OPTIONS.find((option) => option.value === value)?.symbol || "₺";
+  return CURRENCY_OPTIONS.find((option) => option.value === value)?.symbol || "â‚º";
 }
 
 function getAreaRule(type: string) {
@@ -1001,7 +1006,7 @@ function getAreaRule(type: string) {
       keywords: [],
       min: 10,
       max: 1000000,
-      label: "Bu mülk tipi",
+      label: "Bu mÃ¼lk tipi",
     }
   );
 }
@@ -1010,8 +1015,8 @@ function getFloorNumberFromLabel(label: string) {
   const exactFloor = label.match(/^(\d+)\. Kat$/);
   if (exactFloor) return exactFloor[1];
 
-  if (label === "Zemin Kat" || label === "Giriş Katı" || label === "Dükkan Girişi") return "0";
-  if (label === "Yüksek Giriş") return "1";
+  if (label === "Zemin Kat" || label === "GiriÅŸ KatÄ±" || label === "DÃ¼kkan GiriÅŸi") return "0";
+  if (label === "YÃ¼ksek GiriÅŸ") return "1";
 
   const kot = label.match(/^Kot -(\d+)$/);
   if (kot) return `-${kot[1]}`;
@@ -1032,7 +1037,7 @@ function getImageDimensions(file: File) {
 
     image.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("Görsel okunamadı."));
+      reject(new Error("GÃ¶rsel okunamadÄ±."));
     };
 
     image.src = url;
@@ -1058,6 +1063,7 @@ export default function StokCreateModal({
   galleryImages,
   setGalleryImages,
   onSubmit,
+  existingDocumentStatus,
 }: Props) {
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -1275,19 +1281,19 @@ export default function StokCreateModal({
     const invalidType = files.find((file) => !isAcceptedImage(file));
 
     if (invalidType) {
-      return "Sadece JPG, PNG veya WEBP formatında görsel yükleyebilirsiniz.";
+      return "Sadece JPG, PNG veya WEBP formatÄ±nda gÃ¶rsel yÃ¼kleyebilirsiniz.";
     }
 
     const tooLarge = files.find((file) => file.size > MAX_FILE_SIZE);
 
     if (tooLarge) {
-      return `Seçtiğiniz görsel 15 MB sınırını aşıyor. Seçilen görsel: ${formatFileSize(tooLarge.size)}. Lütfen daha düşük boyutlu bir JPG, PNG veya WEBP görsel yükleyiniz. (${tooLarge.name})`;
+      return `SeÃ§tiÄŸiniz gÃ¶rsel 15 MB sÄ±nÄ±rÄ±nÄ± aÅŸÄ±yor. SeÃ§ilen gÃ¶rsel: ${formatFileSize(tooLarge.size)}. LÃ¼tfen daha dÃ¼ÅŸÃ¼k boyutlu bir JPG, PNG veya WEBP gÃ¶rsel yÃ¼kleyiniz. (${tooLarge.name})`;
     }
 
     const tooSmall = files.find((file) => file.size < MIN_FILE_SIZE);
 
     if (tooSmall) {
-      return `Seçtiğiniz görsel dosyası çok küçük görünüyor. Lütfen daha kaliteli bir görsel yükleyiniz. (${tooSmall.name})`;
+      return `SeÃ§tiÄŸiniz gÃ¶rsel dosyasÄ± Ã§ok kÃ¼Ã§Ã¼k gÃ¶rÃ¼nÃ¼yor. LÃ¼tfen daha kaliteli bir gÃ¶rsel yÃ¼kleyiniz. (${tooSmall.name})`;
     }
 
     return "";
@@ -1310,11 +1316,11 @@ export default function StokCreateModal({
     }
 
     if (lowResolutionFiles.length > 0) {
-      return `Uyarı: ${lowResolutionFiles.length} görselin çözünürlüğü düşük olabilir. Yüklemeyi engellemedik, ancak daha kaliteli fotoğraf kullanmanız önerilir. (${lowResolutionFiles.slice(0, 3).join(", ")}${lowResolutionFiles.length > 3 ? ", ..." : ""})`;
+      return `UyarÄ±: ${lowResolutionFiles.length} gÃ¶rselin Ã§Ã¶zÃ¼nÃ¼rlÃ¼ÄŸÃ¼ dÃ¼ÅŸÃ¼k olabilir. YÃ¼klemeyi engellemedik, ancak daha kaliteli fotoÄŸraf kullanmanÄ±z Ã¶nerilir. (${lowResolutionFiles.slice(0, 3).join(", ")}${lowResolutionFiles.length > 3 ? ", ..." : ""})`;
     }
 
     if (unreadableFiles.length > 0) {
-      return `Uyarı: ${unreadableFiles.length} görselin ön izlemesi tarayıcıda okunamadı. HEIC/HEIF veya cihaz kaynaklı olabilir; yüklemeyi engellemedik. (${unreadableFiles.slice(0, 3).join(", ")}${unreadableFiles.length > 3 ? ", ..." : ""})`;
+      return `UyarÄ±: ${unreadableFiles.length} gÃ¶rselin Ã¶n izlemesi tarayÄ±cÄ±da okunamadÄ±. HEIC/HEIF veya cihaz kaynaklÄ± olabilir; yÃ¼klemeyi engellemedik. (${unreadableFiles.slice(0, 3).join(", ")}${unreadableFiles.length > 3 ? ", ..." : ""})`;
     }
 
     return "";
@@ -1344,7 +1350,7 @@ export default function StokCreateModal({
     const remaining = MAX_GALLERY_COUNT - galleryImages.length;
 
     if (remaining <= 0) {
-      setImageError(`En fazla ${MAX_GALLERY_COUNT} galeri fotoğrafı yükleyebilirsiniz.`);
+      setImageError(`En fazla ${MAX_GALLERY_COUNT} galeri fotoÄŸrafÄ± yÃ¼kleyebilirsiniz.`);
       event.target.value = "";
       return;
     }
@@ -1381,7 +1387,7 @@ export default function StokCreateModal({
     });
 
     if (uniqueFiles.length === 0) {
-      setImageError("Aynı fotoğraf birden fazla kez eklenemez.");
+      setImageError("AynÄ± fotoÄŸraf birden fazla kez eklenemez.");
       event.target.value = "";
       return;
     }
@@ -1400,10 +1406,10 @@ export default function StokCreateModal({
 
     if (files.length > remaining) {
       setImageError(
-        `En fazla ${MAX_GALLERY_COUNT} galeri fotoğrafı yükleyebilirsiniz. Fazla seçilen görseller eklenmedi.`,
+        `En fazla ${MAX_GALLERY_COUNT} galeri fotoÄŸrafÄ± yÃ¼kleyebilirsiniz. Fazla seÃ§ilen gÃ¶rseller eklenmedi.`,
       );
     } else if (uniqueFiles.length !== acceptedFiles.length) {
-      setImageError("Aynı fotoğraf birden fazla kez eklenemez.");
+      setImageError("AynÄ± fotoÄŸraf birden fazla kez eklenemez.");
     } else if (qualityWarning) {
       setImageError(qualityWarning);
     }
@@ -1475,13 +1481,13 @@ export default function StokCreateModal({
     }
 
     if (!isAcceptedDocument(file)) {
-      setImageError("Kimlik belgesi JPG, PNG, WEBP veya PDF formatında olmalıdır.");
+      setImageError("Kimlik belgesi JPG, PNG, WEBP veya PDF formatÄ±nda olmalÄ±dÄ±r.");
       setUnitFileField(key, null);
       return;
     }
 
     if (file.size > MAX_DOCUMENT_SIZE) {
-      setImageError(`Kimlik belgesi 15 MB sınırını aşıyor. Seçilen belge: ${formatFileSize(file.size)}.`);
+      setImageError(`Kimlik belgesi 15 MB sÄ±nÄ±rÄ±nÄ± aÅŸÄ±yor. SeÃ§ilen belge: ${formatFileSize(file.size)}.`);
       setUnitFileField(key, null);
       return;
     }
@@ -1498,13 +1504,13 @@ export default function StokCreateModal({
     }
 
     if (!isAcceptedDocument(file)) {
-      setImageError("Tapu dosyası JPG, PNG, WEBP veya PDF formatında olmalıdır.");
+      setImageError("Tapu dosyasÄ± JPG, PNG, WEBP veya PDF formatÄ±nda olmalÄ±dÄ±r.");
       setUnitFileField("propertyDeedFile", null);
       return;
     }
 
     if (file.size > MAX_DOCUMENT_SIZE) {
-      setImageError(`Tapu dosyası 15 MB sınırını aşıyor. Seçilen belge: ${formatFileSize(file.size)}.`);
+      setImageError(`Tapu dosyasÄ± 15 MB sÄ±nÄ±rÄ±nÄ± aÅŸÄ±yor. SeÃ§ilen belge: ${formatFileSize(file.size)}.`);
       setUnitFileField("propertyDeedFile", null);
       return;
     }
@@ -1547,7 +1553,7 @@ export default function StokCreateModal({
     const rule = getAreaRule(unitForm.type);
 
     if (area && (area < rule.min || area > rule.max)) {
-      return `${rule.label} metrekare değeri mantıksız görünüyor. ${rule.min.toLocaleString("tr-TR")} m² ile ${rule.max.toLocaleString("tr-TR")} m² arasında bir değer giriniz veya bilgiyi kontrol ediniz.`;
+      return `${rule.label} metrekare deÄŸeri mantÄ±ksÄ±z gÃ¶rÃ¼nÃ¼yor. ${rule.min.toLocaleString("tr-TR")} mÂ² ile ${rule.max.toLocaleString("tr-TR")} mÂ² arasÄ±nda bir deÄŸer giriniz veya bilgiyi kontrol ediniz.`;
     }
 
     if (isRequiredField("area") && !area) {
@@ -1559,59 +1565,59 @@ export default function StokCreateModal({
     }
 
     if (adaNo && adaNo !== cleanAdaNo) {
-      return "Ada No sadece rakamlardan oluşmalı ve en fazla 6 hane olmalıdır.";
+      return "Ada No sadece rakamlardan oluÅŸmalÄ± ve en fazla 6 hane olmalÄ±dÄ±r.";
     }
 
     if (parselNo && parselNo !== cleanParselNo) {
-      return "Parsel No sadece rakamlardan oluşmalı ve en fazla 4 hane olmalıdır.";
+      return "Parsel No sadece rakamlardan oluÅŸmalÄ± ve en fazla 4 hane olmalÄ±dÄ±r.";
     }
 
     if (isRequiredField("adaNo") && !cleanAdaNo) {
-      return "Bu portföy tipi için Ada No zorunludur.";
+      return "Bu portfÃ¶y tipi iÃ§in Ada No zorunludur.";
     }
 
     if (isRequiredField("parselNo") && !cleanParselNo) {
-      return "Bu portföy tipi için Parsel No zorunludur.";
+      return "Bu portfÃ¶y tipi iÃ§in Parsel No zorunludur.";
     }
 
     if (isRequiredField("number") && !number) {
-      return "Bağımsız bölüm / kapı numarası zorunludur.";
+      return "BaÄŸÄ±msÄ±z bÃ¶lÃ¼m / kapÄ± numarasÄ± zorunludur.";
     }
 
     if (!isLandType(unitForm.type) && /^\d{5,}$/.test(number)) {
-      return "Bağımsız bölüm / kapı numarası olağan dışı görünüyor. Lütfen değeri kontrol ediniz.";
+      return "BaÄŸÄ±msÄ±z bÃ¶lÃ¼m / kapÄ± numarasÄ± olaÄŸan dÄ±ÅŸÄ± gÃ¶rÃ¼nÃ¼yor. LÃ¼tfen deÄŸeri kontrol ediniz.";
     }
 
     if (price && (price < 100000 || price > 5000000000)) {
-      return "Fiyat değeri olağan dışı görünüyor. Lütfen para birimini ve tutarı kontrol ediniz.";
+      return "Fiyat deÄŸeri olaÄŸan dÄ±ÅŸÄ± gÃ¶rÃ¼nÃ¼yor. LÃ¼tfen para birimini ve tutarÄ± kontrol ediniz.";
     }
 
     if (isRequiredField("roomCount") && !String(unitForm.roomCount || "").trim()) {
-      return "Oda sayısı zorunludur.";
+      return "Oda sayÄ±sÄ± zorunludur.";
     }
 
     if (isRequiredField("buildingAge") && !buildingAge) {
-      return "Bina yaşı zorunludur.";
+      return "Bina yaÅŸÄ± zorunludur.";
     }
 
     if (isRequiredField("floor") && !selectedFloorLabel) {
-      return "Bulunduğu kat zorunludur.";
+      return "BulunduÄŸu kat zorunludur.";
     }
 
     if (isRequiredField("totalFloors") && !buildingFloorCount) {
-      return "Kat sayısı zorunludur.";
+      return "Kat sayÄ±sÄ± zorunludur.";
     }
 
     if (isRequiredField("bedCount") && !bedCount.trim()) {
-      return "Yatak sayısı zorunludur.";
+      return "Yatak sayÄ±sÄ± zorunludur.";
     }
 
     if (isRequiredField("closedArea") && !closedArea.trim()) {
-      return "Kapalı alan zorunludur.";
+      return "KapalÄ± alan zorunludur.";
     }
 
     if (isRequiredField("openArea") && !openArea.trim()) {
-      return "Açık alan zorunludur.";
+      return "AÃ§Ä±k alan zorunludur.";
     }
 
     const missingSpecialField = specialFields.find((field) =>
@@ -1622,30 +1628,30 @@ export default function StokCreateModal({
       return `${missingSpecialField.label} zorunludur.`;
     }
 
-    if (!propertyDeedFile) {
-      return "Bu portföye ait tapu dosyası zorunludur.";
+    if (!propertyDeedFile && !existingDocumentStatus?.propertyDeed) {
+      return "Bu portfÃ¶ye ait tapu dosyasÄ± zorunludur.";
     }
 
     if (deedOwnerPhone && !isValidTurkishPhone(deedOwnerPhone)) {
-      return "Tapu sahibi telefonu geçerli formatta olmalıdır. Örn: 0542 852 41 41";
+      return "Tapu sahibi telefonu geÃ§erli formatta olmalÄ±dÄ±r. Ã–rn: 0542 852 41 41";
     }
 
     if (deedOwnerEmail && !isValidEmail(deedOwnerEmail)) {
-      return "Tapu sahibi e-posta adresi geçerli formatta olmalıdır. Örn: isim@mail.com";
+      return "Tapu sahibi e-posta adresi geÃ§erli formatta olmalÄ±dÄ±r. Ã–rn: isim@mail.com";
     }
 
     const availableCreditAmount = Number(String((unitForm as any).availableCreditAmount || "").replace(/\D/g, ""));
 
     if (availableCreditAmount && price && availableCreditAmount > price) {
-      return "Kullanılabilir kredi tutarı satış fiyatından büyük olamaz.";
+      return "KullanÄ±labilir kredi tutarÄ± satÄ±ÅŸ fiyatÄ±ndan bÃ¼yÃ¼k olamaz.";
     }
 
     if (doorAccessInfo.length > 500) {
-      return "Kapı erişim bilgisi en fazla 500 karakter olabilir.";
+      return "KapÄ± eriÅŸim bilgisi en fazla 500 karakter olabilir.";
     }
 
     if (descriptionLength > MAX_DESCRIPTION_LENGTH) {
-      return `Açıklama alanı en fazla ${MAX_DESCRIPTION_LENGTH} karakter olabilir.`;
+      return `AÃ§Ä±klama alanÄ± en fazla ${MAX_DESCRIPTION_LENGTH} karakter olabilir.`;
     }
 
     if (showFloorFields && selectedFloorLabel && buildingFloorCount) {
@@ -1653,7 +1659,7 @@ export default function StokCreateModal({
       const totalFloor = Number(buildingFloorCount);
 
       if (foundFloor > totalFloor) {
-        return "Bulunduğu kat, toplam kat sayısından büyük olamaz. Lütfen kat bilgisini kontrol ediniz.";
+        return "BulunduÄŸu kat, toplam kat sayÄ±sÄ±ndan bÃ¼yÃ¼k olamaz. LÃ¼tfen kat bilgisini kontrol ediniz.";
       }
     }
 
@@ -1681,10 +1687,10 @@ export default function StokCreateModal({
         onClick={(e) => e.stopPropagation()}
         onTouchMove={(e) => e.stopPropagation()}
       >
-        <button className="stock-modal-v10-close" onClick={onClose} aria-label="Kapat">×</button>
+        <button className="stock-modal-v10-close" onClick={onClose} aria-label="Kapat">Ã—</button>
 
         <div className="stock-modal-v2-body stock-modal-v10-body" style={{ paddingBottom: "156px" }}>
-          {formSuccess && <div className="stock-form-success">Portföy başarıyla eklendi.</div>}
+          {formSuccess && <div className="stock-form-success">PortfÃ¶y baÅŸarÄ±yla eklendi.</div>}
           {formError && <div className="stock-form-error">{formError}</div>}
           {localError && <div className="stock-form-error">{localError}</div>}
           {imageError && <div className="stock-form-error">{imageError}</div>}
@@ -1698,7 +1704,7 @@ export default function StokCreateModal({
                     value={selectedProjectId}
                     onChange={(e) => setSelectedProjectId(e.target.value)}
                   >
-                    <option value="">Yeni Proje Oluştur</option>
+                    <option value="">Yeni Proje OluÅŸtur</option>
                     {projects.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} ({p.city})
@@ -1710,7 +1716,7 @@ export default function StokCreateModal({
 
               {!selectedProjectId && (
                 <label className="stock-form-field full">
-                  <span>Proje Adı *</span>
+                  <span>Proje AdÄ± *</span>
                   <input
                     value={projectForm.name}
                     onChange={(e) => setProjectField("name", e.target.value)}
@@ -1720,7 +1726,7 @@ export default function StokCreateModal({
               )}
 
               <label className="stock-form-field">
-                <span>Şehir *</span>
+                <span>Åehir *</span>
                 <select
                   value={projectForm.city}
                   onChange={(e) => {
@@ -1734,7 +1740,7 @@ export default function StokCreateModal({
                     setSelectedPlace("");
                   }}
                 >
-                  <option value="">Şehir seçiniz</option>
+                  <option value="">Åehir seÃ§iniz</option>
                   {provinceOptions.map((city) => (
                     <option key={city.id} value={city.name}>
                       {city.name}
@@ -1743,13 +1749,13 @@ export default function StokCreateModal({
                 </select>
                 {locationLoading && (
                   <p className="mt-2 text-center text-xs font-bold text-[#64748B]">
-                    Konum verisi yükleniyor...
+                    Konum verisi yÃ¼kleniyor...
                   </p>
                 )}
               </label>
 
               <label className="stock-form-field">
-                <span>İlçe *</span>
+                <span>Ä°lÃ§e *</span>
                 {districtOptions.length > 0 ? (
                   <select
                     value={projectForm.district}
@@ -1759,7 +1765,7 @@ export default function StokCreateModal({
                       setSelectedPlace("");
                     }}
                   >
-                    <option value="">İlçe seçiniz</option>
+                    <option value="">Ä°lÃ§e seÃ§iniz</option>
                     {districtOptions.map((district) => (
                       <option key={district.id} value={district.name}>
                         {district.name}
@@ -1772,14 +1778,14 @@ export default function StokCreateModal({
                     onChange={(e) => setProjectField("district", e.target.value)}
                     onBlur={(e) => setProjectFieldFormatted("district", e.target.value)}
                     placeholder={
-                      locationLoading ? "İlçeler yükleniyor..." : "İlçe yazınız"
+                      locationLoading ? "Ä°lÃ§eler yÃ¼kleniyor..." : "Ä°lÃ§e yazÄ±nÄ±z"
                     }
                   />
                 )}
               </label>
 
               <label className="stock-form-field full">
-                <span>Mahalle / Köy / Mevki *</span>
+                <span>Mahalle / KÃ¶y / Mevki *</span>
                 {placeOptions.length > 0 ? (
                   <select
                     value={selectedPlace || projectForm.address}
@@ -1789,7 +1795,7 @@ export default function StokCreateModal({
                       setProjectField("address", value);
                     }}
                   >
-                    <option value="">Mahalle / köy seçiniz</option>
+                    <option value="">Mahalle / kÃ¶y seÃ§iniz</option>
                     {projectForm.address && !placeOptions.some((place) => place.name === projectForm.address) && (
                       <option value={projectForm.address}>{projectForm.address}</option>
                     )}
@@ -1806,8 +1812,8 @@ export default function StokCreateModal({
                     onBlur={(e) => setProjectFieldFormatted("address", e.target.value)}
                     placeholder={
                       locationLoading
-                        ? "Mahalle / köy verisi yükleniyor..."
-                        : "Mahalle / köy / mevki yazınız"
+                        ? "Mahalle / kÃ¶y verisi yÃ¼kleniyor..."
+                        : "Mahalle / kÃ¶y / mevki yazÄ±nÄ±z"
                     }
                   />
                 )}
@@ -1849,7 +1855,7 @@ export default function StokCreateModal({
           <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
               <label className="stock-form-field">
-                <span>Mülk Tipi *</span>
+                <span>MÃ¼lk Tipi *</span>
                 <select
                   value={mainCategory}
                   onChange={(e) => {
@@ -1939,7 +1945,7 @@ export default function StokCreateModal({
                     value={unitForm.roomCount}
                     onChange={(e) => setUnitField("roomCount", e.target.value)}
                   >
-                    <option value="">Oda sayısı seçiniz</option>
+                    <option value="">Oda sayÄ±sÄ± seÃ§iniz</option>
                     {roomOptions.map((option) => (
                       <option key={option} value={option}>
                         {option}
@@ -1956,7 +1962,7 @@ export default function StokCreateModal({
                     type="number"
                     value={unitForm.area}
                     onChange={(e) => setUnitField("area", e.target.value)}
-                    placeholder="Örn: 190"
+                    placeholder="Ã–rn: 190"
                   />
                 </label>
               )}
@@ -1968,7 +1974,7 @@ export default function StokCreateModal({
                     type="number"
                     value={openArea}
                     onChange={(e) => setUnitField("openArea", e.target.value)}
-                    placeholder="Örn: 5000"
+                    placeholder="Ã–rn: 5000"
                   />
                 </label>
               )}
@@ -1980,7 +1986,7 @@ export default function StokCreateModal({
                     type="number"
                     value={closedArea}
                     onChange={(e) => setUnitField("closedArea", e.target.value)}
-                    placeholder="Örn: 1200"
+                    placeholder="Ã–rn: 1200"
                   />
                 </label>
               )}
@@ -1992,7 +1998,7 @@ export default function StokCreateModal({
                     value={bedCount}
                     onChange={(e) => setUnitField("bedCount", e.target.value)}
                   >
-                    <option value="">Yatak sayısı seçiniz</option>
+                    <option value="">Yatak sayÄ±sÄ± seÃ§iniz</option>
                     {TOURISTIC_BED_COUNT_VALUE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
@@ -2009,7 +2015,7 @@ export default function StokCreateModal({
                     value={buildingAge}
                     onChange={(e) => setUnitField("buildingAge", e.target.value)}
                   >
-                    <option value="">Bina yaşı seçiniz</option>
+                    <option value="">Bina yaÅŸÄ± seÃ§iniz</option>
                     {BUILDING_AGE_OPTIONS.map((age) => (
                       <option key={age} value={age}>
                         {age}
@@ -2033,7 +2039,7 @@ export default function StokCreateModal({
                       } as UnitFormState));
                     }}
                   >
-                    <option value="">Kat seçiniz</option>
+                    <option value="">Kat seÃ§iniz</option>
                     {FLOOR_LABEL_OPTIONS.map((floor) => (
                       <option key={floor} value={floor}>
                         {floor}
@@ -2050,10 +2056,10 @@ export default function StokCreateModal({
                     value={buildingFloorCount}
                     onChange={(e) => setUnitField("totalFloors", e.target.value)}
                   >
-                    <option value="">Seçiniz</option>
+                    <option value="">SeÃ§iniz</option>
                     {BUILDING_FLOOR_OPTIONS.map((floor) => (
                       <option key={floor} value={floor}>
-                        {floor} Katlı
+                        {floor} KatlÄ±
                       </option>
                     ))}
                   </select>
@@ -2067,7 +2073,7 @@ export default function StokCreateModal({
                     value={String((unitForm as any)[field.key] || "")}
                     onChange={(e) => setUnitField(field.key, e.target.value)}
                   >
-                    <option value="">Seçiniz</option>
+                    <option value="">SeÃ§iniz</option>
                     {field.options.map((option) => (
                       <option key={option} value={option}>
                         {option}
@@ -2093,7 +2099,7 @@ export default function StokCreateModal({
                     inputMode="numeric"
                     value={adaNo}
                     onChange={(e) => setUnitField("adaNo", sanitizeAdaNo(e.target.value))}
-                    placeholder="Örn: 4752"
+                    placeholder="Ã–rn: 4752"
                     maxLength={6}
                   />
                 </label>
@@ -2107,7 +2113,7 @@ export default function StokCreateModal({
                     inputMode="numeric"
                     value={parselNo}
                     onChange={(e) => setUnitField("parselNo", sanitizeParselNo(e.target.value))}
-                    placeholder="Örn: 11"
+                    placeholder="Ã–rn: 11"
                     maxLength={4}
                   />
                 </label>
@@ -2147,7 +2153,7 @@ export default function StokCreateModal({
                       inputMode="numeric"
                       value={priceDisplay}
                       onChange={(e) => setUnitField("price", parseFormattedNumber(e.target.value))}
-                      placeholder="Örn: 10.500.000"
+                      placeholder="Ã–rn: 10.500.000"
                     />
                   </label>
                 </>
@@ -2186,17 +2192,17 @@ export default function StokCreateModal({
                   <span className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#1557D6]/8" />
                   <span className="relative flex min-w-0 items-center gap-3">
                     <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-[18px] font-black shadow-[0_10px_22px_rgba(21,87,214,0.16)] ${featuresOpen ? "bg-[#1557D6] text-white" : "bg-white text-[#1557D6]"}`}>
-                      ✦
+                      âœ¦
                     </span>
                     <span className="min-w-0">
-                      <b className="block text-[14px] font-black tracking-[-0.02em] text-[#06194A]">Ek Özellikler</b>
+                      <b className="block text-[14px] font-black tracking-[-0.02em] text-[#06194A]">Ek Ã–zellikler</b>
                       <small className="mt-0.5 block text-[11px] font-bold leading-4 text-[#64748B]">
-                        {selectedFeatures.length > 0 ? `${selectedFeatures.length} özellik seçildi · Portföy kartında özellik rozeti olarak görünür` : "Bu portföy tipine uygun ek özellikleri seç"}
+                        {selectedFeatures.length > 0 ? `${selectedFeatures.length} Ã¶zellik seÃ§ildi Â· PortfÃ¶y kartÄ±nda Ã¶zellik rozeti olarak gÃ¶rÃ¼nÃ¼r` : "Bu portfÃ¶y tipine uygun ek Ã¶zellikleri seÃ§"}
                       </small>
                     </span>
                   </span>
                   <span className={`relative shrink-0 rounded-full px-4 py-2 text-[11px] font-black shadow-[0_10px_22px_rgba(21,87,214,0.14)] ${featuresOpen ? "bg-[#06194A] text-white" : "bg-[#1557D6] text-white"}`}>
-                    {featuresOpen ? "Gizle" : "Göster"}
+                    {featuresOpen ? "Gizle" : "GÃ¶ster"}
                   </span>
                 </button>
               </div>
@@ -2206,8 +2212,8 @@ export default function StokCreateModal({
                   <div className="rounded-[26px] border border-[#DDE7F3] bg-gradient-to-b from-white to-[#F8FAFC] p-3 shadow-[0_18px_44px_rgba(15,23,42,0.07)]">
                     <div className="mb-3 flex items-center justify-between gap-2 rounded-[20px] bg-[#15803D] px-3 py-2 text-white shadow-[0_14px_30px_rgba(21,128,61,0.18)]">
                       <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Öne Çıkanlar</p>
-                        <p className="mt-0.5 text-[12px] font-black leading-4">Seçilenler portföy detayında özellik rozeti olarak görünür.</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Ã–ne Ã‡Ä±kanlar</p>
+                        <p className="mt-0.5 text-[12px] font-black leading-4">SeÃ§ilenler portfÃ¶y detayÄ±nda Ã¶zellik rozeti olarak gÃ¶rÃ¼nÃ¼r.</p>
                       </div>
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-white/12 text-[13px] font-black">
                         {selectedFeatures.length}/{featureOptions.length}
@@ -2232,12 +2238,12 @@ export default function StokCreateModal({
                               <span className="min-w-0">
                                 <b className="block truncate text-[12px] font-black uppercase tracking-[0.08em] text-[#06194A]">{group.label}</b>
                                 <small className="mt-0.5 block text-[10px] font-bold text-[#64748B]">
-                                  {selectedInGroup > 0 ? `${selectedInGroup} seçili · ${group.options.length} seçenek` : `${group.options.length} seçenek`}
+                                  {selectedInGroup > 0 ? `${selectedInGroup} seÃ§ili Â· ${group.options.length} seÃ§enek` : `${group.options.length} seÃ§enek`}
                                 </small>
                               </span>
 
                               <span className={`flex h-9 w-9 items-center justify-center justify-self-end rounded-[14px] text-[18px] font-black transition ${groupOpen ? "bg-[#06194A] text-white" : "bg-[#EFF6FF] text-[#1557D6]"}`}>
-                                {groupOpen ? "−" : "+"}
+                                {groupOpen ? "âˆ’" : "+"}
                               </span>
                             </button>
 
@@ -2259,7 +2265,7 @@ export default function StokCreateModal({
                                       }`}
                                     >
                                       <span className={`absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black ${checked ? "bg-emerald-600 text-white" : "bg-[#F1F5F9] text-[#94A3B8]"}`}>
-                                        {checked ? "✓" : "+"}
+                                        {checked ? "âœ“" : "+"}
                                       </span>
                                       <span className="flex flex-col items-center justify-center gap-1.5 px-1">
                                         <span className="line-clamp-2 leading-tight">{feature.label}</span>
@@ -2281,7 +2287,7 @@ export default function StokCreateModal({
                           onClick={() => setUnitField("features", [] as any)}
                           className="flex min-h-[38px] items-center justify-center rounded-[14px] bg-rose-50 px-4 py-2 text-center text-[11px] font-black text-rose-700 shadow-[0_10px_22px_rgba(225,29,72,0.08)] transition active:scale-[0.98]"
                         >
-                          Seçimleri Temizle
+                          SeÃ§imleri Temizle
                         </button>
                       </div>
                     )}
@@ -2294,22 +2300,22 @@ export default function StokCreateModal({
           <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
               <div className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">🔒 Erişim Bilgileri</span>
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">ğŸ”’ EriÅŸim Bilgileri</span>
                 <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
-                  Kapı şifresi, site giriş kodu, kapıcı bilgisi gibi erişim notları mahremdir. Havuzda ve genel görünümde gerçek değer gösterilmez.
+                  KapÄ± ÅŸifresi, site giriÅŸ kodu, kapÄ±cÄ± bilgisi gibi eriÅŸim notlarÄ± mahremdir. Havuzda ve genel gÃ¶rÃ¼nÃ¼mde gerÃ§ek deÄŸer gÃ¶sterilmez.
                 </p>
               </div>
 
               <label className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 text-center shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                <span>Kapı Erişim Bilgisi</span>
+                <span>KapÄ± EriÅŸim Bilgisi</span>
                 <textarea
                   maxLength={500}
                   value={doorAccessInfo}
                   onChange={(e) => setUnitField("doorAccessInfo", e.target.value)}
-                  placeholder="Örn: A Blok kapı şifresi 4455 / Kapıcı Mehmet Bey / Site giriş kodu 9876"
+                  placeholder="Ã–rn: A Blok kapÄ± ÅŸifresi 4455 / KapÄ±cÄ± Mehmet Bey / Site giriÅŸ kodu 9876"
                 />
                 <p className="mt-2 text-center text-xs font-black text-[#64748B]">
-                  Ekranda kullanıcıya: “🔒 Randevulaşma sonrası portföy sahibinden talep ediniz.” şeklinde gösterilir.
+                  Ekranda kullanÄ±cÄ±ya: â€œğŸ”’ RandevulaÅŸma sonrasÄ± portfÃ¶y sahibinden talep ediniz.â€ ÅŸeklinde gÃ¶sterilir.
                 </p>
               </label>
             </div>
@@ -2318,26 +2324,26 @@ export default function StokCreateModal({
           <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
               <div className="stock-form-field full">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">👤 Tapu Sahibi Bilgileri</span>
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">ğŸ‘¤ Tapu Sahibi Bilgileri</span>
                 <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
-                  Bu bilgiler mahremdir. Sadece portföy sahibi ve Yazılım Ekibi görebilir. Portföy kaydedilince CRM kaydı otomatik oluşturulur veya mevcut CRM kaydıyla eşleştirilir.
+                  Bu bilgiler mahremdir. Sadece portfÃ¶y sahibi ve YazÄ±lÄ±m Ekibi gÃ¶rebilir. PortfÃ¶y kaydedilince CRM kaydÄ± otomatik oluÅŸturulur veya mevcut CRM kaydÄ±yla eÅŸleÅŸtirilir.
                 </p>
               </div>
 
               {crmCustomers.length > 0 && (
                 <label className="stock-form-field full">
-                  <span>CRM’den Tapu Sahibi Seç</span>
+                  <span>CRMâ€™den Tapu Sahibi SeÃ§</span>
                   <select
                     value={selectedCrmCustomerId}
                     onChange={(e) => handleCrmCustomerSelect(e.target.value)}
                   >
-                    <option value="">CRM kaydı seçmeden devam et</option>
+                    <option value="">CRM kaydÄ± seÃ§meden devam et</option>
                     {crmCustomers.map((customer) => {
                       const fullName = [customer.firstName, customer.lastName]
                         .filter(Boolean)
                         .join(" ")
-                        .trim() || "İsimsiz CRM Kaydı";
-                      const meta = [customer.phone, customer.email].filter(Boolean).join(" · ");
+                        .trim() || "Ä°simsiz CRM KaydÄ±";
+                      const meta = [customer.phone, customer.email].filter(Boolean).join(" Â· ");
 
                       return (
                         <option key={customer.id} value={customer.id}>
@@ -2347,7 +2353,7 @@ export default function StokCreateModal({
                     })}
                   </select>
                   <small className="stock-upload-hint">
-                    Kendi CRM kayıtlarınızdan seçim yaparsanız ad, telefon ve e-posta otomatik dolar.
+                    Kendi CRM kayÄ±tlarÄ±nÄ±zdan seÃ§im yaparsanÄ±z ad, telefon ve e-posta otomatik dolar.
                   </small>
                 </label>
               )}
@@ -2358,7 +2364,7 @@ export default function StokCreateModal({
                   value={deedOwnerFullName}
                   onChange={(e) => setUnitField("deedOwnerFullName", e.target.value)}
                   onBlur={(e) => setUnitField("deedOwnerFullName", normalizeTurkishText(e.target.value))}
-                  placeholder="Örn: Ahmet Yılmaz"
+                  placeholder="Ã–rn: Ahmet YÄ±lmaz"
                 />
               </label>
 
@@ -2371,7 +2377,7 @@ export default function StokCreateModal({
                   onChange={(e) => setUnitField("deedOwnerPhone", formatPhoneInput(e.target.value))}
                   onBlur={(e) => setUnitField("deedOwnerPhone", formatPhoneInput(e.target.value))}
                   maxLength={14}
-                  placeholder="Örn: 0542 852 41 41"
+                  placeholder="Ã–rn: 0542 852 41 41"
                 />
               </label>
 
@@ -2385,19 +2391,19 @@ export default function StokCreateModal({
                   value={deedOwnerEmail}
                   onChange={(e) => setUnitField("deedOwnerEmail", normalizeEmailInput(e.target.value))}
                   onBlur={(e) => setUnitField("deedOwnerEmail", normalizeEmailInput(e.target.value))}
-                  placeholder="Örn: tapusahibi@email.com"
+                  placeholder="Ã–rn: tapusahibi@email.com"
                 />
               </label>
 
               <div className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">📄 Portföy Tapu Dosyası *</span>
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">ğŸ“„ PortfÃ¶y Tapu DosyasÄ± *</span>
                 <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
-                  Her portföy için tapu dosyası ayrı yüklenir. Kimlik belgesi kişiye aittir; tapu dosyası portföye aittir.
+                  Her portfÃ¶y iÃ§in tapu dosyasÄ± ayrÄ± yÃ¼klenir. Kimlik belgesi kiÅŸiye aittir; tapu dosyasÄ± portfÃ¶ye aittir.
                 </p>
               </div>
 
               <label className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 text-center shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                <span>Tapu Dosyası *</span>
+                <span>Tapu DosyasÄ± *</span>
                 <input
                   id="propertyDeedFileInput"
                   type="file"
@@ -2409,10 +2415,10 @@ export default function StokCreateModal({
                   htmlFor="propertyDeedFileInput"
                   className="mt-2 flex min-h-[48px] w-full cursor-pointer items-center justify-center rounded-[18px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 text-center text-sm font-black text-[#06194A] shadow-inner transition active:scale-[0.99]"
                 >
-                  {propertyDeedFile ? propertyDeedFile.name : "Tapu dosyası seç"}
+                  {propertyDeedFile ? propertyDeedFile.name : "Tapu dosyasÄ± seÃ§"}
                 </label>
                 <small className="stock-upload-hint mt-2 block text-center">
-                  {propertyDeedFile ? `Seçildi · ${formatFileSize(propertyDeedFile.size)}` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
+                  {propertyDeedFile ? `SeÃ§ildi Â· ${formatFileSize(propertyDeedFile.size)}` : "JPG / PNG / WEBP / PDF Â· maks. 15 MB"}
                 </small>
                 {propertyDeedFile && (
                   <button
@@ -2420,29 +2426,29 @@ export default function StokCreateModal({
                     className="mx-auto mt-2 flex min-h-[38px] items-center justify-center rounded-xl bg-rose-50 px-4 py-2 text-[11px] font-black text-rose-700"
                     onClick={() => setUnitFileField("propertyDeedFile", null)}
                   >
-                    Tapu dosyasını kaldır
+                    Tapu dosyasÄ±nÄ± kaldÄ±r
                   </button>
                 )}
               </label>
 
               {selectedCrmCustomerId ? (
                 <div className="stock-form-field full rounded-[24px] border-2 border-emerald-200 bg-gradient-to-b from-emerald-50 to-white p-4 text-center shadow-[0_14px_30px_rgba(16,185,129,0.10)]">
-                  <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-white px-3 py-2 text-[#065F46] shadow-[0_10px_22px_rgba(16,185,129,0.08)]">✅ Tapu sahibi CRM’den seçildi</span>
+                  <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-white px-3 py-2 text-[#065F46] shadow-[0_10px_22px_rgba(16,185,129,0.08)]">âœ… Tapu sahibi CRMâ€™den seÃ§ildi</span>
                   <p className="mt-2 text-xs font-bold leading-5 text-[#64748B]">
-                    Kimlik ön yüz / arka yüz bilgisi kişi kaydında tutulur. Aynı tapu sahibi için tekrar istenmez.
+                    Kimlik Ã¶n yÃ¼z / arka yÃ¼z bilgisi kiÅŸi kaydÄ±nda tutulur. AynÄ± tapu sahibi iÃ§in tekrar istenmez.
                   </p>
                 </div>
               ) : (
                 <>
                   <div className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                    <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">🔐 Tapu Sahibi Kimlik Belgesi</span>
+                    <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">ğŸ” Tapu Sahibi Kimlik Belgesi</span>
                     <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
-                      İlk kez girilen tapu sahibi için kimlik belgesi alınır. CRM’den seçilen kişilerde tekrar istenmez.
+                      Ä°lk kez girilen tapu sahibi iÃ§in kimlik belgesi alÄ±nÄ±r. CRMâ€™den seÃ§ilen kiÅŸilerde tekrar istenmez.
                     </p>
                   </div>
 
                   <label className="stock-form-field rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 text-center shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                    <span>Kimlik Ön Yüz</span>
+                    <span>Kimlik Ã–n YÃ¼z</span>
                     <input
                       id="deedOwnerIdFrontFileInput"
                       type="file"
@@ -2454,10 +2460,10 @@ export default function StokCreateModal({
                       htmlFor="deedOwnerIdFrontFileInput"
                       className="mt-2 flex min-h-[48px] w-full cursor-pointer items-center justify-center rounded-[18px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 text-center text-sm font-black text-[#06194A] shadow-inner transition active:scale-[0.99]"
                     >
-                      {deedOwnerIdFrontFile ? deedOwnerIdFrontFile.name : "Kimlik ön yüz seç"}
+                      {deedOwnerIdFrontFile ? deedOwnerIdFrontFile.name : "Kimlik Ã¶n yÃ¼z seÃ§"}
                     </label>
                     <small className="stock-upload-hint mt-2 block text-center">
-                      {deedOwnerIdFrontFile ? `Seçildi · ${formatFileSize(deedOwnerIdFrontFile.size)}` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
+                      {deedOwnerIdFrontFile ? `SeÃ§ildi Â· ${formatFileSize(deedOwnerIdFrontFile.size)}` : "JPG / PNG / WEBP / PDF Â· maks. 15 MB"}
                     </small>
                     {deedOwnerIdFrontFile && (
                       <button
@@ -2465,13 +2471,13 @@ export default function StokCreateModal({
                         className="mx-auto mt-2 flex min-h-[38px] items-center justify-center rounded-xl bg-rose-50 px-4 py-2 text-[11px] font-black text-rose-700"
                         onClick={() => setUnitFileField("deedOwnerIdFrontFile", null)}
                       >
-                        Ön yüzü kaldır
+                        Ã–n yÃ¼zÃ¼ kaldÄ±r
                       </button>
                     )}
                   </label>
 
                   <label className="stock-form-field rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 text-center shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                    <span>Kimlik Arka Yüz</span>
+                    <span>Kimlik Arka YÃ¼z</span>
                     <input
                       id="deedOwnerIdBackFileInput"
                       type="file"
@@ -2483,10 +2489,10 @@ export default function StokCreateModal({
                       htmlFor="deedOwnerIdBackFileInput"
                       className="mt-2 flex min-h-[48px] w-full cursor-pointer items-center justify-center rounded-[18px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 text-center text-sm font-black text-[#06194A] shadow-inner transition active:scale-[0.99]"
                     >
-                      {deedOwnerIdBackFile ? deedOwnerIdBackFile.name : "Kimlik arka yüz seç"}
+                      {deedOwnerIdBackFile ? deedOwnerIdBackFile.name : "Kimlik arka yÃ¼z seÃ§"}
                     </label>
                     <small className="stock-upload-hint mt-2 block text-center">
-                      {deedOwnerIdBackFile ? `Seçildi · ${formatFileSize(deedOwnerIdBackFile.size)}` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
+                      {deedOwnerIdBackFile ? `SeÃ§ildi Â· ${formatFileSize(deedOwnerIdBackFile.size)}` : "JPG / PNG / WEBP / PDF Â· maks. 15 MB"}
                     </small>
                     {deedOwnerIdBackFile && (
                       <button
@@ -2494,7 +2500,7 @@ export default function StokCreateModal({
                         className="mx-auto mt-2 flex min-h-[38px] items-center justify-center rounded-xl bg-rose-50 px-4 py-2 text-[11px] font-black text-rose-700"
                         onClick={() => setUnitFileField("deedOwnerIdBackFile", null)}
                       >
-                        Arka yüzü kaldır
+                        Arka yÃ¼zÃ¼ kaldÄ±r
                       </button>
                     )}
                   </label>
@@ -2506,9 +2512,9 @@ export default function StokCreateModal({
           <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
               <div className="stock-form-field full">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">🖼️ Galeriye Fotoğraf Ekle * ({galleryImages.length}/{MAX_GALLERY_COUNT})</span>
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">ğŸ–¼ï¸ Galeriye FotoÄŸraf Ekle * ({galleryImages.length}/{MAX_GALLERY_COUNT})</span>
                 <small className="stock-upload-hint block text-center">
-                  JPG / PNG / WEBP · min. 800×600 px · önerilen 1920×1080 · maks. 15 MB
+                  JPG / PNG / WEBP Â· min. 800Ã—600 px Â· Ã¶nerilen 1920Ã—1080 Â· maks. 15 MB
                 </small>
 
                 <input
@@ -2529,11 +2535,11 @@ export default function StokCreateModal({
                   }}
                   disabled={galleryImages.length >= MAX_GALLERY_COUNT || checkingImages}
                 >
-                  {checkingImages ? "Görseller kontrol ediliyor..." : "Galeriye Fotoğraf Ekle"}
+                  {checkingImages ? "GÃ¶rseller kontrol ediliyor..." : "Galeriye FotoÄŸraf Ekle"}
                 </button>
 
                 <p className="mt-2 text-xs font-bold text-[#64748B]">
-                  İlk eklenen fotoğraf otomatik kapak olur. İsterseniz başka bir görseli “Kapak Yap” olarak seçebilirsiniz.
+                  Ä°lk eklenen fotoÄŸraf otomatik kapak olur. Ä°sterseniz baÅŸka bir gÃ¶rseli â€œKapak Yapâ€ olarak seÃ§ebilirsiniz.
                 </p>
 
                 {galleryImages.length > 0 ? (
@@ -2551,7 +2557,7 @@ export default function StokCreateModal({
                           <div className="relative aspect-[4/3] min-h-[118px] overflow-hidden bg-[#EEF5FF]">
                             <img
                               src={image.previewUrl}
-                              alt={`Galeri fotoğrafı ${index + 1}`}
+                              alt={`Galeri fotoÄŸrafÄ± ${index + 1}`}
                               className="absolute inset-0 h-full w-full object-cover"
                             />
 
@@ -2568,10 +2574,10 @@ export default function StokCreateModal({
 
                           <div className="p-2.5">
                             <p className="truncate text-xs font-black text-[#06194A]">
-                              {image.file?.name || image.name || `Fotoğraf ${index + 1}`}
+                              {image.file?.name || image.name || `FotoÄŸraf ${index + 1}`}
                             </p>
                             <p className="text-[10px] font-bold text-[#64748B]">
-                              {image.file?.size ? formatFileSize(image.file.size) : image.size ? formatFileSize(image.size) : image.existing ? "Mevcut fotoğraf" : ""}
+                              {image.file?.size ? formatFileSize(image.file.size) : image.size ? formatFileSize(image.size) : image.existing ? "Mevcut fotoÄŸraf" : ""}
                             </p>
 
                             <div className="mt-2 grid grid-cols-1 gap-2">
@@ -2603,17 +2609,17 @@ export default function StokCreateModal({
                   </div>
                 ) : (
                   <div className="mt-4 rounded-[24px] border border-dashed border-[#DDE7F3] bg-[#F7FBFF] p-5 text-center text-sm font-bold text-[#64748B]">
-                    En az 1 fotoğraf ekleyiniz. Kapak fotoğrafını galeri içinden seçebilirsiniz.
+                    En az 1 fotoÄŸraf ekleyiniz. Kapak fotoÄŸrafÄ±nÄ± galeri iÃ§inden seÃ§ebilirsiniz.
                   </div>
                 )}
               </div>
 
               <div className="stock-form-field full stock-image-summary-row">
-                <span>Görsel Özeti</span>
+                <span>GÃ¶rsel Ã–zeti</span>
                 <div className="stock-image-summary">
                   <div>
                     <b>Kapak</b>
-                    <strong>{coverImage ? "Seçildi" : "Bekliyor"}</strong>
+                    <strong>{coverImage ? "SeÃ§ildi" : "Bekliyor"}</strong>
                   </div>
                   <div>
                     <b>Galeri</b>
@@ -2638,7 +2644,7 @@ export default function StokCreateModal({
             )}
 
             <button className="stock-cancel-btn" onClick={onClose}>
-              İptal
+              Ä°ptal
             </button>
 
             <button
@@ -2646,7 +2652,7 @@ export default function StokCreateModal({
               onClick={handleSubmit}
               disabled={formLoading || checkingImages}
             >
-              {formLoading ? "Kaydediliyor..." : "Portföyü Kaydet"}
+              {formLoading ? "Kaydediliyor..." : "PortfÃ¶yÃ¼ Kaydet"}
             </button>
           </div>
         )}
@@ -2654,3 +2660,4 @@ export default function StokCreateModal({
     </div>
   );
 }
+

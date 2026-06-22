@@ -237,6 +237,26 @@ function getUnitCoverImage(unit?: Unit | null) {
   );
 }
 
+function getAuthorityDocuments(unit?: Unit | null) {
+  return Array.isArray((unit as any)?.authorityDocuments)
+    ? ((unit as any).authorityDocuments as any[])
+    : [];
+}
+
+function hasAuthorityDocument(
+  unit: Unit | null | undefined,
+  authorityType: string,
+  documentSide?: string,
+) {
+  return getAuthorityDocuments(unit).some((document) => {
+    const typeMatch = String(document?.authorityType || "") === authorityType;
+    const sideMatch = documentSide
+      ? String(document?.documentSide || "").toLocaleUpperCase("tr-TR") === documentSide
+      : true;
+    return typeMatch && sideMatch;
+  });
+}
+
 function isUnitVerified(unit?: Unit | null) {
   return Boolean(
     unit?.isVerified ||
@@ -639,6 +659,46 @@ function StokPageInner() {
     });
   };
 
+
+  const uploadPortfolioDocument = async (
+    unitId: string,
+    file: File,
+    authorityType: string,
+    documentSide?: string,
+  ) => {
+    const payload = new FormData();
+    payload.append("portfolioId", unitId);
+    payload.append("authorityType", authorityType);
+    if (documentSide) payload.append("documentSide", documentSide);
+    payload.append("file", file);
+
+    return api.post("/portfolio-documents/upload", payload, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  };
+
+  const uploadPortfolioFormDocuments = async (unitId: string) => {
+    const propertyDeedFile = (unitForm as any).propertyDeedFile as File | null | undefined;
+    const deedOwnerIdFrontFile = (unitForm as any).deedOwnerIdFrontFile as File | null | undefined;
+    const deedOwnerIdBackFile = (unitForm as any).deedOwnerIdBackFile as File | null | undefined;
+
+    const uploads: Promise<unknown>[] = [];
+
+    if (propertyDeedFile) {
+      uploads.push(uploadPortfolioDocument(unitId, propertyDeedFile, "TAPU"));
+    }
+
+    if (deedOwnerIdFrontFile) {
+      uploads.push(uploadPortfolioDocument(unitId, deedOwnerIdFrontFile, "TAPU_SAHIBI_KIMLIK", "FRONT"));
+    }
+
+    if (deedOwnerIdBackFile) {
+      uploads.push(uploadPortfolioDocument(unitId, deedOwnerIdBackFile, "TAPU_SAHIBI_KIMLIK", "BACK"));
+    }
+
+    if (uploads.length > 0) await Promise.all(uploads);
+  };
+
   const handleSubmit = async () => {
     setFormError("");
     setFormLoading(true);
@@ -705,6 +765,8 @@ function StokPageInner() {
             ),
           );
         }
+
+        await uploadPortfolioFormDocuments(editingUnit.id);
 
         setFormSuccess(true);
         await fetchData();
@@ -774,6 +836,8 @@ function StokPageInner() {
             ),
           ),
       );
+
+      await uploadPortfolioFormDocuments(createdUnitId);
 
       setFormSuccess(true);
       await fetchData();
@@ -1226,6 +1290,11 @@ function StokPageInner() {
         setCoverImage={setCoverImage}
         galleryImages={galleryImages}
         setGalleryImages={setGalleryImages}
+        existingDocumentStatus={{
+          propertyDeed: hasAuthorityDocument(editingUnit, "TAPU") || Boolean(editingUnit?.tapuVerified),
+          deedOwnerIdFront: hasAuthorityDocument(editingUnit, "TAPU_SAHIBI_KIMLIK", "FRONT"),
+          deedOwnerIdBack: hasAuthorityDocument(editingUnit, "TAPU_SAHIBI_KIMLIK", "BACK"),
+        }}
         onSubmit={handleSubmit}
       />
 
