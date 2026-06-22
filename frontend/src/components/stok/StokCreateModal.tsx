@@ -1362,7 +1362,31 @@ export default function StokCreateModal({
       return;
     }
 
-    const newImages = acceptedFiles.map(createLocalImage);
+    const selectedKeys = new Set<string>();
+    const existingKeys = new Set(
+      galleryImages.map((image) =>
+        image.file
+          ? `${image.file.name}-${image.file.size}-${image.file.lastModified}`
+          : `${image.id}-${image.previewUrl || ""}`,
+      ),
+    );
+
+    const uniqueFiles = acceptedFiles.filter((file) => {
+      const key = `${file.name}-${file.size}-${file.lastModified}`;
+
+      if (selectedKeys.has(key) || existingKeys.has(key)) return false;
+
+      selectedKeys.add(key);
+      return true;
+    });
+
+    if (uniqueFiles.length === 0) {
+      setImageError("Aynı fotoğraf birden fazla kez eklenemez.");
+      event.target.value = "";
+      return;
+    }
+
+    const newImages = uniqueFiles.map(createLocalImage);
 
     setGalleryImages((current) => {
       const nextImages = [...current, ...newImages];
@@ -1378,6 +1402,8 @@ export default function StokCreateModal({
       setImageError(
         `En fazla ${MAX_GALLERY_COUNT} galeri fotoğrafı yükleyebilirsiniz. Fazla seçilen görseller eklenmedi.`,
       );
+    } else if (uniqueFiles.length !== acceptedFiles.length) {
+      setImageError("Aynı fotoğraf birden fazla kez eklenemez.");
     } else if (qualityWarning) {
       setImageError(qualityWarning);
     }
