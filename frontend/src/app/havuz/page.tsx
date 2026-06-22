@@ -1338,6 +1338,176 @@ function getHighlightFeatures(unit: Unit) {
     : ["Merkezi Konum", "Yatırıma Uygun", "Ortak Çalışmaya Uygun"];
 }
 
+
+type PremiumHighlight = {
+  icon: string;
+  title: string;
+  text: string;
+};
+
+function getPremiumPortfolioHighlights(unit: Unit): PremiumHighlight[] {
+  const text = [
+    unit.type,
+    unit.status,
+    unit.roomCount,
+    unit.description,
+    unit.project?.name,
+    unit.project?.address,
+  ]
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
+  const highlights: PremiumHighlight[] = [];
+
+  if (unit.project?.district || unit.project?.city) {
+    highlights.push({
+      icon: "📍",
+      title: "Konum Avantajı",
+      text: getLocation(unit),
+    });
+  }
+
+  if (unit.area) {
+    highlights.push({
+      icon: "📐",
+      title: "Net Kullanım Alanı",
+      text: `${Number(unit.area).toLocaleString("tr-TR")} m²`,
+    });
+  }
+
+  if (unit.roomCount) {
+    highlights.push({
+      icon: "🏡",
+      title: "Kullanım Planı",
+      text: unit.roomCount,
+    });
+  }
+
+  if (text.includes("yatırım") || text.includes("yatirim")) {
+    highlights.push({
+      icon: "💰",
+      title: "Yatırım Potansiyeli",
+      text: "Al-sat ve uzun vadeli değer için uygun",
+    });
+  }
+
+  if (text.includes("merkez") || unit.project?.district) {
+    highlights.push({
+      icon: "🎯",
+      title: "Talep Gören Bölge",
+      text: "Bölge odaklı müşteri eşleştirmesine uygun",
+    });
+  }
+
+  if (text.includes("otopark") || text.includes("garaj")) {
+    highlights.push({
+      icon: "🚗",
+      title: "Otopark Avantajı",
+      text: "Araç kullanımına uygun portföy",
+    });
+  }
+
+  if (text.includes("bahçe") || text.includes("bahce")) {
+    highlights.push({
+      icon: "🌿",
+      title: "Açık Alan Kullanımı",
+      text: "Bahçe ve dış yaşam beklentisine uygun",
+    });
+  }
+
+  if (text.includes("deniz")) {
+    highlights.push({
+      icon: "🌅",
+      title: "Manzara Değeri",
+      text: "Vitrin etkisi yüksek portföy",
+    });
+  }
+
+  if (text.includes("havuz")) {
+    highlights.push({
+      icon: "🏊",
+      title: "Sosyal Donatı",
+      text: "Havuz beklentisi olan müşteriye uygun",
+    });
+  }
+
+  if (text.includes("güvenlik") || text.includes("guvenlik") || text.includes("site")) {
+    highlights.push({
+      icon: "🛡️",
+      title: "Site Yaşamı",
+      text: "Güvenli yaşam beklentisine uygun",
+    });
+  }
+
+  const fallback: PremiumHighlight[] = [
+    {
+      icon: "🤝",
+      title: "İş Birliğine Uygun",
+      text: "Meslektaş paylaşımına açık portföy",
+    },
+    {
+      icon: "🔑",
+      title: "Satışa Hazır Sunum",
+      text: "Havuz görüşmesi için sade ve net bilgi",
+    },
+    {
+      icon: "📌",
+      title: "Envanter Değeri",
+      text: "Bölge portföy havuzunu güçlendirir",
+    },
+  ];
+
+  return Array.from(
+    new Map([...highlights, ...fallback].map((item) => [item.title, item])).values(),
+  ).slice(0, 6);
+}
+
+function getCollaborationOpportunities(unit: Unit): PremiumHighlight[] {
+  const text = [unit.type, unit.status, unit.description, unit.project?.name]
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
+  const opportunities: PremiumHighlight[] = [
+    {
+      icon: "🤝",
+      title: "Ortak Çalışmaya Açık",
+      text: "Meslektaş görüşmesi başlatılabilir",
+    },
+    {
+      icon: "📣",
+      title: "Paylaşıma Uygun",
+      text: "Havuz içinde iş fırsatı oluşturur",
+    },
+  ];
+
+  if (text.includes("arsa") || text.includes("kat karşılığı") || text.includes("kat karsiligi")) {
+    opportunities.push({
+      icon: "🏗️",
+      title: "Proje Fırsatı",
+      text: "Müteahhit ve arsa çalışmasına uygun",
+    });
+  } else if (
+    text.includes("ticari") ||
+    text.includes("dükkan") ||
+    text.includes("dukkan") ||
+    text.includes("ofis") ||
+    text.includes("mağaza") ||
+    text.includes("magaza")
+  ) {
+    opportunities.push({
+      icon: "🏢",
+      title: "Ticari Potansiyel",
+      text: "Kurumsal müşteriyle değerlendirilebilir",
+    });
+  } else {
+    opportunities.push({
+      icon: "🏠",
+      title: "Alıcı Adayına Uygun",
+      text: "Konut arayan müşteriyle değerlendirilebilir",
+    });
+  }
+
+  return opportunities.slice(0, 3);
+}
+
 function getPrimarySpecs(unit: Unit) {
   const specs: string[] = [];
 
@@ -1377,6 +1547,39 @@ function CompactFeaturePill({ text }: { text: string }) {
       <span className="min-w-0 break-words [overflow-wrap:anywhere]">
         {limitText(text, 24)}
       </span>
+    </div>
+  );
+}
+
+
+function PremiumHighlightCard({
+  item,
+  compact = false,
+}: {
+  item: PremiumHighlight;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={`flex min-w-0 items-center gap-2 rounded-[17px] border-2 border-[#D7E3F2] bg-white p-2 text-left shadow-[0_7px_16px_rgba(15,23,42,0.035)] ${
+        compact ? "min-h-[58px]" : "min-h-[74px] flex-col justify-center text-center"
+      }`}
+    >
+      <span
+        className={`flex shrink-0 items-center justify-center rounded-[14px] bg-[#EFF6FF] text-center ${
+          compact ? "h-9 w-9 text-[18px]" : "h-10 w-10 text-[20px]"
+        }`}
+      >
+        {item.icon}
+      </span>
+      <div className="min-w-0">
+        <p className="text-[11px] font-black leading-[1.12] tracking-[-0.02em] text-[#1F2937] break-words [overflow-wrap:anywhere]">
+          {limitText(item.title, 36)}
+        </p>
+        <p className="mt-0.5 text-[9.5px] font-bold leading-4 text-[#64748B] break-words [overflow-wrap:anywhere]">
+          {limitText(item.text, 54)}
+        </p>
+      </div>
     </div>
   );
 }
@@ -1516,8 +1719,9 @@ function PoolDetailModal({
   onAction: (type: PoolAction) => void;
 }) {
   const image = getCover(unit);
-  const features = getHighlightFeatures(unit);
   const specs = getPrimarySpecs(unit);
+  const portfolioHighlights = getPremiumPortfolioHighlights(unit);
+  const collaborationHighlights = getCollaborationOpportunities(unit);
   const imageCount = (Array.isArray(unit.images) ? unit.images.length : 0) || 1;
   const messageBusy = busyAction === `MESSAGE_${unit.id}`;
 
@@ -1585,24 +1789,35 @@ function PoolDetailModal({
             </div>
           </div>
 
-          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3">
-            <p className="text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-              Dikkat Çeken Özellikler
-            </p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {features.slice(0, 4).map((item) => (
-                <CompactFeaturePill key={item} text={item} />
+          <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
+            <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+                Portföy Özeti
+              </p>
+              <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
+                Bu portföyün sahada öne çıkan kısa satış notları
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-3">
+              {portfolioHighlights.map((item) => (
+                <PremiumHighlightCard key={item.title} item={item} />
               ))}
             </div>
           </section>
 
-          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3">
-            <p className="text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
-              Meslektaş Havuzu
-            </p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <MatchPill text="Paylaşıma Açık" />
-              <MatchPill text="Ortak Çalışmaya Uygun" />
+          <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FAFC] shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
+            <div className="border-b-2 border-[#E2EAF5] bg-white px-3 py-2.5 text-center">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+                İş Birliği Fırsatı
+              </p>
+              <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
+                Havuz mantığına uygun meslektaş çalışma başlıkları
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-2 p-3">
+              {collaborationHighlights.map((item) => (
+                <PremiumHighlightCard key={item.title} item={item} compact />
+              ))}
             </div>
           </section>
 
