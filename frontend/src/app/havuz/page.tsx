@@ -1729,15 +1729,6 @@ function PremiumHighlightCard({
   );
 }
 
-
-
-
-
-
-
-
-
-
 function PoolUnitCard({
   index,
   unit,
@@ -1807,9 +1798,9 @@ function PoolUnitCard({
   return (
     <article
       onClick={onDetail}
-      className="grid min-h-[292px] cursor-pointer grid-cols-[48%_52%] overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.07)] active:scale-[0.995]"
+      className="grid min-h-[265px] cursor-pointer grid-cols-[48%_52%] overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.07)] active:scale-[0.995]"
     >
-      <div className="relative min-h-[292px] overflow-hidden bg-[#EEF3F8]">
+      <div className="relative min-h-[265px] overflow-hidden bg-[#EEF3F8]">
         {image ? (
           <img
             src={image}
@@ -1832,7 +1823,7 @@ function PoolUnitCard({
       </div>
 
       <div className="flex min-w-0 flex-col text-center">
-        <div className="flex min-h-[126px] flex-col items-center justify-center px-3 pb-2 pt-2.5">
+        <div className="flex min-h-[110px] flex-col items-center justify-center px-3 pb-2 pt-2">
           <p className="text-[10px] font-black uppercase leading-none tracking-[0.12em] text-[#2563EB]">
             {typeChip}
           </p>
@@ -1875,11 +1866,11 @@ function PoolUnitCard({
           ))}
         </div>
 
-        <div className="grid grid-cols-1 gap-1 px-3 py-2 text-left">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 px-3 py-2 text-left">
           {detailSpecs.map((item) => (
             <p
               key={item.label}
-              className="min-w-0 text-[9.5px] font-black leading-[1.25] text-[#475569] break-words [overflow-wrap:anywhere]"
+              className="min-w-0 text-[9px] font-black leading-[1.15] text-[#475569]"
             >
               <span className="text-[#1F2937]">{item.label}:</span> {item.value}
             </p>
@@ -1914,6 +1905,7 @@ function PoolUnitCard({
     </article>
   );
 }
+
 
 function PoolDetailModal({
   unit,
