@@ -237,31 +237,60 @@ function getUnitCoverImage(unit?: Unit | null) {
   );
 }
 
-function getAuthorityDocuments(unit?: Unit | null) {
-  return Array.isArray((unit as any)?.authorityDocuments)
-    ? ((unit as any).authorityDocuments as any[])
-    : [];
-}
-
-function hasAuthorityDocument(
-  unit: Unit | null | undefined,
-  authorityType: string,
-  documentSide?: string,
-) {
-  return getAuthorityDocuments(unit).some((document) => {
-    const typeMatch = String(document?.authorityType || "") === authorityType;
-    const sideMatch = documentSide
-      ? String(document?.documentSide || "").toLocaleUpperCase("tr-TR") === documentSide
-      : true;
-    return typeMatch && sideMatch;
-  });
-}
-
 function isUnitVerified(unit?: Unit | null) {
   return Boolean(
     unit?.isVerified ||
     (unit?.tapuVerified && unit?.photoVerified && unit?.yetkiVerified),
   );
+}
+
+function getPortfolioQuality(unit?: MapUnit | null) {
+  const imageCount = getUnitImages(unit as Unit).length;
+  const hasPhoto = imageCount > 0 || Boolean((unit as any)?.photoVerified);
+  const hasDocument = Boolean(
+    (unit as any)?.tapuVerified ||
+    (unit as any)?.yetkiVerified ||
+    (unit as any)?.isVerified,
+  );
+  const hasLocation = Boolean(
+    unit?.project?.latitude && unit?.project?.longitude,
+  );
+  const hasAuthority = Boolean(
+    (unit as any)?.yetkiVerified || (unit as any)?.isVerified,
+  );
+  const approvalStatus = String((unit as any)?.approvalStatus || "");
+  const isPoolReady =
+    approvalStatus === "ONAYLANDI" ||
+    approvalStatus === "HAVUZDA" ||
+    Boolean((unit as any)?.isPoolVisible);
+
+  const score =
+    (hasPhoto ? 25 : 0) +
+    (hasDocument ? 25 : 0) +
+    (hasLocation ? 20 : 0) +
+    (hasAuthority ? 15 : 0) +
+    (isPoolReady ? 15 : 0);
+
+  const label =
+    score >= 90
+      ? "Mükemmel"
+      : score >= 75
+        ? "Çok İyi"
+        : score >= 60
+          ? "İyi"
+          : score >= 40
+            ? "Geliştirilmeli"
+            : "Riskli";
+
+  return {
+    score,
+    label,
+    hasPhoto,
+    hasDocument,
+    hasLocation,
+    hasAuthority,
+    isPoolReady,
+  };
 }
 
 function formatFloorInfo(
@@ -511,6 +540,34 @@ function StokPageInner() {
         units.length,
     );
   }, [units]);
+  const portfolioQualityStats = useMemo(() => {
+    if (!units.length) {
+      return {
+        averageScore: 0,
+        qualityPortfolioCount: 0,
+        riskyPortfolioCount: 0,
+        poolReadyCount: 0,
+        missingDocumentCount: 0,
+      };
+    }
+
+    const qualities = units.map((unit) => getPortfolioQuality(unit));
+
+    return {
+      averageScore: Math.round(
+        qualities.reduce((sum, quality) => sum + quality.score, 0) /
+          qualities.length,
+      ),
+      qualityPortfolioCount: qualities.filter((quality) => quality.score >= 75)
+        .length,
+      riskyPortfolioCount: qualities.filter((quality) => quality.score < 60)
+        .length,
+      poolReadyCount: qualities.filter((quality) => quality.isPoolReady).length,
+      missingDocumentCount: qualities.filter((quality) => !quality.hasDocument)
+        .length,
+    };
+  }, [units]);
+
   const uniqueCities = useMemo(
     () =>
       Array.from(
@@ -659,46 +716,6 @@ function StokPageInner() {
     });
   };
 
-
-  const uploadPortfolioDocument = async (
-    unitId: string,
-    file: File,
-    authorityType: string,
-    documentSide?: string,
-  ) => {
-    const payload = new FormData();
-    payload.append("portfolioId", unitId);
-    payload.append("authorityType", authorityType);
-    if (documentSide) payload.append("documentSide", documentSide);
-    payload.append("file", file);
-
-    return api.post("/portfolio-documents/upload", payload, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-  };
-
-  const uploadPortfolioFormDocuments = async (unitId: string) => {
-    const propertyDeedFile = (unitForm as any).propertyDeedFile as File | null | undefined;
-    const deedOwnerIdFrontFile = (unitForm as any).deedOwnerIdFrontFile as File | null | undefined;
-    const deedOwnerIdBackFile = (unitForm as any).deedOwnerIdBackFile as File | null | undefined;
-
-    const uploads: Promise<unknown>[] = [];
-
-    if (propertyDeedFile) {
-      uploads.push(uploadPortfolioDocument(unitId, propertyDeedFile, "TAPU"));
-    }
-
-    if (deedOwnerIdFrontFile) {
-      uploads.push(uploadPortfolioDocument(unitId, deedOwnerIdFrontFile, "TAPU_SAHIBI_KIMLIK", "FRONT"));
-    }
-
-    if (deedOwnerIdBackFile) {
-      uploads.push(uploadPortfolioDocument(unitId, deedOwnerIdBackFile, "TAPU_SAHIBI_KIMLIK", "BACK"));
-    }
-
-    if (uploads.length > 0) await Promise.all(uploads);
-  };
-
   const handleSubmit = async () => {
     setFormError("");
     setFormLoading(true);
@@ -765,8 +782,6 @@ function StokPageInner() {
             ),
           );
         }
-
-        await uploadPortfolioFormDocuments(editingUnit.id);
 
         setFormSuccess(true);
         await fetchData();
@@ -836,8 +851,6 @@ function StokPageInner() {
             ),
           ),
       );
-
-      await uploadPortfolioFormDocuments(createdUnitId);
 
       setFormSuccess(true);
       await fetchData();
@@ -1077,16 +1090,45 @@ function StokPageInner() {
             <MiniMetric label="Kiralık" value={rentCount} tone="orange" />
           </div>
 
-        <PortfolioDocumentCenterEntry
-          totalCount={units.length}
-          activeCount={activeCount}
-          verifiedCount={units.filter((unit) => isUnitVerified(unit)).length}
-          onOpen={() => {
-  		window.location.href = "/portfoy/quality";
-	}}
-        />
-
-
+          <section className="mt-3 rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FBFF] p-2 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+            <div className="mb-2 px-1 text-center">
+              <h2 className="text-center text-[14px] font-black text-[#06194A]">
+                Portföy Kalite Merkezi
+              </h2>
+              <p className="mx-auto mt-1 max-w-[290px] text-center text-[10px] font-bold leading-4 text-[#64748B]">
+                Fotoğraf, belge, konum ve havuz hazırlığı
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push("/portfoy/quality")}
+                className="mt-2 inline-flex min-h-[28px] items-center justify-center rounded-full bg-white px-3 py-1 text-center text-[10px] font-black text-[#1557D6] shadow-sm active:scale-[0.98]"
+              >
+                Detay {portfolioQualityStats.averageScore}/100
+              </button>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              <QualityMiniMetric
+                label="Ortalama"
+                value={`${portfolioQualityStats.averageScore}`}
+                tone="blue"
+              />
+              <QualityMiniMetric
+                label="Kaliteli"
+                value={portfolioQualityStats.qualityPortfolioCount}
+                tone="green"
+              />
+              <QualityMiniMetric
+                label="Riskli"
+                value={portfolioQualityStats.riskyPortfolioCount}
+                tone="orange"
+              />
+              <QualityMiniMetric
+                label="Hazır"
+                value={portfolioQualityStats.poolReadyCount}
+                tone="slate"
+              />
+            </div>
+          </section>
         </section>
 
         <button
@@ -1290,11 +1332,6 @@ function StokPageInner() {
         setCoverImage={setCoverImage}
         galleryImages={galleryImages}
         setGalleryImages={setGalleryImages}
-        existingDocumentStatus={{
-          propertyDeed: hasAuthorityDocument(editingUnit, "TAPU") || Boolean(editingUnit?.tapuVerified),
-          deedOwnerIdFront: hasAuthorityDocument(editingUnit, "TAPU_SAHIBI_KIMLIK", "FRONT"),
-          deedOwnerIdBack: hasAuthorityDocument(editingUnit, "TAPU_SAHIBI_KIMLIK", "BACK"),
-        }}
         onSubmit={handleSubmit}
       />
 
@@ -1333,46 +1370,41 @@ function MiniMetric({
   );
 }
 
-function PortfolioDocumentCenterEntry({
-  totalCount,
-  activeCount,
-  verifiedCount,
-  onOpen,
+function QualityMiniMetric({
+  label,
+  value,
+  tone = "slate",
 }: {
-  totalCount: number;
-  activeCount: number;
-  verifiedCount: number;
-  onOpen: () => void;
+  label: string;
+  value: string | number;
+  tone?: "slate" | "green" | "blue" | "orange";
 }) {
-  const waitingCount = Math.max(0, totalCount - verifiedCount);
+  const toneClass =
+    tone === "green"
+      ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+      : tone === "blue"
+        ? "border-blue-100 bg-blue-50 text-[#1557D6]"
+        : tone === "orange"
+          ? "border-orange-100 bg-orange-50 text-orange-700"
+          : "border-slate-200 bg-white text-[#06194A]";
 
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="mt-3 w-full rounded-[24px] border border-[#C7D6E8] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] p-3 text-center shadow-[0_14px_32px_rgba(37,99,235,0.12)] active:scale-[0.99]"
+    <article
+      className={`rounded-[16px] border px-1.5 py-2 text-center ${toneClass}`}
     >
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#1557D6] text-white shadow-[0_10px_22px_rgba(21,87,214,0.24)]">
-        <Building2 size={23} />
-      </div>
+      <p className="text-[15px] font-black leading-none">{value}</p>
+      <p className="mt-1 text-[8.5px] font-black">{label}</p>
+    </article>
+  );
+}
 
-      <h2 className="mt-2 text-[17px] font-black tracking-[-0.03em] text-[#06194A]">
-        Belge Yükleme Merkezi
-      </h2>
-      <p className="mx-auto mt-1 max-w-[320px] text-[11px] font-bold leading-[1.45] text-[#64748B]">
-        Yetki belgesi, tapu ve portföy evraklarını tek merkezden yükle, yenile ve incelemeye hazırla.
-      </p>
-
-      <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[18px] border border-[#DDE7F3] bg-white">
-        <MiniMetric label="Toplam" value={totalCount} />
-        <MiniMetric label="Aktif" value={activeCount} tone="blue" />
-        <MiniMetric label="Bekleyen" value={waitingCount} tone="orange" />
-      </div>
-
-      <div className="mt-3 flex min-h-[42px] items-center justify-center rounded-[16px] bg-[#1557D6] px-4 text-[13px] font-black text-white shadow-[0_10px_22px_rgba(21,87,214,0.22)]">
-        Belge Merkezini Aç
-      </div>
-    </button>
+function QualityFlag({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span
+      className={`rounded-full px-1.5 py-0.5 ${ok ? "bg-emerald-50 text-emerald-700" : "bg-orange-50 text-orange-700"}`}
+    >
+      {ok ? "✓" : "!"} {label}
+    </span>
   );
 }
 
@@ -1418,6 +1450,7 @@ function CompactPortfolioCard({
   const isPoolVisible = Boolean((unit as any).isPoolVisible);
   const canSendToPool = approvalStatus === "ONAYLANDI" && !isPoolVisible;
   const canRemoveFromPool = approvalStatus === "HAVUZDA" || isPoolVisible;
+  const quality = getPortfolioQuality(unit);
   const cardStyle = PORTFOLIO_CARD_STYLES[index % PORTFOLIO_CARD_STYLES.length];
 
   return (
@@ -1477,6 +1510,25 @@ function CompactPortfolioCard({
           )}
         </div>
 
+        <div
+          className={`mt-1 rounded-[14px] border-2 border-[#C7D6E8] ${cardStyle.soft} px-2 py-1`}
+        >
+          <div className="text-center">
+            <span className="block text-center text-[9px] font-black text-[#64748B]">
+              Kalite
+            </span>
+            <span
+              className={`mt-1 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-center text-[9px] font-black ${quality.score >= 75 ? "bg-emerald-50 text-emerald-700" : quality.score >= 60 ? "bg-blue-50 text-[#1557D6]" : "bg-orange-50 text-orange-700"}`}
+            >
+              {quality.score}/100 · {quality.label}
+            </span>
+          </div>
+          <div className="mt-1 grid grid-cols-3 gap-1 text-center text-[8.5px] font-black">
+            <QualityFlag ok={quality.hasPhoto} label="Foto" />
+            <QualityFlag ok={quality.hasDocument} label="Belge" />
+            <QualityFlag ok={quality.hasLocation} label="Konum" />
+          </div>
+        </div>
 
         {(unit as any).availableCreditAmount ? (
           <div className="mt-1 rounded-[12px] border border-blue-100 bg-[#EFF6FF] px-2 py-1 text-center">
@@ -1597,14 +1649,12 @@ function PortfolioMap({
   const markersRef = useRef<any[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     let alive = true;
 
     setLoading(true);
     setError("");
-    setMapReady(false);
 
     loadGoogleMapsScript()
       .then(() => {
@@ -1627,8 +1677,6 @@ function PortfolioMap({
           fullscreenControl: false,
           gestureHandling: "greedy",
         });
-
-        setMapReady(true);
       })
       .catch((err: Error) => setError(err.message || "Harita yüklenemedi."))
       .finally(() => {
@@ -1639,27 +1687,26 @@ function PortfolioMap({
       alive = false;
       markersRef.current.forEach((marker) => marker.setMap?.(null));
       markersRef.current = [];
-      googleMapRef.current = null;
-      setMapReady(false);
     };
   }, []);
 
   useEffect(() => {
-    if (!mapReady || !googleMapRef.current || !window.google?.maps) return;
+    if (!googleMapRef.current || !window.google?.maps) return;
 
     markersRef.current.forEach((marker) => marker.setMap?.(null));
     markersRef.current = [];
 
     const bounds = new window.google.maps.LatLngBounds();
 
-    units.forEach((unit) => {
-      const lat = Number(unit.project?.latitude || 0);
-      const lng = Number(unit.project?.longitude || 0);
-      if (lat && lng) bounds.extend({ lat, lng });
-    });
-
     if (!showPins) {
-      if (!bounds.isEmpty()) googleMapRef.current.fitBounds(bounds, 56);
+      if (units.length > 0) {
+        units.forEach((unit) => {
+          const lat = Number(unit.project?.latitude || 0);
+          const lng = Number(unit.project?.longitude || 0);
+          if (lat && lng) bounds.extend({ lat, lng });
+        });
+        if (!bounds.isEmpty()) googleMapRef.current.fitBounds(bounds, 56);
+      }
       return;
     }
 
@@ -1669,42 +1716,69 @@ function PortfolioMap({
 
       if (!lat || !lng) return;
 
+      const priceText = formatCompactPrice(
+        unit.price,
+        unit.priceCurrency,
+      ).replace(" ₺", "₺");
+      const pinColor = unit.status === "KIRALIK" ? "#1557D6" : "#059669";
       const isSelected = selectedUnitId === unit.id;
-      const fill = isSelected ? "#0B3FB3" : "#1557D6";
-      const svg = `
-        <svg width="48" height="58" viewBox="0 0 48 58" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M24 56C24 56 43 35.6 43 20.5C43 9.73 34.49 1 24 1C13.51 1 5 9.73 5 20.5C5 35.6 24 56 24 56Z" fill="${fill}" stroke="white" stroke-width="3"/>
-          <circle cx="24" cy="21" r="12.5" fill="white"/>
-          <path d="M15.8 22.2L24 15.5L32.2 22.2" stroke="#1557D6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M18.6 21.4V30.2H29.4V21.4" stroke="#1557D6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M22 30.2V25.2H26V30.2" stroke="#1557D6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      `;
+      const overlay = new window.google.maps.OverlayView();
+      let element: HTMLButtonElement | null = null;
 
-      const marker = new window.google.maps.Marker({
-        position: { lat, lng },
-        map: googleMapRef.current,
-        title: unit.project?.name || "EPH Portföy",
-        icon: {
-          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-          scaledSize: new window.google.maps.Size(
-            isSelected ? 52 : 44,
-            isSelected ? 62 : 54,
-          ),
-          anchor: new window.google.maps.Point(
-            isSelected ? 26 : 22,
-            isSelected ? 62 : 54,
-          ),
-        },
-        zIndex: isSelected ? 30 : 20,
-      });
+      overlay.onAdd = function onAdd() {
+        element = document.createElement("button");
+        element.type = "button";
+        element.title = unit.project?.name || "EPH Portföy";
+        element.textContent = priceText;
+        element.style.position = "absolute";
+        element.style.transform = "translate(-50%, -100%)";
+        element.style.minWidth = isSelected ? "78px" : "64px";
+        element.style.minHeight = isSelected ? "34px" : "30px";
+        element.style.padding = "0 9px";
+        element.style.borderRadius = "999px 999px 999px 6px";
+        element.style.border = "2px solid #ffffff";
+        element.style.background = pinColor;
+        element.style.color = "#ffffff";
+        element.style.fontSize = isSelected ? "12px" : "11px";
+        element.style.fontWeight = "900";
+        element.style.lineHeight = "1";
+        element.style.boxShadow = "0 12px 22px rgba(15,23,42,0.28)";
+        element.style.zIndex = isSelected ? "30" : "20";
+        element.style.cursor = "pointer";
+        element.style.whiteSpace = "nowrap";
+        element.style.display = "flex";
+        element.style.alignItems = "center";
+        element.style.justifyContent = "center";
+        element.style.pointerEvents = "auto";
+        element.addEventListener("click", () => onSelectUnit(unit.id));
+        const panes = overlay.getPanes();
+        panes?.overlayMouseTarget.appendChild(element);
+      };
 
-      marker.addListener("click", () => onSelectUnit(unit.id));
-      markersRef.current.push(marker);
+      overlay.draw = function draw() {
+        if (!element) return;
+        const projection = overlay.getProjection();
+        const point = projection.fromLatLngToDivPixel(
+          new window.google.maps.LatLng(lat, lng),
+        );
+        if (!point) return;
+        element.style.left = `${point.x}px`;
+        element.style.top = `${point.y}px`;
+      };
+
+      overlay.onRemove = function onRemove() {
+        if (element?.parentNode) element.parentNode.removeChild(element);
+        element = null;
+      };
+
+      overlay.setMap(googleMapRef.current);
+      markersRef.current.push(overlay);
+      bounds.extend({ lat, lng });
     });
 
-    if (!bounds.isEmpty()) googleMapRef.current.fitBounds(bounds, 56);
-  }, [mapReady, onSelectUnit, selectedUnitId, showPins, units]);
+    if (units.length > 0 && !bounds.isEmpty())
+      googleMapRef.current.fitBounds(bounds, 56);
+  }, [onSelectUnit, selectedUnitId, showPins, units]);
 
   return (
     <div className="relative h-[360px] bg-[#EEF5FF]">

@@ -1,0 +1,251 @@
+[33mcommit e3052c51781a96db32288a3d373c1328f6b65aa7[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Mon Jun 22 19:27:41 2026 +0300
+
+    fix: edit mode document validation
+
+[33mcommit ddbdfc6e0728659340bd56c23fd3864d075d8605[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Mon Jun 22 17:03:51 2026 +0300
+
+    fix: duplicate gallery image upload
+
+[33mcommit cc4835c9948721d8b71feda75903c9a64ba675fb[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Sun Jun 21 12:50:38 2026 +0300
+
+    fix: portfolio gallery edit modal
+
+[33mcommit 8e5bc0ebf0381fc9f71c6da6e238a610c973fc95[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Sat Jun 20 17:25:09 2026 +0300
+
+    fix: premium portfolio form ui
+
+[33mcommit 743833154e19bb51c17ee5f2abfcf1d02de44a5b[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Fri Jun 19 08:36:54 2026 +0300
+
+    fix: stok create modal gallery cover image ux improvements
+
+[33mcommit d32e73448a676656fe48e7b36e5ef1c64aee774a[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Thu Jun 18 21:45:48 2026 +0300
+
+    Ada parsel improvements and heading alignment fixes
+
+[33mcommit 821f0262638eb44d3730b76dd9b42c38e5f5baf1[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Thu Jun 18 13:03:12 2026 +0300
+
+    fix: portfolio image upload saha test improvements
+
+[33mcommit c83ff6a9c9a499775ccdb7a2227e09b270067366[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Thu Jun 18 09:33:33 2026 +0300
+
+    fix: portfoy saha testi alt menu geri tusu harita
+
+[33mcommit 9e1cb03a9d82b1664ea7397a3bbd9ba1bcc1c493[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Sun Jun 14 01:49:05 2026 +0300
+
+    Portfoy V6.2 kredi ve erisim bilgisi eklendi
+
+[33mcommit c8950142b93fe980ffd3338be4bcd8957b33bdb7[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Fri Jun 12 09:00:48 2026 +0300
+
+    Polish portfolio create modal UI
+
+[33mcommit ff5343f16714eaddd84dbe15eb9cfb04724b4f40[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Fri Jun 12 08:40:32 2026 +0300
+
+    Add portfolio extra features system
+
+[33mcommit 166b23c1401241a64c3efa49e1e5fd6e2bc50802[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Fri Jun 12 08:06:36 2026 +0300
+
+    Standardize portfolio input validation
+
+[33mcommit d2fe05f666ad86cf62ccc4a1b6d8b43090d7f0de[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Fri Jun 12 06:50:39 2026 +0300
+
+    Improve deed owner identity upload buttons UI
+
+[33mcommit 06ee89daf400da7bee60bac8fe2509edb9899449[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Fri Jun 12 06:28:24 2026 +0300
+
+    Add deed owner identity document support
+
+[33mcommit fb4302eb2e581440cb00859172510d5355cfc69a[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Fri Jun 12 06:00:24 2026 +0300
+
+    Fill location fields from current location
+
+[33mcommit 23bd74904ad5666cfaa960587e4b9462a970fa20[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Fri Jun 12 05:22:41 2026 +0300
+
+    Fix stock modal nested footer overlap
+
+[33mcommit 1cba6e84fe5f75b575d4afa214bbf23d7e008717[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Thu Jun 11 23:27:10 2026 +0300
+
+    Portfoy Faz-3 mahremiyet fotograf tapu sahibi CRM entegrasyonu
+
+[33mcommit 347cdf824ff6f77dbf9130859e8b13b1db044c56[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed Jun 10 00:10:57 2026 +0300
+
+    CRM mahremiyet kurallari eklendi
+
+[33mcommit 810fc649db431b598c12c564fb7c7e8f26252db0[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed Jun 3 16:33:55 2026 +0300
+
+    Turistik tesis kayit hatasi ve hata mesajlari duzeltildi
+
+[33mcommit 5a09f2fdc9568f9700c4110d4dbc35f34c8e9a1b[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed Jun 3 16:24:23 2026 +0300
+
+    Turistik tesis oda ve yatak sayisi secenekleri guncellendi
+
+[33mcommit 0fedae2ba57b27d82780f223afc772f345dbd659[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed Jun 3 11:19:48 2026 +0300
+
+    Samsung image upload compatibility
+
+[33mcommit 183a913bc330d81bac357cc6d053444701a78862[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed Jun 3 10:54:12 2026 +0300
+
+    Portfoy gorsel yukleme limiti 15mb
+
+[33mcommit be09778c5305dcde526cae858ca14da9cf7132cf[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed Jun 3 10:07:20 2026 +0300
+
+    Portfoy modal gorsel uyari ve kaydet butonu fix
+
+[33mcommit a03e204547bdee22715304c635d03fdd728d004b[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed Jun 3 09:49:57 2026 +0300
+
+    Portfoy modal v10 tasarim duzeltmesi
+
+[33mcommit ec82c04429b615b22b6f911553105dc3005e94c5[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed Jun 3 09:37:47 2026 +0300
+
+    Portfoy modal premium metal scroll v9
+
+[33mcommit 6859b2761048f1884f9364c97c5ec0aee50b124d[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed Jun 3 08:49:22 2026 +0300
+
+    Portfoy modal header kaldirildi scroll fix v6
+
+[33mcommit 55406555107b931d407907ad6e59af2df3bd933c[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed Jun 3 01:50:40 2026 +0300
+
+    Portfoy formu kompakt v4
+
+[33mcommit e8564dd2736181ab4b56993185a64e6aed1b47ef[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed Jun 3 01:06:33 2026 +0300
+
+    Portfoy sayfasi ve modal v3 tasarimi
+
+[33mcommit 232848aa5eb2b8f702c32e61b0e11342751e775d[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed Jun 3 00:31:31 2026 +0300
+
+    Portfoy giris formu duzeltildi
+
+[33mcommit 349cb9b57a5e40892be126c84cb37e353452c8dc[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed Jun 3 00:19:26 2026 +0300
+
+    Portfoy kategori sistemi v2
+
+[33mcommit ce8b6bd6e40098f9b5cc7d1e7f9c7c3bc4353518[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Tue Jun 2 21:15:45 2026 +0300
+
+    Bulundugu kat listesi sadeleştirildi
+
+[33mcommit ea0d63f97d3c41d49f184cdf43fde635e03285db[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Tue Jun 2 16:52:12 2026 +0300
+
+    Mahalle ve koy secimi duzeltildi
+
+[33mcommit 197d1ad186c42ba57907fff8f59d8ea8ba2f26d5[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Tue Jun 2 16:37:23 2026 +0300
+
+    Stok konum secimi il ilce mahalle koy verisiyle gelistirildi
+
+[33mcommit d93d924380a0ae110fefbdc36a4ff2f5e9e3878d[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Tue Jun 2 16:14:04 2026 +0300
+
+    Stok formu dinamik mulk tipine gore gelistirildi
+
+[33mcommit e0406dd4392024c0562af56affa320c3845649d5[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Tue Jun 2 15:49:20 2026 +0300
+
+    Stok girisinde akilli dogrulama kurallari eklendi
+
+[33mcommit 8a8d1bdb1ed964bdd38c8340f291d10548ac5be3[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Tue Jun 2 13:07:44 2026 +0300
+
+    Stok ilan giris ekrani gelistirildi
+
+[33mcommit 354a1370d562935d9dde4adaf6eff44879bc9fa4[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Tue Jun 2 10:46:24 2026 +0300
+
+    Portfoy gorsel sistemi
+
+[33mcommit 42b9fbb39d1b3d00f6f53198fa9b05914ef192d0[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Tue Jun 2 10:07:04 2026 +0300
+
+    Portfoy gorsel kayit sistemi eklendi
+
+[33mcommit 18647127ea492568618717fe666093ae50684f8d[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Sat May 30 18:42:02 2026 +0300
+
+    translate stock create modal text
+
+[33mcommit 17c161d9e3bd7795c77e3f8fb96e297708a1d9b9[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Sat May 30 17:43:38 2026 +0300
+
+    expand stock property standards for turkey
+
+[33mcommit d36a129a56dff7812dedede1535065df6cfd74aa[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Thu May 21 00:02:07 2026 +0300
+
+    feat: premium data table stok tasarimi
+
+[33mcommit c50fce25a2d3725091cd669fce8e8033a23757e6[m
+Author: KayaErtug <mustafaertugkaya@gmail.com>
+Date:   Wed May 20 13:19:11 2026 +0300
+
+    refactor: stok page component mimarisi
