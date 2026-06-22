@@ -1182,7 +1182,8 @@ function PoolMapSection({
       </div>
 
       <div className="border-t-2 border-[#C7D6E8] bg-white px-2 py-2 text-center text-[11px] font-black text-[#64748B]">
-        <span className="text-[#2563EB]">{exactCount}</span> gerçek konum gösteriliyor
+        <span className="text-[#2563EB]">{exactCount}</span> gerçek konum
+        gösteriliyor
       </div>
 
       {selectedItem ? (
@@ -1336,7 +1337,6 @@ function getHighlightFeatures(unit: Unit) {
     : ["Merkezi Konum", "Yatırıma Uygun", "Ortak Çalışmaya Uygun"];
 }
 
-
 type PremiumHighlight = {
   icon: string;
   title: string;
@@ -1428,7 +1428,11 @@ function getPremiumPortfolioHighlights(unit: Unit): PremiumHighlight[] {
     });
   }
 
-  if (text.includes("güvenlik") || text.includes("guvenlik") || text.includes("site")) {
+  if (
+    text.includes("güvenlik") ||
+    text.includes("guvenlik") ||
+    text.includes("site")
+  ) {
     highlights.push({
       icon: "🛡️",
       title: "Site Yaşamı",
@@ -1470,11 +1474,14 @@ function getPremiumPortfolioHighlights(unit: Unit): PremiumHighlight[] {
   ];
 
   return Array.from(
-    new Map([...highlights, ...fallback].map((item) => [item.title, item])).values(),
+    new Map(
+      [...highlights, ...fallback].map((item) => [item.title, item]),
+    ).values(),
   ).slice(0, 9);
 }
 
 function getVisiblePortfolioDetails(unit: Unit): PremiumHighlight[] {
+  const imageCount = Array.isArray(unit.images) ? unit.images.length : 0;
   const details: PremiumHighlight[] = [];
 
   details.push({
@@ -1491,35 +1498,38 @@ function getVisiblePortfolioDetails(unit: Unit): PremiumHighlight[] {
     });
   }
 
-  if (unit.roomCount) {
-    details.push({
-      icon: "🏠",
-      title: "Oda Planı",
-      text: unit.roomCount,
-    });
-  }
-
-  if (unit.area) {
+  if (unit.roomCount)
+    details.push({ icon: "🏠", title: "Oda Planı", text: unit.roomCount });
+  if (unit.area)
     details.push({
       icon: "📐",
       title: "Alan",
       text: `${Number(unit.area).toLocaleString("tr-TR")} m²`,
     });
-  }
+  if (unit.price)
+    details.push({
+      icon: "💎",
+      title: "Fiyat",
+      text: compactMoney(unit.price, unit.priceCurrency),
+    });
+
+  details.push({ icon: "📍", title: "İl / İlçe", text: getLocation(unit) });
+
+  if (unit.project?.city)
+    details.push({ icon: "🗺️", title: "Şehir", text: unit.project.city });
+  if (unit.project?.district)
+    details.push({ icon: "📌", title: "Bölge", text: unit.project.district });
 
   details.push({
-    icon: "📍",
-    title: "Bölge",
-    text: getLocation(unit),
+    icon: "🖼️",
+    title: "Galeri",
+    text: imageCount ? `${imageCount} fotoğraf` : "Fotoğraf bekleniyor",
   });
+  details.push({ icon: "🧾", title: "EPH ID", text: getEphId(unit.id) });
 
-  details.push({
-    icon: "🧾",
-    title: "EPH ID",
-    text: getEphId(unit.id),
-  });
-
-  return details.slice(0, 6);
+  return Array.from(
+    new Map(details.map((item) => [item.title, item])).values(),
+  ).slice(0, 9);
 }
 
 type PremiumSpec = {
@@ -1529,7 +1539,16 @@ type PremiumSpec = {
 };
 
 function getPremiumSpecs(unit: Unit): PremiumSpec[] {
-  const specs: PremiumSpec[] = [];
+  const imageCount = Array.isArray(unit.images) ? unit.images.length : 0;
+  const specs: PremiumSpec[] = [
+    { label: "Portföy", value: typeLabel(unit.type), icon: "⌂" },
+    {
+      label: "İşlem",
+      value: unit.status ? String(unit.status).replaceAll("_", " ") : "Havuz",
+      icon: "◆",
+    },
+    { label: "Bölge", value: getLocation(unit), icon: "⌖" },
+  ];
 
   if (unit.roomCount) {
     specs.push({ label: "Oda Planı", value: unit.roomCount, icon: "▦" });
@@ -1537,15 +1556,19 @@ function getPremiumSpecs(unit: Unit): PremiumSpec[] {
 
   if (unit.area) {
     specs.push({
-      label: "Net Alan",
+      label: "Alan",
       value: `${Number(unit.area).toLocaleString("tr-TR")} m²`,
       icon: "m²",
     });
   }
 
-  specs.push({ label: "Portföy", value: typeLabel(unit.type), icon: "⌂" });
+  specs.push({
+    label: "Galeri",
+    value: imageCount ? `${imageCount} Fotoğraf` : "Fotoğraf Yok",
+    icon: "▣",
+  });
 
-  return specs.slice(0, 3);
+  return specs.slice(0, 6);
 }
 
 function getCollaborationOpportunities(unit: Unit): PremiumHighlight[] {
@@ -1565,7 +1588,11 @@ function getCollaborationOpportunities(unit: Unit): PremiumHighlight[] {
     },
   ];
 
-  if (text.includes("arsa") || text.includes("kat karşılığı") || text.includes("kat karsiligi")) {
+  if (
+    text.includes("arsa") ||
+    text.includes("kat karşılığı") ||
+    text.includes("kat karsiligi")
+  ) {
     opportunities.push({
       icon: "🏗️",
       title: "Proje Fırsatı",
@@ -1592,7 +1619,25 @@ function getCollaborationOpportunities(unit: Unit): PremiumHighlight[] {
     });
   }
 
-  return opportunities.slice(0, 3);
+  opportunities.push(
+    {
+      icon: "⚡",
+      title: "Hızlı Görüşme",
+      text: "Mesaj, ilgi ve müşteri bildirimi hazır",
+    },
+    {
+      icon: "🧭",
+      title: "Saha Takibi",
+      text: "Bölge bazlı portföy çalışmasına uygun",
+    },
+    {
+      icon: "🔑",
+      title: "Sunuma Hazır",
+      text: "Müşteriye anlatılabilir net bilgi akışı",
+    },
+  );
+
+  return opportunities.slice(0, 6);
 }
 
 function getPrimarySpecs(unit: Unit) {
@@ -1638,7 +1683,6 @@ function CompactFeaturePill({ text }: { text: string }) {
   );
 }
 
-
 function PremiumHighlightCard({
   item,
   compact = false,
@@ -1660,16 +1704,24 @@ function PremiumHighlightCard({
     >
       <span
         className={`flex shrink-0 items-center justify-center rounded-[14px] bg-[#EFF6FF] text-center ${
-          compact ? "h-9 w-9 text-[18px]" : dense ? "h-9 w-9 text-[18px]" : "h-10 w-10 text-[20px]"
+          compact
+            ? "h-9 w-9 text-[18px]"
+            : dense
+              ? "h-9 w-9 text-[18px]"
+              : "h-10 w-10 text-[20px]"
         }`}
       >
         {item.icon}
       </span>
       <div className="min-w-0 text-center">
-        <p className={`${dense ? "text-[9.5px]" : "text-[11px]"} font-black leading-[1.12] tracking-[-0.02em] text-[#1F2937] break-words [overflow-wrap:anywhere]`}>
+        <p
+          className={`${dense ? "text-[9.5px]" : "text-[11px]"} font-black leading-[1.12] tracking-[-0.02em] text-[#1F2937] break-words [overflow-wrap:anywhere]`}
+        >
           {limitText(item.title, dense ? 24 : 36)}
         </p>
-        <p className={`${dense ? "mt-1 text-[8.5px] leading-3" : "mt-0.5 text-[9.5px] leading-4"} font-bold text-[#64748B] break-words [overflow-wrap:anywhere]`}>
+        <p
+          className={`${dense ? "mt-1 text-[8.5px] leading-3" : "mt-0.5 text-[9.5px] leading-4"} font-bold text-[#64748B] break-words [overflow-wrap:anywhere]`}
+        >
           {limitText(item.text, dense ? 42 : 54)}
         </p>
       </div>
@@ -1813,14 +1865,21 @@ function PoolDetailModal({
 }) {
   const images = getUnitImages(unit);
   const fallbackImage = getCover(unit);
-  const galleryImages = images.length ? images : fallbackImage ? [fallbackImage] : [];
+  const galleryImages = images.length
+    ? images
+    : fallbackImage
+      ? [fallbackImage]
+      : [];
   const [galleryIndex, setGalleryIndex] = useState(0);
   const image = galleryImages[galleryIndex] || galleryImages[0] || "";
   const specs = getPremiumSpecs(unit);
   const portfolioHighlights = getPremiumPortfolioHighlights(unit);
   const collaborationHighlights = getCollaborationOpportunities(unit);
   const visibleDetails = getVisiblePortfolioDetails(unit);
-  const imageCount = galleryImages.length || (Array.isArray(unit.images) ? unit.images.length : 0) || 0;
+  const imageCount =
+    galleryImages.length ||
+    (Array.isArray(unit.images) ? unit.images.length : 0) ||
+    0;
   const messageBusy = busyAction === `MESSAGE_${unit.id}`;
 
   useEffect(() => {
@@ -1847,12 +1906,12 @@ function PoolDetailModal({
         <div className="relative shrink-0 bg-white">
           <div className="mx-auto mt-2 h-1.5 w-11 rounded-full bg-[#CBD5E1]" />
 
-          <div className="relative mt-2 h-[260px] overflow-hidden bg-[#EEF3F8] sm:h-[280px]">
+          <div className="relative mt-2 h-[270px] overflow-hidden bg-gradient-to-br from-[#EAF1FB] via-white to-[#EEF3F8] sm:h-[292px]">
             {image ? (
               <img
                 src={image}
                 alt={unit.project?.name || "Portföy"}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-[#2563EB]">
@@ -1895,7 +1954,9 @@ function PoolDetailModal({
                     type="button"
                     onClick={() => setGalleryIndex(index)}
                     className={`h-[54px] min-w-[68px] overflow-hidden rounded-[12px] border-2 bg-white shadow-[0_8px_16px_rgba(15,23,42,0.18)] ${
-                      galleryIndex === index ? "border-[#2563EB]" : "border-white/85"
+                      galleryIndex === index
+                        ? "border-[#2563EB]"
+                        : "border-white/85"
                     }`}
                     aria-label={`${index + 1}. fotoğraf`}
                   >
@@ -1953,7 +2014,7 @@ function PoolDetailModal({
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 border-t-2 border-[#E2EAF5] bg-white p-2.5">
+            <div className="grid grid-cols-3 gap-1.5 border-t-2 border-[#E2EAF5] bg-white p-2.5">
               {specs.map((spec) => (
                 <PremiumSpecCard key={spec.label} spec={spec} />
               ))}
@@ -1992,11 +2053,16 @@ function PoolDetailModal({
             </div>
           </section>
 
-          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-white p-3 text-center">
-            <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-              Portföy Notu
-            </p>
-            <p className="mx-auto mt-1.5 max-w-[360px] text-center text-[12px] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
+          <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white text-center shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
+            <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
+              <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+                Portföy Sahibinin Notu
+              </p>
+              <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
+                Kullanıcının portföy için yazdığı açıklama
+              </p>
+            </div>
+            <p className="mx-auto max-w-[370px] px-3 py-3 text-center text-[12.5px] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
               {unit.description ||
                 "Bu Havuz portföyü için açıklama girilmemiş."}
             </p>
@@ -2020,10 +2086,11 @@ function PoolDetailModal({
 
           <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3 text-center">
             <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-              Havuz Bilgisi
+              Görüşme Bilgisi
             </p>
             <p className="mx-auto mt-1.5 max-w-[350px] text-center text-[12px] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
-              Portföy sahibiyle görüşme başlatılabilir. İletişim ve tam adres bilgileri yalnızca yetkili görüşme akışında paylaşılır.
+              Portföy sahibiyle mesaj, ilgi bildirimi veya müşterim var akışı
+              üzerinden güvenli görüşme başlatılabilir.
             </p>
           </section>
         </div>
@@ -2067,18 +2134,16 @@ function PoolDetailModal({
 
 function PremiumSpecCard({ spec }: { spec: PremiumSpec }) {
   return (
-    <div className="flex min-h-[52px] items-center justify-center gap-2 rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-1.5 text-center">
+    <div className="flex min-h-[66px] min-w-0 flex-col items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-1.5 text-center shadow-[0_6px_12px_rgba(15,23,42,0.035)]">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-white text-[13px] font-black text-[#2563EB] shadow-[0_6px_12px_rgba(15,23,42,0.05)]">
         {spec.icon}
       </div>
-      <div className="min-w-0 text-center">
-        <p className="text-[8px] font-black uppercase tracking-[0.08em] text-[#64748B]">
-          {spec.label}
-        </p>
-        <p className="mt-0.5 text-[11px] font-black leading-[1.05] text-[#0F172A] break-words [overflow-wrap:anywhere]">
-          {limitText(spec.value, 22)}
-        </p>
-      </div>
+      <p className="mt-1 text-[7.5px] font-black uppercase tracking-[0.06em] text-[#64748B]">
+        {spec.label}
+      </p>
+      <p className="mt-0.5 text-[10px] font-black leading-[1.08] text-[#0F172A] break-words [overflow-wrap:anywhere]">
+        {limitText(spec.value, 24)}
+      </p>
     </div>
   );
 }
