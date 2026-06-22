@@ -15,6 +15,12 @@ export class CrmController {
     return this.crmService.getAdminSummary(user.role);
   }
 
+
+  @Get('admin-performance')
+  getAdminPerformance(@CurrentUser() user: any) {
+    return this.crmService.getAdminPerformance(user.role);
+  }
+
   @Get('customers')
   getCustomers(@CurrentUser() user: any) {
     return this.crmService.getCustomers(user.id, user.role);

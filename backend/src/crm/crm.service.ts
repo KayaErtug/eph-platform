@@ -659,6 +659,283 @@ export class CrmService {
     };
   }
 
+
+  async getAdminPerformance(userRole: Role) {
+    const normalizedRole = String(userRole || '').toUpperCase();
+    const allowedRoles = ['ADMIN', 'SUPER_ADMIN', 'MODERATOR'];
+
+    if (!allowedRoles.includes(normalizedRole)) {
+      throw new ForbiddenException('CRM performans özetine erişim yetkiniz yok.');
+    }
+
+    const [offices, users, customerGroups, closedCustomerGroups, pendingTaskGroups, activityGroups, units] = await Promise.all([
+      this.prisma.office.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          city: true,
+          district: true,
+          users: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              role: true,
+            },
+          },
+          teams: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              name: true,
+              leader: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+              members: {
+                where: { isActive: true },
+                select: {
+                  userId: true,
+                  user: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                      role: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.user.findMany({
+        where: {
+          role: {
+            in: [Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI],
+          },
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          role: true,
+          office: {
+            select: {
+              id: true,
+              name: true,
+              city: true,
+              district: true,
+            },
+          },
+        },
+      }),
+      this.prisma.customer.groupBy({
+        by: ['ownerId'],
+        _count: { _all: true },
+      }),
+      this.prisma.customer.groupBy({
+        by: ['ownerId'],
+        where: { status: CustomerStatus.KAPANDI },
+        _count: { _all: true },
+      }),
+      this.prisma.task.groupBy({
+        by: ['userId'],
+        where: { status: TaskStatus.BEKLIYOR },
+        _count: { _all: true },
+      }),
+      this.prisma.activity.groupBy({
+        by: ['userId'],
+        _count: { _all: true },
+      }),
+      this.prisma.unit.findMany({
+        select: {
+          id: true,
+          isPoolVisible: true,
+          project: {
+            select: {
+              ownerId: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const customerCountByUser = new Map(customerGroups.map((item) => [item.ownerId, item._count._all]));
+    const closedCountByUser = new Map(closedCustomerGroups.map((item) => [item.ownerId, item._count._all]));
+    const pendingTaskCountByUser = new Map(pendingTaskGroups.map((item) => [item.userId, item._count._all]));
+    const activityCountByUser = new Map(activityGroups.map((item) => [item.userId, item._count._all]));
+    const portfolioCountByUser = new Map<string, number>();
+    const poolPortfolioCountByUser = new Map<string, number>();
+
+    units.forEach((unit) => {
+      const ownerId = unit.project?.ownerId;
+      if (!ownerId) return;
+
+      portfolioCountByUser.set(ownerId, (portfolioCountByUser.get(ownerId) || 0) + 1);
+
+      if (unit.isPoolVisible) {
+        poolPortfolioCountByUser.set(ownerId, (poolPortfolioCountByUser.get(ownerId) || 0) + 1);
+      }
+    });
+
+    const sumForUsers = (userIds: string[], source: Map<string, number>) =>
+      userIds.reduce((total, userId) => total + (source.get(userId) || 0), 0);
+
+    const calculateScore = (input: {
+      customerCount: number;
+      closedCount: number;
+      activityCount: number;
+      portfolioCount: number;
+      poolPortfolioCount: number;
+      memberCount?: number;
+    }) => {
+      const customerScore = Math.min(25, input.customerCount * 0.75);
+      const closedScore = Math.min(25, input.closedCount * 2.5);
+      const activityScore = Math.min(20, input.activityCount * 0.65);
+      const portfolioScore = Math.min(20, input.portfolioCount * 0.65);
+      const poolScore = Math.min(10, input.poolPortfolioCount * 1.2);
+      const memberBonus = Math.min(8, (input.memberCount || 0) * 0.6);
+
+      return Math.max(0, Math.min(100, Math.round(customerScore + closedScore + activityScore + portfolioScore + poolScore + memberBonus)));
+    };
+
+    const officePerformance = offices
+      .map((office) => {
+        const userIds = office.users.map((item) => item.id);
+        const customerCount = sumForUsers(userIds, customerCountByUser);
+        const closedCount = sumForUsers(userIds, closedCountByUser);
+        const pendingTaskCount = sumForUsers(userIds, pendingTaskCountByUser);
+        const activityCount = sumForUsers(userIds, activityCountByUser);
+        const portfolioCount = sumForUsers(userIds, portfolioCountByUser);
+        const poolPortfolioCount = sumForUsers(userIds, poolPortfolioCountByUser);
+
+        return {
+          id: office.id,
+          name: office.name,
+          location: [office.city, office.district].filter(Boolean).join(' / ') || 'Konum yok',
+          advisorCount: office.users.length,
+          teamCount: office.teams.length,
+          customerCount,
+          closedCount,
+          pendingTaskCount,
+          activityCount,
+          portfolioCount,
+          poolPortfolioCount,
+          performanceScore: calculateScore({
+            customerCount,
+            closedCount,
+            activityCount,
+            portfolioCount,
+            poolPortfolioCount,
+            memberCount: office.users.length,
+          }),
+        };
+      })
+      .sort((a, b) => b.performanceScore - a.performanceScore || b.customerCount - a.customerCount)
+      .slice(0, 5);
+
+    const teamPerformance = offices
+      .flatMap((office) =>
+        office.teams.map((team) => {
+          const userIds = team.members.map((member) => member.userId);
+          const customerCount = sumForUsers(userIds, customerCountByUser);
+          const closedCount = sumForUsers(userIds, closedCountByUser);
+          const pendingTaskCount = sumForUsers(userIds, pendingTaskCountByUser);
+          const activityCount = sumForUsers(userIds, activityCountByUser);
+          const portfolioCount = sumForUsers(userIds, portfolioCountByUser);
+          const poolPortfolioCount = sumForUsers(userIds, poolPortfolioCountByUser);
+
+          return {
+            id: team.id,
+            name: team.name,
+            officeName: office.name,
+            leaderName: [team.leader?.firstName, team.leader?.lastName].filter(Boolean).join(' ') || 'Lider yok',
+            memberCount: team.members.length,
+            customerCount,
+            closedCount,
+            pendingTaskCount,
+            activityCount,
+            portfolioCount,
+            poolPortfolioCount,
+            performanceScore: calculateScore({
+              customerCount,
+              closedCount,
+              activityCount,
+              portfolioCount,
+              poolPortfolioCount,
+              memberCount: team.members.length,
+            }),
+          };
+        }),
+      )
+      .sort((a, b) => b.performanceScore - a.performanceScore || b.customerCount - a.customerCount)
+      .slice(0, 5);
+
+    const teamNameByUserId = new Map<string, string>();
+
+    offices.forEach((office) => {
+      office.teams.forEach((team) => {
+        team.members.forEach((member) => {
+          if (!teamNameByUserId.has(member.userId)) {
+            teamNameByUserId.set(member.userId, team.name);
+          }
+        });
+      });
+    });
+
+    const advisorPerformance = users
+      .map((advisor) => {
+        const customerCount = customerCountByUser.get(advisor.id) || 0;
+        const closedCount = closedCountByUser.get(advisor.id) || 0;
+        const pendingTaskCount = pendingTaskCountByUser.get(advisor.id) || 0;
+        const activityCount = activityCountByUser.get(advisor.id) || 0;
+        const portfolioCount = portfolioCountByUser.get(advisor.id) || 0;
+        const poolPortfolioCount = poolPortfolioCountByUser.get(advisor.id) || 0;
+
+        return {
+          id: advisor.id,
+          name: [advisor.firstName, advisor.lastName].filter(Boolean).join(' ') || advisor.email || 'Danışman',
+          role: advisor.role,
+          officeName: advisor.office?.name || 'Ofis yok',
+          teamName: teamNameByUserId.get(advisor.id) || 'Takım yok',
+          customerCount,
+          closedCount,
+          pendingTaskCount,
+          activityCount,
+          portfolioCount,
+          poolPortfolioCount,
+          performanceScore: calculateScore({
+            customerCount,
+            closedCount,
+            activityCount,
+            portfolioCount,
+            poolPortfolioCount,
+          }),
+        };
+      })
+      .filter((advisor) => advisor.customerCount > 0 || advisor.portfolioCount > 0 || advisor.activityCount > 0)
+      .sort((a, b) => b.performanceScore - a.performanceScore || b.customerCount - a.customerCount)
+      .slice(0, 10);
+
+    return {
+      officePerformance,
+      teamPerformance,
+      advisorPerformance,
+    };
+  }
+
+
   async getPipeline(userId: string, userRole: Role) {
     const customers = await this.prisma.customer.findMany({
       where: this.getCustomerWhere(userId, userRole),

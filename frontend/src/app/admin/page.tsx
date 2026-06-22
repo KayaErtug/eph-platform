@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Activity,
+  Award,
+  BarChart3,
   ArrowRight,
   Bell,
   Building2,
@@ -122,6 +124,31 @@ type CrmAdminSummary = {
   totalActivities?: number;
   totalInterests?: number;
   totalCustomerProperties?: number;
+};
+
+type CrmPerformanceRow = {
+  id: string;
+  name: string;
+  location?: string;
+  officeName?: string;
+  leaderName?: string;
+  teamName?: string;
+  advisorCount?: number;
+  teamCount?: number;
+  memberCount?: number;
+  customerCount?: number;
+  closedCount?: number;
+  pendingTaskCount?: number;
+  activityCount?: number;
+  portfolioCount?: number;
+  poolPortfolioCount?: number;
+  performanceScore?: number;
+};
+
+type CrmAdminPerformance = {
+  officePerformance?: CrmPerformanceRow[];
+  teamPerformance?: CrmPerformanceRow[];
+  advisorPerformance?: CrmPerformanceRow[];
 };
 
 type StatTone = "blue" | "orange" | "green" | "purple" | "cyan" | "rose" | "gray";
@@ -262,6 +289,7 @@ export default function AdminPage() {
   const [visits, setVisits] = useState<VisitItem[]>([]);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null);
   const [crmAdminSummary, setCrmAdminSummary] = useState<CrmAdminSummary | null>(null);
+  const [crmAdminPerformance, setCrmAdminPerformance] = useState<CrmAdminPerformance | null>(null);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -290,7 +318,7 @@ export default function AdminPage() {
     setLoading(true);
 
     try {
-      const [statsResult, approvalsResult, applicationsResult, visitsResult, summaryResult, crmSummaryResult] =
+      const [statsResult, approvalsResult, applicationsResult, visitsResult, summaryResult, crmSummaryResult, crmPerformanceResult] =
         await Promise.allSettled([
           api.get("/admin/stats"),
           api.get("/units/admin/portfolio-approvals?status=ALL"),
@@ -298,6 +326,7 @@ export default function AdminPage() {
           api.get("/visits"),
           api.get("/admin/dashboard-summary"),
           api.get("/crm/admin-summary"),
+          api.get("/crm/admin-performance"),
         ]);
 
       if (statsResult.status === "fulfilled") {
@@ -332,6 +361,12 @@ export default function AdminPage() {
         setCrmAdminSummary(crmSummaryResult.value.data || null);
       } else {
         setCrmAdminSummary(null);
+      }
+
+      if (crmPerformanceResult.status === "fulfilled") {
+        setCrmAdminPerformance(crmPerformanceResult.value.data || null);
+      } else {
+        setCrmAdminPerformance(null);
       }
     } finally {
       setLoading(false);
@@ -881,6 +916,8 @@ export default function AdminPage() {
               </div>
             </section>
 
+            <CrmAdminPerformanceSection data={crmAdminPerformance} />
+
             <section className="mt-3 grid gap-2 lg:grid-cols-[0.9fr_1.1fr]">
               <div className="rounded-2xl bg-white p-3 shadow-sm border-2 border-[#C7D6E8]">
                 <div className="mb-3 text-center">
@@ -1200,6 +1237,141 @@ function SystemMiniCard({
           {item.sub}
         </p>
       </div>
+    </div>
+  );
+}
+
+
+function CrmAdminPerformanceSection({ data }: { data: CrmAdminPerformance | null }) {
+  const officeRows = data?.officePerformance || [];
+  const teamRows = data?.teamPerformance || [];
+  const advisorRows = data?.advisorPerformance || [];
+
+  return (
+    <section className="mt-3 rounded-2xl border-2 border-[#C7D6E8] bg-white p-3 shadow-sm">
+      <div className="mb-3 text-center">
+        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-700">
+          CRM-ADMIN V2
+        </p>
+        <h2 className="mt-1 text-center text-[17px] font-black tracking-[-0.04em] text-[#06194A]">
+          Performans Merkezi
+        </h2>
+        <p className="mt-1 text-center text-[11px] font-semibold leading-4 text-slate-500">
+          Ofis, takım ve danışman performansı genel özet olarak gösterilir.
+        </p>
+      </div>
+
+      <div className="grid gap-2 lg:grid-cols-3">
+        <PerformancePanel
+          title="Ofis Performansı"
+          subtitle="En aktif ofisler"
+          icon={<Building2 size={18} />}
+          rows={officeRows}
+          empty="Ofis performansı bulunamadı."
+          meta={(row) => `${row.advisorCount || 0} danışman • ${row.teamCount || 0} takım`}
+        />
+        <PerformancePanel
+          title="Takım Performansı"
+          subtitle="En aktif takımlar"
+          icon={<UsersRound size={18} />}
+          rows={teamRows}
+          empty="Takım performansı bulunamadı."
+          meta={(row) => `${row.officeName || 'Ofis yok'} • ${row.memberCount || 0} üye`}
+        />
+        <PerformancePanel
+          title="En Aktif Danışmanlar"
+          subtitle="CRM + portföy aktivitesi"
+          icon={<Award size={18} />}
+          rows={advisorRows}
+          empty="Danışman aktivitesi bulunamadı."
+          meta={(row) => `${row.officeName || 'Ofis yok'} • ${row.teamName || 'Takım yok'}`}
+          limit={6}
+        />
+      </div>
+    </section>
+  );
+}
+
+function PerformancePanel({
+  title,
+  subtitle,
+  icon,
+  rows,
+  empty,
+  meta,
+  limit = 5,
+}: {
+  title: string;
+  subtitle: string;
+  icon: ReactNode;
+  rows: CrmPerformanceRow[];
+  empty: string;
+  meta: (row: CrmPerformanceRow) => string;
+  limit?: number;
+}) {
+  return (
+    <div className="rounded-2xl border-2 border-[#C7D6E8] bg-[#F8FAFC] p-2.5">
+      <div className="mb-2 flex items-center justify-center gap-2 text-center">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+          {icon}
+        </span>
+        <div className="min-w-0 text-center">
+          <h3 className="break-words text-center text-[13px] font-black leading-4 text-[#06194A]">
+            {title}
+          </h3>
+          <p className="text-center text-[10px] font-semibold text-slate-500">
+            {subtitle}
+          </p>
+        </div>
+      </div>
+
+      {rows.length ? (
+        <div className="space-y-2">
+          {rows.slice(0, limit).map((row, index) => (
+            <div
+              key={row.id}
+              className="rounded-2xl border-2 border-[#D7E3F2] bg-white p-2 text-center shadow-[0_6px_16px_rgba(15,23,42,0.035)]"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#06194A] text-[11px] font-black text-white">
+                  {index + 1}
+                </div>
+                <div className="min-w-0 flex-1 text-center">
+                  <p className="break-words text-center text-[12px] font-black leading-4 text-[#06194A]">
+                    {row.name}
+                  </p>
+                  <p className="mt-0.5 break-words text-center text-[9.5px] font-semibold leading-3 text-slate-500">
+                    {meta(row)}
+                  </p>
+                </div>
+                <div className="flex h-8 min-w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 px-2 text-[11px] font-black text-white">
+                  %{row.performanceScore || 0}
+                </div>
+              </div>
+
+              <div className="mt-2 grid grid-cols-3 gap-1 text-center">
+                <MiniMetric label="CRM" value={row.customerCount || 0} />
+                <MiniMetric label="Kapalı" value={row.closedCount || 0} />
+                <MiniMetric label="Portföy" value={row.portfolioCount || 0} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl bg-white p-4 text-center">
+          <BarChart3 className="mx-auto text-slate-400" size={22} />
+          <p className="mt-2 text-[12px] font-black text-slate-600">{empty}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-xl bg-[#EFF6FF] px-1.5 py-1 text-center">
+      <p className="text-[10px] font-black leading-3 text-[#06194A]">{value}</p>
+      <p className="text-[8px] font-black uppercase leading-3 text-blue-700">{label}</p>
     </div>
   );
 }
