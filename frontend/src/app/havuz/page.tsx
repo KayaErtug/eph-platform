@@ -1637,7 +1637,7 @@ function getCollaborationOpportunities(unit: Unit): PremiumHighlight[] {
     },
   );
 
-  return opportunities.slice(0, 6);
+  return opportunities.slice(0, 3);
 }
 
 function getPrimarySpecs(unit: Unit) {
@@ -1875,7 +1875,6 @@ function PoolDetailModal({
   const specs = getPremiumSpecs(unit);
   const portfolioHighlights = getPremiumPortfolioHighlights(unit);
   const collaborationHighlights = getCollaborationOpportunities(unit);
-  const visibleDetails = getVisiblePortfolioDetails(unit);
   const imageCount =
     galleryImages.length ||
     (Array.isArray(unit.images) ? unit.images.length : 0) ||
@@ -1906,7 +1905,7 @@ function PoolDetailModal({
         <div className="relative shrink-0 bg-white">
           <div className="mx-auto mt-2 h-1.5 w-11 rounded-full bg-[#CBD5E1]" />
 
-          <div className="relative mt-2 h-[270px] overflow-hidden bg-gradient-to-br from-[#EAF1FB] via-white to-[#EEF3F8] sm:h-[292px]">
+          <div className="relative mt-2 h-[320px] overflow-hidden bg-gradient-to-br from-[#EAF1FB] via-white to-[#EEF3F8] sm:h-[340px]">
             {image ? (
               <img
                 src={image}
@@ -2021,6 +2020,21 @@ function PoolDetailModal({
             </div>
           </div>
 
+          <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white text-center shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
+            <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
+              <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+                Portföy Sahibinin Notu
+              </p>
+              <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
+                Kullanıcının portföy için yazdığı açıklama
+              </p>
+            </div>
+            <p className="mx-auto max-w-[370px] px-3 py-3 text-center text-[12.5px] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
+              {unit.description ||
+                "Bu Havuz portföyü için açıklama girilmemiş."}
+            </p>
+          </section>
+
           <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
             <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
               <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
@@ -2053,46 +2067,11 @@ function PoolDetailModal({
             </div>
           </section>
 
-          <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white text-center shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
-            <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
-              <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-                Portföy Sahibinin Notu
-              </p>
-              <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
-                Kullanıcının portföy için yazdığı açıklama
-              </p>
-            </div>
-            <p className="mx-auto max-w-[370px] px-3 py-3 text-center text-[12.5px] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
-              {unit.description ||
-                "Bu Havuz portföyü için açıklama girilmemiş."}
-            </p>
-          </section>
 
-          <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
-            <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
-              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-                Portföy Detayları
-              </p>
-              <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
-                Havuzda gösterilebilen güvenli portföy bilgileri
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-1.5 p-2.5">
-              {visibleDetails.map((item) => (
-                <PremiumHighlightCard key={item.title} item={item} dense />
-              ))}
-            </div>
-          </section>
 
-          <section className="mt-3 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3 text-center">
-            <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-              Görüşme Bilgisi
-            </p>
-            <p className="mx-auto mt-1.5 max-w-[350px] text-center text-[12px] font-bold leading-5 text-[#475569] break-words [overflow-wrap:anywhere]">
-              Portföy sahibiyle mesaj, ilgi bildirimi veya müşterim var akışı
-              üzerinden güvenli görüşme başlatılabilir.
-            </p>
-          </section>
+
+
+
         </div>
 
         <div className="shrink-0 border-t-2 border-[#C7D6E8] bg-white/95 p-2.5 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-12px_28px_rgba(15,23,42,0.08)]">
