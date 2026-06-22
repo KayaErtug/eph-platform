@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -110,6 +110,18 @@ type DashboardSummary = {
     today?: number;
     recipientTotal?: number;
   };
+};
+
+type CrmAdminSummary = {
+  totalCustomers?: number;
+  activeCustomers?: number;
+  closedDeals?: number;
+  lostDeals?: number;
+  pendingTasks?: number;
+  totalTasks?: number;
+  totalActivities?: number;
+  totalInterests?: number;
+  totalCustomerProperties?: number;
 };
 
 type StatTone = "blue" | "orange" | "green" | "purple" | "cyan" | "rose" | "gray";
@@ -249,6 +261,7 @@ export default function AdminPage() {
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [visits, setVisits] = useState<VisitItem[]>([]);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null);
+  const [crmAdminSummary, setCrmAdminSummary] = useState<CrmAdminSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -277,13 +290,14 @@ export default function AdminPage() {
     setLoading(true);
 
     try {
-      const [statsResult, approvalsResult, applicationsResult, visitsResult, summaryResult] =
+      const [statsResult, approvalsResult, applicationsResult, visitsResult, summaryResult, crmSummaryResult] =
         await Promise.allSettled([
           api.get("/admin/stats"),
           api.get("/units/admin/portfolio-approvals?status=ALL"),
           api.get("/admin/applications?status=all"),
           api.get("/visits"),
           api.get("/admin/dashboard-summary"),
+          api.get("/crm/admin-summary"),
         ]);
 
       if (statsResult.status === "fulfilled") {
@@ -312,6 +326,12 @@ export default function AdminPage() {
 
       if (summaryResult.status === "fulfilled") {
         setDashboardSummary(summaryResult.value.data || null);
+      }
+
+      if (crmSummaryResult.status === "fulfilled") {
+        setCrmAdminSummary(crmSummaryResult.value.data || null);
+      } else {
+        setCrmAdminSummary(null);
       }
     } finally {
       setLoading(false);
@@ -586,6 +606,67 @@ export default function AdminPage() {
     },
   ];
 
+  const crmAdminCards: StatCardItem[] = [
+    {
+      label: "Toplam CRM",
+      value: crmAdminSummary?.totalCustomers || 0,
+      sub: "Müşteri kaydı",
+      tone: "blue",
+      icon: <UsersRound size={20} />,
+    },
+    {
+      label: "Aktif CRM",
+      value: crmAdminSummary?.activeCustomers || 0,
+      sub: "Devam eden",
+      tone: "green",
+      icon: <Activity size={20} />,
+    },
+    {
+      label: "Kapalı",
+      value: crmAdminSummary?.closedDeals || 0,
+      sub: "Tamamlanan iş",
+      tone: "purple",
+      icon: <CheckCircle2 size={20} />,
+    },
+    {
+      label: "Kaybedilen",
+      value: crmAdminSummary?.lostDeals || 0,
+      sub: "Sonlanan kayıt",
+      tone: "gray",
+      icon: <X size={20} />,
+    },
+    {
+      label: "Bekleyen",
+      value: crmAdminSummary?.pendingTasks || 0,
+      sub: "Görev",
+      tone: "orange",
+      icon: <CalendarDays size={20} />,
+    },
+    {
+      label: "Aktivite",
+      value: crmAdminSummary?.totalActivities || 0,
+      sub: "Görüşme notu",
+      tone: "cyan",
+      icon: <MessageCircle size={20} />,
+    },
+    {
+      label: "İlgi Kaydı",
+      value: crmAdminSummary?.totalInterests || 0,
+      sub: "Talep profili",
+      tone: "rose",
+      icon: <Sparkles size={20} />,
+    },
+    {
+      label: "Bağlantı",
+      value: crmAdminSummary?.totalCustomerProperties || 0,
+      sub: "Portföy ilişkisi",
+      tone: "purple",
+      icon: <Building2 size={20} />,
+    },
+  ];
+
+
+
   if (!hasHydrated || loading) {
     return (
       <main className="flex min-h-[100dvh] items-center justify-center bg-[#F4F8FF] text-[#06194A]">
@@ -778,6 +859,26 @@ export default function AdminPage() {
               {systemCards.map((item) => (
                 <SystemMiniCard key={item.title} item={item} />
               ))}
+            </section>
+
+            <section className="mt-3 rounded-2xl border-2 border-[#C7D6E8] bg-white p-3 shadow-sm">
+              <div className="mb-3 text-center">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">
+                  CRM-ADMIN V1
+                </p>
+                <h2 className="mt-1 text-center text-[17px] font-black tracking-[-0.04em] text-[#06194A]">
+                  CRM Yönetim Merkezi
+                </h2>
+                <p className="mt-1 text-center text-[11px] font-semibold leading-4 text-slate-500">
+                  Yönetici yalnızca genel CRM özetini görür; müşteri detayları gizli kalır.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                {crmAdminCards.map((item) => (
+                  <AdminStatCard key={item.label} item={item} compact />
+                ))}
+              </div>
             </section>
 
             <section className="mt-3 grid gap-2 lg:grid-cols-[0.9fr_1.1fr]">
