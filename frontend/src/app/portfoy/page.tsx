@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -1596,6 +1596,7 @@ function PortfolioMap({
       if (!lat || !lng) return;
 
       const isSelected = selectedUnitId === unit.id;
+
       const svg = `
         <svg width="48" height="58" viewBox="0 0 48 58" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M24 56C24 56 43 35.6 43 20.5C43 9.73 34.49 1 24 1C13.51 1 5 9.73 5 20.5C5 35.6 24 56 24 56Z" fill="${isSelected ? "#0B3FB3" : "#1557D6"}" stroke="white" stroke-width="3"/>
@@ -1609,14 +1610,13 @@ function PortfolioMap({
       const marker = new window.google.maps.Marker({
         position: { lat, lng },
         map: googleMapRef.current,
-        title: unit.project?.name || "EPH Portföy",
+        title: unit.project?.name || "EPH PortfÃ¶y",
         icon: {
           url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
           scaledSize: new window.google.maps.Size(isSelected ? 52 : 44, isSelected ? 62 : 54),
           anchor: new window.google.maps.Point(isSelected ? 26 : 22, isSelected ? 62 : 54),
         },
         zIndex: isSelected ? 30 : 20,
-        optimized: true,
       });
 
       marker.addListener("click", () => onSelectUnit(unit.id));
@@ -1657,3 +1657,4 @@ export default function StokPage() {
     </Suspense>
   );
 }
+
