@@ -1595,63 +1595,71 @@ function PortfolioMap({
 
       if (!lat || !lng) return;
 
-      const priceText = formatCompactPrice(
-        unit.price,
-        unit.priceCurrency,
-      ).replace(" ₺", "₺");
-      const pinColor = unit.status === "KIRALIK" ? "#1557D6" : "#059669";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       const isSelected = selectedUnitId === unit.id;
-      const overlay = new window.google.maps.OverlayView();
-      let element: HTMLButtonElement | null = null;
+      const fill = isSelected ? "#0B3FB3" : "#1557D6";
+      const svg = `
+        <svg width="48" height="58" viewBox="0 0 48 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M24 56C24 56 43 35.6 43 20.5C43 9.73 34.49 1 24 1C13.51 1 5 9.73 5 20.5C5 35.6 24 56 24 56Z" fill="${fill}" stroke="white" stroke-width="3"/>
+          <circle cx="24" cy="21" r="12.5" fill="white"/>
+          <path d="M15.8 22.2L24 15.5L32.2 22.2" stroke="#1557D6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M18.6 21.4V30.2H29.4V21.4" stroke="#1557D6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M22 30.2V25.2H26V30.2" stroke="#1557D6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      `;
 
-      overlay.onAdd = function onAdd() {
-        element = document.createElement("button");
-        element.type = "button";
-        element.title = unit.project?.name || "EPH Portföy";
-        element.textContent = priceText;
-        element.style.position = "absolute";
-        element.style.transform = "translate(-50%, -100%)";
-        element.style.minWidth = isSelected ? "78px" : "64px";
-        element.style.minHeight = isSelected ? "34px" : "30px";
-        element.style.padding = "0 9px";
-        element.style.borderRadius = "999px 999px 999px 6px";
-        element.style.border = "2px solid #ffffff";
-        element.style.background = pinColor;
-        element.style.color = "#ffffff";
-        element.style.fontSize = isSelected ? "12px" : "11px";
-        element.style.fontWeight = "900";
-        element.style.lineHeight = "1";
-        element.style.boxShadow = "0 12px 22px rgba(15,23,42,0.28)";
-        element.style.zIndex = isSelected ? "30" : "20";
-        element.style.cursor = "pointer";
-        element.style.whiteSpace = "nowrap";
-        element.style.display = "flex";
-        element.style.alignItems = "center";
-        element.style.justifyContent = "center";
-        element.style.pointerEvents = "auto";
-        element.addEventListener("click", () => onSelectUnit(unit.id));
-        const panes = overlay.getPanes();
-        panes?.overlayMouseTarget.appendChild(element);
-      };
+      const marker = new window.google.maps.Marker({
+        position: { lat, lng },
+        map: googleMapRef.current,
+        title: unit.project?.name || "EPH Portföy",
+        icon: {
+          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+          scaledSize: new window.google.maps.Size(
+            isSelected ? 52 : 44,
+            isSelected ? 62 : 54,
+          ),
+          anchor: new window.google.maps.Point(
+            isSelected ? 26 : 22,
+            isSelected ? 62 : 54,
+          ),
+        },
+        zIndex: isSelected ? 30 : 20,
+      });
 
-      overlay.draw = function draw() {
-        if (!element) return;
-        const projection = overlay.getProjection();
-        const point = projection.fromLatLngToDivPixel(
-          new window.google.maps.LatLng(lat, lng),
-        );
-        if (!point) return;
-        element.style.left = `${point.x}px`;
-        element.style.top = `${point.y}px`;
-      };
+      marker.addListener("click", () => onSelectUnit(unit.id));
+      markersRef.current.push(marker);
 
-      overlay.onRemove = function onRemove() {
-        if (element?.parentNode) element.parentNode.removeChild(element);
-        element = null;
-      };
 
-      overlay.setMap(googleMapRef.current);
-      markersRef.current.push(overlay);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       bounds.extend({ lat, lng });
     });
 
