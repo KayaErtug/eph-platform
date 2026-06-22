@@ -1729,6 +1729,15 @@ function PremiumHighlightCard({
   );
 }
 
+
+
+
+
+
+
+
+
+
 function PoolUnitCard({
   index,
   unit,
@@ -1754,26 +1763,27 @@ function PoolUnitCard({
   const text = [unit.type, unit.status, unit.description, unit.project?.name]
     .join(" ")
     .toLocaleLowerCase("tr-TR");
+
   const isLand =
     typeChip.includes("ARSA") ||
     text.includes("arsa") ||
     text.includes("tarla") ||
     text.includes("bağ") ||
     text.includes("bag");
-  const hasNaturalGas = text.includes("doğalgaz") || text.includes("dogalgaz");
+
   const highlight = features[0] || "Ortak Çalışmaya Uygun";
   const busy = Boolean(busyAction);
 
   const quickSpecs = isLand
     ? [
-        { icon: "▴", label: "Yol" },
+        { icon: "▴", label: "Yol Var" },
         { icon: "○", label: "Su" },
         { icon: "ϟ", label: "Elektrik" },
-        { icon: "♨", label: hasNaturalGas ? "Doğalgaz" : "Doğalgaz" },
+        { icon: "♨", label: "Doğalgaz" },
       ]
     : [
-        { icon: "▦", label: "Kat" },
-        { icon: "☼", label: "Cephe" },
+        { icon: "▦", label: "2. Kat" },
+        { icon: "☼", label: "Güney" },
         { icon: "♨", label: "Banyo" },
         { icon: "▥", label: "Balkon" },
       ];
@@ -1797,9 +1807,9 @@ function PoolUnitCard({
   return (
     <article
       onClick={onDetail}
-      className="grid min-h-[230px] cursor-pointer grid-cols-[39%_61%] overflow-hidden rounded-[18px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.055)] active:scale-[0.995]"
+      className="grid min-h-[292px] cursor-pointer grid-cols-[48%_52%] overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.07)] active:scale-[0.995]"
     >
-      <div className="relative min-h-[230px] overflow-hidden bg-[#EEF3F8]">
+      <div className="relative min-h-[292px] overflow-hidden bg-[#EEF3F8]">
         {image ? (
           <img
             src={image}
@@ -1808,75 +1818,75 @@ function PoolUnitCard({
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[#2563EB]">
-            <Building2 size={30} />
+            <Building2 size={34} />
           </div>
         )}
 
-        <div className="absolute left-2 top-2 rounded-full bg-white/95 px-2 py-0.5 text-[8px] font-black text-emerald-700 shadow-sm">
+        <div className="absolute left-2 top-2 rounded-full bg-white/95 px-2.5 py-1 text-[8px] font-black text-emerald-700 shadow-sm">
           EPH Onaylı
         </div>
 
-        <div className="absolute bottom-2 left-2 rounded-full bg-slate-950/78 px-2 py-1 text-[9px] font-black text-white shadow-sm">
+        <div className="absolute bottom-2 left-2 rounded-full bg-slate-950/80 px-2.5 py-1.5 text-[10px] font-black text-white shadow-sm">
           {imageCount} Fotoğraf
         </div>
       </div>
 
       <div className="flex min-w-0 flex-col text-center">
-        <div className="flex min-h-[108px] flex-col items-center justify-center px-2.5 pb-1.5 pt-2">
-          <p className="text-[10px] font-black uppercase leading-none tracking-[0.1em] text-[#2563EB]">
+        <div className="flex min-h-[126px] flex-col items-center justify-center px-3 pb-2 pt-2.5">
+          <p className="text-[10px] font-black uppercase leading-none tracking-[0.12em] text-[#2563EB]">
             {typeChip}
           </p>
 
-          <h3 className="mt-1 line-clamp-2 text-[15px] font-black leading-[1.08] tracking-[-0.035em] text-[#0F172A] break-words [overflow-wrap:anywhere]">
+          <h3 className="mt-1.5 line-clamp-2 text-[16px] font-black leading-[1.08] tracking-[-0.04em] text-[#0F172A] break-words [overflow-wrap:anywhere]">
             {limitText(unit.project?.name || "EPH Portföy", 58)}
           </h3>
 
-          <p className="mt-1 flex min-w-0 items-center justify-center gap-1 text-[9.5px] font-bold leading-3 text-[#64748B]">
-            <MapPin size={10} className="shrink-0" />
+          <p className="mt-1.5 flex min-w-0 items-center justify-center gap-1 text-[10px] font-bold leading-3 text-[#64748B]">
+            <MapPin size={11} className="shrink-0" />
             <span className="min-w-0 line-clamp-1 break-words [overflow-wrap:anywhere]">
               {getLocation(unit)}
             </span>
           </p>
 
-          <p className="mt-1.5 text-[19px] font-black leading-none tracking-[-0.045em] text-[#0F172A]">
+          <p className="mt-2 text-[23px] font-black leading-none tracking-[-0.055em] text-[#0F172A]">
             {compactMoney(unit.price, unit.priceCurrency)}
           </p>
 
-          <div className="mt-2 flex min-w-0 flex-wrap items-center justify-center gap-1.5 text-[9px] font-black text-[#1F2937]">
+          <div className="mt-2.5 flex min-w-0 flex-wrap items-center justify-center gap-1.5 text-[10px] font-black text-[#1F2937]">
             {specs.slice(0, 3).map((spec) => (
-              <span key={spec} className="rounded-full bg-[#F8FAFC] px-2 py-1 leading-none">
+              <span key={spec} className="rounded-full bg-[#F8FAFC] px-2.5 py-1 leading-none">
                 {limitText(spec, 16)}
               </span>
             ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-4 border-y border-[#D7E3F2] bg-[#FBFDFF]">
+        <div className="grid grid-cols-2 gap-1.5 px-2.5 py-2">
           {quickSpecs.map((item) => (
             <div
               key={item.label}
-              className="flex min-h-[31px] min-w-0 items-center justify-center gap-1 border-r border-[#D7E3F2] px-1 last:border-r-0"
+              className="flex min-h-[30px] min-w-0 items-center justify-center gap-1 rounded-[10px] bg-[#F8FAFC] px-1.5"
             >
-              <span className="text-[11px] font-black leading-none text-[#2563EB]">{item.icon}</span>
-              <span className="min-w-0 text-[8.5px] font-black leading-[1.05] text-[#334155] break-words [overflow-wrap:anywhere]">
+              <span className="text-[12px] font-black leading-none text-[#2563EB]">{item.icon}</span>
+              <span className="min-w-0 text-[9.5px] font-black leading-[1.05] text-[#334155] break-words [overflow-wrap:anywhere]">
                 {item.label}
               </span>
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-x-1 gap-y-0.5 px-2.5 py-2 text-left">
+        <div className="grid grid-cols-1 gap-1 px-3 py-2 text-left">
           {detailSpecs.map((item) => (
             <p
               key={item.label}
-              className="min-w-0 text-[8.5px] font-black leading-[1.28] text-[#475569] break-words [overflow-wrap:anywhere]"
+              className="min-w-0 text-[9.5px] font-black leading-[1.25] text-[#475569] break-words [overflow-wrap:anywhere]"
             >
               <span className="text-[#1F2937]">{item.label}:</span> {item.value}
             </p>
           ))}
         </div>
 
-        <div className="mt-auto grid grid-cols-2 border-t border-[#D7E3F2] bg-white">
+        <div className="mt-auto grid grid-cols-2 gap-1.5 px-2.5 pb-2 pt-1">
           <button
             type="button"
             onClick={(event) => {
@@ -1884,7 +1894,7 @@ function PoolUnitCard({
               onAction("INTEREST");
             }}
             disabled={busy}
-            className="flex min-h-[35px] items-center justify-center gap-1 border-r border-[#D7E3F2] px-1 text-[10px] font-black text-[#1D4ED8] disabled:opacity-60"
+            className="flex min-h-[34px] items-center justify-center rounded-[12px] bg-[#F8FAFC] px-1 text-[10px] font-black text-[#1D4ED8] disabled:opacity-60"
           >
             ☆ İlgilen 10K
           </button>
@@ -1895,7 +1905,7 @@ function PoolUnitCard({
               event.stopPropagation();
               onDetail();
             }}
-            className="flex min-h-[35px] items-center justify-center gap-1 px-1 text-[10px] font-black text-[#2563EB]"
+            className="flex min-h-[34px] items-center justify-center rounded-[12px] bg-[#F8FAFC] px-1 text-[10px] font-black text-[#2563EB]"
           >
             ✨ {limitText(highlight, 18)}
           </button>
