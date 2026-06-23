@@ -11,6 +11,8 @@ import {
   KotaDonemi,
   UyelikDurumu,
 } from '@prisma/client';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import QRCode from 'qrcode';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -41,6 +43,11 @@ type AuthorityLetterQuotaResult = {
 
 const AUTHORITY_LETTER_MONTHLY_QUOTA_CODE = 'AUTHORITY_LETTER_MONTHLY';
 const AUTHORITY_LETTER_OVER_LIMIT_COST = 5;
+const PLATFORM_URL =
+  process.env.FRONTEND_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.APP_URL ||
+  'https://emlakportfoyhavuzu.com';
 
 @Injectable()
 export class EphAuthorityLettersService {
@@ -55,7 +62,6 @@ export class EphAuthorityLettersService {
       orderBy: { createdAt: 'desc' },
     });
   }
-
 
   async getQuota(input: CurrentUserPayload) {
     return this.getAuthorityLetterQuotaSnapshot({
@@ -161,8 +167,199 @@ export class EphAuthorityLettersService {
         result.quota.chargedKontor > 0
           ? `EPH yetki belgesi taslağı oluşturuldu. Aylık ücretsiz limit aşıldığı için ${result.quota.chargedKontor} kontör harcandı.`
           : 'EPH yetki belgesi taslağı oluşturuldu.',
-      letter: result.letter,
+      letter: {
+        ...result.letter,
+        verificationUrl: this.getVerificationUrl(result.letter.authorityNo),
+      },
       quota: result.quota,
+    };
+  }
+
+  async verifyByAuthorityNo(authorityNo: string) {
+    const cleanedAuthorityNo = this.cleanText(authorityNo);
+
+    if (!cleanedAuthorityNo) {
+      throw new BadRequestException('Belge numarası zorunludur.');
+    }
+
+    const letter = await this.prisma.ePHAuthorityLetter.findUnique({
+      where: { authorityNo: cleanedAuthorityNo },
+      include: {
+        unit: {
+          include: {
+            project: {
+              include: {
+                owner: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!letter) {
+      return {
+        valid: false,
+        message: 'Belge bulunamadı.',
+      };
+    }
+
+    const now = new Date();
+    const isExpired = letter.authorityEndDate < now;
+    const status = String(letter.status || '').toUpperCase();
+    const valid = !isExpired && status !== 'IPTAL' && status !== 'SILINDI';
+
+    return {
+      valid,
+      message: valid
+        ? 'EPH yetki belgesi doğrulandı.'
+        : 'Belge süresi dolmuş veya pasif durumdadır.',
+      authorityNo: letter.authorityNo,
+      status: letter.status,
+      authorityType: letter.authorityType,
+      authorityStartDate: letter.authorityStartDate,
+      authorityEndDate: letter.authorityEndDate,
+      createdAt: letter.createdAt,
+      ownerName: this.maskName(letter.ownerName),
+      portfolio: {
+        id: letter.unit.id,
+        ephId: this.getEphId(letter.unit.id),
+        type: letter.unit.type,
+        status: letter.unit.status,
+        city: letter.unit.project.city,
+        district: letter.unit.project.district,
+        projectName: letter.unit.project.name,
+      },
+      consultant: {
+        name: this.formatName(
+          letter.unit.project.owner?.firstName,
+          letter.unit.project.owner?.lastName,
+        ),
+        memberCode: letter.unit.project.owner?.memberCode || null,
+      },
+      verificationUrl: this.getVerificationUrl(letter.authorityNo),
+    };
+  }
+
+  async generatePdf(input: CurrentUserPayload & { id: string }) {
+    const letter = await this.prisma.ePHAuthorityLetter.findUnique({
+      where: { id: input.id },
+      include: {
+        unit: {
+          include: {
+            project: {
+              include: {
+                owner: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!letter) {
+      throw new NotFoundException('Yetki belgesi bulunamadı.');
+    }
+
+    this.ensureCanManage(input, letter.unit.project.ownerId);
+
+    const verificationUrl = this.getVerificationUrl(letter.authorityNo);
+    const qrPng = await QRCode.toDataURL(verificationUrl, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 220,
+      color: {
+        dark: '#06194A',
+        light: '#FFFFFF',
+      },
+    });
+
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595.28, 841.89]);
+    const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const qrImage = await pdfDoc.embedPng(qrPng);
+    const width = page.getWidth();
+    const height = page.getHeight();
+    const blue = rgb(0.145, 0.388, 0.922);
+    const navy = rgb(0.024, 0.098, 0.29);
+    const slate = rgb(0.392, 0.455, 0.545);
+    const border = rgb(0.78, 0.839, 0.91);
+    const soft = rgb(0.969, 0.98, 0.996);
+
+    this.drawRoundedRect(page, 28, 24, width - 56, height - 48, 18, rgb(1, 1, 1), border);
+    page.drawRectangle({ x: 28, y: height - 122, width: width - 56, height: 98, color: rgb(0.937, 0.965, 1) });
+    page.drawRectangle({ x: 28, y: height - 122, width: 7, height: 98, color: blue });
+
+    page.drawText('EPH', { x: 52, y: height - 70, size: 24, font: boldFont, color: blue });
+    page.drawText('Emlak Portföy Havuzu', { x: 52, y: height - 91, size: 10, font: boldFont, color: navy });
+    page.drawText('YETKİ BELGESİ', { x: 346, y: height - 68, size: 22, font: boldFont, color: navy });
+    page.drawText('Satış / Kiralama Yetkilendirme Taslağı', { x: 346, y: height - 89, size: 9, font: regularFont, color: slate });
+
+    this.drawInfoBox(page, boldFont, regularFont, 48, height - 178, 236, 56, 'Belge No', letter.authorityNo);
+    this.drawInfoBox(page, boldFont, regularFont, 310, height - 178, 236, 56, 'Doğrulama Durumu', 'QR kod ile doğrulanabilir');
+
+    this.drawSectionTitle(page, boldFont, 'Taraf Bilgileri', 48, height - 220);
+    this.drawField(page, boldFont, regularFont, 'Malik', letter.ownerName, 48, height - 248, 240);
+    this.drawField(page, boldFont, regularFont, 'Telefon', letter.ownerPhone || 'Belirtilmedi', 310, height - 248, 236);
+    this.drawField(page, boldFont, regularFont, 'E-posta', letter.ownerEmail || 'Belirtilmedi', 48, height - 286, 240);
+    this.drawField(page, boldFont, regularFont, 'Danışman', this.formatName(letter.unit.project.owner?.firstName, letter.unit.project.owner?.lastName), 310, height - 286, 236);
+
+    this.drawSectionTitle(page, boldFont, 'Portföy Bilgileri', 48, height - 332);
+    this.drawField(page, boldFont, regularFont, 'Portföy ID', this.getEphId(letter.unit.id), 48, height - 360, 152);
+    this.drawField(page, boldFont, regularFont, 'Portföy Tipi', String(letter.unit.type || 'Portföy'), 220, height - 360, 152);
+    this.drawField(page, boldFont, regularFont, 'İşlem', String(letter.unit.status || 'Belirtilmedi'), 392, height - 360, 154);
+    this.drawField(page, boldFont, regularFont, 'Konum', `${letter.unit.project.city} / ${letter.unit.project.district}`, 48, height - 398, 498);
+
+    this.drawSectionTitle(page, boldFont, 'Yetki Bilgileri', 48, height - 444);
+    this.drawField(page, boldFont, regularFont, 'Yetki Türü', this.getAuthorityTypeLabel(letter.authorityType), 48, height - 472, 152);
+    this.drawField(page, boldFont, regularFont, 'Başlangıç', this.formatDate(letter.authorityStartDate), 220, height - 472, 152);
+    this.drawField(page, boldFont, regularFont, 'Bitiş', this.formatDate(letter.authorityEndDate), 392, height - 472, 154);
+
+    page.drawRectangle({ x: 48, y: height - 604, width: 318, height: 90, color: soft, borderColor: border, borderWidth: 1 });
+    page.drawText('Yetkilendirme Beyanı', { x: 64, y: height - 540, size: 11, font: boldFont, color: navy });
+    this.drawWrappedText(
+      page,
+      regularFont,
+      'Bu belge, ilgili portföy için EPH Platformu üzerinde yetki belgesi taslağı oluşturulduğunu gösterir. Fiziki imza süreçleri ve nihai belge sorumluluğu taraflara aittir. Belgenin doğruluğu QR kod okutularak kontrol edilebilir.',
+      64,
+      height - 560,
+      286,
+      10,
+      14,
+      slate,
+    );
+
+    page.drawRectangle({ x: 386, y: height - 604, width: 160, height: 160, color: rgb(1, 1, 1), borderColor: border, borderWidth: 1 });
+    page.drawImage(qrImage, { x: 414, y: height - 574, width: 104, height: 104 });
+    page.drawText('Belge Doğrulama', { x: 421, y: height - 592, size: 9, font: boldFont, color: navy });
+    page.drawText('QR kodu okutun', { x: 425, y: height - 609, size: 8, font: regularFont, color: slate });
+
+    this.drawSignatureBox(page, boldFont, regularFont, 48, 114, 'Malik İmzası', letter.ownerName);
+    this.drawSignatureBox(page, boldFont, regularFont, 310, 114, 'Danışman İmzası', this.formatName(letter.unit.project.owner?.firstName, letter.unit.project.owner?.lastName));
+
+    page.drawText('Bu belge EPH Platformu tarafından üretilmiştir. QR kod ile doğrulanabilir.', {
+      x: 48,
+      y: 70,
+      size: 8,
+      font: regularFont,
+      color: slate,
+    });
+    page.drawText(verificationUrl, { x: 48, y: 55, size: 7, font: regularFont, color: blue });
+    page.drawText('EPH', { x: 502, y: 55, size: 17, font: boldFont, color: blue });
+
+    const pdfBytes = await pdfDoc.save();
+
+    await this.prisma.ePHAuthorityLetter.update({
+      where: { id: letter.id },
+      data: {
+        status: 'PDF_OLUSTURULDU',
+      },
+    });
+
+    return {
+      fileName: `${letter.authorityNo}.pdf`,
+      pdfBytes,
     };
   }
 
@@ -442,8 +639,12 @@ export class EphAuthorityLettersService {
 
   private getMonthRange() {
     const now = new Date();
-    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
-    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+    const start = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
+    );
+    const end = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0),
+    );
 
     return { start, end };
   }
@@ -541,5 +742,121 @@ export class EphAuthorityLettersService {
     });
 
     return `EPH-YB-${year}-${String(count + 1).padStart(6, '0')}`;
+  }
+
+  private getVerificationUrl(authorityNo: string) {
+    return `${PLATFORM_URL.replace(/\/$/, '')}/verify-authority/${encodeURIComponent(authorityNo)}`;
+  }
+
+  private getEphId(id: string) {
+    const cleaned = String(id || '')
+      .replaceAll('-', '')
+      .slice(0, 6)
+      .toUpperCase();
+    return `EPH-${cleaned || '000000'}`;
+  }
+
+  private maskName(value?: string | null) {
+    const parts = String(value || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (!parts.length) return 'Gizli';
+
+    return parts
+      .map((part, index) => {
+        if (index === 0) return part;
+        return `${part.slice(0, 1)}***`;
+      })
+      .join(' ');
+  }
+
+  private formatName(firstName?: string | null, lastName?: string | null) {
+    const name = [firstName, lastName].filter(Boolean).join(' ').trim();
+    return name || 'EPH Danışmanı';
+  }
+
+  private formatDate(value: Date) {
+    return new Intl.DateTimeFormat('tr-TR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(value);
+  }
+
+  private getAuthorityTypeLabel(value: string) {
+    const normalized = String(value || '').toUpperCase();
+    if (normalized === 'SATIS') return 'Satış';
+    if (normalized === 'KIRALAMA') return 'Kiralama';
+    if (normalized === 'SATIS_VE_KIRALAMA') return 'Satış ve Kiralama';
+    return value || 'Yetki';
+  }
+
+  private drawSectionTitle(page: any, font: any, text: string, x: number, y: number) {
+    page.drawText(text, { x, y, size: 12, font, color: rgb(0.024, 0.098, 0.29) });
+    page.drawLine({ start: { x, y: y - 8 }, end: { x: x + 498, y: y - 8 }, thickness: 1, color: rgb(0.78, 0.839, 0.91) });
+  }
+
+  private drawInfoBox(page: any, boldFont: any, regularFont: any, x: number, y: number, w: number, h: number, label: string, value: string) {
+    page.drawRectangle({ x, y, width: w, height: h, color: rgb(0.969, 0.98, 0.996), borderColor: rgb(0.78, 0.839, 0.91), borderWidth: 1 });
+    page.drawText(label, { x: x + 14, y: y + h - 20, size: 8, font: boldFont, color: rgb(0.145, 0.388, 0.922) });
+    page.drawText(this.safePdfText(value), { x: x + 14, y: y + 16, size: 12, font: boldFont, color: rgb(0.024, 0.098, 0.29) });
+  }
+
+  private drawField(page: any, boldFont: any, regularFont: any, label: string, value: string, x: number, y: number, w: number) {
+    page.drawRectangle({ x, y, width: w, height: 28, color: rgb(0.969, 0.98, 0.996), borderColor: rgb(0.78, 0.839, 0.91), borderWidth: 1 });
+    page.drawText(label, { x: x + 10, y: y + 17, size: 7, font: boldFont, color: rgb(0.392, 0.455, 0.545) });
+    page.drawText(this.safePdfText(String(value || 'Belirtilmedi')).slice(0, 42), { x: x + 10, y: y + 7, size: 8.5, font: regularFont, color: rgb(0.024, 0.098, 0.29) });
+  }
+
+  private drawSignatureBox(page: any, boldFont: any, regularFont: any, x: number, y: number, title: string, name: string) {
+    page.drawRectangle({ x, y, width: 236, height: 70, color: rgb(1, 1, 1), borderColor: rgb(0.78, 0.839, 0.91), borderWidth: 1 });
+    page.drawText(title, { x: x + 14, y: y + 48, size: 10, font: boldFont, color: rgb(0.024, 0.098, 0.29) });
+    page.drawText(this.safePdfText(name), { x: x + 14, y: y + 14, size: 8.5, font: regularFont, color: rgb(0.392, 0.455, 0.545) });
+    page.drawLine({ start: { x: x + 14, y: y + 34 }, end: { x: x + 222, y: y + 34 }, thickness: 0.8, color: rgb(0.78, 0.839, 0.91) });
+  }
+
+  private drawRoundedRect(page: any, x: number, y: number, w: number, h: number, _r: number, color: any, borderColor: any) {
+    page.drawRectangle({ x, y, width: w, height: h, color, borderColor, borderWidth: 1.2 });
+  }
+
+  private drawWrappedText(page: any, font: any, text: string, x: number, y: number, maxWidth: number, size: number, lineHeight: number, color: any) {
+    const words = this.safePdfText(text).split(' ');
+    let line = '';
+    let currentY = y;
+
+    words.forEach((word) => {
+      const nextLine = line ? `${line} ${word}` : word;
+      const nextWidth = font.widthOfTextAtSize(nextLine, size);
+
+      if (nextWidth > maxWidth && line) {
+        page.drawText(line, { x, y: currentY, size, font, color });
+        line = word;
+        currentY -= lineHeight;
+      } else {
+        line = nextLine;
+      }
+    });
+
+    if (line) {
+      page.drawText(line, { x, y: currentY, size, font, color });
+    }
+  }
+
+  private safePdfText(value: string) {
+    return String(value || '')
+      .replace(/ğ/g, 'g')
+      .replace(/Ğ/g, 'G')
+      .replace(/ü/g, 'u')
+      .replace(/Ü/g, 'U')
+      .replace(/ş/g, 's')
+      .replace(/Ş/g, 'S')
+      .replace(/ı/g, 'i')
+      .replace(/İ/g, 'I')
+      .replace(/ö/g, 'o')
+      .replace(/Ö/g, 'O')
+      .replace(/ç/g, 'c')
+      .replace(/Ç/g, 'C');
   }
 }
