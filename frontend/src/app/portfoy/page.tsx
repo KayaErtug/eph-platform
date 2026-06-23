@@ -270,7 +270,7 @@ function makeWhatsappLocationText(unit: MapUnit) {
     lat && lng
       ? `https://www.google.com/maps?q=${lat},${lng}`
       : getShareUrl(unit);
-  const location = [unit.project?.district, unit.project?.city]
+  const location = [unit.project?.city, unit.project?.district, unit.project?.address]
     .filter(Boolean)
     .join(" / ");
 
@@ -804,7 +804,7 @@ function StokPageInner() {
   const getPortfolioShareData = (unit: MapUnit): PortfolioShareData => {
     const title = unit.project?.name || "EPH Portföy";
     const location =
-      [unit.project?.district, unit.project?.city]
+      [unit.project?.city, unit.project?.district, unit.project?.address]
         .filter(Boolean)
         .join(" / ") || "Konum bilgisi yok";
 
@@ -1350,10 +1350,9 @@ function CompactPortfolioCard({
   const image = getUnitCoverImage(unit) || "/LOGO_EPH.png";
   const status = statusLabels[unit.status] || unit.status || "Portföy";
   const location =
-    [unit.project?.address, unit.project?.district]
+    [unit.project?.city, unit.project?.district, unit.project?.address]
       .filter(Boolean)
-      .join(" · ") ||
-    unit.project?.city ||
+      .join(" / ") ||
     "Konum yok";
   const hasLocation = Boolean(
     unit.project?.latitude && unit.project?.longitude,
@@ -1614,14 +1613,16 @@ function PortfolioMap({
       if (!lat || !lng) return;
 
       const isSelected = selectedUnitId === unit.id;
-      const fill = isSelected ? "#0B3FB3" : "#1557D6";
       const svg = `
-        <svg width="48" height="58" viewBox="0 0 48 58" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M24 56C24 56 43 35.6 43 20.5C43 9.73 34.49 1 24 1C13.51 1 5 9.73 5 20.5C5 35.6 24 56 24 56Z" fill="${fill}" stroke="white" stroke-width="3"/>
-          <circle cx="24" cy="21" r="12.5" fill="white"/>
-          <path d="M15.8 22.2L24 15.5L32.2 22.2" stroke="#1557D6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M18.6 21.4V30.2H29.4V21.4" stroke="#1557D6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M22 30.2V25.2H26V30.2" stroke="#1557D6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg width="64" height="78" viewBox="0 0 64 78" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <filter id="shadow" x="-20%" y="-10%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="8" stdDeviation="5" flood-color="#0F172A" flood-opacity="0.28"/>
+          </filter>
+          <path filter="url(#shadow)" d="M32 76C32 76 58 47.9 58 28C58 12.536 46.359 2 32 2C17.641 2 6 12.536 6 28C6 47.9 32 76 32 76Z" fill="#2563EB"/>
+          <path d="M32 68C32 68 52 45.7 52 29C52 17.402 43.046 9 32 9C20.954 9 12 17.402 12 29C12 45.7 32 68 32 68Z" fill="#1D4ED8"/>
+          <circle cx="32" cy="29" r="19" fill="white"/>
+          <circle cx="32" cy="29" r="15" fill="#EFF6FF"/>
+          <text x="32" y="34" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="900" fill="#2563EB">EPH</text>
         </svg>
       `;
 
@@ -1632,12 +1633,12 @@ function PortfolioMap({
         icon: {
           url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
           scaledSize: new window.google.maps.Size(
-            isSelected ? 52 : 44,
-            isSelected ? 62 : 54,
+            isSelected ? 48 : 42,
+            isSelected ? 58 : 52,
           ),
           anchor: new window.google.maps.Point(
-            isSelected ? 26 : 22,
-            isSelected ? 62 : 54,
+            isSelected ? 24 : 21,
+            isSelected ? 58 : 52,
           ),
         },
         zIndex: isSelected ? 30 : 20,

@@ -27,6 +27,7 @@ export default function StokRow({ unit }: { unit: Unit }) {
   const projectName = unit.project?.name || "Proje";
   const city = unit.project?.city || "-";
   const district = unit.project?.district || "-";
+  const neighborhood = unit.project?.address || "-";
   const ownerInitial = (
     unit.project?.owner?.firstName?.[0] || "E"
   ).toUpperCase();
@@ -61,7 +62,7 @@ export default function StokRow({ unit }: { unit: Unit }) {
               <MapPin size={13} />
 
               <span>
-                {city} / {district}
+                {[city, district, neighborhood].filter((item) => item && item !== "-").join(" / ") || "-"}
               </span>
             </div>
 
