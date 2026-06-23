@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { CheckCircle2, FileText, ShieldCheck, XCircle } from "lucide-react";
 
 const API_URL =
@@ -37,10 +37,10 @@ type VerifyResponse = {
 };
 
 function formatDate(value?: string) {
-  if (!value) return "—";
+  if (!value) return "â€”";
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "â€”";
 
   return new Intl.DateTimeFormat("tr-TR", {
     day: "2-digit",
@@ -51,9 +51,9 @@ function formatDate(value?: string) {
 
 function authorityTypeLabel(value?: string) {
   const normalized = String(value || "").toUpperCase();
-  if (normalized === "SATIS") return "Satış";
+  if (normalized === "SATIS") return "SatÄ±ÅŸ";
   if (normalized === "KIRALAMA") return "Kiralama";
-  if (normalized === "SATIS_VE_KIRALAMA") return "Satış ve Kiralama";
+  if (normalized === "SATIS_VE_KIRALAMA") return "SatÄ±ÅŸ ve Kiralama";
   return value || "Yetki";
 }
 
@@ -69,7 +69,7 @@ async function getVerification(authorityNo: string): Promise<VerifyResponse> {
     if (!response.ok) {
       return {
         valid: false,
-        message: "Belge doğrulama servisine ulaşılamadı.",
+        message: "Belge doÄŸrulama servisine ulaÅŸÄ±lamadÄ±.",
       };
     }
 
@@ -77,7 +77,7 @@ async function getVerification(authorityNo: string): Promise<VerifyResponse> {
   } catch {
     return {
       valid: false,
-      message: "Belge doğrulama servisine ulaşılamadı.",
+      message: "Belge doÄŸrulama servisine ulaÅŸÄ±lamadÄ±.",
     };
   }
 }
@@ -89,7 +89,7 @@ function InfoCard({ label, value }: { label: string; value?: string | null }) {
         {label}
       </p>
       <p className="mt-1 text-[13px] font-black leading-5 text-[#06194A] break-words [overflow-wrap:anywhere]">
-        {value || "—"}
+        {value || "â€”"}
       </p>
     </div>
   );
@@ -108,13 +108,13 @@ export default async function VerifyAuthorityPage({ params }: PageProps) {
             <ShieldCheck size={28} />
           </div>
           <p className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#2563EB]">
-            EPH Belge Doğrulama
+            EPH Belge DoÄŸrulama
           </p>
           <h1 className="mt-1 text-[22px] font-black tracking-[-0.04em] text-[#06194A]">
-            Yetki Belgesi Kontrolü
+            Yetki Belgesi KontrolÃ¼
           </h1>
           <p className="mx-auto mt-2 max-w-[330px] text-[12px] font-bold leading-5 text-[#64748B]">
-            Bu ekran, QR kod ile açılan EPH yetki belgesinin sistem kaydını gösterir.
+            Bu ekran, QR kod ile aÃ§Ä±lan EPH yetki belgesinin sistem kaydÄ±nÄ± gÃ¶sterir.
           </p>
         </div>
 
@@ -130,23 +130,23 @@ export default async function VerifyAuthorityPage({ params }: PageProps) {
               {valid ? <CheckCircle2 size={26} /> : <XCircle size={26} />}
             </div>
             <h2 className="mt-2 text-[18px] font-black">
-              {valid ? "Belge Geçerli" : "Belge Doğrulanamadı"}
+              {valid ? "Belge GeÃ§erli" : "Belge DoÄŸrulanamadÄ±"}
             </h2>
             <p className="mt-1 text-[12px] font-black leading-5">
               {data.message ||
                 (valid
-                  ? "EPH yetki belgesi sistemde doğrulandı."
-                  : "Belge kaydı bulunamadı veya pasif durumda.")}
+                  ? "EPH yetki belgesi sistemde doÄŸrulandÄ±."
+                  : "Belge kaydÄ± bulunamadÄ± veya pasif durumda.")}
             </p>
           </section>
 
           <section className="mt-4 grid grid-cols-2 gap-2">
             <InfoCard label="Belge No" value={data.authorityNo || authorityNo} />
             <InfoCard label="Durum" value={data.status} />
-            <InfoCard label="Yetki Türü" value={authorityTypeLabel(data.authorityType)} />
+            <InfoCard label="Yetki TÃ¼rÃ¼" value={authorityTypeLabel(data.authorityType)} />
             <InfoCard label="Malik" value={data.ownerName} />
-            <InfoCard label="Başlangıç" value={formatDate(data.authorityStartDate)} />
-            <InfoCard label="Bitiş" value={formatDate(data.authorityEndDate)} />
+            <InfoCard label="BaÅŸlangÄ±Ã§" value={formatDate(data.authorityStartDate)} />
+            <InfoCard label="BitiÅŸ" value={formatDate(data.authorityEndDate)} />
           </section>
 
           <section className="mt-4 rounded-[22px] border-2 border-[#C7D6E8] bg-white p-3 text-center">
@@ -154,18 +154,18 @@ export default async function VerifyAuthorityPage({ params }: PageProps) {
               <FileText size={22} />
             </div>
             <h3 className="mt-2 text-[16px] font-black text-[#06194A]">
-              Portföy Bilgileri
+              PortfÃ¶y Bilgileri
             </h3>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <InfoCard label="Portföy ID" value={data.portfolio?.ephId} />
-              <InfoCard label="Portföy Tipi" value={data.portfolio?.type} />
-              <InfoCard label="İşlem" value={data.portfolio?.status} />
+              <InfoCard label="PortfÃ¶y ID" value={data.portfolio?.ephId} />
+              <InfoCard label="PortfÃ¶y Tipi" value={data.portfolio?.type} />
+              <InfoCard label="Ä°ÅŸlem" value={data.portfolio?.status} />
               <InfoCard
                 label="Konum"
                 value={
                   data.portfolio?.city || data.portfolio?.district
                     ? `${data.portfolio?.city || ""} / ${data.portfolio?.district || ""}`
-                    : "—"
+                    : "â€”"
                 }
               />
             </div>
@@ -173,18 +173,18 @@ export default async function VerifyAuthorityPage({ params }: PageProps) {
 
           <section className="mt-4 rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3 text-center">
             <h3 className="text-[15px] font-black text-[#06194A]">
-              Danışman Bilgisi
+              DanÄ±ÅŸman Bilgisi
             </h3>
             <p className="mt-1 text-[13px] font-black text-[#2563EB]">
-              {data.consultant?.name || "EPH Danışmanı"}
+              {data.consultant?.name || "EPH DanÄ±ÅŸmanÄ±"}
             </p>
             <p className="mt-1 text-[11px] font-bold text-[#64748B]">
-              Üye Kodu: {data.consultant?.memberCode || "—"}
+              Ãœye Kodu: {data.consultant?.memberCode || "â€”"}
             </p>
           </section>
 
           <Link
-            href="/"
+            href="/dashboard"
             className="mt-4 flex min-h-[46px] items-center justify-center rounded-[18px] bg-[#2563EB] px-4 text-center text-[13px] font-black text-white"
           >
             EPH Ana Sayfa
