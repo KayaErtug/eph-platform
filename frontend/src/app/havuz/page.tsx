@@ -328,13 +328,14 @@ function loadHavuzGoogleMapsScript() {
 
 function getLocation(unit: Unit) {
   return (
-    [unit.project?.city, unit.project?.district].filter(Boolean).join(" / ") ||
-    "Konum yok"
+    [unit.project?.city, unit.project?.district, unit.project?.address]
+      .filter(Boolean)
+      .join(" / ") || "Konum yok"
   );
 }
 
 function getMahalle(unit: Unit) {
-  return unit.project?.district || unit.project?.city || "Mahalle bilgisi yok";
+  return unit.project?.address || unit.project?.district || unit.project?.city || "Mahalle bilgisi yok";
 }
 
 function getEphId(id: string) {
@@ -1527,7 +1528,7 @@ function getVisiblePortfolioDetails(unit: Unit): PremiumHighlight[] {
       text: compactMoney(unit.price, unit.priceCurrency),
     });
 
-  details.push({ icon: "📍", title: "İl / İlçe", text: getLocation(unit) });
+  details.push({ icon: "📍", title: "İl / İlçe / Mahalle", text: getLocation(unit) });
 
   if (unit.project?.city)
     details.push({ icon: "🗺️", title: "Şehir", text: unit.project.city });
