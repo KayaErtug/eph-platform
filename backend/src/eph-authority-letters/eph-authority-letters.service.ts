@@ -1,4 +1,4 @@
-﻿import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 import {
@@ -15,7 +15,7 @@ import {
   UyelikDurumu,
 } from '@prisma/client';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import * as QRCode from 'qrcode';
+import QRCode from 'qrcode';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -77,7 +77,7 @@ export class EphAuthorityLettersService {
     const unitId = this.cleanText(input.body?.unitId);
 
     if (!unitId) {
-      throw new BadRequestException('PortfÃ¶y ID zorunludur.');
+      throw new BadRequestException('Portföy ID zorunludur.');
     }
 
     const unit = await this.getUnitOrFail(unitId);
@@ -96,7 +96,7 @@ export class EphAuthorityLettersService {
 
       if (existingLetter) {
         throw new ConflictException(
-          'Bu portfÃ¶y iÃ§in aktif bir yetki belgesi bulunmaktadÄ±r. Yeni belge oluÅŸturmak iÃ§in Ã¶nce mevcut belgeyi siliniz.',
+          'Bu portföy için aktif bir yetki belgesi bulunmaktadır. Yeni belge oluşturmak için önce mevcut belgeyi siliniz.',
         );
       }
 
@@ -134,7 +134,7 @@ export class EphAuthorityLettersService {
           userId: input.userId,
           amount: AUTHORITY_LETTER_OVER_LIMIT_COST,
           ilgiliKayitId: letter.id,
-          aciklama: `${letter.authorityNo} numaralÄ± yetki belgesi Ã¼retimi iÃ§in aylÄ±k Ã¼cretsiz limit aÅŸÄ±ldÄ±ÄŸÄ±ndan ${AUTHORITY_LETTER_OVER_LIMIT_COST} kontÃ¶r harcandÄ±.`,
+          aciklama: `${letter.authorityNo} numaralı yetki belgesi üretimi için aylık ücretsiz limit aşıldığından ${AUTHORITY_LETTER_OVER_LIMIT_COST} kontör harcandı.`,
         });
       }
 
@@ -168,8 +168,8 @@ export class EphAuthorityLettersService {
       success: true,
       message:
         result.quota.chargedKontor > 0
-          ? `EPH yetki belgesi taslaÄŸÄ± oluÅŸturuldu. AylÄ±k Ã¼cretsiz limit aÅŸÄ±ldÄ±ÄŸÄ± iÃ§in ${result.quota.chargedKontor} kontÃ¶r harcandÄ±.`
-          : 'EPH yetki belgesi taslaÄŸÄ± oluÅŸturuldu.',
+          ? `EPH yetki belgesi taslağı oluşturuldu. Aylık ücretsiz limit aşıldığı için ${result.quota.chargedKontor} kontör harcandı.`
+          : 'EPH yetki belgesi taslağı oluşturuldu.',
       letter: {
         ...result.letter,
         verificationUrl: this.getVerificationUrl(result.letter.authorityNo),
@@ -182,7 +182,7 @@ export class EphAuthorityLettersService {
     const cleanedAuthorityNo = this.cleanText(authorityNo);
 
     if (!cleanedAuthorityNo) {
-      throw new BadRequestException('Belge numarasÄ± zorunludur.');
+      throw new BadRequestException('Belge numarası zorunludur.');
     }
 
     const letter = await this.prisma.ePHAuthorityLetter.findUnique({
@@ -203,7 +203,7 @@ export class EphAuthorityLettersService {
     if (!letter) {
       return {
         valid: false,
-        message: 'Belge bulunamadÄ±.',
+        message: 'Belge bulunamadı.',
       };
     }
 
@@ -215,8 +215,8 @@ export class EphAuthorityLettersService {
     return {
       valid,
       message: valid
-        ? 'EPH yetki belgesi doÄŸrulandÄ±.'
-        : 'Belge sÃ¼resi dolmuÅŸ veya pasif durumdadÄ±r.',
+        ? 'EPH yetki belgesi doğrulandı.'
+        : 'Belge süresi dolmuş veya pasif durumdadır.',
       authorityNo: letter.authorityNo,
       status: letter.status,
       authorityType: letter.authorityType,
@@ -261,7 +261,7 @@ export class EphAuthorityLettersService {
     });
 
     if (!letter) {
-      throw new NotFoundException('Yetki belgesi bulunamadÄ±.');
+      throw new NotFoundException('Yetki belgesi bulunamadı.');
     }
 
     this.ensureCanManage(input, letter.unit.project.ownerId);
@@ -308,7 +308,7 @@ export class EphAuthorityLettersService {
     }
 
     page.drawText('EMLAK PORTFOY HAVUZU', { x: 34, y: height - 146, size: 9.2, font: boldFont, color: navy });
-    page.drawText('GUVEN  â€¢  PAYLAS  â€¢  KAZAN', { x: 44, y: height - 160, size: 7.6, font: boldFont, color: slate });
+    page.drawText('GUVEN  •  PAYLAS  •  KAZAN', { x: 44, y: height - 160, size: 7.6, font: boldFont, color: slate });
 
     page.drawText('GAYRIMENKUL SATIS / KIRALAMA', { x: 158, y: height - 66, size: 20, font: boldFont, color: navy });
     page.drawText('YETKILENDIRME SOZLESMESI', { x: 184, y: height - 94, size: 20, font: boldFont, color: navy });
@@ -448,7 +448,7 @@ export class EphAuthorityLettersService {
     });
 
     if (!letter) {
-      throw new NotFoundException('Yetki belgesi bulunamadÄ±.');
+      throw new NotFoundException('Yetki belgesi bulunamadı.');
     }
 
     this.ensureCanManage(input, letter.unit.project.ownerId);
@@ -456,7 +456,7 @@ export class EphAuthorityLettersService {
     const pdfUrl = this.cleanText(input.pdfUrl);
 
     if (!pdfUrl) {
-      throw new BadRequestException('PDF baÄŸlantÄ±sÄ± zorunludur.');
+      throw new BadRequestException('PDF bağlantısı zorunludur.');
     }
 
     const updated = await this.prisma.ePHAuthorityLetter.update({
@@ -469,7 +469,7 @@ export class EphAuthorityLettersService {
 
     return {
       success: true,
-      message: 'PDF yetki belgesine iÅŸlendi.',
+      message: 'PDF yetki belgesine işlendi.',
       letter: updated,
     };
   }
@@ -497,7 +497,7 @@ export class EphAuthorityLettersService {
 
     if (!packageInfo || !packageInfo.aktifMi) {
       throw new BadRequestException(
-        'Aktif Ã¼yelik paketiniz doÄŸrulanamadÄ±. Yetki belgesi Ã¼retim limiti hesaplanamadÄ±.',
+        'Aktif üyelik paketiniz doğrulanamadı. Yetki belgesi üretim limiti hesaplanamadı.',
       );
     }
 
@@ -505,7 +505,7 @@ export class EphAuthorityLettersService {
 
     if (!activePortfolioLimit) {
       throw new BadRequestException(
-        'Ãœyelik paketinizde aktif portfÃ¶y limiti tanÄ±mlÄ± deÄŸil.',
+        'Üyelik paketinizde aktif portföy limiti tanımlı değil.',
       );
     }
 
@@ -604,7 +604,7 @@ export class EphAuthorityLettersService {
       isOverLimit: used >= monthlyLimit,
       package: {
         code: 'EPH_DEFAULT',
-        name: 'VarsayÄ±lan Paket',
+        name: 'Varsayılan Paket',
         activePortfolioLimit: 10,
       },
       periodStart: monthRange.start,
@@ -682,7 +682,7 @@ export class EphAuthorityLettersService {
 
     if (!packageInfo || !packageInfo.aktifMi) {
       throw new BadRequestException(
-        'Aktif Ã¼yelik paketiniz doÄŸrulanamadÄ±. Yetki belgesi Ã¼retim limiti hesaplanamadÄ±.',
+        'Aktif üyelik paketiniz doğrulanamadı. Yetki belgesi üretim limiti hesaplanamadı.',
       );
     }
 
@@ -690,7 +690,7 @@ export class EphAuthorityLettersService {
 
     if (!activePortfolioLimit) {
       throw new BadRequestException(
-        'Ãœyelik paketinizde aktif portfÃ¶y limiti tanÄ±mlÄ± deÄŸil.',
+        'Üyelik paketinizde aktif portföy limiti tanımlı değil.',
       );
     }
 
@@ -760,12 +760,12 @@ export class EphAuthorityLettersService {
     }
 
     if (!wallet.aktifMi) {
-      throw new BadRequestException('KontÃ¶r cÃ¼zdanÄ±nÄ±z aktif deÄŸil.');
+      throw new BadRequestException('Kontör cüzdanınız aktif değil.');
     }
 
     if (wallet.bakiye < input.amount) {
       throw new BadRequestException(
-        `AylÄ±k Ã¼cretsiz yetki belgesi hakkÄ±nÄ±z dolmuÅŸtur. Yeni belge Ã¼retmek iÃ§in ${input.amount} kontÃ¶r gereklidir. Mevcut bakiyeniz ${wallet.bakiye} kontÃ¶r.`,
+        `Aylık ücretsiz yetki belgesi hakkınız dolmuştur. Yeni belge üretmek için ${input.amount} kontör gereklidir. Mevcut bakiyeniz ${wallet.bakiye} kontör.`,
       );
     }
 
@@ -823,7 +823,7 @@ export class EphAuthorityLettersService {
     });
 
     if (!unit) {
-      throw new NotFoundException('PortfÃ¶y bulunamadÄ±.');
+      throw new NotFoundException('Portföy bulunamadı.');
     }
 
     return unit;
@@ -833,14 +833,14 @@ export class EphAuthorityLettersService {
     if (this.isManager(user.userRole)) return;
     if (user.userId === ownerId) return;
 
-    throw new ForbiddenException('Bu yetki belgesini gÃ¶rÃ¼ntÃ¼leme yetkiniz yok.');
+    throw new ForbiddenException('Bu yetki belgesini görüntüleme yetkiniz yok.');
   }
 
   private ensureCanManage(user: CurrentUserPayload, ownerId: string) {
     if (this.isSuperAdmin(user.userRole)) return;
     if (user.userId === ownerId) return;
 
-    throw new ForbiddenException('Bu yetki belgesini oluÅŸturma yetkiniz yok.');
+    throw new ForbiddenException('Bu yetki belgesini oluşturma yetkiniz yok.');
   }
 
   private isSuperAdmin(role?: string) {
@@ -861,7 +861,7 @@ export class EphAuthorityLettersService {
     }
 
     throw new BadRequestException(
-      'Yetki tÃ¼rÃ¼ SATIS, KIRALAMA veya SATIS_VE_KIRALAMA olmalÄ±dÄ±r.',
+      'Yetki türü SATIS, KIRALAMA veya SATIS_VE_KIRALAMA olmalıdır.',
     );
   }
 
@@ -872,7 +872,7 @@ export class EphAuthorityLettersService {
       return numeric;
     }
 
-    throw new BadRequestException('Yetki sÃ¼resi 30, 90, 180 veya 365 gÃ¼n olmalÄ±dÄ±r.');
+    throw new BadRequestException('Yetki süresi 30, 90, 180 veya 365 gün olmalıdır.');
   }
 
   private normalizeDate(value?: string) {
@@ -881,7 +881,7 @@ export class EphAuthorityLettersService {
     const date = new Date(value);
 
     if (Number.isNaN(date.getTime())) {
-      throw new BadRequestException('BaÅŸlangÄ±Ã§ tarihi geÃ§ersiz.');
+      throw new BadRequestException('Başlangıç tarihi geçersiz.');
     }
 
     return date;
@@ -941,7 +941,7 @@ export class EphAuthorityLettersService {
 
   private formatName(firstName?: string | null, lastName?: string | null) {
     const name = [firstName, lastName].filter(Boolean).join(' ').trim();
-    return name || 'EPH DanÄ±ÅŸmanÄ±';
+    return name || 'EPH Danışmanı';
   }
 
   private formatDate(value: Date) {
@@ -954,9 +954,9 @@ export class EphAuthorityLettersService {
 
   private getAuthorityTypeLabel(value: string) {
     const normalized = String(value || '').toUpperCase();
-    if (normalized === 'SATIS') return 'SatÄ±ÅŸ';
+    if (normalized === 'SATIS') return 'Satış';
     if (normalized === 'KIRALAMA') return 'Kiralama';
-    if (normalized === 'SATIS_VE_KIRALAMA') return 'SatÄ±ÅŸ ve Kiralama';
+    if (normalized === 'SATIS_VE_KIRALAMA') return 'Satış ve Kiralama';
     return value || 'Yetki';
   }
 
@@ -1071,17 +1071,21 @@ export class EphAuthorityLettersService {
 
   private safePdfText(value: string) {
     return String(value || '')
-      .replace(/ÄŸ/g, 'g')
-      .replace(/Ä/g, 'G')
-      .replace(/Ã¼/g, 'u')
-      .replace(/Ãœ/g, 'U')
-      .replace(/ÅŸ/g, 's')
-      .replace(/Å/g, 'S')
-      .replace(/Ä±/g, 'i')
-      .replace(/Ä°/g, 'I')
-      .replace(/Ã¶/g, 'o')
-      .replace(/Ã–/g, 'O')
-      .replace(/Ã§/g, 'c')
-      .replace(/Ã‡/g, 'C');
+      .replace(/₺/g, 'TL')
+      .replace(/€/g, 'EUR')
+      .replace(/£/g, 'GBP')
+      .replace(/ğ/g, 'g')
+      .replace(/Ğ/g, 'G')
+      .replace(/ü/g, 'u')
+      .replace(/Ü/g, 'U')
+      .replace(/ş/g, 's')
+      .replace(/Ş/g, 'S')
+      .replace(/ı/g, 'i')
+      .replace(/İ/g, 'I')
+      .replace(/ö/g, 'o')
+      .replace(/Ö/g, 'O')
+      .replace(/ç/g, 'c')
+      .replace(/Ç/g, 'C')
+      .replace(/[\u0080-\uFFFF]/g, '');
   }
 }
