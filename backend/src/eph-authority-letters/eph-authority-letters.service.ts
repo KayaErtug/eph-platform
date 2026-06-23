@@ -294,7 +294,6 @@ export class EphAuthorityLettersService {
     const slate = rgb(0.392, 0.455, 0.545);
     const border = rgb(0.78, 0.839, 0.91);
     const soft = rgb(0.969, 0.98, 0.996);
-    const softBlue = rgb(0.937, 0.965, 1);
     const green = rgb(0.047, 0.518, 0.259);
 
     page.drawRectangle({ x: 18, y: 18, width: width - 36, height: height - 36, color: rgb(1, 1, 1), borderColor: border, borderWidth: 1.2 });
@@ -302,38 +301,38 @@ export class EphAuthorityLettersService {
     page.drawLine({ start: { x: 18, y: 18 }, end: { x: width - 18, y: 18 }, thickness: 4, color: blue });
 
     if (logoImage) {
-      page.drawImage(logoImage, { x: 34, y: height - 122, width: 92, height: 92 });
+      page.drawImage(logoImage, { x: 34, y: 706, width: 86, height: 86 });
     } else {
-      page.drawText('EPH', { x: 46, y: height - 78, size: 28, font: boldFont, color: blue });
+      page.drawText('EPH', { x: 46, y: 750, size: 28, font: boldFont, color: blue });
     }
 
-    page.drawText('EMLAK PORTFOY HAVUZU', { x: 34, y: height - 146, size: 9.2, font: boldFont, color: navy });
-    page.drawText('GUVEN - PAYLAS - KAZAN', { x: 42, y: height - 160, size: 7.6, font: boldFont, color: slate });
+    page.drawText('EMLAK PORTFOY HAVUZU', { x: 34, y: 688, size: 9.2, font: boldFont, color: navy });
+    page.drawText('GUVEN - PAYLAS - KAZAN', { x: 42, y: 674, size: 7.6, font: boldFont, color: slate });
 
-    page.drawText('GAYRIMENKUL SATIS / KIRALAMA', { x: 140, y: height - 66, size: 18, font: boldFont, color: navy });
-    page.drawText('YETKILENDIRME SOZLESMESI', { x: 168, y: height - 92, size: 18, font: boldFont, color: navy });
-    page.drawLine({ start: { x: 212, y: height - 110 }, end: { x: 386, y: height - 110 }, thickness: 1.1, color: border });
-    page.drawText('EPH EMLAK PORTFOY HAVUZU PLATFORMU', { x: 198, y: height - 133, size: 9.5, font: boldFont, color: primary });
+    page.drawText('GAYRIMENKUL SATIS / KIRALAMA', { x: 146, y: 754, size: 16, font: boldFont, color: navy });
+    page.drawText('YETKILENDIRME SOZLESMESI', { x: 168, y: 731, size: 16, font: boldFont, color: navy });
+    page.drawLine({ start: { x: 205, y: 713 }, end: { x: 386, y: 713 }, thickness: 1.1, color: border });
+    page.drawText('EPH EMLAK PORTFOY HAVUZU PLATFORMU', { x: 190, y: 690, size: 9.3, font: boldFont, color: primary });
 
-    this.drawPdfMetaBox(page, boldFont, regularFont, 442, height - 152, 116, 116, [
+    this.drawPdfMetaBox(page, boldFont, regularFont, 440, 688, 124, 108, [
       ['BELGE NO', letter.authorityNo],
       ['PORTFOY NO', this.getEphId(letter.unit.id)],
       ['DUZENLEME', this.formatDate(new Date())],
       ['DOGRULAMA', 'QR ILE AKTIF'],
     ]);
 
-    this.drawPdfPanel(page, boldFont, '1. TASINMAZ MALIKI BILGILERI', 28, height - 300, 260, 116, blue);
-    this.drawPdfRow(page, boldFont, regularFont, 'Ad Soyad', letter.ownerName, 44, height - 224, 222);
-    this.drawPdfRow(page, boldFont, regularFont, 'Telefon', letter.ownerPhone || 'Belirtilmedi', 44, height - 254, 222);
-    this.drawPdfRow(page, boldFont, regularFont, 'Adres', letter.unit.project.address || `${letter.unit.project.city} / ${letter.unit.project.district}`, 44, height - 284, 222);
+    this.drawPdfPanel(page, boldFont, '1. TASINMAZ MALIKI BILGILERI', 28, 558, 260, 118, blue);
+    this.drawPdfRow(page, boldFont, regularFont, 'Ad Soyad', letter.ownerName, 44, 632, 222);
+    this.drawPdfRow(page, boldFont, regularFont, 'Telefon', letter.ownerPhone || 'Belirtilmedi', 44, 602, 222);
+    this.drawPdfRow(page, boldFont, regularFont, 'Adres', letter.unit.project.address || `${letter.unit.project.city} / ${letter.unit.project.district}`, 44, 572, 222);
 
-    this.drawPdfPanel(page, boldFont, '2. YETKILENDIRILEN EMLAK DANISMANI BILGILERI', 307, height - 300, 260, 116, blue);
-    this.drawPdfRow(page, boldFont, regularFont, 'Ad Soyad', this.formatName(letter.unit.project.owner?.firstName, letter.unit.project.owner?.lastName), 323, height - 224, 222);
-    this.drawPdfRow(page, boldFont, regularFont, 'Telefon', '+90 535 79 09 EPH', 323, height - 254, 222);
-    this.drawPdfRow(page, boldFont, regularFont, 'EPH Uye No', letter.unit.project.owner?.memberCode || 'Belirtilmedi', 323, height - 284, 222);
+    this.drawPdfPanel(page, boldFont, '2. YETKILENDIRILEN EMLAK DANISMANI BILGILERI', 307, 558, 260, 118, blue);
+    this.drawPdfRow(page, boldFont, regularFont, 'Ad Soyad', this.formatName(letter.unit.project.owner?.firstName, letter.unit.project.owner?.lastName), 323, 632, 222);
+    this.drawPdfRow(page, boldFont, regularFont, 'Telefon', '+90 535 79 09 EPH', 323, 602, 222);
+    this.drawPdfRow(page, boldFont, regularFont, 'EPH Uye No', letter.unit.project.owner?.memberCode || 'Belirtilmedi', 323, 572, 222);
 
-    this.drawPdfPanel(page, boldFont, '3. TASINMAZ BILGILERI', 28, height - 425, 539, 108, blue);
-    const propertyY = height - 356;
+    this.drawPdfPanel(page, boldFont, '3. TASINMAZ BILGILERI', 28, 432, 539, 104, blue);
+    const propertyY = 491;
     const propertyCells = [
       ['Il', letter.unit.project.city],
       ['Ilce', letter.unit.project.district],
@@ -354,22 +353,22 @@ export class EphAuthorityLettersService {
       this.drawPdfSmallCell(page, boldFont, regularFont, cell[0], cell[1], 42 + col * 130, propertyY - row * 28, 116);
     });
 
-    this.drawPdfPanel(page, boldFont, '4. YETKI TURU', 28, height - 538, 172, 86, blue);
-    this.drawCheckLine(page, boldFont, 48, height - 486, 'SATIS YETKISI', letter.authorityType === 'SATIS');
-    this.drawCheckLine(page, boldFont, 48, height - 510, 'KIRALAMA YETKISI', letter.authorityType === 'KIRALAMA');
-    this.drawCheckLine(page, boldFont, 48, height - 534, 'SATIS VE KIRALAMA', letter.authorityType === 'SATIS_VE_KIRALAMA');
+    this.drawPdfPanel(page, boldFont, '4. YETKI TURU', 28, 330, 172, 78, blue);
+    this.drawCheckLine(page, boldFont, 48, 374, 'SATIS YETKISI', letter.authorityType === 'SATIS');
+    this.drawCheckLine(page, boldFont, 48, 350, 'KIRALAMA YETKISI', letter.authorityType === 'KIRALAMA');
+    this.drawCheckLine(page, boldFont, 48, 326, 'SATIS VE KIRALAMA', letter.authorityType === 'SATIS_VE_KIRALAMA');
 
-    this.drawPdfPanel(page, boldFont, '5. YETKI SURESI', 212, height - 538, 172, 86, blue);
-    this.drawPdfRow(page, boldFont, regularFont, 'Baslangic', this.formatDate(letter.authorityStartDate), 230, height - 490, 134);
-    this.drawPdfRow(page, boldFont, regularFont, 'Bitis', this.formatDate(letter.authorityEndDate), 230, height - 516, 134);
-    page.drawText('Toplam Sure', { x: 230, y: height - 535, size: 8.6, font: boldFont, color: navy });
-    page.drawText(`${this.calculateDurationDays(letter.authorityStartDate, letter.authorityEndDate)} GUN`, { x: 302, y: height - 535, size: 10.5, font: boldFont, color: primary });
+    this.drawPdfPanel(page, boldFont, '5. YETKI SURESI', 212, 330, 172, 78, blue);
+    this.drawPdfRow(page, boldFont, regularFont, 'Baslangic', this.formatDate(letter.authorityStartDate), 230, 372, 134);
+    this.drawPdfRow(page, boldFont, regularFont, 'Bitis', this.formatDate(letter.authorityEndDate), 230, 348, 134);
+    page.drawText('Toplam Sure', { x: 230, y: 330, size: 8.6, font: boldFont, color: navy });
+    page.drawText(`${this.calculateDurationDays(letter.authorityStartDate, letter.authorityEndDate)} GUN`, { x: 302, y: 330, size: 10.5, font: boldFont, color: primary });
 
-    this.drawPdfPanel(page, boldFont, '6. MUNHASIRLIK DURUMU', 396, height - 538, 171, 86, blue);
-    this.drawCheckLine(page, boldFont, 416, height - 492, 'MUNHASIR YETKI', false);
-    this.drawCheckLine(page, boldFont, 416, height - 520, 'MUNHASIR OLMAYAN YETKI', true);
+    this.drawPdfPanel(page, boldFont, '6. MUNHASIRLIK DURUMU', 396, 330, 171, 78, blue);
+    this.drawCheckLine(page, boldFont, 416, 368, 'MUNHASIR YETKI', false);
+    this.drawCheckLine(page, boldFont, 416, 340, 'MUNHASIR OLMAYAN YETKI', true);
 
-    page.drawText('7. SOZLESME HUKUMLERI', { x: 38, y: height - 568, size: 11, font: boldFont, color: navy });
+    page.drawText('7. SOZLESME HUKUMLERI', { x: 38, y: 306, size: 11, font: boldFont, color: navy });
     const terms = [
       'Malik, yukarida bilgileri bulunan tasinmaz icin emlak danismanini satis veya kiralama surecinde yetkilendirdigini kabul eder.',
       'Danisman, tasinmazin pazarlanmasi, tanitimi, gosterimi ve alici ya da kiraci adaylari ile gorusmeleri yurutmeye yetkilidir.',
@@ -377,42 +376,42 @@ export class EphAuthorityLettersService {
       'Malik, beyan ettigi bilgilerin dogru oldugunu ve tasinmaz uzerinde tasarruf yetkisine sahip bulundugunu beyan eder.',
       'Isbu belge EPH Platformu uzerinde uretilmis olup QR kod ile sistem kaydi dogrulanabilir.',
     ];
-    let termsY = height - 588;
+    let termsY = 287;
     terms.forEach((term, index) => {
-      page.drawText(`${index + 1}.`, { x: 40, y: termsY, size: 7.3, font: boldFont, color: primary });
-      termsY = this.drawWrappedText(page, regularFont, term, 57, termsY, 340, 6.8, 8.5, rgb(0.08, 0.1, 0.14)) - 4;
+      page.drawText(`${index + 1}.`, { x: 40, y: termsY, size: 6.8, font: boldFont, color: primary });
+      termsY = this.drawWrappedText(page, regularFont, term, 57, termsY, 335, 6.2, 7.4, rgb(0.08, 0.1, 0.14)) - 3;
     });
 
-    page.drawRectangle({ x: 426, y: 198, width: 118, height: 126, color: rgb(1, 1, 1), borderColor: border, borderWidth: 1.2 });
-    page.drawText('BELGE DOGRULAMA', { x: 440, y: 308, size: 8.2, font: boldFont, color: green });
-    page.drawImage(qrImage, { x: 449, y: 223, width: 72, height: 72 });
-    page.drawText('QR kodu okutun', { x: 452, y: 214, size: 7.2, font: boldFont, color: navy });
-    page.drawText(letter.authorityNo, { x: 439, y: 205, size: 6.4, font: boldFont, color: primary });
+    page.drawRectangle({ x: 426, y: 186, width: 118, height: 122, color: rgb(1, 1, 1), borderColor: border, borderWidth: 1.2 });
+    page.drawText('BELGE DOGRULAMA', { x: 440, y: 292, size: 8.2, font: boldFont, color: green });
+    page.drawImage(qrImage, { x: 449, y: 209, width: 72, height: 72 });
+    page.drawText('QR kodu okutun', { x: 452, y: 200, size: 7.2, font: boldFont, color: navy });
+    page.drawText(letter.authorityNo, { x: 439, y: 191, size: 6.4, font: boldFont, color: primary });
 
-    page.drawRectangle({ x: 46, y: 112, width: 232, height: 76, color: soft, borderColor: border, borderWidth: 1 });
-    page.drawRectangle({ x: 46, y: 167, width: 232, height: 21, color: blue });
-    page.drawText('8. TASINMAZ MALIKI', { x: 92, y: 173, size: 9, font: boldFont, color: rgb(1, 1, 1) });
-    page.drawText(`Ad Soyad: ${this.safePdfText(letter.ownerName)}`, { x: 60, y: 150, size: 8, font: regularFont, color: navy });
-    page.drawText('Imza:', { x: 60, y: 130, size: 8, font: regularFont, color: navy });
-    page.drawRectangle({ x: 108, y: 121, width: 150, height: 30, borderColor: border, borderWidth: 0.8 });
+    page.drawRectangle({ x: 46, y: 104, width: 232, height: 66, color: soft, borderColor: border, borderWidth: 1 });
+    page.drawRectangle({ x: 46, y: 149, width: 232, height: 21, color: blue });
+    page.drawText('8. TASINMAZ MALIKI', { x: 92, y: 155, size: 9, font: boldFont, color: rgb(1, 1, 1) });
+    page.drawText(`Ad Soyad: ${this.safePdfText(letter.ownerName)}`, { x: 60, y: 132, size: 8, font: regularFont, color: navy });
+    page.drawText('Imza:', { x: 60, y: 114, size: 8, font: regularFont, color: navy });
+    page.drawRectangle({ x: 108, y: 108, width: 150, height: 25, borderColor: border, borderWidth: 0.8 });
 
-    page.drawRectangle({ x: 318, y: 112, width: 232, height: 76, color: soft, borderColor: border, borderWidth: 1 });
-    page.drawRectangle({ x: 318, y: 167, width: 232, height: 21, color: blue });
-    page.drawText('9. EMLAK DANISMANI', { x: 364, y: 173, size: 9, font: boldFont, color: rgb(1, 1, 1) });
-    page.drawText(`Ad Soyad: ${this.safePdfText(this.formatName(letter.unit.project.owner?.firstName, letter.unit.project.owner?.lastName))}`, { x: 332, y: 150, size: 8, font: regularFont, color: navy });
-    page.drawText('Imza:', { x: 332, y: 130, size: 8, font: regularFont, color: navy });
-    page.drawRectangle({ x: 380, y: 121, width: 150, height: 30, borderColor: border, borderWidth: 0.8 });
+    page.drawRectangle({ x: 318, y: 104, width: 232, height: 66, color: soft, borderColor: border, borderWidth: 1 });
+    page.drawRectangle({ x: 318, y: 149, width: 232, height: 21, color: blue });
+    page.drawText('9. EMLAK DANISMANI', { x: 364, y: 155, size: 9, font: boldFont, color: rgb(1, 1, 1) });
+    page.drawText(`Ad Soyad: ${this.safePdfText(this.formatName(letter.unit.project.owner?.firstName, letter.unit.project.owner?.lastName))}`, { x: 332, y: 132, size: 8, font: regularFont, color: navy });
+    page.drawText('Imza:', { x: 332, y: 114, size: 8, font: regularFont, color: navy });
+    page.drawRectangle({ x: 380, y: 108, width: 150, height: 25, borderColor: border, borderWidth: 0.8 });
 
-    page.drawLine({ start: { x: 216, y: 98 }, end: { x: 380, y: 98 }, thickness: 0.8, color: border });
-    page.drawText('TARIH', { x: 282, y: 88, size: 9, font: boldFont, color: primary });
-    page.drawText(this.formatDate(new Date()), { x: 272, y: 75, size: 9, font: boldFont, color: navy });
+    page.drawLine({ start: { x: 216, y: 91 }, end: { x: 380, y: 91 }, thickness: 0.8, color: border });
+    page.drawText('TARIH', { x: 282, y: 82, size: 9, font: boldFont, color: primary });
+    page.drawText(this.formatDate(new Date()), { x: 272, y: 69, size: 9, font: boldFont, color: navy });
 
     if (logoImage) {
-      page.drawImage(logoImage, { x: 34, y: 42, width: 44, height: 44 });
+      page.drawImage(logoImage, { x: 34, y: 38, width: 42, height: 42 });
     }
-    page.drawText('EPH', { x: 82, y: 61, size: 18, font: boldFont, color: blue });
-    page.drawText('+90 535 79 09 EPH', { x: 226, y: 59, size: 7.5, font: boldFont, color: navy });
-    page.drawText('www.emlakportfoyhavuzu.com', { x: 344, y: 59, size: 7.5, font: boldFont, color: navy });
+    page.drawText('EPH', { x: 80, y: 56, size: 18, font: boldFont, color: blue });
+    page.drawText('+90 535 79 09 EPH', { x: 224, y: 54, size: 7.5, font: boldFont, color: navy });
+    page.drawText('www.emlakportfoyhavuzu.com', { x: 342, y: 54, size: 7.5, font: boldFont, color: navy });
     page.drawRectangle({ x: 462, y: 34, width: 86, height: 23, color: blue });
     page.drawText('EPH PLATFORMU', { x: 478, y: 47, size: 7, font: boldFont, color: rgb(1, 1, 1) });
     page.drawText('DOGRULANABILIR', { x: 483, y: 39, size: 5.7, font: boldFont, color: rgb(1, 1, 1) });
