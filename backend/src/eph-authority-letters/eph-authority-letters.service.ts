@@ -486,9 +486,7 @@ export class EphAuthorityLettersService {
     });
 
     if (!activePackageRelation) {
-      throw new BadRequestException(
-        'Aktif üyelik paketiniz bulunamadı. Yetki belgesi üretim limiti hesaplanamadı.',
-      );
+      return this.getDefaultAuthorityLetterQuotaSnapshot(input);
     }
 
     const packageInfo = await input.tx.uyelikPaketi.findUnique({
@@ -560,6 +558,103 @@ export class EphAuthorityLettersService {
     };
   }
 
+
+  private async getDefaultAuthorityLetterQuotaSnapshot(input: {
+    tx: any;
+    userId: string;
+  }) {
+    const monthlyLimit = 20;
+    const monthRange = this.getMonthRange();
+
+    const quota = await input.tx.kotaKullanimi.upsert({
+      where: {
+        kullaniciId_kotaKodu_donem_donemBaslangic: {
+          kullaniciId: input.userId,
+          kotaKodu: AUTHORITY_LETTER_MONTHLY_QUOTA_CODE,
+          donem: KotaDonemi.AYLIK,
+          donemBaslangic: monthRange.start,
+        },
+      },
+      update: {
+        limit: monthlyLimit,
+        donemBitis: monthRange.end,
+      },
+      create: {
+        kullaniciId: input.userId,
+        kotaKodu: AUTHORITY_LETTER_MONTHLY_QUOTA_CODE,
+        donem: KotaDonemi.AYLIK,
+        limit: monthlyLimit,
+        kullanilan: 0,
+        donemBaslangic: monthRange.start,
+        donemBitis: monthRange.end,
+      },
+    });
+
+    const used = Number(quota.kullanilan || 0);
+    const remaining = Math.max(monthlyLimit - used, 0);
+
+    return {
+      success: true,
+      quotaCode: AUTHORITY_LETTER_MONTHLY_QUOTA_CODE,
+      period: 'AYLIK',
+      limit: monthlyLimit,
+      used,
+      remaining,
+      overLimitCost: AUTHORITY_LETTER_OVER_LIMIT_COST,
+      isOverLimit: used >= monthlyLimit,
+      package: {
+        code: 'EPH_DEFAULT',
+        name: 'Varsayılan Paket',
+        activePortfolioLimit: 10,
+      },
+      periodStart: monthRange.start,
+      periodEnd: monthRange.end,
+    };
+  }
+
+  private async getDefaultAuthorityLetterQuotaUsage(input: {
+    tx: any;
+    userId: string;
+  }): Promise<AuthorityLetterQuotaResult> {
+    const monthlyLimit = 20;
+    const monthRange = this.getMonthRange();
+
+    const quota = await input.tx.kotaKullanimi.upsert({
+      where: {
+        kullaniciId_kotaKodu_donem_donemBaslangic: {
+          kullaniciId: input.userId,
+          kotaKodu: AUTHORITY_LETTER_MONTHLY_QUOTA_CODE,
+          donem: KotaDonemi.AYLIK,
+          donemBaslangic: monthRange.start,
+        },
+      },
+      update: {
+        limit: monthlyLimit,
+        donemBitis: monthRange.end,
+      },
+      create: {
+        kullaniciId: input.userId,
+        kotaKodu: AUTHORITY_LETTER_MONTHLY_QUOTA_CODE,
+        donem: KotaDonemi.AYLIK,
+        limit: monthlyLimit,
+        kullanilan: 0,
+        donemBaslangic: monthRange.start,
+        donemBitis: monthRange.end,
+      },
+    });
+
+    const usedBefore = Number(quota.kullanilan || 0);
+    const isFree = usedBefore < monthlyLimit;
+
+    return {
+      limit: monthlyLimit,
+      usedBefore,
+      usedAfter: usedBefore,
+      isFree,
+      chargedKontor: isFree ? 0 : AUTHORITY_LETTER_OVER_LIMIT_COST,
+    };
+  }
+
   private async prepareAuthorityLetterQuotaUsage(input: {
     tx: any;
     userId: string;
@@ -576,9 +671,7 @@ export class EphAuthorityLettersService {
     });
 
     if (!activePackageRelation) {
-      throw new BadRequestException(
-        'Aktif üyelik paketiniz bulunamadı. Yetki belgesi üretim limiti hesaplanamadı.',
-      );
+      return this.getDefaultAuthorityLetterQuotaUsage(input);
     }
 
     const packageInfo = await input.tx.uyelikPaketi.findUnique({
