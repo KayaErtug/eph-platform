@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
+
 import {
   BadRequestException,
   ConflictException,
@@ -264,10 +267,10 @@ export class EphAuthorityLettersService {
     this.ensureCanManage(input, letter.unit.project.ownerId);
 
     const verificationUrl = this.getVerificationUrl(letter.authorityNo);
-    const qrPng = await QRCode.toDataURL(verificationUrl, {
+    const qrDataUrl = await QRCode.toDataURL(verificationUrl, {
       errorCorrectionLevel: 'M',
       margin: 1,
-      width: 220,
+      width: 360,
       color: {
         dark: '#06194A',
         light: '#FFFFFF',
@@ -278,75 +281,146 @@ export class EphAuthorityLettersService {
     const page = pdfDoc.addPage([595.28, 841.89]);
     const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const qrImage = await pdfDoc.embedPng(qrPng);
+    const qrBytes = Buffer.from(qrDataUrl.split(',')[1], 'base64');
+    const qrImage = await pdfDoc.embedPng(qrBytes);
+    const logoBytes = this.getLogoBytes();
+    const logoImage = logoBytes ? await pdfDoc.embedPng(logoBytes) : null;
+
     const width = page.getWidth();
     const height = page.getHeight();
-    const blue = rgb(0.145, 0.388, 0.922);
     const navy = rgb(0.024, 0.098, 0.29);
+    const blue = rgb(0.02, 0.243, 0.545);
+    const primary = rgb(0.145, 0.388, 0.922);
     const slate = rgb(0.392, 0.455, 0.545);
     const border = rgb(0.78, 0.839, 0.91);
     const soft = rgb(0.969, 0.98, 0.996);
+    const softBlue = rgb(0.937, 0.965, 1);
+    const green = rgb(0.047, 0.518, 0.259);
 
-    this.drawRoundedRect(page, 28, 24, width - 56, height - 48, 18, rgb(1, 1, 1), border);
-    page.drawRectangle({ x: 28, y: height - 122, width: width - 56, height: 98, color: rgb(0.937, 0.965, 1) });
-    page.drawRectangle({ x: 28, y: height - 122, width: 7, height: 98, color: blue });
+    page.drawRectangle({ x: 18, y: 18, width: width - 36, height: height - 36, color: rgb(1, 1, 1), borderColor: border, borderWidth: 1.2 });
+    page.drawLine({ start: { x: 18, y: height - 18 }, end: { x: width - 18, y: height - 18 }, thickness: 4, color: blue });
+    page.drawLine({ start: { x: 18, y: 18 }, end: { x: width - 18, y: 18 }, thickness: 4, color: blue });
 
-    page.drawText('EPH', { x: 52, y: height - 70, size: 24, font: boldFont, color: blue });
-    page.drawText('Emlak Portföy Havuzu', { x: 52, y: height - 91, size: 10, font: boldFont, color: navy });
-    page.drawText('YETKİ BELGESİ', { x: 346, y: height - 68, size: 22, font: boldFont, color: navy });
-    page.drawText('Satış / Kiralama Yetkilendirme Taslağı', { x: 346, y: height - 89, size: 9, font: regularFont, color: slate });
+    if (logoImage) {
+      page.drawImage(logoImage, { x: 34, y: height - 122, width: 92, height: 92 });
+    } else {
+      page.drawText('EPH', { x: 46, y: height - 78, size: 28, font: boldFont, color: blue });
+    }
 
-    this.drawInfoBox(page, boldFont, regularFont, 48, height - 178, 236, 56, 'Belge No', letter.authorityNo);
-    this.drawInfoBox(page, boldFont, regularFont, 310, height - 178, 236, 56, 'Doğrulama Durumu', 'QR kod ile doğrulanabilir');
+    page.drawText('EMLAK PORTFOY HAVUZU', { x: 34, y: height - 146, size: 9.2, font: boldFont, color: navy });
+    page.drawText('GUVEN  •  PAYLAS  •  KAZAN', { x: 44, y: height - 160, size: 7.6, font: boldFont, color: slate });
 
-    this.drawSectionTitle(page, boldFont, 'Taraf Bilgileri', 48, height - 220);
-    this.drawField(page, boldFont, regularFont, 'Malik', letter.ownerName, 48, height - 248, 240);
-    this.drawField(page, boldFont, regularFont, 'Telefon', letter.ownerPhone || 'Belirtilmedi', 310, height - 248, 236);
-    this.drawField(page, boldFont, regularFont, 'E-posta', letter.ownerEmail || 'Belirtilmedi', 48, height - 286, 240);
-    this.drawField(page, boldFont, regularFont, 'Danışman', this.formatName(letter.unit.project.owner?.firstName, letter.unit.project.owner?.lastName), 310, height - 286, 236);
+    page.drawText('GAYRIMENKUL SATIS / KIRALAMA', { x: 158, y: height - 66, size: 20, font: boldFont, color: navy });
+    page.drawText('YETKILENDIRME SOZLESMESI', { x: 184, y: height - 94, size: 20, font: boldFont, color: navy });
+    page.drawLine({ start: { x: 198, y: height - 112 }, end: { x: 397, y: height - 112 }, thickness: 1.1, color: border });
+    page.drawText('EPH EMLAK PORTFOY HAVUZU PLATFORMU', { x: 192, y: height - 133, size: 9.5, font: boldFont, color: primary });
 
-    this.drawSectionTitle(page, boldFont, 'Portföy Bilgileri', 48, height - 332);
-    this.drawField(page, boldFont, regularFont, 'Portföy ID', this.getEphId(letter.unit.id), 48, height - 360, 152);
-    this.drawField(page, boldFont, regularFont, 'Portföy Tipi', String(letter.unit.type || 'Portföy'), 220, height - 360, 152);
-    this.drawField(page, boldFont, regularFont, 'İşlem', String(letter.unit.status || 'Belirtilmedi'), 392, height - 360, 154);
-    this.drawField(page, boldFont, regularFont, 'Konum', `${letter.unit.project.city} / ${letter.unit.project.district}`, 48, height - 398, 498);
+    this.drawPdfMetaBox(page, boldFont, regularFont, 430, height - 142, 132, 108, [
+      ['BELGE NO', letter.authorityNo],
+      ['PORTFOY NO', this.getEphId(letter.unit.id)],
+      ['DUZENLEME', this.formatDate(new Date())],
+      ['DOGRULAMA', 'QR ILE AKTIF'],
+    ]);
 
-    this.drawSectionTitle(page, boldFont, 'Yetki Bilgileri', 48, height - 444);
-    this.drawField(page, boldFont, regularFont, 'Yetki Türü', this.getAuthorityTypeLabel(letter.authorityType), 48, height - 472, 152);
-    this.drawField(page, boldFont, regularFont, 'Başlangıç', this.formatDate(letter.authorityStartDate), 220, height - 472, 152);
-    this.drawField(page, boldFont, regularFont, 'Bitiş', this.formatDate(letter.authorityEndDate), 392, height - 472, 154);
+    this.drawPdfPanel(page, boldFont, '1. TASINMAZ MALIKI BILGILERI', 28, height - 302, 260, 126, blue);
+    this.drawPdfRow(page, boldFont, regularFont, 'Ad Soyad', letter.ownerName, 44, height - 214, 222);
+    this.drawPdfRow(page, boldFont, regularFont, 'Telefon', letter.ownerPhone || 'Belirtilmedi', 44, height - 242, 222);
+    this.drawPdfRow(page, boldFont, regularFont, 'E-Posta', letter.ownerEmail || 'Belirtilmedi', 44, height - 270, 222);
+    this.drawPdfRow(page, boldFont, regularFont, 'Adres', letter.unit.project.address || `${letter.unit.project.city} / ${letter.unit.project.district}`, 44, height - 298, 222);
 
-    page.drawRectangle({ x: 48, y: height - 604, width: 318, height: 90, color: soft, borderColor: border, borderWidth: 1 });
-    page.drawText('Yetkilendirme Beyanı', { x: 64, y: height - 540, size: 11, font: boldFont, color: navy });
-    this.drawWrappedText(
-      page,
-      regularFont,
-      'Bu belge, ilgili portföy için EPH Platformu üzerinde yetki belgesi taslağı oluşturulduğunu gösterir. Fiziki imza süreçleri ve nihai belge sorumluluğu taraflara aittir. Belgenin doğruluğu QR kod okutularak kontrol edilebilir.',
-      64,
-      height - 560,
-      286,
-      10,
-      14,
-      slate,
-    );
+    this.drawPdfPanel(page, boldFont, '2. YETKILENDIRILEN EMLAK DANISMANI BILGILERI', 307, height - 302, 260, 126, blue);
+    this.drawPdfRow(page, boldFont, regularFont, 'Ad Soyad', this.formatName(letter.unit.project.owner?.firstName, letter.unit.project.owner?.lastName), 323, height - 214, 222);
+    this.drawPdfRow(page, boldFont, regularFont, 'Telefon', letter.unit.project.owner?.phone || 'Belirtilmedi', 323, height - 242, 222);
+    this.drawPdfRow(page, boldFont, regularFont, 'E-Posta', letter.unit.project.owner?.email || 'Belirtilmedi', 323, height - 270, 222);
+    this.drawPdfRow(page, boldFont, regularFont, 'EPH Uye No', letter.unit.project.owner?.memberCode || 'Belirtilmedi', 323, height - 298, 222);
 
-    page.drawRectangle({ x: 386, y: height - 604, width: 160, height: 160, color: rgb(1, 1, 1), borderColor: border, borderWidth: 1 });
-    page.drawImage(qrImage, { x: 414, y: height - 574, width: 104, height: 104 });
-    page.drawText('Belge Doğrulama', { x: 421, y: height - 592, size: 9, font: boldFont, color: navy });
-    page.drawText('QR kodu okutun', { x: 425, y: height - 609, size: 8, font: regularFont, color: slate });
-
-    this.drawSignatureBox(page, boldFont, regularFont, 48, 114, 'Malik İmzası', letter.ownerName);
-    this.drawSignatureBox(page, boldFont, regularFont, 310, 114, 'Danışman İmzası', this.formatName(letter.unit.project.owner?.firstName, letter.unit.project.owner?.lastName));
-
-    page.drawText('Bu belge EPH Platformu tarafından üretilmiştir. QR kod ile doğrulanabilir.', {
-      x: 48,
-      y: 70,
-      size: 8,
-      font: regularFont,
-      color: slate,
+    this.drawPdfPanel(page, boldFont, '3. TASINMAZ BILGILERI', 28, height - 430, 539, 108, blue);
+    const propertyY = height - 360;
+    const propertyCells = [
+      ['Il', letter.unit.project.city],
+      ['Ilce', letter.unit.project.district],
+      ['Mahalle', letter.unit.project.address || 'Belirtilmedi'],
+      ['Tasinmaz Turu', String(letter.unit.type || 'Portfoy')],
+      ['Ada', letter.unit.adaNo || 'Belirtilmedi'],
+      ['Parsel', letter.unit.parselNo || 'Belirtilmedi'],
+      ['Bagimsiz Bolum', letter.unit.number || 'Belirtilmedi'],
+      ['Brut m2', letter.unit.area ? `${letter.unit.area} m2` : 'Belirtilmedi'],
+      ['Kat', letter.unit.floorLabel || (letter.unit.floor ? String(letter.unit.floor) : 'Belirtilmedi')],
+      ['Portfoy No', this.getEphId(letter.unit.id)],
+      ['Portfoy Turu', String(letter.unit.status || 'Belirtilmedi')],
+      ['Fiyat', letter.unit.price ? `${Number(letter.unit.price).toLocaleString('tr-TR')} ${letter.unit.priceCurrency || 'TRY'}` : 'Belirtilmedi'],
+    ];
+    propertyCells.forEach((cell, index) => {
+      const col = index % 4;
+      const row = Math.floor(index / 4);
+      this.drawPdfSmallCell(page, boldFont, regularFont, cell[0], cell[1], 42 + col * 130, propertyY - row * 28, 116);
     });
-    page.drawText(verificationUrl, { x: 48, y: 55, size: 7, font: regularFont, color: blue });
-    page.drawText('EPH', { x: 502, y: 55, size: 17, font: boldFont, color: blue });
+
+    this.drawPdfPanel(page, boldFont, '4. YETKI TURU', 28, height - 538, 172, 86, blue);
+    this.drawCheckLine(page, boldFont, 48, height - 486, 'SATIS YETKISI', letter.authorityType === 'SATIS');
+    this.drawCheckLine(page, boldFont, 48, height - 510, 'KIRALAMA YETKISI', letter.authorityType === 'KIRALAMA');
+    this.drawCheckLine(page, boldFont, 48, height - 534, 'SATIS VE KIRALAMA', letter.authorityType === 'SATIS_VE_KIRALAMA');
+
+    this.drawPdfPanel(page, boldFont, '5. YETKI SURESI', 212, height - 538, 172, 86, blue);
+    this.drawPdfRow(page, boldFont, regularFont, 'Baslangic', this.formatDate(letter.authorityStartDate), 230, height - 490, 134);
+    this.drawPdfRow(page, boldFont, regularFont, 'Bitis', this.formatDate(letter.authorityEndDate), 230, height - 516, 134);
+    page.drawText('Toplam Sure', { x: 230, y: height - 535, size: 8.6, font: boldFont, color: navy });
+    page.drawText(`${this.calculateDurationDays(letter.authorityStartDate, letter.authorityEndDate)} GUN`, { x: 302, y: height - 535, size: 10.5, font: boldFont, color: primary });
+
+    this.drawPdfPanel(page, boldFont, '6. MUNHASIRLIK DURUMU', 396, height - 538, 171, 86, blue);
+    this.drawCheckLine(page, boldFont, 416, height - 492, 'MUNHASIR YETKI', false);
+    this.drawCheckLine(page, boldFont, 416, height - 520, 'MUNHASIR OLMAYAN YETKI', true);
+
+    page.drawText('7. SOZLESME HUKUMLERI', { x: 38, y: height - 570, size: 11, font: boldFont, color: navy });
+    const terms = [
+      'Malik, yukarida bilgileri bulunan tasinmazin satisa, kiralamaya veya satis ve kiralamaya birlikte arz edilmesi amaciyla yukarida bilgileri yer alan emlak danismanini yetkilendirdigini kabul eder.',
+      'Danisman, tasinmazin pazarlanmasi, tanitilmasi, gosterimi, alici veya kiraci adaylari ile gorusmelerin yurutulmesi ve taraflar arasinda iletisim kurulmasina aracilik etme yetkisine sahiptir.',
+      'Taraflar, hizmet bedeli konusunu yururlukteki mevzuat ve meslek kurallari cercevesinde ayrica kararlastiracaklarini kabul eder.',
+      'Malik, tasinmaz uzerinde tasarruf yetkisine sahip oldugunu, beyan ettigi bilgilerin dogru oldugunu ve tasinmazin pazarlanmasina izin verdigini beyan eder.',
+      'Danisman, meslek etigi kurallarina uygun hareket edecegini, malikin menfaatlerini koruyacagini ve gerekli ozeni gosterecegini kabul eder.',
+      'Taraflar, kisisel verilerin korunmasi mevzuatina uygun hareket edeceklerini kabul eder.',
+      'Isbu sozlesme, taraflarin imzasi ile yururluge girer ve belirtilen sure sonunda kendiliginden sona erer.',
+    ];
+    let termsY = height - 590;
+    terms.forEach((term, index) => {
+      page.drawText(`${index + 1}.`, { x: 40, y: termsY, size: 7.5, font: boldFont, color: primary });
+      termsY = this.drawWrappedText(page, regularFont, term, 57, termsY, 350, 7.2, 10, rgb(0.08, 0.1, 0.14)) - 5;
+    });
+
+    page.drawRectangle({ x: 420, y: height - 706, width: 126, height: 126, color: rgb(1, 1, 1), borderColor: border, borderWidth: 1.2 });
+    page.drawImage(qrImage, { x: 443, y: height - 676, width: 80, height: 80 });
+    page.drawText('BELGE DOGRULAMA', { x: 438, y: height - 594, size: 8.2, font: boldFont, color: green });
+    page.drawText('QR kodu okutun', { x: 449, y: height - 690, size: 7.2, font: boldFont, color: navy });
+    page.drawText(letter.authorityNo, { x: 435, y: height - 702, size: 6.6, font: boldFont, color: primary });
+
+    page.drawRectangle({ x: 38, y: 142, width: 220, height: 72, color: soft, borderColor: border, borderWidth: 1 });
+    page.drawRectangle({ x: 38, y: 193, width: 220, height: 21, color: blue });
+    page.drawText('8. TASINMAZ MALIKI', { x: 74, y: 199, size: 9, font: boldFont, color: rgb(1, 1, 1) });
+    page.drawText(`Ad Soyad: ${this.safePdfText(letter.ownerName)}`, { x: 52, y: 176, size: 8, font: regularFont, color: navy });
+    page.drawText('Imza:', { x: 52, y: 158, size: 8, font: regularFont, color: navy });
+    page.drawRectangle({ x: 96, y: 150, width: 144, height: 28, borderColor: border, borderWidth: 0.8 });
+
+    page.drawRectangle({ x: 338, y: 142, width: 220, height: 72, color: soft, borderColor: border, borderWidth: 1 });
+    page.drawRectangle({ x: 338, y: 193, width: 220, height: 21, color: blue });
+    page.drawText('9. EMLAK DANISMANI', { x: 374, y: 199, size: 9, font: boldFont, color: rgb(1, 1, 1) });
+    page.drawText(`Ad Soyad: ${this.safePdfText(this.formatName(letter.unit.project.owner?.firstName, letter.unit.project.owner?.lastName))}`, { x: 352, y: 176, size: 8, font: regularFont, color: navy });
+    page.drawText('Imza:', { x: 352, y: 158, size: 8, font: regularFont, color: navy });
+    page.drawRectangle({ x: 396, y: 150, width: 144, height: 28, borderColor: border, borderWidth: 0.8 });
+
+    page.drawLine({ start: { x: 216, y: 126 }, end: { x: 380, y: 126 }, thickness: 0.8, color: border });
+    page.drawText('TARIH', { x: 282, y: 115, size: 9, font: boldFont, color: primary });
+    page.drawText(this.formatDate(new Date()), { x: 272, y: 100, size: 9, font: boldFont, color: navy });
+
+    if (logoImage) {
+      page.drawImage(logoImage, { x: 32, y: 42, width: 48, height: 48 });
+    }
+    page.drawText('EPH', { x: 78, y: 60, size: 20, font: boldFont, color: blue });
+    page.drawText('www.emlakportfoyhavuzu.com', { x: 162, y: 61, size: 7.5, font: boldFont, color: navy });
+    page.drawText('0850 305 25 10', { x: 314, y: 61, size: 7.5, font: boldFont, color: navy });
+    page.drawText('info@emlakportfoyhavuzu.com', { x: 414, y: 61, size: 7.5, font: boldFont, color: navy });
+    page.drawRectangle({ x: 472, y: 34, width: 76, height: 23, color: blue });
+    page.drawText('EPH PLATFORMU', { x: 486, y: 47, size: 7, font: boldFont, color: rgb(1, 1, 1) });
+    page.drawText('DOGRULANABILIR', { x: 489, y: 39, size: 5.7, font: boldFont, color: rgb(1, 1, 1) });
 
     const pdfBytes = await pdfDoc.save();
 
@@ -841,7 +915,65 @@ export class EphAuthorityLettersService {
 
     if (line) {
       page.drawText(line, { x, y: currentY, size, font, color });
+      currentY -= lineHeight;
     }
+
+    return currentY;
+  }
+
+  private calculateDurationDays(start: Date, end: Date) {
+    const diff = end.getTime() - start.getTime();
+    return Math.max(0, Math.round(diff / (1000 * 60 * 60 * 24)));
+  }
+
+  private drawPdfPanel(page: any, boldFont: any, title: string, x: number, y: number, w: number, h: number, color: any) {
+    page.drawRectangle({ x, y, width: w, height: h, color: rgb(1, 1, 1), borderColor: rgb(0.78, 0.839, 0.91), borderWidth: 1 });
+    page.drawRectangle({ x, y: y + h - 24, width: w, height: 24, color });
+    page.drawText(this.safePdfText(title), { x: x + 13, y: y + h - 16, size: 9.5, font: boldFont, color: rgb(1, 1, 1) });
+  }
+
+  private drawPdfMetaBox(page: any, boldFont: any, regularFont: any, x: number, y: number, w: number, h: number, rows: string[][]) {
+    page.drawRectangle({ x, y, width: w, height: h, color: rgb(1, 1, 1), borderColor: rgb(0.78, 0.839, 0.91), borderWidth: 1 });
+    const rowH = h / rows.length;
+    rows.forEach((row, index) => {
+      const rowY = y + h - rowH * (index + 1);
+      if (index > 0) {
+        page.drawLine({ start: { x, y: rowY + rowH }, end: { x: x + w, y: rowY + rowH }, thickness: 0.6, color: rgb(0.78, 0.839, 0.91) });
+      }
+      page.drawText(this.safePdfText(row[0]), { x: x + 8, y: rowY + 9, size: 6.2, font: boldFont, color: rgb(0.024, 0.098, 0.29) });
+      page.drawText(this.safePdfText(row[1]).slice(0, 24), { x: x + 65, y: rowY + 9, size: 6.5, font: regularFont, color: rgb(0.024, 0.098, 0.29) });
+    });
+  }
+
+  private drawPdfRow(page: any, boldFont: any, regularFont: any, label: string, value: string, x: number, y: number, w: number) {
+    page.drawText(this.safePdfText(label), { x, y, size: 7.2, font: boldFont, color: rgb(0.024, 0.098, 0.29) });
+    page.drawText(':', { x: x + 66, y, size: 7.2, font: boldFont, color: rgb(0.392, 0.455, 0.545) });
+    page.drawText(this.safePdfText(String(value || 'Belirtilmedi')).slice(0, 36), { x: x + 78, y, size: 7.2, font: regularFont, color: rgb(0.08, 0.1, 0.14) });
+    page.drawLine({ start: { x, y: y - 8 }, end: { x: x + w, y: y - 8 }, thickness: 0.35, color: rgb(0.78, 0.839, 0.91) });
+  }
+
+  private drawPdfSmallCell(page: any, boldFont: any, regularFont: any, label: string, value: string, x: number, y: number, w: number) {
+    page.drawText(this.safePdfText(label), { x, y, size: 6.5, font: boldFont, color: rgb(0.02, 0.243, 0.545) });
+    page.drawText(this.safePdfText(String(value || 'Belirtilmedi')).slice(0, 18), { x: x + 54, y, size: 6.6, font: regularFont, color: rgb(0.08, 0.1, 0.14) });
+  }
+
+  private drawCheckLine(page: any, boldFont: any, x: number, y: number, label: string, checked: boolean) {
+    page.drawRectangle({ x, y: y - 4, width: 10, height: 10, borderColor: rgb(0.02, 0.243, 0.545), borderWidth: 0.9, color: checked ? rgb(0.02, 0.243, 0.545) : rgb(1, 1, 1) });
+    if (checked) {
+      page.drawText('X', { x: x + 2.4, y: y - 1.7, size: 6.6, font: boldFont, color: rgb(1, 1, 1) });
+    }
+    page.drawText(this.safePdfText(label), { x: x + 18, y, size: 7.8, font: boldFont, color: rgb(0.08, 0.1, 0.14) });
+  }
+
+  private getLogoBytes() {
+    const candidates = [
+      join(process.cwd(), '../frontend/public/LOGO_EPH.png'),
+      join(process.cwd(), 'frontend/public/LOGO_EPH.png'),
+      join(process.cwd(), 'public/LOGO_EPH.png'),
+    ];
+
+    const logoPath = candidates.find((candidate) => existsSync(candidate));
+    return logoPath ? readFileSync(logoPath) : null;
   }
 
   private safePdfText(value: string) {
