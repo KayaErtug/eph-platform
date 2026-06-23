@@ -1106,8 +1106,22 @@ function PoolMapSection({
         optimized: false,
         zIndex: 9999,
         icon: {
-          url: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
-          scaledSize: new googleMaps.Size(38, 38),
+          url:
+            "data:image/svg+xml;charset=UTF-8," +
+            encodeURIComponent(`
+              <svg width="64" height="78" viewBox="0 0 64 78" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <filter id="shadow" x="-20%" y="-10%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="8" stdDeviation="5" flood-color="#0F172A" flood-opacity="0.28"/>
+                </filter>
+                <path filter="url(#shadow)" d="M32 76C32 76 58 47.9 58 28C58 12.536 46.359 2 32 2C17.641 2 6 12.536 6 28C6 47.9 32 76 32 76Z" fill="#2563EB"/>
+                <path d="M32 68C32 68 52 45.7 52 29C52 17.402 43.046 9 32 9C20.954 9 12 17.402 12 29C12 45.7 32 68 32 68Z" fill="#1D4ED8"/>
+                <circle cx="32" cy="29" r="19" fill="white"/>
+                <circle cx="32" cy="29" r="15" fill="#EFF6FF"/>
+                <text x="32" y="34" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="900" fill="#2563EB">EPH</text>
+              </svg>
+            `),
+          scaledSize: new googleMaps.Size(42, 52),
+          anchor: new googleMaps.Point(21, 52),
         },
       });
 
