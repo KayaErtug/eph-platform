@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -248,8 +248,6 @@ model Unit {
   type                   UnitType                     @default(DAIRE)
   floor                  Int?
   number                 String?
-  adaNo                  String?
-  parselNo               String?
   roomCount              String?
   area                   Float?
   price                  Float
@@ -280,9 +278,11 @@ model Unit {
   features               String[]                     @default([])
   availableCreditAmount  Float?
   doorAccessInfo         String?
+  adaNo                  String?
+  parselNo               String?
   customerProperties     CustomerProperty[]
-  authorityDocuments     PortfolioAuthorityDocument[]
   authorityLetters       EPHAuthorityLetter[]
+  authorityDocuments     PortfolioAuthorityDocument[]
   project                Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   images                 UnitImage[]
 
@@ -313,29 +313,29 @@ model UnitImage {
 }
 
 model PortfolioAuthorityDocument {
-  id            String                 @id @default(uuid())
-  unitId        String
-  authorityType PortfolioAuthorityType
-  fileUrl       String
-  fileName      String?
-  mimeType      String?
-  sizeBytes     Int?
-  approved      Boolean                @default(false)
-  approvedById  String?
-  approvedAt    DateTime?
-  rejectReason  String?
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
-  documentSide  String?
-  documentType      String?
-  ocrQualityScore   Int?
-  confidenceScore   Int?
-  riskLevel         String?
-  qrDetected        Boolean?
-  linaSummary       String?
-  analyzedAt        DateTime?
-  approvedBy    User?                  @relation("PortfolioAuthorityApprover", fields: [approvedById], references: [id])
-  unit          Unit                   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  id              String                 @id @default(uuid())
+  unitId          String
+  authorityType   PortfolioAuthorityType
+  fileUrl         String
+  fileName        String?
+  mimeType        String?
+  sizeBytes       Int?
+  approved        Boolean                @default(false)
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectReason    String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  documentSide    String?
+  analyzedAt      DateTime?
+  confidenceScore Int?
+  documentType    String?
+  linaSummary     String?
+  ocrQualityScore Int?
+  qrDetected      Boolean?
+  riskLevel       String?
+  approvedBy      User?                  @relation("PortfolioAuthorityApprover", fields: [approvedById], references: [id])
+  unit            Unit                   @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
   @@index([unitId])
   @@index([authorityType])
@@ -2219,6 +2219,27 @@ model LinaOneriBasariKaydi {
   @@index([etkiPuani])
 }
 
+model EPHAuthorityLetter {
+  id                 String   @id @default(cuid())
+  unitId             String
+  authorityNo        String   @unique
+  ownerName          String
+  ownerPhone         String?
+  ownerEmail         String?
+  authorityType      String
+  authorityStartDate DateTime
+  authorityEndDate   DateTime
+  status             String   @default("TASLAK")
+  pdfUrl             String?
+  createdById        String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  unit               Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@index([status])
+}
+
 enum Role {
   EMLAKCI
   MUTEAHHIT
@@ -2830,34 +2851,4 @@ enum LinaEpostaDurumu {
   GONDERILDI
   HATA
   IPTAL
-}
-
-model EPHAuthorityLetter {
-  id                 String   @id @default(cuid())
-
-  unitId             String
-  unit               Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
-
-  authorityNo        String   @unique
-
-  ownerName          String
-  ownerPhone         String?
-  ownerEmail         String?
-
-  authorityType      String
-
-  authorityStartDate DateTime
-  authorityEndDate   DateTime
-
-  status             String   @default("TASLAK")
-
-  pdfUrl             String?
-
-  createdById        String
-
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  @@index([unitId])
-  @@index([status])
 }
