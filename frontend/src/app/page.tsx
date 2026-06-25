@@ -290,12 +290,12 @@ function StatsBand() {
 
 function PaymentBand() {
   const logos = [
-    { name: "Visa", src: "/landing/logos/visa.png", className: "h-8 md:h-9" },
-    { name: "Mastercard", src: "/landing/logos/mastercard.png", className: "h-8 md:h-9" },
-    { name: "TROY", src: "/landing/logos/troy.png", className: "h-8 md:h-9" },
-    { name: "PAYTR", src: "/landing/logos/paytr.png", className: "h-8 md:h-9" },
-    { name: "iyzico", src: "/landing/logos/iyzico.png", className: "h-8 md:h-9" },
-    { name: "ZiraatPay", src: "/landing/logos/ziraatpay.png", className: "h-9 md:h-10" },
+    { name: "Visa", src: "/landing/logos/visa.png" },
+    { name: "Mastercard", src: "/landing/logos/mastercard.png" },
+    { name: "TROY", src: "/landing/logos/troy.png" },
+    { name: "PAYTR", src: "/landing/logos/paytr.png" },
+    { name: "iyzico", src: "/landing/logos/iyzico.png" },
+    { name: "ZiraatPay", src: "/landing/logos/ziraatpay.png" },
   ];
 
   return (
@@ -305,11 +305,18 @@ function PaymentBand() {
           Güvenli Ödeme Altyapımız
         </div>
 
-        <div className="mt-5 rounded-[18px] border border-[#DCE7F5] bg-white px-5 py-5 shadow-[0_18px_50px_rgba(15,30,53,.08)]">
-          <div className="grid grid-cols-2 items-center justify-items-center gap-x-6 gap-y-6 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mt-5 rounded-[18px] border border-[#DCE7F5] bg-white px-4 py-4 shadow-[0_14px_38px_rgba(15,30,53,.06)]">
+          <div className="grid grid-cols-2 items-center justify-items-center gap-y-3 sm:grid-cols-3 lg:grid-cols-6 lg:gap-y-0">
             {logos.map((logo) => (
-              <div key={logo.name} className="flex h-12 w-full items-center justify-center border-[#E6EEF8] lg:border-r lg:last:border-r-0">
-                <img src={logo.src} alt={logo.name} className={`${logo.className} max-w-[132px] object-contain`} />
+              <div
+                key={logo.name}
+                className="group flex h-14 w-full items-center justify-center border-[#E6EEF8] px-4 lg:border-r lg:last:border-r-0"
+              >
+                <img
+                  src={logo.src}
+                  alt={logo.name}
+                  className="h-5 w-auto max-w-[108px] object-contain transition duration-200 group-hover:scale-105"
+                />
               </div>
             ))}
           </div>
