@@ -289,15 +289,6 @@ function StatsBand() {
 }
 
 function PaymentBand() {
-  const logos = [
-    { name: "Visa", src: "/landing/logos/visa.png" },
-    { name: "Mastercard", src: "/landing/logos/mastercard.png" },
-    { name: "TROY", src: "/landing/logos/troy.png" },
-    { name: "PAYTR", src: "/landing/logos/paytr.png" },
-    { name: "iyzico", src: "/landing/logos/iyzico.png" },
-    { name: "ZiraatPay", src: "/landing/logos/ziraatpay.png" },
-  ];
-
   return (
     <section className="bg-[#F6FAFF] px-5 py-10 md:px-10">
       <div className="mx-auto max-w-[1180px]">
@@ -306,19 +297,35 @@ function PaymentBand() {
         </div>
 
         <div className="mt-5 rounded-[18px] border border-[#DCE7F5] bg-white px-4 py-3 shadow-[0_14px_38px_rgba(15,30,53,.06)]">
-          <div className="flex flex-nowrap items-center justify-between gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {logos.map((logo) => (
-              <div
-                key={logo.name}
-                className="group flex h-12 shrink-0 items-center justify-center border-r border-[#E6EEF8] px-3 last:border-r-0"
-              >
-                <img
-                  src={logo.src}
-                  alt={logo.name}
-                  className="h-4 w-auto max-w-[72px] object-contain transition duration-200 group-hover:scale-105"
-                />
-              </div>
-            ))}
+          <div className="flex flex-nowrap items-center justify-between overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex h-12 shrink-0 items-center justify-center border-r border-[#E6EEF8] px-4">
+              <span className="text-[18px] font-black italic tracking-tight text-[#1A1F71]">VISA</span>
+            </div>
+
+            <div className="flex h-12 shrink-0 items-center justify-center gap-1 border-r border-[#E6EEF8] px-4">
+              <span className="h-5 w-5 rounded-full bg-[#EB001B] opacity-90" />
+              <span className="-ml-2.5 h-5 w-5 rounded-full bg-[#F79E1B] opacity-90" />
+            </div>
+
+            <div className="flex h-12 shrink-0 items-center justify-center border-r border-[#E6EEF8] px-4">
+              <span className="text-[14px] font-black tracking-[0.08em] text-[#003087]">troy</span>
+            </div>
+
+            <div className="flex h-12 shrink-0 items-center justify-center border-r border-[#E6EEF8] px-4">
+              <span className="text-[13px] font-black tracking-tight text-[#2563EB]">
+                PAY<span className="text-[#0F1E35]">TR</span>
+              </span>
+            </div>
+
+            <div className="flex h-12 shrink-0 items-center justify-center border-r border-[#E6EEF8] px-4">
+              <span className="text-[14px] font-bold italic text-[#00AEEF]">iyzico</span>
+            </div>
+
+            <div className="flex h-12 shrink-0 items-center justify-center px-4">
+              <span className="text-[12px] font-black text-[#009A44]">
+                Ziraat<span className="text-[#E30613]">Pay</span>
+              </span>
+            </div>
           </div>
         </div>
 
