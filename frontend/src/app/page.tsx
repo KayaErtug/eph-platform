@@ -38,8 +38,6 @@ const stats = [
   { icon: ShieldCheck, value: "7/24", label: "Canlı Destek" },
 ];
 
-const payments = ["PAYTR", "iyzico", "Ziraat Pay"];
-
 function Header() {
   const [open, setOpen] = useState(false);
 
@@ -66,7 +64,7 @@ function Header() {
             <Link href="/giris" className="hidden h-11 items-center justify-center rounded-[10px] border border-white/18 bg-white/8 px-7 text-[13px] font-medium text-white transition hover:border-[#3B82F6] md:flex">
               Giriş Yap
             </Link>
-            <button onClick={() => setOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-[10px] text-white/82 transition hover:bg-white/8" aria-label="Menü">
+            <button type="button" onClick={() => setOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-[10px] text-white/82 transition hover:bg-white/8" aria-label="Menü">
               <Menu size={25} strokeWidth={1.7} />
             </button>
           </div>
@@ -75,7 +73,7 @@ function Header() {
 
       <div className={`fixed inset-0 z-[80] bg-[#071326]/70 backdrop-blur-sm transition ${open ? "opacity-100" : "pointer-events-none opacity-0"}`} onClick={() => setOpen(false)} />
       <aside className={`fixed right-4 top-4 z-[90] w-[calc(100%-32px)] max-w-[360px] rounded-[24px] border border-white/14 bg-[#10213B] p-5 shadow-[0_30px_100px_rgba(0,0,0,.45)] transition md:right-7 md:top-7 ${open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-4 opacity-0"}`}>
-        <button onClick={() => setOpen(false)} className="ml-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/14 text-white" aria-label="Kapat">
+        <button type="button" onClick={() => setOpen(false)} className="ml-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/14 text-white" aria-label="Kapat">
           <X size={18} />
         </button>
         <div className="mt-4 grid gap-3 text-[16px] font-semibold text-white">
@@ -117,7 +115,7 @@ function Hero() {
             <Link href="/kayit" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[10px] bg-[#2563EB] px-8 text-[15px] font-semibold text-white shadow-[0_16px_42px_rgba(37,99,235,.34)] transition hover:bg-[#1D4ED8]">
               Ücretsiz Başvur <ArrowRight size={18} />
             </Link>
-            <button className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[10px] border border-white/22 bg-white/8 px-8 text-[15px] font-medium text-white/92 backdrop-blur-md transition hover:border-[#60A5FA]">
+            <button type="button" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[10px] border border-white/22 bg-white/8 px-8 text-[15px] font-medium text-white/92 backdrop-blur-md transition hover:border-[#60A5FA]">
               <CirclePlay size={20} strokeWidth={1.7} /> Platformu İzle
             </button>
           </div>
@@ -366,7 +364,7 @@ function HelpDrawer() {
       <div className={`fixed inset-0 z-[85] bg-[#061225]/62 backdrop-blur-sm transition ${open ? "opacity-100" : "pointer-events-none opacity-0"}`} onClick={() => setOpen(false)} />
 
       <aside className={`fixed bottom-0 right-0 z-[90] w-full max-w-[390px] rounded-t-[24px] border border-white/14 bg-[#10213B] p-5 shadow-[0_30px_100px_rgba(0,0,0,.48)] transition md:bottom-6 md:right-6 md:rounded-[24px] ${open ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-8 opacity-0"}`}>
-        <button onClick={() => setOpen(false)} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-white/14 text-white/78" aria-label="Kapat">
+        <button type="button" onClick={() => setOpen(false)} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-white/14 text-white/78" aria-label="Kapat">
           <X size={17} />
         </button>
 
@@ -389,7 +387,7 @@ function HelpDrawer() {
             </label>
           </div>
 
-          <button className="h-11 rounded-[10px] bg-[#2563EB] text-[13px] font-semibold text-white">Gönder</button>
+          <button type="button" className="h-11 rounded-[10px] bg-[#2563EB] text-[13px] font-semibold text-white">Gönder</button>
           <a href={whatsappUrl} target="_blank" rel="noreferrer" className="flex h-11 items-center justify-center gap-2 rounded-[10px] border border-white/12 text-[13px] font-medium text-white/76">
             <Phone size={16} /> {whatsappNumber}
           </a>
@@ -423,9 +421,9 @@ function CookieBanner() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3 md:flex">
-          <button className="h-12 rounded-[9px] border border-white/16 px-7 text-[13px] font-medium text-white/82">Tercihleri Yönet</button>
-          <button onClick={() => setVisible(false)} className="h-12 rounded-[9px] border border-white/16 px-7 text-[13px] font-medium text-white/82">Reddet</button>
-          <button onClick={() => { window.localStorage.setItem("eph-cookie-consent", "accepted"); setVisible(false); }} className="h-12 rounded-[9px] bg-[#2563EB] px-7 text-[13px] font-semibold text-white">Tümünü Kabul Et</button>
+          <button type="button" className="h-12 rounded-[9px] border border-white/16 px-7 text-[13px] font-medium text-white/82">Tercihleri Yönet</button>
+          <button type="button" onClick={() => setVisible(false)} className="h-12 rounded-[9px] border border-white/16 px-7 text-[13px] font-medium text-white/82">Reddet</button>
+          <button type="button" onClick={() => { window.localStorage.setItem("eph-cookie-consent", "accepted"); setVisible(false); }} className="h-12 rounded-[9px] bg-[#2563EB] px-7 text-[13px] font-semibold text-white">Tümünü Kabul Et</button>
         </div>
       </div>
     </div>
@@ -481,18 +479,33 @@ export default function LandingPage() {
           <div className="text-[16px] font-bold text-[#0F1E35]">Bizi Takip Edin</div>
 
           <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1877F2] text-[15px] font-black text-white shadow-[0_10px_26px_rgba(24,119,242,.24)] transition hover:-translate-y-1 hover:scale-105">
-              f
+            {/* Facebook */}
+            <a href="https://www.facebook.com/profile.php?id=61590178241390&locale=tr_TR" target="_blank" rel="noreferrer" aria-label="Facebook" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1877F2] text-white shadow-[0_10px_26px_rgba(24,119,242,.28)] transition hover:-translate-y-1 hover:scale-105">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
             </a>
-            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#F58529,#DD2A7B,#8134AF,#515BD4)] text-[13px] font-black text-white shadow-[0_10px_26px_rgba(221,42,123,.22)] transition hover:-translate-y-1 hover:scale-105">
-              ig
+            {/* Instagram */}
+            <a href="https://www.instagram.com/ephplatform" target="_blank" rel="noreferrer" aria-label="Instagram" className="flex h-11 w-11 items-center justify-center rounded-full text-white shadow-[0_10px_26px_rgba(221,42,123,.28)] transition hover:-translate-y-1 hover:scale-105" style={{background:"linear-gradient(135deg,#F58529,#DD2A7B,#8134AF,#515BD4)"}}>
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="5"/>
+                <circle cx="12" cy="12" r="4.5"/>
+                <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+              </svg>
             </a>
-            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#0A66C2] text-[13px] font-black text-white shadow-[0_10px_26px_rgba(10,102,194,.22)] transition hover:-translate-y-1 hover:scale-105">
-              in
-            </a>
-            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FF0000] text-[12px] font-black text-white shadow-[0_10px_26px_rgba(255,0,0,.20)] transition hover:-translate-y-1 hover:scale-105">
-              ▶
-            </a>
+            {/* LinkedIn */}
+            <button type="button" aria-label="LinkedIn" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#0A66C2] text-white shadow-[0_10px_26px_rgba(10,102,194,.28)] transition hover:-translate-y-1 hover:scale-105">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/>
+                <rect x="2" y="9" width="4" height="12"/>
+                <circle cx="4" cy="4" r="2"/>
+              </svg>
+            </button>
+            {/* YouTube */}
+            <button type="button" aria-label="YouTube" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FF0000] text-white shadow-[0_10px_26px_rgba(255,0,0,.24)] transition hover:-translate-y-1 hover:scale-105">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.96-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/>
+                <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/>
+              </svg>
+            </button>
           </div>
 
           <button
