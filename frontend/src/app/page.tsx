@@ -289,22 +289,43 @@ function StatsBand() {
 }
 
 function PaymentBand() {
+  const logos = [
+    { name: "Visa", src: "/landing/logos/visa.png", className: "h-8 md:h-9" },
+    { name: "Mastercard", src: "/landing/logos/mastercard.png", className: "h-8 md:h-9" },
+    { name: "TROY", src: "/landing/logos/troy.png", className: "h-8 md:h-9" },
+    { name: "PAYTR", src: "/landing/logos/paytr.png", className: "h-8 md:h-9" },
+    { name: "iyzico", src: "/landing/logos/iyzico.png", className: "h-8 md:h-9" },
+    { name: "ZiraatPay", src: "/landing/logos/ziraatpay.png", className: "h-9 md:h-10" },
+  ];
+
   return (
-    <section className="bg-[#0E1E38] px-5 pb-28 md:px-10">
-      <div className="mx-auto grid max-w-[1380px] items-center gap-4 rounded-[16px] border border-white/12 bg-white/[0.075] p-5 text-center shadow-[0_18px_60px_rgba(0,0,0,.18)] md:grid-cols-[1.25fr_1fr_1fr_1fr_1.45fr]">
-        <div className="text-[13px] font-medium text-white/58">Güvenli Ödeme Altyapımız</div>
-        {payments.map((item) => (
-          <div key={item} className="text-[24px] font-black tracking-[-0.03em] text-white/88">
-            {item}
-          </div>
-        ))}
-        <div className="flex items-center justify-center gap-2 text-[12px] font-medium text-white/64">
-          <ShieldCheck size={18} className="text-[#60A5FA]" />
-          256 Bit SSL Güvenlik
+    <section className="bg-[#F6FAFF] px-5 py-10 md:px-10">
+      <div className="mx-auto max-w-[1180px]">
+        <div className="text-center text-[18px] font-bold tracking-[-0.02em] text-[#0F1E35]">
+          Güvenli Ödeme Altyapımız
         </div>
-        <a href={whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/14 px-5 text-[13px] font-semibold text-emerald-100">
-          <Phone size={17} /> WhatsApp {whatsappNumber}
-        </a>
+
+        <div className="mt-5 rounded-[18px] border border-[#DCE7F5] bg-white px-5 py-5 shadow-[0_18px_50px_rgba(15,30,53,.08)]">
+          <div className="grid grid-cols-2 items-center justify-items-center gap-x-6 gap-y-6 sm:grid-cols-3 lg:grid-cols-6">
+            {logos.map((logo) => (
+              <div key={logo.name} className="flex h-12 w-full items-center justify-center border-[#E6EEF8] lg:border-r lg:last:border-r-0">
+                <img src={logo.src} alt={logo.name} className={`${logo.className} max-w-[132px] object-contain`} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mx-auto mt-5 grid max-w-[820px] gap-3 text-center sm:grid-cols-3">
+          <div className="flex items-center justify-center gap-2 text-[13px] font-semibold text-[#1F3B64]">
+            <ShieldCheck size={17} className="text-[#2563EB]" /> PCI DSS
+          </div>
+          <div className="flex items-center justify-center gap-2 text-[13px] font-semibold text-[#1F3B64]">
+            <ShieldCheck size={17} className="text-[#2563EB]" /> 256 Bit SSL
+          </div>
+          <div className="flex items-center justify-center gap-2 text-[13px] font-semibold text-[#1F3B64]">
+            <ShieldCheck size={17} className="text-[#2563EB]" /> 3D Secure
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -405,13 +426,49 @@ export default function LandingPage() {
       <CustomerSection />
       <AnalyticsSection />
       <StatsBand />
-      <footer id="iletisim" className="bg-[#0E1E38] px-5 py-6 md:px-10">
-        <div className="mx-auto flex max-w-[1380px] flex-col items-center justify-between gap-4 rounded-[16px] border border-white/12 bg-white/[0.055] p-5 text-center md:flex-row">
-          <div className="text-[13px] text-white/62">EPH — Emlak Portföy Havuzu</div>
-          <div className="flex flex-wrap items-center justify-center gap-8 text-[13px] text-white/66"><span>KVKK</span><span>Kullanıcı Sözleşmesi</span><span>Gizlilik Politikası</span></div>
-          <Link href="/kayit" className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[#2563EB] px-6 text-[13px] font-semibold text-white">
-            Ücretsiz Başvur <ArrowRight size={16} />
-          </Link>
+      <footer id="iletisim" className="bg-[#F6FAFF] px-5 pt-12 md:px-10">
+        <div className="mx-auto max-w-[1180px] rounded-[24px] border border-[#DCE7F5] bg-white p-6 shadow-[0_18px_50px_rgba(15,30,53,.06)] md:p-8">
+          <div className="grid gap-8 md:grid-cols-[1fr_1fr_1fr] md:items-start">
+            <div className="hidden md:block" />
+
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-3">
+                <img src="/LOGO_EPH.png" alt="EPH" className="h-12 w-12 object-contain" />
+                <div className="text-left leading-none">
+                  <div className="text-[26px] font-black tracking-[0.18em] text-[#0F1E35]">E.P.H.</div>
+                  <div className="mt-1 text-[11px] font-semibold text-[#51657F]">Emlak Portföy Havuzu</div>
+                </div>
+              </div>
+              <p className="mx-auto mt-4 max-w-[320px] text-[13px] leading-6 text-[#51657F]">
+                Gayrimenkul profesyonelleri için geliştirilmiş modern portföy, CRM ve pazar analizi platformu.
+              </p>
+              <div className="mt-5 flex justify-center gap-3">
+                {["f", "ig", "in", "yt"].map((item) => (
+                  <span key={item} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EEF4FC] text-[11px] font-bold text-[#2563EB]">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="text-center md:text-right">
+              <div className="text-[15px] font-bold text-[#0F1E35]">Bize Ulaşın</div>
+              <div className="mt-4 grid gap-3 text-[14px] font-semibold text-[#1F3B64]">
+                <a href="tel:+905357909374" className="inline-flex items-center justify-center gap-2 md:justify-end">
+                  <Phone size={16} className="text-[#2563EB]" />
+                  +90 535 790 93 74
+                </a>
+                <a href="mailto:info@emlakportfoyhavuzu.com" className="inline-flex items-center justify-center gap-2 break-all md:justify-end">
+                  <span className="text-[#2563EB]">@</span>
+                  info@emlakportfoyhavuzu.com
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 border-t border-[#E6EEF8] pt-5 text-center text-[12px] font-medium text-[#6A7E96]">
+            © 2024 EPH — Emlak Portföy Havuzu. Tüm hakları saklıdır.
+          </div>
         </div>
       </footer>
       <PaymentBand />
