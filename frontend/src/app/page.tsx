@@ -305,17 +305,17 @@ function PaymentBand() {
           Güvenli Ödeme Altyapımız
         </div>
 
-        <div className="mt-5 rounded-[18px] border border-[#DCE7F5] bg-white px-4 py-4 shadow-[0_14px_38px_rgba(15,30,53,.06)]">
+        <div className="mt-5 rounded-[18px] border border-[#DCE7F5] bg-white px-4 py-3 shadow-[0_14px_38px_rgba(15,30,53,.06)]">
           <div className="grid grid-cols-2 items-center justify-items-center gap-y-3 sm:grid-cols-3 lg:grid-cols-6 lg:gap-y-0">
             {logos.map((logo) => (
               <div
                 key={logo.name}
-                className="group flex h-14 w-full items-center justify-center border-[#E6EEF8] px-4 lg:border-r lg:last:border-r-0"
+                className="group flex h-10 w-full items-center justify-center border-[#E6EEF8] px-3 lg:border-r lg:last:border-r-0"
               >
                 <img
                   src={logo.src}
                   alt={logo.name}
-                  className="h-5 w-auto max-w-[108px] object-contain transition duration-200 group-hover:scale-105"
+                  className="h-3.5 w-auto max-w-[78px] object-contain transition duration-200 group-hover:scale-105"
                 />
               </div>
             ))}
