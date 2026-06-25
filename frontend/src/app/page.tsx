@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  ArrowUp,
   Building2,
   Check,
   ChevronLeft,
@@ -456,13 +457,6 @@ export default function LandingPage() {
               <p className="mx-auto mt-4 max-w-[320px] text-[13px] leading-6 text-[#51657F]">
                 Gayrimenkul profesyonelleri için geliştirilmiş modern portföy, CRM ve pazar analizi platformu.
               </p>
-              <div className="mt-5 flex justify-center gap-3">
-                {["f", "ig", "in", "yt"].map((item) => (
-                  <span key={item} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EEF4FC] text-[11px] font-bold text-[#2563EB]">
-                    {item}
-                  </span>
-                ))}
-              </div>
             </div>
 
             <div className="text-center md:text-right">
@@ -479,13 +473,43 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-
-          <div className="mt-8 border-t border-[#E6EEF8] pt-5 text-center text-[12px] font-medium text-[#6A7E96]">
-            © 2024 EPH — Emlak Portföy Havuzu. Tüm hakları saklıdır.
-          </div>
         </div>
       </footer>
       <PaymentBand />
+      <section className="bg-[#F6FAFF] px-5 pb-28 md:px-10">
+        <div className="mx-auto max-w-[1180px] rounded-[24px] border border-[#DCE7F5] bg-white p-6 text-center shadow-[0_18px_50px_rgba(15,30,53,.06)]">
+          <div className="text-[16px] font-bold text-[#0F1E35]">Bizi Takip Edin</div>
+
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1877F2] text-[15px] font-black text-white shadow-[0_10px_26px_rgba(24,119,242,.24)] transition hover:-translate-y-1 hover:scale-105">
+              f
+            </a>
+            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#F58529,#DD2A7B,#8134AF,#515BD4)] text-[13px] font-black text-white shadow-[0_10px_26px_rgba(221,42,123,.22)] transition hover:-translate-y-1 hover:scale-105">
+              ig
+            </a>
+            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#0A66C2] text-[13px] font-black text-white shadow-[0_10px_26px_rgba(10,102,194,.22)] transition hover:-translate-y-1 hover:scale-105">
+              in
+            </a>
+            <a href="#" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FF0000] text-[12px] font-black text-white shadow-[0_10px_26px_rgba(255,0,0,.20)] transition hover:-translate-y-1 hover:scale-105">
+              ▶
+            </a>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="mx-auto mt-7 flex h-12 w-12 items-center justify-center rounded-full border border-[#DCE7F5] bg-white text-[#2563EB] shadow-[0_14px_35px_rgba(15,30,53,.10)] transition hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(37,99,235,.16)]"
+            aria-label="Sayfa başına dön"
+          >
+            <ArrowUp size={23} strokeWidth={2.2} />
+          </button>
+          <div className="mt-2 text-[12px] font-semibold text-[#51657F]">Sayfa Başına Dön</div>
+
+          <div className="mx-auto mt-6 max-w-[720px] border-t border-[#E6EEF8] pt-5 text-center text-[12px] font-medium text-[#6A7E96]">
+            © 2024 EPH — Emlak Portföy Havuzu. Tüm hakları saklıdır.
+          </div>
+        </div>
+      </section>
       <CookieBanner />
       <HelpDrawer />
       <style jsx global>{`
