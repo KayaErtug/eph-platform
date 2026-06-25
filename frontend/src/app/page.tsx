@@ -11,6 +11,7 @@ import {
   CirclePlay,
   Cookie,
   Menu,
+  Phone,
   Mouse,
   PieChart,
   ShieldCheck,
@@ -32,6 +33,8 @@ const stats = [
   { icon: PieChart, value: "1.500+", label: "Günlük Talep" },
   { icon: ShieldCheck, value: "7/24", label: "Canlı Destek" },
 ];
+
+const payments = ["PAYTR", "iyzico", "Ziraat Pay"];
 
 function Header() {
   const [open, setOpen] = useState(false);
@@ -83,9 +86,9 @@ function Hero() {
   return (
     <section className="relative min-h-[720px] overflow-hidden border-b border-white/[0.06] bg-[#020611] md:min-h-[760px]">
       <div className="absolute inset-0">
-        <img src="/landing/hero-city-villa-4k.webp" alt="EPH premium gayrimenkul" className="h-full w-full object-cover object-center opacity-95" />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,#020611_0%,rgba(2,6,17,.94)_30%,rgba(2,6,17,.45)_62%,rgba(2,6,17,.18)_100%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,17,.30)_0%,rgba(2,6,17,.08)_42%,#020611_100%)]" />
+        <img src="/landing/hero-city-villa-4k.webp" alt="EPH premium gayrimenkul" className="h-full w-full object-cover object-[68%_center] opacity-100" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,17,.82)_0%,rgba(2,6,17,.55)_38%,rgba(2,6,17,.20)_65%,transparent_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,17,.15)_0%,transparent_40%,rgba(2,6,17,.70)_100%)]" />
       </div>
       <div className="relative z-10 mx-auto flex min-h-[720px] max-w-[1380px] flex-col justify-center px-5 pb-20 pt-28 md:min-h-[760px] md:px-10">
         <div className="max-w-[565px]">
@@ -237,6 +240,24 @@ function StatsBand() {
   );
 }
 
+
+function PaymentBand() {
+  return (
+    <section className="bg-[#020611] px-5 pb-8 md:px-10">
+      <div className="mx-auto grid max-w-[1380px] items-center gap-4 rounded-[16px] border border-white/10 bg-white/[0.04] p-5 text-center md:grid-cols-[1fr_1fr_1fr_1.35fr]">
+        {payments.map((item) => (
+          <div key={item} className="text-[24px] font-black tracking-[-0.03em] text-white/80">
+            {item}
+          </div>
+        ))}
+        <a href="https://wa.me/905357909374" target="_blank" rel="noreferrer" className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/12 px-5 text-[13px] font-semibold text-emerald-100">
+          <Phone size={17} /> WhatsApp +90 535 79 09 374
+        </a>
+      </div>
+    </section>
+  );
+}
+
 function CookieBanner() {
   const [visible, setVisible] = useState(false);
   useEffect(() => setVisible(window.localStorage.getItem("eph-cookie-consent") !== "accepted"), []);
@@ -270,6 +291,7 @@ export default function LandingPage() {
       <CustomerSection />
       <AnalyticsSection />
       <StatsBand />
+      <PaymentBand />
       <footer id="iletisim" className="bg-[#020611] px-5 pb-28 md:px-10">
         <div className="mx-auto flex max-w-[1380px] flex-col items-center justify-between gap-4 rounded-[16px] border border-white/10 bg-white/[0.035] p-5 text-center md:flex-row">
           <div className="text-[13px] text-white/54">EPH — Emlak Portföy Havuzu</div>
