@@ -83,7 +83,7 @@ function Hero() {
   return (
     <section className="relative min-h-[720px] overflow-hidden border-b border-white/[0.06] bg-[#020611] md:min-h-[760px]">
       <div className="absolute inset-0">
-        <img src="/landing/hero-city-villa-4k.webp" alt="EPH premium gayrimenkul" className="h-full w-full object-cover object-center" />
+        <img src="/landing/hero-city-villa-4k.webp" alt="EPH premium gayrimenkul" className="h-full w-full object-cover object-center opacity-95" />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,#020611_0%,rgba(2,6,17,.94)_30%,rgba(2,6,17,.45)_62%,rgba(2,6,17,.18)_100%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,17,.30)_0%,rgba(2,6,17,.08)_42%,#020611_100%)]" />
       </div>
@@ -98,7 +98,7 @@ function Hero() {
             Portföy, müşteri, CRM, pazar analizi ve yapay zeka tek platformda. İşinizi büyütmenin en akıllı yolu.
           </p>
           <div className="mt-9 flex flex-col gap-4 sm:flex-row">
-            <Link href="/kayit" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[10px] bg-[#7c3aed] px-8 text-[15px] font-semibold text-white shadow-[0_16px_42px_rgba(124,58,237,.30)] transition hover:bg-[#8b5cf6]">
+            <Link href="/kayit" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[10px] bg-[#6d28d9] px-8 text-[15px] font-semibold text-white shadow-[0_16px_42px_rgba(124,58,237,.30)] transition hover:bg-[#8b5cf6]">
               Ücretsiz Başvur <ArrowRight size={18} />
             </Link>
             <button className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[10px] border border-white/18 bg-black/18 px-8 text-[15px] font-medium text-white/88 backdrop-blur-md transition hover:border-[#8b5cf6]">
