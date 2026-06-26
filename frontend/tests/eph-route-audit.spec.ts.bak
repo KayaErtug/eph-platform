@@ -1,0 +1,206 @@
+import { test, expect } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
+
+const routes = [
+  '/',
+  '/admin',
+  '/admin/announcements',
+  '/admin/audit-log',
+  '/admin/help-center',
+  '/admin/katilim-talepleri',
+  '/admin/onay-sayfasi',
+  '/admin/organization',
+  '/admin/portfolio-approvals',
+  '/admin/referrals',
+  '/admin/reports',
+  '/admin/settings',
+  '/admin/system-messages',
+  '/admin/turan',
+  '/admin/users',
+  '/cerez-politikasi',
+  '/crm',
+  '/crm/office-owner',
+  '/crm/team-leader',
+  '/dashboard',
+  '/forum-v3',
+  '/giris',
+  '/gizlilik-politikasi',
+  '/havuz',
+  '/help-center',
+  '/kayit',
+  '/kontor',
+  '/kullanici-sozlesmesi',
+  '/kvkk',
+  '/lina',
+  '/market',
+  '/messages',
+  '/network',
+  '/notification-settings',
+  '/platform-anayasasi',
+  '/portfoy',
+  '/portfoy/quality',
+  '/profil',
+  '/stok',
+  '/ucretlendirme',
+  '/uyelik',
+];
+
+type RouteAudit = {
+  route: string;
+  finalUrl: string;
+  status: number | null;
+  title: string;
+  consoleErrors: string[];
+  pageErrors: string[];
+  visibleButtons: Array<{ text: string; disabled: boolean; ariaLabel: string }>;
+  visibleLinks: Array<{ text: string; href: string; ariaLabel: string }>;
+  hasBackControl: boolean;
+  result: 'OK' | 'WARN' | 'FAIL';
+  notes: string[];
+};
+
+const audits: RouteAudit[] = [];
+
+function cleanText(value: string | null | undefined) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, 140);
+}
+
+test.describe('EPH Genel Route / Buton / Geri Tuşu Denetimi', () => {
+  for (const route of routes) {
+    test(`${route} route denetimi`, async ({ page }) => {
+      const consoleErrors: string[] = [];
+      const pageErrors: string[] = [];
+
+      page.on('console', (message) => {
+        if (message.type() === 'error') consoleErrors.push(cleanText(message.text()));
+      });
+
+      page.on('pageerror', (error) => {
+        pageErrors.push(cleanText(error.message));
+      });
+
+      const response = await page.goto(route, { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle').catch(() => undefined);
+      await page.waitForTimeout(800);
+
+      const title = cleanText(await page.title());
+      const finalUrl = page.url();
+      const status = response?.status() ?? null;
+
+      const visibleButtons = await page.locator('button:visible').evaluateAll((buttons) =>
+        buttons.map((button) => ({
+          text: (button.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+          disabled: Boolean((button as HTMLButtonElement).disabled || button.getAttribute('aria-disabled') === 'true'),
+          ariaLabel: button.getAttribute('aria-label') || '',
+        })),
+      );
+
+      const visibleLinks = await page.locator('a:visible').evaluateAll((links) =>
+        links.map((link) => ({
+          text: (link.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+          href: (link as HTMLAnchorElement).href || '',
+          ariaLabel: link.getAttribute('aria-label') || '',
+        })),
+      );
+
+      const bodyText = cleanText(await page.locator('body').innerText().catch(() => ''));
+      const hasBackControl = await page
+        .locator('a,button')
+        .filter({ hasText: /geri|dön|back/i })
+        .first()
+        .isVisible()
+        .catch(() => false);
+
+      const notes: string[] = [];
+      let result: RouteAudit['result'] = 'OK';
+
+      if (status && status >= 500) {
+        result = 'FAIL';
+        notes.push(`HTTP ${status}`);
+      }
+
+      if (/404|not found|bulunamadı/i.test(bodyText)) {
+        result = 'FAIL';
+        notes.push('404/bulunamadı metni görüldü');
+      }
+
+      if (pageErrors.length > 0) {
+        result = 'FAIL';
+        notes.push(`${pageErrors.length} page error`);
+      }
+
+      if (consoleErrors.length > 0 && result !== 'FAIL') {
+        result = 'WARN';
+        notes.push(`${consoleErrors.length} console error`);
+      }
+
+      if (!hasBackControl && !['/', '/giris', '/kayit', '/dashboard'].includes(route)) {
+        if (result === 'OK') result = 'WARN';
+        notes.push('Geri/Dön kontrolü görünmedi');
+      }
+
+      const disabledButtons = visibleButtons.filter((button) => button.disabled).length;
+      if (disabledButtons > 0 && result === 'OK') {
+        result = 'WARN';
+        notes.push(`${disabledButtons} disabled buton var`);
+      }
+
+      audits.push({
+        route,
+        finalUrl,
+        status,
+        title,
+        consoleErrors,
+        pageErrors,
+        visibleButtons,
+        visibleLinks,
+        hasBackControl,
+        result,
+        notes,
+      });
+
+      expect(status || 200).toBeLessThan(500);
+      expect(pageErrors, pageErrors.join('\n')).toHaveLength(0);
+    });
+  }
+
+  test.afterAll(async () => {
+    const outputDir = path.join(process.cwd(), 'test-results');
+    fs.mkdirSync(outputDir, { recursive: true });
+
+    const lines = [
+      '# EPH Genel Denetim Raporu',
+      '',
+      `Tarih: ${new Date().toLocaleString('tr-TR')}`,
+      '',
+      '| Durum | Route | Final URL | Notlar | Buton | Link | Geri |',
+      '|---|---|---|---|---:|---:|---|',
+      ...audits.map((audit) =>
+        `| ${audit.result} | ${audit.route} | ${audit.finalUrl} | ${audit.notes.join('; ') || '-'} | ${audit.visibleButtons.length} | ${audit.visibleLinks.length} | ${audit.hasBackControl ? 'VAR' : 'YOK'} |`,
+      ),
+      '',
+      '## Detaylar',
+      '',
+      ...audits.flatMap((audit) => [
+        `### ${audit.result} — ${audit.route}`,
+        '',
+        `Final URL: ${audit.finalUrl}`,
+        '',
+        `Notlar: ${audit.notes.join('; ') || '-'}`,
+        '',
+        `Console Errors: ${audit.consoleErrors.join(' | ') || '-'}`,
+        '',
+        `Page Errors: ${audit.pageErrors.join(' | ') || '-'}`,
+        '',
+        `Butonlar: ${audit.visibleButtons.map((button) => `${button.text || button.ariaLabel || 'İsimsiz'}${button.disabled ? ' [disabled]' : ''}`).join(' | ') || '-'}`,
+        '',
+        `Linkler: ${audit.visibleLinks.map((link) => `${link.text || link.ariaLabel || 'İsimsiz'} -> ${link.href}`).join(' | ') || '-'}`,
+        '',
+      ]),
+    ];
+
+    fs.writeFileSync(path.join(outputDir, 'eph-audit-report.md'), lines.join('\n'), 'utf8');
+    fs.writeFileSync(path.join(outputDir, 'eph-audit-report.raw.json'), JSON.stringify(audits, null, 2), 'utf8');
+  });
+});

@@ -1,0 +1,1007 @@
+{
+  "projectName": "desktop-chromium",
+  "loginStatus": "ENV_LOGIN_YOK",
+  "results": [
+    {
+      "route": "/",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR"
+      ],
+      "buttons": 2,
+      "links": 15,
+      "enabledButtons": 2,
+      "disabledButtons": 0,
+      "backButton": "GEREKMEZ",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\root.png"
+    },
+    {
+      "route": "/admin",
+      "status": "UYARI",
+      "finalUrl": "http://localhost:3000/admin",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 6,
+      "links": 0,
+      "enabledButtons": 6,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin.png"
+    },
+    {
+      "route": "/admin/announcements",
+      "status": "UYARI",
+      "finalUrl": "http://localhost:3000/admin/announcements",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 6,
+      "links": 0,
+      "enabledButtons": 6,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin_announcements.png"
+    },
+    {
+      "route": "/admin/audit-log",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/admin/audit-log",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR",
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 5,
+      "links": 0,
+      "enabledButtons": 5,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Invalid or unexpected token"
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin_audit-log.png"
+    },
+    {
+      "route": "/admin/help-center",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/admin/help-center",
+      "httpStatus": 200,
+      "title": "",
+      "notes": [
+        "PAGE_ERROR",
+        "FAILED_REQUEST"
+      ],
+      "buttons": 4,
+      "links": 13,
+      "enabledButtons": 4,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization.",
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [
+        "net::ERR_ABORTED http://localhost:3000/_next/static/chunks/app/giris/page.js"
+      ],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin_help-center.png"
+    },
+    {
+      "route": "/admin/katilim-talepleri",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/admin/katilim-talepleri",
+      "httpStatus": 200,
+      "title": "",
+      "notes": [
+        "PAGE_ERROR",
+        "FAILED_REQUEST"
+      ],
+      "buttons": 7,
+      "links": 1,
+      "enabledButtons": 7,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [
+        "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used: - A"
+      ],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization.",
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/2155d6170c428a7d.webpack.hot-update.json",
+        "net::ERR_ABORTED http://localhost:3001/admin/katilim-talepleri?status=all"
+      ],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin_katilim-talepleri.png"
+    },
+    {
+      "route": "/admin/onay-sayfasi",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/admin/onay-sayfasi",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR",
+        "CONSOLE_ERROR"
+      ],
+      "buttons": 12,
+      "links": 1,
+      "enabledButtons": 12,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [
+        "Can't perform a React state update on a component that hasn't mounted yet. This indicates that you have a side-effect in your render function that asynchronously tries to update th"
+      ],
+      "pageErrors": [
+        "Invalid or unexpected token"
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin_onay-sayfasi.png"
+    },
+    {
+      "route": "/admin/organization",
+      "status": "UYARI",
+      "finalUrl": "http://localhost:3000/admin/organization",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 6,
+      "links": 0,
+      "enabledButtons": 6,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin_organization.png"
+    },
+    {
+      "route": "/admin/portfolio-approvals",
+      "status": "UYARI",
+      "finalUrl": "http://localhost:3000/admin/portfolio-approvals",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 5,
+      "links": 0,
+      "enabledButtons": 5,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin_portfolio-approvals.png"
+    },
+    {
+      "route": "/admin/referrals",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/admin/referrals",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "BOS_SAYFA_RISKI",
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 5,
+      "links": 0,
+      "enabledButtons": 5,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin_referrals.png"
+    },
+    {
+      "route": "/admin/reports",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/admin/reports",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR",
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 6,
+      "links": 0,
+      "enabledButtons": 6,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Invalid or unexpected token",
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin_reports.png"
+    },
+    {
+      "route": "/admin/settings",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/admin/settings",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR"
+      ],
+      "buttons": 6,
+      "links": 11,
+      "enabledButtons": 6,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Invalid or unexpected token",
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin_settings.png"
+    },
+    {
+      "route": "/admin/system-messages",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/admin/system-messages",
+      "httpStatus": 200,
+      "title": "",
+      "notes": [
+        "PAGE_ERROR",
+        "FAILED_REQUEST",
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 4,
+      "links": 0,
+      "enabledButtons": 4,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Invalid or unexpected token",
+        "Internal Next.js error: Router action dispatched before initialization.",
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/app/layout.ad7b354664c12ca2.hot-update.js",
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/webpack.ad7b354664c12ca2.hot-update.js"
+      ],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin_system-messages.png"
+    },
+    {
+      "route": "/admin/turan",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/admin/turan",
+      "httpStatus": 200,
+      "title": "",
+      "notes": [
+        "PAGE_ERROR",
+        "FAILED_REQUEST",
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 4,
+      "links": 0,
+      "enabledButtons": 4,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Invalid or unexpected token",
+        "Internal Next.js error: Router action dispatched before initialization.",
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/app/layout.b109b4e461ddef27.hot-update.js",
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/webpack.b109b4e461ddef27.hot-update.js"
+      ],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin_turan.png"
+    },
+    {
+      "route": "/admin/users",
+      "status": "UYARI",
+      "finalUrl": "http://localhost:3000/admin/users",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 5,
+      "links": 0,
+      "enabledButtons": 5,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\admin_users.png"
+    },
+    {
+      "route": "/cerez-politikasi",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/cerez-politikasi",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR",
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 10,
+      "links": 3,
+      "enabledButtons": 7,
+      "disabledButtons": 3,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\cerez-politikasi.png"
+    },
+    {
+      "route": "/crm",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/crm",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR"
+      ],
+      "buttons": 15,
+      "links": 7,
+      "enabledButtons": 12,
+      "disabledButtons": 3,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\crm.png"
+    },
+    {
+      "route": "/crm/office-owner",
+      "status": "OK",
+      "finalUrl": "http://localhost:3000/crm/office-owner",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [],
+      "buttons": 5,
+      "links": 5,
+      "enabledButtons": 5,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "route": "/crm/team-leader",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/crm/team-leader",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR"
+      ],
+      "buttons": 5,
+      "links": 5,
+      "enabledButtons": 5,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Invalid or unexpected token"
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\crm_team-leader.png"
+    },
+    {
+      "route": "/dashboard",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/dashboard",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR"
+      ],
+      "buttons": 14,
+      "links": 7,
+      "enabledButtons": 11,
+      "disabledButtons": 3,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\dashboard.png"
+    },
+    {
+      "route": "/forum-v3",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/forum-v3",
+      "httpStatus": 200,
+      "title": "",
+      "notes": [
+        "PAGE_ERROR",
+        "FAILED_REQUEST"
+      ],
+      "buttons": 12,
+      "links": 21,
+      "enabledButtons": 12,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization.",
+        "Invalid or unexpected token",
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/81dee10d4e675a7d.webpack.hot-update.json"
+      ],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\forum-v3.png"
+    },
+    {
+      "route": "/giris",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/giris",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR"
+      ],
+      "buttons": 2,
+      "links": 1,
+      "enabledButtons": 2,
+      "disabledButtons": 0,
+      "backButton": "GEREKMEZ",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\giris.png"
+    },
+    {
+      "route": "/gizlilik-politikasi",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/gizlilik-politikasi",
+      "httpStatus": 200,
+      "title": "",
+      "notes": [
+        "PAGE_ERROR",
+        "FAILED_REQUEST",
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 0,
+      "links": 1,
+      "enabledButtons": 0,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Invalid or unexpected token",
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/app/layout.68aba89b53c8cd47.hot-update.js",
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/webpack.68aba89b53c8cd47.hot-update.js"
+      ],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\gizlilik-politikasi.png"
+    },
+    {
+      "route": "/havuz",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/havuz",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR",
+        "CONSOLE_ERROR"
+      ],
+      "buttons": 5,
+      "links": 5,
+      "enabledButtons": 5,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [
+        "Can't perform a React state update on a component that hasn't mounted yet. This indicates that you have a side-effect in your render function that asynchronously tries to update th"
+      ],
+      "pageErrors": [
+        "Invalid or unexpected token",
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\havuz.png"
+    },
+    {
+      "route": "/help-center",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/help-center",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR"
+      ],
+      "buttons": 6,
+      "links": 10,
+      "enabledButtons": 6,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\help-center.png"
+    },
+    {
+      "route": "/kayit",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/kayit",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR",
+        "CONSOLE_ERROR"
+      ],
+      "buttons": 3,
+      "links": 1,
+      "enabledButtons": 3,
+      "disabledButtons": 0,
+      "backButton": "GEREKMEZ",
+      "consoleErrors": [
+        "Can't perform a React state update on a component that hasn't mounted yet. This indicates that you have a side-effect in your render function that asynchronously tries to update th"
+      ],
+      "pageErrors": [
+        "Invalid or unexpected token"
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\kayit.png"
+    },
+    {
+      "route": "/kontor",
+      "status": "UYARI",
+      "finalUrl": "http://localhost:3000/kontor",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 5,
+      "links": 0,
+      "enabledButtons": 5,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\kontor.png"
+    },
+    {
+      "route": "/kullanici-sozlesmesi",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/kullanici-sozlesmesi",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR",
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 11,
+      "links": 3,
+      "enabledButtons": 8,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/app/layout.6bee3c7d69b0cd44.hot-update.js",
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/webpack.6bee3c7d69b0cd44.hot-update.js",
+        "net::ERR_ABORTED http://localhost:3000/_next/static/css/app/layout.css?v=1782272509653"
+      ],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\kullanici-sozlesmesi.png"
+    },
+    {
+      "route": "/kvkk",
+      "status": "UYARI",
+      "finalUrl": "http://localhost:3000/kvkk",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 0,
+      "links": 1,
+      "enabledButtons": 0,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/app/layout.6bee3c7d69b0cd44.hot-update.js",
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/webpack.6bee3c7d69b0cd44.hot-update.js",
+        "net::ERR_ABORTED http://localhost:3000/kvkk?_rsc=AjjGGrZCAD9y2oge"
+      ],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\kvkk.png"
+    },
+    {
+      "route": "/lina",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/lina",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR",
+        "CONSOLE_ERROR",
+        "FAILED_REQUEST"
+      ],
+      "buttons": 17,
+      "links": 0,
+      "enabledButtons": 16,
+      "disabledButtons": 1,
+      "backButton": "VAR",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+      ],
+      "pageErrors": [
+        "Unexpected end of JSON input"
+      ],
+      "failedRequests": [
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/webpack.cbb6eea1898b0f7d.hot-update.js",
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/38583ae11ddf0e41.webpack.hot-update.json",
+        "net::ERR_ABORTED http://localhost:3000/lina?_rsc=vy54cyhb-ObH4P4p"
+      ],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\lina.png"
+    },
+    {
+      "route": "/market",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/market",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR",
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 23,
+      "links": 2,
+      "enabledButtons": 20,
+      "disabledButtons": 3,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\market.png"
+    },
+    {
+      "route": "/messages",
+      "status": "OK",
+      "finalUrl": "http://localhost:3000/messages",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [],
+      "buttons": 5,
+      "links": 5,
+      "enabledButtons": 5,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "route": "/network",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/network",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR",
+        "CONSOLE_ERROR"
+      ],
+      "buttons": 34,
+      "links": 5,
+      "enabledButtons": 34,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [
+        "Can't perform a React state update on a component that hasn't mounted yet. This indicates that you have a side-effect in your render function that asynchronously tries to update th"
+      ],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\network.png"
+    },
+    {
+      "route": "/notification-settings",
+      "status": "OK",
+      "finalUrl": "http://localhost:3000/notification-settings",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [],
+      "buttons": 20,
+      "links": 2,
+      "enabledButtons": 20,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "route": "/platform-anayasasi",
+      "status": "UYARI",
+      "finalUrl": "http://localhost:3000/platform-anayasasi",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 2,
+      "links": 1,
+      "enabledButtons": 2,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\platform-anayasasi.png"
+    },
+    {
+      "route": "/portfoy",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/portfoy",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "PAGE_ERROR"
+      ],
+      "buttons": 4,
+      "links": 5,
+      "enabledButtons": 4,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Invalid or unexpected token"
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\portfoy.png"
+    },
+    {
+      "route": "/portfoy/quality",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/portfoy/quality",
+      "httpStatus": 200,
+      "title": "",
+      "notes": [
+        "PAGE_ERROR",
+        "FAILED_REQUEST"
+      ],
+      "buttons": 4,
+      "links": 5,
+      "enabledButtons": 4,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization.",
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/webpack.462e8868a8205c3a.hot-update.js",
+        "net::ERR_ABORTED http://localhost:3000/_next/static/chunks/app/giris/page.js",
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/app/layout.462e8868a8205c3a.hot-update.js"
+      ],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\portfoy_quality.png"
+    },
+    {
+      "route": "/profil",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/profil",
+      "httpStatus": 200,
+      "title": "",
+      "notes": [
+        "BOS_SAYFA_RISKI",
+        "PAGE_ERROR",
+        "FAILED_REQUEST",
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 4,
+      "links": 0,
+      "enabledButtons": 4,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Internal Next.js error: Router action dispatched before initialization.",
+        "Internal Next.js error: Router action dispatched before initialization."
+      ],
+      "failedRequests": [
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/webpack.462e8868a8205c3a.hot-update.js",
+        "net::ERR_ABORTED http://localhost:3000/_next/static/webpack/app/layout.462e8868a8205c3a.hot-update.js"
+      ],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\profil.png"
+    },
+    {
+      "route": "/stok",
+      "status": "OK",
+      "finalUrl": "http://localhost:3000/portfoy",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [],
+      "buttons": 6,
+      "links": 5,
+      "enabledButtons": 6,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "route": "/ucretlendirme",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/ucretlendirme",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "500_METNI",
+        "GERI_TUSU_YOK"
+      ],
+      "buttons": 15,
+      "links": 0,
+      "enabledButtons": 15,
+      "disabledButtons": 0,
+      "backButton": "YOK",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\ucretlendirme.png"
+    },
+    {
+      "route": "/uyelik",
+      "status": "KRITIK",
+      "finalUrl": "http://localhost:3000/uyelik",
+      "httpStatus": 200,
+      "title": "EPH Platform — Emlak Portföy Havuzu",
+      "notes": [
+        "500_METNI",
+        "PAGE_ERROR"
+      ],
+      "buttons": 5,
+      "links": 7,
+      "enabledButtons": 5,
+      "disabledButtons": 0,
+      "backButton": "VAR",
+      "consoleErrors": [],
+      "pageErrors": [
+        "Invalid or unexpected token"
+      ],
+      "failedRequests": [],
+      "screenshot": "test-results\\screenshots\\desktop-chromium\\uyelik.png"
+    }
+  ],
+  "buttonResults": [
+    {
+      "route": "/",
+      "index": 0,
+      "label": "-",
+      "beforeUrl": "http://localhost:3000/",
+      "afterUrl": "http://localhost:3000/",
+      "result": "BILGI",
+      "note": "Güvenli test edilecek buton bulunamadı."
+    },
+    {
+      "route": "/giris",
+      "index": 0,
+      "label": "-",
+      "beforeUrl": "http://localhost:3000/giris",
+      "afterUrl": "http://localhost:3000/giris",
+      "result": "BILGI",
+      "note": "Güvenli test edilecek buton bulunamadı."
+    },
+    {
+      "route": "/dashboard",
+      "index": 0,
+      "label": "-",
+      "beforeUrl": "http://localhost:3000/dashboard",
+      "afterUrl": "http://localhost:3000/dashboard",
+      "result": "BILGI",
+      "note": "Güvenli test edilecek buton bulunamadı."
+    },
+    {
+      "route": "/crm",
+      "index": 0,
+      "label": "-",
+      "beforeUrl": "http://localhost:3000/crm",
+      "afterUrl": "http://localhost:3000/crm",
+      "result": "BILGI",
+      "note": "Güvenli test edilecek buton bulunamadı."
+    },
+    {
+      "route": "/portfoy",
+      "index": 0,
+      "label": "-",
+      "beforeUrl": "http://localhost:3000/portfoy",
+      "afterUrl": "http://localhost:3000/portfoy",
+      "result": "BILGI",
+      "note": "Güvenli test edilecek buton bulunamadı."
+    },
+    {
+      "route": "/havuz",
+      "index": 0,
+      "label": "-",
+      "beforeUrl": "http://localhost:3000/havuz",
+      "afterUrl": "http://localhost:3000/havuz",
+      "result": "BILGI",
+      "note": "Güvenli test edilecek buton bulunamadı."
+    },
+    {
+      "route": "/messages",
+      "index": 0,
+      "label": "-",
+      "beforeUrl": "http://localhost:3000/messages",
+      "afterUrl": "http://localhost:3000/messages",
+      "result": "BILGI",
+      "note": "Güvenli test edilecek buton bulunamadı."
+    },
+    {
+      "route": "/kontor",
+      "index": 0,
+      "label": "-",
+      "beforeUrl": "http://localhost:3000/kontor",
+      "afterUrl": "http://localhost:3000/kontor",
+      "result": "BILGI",
+      "note": "Güvenli test edilecek buton bulunamadı."
+    },
+    {
+      "route": "/lina",
+      "index": 1,
+      "label": "Geri dön",
+      "beforeUrl": "http://localhost:3000/lina",
+      "afterUrl": "http://localhost:3000/lina",
+      "result": "OK",
+      "note": "Aynı sayfada kaldı."
+    },
+    {
+      "route": "/profil",
+      "index": 0,
+      "label": "-",
+      "beforeUrl": "http://localhost:3000/profil",
+      "afterUrl": "http://localhost:3000/profil",
+      "result": "BILGI",
+      "note": "Güvenli test edilecek buton bulunamadı."
+    }
+  ]
+}
