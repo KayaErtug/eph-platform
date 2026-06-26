@@ -73,6 +73,9 @@ model User {
   restrictionsCreated         UserRestriction[]            @relation("RestrictionCreator")
   restrictions                UserRestriction[]            @relation("RestrictedUser")
   visits                      UserVisit[]
+  hediyeKontorHavuzlari       HediyeKontorHavuzu[]         @relation("GiftPoolCreator")
+  hediyeKontorGonderimleri    HediyeKontorDagitimi[]       @relation("GiftCreditSender")
+  hediyeKontorAlimlari        HediyeKontorDagitimi[]       @relation("GiftCreditRecipient")
 
   @@index([officeId])
 }
@@ -904,6 +907,44 @@ model KullaniciUyelikPaketi {
   @@index([durum])
   @@index([baslangicTarihi])
   @@index([bitisTarihi])
+}
+
+model HediyeKontorHavuzu {
+  id            String                 @id @default(uuid())
+  kod           String                 @unique @default("GLOBAL")
+  bakiye        Int                    @default(50000)
+  toplamYukleme Int                    @default(50000)
+  toplamDagitim Int                    @default(0)
+  aktifMi       Boolean                @default(true)
+  createdById   String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  createdBy     User?                  @relation("GiftPoolCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  dagitimlar    HediyeKontorDagitimi[]
+
+  @@index([aktifMi])
+  @@index([createdById])
+}
+
+model HediyeKontorDagitimi {
+  id            String             @id @default(uuid())
+  havuzId       String
+  gonderenId    String?
+  aliciId       String?
+  miktar        Int
+  gonderenRol   Role
+  adminKaynakli Boolean            @default(false)
+  aciklama      String?
+  createdAt     DateTime           @default(now())
+  havuz         HediyeKontorHavuzu @relation(fields: [havuzId], references: [id], onDelete: Cascade)
+  gonderen      User?              @relation("GiftCreditSender", fields: [gonderenId], references: [id], onDelete: SetNull)
+  alici         User?              @relation("GiftCreditRecipient", fields: [aliciId], references: [id], onDelete: SetNull)
+
+  @@index([havuzId])
+  @@index([gonderenId])
+  @@index([aliciId])
+  @@index([adminKaynakli])
+  @@index([createdAt])
 }
 
 model KontorCuzdani {
@@ -2617,6 +2658,10 @@ enum AuditAction {
   VIEW_SENSITIVE_DATA_ATTEMPT
   SYSTEM_SECURITY_ACTION
   TECHNICAL_SUPPORT_ACCESS
+  HEDIYE_KONTOR_HAVUZU_OLUSTUR
+  HEDIYE_KONTOR_HAVUZU_YUKLE
+  HEDIYE_KONTOR_GONDER
+  TRIAL_UZAT
 }
 
 enum KullaniciHesapTuru {

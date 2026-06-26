@@ -48,7 +48,8 @@ export class UsersService {
         },
         update: {
           paketAdi: 'DENEME',
-          aciklama: 'Yeni kullanıcılar için 30 günlük ücretsiz başlangıç paketi.',
+          aciklama:
+            'Yeni kullanıcılar için role göre 30 veya 60 günlük ücretsiz başlangıç paketi.',
           aktifPortfoyLimiti: 25,
           aylikForumKonusuLimiti: null,
           aylikMesajBaslatmaLimiti: null,
@@ -63,7 +64,8 @@ export class UsersService {
         create: {
           paketKodu: 'DENEME',
           paketAdi: 'DENEME',
-          aciklama: 'Yeni kullanıcılar için 30 günlük ücretsiz başlangıç paketi.',
+          aciklama:
+            'Yeni kullanıcılar için role göre 30 veya 60 günlük ücretsiz başlangıç paketi.',
           aktifPortfoyLimiti: 25,
           aylikForumKonusuLimiti: null,
           aylikMesajBaslatmaLimiti: null,
@@ -77,9 +79,18 @@ export class UsersService {
         },
       });
 
+      const trialGunSayisi =
+        data.role === Role.MUTEAHHIT ||
+        data.role === Role.INSAAT_FIRMASI
+          ? 60
+          : 30;
+
       const baslangicTarihi = new Date();
       const bitisTarihi = new Date(baslangicTarihi);
-      bitisTarihi.setDate(bitisTarihi.getDate() + 30);
+
+      bitisTarihi.setDate(
+        bitisTarihi.getDate() + trialGunSayisi,
+      );
 
       await tx.kullaniciUyelikPaketi.create({
         data: {
@@ -90,7 +101,7 @@ export class UsersService {
           bitisTarihi,
           pilotPaketMi: false,
           testPaketiMi: false,
-          notlar: 'Yeni kullanıcı otomatik DENEME paketi.',
+          notlar: `${data.role} rolü için ${trialGunSayisi} günlük otomatik DENEME paketi.`,
         },
       });
 
@@ -113,7 +124,7 @@ export class UsersService {
           miktar: 500,
           oncekiBakiye: 0,
           sonrakiBakiye: 500,
-          aciklama: 'DENEME paketi başlangıç kontörü.',
+          aciklama: `${trialGunSayisi} günlük DENEME paketi başlangıç kontörü.`,
           ilgiliKayitTuru: 'UYELIK_PAKETI',
           ilgiliKayitId: denemePaketi.id,
           olusturanId: null,

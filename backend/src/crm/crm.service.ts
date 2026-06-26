@@ -681,7 +681,6 @@ export class CrmService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true,
               role: true,
             },
           },
@@ -695,7 +694,6 @@ export class CrmService {
                   id: true,
                   firstName: true,
                   lastName: true,
-                  email: true,
                 },
               },
               members: {
@@ -707,7 +705,6 @@ export class CrmService {
                       id: true,
                       firstName: true,
                       lastName: true,
-                      email: true,
                       role: true,
                     },
                   },
@@ -728,7 +725,6 @@ export class CrmService {
           id: true,
           firstName: true,
           lastName: true,
-          email: true,
           role: true,
           office: {
             select: {
@@ -905,7 +901,7 @@ export class CrmService {
 
         return {
           id: advisor.id,
-          name: [advisor.firstName, advisor.lastName].filter(Boolean).join(' ') || advisor.email || 'Danışman',
+          name: [advisor.firstName, advisor.lastName].filter(Boolean).join(' ') || 'Danışman',
           role: advisor.role,
           officeName: advisor.office?.name || 'Ofis yok',
           teamName: teamNameByUserId.get(advisor.id) || 'Takım yok',
@@ -934,6 +930,7 @@ export class CrmService {
       advisorPerformance,
     };
   }
+
 
 
   async getPipeline(userId: string, userRole: Role) {

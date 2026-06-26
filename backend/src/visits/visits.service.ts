@@ -13,7 +13,31 @@ export class VisitsService {
     ip?: string;
     userAgent?: string;
   }) {
-    return this.prisma.userVisit.create({ data });
+    const requestedUserId = data.userId?.trim() || null;
+
+    let safeUserId: string | null = null;
+
+    if (requestedUserId) {
+      const user = await this.prisma.user.findUnique({
+        where: {
+          id: requestedUserId,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      safeUserId = user?.id || null;
+    }
+
+    return this.prisma.userVisit.create({
+      data: {
+        userId: safeUserId,
+        page: data.page,
+        ip: data.ip,
+        userAgent: data.userAgent,
+      },
+    });
   }
 
   async getVisits(page?: string, userId?: string) {

@@ -5,3 +5,6 @@ node_modules/
 dist/
 build/
 *.log
+
+# Backend runtime profile uploads
+backend/public/profile-images/

@@ -588,10 +588,10 @@ export class PortfolioImagesService {
       throw new NotFoundException('Portföy bulunamadı.');
     }
 
-    const isAdmin =
-      input.userRole === 'ADMIN' || input.userRole === 'SUPER_ADMIN';
+    const isSuperAdmin = input.userRole === 'SUPER_ADMIN';
+    const isOwner = unit.project.ownerId === input.userId;
 
-    if (!isAdmin && unit.project.ownerId !== input.userId) {
+    if (!isSuperAdmin && !isOwner) {
       throw new ForbiddenException('Bu portföyün görsellerini yönetemezsiniz.');
     }
 
