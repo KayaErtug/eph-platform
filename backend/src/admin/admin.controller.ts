@@ -253,4 +253,24 @@ export class AdminController {
   updateKatilimTalebiNotu(@Param("id") id: string, @Body() body: { adminNote?: string }) {
     return this.adminService.updateApplicationNote(id, body.adminNote || "");
   }
+
+  @Patch("users/:id/trial-extend")
+  @Roles(Role.SUPER_ADMIN)
+  extendUserTrial(
+    @Param("id") id: string,
+    @Body()
+    body: {
+      gunSayisi: number;
+      gerekce?: string;
+    },
+    @Req() request: AdminRequest,
+  ) {
+    return this.adminService.extendUserTrial(
+      id,
+      body,
+      this.extractActor(request),
+    );
+  }
+
+
 }

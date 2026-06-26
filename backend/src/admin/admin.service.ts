@@ -6,7 +6,12 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { MailService } from "../mail.service";
-import { Capability, Role } from "@prisma/client";
+import {
+  AuditAction,
+  Capability,
+  Role,
+  UyelikDurumu,
+} from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 
 type AdminActor = {
@@ -2236,4 +2241,174 @@ export class AdminService {
 
     return updated;
   }
+
+  async extendUserTrial(
+    userId: string,
+    body: {
+      gunSayisi: number;
+      gerekce?: string;
+    },
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    const actorId = this.getActorId(actor);
+    const normalizedUserId = String(userId || "").trim();
+    const gunSayisi = Number(body?.gunSayisi);
+    const gerekce =
+      String(body?.gerekce || "").trim().slice(0, 500) ||
+      "Yazılım Ekibi tarafından deneme süresi uzatıldı.";
+
+    if (!normalizedUserId) {
+      throw new BadRequestException("Kullanıcı kimliği zorunludur.");
+    }
+
+    if (!Number.isInteger(gunSayisi) || gunSayisi <= 0) {
+      throw new BadRequestException(
+        "Uzatma süresi pozitif tam gün sayısı olmalıdır.",
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtext(${`trial-extend:${normalizedUserId}`})
+        )
+      `;
+
+      const user = await tx.user.findUnique({
+        where: { id: normalizedUserId },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          role: true,
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException("Kullanıcı bulunamadı.");
+      }
+
+      if (user.role === Role.SUPER_ADMIN) {
+        throw new BadRequestException(
+          "Yazılım Ekibi hesabının üyelik süresi değiştirilemez.",
+        );
+      }
+
+      const mevcutUyelik =
+        await tx.kullaniciUyelikPaketi.findFirst({
+          where: {
+            kullaniciId: normalizedUserId,
+          },
+          orderBy: {
+            baslangicTarihi: "desc",
+          },
+        });
+
+      if (!mevcutUyelik) {
+        throw new NotFoundException(
+          "Kullanıcının üyelik paketi bulunamadı.",
+        );
+      }
+
+      if (!mevcutUyelik.bitisTarihi) {
+        throw new BadRequestException(
+          "Süresiz üyelik paketinin bitiş tarihi uzatılamaz.",
+        );
+      }
+
+      const paket = await tx.uyelikPaketi.findUnique({
+        where: {
+          id: mevcutUyelik.paketId,
+        },
+        select: {
+          id: true,
+          paketKodu: true,
+          paketAdi: true,
+        },
+      });
+
+      if (!paket || paket.paketKodu !== "DENEME") {
+        throw new BadRequestException(
+          "Kullanıcının güncel üyelik paketi DENEME değildir.",
+        );
+      }
+
+      const simdi = new Date();
+      const eskiBitisTarihi = mevcutUyelik.bitisTarihi;
+      const uzatmaBaslangici =
+        eskiBitisTarihi && eskiBitisTarihi > simdi
+          ? new Date(eskiBitisTarihi)
+          : new Date(simdi);
+
+      const yeniBitisTarihi = new Date(uzatmaBaslangici);
+      yeniBitisTarihi.setUTCDate(
+        yeniBitisTarihi.getUTCDate() + gunSayisi,
+      );
+
+      const guncelUyelik =
+        await tx.kullaniciUyelikPaketi.update({
+          where: {
+            id: mevcutUyelik.id,
+          },
+          data: {
+            durum: UyelikDurumu.AKTIF,
+            bitisTarihi: yeniBitisTarihi,
+          },
+        });
+
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          targetUserId: normalizedUserId,
+          action: AuditAction.TRIAL_UZAT,
+          entityType: "KullaniciUyelikPaketi",
+          entityId: mevcutUyelik.id,
+          description: gerekce,
+          metadata: {
+            gunSayisi,
+            paketKodu: paket.paketKodu,
+            paketAdi: paket.paketAdi,
+            eskiDurum: mevcutUyelik.durum,
+            yeniDurum: UyelikDurumu.AKTIF,
+            eskiBitisTarihi:
+              eskiBitisTarihi?.toISOString() || null,
+            uzatmaBaslangici:
+              uzatmaBaslangici.toISOString(),
+            yeniBitisTarihi:
+              yeniBitisTarihi.toISOString(),
+          },
+          ipAddress: actor?.ipAddress,
+          userAgent: actor?.userAgent,
+        },
+      });
+
+      const kullaniciAdi =
+        `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+        user.email;
+
+      return {
+        success: true,
+        mesaj: `${kullaniciAdi} kullanıcısının deneme süresi ${gunSayisi} gün uzatıldı.`,
+        kullanici: {
+          id: user.id,
+          ad: kullaniciAdi,
+          email: user.email,
+        },
+        uyelik: {
+          id: guncelUyelik.id,
+          paketKodu: paket.paketKodu,
+          durum: guncelUyelik.durum,
+          eklenenGun: gunSayisi,
+          eskiBitisTarihi,
+          yeniBitisTarihi:
+            guncelUyelik.bitisTarihi,
+        },
+      };
+    });
+  }
+
+
 }
