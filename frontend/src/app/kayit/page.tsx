@@ -13,6 +13,7 @@ import {
   KeyRound,
   LockKeyhole,
   Mail,
+  MapPin,
   Phone,
   ShieldCheck,
   UserRound,
@@ -34,6 +35,91 @@ const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Admin",
   SUPER_ADMIN: "Yazılım Ekibi",
 };
+
+const CITY_OPTIONS = [
+  "KKTC",
+  "Adana",
+  "Adıyaman",
+  "Afyonkarahisar",
+  "Ağrı",
+  "Aksaray",
+  "Amasya",
+  "Ankara",
+  "Antalya",
+  "Ardahan",
+  "Artvin",
+  "Aydın",
+  "Balıkesir",
+  "Bartın",
+  "Batman",
+  "Bayburt",
+  "Bilecik",
+  "Bingöl",
+  "Bitlis",
+  "Bolu",
+  "Burdur",
+  "Bursa",
+  "Çanakkale",
+  "Çankırı",
+  "Çorum",
+  "Denizli",
+  "Diyarbakır",
+  "Düzce",
+  "Edirne",
+  "Elazığ",
+  "Erzincan",
+  "Erzurum",
+  "Eskişehir",
+  "Gaziantep",
+  "Giresun",
+  "Gümüşhane",
+  "Hakkâri",
+  "Hatay",
+  "Iğdır",
+  "Isparta",
+  "İstanbul",
+  "İzmir",
+  "Kahramanmaraş",
+  "Karabük",
+  "Karaman",
+  "Kars",
+  "Kastamonu",
+  "Kayseri",
+  "Kilis",
+  "Kırıkkale",
+  "Kırklareli",
+  "Kırşehir",
+  "Kocaeli",
+  "Konya",
+  "Kütahya",
+  "Malatya",
+  "Manisa",
+  "Mardin",
+  "Mersin",
+  "Muğla",
+  "Muş",
+  "Nevşehir",
+  "Niğde",
+  "Ordu",
+  "Osmaniye",
+  "Rize",
+  "Sakarya",
+  "Samsun",
+  "Siirt",
+  "Sinop",
+  "Sivas",
+  "Şanlıurfa",
+  "Şırnak",
+  "Tekirdağ",
+  "Tokat",
+  "Trabzon",
+  "Tunceli",
+  "Uşak",
+  "Van",
+  "Yalova",
+  "Yozgat",
+  "Zonguldak"
+];
 
 function KayitForm() {
   const router = useRouter();
@@ -118,7 +204,7 @@ function KayitForm() {
       <style>{`
         *{box-sizing:border-box}
         body{margin:0;background:#F7FBFF;font-family:Inter,Arial,sans-serif}
-        .page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#F7FBFF;color:#06194A}
+        .page{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;background:#F7FBFF;color:#06194A}
         .shell{width:100%;max-width:1120px;min-height:720px;display:grid;grid-template-columns:.95fr 1.05fr;overflow:hidden;border-radius:32px;background:#fff;border:1px solid #DDE7F3;box-shadow:0 24px 70px rgba(15,23,42,.10)}
         .left{background:linear-gradient(145deg,#06194A,#1557D6);color:#fff;padding:42px;display:flex;flex-direction:column;justify-content:space-between}
         .brand{display:flex;align-items:center;gap:12px}
@@ -141,6 +227,7 @@ function KayitForm() {
         .row-label{text-align:left;font-size:12px;font-weight:950;color:#475569;letter-spacing:.02em}
         .input{width:100%;height:42px;border:0;background:transparent;text-align:right;font-size:15px;font-weight:900;color:#06194A;outline:none}
         .input::placeholder{color:#94A3B8}
+        select.input{cursor:pointer}
         .lock-dot{display:flex;height:30px;width:30px;align-items:center;justify-content:center;border-radius:999px;background:#E0ECFF;color:#1557D6;font-size:13px;font-weight:950}
         .password-btn{border:0;background:#EFF6FF;color:#1557D6;border-radius:999px;height:32px;width:32px;cursor:pointer}
         .success,.error,.hint{margin-top:10px;border-radius:16px;padding:12px;text-align:center;font-size:13px;font-weight:900;line-height:1.5}
@@ -153,9 +240,9 @@ function KayitForm() {
         .bottom a{color:#1557D6;font-weight:950}
         @media(max-width:900px){
           .page{padding:0}
-          .shell{display:block;min-height:100vh;border-radius:0;box-shadow:none}
+          .shell{display:block;min-height:100dvh;border-radius:0;box-shadow:none}
           .left{display:none}
-          .right{min-height:100vh;align-items:flex-start;padding:28px 16px}
+          .right{min-height:100dvh;align-items:flex-start;padding:28px 16px calc(28px + env(safe-area-inset-bottom))}
           .card{max-width:460px;margin:0 auto}
           .title{font-size:30px}
           .row{grid-template-columns:40px 88px 1fr 30px;gap:8px;padding:9px 10px;border-radius:20px}
@@ -264,6 +351,18 @@ function KayitForm() {
                   </FormRow>
                   <div className="hint">Nasıl yazarsanız yazın sistem +90 532 282 88 75 formatına çevirir.</div>
                   {errors.phone && <div className="error">{errors.phone.message}</div>}
+
+                  <FormRow icon={<MapPin size={18} />} label="Şehir">
+                    <select {...register("city")} className="input" defaultValue="">
+                      <option value="" disabled>Şehir seçiniz</option>
+                      {CITY_OPTIONS.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  </FormRow>
+                  {errors.city && <div className="error">{errors.city.message}</div>}
 
                   <FormRow icon={<LockKeyhole size={18} />} label="Şifre" action={
                     <button type="button" className="password-btn" onClick={() => setShowPassword(!showPassword)}>

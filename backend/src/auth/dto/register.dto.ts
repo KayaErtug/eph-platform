@@ -53,6 +53,13 @@ export class RegisterDto {
   })
   phone: string;
 
+  @Transform(({ value }) => String(value || '').trim())
+  @IsString()
+  @MinLength(2, {
+    message: 'Şehir seçimi zorunludur',
+  })
+  city: string;
+
   @IsString()
   @MinLength(6)
   password: string;

@@ -94,6 +94,7 @@ export class AuthService {
       lastName: dto.lastName,
       email: dto.email,
       phone: dto.phone,
+      city: dto.city.trim(),
       passwordHash,
       role,
       isApproved,

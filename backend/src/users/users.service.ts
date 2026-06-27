@@ -23,6 +23,7 @@ export class UsersService {
     lastName: string;
     email: string;
     phone: string;
+    city: string;
     passwordHash: string;
     role: Role;
     isApproved?: boolean;
@@ -35,6 +36,7 @@ export class UsersService {
           lastName: data.lastName,
           email: data.email,
           phone: data.phone,
+          city: data.city,
           passwordHash: data.passwordHash,
           role: data.role,
           isApproved: data.isApproved ?? false,

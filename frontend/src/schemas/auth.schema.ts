@@ -47,6 +47,8 @@ export const registerSchema = z.object({
 
   phone: phoneSchema,
 
+  city: z.string().trim().min(2, "Şehir seçimi zorunludur"),
+
   password: z.string().min(6, "Sifre en az 6 karakter olmali"),
 
   inviteCode: z.string().optional(),
