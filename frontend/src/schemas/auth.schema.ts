@@ -35,29 +35,43 @@ const phoneSchema = z
   .transform((value) => normalizePhoneForSystem(value))
   .refine(
     (value) => /^\+90 5\d{2} \d{3} \d{2} \d{2}$/.test(value),
-    "Telefon numarası +90 532 282 88 75 formatına uygun olmalıdır"
+    "Telefon numarası +90 532 282 88 75 formatına uygun olmalıdır",
   );
 
 export const registerSchema = z.object({
-  firstName: z.string().min(2, "Ad en az 2 karakter olmali"),
+  firstName: z.string().min(2, "Ad en az 2 karakter olmalıdır"),
 
-  lastName: z.string().min(2, "Soyad en az 2 karakter olmali"),
+  lastName: z.string().min(2, "Soyad en az 2 karakter olmalıdır"),
 
-  email: z.string().email("Gecerli bir email girin"),
+  email: z.string().email("Geçerli bir e-posta adresi girin"),
 
   phone: phoneSchema,
 
   city: z.string().trim().min(2, "Şehir seçimi zorunludur"),
 
-  password: z.string().min(6, "Sifre en az 6 karakter olmali"),
+  role: z.enum(
+    [
+      "EMLAKCI",
+      "MUTEAHHIT",
+      "INSAAT_FIRMASI",
+      "MODERATOR",
+      "ADMIN",
+      "SUPER_ADMIN",
+    ],
+    {
+      error: "Meslek seçimi zorunludur",
+    },
+  ),
+
+  password: z.string().min(6, "Şifre en az 6 karakter olmalıdır"),
 
   inviteCode: z.string().optional(),
 });
 
 export const loginSchema = z.object({
-  email: z.string().email("Gecerli bir email girin"),
+  email: z.string().email("Geçerli bir e-posta adresi girin"),
 
-  password: z.string().min(6, "Sifre en az 6 karakter olmali"),
+  password: z.string().min(6, "Şifre en az 6 karakter olmalıdır"),
 });
 
 export type RegisterFormData = z.infer<typeof registerSchema>;

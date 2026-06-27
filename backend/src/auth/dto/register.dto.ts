@@ -1,6 +1,8 @@
+import { Role } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
+  IsEnum,
   IsOptional,
   IsString,
   Matches,
@@ -59,6 +61,11 @@ export class RegisterDto {
     message: 'Şehir seçimi zorunludur',
   })
   city: string;
+
+  @IsEnum(Role, {
+    message: 'Geçerli bir meslek seçiniz',
+  })
+  role: Role;
 
   @IsString()
   @MinLength(6)

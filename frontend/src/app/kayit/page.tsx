@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import {
+  BriefcaseBusiness,
   CheckCircle2,
   Eye,
   EyeOff,
@@ -27,7 +28,18 @@ import {
   RegisterFormData,
 } from "@/schemas/auth.schema";
 
-const ROLE_LABELS: Record<string, string> = {
+const REGISTRATION_ROLES = [
+  "EMLAKCI",
+  "MUTEAHHIT",
+  "INSAAT_FIRMASI",
+  "MODERATOR",
+  "ADMIN",
+  "SUPER_ADMIN",
+] as const;
+
+type RegistrationRole = (typeof REGISTRATION_ROLES)[number];
+
+const ROLE_LABELS: Record<RegistrationRole, string> = {
   EMLAKCI: "Emlakçı",
   MUTEAHHIT: "Müteahhit",
   INSAAT_FIRMASI: "İnşaat Firması",
@@ -35,6 +47,25 @@ const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Admin",
   SUPER_ADMIN: "Yazılım Ekibi",
 };
+
+const PUBLIC_ROLE_OPTIONS: Array<{
+  value: Extract<
+    RegistrationRole,
+    "EMLAKCI" | "MUTEAHHIT" | "INSAAT_FIRMASI"
+  >;
+  label: string;
+}> = [
+  { value: "EMLAKCI", label: "Emlakçı" },
+  { value: "MUTEAHHIT", label: "Müteahhit" },
+  { value: "INSAAT_FIRMASI", label: "İnşaat Firması" },
+];
+
+function isRegistrationRole(value: unknown): value is RegistrationRole {
+  return (
+    typeof value === "string" &&
+    REGISTRATION_ROLES.includes(value as RegistrationRole)
+  );
+}
 
 const CITY_OPTIONS = [
   "KKTC",
@@ -128,7 +159,8 @@ function KayitForm() {
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [detectedRole, setDetectedRole] = useState<string | null>(null);
+  const [detectedRole, setDetectedRole] =
+    useState<RegistrationRole | null>(null);
   const [referralLoading, setReferralLoading] = useState(false);
   const [referralValid, setReferralValid] = useState(false);
 
@@ -137,9 +169,13 @@ function KayitForm() {
     handleSubmit,
     watch,
     setValue,
+    resetField,
     formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
+    defaultValues: {
+      role: undefined,
+    },
   });
 
   const inviteCode = watch("inviteCode");
@@ -149,6 +185,7 @@ function KayitForm() {
     if (!inviteCode || inviteCode.length < 4) {
       setReferralValid(false);
       setDetectedRole(null);
+      resetField("role");
       return;
     }
 
@@ -165,18 +202,26 @@ function KayitForm() {
           shouldValidate: true,
         });
 
+        if (!isRegistrationRole(res.data.role)) {
+          throw new Error("Geçersiz referans rolü");
+        }
+
         setDetectedRole(res.data.role);
+        setValue("role", res.data.role, {
+          shouldValidate: true,
+        });
         setReferralValid(true);
       } catch {
         setReferralValid(false);
         setDetectedRole(null);
+        resetField("role");
       } finally {
         setReferralLoading(false);
       }
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [inviteCode, setValue]);
+  }, [inviteCode, resetField, setValue]);
 
   const onSubmit = async (data: RegisterFormData) => {
     setLoading(true);
@@ -185,6 +230,7 @@ function KayitForm() {
     try {
       const payload = {
         ...data,
+        role: detectedRole || data.role,
         phone: normalizePhoneForSystem(data.phone),
       };
 
@@ -313,7 +359,7 @@ function KayitForm() {
                           {ROLE_LABELS[detectedRole]} referans kaydı bulundu.
                         </div>
                         <div className="hint">
-                          Ad, soyad ve e-posta güvenlik için kilitlendi. Telefon ve şifre alanını siz belirleyebilirsiniz.
+                          Ad, soyad, e-posta ve meslek bilgisi güvenlik için kilitlendi. Telefon ve şifre alanını siz belirleyebilirsiniz.
                         </div>
                       </>
                     )}
@@ -351,6 +397,35 @@ function KayitForm() {
                   </FormRow>
                   <div className="hint">Nasıl yazarsanız yazın sistem +90 532 282 88 75 formatına çevirir.</div>
                   {errors.phone && <div className="error">{errors.phone.message}</div>}
+
+                  <FormRow
+                    icon={<BriefcaseBusiness size={18} />}
+                    label="Meslek"
+                    locked={referralValid}
+                  >
+                    {referralValid ? (
+                      <>
+                        <input type="hidden" {...register("role")} />
+                        <input
+                          value={
+                            detectedRole ? ROLE_LABELS[detectedRole] : ""
+                          }
+                          readOnly
+                          className="input"
+                        />
+                      </>
+                    ) : (
+                      <select {...register("role")} className="input">
+                        <option value="" disabled>Meslek seçiniz</option>
+                        {PUBLIC_ROLE_OPTIONS.map((role) => (
+                          <option key={role.value} value={role.value}>
+                            {role.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </FormRow>
+                  {errors.role && <div className="error">{errors.role.message}</div>}
 
                   <FormRow icon={<MapPin size={18} />} label="Şehir">
                     <select {...register("city")} className="input" defaultValue="">

@@ -1,19 +1,17 @@
 import {
-  Injectable,
   BadRequestException,
+  Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-
+import { Role } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcryptjs';
 
-import { UsersService } from '../users/users.service';
 import { InvitationsService } from '../invitations/invitations.service';
 import { PrismaService } from '../prisma/prisma.service';
-
-import { RegisterDto } from './dto/register.dto';
+import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
-
-import * as bcrypt from 'bcryptjs';
+import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
@@ -60,7 +58,13 @@ export class AuthService {
       throw new BadRequestException('Bu email zaten kayıtlı.');
     }
 
-    let role: any = 'EMLAKCI';
+    const publicRegistrationRoles: Role[] = [
+      Role.EMLAKCI,
+      Role.MUTEAHHIT,
+      Role.INSAAT_FIRMASI,
+    ];
+
+    let role: Role = dto.role;
     let isApproved = false;
 
     if (dto.inviteCode && dto.inviteCode.trim() !== '') {
@@ -84,6 +88,8 @@ export class AuthService {
           usedAt: new Date(),
         },
       });
+    } else if (!publicRegistrationRoles.includes(role)) {
+      throw new BadRequestException('Geçerli bir meslek seçiniz.');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
