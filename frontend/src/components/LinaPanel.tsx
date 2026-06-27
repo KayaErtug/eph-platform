@@ -218,7 +218,8 @@ export default function LinaPanel({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const didMountMessagesRef = useRef(false);
   const mediaRef = useRef<MediaRecorder | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   const [imageOk, setImageOk] = useState(true);
   const [messages, setMessages] = useState<Message[]>([
@@ -394,11 +395,64 @@ export default function LinaPanel({
     }
   };
 
+  const ensureAudioContext = async () => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    const AudioContextConstructor =
+      window.AudioContext ||
+      (
+        window as typeof window & {
+          webkitAudioContext?: typeof AudioContext;
+        }
+      ).webkitAudioContext;
+
+    if (!AudioContextConstructor) {
+      return null;
+    }
+
+    const context =
+      audioContextRef.current || new AudioContextConstructor();
+
+    audioContextRef.current = context;
+
+    if (context.state === "suspended") {
+      await context.resume();
+    }
+
+    return context;
+  };
+
+  const unlockAudioPlayback = async () => {
+    try {
+      const context = await ensureAudioContext();
+
+      if (!context) {
+        return;
+      }
+
+      const silentBuffer = context.createBuffer(1, 1, 22050);
+      const silentSource = context.createBufferSource();
+
+      silentSource.buffer = silentBuffer;
+      silentSource.connect(context.destination);
+      silentSource.start(0);
+    } catch {
+      return;
+    }
+  };
+
   const stopCurrentAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current = null;
+    if (audioSourceRef.current) {
+      try {
+        audioSourceRef.current.stop();
+        audioSourceRef.current.disconnect();
+      } catch {
+        // Kaynak zaten sonlanmış olabilir.
+      }
+
+      audioSourceRef.current = null;
     }
 
     setSpeaking(false);
@@ -435,6 +489,11 @@ export default function LinaPanel({
     return () => {
       stopCurrentAudio();
       stopRecording();
+
+      if (audioContextRef.current) {
+        void audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
     };
   }, []);
 
@@ -499,6 +558,14 @@ export default function LinaPanel({
   const speakWithElevenLabs = async (text: string) => {
     try {
       setVoiceError("");
+
+      const context = await ensureAudioContext();
+
+      if (!context) {
+        setVoiceError("Bu cihaz Lina sesini desteklemiyor.");
+        return;
+      }
+
       stopCurrentAudio();
       setSpeaking(true);
 
@@ -526,28 +593,31 @@ export default function LinaPanel({
         return;
       }
 
-      const blob = await res.blob();
-      const audioUrl = URL.createObjectURL(blob);
-      const audio = new Audio(audioUrl);
+      const audioData = await res.arrayBuffer();
+      const audioBuffer = await context.decodeAudioData(
+        audioData.slice(0),
+      );
+      const source = context.createBufferSource();
 
-      audio.playbackRate = 1.12;
-      audioRef.current = audio;
+      source.buffer = audioBuffer;
+      source.playbackRate.value = 1.12;
+      source.connect(context.destination);
+      audioSourceRef.current = source;
 
-      audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
+      source.onended = () => {
+        if (audioSourceRef.current === source) {
+          audioSourceRef.current = null;
+        }
+
         setSpeaking(false);
       };
 
-      audio.onerror = () => {
-        URL.revokeObjectURL(audioUrl);
-        setSpeaking(false);
-        setVoiceError("Ses oynatılırken hata oluştu.");
-      };
-
-      await audio.play();
+      source.start(0);
     } catch {
       setSpeaking(false);
-      setVoiceError("Tarayıcı sesi başlatamadı. Tekrar deneyin.");
+      setVoiceError(
+        "Lina'nın sesi otomatik başlatılamadı. Dinle butonuna dokunun.",
+      );
     }
   };
 
@@ -555,6 +625,8 @@ export default function LinaPanel({
     const text = (textFromVoice || input).trim();
 
     if (!text || loading) return;
+
+    await unlockAudioPlayback();
 
     const newMessages: Message[] = [...messages, { role: "user", text }];
 
@@ -582,6 +654,7 @@ export default function LinaPanel({
   const startRecording = async () => {
     try {
       setVoiceError("");
+      await unlockAudioPlayback();
 
       if (!navigator.mediaDevices?.getUserMedia) {
         setVoiceError("Bu cihaz ses kaydını desteklemiyor.");
