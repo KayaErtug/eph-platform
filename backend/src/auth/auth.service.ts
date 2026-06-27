@@ -35,10 +35,10 @@ export class AuthService {
 
   private getVerificationExpiryMinutes() {
     const value = Number(
-      process.env.EMAIL_VERIFICATION_CODE_EXPIRES_MINUTES || 10,
+      process.env.EMAIL_VERIFICATION_CODE_EXPIRES_MINUTES || 30,
     );
 
-    return Number.isFinite(value) && value > 0 ? Math.floor(value) : 10;
+    return Number.isFinite(value) && value > 0 ? Math.floor(value) : 30;
   }
 
   private getVerificationResendSeconds() {

@@ -585,7 +585,12 @@ export class AdminService {
 
   async getStats() {
     const totalUsers = await this.prisma.user.count();
-    const pendingUsers = await this.prisma.user.count({ where: { isApproved: false } });
+    const pendingUsers = await this.prisma.user.count({
+      where: {
+        isApproved: false,
+        isVerified: true,
+      },
+    });
     const approvedUsers = await this.prisma.user.count({ where: { isApproved: true } });
     const totalInvitations = await this.prisma.invitation.count();
     const pendingDocuments = await this.prisma.document.count({ where: { status: "PENDING" } });
@@ -902,7 +907,10 @@ export class AdminService {
 
     const where =
       filter === "pending"
-        ? { isApproved: false }
+        ? {
+            isApproved: false,
+            isVerified: true,
+          }
         : filter === "approved"
           ? { isApproved: true }
           : {};
@@ -1234,6 +1242,12 @@ export class AdminService {
 
     if (!user) {
       throw new NotFoundException("Kullanıcı bulunamadı.");
+    }
+
+    if (!user.isVerified) {
+      throw new BadRequestException(
+        "E-posta doğrulaması tamamlanmamış kullanıcı onaylanamaz.",
+      );
     }
 
     const memberCode = user.memberCode || (await this.generateUniqueMemberCode(user));
