@@ -68,7 +68,7 @@ const membershipPlans = [
 const revenueModules = [
   {
     title: "Kontör Ekonomisi",
-    text: "Mesaj, ilgileniyorum ve müşterim var aksiyonları kontör ile çalışır. Listeleme ve detay görüntüleme ücretsiz kalır.",
+    text: "Havuz ve Forum içeriklerini listelemek ve görüntülemek ücretsizdir. Mesaj, ilgileniyorum, müşterim var ve yardımcı olabilirim aksiyonları kontör ile çalışır.",
     icon: WalletCards,
   },
   {
@@ -85,8 +85,11 @@ const revenueModules = [
 
 const creditActions = [
   ["Havuz mesajı", "3 kontör"],
-  ["İlgileniyorum", "10 kontör"],
-  ["Müşterim var", "20 kontör"],
+  ["Havuzda ilgileniyorum", "10 kontör"],
+  ["Havuzda müşterim var", "20 kontör"],
+  ["Forum mesajı", "3 kontör"],
+  ["Forumda ilgileniyorum", "10 kontör"],
+  ["Forumda yardımcı olabilirim", "10 kontör"],
   ["Listeleme ve detay", "Ücretsiz"],
 ];
 

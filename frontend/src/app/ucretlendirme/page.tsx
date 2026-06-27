@@ -95,9 +95,9 @@ const creditPackages = [
 ];
 
 const creditUses = [
-  ["Acil forum talebi", "50 kontör"],
-  ["Talebi sabitle", "100 kontör"],
-  ["Forum vitrini", "250 kontör"],
+  ["Forum mesajı", "3 kontör"],
+  ["Forumda ilgileniyorum", "10 kontör"],
+  ["Forumda yardımcı olabilirim", "10 kontör"],
   ["Portföy öne çıkar", "150 kontör"],
   ["Lina AI ilan metni", "10 kontör"],
   ["Ses kaydından ilan oluştur", "25 kontör"],
@@ -116,7 +116,7 @@ const faqs = [
   {
     question: "Kontörler temel işlemler için mi harcanır?",
     answer:
-      "Hayır. Portföy eklemek, CRM kullanmak ve temel forum kullanımı platformun ana kullanımına dahildir. Kontörler üretkenliği artıran premium işlemler için kullanılır.",
+      "Hayır. Portföy eklemek, CRM kullanmak, Forum ve Havuz içeriklerini listelemek ve detaylarını görüntülemek ücretsizdir. Mesaj ve iş fırsatı oluşturan aksiyonlar kontör ile çalışır.",
   },
   {
     question: "Abonelik aylık mı?",
@@ -136,7 +136,7 @@ const faqs = [
   {
     question: "Kontör satın almak zorunlu mu?",
     answer:
-      "Hayır. Kontör paketleri zorunlu değildir. Üyelik paketleri platform erişimi sağlar; kontörler ek görünürlük, içerik üretimi ve premium işlemler için kullanılır.",
+      "Hayır. Üyelik paketleri platform erişimi sağlar. Kontörler mesajlaşma, iş fırsatı aksiyonları, ek görünürlük ve üretkenlik araçlarında kullanılır.",
   },
 ];
 
@@ -156,7 +156,7 @@ export default function UcretlendirmePage() {
           <p className="mx-auto mt-4 max-w-3xl text-sm font-semibold leading-7 text-[#64748B] md:text-base">
             EPH; CRM, portföy yönetimi, forum, havuz, mesajlaşma ve Lina AI
             araçlarını tek platformda sunar. Temel kullanım aboneliğe dahildir;
-            üretkenliği artıran premium işlemler kontör ile kullanılır.
+            iletişim, iş fırsatı ve üretkenliği artıran işlemler kontör ile kullanılır.
           </p>
 
           <div className="mx-auto mt-5 flex max-w-3xl flex-wrap justify-center gap-2">
@@ -244,7 +244,7 @@ export default function UcretlendirmePage() {
               Kontör Paketleri
             </h2>
             <p className="mx-auto mt-2 max-w-3xl text-sm font-semibold leading-7 text-[#64748B]">
-              Kontörler temel kullanım için değil; acil talep, vitrin, Lina AI,
+              Kontörler temel kullanım için değil; mesajlaşma, iş fırsatı, Lina AI,
               sosyal medya içeriği, PDF dosyası ve toplu işlemler gibi premium
               araçlar için kullanılır.
             </p>

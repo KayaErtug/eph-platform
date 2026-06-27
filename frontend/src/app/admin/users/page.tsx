@@ -39,6 +39,37 @@ type Role =
 
 type Capability = "TEAM_LEADER" | "OFFICE_OWNER";
 
+type ActiveMembership = {
+  id: string;
+  paketId: string;
+  paketKodu?: string | null;
+  paketAdi?: string | null;
+  durum?: string | null;
+  baslangicTarihi?: string | null;
+  bitisTarihi?: string | null;
+  pilotPaketMi?: boolean;
+  testPaketiMi?: boolean;
+};
+
+type GiftPoolData = {
+  havuz: {
+    id: string;
+    kod: string;
+    bakiye: number;
+    toplamYukleme: number;
+    toplamDagitim: number;
+    aktifMi: boolean;
+  };
+  yetki: {
+    rol: string;
+    secenekler?: number[] | null;
+    gunlukLimit?: number | null;
+    bugunGonderilen?: number;
+    bugunIslemAdedi?: number;
+    bugunKalan?: number | null;
+  };
+};
+
 type UserRestriction = {
   id: string;
   type: string;
@@ -73,6 +104,7 @@ type AdminUser = {
   nominationQuota?: number;
   referralCode?: string | null;
   createdAt?: string;
+  aktifUyelik?: ActiveMembership | null;
   capabilities?: {
     id: string;
     capability: Capability;
@@ -215,6 +247,19 @@ export default function AdminUsersPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const [giftPool, setGiftPool] =
+    useState<GiftPoolData | null>(null);
+  const [giftAmount, setGiftAmount] = useState("100");
+  const [giftReason, setGiftReason] = useState("");
+  const [poolTopupAmount, setPoolTopupAmount] =
+    useState("10000");
+  const [poolTopupReason, setPoolTopupReason] =
+    useState("");
+  const [trialDays, setTrialDays] = useState("7");
+  const [trialReason, setTrialReason] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const [actionError, setActionError] = useState("");
+
   const [filter, setFilter] = useState<"all" | "approved" | "pending">("all");
   const [roleFilter, setRoleFilter] = useState("all");
   const [query, setQuery] = useState("");
@@ -246,6 +291,7 @@ export default function AdminUsersPage() {
     }
 
     loadUsers(filter);
+    loadGiftPool();
   }, [hasHydrated, user?.id, user?.role]);
 
   async function loadUsers(nextFilter = filter) {
@@ -261,6 +307,215 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadGiftPool() {
+    try {
+      const response = await api.get(
+        `/kontor/hediye-havuzu?t=${Date.now()}`,
+      );
+      setGiftPool(response.data || null);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          "Hediye kontör havuzu yüklenemedi.",
+      );
+    }
+  }
+
+  async function topupGiftPool() {
+    if (!isSuperAdmin) return;
+
+    const amount = Number(poolTopupAmount);
+
+    if (!Number.isInteger(amount) || amount <= 0) {
+      setError("Havuza eklenecek miktar pozitif tam sayı olmalıdır.");
+      return;
+    }
+
+    setBusyKey("gift-pool-topup");
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await api.post(
+        "/kontor/hediye-havuzu/yukle",
+        {
+          miktar: amount,
+          aciklama:
+            poolTopupReason.trim() ||
+            "Yazılım Ekibi tarafından hediye havuzuna kontör eklendi.",
+        },
+      );
+
+      await loadGiftPool();
+      setPoolTopupReason("");
+      setSuccess(
+        response.data?.mesaj ||
+          `${amount} kontör hediye havuzuna eklendi.`,
+      );
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          "Hediye havuzuna kontör eklenemedi.",
+      );
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function sendGiftCredit() {
+    if (!selectedUser) return;
+
+    const amount = Number(giftAmount);
+
+    if (!Number.isInteger(amount) || amount <= 0) {
+      setActionError("Kontör miktarı pozitif tam sayı olmalıdır.");
+      return;
+    }
+
+    if (giftReason.trim().length > 50) {
+      setActionError(
+        "Hediye açıklaması en fazla 50 karakter olabilir.",
+      );
+      return;
+    }
+
+    setBusyKey(`${selectedUser.id}-gift-credit`);
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      const response = await api.post(
+        "/kontor/hediye-gonder",
+        {
+          aliciId: selectedUser.id,
+          miktar: amount,
+          aciklama:
+            giftReason.trim() ||
+            `${fullName(selectedUser)} kullanıcısına hediye kontör gönderildi.`,
+        },
+      );
+
+      await loadGiftPool();
+      setGiftReason("");
+      setActionMessage(
+        response.data?.mesaj ||
+          `${amount} kontör başarıyla gönderildi.`,
+      );
+    } catch (err: any) {
+      setActionError(
+        err?.response?.data?.message ||
+          "Hediye kontör gönderilemedi.",
+      );
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  async function extendTrial() {
+    if (!selectedUser || !isSuperAdmin) return;
+
+    const days = Number(trialDays);
+
+    if (!Number.isInteger(days) || days <= 0) {
+      setActionError("Gün sayısı pozitif tam sayı olmalıdır.");
+      return;
+    }
+
+    if (days > 30) {
+      setActionError(
+        "Deneme süresi tek işlemde en fazla 30 gün uzatılabilir.",
+      );
+      return;
+    }
+
+    if (trialReason.trim().length > 50) {
+      setActionError(
+        "Uzatma gerekçesi en fazla 50 karakter olabilir.",
+      );
+      return;
+    }
+
+    setBusyKey(`${selectedUser.id}-trial-extend`);
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      const response = await api.patch(
+        `/admin/users/${selectedUser.id}/trial-extend`,
+        {
+          gunSayisi: days,
+          gerekce:
+            trialReason.trim() ||
+            "Yazılım Ekibi tarafından deneme süresi uzatıldı.",
+        },
+      );
+
+      const nextEndDate =
+        response.data?.uyelik?.yeniBitisTarihi || null;
+
+      const nextMembership: ActiveMembership = {
+        ...(selectedUser.aktifUyelik || {
+          id: response.data?.uyelik?.id || "",
+          paketId: "",
+        }),
+        paketKodu:
+          response.data?.uyelik?.paketKodu ||
+          selectedUser.aktifUyelik?.paketKodu ||
+          "DENEME",
+        paketAdi:
+          selectedUser.aktifUyelik?.paketAdi ||
+          "Deneme Paketi",
+        durum:
+          response.data?.uyelik?.durum ||
+          "AKTIF",
+        bitisTarihi: nextEndDate,
+      };
+
+      setSelectedUser((current) =>
+        current
+          ? {
+              ...current,
+              aktifUyelik: nextMembership,
+            }
+          : current,
+      );
+
+      setUsers((current) =>
+        current.map((item) =>
+          item.id === selectedUser.id
+            ? {
+                ...item,
+                aktifUyelik: nextMembership,
+              }
+            : item,
+        ),
+      );
+
+      setTrialReason("");
+      setActionMessage(
+        response.data?.mesaj ||
+          `Deneme süresi ${days} gün uzatıldı.`,
+      );
+    } catch (err: any) {
+      setActionError(
+        err?.response?.data?.message ||
+          "Deneme süresi uzatılamadı.",
+      );
+    } finally {
+      setBusyKey("");
+    }
+  }
+
+  function openUserDetail(target: AdminUser) {
+    setSelectedUser(target);
+    setGiftAmount("100");
+    setGiftReason("");
+    setTrialDays("7");
+    setTrialReason("");
+    setActionMessage("");
+    setActionError("");
   }
 
   function changeFilter(value: "all" | "approved" | "pending") {
@@ -588,6 +843,88 @@ export default function AdminUsersPage() {
       <div className="mx-auto w-full max-w-[1180px] px-3 py-3 pb-20">
         <AdminFlagBanner className="mb-2 rounded-[8px]" />
 
+        {giftPool ? (
+          <section className="mb-3 rounded-3xl border-2 border-[#C7D6E8] bg-white p-3 shadow-sm">
+            <div className="text-center">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+                Hediye Kontör Havuzu
+              </p>
+              <p className="mt-1 text-[24px] font-black text-[#172033]">
+                {giftPool.havuz.bakiye.toLocaleString("tr-TR")}
+              </p>
+              <p className="text-[11px] font-bold text-slate-500">
+                Kullanılabilir kontör
+              </p>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <DetailBox
+                label="Yüklenen"
+                value={giftPool.havuz.toplamYukleme.toLocaleString("tr-TR")}
+              />
+              <DetailBox
+                label="Dağıtılan"
+                value={giftPool.havuz.toplamDagitim.toLocaleString("tr-TR")}
+              />
+              <DetailBox
+                label="Bugün"
+                value={String(giftPool.yetki.bugunGonderilen || 0)}
+              />
+            </div>
+
+            {isAdmin ? (
+              <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 p-3 text-center">
+                <p className="text-[11px] font-black text-blue-700">
+                  Günlük kalan:{" "}
+                  {giftPool.yetki.bugunKalan?.toLocaleString("tr-TR") || 0}
+                  {" / "}
+                  {giftPool.yetki.gunlukLimit?.toLocaleString("tr-TR") || 5000}
+                </p>
+                <p className="mt-1 text-[10px] font-bold leading-4 text-blue-600">
+                  Her kullanıcı ADMIN hesaplarından en fazla 2 hediye ve
+                  toplam 1.000 kontör alabilir.
+                </p>
+              </div>
+            ) : null}
+
+            {isSuperAdmin ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-[160px_1fr_150px]">
+                <input
+                  type="number"
+                  min="1"
+                  value={poolTopupAmount}
+                  onChange={(event) =>
+                    setPoolTopupAmount(event.target.value)
+                  }
+                  placeholder="Kontör"
+                  className="h-11 rounded-xl border border-slate-200 px-3 text-center text-[13px] font-black outline-none focus:border-[#2563EB]"
+                />
+
+                <input
+                  value={poolTopupReason}
+                  onChange={(event) =>
+                    setPoolTopupReason(event.target.value)
+                  }
+                  placeholder="Havuz yükleme açıklaması"
+                  className="h-11 rounded-xl border border-slate-200 px-3 text-center text-[12px] font-bold outline-none focus:border-[#2563EB]"
+                />
+
+                <button
+                  type="button"
+                  onClick={topupGiftPool}
+                  disabled={busyKey === "gift-pool-topup"}
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-3 text-[12px] font-black text-white disabled:opacity-60"
+                >
+                  {busyKey === "gift-pool-topup" ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : null}
+                  Havuza Ekle
+                </button>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
         {isSuperAdmin ? (
           <button
             type="button"
@@ -684,7 +1021,7 @@ export default function AdminUsersPage() {
                 isSuperAdmin={isSuperAdmin}
                 busyKey={busyKey}
                 onApprove={approveUser}
-                onDetail={(target) => setSelectedUser(target)}
+                onDetail={openUserDetail}
                 onSuspend={(target) => {
                   setSuspendUser(target);
                   setSuspendReason("");
@@ -739,6 +1076,155 @@ export default function AdminUsersPage() {
               <p className="mt-1 text-[11px] font-bold text-rose-500">Bitiş: {dateText(activeRestriction(selectedUser)?.endsAt)}</p>
             </div>
           ) : null}
+
+          {actionError ? (
+            <div className="mt-3 rounded-2xl border border-rose-100 bg-rose-50 p-3 text-center text-[12px] font-black text-rose-700">
+              {actionError}
+            </div>
+          ) : null}
+
+          {actionMessage ? (
+            <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-center text-[12px] font-black text-emerald-700">
+              {actionMessage}
+            </div>
+          ) : null}
+
+          <section className="mt-3 rounded-2xl border-2 border-[#C7D6E8] bg-white p-3">
+            <p className="text-center text-[11px] font-black uppercase tracking-[0.1em] text-[#2563EB]">
+              Hediye Kontör Gönder
+            </p>
+
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {[100, 250, 500].map((amount) => (
+                <button
+                  key={amount}
+                  type="button"
+                  onClick={() => setGiftAmount(String(amount))}
+                  className={`h-10 rounded-xl border-2 text-[12px] font-black ${
+                    giftAmount === String(amount)
+                      ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]"
+                      : "border-[#C7D6E8] bg-white text-slate-700"
+                  }`}
+                >
+                  {amount}
+                </button>
+              ))}
+            </div>
+
+            {isSuperAdmin ? (
+              <input
+                type="number"
+                min="1"
+                value={giftAmount}
+                onChange={(event) => setGiftAmount(event.target.value)}
+                placeholder="Özel kontör miktarı"
+                className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-center text-[13px] font-black outline-none focus:border-[#2563EB]"
+              />
+            ) : null}
+
+            <textarea
+              value={giftReason}
+              onChange={(event) => setGiftReason(event.target.value)}
+              rows={2}
+              maxLength={50}
+              placeholder="Hediye açıklaması — en fazla 50 karakter"
+              className="mt-2 w-full resize-none rounded-xl border border-slate-200 p-3 text-center text-[12px] font-bold outline-none focus:border-[#2563EB]"
+            />
+
+            <button
+              type="button"
+              onClick={sendGiftCredit}
+              disabled={
+                busyKey === `${selectedUser.id}-gift-credit`
+              }
+              className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-[12px] font-black text-white disabled:opacity-60"
+            >
+              {busyKey === `${selectedUser.id}-gift-credit` ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : null}
+              {giftAmount || "0"} Kontör Gönder
+            </button>
+          </section>
+
+          <section className="mt-3 rounded-2xl border-2 border-[#C7D6E8] bg-slate-50 p-3">
+            <p className="text-center text-[11px] font-black uppercase tracking-[0.1em] text-[#2563EB]">
+              Üyelik Durumu
+            </p>
+
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <DetailBox
+                label="Paket"
+                value={
+                  selectedUser.aktifUyelik?.paketAdi ||
+                  selectedUser.aktifUyelik?.paketKodu ||
+                  "Paket yok"
+                }
+              />
+              <DetailBox
+                label="Durum"
+                value={selectedUser.aktifUyelik?.durum || "Yok"}
+              />
+              <DetailBox
+                label="Başlangıç"
+                value={dateText(
+                  selectedUser.aktifUyelik?.baslangicTarihi,
+                )}
+              />
+              <DetailBox
+                label="Bitiş"
+                value={
+                  selectedUser.aktifUyelik?.bitisTarihi
+                    ? dateText(
+                        selectedUser.aktifUyelik.bitisTarihi,
+                      )
+                    : "Süresiz / Yok"
+                }
+              />
+            </div>
+
+            {isSuperAdmin &&
+            selectedUser.role !== "SUPER_ADMIN" ? (
+              <>
+                <div className="mt-2 grid grid-cols-[110px_1fr] gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={trialDays}
+                    onChange={(event) =>
+                      setTrialDays(event.target.value)
+                    }
+                    placeholder="Gün"
+                    className="h-11 rounded-xl border border-slate-200 px-3 text-center text-[13px] font-black outline-none focus:border-[#2563EB]"
+                  />
+
+                  <input
+                    value={trialReason}
+                    maxLength={50}
+                    onChange={(event) =>
+                      setTrialReason(event.target.value)
+                    }
+                    placeholder="Uzatma gerekçesi — en fazla 50 karakter"
+                    className="h-11 rounded-xl border border-slate-200 px-3 text-center text-[12px] font-bold outline-none focus:border-[#2563EB]"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={extendTrial}
+                  disabled={
+                    busyKey === `${selectedUser.id}-trial-extend`
+                  }
+                  className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-3 text-[12px] font-black text-white disabled:opacity-60"
+                >
+                  {busyKey === `${selectedUser.id}-trial-extend` ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : null}
+                  Deneme Süresini Uzat
+                </button>
+              </>
+            ) : null}
+          </section>
         </Modal>
       ) : null}
 

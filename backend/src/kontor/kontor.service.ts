@@ -534,8 +534,17 @@ export class KontorService {
       );
     }
 
+    const aciklamaMetni =
+      String(body?.aciklama || '').trim();
+
+    if (aciklamaMetni.length > 50) {
+      throw new BadRequestException(
+        'Hediye açıklaması en fazla 50 karakter olabilir.',
+      );
+    }
+
     const aciklama =
-      this.cleanDescription(body?.aciklama) ||
+      aciklamaMetni ||
       'Hediye kontör gönderimi.';
 
     const dayRange = this.getIstanbulDayRange();

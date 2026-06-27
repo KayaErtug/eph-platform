@@ -1013,11 +1013,88 @@ export class AdminService {
       orderBy: { createdAt: "desc" },
     });
 
+    const userIds = users.map((user) => user.id);
+
+    const uyelikler = userIds.length
+      ? await this.prisma.kullaniciUyelikPaketi.findMany({
+          where: {
+            kullaniciId: {
+              in: userIds,
+            },
+          },
+          select: {
+            id: true,
+            kullaniciId: true,
+            paketId: true,
+            durum: true,
+            baslangicTarihi: true,
+            bitisTarihi: true,
+            pilotPaketMi: true,
+            testPaketiMi: true,
+          },
+          orderBy: {
+            baslangicTarihi: "desc",
+          },
+        })
+      : [];
+
+    const paketIds = Array.from(
+      new Set(uyelikler.map((uyelik) => uyelik.paketId)),
+    );
+
+    const paketler = paketIds.length
+      ? await this.prisma.uyelikPaketi.findMany({
+          where: {
+            id: {
+              in: paketIds,
+            },
+          },
+          select: {
+            id: true,
+            paketKodu: true,
+            paketAdi: true,
+          },
+        })
+      : [];
+
+    const paketMap = new Map(
+      paketler.map((paket) => [paket.id, paket]),
+    );
+
+    const sonUyelikMap = new Map<
+      string,
+      (typeof uyelikler)[number]
+    >();
+
+    for (const uyelik of uyelikler) {
+      if (!sonUyelikMap.has(uyelik.kullaniciId)) {
+        sonUyelikMap.set(uyelik.kullaniciId, uyelik);
+      }
+    }
+
     return users.map((user) => {
       const maskedUser = this.maskSoftwareTeamUserForActor(user, actor);
+      const aktifUyelik = sonUyelikMap.get(user.id) || null;
+      const paket = aktifUyelik
+        ? paketMap.get(aktifUyelik.paketId) || null
+        : null;
 
       return {
         ...maskedUser,
+        aktifUyelik: aktifUyelik
+          ? {
+              id: aktifUyelik.id,
+              paketId: aktifUyelik.paketId,
+              paketKodu: paket?.paketKodu || null,
+              paketAdi: paket?.paketAdi || null,
+              durum: aktifUyelik.durum,
+              baslangicTarihi:
+                aktifUyelik.baslangicTarihi,
+              bitisTarihi: aktifUyelik.bitisTarihi,
+              pilotPaketMi: aktifUyelik.pilotPaketMi,
+              testPaketiMi: aktifUyelik.testPaketiMi,
+            }
+          : null,
         capabilities: (user.capabilities || []).map((capability) => ({
           ...capability,
           createdBy: this.maskSoftwareTeamNestedUser(capability.createdBy, actor),
@@ -2255,8 +2332,10 @@ export class AdminService {
     const actorId = this.getActorId(actor);
     const normalizedUserId = String(userId || "").trim();
     const gunSayisi = Number(body?.gunSayisi);
+    const gerekceMetni =
+      String(body?.gerekce || "").trim();
     const gerekce =
-      String(body?.gerekce || "").trim().slice(0, 500) ||
+      gerekceMetni ||
       "Yazılım Ekibi tarafından deneme süresi uzatıldı.";
 
     if (!normalizedUserId) {
@@ -2266,6 +2345,18 @@ export class AdminService {
     if (!Number.isInteger(gunSayisi) || gunSayisi <= 0) {
       throw new BadRequestException(
         "Uzatma süresi pozitif tam gün sayısı olmalıdır.",
+      );
+    }
+
+    if (gunSayisi > 30) {
+      throw new BadRequestException(
+        "Deneme süresi tek işlemde en fazla 30 gün uzatılabilir.",
+      );
+    }
+
+    if (gerekceMetni.length > 50) {
+      throw new BadRequestException(
+        "Uzatma gerekçesi en fazla 50 karakter olabilir.",
       );
     }
 
