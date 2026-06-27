@@ -140,6 +140,7 @@ export class LinaService {
       sourceModule,
       user,
     );
+    const portfolioFlowActive = Boolean(portfolioRuntimeContext.trim());
     const chatPreparation = await this.safePrepareChat(user, sourceModule);
 
     try {
@@ -168,9 +169,8 @@ export class LinaService {
       const kvkkFiltered = outputFilter.filtered || inputFilter.filtered;
 
       await this.rememberPortfolioAssistantMessage(
-        safeUserMessage,
         outputFilter.safeText,
-        sourceModule,
+        portfolioFlowActive,
         user,
       );
 
@@ -270,6 +270,7 @@ export class LinaService {
     }
 
     await this.linaMemoryService.clearUserMemory(user.id);
+    await this.linaPortfolioSessionService.cancelActiveSession(user.id);
     const preferences = await this.linaMemoryService.resetPreferences(user.id);
 
     this.linaAuditService.log({
@@ -907,7 +908,31 @@ export class LinaService {
     sourceModule: LinaModuleName,
     user?: LinaApiUser,
   ): Promise<string> {
-    if (!user?.id || !this.isPortfolioFlowMessage(message, sourceModule)) {
+    if (!user?.id) {
+      return "";
+    }
+
+    const normalized = this.normalizeTextForSearch(message);
+
+    if (this.isPortfolioCancelIntent(normalized)) {
+      await this.linaPortfolioSessionService.cancelActiveSession(user.id);
+      return "";
+    }
+
+    const explicitCreateIntent =
+      this.hasExplicitPortfolioCreateIntent(normalized);
+    const activeSession = explicitCreateIntent
+      ? null
+      : await this.getMarkedActivePortfolioSession(user.id);
+
+    const isContinuation =
+      Boolean(activeSession) &&
+      this.isPortfolioContinuationMessage(
+        normalized,
+        activeSession as NonNullable<typeof activeSession>,
+      );
+
+    if (!explicitCreateIntent && !isContinuation) {
       return "";
     }
 
@@ -916,13 +941,18 @@ export class LinaService {
         user.id,
         message,
       );
+
+      if (explicitCreateIntent) {
+        await this.markPortfolioCreateIntent(session.id, session.state);
+      }
+
       const enginePrompt =
         this.linaPortfolioEngineService.buildEnginePrompt(session);
       const recentMessages = session.state.userMessages || [];
       const recentConversation = recentMessages.slice(-8).join("\n");
 
       return [
-        "Bu bölüm Lina V5 portföy oluşturma motorunun yüksek öncelikli canlı bağlamıdır.",
+        "Bu bölüm yalnızca kullanıcının açıkça başlattığı aktif portföy oluşturma oturumudur.",
         "Kararı GPT değil backend engine verir. Lina yalnızca bu karara göre kısa ve doğal cevap yazar.",
         "",
         enginePrompt,
@@ -942,20 +972,19 @@ export class LinaService {
       ].join("\n");
     } catch (error) {
       return [
-        "Portföy V5 engine bağlamı hazırlanırken teknik hata oluştu.",
-        "Bu durumda kullanıcıdan aynı bilgileri tekrar tekrar isteme; kısa şekilde bir sonraki eksik bilgiyi sor.",
+        "Açıkça başlatılmış portföy oluşturma akışında teknik hata oluştu.",
+        "Kullanıcıdan aynı bilgileri tekrar isteme; kısa şekilde bir sonraki eksik bilgiyi sor.",
         `Teknik hata: ${error instanceof Error ? error.message : "UNKNOWN_PORTFOLIO_ENGINE_ERROR"}`,
       ].join("\n");
     }
   }
 
   private async rememberPortfolioAssistantMessage(
-    userMessage: string,
     assistantMessage: string,
-    sourceModule: LinaModuleName,
+    portfolioFlowActive: boolean,
     user?: LinaApiUser,
   ): Promise<void> {
-    if (!user?.id || !this.isPortfolioFlowMessage(userMessage, sourceModule)) {
+    if (!user?.id || !portfolioFlowActive) {
       return;
     }
 
@@ -969,50 +998,201 @@ export class LinaService {
     }
   }
 
-  private isPortfolioFlowMessage(
-    message: string,
-    sourceModule: LinaModuleName,
-  ): boolean {
-    const normalized = this.normalizeTextForSearch(message);
-
-    if (sourceModule === "pool") {
-      return true;
-    }
-
-    const portfolioKeywords = [
-      "ilan",
-      "portfoy",
-      "portföy",
-      "daire",
-      "konut",
-      "villa",
-      "arsa",
-      "tarla",
-      "dukkan",
-      "dükkan",
-      "isyeri",
-      "işyeri",
-      "iş yeri",
-      "satilik",
-      "satılık",
-      "kiralik",
-      "kiralık",
-      "metrekare",
-      "m2",
-      "katli",
-      "katlı",
-      "fiyat",
-      "tl",
-      "milyon",
-      "denizli",
-      "honaz",
-      "merkezefendi",
-      "pamukkale",
+  private hasExplicitPortfolioCreateIntent(normalizedMessage: string): boolean {
+    const phrases = [
+      "portfoy olustur",
+      "portfoy olusturalim",
+      "portfoy girisi yap",
+      "portfoy girelim",
+      "portfoy ekle",
+      "portfoy kaydet",
+      "yeni portfoy",
+      "ilan olustur",
+      "ilan olusturalim",
+      "ilan girisi yap",
+      "ilan girelim",
+      "ilan ekle",
+      "ilan kaydet",
+      "yeni ilan",
+      "stok girisi yap",
+      "yeni stok ekle",
     ];
 
-    return portfolioKeywords.some((keyword) =>
-      normalized.includes(this.normalizeTextForSearch(keyword)),
-    );
+    return phrases.some((phrase) => normalizedMessage.includes(phrase));
+  }
+
+  private isPortfolioCancelIntent(normalizedMessage: string): boolean {
+    const phrases = [
+      "portfoy islemini iptal et",
+      "portfoy olusturmayi iptal et",
+      "ilan olusturmayi iptal et",
+      "portfoy akisini kapat",
+      "ilan akisini kapat",
+    ];
+
+    return phrases.some((phrase) => normalizedMessage.includes(phrase));
+  }
+
+  private async getMarkedActivePortfolioSession(userId: string) {
+    const session = await this.prisma.linaPortfolioSession.findFirst({
+      where: {
+        userId,
+        mode: "PORTFOLIO_CREATE",
+        status: {
+          in: ["DRAFT", "READY_FOR_CONFIRMATION"],
+        },
+      },
+      orderBy: {
+        lastActivityAt: "desc",
+      },
+      select: {
+        id: true,
+        step: true,
+        city: true,
+        district: true,
+        neighborhood: true,
+        roomCount: true,
+        squareMeter: true,
+        floor: true,
+        buildingFloorCount: true,
+        price: true,
+        stateJson: true,
+      },
+    });
+
+    if (!session) {
+      return null;
+    }
+
+    const state = this.toPlainObject(session.stateJson);
+
+    if (state.lastIntent !== "PORTFOLIO_CREATE") {
+      return null;
+    }
+
+    return session;
+  }
+
+  private isPortfolioContinuationMessage(
+    normalizedMessage: string,
+    session: {
+      step: string;
+      city: string | null;
+      district: string | null;
+      neighborhood: string | null;
+      roomCount: string | null;
+      squareMeter: number | null;
+      floor: string | null;
+      buildingFloorCount: number | null;
+      price: number | null;
+    },
+  ): boolean {
+    if (!normalizedMessage) {
+      return false;
+    }
+
+    const generalConversationSignals = [
+      "hatirla",
+      "odaklaniyorum",
+      "konusalim",
+      "sohbet",
+      "nasil",
+      "neden",
+      "sence",
+      "anlat",
+      "nedir",
+      "kimdir",
+      "bugun",
+      "yarin",
+      "gorev",
+      "crm",
+      "havuz",
+      "forum",
+      "mesaj",
+      "yardimci ol",
+    ];
+
+    if (
+      generalConversationSignals.some((signal) =>
+        normalizedMessage.includes(signal),
+      )
+    ) {
+      return false;
+    }
+
+    if (session.step === "TRANSACTION_TYPE") {
+      return /\b(satilik|kiralik)\b/.test(normalizedMessage);
+    }
+
+    if (session.step === "LOCATION") {
+      const wordCount = normalizedMessage.split(" ").filter(Boolean).length;
+      return (
+        wordCount >= 1 &&
+        wordCount <= 4 &&
+        /^[a-z0-9\s]+$/.test(normalizedMessage)
+      );
+    }
+
+    if (session.step === "ROOM_AND_SIZE") {
+      return (
+        /\b\d+\s*\+\s*\d+\b/.test(normalizedMessage) ||
+        /\b\d+\s*(m2|metrekare)\b/.test(normalizedMessage)
+      );
+    }
+
+    if (session.step === "FLOOR_INFO") {
+      return (
+        /\b(zemin|giris|bodrum|cati|bahce)\b/.test(normalizedMessage) ||
+        /\b\d+\s*(inci|nci|kat|katli)\b/.test(normalizedMessage) ||
+        /^\d{1,2}$/.test(normalizedMessage)
+      );
+    }
+
+    if (session.step === "PRICE") {
+      return (
+        /\b\d[\d\s.,]*\s*(tl|try|milyon|bin)\b/.test(normalizedMessage) ||
+        /^\d[\d\s.,]*$/.test(normalizedMessage)
+      );
+    }
+
+    if (
+      session.step === "SUMMARY" ||
+      session.step === "CONFIRMATION"
+    ) {
+      return /^(evet|hayir|onayliyorum|onaylamiyorum|tamam|iptal)$/.test(
+        normalizedMessage,
+      );
+    }
+
+    return false;
+  }
+
+  private async markPortfolioCreateIntent(
+    sessionId: string,
+    stateValue: unknown,
+  ): Promise<void> {
+    const state = this.toPlainObject(stateValue);
+
+    await this.prisma.linaPortfolioSession.update({
+      where: {
+        id: sessionId,
+      },
+      data: {
+        stateJson: {
+          ...state,
+          lastIntent: "PORTFOLIO_CREATE",
+          updatedBy: "intent-router",
+        } as any,
+      },
+    });
+  }
+
+  private toPlainObject(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return {};
+    }
+
+    return value as Record<string, unknown>;
   }
 
   private normalizeTextForSearch(value: string): string {
@@ -1065,9 +1245,11 @@ export class LinaService {
       "# LINA V5 SYSTEM PROMPT",
       "",
       "Aşağıdaki bölümleri bu öncelik sırasıyla kullan.",
-      "Öncelik sırası: Core Prompt > Güvenlik/KVKK > Lina V5 Constitution > Portfolio Runtime Context > Role Prompt > Current Module > Live Database Context > Memory.",
+      "Öncelik sırası: Core Prompt > Güvenlik/KVKK > Lina V5 Constitution > Role Prompt > Current Module > Live Database Context > Memory. Portfolio Runtime Context yalnız aktifse uygulanır.",
       "Sistemde olmayan veriyi uydurma. Veri yoksa bunu kısa ve dürüst şekilde söyle.",
-      "Portföy oluşturma konuşmalarında karar mercii GPT değil Portfolio Runtime Context içindeki V5 Engine çıktısıdır.",
+      "Kullanıcı açıkça portföy veya ilan oluşturma istemedikçe portföy akışı başlatma.",
+      "Konum, fiyat, ilçe, mahalle veya gayrimenkul kelimesi tek başına portföy oluşturma niyeti değildir.",
+      "Portfolio Runtime Context aktifse karar mercii GPT değil bu bağlamdaki V5 Engine çıktısıdır.",
       "",
       "---",
       "",
@@ -1110,10 +1292,11 @@ export class LinaService {
       "",
       "# 8) FINAL ANSWER RULES",
       "- Her zaman Türkçe cevap ver.",
-      "- Cevapları kısa, net, premium ve sektör odaklı üret.",
-      "- Portföy oluşturma akışında aynı bilgiyi tekrar sorma.",
-      "- Kullanıcı kısa cevap verdiyse bunu önceki portföy bağlamıyla birleştir.",
-      "- Her cevapta en fazla bir sonraki eksik bilgiyi sor.",
+      "- Cevapları kısa, net, doğal ve kullanıcının gerçek niyetine uygun üret.",
+      "- Portfolio Runtime Context aktif değilse bağımsız sohbet et; portföy formu soruları sorma.",
+      "- Yalnız aktif portföy oluşturma akışında aynı bilgiyi tekrar sorma.",
+      "- Yalnız aktif portföy oluşturma akışında kısa cevabı portföy bağlamıyla birleştir.",
+      "- Yalnız aktif portföy oluşturma akışında en fazla bir sonraki eksik bilgiyi sor.",
       "- Telefon, e-posta, TC kimlik, IBAN, API key, token, şifre, özel müşteri notu ve özel mesaj içeriği paylaşma.",
       "- Başka kullanıcının özel verisine erişim varmış gibi davranma.",
       "- Kesin satış, kesin fiyat, kesin kazanç, kesin yatırım veya hukuki garanti verme.",
@@ -1671,9 +1854,10 @@ export class LinaService {
 
   private getFallbackV5Constitution(): string {
     return [
-      "Lina V5, EPH Platform içinde çalışan tek karakterli dijital operasyon asistanıdır.",
-      "Lina sakin, net, güven veren, profesyonel ve sektör odaklı konuşur.",
-      "Lina portföy oluşturma akışında karar vermez; V5 Engine çıktısını uygular.",
+      "Lina V5, EPH Platform içinde çalışan bağımsız dijital operasyon asistanıdır.",
+      "Lina sakin, net, güven veren ve kullanıcının konuşma niyetine uygun cevap verir.",
+      "Lina açık bir işlem talebi yoksa normal sohbet eder ve hiçbir modül akışını kendiliğinden başlatmaz.",
+      "Lina yalnız açıkça başlatılmış portföy oluşturma akışında V5 Engine çıktısını uygular.",
       "Lina aynı bilgiyi tekrar sormaz.",
       "Lina her cevapta yalnızca bir sonraki eksik bilgiyi ister.",
       "Lina uzun açıklama yapmaz, motivasyon konuşmasına kaçmaz, satış temsilcisi gibi davranmaz.",
@@ -1688,7 +1872,7 @@ export class LinaService {
       "KVKK, gizlilik, veri erişim sınırları ve platform güvenliği her şeyden önce gelir.",
       "Telefon, e-posta, açık adres, TC kimlik, IBAN, API key, token, şifre, özel müşteri notu ve özel mesaj içeriği paylaşmazsın.",
       "Başka kullanıcıların CRM, portföy, mesaj veya özel bilgilerine erişim varmış gibi davranmazsın.",
-      "Cevapların profesyonel, kısa, net ve sektör odaklı olmalı.",
+      "Cevapların profesyonel, kısa, net ve kullanıcının gerçek niyetine uygun olmalı.",
       "Kesin satış, kesin kazanç, kesin fiyat veya hukuki garanti vermezsin.",
     ].join("\n");
   }
