@@ -20,6 +20,7 @@ import {
   Sparkles,
   Tag,
   UserRound,
+  X,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -32,6 +33,8 @@ type NetworkUser = {
   role?: string | null;
   email?: string | null;
 };
+
+type ForumActionType = "MESSAGE" | "INTEREST" | "HELP";
 
 type NetworkPost = {
   id: string;
@@ -250,9 +253,6 @@ function visibilityLabel(value?: string | null) {
   return "Tüm EPH";
 }
 
-function buildPresetMessage(post: NetworkPost) {
-  return `Merhaba,\n\n"${post.title}" talebiyle ilgileniyorum.\n\nDetayları görüşebilir miyiz?`;
-}
 
 function criteriaFromPost(post: NetworkPost) {
   const text = normalizeText(
@@ -283,7 +283,9 @@ export default function NetworkPostDetailPage() {
   const postId = String(params?.id || "");
   const [post, setPost] = useState<NetworkPost | null>(null);
   const [loading, setLoading] = useState(true);
-  const [interestLoading, setInterestLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [selectedAction, setSelectedAction] =
+    useState<ForumActionType | null>(null);
   const [saved, setSaved] = useState(false);
 
   const owner = useMemo(() => getPostUser(post), [post]);
@@ -350,7 +352,7 @@ export default function NetworkPostDetailPage() {
     }
   };
 
-  const handleInterest = async () => {
+  const openForumAction = (action: ForumActionType) => {
     if (!post) return;
 
     if (!user?.id) {
@@ -367,30 +369,81 @@ export default function NetworkPostDetailPage() {
     }
 
     if (participantId === user.id) {
-      alert("Bu talep size ait.");
+      alert("Kendi Forum paylaşımınız için bu işlemi yapamazsınız.");
       return;
     }
 
+    setSelectedAction(action);
+  };
+
+  const confirmForumAction = async () => {
+    if (!post || !selectedAction || actionLoading) return;
+
+    const endpoint =
+      selectedAction === "MESSAGE"
+        ? "message"
+        : selectedAction === "INTEREST"
+          ? "interest"
+          : "help";
+
+    const payload =
+      selectedAction === "MESSAGE"
+        ? {
+            message: `Merhaba, "${post.title}" başlıklı Forum paylaşımınız hakkında görüşmek istiyorum.`,
+          }
+        : {
+            note:
+              selectedAction === "INTEREST"
+                ? `"${post.title}" başlıklı paylaşımınızla ilgileniyorum.`
+                : `"${post.title}" başlıklı paylaşımınız için yardımcı olabilirim.`,
+          };
+
     try {
-      setInterestLoading(true);
+      setActionLoading(true);
 
-      const res = await api.post("/conversations/start", {
-        creatorId: user.id,
-        participantId,
-        postId: post.id,
-        title: "İLGİLENİYORUM",
-      });
+      const response = await api.post(
+        `/network/posts/${post.id}/${endpoint}`,
+        payload,
+      );
 
-      const searchParams = new URLSearchParams({
-        title: "İLGİLENİYORUM",
-        draft: buildPresetMessage(post),
-      });
+      const remainingBalance =
+        response.data?.remainingBalance ??
+        response.data?.balance ??
+        null;
 
-      router.push(`/messages/${res.data.id}?${searchParams.toString()}`);
-    } catch {
-      alert("Görüşme başlatılamadı.");
+      setSelectedAction(null);
+
+      if (selectedAction === "MESSAGE") {
+        const conversationId =
+          response.data?.conversationId ||
+          response.data?.conversation?.id;
+
+        router.push(
+          conversationId
+            ? `/messages/${conversationId}`
+            : "/messages",
+        );
+
+        return;
+      }
+
+      const actionLabel =
+        selectedAction === "INTEREST"
+          ? "İlgileniyorum bildirimi"
+          : "Yardımcı olabilirim bildirimi";
+
+      alert(
+        remainingBalance === null
+          ? `${actionLabel} gönderildi.`
+          : `${actionLabel} gönderildi. Kalan bakiyeniz ${remainingBalance} kontör.`,
+      );
+    } catch (error: any) {
+      alert(
+        error?.response?.data?.message ||
+          "Forum işlemi tamamlanamadı.",
+      );
     } finally {
-      setInterestLoading(false);
+      setActionLoading(false);
     }
   };
 
@@ -467,12 +520,12 @@ export default function NetworkPostDetailPage() {
 
             <button
               type="button"
-              onClick={handleInterest}
-              disabled={interestLoading}
+              onClick={() => openForumAction("MESSAGE")}
+              disabled={actionLoading}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] border border-[#DDE7F3] bg-white text-[#06194A] disabled:opacity-60"
               aria-label="Görüşme başlat"
             >
-              {interestLoading ? (
+              {actionLoading ? (
                 <Loader2 size={17} className="animate-spin" />
               ) : (
                 <MessageCircle size={17} />
@@ -547,11 +600,11 @@ export default function NetworkPostDetailPage() {
 
                 <button
                   type="button"
-                  onClick={handleInterest}
-                  disabled={interestLoading}
+                  onClick={() => openForumAction("INTEREST")}
+                  disabled={actionLoading}
                   className="flex h-9 items-center justify-center gap-1 rounded-[14px] bg-[#1557D6] px-1 text-[9.5px] font-black text-white shadow-[0_8px_16px_rgba(21,87,214,0.22)] disabled:opacity-70"
                 >
-                  {interestLoading ? (
+                  {actionLoading ? (
                     <Loader2 size={13} className="animate-spin" />
                   ) : (
                     <HeartHandshake size={13} />
@@ -647,39 +700,75 @@ export default function NetworkPostDetailPage() {
 
         <section className="grid grid-cols-1 gap-1.5">
           <div className="rounded-[20px] border border-white bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-            <h3 className="text-left text-[12.5px] font-black text-[#06194A]">
-              İletişim
+            <h3 className="text-center text-[12.5px] font-black text-[#06194A]">
+              Forum İşlemleri
             </h3>
+
+            <p className="mt-1 text-center text-[9.5px] font-bold text-[#64748B]">
+              Okuma, paylaşım ve takip ücretsizdir.
+            </p>
+
             <div className="mt-2 grid grid-cols-2 gap-1.5">
               <button
                 type="button"
-                onClick={handleInterest}
-                disabled={interestLoading}
-                className="flex h-11 items-center justify-center gap-1 rounded-[16px] bg-[#1557D6] px-2 text-[11px] font-black text-white disabled:opacity-70"
+                onClick={() => openForumAction("MESSAGE")}
+                disabled={actionLoading}
+                className="flex min-h-11 items-center justify-center gap-1 rounded-[16px] bg-[#1557D6] px-2 text-[11px] font-black text-white disabled:opacity-60"
               >
-                {interestLoading ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <MessageCircle size={14} />
-                )}
-                Mesajlaş
+                <MessageCircle size={14} />
+                Mesaj 3K
               </button>
+
+              <button
+                type="button"
+                onClick={() => openForumAction("INTEREST")}
+                disabled={actionLoading}
+                className="flex min-h-11 items-center justify-center gap-1 rounded-[16px] border-2 border-[#2563EB] bg-[#EFF6FF] px-2 text-[11px] font-black text-[#1D4ED8] disabled:opacity-60"
+              >
+                <CheckCircle2 size={14} />
+                İlgilen 10K
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openForumAction("HELP")}
+                disabled={actionLoading}
+                className="flex min-h-11 items-center justify-center gap-1 rounded-[16px] bg-emerald-600 px-2 text-[11px] font-black text-white disabled:opacity-60"
+              >
+                <HeartHandshake size={15} />
+                Yardımcı Ol 10K
+              </button>
+
               <button
                 type="button"
                 onClick={handleSave}
-                className={`flex h-11 items-center justify-center gap-1 rounded-[16px] border px-2 text-[11px] font-black ${
+                disabled={actionLoading}
+                className={`flex min-h-11 items-center justify-center gap-1 rounded-[16px] border px-2 text-[11px] font-black disabled:opacity-60 ${
                   saved
                     ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
                     : "border-[#DDE7F3] bg-[#F8FBFF] text-[#06194A]"
                 }`}
               >
-                <Bookmark size={14} fill={saved ? "currentColor" : "none"} />
+                <Bookmark
+                  size={14}
+                  fill={saved ? "currentColor" : "none"}
+                />
                 {saved ? "Kaydedildi" : "Kaydet"}
               </button>
             </div>
           </div>
         </section>
       </div>
+
+      {selectedAction && post && (
+        <ForumActionModal
+          action={selectedAction}
+          post={post}
+          busy={actionLoading}
+          onClose={() => setSelectedAction(null)}
+          onConfirm={confirmForumAction}
+        />
+      )}
 
       <button
         type="button"
@@ -691,6 +780,116 @@ export default function NetworkPostDetailPage() {
         <span className="mt-0.5 text-[10px] font-black">Lina</span>
       </button>
     </main>
+  );
+}
+
+
+function ForumActionModal({
+  action,
+  post,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  action: ForumActionType;
+  post: NetworkPost;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const config = {
+    MESSAGE: {
+      title: "Forum Mesajı",
+      cost: 3,
+      confirmText: "3 Kontör Harca ve Mesaj Gönder",
+    },
+    INTEREST: {
+      title: "İlgileniyorum Bildirimi",
+      cost: 10,
+      confirmText: "10 Kontör Harca ve İlgilen",
+    },
+    HELP: {
+      title: "Yardımcı Olabilirim",
+      cost: 10,
+      confirmText: "10 Kontör Harca ve Bildir",
+    },
+  }[action];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-3 py-4">
+      <section className="w-[min(94vw,430px)] overflow-hidden rounded-[24px] border-2 border-[#C7D6E8] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+        <div className="relative px-14 pb-3 pt-4 text-center">
+          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+            Forum Kontör İşlemi
+          </p>
+
+          <h2 className="mt-1 text-[19px] font-black leading-tight text-[#1F2937]">
+            {config.title}
+          </h2>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-[14px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB] disabled:opacity-60"
+            aria-label="Kapat"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="px-3 pb-3">
+          <div className="rounded-[18px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+              Paylaşım
+            </p>
+
+            <p className="mt-1 break-words text-[12px] font-black leading-5 text-[#1F2937]">
+              {post.title}
+            </p>
+          </div>
+
+          <div className="mt-2 rounded-[18px] border-2 border-[#C7D6E8] bg-white p-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#2563EB]">
+              İşlem Özeti
+            </p>
+
+            <p className="mt-1 text-[12px] font-bold leading-5 text-[#475569]">
+              Bu işlem {config.cost} kontör harcar. Onaydan sonra paylaşım
+              sahibine bildirim gönderilir ve işlem cüzdan hareketlerine
+              kaydedilir.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 border-t border-[#D7E3F2] p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="min-h-12 rounded-[16px] border-2 border-[#C7D6E8] bg-white px-2 text-[12px] font-black text-[#2563EB] disabled:opacity-60"
+          >
+            Vazgeç
+          </button>
+
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className="min-h-12 rounded-[16px] bg-[#2563EB] px-2 text-[11px] font-black leading-4 text-white disabled:opacity-60"
+          >
+            {busy ? (
+              <span className="flex items-center justify-center gap-1">
+                <Loader2 size={14} className="animate-spin" />
+                İşleniyor
+              </span>
+            ) : (
+              config.confirmText
+            )}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
