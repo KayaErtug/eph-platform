@@ -142,6 +142,54 @@ export class LinaService {
     );
     const portfolioFlowActive = Boolean(portfolioRuntimeContext.trim());
     const chatPreparation = await this.safePrepareChat(user, sourceModule);
+    const deterministicPortfolioReply =
+      this.extractPortfolioExactReply(portfolioRuntimeContext);
+
+    if (deterministicPortfolioReply) {
+      const outputFilter = this.linaKvkkService.filterText(
+        deterministicPortfolioReply,
+      );
+      const kvkkFiltered = outputFilter.filtered || inputFilter.filtered;
+
+      await this.rememberPortfolioAssistantMessage(
+        outputFilter.safeText,
+        portfolioFlowActive,
+        user,
+      );
+
+      await this.safeRecordConversation({
+        preparation: chatPreparation,
+        user,
+        sourceModule,
+        userMessage: safeUserMessage,
+        assistantMessage: outputFilter.safeText,
+        inputTokenCount: 0,
+        outputTokenCount: 0,
+      });
+
+      this.linaAuditService.log({
+        userId: user?.id,
+        role: user?.role,
+        module: sourceModule,
+        action: "lina_portfolio_flow",
+        result: kvkkFiltered ? "filtered" : "success",
+        riskLevel: kvkkFiltered ? 2 : 0,
+        kvkkFiltered,
+      });
+
+      return {
+        success: true,
+        message: outputFilter.safeText,
+        provider: "local",
+        kvkkFiltered,
+        detectedTypes: Array.from(
+          new Set([
+            ...inputFilter.detectedTypes,
+            ...outputFilter.detectedTypes,
+          ]),
+        ),
+      };
+    }
 
     try {
       const provider = this.getAiProvider();
@@ -960,14 +1008,12 @@ export class LinaService {
         "SON KULLANICI MESAJLARI",
         recentConversation || "Henüz kayıtlı mesaj yok.",
         "",
-        "V5 CEVAP KURALLARI",
-        "- Engine alanı dolu gösteriyorsa kullanıcıdan aynı alanı tekrar isteme.",
-        "- Eksik alanlardan yalnızca ilk mantıklı bilgiyi sor.",
-        "- Kullanıcı 3+1 dediyse oda sayısı verilmiştir; tekrar oda sayısı sorma.",
-        "- Kullanıcı satılık dediyse işlem türü verilmiştir; tekrar satılık mı kiralık mı diye sorma.",
-        "- Kullanıcı daire dediyse portföy türü verilmiştir; tekrar daire/villa/arsa diye sorma.",
-        "- Konum bilgisi eksikse sadece eksik parçayı sor; ilçe veya mahalle uydurma.",
-        "- Her cevap tek sonraki eksik bilgiye odaklansın.",
+        "MANUEL PORTFÖY FORMU KURALLARI",
+        "- Engine tarafından üretilen PORTFOLIO_EXACT_REPLY metnini değiştirme.",
+        "- Alan sırası: Portföy Adı, Şehir, İlçe, Mahalle/Köy/Mevki, Mülk Tipi, Alt Kategori, Durum, Oda Sayısı, Alan, Bina Yaşı, Bulunduğu Kat, Toplam Kat, Ada, Parsel, Daire/Bölüm No, Para Birimi, Fiyat, Özet ve Onay.",
+        "- Kullanıcıdan aynı alanı tekrar isteme.",
+        "- Villa için daire ifadesi kullanma.",
+        "- Her cevap yalnızca sıradaki tek alanı sorsun.",
         "- 'Başka nasıl yardımcı olabilirim?' deme.",
       ].join("\n");
     } catch (error) {
@@ -1120,51 +1166,34 @@ export class LinaService {
       return false;
     }
 
-    if (session.step === "TRANSACTION_TYPE") {
-      return /\b(satilik|kiralik)\b/.test(normalizedMessage);
-    }
-
-    if (session.step === "LOCATION") {
-      const wordCount = normalizedMessage.split(" ").filter(Boolean).length;
-      return (
-        wordCount >= 1 &&
-        wordCount <= 4 &&
-        /^[a-z0-9\s]+$/.test(normalizedMessage)
-      );
-    }
-
-    if (session.step === "ROOM_AND_SIZE") {
-      return (
-        /\b\d+\s*\+\s*\d+\b/.test(normalizedMessage) ||
-        /\b\d+\s*(m2|metrekare)\b/.test(normalizedMessage)
-      );
-    }
-
-    if (session.step === "FLOOR_INFO") {
-      return (
-        /\b(zemin|giris|bodrum|cati|bahce)\b/.test(normalizedMessage) ||
-        /\b\d+\s*(inci|nci|kat|katli)\b/.test(normalizedMessage) ||
-        /^\d{1,2}$/.test(normalizedMessage)
-      );
-    }
-
-    if (session.step === "PRICE") {
-      return (
-        /\b\d[\d\s.,]*\s*(tl|try|milyon|bin)\b/.test(normalizedMessage) ||
-        /^\d[\d\s.,]*$/.test(normalizedMessage)
-      );
-    }
-
     if (
       session.step === "SUMMARY" ||
       session.step === "CONFIRMATION"
     ) {
-      return /^(evet|hayir|onayliyorum|onaylamiyorum|tamam|iptal)$/.test(
+      return /^(evet|hayir|onayliyorum|onaylamiyorum|onayla|tamam|dogru|yanlis|duzelt|iptal)$/.test(
         normalizedMessage,
       );
     }
 
-    return false;
+    const wordCount = normalizedMessage.split(" ").filter(Boolean).length;
+
+    return (
+      normalizedMessage.length <= 180 &&
+      wordCount >= 1 &&
+      wordCount <= 20
+    );
+  }
+
+  private extractPortfolioExactReply(
+    runtimeContext: string,
+  ): string | null {
+    const match = String(runtimeContext || "").match(
+      /PORTFOLIO_EXACT_REPLY_START\s*([\s\S]*?)\s*PORTFOLIO_EXACT_REPLY_END/,
+    );
+
+    const reply = match?.[1]?.trim();
+
+    return reply || null;
   }
 
   private async markPortfolioCreateIntent(

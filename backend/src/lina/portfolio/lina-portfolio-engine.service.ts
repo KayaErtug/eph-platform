@@ -3,24 +3,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import {
+  LinaPortfolioDraftInput,
   LinaPortfolioSessionContext,
   LinaPortfolioSessionService,
 } from './lina-portfolio-session.service';
-
-type ExtractedPortfolioFields = Partial<{
-  title: string | null;
-  propertyType: string | null;
-  transactionType: string | null;
-  city: string | null;
-  district: string | null;
-  neighborhood: string | null;
-  roomCount: string | null;
-  squareMeter: number | null;
-  floor: string | null;
-  buildingFloorCount: number | null;
-  price: number | null;
-  currency: string | null;
-}>;
 
 type CityRecord = {
   name: string;
@@ -50,7 +36,28 @@ export class LinaPortfolioEngineService {
 
     await this.linaPortfolioSessionService.appendUserMessage(userId, message);
 
-    const extractedFields = this.extractFieldsFromMessage(message, currentSession);
+    const confirmation = this.extractConfirmation(message);
+
+    if (
+      (currentSession.step === 'SUMMARY' ||
+        currentSession.step === 'CONFIRMATION') &&
+      confirmation === 'APPROVED'
+    ) {
+      return this.linaPortfolioSessionService.markApproved(userId);
+    }
+
+    if (
+      (currentSession.step === 'SUMMARY' ||
+        currentSession.step === 'CONFIRMATION') &&
+      confirmation === 'REJECTED'
+    ) {
+      return this.linaPortfolioSessionService.markRejected(userId);
+    }
+
+    const extractedFields = this.extractFieldsFromMessage(
+      message,
+      currentSession,
+    );
 
     if (Object.keys(extractedFields).length > 0) {
       return this.linaPortfolioSessionService.updateExtractedFields(
@@ -63,307 +70,356 @@ export class LinaPortfolioEngineService {
   }
 
   buildEnginePrompt(session: LinaPortfolioSessionContext): string {
-    const nextQuestion = this.getNextQuestion(session);
-    const hasStarted = this.hasMeaningfulPortfolioStart(session);
+    const exactReply = this.buildExactReply(session);
 
     return [
-      'LINA PORTFÖY V5 ENGINE',
-      'Kararı backend verir. Lina yalnızca kullanıcıya doğal ve kısa cevap yazar.',
+      'LINA PORTFÖY MANUEL FORM ENGINE V1',
+      'Bu akış EPH manuel portföy giriş formunun birebir sırasını kullanır.',
+      'Kararı backend verir. GPT alan sırasını değiştiremez.',
       '',
-      `Portföy türü: ${session.propertyType || 'Eksik'}`,
-      `İşlem türü: ${session.transactionType || 'Eksik'}`,
-      `İl: ${session.city || 'Eksik'}`,
+      `Portföy adı: ${session.title || (session.titleSkipped ? 'Geçildi' : 'Eksik')}`,
+      `Şehir: ${session.city || 'Eksik'}`,
       `İlçe: ${session.district || 'Eksik'}`,
-      `Mahalle: ${session.neighborhood || 'Eksik'}`,
-      `Oda sayısı: ${session.roomCount || 'Eksik'}`,
-      `Metrekare: ${session.squareMeter ?? 'Eksik'}`,
-      `Bulunduğu kat: ${session.floor || 'Eksik'}`,
-      `Bina kat sayısı: ${session.buildingFloorCount ?? 'Eksik'}`,
-      `Fiyat: ${session.price ?? 'Eksik'} ${session.currency}`,
+      `Mahalle / Köy / Mevki: ${session.neighborhood || 'Eksik'}`,
+      `Mülk tipi: ${session.mainCategory || 'Eksik'}`,
+      `Alt kategori: ${session.propertyType || 'Eksik'}`,
+      `Durum: ${session.transactionType || 'Eksik'}`,
+      `Oda sayısı: ${session.roomCount || 'Uygulanmıyor / Eksik'}`,
+      `Alan: ${session.squareMeter ?? 'Eksik'}`,
+      `Bina yaşı: ${session.buildingAge || 'Uygulanmıyor / Eksik'}`,
+      `Bulunduğu kat: ${session.floor || 'Uygulanmıyor / Eksik'}`,
+      `Toplam kat sayısı: ${session.buildingFloorCount ?? 'Uygulanmıyor / Eksik'}`,
+      `Ada No: ${session.adaNo || (session.adaNoSkipped ? 'Geçildi' : 'Eksik')}`,
+      `Parsel No: ${session.parselNo || (session.parselNoSkipped ? 'Geçildi' : 'Eksik')}`,
+      `Daire / Bölüm No: ${session.unitNumber || (session.unitNumberSkipped ? 'Geçildi' : 'Eksik')}`,
+      `Para birimi: ${session.currencyConfirmed ? session.currency : 'Eksik'}`,
+      `Fiyat: ${session.price ?? 'Eksik'}`,
       `Sıradaki adım: ${session.step}`,
       `Eksik alanlar: ${session.missingFields.length ? session.missingFields.join(', ') : 'Yok'}`,
-      `Engine tarafından önerilen tek soru: ${nextQuestion}`,
       '',
-      'İnsansı tepki kuralı:',
-      hasStarted
-        ? '- Bu oturum zaten başladıysa gereksiz “Elbette/Tabii” girişini tekrar etme. Kayıt cümlesi + tek soru ile ilerle.'
-        : '- Bu yeni portföy akışının ilk cevabıysa kısa ve doğal kabul cümlesiyle başla. Örnek: “Elbette Tamer Bey. Daire ilanını oluşturmaya başlıyorum.”',
+      'KESİN KURALLAR',
+      '- Kullanıcıya yalnız sıradaki tek alanı sor.',
+      '- Daha önce verilen alanı tekrar sorma.',
+      '- Villa için “daire kaçıncı katta” deme; “gayrimenkulün bulunduğu kat” de.',
+      '- Mülk tipi ve alt kategori birbirinden ayrıdır.',
+      '- Mahalle bilgisinden sonra harita doğrulamasının kayıt ekranında yapılacağını tek cümleyle belirt.',
+      '- Kullanıcı “geç” derse yalnız opsiyonel alanı geç.',
+      '- Özet aşamasından önce onay isteme.',
+      '- Kullanıcı onay vermeden oturumu tamamlanmış sayma.',
       '',
-      'Kesin kurallar:',
-      '- Kullanıcı daha önce verdiği bilgiyi tekrar sorma.',
-      '- Eksik alanlardan yalnızca Engine tarafından önerilen tek soruyu sor.',
-      '- Oda sayısı varsa tekrar oda sayısı sorma.',
-      '- İşlem türü SATILIK veya KIRALIK ise tekrar satılık mı kiralık mı diye sorma.',
-      '- Portföy türü DAIRE ise tekrar daire/villa/arsa diye sorma.',
-      '- Konum bilgisi varsa tekrar konum sorma.',
-      '- Kullanıcı il, ilçe veya mahalle bilgisi verdiyse “kaydetmemi ister misiniz?” diye sorma; engine kaydettiyse direkt kaydettiğini söyle.',
-      '- Kullanıcı beklenen alan için kısa sayı verdiyse ve Engine kaydettiyse o bilgiyi sahiplen.',
-      '- Cevap kısa, sıcak ve operasyonel olsun.',
+      'PORTFOLIO_EXACT_REPLY_START',
+      exactReply,
+      'PORTFOLIO_EXACT_REPLY_END',
+      'Yukarıdaki cevap kullanıcıya aynen verilmelidir.',
     ].join('\n');
   }
 
-  private getNextQuestion(session: LinaPortfolioSessionContext): string {
-    const missing = session.missingFields || [];
-
-    if (missing.includes('İşlem Türü')) {
-      return 'İşlem türü satılık mı, kiralık mı olacak?';
+  buildExactReply(session: LinaPortfolioSessionContext): string {
+    if (session.step === 'CREATED') {
+      return 'Portföy bilgilerini onayladım. Portföy taslağınız hazır.';
     }
 
-    if (missing.includes('İl')) {
-      return 'İlan hangi ilde?';
+    if (session.step === 'SUMMARY' || session.step === 'CONFIRMATION') {
+      return `${this.buildSummary(session)}\n\nBilgileri onaylıyor musunuz?`;
     }
 
-    if (missing.includes('İlçe')) {
-      return 'İlçe bilgisini paylaşır mısınız?';
+    const question = this.getNextQuestion(session);
+    const userMessageCount = session.state.userMessages?.length || 0;
+
+    if (userMessageCount <= 1 && session.step === 'TITLE') {
+      return `Portföy girişine başlayalım. ${question}`;
     }
 
-    if (missing.includes('Mahalle')) {
-      return 'Mahalle bilgisini paylaşır mısınız?';
+    if (session.step === 'MAIN_CATEGORY' && session.neighborhood) {
+      return `Konum bilgisini kaydettim. Harita konumu portföy kayıt ekranında doğrulanacak. ${question}`;
     }
 
-    if (missing.includes('Oda Sayısı')) {
-      return 'Oda sayısı nedir?';
-    }
-
-    if (missing.includes('Metrekare')) {
-      return 'Metrekare bilgisini paylaşır mısınız?';
-    }
-
-    if (missing.includes('Bulunduğu Kat')) {
-      return 'Daire kaçıncı katta?';
-    }
-
-    if (missing.includes('Bina Kat Sayısı')) {
-      return 'Bina toplam kaç katlı?';
-    }
-
-    if (missing.includes('Fiyat')) {
-      return 'Satış fiyatını paylaşır mısınız?';
-    }
-
-    return 'Bilgiler tamamlandı. Onaylıyor musunuz?';
+    return `Kaydettim. ${question}`;
   }
 
-  private hasMeaningfulPortfolioStart(session: LinaPortfolioSessionContext): boolean {
-    const state = session.state || {};
-    const userMessageCount = state.userMessages?.length || 0;
+  private getNextQuestion(session: LinaPortfolioSessionContext): string {
+    switch (session.step) {
+      case 'TITLE':
+        return 'Bu portföye bir isim vermek ister misiniz? İstemiyorsanız “geç” diyebilirsiniz.';
+      case 'CITY':
+        return 'Şehir bilgisini paylaşır mısınız?';
+      case 'DISTRICT':
+        return 'İlçe bilgisini paylaşır mısınız?';
+      case 'NEIGHBORHOOD':
+        return 'Mahalle, köy veya mevki bilgisini paylaşır mısınız?';
+      case 'MAIN_CATEGORY':
+        return 'Mülk tipi nedir? Örneğin konut, ticari, arsa/arazi, sanayi veya turistik tesis.';
+      case 'SUB_CATEGORY':
+        return 'Alt kategoriyi paylaşır mısınız? Örneğin daire, villa, rezidans, arsa, tarla, ofis veya dükkan.';
+      case 'TRANSACTION_TYPE':
+        return 'Portföyün durumu nedir? Örneğin satılık, kiralık, günlük kiralık veya devren.';
+      case 'ROOM_COUNT':
+        return 'Oda sayısını paylaşır mısınız?';
+      case 'SQUARE_METER':
+        return 'Alan bilgisini metrekare olarak paylaşır mısınız?';
+      case 'BUILDING_AGE':
+        return 'Bina yaşını paylaşır mısınız?';
+      case 'FLOOR':
+        return 'Gayrimenkulün bulunduğu katı paylaşır mısınız?';
+      case 'BUILDING_FLOOR_COUNT':
+        return 'Toplam kat sayısını paylaşır mısınız?';
+      case 'ADA_NO':
+        return this.isLandPortfolio(session)
+          ? 'Ada numarasını paylaşır mısınız?'
+          : 'Ada numarası varsa paylaşır mısınız? Yoksa “geç” diyebilirsiniz.';
+      case 'PARSEL_NO':
+        return this.isLandPortfolio(session)
+          ? 'Parsel numarasını paylaşır mısınız?'
+          : 'Parsel numarası varsa paylaşır mısınız? Yoksa “geç” diyebilirsiniz.';
+      case 'UNIT_NUMBER':
+        return 'Daire veya bölüm numarası varsa paylaşır mısınız? Yoksa “geç” diyebilirsiniz.';
+      case 'CURRENCY':
+        return 'Para birimini seçelim: Türk Lirası, Amerikan Doları, Euro veya İngiliz Sterlini?';
+      case 'PRICE':
+        return 'Fiyat bilgisini paylaşır mısınız?';
+      default:
+        return 'Bilgileri onaylıyor musunuz?';
+    }
+  }
 
-    return userMessageCount > 1;
+  private buildSummary(session: LinaPortfolioSessionContext): string {
+    const parts = [
+      session.title ? `Portföy adı: ${session.title}` : null,
+      `Konum: ${[session.city, session.district, session.neighborhood].filter(Boolean).join(' / ')}`,
+      `Mülk tipi: ${session.mainCategory}`,
+      `Alt kategori: ${session.propertyType}`,
+      `Durum: ${session.transactionType}`,
+      session.roomCount ? `Oda sayısı: ${session.roomCount}` : null,
+      `Alan: ${session.squareMeter} m²`,
+      session.buildingAge ? `Bina yaşı: ${session.buildingAge}` : null,
+      session.floor ? `Bulunduğu kat: ${session.floor}` : null,
+      session.buildingFloorCount
+        ? `Toplam kat: ${session.buildingFloorCount}`
+        : null,
+      session.adaNo ? `Ada No: ${session.adaNo}` : null,
+      session.parselNo ? `Parsel No: ${session.parselNo}` : null,
+      session.unitNumber
+        ? `Daire / Bölüm No: ${session.unitNumber}`
+        : null,
+      `Fiyat: ${this.formatPrice(session.price)} ${this.getCurrencyLabel(session.currency)}`,
+    ].filter(Boolean);
+
+    return ['Portföy özeti:', ...parts.map((part) => `• ${part}`)].join(
+      '\n',
+    );
   }
 
   private extractFieldsFromMessage(
     message: string,
     session: LinaPortfolioSessionContext,
-  ): ExtractedPortfolioFields {
+  ): LinaPortfolioDraftInput {
     const normalized = this.normalize(message);
-    const fields: ExtractedPortfolioFields = {};
-    const expectedField = this.getExpectedField(session);
-    const plainNumber = this.extractPlainNumber(message);
+    const fields: LinaPortfolioDraftInput = {};
+    const step = session.step;
 
-    Object.assign(
-      fields,
-      this.extractContextAwareNumber(plainNumber, expectedField),
-    );
+    if (this.isSkipIntent(normalized)) {
+      if (step === 'TITLE') fields.titleSkipped = true;
+      if (step === 'ADA_NO' && !this.isLandPortfolio(session)) {
+        fields.adaNoSkipped = true;
+      }
+      if (step === 'PARSEL_NO' && !this.isLandPortfolio(session)) {
+        fields.parselNoSkipped = true;
+      }
+      if (step === 'UNIT_NUMBER') fields.unitNumberSkipped = true;
+      return fields;
+    }
 
-    Object.assign(
-      fields,
-      this.extractContextAwareLocation(message, expectedField),
-    );
+    const category = this.extractCategory(normalized);
+    if (category.mainCategory) fields.mainCategory = category.mainCategory;
+    if (category.propertyType) fields.propertyType = category.propertyType;
 
     const transactionType = this.extractTransactionType(normalized);
-    if (transactionType) {
-      fields.transactionType = transactionType;
-    }
-
-    const propertyType = this.extractPropertyType(normalized);
-    if (propertyType) {
-      fields.propertyType = propertyType;
-    }
+    if (transactionType) fields.transactionType = transactionType;
 
     const roomCount = this.extractRoomCount(message);
-    if (roomCount) {
-      fields.roomCount = roomCount;
+    if (roomCount) fields.roomCount = roomCount;
+
+    const squareMeter = this.extractSquareMeter(message, step);
+    if (squareMeter !== null) fields.squareMeter = squareMeter;
+
+    const buildingAge = this.extractBuildingAge(message, step);
+    if (buildingAge) fields.buildingAge = buildingAge;
+
+    const floor = this.extractFloor(message, step);
+    if (floor) fields.floor = floor;
+
+    const buildingFloorCount = this.extractBuildingFloorCount(message, step);
+    if (buildingFloorCount !== null) {
+      fields.buildingFloorCount = buildingFloorCount;
     }
 
-    const squareMeter = this.extractSquareMeter(message);
-    if (squareMeter) {
-      fields.squareMeter = squareMeter;
+    const currency = this.extractCurrency(normalized);
+    if (currency) {
+      fields.currency = currency;
+      fields.currencyConfirmed = true;
     }
 
-    const floorInfo = this.extractFloorInfo(message);
-    if (floorInfo.floor) {
-      fields.floor = floorInfo.floor;
+    const price = this.extractPrice(message, step);
+    if (price !== null) fields.price = price;
+
+    if (step === 'TITLE' && !fields.titleSkipped) {
+      const title = this.extractTitle(message, normalized);
+      if (title) fields.title = title;
     }
 
-    if (floorInfo.buildingFloorCount) {
-      fields.buildingFloorCount = floorInfo.buildingFloorCount;
+    if (step === 'CITY' && !fields.city) {
+      const city = this.extractKnownCity(normalized) || this.cleanFreeText(message);
+      if (city) fields.city = this.toTitleCase(city);
     }
 
-    const price = this.extractPrice(message);
-    if (price) {
-      fields.price = price;
-      fields.currency = 'TRY';
+    if (step === 'DISTRICT' && !fields.district) {
+      const value = this.cleanFreeText(message);
+      if (value) fields.district = this.toTitleCase(value);
     }
 
-    const city = this.extractKnownCity(normalized);
-    if (city) {
-      fields.city = city;
+    if (step === 'NEIGHBORHOOD' && !fields.neighborhood) {
+      const value = this.cleanLocationText(message);
+      if (value) fields.neighborhood = this.toTitleCase(value);
     }
 
-    const simpleNeighborhood = this.extractSimpleNeighborhood(message, fields.city || session.city);
-    if (simpleNeighborhood) {
-      fields.neighborhood = simpleNeighborhood;
+    if (step === 'MAIN_CATEGORY' && !fields.mainCategory) {
+      const value = this.cleanFreeText(message);
+      if (value) fields.mainCategory = this.normalizeEnumValue(value);
+    }
+
+    if (step === 'SUB_CATEGORY' && !fields.propertyType) {
+      const value = this.cleanFreeText(message);
+      if (value) fields.propertyType = this.normalizeEnumValue(value);
+    }
+
+    if (step === 'TRANSACTION_TYPE' && !fields.transactionType) {
+      const value = this.cleanFreeText(message);
+      if (value) fields.transactionType = this.normalizeEnumValue(value);
+    }
+
+    if (step === 'ADA_NO') {
+      const value = this.extractIdentifier(message);
+      if (value) fields.adaNo = value;
+    }
+
+    if (step === 'PARSEL_NO') {
+      const value = this.extractIdentifier(message);
+      if (value) fields.parselNo = value;
+    }
+
+    if (step === 'UNIT_NUMBER') {
+      const value = this.extractIdentifier(message);
+      if (value) fields.unitNumber = value;
     }
 
     return fields;
   }
 
-  private getExpectedField(session: LinaPortfolioSessionContext): string | null {
-    const missing = session.missingFields || [];
+  private extractConfirmation(
+    message: string,
+  ): 'APPROVED' | 'REJECTED' | null {
+    const normalized = this.normalize(message);
 
-    if (missing.includes('İşlem Türü')) {
-      return 'transactionType';
+    if (
+      /^(evet|onayliyorum|onayla|tamam|dogru|uygun)$/.test(normalized)
+    ) {
+      return 'APPROVED';
     }
 
-    if (missing.includes('İl')) {
-      return 'city';
-    }
-
-    if (missing.includes('İlçe')) {
-      return 'district';
-    }
-
-    if (missing.includes('Mahalle')) {
-      return 'neighborhood';
-    }
-
-    if (missing.includes('Oda Sayısı')) {
-      return 'roomCount';
-    }
-
-    if (missing.includes('Metrekare')) {
-      return 'squareMeter';
-    }
-
-    if (missing.includes('Bulunduğu Kat')) {
-      return 'floor';
-    }
-
-    if (missing.includes('Bina Kat Sayısı')) {
-      return 'buildingFloorCount';
-    }
-
-    if (missing.includes('Fiyat')) {
-      return 'price';
+    if (
+      /^(hayir|onaylamiyorum|yanlis|duzelt|degistirelim)$/.test(normalized)
+    ) {
+      return 'REJECTED';
     }
 
     return null;
   }
 
-  private extractContextAwareNumber(
-    plainNumber: number | null,
-    expectedField: string | null,
-  ): ExtractedPortfolioFields {
-    if (plainNumber === null || !expectedField) {
-      return {};
-    }
-
-    if (expectedField === 'squareMeter' && this.isReasonableSquareMeter(plainNumber)) {
-      return {
-        squareMeter: plainNumber,
-      };
-    }
-
-    if (expectedField === 'buildingFloorCount' && this.isReasonableBuildingFloorCount(plainNumber)) {
-      return {
-        buildingFloorCount: plainNumber,
-      };
-    }
-
-    if (expectedField === 'floor' && this.isReasonableFloor(plainNumber)) {
-      return {
-        floor: String(plainNumber),
-      };
-    }
-
-    if (expectedField === 'price' && this.isReasonablePrice(plainNumber)) {
-      return {
-        price: plainNumber,
-        currency: 'TRY',
-      };
-    }
-
-    return {};
-  }
-
-  private extractContextAwareLocation(
-    message: string,
-    expectedField: string | null,
-  ): ExtractedPortfolioFields {
-    const clean = this.cleanLocationText(message, null);
-
-    if (!clean || clean.length < 2) {
-      return {};
-    }
-
-    if (expectedField === 'city') {
-      const city = this.extractKnownCity(this.normalize(message));
-
-      return city ? { city } : {};
-    }
-
-    if (expectedField === 'district') {
-      return {
-        district: this.toTitleCase(clean),
-      };
-    }
-
-    if (expectedField === 'neighborhood') {
-      return {
-        neighborhood: this.toTitleCase(clean),
-      };
-    }
-
-    return {};
-  }
-
-  private extractPlainNumber(message: string): number | null {
-    const clean = String(message || '').trim();
-
-    if (!/^\d{1,12}$/.test(clean)) {
+  private extractTitle(message: string, normalized: string): string | null {
+    if (
+      normalized.includes('portfoy olustur') ||
+      normalized.includes('portfoy girisi') ||
+      normalized.includes('yeni portfoy') ||
+      normalized.includes('ilan olustur')
+    ) {
       return null;
     }
 
-    const value = Number(clean);
+    const explicit = String(message || '').match(
+      /(?:adi|adı|ismi|başlığı|basligi)\s*[:\-]?\s*(.+)$/i,
+    );
 
-    if (!Number.isFinite(value) || value <= 0) {
-      return null;
+    return this.cleanFreeText(explicit?.[1] || message);
+  }
+
+  private extractCategory(normalized: string): {
+    mainCategory: string | null;
+    propertyType: string | null;
+  } {
+    const mappings: Array<{
+      words: string[];
+      mainCategory: string;
+      propertyType: string;
+    }> = [
+      { words: ['daire', 'apartman'], mainCategory: 'KONUT', propertyType: 'DAIRE' },
+      { words: ['villa'], mainCategory: 'KONUT', propertyType: 'VILLA' },
+      { words: ['rezidans'], mainCategory: 'KONUT', propertyType: 'REZIDANS' },
+      { words: ['mustakil ev', 'mustak ev'], mainCategory: 'KONUT', propertyType: 'MUSTAK_EV' },
+      { words: ['yazlik'], mainCategory: 'KONUT', propertyType: 'YAZLIK' },
+      { words: ['arsa'], mainCategory: 'ARSA_ARAZI', propertyType: 'ARSA' },
+      { words: ['tarla'], mainCategory: 'ARSA_ARAZI', propertyType: 'TARLA' },
+      { words: ['bahce'], mainCategory: 'ARSA_ARAZI', propertyType: 'BAHCE' },
+      { words: ['zeytinlik'], mainCategory: 'ARSA_ARAZI', propertyType: 'ZEYTINLIK' },
+      { words: ['dukkan', 'magaza'], mainCategory: 'TICARI', propertyType: 'DUKKAN_MAGAZA' },
+      { words: ['ofis', 'buro'], mainCategory: 'TICARI', propertyType: 'OFIS_BURO' },
+      { words: ['depo', 'antrepo'], mainCategory: 'TICARI', propertyType: 'DEPO_ANTREPO' },
+      { words: ['fabrika'], mainCategory: 'SANAYI', propertyType: 'FABRIKA_ATOLYE' },
+      { words: ['atolye'], mainCategory: 'SANAYI', propertyType: 'ATOLYE' },
+      { words: ['otel'], mainCategory: 'TURISTIK_TESIS', propertyType: 'OTEL' },
+      { words: ['pansiyon'], mainCategory: 'TURISTIK_TESIS', propertyType: 'PANSIYON' },
+      { words: ['konut projesi'], mainCategory: 'PROJE', propertyType: 'KONUT_PROJESI' },
+      { words: ['villa projesi'], mainCategory: 'PROJE', propertyType: 'VILLA_PROJESI' },
+    ];
+
+    for (const mapping of mappings) {
+      if (mapping.words.some((word) => normalized.includes(word))) {
+        return {
+          mainCategory: mapping.mainCategory,
+          propertyType: mapping.propertyType,
+        };
+      }
     }
 
-    return value;
-  }
+    if (normalized.includes('konut')) {
+      return { mainCategory: 'KONUT', propertyType: null };
+    }
+    if (normalized.includes('ticari')) {
+      return { mainCategory: 'TICARI', propertyType: null };
+    }
+    if (normalized.includes('arsa arazi') || normalized.includes('arazi')) {
+      return { mainCategory: 'ARSA_ARAZI', propertyType: null };
+    }
+    if (normalized.includes('sanayi')) {
+      return { mainCategory: 'SANAYI', propertyType: null };
+    }
+    if (normalized.includes('turistik')) {
+      return { mainCategory: 'TURISTIK_TESIS', propertyType: null };
+    }
+    if (normalized.includes('proje')) {
+      return { mainCategory: 'PROJE', propertyType: null };
+    }
 
-  private isReasonableSquareMeter(value: number): boolean {
-    return value >= 10 && value <= 50000;
-  }
-
-  private isReasonableBuildingFloorCount(value: number): boolean {
-    return value >= 1 && value <= 100;
-  }
-
-  private isReasonableFloor(value: number): boolean {
-    return value >= -10 && value <= 100;
-  }
-
-  private isReasonablePrice(value: number): boolean {
-    return value >= 1000 && value <= 10_000_000_000;
+    return { mainCategory: null, propertyType: null };
   }
 
   private extractTransactionType(normalized: string): string | null {
+    if (normalized.includes('gunluk kiralik')) return 'GUNLUK_KIRALIK';
+    if (normalized.includes('devren satilik')) return 'DEVREN_SATILIK';
+    if (normalized.includes('devren kiralik')) return 'DEVREN_KIRALIK';
+    if (normalized.includes('kat karsiligi')) return 'KAT_KARSILIGI';
     if (normalized.includes('satilik') || normalized.includes('satisa')) {
       return 'SATILIK';
     }
-
     if (normalized.includes('kiralik') || normalized.includes('kiraya')) {
       return 'KIRALIK';
     }
@@ -371,245 +427,175 @@ export class LinaPortfolioEngineService {
     return null;
   }
 
-  private extractPropertyType(normalized: string): string | null {
-    if (normalized.includes('daire') || normalized.includes('apartman')) {
-      return 'DAIRE';
-    }
-
-    if (normalized.includes('villa')) {
-      return 'VILLA';
-    }
-
-    if (normalized.includes('arsa')) {
-      return 'ARSA';
-    }
-
-    if (normalized.includes('tarla')) {
-      return 'TARLA';
-    }
-
-    if (
-      normalized.includes('dukkan') ||
-      normalized.includes('isyeri') ||
-      normalized.includes('is yeri') ||
-      normalized.includes('ofis')
-    ) {
-      return 'IS_YERI';
-    }
-
-    return null;
-  }
-
   private extractRoomCount(message: string): string | null {
-    const match = String(message || '').match(/\b(\d{1,2})\s*(?:\.|,)?\s*(?:\+|artı)\s*(\d{1,2})\b/i);
-
-    if (!match) {
-      return null;
-    }
-
-    return `${match[1]}+${match[2]}`;
-  }
-
-  private extractSquareMeter(message: string): number | null {
     const match = String(message || '').match(
-      /\b(\d{2,5})\s*(m2|m²|metrekare|metre kare|metre)\b/i,
+      /\b(\d{1,2})\s*[_-]?\s*(?:\+|artı|arti)\s*(\d{1,2})\b/i,
     );
 
-    if (!match) {
-      return null;
-    }
-
-    const value = Number(match[1]);
-
-    if (!Number.isFinite(value) || !this.isReasonableSquareMeter(value)) {
-      return null;
-    }
-
-    return value;
+    return match ? `${match[1]}+${match[2]}` : null;
   }
 
-  private extractFloorInfo(message: string): {
-    floor: string | null;
-    buildingFloorCount: number | null;
-  } {
-    const text = String(message || '');
-
-    const buildingAndFloor = text.match(
-      /\b(\d{1,2})\s*katlı\s*binanın\s*(\d{1,2})\.?\s*katı\b/i,
+  private extractSquareMeter(
+    message: string,
+    step: string,
+  ): number | null {
+    const explicit = String(message || '').match(
+      /\b(\d{1,6})\s*(m2|m²|metrekare|metre kare)\b/i,
     );
+    const plain = step === 'SQUARE_METER' ? this.extractPlainNumber(message) : null;
+    const value = explicit ? Number(explicit[1]) : plain;
 
-    if (buildingAndFloor) {
-      return {
-        buildingFloorCount: Number(buildingAndFloor[1]),
-        floor: buildingAndFloor[2],
-      };
-    }
-
-    const floorOnly = text.match(/\b(\d{1,2})\.?\s*kat\b/i);
-
-    if (floorOnly) {
-      return {
-        buildingFloorCount: null,
-        floor: floorOnly[1],
-      };
-    }
-
-    const groundFloor = this.normalize(text);
-
-    if (groundFloor.includes('zemin kat')) {
-      return {
-        buildingFloorCount: null,
-        floor: 'Zemin',
-      };
-    }
-
-    if (groundFloor.includes('giris kat') || groundFloor.includes('giriş kat')) {
-      return {
-        buildingFloorCount: null,
-        floor: 'Giriş',
-      };
-    }
-
-    return {
-      floor: null,
-      buildingFloorCount: null,
-    };
+    return value !== null && value >= 1 && value <= 1_000_000
+      ? value
+      : null;
   }
 
-  private extractPrice(message: string): number | null {
-    const text = String(message || '').toLocaleLowerCase('tr-TR');
+  private extractBuildingAge(message: string, step: string): string | null {
+    const normalized = this.normalize(message);
 
-    const millionMatch = text.match(
-      /\b(\d+(?:[.,]\d+)?)\s*(milyon|mn|m)\b/i,
-    );
-
-    if (millionMatch) {
-      const value = Number(millionMatch[1].replace(',', '.'));
-
-      if (Number.isFinite(value) && value > 0) {
-        return Math.round(value * 1_000_000);
-      }
+    if (normalized.includes('sifir') || normalized.includes('yeni bina')) {
+      return '0';
     }
 
-    const moneyMatch = text.match(
-      /\b(\d{1,3}(?:[.,]\d{3})+|\d{6,12})\s*(tl|₺|try|lira)?\b/i,
-    );
+    const explicit = String(message || '').match(/\b(\d{1,3})\s*(yas|yaş)\b/i);
+    const plain = step === 'BUILDING_AGE' ? this.extractPlainNumber(message) : null;
+    const value = explicit ? Number(explicit[1]) : plain;
 
-    if (moneyMatch) {
-      const value = Number(moneyMatch[1].replace(/[.,]/g, ''));
+    return value !== null && value >= 0 && value <= 500
+      ? String(value)
+      : null;
+  }
 
-      if (Number.isFinite(value) && this.isReasonablePrice(value)) {
-        return value;
-      }
+  private extractFloor(message: string, step: string): string | null {
+    const normalized = this.normalize(message);
+    const namedFloors: Array<[string, string]> = [
+      ['kot 1', 'Kot -1'],
+      ['bodrum', 'Bodrum'],
+      ['yari bodrum', 'Yarı Bodrum'],
+      ['zemin', 'Zemin Kat'],
+      ['yuksek giris', 'Yüksek Giriş'],
+      ['giris', 'Giriş Kat'],
+      ['bahce', 'Bahçe Katı'],
+      ['cati', 'Çatı Katı'],
+      ['teras', 'Teras Katı'],
+      ['penthouse', 'Penthouse'],
+    ];
+
+    for (const [key, label] of namedFloors) {
+      if (normalized.includes(key)) return label;
     }
+
+    const explicit = String(message || '').match(/\b(\d{1,3})\.?\s*kat\b/i);
+    const plain = step === 'FLOOR' ? this.extractPlainNumber(message) : null;
+    const value = explicit ? Number(explicit[1]) : plain;
+
+    return value !== null && value >= 0 && value <= 200
+      ? `${value}. Kat`
+      : null;
+  }
+
+  private extractBuildingFloorCount(
+    message: string,
+    step: string,
+  ): number | null {
+    const explicit = String(message || '').match(
+      /\b(?:toplam\s*)?(\d{1,3})\s*kat(?:li|lı)?\b/i,
+    );
+    const plain =
+      step === 'BUILDING_FLOOR_COUNT'
+        ? this.extractPlainNumber(message)
+        : null;
+    const value = explicit ? Number(explicit[1]) : plain;
+
+    return value !== null && value >= 1 && value <= 200
+      ? value
+      : null;
+  }
+
+  private extractCurrency(normalized: string): string | null {
+    if (
+      normalized.includes('turk lirasi') ||
+      normalized === 'tl' ||
+      normalized === 'try' ||
+      normalized.includes('lira')
+    ) {
+      return 'TRY';
+    }
+    if (normalized.includes('dolar') || normalized === 'usd') return 'USD';
+    if (normalized.includes('euro') || normalized === 'eur') return 'EUR';
+    if (normalized.includes('sterlin') || normalized === 'gbp') return 'GBP';
 
     return null;
+  }
+
+  private extractPrice(message: string, step: string): number | null {
+    const text = String(message || '').toLocaleLowerCase('tr-TR');
+    const million = text.match(/\b(\d+(?:[.,]\d+)?)\s*(milyon|mn)\b/i);
+
+    if (million) {
+      const value = Number(million[1].replace(',', '.'));
+      return Number.isFinite(value) && value > 0
+        ? Math.round(value * 1_000_000)
+        : null;
+    }
+
+    const explicit = text.match(
+      /\b(\d{1,3}(?:[.,]\d{3})+|\d{4,12})\s*(tl|₺|try|usd|dolar|eur|euro|gbp|sterlin)?\b/i,
+    );
+    const plain = step === 'PRICE' ? this.extractFormattedNumber(text) : null;
+    const value = explicit
+      ? Number(explicit[1].replace(/[.,]/g, ''))
+      : plain;
+
+    return value !== null && value >= 1 ? value : null;
+  }
+
+  private extractIdentifier(message: string): string | null {
+    const value = String(message || '')
+      .trim()
+      .replace(/^(ada|parsel|daire|bolum|bölüm|no|numara)\s*[:\-]?\s*/i, '')
+      .trim();
+
+    return value && value.length <= 80 ? value : null;
   }
 
   private extractKnownCity(normalized: string): string | null {
-    const cities = this.loadCities();
-    const match = cities.find((city) =>
+    const match = this.loadCities().find((city) =>
       normalized.includes(city.normalized),
     );
 
     return match?.name || null;
   }
 
-  private extractSimpleNeighborhood(message: string, city?: string | null): string | null {
-    const text = String(message || '').trim();
-
-    const explicitMatch = text.match(
-      /\b(?:mahallesi|mah\.|mahalle)\s+([A-Za-zÇĞİÖŞÜçğıöşü0-9\s-]{3,40})/i,
-    );
-
-    if (explicitMatch) {
-      return this.cleanLocationText(explicitMatch[1], city);
-    }
-
-    const deDaMatch = text.match(
-      /\b([A-Za-zÇĞİÖŞÜçğıöşü0-9\s-]{3,40})['’]?(?:de|da|te|ta)\s+(?:satılık|kiralık|daire|konut|villa|arsa|ilan)/i,
-    );
-
-    if (deDaMatch) {
-      const value = this.cleanLocationText(deDaMatch[1], city);
-
-      if (!this.isBadNeighborhoodCandidate(value)) {
-        return this.toTitleCase(value);
-      }
-    }
-
-    return null;
-  }
-
-  private cleanLocationText(value: string, city?: string | null): string {
-    let cleaned = String(value || '')
-      .replace(/\bmerkez\b/gi, '')
-      .replace(/\bilce\b/gi, '')
-      .replace(/\bilçe\b/gi, '')
-      .replace(/\bmahallesi\b/gi, '')
-      .replace(/\bmahalle\b/gi, '')
-      .replace(/\bmah\.\b/gi, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const cities = city
-      ? this.loadCities().filter((item) => item.name === city)
-      : this.loadCities();
-
-    for (const cityItem of cities) {
-      cleaned = cleaned
-        .replace(new RegExp(`\\b${this.escapeRegExp(cityItem.name)}\\b`, 'gi'), '')
-        .replace(new RegExp(`\\b${this.escapeRegExp(cityItem.normalized)}\\b`, 'gi'), '')
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-
-    return cleaned;
-  }
-
-  private isBadNeighborhoodCandidate(value: string): boolean {
-    const normalized = this.normalize(value);
-
-    if (!normalized || normalized.length < 3) {
-      return true;
-    }
-
-    const badWords = [
-      'satilik',
-      'kiralik',
-      'daire',
-      'konut',
-      'villa',
-      'arsa',
-      'ilan',
-      'girelim',
-      'ekleyelim',
-      'olusturalim',
-    ];
-
-    return badWords.includes(normalized);
-  }
-
   private loadCities(): CityRecord[] {
-    if (this.cityCache) {
-      return this.cityCache;
-    }
+    if (this.cityCache) return this.cityCache;
 
     const possiblePaths = [
-      path.join(process.cwd(), 'src', 'lina', 'geo', 'Lina_Cities_TR_KKTC.json'),
-      path.join(process.cwd(), 'backend', 'src', 'lina', 'geo', 'Lina_Cities_TR_KKTC.json'),
+      path.join(
+        process.cwd(),
+        'src',
+        'lina',
+        'geo',
+        'Lina_Cities_TR_KKTC.json',
+      ),
+      path.join(
+        process.cwd(),
+        'backend',
+        'src',
+        'lina',
+        'geo',
+        'Lina_Cities_TR_KKTC.json',
+      ),
       path.join(__dirname, '..', 'geo', 'Lina_Cities_TR_KKTC.json'),
-      path.join(__dirname, '..', '..', 'src', 'lina', 'geo', 'Lina_Cities_TR_KKTC.json'),
     ];
 
     for (const filePath of possiblePaths) {
       try {
-        if (!fs.existsSync(filePath)) {
-          continue;
-        }
+        if (!fs.existsSync(filePath)) continue;
 
-        const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as CityDataFile;
-
+        const parsed = JSON.parse(
+          fs.readFileSync(filePath, 'utf8'),
+        ) as CityDataFile;
         const turkiye = Array.isArray(parsed.turkiye) ? parsed.turkiye : [];
         const kktc = Array.isArray(parsed.kktc) ? parsed.kktc : [];
 
@@ -636,6 +622,81 @@ export class LinaPortfolioEngineService {
     return this.cityCache;
   }
 
+  private isLandPortfolio(session: LinaPortfolioSessionContext): boolean {
+    const value = `${session.mainCategory} ${session.propertyType}`.toUpperCase();
+
+    return [
+      'ARSA',
+      'ARAZI',
+      'TARLA',
+      'BAHCE',
+      'BAG',
+      'ZEYTINLIK',
+      'ADA',
+    ].some((word) => value.includes(word));
+  }
+
+  private isSkipIntent(normalized: string): boolean {
+    return /^(gec|atla|yok|bos birak|istemiyorum)$/.test(normalized);
+  }
+
+  private cleanLocationText(value: string): string {
+    return String(value || '')
+      .replace(/\b(mahallesi|mahalle|mah\.|koyu|köyü|koy|köy|mevkii|mevki)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private cleanFreeText(value: string): string | null {
+    const cleaned = String(value || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return cleaned && cleaned.length <= 150 ? cleaned : null;
+  }
+
+  private extractPlainNumber(message: string): number | null {
+    const clean = String(message || '').trim();
+    if (!/^\d{1,12}$/.test(clean)) return null;
+
+    const value = Number(clean);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  private extractFormattedNumber(message: string): number | null {
+    const clean = String(message || '')
+      .trim()
+      .replace(/[.\s]/g, '')
+      .replace(',', '.');
+
+    if (!/^\d+(?:\.\d+)?$/.test(clean)) return null;
+
+    const value = Number(clean);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  private formatPrice(value: number | null): string {
+    if (!value) return '-';
+    return new Intl.NumberFormat('tr-TR', {
+      maximumFractionDigits: 2,
+    }).format(value);
+  }
+
+  private getCurrencyLabel(currency: string): string {
+    const labels: Record<string, string> = {
+      TRY: 'Türk Lirası',
+      USD: 'Amerikan Doları',
+      EUR: 'Euro',
+      GBP: 'İngiliz Sterlini',
+    };
+
+    return labels[currency] || currency;
+  }
+
+  private normalizeEnumValue(value: string): string {
+    return this.normalize(value).toUpperCase().replace(/\s+/g, '_');
+  }
+
   private toTitleCase(value: string): string {
     return String(value || '')
       .trim()
@@ -646,10 +707,6 @@ export class LinaPortfolioEngineService {
         return `${lower.charAt(0).toLocaleUpperCase('tr-TR')}${lower.slice(1)}`;
       })
       .join(' ');
-  }
-
-  private escapeRegExp(value: string): string {
-    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private normalize(value: string): string {
