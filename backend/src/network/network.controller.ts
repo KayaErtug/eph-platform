@@ -1,5 +1,17 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { NetworkService } from './network.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('network')
 export class NetworkController {
@@ -88,4 +100,36 @@ export class NetworkController {
   create(@Body() body: any) {
     return this.networkService.create(body);
   }
+
+  @Post('posts/:id/message')
+  @UseGuards(JwtAuthGuard)
+  messagePost(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body?: { message?: string },
+  ) {
+    return this.networkService.messagePost(id, user, body);
+  }
+
+  @Post('posts/:id/interest')
+  @UseGuards(JwtAuthGuard)
+  interestPost(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body?: { note?: string },
+  ) {
+    return this.networkService.interestPost(id, user, body);
+  }
+
+  @Post('posts/:id/help')
+  @UseGuards(JwtAuthGuard)
+  helpPost(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body?: { note?: string },
+  ) {
+    return this.networkService.helpPost(id, user, body);
+  }
+
+
 }

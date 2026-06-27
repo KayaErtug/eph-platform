@@ -4,7 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import {
+  KontorHareketTuru,
+  KontorIslemTuru,
+  Prisma,
+} from "@prisma/client";
 import { randomUUID } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { PushService } from "../push/push.service";
@@ -22,6 +26,18 @@ type CreateNetworkPostDto = {
   visibility?: string;
   tags?: string[];
   expiresAt?: string;
+};
+
+type CurrentUserPayload = {
+  id?: string;
+  sub?: string;
+  role?: string;
+  email?: string;
+};
+
+type ForumActionPayload = {
+  message?: string;
+  note?: string;
 };
 
 type UpdateNetworkPostDto = {
@@ -1208,4 +1224,397 @@ export class NetworkService {
       },
     });
   }
+
+  private getForumActionUserId(user?: CurrentUserPayload): string {
+    const userId = String(user?.id || user?.sub || "").trim();
+
+    if (!userId) {
+      throw new ForbiddenException(
+        "Forum işlemi için kullanıcı kimliği doğrulanamadı.",
+      );
+    }
+
+    return userId;
+  }
+
+  private cleanForumActionText(value?: string | null): string {
+    return String(value || "").trim().slice(0, 1000);
+  }
+
+  private async getForumActionContext(
+    tx: Prisma.TransactionClient,
+    postId: string,
+    user?: CurrentUserPayload,
+  ) {
+    const actorId = this.getForumActionUserId(user);
+
+    const [post, actor] = await Promise.all([
+      tx.networkPost.findFirst({
+        where: {
+          id: postId,
+          isActive: true,
+          expiresAt: {
+            gt: new Date(),
+          },
+        },
+        select: {
+          id: true,
+          userId: true,
+          title: true,
+        },
+      }),
+      tx.user.findUnique({
+        where: {
+          id: actorId,
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      }),
+    ]);
+
+    if (!post) {
+      throw new NotFoundException(
+        "Aktif Forum paylaşımı bulunamadı.",
+      );
+    }
+
+    if (!actor) {
+      throw new NotFoundException("Kullanıcı bulunamadı.");
+    }
+
+    if (post.userId === actorId) {
+      throw new BadRequestException(
+        "Kendi Forum paylaşımınız için bu işlemi yapamazsınız.",
+      );
+    }
+
+    const actorName =
+      `${actor.firstName || ""} ${actor.lastName || ""}`.trim() ||
+      actor.email;
+
+    return {
+      actorId,
+      actorName,
+      post,
+    };
+  }
+
+  private async spendForumKontor(
+    tx: Prisma.TransactionClient,
+    input: {
+      userId: string;
+      amount: number;
+      islemTuru: KontorIslemTuru;
+      aciklama: string;
+      postId: string;
+    },
+  ) {
+    await tx.$executeRaw`
+      SELECT pg_advisory_xact_lock(
+        hashtext(${`forum-wallet:${input.userId}`})
+      )
+    `;
+
+    let wallet = await tx.kontorCuzdani.findUnique({
+      where: {
+        kullaniciId: input.userId,
+      },
+    });
+
+    if (!wallet) {
+      wallet = await tx.kontorCuzdani.create({
+        data: {
+          kullaniciId: input.userId,
+          bakiye: 0,
+          toplamYukleme: 0,
+          toplamHarcama: 0,
+          toplamHediye: 0,
+          aktifMi: true,
+        },
+      });
+    }
+
+    if (!wallet.aktifMi) {
+      throw new BadRequestException(
+        "Kontör cüzdanınız aktif değil.",
+      );
+    }
+
+    if (wallet.bakiye < input.amount) {
+      throw new BadRequestException(
+        `Bu işlem için ${input.amount} kontör gerekir. Mevcut bakiyeniz ${wallet.bakiye} kontör.`,
+      );
+    }
+
+    const nextBalance = wallet.bakiye - input.amount;
+
+    const updatedWallet = await tx.kontorCuzdani.update({
+      where: {
+        kullaniciId: input.userId,
+      },
+      data: {
+        bakiye: nextBalance,
+        toplamHarcama: {
+          increment: input.amount,
+        },
+      },
+    });
+
+    const movement = await tx.kontorHareketi.create({
+      data: {
+        kullaniciId: input.userId,
+        hareketTuru: KontorHareketTuru.HARCAMA,
+        islemTuru: input.islemTuru,
+        miktar: input.amount,
+        oncekiBakiye: wallet.bakiye,
+        sonrakiBakiye: nextBalance,
+        aciklama: input.aciklama,
+        ilgiliKayitTuru: "NETWORK_POST",
+        ilgiliKayitId: input.postId,
+        olusturanId: input.userId,
+      },
+    });
+
+    return {
+      wallet: updatedWallet,
+      movement,
+    };
+  }
+
+  async messagePost(
+    postId: string,
+    user: CurrentUserPayload,
+    body?: ForumActionPayload,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const context = await this.getForumActionContext(
+        tx,
+        postId,
+        user,
+      );
+
+      const kontorResult = await this.spendForumKontor(tx, {
+        userId: context.actorId,
+        amount: 3,
+        islemTuru: KontorIslemTuru.FORUM_MESAJ,
+        aciklama: `${context.post.title} Forum paylaşımı için mesaj başlatıldı.`,
+        postId: context.post.id,
+      });
+
+      const participantIds = [
+        context.actorId,
+        context.post.userId,
+      ].sort();
+
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtext(${`forum-conversation:${context.post.id}:${participantIds.join(":")}`})
+        )
+      `;
+
+      const existingConversation =
+        await tx.conversation.findFirst({
+          where: {
+            postId: context.post.id,
+            AND: [
+              {
+                ConversationParticipant: {
+                  some: {
+                    userId: context.actorId,
+                  },
+                },
+              },
+              {
+                ConversationParticipant: {
+                  some: {
+                    userId: context.post.userId,
+                  },
+                },
+              },
+            ],
+          },
+          include: {
+            ConversationParticipant: true,
+          },
+        });
+
+      const conversation =
+        existingConversation &&
+        existingConversation.ConversationParticipant.length === 2
+          ? existingConversation
+          : await tx.conversation.create({
+              data: {
+                id: randomUUID(),
+                postId: context.post.id,
+                title: `Forum Mesajı - ${context.post.title}`,
+                updatedAt: new Date(),
+                ConversationParticipant: {
+                  create: [
+                    {
+                      id: randomUUID(),
+                      userId: context.actorId,
+                    },
+                    {
+                      id: randomUUID(),
+                      userId: context.post.userId,
+                    },
+                  ],
+                },
+              },
+              include: {
+                ConversationParticipant: true,
+              },
+            });
+
+      const message =
+        this.cleanForumActionText(body?.message) ||
+        `Merhaba, "${context.post.title}" başlıklı Forum paylaşımınız hakkında görüşmek istiyorum.`;
+
+      await tx.message.create({
+        data: {
+          id: randomUUID(),
+          conversationId: conversation.id,
+          senderId: context.actorId,
+          body: message,
+        },
+      });
+
+      await tx.conversation.update({
+        where: {
+          id: conversation.id,
+        },
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+
+      await tx.networkNotification.create({
+        data: {
+          userId: context.post.userId,
+          postId: context.post.id,
+          title: "Forum mesajı başlatıldı",
+          message: `${context.actorName}, "${context.post.title}" paylaşımınız için mesaj gönderdi.`,
+        },
+      });
+
+      return {
+        ok: true,
+        message: "Forum mesajı başlatıldı. 3 kontör harcandı.",
+        cost: 3,
+        spent: 3,
+        previousBalance:
+          kontorResult.movement.oncekiBakiye,
+        remainingBalance:
+          kontorResult.wallet.bakiye,
+        balance:
+          kontorResult.wallet.bakiye,
+        conversationId: conversation.id,
+        url: `/messages/${conversation.id}`,
+      };
+    });
+  }
+
+  async interestPost(
+    postId: string,
+    user: CurrentUserPayload,
+    body?: ForumActionPayload,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const context = await this.getForumActionContext(
+        tx,
+        postId,
+        user,
+      );
+
+      const kontorResult = await this.spendForumKontor(tx, {
+        userId: context.actorId,
+        amount: 10,
+        islemTuru:
+          KontorIslemTuru.FORUM_ILGILENIYORUM,
+        aciklama: `${context.post.title} Forum paylaşımı için ilgileniyorum bildirimi gönderildi.`,
+        postId: context.post.id,
+      });
+
+      const note = this.cleanForumActionText(body?.note);
+      const noteText = note ? ` Not: ${note}` : "";
+
+      await tx.networkNotification.create({
+        data: {
+          userId: context.post.userId,
+          postId: context.post.id,
+          title: "Forum paylaşımınızla ilgilenen var",
+          message: `${context.actorName}, "${context.post.title}" paylaşımınızla ilgileniyor.${noteText}`,
+        },
+      });
+
+      return {
+        ok: true,
+        message:
+          "İlgileniyorum bildirimi gönderildi. 10 kontör harcandı.",
+        cost: 10,
+        spent: 10,
+        previousBalance:
+          kontorResult.movement.oncekiBakiye,
+        remainingBalance:
+          kontorResult.wallet.bakiye,
+        balance:
+          kontorResult.wallet.bakiye,
+      };
+    });
+  }
+
+  async helpPost(
+    postId: string,
+    user: CurrentUserPayload,
+    body?: ForumActionPayload,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const context = await this.getForumActionContext(
+        tx,
+        postId,
+        user,
+      );
+
+      const kontorResult = await this.spendForumKontor(tx, {
+        userId: context.actorId,
+        amount: 10,
+        islemTuru:
+          KontorIslemTuru.FORUM_YARDIMCI_OLABILIRIM,
+        aciklama: `${context.post.title} Forum paylaşımı için yardımcı olabilirim bildirimi gönderildi.`,
+        postId: context.post.id,
+      });
+
+      const note = this.cleanForumActionText(body?.note);
+      const noteText = note ? ` Not: ${note}` : "";
+
+      await tx.networkNotification.create({
+        data: {
+          userId: context.post.userId,
+          postId: context.post.id,
+          title: "Forum paylaşımınıza yardım teklifi",
+          message: `${context.actorName}, "${context.post.title}" paylaşımınız için yardımcı olabileceğini bildirdi.${noteText}`,
+        },
+      });
+
+      return {
+        ok: true,
+        message:
+          "Yardımcı olabilirim bildirimi gönderildi. 10 kontör harcandı.",
+        cost: 10,
+        spent: 10,
+        previousBalance:
+          kontorResult.movement.oncekiBakiye,
+        remainingBalance:
+          kontorResult.wallet.bakiye,
+        balance:
+          kontorResult.wallet.bakiye,
+      };
+    });
+  }
+
+
 }
