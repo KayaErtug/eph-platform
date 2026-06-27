@@ -1,4 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const DEFAULT_LINA_VOICE_ID = "LYfSi2g3Frvxg50fRl91";
+const DEFAULT_LINA_MODEL_ID = "eleven_multilingual_v2";
+
+function readEnvValue(key: string) {
+  const fromProcess = process.env[key];
+
+  if (fromProcess && fromProcess.trim().length > 0) {
+    return fromProcess.trim();
+  }
+
+  try {
+    const envPath = path.join(process.cwd(), ".env.local");
+    const envFile = fs.readFileSync(envPath, "utf8");
+
+    const line = envFile
+      .split("\n")
+      .map((item) => item.trim())
+      .find((item) => item.startsWith(`${key}=`));
+
+    if (!line) {
+      return "";
+    }
+
+    return line.replace(`${key}=`, "").trim().replace(/^["']|["']$/g, "");
+  } catch {
+    return "";
+  }
+}
+
+function normalizeVoiceText(text: string) {
+  return String(text || "")
+    .replace(/\bEPH\b/g, "Emlak Portföy Havuzu")
+    .replace(/\beph\b/g, "Emlak Portföy Havuzu")
+    .replace(/\bTRY\b/g, "Türk Lirası")
+    .replace(/\bTL\b/g, "Türk Lirası")
+    .replace(/₺/g, " Türk Lirası ")
+    .replace(/\b0\s*km\b/gi, "sıfır kilometre")
+    .replace(/\b0km\b/gi, "sıfır kilometre")
+    .replace(/\b(\d+)\s*[,.]\s*5\s*\+\s*(\d+)\b/g, "$1 buçuk artı $2")
+    .replace(/\b(\d+)\s*\+\s*(\d+)\b/g, "$1 artı $2")
+    .replace(/\n/g, ". ")
+    .replace(/\. \. /g, ". ")
+    .replace(/\. /g, ". ")
+    .replace(/, /g, ", ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -6,17 +59,19 @@ export async function POST(req: NextRequest) {
 
     const cleanText =
       typeof text === "string" && text.trim().length > 0
-        ? text.trim()
+        ? normalizeVoiceText(text.trim())
         : "Merhaba, ben Lina. Size nasıl yardımcı olabilirim?";
 
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    const voiceId = process.env.ELEVENLABS_VOICE_ID;
+    const apiKey = readEnvValue("ELEVENLABS_API_KEY");
+    const voiceId =
+      readEnvValue("ELEVENLABS_VOICE_ID") || DEFAULT_LINA_VOICE_ID;
+    const modelId =
+      readEnvValue("ELEVENLABS_MODEL_ID") || DEFAULT_LINA_MODEL_ID;
 
-    if (!apiKey || !voiceId) {
+    if (!apiKey) {
       return NextResponse.json(
         {
-          error:
-            "ElevenLabs API bilgileri eksik. ELEVENLABS_API_KEY ve ELEVENLABS_VOICE_ID kontrol edilmeli.",
+          error: "ELEVENLABS_API_KEY eksik.",
         },
         { status: 500 },
       );
@@ -32,11 +87,11 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           text: cleanText,
-          model_id: "eleven_multilingual_v2",
+          model_id: modelId,
           voice_settings: {
-            stability: 0.58,
-            similarity_boost: 0.82,
-            style: 0.18,
+            stability: 1,
+            similarity_boost: 1,
+            style: 0,
             use_speaker_boost: true,
           },
         }),
@@ -44,12 +99,12 @@ export async function POST(req: NextRequest) {
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
+      const detail = await response.text();
 
       return NextResponse.json(
         {
-          error: "Lina ses üretimi başarısız oldu.",
-          detail: errorText,
+          error: "Lina sesi üretilemedi.",
+          detail,
         },
         { status: 500 },
       );
@@ -64,9 +119,7 @@ export async function POST(req: NextRequest) {
         "Cache-Control": "no-store",
       },
     });
-  } catch (error) {
-    console.error("Lina voice error:", error);
-
+  } catch {
     return NextResponse.json(
       {
         error: "Lina ses servisi çalışırken hata oluştu.",

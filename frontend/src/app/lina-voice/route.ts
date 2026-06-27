@@ -63,8 +63,10 @@ export async function POST(req: NextRequest) {
         : "Merhaba, ben Lina. Size nasıl yardımcı olabilirim?";
 
     const apiKey = readEnvValue("ELEVENLABS_API_KEY");
-    const voiceId = readEnvValue("ELEVENLABS_VOICE_ID") || DEFAULT_LINA_VOICE_ID;
-    const modelId = readEnvValue("ELEVENLABS_MODEL_ID") || DEFAULT_LINA_MODEL_ID;
+    const voiceId =
+      readEnvValue("ELEVENLABS_VOICE_ID") || DEFAULT_LINA_VOICE_ID;
+    const modelId =
+      readEnvValue("ELEVENLABS_MODEL_ID") || DEFAULT_LINA_MODEL_ID;
 
     if (!apiKey) {
       return NextResponse.json(
@@ -87,9 +89,9 @@ export async function POST(req: NextRequest) {
           text: cleanText,
           model_id: modelId,
           voice_settings: {
-            stability: 0.92,
-            similarity_boost: 0.98,
-            style: 0.05,
+            stability: 1,
+            similarity_boost: 1,
+            style: 0,
             use_speaker_boost: true,
           },
         }),
