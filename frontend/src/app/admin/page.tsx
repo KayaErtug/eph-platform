@@ -19,7 +19,6 @@ import {
   Loader2,
   LogOut,
   Megaphone,
-  Menu,
   MessageCircle,
   RefreshCw,
   Search,
@@ -291,7 +290,6 @@ export default function AdminPage() {
   const [crmAdminSummary, setCrmAdminSummary] = useState<CrmAdminSummary | null>(null);
   const [crmAdminPerformance, setCrmAdminPerformance] = useState<CrmAdminPerformance | null>(null);
   const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const role = String(user?.role || "").toUpperCase();
   const isSuperAdmin = role === "SUPER_ADMIN";
@@ -717,35 +715,6 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-[100dvh] overflow-y-auto bg-[#F4F8FF] pb-[env(safe-area-inset-bottom)] text-[#06194A]">
-      {menuOpen && (
-        <div
-          className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-sm lg:hidden"
-          onClick={() => setMenuOpen(false)}
-        >
-          <aside
-            className="h-full w-[82%] max-w-[330px] bg-[#071A39] p-4 text-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-5 flex items-center justify-between">
-              <AdminBrand compact />
-              <button
-                onClick={() => setMenuOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white/10 text-white"
-                aria-label="Menüyü kapat"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <SideNav
-              portfolioCount={portfolioCounts.waiting}
-              pendingApplications={pendingApplications}
-              isSuperAdmin={isSuperAdmin}
-            />
-          </aside>
-        </div>
-      )}
-
       <div className="lg:flex">
         <aside className="hidden min-h-screen w-[250px] shrink-0 bg-[#071A39] p-4 text-white lg:sticky lg:top-0 lg:block">
           <AdminBrand />
@@ -789,14 +758,6 @@ export default function AdminPage() {
           <header className="sticky top-0 z-40 border-b-2 border-[#C7D6E8] bg-white/95 px-3 py-2.5 backdrop-blur-xl lg:px-6">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <button
-                  onClick={() => setMenuOpen(true)}
-                  className="flex h-10 w-10 items-center justify-center rounded-2xl text-[#06194A]"
-                  aria-label="Menüyü aç"
-                >
-                  <Menu size={24} />
-                </button>
-
                 <div className="hidden min-w-0 lg:block">
                   <h1 className="break-words text-[23px] font-black tracking-[-0.04em]">
                     EPH Yönetim Merkezi
