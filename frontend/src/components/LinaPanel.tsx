@@ -13,7 +13,6 @@ import {
   Clock3,
   Loader2,
   Mic,
-  MicOff,
   RefreshCcw,
   Send,
   Sparkles,
@@ -220,6 +219,14 @@ export default function LinaPanel({
   const mediaRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const recordingFrameRef = useRef<number | null>(null);
+  const recordingTimeoutRef = useRef<number | null>(null);
+  const recordingStartedAtRef = useRef(0);
+  const lastVoiceAtRef = useRef(0);
+  const voiceDetectedRef = useRef(false);
+  const discardRecordingRef = useRef(false);
 
   const [imageOk, setImageOk] = useState(true);
   const [messages, setMessages] = useState<Message[]>([
@@ -233,6 +240,7 @@ export default function LinaPanel({
   const [loading, setLoading] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const [endOfDayReview, setEndOfDayReview] =
     useState<LinaEndOfDayReview | null>(null);
@@ -458,9 +466,30 @@ export default function LinaPanel({
     setSpeaking(false);
   };
 
-  const stopRecording = () => {
+  const clearRecordingMonitor = () => {
+    if (recordingFrameRef.current !== null) {
+      window.cancelAnimationFrame(recordingFrameRef.current);
+      recordingFrameRef.current = null;
+    }
+
+    if (recordingTimeoutRef.current !== null) {
+      window.clearTimeout(recordingTimeoutRef.current);
+      recordingTimeoutRef.current = null;
+    }
+
+    analyserRef.current?.disconnect();
+    analyserRef.current = null;
+  };
+
+  const stopRecording = (discard = false) => {
+    discardRecordingRef.current = discard;
+    clearRecordingMonitor();
+
     if (mediaRef.current && mediaRef.current.state !== "inactive") {
       mediaRef.current.stop();
+    } else {
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
     }
 
     setRecording(false);
@@ -488,7 +517,7 @@ export default function LinaPanel({
   useEffect(() => {
     return () => {
       stopCurrentAudio();
-      stopRecording();
+      stopRecording(true);
 
       if (audioContextRef.current) {
         void audioContextRef.current.close();
@@ -652,6 +681,10 @@ export default function LinaPanel({
   };
 
   const startRecording = async () => {
+    if (recording || transcribing || loading) {
+      return;
+    }
+
     try {
       setVoiceError("");
       await unlockAudioPlayback();
@@ -661,26 +694,63 @@ export default function LinaPanel({
         return;
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/mp4")
+          ? "audio/mp4"
+          : "";
+
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
       const chunks: BlobPart[] = [];
 
+      recordingStreamRef.current = stream;
       mediaRef.current = recorder;
+      discardRecordingRef.current = false;
+      recordingStartedAtRef.current = Date.now();
+      lastVoiceAtRef.current = Date.now();
+      voiceDetectedRef.current = false;
 
       recorder.ondataavailable = (event) => {
-        chunks.push(event.data);
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
       };
 
       recorder.onstop = async () => {
+        clearRecordingMonitor();
         stream.getTracks().forEach((track) => track.stop());
+        recordingStreamRef.current = null;
+        mediaRef.current = null;
 
-        const audioBlob = new Blob(chunks, { type: "audio/webm" });
+        if (discardRecordingRef.current) {
+          discardRecordingRef.current = false;
+          return;
+        }
+
+        if (!chunks.length || !voiceDetectedRef.current) {
+          setVoiceError("Ses algılanamadı. Mikrofona dokunup tekrar konuşun.");
+          return;
+        }
+
+        const blobType = recorder.mimeType || mimeType || "audio/webm";
+        const extension = blobType.includes("mp4") ? "m4a" : "webm";
+        const audioBlob = new Blob(chunks, { type: blobType });
         const formData = new FormData();
 
-        formData.append("audio", audioBlob, "audio.webm");
+        formData.append("audio", audioBlob, `audio.${extension}`);
 
         try {
-          setLoading(true);
+          setTranscribing(true);
 
           const res = await fetch("/api/whisper", {
             method: "POST",
@@ -688,29 +758,103 @@ export default function LinaPanel({
           });
 
           const data = await res.json();
-          const text = data?.text?.trim();
+          const voiceText = data?.text?.trim();
 
-          if (text) {
-            await sendMessage(text);
+          if (voiceText) {
+            await sendMessage(voiceText);
           } else {
             setVoiceError("Ses anlaşılamadı. Lütfen tekrar deneyin.");
           }
         } catch {
           setVoiceError("Ses metne dönüştürülemedi.");
         } finally {
-          setLoading(false);
+          setTranscribing(false);
         }
       };
 
-      recorder.start();
+      recorder.start(250);
       setRecording(true);
+
+      const context = await ensureAudioContext();
+
+      if (context) {
+        const source = context.createMediaStreamSource(stream);
+        const analyser = context.createAnalyser();
+        const samples = new Uint8Array(analyser.fftSize);
+
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.72;
+        source.connect(analyser);
+        analyserRef.current = analyser;
+
+        const monitorVoice = () => {
+          if (!mediaRef.current || mediaRef.current.state === "inactive") {
+            return;
+          }
+
+          analyser.getByteTimeDomainData(samples);
+
+          let total = 0;
+          for (const sample of samples) {
+            const normalized = (sample - 128) / 128;
+            total += normalized * normalized;
+          }
+
+          const volume = Math.sqrt(total / samples.length);
+          const now = Date.now();
+
+          if (volume > 0.025) {
+            voiceDetectedRef.current = true;
+            lastVoiceAtRef.current = now;
+          }
+
+          const recordingDuration = now - recordingStartedAtRef.current;
+          const silenceDuration = now - lastVoiceAtRef.current;
+
+          if (
+            voiceDetectedRef.current &&
+            recordingDuration > 1000 &&
+            silenceDuration > 1300
+          ) {
+            stopRecording();
+            return;
+          }
+
+          if (!voiceDetectedRef.current && recordingDuration > 7000) {
+            stopRecording();
+            return;
+          }
+
+          recordingFrameRef.current = window.requestAnimationFrame(monitorVoice);
+        };
+
+        recordingFrameRef.current = window.requestAnimationFrame(monitorVoice);
+      }
+
+      recordingTimeoutRef.current = window.setTimeout(() => {
+        stopRecording();
+      }, 45000);
     } catch {
+      setRecording(false);
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current = null;
+      clearRecordingMonitor();
       setVoiceError("Mikrofon izni alınamadı.");
     }
   };
 
+  const toggleRecording = () => {
+    if (recording) {
+      stopRecording();
+      return;
+    }
+
+    void startRecording();
+  };
+
   const resetConversation = () => {
     stopCurrentAudio();
+    stopRecording(true);
 
     setMessages([
       {
@@ -1039,6 +1183,25 @@ export default function LinaPanel({
           )}
 
           <div className="rounded-[28px] bg-white p-2 shadow-[0_18px_45px_rgba(15,23,42,0.10)]">
+            {(recording || transcribing) && (
+              <div className="mb-2 flex min-h-11 items-center justify-center gap-3 rounded-[22px] bg-[#F5F0FF] px-4 text-sm font-black text-[#6D28D9]">
+                {recording ? (
+                  <>
+                    <span className="relative flex h-3 w-3">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#8B5CF6] opacity-50" />
+                      <span className="relative inline-flex h-3 w-3 rounded-full bg-[#7C3AED]" />
+                    </span>
+                    Dinliyorum… Bitirince otomatik göndereceğim.
+                  </>
+                ) : (
+                  <>
+                    <Loader2 size={17} className="animate-spin" />
+                    Sesiniz yazıya çevriliyor…
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
               <textarea
                 value={input}
@@ -1049,26 +1212,35 @@ export default function LinaPanel({
                     sendMessage();
                   }
                 }}
-                placeholder="Lina’ya yaz veya mikrofona basıp anlat..."
-                className="max-h-24 min-h-12 flex-1 resize-none rounded-[22px] bg-[#F8FAFC] px-4 py-3 text-sm font-semibold text-[#06194A] outline-none placeholder:text-[#94A3B8]"
+                disabled={recording || transcribing}
+                placeholder={
+                  recording
+                    ? "Sizi dinliyorum…"
+                    : transcribing
+                      ? "Ses işleniyor…"
+                      : "Lina’ya yaz veya mikrofona dokunup konuş…"
+                }
+                className="max-h-24 min-h-12 flex-1 resize-none rounded-[22px] bg-[#F8FAFC] px-4 py-3 text-sm font-semibold text-[#06194A] outline-none placeholder:text-[#94A3B8] disabled:opacity-70"
               />
 
               <button
                 type="button"
-                onClick={recording ? stopRecording : startRecording}
-                disabled={loading}
-                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-sm transition disabled:opacity-60 ${
-                  recording ? "bg-red-600 text-white" : "bg-white text-[#7C3AED]"
+                onClick={toggleRecording}
+                disabled={loading || transcribing}
+                className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-[0_10px_24px_rgba(124,58,237,0.18)] transition active:scale-95 disabled:opacity-50 ${
+                  recording
+                    ? "bg-[#7C3AED] text-white ring-4 ring-[#EDE9FE]"
+                    : "bg-[#F5F0FF] text-[#7C3AED]"
                 }`}
-                aria-label={recording ? "Kaydı durdur" : "Konuş"}
+                aria-label={recording ? "Konuşmayı bitir" : "Sesli konuş"}
               >
-                {recording ? <MicOff size={21} /> : <Mic size={21} />}
+                <Mic size={22} className={recording ? "animate-pulse" : ""} />
               </button>
 
               <button
                 type="button"
                 onClick={() => sendMessage()}
-                disabled={loading || !input.trim()}
+                disabled={loading || recording || transcribing || !input.trim()}
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#1557D6] text-white shadow-[0_10px_24px_rgba(21,87,214,0.24)] transition disabled:opacity-50"
                 aria-label="Gönder"
               >
