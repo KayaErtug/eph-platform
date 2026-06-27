@@ -6,9 +6,11 @@ import {
   BarChart3,
   Bell,
   Bot,
+  Brain,
   Building2,
   CheckCircle2,
   ChevronRight,
+  Clock3,
   Loader2,
   Mic,
   MicOff,
@@ -17,6 +19,7 @@ import {
   Sparkles,
   Star,
   Target,
+  Trash2,
   UserRound,
   Users,
   Volume2,
@@ -38,6 +41,30 @@ type LinaChatResponse = {
   success?: boolean;
   message?: string;
   reply?: string;
+  error?: string;
+};
+
+type LinaEndOfDayChoice =
+  | "OTUZ_GUN_KAYDET"
+  | "KALICI_KAYDET"
+  | "BUGUNU_SIL";
+
+type LinaEndOfDayReview = {
+  id: string;
+  date: string;
+  summary: string;
+  sessionCount: number;
+  conversationCount: number;
+  choice: LinaEndOfDayChoice | null;
+  status: string;
+};
+
+type LinaEndOfDayResponse = {
+  available?: boolean;
+  date?: string;
+  review?: LinaEndOfDayReview | null;
+  success?: boolean;
+  message?: string;
   error?: string;
 };
 
@@ -161,6 +188,25 @@ function getLinaChatEndpoints() {
   return Array.from(new Set(endpoints));
 }
 
+function getLinaMemoryEndpoints(path: string) {
+  const envBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const isLocal =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1");
+
+  const endpoints = [
+    envBase ? `${envBase}${normalizedPath}` : "",
+    `/api${normalizedPath}`,
+    normalizedPath,
+    `https://emlakportfoyhavuzu.com/api${normalizedPath}`,
+    isLocal ? `http://localhost:3001${normalizedPath}` : "",
+  ].filter(Boolean);
+
+  return Array.from(new Set(endpoints));
+}
+
 export default function LinaPanel({
   open = true,
   onClose = () => {},
@@ -187,6 +233,11 @@ export default function LinaPanel({
   const [speaking, setSpeaking] = useState(false);
   const [recording, setRecording] = useState(false);
   const [voiceError, setVoiceError] = useState("");
+  const [endOfDayReview, setEndOfDayReview] =
+    useState<LinaEndOfDayReview | null>(null);
+  const [memoryLoading, setMemoryLoading] = useState(false);
+  const [memorySaving, setMemorySaving] = useState(false);
+  const [memoryMessage, setMemoryMessage] = useState("");
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -195,6 +246,153 @@ export default function LinaPanel({
     if (hour < 18) return "İyi günler";
     return "İyi akşamlar";
   }, []);
+
+  const fetchEndOfDayReview = async () => {
+    const token = getAuthToken(user);
+
+    if (!token) {
+      setEndOfDayReview(null);
+      return;
+    }
+
+    setMemoryLoading(true);
+
+    try {
+      const endpoints = getLinaMemoryEndpoints(
+        "/lina/memory/end-of-day",
+      );
+      let lastError = "";
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          });
+
+          const raw = await response.text();
+          let data: LinaEndOfDayResponse = {};
+
+          try {
+            data = raw
+              ? (JSON.parse(raw) as LinaEndOfDayResponse)
+              : {};
+          } catch {
+            data = { message: raw };
+          }
+
+          if (!response.ok) {
+            lastError =
+              data?.message ||
+              data?.error ||
+              `HTTP ${response.status}`;
+            continue;
+          }
+
+          const review =
+            data?.available &&
+            data?.review &&
+            data.review.status !== "TAMAMLANDI"
+              ? data.review
+              : null;
+
+          setEndOfDayReview(review);
+          setMemoryMessage("");
+          return;
+        } catch (error) {
+          lastError =
+            error instanceof Error
+              ? error.message
+              : "Gün sonu hafızası alınamadı.";
+        }
+      }
+
+      throw new Error(lastError || "Gün sonu hafızası alınamadı.");
+    } catch {
+      setEndOfDayReview(null);
+    } finally {
+      setMemoryLoading(false);
+    }
+  };
+
+  const saveEndOfDayChoice = async (
+    choice: LinaEndOfDayChoice,
+  ) => {
+    const token = getAuthToken(user);
+
+    if (!token || !endOfDayReview || memorySaving) {
+      return;
+    }
+
+    setMemorySaving(true);
+    setMemoryMessage("");
+
+    try {
+      const endpoints = getLinaMemoryEndpoints(
+        "/lina/memory/end-of-day",
+      );
+      let lastError = "";
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              choice,
+              date: endOfDayReview.date,
+            }),
+          });
+
+          const raw = await response.text();
+          let data: LinaEndOfDayResponse = {};
+
+          try {
+            data = raw
+              ? (JSON.parse(raw) as LinaEndOfDayResponse)
+              : {};
+          } catch {
+            data = { message: raw };
+          }
+
+          if (!response.ok) {
+            lastError =
+              data?.message ||
+              data?.error ||
+              `HTTP ${response.status}`;
+            continue;
+          }
+
+          setMemoryMessage(
+            data?.message || "Hafıza tercihiniz kaydedildi.",
+          );
+          setEndOfDayReview(null);
+          return;
+        } catch (error) {
+          lastError =
+            error instanceof Error
+              ? error.message
+              : "Hafıza tercihi kaydedilemedi.";
+        }
+      }
+
+      throw new Error(lastError || "Hafıza tercihi kaydedilemedi.");
+    } catch (error) {
+      setMemoryMessage(
+        error instanceof Error
+          ? error.message
+          : "Hafıza tercihi kaydedilemedi.",
+      );
+    } finally {
+      setMemorySaving(false);
+    }
+  };
 
   const stopCurrentAudio = () => {
     if (audioRef.current) {
@@ -213,6 +411,12 @@ export default function LinaPanel({
 
     setRecording(false);
   };
+
+  useEffect(() => {
+    if (!open) return;
+
+    void fetchEndOfDayReview();
+  }, [open, user]);
 
   useEffect(() => {
     if (!open) return;
@@ -364,6 +568,7 @@ export default function LinaPanel({
       setMessages((prev) => [...prev, { role: "lina", text: reply }]);
 
       await speakWithElevenLabs(reply);
+      await fetchEndOfDayReview();
     } catch {
       const fallback =
         "Şu anda Lina'nın ana beyniyle bağlantı kurulamadı. Demo cevap üretmeyeceğim. Lütfen bağlantı ayarlarını kontrol ettikten sonra tekrar deneyin.";
@@ -591,6 +796,97 @@ export default function LinaPanel({
               ))}
             </div>
           </section>
+
+          {(endOfDayReview || memoryLoading || memoryMessage) && (
+            <section className="mt-5">
+              <div className="rounded-[28px] border border-[#D8E6FB] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EEF5FF] p-4 shadow-[0_14px_38px_rgba(15,23,42,0.07)]">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EAF2FF] text-[#1557D6]">
+                    <Brain size={23} />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base font-black">
+                      Gün Sonu Hafıza Onayı
+                    </h3>
+
+                    {memoryLoading && !endOfDayReview ? (
+                      <div className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-[#64748B]">
+                        <Loader2 size={16} className="animate-spin" />
+                        Günlük özet hazırlanıyor...
+                      </div>
+                    ) : endOfDayReview ? (
+                      <>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-black text-[#475569] shadow-sm">
+                            <Clock3 size={13} />
+                            {endOfDayReview.conversationCount} konuşma
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-black text-[#475569] shadow-sm">
+                            {endOfDayReview.sessionCount} oturum
+                          </span>
+                        </div>
+
+                        <p className="mt-3 text-sm font-semibold leading-6 text-[#334155]">
+                          {endOfDayReview.summary}
+                        </p>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+
+                {endOfDayReview && (
+                  <div className="mt-4 grid gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        saveEndOfDayChoice("OTUZ_GUN_KAYDET")
+                      }
+                      disabled={memorySaving}
+                      className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1557D6] px-4 text-sm font-black text-white shadow-[0_10px_24px_rgba(21,87,214,0.22)] disabled:opacity-60"
+                    >
+                      {memorySaving ? (
+                        <Loader2 size={17} className="animate-spin" />
+                      ) : (
+                        <Clock3 size={17} />
+                      )}
+                      30 Gün Hafızaya Kaydet
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        saveEndOfDayChoice("KALICI_KAYDET")
+                      }
+                      disabled={memorySaving}
+                      className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#F4C95D] bg-[#FFFBEB] px-4 text-sm font-black text-[#9A6700] disabled:opacity-60"
+                    >
+                      <Star size={17} />
+                      Kalıcı Hafızaya Ekle
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        saveEndOfDayChoice("BUGUNU_SIL")
+                      }
+                      disabled={memorySaving}
+                      className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#FECACA] bg-[#FFF7F7] px-4 text-sm font-black text-[#C24141] disabled:opacity-60"
+                    >
+                      <Trash2 size={17} />
+                      Bugünkü Konuşmaları Sil
+                    </button>
+                  </div>
+                )}
+
+                {memoryMessage && (
+                  <p className="mt-3 rounded-2xl bg-white px-4 py-3 text-center text-xs font-black text-[#1557D6] shadow-sm">
+                    {memoryMessage}
+                  </p>
+                )}
+              </div>
+            </section>
+          )}
 
           <section className="mt-6">
             <h3 className="px-1 text-center text-xl font-black tracking-tight">

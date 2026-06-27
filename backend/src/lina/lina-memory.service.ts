@@ -1,5 +1,16 @@
-import { Injectable } from "@nestjs/common";
-import { LinaDurum, LinaKanal, LinaModul } from "@prisma/client";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import {
+  LinaDurum,
+  LinaGunSonuSecimi,
+  LinaHafizaKatmani,
+  LinaHafizaOnemi,
+  LinaKanal,
+  LinaModul,
+} from "@prisma/client";
 
 import { PrismaService } from "../prisma/prisma.service";
 import { LinaPreferencesDto } from "./dto/lina-preferences.dto";
@@ -401,6 +412,406 @@ export class LinaMemoryService {
     ]);
   }
 
+  async getMemoryCenter(userId: string) {
+    await this.expireThirtyDayMemories(userId);
+
+    const [memories, endOfDay] = await Promise.all([
+      this.prisma.linaHafiza.findMany({
+        where: {
+          kullaniciId: userId,
+          aktifMi: true,
+          kullaniciOnayliMi: true,
+          silinmeTarihi: null,
+          OR: [
+            { kaliciMi: true },
+            { gecerlilikTarihi: { gte: new Date() } },
+          ],
+        },
+        orderBy: [
+          { kaliciMi: "desc" },
+          { guncellenmeTarihi: "desc" },
+        ],
+        select: {
+          id: true,
+          katman: true,
+          onem: true,
+          baslik: true,
+          icerik: true,
+          veri: true,
+          kaliciMi: true,
+          kaynakModul: true,
+          onayTarihi: true,
+          gecerlilikTarihi: true,
+          sonKullanilmaTarihi: true,
+          kullanimSayisi: true,
+          olusturulmaTarihi: true,
+          guncellenmeTarihi: true,
+        },
+      }),
+      this.getOrCreateEndOfDayReview(userId),
+    ]);
+
+    const mappedMemories = memories.map((memory) =>
+      this.mapMemoryRecord(memory),
+    );
+
+    return {
+      success: true,
+      counts: {
+        total: mappedMemories.length,
+        thirtyDay: mappedMemories.filter((memory) => !memory.permanent)
+          .length,
+        permanent: mappedMemories.filter((memory) => memory.permanent)
+          .length,
+      },
+      thirtyDayMemories: mappedMemories.filter(
+        (memory) => !memory.permanent,
+      ),
+      permanentMemories: mappedMemories.filter(
+        (memory) => memory.permanent,
+      ),
+      endOfDay,
+    };
+  }
+
+  async getOrCreateEndOfDayReview(
+    userId: string,
+    requestedDate?: string,
+  ) {
+    const dateKey = this.normalizeDateKey(requestedDate);
+    const { start, end, databaseDate } =
+      this.getIstanbulDayRange(dateKey);
+
+    const conversations = await this.prisma.linaKonusma.findMany({
+      where: {
+        kullaniciId: userId,
+        silinmeTarihi: null,
+        olusturulmaTarihi: {
+          gte: start,
+          lt: end,
+        },
+      },
+      orderBy: {
+        olusturulmaTarihi: "asc",
+      },
+      select: {
+        id: true,
+        oturumId: true,
+        modul: true,
+        kullaniciMesaji: true,
+        linaCevabi: true,
+        ozet: true,
+        olusturulmaTarihi: true,
+      },
+    });
+
+    if (!conversations.length) {
+      return {
+        available: false,
+        date: dateKey,
+        review: null,
+      };
+    }
+
+    const existing = await this.prisma.linaGunSonuOnayi.findUnique({
+      where: {
+        kullaniciId_tarih: {
+          kullaniciId: userId,
+          tarih: databaseDate,
+        },
+      },
+    });
+
+    if (existing?.durum === LinaDurum.TAMAMLANDI) {
+      return {
+        available: true,
+        date: dateKey,
+        review: this.mapEndOfDayReview(existing),
+      };
+    }
+
+    const sessionIds = Array.from(
+      new Set(
+        conversations
+          .map((conversation) => conversation.oturumId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    const dailySummary = this.buildDailySummary(conversations);
+
+    const review = existing
+      ? await this.prisma.linaGunSonuOnayi.update({
+          where: {
+            id: existing.id,
+          },
+          data: {
+            gunlukOzet: dailySummary,
+            oturumIdleri: sessionIds,
+            oturumSayisi: sessionIds.length,
+            konusmaSayisi: conversations.length,
+            durum: LinaDurum.BEKLIYOR,
+          },
+        })
+      : await this.prisma.linaGunSonuOnayi.create({
+          data: {
+            kullaniciId: userId,
+            tarih: databaseDate,
+            gunlukOzet: dailySummary,
+            oturumIdleri: sessionIds,
+            oturumSayisi: sessionIds.length,
+            konusmaSayisi: conversations.length,
+            durum: LinaDurum.BEKLIYOR,
+          },
+        });
+
+    return {
+      available: true,
+      date: dateKey,
+      review: this.mapEndOfDayReview(review),
+    };
+  }
+
+  async decideEndOfDay(
+    userId: string,
+    choiceValue: string,
+    requestedDate?: string,
+  ) {
+    const choice = this.normalizeEndOfDayChoice(choiceValue);
+    const dateKey = this.normalizeDateKey(requestedDate);
+    const { start, end, databaseDate } =
+      this.getIstanbulDayRange(dateKey);
+
+    const prepared = await this.getOrCreateEndOfDayReview(
+      userId,
+      dateKey,
+    );
+
+    if (!prepared.available || !prepared.review) {
+      throw new BadRequestException(
+        "Bu tarih için kaydedilecek Lina konuşması bulunamadı.",
+      );
+    }
+
+    const review = await this.prisma.linaGunSonuOnayi.findUnique({
+      where: {
+        kullaniciId_tarih: {
+          kullaniciId: userId,
+          tarih: databaseDate,
+        },
+      },
+    });
+
+    if (!review) {
+      throw new NotFoundException("Gün sonu hafıza özeti bulunamadı.");
+    }
+
+    const now = new Date();
+
+    if (choice === LinaGunSonuSecimi.BUGUNU_SIL) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.linaHafiza.updateMany({
+          where: {
+            kullaniciId: userId,
+            gunSonuOnayId: review.id,
+            silinmeTarihi: null,
+          },
+          data: {
+            aktifMi: false,
+            silinmeTarihi: now,
+          },
+        });
+
+        await tx.linaKonusma.updateMany({
+          where: {
+            kullaniciId: userId,
+            silinmeTarihi: null,
+            olusturulmaTarihi: {
+              gte: start,
+              lt: end,
+            },
+          },
+          data: {
+            silinmeTarihi: now,
+          },
+        });
+
+        if (review.oturumIdleri.length) {
+          await tx.linaOturum.updateMany({
+            where: {
+              kullaniciId: userId,
+              id: {
+                in: review.oturumIdleri,
+              },
+              silinmeTarihi: null,
+            },
+            data: {
+              durum: LinaDurum.IPTAL,
+              kapanmaTarihi: now,
+              silinmeTarihi: now,
+            },
+          });
+        }
+
+        await tx.linaGunSonuOnayi.update({
+          where: {
+            id: review.id,
+          },
+          data: {
+            secim: choice,
+            durum: LinaDurum.TAMAMLANDI,
+            onayTarihi: now,
+          },
+        });
+      });
+
+      return {
+        success: true,
+        choice,
+        message: "Bugünkü Lina konuşmaları silindi.",
+      };
+    }
+
+    const conversations = await this.prisma.linaKonusma.findMany({
+      where: {
+        kullaniciId: userId,
+        silinmeTarihi: null,
+        olusturulmaTarihi: {
+          gte: start,
+          lt: end,
+        },
+      },
+      orderBy: {
+        olusturulmaTarihi: "asc",
+      },
+      take: 40,
+      select: {
+        modul: true,
+        kullaniciMesaji: true,
+        linaCevabi: true,
+        olusturulmaTarihi: true,
+      },
+    });
+
+    const permanent =
+      choice === LinaGunSonuSecimi.KALICI_KAYDET;
+    const expiresAt = permanent
+      ? null
+      : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const memoryData = {
+      date: dateKey,
+      sessionIds: review.oturumIdleri,
+      sessionCount: review.oturumSayisi,
+      conversationCount: review.konusmaSayisi,
+      conversations: conversations.map((conversation) => ({
+        module: conversation.modul,
+        user: this.cleanMemoryText(
+          conversation.kullaniciMesaji,
+          500,
+        ),
+        assistant: this.cleanMemoryText(
+          conversation.linaCevabi || "",
+          700,
+        ),
+        createdAt: conversation.olusturulmaTarihi.toISOString(),
+      })),
+    };
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.linaHafiza.updateMany({
+        where: {
+          kullaniciId: userId,
+          gunSonuOnayId: review.id,
+          silinmeTarihi: null,
+        },
+        data: {
+          aktifMi: false,
+          silinmeTarihi: now,
+        },
+      });
+
+      const memory = await tx.linaHafiza.create({
+        data: {
+          kullaniciId: userId,
+          gunSonuOnayId: review.id,
+          katman: LinaHafizaKatmani.KULLANICI,
+          onem: permanent
+            ? LinaHafizaOnemi.KALICI
+            : LinaHafizaOnemi.YUKSEK,
+          baslik: `${this.formatTurkishDate(dateKey)} Gün Özeti`,
+          icerik: review.gunlukOzet,
+          veri: memoryData,
+          kaliciMi: permanent,
+          kullaniciOnayliMi: true,
+          aktifMi: true,
+          kaynakModul: LinaModul.GENEL,
+          onayTarihi: now,
+          gecerlilikTarihi: expiresAt,
+        },
+      });
+
+      const updatedReview = await tx.linaGunSonuOnayi.update({
+        where: {
+          id: review.id,
+        },
+        data: {
+          secim: choice,
+          durum: LinaDurum.TAMAMLANDI,
+          onayTarihi: now,
+        },
+      });
+
+      return {
+        memory,
+        review: updatedReview,
+      };
+    });
+
+    return {
+      success: true,
+      choice,
+      message: permanent
+        ? "Bugünün özeti kalıcı hafızaya eklendi."
+        : "Bugünün özeti 30 günlük hafızaya eklendi.",
+      memory: this.mapMemoryRecord(result.memory),
+      review: this.mapEndOfDayReview(result.review),
+    };
+  }
+
+  async deleteMemory(userId: string, memoryId: string) {
+    const memory = await this.prisma.linaHafiza.findFirst({
+      where: {
+        id: memoryId,
+        kullaniciId: userId,
+        silinmeTarihi: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!memory) {
+      throw new NotFoundException("Hafıza kaydı bulunamadı.");
+    }
+
+    await this.prisma.linaHafiza.update({
+      where: {
+        id: memory.id,
+      },
+      data: {
+        aktifMi: false,
+        silinmeTarihi: new Date(),
+      },
+    });
+
+    return {
+      success: true,
+      message: "Hafıza kaydı silindi.",
+      memoryId: memory.id,
+    };
+  }
+
   isQuietNow(preferences: LinaMemoryPreference, now = new Date()): boolean {
     if (!preferences.quietHoursEnabled) {
       return false;
@@ -422,6 +833,256 @@ export class LinaMemoryService {
     }
 
     return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+  }
+
+  private async expireThirtyDayMemories(
+    userId: string,
+  ): Promise<void> {
+    await this.prisma.linaHafiza.updateMany({
+      where: {
+        kullaniciId: userId,
+        kaliciMi: false,
+        aktifMi: true,
+        silinmeTarihi: null,
+        gecerlilikTarihi: {
+          lt: new Date(),
+        },
+      },
+      data: {
+        aktifMi: false,
+      },
+    });
+  }
+
+  private normalizeEndOfDayChoice(
+    value: string,
+  ): LinaGunSonuSecimi {
+    const normalized = String(value || "")
+      .trim()
+      .toUpperCase();
+
+    if (
+      normalized === LinaGunSonuSecimi.OTUZ_GUN_KAYDET ||
+      normalized === "30_GUN_KAYDET" ||
+      normalized === "30_GÜN_KAYDET"
+    ) {
+      return LinaGunSonuSecimi.OTUZ_GUN_KAYDET;
+    }
+
+    if (
+      normalized === LinaGunSonuSecimi.KALICI_KAYDET ||
+      normalized === "KALICI_HAFIZAYA_EKLE"
+    ) {
+      return LinaGunSonuSecimi.KALICI_KAYDET;
+    }
+
+    if (
+      normalized === LinaGunSonuSecimi.BUGUNU_SIL ||
+      normalized === "BUGUNKU_KONUSMALARI_SIL" ||
+      normalized === "BUGÜNKÜ_KONUŞMALARI_SİL"
+    ) {
+      return LinaGunSonuSecimi.BUGUNU_SIL;
+    }
+
+    throw new BadRequestException("Geçersiz gün sonu hafıza seçimi.");
+  }
+
+  private normalizeDateKey(value?: string): string {
+    if (!value) {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Europe/Istanbul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+    }
+
+    const normalized = String(value).trim();
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+      throw new BadRequestException(
+        "Tarih YYYY-MM-DD formatında olmalıdır.",
+      );
+    }
+
+    return normalized;
+  }
+
+  private getIstanbulDayRange(dateKey: string) {
+    const [year, month, day] = dateKey.split("-").map(Number);
+
+    if (
+      !year ||
+      !month ||
+      !day ||
+      month < 1 ||
+      month > 12 ||
+      day < 1 ||
+      day > 31
+    ) {
+      throw new BadRequestException("Geçersiz tarih.");
+    }
+
+    const start = new Date(
+      Date.UTC(year, month - 1, day, -3, 0, 0, 0),
+    );
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    const databaseDate = new Date(
+      Date.UTC(year, month - 1, day, 0, 0, 0, 0),
+    );
+
+    return {
+      start,
+      end,
+      databaseDate,
+    };
+  }
+
+  private buildDailySummary(
+    conversations: Array<{
+      modul: LinaModul;
+      kullaniciMesaji: string;
+      linaCevabi: string | null;
+    }>,
+  ): string {
+    const moduleCounts = new Map<string, number>();
+
+    for (const conversation of conversations) {
+      const label = this.getModuleLabel(conversation.modul);
+      moduleCounts.set(label, (moduleCounts.get(label) || 0) + 1);
+    }
+
+    const moduleSummary = Array.from(moduleCounts.entries())
+      .map(([label, count]) => `${label}: ${count}`)
+      .join(", ");
+
+    const topics = Array.from(
+      new Set(
+        conversations
+          .map((conversation) =>
+            this.cleanMemoryText(conversation.kullaniciMesaji, 110),
+          )
+          .filter(Boolean),
+      ),
+    )
+      .slice(-4)
+      .map((topic) => `“${topic}”`)
+      .join("; ");
+
+    return [
+      `Bugün Lina ile ${conversations.length} konuşma yaptınız.`,
+      moduleSummary
+        ? `Modül dağılımı: ${moduleSummary}.`
+        : "",
+      topics
+        ? `Öne çıkan konuşmalar: ${topics}.`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .slice(0, 1800);
+  }
+
+  private getModuleLabel(module: LinaModul): string {
+    const labels: Partial<Record<LinaModul, string>> = {
+      [LinaModul.GENEL]: "Genel sohbet",
+      [LinaModul.PORTFOY]: "Portföy",
+      [LinaModul.CRM]: "CRM",
+      [LinaModul.FORUM]: "Forum",
+      [LinaModul.HAVUZ]: "Havuz",
+      [LinaModul.GOREV]: "Görev",
+      [LinaModul.RAPORLAMA]: "Raporlama",
+      [LinaModul.BILDIRIM]: "Bildirim",
+      [LinaModul.YETKI]: "Yetki",
+    };
+
+    return labels[module] || String(module);
+  }
+
+  private cleanMemoryText(
+    value: string,
+    maxLength: number,
+  ): string {
+    return String(value || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, maxLength);
+  }
+
+  private formatTurkishDate(dateKey: string): string {
+    const [year, month, day] = dateKey.split("-").map(Number);
+
+    return new Intl.DateTimeFormat("tr-TR", {
+      timeZone: "Europe/Istanbul",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    }).format(
+      new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
+    );
+  }
+
+  private mapMemoryRecord(memory: {
+    id: string;
+    katman: LinaHafizaKatmani;
+    onem: LinaHafizaOnemi;
+    baslik: string;
+    icerik: string;
+    veri: unknown;
+    kaliciMi: boolean;
+    kaynakModul: LinaModul;
+    onayTarihi: Date | null;
+    gecerlilikTarihi: Date | null;
+    sonKullanilmaTarihi: Date | null;
+    kullanimSayisi: number;
+    olusturulmaTarihi: Date;
+    guncellenmeTarihi: Date;
+  }) {
+    return {
+      id: memory.id,
+      layer: memory.katman,
+      importance: memory.onem,
+      title: memory.baslik,
+      content: memory.icerik,
+      data: memory.veri,
+      permanent: memory.kaliciMi,
+      sourceModule: memory.kaynakModul,
+      approvedAt: memory.onayTarihi?.toISOString() ?? null,
+      expiresAt: memory.gecerlilikTarihi?.toISOString() ?? null,
+      lastUsedAt:
+        memory.sonKullanilmaTarihi?.toISOString() ?? null,
+      usageCount: memory.kullanimSayisi,
+      createdAt: memory.olusturulmaTarihi.toISOString(),
+      updatedAt: memory.guncellenmeTarihi.toISOString(),
+    };
+  }
+
+  private mapEndOfDayReview(review: {
+    id: string;
+    tarih: Date;
+    gunlukOzet: string;
+    oturumIdleri: string[];
+    oturumSayisi: number;
+    konusmaSayisi: number;
+    secim: LinaGunSonuSecimi | null;
+    durum: LinaDurum;
+    onayTarihi: Date | null;
+    olusturulmaTarihi: Date;
+    guncellenmeTarihi: Date;
+  }) {
+    return {
+      id: review.id,
+      date: review.tarih.toISOString().slice(0, 10),
+      summary: review.gunlukOzet,
+      sessionIds: review.oturumIdleri,
+      sessionCount: review.oturumSayisi,
+      conversationCount: review.konusmaSayisi,
+      choice: review.secim,
+      status: review.durum,
+      approvedAt: review.onayTarihi?.toISOString() ?? null,
+      createdAt: review.olusturulmaTarihi.toISOString(),
+      updatedAt: review.guncellenmeTarihi.toISOString(),
+    };
   }
 
   private async getOrCreateSession(
