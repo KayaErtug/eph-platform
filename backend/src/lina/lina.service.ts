@@ -14,7 +14,12 @@ import {
 } from "./lina-access.service";
 import { LinaKvkkService } from "./lina-kvkk.service";
 import { LinaAuditService } from "./lina-audit.service";
-import { LinaMemoryService } from "./lina-memory.service";
+import {
+  LinaHistoryMessage,
+  LinaMemoryService,
+  LinaPreparedChat,
+  LinaPromptMemorySnapshot,
+} from "./lina-memory.service";
 import { LinaPortfolioSessionService } from "./portfolio/lina-portfolio-session.service";
 import { LinaPortfolioEngineService } from "./portfolio/lina-portfolio-engine.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -45,6 +50,12 @@ type LinaVoiceResponse = {
   mimeType?: string;
   kvkkFiltered: boolean;
   blockedReason?: string;
+};
+
+type LinaProviderAnswer = {
+  content: string;
+  inputTokens: number;
+  outputTokens: number;
 };
 
 @Injectable()
@@ -129,33 +140,49 @@ export class LinaService {
       sourceModule,
       user,
     );
+    const chatPreparation = await this.safePrepareChat(user, sourceModule);
 
     try {
       const provider = this.getAiProvider();
-      const rawAnswer =
+      const providerAnswer =
         provider === "claude"
           ? await this.askClaude(
               safeUserMessage,
               sourceModule,
               user,
               portfolioRuntimeContext,
+              chatPreparation?.history || [],
+              chatPreparation?.memorySnapshot,
             )
           : await this.askOpenAi(
               safeUserMessage,
               sourceModule,
               user,
               portfolioRuntimeContext,
+              chatPreparation?.history || [],
+              chatPreparation?.memorySnapshot,
             );
+      const rawAnswer = providerAnswer.content;
+
+      const outputFilter = this.linaKvkkService.filterText(rawAnswer);
+      const kvkkFiltered = outputFilter.filtered || inputFilter.filtered;
 
       await this.rememberPortfolioAssistantMessage(
         safeUserMessage,
-        rawAnswer,
+        outputFilter.safeText,
         sourceModule,
         user,
       );
 
-      const outputFilter = this.linaKvkkService.filterText(rawAnswer);
-      const kvkkFiltered = outputFilter.filtered || inputFilter.filtered;
+      await this.safeRecordConversation({
+        preparation: chatPreparation,
+        user,
+        sourceModule,
+        userMessage: safeUserMessage,
+        assistantMessage: outputFilter.safeText,
+        inputTokenCount: providerAnswer.inputTokens,
+        outputTokenCount: providerAnswer.outputTokens,
+      });
 
       this.linaAuditService.log({
         userId: user?.id,
@@ -242,6 +269,7 @@ export class LinaService {
       };
     }
 
+    await this.linaMemoryService.clearUserMemory(user.id);
     const preferences = await this.linaMemoryService.resetPreferences(user.id);
 
     this.linaAuditService.log({
@@ -255,7 +283,8 @@ export class LinaService {
 
     return {
       success: true,
-      message: "Kayıtlı Lina tercihlerinizi sıfırladım.",
+      message:
+        "Lina konuşma geçmişiniz, kayıtlı hafızanız ve tercihleriniz temizlendi.",
       preferences,
     };
   }
@@ -390,13 +419,19 @@ export class LinaService {
     sourceModule: LinaModuleName,
     user?: LinaApiUser,
     portfolioRuntimeContext = "",
-  ): Promise<string> {
+    history: LinaHistoryMessage[] = [],
+    memorySnapshot?: LinaPromptMemorySnapshot,
+  ): Promise<LinaProviderAnswer> {
     const apiKey =
       this.configService.get<string>("OPENAI_API_KEY") ||
       process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
-      return this.localFallbackAnswer(message);
+      return {
+        content: this.localFallbackAnswer(message),
+        inputTokens: 0,
+        outputTokens: 0,
+      };
     }
 
     const model =
@@ -407,6 +442,7 @@ export class LinaService {
       sourceModule,
       user,
       portfolioRuntimeContext,
+      memorySnapshot,
     );
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -426,6 +462,7 @@ export class LinaService {
             role: "system",
             content: systemPrompt,
           },
+          ...history,
           {
             role: "user",
             content: message,
@@ -445,6 +482,10 @@ export class LinaService {
           content?: string;
         };
       }>;
+      usage?: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+      };
     };
 
     const content = data?.choices?.[0]?.message?.content?.trim();
@@ -453,7 +494,11 @@ export class LinaService {
       throw new Error("OPENAI_EMPTY_RESPONSE");
     }
 
-    return content;
+    return {
+      content,
+      inputTokens: data.usage?.prompt_tokens || 0,
+      outputTokens: data.usage?.completion_tokens || 0,
+    };
   }
 
   private async askClaude(
@@ -461,13 +506,19 @@ export class LinaService {
     sourceModule: LinaModuleName,
     user?: LinaApiUser,
     portfolioRuntimeContext = "",
-  ): Promise<string> {
+    history: LinaHistoryMessage[] = [],
+    memorySnapshot?: LinaPromptMemorySnapshot,
+  ): Promise<LinaProviderAnswer> {
     const apiKey =
       this.configService.get<string>("ANTHROPIC_API_KEY") ||
       process.env.ANTHROPIC_API_KEY;
 
     if (!apiKey) {
-      return this.localFallbackAnswer(message);
+      return {
+        content: this.localFallbackAnswer(message),
+        inputTokens: 0,
+        outputTokens: 0,
+      };
     }
 
     const model =
@@ -478,6 +529,7 @@ export class LinaService {
       sourceModule,
       user,
       portfolioRuntimeContext,
+      memorySnapshot,
     );
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -493,6 +545,7 @@ export class LinaService {
         temperature: 0.18,
         system: systemPrompt,
         messages: [
+          ...history,
           {
             role: "user",
             content: message,
@@ -511,6 +564,10 @@ export class LinaService {
         type?: string;
         text?: string;
       }>;
+      usage?: {
+        input_tokens?: number;
+        output_tokens?: number;
+      };
     };
 
     const content = data?.content
@@ -521,7 +578,11 @@ export class LinaService {
       throw new Error("CLAUDE_EMPTY_RESPONSE");
     }
 
-    return content;
+    return {
+      content,
+      inputTokens: data.usage?.input_tokens || 0,
+      outputTokens: data.usage?.output_tokens || 0,
+    };
   }
 
   private async askElevenLabs(text: string): Promise<Buffer> {
@@ -612,7 +673,10 @@ export class LinaService {
     normalized = this.normalizeMeasurementForVoice(normalized);
     normalized = this.normalizeRealEstateZeroMeaningForVoice(normalized);
 
-    return normalized.replace(/\s+\/\s+/g, " ").replace(/\s{2,}/g, " ").trim();
+    return normalized
+      .replace(/\s+\/\s+/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
   }
 
   private normalizeMoneyForVoice(text: string): string {
@@ -648,27 +712,45 @@ export class LinaService {
 
   private normalizeMeasurementForVoice(text: string): string {
     return text
-      .replace(/\b(\d{1,3}(?:[.,]\d{3})+|\d+)\s*(m²|m2|metrekare)\b/gi, (_match, value) => {
-        const numberValue = this.parseTurkishNumber(value);
-        const spoken = numberValue === null ? String(value) : this.numberToTurkishWords(numberValue);
+      .replace(
+        /\b(\d{1,3}(?:[.,]\d{3})+|\d+)\s*(m²|m2|metrekare)\b/gi,
+        (_match, value) => {
+          const numberValue = this.parseTurkishNumber(value);
+          const spoken =
+            numberValue === null
+              ? String(value)
+              : this.numberToTurkishWords(numberValue);
 
-        return `${spoken} metrekare`;
-      })
-      .replace(/\b(\d{1,3}(?:[.,]\d{3})+|\d+)\s*(m³|m3|metreküp)\b/gi, (_match, value) => {
-        const numberValue = this.parseTurkishNumber(value);
-        const spoken = numberValue === null ? String(value) : this.numberToTurkishWords(numberValue);
+          return `${spoken} metrekare`;
+        },
+      )
+      .replace(
+        /\b(\d{1,3}(?:[.,]\d{3})+|\d+)\s*(m³|m3|metreküp)\b/gi,
+        (_match, value) => {
+          const numberValue = this.parseTurkishNumber(value);
+          const spoken =
+            numberValue === null
+              ? String(value)
+              : this.numberToTurkishWords(numberValue);
 
-        return `${spoken} metreküp`;
-      })
+          return `${spoken} metreküp`;
+        },
+      )
       .replace(/\b(\d{1,3}(?:[.,]\d{3})+|\d+)\s*cm\b/gi, (_match, value) => {
         const numberValue = this.parseTurkishNumber(value);
-        const spoken = numberValue === null ? String(value) : this.numberToTurkishWords(numberValue);
+        const spoken =
+          numberValue === null
+            ? String(value)
+            : this.numberToTurkishWords(numberValue);
 
         return `${spoken} santimetre`;
       })
       .replace(/\b(\d{1,3}(?:[.,]\d{3})+|\d+)\s*km\b/gi, (_match, value) => {
         const numberValue = this.parseTurkishNumber(value);
-        const spoken = numberValue === null ? String(value) : this.numberToTurkishWords(numberValue);
+        const spoken =
+          numberValue === null
+            ? String(value)
+            : this.numberToTurkishWords(numberValue);
 
         return `${spoken} kilometre`;
       })
@@ -676,7 +758,10 @@ export class LinaService {
         /\b(\d{1,3}(?:[.,]\d{3})+|\d+)\s*metre\b(?=\s*(daire|konut|villa|arsa|tarla|bahçe|bağ|dükkan|iş yeri|ofis|parsel|alan|net|brüt|bürüt|satılık|kiralık|ilan|portföy))/gi,
         (_match, value) => {
           const numberValue = this.parseTurkishNumber(value);
-          const spoken = numberValue === null ? String(value) : this.numberToTurkishWords(numberValue);
+          const spoken =
+            numberValue === null
+              ? String(value)
+              : this.numberToTurkishWords(numberValue);
 
           return `${spoken} metrekare`;
         },
@@ -685,7 +770,10 @@ export class LinaService {
 
   private normalizeRealEstateZeroMeaningForVoice(text: string): string {
     return text
-      .replace(/\bsıfır\s+(daire|konut|villa|ev|iş yeri|dükkan|ofis)\b/gi, "hiç kullanılmamış $1")
+      .replace(
+        /\bsıfır\s+(daire|konut|villa|ev|iş yeri|dükkan|ofis)\b/gi,
+        "hiç kullanılmamış $1",
+      )
       .replace(
         /\b(daire|konut|villa|ev|iş yeri|dükkan|ofis)\s+sıfır\b/gi,
         "$1 hiç kullanılmamış",
@@ -711,7 +799,9 @@ export class LinaService {
   }
 
   private parseTurkishNumber(value: string): number | null {
-    const normalized = String(value || "").replace(/[.,]/g, "").trim();
+    const normalized = String(value || "")
+      .replace(/[.,]/g, "")
+      .trim();
 
     if (!/^\d+$/.test(normalized)) {
       return null;
@@ -812,7 +902,6 @@ export class LinaService {
     return parts.join(" ");
   }
 
-
   private async buildPortfolioRuntimeContext(
     message: string,
     sourceModule: LinaModuleName,
@@ -827,7 +916,8 @@ export class LinaService {
         user.id,
         message,
       );
-      const enginePrompt = this.linaPortfolioEngineService.buildEnginePrompt(session);
+      const enginePrompt =
+        this.linaPortfolioEngineService.buildEnginePrompt(session);
       const recentMessages = session.state.userMessages || [];
       const recentConversation = recentMessages.slice(-8).join("\n");
 
@@ -947,6 +1037,7 @@ export class LinaService {
     sourceModule: LinaModuleName,
     user?: LinaApiUser,
     portfolioRuntimeContext = "",
+    memorySnapshot?: LinaPromptMemorySnapshot,
   ): Promise<string> {
     const corePrompt = this.readPromptFile(
       ["core", "Lina_Core_Prompt.md"],
@@ -961,8 +1052,9 @@ export class LinaService {
       this.getFallbackV5Constitution(),
     );
 
-    const preferences = await this.safeGetPreferences(user?.id);
-    const memoryContext = this.buildMemoryContext(preferences);
+    const resolvedMemorySnapshot =
+      memorySnapshot || (await this.safeGetMemorySnapshot(user?.id));
+    const memoryContext = this.buildMemoryContext(resolvedMemorySnapshot);
     const currentModuleContext = this.buildCurrentModuleContext(
       sourceModule,
       user,
@@ -1437,16 +1529,93 @@ export class LinaService {
     return paths;
   }
 
-  private async safeGetPreferences(userId?: string) {
+  private async safePrepareChat(
+    user: LinaApiUser | undefined,
+    sourceModule: LinaModuleName,
+  ): Promise<LinaPreparedChat | null> {
+    if (!user?.id) {
+      return null;
+    }
+
     try {
-      return await this.linaMemoryService.getPreferences(userId);
+      return await this.linaMemoryService.prepareChat(
+        user.id,
+        user.role,
+        sourceModule,
+      );
+    } catch (error) {
+      this.linaAuditService.log({
+        userId: user.id,
+        role: user.role,
+        module: sourceModule,
+        action: "lina_memory_prepare",
+        result: "error",
+        riskLevel: 1,
+        reason:
+          error instanceof Error
+            ? error.message
+            : "UNKNOWN_MEMORY_PREPARE_ERROR",
+      });
+
+      return null;
+    }
+  }
+
+  private async safeRecordConversation(input: {
+    preparation: LinaPreparedChat | null;
+    user?: LinaApiUser;
+    sourceModule: LinaModuleName;
+    userMessage: string;
+    assistantMessage: string;
+    inputTokenCount: number;
+    outputTokenCount: number;
+  }): Promise<void> {
+    if (!input.preparation || !input.user?.id) {
+      return;
+    }
+
+    try {
+      await this.linaMemoryService.recordConversation({
+        sessionId: input.preparation.sessionId,
+        userId: input.user.id,
+        role: input.user.role,
+        sourceModule: input.sourceModule,
+        userMessage: input.userMessage,
+        assistantMessage: input.assistantMessage,
+        inputTokenCount: input.inputTokenCount,
+        outputTokenCount: input.outputTokenCount,
+        creditUsed: 0,
+      });
+    } catch (error) {
+      this.linaAuditService.log({
+        userId: input.user.id,
+        role: input.user.role,
+        module: input.sourceModule,
+        action: "lina_memory_record",
+        result: "error",
+        riskLevel: 1,
+        reason:
+          error instanceof Error
+            ? error.message
+            : "UNKNOWN_MEMORY_RECORD_ERROR",
+      });
+    }
+  }
+
+  private async safeGetMemorySnapshot(
+    userId?: string,
+  ): Promise<LinaPromptMemorySnapshot | null> {
+    try {
+      return await this.linaMemoryService.getPromptMemorySnapshot(userId);
     } catch {
       return null;
     }
   }
 
-  private buildMemoryContext(preferences: unknown): string {
-    if (!preferences) {
+  private buildMemoryContext(
+    memorySnapshot: LinaPromptMemorySnapshot | null,
+  ): string {
+    if (!memorySnapshot) {
       return [
         "Kullanıcıya ait kayıtlı Lina tercih/hafıza verisi şu anda okunamadı.",
         "Hafıza verisi yoksa geçmiş bilgi uydurma.",
@@ -1454,11 +1623,12 @@ export class LinaService {
     }
 
     return [
-      "Aşağıdaki kullanıcı tercih/hafıza verisini yalnızca yardımcı bağlam olarak kullan.",
-      "Bu veri kullanıcıya özel kabul edilir.",
-      "Bu veri yoksa veya belirsizse uydurma yapma.",
+      "Aşağıdaki kullanıcı tercihleri ve kullanıcı onaylı hafıza kayıtlarını yalnızca yardımcı bağlam olarak kullan.",
+      "Bu veri kullanıcıya özeldir; başka kullanıcılarla paylaşma.",
+      "Süresi dolmuş veya kullanıcı tarafından onaylanmamış bilgi bu bağlamda bulunmaz.",
+      "Bu veri yoksa veya belirsizse geçmiş bilgi uydurma.",
       "",
-      JSON.stringify(preferences, null, 2).slice(0, 6000),
+      JSON.stringify(memorySnapshot, null, 2).slice(0, 9000),
     ].join("\n");
   }
 

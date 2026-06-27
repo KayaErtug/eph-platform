@@ -52,6 +52,8 @@ model User {
   documents                   Document[]
   linaPortfolioSessions       LinaPortfolioSession[]
   linaPreference              LinaPreference?
+  linaOturumlari              LinaOturum[]
+  linaGunSonuOnaylari         LinaGunSonuOnayi[]
   Message                     Message[]
   NetworkNotification         NetworkNotification[]
   NetworkPost                 NetworkPost[]
@@ -1073,9 +1075,65 @@ model DestekTalebi {
   @@index([oncelik])
 }
 
+model LinaOturum {
+  id                String        @id @default(uuid())
+  kullaniciId       String
+  rolSnapshot       String?
+  kanal             LinaKanal     @default(YAZILI)
+  kaynakModul       LinaModul     @default(GENEL)
+  durum             LinaDurum     @default(ISLENIYOR)
+  oturumOzeti       String?
+  mesajSayisi       Int           @default(0)
+  inputTokenSayisi  Int           @default(0)
+  outputTokenSayisi Int           @default(0)
+  harcananKontor    Int           @default(0)
+  sonAktiviteTarihi DateTime      @default(now())
+  kapanmaTarihi     DateTime?
+  gecerlilikTarihi  DateTime?
+  silinmeTarihi     DateTime?
+  olusturulmaTarihi DateTime      @default(now())
+  guncellenmeTarihi DateTime      @updatedAt
+  kullanici         User          @relation(fields: [kullaniciId], references: [id], onDelete: Cascade)
+  konusmalar        LinaKonusma[]
+  hafizalar         LinaHafiza[]
+
+  @@index([kullaniciId])
+  @@index([kullaniciId, durum])
+  @@index([kaynakModul])
+  @@index([durum])
+  @@index([sonAktiviteTarihi])
+  @@index([gecerlilikTarihi])
+  @@index([silinmeTarihi])
+}
+
+model LinaGunSonuOnayi {
+  id                String             @id @default(uuid())
+  kullaniciId       String
+  tarih             DateTime           @db.Date
+  gunlukOzet        String
+  oturumIdleri      String[]           @default([])
+  oturumSayisi      Int                @default(0)
+  konusmaSayisi     Int                @default(0)
+  secim             LinaGunSonuSecimi?
+  durum             LinaDurum          @default(BEKLIYOR)
+  onayTarihi        DateTime?
+  olusturulmaTarihi DateTime           @default(now())
+  guncellenmeTarihi DateTime           @updatedAt
+  kullanici         User               @relation(fields: [kullaniciId], references: [id], onDelete: Cascade)
+  hafizalar         LinaHafiza[]
+
+  @@unique([kullaniciId, tarih])
+  @@index([kullaniciId])
+  @@index([tarih])
+  @@index([secim])
+  @@index([durum])
+}
+
 model LinaKonusma {
   id                String             @id @default(uuid())
   kullaniciId       String?
+  oturumId          String?
+  siraNo            Int?
   rol               String?
   kanal             LinaKanal          @default(YAZILI)
   modul             LinaModul          @default(GENEL)
@@ -1083,18 +1141,28 @@ model LinaKonusma {
   kullaniciMesaji   String
   linaCevabi        String?
   ozet              String?
+  inputTokenSayisi  Int                @default(0)
+  outputTokenSayisi Int                @default(0)
+  harcananKontor    Int                @default(0)
   belirsizlikVarMi  Boolean            @default(false)
   yetkiUygunMu      Boolean            @default(true)
   riskSeviyesi      LinaRiskSeviyesi   @default(YOK)
   firsatSeviyesi    LinaFirsatSeviyesi @default(YOK)
   durum             LinaDurum          @default(TAMAMLANDI)
+  silinmeTarihi     DateTime?
   olusturulmaTarihi DateTime           @default(now())
   guncellenmeTarihi DateTime           @updatedAt
+  oturum            LinaOturum?        @relation(fields: [oturumId], references: [id], onDelete: SetNull)
 
+  @@unique([oturumId, siraNo])
   @@index([kullaniciId])
+  @@index([kullaniciId, olusturulmaTarihi])
+  @@index([oturumId])
+  @@index([oturumId, olusturulmaTarihi])
   @@index([rol])
   @@index([modul])
   @@index([niyet])
+  @@index([silinmeTarihi])
   @@index([olusturulmaTarihi])
 }
 
@@ -1118,25 +1186,42 @@ model LinaBaglam {
 }
 
 model LinaHafiza {
-  id                String            @id @default(uuid())
-  kullaniciId       String?
-  konusmaId         String?
-  katman            LinaHafizaKatmani
-  onem              LinaHafizaOnemi   @default(ORTA)
-  baslik            String
-  icerik            String
-  veri              Json?
-  kaliciMi          Boolean           @default(false)
-  aktifMi           Boolean           @default(true)
-  kaynakModul       LinaModul         @default(GENEL)
-  olusturulmaTarihi DateTime          @default(now())
-  guncellenmeTarihi DateTime          @updatedAt
+  id                  String            @id @default(uuid())
+  kullaniciId         String?
+  konusmaId           String?
+  oturumId            String?
+  gunSonuOnayId       String?
+  katman              LinaHafizaKatmani
+  onem                LinaHafizaOnemi   @default(ORTA)
+  baslik              String
+  icerik              String
+  veri                Json?
+  kaliciMi            Boolean           @default(false)
+  kullaniciOnayliMi   Boolean           @default(false)
+  aktifMi             Boolean           @default(true)
+  kaynakModul         LinaModul         @default(GENEL)
+  onayTarihi          DateTime?
+  gecerlilikTarihi    DateTime?
+  sonKullanilmaTarihi DateTime?
+  kullanimSayisi      Int               @default(0)
+  silinmeTarihi       DateTime?
+  olusturulmaTarihi   DateTime          @default(now())
+  guncellenmeTarihi   DateTime          @updatedAt
+  oturum              LinaOturum?       @relation(fields: [oturumId], references: [id], onDelete: SetNull)
+  gunSonuOnayi        LinaGunSonuOnayi? @relation(fields: [gunSonuOnayId], references: [id], onDelete: SetNull)
 
   @@index([kullaniciId])
+  @@index([kullaniciId, aktifMi])
   @@index([konusmaId])
+  @@index([oturumId])
+  @@index([gunSonuOnayId])
   @@index([katman])
   @@index([onem])
   @@index([aktifMi])
+  @@index([kaliciMi])
+  @@index([kullaniciOnayliMi])
+  @@index([gecerlilikTarihi])
+  @@index([silinmeTarihi])
 }
 
 model LinaTercih {
@@ -2748,6 +2833,12 @@ enum DestekTalepDurumu {
   ISLENIYOR
   YANITLANDI
   KAPANDI
+}
+
+enum LinaGunSonuSecimi {
+  OTUZ_GUN_KAYDET
+  KALICI_KAYDET
+  BUGUNU_SIL
 }
 
 enum LinaKanal {
