@@ -163,6 +163,9 @@ function KayitForm() {
     useState<RegistrationRole | null>(null);
   const [referralLoading, setReferralLoading] = useState(false);
   const [referralValid, setReferralValid] = useState(false);
+  const [applicationSuccess, setApplicationSuccess] = useState<{
+    email: string;
+  } | null>(null);
 
   const {
     register,
@@ -226,6 +229,7 @@ function KayitForm() {
   const onSubmit = async (data: RegisterFormData) => {
     setLoading(true);
     setServerError("");
+    setApplicationSuccess(null);
 
     try {
       const payload = {
@@ -236,10 +240,36 @@ function KayitForm() {
 
       const res = await api.post("/auth/register", payload);
 
-      setAuth(res.data.user, res.data.token);
-      router.push("/dashboard");
+      if (res.data?.token && res.data?.user) {
+        setAuth(res.data.user, res.data.token);
+        router.push("/dashboard");
+        return;
+      }
+
+      if (res.data?.success) {
+        setApplicationSuccess({
+          email: data.email.trim().toLowerCase(),
+        });
+
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+
+        return;
+      }
+
+      setServerError(
+        "Başvurunuz tamamlanamadı. Lütfen bilgilerinizi kontrol ederek tekrar deneyin.",
+      );
     } catch (err: any) {
-      setServerError(err?.response?.data?.message || "Bir hata oluştu.");
+      const message = err?.response?.data?.message;
+
+      setServerError(
+        Array.isArray(message)
+          ? message.join(" • ")
+          : message || "Bir hata oluştu.",
+      );
     } finally {
       setLoading(false);
     }
@@ -282,6 +312,13 @@ function KayitForm() {
         .hint{background:#EFF6FF;border:1px solid #BFDBFE;color:#1557D6}
         .submit{width:100%;height:56px;margin-top:18px;border:0;border-radius:20px;background:#1557D6;color:#fff;font-size:15px;font-weight:950;cursor:pointer;box-shadow:0 14px 28px rgba(21,87,214,.20)}
         .submit:disabled{opacity:.65;cursor:not-allowed}
+        .application-success{margin-top:24px;border:2px solid #A7F3D0;background:#F0FDF4;border-radius:26px;padding:24px;text-align:center;box-shadow:0 18px 40px rgba(5,150,105,.10)}
+        .application-success-icon{width:64px;height:64px;margin:0 auto 16px;border-radius:999px;background:#DCFCE7;color:#059669;display:flex;align-items:center;justify-content:center}
+        .application-success-title{font-size:24px;font-weight:950;color:#065F46;letter-spacing:-.025em}
+        .application-success-text{margin:12px auto 0;max-width:420px;color:#334155;font-size:14px;font-weight:750;line-height:1.7}
+        .application-success-email{margin-top:14px;border:1px solid #BBF7D0;background:#FFFFFF;border-radius:16px;padding:12px;color:#065F46;font-size:13px;font-weight:950;overflow-wrap:anywhere}
+        .application-success-note{margin-top:14px;color:#64748B;font-size:12px;font-weight:750;line-height:1.6}
+        .application-success-link{margin-top:20px;width:100%;min-height:52px;border-radius:18px;background:#1557D6;color:#FFFFFF;text-decoration:none;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:950;box-shadow:0 12px 24px rgba(21,87,214,.18)}
         .bottom{margin-top:20px;text-align:center;color:#64748B;font-weight:700}
         .bottom a{color:#1557D6;font-weight:950}
         @media(max-width:900px){
@@ -331,134 +368,177 @@ function KayitForm() {
 
           <section className="right">
             <div className="card">
-              <div className="title">Hesap oluştur</div>
+              {applicationSuccess ? (
+                <>
+                  <div className="title">Başvurunuz alındı</div>
 
-              <div className="subtitle">
-                Referans kodunuz varsa girin. Yoksa normal üyelik başvurusu yapabilirsiniz.
-              </div>
-
-              <form onSubmit={handleSubmit(onSubmit)}>
-                <div className="form-grid">
-                  <div>
-                    <div className="row ref">
-                      <span className="row-icon"><KeyRound size={18} /></span>
-                      <input
-                        {...register("inviteCode")}
-                        placeholder="EPH-05-ADM08-1524XXXXXXX"
-                        className="input"
-                        style={{ textTransform: "uppercase", textAlign: "center" }}
-                      />
+                  <div
+                    className="application-success"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <div className="application-success-icon">
+                      <CheckCircle2 size={34} strokeWidth={2.5} />
                     </div>
 
-                    {referralLoading && <div className="success">Kontrol ediliyor...</div>}
+                    <div className="application-success-title">
+                      Üyelik talebiniz başarıyla oluşturuldu
+                    </div>
 
-                    {referralValid && detectedRole && (
-                      <>
-                        <div className="success">
-                          <CheckCircle2 size={16} />
-                          {ROLE_LABELS[detectedRole]} referans kaydı bulundu.
-                        </div>
-                        <div className="hint">
-                          Ad, soyad, e-posta ve meslek bilgisi güvenlik için kilitlendi. Telefon ve şifre alanını siz belirleyebilirsiniz.
-                        </div>
-                      </>
-                    )}
+                    <div className="application-success-text">
+                      Başvurunuz inceleme sırasına alınmıştır. İnceleme
+                      tamamlandığında hesabınız kullanıma açılacaktır. Gerekli
+                      görülmesi hâlinde Yazılım Ekibi, kayıt sırasında
+                      paylaştığınız telefon veya e-posta üzerinden sizinle
+                      iletişime geçebilir.
+                    </div>
+
+                    <div className="application-success-email">
+                      Kayıt e-postası: {applicationSuccess.email}
+                    </div>
+
+                    <div className="application-success-note">
+                      Lütfen aynı e-posta adresiyle tekrar başvuru yapmayın.
+                      Başvurunuz onaylandığında giriş yapabilirsiniz.
+                    </div>
+
+                    <Link href="/giris" className="application-success-link">
+                      Giriş sayfasına dön
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="title">Hesap oluştur</div>
+
+                  <div className="subtitle">
+                    Referans kodunuz varsa girin. Yoksa normal üyelik başvurusu yapabilirsiniz.
                   </div>
 
-                  <FormRow icon={<UserRound size={18} />} label="Ad" locked={referralValid}>
-                    <input {...register("firstName")} readOnly={referralValid} placeholder="Ad" className="input" />
-                  </FormRow>
-                  {errors.firstName && <div className="error">{errors.firstName.message}</div>}
+                  <form onSubmit={handleSubmit(onSubmit)}>
+                    <div className="form-grid">
+                      <div>
+                        <div className="row ref">
+                          <span className="row-icon"><KeyRound size={18} /></span>
+                          <input
+                            {...register("inviteCode")}
+                            placeholder="EPH-05-ADM08-1524XXXXXXX"
+                            className="input"
+                            style={{ textTransform: "uppercase", textAlign: "center" }}
+                          />
+                        </div>
 
-                  <FormRow icon={<UserRound size={18} />} label="Soyad" locked={referralValid}>
-                    <input {...register("lastName")} readOnly={referralValid} placeholder="Soyad" className="input" />
-                  </FormRow>
-                  {errors.lastName && <div className="error">{errors.lastName.message}</div>}
+                        {referralLoading && <div className="success">Kontrol ediliyor...</div>}
 
-                  <FormRow icon={<Mail size={18} />} label="E-posta" locked={referralValid}>
-                    <input {...register("email")} readOnly={referralValid} type="email" placeholder="mail@example.com" className="input" />
-                  </FormRow>
-                  {errors.email && <div className="error">{errors.email.message}</div>}
+                        {referralValid && detectedRole && (
+                          <>
+                            <div className="success">
+                              <CheckCircle2 size={16} />
+                              {ROLE_LABELS[detectedRole]} referans kaydı bulundu.
+                            </div>
+                            <div className="hint">
+                              Ad, soyad, e-posta ve meslek bilgisi güvenlik için kilitlendi. Telefon ve şifre alanını siz belirleyebilirsiniz.
+                            </div>
+                          </>
+                        )}
+                      </div>
 
-                  <FormRow icon={<Phone size={18} />} label="Telefon">
-                    <input
-                      {...register("phone")}
-                      value={phoneValue}
-                      onChange={(event) =>
-                        setValue("phone", normalizePhoneForSystem(event.target.value), {
-                          shouldDirty: true,
-                          shouldValidate: true,
-                        })
-                      }
-                      inputMode="tel"
-                      placeholder="+90 532 282 88 75"
-                      className="input"
-                    />
-                  </FormRow>
-                  <div className="hint">Nasıl yazarsanız yazın sistem +90 532 282 88 75 formatına çevirir.</div>
-                  {errors.phone && <div className="error">{errors.phone.message}</div>}
+                      <FormRow icon={<UserRound size={18} />} label="Ad" locked={referralValid}>
+                        <input {...register("firstName")} readOnly={referralValid} placeholder="Ad" className="input" />
+                      </FormRow>
+                      {errors.firstName && <div className="error">{errors.firstName.message}</div>}
 
-                  <FormRow
-                    icon={<BriefcaseBusiness size={18} />}
-                    label="Meslek"
-                    locked={referralValid}
-                  >
-                    {referralValid ? (
-                      <>
-                        <input type="hidden" {...register("role")} />
+                      <FormRow icon={<UserRound size={18} />} label="Soyad" locked={referralValid}>
+                        <input {...register("lastName")} readOnly={referralValid} placeholder="Soyad" className="input" />
+                      </FormRow>
+                      {errors.lastName && <div className="error">{errors.lastName.message}</div>}
+
+                      <FormRow icon={<Mail size={18} />} label="E-posta" locked={referralValid}>
+                        <input {...register("email")} readOnly={referralValid} type="email" placeholder="mail@example.com" className="input" />
+                      </FormRow>
+                      {errors.email && <div className="error">{errors.email.message}</div>}
+
+                      <FormRow icon={<Phone size={18} />} label="Telefon">
                         <input
-                          value={
-                            detectedRole ? ROLE_LABELS[detectedRole] : ""
+                          {...register("phone")}
+                          value={phoneValue}
+                          onChange={(event) =>
+                            setValue("phone", normalizePhoneForSystem(event.target.value), {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            })
                           }
-                          readOnly
+                          inputMode="tel"
+                          placeholder="+90 532 282 88 75"
                           className="input"
                         />
-                      </>
-                    ) : (
-                      <select {...register("role")} className="input">
-                        <option value="" disabled>Meslek seçiniz</option>
-                        {PUBLIC_ROLE_OPTIONS.map((role) => (
-                          <option key={role.value} value={role.value}>
-                            {role.label}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </FormRow>
-                  {errors.role && <div className="error">{errors.role.message}</div>}
+                      </FormRow>
+                      <div className="hint">Nasıl yazarsanız yazın sistem +90 532 282 88 75 formatına çevirir.</div>
+                      {errors.phone && <div className="error">{errors.phone.message}</div>}
 
-                  <FormRow icon={<MapPin size={18} />} label="Şehir">
-                    <select {...register("city")} className="input" defaultValue="">
-                      <option value="" disabled>Şehir seçiniz</option>
-                      {CITY_OPTIONS.map((city) => (
-                        <option key={city} value={city}>
-                          {city}
-                        </option>
-                      ))}
-                    </select>
-                  </FormRow>
-                  {errors.city && <div className="error">{errors.city.message}</div>}
+                      <FormRow
+                        icon={<BriefcaseBusiness size={18} />}
+                        label="Meslek"
+                        locked={referralValid}
+                      >
+                        {referralValid ? (
+                          <>
+                            <input type="hidden" {...register("role")} />
+                            <input
+                              value={
+                                detectedRole ? ROLE_LABELS[detectedRole] : ""
+                              }
+                              readOnly
+                              className="input"
+                            />
+                          </>
+                        ) : (
+                          <select {...register("role")} className="input">
+                            <option value="" disabled>Meslek seçiniz</option>
+                            {PUBLIC_ROLE_OPTIONS.map((role) => (
+                              <option key={role.value} value={role.value}>
+                                {role.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </FormRow>
+                      {errors.role && <div className="error">{errors.role.message}</div>}
 
-                  <FormRow icon={<LockKeyhole size={18} />} label="Şifre" action={
-                    <button type="button" className="password-btn" onClick={() => setShowPassword(!showPassword)}>
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      <FormRow icon={<MapPin size={18} />} label="Şehir">
+                        <select {...register("city")} className="input" defaultValue="">
+                          <option value="" disabled>Şehir seçiniz</option>
+                          {CITY_OPTIONS.map((city) => (
+                            <option key={city} value={city}>
+                              {city}
+                            </option>
+                          ))}
+                        </select>
+                      </FormRow>
+                      {errors.city && <div className="error">{errors.city.message}</div>}
+
+                      <FormRow icon={<LockKeyhole size={18} />} label="Şifre" action={
+                        <button type="button" className="password-btn" onClick={() => setShowPassword(!showPassword)}>
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      }>
+                        <input {...register("password")} type={showPassword ? "text" : "password"} placeholder="Şifre oluştur" className="input" />
+                      </FormRow>
+                      {errors.password && <div className="error">{errors.password.message}</div>}
+
+                      {serverError && <div className="error">{serverError}</div>}
+                    </div>
+
+                    <button type="submit" className="submit" disabled={loading}>
+                      {loading ? "Hesap oluşturuluyor..." : "Üyelik Başvurusu Gönder"}
                     </button>
-                  }>
-                    <input {...register("password")} type={showPassword ? "text" : "password"} placeholder="Şifre oluştur" className="input" />
-                  </FormRow>
-                  {errors.password && <div className="error">{errors.password.message}</div>}
+                  </form>
 
-                  {serverError && <div className="error">{serverError}</div>}
-                </div>
-
-                <button type="submit" className="submit" disabled={loading}>
-                  {loading ? "Hesap oluşturuluyor..." : "Üyelik Başvurusu Gönder"}
-                </button>
-              </form>
-
-              <div className="bottom">
-                Zaten hesabınız var mı? <Link href="/giris">Giriş Yap</Link>
-              </div>
+                  <div className="bottom">
+                    Zaten hesabınız var mı? <Link href="/giris">Giriş Yap</Link>
+                  </div>
+                </>
+              )}
             </div>
           </section>
         </section>
