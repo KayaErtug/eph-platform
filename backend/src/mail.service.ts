@@ -1,18 +1,135 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
+export type RegistrationType =
+  | 'EMLAK_DANISMANI'
+  | 'EMLAK_OFISI'
+  | 'MUTEAHHIT'
+  | 'INSAAT_FIRMASI';
+
 @Injectable()
 export class MailService {
-  private transporter = nodemailer.createTransport({
-    host: 'mail.kurumsaleposta.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: 'bildirim@emlakportfoyhavuzu.com',
-      pass: 'EmlaK_635122!Eph',
-    },
-    tls: { rejectUnauthorized: false },
-  });
+  private readonly transporter: nodemailer.Transporter;
+
+  constructor() {
+    const smtpPort = Number(process.env.SMTP_PORT || 587);
+    const smtpSecure =
+      String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
+    const rejectUnauthorized =
+      String(
+        process.env.SMTP_TLS_REJECT_UNAUTHORIZED || 'true',
+      ).toLowerCase() === 'true';
+
+    this.transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'mail.kurumsaleposta.com',
+      port: Number.isFinite(smtpPort) ? smtpPort : 587,
+      secure: smtpSecure,
+      auth: {
+        user: process.env.SMTP_USER || '',
+        pass: process.env.SMTP_PASS || '',
+      },
+      tls: {
+        rejectUnauthorized,
+      },
+    });
+  }
+
+  private getRegistrationRequirements(registrationType: RegistrationType) {
+    const requirements: Record<
+      RegistrationType,
+      {
+        roleLabel: string;
+        requiredDocuments: string;
+        controlPoint: string;
+      }
+    > = {
+      EMLAK_DANISMANI: {
+        roleLabel: 'Emlak Danışmanı',
+        requiredDocuments: 'MYK Seviye 4 veya Seviye 5 Belgesi',
+        controlPoint: 'MYK Portal / e-Devlet',
+      },
+      EMLAK_OFISI: {
+        roleLabel: 'Emlak Ofisi',
+        requiredDocuments: 'Taşınmaz Ticareti Yetki Belgesi',
+        controlPoint: 'TTBS Sistemi / e-Devlet',
+      },
+      MUTEAHHIT: {
+        roleLabel: 'Müteahhit (Bireysel)',
+        requiredDocuments: 'YAMBİS Kayıt Belgesi + Vergi Levhası',
+        controlPoint: 'ÇŞB Bakanlığı + GİB Doğrulama',
+      },
+      INSAAT_FIRMASI: {
+        roleLabel: 'İnşaat Firması',
+        requiredDocuments: 'YAMBİS Kayıt Belgesi + Vergi Levhası',
+        controlPoint: 'ÇŞB Bakanlığı + GİB Doğrulama',
+      },
+    };
+
+    return requirements[registrationType];
+  }
+
+  async sendEmailVerificationCode(data: {
+    email: string;
+    firstName: string;
+    code: string;
+    expiresInMinutes: number;
+    registrationType: RegistrationType;
+  }) {
+    const fromName = process.env.SMTP_FROM_NAME || 'EPH Platform';
+    const fromEmail =
+      process.env.SMTP_FROM_EMAIL ||
+      process.env.SMTP_USER ||
+      'bildirim@emlakportfoyhavuzu.com';
+    const requirement = this.getRegistrationRequirements(
+      data.registrationType,
+    );
+
+    await this.transporter.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.email,
+      subject: 'EPH Platform E-posta Doğrulama Kodunuz',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#F4F8FF;padding:24px;">
+          <div style="overflow:hidden;border:1px solid #C7D6E8;border-radius:20px;background:#FFFFFF;">
+            <div style="background:#2563EB;padding:24px;text-align:center;">
+              <h1 style="margin:0;color:#FFFFFF;font-size:24px;">E-posta Adresinizi Doğrulayın</h1>
+              <p style="margin:8px 0 0;color:#DBEAFE;font-size:14px;">EPH Platform güvenli üyelik doğrulaması</p>
+            </div>
+
+            <div style="padding:28px;color:#1F2937;">
+              <p style="margin:0 0 14px;font-size:16px;line-height:1.7;">Merhaba <strong>${data.firstName}</strong>,</p>
+              <p style="margin:0 0 20px;font-size:15px;line-height:1.7;">Üyelik başvurunuzu tamamlamak için aşağıdaki 6 haneli doğrulama kodunu kayıt ekranına girin.</p>
+
+              <div style="margin:24px 0;border:2px dashed #2563EB;border-radius:16px;background:#EFF6FF;padding:22px;text-align:center;">
+                <p style="margin:0 0 8px;color:#64748B;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">Doğrulama Kodunuz</p>
+                <p style="margin:0;color:#06194A;font-family:monospace;font-size:34px;font-weight:900;letter-spacing:8px;">${data.code}</p>
+              </div>
+
+              <div style="margin:0 0 18px;border:1px solid #BFDBFE;border-radius:14px;background:#EFF6FF;padding:16px;">
+                <p style="margin:0 0 12px;color:#1E3A8A;font-size:14px;font-weight:800;">${requirement.roleLabel} başvuru belgeleri</p>
+                <table style="width:100%;border-collapse:collapse;">
+                  <tr>
+                    <td style="width:138px;padding:7px 0;color:#64748B;font-size:13px;vertical-align:top;">Zorunlu belgeler</td>
+                    <td style="padding:7px 0;color:#1F2937;font-size:13px;font-weight:700;line-height:1.6;">${requirement.requiredDocuments}</td>
+                  </tr>
+                  <tr>
+                    <td style="width:138px;padding:7px 0;color:#64748B;font-size:13px;vertical-align:top;">Kontrol noktası</td>
+                    <td style="padding:7px 0;color:#1F2937;font-size:13px;font-weight:700;line-height:1.6;">${requirement.controlPoint}</td>
+                  </tr>
+                </table>
+                <p style="margin:10px 0 0;color:#475569;font-size:12px;line-height:1.6;">E-posta doğrulamasından sonra başvurunuzun incelenebilmesi için bu belgeleri hazır bulundurmanız gerekir.</p>
+              </div>
+
+              <div style="border:1px solid #E2E8F0;border-radius:12px;background:#F8FAFC;padding:16px;">
+                <p style="margin:0;color:#475569;font-size:13px;line-height:1.7;">Bu kod <strong>${data.expiresInMinutes} dakika</strong> boyunca geçerlidir ve yalnızca bir kez kullanılabilir.</p>
+                <p style="margin:10px 0 0;color:#475569;font-size:13px;line-height:1.7;">Bu başvuruyu siz yapmadıysanız bu e-postayı dikkate almayın.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `,
+    });
+  }
 
   async sendNewApplication(data: {
     applicantName: string;

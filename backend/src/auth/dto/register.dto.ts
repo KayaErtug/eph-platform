@@ -38,6 +38,13 @@ function normalizePhoneForSystem(value?: string | null) {
   return `+90 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6, 8)} ${local.slice(8, 10)}`;
 }
 
+export enum RegistrationType {
+  EMLAK_DANISMANI = 'EMLAK_DANISMANI',
+  EMLAK_OFISI = 'EMLAK_OFISI',
+  MUTEAHHIT = 'MUTEAHHIT',
+  INSAAT_FIRMASI = 'INSAAT_FIRMASI',
+}
+
 export class RegisterDto {
   @IsString()
   firstName: string;
@@ -66,6 +73,12 @@ export class RegisterDto {
     message: 'Geçerli bir meslek seçiniz',
   })
   role: Role;
+
+  @IsOptional()
+  @IsEnum(RegistrationType, {
+    message: 'Geçerli bir kayıt türü seçiniz',
+  })
+  registrationType?: RegistrationType;
 
   @IsString()
   @MinLength(6)

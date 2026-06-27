@@ -38,6 +38,18 @@ const phoneSchema = z
     "Telefon numarası +90 532 282 88 75 formatına uygun olmalıdır",
   );
 
+export const registrationTypeSchema = z.enum(
+  [
+    "EMLAK_DANISMANI",
+    "EMLAK_OFISI",
+    "MUTEAHHIT",
+    "INSAAT_FIRMASI",
+  ],
+  {
+    error: "Kayıt türü seçimi geçersizdir",
+  },
+);
+
 export const registerSchema = z.object({
   firstName: z.string().min(2, "Ad en az 2 karakter olmalıdır"),
 
@@ -63,6 +75,8 @@ export const registerSchema = z.object({
     },
   ),
 
+  registrationType: registrationTypeSchema.optional(),
+
   password: z.string().min(6, "Şifre en az 6 karakter olmalıdır"),
 
   inviteCode: z.string().optional(),
@@ -73,6 +87,8 @@ export const loginSchema = z.object({
 
   password: z.string().min(6, "Şifre en az 6 karakter olmalıdır"),
 });
+
+export type RegistrationType = z.infer<typeof registrationTypeSchema>;
 
 export type RegisterFormData = z.infer<typeof registerSchema>;
 

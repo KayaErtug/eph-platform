@@ -8,6 +8,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { UsersModule } from '../users/users.module';
 import { InvitationsModule } from '../invitations/invitations.module';
+import { MailService } from '../mail.service';
 
 @Module({
   imports: [
@@ -19,7 +20,13 @@ import { InvitationsModule } from '../invitations/invitations.module';
       signOptions: { expiresIn: '7d' },
     }),
   ],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    JwtAuthGuard,
+    RolesGuard,
+    MailService,
+  ],
   controllers: [AuthController],
   exports: [JwtAuthGuard, RolesGuard, JwtModule],
 })

@@ -1,12 +1,15 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Role } from '@prisma/client';
+
 import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
+import { CurrentUser } from './decorators/current-user.decorator';
+import { Roles } from './decorators/roles.decorator';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
-import { Roles } from './decorators/roles.decorator';
-import { CurrentUser } from './decorators/current-user.decorator';
-import { Role } from '@prisma/client';
 
 @Controller('auth')
 export class AuthController {
@@ -17,19 +20,27 @@ export class AuthController {
     return this.authService.register(dto);
   }
 
+  @Post('verify-email')
+  verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto);
+  }
+
+  @Post('resend-verification')
+  resendVerification(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendVerification(dto);
+  }
+
   @Post('login')
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
 
-  // Giriş yapmış herkes erişebilir
   @UseGuards(JwtAuthGuard)
   @Get('me')
   getMe(@CurrentUser() user: any) {
     return user;
   }
 
-  // Sadece ADMIN erişebilir
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Get('admin-only')
@@ -37,7 +48,6 @@ export class AuthController {
     return { message: 'Sadece admin görebilir.' };
   }
 
-  // Sadece EMLAKCI ve ADMIN erişebilir
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.EMLAKCI, Role.ADMIN)
   @Get('emlakci-only')

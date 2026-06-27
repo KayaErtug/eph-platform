@@ -17,6 +17,11 @@ model User {
   lastName                    String
   role                        Role
   isVerified                  Boolean                      @default(false)
+  emailVerifiedAt             DateTime?
+  emailVerificationCodeHash   String?
+  emailVerificationExpiresAt  DateTime?
+  emailVerificationAttempts   Int                          @default(0)
+  emailVerificationLastSentAt DateTime?
   isApproved                  Boolean                      @default(false)
   createdAt                   DateTime                     @default(now())
   updatedAt                   DateTime                     @updatedAt
