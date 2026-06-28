@@ -629,7 +629,7 @@ export default function LinaPanel({
       const source = context.createBufferSource();
 
       source.buffer = audioBuffer;
-      source.playbackRate.value = 1.12;
+      source.playbackRate.value = 1;
       source.connect(context.destination);
       audioSourceRef.current = source;
 
