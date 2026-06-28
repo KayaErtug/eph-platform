@@ -254,6 +254,7 @@ model Project {
   units               Unit[]
   blocks              ProjectBlock[]
   inventoryBatches    ProjectInventoryBatch[]
+  mediaPackages       ProjectMediaPackage[]
 
   @@unique([ownerId, code])
   @@index([ownerId])
@@ -304,6 +305,52 @@ model ProjectFloor {
   @@index([sourceBatchId])
   @@index([floorType])
   @@index([isActive])
+}
+
+model ProjectMediaPackage {
+  id        String                  @id @default(uuid())
+  projectId String
+  code      String
+  name      String
+  type      ProjectMediaPackageType
+  unitType  UnitType?
+  roomCount String?
+  isDefault Boolean                 @default(false)
+  isActive  Boolean                 @default(true)
+  sortOrder Int                     @default(0)
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  project   Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assets    ProjectMediaAsset[]
+  units     Unit[]
+
+  @@unique([projectId, code])
+  @@index([projectId, type])
+  @@index([projectId, unitType, roomCount])
+  @@index([projectId, isDefault])
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+model ProjectMediaAsset {
+  id           String              @id @default(uuid())
+  packageId    String
+  url          String
+  supabaseUrl  String?
+  path         String
+  bucket       String              @default("portfolio-images")
+  originalName String?
+  mimetype     String?
+  size         Int?
+  isCover      Boolean             @default(false)
+  sortOrder    Int                 @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  package      ProjectMediaPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId])
+  @@index([packageId, isCover])
+  @@index([packageId, sortOrder])
 }
 
 model ProjectInventoryBatch {
@@ -390,6 +437,7 @@ model Unit {
   floorId                String?
   sourceBatchId          String?
   salesRepresentativeId  String?
+  mediaPackageId         String?
   inventoryCode          String?
   externalRef            String?
   inventorySortOrder     Int                          @default(0)
@@ -440,6 +488,7 @@ model Unit {
   projectFloor           ProjectFloor?                @relation(fields: [floorId], references: [id], onDelete: SetNull)
   sourceBatch            ProjectInventoryBatch?       @relation("UnitSourceBatch", fields: [sourceBatchId], references: [id], onDelete: SetNull)
   salesRepresentative    User?                        @relation("UnitSalesRepresentative", fields: [salesRepresentativeId], references: [id], onDelete: SetNull)
+  mediaPackage           ProjectMediaPackage?         @relation(fields: [mediaPackageId], references: [id], onDelete: SetNull)
   batchItems             ProjectInventoryBatchItem[]
   images                 UnitImage[]
 
@@ -452,6 +501,7 @@ model Unit {
   @@index([floorId])
   @@index([sourceBatchId])
   @@index([salesRepresentativeId])
+  @@index([mediaPackageId])
   @@index([deliveryDate])
   @@index([approvalStatus])
   @@index([isPoolVisible])
@@ -2670,6 +2720,13 @@ enum PortfolioAuthorityType {
   KAT_KARSILIGI_SOZLESMESI
   DIGER_DOGRULAMA_EVRAKI
   TAPU_SAHIBI_KIMLIK
+}
+
+enum ProjectMediaPackageType {
+  PROJECT_GENERAL
+  UNIT_STANDARD
+  COMMERCIAL_STANDARD
+  OTHER
 }
 
 enum ProjectFloorType {
