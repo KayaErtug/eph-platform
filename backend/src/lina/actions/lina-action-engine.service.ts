@@ -230,11 +230,18 @@ export class LinaActionEngineService {
 
   private isCrmCustomerCreateCommand(message: string): boolean {
     const normalized = this.normalize(message);
+    const isNestedCrmAction =
+      /(gorev|aktivite|ilgi|talep)\s*(?:ekle|kaydet|olustur)/.test(
+        normalized,
+      ) ||
+      /(not ekle|gorusme ekle|telefon gorusmesi|whatsapp gorusmesi|yer gosterimi ekle|teklif ekle)/.test(
+        normalized,
+      );
 
     return (
       /(crm|musteri)/.test(normalized) &&
       /(ekle|kaydet|olustur)/.test(normalized) &&
-      !/(gorev|aktivite|not|ilgi|talep)/.test(normalized)
+      !isNestedCrmAction
     );
   }
 
@@ -285,7 +292,7 @@ export class LinaActionEngineService {
     return (
       /(crm|musteri)/.test(normalized) &&
       /(telefon|e posta|email|sehir|il|butce|not)/.test(normalized) &&
-      /(guncelle|degistir|duzelt|ekle)/.test(normalized)
+      /(guncelle|degistir|duzelt)/.test(normalized)
     );
   }
 
