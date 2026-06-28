@@ -1,4 +1,9 @@
-import { ProjectFloorType, UnitStatus, UnitType } from '@prisma/client';
+import {
+  ProjectFloorType,
+  ProjectMediaPackageType,
+  UnitStatus,
+  UnitType,
+} from '@prisma/client';
 
 export type ProjectSalesPreviewAction =
   | 'CREATE'
@@ -56,6 +61,22 @@ export interface ProjectSalesFloorValue {
   floorType: ProjectFloorType;
 }
 
+export interface ProjectSalesPhotoPackage {
+  sourceRow: number;
+  code: string;
+  name: string;
+  type: ProjectMediaPackageType | null;
+  unitType: UnitType | null;
+  roomCount: string | null;
+  zipFolder: string;
+  isDefault: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  description: string | null;
+  valid: boolean;
+  issues: ProjectSalesValidationIssue[];
+}
+
 export interface ProjectSalesUnitRow {
   sourceRow: number;
   projectCode: string;
@@ -75,6 +96,7 @@ export interface ProjectSalesUnitRow {
   facades: string[];
   deliveryDate: string | null;
   featurePackageCode: string | null;
+  photoPackageCode: string | null;
   features: string[];
   salesRepresentativeEmail: string | null;
   description: string | null;
@@ -95,6 +117,8 @@ export interface ProjectSalesPreviewSummary {
   unitCount: number;
   featurePackageCount: number;
   selectedFeatureCount: number;
+  photoPackageCount: number;
+  invalidPhotoPackageCount: number;
   validUnitCount: number;
   invalidUnitCount: number;
   duplicateUnitCount: number;
@@ -114,5 +138,6 @@ export interface ProjectSalesPreviewResult {
   blocks: ProjectSalesBlockRow[];
   units: ProjectSalesUnitRow[];
   featurePackages: ProjectSalesFeaturePackage[];
+  photoPackages: ProjectSalesPhotoPackage[];
   issues: ProjectSalesValidationIssue[];
 }

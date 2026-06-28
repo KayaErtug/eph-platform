@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   ProjectFloorType,
+  ProjectMediaPackageType,
   UnitStatus,
   UnitType,
 } from '@prisma/client';
@@ -10,6 +11,7 @@ import {
   ProjectSalesBlockRow,
   ProjectSalesFeaturePackage,
   ProjectSalesFloorValue,
+  ProjectSalesPhotoPackage,
   ProjectSalesPreviewResult,
   ProjectSalesProjectRow,
   ProjectSalesUnitRow,
@@ -37,7 +39,7 @@ type ExistingUnit = {
 
 @Injectable()
 export class ProjectSalesService {
-  private readonly supportedTemplateVersion = 'EPH-PROJE-SATIS-V3';
+  private readonly supportedTemplateVersion = 'EPH-PROJE-SATIS-V4';
   private readonly requiredSheets = [
     'KULLANIM_REHBERI',
     'PROJE',
@@ -45,6 +47,7 @@ export class ProjectSalesService {
     'BAGIMSIZ_BOLUMLER',
     'KURAL_URETIMI',
     'OZELLIK_PAKETLERI',
+    'FOTOGRAF_PAKETLERI',
   ];
   private readonly allowedCurrencies = ['TRY', 'USD', 'EUR', 'GBP'];
   private readonly allowedExtensions = ['.xlsx', '.xls'];
@@ -97,11 +100,13 @@ export class ProjectSalesService {
     }
 
     const featurePackages = this.parseFeaturePackages(workbook, issues);
+    const photoPackages = this.parsePhotoPackages(workbook, issues);
     const projects = this.parseProjects(workbook, issues);
     const blocks = this.parseBlocks(workbook, issues);
     const units = this.parseUnits(
       workbook,
       featurePackages,
+      photoPackages,
       issues,
     );
 
@@ -132,6 +137,7 @@ export class ProjectSalesService {
 
     this.refreshValidity(projects);
     this.refreshValidity(blocks);
+    this.refreshValidity(photoPackages);
     this.refreshValidity(units);
 
     const errorCount = issues.filter((item) => item.level === 'ERROR').length;
@@ -153,6 +159,10 @@ export class ProjectSalesService {
           (total, item) => total + item.features.length,
           0,
         ),
+        photoPackageCount: photoPackages.length,
+        invalidPhotoPackageCount: photoPackages.filter(
+          (item) => !item.valid,
+        ).length,
         validUnitCount: units.filter(
           (item) => item.valid && item.action !== 'SKIP_DUPLICATE',
         ).length,
@@ -173,6 +183,7 @@ export class ProjectSalesService {
       blocks,
       units,
       featurePackages,
+      photoPackages,
       issues,
     };
   }
@@ -308,6 +319,254 @@ export class ProjectSalesService {
     }));
   }
 
+
+private parsePhotoPackages(
+  workbook: XLSX.WorkBook,
+  issues: ProjectSalesValidationIssue[],
+): ProjectSalesPhotoPackage[] {
+  const sheetName = 'FOTOGRAF_PAKETLERI';
+  const rows = this.getSheetRows(workbook, sheetName);
+  const headerIndex = this.findHeaderRowIndex(
+    rows,
+    ['PAKET_KODU', 'PAKET_ADI', 'PAKET_TURU', 'ZIP_KLASORU'],
+    sheetName,
+  );
+  const headers = this.headerMap(rows[headerIndex] ?? []);
+  const result: ProjectSalesPhotoPackage[] = [];
+
+  for (
+    let rowIndex = headerIndex + 1;
+    rowIndex < rows.length;
+    rowIndex += 1
+  ) {
+    const row = rows[rowIndex];
+
+    if (this.isBlankRow(row)) {
+      continue;
+    }
+
+    const sourceRow = rowIndex + 1;
+    const rowIssues: ProjectSalesValidationIssue[] = [];
+    const code = this.normalizeCode(
+      this.value(row, headers, 'PAKET_KODU'),
+    );
+    const name = this.text(
+      this.value(row, headers, 'PAKET_ADI'),
+    );
+    const type = this.enumValue(
+      ProjectMediaPackageType,
+      this.value(row, headers, 'PAKET_TURU'),
+    );
+    const rawUnitType = this.text(
+      this.value(row, headers, 'PORTFOY_TIPI'),
+    );
+    const unitType = rawUnitType
+      ? this.enumValue(
+          UnitType,
+          this.value(row, headers, 'PORTFOY_TIPI'),
+        )
+      : null;
+    const roomCount =
+      this.text(
+        this.value(row, headers, 'ODA_KONSEPT'),
+      ) || null;
+    const zipFolder = this.text(
+      this.value(row, headers, 'ZIP_KLASORU'),
+    );
+    const isDefault = this.booleanValue(
+      this.value(row, headers, 'VARSAYILAN'),
+      false,
+    );
+    const isActive = this.booleanValue(
+      this.value(row, headers, 'AKTIF'),
+      true,
+    );
+    const sortOrder =
+      this.optionalInteger(
+        this.value(row, headers, 'SIRA'),
+      ) ?? 0;
+    const description =
+      this.text(
+        this.value(row, headers, 'ACIKLAMA'),
+      ) || null;
+
+    this.requireValue(
+      rowIssues,
+      sheetName,
+      sourceRow,
+      'A',
+      'PHOTO_PACKAGE_CODE_REQUIRED',
+      'Paket Kodu zorunludur.',
+      code,
+    );
+    this.requireValue(
+      rowIssues,
+      sheetName,
+      sourceRow,
+      'B',
+      'PHOTO_PACKAGE_NAME_REQUIRED',
+      'Paket Adı zorunludur.',
+      name,
+    );
+
+    if (!type) {
+      rowIssues.push({
+        level: 'ERROR',
+        sheet: sheetName,
+        row: sourceRow,
+        column: 'C',
+        code: 'INVALID_PHOTO_PACKAGE_TYPE',
+        message: 'Paket Türü geçerli bir EPH değeri olmalıdır.',
+        value: this.value(row, headers, 'PAKET_TURU'),
+      });
+    }
+
+    if (rawUnitType && !unitType) {
+      rowIssues.push({
+        level: 'ERROR',
+        sheet: sheetName,
+        row: sourceRow,
+        column: 'D',
+        code: 'INVALID_PHOTO_PACKAGE_UNIT_TYPE',
+        message: 'Portföy Tipi geçerli bir EPH UnitType değeri olmalıdır.',
+        value: rawUnitType,
+      });
+    }
+
+    if (
+      code &&
+      !/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(code)
+    ) {
+      rowIssues.push({
+        level: 'ERROR',
+        sheet: sheetName,
+        row: sourceRow,
+        column: 'A',
+        code: 'INVALID_PHOTO_PACKAGE_CODE',
+        message:
+          'Paket Kodu yalnız büyük harf, rakam ve tire içerebilir.',
+        value: code,
+      });
+    }
+
+    const expectedZipFolder = this.slugifyCode(code);
+
+    if (!zipFolder) {
+      rowIssues.push({
+        level: 'ERROR',
+        sheet: sheetName,
+        row: sourceRow,
+        column: 'F',
+        code: 'PHOTO_PACKAGE_ZIP_FOLDER_REQUIRED',
+        message: 'ZIP Klasörü zorunludur.',
+      });
+    } else if (
+      this.slugifyCode(zipFolder) !== expectedZipFolder
+    ) {
+      rowIssues.push({
+        level: 'ERROR',
+        sheet: sheetName,
+        row: sourceRow,
+        column: 'F',
+        code: 'PHOTO_PACKAGE_FOLDER_MISMATCH',
+        message:
+          'ZIP Klasörü, Paket Kodunun küçük harfli karşılığı olmalıdır.',
+        value: zipFolder,
+      });
+    }
+
+    if (sortOrder < 0) {
+      rowIssues.push({
+        level: 'ERROR',
+        sheet: sheetName,
+        row: sourceRow,
+        column: 'I',
+        code: 'INVALID_PHOTO_PACKAGE_SORT_ORDER',
+        message: 'Sıra değeri negatif olamaz.',
+        value: sortOrder,
+      });
+    }
+
+    issues.push(...rowIssues);
+    result.push({
+      sourceRow,
+      code,
+      name,
+      type,
+      unitType,
+      roomCount,
+      zipFolder,
+      isDefault,
+      isActive,
+      sortOrder,
+      description,
+      valid: !this.hasError(rowIssues),
+      issues: rowIssues,
+    });
+  }
+
+  this.markDuplicates(
+    result,
+    (item) => item.code,
+    sheetName,
+    'DUPLICATE_PHOTO_PACKAGE_CODE',
+    'Fotoğraf Paket Kodu tekrar ediyor.',
+    issues,
+  );
+
+  this.markDuplicates(
+    result,
+    (item) => this.slugifyCode(item.zipFolder),
+    sheetName,
+    'DUPLICATE_PHOTO_PACKAGE_FOLDER',
+    'ZIP Klasörü tekrar ediyor.',
+    issues,
+  );
+
+  const activeGeneralPackages = result.filter(
+    (item) =>
+      item.isActive &&
+      item.type ===
+        ProjectMediaPackageType.PROJECT_GENERAL,
+  );
+  const defaultGeneralPackages = activeGeneralPackages.filter(
+    (item) => item.isDefault,
+  );
+
+  if (activeGeneralPackages.length === 0) {
+    const issue: ProjectSalesValidationIssue = {
+      level: 'ERROR',
+      sheet: sheetName,
+      row: headerIndex + 1,
+      code: 'GENERAL_PHOTO_PACKAGE_REQUIRED',
+      message:
+        'En az bir aktif PROJECT_GENERAL fotoğraf paketi tanımlanmalıdır.',
+    };
+    issues.push(issue);
+  }
+
+  if (defaultGeneralPackages.length !== 1) {
+    const issue: ProjectSalesValidationIssue = {
+      level: 'ERROR',
+      sheet: sheetName,
+      row:
+        defaultGeneralPackages[0]?.sourceRow ??
+        activeGeneralPackages[0]?.sourceRow ??
+        headerIndex + 1,
+      code: 'DEFAULT_GENERAL_PHOTO_PACKAGE_REQUIRED',
+      message:
+        'Tam olarak bir PROJECT_GENERAL paketi Varsayılan=EVET olmalıdır.',
+      value: defaultGeneralPackages.length,
+    };
+    issues.push(issue);
+
+    for (const item of defaultGeneralPackages) {
+      item.issues.push(issue);
+    }
+  }
+
+  return result;
+}
   private parseProjects(
     workbook: XLSX.WorkBook,
     issues: ProjectSalesValidationIssue[],
@@ -541,6 +800,7 @@ export class ProjectSalesService {
   private parseUnits(
     workbook: XLSX.WorkBook,
     featurePackages: ProjectSalesFeaturePackage[],
+    photoPackages: ProjectSalesPhotoPackage[],
     issues: ProjectSalesValidationIssue[],
   ): ProjectSalesUnitRow[] {
     const sheetName = 'BAGIMSIZ_BOLUMLER';
@@ -553,6 +813,9 @@ export class ProjectSalesService {
     const headers = this.headerMap(rows[headerIndex] ?? []);
     const packageMap = new Map(
       featurePackages.map((item) => [item.code, item.features]),
+    );
+    const photoPackageMap = new Map(
+      photoPackages.map((item) => [item.code, item]),
     );
     const result: ProjectSalesUnitRow[] = [];
 
@@ -620,6 +883,10 @@ export class ProjectSalesService {
       const featurePackageCode =
         this.normalizeCode(
           this.value(row, headers, 'OZELLIK_PAKETI'),
+        ) || null;
+      const photoPackageCode =
+        this.normalizeCode(
+          this.value(row, headers, 'FOTOGRAF_PAKETI'),
         ) || null;
       const salesRepresentativeEmail =
         this.text(
@@ -783,6 +1050,42 @@ export class ProjectSalesService {
       }
 
       if (
+        photoPackageCode &&
+        !photoPackageMap.has(photoPackageCode)
+      ) {
+        rowIssues.push({
+          level: 'ERROR',
+          sheet: sheetName,
+          row: sourceRow,
+          column: 'S',
+          code: 'PHOTO_PACKAGE_NOT_FOUND',
+          message: 'Seçilen fotoğraf paketi bulunamadı.',
+          value: photoPackageCode,
+        });
+      }
+
+      const selectedPhotoPackage = photoPackageCode
+        ? photoPackageMap.get(photoPackageCode)
+        : null;
+
+      if (
+        selectedPhotoPackage?.unitType &&
+        type &&
+        selectedPhotoPackage.unitType !== type
+      ) {
+        rowIssues.push({
+          level: 'ERROR',
+          sheet: sheetName,
+          row: sourceRow,
+          column: 'S',
+          code: 'PHOTO_PACKAGE_UNIT_TYPE_MISMATCH',
+          message:
+            'Fotoğraf paketinin Portföy Tipi, bağımsız bölümün Portföy Tipi ile uyuşmuyor.',
+          value: photoPackageCode,
+        });
+      }
+
+      if (
         salesRepresentativeEmail &&
         !this.isEmail(salesRepresentativeEmail)
       ) {
@@ -817,6 +1120,7 @@ export class ProjectSalesService {
         facades,
         deliveryDate,
         featurePackageCode,
+        photoPackageCode,
         features: featurePackageCode
           ? packageMap.get(featurePackageCode) ?? []
           : [],
@@ -1263,6 +1567,20 @@ export class ProjectSalesService {
 
   private normalizeCode(value: unknown) {
     return this.normalizeKey(value).replace(/_+/g, '-');
+  }
+
+  private slugifyCode(value: unknown) {
+    return this.text(value)
+      .toLocaleLowerCase('tr-TR')
+      .replace(/ç/g, 'c')
+      .replace(/ğ/g, 'g')
+      .replace(/ı/g, 'i')
+      .replace(/ö/g, 'o')
+      .replace(/ş/g, 's')
+      .replace(/ü/g, 'u')
+      .replace(/\+/g, '-')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
 
   private text(value: unknown) {
