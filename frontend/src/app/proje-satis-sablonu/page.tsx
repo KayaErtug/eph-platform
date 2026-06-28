@@ -380,6 +380,8 @@ export default function ProjectSalesTemplatePage() {
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+            gridAutoRows: "1fr",
+            alignItems: "stretch",
             gap: 12,
             marginTop: 14,
           }}
@@ -773,7 +775,11 @@ function BenefitCard({
   return (
     <article
       style={{
+        width: "100%",
+        height: "100%",
         minWidth: 0,
+        display: "flex",
+        boxSizing: "border-box",
         borderRadius: 24,
         border: `1.5px solid ${border}`,
         background: "#FFFFFF",
@@ -783,7 +789,10 @@ function BenefitCard({
     >
       <div
         style={{
-          minHeight: 205,
+          width: "100%",
+          height: "100%",
+          minHeight: 300,
+          boxSizing: "border-box",
           borderRadius: 20,
           border: `2px solid ${border}`,
           background: soft,
@@ -799,6 +808,7 @@ function BenefitCard({
           style={{
             width: 52,
             height: 52,
+            flex: "0 0 52px",
             borderRadius: 16,
             display: "grid",
             placeItems: "center",
@@ -814,7 +824,7 @@ function BenefitCard({
         <div
           style={{
             width: "100%",
-            minHeight: 50,
+            minHeight: 62,
             marginTop: 12,
             display: "flex",
             alignItems: "center",
@@ -824,13 +834,18 @@ function BenefitCard({
           <h3
             style={{
               width: "100%",
+              minHeight: 50,
               margin: 0,
               borderRadius: 999,
               background: accent,
               color: "#FFFFFF",
-              padding: "10px 12px",
+              padding: "9px 10px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxSizing: "border-box",
               fontSize: 14,
-              lineHeight: 1.25,
+              lineHeight: 1.2,
               fontWeight: 950,
               textAlign: "center",
               boxShadow: `0 10px 22px ${accent}33`,
@@ -840,18 +855,28 @@ function BenefitCard({
           </h3>
         </div>
 
-        <p
+        <div
           style={{
-            margin: "14px 0 0",
-            color: "#475569",
-            fontSize: 13,
-            lineHeight: 1.6,
-            fontWeight: 700,
-            textAlign: "center",
+            width: "100%",
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          {text}
-        </p>
+          <p
+            style={{
+              margin: "12px 0 0",
+              color: "#475569",
+              fontSize: 13,
+              lineHeight: 1.6,
+              fontWeight: 700,
+              textAlign: "center",
+            }}
+          >
+            {text}
+          </p>
+        </div>
       </div>
     </article>
   );
