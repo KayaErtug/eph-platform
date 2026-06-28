@@ -10,6 +10,7 @@ import {
   Bot,
   Building2,
   ChevronRight,
+  FileSpreadsheet,
   HelpCircle,
   Home,
   Lightbulb,
@@ -49,6 +50,7 @@ function getTitle(pathname: string) {
   if (pathname.startsWith("/admin")) return "ADMİN";
   if (pathname.startsWith("/market")) return "MARKET";
   if (pathname.startsWith("/lina")) return "LİNA";
+  if (pathname.startsWith("/proje-satis-sablonu")) return "PROJE SATIŞ";
 
   return "ANASAYFA";
 }
@@ -119,7 +121,6 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
   const showShell = shouldShowShell(pathname);
   const showBottomNav = shouldShowBottomNav(pathname);
   const title = useMemo(() => getTitle(pathname), [pathname]);
-
 
   useEffect(() => {
     const setViewportVars = () => {
@@ -279,6 +280,11 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
 
               <MenuSection title="EPH">
                 <MenuRow icon={<ShoppingBag size={17} />} label="Market" onClick={() => go("/ucretlendirme")} />
+                <MenuRow
+                  icon={<FileSpreadsheet size={17} />}
+                  label="Proje Satış Excel Şablonu"
+                  onClick={() => go("/proje-satis-sablonu")}
+                />
                 <MenuRow
                   icon={<Star size={17} />}
                   label="Duyurular"

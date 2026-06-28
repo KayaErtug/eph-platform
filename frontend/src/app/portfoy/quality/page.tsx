@@ -552,17 +552,17 @@ export default function PortfolioQualityPage() {
     <main className="min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#F4F8FF] pb-[calc(112px+env(safe-area-inset-bottom))] text-[#1F2937]">
       <div className="mx-auto w-full max-w-[430px] px-3 py-3">
         <section className="rounded-[28px] border border-[#C7D6E8] bg-white p-3 text-center shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
-          <div className="flex items-center justify-between gap-3">
+          <div className="grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-3">
             <button
               type="button"
-              onClick={() => router.push("/portfoy")}
+              onClick={() => router.push("/uretkenlik")}
               className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#F8FAFC] text-[#1F2937] active:scale-[0.98]"
-              aria-label="Portföye dön"
+              aria-label="Üretkenlik sayfasına dön"
             >
               <ArrowLeft size={20} />
             </button>
-            <div className="min-w-0 flex-1 text-center">
-              <h1 className="break-words text-center text-[22px] font-black tracking-[-0.05em] text-[#06194A]">
+            <div className="flex min-h-11 min-w-0 flex-col items-center justify-center text-center">
+              <h1 className="flex min-h-[28px] items-center justify-center break-words text-center text-[22px] font-black tracking-[-0.05em] text-[#06194A]">
                 Belge Yükleme Merkezi
               </h1>
               <p className="mx-auto mt-1 max-w-[320px] text-center text-[11px] font-bold leading-5 text-[#64748B]">

@@ -20,6 +20,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ProjectMediaZipService } from './project-media-zip.service';
+import { ProjectSalesImportService } from './project-sales-import.service';
 import { ProjectSalesService } from './project-sales.service';
 
 const MEDIA_ZIP_MAX_FILE_SIZE = 200 * 1024 * 1024;
@@ -44,6 +45,7 @@ const mediaZipStorage = diskStorage({
 export class ProjectSalesController {
   constructor(
     private readonly projectSalesService: ProjectSalesService,
+    private readonly projectSalesImportService: ProjectSalesImportService,
     private readonly projectMediaZipService: ProjectMediaZipService,
   ) {}
 
@@ -67,7 +69,48 @@ export class ProjectSalesController {
       throw new BadRequestException('Excel dosyası yüklenmedi.');
     }
 
-    return this.projectSalesService.previewExcel(user.id, file);
+    return this.projectSalesImportService.previewExcel(
+      user.id,
+      file,
+    );
+  }
+
+  @Post('imports/commit')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 15 * 1024 * 1024 },
+    }),
+  )
+  commitExcel(
+    @CurrentUser() user: any,
+    @UploadedFile() file?: Express.Multer.File,
+    @Body('previewHash') previewHash?: string,
+    @Body('confirmation') confirmation?: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Excel dosyası yüklenmedi.');
+    }
+
+    return this.projectSalesImportService.commitExcel({
+      userId: user.id,
+      userRole: user.role,
+      file,
+      previewHash: previewHash || '',
+      confirmation: confirmation || '',
+    });
+  }
+
+  @Get('imports/batches/:batchId')
+  getImportBatch(
+    @CurrentUser() user: any,
+    @Param('batchId') batchId: string,
+  ) {
+    return this.projectSalesImportService.getBatch(
+      user.id,
+      user.role,
+      batchId,
+    );
   }
 
   @Get('media/:projectCode/config')

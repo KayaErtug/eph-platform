@@ -34,6 +34,7 @@ import { EphAuthorityLettersModule } from './eph-authority-letters/eph-authority
 import { LinaModule } from './lina/lina.module';
 import { TuranModule } from './turan/turan.module';
 import { ProjectSalesModule } from './project-sales/project-sales.module';
+import { ProjectSalesTemplatesModule } from './project-sales-templates/project-sales-templates.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { ProjectSalesModule } from './project-sales/project-sales.module';
     ProjectsModule,
     UnitsModule,
     ProjectSalesModule,
+    ProjectSalesTemplatesModule,
 
     NominationsModule,
     ApplicationsModule,
