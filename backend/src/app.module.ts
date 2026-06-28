@@ -33,6 +33,7 @@ import { KontorModule } from './kontor/kontor.module';
 import { EphAuthorityLettersModule } from './eph-authority-letters/eph-authority-letters.module';
 import { LinaModule } from './lina/lina.module';
 import { TuranModule } from './turan/turan.module';
+import { ProjectSalesModule } from './project-sales/project-sales.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { TuranModule } from './turan/turan.module';
 
     ProjectsModule,
     UnitsModule,
+    ProjectSalesModule,
 
     NominationsModule,
     ApplicationsModule,
