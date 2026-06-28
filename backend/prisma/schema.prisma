@@ -65,6 +65,8 @@ model User {
   announcementsCreated        PlatformAnnouncement[]       @relation("AnnouncementCreator")
   portfolioAuthorityApprovals PortfolioAuthorityDocument[] @relation("PortfolioAuthorityApprover")
   projects                    Project[]
+  projectInventoryBatches     ProjectInventoryBatch[]      @relation("ProjectInventoryBatchCreator")
+  salesUnits                  Unit[]                       @relation("UnitSalesRepresentative")
   pushSubscriptions           PushSubscription[]
   reportsCreated              Report[]                     @relation("ReportReporter")
   reportsResolved             Report[]                     @relation("ReportResolver")
@@ -231,35 +233,175 @@ model Document {
 }
 
 model Project {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  city        String
-  district    String
-  address     String
-  ownerId     String
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  latitude    Float?
-  longitude   Float?
-  mapAddress  String?
-  placeId     String?
-  owner       User     @relation(fields: [ownerId], references: [id])
-  units       Unit[]
+  id                  String                  @id @default(uuid())
+  name                String
+  code                String?
+  description         String?
+  city                String
+  district            String
+  address             String
+  ownerId             String
+  completionPercent   Int?
+  defaultDeliveryDate DateTime?
+  isActive            Boolean                 @default(true)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  latitude            Float?
+  longitude           Float?
+  mapAddress          String?
+  placeId             String?
+  owner               User                    @relation(fields: [ownerId], references: [id])
+  units               Unit[]
+  blocks              ProjectBlock[]
+  inventoryBatches    ProjectInventoryBatch[]
 
+  @@unique([ownerId, code])
+  @@index([ownerId])
   @@index([latitude, longitude])
   @@index([city, district])
+  @@index([isActive])
+}
+
+model ProjectBlock {
+  id             String                 @id @default(uuid())
+  projectId      String
+  sourceBatchId  String?
+  code           String
+  normalizedCode String
+  name           String?
+  sortOrder      Int                    @default(0)
+  isActive       Boolean                @default(true)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceBatch    ProjectInventoryBatch? @relation("ProjectBlockSourceBatch", fields: [sourceBatchId], references: [id], onDelete: SetNull)
+  floors         ProjectFloor[]
+  units          Unit[]
+
+  @@unique([projectId, normalizedCode])
+  @@index([projectId, sortOrder])
+  @@index([sourceBatchId])
+  @@index([isActive])
+}
+
+model ProjectFloor {
+  id            String                 @id @default(uuid())
+  blockId       String
+  sourceBatchId String?
+  level         Int
+  label         String
+  floorType     ProjectFloorType       @default(NORMAL)
+  sortOrder     Int                    @default(0)
+  isActive      Boolean                @default(true)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  block         ProjectBlock           @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  sourceBatch   ProjectInventoryBatch? @relation("ProjectFloorSourceBatch", fields: [sourceBatchId], references: [id], onDelete: SetNull)
+  units         Unit[]
+
+  @@unique([blockId, level])
+  @@index([blockId, sortOrder])
+  @@index([sourceBatchId])
+  @@index([floorType])
+  @@index([isActive])
+}
+
+model ProjectInventoryBatch {
+  id                String                      @id @default(uuid())
+  projectId         String
+  createdById       String
+  originalBatchId   String?
+  type              ProjectInventoryBatchType
+  status            ProjectInventoryBatchStatus @default(UPLOADED)
+  idempotencyKey    String
+  inputHash         String?
+  sourceFileName    String?
+  sourceFileUrl     String?
+  sourceText        String?
+  templateVersion   String?
+  totalRows         Int                         @default(0)
+  processedRows     Int                         @default(0)
+  validRows         Int                         @default(0)
+  invalidRows       Int                         @default(0)
+  createdCount      Int                         @default(0)
+  updatedCount      Int                         @default(0)
+  skippedCount      Int                         @default(0)
+  failedCount       Int                         @default(0)
+  progressPercent   Int                         @default(0)
+  validationSummary Json?
+  errorSummary      Json?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  cancelRequestedAt DateTime?
+  cancelledAt       DateTime?
+  rolledBackAt      DateTime?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  project           Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy         User                        @relation("ProjectInventoryBatchCreator", fields: [createdById], references: [id])
+  originalBatch     ProjectInventoryBatch?      @relation("ProjectInventoryBatchRollback", fields: [originalBatchId], references: [id], onDelete: SetNull)
+  rollbackBatches   ProjectInventoryBatch[]     @relation("ProjectInventoryBatchRollback")
+  items             ProjectInventoryBatchItem[]
+  createdBlocks     ProjectBlock[]              @relation("ProjectBlockSourceBatch")
+  createdFloors     ProjectFloor[]              @relation("ProjectFloorSourceBatch")
+  createdUnits      Unit[]                      @relation("UnitSourceBatch")
+
+  @@unique([projectId, idempotencyKey])
+  @@index([projectId, status])
+  @@index([projectId, type])
+  @@index([createdById])
+  @@index([originalBatchId])
+  @@index([inputHash])
+  @@index([createdAt])
+}
+
+model ProjectInventoryBatchItem {
+  id             String                          @id @default(uuid())
+  batchId        String
+  unitId         String?
+  sequence       Int
+  sourceRow      Int?
+  naturalKey     String?
+  action         ProjectInventoryBatchItemAction @default(CREATE)
+  status         ProjectInventoryBatchItemStatus @default(PENDING)
+  rawData        Json?
+  normalizedData Json?
+  errors         Json?
+  warnings       Json?
+  beforeData     Json?
+  afterData      Json?
+  afterHash      String?
+  createdAt      DateTime                        @default(now())
+  updatedAt      DateTime                        @updatedAt
+  batch          ProjectInventoryBatch           @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  unit           Unit?                           @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  @@unique([batchId, sequence])
+  @@index([batchId, status])
+  @@index([batchId, action])
+  @@index([unitId])
+  @@index([naturalKey])
 }
 
 model Unit {
   id                     String                       @id @default(uuid())
   projectId              String
+  blockId                String?
+  floorId                String?
+  sourceBatchId          String?
+  salesRepresentativeId  String?
+  inventoryCode          String?
+  externalRef            String?
+  inventorySortOrder     Int                          @default(0)
   type                   UnitType                     @default(DAIRE)
   floor                  Int?
   number                 String?
   roomCount              String?
   area                   Float?
+  netArea                Float?
+  grossArea              Float?
+  facades                String[]                     @default([])
+  deliveryDate           DateTime?
   price                  Float
   status                 UnitStatus                   @default(SATILIK)
   description            String?
@@ -294,8 +436,23 @@ model Unit {
   authorityLetters       EPHAuthorityLetter[]
   authorityDocuments     PortfolioAuthorityDocument[]
   project                Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  block                  ProjectBlock?                @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  projectFloor           ProjectFloor?                @relation(fields: [floorId], references: [id], onDelete: SetNull)
+  sourceBatch            ProjectInventoryBatch?       @relation("UnitSourceBatch", fields: [sourceBatchId], references: [id], onDelete: SetNull)
+  salesRepresentative    User?                        @relation("UnitSalesRepresentative", fields: [salesRepresentativeId], references: [id], onDelete: SetNull)
+  batchItems             ProjectInventoryBatchItem[]
   images                 UnitImage[]
 
+  @@unique([projectId, inventoryCode])
+  @@unique([projectId, externalRef])
+  @@unique([projectId, blockId, floorId, number])
+  @@index([projectId, blockId, floorId])
+  @@index([projectId, status])
+  @@index([blockId])
+  @@index([floorId])
+  @@index([sourceBatchId])
+  @@index([salesRepresentativeId])
+  @@index([deliveryDate])
   @@index([approvalStatus])
   @@index([isPoolVisible])
   @@index([availableCreditAmount])
@@ -2515,9 +2672,66 @@ enum PortfolioAuthorityType {
   TAPU_SAHIBI_KIMLIK
 }
 
+enum ProjectFloorType {
+  BODRUM
+  ZEMIN
+  NORMAL
+  ASMA
+  TERAS
+  CATI
+  DIGER
+}
+
+enum ProjectInventoryBatchType {
+  EXCEL_IMPORT
+  CSV_IMPORT
+  RULE_GENERATION
+  NATURAL_LANGUAGE_GENERATION
+  BULK_PRICE_UPDATE
+  BULK_STATUS_UPDATE
+  BULK_FEATURE_UPDATE
+  BULK_DELIVERY_UPDATE
+  ROLLBACK
+}
+
+enum ProjectInventoryBatchStatus {
+  UPLOADED
+  VALIDATING
+  PREVIEW_READY
+  QUEUED
+  PROCESSING
+  COMPLETED
+  PARTIAL
+  FAILED
+  CANCELLED
+  ROLLED_BACK
+}
+
+enum ProjectInventoryBatchItemAction {
+  CREATE
+  UPDATE
+  SKIP
+  DELETE
+  NO_CHANGE
+  ROLLBACK
+}
+
+enum ProjectInventoryBatchItemStatus {
+  PENDING
+  VALID
+  INVALID
+  PROCESSING
+  CREATED
+  UPDATED
+  SKIPPED
+  FAILED
+  ROLLED_BACK
+}
+
 enum UnitStatus {
   SATILIK
   REZERVE
+  OPSIYONLU
   SATILDI
   PASIF
   KIRALIK
