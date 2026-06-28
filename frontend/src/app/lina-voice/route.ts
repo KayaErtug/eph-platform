@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
             similarity_boost: 0.82,
             style: 0,
             use_speaker_boost: true,
-            speed: 0.92,
+            speed: 1.05,
           },
         }),
       },
@@ -123,6 +123,7 @@ export async function POST(req: NextRequest) {
         "Cache-Control": "no-store",
         "X-Lina-Voice-Id": voiceId,
         "X-Lina-Voice-Seed": String(LINA_VOICE_SEED),
+        "X-Lina-Voice-Speed": "1.05",
       },
     });
   } catch {
