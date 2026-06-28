@@ -219,6 +219,7 @@ export default function LinaPanel({
   const mediaRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const voiceRequestIdRef = useRef(0);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const recordingFrameRef = useRef<number | null>(null);
@@ -596,9 +597,11 @@ export default function LinaPanel({
       }
 
       stopCurrentAudio();
+      const requestId = voiceRequestIdRef.current + 1;
+      voiceRequestIdRef.current = requestId;
       setSpeaking(true);
 
-      let res = await fetch("/lina-voice", {
+      const res = await fetch("/api/lina-voice", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -607,25 +610,27 @@ export default function LinaPanel({
       });
 
       if (!res.ok) {
-        res = await fetch("/api/lina-voice", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ text }),
-        });
-      }
-
-      if (!res.ok) {
-        setSpeaking(false);
-        setVoiceError("Lina sesi şu anda üretilemedi.");
+        if (voiceRequestIdRef.current === requestId) {
+          setSpeaking(false);
+          setVoiceError("Lina sesi şu anda üretilemedi.");
+        }
         return;
       }
 
       const audioData = await res.arrayBuffer();
+
+      if (voiceRequestIdRef.current !== requestId) {
+        return;
+      }
+
       const audioBuffer = await context.decodeAudioData(
         audioData.slice(0),
       );
+
+      if (voiceRequestIdRef.current !== requestId) {
+        return;
+      }
+
       const source = context.createBufferSource();
 
       source.buffer = audioBuffer;
@@ -638,7 +643,9 @@ export default function LinaPanel({
           audioSourceRef.current = null;
         }
 
-        setSpeaking(false);
+        if (voiceRequestIdRef.current === requestId) {
+          setSpeaking(false);
+        }
       };
 
       source.start(0);

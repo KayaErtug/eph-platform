@@ -63,6 +63,7 @@ export class LinaController {
       body?.message,
       user,
       sourceModule,
+      body?.history,
     );
 
     if (actionResult.handled) {

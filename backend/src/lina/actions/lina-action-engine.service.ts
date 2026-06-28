@@ -1,15 +1,21 @@
 import { Injectable } from "@nestjs/common";
 import {
   ActivityType,
+  CustomerInterestPriority,
+  CustomerPurchaseIntent,
+  CustomerRole,
   CustomerStatus,
   Role,
   TaskStatus,
+  UnitStatus,
+  UnitType,
 } from "@prisma/client";
 
 import { CrmService } from "../../crm/crm.service";
 import { LinaAuditService } from "../lina-audit.service";
 import {
   LinaActionExecutionResult,
+  LinaActionHistoryItem,
   LinaActionSourceModule,
   LinaActionUser,
   LinaPendingAction,
@@ -26,6 +32,18 @@ type CustomerLike = {
   budget?: number | null;
   status?: CustomerStatus;
   notes?: string | null;
+  interests?: Array<{
+    id: string;
+    city?: string | null;
+    district?: string | null;
+    neighborhood?: string | null;
+    propertyTypes?: UnitType[];
+    statuses?: UnitStatus[];
+    maxBudget?: number | null;
+    roomCounts?: string[];
+    purchaseIntent?: CustomerPurchaseIntent;
+    isActive?: boolean;
+  }>;
   tasks?: Array<{
     id: string;
     title: string;
@@ -44,11 +62,36 @@ type ParsedCustomerFields = {
   notes?: string;
 };
 
+type ParsedNaturalCrmLead = {
+  fullName: string;
+  firstName: string;
+  lastName: string;
+  city?: string;
+  district?: string;
+  neighborhood?: string;
+  maxBudget?: number;
+  roomCounts: string[];
+  propertyTypes: UnitType[];
+  statuses: UnitStatus[];
+  purchaseIntent: CustomerPurchaseIntent;
+  customerRole: CustomerRole;
+  originalText: string;
+};
+
+type PendingCrmCreation = {
+  userId: string;
+  createdAt: number;
+  expiresAt: number;
+};
+
+
 const PENDING_ACTION_TTL_MS = 5 * 60 * 1000;
+const PENDING_CRM_CREATION_TTL_MS = 10 * 60 * 1000;
 
 @Injectable()
 export class LinaActionEngineService {
   private readonly pendingActions = new Map<string, LinaPendingAction>();
+  private readonly pendingCrmCreations = new Map<string, PendingCrmCreation>();
 
   constructor(
     private readonly crmService: CrmService,
@@ -59,8 +102,10 @@ export class LinaActionEngineService {
     rawMessage: string,
     rawUser: LinaActionUser | undefined,
     sourceModule: LinaActionSourceModule = "general",
+    rawHistory: LinaActionHistoryItem[] = [],
   ): Promise<LinaActionExecutionResult> {
     const message = String(rawMessage || "").trim();
+    const history = this.normalizeHistory(rawHistory);
 
     if (!message) {
       return { handled: false };
@@ -90,11 +135,38 @@ export class LinaActionEngineService {
       return confirmationResult;
     }
 
-    if (this.isInformationalQuestion(message)) {
-      return { handled: false };
-    }
-
     try {
+      const crmDraftStart = this.handleCrmCreationStart(
+        message,
+        user,
+        sourceModule,
+      );
+
+      if (crmDraftStart) {
+        return crmDraftStart;
+      }
+
+      const crmCreationContextActive = this.hasCrmCreationContext(
+        user.id,
+        message,
+        history,
+      );
+
+      if (
+        crmCreationContextActive &&
+        this.looksLikeNaturalCrmLead(message)
+      ) {
+        return await this.createCrmCustomerFromNaturalLead(
+          message,
+          user,
+          sourceModule,
+        );
+      }
+
+      if (this.isInformationalQuestion(message)) {
+        return { handled: false };
+      }
+
       if (this.isCrmCustomerListCommand(message)) {
         return await this.listCrmCustomers(user, sourceModule);
       }
@@ -175,6 +247,457 @@ export class LinaActionEngineService {
       role,
       email: user?.email,
     };
+  }
+
+  private normalizeHistory(
+    history: LinaActionHistoryItem[],
+  ): LinaActionHistoryItem[] {
+    if (!Array.isArray(history)) {
+      return [];
+    }
+
+    return history
+      .slice(-20)
+      .map((item) => ({
+        role:
+          item?.role === "assistant"
+            ? ("assistant" as const)
+            : ("user" as const),
+        content: String(item?.content || "").trim(),
+      }))
+      .filter((item) => item.content.length > 0);
+  }
+
+  private handleCrmCreationStart(
+    message: string,
+    user: LinaResolvedUser,
+    sourceModule: LinaActionSourceModule,
+  ): LinaActionExecutionResult | null {
+    const normalized = this.normalize(message);
+    const isStartCommand =
+      /^(lina\s+)?(?:yeni\s+)?(?:crm|musteri)\s+(?:kaydi|kayit)\s+(?:olusturalim|acalim|ekleyelim|olustur|ac)$/.test(
+        normalized,
+      ) ||
+      /^(lina\s+)?crm(?:de|e)?\s+(?:yeni\s+)?musteri\s+(?:olusturalim|ekleyelim|olustur)$/.test(
+        normalized,
+      );
+
+    if (!isStartCommand) {
+      return null;
+    }
+
+    const now = Date.now();
+
+    this.pendingCrmCreations.set(user.id, {
+      userId: user.id,
+      createdAt: now,
+      expiresAt: now + PENDING_CRM_CREATION_TTL_MS,
+    });
+
+    this.audit(user, sourceModule, "crm_customer_create_prepare", "success");
+
+    return {
+      handled: true,
+      success: true,
+      action: "crm_customer_create",
+      message:
+        "Elbette. CRM kaydı oluşturacağım. Müşterinin ad-soyadını; varsa telefonunu, aradığı il-ilçe-mahalleyi, bütçesini, oda sayısını ve gayrimenkul türünü tek cümlede söyleyin.",
+    };
+  }
+
+  private hasCrmCreationContext(
+    userId: string,
+    currentMessage: string,
+    history: LinaActionHistoryItem[],
+  ): boolean {
+    const pending = this.pendingCrmCreations.get(userId);
+
+    if (pending) {
+      if (pending.expiresAt >= Date.now()) {
+        return true;
+      }
+
+      this.pendingCrmCreations.delete(userId);
+    }
+
+    const currentNormalized = this.normalize(currentMessage);
+    let currentMessageSkipped = false;
+
+    const previousHistory = [...history]
+      .reverse()
+      .filter((item) => {
+        if (
+          !currentMessageSkipped &&
+          item.role === "user" &&
+          this.normalize(item.content) === currentNormalized
+        ) {
+          currentMessageSkipped = true;
+          return false;
+        }
+
+        return true;
+      })
+      .slice(0, 10);
+
+    return previousHistory.some((item) => {
+      const normalized = this.normalize(item.content);
+
+      if (item.role === "user") {
+        return (
+          /(?:crm|musteri).*(?:kaydi|kayit).*(?:olustur|ekle|ac)/.test(
+            normalized,
+          ) ||
+          /(?:olustur|ekle|ac).*(?:crm|musteri).*(?:kaydi|kayit)/.test(
+            normalized,
+          )
+        );
+      }
+
+      return (
+        normalized.includes("crm kaydi olusturacagim") ||
+        normalized.includes("musterinin ad soyadini") ||
+        normalized.includes("musteri bilgilerini soyleyin")
+      );
+    });
+  }
+
+  private looksLikeNaturalCrmLead(message: string): boolean {
+    const normalized = this.normalize(message);
+    const firstSegment = String(message || "").split(",")[0]?.trim() || "";
+    const nameParts = this.splitPersonName(firstSegment);
+
+    if (!nameParts) {
+      return false;
+    }
+
+    return (
+      /(satin almak istiyor|kiralamak istiyor|yatirim yapmak istiyor|daire ariyor|villa ariyor|arsa ariyor|gayrimenkul ariyor)/.test(
+        normalized,
+      ) ||
+      (
+        /(milyon|bin|tl|₺|butce|kadar)/.test(normalized) &&
+        /(daire|villa|rezidans|mustakil ev|arsa|tarla|dukkan|ofis)/.test(
+          normalized,
+        )
+      )
+    );
+  }
+
+  private async createCrmCustomerFromNaturalLead(
+    message: string,
+    user: LinaResolvedUser,
+    sourceModule: LinaActionSourceModule,
+  ): Promise<LinaActionExecutionResult> {
+    const lead = this.parseNaturalCrmLead(message);
+
+    if (!lead) {
+      return {
+        handled: true,
+        success: false,
+        message:
+          "CRM kaydını oluşturmak istediğinizi anladım; ancak müşteri adı veya talep ayrıntılarından bazılarını ayıramadım. Ad-soyadı, konum, bütçe ve gayrimenkul türünü tek cümlede tekrar söyleyin.",
+      };
+    }
+
+    const customers = (await this.crmService.getCustomers(
+      user.id,
+      user.role,
+    )) as CustomerLike[];
+
+    const existingCustomer = customers.find(
+      (customer) =>
+        this.normalize(this.customerFullName(customer)) ===
+        this.normalize(lead.fullName),
+    );
+
+    let customer: CustomerLike;
+    let createdNewCustomer = false;
+
+    if (existingCustomer) {
+      customer = (await this.crmService.getCustomer(
+        existingCustomer.id,
+        user.id,
+        user.role,
+      )) as CustomerLike;
+
+      const duplicateInterest = customer.interests?.find((interest) => {
+        const sameCity =
+          this.normalize(interest.city || "") ===
+          this.normalize(lead.city || "");
+        const sameDistrict =
+          this.normalize(interest.district || "") ===
+          this.normalize(lead.district || "");
+        const sameNeighborhood =
+          this.normalize(interest.neighborhood || "") ===
+          this.normalize(lead.neighborhood || "");
+        const sameRoom =
+          lead.roomCounts.length === 0 ||
+          lead.roomCounts.some((roomCount) =>
+            interest.roomCounts?.includes(roomCount),
+          );
+        const sameType =
+          lead.propertyTypes.length === 0 ||
+          lead.propertyTypes.some((propertyType) =>
+            interest.propertyTypes?.includes(propertyType),
+          );
+
+        return (
+          interest.isActive !== false &&
+          sameCity &&
+          sameDistrict &&
+          sameNeighborhood &&
+          sameRoom &&
+          sameType
+        );
+      });
+
+      if (duplicateInterest) {
+        this.pendingCrmCreations.delete(user.id);
+
+        return {
+          handled: true,
+          success: true,
+          action: "crm_customer_create_with_interest",
+          message: `${lead.fullName} için aynı konum ve özelliklerde aktif bir CRM talebi zaten bulunuyor. Tekrar kayıt oluşturmadım.`,
+          data: {
+            customerId: customer.id,
+            interestId: duplicateInterest.id,
+            reusedCustomer: true,
+          },
+        };
+      }
+    } else {
+      customer = (await this.crmService.createCustomer(user.id, {
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        city: lead.city,
+        budget: lead.maxBudget,
+        interestedArea: [lead.city, lead.district, lead.neighborhood]
+          .filter(Boolean)
+          .join(" / "),
+        interestedType: lead.propertyTypes[0],
+        source: "LINA",
+        status: CustomerStatus.YENI_LEAD,
+        roles: [lead.customerRole],
+        notes: lead.originalText,
+      })) as CustomerLike;
+
+      createdNewCustomer = true;
+    }
+
+    try {
+      const interest = await this.crmService.addCustomerInterest(
+        customer.id,
+        user.id,
+        user.role,
+        {
+          title: this.buildNaturalLeadTitle(lead),
+          city: lead.city,
+          district: lead.district,
+          neighborhood: lead.neighborhood,
+          propertyTypes: lead.propertyTypes,
+          statuses: lead.statuses,
+          maxBudget: lead.maxBudget,
+          priceCurrency: "TRY",
+          roomCounts: lead.roomCounts,
+          purchaseIntent: lead.purchaseIntent,
+          priority: CustomerInterestPriority.NORMAL,
+          notes: lead.originalText,
+          isActive: true,
+        },
+      );
+
+      this.pendingCrmCreations.delete(user.id);
+      this.audit(
+        user,
+        sourceModule,
+        "crm_customer_create_with_interest",
+        "success",
+      );
+
+      const locationText = [
+        lead.city,
+        lead.district,
+        lead.neighborhood,
+      ]
+        .filter(Boolean)
+        .join(" / ");
+      const budgetText =
+        typeof lead.maxBudget === "number"
+          ? `${new Intl.NumberFormat("tr-TR").format(lead.maxBudget)} ₺`
+          : "Belirtilmedi";
+      const roomText =
+        lead.roomCounts.length > 0
+          ? lead.roomCounts.join(", ")
+          : "Oda sayısı belirtilmedi";
+      const propertyText = lead.propertyTypes
+        .map((type) => this.propertyTypeLabel(type))
+        .join(", ");
+
+      return {
+        handled: true,
+        success: true,
+        action: "crm_customer_create_with_interest",
+        message: [
+          `${lead.fullName} için CRM kaydı ve müşteri talebi oluşturuldu.`,
+          locationText ? `Konum: ${locationText}` : null,
+          `Talep: ${roomText} ${propertyText || "gayrimenkul"}`,
+          `Üst bütçe: ${budgetText}`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        data: {
+          customer,
+          interest,
+          reusedCustomer: !createdNewCustomer,
+        },
+      };
+    } catch (error) {
+      if (createdNewCustomer) {
+        try {
+          await this.crmService.deleteCustomer(
+            customer.id,
+            user.id,
+            user.role,
+          );
+        } catch {
+          // Asıl hata korunur; geri alma hatası kullanıcıya ayrıca yansıtılmaz.
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  private parseNaturalCrmLead(
+    message: string,
+  ): ParsedNaturalCrmLead | null {
+    const text = String(message || "")
+      .replace(/\s+/g, " ")
+      .trim();
+    const fullName = text.split(",")[0]?.trim() || "";
+    const nameParts = this.splitPersonName(fullName);
+
+    if (!nameParts) {
+      return null;
+    }
+
+    const normalized = this.normalize(text);
+    const locationMatch = text.match(
+      /,\s*([A-Za-zÇĞİÖŞÜçğıöşü-]+)\s+([A-Za-zÇĞİÖŞÜçğıöşü\s-]+?)\s+ilçesi\s+([A-Za-zÇĞİÖŞÜçğıöşü0-9\s-]+?)\s+mahallesi(?:nde|nda|de|da)?\b/i,
+    );
+    const budgetMatch = text.match(
+      /([\d.,]+)\s*(milyon|bin)?\s*(?:tl|₺|türk lirası)?(?:['’]?(?:ye|ya|e|a))?\s+kadar/i,
+    );
+    const roomMatch = text.match(
+      /\b(\d+(?:[,.]5)?\s*\+\s*\d+)\b/,
+    );
+
+    const propertyTypes = this.extractNaturalLeadPropertyTypes(normalized);
+    const purchaseIntent = this.extractNaturalLeadPurchaseIntent(normalized);
+    const statuses =
+      purchaseIntent === CustomerPurchaseIntent.KIRALAMA
+        ? [UnitStatus.KIRALIK]
+        : [UnitStatus.SATILIK];
+    const customerRole =
+      purchaseIntent === CustomerPurchaseIntent.KIRALAMA
+        ? CustomerRole.KIRACI
+        : purchaseIntent === CustomerPurchaseIntent.YATIRIM
+          ? CustomerRole.YATIRIMCI
+          : CustomerRole.ALICI;
+
+    return {
+      fullName: this.titleCase(fullName),
+      firstName: nameParts.firstName,
+      lastName: nameParts.lastName,
+      city: locationMatch?.[1]?.trim(),
+      district: locationMatch?.[2]?.trim(),
+      neighborhood: locationMatch?.[3]?.trim(),
+      maxBudget: budgetMatch
+        ? this.parseTurkishMoney(budgetMatch[1], budgetMatch[2])
+        : undefined,
+      roomCounts: roomMatch
+        ? [roomMatch[1].replace(/\s+/g, "").replace(",", ".")]
+        : [],
+      propertyTypes,
+      statuses,
+      purchaseIntent,
+      customerRole,
+      originalText: text,
+    };
+  }
+
+  private extractNaturalLeadPropertyTypes(
+    normalizedMessage: string,
+  ): UnitType[] {
+    const mappings: Array<[RegExp, UnitType]> = [
+      [/\bmustakil ev\b/, UnitType.MUSTAK_EV],
+      [/\bdukkan\b|\bmagaza\b/, UnitType.DUKKAN_MAGAZA],
+      [/\bofis\b|\bburo\b/, UnitType.OFIS_BURO],
+      [/\brezidans\b/, UnitType.REZIDANS],
+      [/\bvilla\b/, UnitType.VILLA],
+      [/\bdubleks\b/, UnitType.DAIRE],
+      [/\bdaire\b/, UnitType.DAIRE],
+      [/\bkonut\b/, UnitType.DAIRE],
+      [/\barsa\b/, UnitType.ARSA],
+      [/\btarla\b/, UnitType.TARLA],
+    ];
+
+    const propertyTypes = mappings
+      .filter(([pattern]) => pattern.test(normalizedMessage))
+      .map(([, propertyType]) => propertyType);
+
+    return Array.from(new Set(propertyTypes));
+  }
+
+  private extractNaturalLeadPurchaseIntent(
+    normalizedMessage: string,
+  ): CustomerPurchaseIntent {
+    if (/(kiralamak|kiralik|kiralama)/.test(normalizedMessage)) {
+      return CustomerPurchaseIntent.KIRALAMA;
+    }
+
+    if (/(yatirim|yatirimlik)/.test(normalizedMessage)) {
+      return CustomerPurchaseIntent.YATIRIM;
+    }
+
+    return CustomerPurchaseIntent.SATIN_ALMA;
+  }
+
+  private buildNaturalLeadTitle(lead: ParsedNaturalCrmLead): string {
+    const roomText =
+      lead.roomCounts.length > 0
+        ? `${lead.roomCounts.join(", ")} `
+        : "";
+    const typeText =
+      lead.propertyTypes.length > 0
+        ? lead.propertyTypes
+            .map((type) => this.propertyTypeLabel(type))
+            .join(", ")
+        : "Gayrimenkul";
+    const intentText =
+      lead.purchaseIntent === CustomerPurchaseIntent.KIRALAMA
+        ? "Kiralama Talebi"
+        : lead.purchaseIntent === CustomerPurchaseIntent.YATIRIM
+          ? "Yatırım Talebi"
+          : "Satın Alma Talebi";
+
+    return `${roomText}${typeText} — ${intentText}`;
+  }
+
+  private propertyTypeLabel(type: UnitType): string {
+    const labels: Partial<Record<UnitType, string>> = {
+      [UnitType.DAIRE]: "Daire",
+      [UnitType.VILLA]: "Villa",
+      [UnitType.REZIDANS]: "Rezidans",
+      [UnitType.MUSTAK_EV]: "Müstakil Ev",
+      [UnitType.DUKKAN_MAGAZA]: "Dükkan / Mağaza",
+      [UnitType.OFIS_BURO]: "Ofis / Büro",
+      [UnitType.ARSA]: "Arsa",
+      [UnitType.TARLA]: "Tarla",
+    };
+
+    return labels[type] || String(type).replaceAll("_", " ");
   }
 
   private looksLikePlatformAction(message: string): boolean {

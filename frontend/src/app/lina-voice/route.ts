@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 const DEFAULT_LINA_VOICE_ID = "LYfSi2g3Frvxg50fRl91";
 const DEFAULT_LINA_MODEL_ID = "eleven_multilingual_v2";
+const LINA_VOICE_SEED = 20260628;
 
 function readEnvValue(key: string) {
   const fromProcess = process.env[key];
@@ -89,12 +90,13 @@ export async function POST(req: NextRequest) {
           text: cleanText,
           model_id: modelId,
           language_code: "tr",
+          seed: LINA_VOICE_SEED,
           voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
+            stability: 0.72,
+            similarity_boost: 0.82,
             style: 0,
             use_speaker_boost: true,
-            speed: 0.86,
+            speed: 0.92,
           },
         }),
       },
@@ -119,6 +121,8 @@ export async function POST(req: NextRequest) {
       headers: {
         "Content-Type": "audio/mpeg",
         "Cache-Control": "no-store",
+        "X-Lina-Voice-Id": voiceId,
+        "X-Lina-Voice-Seed": String(LINA_VOICE_SEED),
       },
     });
   } catch {
