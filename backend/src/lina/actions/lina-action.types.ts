@@ -1,0 +1,54 @@
+import { Role } from "@prisma/client";
+
+export type LinaActionSourceModule =
+  | "dashboard"
+  | "crm"
+  | "network"
+  | "pool"
+  | "notifications"
+  | "general";
+
+export type LinaActionUser = {
+  id?: string;
+  role?: string;
+  email?: string;
+};
+
+export type LinaResolvedUser = {
+  id: string;
+  role: Role;
+  email?: string;
+};
+
+export type LinaActionName =
+  | "crm_customer_list"
+  | "crm_customer_find"
+  | "crm_customer_create"
+  | "crm_customer_update"
+  | "crm_customer_status_update"
+  | "crm_customer_delete"
+  | "crm_activity_create"
+  | "crm_task_create"
+  | "crm_task_update"
+  | "confirmation_cancelled";
+
+export type LinaActionExecutionResult = {
+  handled: boolean;
+  success?: boolean;
+  message?: string;
+  action?: LinaActionName;
+  requiresConfirmation?: boolean;
+  data?: unknown;
+};
+
+export type LinaPendingAction =
+  | {
+      type: "crm_customer_delete";
+      userId: string;
+      createdAt: number;
+      expiresAt: number;
+      payload: {
+        customerId: string;
+        customerName: string;
+      };
+    };

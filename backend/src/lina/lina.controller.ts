@@ -14,6 +14,8 @@ import {
 import { Request } from "express";
 
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { LinaActionEngineService } from "./actions/lina-action-engine.service";
+import { LinaActionSourceModule } from "./actions/lina-action.types";
 import { LinaChatDto } from "./dto/lina-chat.dto";
 import { LinaPreferencesDto } from "./dto/lina-preferences.dto";
 import { LinaVoiceDto } from "./dto/lina-voice.dto";
@@ -40,6 +42,7 @@ export class LinaController {
   constructor(
     private readonly linaService: LinaService,
     private readonly linaMemoryService: LinaMemoryService,
+    private readonly linaActionEngineService: LinaActionEngineService,
   ) {}
 
   @Get("status")
@@ -53,10 +56,31 @@ export class LinaController {
     @Body() body: LinaChatDto,
     @Req() request: RequestWithUser,
   ) {
-    return this.linaService.createTextReply(
-      body,
-      this.extractUser(request),
+    const user = this.extractUser(request);
+    const sourceModule = this.normalizeSourceModule(body?.sourceModule);
+
+    const actionResult = await this.linaActionEngineService.tryExecute(
+      body?.message,
+      user,
+      sourceModule,
     );
+
+    if (actionResult.handled) {
+      return {
+        success: Boolean(actionResult.success),
+        message:
+          actionResult.message ||
+          "Lina işlemi tamamladı ancak sonuç mesajı oluşturamadı.",
+        provider: "local" as const,
+        kvkkFiltered: false,
+        detectedTypes: [],
+        action: actionResult.action,
+        requiresConfirmation: actionResult.requiresConfirmation ?? false,
+        data: actionResult.data,
+      };
+    }
+
+    return this.linaService.createTextReply(body, user);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -174,6 +198,23 @@ export class LinaController {
       role: this.readHeader(request, "x-user-role"),
       email: this.readHeader(request, "x-user-email"),
     };
+  }
+
+  private normalizeSourceModule(
+    sourceModule?: string,
+  ): LinaActionSourceModule {
+    const allowedModules: LinaActionSourceModule[] = [
+      "dashboard",
+      "crm",
+      "network",
+      "pool",
+      "notifications",
+      "general",
+    ];
+
+    return allowedModules.includes(sourceModule as LinaActionSourceModule)
+      ? (sourceModule as LinaActionSourceModule)
+      : "general";
   }
 
   private readHeader(
