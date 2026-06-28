@@ -8,11 +8,12 @@ import {
   Building2,
   CheckCircle2,
   Download,
-  Factory,
   FileSpreadsheet,
+  ImageIcon,
   Loader2,
   LockKeyhole,
   ShieldCheck,
+  Sparkles,
   X,
 } from "lucide-react";
 
@@ -79,6 +80,42 @@ function getDownloadFileName(contentDisposition?: string) {
   return basicMatch?.[1] || FILE_NAME;
 }
 
+
+const benefitCards = [
+  {
+    title: "Toplu Portföy Girişi",
+    text: "Projelerinizdeki tüm daire ve bağımsız bölümleri tek Excel dosyasıyla topluca sisteme aktarın.",
+    icon: <Building2 size={22} />,
+    accent: "#2563EB",
+    soft: "#EFF6FF",
+    border: "#93C5FD",
+  },
+  {
+    title: "Esnek Proje Yapısı",
+    text: "Daire tiplerini, özel konseptleri ve fotoğraf paketlerini projenize göre kolayca tanımlayın.",
+    icon: <Sparkles size={22} />,
+    accent: "#0EA5E9",
+    soft: "#F0F9FF",
+    border: "#7DD3FC",
+  },
+  {
+    title: "Fotoğraf Paketleri",
+    text: "Örnek daire fotoğraflarını ve projenizin genel görsellerini tüm bağımsız bölümlere kolayca entegre edin.",
+    icon: <ImageIcon size={22} />,
+    accent: "#8B5CF6",
+    soft: "#F5F3FF",
+    border: "#C4B5FD",
+  },
+  {
+    title: "Güvenli Aktarım",
+    text: "Verileri kaydetmeden önce kontrol edin, hataları görün ve tekrar kayıt oluşmasını önleyin.",
+    icon: <ShieldCheck size={22} />,
+    accent: "#16A34A",
+    soft: "#F0FDF4",
+    border: "#86EFAC",
+  },
+];
+
 export default function ProjectSalesTemplatePage() {
   const router = useRouter();
   const { user, hasHydrated } = useAuthStore();
@@ -119,8 +156,12 @@ export default function ProjectSalesTemplatePage() {
         response.headers["content-type"] ||
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       );
+      const rawContentDisposition =
+        response.headers["content-disposition"];
       const fileName = getDownloadFileName(
-        response.headers["content-disposition"],
+        typeof rawContentDisposition === "string"
+          ? rawContentDisposition
+          : undefined,
       );
       const blob = new Blob([response.data], { type: contentType });
       const blobUrl = window.URL.createObjectURL(blob);
@@ -338,26 +379,22 @@ export default function ProjectSalesTemplatePage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
             gap: 12,
             marginTop: 14,
           }}
         >
-          <InfoCard
-            icon={<Building2 size={22} />}
-            title="Müteahhit"
-            text="Yüzlerce veya binlerce bağımsız bölümü toplu hazırlayın."
-          />
-          <InfoCard
-            icon={<Factory size={22} />}
-            title="İnşaat Firması"
-            text="Oda tipi, konsept ve fotoğraf paketlerini projeye göre tanımlayın."
-          />
-          <InfoCard
-            icon={<ShieldCheck size={22} />}
-            title="Kontrollü Aktarım"
-            text="Ön izleme, doğrulama ve tekrar kayıt önleme altyapısıyla kullanın."
-          />
+          {benefitCards.map((item) => (
+            <BenefitCard
+              key={item.title}
+              title={item.title}
+              text={item.text}
+              icon={item.icon}
+              accent={item.accent}
+              soft={item.soft}
+              border={item.border}
+            />
+          ))}
         </div>
 
         <section
@@ -372,14 +409,14 @@ export default function ProjectSalesTemplatePage() {
         >
           <div
             style={{
-              display: "flex",
-              alignItems: "flex-start",
+              display: "grid",
+              gridTemplateColumns: "48px minmax(0, 1fr) 48px",
+              alignItems: "center",
               gap: 12,
             }}
           >
             <div
               style={{
-                flex: "0 0 auto",
                 width: 48,
                 height: 48,
                 borderRadius: 16,
@@ -392,7 +429,17 @@ export default function ProjectSalesTemplatePage() {
               <FileSpreadsheet size={25} />
             </div>
 
-            <div style={{ minWidth: 0, flex: 1 }}>
+            <div
+              style={{
+                minWidth: 0,
+                minHeight: 48,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+              }}
+            >
               <h2
                 style={{
                   margin: 0,
@@ -400,6 +447,7 @@ export default function ProjectSalesTemplatePage() {
                   fontSize: 19,
                   lineHeight: 1.3,
                   fontWeight: 950,
+                  textAlign: "center",
                 }}
               >
                 Excel Şablonu V4
@@ -411,12 +459,15 @@ export default function ProjectSalesTemplatePage() {
                   fontSize: 13,
                   lineHeight: 1.55,
                   fontWeight: 650,
-                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                  textAlign: "center",
                 }}
               >
                 {FILE_NAME}
               </p>
             </div>
+
+            <div aria-hidden="true" style={{ width: 48, height: 48 }} />
           </div>
 
           <div
@@ -704,60 +755,104 @@ export default function ProjectSalesTemplatePage() {
   );
 }
 
-function InfoCard({
+function BenefitCard({
   icon,
   title,
   text,
+  accent,
+  soft,
+  border,
 }: {
   icon: React.ReactNode;
   title: string;
   text: string;
+  accent: string;
+  soft: string;
+  border: string;
 }) {
   return (
     <article
       style={{
         minWidth: 0,
-        borderRadius: 21,
-        border: "1px solid #C7D6E8",
+        borderRadius: 24,
+        border: `1.5px solid ${border}`,
         background: "#FFFFFF",
-        padding: 15,
-        boxShadow: "0 10px 30px rgba(15, 23, 42, 0.06)",
+        padding: 14,
+        boxShadow: "0 12px 30px rgba(15, 23, 42, 0.06)",
       }}
     >
       <div
         style={{
-          width: 42,
-          height: 42,
-          borderRadius: 14,
-          display: "grid",
-          placeItems: "center",
-          color: "#1557D6",
-          background: "#EFF6FF",
+          minHeight: 205,
+          borderRadius: 20,
+          border: `2px solid ${border}`,
+          background: soft,
+          padding: "14px 12px 16px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          textAlign: "center",
         }}
       >
-        {icon}
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 16,
+            display: "grid",
+            placeItems: "center",
+            background: "#FFFFFF",
+            color: accent,
+            border: `1px solid ${border}`,
+            boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
+          }}
+        >
+          {icon}
+        </div>
+
+        <div
+          style={{
+            width: "100%",
+            minHeight: 50,
+            marginTop: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <h3
+            style={{
+              width: "100%",
+              margin: 0,
+              borderRadius: 999,
+              background: accent,
+              color: "#FFFFFF",
+              padding: "10px 12px",
+              fontSize: 14,
+              lineHeight: 1.25,
+              fontWeight: 950,
+              textAlign: "center",
+              boxShadow: `0 10px 22px ${accent}33`,
+            }}
+          >
+            {title}
+          </h3>
+        </div>
+
+        <p
+          style={{
+            margin: "14px 0 0",
+            color: "#475569",
+            fontSize: 13,
+            lineHeight: 1.6,
+            fontWeight: 700,
+            textAlign: "center",
+          }}
+        >
+          {text}
+        </p>
       </div>
-      <h3
-        style={{
-          margin: "12px 0 0",
-          color: "#1F2937",
-          fontSize: 15,
-          fontWeight: 950,
-        }}
-      >
-        {title}
-      </h3>
-      <p
-        style={{
-          margin: "6px 0 0",
-          color: "#64748B",
-          fontSize: 12,
-          lineHeight: 1.55,
-          fontWeight: 650,
-        }}
-      >
-        {text}
-      </p>
     </article>
   );
 }
