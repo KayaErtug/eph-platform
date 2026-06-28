@@ -273,7 +273,9 @@ export class LinaActionEngineService {
     user: LinaResolvedUser,
     sourceModule: LinaActionSourceModule,
   ): LinaActionExecutionResult | null {
-    const normalized = this.normalize(message);
+    const normalized = this.normalize(message)
+      .replace(/[.!?]+$/g, "")
+      .trim();
     const isStartCommand =
       /^(lina\s+)?(?:yeni\s+)?(?:crm|musteri)\s+(?:kaydi|kayit)\s+(?:olusturalim|acalim|ekleyelim|olustur|ac)$/.test(
         normalized,

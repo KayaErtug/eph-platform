@@ -210,7 +210,7 @@ export default function LinaPanel({
   open = true,
   onClose = () => {},
 }: LinaPanelProps) {
-  const { user } = useAuthStore();
+  const { user, hasHydrated } = useAuthStore();
 
   const userName = getSafeUserName(user);
 
@@ -248,6 +248,35 @@ export default function LinaPanel({
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [memorySaving, setMemorySaving] = useState(false);
   const [memoryMessage, setMemoryMessage] = useState("");
+
+  useEffect(() => {
+    if (!hasHydrated || !user) {
+      return;
+    }
+
+    setMessages((currentMessages) => {
+      if (
+        currentMessages.length !== 1 ||
+        currentMessages[0]?.role !== "lina" ||
+        !currentMessages[0].text.includes("Size nasıl yardımcı olabilirim?")
+      ) {
+        return currentMessages;
+      }
+
+      const nextWelcomeMessage = createWelcomeMessage(userName);
+
+      if (currentMessages[0].text === nextWelcomeMessage) {
+        return currentMessages;
+      }
+
+      return [
+        {
+          role: "lina",
+          text: nextWelcomeMessage,
+        },
+      ];
+    });
+  }, [hasHydrated, user, userName]);
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -601,7 +630,7 @@ export default function LinaPanel({
       voiceRequestIdRef.current = requestId;
       setSpeaking(true);
 
-      const res = await fetch("/api/lina-voice", {
+      const res = await fetch("/lina-voice", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
