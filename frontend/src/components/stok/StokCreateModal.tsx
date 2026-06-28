@@ -77,15 +77,6 @@ const ACCEPTED_IMAGE_TYPES = [
   "application/octet-stream",
 ];
 
-const ACCEPTED_DOCUMENT_TYPES = [
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-  "application/pdf",
-];
-
-const MAX_DOCUMENT_SIZE = 15 * 1024 * 1024;
 
 const SPECIAL_FIELD_KEYS = [
   "villaType",
@@ -910,13 +901,6 @@ function isAcceptedImage(file: File) {
   return ACCEPTED_IMAGE_TYPES.includes(type);
 }
 
-function isAcceptedDocument(file: File) {
-  const type = String(file.type || "").toLowerCase();
-
-  if (!type) return true;
-
-  return ACCEPTED_DOCUMENT_TYPES.includes(type);
-}
 
 function normalizeTurkishText(value: string) {
   return value
@@ -932,51 +916,10 @@ function normalizeTurkishText(value: string) {
     .replace(/\s+/g, " ");
 }
 
-function formatPhoneInput(value: string) {
-  const onlyDigits = value.replace(/\D/g, "").slice(0, 11);
 
-  if (!onlyDigits) return "";
 
-  const normalized = onlyDigits.startsWith("90") && onlyDigits.length > 10
-    ? `0${onlyDigits.slice(2)}`.slice(0, 11)
-    : onlyDigits;
 
-  const digits = normalized.startsWith("0") ? normalized : `0${normalized}`.slice(0, 11);
-  const parts = [
-    digits.slice(0, 4),
-    digits.slice(4, 7),
-    digits.slice(7, 9),
-    digits.slice(9, 11),
-  ].filter(Boolean);
 
-  return parts.join(" ");
-}
-
-function getPhoneDigits(value: string) {
-  return value.replace(/\D/g, "");
-}
-
-function isValidTurkishPhone(value: string) {
-  const digits = getPhoneDigits(value);
-
-  if (!digits) return true;
-  if (digits.length === 11 && digits.startsWith("05")) return true;
-  if (digits.length === 10 && digits.startsWith("5")) return true;
-
-  return false;
-}
-
-function normalizeEmailInput(value: string) {
-  return value.trim().toLocaleLowerCase("tr-TR").replace(/\s+/g, "");
-}
-
-function isValidEmail(value: string) {
-  const email = normalizeEmailInput(value);
-
-  if (!email) return true;
-
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
-}
 
 function formatPriceInput(value: string) {
   const onlyDigits = value.replace(/\D/g, "");
@@ -1086,13 +1029,8 @@ export default function StokCreateModal({
   const deedOwnerFullName = String((unitForm as any).deedOwnerFullName || "");
   const adaNo = String((unitForm as any).adaNo || "");
   const parselNo = String((unitForm as any).parselNo || "");
-  const deedOwnerPhone = String((unitForm as any).deedOwnerPhone || "");
-  const deedOwnerEmail = String((unitForm as any).deedOwnerEmail || "");
   const availableCreditAmountDisplay = formatPriceInput(String((unitForm as any).availableCreditAmount || ""));
   const doorAccessInfo = String((unitForm as any).doorAccessInfo || "");
-  const deedOwnerIdFrontFile = (unitForm as any).deedOwnerIdFrontFile as File | null | undefined;
-  const deedOwnerIdBackFile = (unitForm as any).deedOwnerIdBackFile as File | null | undefined;
-  const propertyDeedFile = (unitForm as any).propertyDeedFile as File | null | undefined;
   const selectedFeatures = Array.isArray((unitForm as any).features) ? ((unitForm as any).features as string[]) : [];
   const featureOptions = useMemo(() => getFeatureOptionsForType(unitForm.type), [unitForm.type]);
   const groupedFeatureOptions = useMemo(() => {
@@ -1416,9 +1354,6 @@ export default function StokCreateModal({
     setUnitForm((current) => ({ ...current, [key]: value } as UnitFormState));
   };
 
-  const setUnitFileField = (key: string, file: File | null) => {
-    setUnitForm((current) => ({ ...current, [key]: file } as UnitFormState));
-  };
 
   const toggleFeature = (featureKey: string) => {
     setUnitForm((current) => {
@@ -1440,52 +1375,6 @@ export default function StokCreateModal({
     );
   };
 
-  const handleIdentityDocumentChange = (key: "deedOwnerIdFrontFile" | "deedOwnerIdBackFile", file?: File) => {
-    setImageError("");
-
-    if (!file) {
-      setUnitFileField(key, null);
-      return;
-    }
-
-    if (!isAcceptedDocument(file)) {
-      setImageError("Kimlik belgesi JPG, PNG, WEBP veya PDF formatında olmalıdır.");
-      setUnitFileField(key, null);
-      return;
-    }
-
-    if (file.size > MAX_DOCUMENT_SIZE) {
-      setImageError(`Kimlik belgesi 15 MB sınırını aşıyor. Seçilen belge: ${formatFileSize(file.size)}.`);
-      setUnitFileField(key, null);
-      return;
-    }
-
-    setUnitFileField(key, file);
-  };
-
-  const handlePropertyDeedDocumentChange = (file?: File) => {
-    setImageError("");
-
-    if (!file) {
-      setUnitFileField("propertyDeedFile", null);
-      return;
-    }
-
-    if (!isAcceptedDocument(file)) {
-      setImageError("Tapu dosyası JPG, PNG, WEBP veya PDF formatında olmalıdır.");
-      setUnitFileField("propertyDeedFile", null);
-      return;
-    }
-
-    if (file.size > MAX_DOCUMENT_SIZE) {
-      setImageError(`Tapu dosyası 15 MB sınırını aşıyor. Seçilen belge: ${formatFileSize(file.size)}.`);
-      setUnitFileField("propertyDeedFile", null);
-      return;
-    }
-
-    setUnitFileField("propertyDeedFile", file);
-  };
-
   const handleCrmCustomerSelect = (customerId: string) => {
     setSelectedCrmCustomerId(customerId);
 
@@ -1502,9 +1391,8 @@ export default function StokCreateModal({
 
     setUnitForm((current) => ({
       ...(current as any),
-      deedOwnerFullName: fullName || (current as any).deedOwnerFullName || "",
-      deedOwnerPhone: customer.phone ? formatPhoneInput(customer.phone) : (current as any).deedOwnerPhone || "",
-      deedOwnerEmail: customer.email ? normalizeEmailInput(customer.email) : (current as any).deedOwnerEmail || "",
+      deedOwnerFullName:
+        fullName || (current as any).deedOwnerFullName || "",
     } as UnitFormState));
 
     if (!projectForm.city && customer.city) {
@@ -1596,17 +1484,6 @@ export default function StokCreateModal({
       return `${missingSpecialField.label} zorunludur.`;
     }
 
-    if (!propertyDeedFile) {
-      return "Bu portföye ait tapu dosyası zorunludur.";
-    }
-
-    if (deedOwnerPhone && !isValidTurkishPhone(deedOwnerPhone)) {
-      return "Tapu sahibi telefonu geçerli formatta olmalıdır. Örn: 0542 852 41 41";
-    }
-
-    if (deedOwnerEmail && !isValidEmail(deedOwnerEmail)) {
-      return "Tapu sahibi e-posta adresi geçerli formatta olmalıdır. Örn: isim@mail.com";
-    }
 
     const availableCreditAmount = Number(String((unitForm as any).availableCreditAmount || "").replace(/\D/g, ""));
 
@@ -1663,8 +1540,13 @@ export default function StokCreateModal({
           {localError && <div className="stock-form-error">{localError}</div>}
           {imageError && <div className="stock-form-error">{imageError}</div>}
 
-          <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
+          <div className="stock-form-block rounded-[30px] border-2 border-[#D7E1EF] bg-[#F8FAFC] p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
+              <section className="col-span-full rounded-[26px] border-2 border-[#F2C66D] bg-[#FFF7E6] p-3 shadow-[0_14px_30px_rgba(180,83,9,0.08)]">
+                <div className="mb-3 rounded-[16px] bg-[#F59E0B] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white">
+                  Proje Bilgileri
+                </div>
+                <div className="grid gap-3">
               {projects.length > 0 && (
                 <label className="stock-form-field full">
                   <span>Mevcut Projeye Ekle</span>
@@ -1692,7 +1574,14 @@ export default function StokCreateModal({
                   />
                 </label>
               )}
+                </div>
+              </section>
 
+              <section className="col-span-full rounded-[26px] border-2 border-[#8CC8F6] bg-[#EDF8FF] p-3 shadow-[0_14px_30px_rgba(2,132,199,0.08)]">
+                <div className="mb-3 rounded-[16px] bg-[#0284C7] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white">
+                  Adres Bilgileri
+                </div>
+                <div className="grid gap-3">
               <label className="stock-form-field">
                 <span>Şehir *</span>
                 <select
@@ -1786,7 +1675,13 @@ export default function StokCreateModal({
                   />
                 )}
               </label>
+                </div>
+              </section>
 
+              <section className="col-span-full rounded-[26px] border-2 border-[#F3A7A7] bg-[#FFF1F2] p-3 shadow-[0_14px_30px_rgba(225,29,72,0.08)]">
+                <div className="mb-3 rounded-[16px] bg-[#E11D48] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white">
+                  Harita ve Konum Doğrulama
+                </div>
               <div className="stock-form-field full">
                 <GoogleGeoPicker
                   city={projectForm.city}
@@ -1817,11 +1712,17 @@ export default function StokCreateModal({
                   }}
                 />
               </div>
+              </section>
             </div>
           </div>
 
-          <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
+          <div className="stock-form-block rounded-[30px] border-2 border-[#D7E1EF] bg-[#F8FAFC] p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
+              <section className="col-span-full rounded-[26px] border-2 border-[#B8AEF4] bg-[#F4F1FF] p-3 shadow-[0_14px_30px_rgba(109,40,217,0.08)]">
+                <div className="mb-3 rounded-[16px] bg-[#6D28D9] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white">
+                  Portföy Temel Bilgileri
+                </div>
+                <div className="grid gap-3">
               <label className="stock-form-field">
                 <span>Mülk Tipi *</span>
                 <select
@@ -2059,6 +1960,14 @@ export default function StokCreateModal({
                 </div>
               )}
 
+                </div>
+              </section>
+
+              <section className="col-span-full rounded-[26px] border-2 border-[#7DD3FC] bg-[#ECFEFF] p-3 shadow-[0_14px_30px_rgba(8,145,178,0.08)]">
+                <div className="mb-3 rounded-[16px] bg-[#0891B2] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white">
+                  Ada, Parsel ve Fiyat Bilgileri
+                </div>
+                <div className="grid gap-3">
               {showAdaNoField && (
                 <label className="stock-form-field">
                   <span>{getFieldLabel("adaNo", unitForm.type, isRequiredField("adaNo"))}</span>
@@ -2141,12 +2050,17 @@ export default function StokCreateModal({
                   </p>
                 </label>
               )}
+                </div>
+              </section>
             </div>
           </div>
 
 
-          <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
-            <div className="stock-form-grid">
+          <div className="stock-form-block rounded-[30px] border-[3px] border-[#8B5CF6] bg-[#F5F3FF] p-3 shadow-[0_22px_54px_rgba(109,40,217,0.14)] ring-4 ring-[#DDD6FE]/70">
+            <div className="mb-3 rounded-[16px] bg-[#7C3AED] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(124,58,237,0.24)]">
+              Ek Özellikler
+            </div>
+            <div className="stock-form-grid rounded-[24px] border-2 border-[#A78BFA] bg-[#FCFAFF] p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.75),0_14px_30px_rgba(109,40,217,0.08)]">
               <div className="stock-form-field full">
                 <button
                   type="button"
@@ -2265,16 +2179,19 @@ export default function StokCreateModal({
             </div>
           </div>
 
-          <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
-            <div className="stock-form-grid">
-              <div className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">🔒 Ziyaret ve Erişim Bilgileri</span>
+          <div className="stock-form-block rounded-[30px] border-[3px] border-[#F59E0B] bg-[#FFE7AD] p-3 shadow-[0_22px_54px_rgba(180,83,9,0.20)] ring-4 ring-[#FCD34D]/80">
+            <div className="mb-3 rounded-[16px] bg-[#D97706] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(217,119,6,0.24)]">
+              Ziyaret ve Erişim
+            </div>
+            <div className="stock-form-grid rounded-[24px] border-2 border-[#E9A93C] bg-[#FFF0C7] p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.65),0_14px_30px_rgba(180,83,9,0.14)]">
+              <div className="stock-form-field full rounded-[24px] border-2 border-[#F2B94B] bg-[#FFF8E1] p-4 shadow-[0_18px_42px_rgba(180,83,9,0.12)]">
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border border-[#F3C96B] bg-[#FFF1C8] px-3 py-2 text-[#06194A]">🔒 Ziyaret ve Erişim Bilgileri</span>
                 <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
                   Ziyaret saati, randevu bilgisi, yol tarifi veya erişim notları burada tutulur. Havuzda ve genel görünümde gerçek değer gösterilmez.
                 </p>
               </div>
 
-              <label className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 text-center shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
+              <label className="stock-form-field full rounded-[24px] border-2 border-[#F2B94B] bg-[#FFF8E1] p-4 text-center shadow-[0_18px_42px_rgba(180,83,9,0.12)]">
                 <span>Ziyaret ve Erişim Notları</span>
                 <textarea
                   maxLength={500}
@@ -2289,17 +2206,22 @@ export default function StokCreateModal({
             </div>
           </div>
 
-          <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
-            <div className="stock-form-grid">
-              <div className="stock-form-field full">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">👤 Tapu Sahibi Bilgileri</span>
+          <div className="stock-form-block rounded-[30px] border-[3px] border-[#A855F7] bg-[#EEDBFF] p-3 shadow-[0_22px_54px_rgba(126,34,206,0.20)] ring-4 ring-[#D8B4FE]/85">
+            <div className="mb-3 rounded-[16px] bg-[#9333EA] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(147,51,234,0.24)]">
+              Tapu Sahibi
+            </div>
+            <div className="stock-form-grid rounded-[24px] border-2 border-[#C084FC] bg-[#F4E6FF] p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.65),0_14px_30px_rgba(126,34,206,0.14)]">
+              <div className="stock-form-field full rounded-[24px] border-2 border-[#D8B4FE] bg-[#FBF3FF] p-4 shadow-[0_16px_36px_rgba(126,34,206,0.10)]">
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border border-[#D8B4FE] bg-[#F1E2FF] px-3 py-2 text-[#06194A]">
+                  👤 Tapu Sahibi
+                </span>
                 <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
-                  Bu bilgiler mahremdir. Sadece portföy sahibi ve Yazılım Ekibi görebilir. Portföy kaydedilince CRM kaydı otomatik oluşturulur veya mevcut CRM kaydıyla eşleştirilir.
+                  Tapu sahibini CRM kayıtlarınızdan seçin veya yalnızca ad soyad bilgisini girin.
                 </p>
               </div>
 
               {crmCustomers.length > 0 && (
-                <label className="stock-form-field full">
+                <label className="stock-form-field full rounded-[24px] border-2 border-[#D8B4FE] bg-[#FBF3FF] p-4 shadow-[0_16px_36px_rgba(126,34,206,0.10)]">
                   <span>CRM’den Tapu Sahibi Seç</span>
                   <select
                     value={selectedCrmCustomerId}
@@ -2311,174 +2233,44 @@ export default function StokCreateModal({
                         .filter(Boolean)
                         .join(" ")
                         .trim() || "İsimsiz CRM Kaydı";
-                      const meta = [customer.phone, customer.email].filter(Boolean).join(" · ");
 
                       return (
                         <option key={customer.id} value={customer.id}>
-                          {fullName}{meta ? ` (${meta})` : ""}
+                          {fullName}
                         </option>
                       );
                     })}
                   </select>
                   <small className="stock-upload-hint">
-                    Kendi CRM kayıtlarınızdan seçim yaparsanız ad, telefon ve e-posta otomatik dolar.
+                    Seçilen CRM kaydının ad soyad bilgisi otomatik doldurulur.
                   </small>
                 </label>
               )}
 
-              <label className="stock-form-field">
+              <label className="stock-form-field full rounded-[24px] border-2 border-[#D8B4FE] bg-[#FBF3FF] p-4 shadow-[0_16px_36px_rgba(126,34,206,0.10)]">
                 <span>Tapu Sahibi Ad Soyad</span>
                 <input
                   value={deedOwnerFullName}
-                  onChange={(e) => setUnitField("deedOwnerFullName", e.target.value)}
-                  onBlur={(e) => setUnitField("deedOwnerFullName", normalizeTurkishText(e.target.value))}
+                  onChange={(e) =>
+                    setUnitField("deedOwnerFullName", e.target.value)
+                  }
+                  onBlur={(e) =>
+                    setUnitField(
+                      "deedOwnerFullName",
+                      normalizeTurkishText(e.target.value),
+                    )
+                  }
                   placeholder="Örn: Ahmet Yılmaz"
                 />
               </label>
-
-              <label className="stock-form-field">
-                <span>Tapu Sahibi Telefon</span>
-                <input
-                  type="tel"
-                  inputMode="tel"
-                  value={deedOwnerPhone}
-                  onChange={(e) => setUnitField("deedOwnerPhone", formatPhoneInput(e.target.value))}
-                  onBlur={(e) => setUnitField("deedOwnerPhone", formatPhoneInput(e.target.value))}
-                  maxLength={14}
-                  placeholder="Örn: 0542 852 41 41"
-                />
-              </label>
-
-              <label className="stock-form-field full">
-                <span>Tapu Sahibi E-posta</span>
-                <input
-                  type="email"
-                  inputMode="email"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  value={deedOwnerEmail}
-                  onChange={(e) => setUnitField("deedOwnerEmail", normalizeEmailInput(e.target.value))}
-                  onBlur={(e) => setUnitField("deedOwnerEmail", normalizeEmailInput(e.target.value))}
-                  placeholder="Örn: tapusahibi@email.com"
-                />
-              </label>
-
-              <div className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">📄 Portföy Tapu Dosyası *</span>
-                <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
-                  Her portföy için tapu dosyası ayrı yüklenir. Kimlik belgesi kişiye aittir; tapu dosyası portföye aittir.
-                </p>
-              </div>
-
-              <label className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 text-center shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                <span>Tapu Dosyası *</span>
-                <input
-                  id="propertyDeedFileInput"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,application/pdf"
-                  onChange={(e) => handlePropertyDeedDocumentChange(e.target.files?.[0])}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="propertyDeedFileInput"
-                  className="mt-2 flex min-h-[48px] w-full cursor-pointer items-center justify-center rounded-[18px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 text-center text-sm font-black text-[#06194A] shadow-inner transition active:scale-[0.99]"
-                >
-                  {propertyDeedFile ? propertyDeedFile.name : "Tapu dosyası seç"}
-                </label>
-                <small className="stock-upload-hint mt-2 block text-center">
-                  {propertyDeedFile ? `Seçildi · ${formatFileSize(propertyDeedFile.size)}` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
-                </small>
-                {propertyDeedFile && (
-                  <button
-                    type="button"
-                    className="mx-auto mt-2 flex min-h-[38px] items-center justify-center rounded-xl bg-rose-50 px-4 py-2 text-[11px] font-black text-rose-700"
-                    onClick={() => setUnitFileField("propertyDeedFile", null)}
-                  >
-                    Tapu dosyasını kaldır
-                  </button>
-                )}
-              </label>
-
-              {selectedCrmCustomerId ? (
-                <div className="stock-form-field full rounded-[24px] border-2 border-emerald-200 bg-gradient-to-b from-emerald-50 to-white p-4 text-center shadow-[0_14px_30px_rgba(16,185,129,0.10)]">
-                  <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-white px-3 py-2 text-[#065F46] shadow-[0_10px_22px_rgba(16,185,129,0.08)]">✅ Tapu sahibi CRM’den seçildi</span>
-                  <p className="mt-2 text-xs font-bold leading-5 text-[#64748B]">
-                    Kimlik ön yüz / arka yüz bilgisi kişi kaydında tutulur. Aynı tapu sahibi için tekrar istenmez.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="stock-form-field full rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                    <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">🔐 Tapu Sahibi Kimlik Belgesi</span>
-                    <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
-                      İlk kez girilen tapu sahibi için kimlik belgesi alınır. CRM’den seçilen kişilerde tekrar istenmez.
-                    </p>
-                  </div>
-
-                  <label className="stock-form-field rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 text-center shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                    <span>Kimlik Ön Yüz</span>
-                    <input
-                      id="deedOwnerIdFrontFileInput"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,application/pdf"
-                      onChange={(e) => handleIdentityDocumentChange("deedOwnerIdFrontFile", e.target.files?.[0])}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor="deedOwnerIdFrontFileInput"
-                      className="mt-2 flex min-h-[48px] w-full cursor-pointer items-center justify-center rounded-[18px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 text-center text-sm font-black text-[#06194A] shadow-inner transition active:scale-[0.99]"
-                    >
-                      {deedOwnerIdFrontFile ? deedOwnerIdFrontFile.name : "Kimlik ön yüz seç"}
-                    </label>
-                    <small className="stock-upload-hint mt-2 block text-center">
-                      {deedOwnerIdFrontFile ? `Seçildi · ${formatFileSize(deedOwnerIdFrontFile.size)}` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
-                    </small>
-                    {deedOwnerIdFrontFile && (
-                      <button
-                        type="button"
-                        className="mx-auto mt-2 flex min-h-[38px] items-center justify-center rounded-xl bg-rose-50 px-4 py-2 text-[11px] font-black text-rose-700"
-                        onClick={() => setUnitFileField("deedOwnerIdFrontFile", null)}
-                      >
-                        Ön yüzü kaldır
-                      </button>
-                    )}
-                  </label>
-
-                  <label className="stock-form-field rounded-[24px] border-2 border-[#D6E1F0] bg-white p-4 text-center shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
-                    <span>Kimlik Arka Yüz</span>
-                    <input
-                      id="deedOwnerIdBackFileInput"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,application/pdf"
-                      onChange={(e) => handleIdentityDocumentChange("deedOwnerIdBackFile", e.target.files?.[0])}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor="deedOwnerIdBackFileInput"
-                      className="mt-2 flex min-h-[48px] w-full cursor-pointer items-center justify-center rounded-[18px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 text-center text-sm font-black text-[#06194A] shadow-inner transition active:scale-[0.99]"
-                    >
-                      {deedOwnerIdBackFile ? deedOwnerIdBackFile.name : "Kimlik arka yüz seç"}
-                    </label>
-                    <small className="stock-upload-hint mt-2 block text-center">
-                      {deedOwnerIdBackFile ? `Seçildi · ${formatFileSize(deedOwnerIdBackFile.size)}` : "JPG / PNG / WEBP / PDF · maks. 15 MB"}
-                    </small>
-                    {deedOwnerIdBackFile && (
-                      <button
-                        type="button"
-                        className="mx-auto mt-2 flex min-h-[38px] items-center justify-center rounded-xl bg-rose-50 px-4 py-2 text-[11px] font-black text-rose-700"
-                        onClick={() => setUnitFileField("deedOwnerIdBackFile", null)}
-                      >
-                        Arka yüzü kaldır
-                      </button>
-                    )}
-                  </label>
-                </>
-              )}
             </div>
           </div>
 
-          <div className="stock-form-block rounded-[30px] border-2 border-[#CBD8EA] bg-white p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
-            <div className="stock-form-grid">
+          <div className="stock-form-block rounded-[30px] border-[3px] border-[#FB923C] bg-[#FFF7ED] p-3 shadow-[0_22px_54px_rgba(194,65,12,0.14)] ring-4 ring-[#FED7AA]/70">
+            <div className="mb-3 rounded-[16px] bg-[#EA580C] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(234,88,12,0.24)]">
+              Portföy Fotoğrafları
+            </div>
+            <div className="stock-form-grid rounded-[24px] border-2 border-[#FDBA74] bg-[#FFFCF7] p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.8),0_14px_30px_rgba(194,65,12,0.08)]">
               <div className="stock-form-field full">
                 <span className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] border-b border-[#D6E1F0] bg-white px-3 py-2 text-[#06194A]">🖼️ Galeriye Fotoğraf Ekle * ({galleryImages.length}/{MAX_GALLERY_COUNT})</span>
                 <small className="stock-upload-hint block text-center">
@@ -2602,6 +2394,60 @@ export default function StokCreateModal({
             </div>
           </div>
         </div>
+
+
+        <style jsx global>{`
+          .stock-modal-v10 .stock-form-field > input:not([type="file"]),
+          .stock-modal-v10 .stock-form-field > select,
+          .stock-modal-v10 .stock-form-field > textarea {
+            width: 100%;
+            min-height: 54px;
+            border: 2px solid #9fb5d1 !important;
+            border-radius: 16px !important;
+            background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%) !important;
+            color: #06194a !important;
+            font-weight: 800 !important;
+            box-shadow:
+              inset 0 1px 0 rgba(255, 255, 255, 0.95),
+              0 8px 18px rgba(15, 23, 42, 0.09) !important;
+            transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+          }
+
+          .stock-modal-v10 .stock-form-field > textarea {
+            min-height: 118px;
+            resize: vertical;
+          }
+
+          .stock-modal-v10 .stock-form-field > input:not([type="file"]):hover,
+          .stock-modal-v10 .stock-form-field > select:hover,
+          .stock-modal-v10 .stock-form-field > textarea:hover {
+            border-color: #6f8fb8 !important;
+          }
+
+          .stock-modal-v10 .stock-form-field > input:not([type="file"]):focus,
+          .stock-modal-v10 .stock-form-field > select:focus,
+          .stock-modal-v10 .stock-form-field > textarea:focus {
+            border-color: #2563eb !important;
+            outline: none !important;
+            box-shadow:
+              0 0 0 4px rgba(37, 99, 235, 0.16),
+              0 12px 24px rgba(37, 99, 235, 0.13) !important;
+            transform: translateY(-1px);
+          }
+
+          .stock-modal-v10 .stock-form-field > input::placeholder,
+          .stock-modal-v10 .stock-form-field > textarea::placeholder {
+            color: #708198 !important;
+            opacity: 1 !important;
+            font-weight: 700 !important;
+          }
+
+          .stock-modal-v10 .stock-form-field > span:first-child {
+            color: #26364f;
+            font-weight: 900;
+            letter-spacing: 0.05em;
+          }
+        `}</style>
 
         {!geoPickerOpen && !galleryPickerActive && !checkingImages && (
           <div className="stock-modal-v2-foot stock-modal-v10-foot">

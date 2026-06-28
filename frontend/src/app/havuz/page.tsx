@@ -168,6 +168,51 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   GBP: "£",
 };
 
+
+const EPH_OWL_IMAGE_DATA_URI = "data:image/png;base64,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";
+
+function escapeMapHtml(value?: string | number | null) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function createEphMapPinSvg(
+  primaryColor: string,
+  selected = false,
+) {
+  const glow = selected ? "0.38" : "0.24";
+  const strokeWidth = selected ? 3 : 2;
+
+  return `
+    <svg width="72" height="88" viewBox="0 0 72 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="ephPinGradient" x1="18" y1="6" x2="56" y2="76" gradientUnits="userSpaceOnUse">
+          <stop stop-color="${primaryColor}"/>
+          <stop offset="1" stop-color="#061A3A"/>
+        </linearGradient>
+        <filter id="ephPinShadow" x="-35%" y="-20%" width="170%" height="175%">
+          <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#061A3A" flood-opacity="${glow}"/>
+        </filter>
+      </defs>
+      <path
+        filter="url(#ephPinShadow)"
+        d="M36 84C36 84 65 52.4 65 30C65 13.5 52 2 36 2C20 2 7 13.5 7 30C7 52.4 36 84 36 84Z"
+        fill="url(#ephPinGradient)"
+        stroke="white"
+        stroke-width="${strokeWidth}"
+      />
+      <circle cx="36" cy="31" r="23" fill="white" fill-opacity="0.98"/>
+      <circle cx="36" cy="31" r="20.5" fill="#EFF6FF" stroke="#B9D2F3" stroke-width="1.5"/>
+      <image href="${EPH_OWL_IMAGE_DATA_URI}" x="15" y="12" width="42" height="34" preserveAspectRatio="xMidYMid meet"/>
+      <circle cx="36" cy="31" r="24.5" fill="none" stroke="${selected ? "#FFC107" : "#D9E8FA"}" stroke-width="${selected ? 3 : 1}"/>
+    </svg>
+  `;
+}
+
 function normalizeRole(role?: string | null) {
   return String(role || "")
     .toLocaleUpperCase("tr-TR")
@@ -852,6 +897,20 @@ export default function HavuzPage() {
     }
   };
 
+  const focusPoolCard = (unitId: string) => {
+    setSelectedMapUnitId(unitId);
+
+    window.setTimeout(() => {
+      const card = document.getElementById(`pool-card-${unitId}`);
+
+      card?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
+      });
+    }, 100);
+  };
+
   if (loading) {
     return (
       <main className="flex min-h-[calc(100dvh-64px)] items-center justify-center bg-[#F4F8FF] px-4 text-[#1F2937]">
@@ -930,6 +989,7 @@ export default function HavuzPage() {
             items={poolMapItems}
             selectedUnitId={selectedMapUnitId}
             onSelectUnit={setSelectedMapUnitId}
+            onNavigateToCard={focusPoolCard}
             busyAction={busyAction}
             onDetail={(unit, match) => setDetailSelection({ unit, match })}
             onMessage={(unit, match) => startPoolMessage(unit, match.score)}
@@ -953,6 +1013,7 @@ export default function HavuzPage() {
                 index={index}
                 unit={unit}
                 match={match}
+                selected={selectedMapUnitId === unit.id}
                 busyAction={busyAction}
                 onDetail={() => setDetailSelection({ unit, match })}
                 onMessage={() => startPoolMessage(unit, match.score)}
@@ -1019,6 +1080,7 @@ function PoolMapSection({
   selectedUnitId,
   busyAction,
   onSelectUnit,
+  onNavigateToCard,
   onDetail,
   onMessage,
   onAction,
@@ -1027,6 +1089,7 @@ function PoolMapSection({
   selectedUnitId: string;
   busyAction: string | null;
   onSelectUnit: (unitId: string) => void;
+  onNavigateToCard: (unitId: string) => void;
   onDetail: (
     unit: Unit,
     match: { score: number; customer: Customer | null; budgetDiff: number },
@@ -1044,6 +1107,7 @@ function PoolMapSection({
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerRefs = useRef<any[]>([]);
+  const infoWindowRef = useRef<any>(null);
   const [mapError, setMapError] = useState("");
   const [mapReady, setMapReady] = useState(false);
   const selectedItem =
@@ -1096,41 +1160,85 @@ function PoolMapSection({
 
     markerRefs.current.forEach((marker) => marker.setMap(null));
     markerRefs.current = [];
+    infoWindowRef.current?.close?.();
 
     const bounds = new googleMaps.LatLngBounds();
 
     items.forEach((item) => {
+      const isSelected = selectedUnitId === item.unit.id;
+      const svg = createEphMapPinSvg("#00AFA5", isSelected);
       const marker = new googleMaps.Marker({
         position: { lat: item.lat, lng: item.lng },
         map,
-        title: item.unit.project?.name || "EPH Portföy",
+        title: `${item.unit.project?.name || "EPH Portföy"} • ${compactMoney(
+          item.unit.price,
+          item.unit.priceCurrency,
+        )}`,
         optimized: false,
-        zIndex: 9999,
+        zIndex: isSelected ? 40 : 20,
         icon: {
           url:
             "data:image/svg+xml;charset=UTF-8," +
-            encodeURIComponent(`
-              <svg width="64" height="78" viewBox="0 0 64 78" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <filter id="shadow" x="-20%" y="-10%" width="140%" height="140%">
-                  <feDropShadow dx="0" dy="8" stdDeviation="5" flood-color="#0F172A" flood-opacity="0.28"/>
-                </filter>
-                <path filter="url(#shadow)" d="M32 76C32 76 58 47.9 58 28C58 12.536 46.359 2 32 2C17.641 2 6 12.536 6 28C6 47.9 32 76 32 76Z" fill="#2563EB"/>
-                <path d="M32 68C32 68 52 45.7 52 29C52 17.402 43.046 9 32 9C20.954 9 12 17.402 12 29C12 45.7 32 68 32 68Z" fill="#1D4ED8"/>
-                <circle cx="32" cy="29" r="19" fill="white"/>
-                <circle cx="32" cy="29" r="15" fill="#EFF6FF"/>
-                <text x="32" y="34" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="900" fill="#2563EB">EPH</text>
-              </svg>
-            `),
-          scaledSize: new googleMaps.Size(42, 52),
-          anchor: new googleMaps.Point(21, 52),
+            encodeURIComponent(svg),
+          scaledSize: new googleMaps.Size(
+            isSelected ? 54 : 46,
+            isSelected ? 66 : 57,
+          ),
+          anchor: new googleMaps.Point(
+            isSelected ? 27 : 23,
+            isSelected ? 66 : 57,
+          ),
         },
       });
 
+      if (!infoWindowRef.current) {
+        infoWindowRef.current = new googleMaps.InfoWindow({
+          disableAutoPan: true,
+        });
+      }
+
+      const infoHtml = `
+        <div style="width:220px;padding:4px 2px;font-family:Arial,sans-serif;color:#0F172A">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.08em;color:#008C84;text-transform:uppercase">
+            EPH Havuz
+          </div>
+          <div style="margin-top:4px;font-size:14px;font-weight:900;line-height:1.2">
+            ${escapeMapHtml(item.unit.project?.name || "EPH Portföy")}
+          </div>
+          <div style="margin-top:5px;font-size:11px;font-weight:700;line-height:1.35;color:#64748B">
+            ${escapeMapHtml(item.locationLabel)}
+          </div>
+          <div style="margin-top:7px;font-size:15px;font-weight:900;color:#06194A">
+            ${escapeMapHtml(
+              compactMoney(item.unit.price, item.unit.priceCurrency),
+            )}
+          </div>
+          <div style="margin-top:4px;font-size:10px;font-weight:800;color:#475569">
+            ${escapeMapHtml(typeLabel(item.unit.type))} • ${escapeMapHtml(
+              item.unit.status || "Portföy",
+            )} • CRM uyumu %${escapeMapHtml(item.match.score)}
+          </div>
+          <div style="margin-top:7px;border-top:1px solid #DCE8F7;padding-top:6px;font-size:10px;font-weight:900;color:#008C84">
+            Kartı görmek için pine tıklayın
+          </div>
+        </div>
+      `;
+
+      marker.addListener("mouseover", () => {
+        infoWindowRef.current?.setContent(infoHtml);
+        infoWindowRef.current?.open(map, marker);
+      });
+
+      marker.addListener("mouseout", () => {
+        window.setTimeout(() => infoWindowRef.current?.close(), 120);
+      });
+
       marker.addListener("click", () => {
+        infoWindowRef.current?.close();
         onSelectUnit(item.unit.id);
         map.panTo({ lat: item.lat, lng: item.lng });
         map.setZoom(Math.max(map.getZoom() || 11, 12));
-        onDetail(item.unit, item.match);
+        onNavigateToCard(item.unit.id);
       });
 
       markerRefs.current.push(marker);
@@ -1146,7 +1254,13 @@ function PoolMapSection({
       map.setCenter(DEFAULT_MAP_CENTER);
       map.setZoom(6);
     }
-  }, [items, onSelectUnit, selectedUnitId, mapReady]);
+  }, [
+    items,
+    mapReady,
+    onNavigateToCard,
+    onSelectUnit,
+    selectedUnitId,
+  ]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -1748,6 +1862,7 @@ function PoolUnitCard({
   index,
   unit,
   match,
+  selected,
   busyAction,
   onDetail,
   onMessage,
@@ -1756,6 +1871,7 @@ function PoolUnitCard({
   index: number;
   unit: Unit;
   match: { score: number; customer: Customer | null; budgetDiff: number };
+  selected: boolean;
   busyAction: string | null;
   onDetail: () => void;
   onMessage: () => void;
@@ -1764,7 +1880,7 @@ function PoolUnitCard({
   const image = getCover(unit);
   const features = getHighlightFeatures(unit);
   const specs = getPrimarySpecs(unit);
-  const imageCount = (Array.isArray(unit.images) ? unit.images.length : 0) || 1;
+  const imageCount = Array.isArray(unit.images) ? unit.images.length : 0;
   const typeChip = getTypeChip(unit);
   const text = [unit.type, unit.status, unit.description, unit.project?.name]
     .join(" ")
@@ -1777,8 +1893,9 @@ function PoolUnitCard({
     text.includes("bağ") ||
     text.includes("bag");
 
-  const highlight = features[0] || "Ortak Çalışmaya Uygun";
+  const highlight = features[0] || "Havuz Detayı";
   const busy = Boolean(busyAction);
+  const location = getLocation(unit);
 
   const quickSpecs = isLand
     ? [
@@ -1788,133 +1905,200 @@ function PoolUnitCard({
         { icon: "♨", label: "Doğalgaz" },
       ]
     : [
-        { icon: "▦", label: "2. Kat" },
+        { icon: "▦", label: unit.roomCount || "Oda" },
+        {
+          icon: "□",
+          label: unit.area
+            ? `${Number(unit.area).toLocaleString("tr-TR")} m²`
+            : "Alan",
+        },
         { icon: "☼", label: "Güney" },
-        { icon: "♨", label: "Banyo" },
         { icon: "▥", label: "Balkon" },
       ];
 
   const detailSpecs = isLand
     ? [
-        { label: "İmar Durumu", value: text.includes("imarlı") || text.includes("imarli") ? "İmarlı" : "Konut" },
+        {
+          label: "İmar Durumu",
+          value:
+            text.includes("imarlı") || text.includes("imarli")
+              ? "İmarlı"
+              : "Belirtilmedi",
+        },
         { label: "TAKS/KAKS", value: "Belirtilmedi" },
         { label: "Cephe", value: "Belirtilmedi" },
         { label: "Ada / Parsel", value: "Belirtilmedi" },
       ]
     : [
         { label: "Bina Yaşı", value: "Belirtilmedi" },
-        { label: "Isınma", value: text.includes("kombi") ? "Kombi" : "Belirtilmedi" },
+        {
+          label: "Isınma",
+          value: text.includes("kombi") ? "Kombi" : "Belirtilmedi",
+        },
         { label: "Aidat", value: "Belirtilmedi" },
-        { label: "Tapu", value: unit.tapuVerified || unit.isVerified ? "Doğrulandı" : "Belirtilmedi" },
+        {
+          label: "Tapu",
+          value:
+            unit.tapuVerified || unit.isVerified
+              ? "Doğrulandı"
+              : "Belirtilmedi",
+        },
         { label: "Kredi", value: "Uygun" },
         { label: "Kullanım", value: "Belirtilmedi" },
       ];
 
   return (
     <article
-      onClick={onDetail}
-      className="grid min-h-[265px] cursor-pointer grid-cols-[48%_52%] overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.07)] active:scale-[0.995]"
+      id={`pool-card-${unit.id}`}
+      data-card-index={index}
+      data-unit-id={unit.id}
+      className={`scroll-mt-24 w-full max-w-full overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.07)] transition-all duration-500 ${
+        selected
+          ? "border-[#00AFA5] ring-4 ring-[#9EEAE5] shadow-[0_18px_42px_rgba(0,175,165,0.24)]"
+          : ""
+      }`}
     >
-      <div className="relative min-h-[265px] overflow-hidden bg-[#EEF3F8]">
-        {image ? (
-          <img
-            src={image}
-            alt={unit.project?.name || "Portföy"}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-[#2563EB]">
-            <Building2 size={34} />
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onDetail}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") onDetail();
+        }}
+        className="grid h-[316px] cursor-pointer grid-cols-[45%_55%] gap-1.5 overflow-hidden p-1.5 active:scale-[0.995]"
+      >
+        <div className="grid h-full min-w-0 grid-rows-[1fr_68px] overflow-hidden rounded-[16px] border border-[#E2EAF5] bg-[#EEF3F8]">
+          <div className="relative min-h-0 overflow-hidden bg-[#EAF1F8]">
+            {image ? (
+              <img
+                src={image}
+                alt={unit.project?.name || "Portföy"}
+                className="absolute inset-0 block h-full w-full object-cover object-center"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-[#2563EB]">
+                <Building2 size={34} />
+              </div>
+            )}
+
+            <div
+              className={`absolute left-2 top-2 max-w-[calc(100%-16px)] truncate rounded-full px-2.5 py-1 text-[8px] font-black text-white shadow-sm ${
+                isVerified(unit) ? "bg-emerald-600" : "bg-amber-500"
+              }`}
+            >
+              {isVerified(unit) ? "EPH Onaylı" : "Kontrol Bekliyor"}
+            </div>
           </div>
-        )}
 
-        <div className="absolute left-2 top-2 rounded-full bg-white/95 px-2.5 py-1 text-[8px] font-black text-emerald-700 shadow-sm">
-          EPH Onaylı
+          <div className="grid min-h-0 grid-cols-2 gap-1 border-t border-[#D7E3F2] bg-white p-1.5">
+            <div className="flex min-w-0 items-center justify-center rounded-[9px] bg-slate-950 px-1 text-center text-[8px] font-black leading-none text-white">
+              <span className="max-w-full truncate">▣ {imageCount} Fotoğraf</span>
+            </div>
+            <div className="flex min-w-0 items-center justify-center rounded-[9px] bg-blue-50 px-1 text-center text-[8px] font-black leading-none text-blue-700">
+              <span className="max-w-full truncate">
+                ⌖ {unit.project?.latitude && unit.project?.longitude ? "Konumlu" : "Konumsuz"}
+              </span>
+            </div>
+            <div className="flex min-w-0 items-center justify-center rounded-[9px] bg-emerald-50 px-1 text-center text-[8px] font-black leading-none text-emerald-700">
+              <span className="max-w-full truncate">
+                ✓ {unit.yetkiVerified || unit.isVerified ? "Yetkili" : "Kontrol"}
+              </span>
+            </div>
+            <div className="flex min-w-0 items-center justify-center rounded-[9px] bg-violet-50 px-1 text-center text-[8px] font-black leading-none text-violet-700">
+              <span className="max-w-full truncate">◆ Havuzda</span>
+            </div>
+          </div>
         </div>
 
-        <div className="absolute bottom-2 left-2 rounded-full bg-slate-950/80 px-2.5 py-1.5 text-[10px] font-black text-white shadow-sm">
-          {imageCount} Fotoğraf
-        </div>
-      </div>
+        <div className="grid h-full min-w-0 grid-rows-[98px_28px_62px_76px_36px] overflow-hidden rounded-[16px] border-2 border-[#C7D6E8] bg-white text-center">
+          <div className="flex min-h-0 min-w-0 flex-col items-center justify-center overflow-hidden px-2.5 py-1.5">
+            <p className="max-w-full truncate text-[9px] font-black uppercase leading-none tracking-[0.11em] text-[#2563EB]">
+              {typeChip}
+            </p>
 
-      <div className="flex min-w-0 flex-col text-center">
-        <div className="flex min-h-[110px] flex-col items-center justify-center px-3 pb-2 pt-2">
-          <p className="text-[10px] font-black uppercase leading-none tracking-[0.12em] text-[#2563EB]">
-            {typeChip}
-          </p>
+            <h3 className="mt-1 max-w-full line-clamp-2 break-words text-[14px] font-black leading-[1.05] tracking-[-0.035em] text-[#0F172A] [overflow-wrap:anywhere]">
+              {unit.project?.name || "EPH Portföy"}
+            </h3>
 
-          <h3 className="mt-1.5 line-clamp-2 text-[16px] font-black leading-[1.08] tracking-[-0.04em] text-[#0F172A] break-words [overflow-wrap:anywhere]">
-            {limitText(unit.project?.name || "EPH Portföy", 58)}
-          </h3>
+            <p className="mt-1 flex max-w-full min-w-0 items-center justify-center gap-1 text-[8.5px] font-bold leading-[1.1] text-[#64748B]">
+              <MapPin size={10} className="shrink-0" />
+              <span className="min-w-0 line-clamp-2 break-words [overflow-wrap:anywhere]">
+                {location}
+              </span>
+            </p>
 
-          <p className="mt-1.5 flex min-w-0 items-center justify-center gap-1 text-[10px] font-bold leading-3 text-[#64748B]">
-            <MapPin size={11} className="shrink-0" />
-            <span className="min-w-0 line-clamp-1 break-words [overflow-wrap:anywhere]">
-              {getLocation(unit)}
-            </span>
-          </p>
+            <p className="mt-1.5 max-w-full truncate text-[20px] font-black leading-none tracking-[-0.05em] text-[#0F172A]">
+              {compactMoney(unit.price, unit.priceCurrency)}
+            </p>
+          </div>
 
-          <p className="mt-2 text-[23px] font-black leading-none tracking-[-0.055em] text-[#0F172A]">
-            {compactMoney(unit.price, unit.priceCurrency)}
-          </p>
-
-          <div className="mt-2.5 flex min-w-0 flex-wrap items-center justify-center gap-1.5 text-[10px] font-black text-[#1F2937]">
+          <div className="flex min-h-0 min-w-0 items-center justify-center gap-1 overflow-hidden px-1.5">
             {specs.slice(0, 3).map((spec) => (
-              <span key={spec} className="rounded-full bg-[#F8FAFC] px-2.5 py-1 leading-none">
-                {limitText(spec, 16)}
+              <span
+                key={spec}
+                className="min-w-0 max-w-[32%] truncate rounded-full bg-[#F8FAFC] px-1.5 py-1 text-[8px] font-black leading-none text-[#334155]"
+              >
+                {spec}
               </span>
             ))}
           </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-1.5 px-2.5 py-2">
-          {quickSpecs.map((item) => (
-            <div
-              key={item.label}
-              className="flex min-h-[30px] min-w-0 items-center justify-center gap-1 rounded-[10px] bg-[#F8FAFC] px-1.5"
+          <div className="grid min-h-0 grid-cols-2 gap-1 overflow-hidden px-1.5 py-1">
+            {quickSpecs.map((item) => (
+              <div
+                key={`${item.icon}-${item.label}`}
+                className="flex min-h-0 min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[9px] bg-[#F8FAFC] px-1"
+              >
+                <span className="shrink-0 text-[10px] font-black leading-none text-[#2563EB]">
+                  {item.icon}
+                </span>
+                <span className="min-w-0 line-clamp-2 break-words text-[8px] font-black leading-[1.05] text-[#334155] [overflow-wrap:anywhere]">
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid min-h-0 grid-cols-2 gap-1 overflow-hidden px-1.5 py-1">
+            {detailSpecs.map((item) => (
+              <div
+                key={item.label}
+                className="flex min-h-0 min-w-0 flex-col items-center justify-center overflow-hidden rounded-[8px] bg-[#FBFDFF] px-1 py-0.5"
+              >
+                <span className="max-w-full truncate text-[7px] font-black uppercase leading-none tracking-[0.04em] text-[#64748B]">
+                  {item.label}
+                </span>
+                <span className="mt-0.5 max-w-full line-clamp-2 break-words text-[8px] font-black leading-[1.05] text-[#1F2937] [overflow-wrap:anywhere]">
+                  {item.value}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid min-h-0 grid-cols-2 items-center gap-1 overflow-hidden border-t border-[#E2EAF5] bg-[#F8FAFC] px-1.5 py-1">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAction("INTEREST");
+              }}
+              disabled={busy}
+              className="flex h-[25px] min-w-0 -translate-y-[1px] items-center justify-center overflow-hidden rounded-[8px] bg-white px-1 text-[8px] font-black leading-none text-[#1D4ED8] shadow-[0_3px_8px_rgba(15,23,42,0.05)] disabled:opacity-60"
             >
-              <span className="text-[12px] font-black leading-none text-[#2563EB]">{item.icon}</span>
-              <span className="min-w-0 text-[9.5px] font-black leading-[1.05] text-[#334155] break-words [overflow-wrap:anywhere]">
-                {item.label}
-              </span>
-            </div>
-          ))}
-        </div>
+              <span className="max-w-full truncate">☆ İlgilen 10K</span>
+            </button>
 
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1 px-3 py-2 text-left">
-          {detailSpecs.map((item) => (
-            <p
-              key={item.label}
-              className="min-w-0 text-[9px] font-black leading-[1.15] text-[#475569]"
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDetail();
+              }}
+              className="flex h-[25px] min-w-0 -translate-y-[1px] items-center justify-center overflow-hidden rounded-[8px] bg-white px-1 text-[8px] font-black leading-none text-[#2563EB] shadow-[0_3px_8px_rgba(15,23,42,0.05)]"
             >
-              <span className="text-[#1F2937]">{item.label}:</span> {item.value}
-            </p>
-          ))}
-        </div>
-
-        <div className="mt-auto grid grid-cols-2 gap-1.5 px-2.5 pb-2 pt-1">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onAction("INTEREST");
-            }}
-            disabled={busy}
-            className="flex min-h-[34px] items-center justify-center rounded-[12px] bg-[#F8FAFC] px-1 text-[10px] font-black text-[#1D4ED8] disabled:opacity-60"
-          >
-            ☆ İlgilen 10K
-          </button>
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDetail();
-            }}
-            className="flex min-h-[34px] items-center justify-center rounded-[12px] bg-[#F8FAFC] px-1 text-[10px] font-black text-[#2563EB]"
-          >
-            ✨ {limitText(highlight, 18)}
-          </button>
+              <span className="max-w-full truncate">✨ {highlight}</span>
+            </button>
+          </div>
         </div>
       </div>
     </article>

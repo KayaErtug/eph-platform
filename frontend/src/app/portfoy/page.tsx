@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -9,15 +10,16 @@ import {
   ChevronDown,
   Edit3,
   Eye,
-  Heart,
   Loader2,
   Map as MapIcon,
   MapPin,
   Navigation,
   Plus,
+  RotateCcw,
   Send,
   Search,
   Share2,
+  SlidersHorizontal,
   Trash2,
   X,
 } from "lucide-react";
@@ -36,6 +38,9 @@ import type {
 } from "@/components/stok/stokTypes";
 
 type SortMode = "newest" | "priceDesc" | "priceAsc";
+type VerificationFilter = "" | "verified" | "unverified";
+type PoolFilter = "" | "inPool" | "outPool";
+type LocationFilter = "" | "withLocation" | "withoutLocation";
 type CrmCustomerOption = {
   id: string;
   firstName?: string | null;
@@ -80,18 +85,6 @@ const statusLabels: Record<string, string> = {
   PASIF: "Pasif",
 };
 
-const hotStatuses = [
-  "SATILIK",
-  "KIRALIK",
-  "GUNLUK_KIRALIK",
-  "DEVREN_SATILIK",
-  "DEVREN_KIRALIK",
-  "ON_SATIS",
-  "PROJE_ASAMASI",
-  "YAKINDA_SATISTA",
-  "INSAAT_PROJESI",
-  "HEMEN_TESLIM",
-];
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   TRY: "₺",
@@ -100,36 +93,65 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   GBP: "£",
 };
 
-const PORTFOLIO_CARD_STYLES = [
-  {
-    frame:
-      "border-[#2563EB] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] shadow-[0_16px_34px_rgba(37,99,235,0.16)]",
-    imageBg: "bg-[#EFF6FF]",
-    soft: "bg-[#F8FBFF]",
-    strip: "bg-[#2563EB]",
-  },
-  {
-    frame:
-      "border-emerald-400 bg-gradient-to-br from-white via-[#F8FFFB] to-emerald-50 shadow-[0_16px_34px_rgba(16,185,129,0.15)]",
-    imageBg: "bg-emerald-50",
-    soft: "bg-[#F7FFFB]",
-    strip: "bg-emerald-500",
-  },
-  {
-    frame:
-      "border-amber-400 bg-gradient-to-br from-white via-[#FFFDF7] to-amber-50 shadow-[0_16px_34px_rgba(245,158,11,0.16)]",
-    imageBg: "bg-amber-50",
-    soft: "bg-[#FFFDF7]",
-    strip: "bg-amber-500",
-  },
-  {
-    frame:
-      "border-violet-400 bg-gradient-to-br from-white via-[#FBFAFF] to-violet-50 shadow-[0_16px_34px_rgba(139,92,246,0.14)]",
-    imageBg: "bg-violet-50",
-    soft: "bg-[#FBFAFF]",
-    strip: "bg-violet-500",
-  },
-];
+
+const EPH_OWL_IMAGE_DATA_URI = "data:image/png;base64,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";
+
+function escapeMapHtml(value?: string | number | null) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function createEphMapPinSvg(
+  primaryColor: string,
+  selected = false,
+) {
+  const glow = selected ? "0.38" : "0.24";
+  const strokeWidth = selected ? 3 : 2;
+
+  return `
+    <svg width="72" height="88" viewBox="0 0 72 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="ephPinGradient" x1="18" y1="6" x2="56" y2="76" gradientUnits="userSpaceOnUse">
+          <stop stop-color="${primaryColor}"/>
+          <stop offset="1" stop-color="#061A3A"/>
+        </linearGradient>
+        <filter id="ephPinShadow" x="-35%" y="-20%" width="170%" height="175%">
+          <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#061A3A" flood-opacity="${glow}"/>
+        </filter>
+      </defs>
+      <path
+        filter="url(#ephPinShadow)"
+        d="M36 84C36 84 65 52.4 65 30C65 13.5 52 2 36 2C20 2 7 13.5 7 30C7 52.4 36 84 36 84Z"
+        fill="url(#ephPinGradient)"
+        stroke="white"
+        stroke-width="${strokeWidth}"
+      />
+      <circle cx="36" cy="31" r="23" fill="white" fill-opacity="0.98"/>
+      <circle cx="36" cy="31" r="20.5" fill="#EFF6FF" stroke="#B9D2F3" stroke-width="1.5"/>
+      <image href="${EPH_OWL_IMAGE_DATA_URI}" x="15" y="12" width="42" height="34" preserveAspectRatio="xMidYMid meet"/>
+      <circle cx="36" cy="31" r="24.5" fill="none" stroke="${selected ? "#FFC107" : "#D9E8FA"}" stroke-width="${selected ? 3 : 1}"/>
+    </svg>
+  `;
+}
+
+const NEW_PORTFOLIO_DAYS = 30;
+
+function formatEnumLabel(value?: string | null) {
+  return String(value || "")
+    .toLocaleLowerCase("tr-TR")
+    .split("_")
+    .filter(Boolean)
+    .map(
+      (part) =>
+        part.charAt(0).toLocaleUpperCase("tr-TR") + part.slice(1),
+    )
+    .join(" ");
+}
+
 
 const DEFAULT_CENTER = { lat: 37.783, lng: 29.096 };
 
@@ -302,8 +324,22 @@ function StokPageInner() {
   const [mapOpen, setMapOpen] = useState(false);
   const [showMapPins, setShowMapPins] = useState(true);
   const [mapSelectedUnitId, setMapSelectedUnitId] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
+  const [districtFilter, setDistrictFilter] = useState("");
+  const [neighborhoodFilter, setNeighborhoodFilter] = useState("");
+  const [minPriceFilter, setMinPriceFilter] = useState("");
+  const [maxPriceFilter, setMaxPriceFilter] = useState("");
+  const [minAreaFilter, setMinAreaFilter] = useState("");
+  const [maxAreaFilter, setMaxAreaFilter] = useState("");
+  const [roomFilter, setRoomFilter] = useState("");
+  const [verificationFilter, setVerificationFilter] =
+    useState<VerificationFilter>("");
+  const [poolFilter, setPoolFilter] = useState<PoolFilter>("");
+  const [locationFilter, setLocationFilter] = useState<LocationFilter>("");
+  const [newOnlyFilter, setNewOnlyFilter] = useState(false);
   const [search, setSearch] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [shareOpen, setShareOpen] = useState(false);
@@ -407,13 +443,53 @@ function StokPageInner() {
 
   const filteredUnits = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("tr-TR");
+    const minPrice = parseFormattedNumber(minPriceFilter);
+    const maxPrice = parseFormattedNumber(maxPriceFilter);
+    const minArea = Number(minAreaFilter || 0);
+    const maxArea = Number(maxAreaFilter || 0);
+    const newLimit = Date.now() - NEW_PORTFOLIO_DAYS * 24 * 60 * 60 * 1000;
 
     let list = units.filter((unit) => {
+      const price = Number(unit.price || 0);
+      const area = Number(unit.area || 0);
+      const hasLocation = Boolean(
+        Number(unit.project?.latitude) && Number(unit.project?.longitude),
+      );
+      const isVerified = isUnitVerified(unit);
+      const isPoolVisible = Boolean(
+        (unit as any).isPoolVisible ||
+          String((unit as any).approvalStatus || "") === "HAVUZDA",
+      );
+
       if (statusFilter && unit.status !== statusFilter) return false;
+      if (typeFilter && unit.type !== typeFilter) return false;
       if (cityFilter && unit.project?.city !== cityFilter) return false;
+      if (districtFilter && unit.project?.district !== districtFilter)
+        return false;
+      if (
+        neighborhoodFilter &&
+        unit.project?.address !== neighborhoodFilter
+      )
+        return false;
+      if (minPrice && price < minPrice) return false;
+      if (maxPrice && price > maxPrice) return false;
+      if (minArea && area < minArea) return false;
+      if (maxArea && area > maxArea) return false;
+      if (roomFilter && unit.roomCount !== roomFilter) return false;
+      if (verificationFilter === "verified" && !isVerified) return false;
+      if (verificationFilter === "unverified" && isVerified) return false;
+      if (poolFilter === "inPool" && !isPoolVisible) return false;
+      if (poolFilter === "outPool" && isPoolVisible) return false;
+      if (locationFilter === "withLocation" && !hasLocation) return false;
+      if (locationFilter === "withoutLocation" && hasLocation) return false;
+      if (newOnlyFilter) {
+        const createdTime = new Date(String(unit.createdAt || "")).getTime();
+        if (!Number.isFinite(createdTime) || createdTime < newLimit)
+          return false;
+      }
       if (!q) return true;
 
-      const text = [
+      const searchableText = [
         unit.project?.name,
         unit.project?.city,
         unit.project?.district,
@@ -427,7 +503,7 @@ function StokPageInner() {
         .join(" ")
         .toLocaleLowerCase("tr-TR");
 
-      return text.includes(q);
+      return searchableText.includes(q);
     });
 
     list = [...list].sort((a, b) => {
@@ -439,7 +515,25 @@ function StokPageInner() {
     });
 
     return list;
-  }, [cityFilter, search, sortMode, statusFilter, units]);
+  }, [
+    cityFilter,
+    districtFilter,
+    locationFilter,
+    maxAreaFilter,
+    maxPriceFilter,
+    minAreaFilter,
+    minPriceFilter,
+    neighborhoodFilter,
+    newOnlyFilter,
+    poolFilter,
+    roomFilter,
+    search,
+    sortMode,
+    statusFilter,
+    typeFilter,
+    units,
+    verificationFilter,
+  ]);
 
   const mapUnits = useMemo(() => {
     return filteredUnits.filter(
@@ -465,10 +559,6 @@ function StokPageInner() {
     ).length;
   }, [filteredUnits]);
 
-  const activeCount = useMemo(
-    () => units.filter((unit) => hotStatuses.includes(unit.status)).length,
-    [units],
-  );
   const rentCount = useMemo(
     () =>
       units.filter((unit) => String(unit.status || "").includes("KIRALIK"))
@@ -503,6 +593,123 @@ function StokPageInner() {
     [units],
   );
 
+  const uniqueDistricts = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          units
+            .filter(
+              (unit) => !cityFilter || unit.project?.city === cityFilter,
+            )
+            .map((unit) => unit.project?.district)
+            .filter((district): district is string => Boolean(district)),
+        ),
+      ).sort((a, b) => a.localeCompare(b, "tr")),
+    [cityFilter, units],
+  );
+
+  const uniqueNeighborhoods = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          units
+            .filter(
+              (unit) =>
+                (!cityFilter || unit.project?.city === cityFilter) &&
+                (!districtFilter ||
+                  unit.project?.district === districtFilter),
+            )
+            .map((unit) => unit.project?.address)
+            .filter(
+              (neighborhood): neighborhood is string =>
+                Boolean(neighborhood),
+            ),
+        ),
+      ).sort((a, b) => a.localeCompare(b, "tr")),
+    [cityFilter, districtFilter, units],
+  );
+
+  const uniqueTypes = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          units
+            .map((unit) => String(unit.type || ""))
+            .filter(Boolean),
+        ),
+      ).sort((a, b) =>
+        formatEnumLabel(a).localeCompare(formatEnumLabel(b), "tr"),
+      ),
+    [units],
+  );
+
+  const uniqueRooms = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          units
+            .map((unit) => String(unit.roomCount || ""))
+            .filter(Boolean),
+        ),
+      ).sort((a, b) => a.localeCompare(b, "tr", { numeric: true })),
+    [units],
+  );
+
+  const activeFilterCount = useMemo(
+    () =>
+      [
+        statusFilter,
+        typeFilter,
+        cityFilter,
+        districtFilter,
+        neighborhoodFilter,
+        minPriceFilter,
+        maxPriceFilter,
+        minAreaFilter,
+        maxAreaFilter,
+        roomFilter,
+        verificationFilter,
+        poolFilter,
+        locationFilter,
+        newOnlyFilter ? "new" : "",
+        sortMode !== "newest" ? sortMode : "",
+      ].filter(Boolean).length,
+    [
+      cityFilter,
+      districtFilter,
+      locationFilter,
+      maxAreaFilter,
+      maxPriceFilter,
+      minAreaFilter,
+      minPriceFilter,
+      neighborhoodFilter,
+      newOnlyFilter,
+      poolFilter,
+      roomFilter,
+      sortMode,
+      statusFilter,
+      typeFilter,
+      verificationFilter,
+    ],
+  );
+
+  const resetFilters = () => {
+    setStatusFilter("");
+    setTypeFilter("");
+    setCityFilter("");
+    setDistrictFilter("");
+    setNeighborhoodFilter("");
+    setMinPriceFilter("");
+    setMaxPriceFilter("");
+    setMinAreaFilter("");
+    setMaxAreaFilter("");
+    setRoomFilter("");
+    setVerificationFilter("");
+    setPoolFilter("");
+    setLocationFilter("");
+    setNewOnlyFilter(false);
+    setSortMode("newest");
+  };
 
   const makeExistingGalleryImages = (unit: MapUnit): LocalPortfolioImage[] => {
     return getUnitImages(unit as Unit).map((image, index) => ({
@@ -911,6 +1118,20 @@ function StokPageInner() {
     window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
   };
 
+  const focusPortfolioCard = (unitId: string) => {
+    setMapSelectedUnitId(unitId);
+
+    window.setTimeout(() => {
+      const card = document.getElementById(`portfolio-card-${unitId}`);
+
+      card?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
+      });
+    }, 100);
+  };
+
   if (!hydrated || loading) {
     return (
       <main className="flex min-h-[100dvh] items-center justify-center overflow-y-auto bg-[#F7FBFF] text-[#06194A]">
@@ -960,60 +1181,266 @@ function StokPageInner() {
             </button>
           </div>
 
-          <div className="mt-3 grid grid-cols-[1fr_1fr_72px] gap-2">
-            <select
-              value={cityFilter}
-              onChange={(event) => setCityFilter(event.target.value)}
-              className="h-10 rounded-[16px] border border-[#DDE7F3] bg-white px-2 text-center text-[12px] font-black outline-none"
-            >
-              <option value="">Tüm Şehirler</option>
-              {uniqueCities.map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
-              ))}
-            </select>
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              className="h-10 rounded-[16px] border border-[#DDE7F3] bg-white px-2 text-center text-[12px] font-black outline-none"
-            >
-              <option value="">Tümü</option>
-              <option value="SATILIK">Satılık</option>
-              <option value="KIRALIK">Kiralık</option>
-            </select>
+          <div className="mt-3 flex items-center gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-[#F8FBFF] px-3 py-2">
+              <Search size={17} className="shrink-0 text-[#64748B]" />
+              <input
+                ref={searchInputRef}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Portföy, il, ilçe, mahalle ara..."
+                className="h-8 min-w-0 flex-1 bg-transparent text-[13px] font-bold outline-none placeholder:text-[#94A3B8]"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  aria-label="Aramayı temizle"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+
             <button
               type="button"
-              onClick={() =>
-                setSortMode((current) =>
-                  current === "newest"
-                    ? "priceDesc"
-                    : current === "priceDesc"
-                      ? "priceAsc"
-                      : "newest",
-                )
-              }
-              className="h-10 rounded-[16px] border border-[#DDE7F3] bg-white text-[12px] font-black"
+              onClick={() => setFilterOpen((current) => !current)}
+              className={`relative flex h-12 min-w-[104px] items-center justify-center gap-2 rounded-[18px] border px-3 text-[12px] font-black active:scale-[0.98] ${
+                filterOpen || activeFilterCount > 0
+                  ? "border-[#1557D6] bg-[#1557D6] text-white"
+                  : "border-[#DDE7F3] bg-white text-[#06194A]"
+              }`}
             >
-              Sırala
+              <SlidersHorizontal size={17} />
+              Filtrele
+              {activeFilterCount > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-[10px] font-black text-[#1557D6]">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
           </div>
 
-          <div className="mt-3 flex items-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-[#F8FBFF] px-3 py-2">
-            <Search size={17} className="text-[#64748B]" />
-            <input
-              ref={searchInputRef}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Portföy, şehir, ilçe ara..."
-              className="h-8 min-w-0 flex-1 bg-transparent text-[13px] font-bold outline-none placeholder:text-[#94A3B8]"
-            />
-            {search && (
-              <button type="button" onClick={() => setSearch("")}>
-                <X size={16} />
+          {filterOpen && (
+            <div className="mt-3 rounded-[24px] border border-[#C7D6E8] bg-[#F8FBFF] p-3 shadow-[0_14px_30px_rgba(37,99,235,0.10)]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-[16px] font-black text-[#06194A]">
+                    Portföy Filtreleri
+                  </h2>
+                  <p className="mt-0.5 text-[10px] font-bold text-[#64748B]">
+                    {filteredUnits.length} sonuç gösteriliyor
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  disabled={activeFilterCount === 0}
+                  className="inline-flex min-h-[36px] items-center gap-1.5 rounded-[14px] border border-[#DDE7F3] bg-white px-3 text-[10px] font-black text-[#1557D6] disabled:opacity-40"
+                >
+                  <RotateCcw size={14} /> Temizle
+                </button>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <FilterSelect
+                  label="İşlem Türü"
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                >
+                  <option value="">Tümü</option>
+                  {Object.entries(statusLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </FilterSelect>
+
+                <FilterSelect
+                  label="Portföy Türü"
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                >
+                  <option value="">Tümü</option>
+                  {uniqueTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {formatEnumLabel(type)}
+                    </option>
+                  ))}
+                </FilterSelect>
+
+                <FilterSelect
+                  label="İl"
+                  value={cityFilter}
+                  onChange={(value) => {
+                    setCityFilter(value);
+                    setDistrictFilter("");
+                    setNeighborhoodFilter("");
+                  }}
+                >
+                  <option value="">Tüm İller</option>
+                  {uniqueCities.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </FilterSelect>
+
+                <FilterSelect
+                  label="İlçe"
+                  value={districtFilter}
+                  onChange={(value) => {
+                    setDistrictFilter(value);
+                    setNeighborhoodFilter("");
+                  }}
+                >
+                  <option value="">Tüm İlçeler</option>
+                  {uniqueDistricts.map((district) => (
+                    <option key={district} value={district}>
+                      {district}
+                    </option>
+                  ))}
+                </FilterSelect>
+
+                <div className="col-span-2">
+                  <FilterSelect
+                    label="Mahalle"
+                    value={neighborhoodFilter}
+                    onChange={setNeighborhoodFilter}
+                  >
+                    <option value="">Tüm Mahalleler</option>
+                    {uniqueNeighborhoods.map((neighborhood) => (
+                      <option key={neighborhood} value={neighborhood}>
+                        {neighborhood}
+                      </option>
+                    ))}
+                  </FilterSelect>
+                </div>
+
+                <FilterInput
+                  label="Minimum Fiyat"
+                  value={minPriceFilter}
+                  onChange={setMinPriceFilter}
+                  placeholder="0 ₺"
+                />
+                <FilterInput
+                  label="Maksimum Fiyat"
+                  value={maxPriceFilter}
+                  onChange={setMaxPriceFilter}
+                  placeholder="Sınırsız"
+                />
+                <FilterInput
+                  label="Minimum m²"
+                  value={minAreaFilter}
+                  onChange={setMinAreaFilter}
+                  placeholder="0"
+                />
+                <FilterInput
+                  label="Maksimum m²"
+                  value={maxAreaFilter}
+                  onChange={setMaxAreaFilter}
+                  placeholder="Sınırsız"
+                />
+
+                <FilterSelect
+                  label="Oda Sayısı"
+                  value={roomFilter}
+                  onChange={setRoomFilter}
+                >
+                  <option value="">Tümü</option>
+                  {uniqueRooms.map((room) => (
+                    <option key={room} value={room}>
+                      {room}
+                    </option>
+                  ))}
+                </FilterSelect>
+
+                <FilterSelect
+                  label="Yetki Durumu"
+                  value={verificationFilter}
+                  onChange={(value) =>
+                    setVerificationFilter(value as VerificationFilter)
+                  }
+                >
+                  <option value="">Tümü</option>
+                  <option value="verified">Yetkili</option>
+                  <option value="unverified">Yetkisiz</option>
+                </FilterSelect>
+
+                <FilterSelect
+                  label="Havuz Durumu"
+                  value={poolFilter}
+                  onChange={(value) => setPoolFilter(value as PoolFilter)}
+                >
+                  <option value="">Tümü</option>
+                  <option value="inPool">Havuzda</option>
+                  <option value="outPool">Havuzda Değil</option>
+                </FilterSelect>
+
+                <FilterSelect
+                  label="Konum Durumu"
+                  value={locationFilter}
+                  onChange={(value) =>
+                    setLocationFilter(value as LocationFilter)
+                  }
+                >
+                  <option value="">Tümü</option>
+                  <option value="withLocation">Konumlu</option>
+                  <option value="withoutLocation">Konumsuz</option>
+                </FilterSelect>
+
+                <div className="col-span-2">
+                  <FilterSelect
+                    label="Sıralama"
+                    value={sortMode}
+                    onChange={(value) => setSortMode(value as SortMode)}
+                  >
+                    <option value="newest">En Yeni</option>
+                    <option value="priceDesc">Fiyat: Yüksekten Düşüğe</option>
+                    <option value="priceAsc">Fiyat: Düşükten Yükseğe</option>
+                  </FilterSelect>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setNewOnlyFilter((current) => !current)}
+                className={`mt-2 flex min-h-[46px] w-full items-center justify-between rounded-[16px] border px-3 text-left active:scale-[0.99] ${
+                  newOnlyFilter
+                    ? "border-[#1557D6] bg-[#EAF2FF]"
+                    : "border-[#DDE7F3] bg-white"
+                }`}
+              >
+                <span>
+                  <span className="block text-[12px] font-black text-[#06194A]">
+                    Yeni Eklenenler
+                  </span>
+                  <span className="mt-0.5 block text-[10px] font-bold text-[#64748B]">
+                    Son {NEW_PORTFOLIO_DAYS} gün içinde eklenen portföyler
+                  </span>
+                </span>
+                <span
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+                    newOnlyFilter ? "bg-[#1557D6]" : "bg-[#CBD5E1]"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${
+                      newOnlyFilter ? "left-6" : "left-1"
+                    }`}
+                  />
+                </span>
               </button>
-            )}
-          </div>
+
+              <button
+                type="button"
+                onClick={() => setFilterOpen(false)}
+                className="mt-3 flex min-h-[44px] w-full items-center justify-center rounded-[16px] bg-[#1557D6] px-4 text-[13px] font-black text-white shadow-[0_10px_22px_rgba(21,87,214,0.22)] active:scale-[0.99]"
+              >
+                {filteredUnits.length} Portföyü Göster
+              </button>
+            </div>
+          )}
 
           <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#E2EAF5] bg-white text-center">
             <MiniMetric label="Portföy" value={units.length} />
@@ -1025,16 +1452,6 @@ function StokPageInner() {
             <MiniMetric label="Satılık" value={saleCount} tone="blue" />
             <MiniMetric label="Kiralık" value={rentCount} tone="orange" />
           </div>
-
-        <PortfolioDocumentCenterEntry
-          totalCount={units.length}
-          activeCount={activeCount}
-          verifiedCount={units.filter((unit) => isUnitVerified(unit)).length}
-          onOpen={() => {
-  		window.location.href = "/portfoy/quality";
-	}}
-        />
-
 
         </section>
 
@@ -1060,6 +1477,7 @@ function StokPageInner() {
               selectedUnitId={selectedMapUnit?.id || ""}
               showPins={showMapPins}
               onSelectUnit={(unitId) => setMapSelectedUnitId(unitId)}
+              onNavigateToCard={focusPortfolioCard}
             />
 
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-2 text-[12px] font-black text-[#64748B]">
@@ -1211,6 +1629,7 @@ function StokPageInner() {
             ))
           )}
         </section>
+
       </div>
 
       <button
@@ -1251,6 +1670,63 @@ function StokPageInner() {
   );
 }
 
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1 block text-[10px] font-black text-[#64748B]">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 w-full min-w-0 rounded-[15px] border border-[#DDE7F3] bg-white px-2.5 text-[11px] font-black text-[#06194A] outline-none"
+      >
+        {children}
+      </select>
+    </label>
+  );
+}
+
+function FilterInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1 block text-[10px] font-black text-[#64748B]">
+        {label}
+      </span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={value}
+        onChange={(event) =>
+          onChange(event.target.value.replace(/[^0-9]/g, ""))
+        }
+        placeholder={placeholder}
+        className="h-11 w-full min-w-0 rounded-[15px] border border-[#DDE7F3] bg-white px-3 text-[11px] font-black text-[#06194A] outline-none placeholder:text-[#94A3B8]"
+      />
+    </label>
+  );
+}
+
 function MiniMetric({
   label,
   value,
@@ -1277,47 +1753,55 @@ function MiniMetric({
   );
 }
 
-function PortfolioDocumentCenterEntry({
-  totalCount,
-  activeCount,
-  verifiedCount,
-  onOpen,
-}: {
-  totalCount: number;
-  activeCount: number;
-  verifiedCount: number;
-  onOpen: () => void;
-}) {
-  const waitingCount = Math.max(0, totalCount - verifiedCount);
+function getPortfolioTypeChip(unit: MapUnit) {
+  const label = formatEnumLabel(unit.type).toLocaleUpperCase("tr-TR");
 
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="mt-3 w-full rounded-[24px] border border-[#C7D6E8] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EFF6FF] p-3 text-center shadow-[0_14px_32px_rgba(37,99,235,0.12)] active:scale-[0.99]"
-    >
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#1557D6] text-white shadow-[0_10px_22px_rgba(21,87,214,0.24)]">
-        <Building2 size={23} />
-      </div>
+  if (label.includes("ARSA")) return "ARSA";
+  if (label.includes("VİLLA") || label.includes("VILLA")) return "VİLLA";
+  if (
+    label.includes("DÜKKAN") ||
+    label.includes("TİCAR") ||
+    label.includes("MAĞAZA") ||
+    label.includes("MAGAZA")
+  )
+    return "TİCARİ";
+  if (label.includes("PROJE")) return "PROJE";
 
-      <h2 className="mt-2 text-[17px] font-black tracking-[-0.03em] text-[#06194A]">
-        Belge Yükleme Merkezi
-      </h2>
-      <p className="mx-auto mt-1 max-w-[320px] text-[11px] font-bold leading-[1.45] text-[#64748B]">
-        Yetki belgesi, tapu ve portföy evraklarını tek merkezden yükle, yenile ve incelemeye hazırla.
-      </p>
+  return label.length > 16 ? "PORTFÖY" : label || "PORTFÖY";
+}
 
-      <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[18px] border border-[#DDE7F3] bg-white">
-        <MiniMetric label="Toplam" value={totalCount} />
-        <MiniMetric label="Aktif" value={activeCount} tone="blue" />
-        <MiniMetric label="Bekleyen" value={waitingCount} tone="orange" />
-      </div>
+function getPortfolioPrimarySpecs(unit: MapUnit) {
+  const specs: string[] = [];
 
-      <div className="mt-3 flex min-h-[42px] items-center justify-center rounded-[16px] bg-[#1557D6] px-4 text-[13px] font-black text-white shadow-[0_10px_22px_rgba(21,87,214,0.22)]">
-        Belge Merkezini Aç
-      </div>
-    </button>
-  );
+  if (unit.roomCount) specs.push(unit.roomCount);
+  if (unit.area)
+    specs.push(`${Number(unit.area).toLocaleString("tr-TR")} m²`);
+  specs.push(formatFloorInfo(unit));
+
+  return specs.slice(0, 3);
+}
+
+function getPortfolioHighlight(unit: MapUnit) {
+  const text = [
+    unit.type,
+    unit.status,
+    unit.roomCount,
+    unit.description,
+    unit.project?.name,
+    unit.project?.address,
+  ]
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
+
+  if (text.includes("deniz")) return "Deniz Manzaralı";
+  if (text.includes("havuz")) return "Yüzme Havuzu";
+  if (text.includes("bahçe") || text.includes("bahce")) return "Geniş Bahçe";
+  if (text.includes("otopark") || text.includes("garaj")) return "Otopark";
+  if (text.includes("site")) return "Site İçerisinde";
+  if (text.includes("yatırım") || text.includes("yatirim"))
+    return "Yatırıma Uygun";
+
+  return "Portföy Detayı";
 }
 
 function CompactPortfolioCard({
@@ -1347,152 +1831,340 @@ function CompactPortfolioCard({
   onRemoveFromPool: () => void;
   onWhatsappLocation: () => void;
 }) {
-  const image = getUnitCoverImage(unit) || "/LOGO_EPH.png";
+  const image = getUnitCoverImage(unit);
+  const imageCount = getUnitImages(unit).length;
   const status = statusLabels[unit.status] || unit.status || "Portföy";
+  const typeChip = getPortfolioTypeChip(unit);
+  const specs = getPortfolioPrimarySpecs(unit);
+  const highlight = getPortfolioHighlight(unit);
   const location =
     [unit.project?.city, unit.project?.district, unit.project?.address]
       .filter(Boolean)
-      .join(" / ") ||
-    "Konum yok";
+      .join(" / ") || "Konum yok";
   const hasLocation = Boolean(
-    unit.project?.latitude && unit.project?.longitude,
+    Number(unit.project?.latitude) && Number(unit.project?.longitude),
   );
   const approvalStatus = String((unit as any).approvalStatus || "");
-  const isPoolVisible = Boolean((unit as any).isPoolVisible);
+  const isPoolVisible = Boolean(
+    (unit as any).isPoolVisible || approvalStatus === "HAVUZDA",
+  );
   const canSendToPool = approvalStatus === "ONAYLANDI" && !isPoolVisible;
   const canRemoveFromPool = approvalStatus === "HAVUZDA" || isPoolVisible;
-  const cardStyle = PORTFOLIO_CARD_STYLES[index % PORTFOLIO_CARD_STYLES.length];
+  const isVerified = isUnitVerified(unit);
+  const text = [unit.type, unit.description, unit.project?.name]
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
+  const isLand =
+    typeChip.includes("ARSA") ||
+    text.includes("arsa") ||
+    text.includes("tarla") ||
+    text.includes("bağ") ||
+    text.includes("bag");
+
+  const quickSpecs = isLand
+    ? [
+        {
+          icon: "□",
+          label: unit.area
+            ? `${Number(unit.area).toLocaleString("tr-TR")} m²`
+            : "Alan",
+        },
+        {
+          icon: "⌗",
+          label:
+            (unit as any).adaNo || (unit as any).parselNo
+              ? "Ada / Parsel"
+              : "Parsel Bilgisi",
+        },
+        {
+          icon: "⌖",
+          label: hasLocation ? "Konumlu" : "Konumsuz",
+        },
+        {
+          icon: "✓",
+          label: isVerified ? "Yetkili" : "Kontrol",
+        },
+      ]
+    : [
+        {
+          icon: "▦",
+          label: unit.roomCount || "Oda",
+        },
+        {
+          icon: "↕",
+          label: formatFloorInfo(unit),
+        },
+        {
+          icon: "□",
+          label: unit.area
+            ? `${Number(unit.area).toLocaleString("tr-TR")} m²`
+            : "Alan",
+        },
+        {
+          icon: "✓",
+          label: isVerified ? "Yetkili" : "Kontrol",
+        },
+      ];
+
+  const detailSpecs = isLand
+    ? [
+        { label: "Durum", value: status },
+        {
+          label: "Ada / Parsel",
+          value:
+            [(unit as any).adaNo, (unit as any).parselNo]
+              .filter(Boolean)
+              .join(" / ") || "Belirtilmedi",
+        },
+        {
+          label: "Tapu",
+          value:
+            unit.tapuVerified || unit.isVerified ? "Doğrulandı" : "Kontrol",
+        },
+        {
+          label: "Havuz",
+          value: isPoolVisible ? "Havuzda" : "Havuz Dışı",
+        },
+      ]
+    : [
+        { label: "Durum", value: status },
+        { label: "Kat", value: formatFloorInfo(unit) },
+        {
+          label: "Tapu",
+          value:
+            unit.tapuVerified || unit.isVerified ? "Doğrulandı" : "Kontrol",
+        },
+        { label: "Fotoğraf", value: `${imageCount} adet` },
+        {
+          label: "Kredi",
+          value: (unit as any).availableCreditAmount
+            ? formatCompactPrice(
+                (unit as any).availableCreditAmount,
+                unit.priceCurrency,
+              )
+            : "Belirtilmedi",
+        },
+        {
+          label: "Havuz",
+          value: isPoolVisible ? "Havuzda" : "Havuz Dışı",
+        },
+      ];
+
+  const mediaBadges = [
+    {
+      icon: "▣",
+      label: `${imageCount} Fotoğraf`,
+      className: "bg-slate-900 text-white",
+    },
+    {
+      icon: "⌖",
+      label: hasLocation ? "Konumlu" : "Konumsuz",
+      className: hasLocation
+        ? "bg-blue-50 text-[#1557D6]"
+        : "bg-slate-100 text-slate-600",
+    },
+    {
+      icon: "✓",
+      label: isVerified ? "Yetkili" : "Kontrol",
+      className: isVerified
+        ? "bg-emerald-50 text-emerald-700"
+        : "bg-amber-50 text-amber-700",
+    },
+    {
+      icon: "◆",
+      label: isPoolVisible ? "Havuzda" : "Havuz Dışı",
+      className: isPoolVisible
+        ? "bg-violet-50 text-violet-700"
+        : "bg-slate-100 text-slate-600",
+    },
+  ];
 
   return (
     <article
-      className={`relative grid min-h-[112px] w-full max-w-full grid-cols-[82px_minmax(0,1fr)_34px] gap-2 overflow-hidden rounded-[26px] border-[3px] p-2 ${selected ? "border-[#1557D6] ring-4 ring-blue-100" : cardStyle.frame}`}
+      id={`portfolio-card-${unit.id}`}
+      data-card-index={index}
+      data-unit-id={unit.id}
+      className={`scroll-mt-24 w-full max-w-full overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.07)] transition-all duration-500 ${
+        selected
+          ? "border-[#1557D6] ring-4 ring-[#A9C8FF] shadow-[0_18px_42px_rgba(21,87,214,0.24)]"
+          : ""
+      }`}
     >
-      <div className={`absolute inset-x-0 top-0 h-1.5 ${cardStyle.strip}`} />
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onOpen}
-        className={`relative h-[96px] overflow-hidden rounded-[18px] ${cardStyle.imageBg}`}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") onOpen();
+        }}
+        className="grid h-[316px] cursor-pointer grid-cols-[45%_55%] gap-1.5 overflow-hidden p-1.5 active:scale-[0.995]"
       >
-        <img
-          src={image}
-          alt={unit.project?.name || "Portföy"}
-          className="h-full w-full object-cover"
-        />
-        <span
-          className={`absolute left-1.5 top-1.5 rounded-full px-2 py-0.5 text-[8.5px] font-black text-white ${unit.status === "KIRALIK" ? "bg-[#1557D6]" : "bg-emerald-600"}`}
-        >
-          {status}
-        </span>
-        <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/62 px-1.5 py-0.5 text-[9px] font-black text-white">
-          📷 {getUnitImages(unit).length}
-        </span>
-      </button>
+        <div className="flex h-full min-w-0 flex-col overflow-hidden rounded-[16px] border border-[#E2EAF5] bg-[#F8FAFC]">
+          <div className="relative h-[232px] flex-none overflow-hidden bg-[#EEF3F8]">
+            {image ? (
+              <img
+                src={image}
+                alt={unit.project?.name || "Portföy"}
+                className="absolute inset-0 h-full w-full object-cover object-center"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-[#2563EB]">
+                <Building2 size={34} />
+              </div>
+            )}
 
-      <button type="button" onClick={onOpen} className="min-w-0 text-center">
-        <div className="flex items-start justify-center gap-2 text-center">
-          <div className="min-w-0 flex-1 text-center">
-            <h2 className="break-words text-center text-[15px] font-black leading-[18px] tracking-[-0.03em] text-[#06194A]">
+            <div
+              className={`absolute left-2 top-2 max-w-[calc(100%-16px)] truncate rounded-full px-2.5 py-1 text-[8px] font-black text-white shadow-sm ${
+                isVerified ? "bg-emerald-600" : "bg-amber-500"
+              }`}
+            >
+              {isVerified ? "EPH Onaylı" : "Onay Bekliyor"}
+            </div>
+
+            <div className="absolute bottom-2 right-2 max-w-[calc(100%-16px)] truncate rounded-full bg-white/95 px-2.5 py-1 text-[8px] font-black text-[#2563EB] shadow-sm">
+              {status}
+            </div>
+          </div>
+
+          <div className="grid h-[70px] flex-none grid-cols-2 gap-1 p-1.5">
+            {mediaBadges.map((badge) => (
+              <div
+                key={`${badge.icon}-${badge.label}`}
+                className={`flex min-h-0 min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[9px] px-1.5 text-center ${badge.className}`}
+              >
+                <span className="shrink-0 text-[9px] font-black leading-none">
+                  {badge.icon}
+                </span>
+                <span className="min-w-0 truncate text-[8px] font-black leading-none">
+                  {badge.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid h-full min-w-0 grid-rows-[98px_28px_62px_80px_32px] overflow-hidden rounded-[16px] border-2 border-[#C7D6E8] bg-white text-center">
+          <div className="flex min-h-0 min-w-0 flex-col items-center justify-center overflow-hidden px-2.5 py-1.5">
+            <p className="max-w-full truncate text-[9px] font-black uppercase leading-none tracking-[0.11em] text-[#2563EB]">
+              {typeChip}
+            </p>
+
+            <h3 className="mt-1 max-w-full line-clamp-2 break-words text-[14px] font-black leading-[1.05] tracking-[-0.035em] text-[#0F172A] [overflow-wrap:anywhere]">
               {unit.project?.name || "EPH Portföy"}
-            </h2>
-            <p className="mt-0.5 break-words text-center text-[11px] font-bold leading-4 text-[#64748B]">
-              {location}
+            </h3>
+
+            <p className="mt-1 flex max-w-full min-w-0 items-center justify-center gap-1 text-[8.5px] font-bold leading-[1.1] text-[#64748B]">
+              <MapPin size={10} className="shrink-0" />
+              <span className="min-w-0 line-clamp-2 break-words [overflow-wrap:anywhere]">
+                {location}
+              </span>
+            </p>
+
+            <p className="mt-1.5 max-w-full truncate text-[20px] font-black leading-none tracking-[-0.05em] text-[#0F172A]">
+              {formatCompactPrice(unit.price, unit.priceCurrency)}
             </p>
           </div>
-          <Heart size={18} className="shrink-0 text-[#94A3B8]" />
-        </div>
 
-        <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center text-[11px] font-black text-[#06194A]">
-          {unit.roomCount && <span>{unit.roomCount}</span>}
-          {unit.area && <span>{unit.area} m²</span>}
-          <span>{formatFloorInfo(unit)}</span>
-        </div>
-
-        <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-center">
-          <p
-            className={`text-[15px] font-black ${unit.status === "KIRALIK" ? "text-[#1557D6]" : "text-emerald-600"}`}
-          >
-            {formatPrice(unit.price, unit.priceCurrency)}
-          </p>
-          {isUnitVerified(unit) && (
-            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-black text-emerald-700">
-              Yetkili
-            </span>
-          )}
-        </div>
-
-
-        {(unit as any).availableCreditAmount ? (
-          <div className="mt-1 rounded-[12px] border border-blue-100 bg-[#EFF6FF] px-2 py-1 text-center">
-            <p className="text-[8.5px] font-black uppercase tracking-[0.08em] text-[#1557D6]">
-              Kullanılabilir Kredi
-            </p>
-            <p className="mt-0.5 break-words text-[11px] font-black leading-tight text-[#06194A]">
-              {formatPrice(
-                (unit as any).availableCreditAmount,
-                unit.priceCurrency,
-              )}
-            </p>
+          <div className="flex min-h-0 min-w-0 items-center justify-center gap-1 overflow-hidden px-1.5">
+            {specs.map((spec) => (
+              <span
+                key={spec}
+                className="min-w-0 max-w-[32%] truncate rounded-full bg-[#F8FAFC] px-1.5 py-1 text-[8px] font-black leading-none text-[#334155]"
+              >
+                {spec}
+              </span>
+            ))}
           </div>
-        ) : null}
 
-        <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-center text-[10px] font-bold text-[#64748B]">
-          <span className="inline-flex items-center gap-1">
-            <Eye size={12} /> Aç
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Edit3 size={12} /> Güncelle
-          </span>
-          {hasLocation && (
-            <span className="inline-flex items-center gap-1 text-emerald-700">
-              <MapPin size={12} /> Konumlu
-            </span>
-          )}
+          <div className="grid min-h-0 grid-cols-2 gap-1 overflow-hidden px-1.5 py-1">
+            {quickSpecs.map((item) => (
+              <div
+                key={`${item.icon}-${item.label}`}
+                className="flex min-h-0 min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[9px] bg-[#F8FAFC] px-1"
+              >
+                <span className="shrink-0 text-[10px] font-black leading-none text-[#2563EB]">
+                  {item.icon}
+                </span>
+                <span className="min-w-0 line-clamp-2 break-words text-[8px] font-black leading-[1.05] text-[#334155] [overflow-wrap:anywhere]">
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid min-h-0 grid-cols-2 gap-1 overflow-hidden px-1.5 py-1">
+            {detailSpecs.map((item) => (
+              <div
+                key={item.label}
+                className="flex min-h-0 min-w-0 flex-col items-center justify-center overflow-hidden rounded-[8px] bg-[#FBFDFF] px-1 py-0.5"
+              >
+                <span className="max-w-full truncate text-[7px] font-black uppercase leading-none tracking-[0.04em] text-[#64748B]">
+                  {item.label}
+                </span>
+                <span className="mt-0.5 max-w-full line-clamp-2 break-words text-[8px] font-black leading-[1.05] text-[#1F2937] [overflow-wrap:anywhere]">
+                  {item.value}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex min-h-0 min-w-0 items-center justify-center overflow-hidden border-t border-[#E2EAF5] bg-[#F8FAFC] px-1.5 text-[8px] font-black text-[#2563EB]">
+            <span className="max-w-full truncate">✨ {highlight}</span>
+          </div>
         </div>
-      </button>
+      </div>
 
-      <div className="flex flex-col items-center justify-between gap-1">
+      <div className="grid grid-cols-4 gap-1.5 border-t border-[#E2EAF5] bg-[#FBFDFF] p-2">
         <button
           type="button"
           onClick={onOpen}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EFF6FF] text-[#1557D6]"
+          className="flex min-h-[38px] flex-col items-center justify-center gap-0.5 rounded-[12px] bg-[#EFF6FF] px-1 text-[9px] font-black text-[#1557D6] active:scale-[0.98]"
         >
           <Eye size={15} />
+          Aç
         </button>
+
         <button
           type="button"
           onClick={onUpdate}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-[#1557D6]"
+          className="flex min-h-[38px] flex-col items-center justify-center gap-0.5 rounded-[12px] bg-blue-50 px-1 text-[9px] font-black text-[#1557D6] active:scale-[0.98]"
         >
           <Edit3 size={15} />
+          Güncelle
         </button>
+
         <button
           type="button"
           onClick={hasLocation ? onWhatsappLocation : onShare}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"
+          className="flex min-h-[38px] flex-col items-center justify-center gap-0.5 rounded-[12px] bg-emerald-50 px-1 text-[9px] font-black text-emerald-700 active:scale-[0.98]"
         >
           {hasLocation ? <Navigation size={15} /> : <Share2 size={15} />}
+          {hasLocation ? "Konum" : "Paylaş"}
         </button>
+
         <button
           type="button"
           onClick={onDelete}
           disabled={deleting}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-red-50 text-red-600 disabled:opacity-50"
+          className="flex min-h-[38px] flex-col items-center justify-center gap-0.5 rounded-[12px] bg-red-50 px-1 text-[9px] font-black text-red-600 disabled:opacity-50"
         >
           {deleting ? (
-            <Loader2 size={14} className="animate-spin" />
+            <Loader2 size={15} className="animate-spin" />
           ) : (
-            <Trash2 size={14} />
+            <Trash2 size={15} />
           )}
+          Sil
         </button>
       </div>
+
       {(canSendToPool || canRemoveFromPool) && (
-        <div className="col-span-3 grid grid-cols-1 gap-1.5 border-t border-[#E7EEF8] pt-2">
+        <div className="border-t border-[#E2EAF5] bg-white p-2">
           {canSendToPool ? (
             <button
               type="button"
               onClick={onSendToPool}
               disabled={poolBusy}
-              className="flex min-h-[38px] items-center justify-center gap-2 rounded-[16px] bg-emerald-600 px-3 text-[11px] font-black text-white shadow-[0_10px_22px_rgba(5,150,105,0.18)] disabled:opacity-60"
+              className="flex min-h-[40px] w-full items-center justify-center gap-2 rounded-[14px] bg-emerald-600 px-3 text-[11px] font-black text-white shadow-[0_10px_22px_rgba(5,150,105,0.18)] disabled:opacity-60"
             >
               {poolBusy ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -1508,7 +2180,7 @@ function CompactPortfolioCard({
               type="button"
               onClick={onRemoveFromPool}
               disabled={poolBusy}
-              className="flex min-h-[38px] items-center justify-center gap-2 rounded-[16px] border border-amber-200 bg-amber-50 px-3 text-[11px] font-black text-amber-800 disabled:opacity-60"
+              className="flex min-h-[40px] w-full items-center justify-center gap-2 rounded-[14px] border border-amber-200 bg-amber-50 px-3 text-[11px] font-black text-amber-800 disabled:opacity-60"
             >
               {poolBusy ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -1529,15 +2201,18 @@ function PortfolioMap({
   selectedUnitId,
   showPins,
   onSelectUnit,
+  onNavigateToCard,
 }: {
   units: MapUnit[];
   selectedUnitId: string;
   showPins: boolean;
   onSelectUnit: (unitId: string) => void;
+  onNavigateToCard: (unitId: string) => void;
 }) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const googleMapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const infoWindowRef = useRef<any>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
@@ -1582,6 +2257,8 @@ function PortfolioMap({
       alive = false;
       markersRef.current.forEach((marker) => marker.setMap?.(null));
       markersRef.current = [];
+      infoWindowRef.current?.close?.();
+      infoWindowRef.current = null;
       googleMapRef.current = null;
       setMapReady(false);
     };
@@ -1613,43 +2290,91 @@ function PortfolioMap({
       if (!lat || !lng) return;
 
       const isSelected = selectedUnitId === unit.id;
-      const svg = `
-        <svg width="64" height="78" viewBox="0 0 64 78" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <filter id="shadow" x="-20%" y="-10%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="8" stdDeviation="5" flood-color="#0F172A" flood-opacity="0.28"/>
-          </filter>
-          <path filter="url(#shadow)" d="M32 76C32 76 58 47.9 58 28C58 12.536 46.359 2 32 2C17.641 2 6 12.536 6 28C6 47.9 32 76 32 76Z" fill="#2563EB"/>
-          <path d="M32 68C32 68 52 45.7 52 29C52 17.402 43.046 9 32 9C20.954 9 12 17.402 12 29C12 45.7 32 68 32 68Z" fill="#1D4ED8"/>
-          <circle cx="32" cy="29" r="19" fill="white"/>
-          <circle cx="32" cy="29" r="15" fill="#EFF6FF"/>
-          <text x="32" y="34" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="900" fill="#2563EB">EPH</text>
-        </svg>
-      `;
-
+      const svg = createEphMapPinSvg("#0D47A1", isSelected);
       const marker = new window.google.maps.Marker({
         position: { lat, lng },
         map: googleMapRef.current,
-        title: unit.project?.name || "EPH Portföy",
+        title: `${unit.project?.name || "EPH Portföy"} • ${formatCompactPrice(
+          unit.price,
+          unit.priceCurrency,
+        )}`,
+        optimized: false,
         icon: {
           url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
           scaledSize: new window.google.maps.Size(
-            isSelected ? 48 : 42,
-            isSelected ? 58 : 52,
+            isSelected ? 54 : 46,
+            isSelected ? 66 : 57,
           ),
           anchor: new window.google.maps.Point(
-            isSelected ? 24 : 21,
-            isSelected ? 58 : 52,
+            isSelected ? 27 : 23,
+            isSelected ? 66 : 57,
           ),
         },
-        zIndex: isSelected ? 30 : 20,
+        zIndex: isSelected ? 40 : 20,
       });
 
-      marker.addListener("click", () => onSelectUnit(unit.id));
+      if (!infoWindowRef.current) {
+        infoWindowRef.current = new window.google.maps.InfoWindow({
+          disableAutoPan: true,
+        });
+      }
+
+      const location =
+        [unit.project?.city, unit.project?.district, unit.project?.address]
+          .filter(Boolean)
+          .join(" / ") || "Konum bilgisi yok";
+      const infoHtml = `
+        <div style="width:220px;padding:4px 2px;font-family:Arial,sans-serif;color:#0F172A">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.08em;color:#1557D6;text-transform:uppercase">
+            EPH Portföy
+          </div>
+          <div style="margin-top:4px;font-size:14px;font-weight:900;line-height:1.2">
+            ${escapeMapHtml(unit.project?.name || "EPH Portföy")}
+          </div>
+          <div style="margin-top:5px;font-size:11px;font-weight:700;line-height:1.35;color:#64748B">
+            ${escapeMapHtml(location)}
+          </div>
+          <div style="margin-top:7px;font-size:15px;font-weight:900;color:#06194A">
+            ${escapeMapHtml(formatCompactPrice(unit.price, unit.priceCurrency))}
+          </div>
+          <div style="margin-top:4px;font-size:10px;font-weight:800;color:#475569">
+            ${escapeMapHtml(formatEnumLabel(unit.type))} • ${escapeMapHtml(
+              statusLabels[unit.status] || unit.status || "Portföy",
+            )}
+          </div>
+          <div style="margin-top:7px;border-top:1px solid #DCE8F7;padding-top:6px;font-size:10px;font-weight:900;color:#1557D6">
+            Kartı görmek için pine tıklayın
+          </div>
+        </div>
+      `;
+
+      marker.addListener("mouseover", () => {
+        infoWindowRef.current?.setContent(infoHtml);
+        infoWindowRef.current?.open(googleMapRef.current, marker);
+      });
+
+      marker.addListener("mouseout", () => {
+        window.setTimeout(() => infoWindowRef.current?.close(), 120);
+      });
+
+      marker.addListener("click", () => {
+        infoWindowRef.current?.close();
+        onSelectUnit(unit.id);
+        onNavigateToCard(unit.id);
+      });
+
       markersRef.current.push(marker);
     });
 
     if (!bounds.isEmpty()) googleMapRef.current.fitBounds(bounds, 56);
-  }, [mapReady, onSelectUnit, selectedUnitId, showPins, units]);
+  }, [
+    mapReady,
+    onNavigateToCard,
+    onSelectUnit,
+    selectedUnitId,
+    showPins,
+    units,
+  ]);
 
   return (
     <div className="relative h-[360px] bg-[#EEF5FF]">

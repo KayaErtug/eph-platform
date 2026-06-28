@@ -10,6 +10,7 @@ import {
   Building2,
   ClipboardCheck,
   Clock3,
+  FileText,
   KeyRound,
   LayoutDashboard,
   Loader2,
@@ -355,6 +356,12 @@ export default function DashboardPage() {
         label: "Lina",
         desc: "Asistan",
         icon: <Bot size={16} />,
+      },
+      {
+        href: "/uretkenlik",
+        label: "Üretkenlik",
+        desc: "Belge Merkezi",
+        icon: <FileText size={16} />,
       },
       {
         href: "/messages",
