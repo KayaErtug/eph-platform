@@ -25,7 +25,7 @@ export class ProjectsController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
+  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.EMLAKCI)
   create(@CurrentUser() user: any, @Body() body: ProjectLocationBody) {
     return this.projectsService.create(user.id, body);
   }

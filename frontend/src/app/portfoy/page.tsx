@@ -388,7 +388,6 @@ function StokPageInner() {
   const canAddUnit =
     user?.role === "MUTEAHHIT" ||
     user?.role === "INSAAT_FIRMASI" ||
-    user?.role === "ADMIN" ||
     user?.role === "EMLAKCI" ||
     user?.role === "SUPER_ADMIN";
 
@@ -768,6 +767,18 @@ function StokPageInner() {
   };
 
   const openCreateModal = () => {
+    const currentRole = String(user?.role || "").toUpperCase();
+
+    if (currentRole === "ADMIN") {
+      window.alert("Rolünüz Admin olduğu için portföy girişi yapamazsınız.");
+      return;
+    }
+
+    if (!canAddUnit) {
+      window.alert("Bu kullanıcı rolüyle portföy girişi yapamazsınız.");
+      return;
+    }
+
     resetForm();
     setShowModal(true);
   };
@@ -1592,7 +1603,7 @@ function StokPageInner() {
             <button
               type="button"
               onClick={openCreateModal}
-              disabled={!canAddUnit}
+              disabled={!canAddUnit && user?.role !== "ADMIN"}
               className="inline-flex h-10 items-center gap-1 rounded-[18px] bg-[#1557D6] px-3 text-[12px] font-black text-white disabled:opacity-50"
             >
               <Plus size={17} /> Yeni Portföy
