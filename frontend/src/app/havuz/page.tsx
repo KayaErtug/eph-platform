@@ -23,6 +23,13 @@ import {
 
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
+import HavuzFilterCenter, {
+  applyHavuzFilters,
+  countHavuzFilters,
+  createEmptyHavuzFilters,
+  getHavuzFilterChips,
+  type HavuzFilterState,
+} from "@/components/havuz/HavuzFilterCenter";
 
 type Unit = {
   id: string;
@@ -120,15 +127,6 @@ declare global {
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 const DEFAULT_MAP_CENTER = { lat: 39.0, lng: 35.0 };
 
-const categories = [
-  "Tümü",
-  "Satılık",
-  "Kiralık",
-  "Kat Karşılığı",
-  "Proje",
-  "Ticari",
-  "Özel",
-];
 
 const POOL_CARD_STYLES = [
   {
@@ -490,49 +488,6 @@ function getPoolQualityTone(score: number) {
   return "border-red-200 bg-red-50 text-red-700";
 }
 
-function calculateHavuzTrustIndex(unit: Unit, matchScore: number) {
-  const hasTapu = Boolean(unit.tapuVerified || unit.isVerified);
-  const hasYetki = Boolean(unit.yetkiVerified || unit.isVerified);
-  const hasPhoto = Boolean(
-    unit.photoVerified ||
-    (Array.isArray(unit.images) && unit.images.length > 0),
-  );
-  const crmMatch = Math.max(0, Math.min(100, Number(matchScore || 0))) >= 75;
-
-  const score =
-    (hasTapu ? 25 : 0) +
-    (hasYetki ? 25 : 0) +
-    (hasPhoto ? 25 : 0) +
-    Math.round(
-      (Math.max(0, Math.min(100, Number(matchScore || 0))) / 100) * 25,
-    );
-
-  return {
-    score: Math.max(0, Math.min(100, score)),
-    checks: [
-      { label: "Tapu", active: hasTapu },
-      { label: "Yetki", active: hasYetki },
-      { label: "Fotoğraf", active: hasPhoto },
-      { label: "CRM Uyum", active: crmMatch },
-    ],
-  };
-}
-
-function getTrustIndexLabel(score: number) {
-  if (score >= 90) return "Çok Güvenli";
-  if (score >= 75) return "Güvenli";
-  if (score >= 60) return "Takip Edilebilir";
-  if (score >= 40) return "Kontrol Gerekli";
-  return "Riskli";
-}
-
-function getTrustIndexTone(score: number) {
-  if (score >= 90) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (score >= 75) return "border-blue-200 bg-blue-50 text-blue-700";
-  if (score >= 60) return "border-cyan-200 bg-cyan-50 text-cyan-700";
-  if (score >= 40) return "border-amber-200 bg-amber-50 text-amber-700";
-  return "border-red-200 bg-red-50 text-red-700";
-}
 
 function hasEphApproval(unit: Unit) {
   return Boolean(unit.isVerified || (unit.tapuVerified && unit.yetkiVerified));
@@ -642,8 +597,11 @@ export default function HavuzPage() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState("Tümü");
   const [search, setSearch] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filters, setFilters] = useState<HavuzFilterState>(() =>
+    createEmptyHavuzFilters(),
+  );
   const [selectedAction, setSelectedAction] = useState<SelectedAction | null>(
     null,
   );
@@ -712,62 +670,16 @@ export default function HavuzPage() {
       .sort((a, b) => b.match.score - a.match.score);
   }, [customers, eligibleUnits]);
 
-  const filteredPoolItems = useMemo(() => {
-    const keyword = search.trim().toLocaleLowerCase("tr-TR");
+  const filteredPoolItems = useMemo(
+    () => applyHavuzFilters(matchedUnits, filters, search),
+    [filters, matchedUnits, search],
+  );
 
-    return matchedUnits
-      .filter(({ unit }) => {
-        if (category === "Tümü") return true;
-
-        const text = [
-          unit.status,
-          unit.type,
-          unit.project?.name,
-          unit.description,
-        ]
-          .join(" ")
-          .toLocaleLowerCase("tr-TR");
-
-        if (category === "Kat Karşılığı")
-          return text.includes("kat") || text.includes("arsa");
-        if (category === "Proje") return text.includes("proje") || builder;
-        if (category === "Ticari")
-          return (
-            text.includes("dukkan") ||
-            text.includes("dükkan") ||
-            text.includes("magaza") ||
-            text.includes("mağaza")
-          );
-        if (category === "Özel")
-          return (
-            text.includes("villa") ||
-            text.includes("turistik") ||
-            text.includes("özel")
-          );
-
-        return text.includes(category.toLocaleLowerCase("tr-TR"));
-      })
-      .filter(({ unit }) => {
-        if (!keyword) return true;
-
-        return [
-          unit.project?.name,
-          unit.project?.city,
-          unit.project?.district,
-          unit.project?.address,
-          unit.type,
-          unit.status,
-          unit.roomCount,
-          unit.description,
-        ]
-          .join(" ")
-          .toLocaleLowerCase("tr-TR")
-          .includes(keyword);
-      });
-  }, [builder, category, matchedUnits, search]);
+  const activeFilterCount = countHavuzFilters(filters);
+  const activeFilterChips = getHavuzFilterChips(filters);
 
   const displayedUnits = useMemo(
-    () => filteredPoolItems.slice(0, 12),
+    () => filteredPoolItems,
     [filteredPoolItems],
   );
 
@@ -936,25 +848,61 @@ export default function HavuzPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               className="h-8 min-w-0 flex-1 bg-transparent text-[12px] font-bold text-[#1F2937] outline-none placeholder:text-[#64748B]"
-              placeholder="Portföy, şehir, ilçe ara..."
+              placeholder="Portföy, şehir, ilçe, mahalle ara..."
             />
           </div>
 
-          <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
-            {categories.map((item) => (
-              <button
-                key={item}
-                onClick={() => setCategory(item)}
-                className={`shrink-0 rounded-full border-2 px-3 py-1.5 text-[11px] font-black ${
-                  category === item
-                    ? "border-[#2563EB] bg-[#2563EB] text-white"
-                    : "border-[#C7D6E8] bg-white text-[#64748B]"
-                }`}
-              >
-                {item}
-              </button>
-            ))}
+          <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
+            <button
+              type="button"
+              onClick={() => setFilterOpen(true)}
+              className="flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] border-2 border-[#2563EB] bg-[#EFF6FF] px-3 text-[12px] font-black text-[#1D4ED8]"
+            >
+              <span>⚙️</span>
+              Gelişmiş Filtreler
+              {activeFilterCount > 0 && (
+                <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[#2563EB] px-1.5 text-[10px] font-black text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+
+            <div className="flex min-w-[82px] flex-col items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-white px-2 text-center">
+              <strong className="text-[16px] font-black leading-none text-[#2563EB]">
+                {filteredPoolItems.length}
+              </strong>
+              <span className="mt-1 text-[8.5px] font-black text-[#64748B]">
+                Sonuç
+              </span>
+            </div>
           </div>
+
+          {activeFilterChips.length > 0 && (
+            <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+              {activeFilterChips.slice(0, 12).map((chip, index) => (
+                <span
+                  key={`${chip}-${index}`}
+                  className="shrink-0 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-1 text-[9.5px] font-black text-[#1D4ED8]"
+                >
+                  {chip}
+                </span>
+              ))}
+
+              {activeFilterChips.length > 12 && (
+                <span className="shrink-0 rounded-full border border-[#C7D6E8] bg-white px-2.5 py-1 text-[9.5px] font-black text-[#64748B]">
+                  +{activeFilterChips.length - 12}
+                </span>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setFilters(createEmptyHavuzFilters())}
+                className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[9.5px] font-black text-rose-700"
+              >
+                Temizle
+              </button>
+            </div>
+          )}
         </section>
 
         <section className="rounded-[22px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
@@ -1041,6 +989,15 @@ export default function HavuzPage() {
           )}
         </section>
       </div>
+
+      <HavuzFilterCenter
+        open={filterOpen}
+        items={matchedUnits}
+        filters={filters}
+        resultCount={filteredPoolItems.length}
+        onChange={setFilters}
+        onClose={() => setFilterOpen(false)}
+      />
 
       {detailSelection && (
         <PoolDetailModal

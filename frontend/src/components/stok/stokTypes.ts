@@ -68,6 +68,9 @@ export interface Unit {
 
   status: string;
   description?: string;
+  deedOwnerFullName?: string;
+  deedOwnerPhone?: string;
+  deedOwnerEmail?: string;
   features?: string[];
 
   isVerified?: boolean;
@@ -145,6 +148,9 @@ export interface UnitFormState {
 
   status: string;
   description: string;
+  deedOwnerFullName: string;
+  deedOwnerPhone: string;
+  deedOwnerEmail: string;
   features?: string[];
 }
 

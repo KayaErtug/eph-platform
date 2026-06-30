@@ -931,6 +931,49 @@ function parseFormattedNumber(value: string) {
   return value.replace(/\D/g, "");
 }
 
+function normalizeDeedOwnerPhoneDigits(value: string) {
+  let digits = String(value || "").replace(/\D/g, "");
+
+  if (digits.startsWith("90")) {
+    digits = `0${digits.slice(2)}`;
+  } else if (digits.startsWith("5")) {
+    digits = `0${digits}`;
+  }
+
+  return digits.slice(0, 11);
+}
+
+function formatDeedOwnerPhone(value: string) {
+  const digits = normalizeDeedOwnerPhoneDigits(value);
+
+  if (!digits) return "";
+  if (digits.length === 1) return digits;
+
+  let formatted = `${digits.slice(0, 1)} (${digits.slice(1, 4)}`;
+
+  if (digits.length >= 4) {
+    formatted += ")";
+  }
+
+  if (digits.length > 4) {
+    formatted += ` ${digits.slice(4, 7)}`;
+  }
+
+  if (digits.length > 7) {
+    formatted += ` ${digits.slice(7, 9)}`;
+  }
+
+  if (digits.length > 9) {
+    formatted += ` ${digits.slice(9, 11)}`;
+  }
+
+  return formatted.slice(0, 17);
+}
+
+function isValidDeedOwnerPhone(value: string) {
+  return /^05\d{9}$/.test(normalizeDeedOwnerPhoneDigits(value));
+}
+
 function getCurrencySymbol(value?: string) {
   return CURRENCY_OPTIONS.find((option) => option.value === value)?.symbol || "₺";
 }
@@ -1027,6 +1070,7 @@ export default function StokCreateModal({
   const openArea = String((unitForm as any).openArea || "");
   const closedArea = String((unitForm as any).closedArea || "");
   const deedOwnerFullName = String((unitForm as any).deedOwnerFullName || "");
+  const deedOwnerPhone = String((unitForm as any).deedOwnerPhone || "");
   const adaNo = String((unitForm as any).adaNo || "");
   const parselNo = String((unitForm as any).parselNo || "");
   const availableCreditAmountDisplay = formatPriceInput(String((unitForm as any).availableCreditAmount || ""));
@@ -1393,6 +1437,10 @@ export default function StokCreateModal({
       ...(current as any),
       deedOwnerFullName:
         fullName || (current as any).deedOwnerFullName || "",
+      deedOwnerPhone:
+        customer.phone
+          ? formatDeedOwnerPhone(customer.phone)
+          : (current as any).deedOwnerPhone || "",
     } as UnitFormState));
 
     if (!projectForm.city && customer.city) {
@@ -1484,6 +1532,10 @@ export default function StokCreateModal({
       return `${missingSpecialField.label} zorunludur.`;
     }
 
+
+    if (deedOwnerPhone && !isValidDeedOwnerPhone(deedOwnerPhone)) {
+      return "Tapu sahibinin cep telefonu 0 (5XX) XXX XX XX formatında olmalıdır.";
+    }
 
     const availableCreditAmount = Number(String((unitForm as any).availableCreditAmount || "").replace(/\D/g, ""));
 
@@ -2216,7 +2268,7 @@ export default function StokCreateModal({
                   👤 Tapu Sahibi
                 </span>
                 <p className="mt-2 text-center text-xs font-bold leading-5 text-[#64748B]">
-                  Tapu sahibini CRM kayıtlarınızdan seçin veya yalnızca ad soyad bilgisini girin.
+                  Tapu sahibini CRM kayıtlarınızdan seçin veya ad soyad ve cep telefonu bilgisini girin.
                 </p>
               </div>
 
@@ -2242,7 +2294,7 @@ export default function StokCreateModal({
                     })}
                   </select>
                   <small className="stock-upload-hint">
-                    Seçilen CRM kaydının ad soyad bilgisi otomatik doldurulur.
+                    Seçilen CRM kaydının ad soyad ve cep telefonu bilgisi otomatik doldurulur.
                   </small>
                 </label>
               )}
@@ -2262,6 +2314,28 @@ export default function StokCreateModal({
                   }
                   placeholder="Örn: Ahmet Yılmaz"
                 />
+              </label>
+
+              <label className="stock-form-field full rounded-[24px] border-2 border-[#D8B4FE] bg-[#FBF3FF] p-4 shadow-[0_16px_36px_rgba(126,34,206,0.10)]">
+                <span>Tapu Sahibi Cep Telefonu</span>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  maxLength={17}
+                  value={deedOwnerPhone}
+                  onChange={(e) =>
+                    setUnitField(
+                      "deedOwnerPhone",
+                      formatDeedOwnerPhone(e.target.value),
+                    )
+                  }
+                  placeholder="0 (5XX) XXX XX XX"
+                  aria-label="Tapu sahibi cep telefonu"
+                />
+                <small className="stock-upload-hint">
+                  Cep telefonu 0 (5XX) XXX XX XX formatında ve en fazla 17 karakter olmalıdır.
+                </small>
               </label>
             </div>
           </div>

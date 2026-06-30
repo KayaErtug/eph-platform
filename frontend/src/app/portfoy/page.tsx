@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -15,7 +14,6 @@ import {
   MapPin,
   Navigation,
   Plus,
-  RotateCcw,
   Send,
   Search,
   Share2,
@@ -29,6 +27,13 @@ import { useAuthStore } from "@/store/auth.store";
 import StokCreateModal from "@/components/stok/StokCreateModal";
 import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
+import PortfolioFilterCenter, {
+  applyPortfolioFilters,
+  countPortfolioFilters,
+  createEmptyPortfolioFilters,
+  getPortfolioFilterChips,
+  type PortfolioFilterState,
+} from "@/components/portfolio/PortfolioFilterCenter";
 import type {
   LocalPortfolioImage,
   Project,
@@ -37,10 +42,7 @@ import type {
   UnitFormState,
 } from "@/components/stok/stokTypes";
 
-type SortMode = "newest" | "priceDesc" | "priceAsc";
-type VerificationFilter = "" | "verified" | "unverified";
-type PoolFilter = "" | "inPool" | "outPool";
-type LocationFilter = "" | "withLocation" | "withoutLocation";
+
 type CrmCustomerOption = {
   id: string;
   firstName?: string | null;
@@ -325,24 +327,9 @@ function StokPageInner() {
   const [showMapPins, setShowMapPins] = useState(true);
   const [mapSelectedUnitId, setMapSelectedUnitId] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [cityFilter, setCityFilter] = useState("");
-  const [districtFilter, setDistrictFilter] = useState("");
-  const [neighborhoodFilter, setNeighborhoodFilter] = useState("");
-  const [minPriceFilter, setMinPriceFilter] = useState("");
-  const [maxPriceFilter, setMaxPriceFilter] = useState("");
-  const [minAreaFilter, setMinAreaFilter] = useState("");
-  const [maxAreaFilter, setMaxAreaFilter] = useState("");
-  const [roomFilter, setRoomFilter] = useState("");
-  const [verificationFilter, setVerificationFilter] =
-    useState<VerificationFilter>("");
-  const [poolFilter, setPoolFilter] = useState<PoolFilter>("");
-  const [locationFilter, setLocationFilter] = useState<LocationFilter>("");
-  const [newOnlyFilter, setNewOnlyFilter] = useState(false);
-  const [search, setSearch] = useState("");
-  const [sortMode, setSortMode] = useState<SortMode>("newest");
-  const [shareOpen, setShareOpen] = useState(false);
+  const [portfolioFilters, setPortfolioFilters] =
+    useState<PortfolioFilterState>(() => createEmptyPortfolioFilters());
+  const [search, setSearch] = useState("");  const [shareOpen, setShareOpen] = useState(false);
   const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
   const [deletingUnitId, setDeletingUnitId] = useState("");
   const [poolActionUnitId, setPoolActionUnitId] = useState("");
@@ -440,99 +427,13 @@ function StokPageInner() {
     }
   };
 
-  const filteredUnits = useMemo(() => {
-    const q = search.trim().toLocaleLowerCase("tr-TR");
-    const minPrice = parseFormattedNumber(minPriceFilter);
-    const maxPrice = parseFormattedNumber(maxPriceFilter);
-    const minArea = Number(minAreaFilter || 0);
-    const maxArea = Number(maxAreaFilter || 0);
-    const newLimit = Date.now() - NEW_PORTFOLIO_DAYS * 24 * 60 * 60 * 1000;
+  const filteredUnits = useMemo(
+    () => applyPortfolioFilters(units, portfolioFilters, search),
+    [portfolioFilters, search, units],
+  );
 
-    let list = units.filter((unit) => {
-      const price = Number(unit.price || 0);
-      const area = Number(unit.area || 0);
-      const hasLocation = Boolean(
-        Number(unit.project?.latitude) && Number(unit.project?.longitude),
-      );
-      const isVerified = isUnitVerified(unit);
-      const isPoolVisible = Boolean(
-        (unit as any).isPoolVisible ||
-          String((unit as any).approvalStatus || "") === "HAVUZDA",
-      );
-
-      if (statusFilter && unit.status !== statusFilter) return false;
-      if (typeFilter && unit.type !== typeFilter) return false;
-      if (cityFilter && unit.project?.city !== cityFilter) return false;
-      if (districtFilter && unit.project?.district !== districtFilter)
-        return false;
-      if (
-        neighborhoodFilter &&
-        unit.project?.address !== neighborhoodFilter
-      )
-        return false;
-      if (minPrice && price < minPrice) return false;
-      if (maxPrice && price > maxPrice) return false;
-      if (minArea && area < minArea) return false;
-      if (maxArea && area > maxArea) return false;
-      if (roomFilter && unit.roomCount !== roomFilter) return false;
-      if (verificationFilter === "verified" && !isVerified) return false;
-      if (verificationFilter === "unverified" && isVerified) return false;
-      if (poolFilter === "inPool" && !isPoolVisible) return false;
-      if (poolFilter === "outPool" && isPoolVisible) return false;
-      if (locationFilter === "withLocation" && !hasLocation) return false;
-      if (locationFilter === "withoutLocation" && hasLocation) return false;
-      if (newOnlyFilter) {
-        const createdTime = new Date(String(unit.createdAt || "")).getTime();
-        if (!Number.isFinite(createdTime) || createdTime < newLimit)
-          return false;
-      }
-      if (!q) return true;
-
-      const searchableText = [
-        unit.project?.name,
-        unit.project?.city,
-        unit.project?.district,
-        unit.project?.address,
-        unit.number,
-        unit.type,
-        unit.status,
-        unit.roomCount,
-        unit.description,
-      ]
-        .join(" ")
-        .toLocaleLowerCase("tr-TR");
-
-      return searchableText.includes(q);
-    });
-
-    list = [...list].sort((a, b) => {
-      if (sortMode === "priceDesc")
-        return Number(b.price || 0) - Number(a.price || 0);
-      if (sortMode === "priceAsc")
-        return Number(a.price || 0) - Number(b.price || 0);
-      return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
-    });
-
-    return list;
-  }, [
-    cityFilter,
-    districtFilter,
-    locationFilter,
-    maxAreaFilter,
-    maxPriceFilter,
-    minAreaFilter,
-    minPriceFilter,
-    neighborhoodFilter,
-    newOnlyFilter,
-    poolFilter,
-    roomFilter,
-    search,
-    sortMode,
-    statusFilter,
-    typeFilter,
-    units,
-    verificationFilter,
-  ]);
+  const activeFilterCount = countPortfolioFilters(portfolioFilters);
+  const activeFilterChips = getPortfolioFilterChips(portfolioFilters);
 
   const mapUnits = useMemo(() => {
     return filteredUnits.filter(
@@ -580,136 +481,6 @@ function StokPageInner() {
         units.length,
     );
   }, [units]);
-  const uniqueCities = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          units
-            .map((unit) => unit.project?.city)
-            .filter((city): city is string => Boolean(city)),
-        ),
-      ).sort((a, b) => a.localeCompare(b, "tr")),
-    [units],
-  );
-
-  const uniqueDistricts = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          units
-            .filter(
-              (unit) => !cityFilter || unit.project?.city === cityFilter,
-            )
-            .map((unit) => unit.project?.district)
-            .filter((district): district is string => Boolean(district)),
-        ),
-      ).sort((a, b) => a.localeCompare(b, "tr")),
-    [cityFilter, units],
-  );
-
-  const uniqueNeighborhoods = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          units
-            .filter(
-              (unit) =>
-                (!cityFilter || unit.project?.city === cityFilter) &&
-                (!districtFilter ||
-                  unit.project?.district === districtFilter),
-            )
-            .map((unit) => unit.project?.address)
-            .filter(
-              (neighborhood): neighborhood is string =>
-                Boolean(neighborhood),
-            ),
-        ),
-      ).sort((a, b) => a.localeCompare(b, "tr")),
-    [cityFilter, districtFilter, units],
-  );
-
-  const uniqueTypes = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          units
-            .map((unit) => String(unit.type || ""))
-            .filter(Boolean),
-        ),
-      ).sort((a, b) =>
-        formatEnumLabel(a).localeCompare(formatEnumLabel(b), "tr"),
-      ),
-    [units],
-  );
-
-  const uniqueRooms = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          units
-            .map((unit) => String(unit.roomCount || ""))
-            .filter(Boolean),
-        ),
-      ).sort((a, b) => a.localeCompare(b, "tr", { numeric: true })),
-    [units],
-  );
-
-  const activeFilterCount = useMemo(
-    () =>
-      [
-        statusFilter,
-        typeFilter,
-        cityFilter,
-        districtFilter,
-        neighborhoodFilter,
-        minPriceFilter,
-        maxPriceFilter,
-        minAreaFilter,
-        maxAreaFilter,
-        roomFilter,
-        verificationFilter,
-        poolFilter,
-        locationFilter,
-        newOnlyFilter ? "new" : "",
-        sortMode !== "newest" ? sortMode : "",
-      ].filter(Boolean).length,
-    [
-      cityFilter,
-      districtFilter,
-      locationFilter,
-      maxAreaFilter,
-      maxPriceFilter,
-      minAreaFilter,
-      minPriceFilter,
-      neighborhoodFilter,
-      newOnlyFilter,
-      poolFilter,
-      roomFilter,
-      sortMode,
-      statusFilter,
-      typeFilter,
-      verificationFilter,
-    ],
-  );
-
-  const resetFilters = () => {
-    setStatusFilter("");
-    setTypeFilter("");
-    setCityFilter("");
-    setDistrictFilter("");
-    setNeighborhoodFilter("");
-    setMinPriceFilter("");
-    setMaxPriceFilter("");
-    setMinAreaFilter("");
-    setMaxAreaFilter("");
-    setRoomFilter("");
-    setVerificationFilter("");
-    setPoolFilter("");
-    setLocationFilter("");
-    setNewOnlyFilter(false);
-    setSortMode("newest");
-  };
-
   const makeExistingGalleryImages = (unit: MapUnit): LocalPortfolioImage[] => {
     return getUnitImages(unit as Unit).map((image, index) => ({
       id: `existing-${image.id}`,
@@ -1215,7 +986,7 @@ function StokPageInner() {
 
             <button
               type="button"
-              onClick={() => setFilterOpen((current) => !current)}
+              onClick={() => setFilterOpen(true)}
               className={`relative flex h-12 min-w-[104px] items-center justify-center gap-2 rounded-[18px] border px-3 text-[12px] font-black active:scale-[0.98] ${
                 filterOpen || activeFilterCount > 0
                   ? "border-[#1557D6] bg-[#1557D6] text-white"
@@ -1232,226 +1003,43 @@ function StokPageInner() {
             </button>
           </div>
 
-          {filterOpen && (
-            <div className="mt-3 rounded-[24px] border border-[#C7D6E8] bg-[#F8FBFF] p-3 shadow-[0_14px_30px_rgba(37,99,235,0.10)]">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-[16px] font-black text-[#06194A]">
-                    Portföy Filtreleri
-                  </h2>
-                  <p className="mt-0.5 text-[10px] font-bold text-[#64748B]">
-                    {filteredUnits.length} sonuç gösteriliyor
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  disabled={activeFilterCount === 0}
-                  className="inline-flex min-h-[36px] items-center gap-1.5 rounded-[14px] border border-[#DDE7F3] bg-white px-3 text-[10px] font-black text-[#1557D6] disabled:opacity-40"
-                >
-                  <RotateCcw size={14} /> Temizle
-                </button>
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <FilterSelect
-                  label="İşlem Türü"
-                  value={statusFilter}
-                  onChange={setStatusFilter}
-                >
-                  <option value="">Tümü</option>
-                  {Object.entries(statusLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </FilterSelect>
-
-                <FilterSelect
-                  label="Portföy Türü"
-                  value={typeFilter}
-                  onChange={setTypeFilter}
-                >
-                  <option value="">Tümü</option>
-                  {uniqueTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {formatEnumLabel(type)}
-                    </option>
-                  ))}
-                </FilterSelect>
-
-                <FilterSelect
-                  label="İl"
-                  value={cityFilter}
-                  onChange={(value) => {
-                    setCityFilter(value);
-                    setDistrictFilter("");
-                    setNeighborhoodFilter("");
-                  }}
-                >
-                  <option value="">Tüm İller</option>
-                  {uniqueCities.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                </FilterSelect>
-
-                <FilterSelect
-                  label="İlçe"
-                  value={districtFilter}
-                  onChange={(value) => {
-                    setDistrictFilter(value);
-                    setNeighborhoodFilter("");
-                  }}
-                >
-                  <option value="">Tüm İlçeler</option>
-                  {uniqueDistricts.map((district) => (
-                    <option key={district} value={district}>
-                      {district}
-                    </option>
-                  ))}
-                </FilterSelect>
-
-                <div className="col-span-2">
-                  <FilterSelect
-                    label="Mahalle"
-                    value={neighborhoodFilter}
-                    onChange={setNeighborhoodFilter}
-                  >
-                    <option value="">Tüm Mahalleler</option>
-                    {uniqueNeighborhoods.map((neighborhood) => (
-                      <option key={neighborhood} value={neighborhood}>
-                        {neighborhood}
-                      </option>
-                    ))}
-                  </FilterSelect>
-                </div>
-
-                <FilterInput
-                  label="Minimum Fiyat"
-                  value={minPriceFilter}
-                  onChange={setMinPriceFilter}
-                  placeholder="0 ₺"
-                />
-                <FilterInput
-                  label="Maksimum Fiyat"
-                  value={maxPriceFilter}
-                  onChange={setMaxPriceFilter}
-                  placeholder="Sınırsız"
-                />
-                <FilterInput
-                  label="Minimum m²"
-                  value={minAreaFilter}
-                  onChange={setMinAreaFilter}
-                  placeholder="0"
-                />
-                <FilterInput
-                  label="Maksimum m²"
-                  value={maxAreaFilter}
-                  onChange={setMaxAreaFilter}
-                  placeholder="Sınırsız"
-                />
-
-                <FilterSelect
-                  label="Oda Sayısı"
-                  value={roomFilter}
-                  onChange={setRoomFilter}
-                >
-                  <option value="">Tümü</option>
-                  {uniqueRooms.map((room) => (
-                    <option key={room} value={room}>
-                      {room}
-                    </option>
-                  ))}
-                </FilterSelect>
-
-                <FilterSelect
-                  label="Yetki Durumu"
-                  value={verificationFilter}
-                  onChange={(value) =>
-                    setVerificationFilter(value as VerificationFilter)
-                  }
-                >
-                  <option value="">Tümü</option>
-                  <option value="verified">Yetkili</option>
-                  <option value="unverified">Yetkisiz</option>
-                </FilterSelect>
-
-                <FilterSelect
-                  label="Havuz Durumu"
-                  value={poolFilter}
-                  onChange={(value) => setPoolFilter(value as PoolFilter)}
-                >
-                  <option value="">Tümü</option>
-                  <option value="inPool">Havuzda</option>
-                  <option value="outPool">Havuzda Değil</option>
-                </FilterSelect>
-
-                <FilterSelect
-                  label="Konum Durumu"
-                  value={locationFilter}
-                  onChange={(value) =>
-                    setLocationFilter(value as LocationFilter)
-                  }
-                >
-                  <option value="">Tümü</option>
-                  <option value="withLocation">Konumlu</option>
-                  <option value="withoutLocation">Konumsuz</option>
-                </FilterSelect>
-
-                <div className="col-span-2">
-                  <FilterSelect
-                    label="Sıralama"
-                    value={sortMode}
-                    onChange={(value) => setSortMode(value as SortMode)}
-                  >
-                    <option value="newest">En Yeni</option>
-                    <option value="priceDesc">Fiyat: Yüksekten Düşüğe</option>
-                    <option value="priceAsc">Fiyat: Düşükten Yükseğe</option>
-                  </FilterSelect>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setNewOnlyFilter((current) => !current)}
-                className={`mt-2 flex min-h-[46px] w-full items-center justify-between rounded-[16px] border px-3 text-left active:scale-[0.99] ${
-                  newOnlyFilter
-                    ? "border-[#1557D6] bg-[#EAF2FF]"
-                    : "border-[#DDE7F3] bg-white"
-                }`}
-              >
-                <span>
-                  <span className="block text-[12px] font-black text-[#06194A]">
-                    Yeni Eklenenler
-                  </span>
-                  <span className="mt-0.5 block text-[10px] font-bold text-[#64748B]">
-                    Son {NEW_PORTFOLIO_DAYS} gün içinde eklenen portföyler
-                  </span>
-                </span>
+          {activeFilterChips.length > 0 && (
+            <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
+              {activeFilterChips.slice(0, 12).map((chip, index) => (
                 <span
-                  className={`relative h-6 w-11 shrink-0 rounded-full transition ${
-                    newOnlyFilter ? "bg-[#1557D6]" : "bg-[#CBD5E1]"
-                  }`}
+                  key={`${chip}-${index}`}
+                  className="shrink-0 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-1 text-[9.5px] font-black text-[#1D4ED8]"
                 >
-                  <span
-                    className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${
-                      newOnlyFilter ? "left-6" : "left-1"
-                    }`}
-                  />
+                  {chip}
                 </span>
-              </button>
+              ))}
+
+              {activeFilterChips.length > 12 && (
+                <span className="shrink-0 rounded-full border border-[#C7D6E8] bg-white px-2.5 py-1 text-[9.5px] font-black text-[#64748B]">
+                  +{activeFilterChips.length - 12}
+                </span>
+              )}
 
               <button
                 type="button"
-                onClick={() => setFilterOpen(false)}
-                className="mt-3 flex min-h-[44px] w-full items-center justify-center rounded-[16px] bg-[#1557D6] px-4 text-[13px] font-black text-white shadow-[0_10px_22px_rgba(21,87,214,0.22)] active:scale-[0.99]"
+                onClick={() =>
+                  setPortfolioFilters(createEmptyPortfolioFilters())
+                }
+                className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[9.5px] font-black text-rose-700"
               >
-                {filteredUnits.length} Portföyü Göster
+                Temizle
               </button>
             </div>
           )}
+
+          <div className="mt-2 flex items-center justify-between rounded-[16px] border border-[#DDE7F3] bg-[#F8FBFF] px-3 py-2">
+            <span className="text-[10px] font-black text-[#64748B]">
+              Aktif filtre sonucu
+            </span>
+            <strong className="text-[14px] font-black text-[#1557D6]">
+              {filteredUnits.length} Portföy
+            </strong>
+          </div>
 
           <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#E2EAF5] bg-white text-center">
             <MiniMetric label="Portföy" value={units.length} />
@@ -1651,6 +1239,15 @@ function StokPageInner() {
         <Plus size={28} />
       </button>
 
+      <PortfolioFilterCenter
+        open={filterOpen}
+        units={units}
+        filters={portfolioFilters}
+        resultCount={filteredUnits.length}
+        onChange={setPortfolioFilters}
+        onClose={() => setFilterOpen(false)}
+      />
+
       <StokCreateModal
         open={showModal}
         onClose={closeModal}
@@ -1678,63 +1275,6 @@ function StokPageInner() {
         onClose={() => setShareOpen(false)}
       />
     </main>
-  );
-}
-
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  children,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  children: ReactNode;
-}) {
-  return (
-    <label className="block min-w-0">
-      <span className="mb-1 block text-[10px] font-black text-[#64748B]">
-        {label}
-      </span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-11 w-full min-w-0 rounded-[15px] border border-[#DDE7F3] bg-white px-2.5 text-[11px] font-black text-[#06194A] outline-none"
-      >
-        {children}
-      </select>
-    </label>
-  );
-}
-
-function FilterInput({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
-  return (
-    <label className="block min-w-0">
-      <span className="mb-1 block text-[10px] font-black text-[#64748B]">
-        {label}
-      </span>
-      <input
-        type="text"
-        inputMode="numeric"
-        value={value}
-        onChange={(event) =>
-          onChange(event.target.value.replace(/[^0-9]/g, ""))
-        }
-        placeholder={placeholder}
-        className="h-11 w-full min-w-0 rounded-[15px] border border-[#DDE7F3] bg-white px-3 text-[11px] font-black text-[#06194A] outline-none placeholder:text-[#94A3B8]"
-      />
-    </label>
   );
 }
 
