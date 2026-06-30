@@ -36,6 +36,13 @@ type NetworkUser = {
 
 type ForumActionType = "MESSAGE" | "INTEREST" | "HELP";
 
+type KontorSuccessToastState = {
+  title: string;
+  message: string;
+  spent: number;
+  balance: number | null;
+};
+
 type NetworkPost = {
   id: string;
   userId?: string | null;
@@ -254,6 +261,43 @@ function visibilityLabel(value?: string | null) {
 }
 
 
+function getNumericValue(data: any, keys: string[]) {
+  for (const key of keys) {
+    const value = data?.[key];
+
+    if (Number.isFinite(Number(value))) {
+      return Number(value);
+    }
+  }
+
+  return null;
+}
+
+function getBalanceFromResponse(data: any) {
+  return getNumericValue(data, [
+    "remainingBalance",
+    "balance",
+    "bakiye",
+    "kalanBakiye",
+    "sonrakiBakiye",
+  ]);
+}
+
+function getSpentFromResponse(data: any, fallback: number) {
+  return (
+    getNumericValue(data, ["spent", "cost", "miktar", "harcananKontor"]) ??
+    fallback
+  );
+}
+
+function playKontorHarcamaSound() {
+  if (typeof window === "undefined") return;
+
+  const audio = new Audio("/sounds/kontor_harcama.mp3");
+  audio.volume = 0.82;
+  audio.play().catch(() => {});
+}
+
 function criteriaFromPost(post: NetworkPost) {
   const text = normalizeText(
     [post.title, post.description, ...(post.tags || [])].join(" "),
@@ -287,6 +331,8 @@ export default function NetworkPostDetailPage() {
   const [selectedAction, setSelectedAction] =
     useState<ForumActionType | null>(null);
   const [saved, setSaved] = useState(false);
+  const [successToast, setSuccessToast] =
+    useState<KontorSuccessToastState | null>(null);
 
   const owner = useMemo(() => getPostUser(post), [post]);
   const category = useMemo(() => categoryLabel(post?.type), [post?.type]);
@@ -323,6 +369,16 @@ export default function NetworkPostDetailPage() {
 
     setSaved(localStorage.getItem(`eph-saved-network-${postId}`) === "1");
   }, [postId]);
+
+  useEffect(() => {
+    if (!successToast) return;
+
+    const timer = window.setTimeout(() => {
+      setSuccessToast(null);
+    }, 3000);
+
+    return () => window.clearTimeout(timer);
+  }, [successToast]);
 
   const handleSave = () => {
     const next = !saved;
@@ -377,26 +433,30 @@ export default function NetworkPostDetailPage() {
   };
 
   const confirmForumAction = async () => {
-    if (!post || !selectedAction || actionLoading) return;
+    const action = selectedAction;
+
+    if (!post || !action || actionLoading) return;
 
     const endpoint =
-      selectedAction === "MESSAGE"
+      action === "MESSAGE"
         ? "message"
-        : selectedAction === "INTEREST"
+        : action === "INTEREST"
           ? "interest"
           : "help";
 
     const payload =
-      selectedAction === "MESSAGE"
+      action === "MESSAGE"
         ? {
             message: `Merhaba, "${post.title}" başlıklı Forum paylaşımınız hakkında görüşmek istiyorum.`,
           }
         : {
             note:
-              selectedAction === "INTEREST"
+              action === "INTEREST"
                 ? `"${post.title}" başlıklı paylaşımınızla ilgileniyorum.`
                 : `"${post.title}" başlıklı paylaşımınız için yardımcı olabilirim.`,
           };
+
+    const fallbackSpent = action === "MESSAGE" ? 3 : 10;
 
     try {
       setActionLoading(true);
@@ -406,37 +466,43 @@ export default function NetworkPostDetailPage() {
         payload,
       );
 
-      const remainingBalance =
-        response.data?.remainingBalance ??
-        response.data?.balance ??
-        null;
+      const spent = getSpentFromResponse(response.data, fallbackSpent);
+      const remainingBalance = getBalanceFromResponse(response.data);
+
+      const actionLabel =
+        action === "MESSAGE"
+          ? "Mesaj Başlatıldı"
+          : action === "INTEREST"
+            ? "İlgileniyorum Bildirildi"
+            : "Yardımcı Olabilirim Bildirildi";
+
+      playKontorHarcamaSound();
+
+      setSuccessToast({
+        title: actionLabel,
+        message:
+          remainingBalance === null
+            ? `${spent} kontör harcandı.`
+            : `${spent} kontör harcandı. Kalan bakiyen ${remainingBalance} kontör.`,
+        spent,
+        balance: remainingBalance,
+      });
 
       setSelectedAction(null);
 
-      if (selectedAction === "MESSAGE") {
+      if (action === "MESSAGE") {
         const conversationId =
           response.data?.conversationId ||
           response.data?.conversation?.id;
 
-        router.push(
-          conversationId
-            ? `/messages/${conversationId}`
-            : "/messages",
-        );
-
-        return;
+        window.setTimeout(() => {
+          router.push(
+            conversationId
+              ? `/messages/${conversationId}`
+              : "/messages",
+          );
+        }, 900);
       }
-
-      const actionLabel =
-        selectedAction === "INTEREST"
-          ? "İlgileniyorum bildirimi"
-          : "Yardımcı olabilirim bildirimi";
-
-      alert(
-        remainingBalance === null
-          ? `${actionLabel} gönderildi.`
-          : `${actionLabel} gönderildi. Kalan bakiyeniz ${remainingBalance} kontör.`,
-      );
     } catch (error: any) {
       alert(
         error?.response?.data?.message ||
@@ -485,6 +551,8 @@ export default function NetworkPostDetailPage() {
       className="min-h-[calc(100dvh-64px)] bg-[#F4F8FF] px-2 pt-2 text-[#06194A]"
       style={{ paddingBottom: "calc(96px + env(safe-area-inset-bottom, 0px))" }}
     >
+      {successToast && <KontorSuccessToast toast={successToast} />}
+
       <div className="mx-auto w-full max-w-[430px] space-y-1.5">
         <section className="rounded-[22px] border border-white bg-white/95 p-2.5 shadow-[0_10px_26px_rgba(15,23,42,0.07)]">
           <div className="flex items-center gap-2">
@@ -783,6 +851,38 @@ export default function NetworkPostDetailPage() {
   );
 }
 
+
+function KontorSuccessToast({
+  toast,
+}: {
+  toast: KontorSuccessToastState;
+}) {
+  return (
+    <div className="fixed left-1/2 top-[78px] z-[90] w-[calc(100%-24px)] max-w-[410px] -translate-x-1/2">
+      <section className="relative overflow-hidden rounded-[22px] border-2 border-[#35FF8A] bg-[#021B18] p-3 text-center text-white shadow-[0_0_0_1px_rgba(53,255,138,0.25),0_0_26px_rgba(53,255,138,0.52),0_18px_44px_rgba(15,23,42,0.32)]">
+        <div className="pointer-events-none absolute -left-10 -top-12 h-28 w-28 rounded-full bg-[#35FF8A]/25 blur-2xl" />
+        <div className="pointer-events-none absolute -right-8 -bottom-14 h-32 w-32 rounded-full bg-[#00E5FF]/18 blur-2xl" />
+        <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#35FF8A] to-transparent" />
+
+        <div className="relative mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[#8DFFB5] bg-[#052E26] text-[#8DFFB5] shadow-[0_0_20px_rgba(53,255,138,0.72)]">
+          <CheckCircle2 size={22} />
+        </div>
+
+        <p className="relative mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#8DFFB5] drop-shadow-[0_0_8px_rgba(53,255,138,0.85)]">
+          İşlem Başarılı
+        </p>
+
+        <h3 className="relative mt-0.5 text-[15px] font-black tracking-[-0.02em] text-white">
+          {toast.title}
+        </h3>
+
+        <p className="relative mt-1 break-words text-[12px] font-black leading-5 text-[#D9FFE8] [overflow-wrap:anywhere]">
+          {toast.message}
+        </p>
+      </section>
+    </div>
+  );
+}
 
 function ForumActionModal({
   action,
