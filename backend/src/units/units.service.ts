@@ -88,6 +88,157 @@ const unitInclude = {
   },
 };
 
+
+const PORTFOLIO_METADATA_PREFIX = '__EPH_META__:';
+
+const PORTFOLIO_METADATA_KEYS = new Set([
+  'buildingAge',
+  'openArea',
+  'closedArea',
+  'bedCount',
+  'villaType',
+  'layoutType',
+  'poolType',
+  'summerHouseType',
+  'buildingStyle',
+  'homeType',
+  'accessSeason',
+  'buildingUsage',
+  'plazaClass',
+  'hotelBuildingStatus',
+  'industrialBuildingType',
+  'workshopType',
+  'businessType',
+  'warehouseType',
+  'shopType',
+  'officeType',
+  'stationType',
+  'zoningType',
+  'fieldType',
+  'vineyardType',
+  'gardenType',
+  'oliveGroveType',
+  'projectStatus',
+  'hotelSubType',
+  'pensionType',
+  'campType',
+  'resortType',
+  'periodType',
+]);
+
+type RequiredPortfolioRule = {
+  fields: string[];
+  specialFields?: string[];
+};
+
+const REQUIRED_PORTFOLIO_RULES: Record<string, RequiredPortfolioRule> = {
+  DAIRE: { fields: ['roomCount', 'area', 'buildingAge', 'floor', 'totalFloors', 'price'] },
+  REZIDANS: { fields: ['roomCount', 'area', 'buildingAge', 'floor', 'totalFloors', 'price'] },
+  VILLA: {
+    fields: ['roomCount', 'area', 'buildingAge', 'price'],
+    specialFields: ['villaType', 'layoutType'],
+  },
+  YAZLIK: {
+    fields: ['roomCount', 'area', 'buildingAge', 'price'],
+    specialFields: ['summerHouseType'],
+  },
+  MUSTAK_EV: {
+    fields: ['roomCount', 'area', 'buildingAge', 'price'],
+    specialFields: ['homeType'],
+  },
+  KOY_EVI: {
+    fields: ['roomCount', 'area', 'price'],
+    specialFields: ['buildingStyle'],
+  },
+  DAG_EVI_YAYLA_EVI: {
+    fields: ['roomCount', 'area', 'price'],
+    specialFields: ['buildingStyle'],
+  },
+  APARTMAN: {
+    fields: ['area', 'buildingAge', 'totalFloors', 'price'],
+    specialFields: ['buildingUsage'],
+  },
+  KOMPLE_BINA: {
+    fields: ['area', 'buildingAge', 'totalFloors', 'price'],
+    specialFields: ['buildingUsage'],
+  },
+  IS_HANI: {
+    fields: ['area', 'totalFloors', 'price'],
+    specialFields: ['buildingUsage'],
+  },
+  PLAZA_BINA: {
+    fields: ['area', 'totalFloors', 'price'],
+    specialFields: ['plazaClass'],
+  },
+  REZIDANS_BINA: {
+    fields: ['area', 'totalFloors', 'price'],
+    specialFields: ['buildingUsage'],
+  },
+  OTEL_BINASI: {
+    fields: ['roomCount', 'area', 'totalFloors', 'price'],
+    specialFields: ['hotelBuildingStatus'],
+  },
+  FABRIKA_URETIM_TESISI: {
+    fields: ['area', 'openArea', 'price'],
+    specialFields: ['industrialBuildingType'],
+  },
+  ATOLYE: { fields: ['area', 'price'] },
+  TICARI_ISLETME: { fields: ['area', 'price'] },
+  DEPO_ANTREPO: { fields: ['area', 'price'] },
+  DUKKAN_MAGAZA: { fields: ['area', 'price'] },
+  OFIS_BURO: { fields: ['roomCount', 'area', 'floor', 'price'] },
+  BENZIN_ISTASYONU: {
+    fields: ['area', 'closedArea', 'price'],
+    specialFields: ['stationType'],
+  },
+  ARSA: {
+    fields: ['area', 'adaNo', 'parselNo', 'price'],
+    specialFields: ['zoningType'],
+  },
+  TARLA: { fields: ['area', 'adaNo', 'parselNo', 'price'] },
+  BAG: { fields: ['area', 'adaNo', 'parselNo', 'price'] },
+  BAHCE: { fields: ['area', 'adaNo', 'parselNo', 'price'] },
+  ZEYTINLIK: { fields: ['area', 'adaNo', 'parselNo', 'price'] },
+  KONUT_PROJESI: { fields: ['area', 'price'] },
+  REZIDANS_PROJESI: { fields: ['area', 'price'] },
+  VILLA_PROJESI: { fields: ['area', 'price'] },
+  OTEL: { fields: ['roomCount', 'bedCount', 'area', 'price'] },
+  PANSIYON: { fields: ['roomCount', 'bedCount', 'area', 'price'] },
+  KAMP_YERI: { fields: ['openArea', 'price'] },
+  TATIL_KOYU: { fields: ['openArea', 'closedArea', 'roomCount', 'price'] },
+  DEVRE_MULK: {
+    fields: ['roomCount', 'area', 'price'],
+    specialFields: ['periodType'],
+  },
+};
+
+const PORTFOLIO_FIELD_LABELS: Record<string, string> = {
+  roomCount: 'Oda Sayısı',
+  area: 'Alan',
+  openArea: 'Açık Alan',
+  closedArea: 'Kapalı Alan',
+  bedCount: 'Yatak Sayısı',
+  buildingAge: 'Bina Yaşı',
+  floor: 'Bulunduğu Kat',
+  totalFloors: 'Toplam Kat Sayısı',
+  adaNo: 'Ada No',
+  parselNo: 'Parsel No',
+  number: 'Bağımsız Bölüm / Kapı No',
+  price: 'Fiyat',
+  villaType: 'Villa Tipi',
+  layoutType: 'Nizam Tipi',
+  summerHouseType: 'Yazlık Türü',
+  homeType: 'Ev Tipi',
+  buildingStyle: 'Yapı Tipi',
+  buildingUsage: 'Bina Kullanım Tipi',
+  plazaClass: 'Plaza Sınıfı',
+  hotelBuildingStatus: 'Otel Bina Durumu',
+  industrialBuildingType: 'Sanayi Yapı Tipi',
+  stationType: 'İstasyon Tipi',
+  zoningType: 'İmar Durumu',
+  periodType: 'Dönem Tipi',
+};
+
 @Injectable()
 export class UnitsService {
   constructor(private prisma: PrismaService) {}
@@ -435,6 +586,39 @@ export class UnitsService {
     };
   }
 
+  private safeDecodePortfolioMetadata(value: string) {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  private parsePortfolioMetadataFeature(value: unknown) {
+    const raw = String(value || '').trim();
+
+    if (!raw.startsWith(PORTFOLIO_METADATA_PREFIX)) return null;
+
+    const payload = raw.slice(PORTFOLIO_METADATA_PREFIX.length);
+    const separatorIndex = payload.indexOf(':');
+
+    if (separatorIndex < 1) return null;
+
+    const key = this.safeDecodePortfolioMetadata(
+      payload.slice(0, separatorIndex),
+    ).trim();
+    const metadataValue = this.safeDecodePortfolioMetadata(
+      payload.slice(separatorIndex + 1),
+    ).trim();
+
+    if (!PORTFOLIO_METADATA_KEYS.has(key) || !metadataValue) return null;
+
+    return {
+      key,
+      value: metadataValue.slice(0, 250),
+    };
+  }
+
   private normalizeFeatures(value?: unknown) {
     if (!Array.isArray(value)) return [];
 
@@ -485,10 +669,92 @@ export class UnitsService {
     return Array.from(
       new Set(
         value
-          .map((item) => String(item || '').trim().toUpperCase())
-          .filter((item) => allowed.has(item)),
+          .map((item) => {
+            const metadata = this.parsePortfolioMetadataFeature(item);
+
+            if (metadata) {
+              return `${PORTFOLIO_METADATA_PREFIX}${encodeURIComponent(
+                metadata.key,
+              )}:${encodeURIComponent(metadata.value)}`;
+            }
+
+            const normalized = String(item || '').trim().toUpperCase();
+            return allowed.has(normalized) ? normalized : '';
+          })
+          .filter(Boolean),
       ),
     );
+  }
+
+  private getPortfolioMetadata(features?: unknown) {
+    if (!Array.isArray(features)) return {} as Record<string, string>;
+
+    return features.reduce<Record<string, string>>((result, item) => {
+      const metadata = this.parsePortfolioMetadataFeature(item);
+
+      if (metadata) {
+        result[metadata.key] = metadata.value;
+      }
+
+      return result;
+    }, {});
+  }
+
+  private hasPortfolioValue(value: unknown) {
+    return String(value ?? '').trim().length > 0;
+  }
+
+  private hasPositivePortfolioNumber(value: unknown) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0;
+  }
+
+  private validateRequiredPortfolioFields(data: Record<string, any>) {
+    const type = String(data.type || '').trim().toUpperCase();
+    const rule = REQUIRED_PORTFOLIO_RULES[type] || REQUIRED_PORTFOLIO_RULES.DAIRE;
+    const metadata = this.getPortfolioMetadata(data.features);
+    const missing: string[] = [];
+
+    const hasField = (field: string) => {
+      if (field === 'floor') {
+        return (
+          this.hasPortfolioValue(data.floorLabel) ||
+          data.floor === 0 ||
+          (typeof data.floor === 'number' && Number.isFinite(data.floor))
+        );
+      }
+
+      if (['area', 'price', 'totalFloors', 'openArea', 'closedArea'].includes(field)) {
+        const value = field in metadata ? metadata[field] : data[field];
+        return this.hasPositivePortfolioNumber(value);
+      }
+
+      if (field in metadata) {
+        return this.hasPortfolioValue(metadata[field]);
+      }
+
+      return this.hasPortfolioValue(data[field]);
+    };
+
+    for (const field of rule.fields) {
+      if (!hasField(field)) {
+        missing.push(PORTFOLIO_FIELD_LABELS[field] || field);
+      }
+    }
+
+    for (const field of rule.specialFields || []) {
+      if (!this.hasPortfolioValue(metadata[field])) {
+        missing.push(PORTFOLIO_FIELD_LABELS[field] || field);
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Portföy kaydı başarısız.\nEksik zorunlu alanlar:\n${missing
+          .map((label) => `• ${label}`)
+          .join('\n')}`,
+      );
+    }
   }
 
   private cleanText(value?: string | null) {
@@ -808,6 +1074,13 @@ export class UnitsService {
 
     this.ensureCanManageUnit(user, project.ownerId);
 
+    const normalizedFeatures = this.normalizeFeatures(data.features);
+
+    this.validateRequiredPortfolioFields({
+      ...data,
+      features: normalizedFeatures,
+    });
+
     const adaParsel = this.validateAdaParselForUnit({
       type: data.type,
       adaNo: data.adaNo,
@@ -834,7 +1107,7 @@ export class UnitsService {
         deedOwnerEmail: this.cleanText(data.deedOwnerEmail),
         availableCreditAmount: this.normalizeOptionalNumber(data.availableCreditAmount),
         doorAccessInfo: this.cleanText(data.doorAccessInfo),
-        features: this.normalizeFeatures(data.features),
+        features: normalizedFeatures,
         projectId,
         approvalStatus: PortfolioApprovalStatus.TASLAK,
         isPoolVisible: false,
@@ -1385,6 +1658,20 @@ export class UnitsService {
     const nextType = 'type' in data ? data.type : unit.type;
     const nextAdaNo = 'adaNo' in data ? data.adaNo : (unit as any).adaNo;
     const nextParselNo = 'parselNo' in data ? data.parselNo : (unit as any).parselNo;
+    const nextFeatures =
+      'features' in data
+        ? this.normalizeFeatures(data.features)
+        : this.normalizeFeatures(unit.features);
+
+    this.validateRequiredPortfolioFields({
+      ...unit,
+      ...data,
+      type: nextType,
+      adaNo: nextAdaNo,
+      parselNo: nextParselNo,
+      features: nextFeatures,
+    });
+
     const adaParsel = this.validateAdaParselForUnit({
       type: nextType,
       adaNo: nextAdaNo,
@@ -1419,7 +1706,7 @@ export class UnitsService {
             : undefined,
         features:
           'features' in data
-            ? this.normalizeFeatures(data.features)
+            ? nextFeatures
             : undefined,
       },
       include: unitInclude,

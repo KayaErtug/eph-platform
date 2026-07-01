@@ -24,6 +24,10 @@ import {
 } from "lucide-react";
 
 import api from "@/lib/api";
+import {
+  playKontorHarcamaSound,
+  registerKontorSoundUnlock,
+} from "@/lib/kontorFeedback";
 import { useAuthStore } from "@/store/auth.store";
 
 type NetworkUser = {
@@ -290,13 +294,6 @@ function getSpentFromResponse(data: any, fallback: number) {
   );
 }
 
-function playKontorHarcamaSound() {
-  if (typeof window === "undefined") return;
-
-  const audio = new Audio("/sounds/kontor_harcama.mp3");
-  audio.volume = 0.82;
-  audio.play().catch(() => {});
-}
 
 function criteriaFromPost(post: NetworkPost) {
   const text = normalizeText(
@@ -371,11 +368,14 @@ export default function NetworkPostDetailPage() {
   }, [postId]);
 
   useEffect(() => {
+    return registerKontorSoundUnlock();
+  }, []);
+  useEffect(() => {
     if (!successToast) return;
 
     const timer = window.setTimeout(() => {
       setSuccessToast(null);
-    }, 3000);
+    }, 5000);
 
     return () => window.clearTimeout(timer);
   }, [successToast]);
@@ -476,7 +476,7 @@ export default function NetworkPostDetailPage() {
             ? "İlgileniyorum Bildirildi"
             : "Yardımcı Olabilirim Bildirildi";
 
-      playKontorHarcamaSound();
+      void playKontorHarcamaSound();
 
       setSuccessToast({
         title: actionLabel,
@@ -501,7 +501,7 @@ export default function NetworkPostDetailPage() {
               ? `/messages/${conversationId}`
               : "/messages",
           );
-        }, 900);
+        }, 2200);
       }
     } catch (error: any) {
       alert(
@@ -858,7 +858,7 @@ function KontorSuccessToast({
   toast: KontorSuccessToastState;
 }) {
   return (
-    <div className="fixed left-1/2 top-[78px] z-[90] w-[calc(100%-24px)] max-w-[410px] -translate-x-1/2">
+    <div role="status" aria-live="assertive" aria-atomic="true" className="fixed left-1/2 top-[78px] z-[90] w-[calc(100%-24px)] max-w-[410px] -translate-x-1/2">
       <section className="relative overflow-hidden rounded-[22px] border-2 border-[#35FF8A] bg-[#021B18] p-3 text-center text-white shadow-[0_0_0_1px_rgba(53,255,138,0.25),0_0_26px_rgba(53,255,138,0.52),0_18px_44px_rgba(15,23,42,0.32)]">
         <div className="pointer-events-none absolute -left-10 -top-12 h-28 w-28 rounded-full bg-[#35FF8A]/25 blur-2xl" />
         <div className="pointer-events-none absolute -right-8 -bottom-14 h-32 w-32 rounded-full bg-[#00E5FF]/18 blur-2xl" />

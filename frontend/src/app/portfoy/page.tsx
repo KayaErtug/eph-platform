@@ -375,6 +375,8 @@ function StokPageInner() {
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState(false);
+  const [formSuccessMessage, setFormSuccessMessage] = useState("");
+  const [formWarningMessage, setFormWarningMessage] = useState("");
 
   const canAddUnit =
     user?.role === "MUTEAHHIT" ||
@@ -538,6 +540,8 @@ function StokPageInner() {
     } as UnitFormState);
     setFormError("");
     setFormSuccess(false);
+    setFormSuccessMessage("");
+    setFormWarningMessage("");
     resetSelectedImages();
   };
 
@@ -610,6 +614,8 @@ function StokPageInner() {
     } as UnitFormState);
     setFormError("");
     setFormSuccess(false);
+    setFormSuccessMessage("");
+    setFormWarningMessage("");
     setShowModal(true);
   };
 
@@ -648,21 +654,43 @@ function StokPageInner() {
 
 
 
+  const getPortfolioSaveErrorMessage = (error: any, editing: boolean) => {
+    const rawMessage = error?.response?.data?.message;
+    const messages = (Array.isArray(rawMessage) ? rawMessage : [rawMessage])
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+    const fallback = editing
+      ? 'Portföy güncellemesi sırasında beklenmeyen bir hata oluştu.'
+      : 'Portföy girişi sırasında beklenmeyen bir hata oluştu.';
+    const detail = messages.length ? messages.join('\n• ') : fallback;
+
+    if (
+      detail.startsWith('Portföy kaydı başarısız.') ||
+      detail.startsWith('Portföy girişi başarısız.') ||
+      detail.startsWith('Portföy güncellemesi başarısız.')
+    ) {
+      return detail;
+    }
+
+    return `${editing ? 'Portföy güncellemesi' : 'Portföy girişi'} başarısız.\nNeden: ${detail}`;
+  };
+
   const handleSubmit = async () => {
-    setFormError("");
+    setFormError('');
+    setFormSuccess(false);
+    setFormSuccessMessage('');
+    setFormWarningMessage('');
     setFormLoading(true);
 
     try {
       const numericPrice = parseFormattedNumber(unitForm.price);
-
-      if (!unitForm.area || !numericPrice) {
-        setFormError("Alan ve fiyat zorunludur.");
-        setFormLoading(false);
-        return;
-      }
-
+      const numericArea = Number(unitForm.area || 0);
       const numericAvailableCreditAmount = parseFormattedNumber(
-        String((unitForm as any).availableCreditAmount || ""),
+        String((unitForm as any).availableCreditAmount || ''),
+      );
+      const normalizedFeatures = mergePortfolioFeatureMetadata(
+        (unitForm as any).features,
+        unitForm as unknown as Record<string, unknown>,
       );
 
       const unitPayload = {
@@ -673,27 +701,24 @@ function StokPageInner() {
           ? parseInt(unitForm.totalFloors, 10)
           : undefined,
         number: unitForm.number,
-        adaNo: String((unitForm as any).adaNo || "").trim() || undefined,
-        parselNo: String((unitForm as any).parselNo || "").trim() || undefined,
+        adaNo: String((unitForm as any).adaNo || '').trim() || undefined,
+        parselNo: String((unitForm as any).parselNo || '').trim() || undefined,
         roomCount: unitForm.roomCount || undefined,
-        area: parseFloat(unitForm.area),
+        area: numericArea || undefined,
         price: numericPrice,
-        priceCurrency: unitForm.priceCurrency || "TRY",
+        priceCurrency: unitForm.priceCurrency || 'TRY',
         status: unitForm.status,
         description: unitForm.description || undefined,
         deedOwnerFullName:
-          String((unitForm as any).deedOwnerFullName || "").trim() || undefined,
+          String((unitForm as any).deedOwnerFullName || '').trim() || undefined,
         deedOwnerPhone:
-          String((unitForm as any).deedOwnerPhone || "").trim() || undefined,
+          String((unitForm as any).deedOwnerPhone || '').trim() || undefined,
         deedOwnerEmail:
-          String((unitForm as any).deedOwnerEmail || "").trim() || undefined,
+          String((unitForm as any).deedOwnerEmail || '').trim() || undefined,
         availableCreditAmount: numericAvailableCreditAmount || undefined,
         doorAccessInfo:
-          String((unitForm as any).doorAccessInfo || "").trim() || undefined,
-        features: mergePortfolioFeatureMetadata(
-          (unitForm as any).features,
-          unitForm as unknown as Record<string, unknown>,
-        ),
+          String((unitForm as any).doorAccessInfo || '').trim() || undefined,
+        features: normalizedFeatures,
       };
 
       if (editingUnit) {
@@ -701,27 +726,57 @@ function StokPageInner() {
 
         const selectedCoverImage = coverImage || galleryImages[0] || null;
         const newGalleryImages = galleryImages.filter((image) => image.file);
-        const existingImageCount = galleryImages.filter((image) => image.existing).length;
-
-        if (newGalleryImages.length > 0) {
-          await Promise.all(
-            newGalleryImages.map((image, index) =>
-              uploadPortfolioImage(
-                editingUnit.id,
-                image.file!,
-                image.id === selectedCoverImage?.id,
-                existingImageCount + index,
-              ),
+        const existingImageCount = galleryImages.filter(
+          (image) => image.existing,
+        ).length;
+        const uploadResults = await Promise.allSettled(
+          newGalleryImages.map((image, index) =>
+            uploadPortfolioImage(
+              editingUnit.id,
+              image.file!,
+              image.id === selectedCoverImage?.id,
+              existingImageCount + index,
             ),
-          );
-        }
+          ),
+        );
+        const failedPhotoCount = uploadResults.filter(
+          (result) => result.status === 'rejected',
+        ).length;
 
         setFormSuccess(true);
-        await fetchData();
 
-        setTimeout(() => {
-          closeModal();
-        }, 500);
+        if (failedPhotoCount > 0) {
+          setFormWarningMessage(
+            `Portföy güncellendi. ${newGalleryImages.length} yeni fotoğraftan ${failedPhotoCount} tanesi yüklenemedi. Portföyü düzenleyerek bu fotoğrafları yeniden ekleyebilirsiniz.`,
+          );
+        } else if (newGalleryImages.length > 0) {
+          setFormSuccessMessage(
+            `Portföy güncellendi. ${newGalleryImages.length} yeni fotoğrafın tamamı yüklendi.`,
+          );
+        } else {
+          setFormSuccessMessage('Portföy başarıyla güncellendi.');
+        }
+
+        try {
+          await fetchData();
+        } catch {
+          // Kayıt tamamlandı; liste yenileme hatası sonucu başarısız gösterilmez.
+        }
+
+        window.setTimeout(
+          () => closeModal(),
+          failedPhotoCount > 0 ? 5500 : 2400,
+        );
+        return;
+      }
+
+      const selectedCoverImage = coverImage || galleryImages[0] || null;
+      const uploadableImages = galleryImages.filter((image) => image.file);
+
+      if (!selectedCoverImage || uploadableImages.length === 0) {
+        setFormError(
+          'Portföy girişi başarısız.\nEksik zorunlu alanlar:\n• En az 1 portföy fotoğrafı',
+        );
         return;
       }
 
@@ -734,12 +789,13 @@ function StokPageInner() {
           !projectForm.district ||
           !projectForm.address
         ) {
-          setFormError("Proje bilgilerini eksiksiz doldurun.");
-          setFormLoading(false);
+          setFormError(
+            'Portföy girişi başarısız.\nEksik zorunlu proje bilgileri:\n• Proje Adı\n• Şehir\n• İlçe\n• Mahalle / Köy / Mevki',
+          );
           return;
         }
 
-        const projectRes = await api.post("/projects", {
+        const projectRes = await api.post('/projects', {
           ...(projectForm as any),
           latitude: (projectForm as any).latitude ?? null,
           longitude: (projectForm as any).longitude ?? null,
@@ -750,14 +806,6 @@ function StokPageInner() {
         projectId = projectRes.data.id;
       }
 
-      const selectedCoverImage = coverImage || galleryImages[0] || null;
-
-      if (!selectedCoverImage || galleryImages.length === 0) {
-        setFormError("En az 1 galeri fotoğrafı ekleyiniz.");
-        setFormLoading(false);
-        return;
-      }
-
       const unitRes = await api.post(
         `/units/project/${projectId}`,
         unitPayload,
@@ -765,34 +813,59 @@ function StokPageInner() {
       const createdUnitId = unitRes.data?.id;
 
       if (!createdUnitId) {
-        setFormError(
-          "Portföy oluşturuldu ancak görsel yükleme için unitId alınamadı.",
+        setFormSuccess(true);
+        setFormWarningMessage(
+          'Portföy kaydı oluşturuldu ancak fotoğraf yükleme kimliği alınamadı. Sayfayı yenileyip portföyü düzenleyerek fotoğrafları ekleyiniz.',
         );
-        setFormLoading(false);
+
+        try {
+          await fetchData();
+        } catch {
+          // Kayıt tamamlandı; liste yenileme hatası sonucu başarısız gösterilmez.
+        }
+
+        window.setTimeout(() => closeModal(), 6000);
         return;
       }
 
-      await Promise.all(
-        galleryImages
-          .filter((image) => image.file)
-          .map((image, index) =>
-            uploadPortfolioImage(
-              createdUnitId,
-              image.file!,
-              image.id === selectedCoverImage.id,
-              index,
-            ),
+      const uploadResults = await Promise.allSettled(
+        uploadableImages.map((image, index) =>
+          uploadPortfolioImage(
+            createdUnitId,
+            image.file!,
+            image.id === selectedCoverImage.id,
+            index,
           ),
+        ),
       );
+      const failedPhotoCount = uploadResults.filter(
+        (result) => result.status === 'rejected',
+      ).length;
 
       setFormSuccess(true);
-      await fetchData();
 
-      setTimeout(() => {
-        closeModal();
-      }, 700);
-    } catch (e: any) {
-      setFormError(e?.response?.data?.message || "Bir hata oluştu.");
+      if (failedPhotoCount > 0) {
+        setFormWarningMessage(
+          `Portföy girişi başarılı. ${uploadableImages.length} fotoğraftan ${failedPhotoCount} tanesi yüklenemedi. Portföyü düzenleyerek bu fotoğrafları yeniden ekleyebilirsiniz.`,
+        );
+      } else {
+        setFormSuccessMessage(
+          `Portföy girişi başarılı. ${uploadableImages.length} fotoğrafın tamamı yüklendi.`,
+        );
+      }
+
+      try {
+        await fetchData();
+      } catch {
+        // Kayıt tamamlandı; liste yenileme hatası sonucu başarısız gösterilmez.
+      }
+
+      window.setTimeout(
+        () => closeModal(),
+        failedPhotoCount > 0 ? 5500 : 2400,
+      );
+    } catch (error: any) {
+      setFormError(getPortfolioSaveErrorMessage(error, Boolean(editingUnit)));
     } finally {
       setFormLoading(false);
     }
@@ -1269,6 +1342,8 @@ function StokPageInner() {
         setUnitForm={setUnitForm}
         formError={formError}
         formSuccess={formSuccess}
+        formSuccessMessage={formSuccessMessage}
+        formWarningMessage={formWarningMessage}
         formLoading={formLoading}
         coverImage={coverImage}
         setCoverImage={setCoverImage}

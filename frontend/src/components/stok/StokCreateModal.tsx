@@ -54,6 +54,8 @@ interface Props {
   setUnitForm: React.Dispatch<React.SetStateAction<UnitFormState>>;
   formError: string;
   formSuccess: boolean;
+  formSuccessMessage: string;
+  formWarningMessage: string;
   formLoading: boolean;
   coverImage: LocalPortfolioImage | null;
   setCoverImage: React.Dispatch<React.SetStateAction<LocalPortfolioImage | null>>;
@@ -1039,6 +1041,8 @@ export default function StokCreateModal({
   setUnitForm,
   formError,
   formSuccess,
+  formSuccessMessage,
+  formWarningMessage,
   formLoading,
   coverImage,
   setCoverImage,
@@ -1591,10 +1595,31 @@ export default function StokCreateModal({
         <button className="stock-modal-v10-close" onClick={onClose} aria-label="Kapat">×</button>
 
         <div className="stock-modal-v2-body stock-modal-v10-body" style={{ paddingBottom: "156px" }}>
-          {formSuccess && <div className="stock-form-success">Portföy başarıyla eklendi.</div>}
-          {formError && <div className="stock-form-error">{formError}</div>}
-          {localError && <div className="stock-form-error">{localError}</div>}
-          {imageError && <div className="stock-form-error">{imageError}</div>}
+          {formSuccess && formSuccessMessage && (
+            <div className="stock-form-success whitespace-pre-line text-center">
+              {formSuccessMessage}
+            </div>
+          )}
+          {formWarningMessage && (
+            <div className="whitespace-pre-line rounded-2xl border-2 border-amber-300 bg-amber-50 p-3 text-center text-sm font-black leading-6 text-amber-800">
+              ⚠️ {formWarningMessage}
+            </div>
+          )}
+          {formError && (
+            <div className="stock-form-error whitespace-pre-line text-center">
+              {formError}
+            </div>
+          )}
+          {localError && (
+            <div className="stock-form-error whitespace-pre-line text-center">
+              Portföy girişi başarısız.{"\\n"}Neden: {localError}
+            </div>
+          )}
+          {imageError && (
+            <div className="stock-form-error whitespace-pre-line text-center">
+              Fotoğraf seçimi başarısız.{"\\n"}Neden: {imageError}
+            </div>
+          )}
 
           <div className="stock-form-block rounded-[30px] border-2 border-[#D7E1EF] bg-[#F8FAFC] p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
