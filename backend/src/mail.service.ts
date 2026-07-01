@@ -131,6 +131,84 @@ export class MailService {
     });
   }
 
+  async sendPasswordResetCode(data: {
+    email: string;
+    firstName: string;
+    code: string;
+    expiresInMinutes: number;
+  }) {
+    const fromName = process.env.SMTP_FROM_NAME || 'EPH Platform';
+    const fromEmail =
+      process.env.SMTP_FROM_EMAIL ||
+      process.env.SMTP_USER ||
+      'bildirim@emlakportfoyhavuzu.com';
+
+    await this.transporter.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.email,
+      subject: 'EPH Platform Şifre Yenileme Kodunuz',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#F4F8FF;padding:24px;">
+          <div style="overflow:hidden;border:1px solid #C7D6E8;border-radius:20px;background:#FFFFFF;">
+            <div style="background:#2563EB;padding:24px;text-align:center;">
+              <h1 style="margin:0;color:#FFFFFF;font-size:24px;">Şifrenizi Yenileyin</h1>
+              <p style="margin:8px 0 0;color:#DBEAFE;font-size:14px;">EPH Platform güvenli hesap kurtarma işlemi</p>
+            </div>
+
+            <div style="padding:28px;color:#1F2937;">
+              <p style="margin:0 0 14px;font-size:16px;line-height:1.7;">Merhaba <strong>${data.firstName}</strong>,</p>
+              <p style="margin:0 0 20px;font-size:15px;line-height:1.7;">EPH hesabınızın şifresini yenilemek için aşağıdaki 6 haneli kodu kullanın.</p>
+
+              <div style="margin:24px 0;border:2px dashed #2563EB;border-radius:16px;background:#EFF6FF;padding:22px;text-align:center;">
+                <p style="margin:0 0 8px;color:#64748B;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">Şifre Yenileme Kodunuz</p>
+                <p style="margin:0;color:#06194A;font-family:monospace;font-size:34px;font-weight:900;letter-spacing:8px;">${data.code}</p>
+              </div>
+
+              <div style="border:1px solid #E2E8F0;border-radius:12px;background:#F8FAFC;padding:16px;">
+                <p style="margin:0;color:#475569;font-size:13px;line-height:1.7;">Bu kod <strong>${data.expiresInMinutes} dakika</strong> boyunca geçerlidir ve yalnızca bir kez kullanılabilir.</p>
+                <p style="margin:10px 0 0;color:#475569;font-size:13px;line-height:1.7;">Bu işlemi siz başlatmadıysanız kodu kimseyle paylaşmayın ve bu e-postayı dikkate almayın.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `,
+    });
+  }
+
+  async sendPasswordChangedNotification(data: {
+    email: string;
+    firstName: string;
+  }) {
+    const fromName = process.env.SMTP_FROM_NAME || 'EPH Platform';
+    const fromEmail =
+      process.env.SMTP_FROM_EMAIL ||
+      process.env.SMTP_USER ||
+      'bildirim@emlakportfoyhavuzu.com';
+
+    await this.transporter.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.email,
+      subject: 'EPH Platform Şifreniz Değiştirildi',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#F4F8FF;padding:24px;">
+          <div style="overflow:hidden;border:1px solid #C7D6E8;border-radius:20px;background:#FFFFFF;">
+            <div style="background:#16A34A;padding:24px;text-align:center;">
+              <h1 style="margin:0;color:#FFFFFF;font-size:24px;">Şifreniz Başarıyla Değiştirildi</h1>
+            </div>
+
+            <div style="padding:28px;color:#1F2937;">
+              <p style="margin:0 0 14px;font-size:16px;line-height:1.7;">Merhaba <strong>${data.firstName}</strong>,</p>
+              <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">EPH Platform hesabınızın şifresi başarıyla yenilendi.</p>
+
+              <div style="border:1px solid #FECACA;border-radius:12px;background:#FFF1F2;padding:16px;">
+                <p style="margin:0;color:#9F1239;font-size:13px;line-height:1.7;">Bu değişikliği siz yapmadıysanız vakit kaybetmeden EPH destek ekibiyle iletişime geçin.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `,
+    });
+  }
   async sendNewApplication(data: {
     applicantName: string;
     applicantEmail: string;

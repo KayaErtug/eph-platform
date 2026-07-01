@@ -25,6 +25,10 @@ import {
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import StokCreateModal from "@/components/stok/StokCreateModal";
+import {
+  decodePortfolioMetadataState,
+  mergePortfolioFeatureMetadata,
+} from "@/components/stok/portfolioFeatureMetadata";
 import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
 import PortfolioFilterCenter, {
@@ -557,6 +561,10 @@ function StokPageInner() {
   const openEditModal = (unit: MapUnit) => {
     resetSelectedImages();
     const existingGalleryImages = makeExistingGalleryImages(unit);
+    const storedFeatures = Array.isArray((unit as any).features)
+      ? ((unit as any).features as string[])
+      : [];
+    const metadataState = decodePortfolioMetadataState(storedFeatures);
     setGalleryImages(existingGalleryImages);
     setCoverImage(
       existingGalleryImages.find((image) => image.isCover) ||
@@ -592,9 +600,8 @@ function StokPageInner() {
       deedOwnerFullName: (unit as any).deedOwnerFullName || "",
       deedOwnerPhone: (unit as any).deedOwnerPhone || "",
       deedOwnerEmail: (unit as any).deedOwnerEmail || "",
-      features: Array.isArray((unit as any).features)
-        ? (unit as any).features
-        : [],
+      ...metadataState,
+      features: storedFeatures,
       availableCreditAmount:
         (unit as any).availableCreditAmount != null
           ? String(Math.round(Number((unit as any).availableCreditAmount)))
@@ -683,9 +690,10 @@ function StokPageInner() {
         availableCreditAmount: numericAvailableCreditAmount || undefined,
         doorAccessInfo:
           String((unitForm as any).doorAccessInfo || "").trim() || undefined,
-        features: Array.isArray((unitForm as any).features)
-          ? (unitForm as any).features
-          : [],
+        features: mergePortfolioFeatureMetadata(
+          (unitForm as any).features,
+          unitForm as unknown as Record<string, unknown>,
+        ),
       };
 
       if (editingUnit) {

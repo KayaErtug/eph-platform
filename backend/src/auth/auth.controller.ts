@@ -8,6 +8,9 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { VerifyPasswordResetCodeDto } from './dto/verify-password-reset-code.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 
@@ -30,6 +33,20 @@ export class AuthController {
     return this.authService.resendVerification(dto);
   }
 
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Post('verify-password-reset-code')
+  verifyPasswordResetCode(@Body() dto: VerifyPasswordResetCodeDto) {
+    return this.authService.verifyPasswordResetCode(dto);
+  }
+
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
+  }
   @Post('login')
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);

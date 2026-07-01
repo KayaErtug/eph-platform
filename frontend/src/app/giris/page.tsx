@@ -273,6 +273,15 @@ export default function GirisPage() {
           font-weight: 700;
           white-space: nowrap;
         }
+        .login-forgot-link {
+          color: #1D4ED8;
+          font-size: 12px;
+          font-weight: 850;
+          white-space: nowrap;
+        }
+        .login-forgot-link:hover {
+          text-decoration: underline;
+        }
         .login-input-wrap { position: relative; }
         .login-input-icon {
           position: absolute;
@@ -529,7 +538,12 @@ export default function GirisPage() {
                     />
                     E-posta adresimi hatırla
                   </label>
-                  <span className="login-remember-hint">Bu cihazda</span>
+                  <Link
+                    href="/sifremi-unuttum"
+                    className="login-forgot-link"
+                  >
+                    Şifremi unuttum
+                  </Link>
                 </div>
 
                 {serverError && (

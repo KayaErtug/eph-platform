@@ -15,6 +15,7 @@ import {
 } from "./stokConstants";
 import { getFeatureGroups } from "./stokFeatureGroups";
 import { getFeaturePresetKeys } from "./stokFeaturePresets";
+import { getPublicPortfolioFeatures } from "./portfolioFeatureMetadata";
 import {
   getFieldRule,
   getSpecialFields,
@@ -1075,7 +1076,10 @@ export default function StokCreateModal({
   const parselNo = String((unitForm as any).parselNo || "");
   const availableCreditAmountDisplay = formatPriceInput(String((unitForm as any).availableCreditAmount || ""));
   const doorAccessInfo = String((unitForm as any).doorAccessInfo || "");
-  const selectedFeatures = Array.isArray((unitForm as any).features) ? ((unitForm as any).features as string[]) : [];
+  const storedFeatures = Array.isArray((unitForm as any).features)
+    ? ((unitForm as any).features as string[])
+    : [];
+  const selectedFeatures = getPublicPortfolioFeatures(storedFeatures);
   const featureOptions = useMemo(() => getFeatureOptionsForType(unitForm.type), [unitForm.type]);
   const groupedFeatureOptions = useMemo(() => {
     const groupMap = new Map<string, { key: string; label: string; options: FeatureOption[] }>();

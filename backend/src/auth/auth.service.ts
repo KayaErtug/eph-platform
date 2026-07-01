@@ -22,6 +22,9 @@ import {
 } from './dto/register.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { VerifyPasswordResetCodeDto } from './dto/verify-password-reset-code.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -205,6 +208,98 @@ export class AuthService {
     });
   }
 
+  private getPasswordResetExpiryMinutes() {
+    const value = Number(
+      process.env.PASSWORD_RESET_CODE_EXPIRES_MINUTES || 10,
+    );
+
+    return Number.isFinite(value) && value > 0 ? Math.floor(value) : 10;
+  }
+
+  private getPasswordResetResendSeconds() {
+    const value = Number(
+      process.env.PASSWORD_RESET_RESEND_SECONDS || 60,
+    );
+
+    return Number.isFinite(value) && value > 0 ? Math.floor(value) : 60;
+  }
+
+  private getPasswordResetMaxAttempts() {
+    const value = Number(
+      process.env.PASSWORD_RESET_MAX_ATTEMPTS || 5,
+    );
+
+    return Number.isFinite(value) && value > 0 ? Math.floor(value) : 5;
+  }
+
+  private getPasswordResetTokenExpiryMinutes() {
+    const value = Number(
+      process.env.PASSWORD_RESET_TOKEN_EXPIRES_MINUTES || 10,
+    );
+
+    return Number.isFinite(value) && value > 0 ? Math.floor(value) : 10;
+  }
+
+  private getPasswordResetTokenSecret() {
+    return (
+      process.env.PASSWORD_RESET_TOKEN_SECRET ||
+      process.env.JWT_SECRET ||
+      'sm-super-secret-jwt-key-degistirin'
+    );
+  }
+
+  private getPasswordResetGenericMessage() {
+    return 'E-posta adresi sistemde kayıtlıysa şifre yenileme kodu gönderilmiştir.';
+  }
+
+  private getPasswordResetRemainingCooldownSeconds(
+    lastSentAt?: Date | null,
+  ) {
+    if (!lastSentAt) {
+      return 0;
+    }
+
+    const resendSeconds = this.getPasswordResetResendSeconds();
+    const elapsedSeconds = Math.floor(
+      (Date.now() - lastSentAt.getTime()) / 1000,
+    );
+
+    return Math.max(0, resendSeconds - elapsedSeconds);
+  }
+
+  private async createAndStorePasswordResetCode(userId: string) {
+    const code = this.generateEmailVerificationCode();
+    const codeHash = await bcrypt.hash(code, 10);
+    const expiresInMinutes = this.getPasswordResetExpiryMinutes();
+    const expiresAt = new Date(
+      Date.now() + expiresInMinutes * 60 * 1000,
+    );
+    const sentAt = new Date();
+
+    const updatedUser = await this.prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        passwordResetCodeHash: codeHash,
+        passwordResetExpiresAt: expiresAt,
+        passwordResetAttempts: 0,
+        passwordResetLastSentAt: sentAt,
+        passwordResetVersion: {
+          increment: 1,
+        },
+      },
+      select: {
+        passwordResetVersion: true,
+      },
+    });
+
+    return {
+      code,
+      expiresInMinutes,
+      passwordResetVersion: updatedUser.passwordResetVersion,
+    };
+  }
   generateReferralCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = 'EPH-';
@@ -500,6 +595,273 @@ export class AuthService {
     };
   }
 
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const email = this.normalizeEmail(dto.email);
+    const user = await this.usersService.findByEmail(email);
+    const defaultResendSeconds = this.getPasswordResetResendSeconds();
+
+    if (!user) {
+      return {
+        success: true,
+        resendAfterSeconds: defaultResendSeconds,
+        message: this.getPasswordResetGenericMessage(),
+      };
+    }
+
+    const remainingCooldownSeconds =
+      this.getPasswordResetRemainingCooldownSeconds(
+        user.passwordResetLastSentAt,
+      );
+
+    if (remainingCooldownSeconds > 0) {
+      return {
+        success: true,
+        resendAfterSeconds: remainingCooldownSeconds,
+        message: this.getPasswordResetGenericMessage(),
+      };
+    }
+
+    try {
+      const reset = await this.createAndStorePasswordResetCode(user.id);
+
+      await this.mailService.sendPasswordResetCode({
+        email: user.email,
+        firstName: user.firstName,
+        code: reset.code,
+        expiresInMinutes: reset.expiresInMinutes,
+      });
+    } catch (error) {
+      console.error(
+        'Şifre yenileme kodu gönderilemedi:',
+        error instanceof Error ? error.message : 'Bilinmeyen hata',
+      );
+
+      try {
+        await this.prisma.user.update({
+          where: {
+            id: user.id,
+          },
+          data: {
+            passwordResetCodeHash: null,
+            passwordResetExpiresAt: null,
+            passwordResetAttempts: 0,
+            passwordResetLastSentAt: null,
+            passwordResetVersion: {
+              increment: 1,
+            },
+          },
+        });
+      } catch (cleanupError) {
+        console.error(
+          'Şifre yenileme kodu temizlenemedi:',
+          cleanupError instanceof Error
+            ? cleanupError.message
+            : 'Bilinmeyen hata',
+        );
+      }
+    }
+
+    return {
+      success: true,
+      resendAfterSeconds: defaultResendSeconds,
+      message: this.getPasswordResetGenericMessage(),
+    };
+  }
+
+  async verifyPasswordResetCode(
+    dto: VerifyPasswordResetCodeDto,
+  ) {
+    const email = this.normalizeEmail(dto.email);
+    const user = await this.usersService.findByEmail(email);
+    const invalidCodeMessage =
+      'Kod geçersiz veya süresi dolmuş. Yeni kod isteyiniz.';
+
+    if (
+      !user ||
+      !user.passwordResetCodeHash ||
+      !user.passwordResetExpiresAt
+    ) {
+      throw new BadRequestException(invalidCodeMessage);
+    }
+
+    const maxAttempts = this.getPasswordResetMaxAttempts();
+
+    if (user.passwordResetAttempts >= maxAttempts) {
+      throw new BadRequestException(
+        'Çok fazla hatalı deneme yapıldı. Yeni kod isteyiniz.',
+      );
+    }
+
+    if (user.passwordResetExpiresAt.getTime() < Date.now()) {
+      await this.prisma.user.update({
+        where: {
+          id: user.id,
+        },
+        data: {
+          passwordResetCodeHash: null,
+          passwordResetExpiresAt: null,
+          passwordResetAttempts: 0,
+        },
+      });
+
+      throw new BadRequestException(invalidCodeMessage);
+    }
+
+    const isCodeValid = await bcrypt.compare(
+      dto.code,
+      user.passwordResetCodeHash,
+    );
+
+    if (!isCodeValid) {
+      const nextAttemptCount = user.passwordResetAttempts + 1;
+
+      await this.prisma.user.update({
+        where: {
+          id: user.id,
+        },
+        data: {
+          passwordResetAttempts: nextAttemptCount,
+        },
+      });
+
+      const remainingAttempts = Math.max(
+        0,
+        maxAttempts - nextAttemptCount,
+      );
+
+      throw new BadRequestException(
+        remainingAttempts > 0
+          ? `Kod hatalı. Kalan deneme hakkınız: ${remainingAttempts}.`
+          : 'Çok fazla hatalı deneme yapıldı. Yeni kod isteyiniz.',
+      );
+    }
+
+    const resetTokenExpiresInMinutes =
+      this.getPasswordResetTokenExpiryMinutes();
+
+    const resetToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        purpose: 'password_reset',
+        version: user.passwordResetVersion,
+      },
+      {
+        secret: this.getPasswordResetTokenSecret(),
+        expiresIn: resetTokenExpiresInMinutes * 60,
+      },
+    );
+
+    await this.prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        passwordResetCodeHash: null,
+        passwordResetExpiresAt: null,
+        passwordResetAttempts: 0,
+        passwordResetLastSentAt: null,
+      },
+    });
+
+    return {
+      success: true,
+      resetToken,
+      expiresInMinutes: resetTokenExpiresInMinutes,
+      message: 'Kod doğrulandı. Yeni şifrenizi belirleyebilirsiniz.',
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    let payload: {
+      sub?: string;
+      purpose?: string;
+      version?: number;
+    };
+
+    try {
+      payload = this.jwtService.verify(dto.resetToken, {
+        secret: this.getPasswordResetTokenSecret(),
+      });
+    } catch {
+      throw new BadRequestException(
+        'Şifre yenileme oturumunun süresi dolmuş. Yeniden kod isteyiniz.',
+      );
+    }
+
+    if (
+      payload.purpose !== 'password_reset' ||
+      !payload.sub ||
+      !Number.isInteger(payload.version)
+    ) {
+      throw new BadRequestException(
+        'Şifre yenileme oturumu geçersizdir.',
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: payload.sub,
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        passwordResetVersion: true,
+      },
+    });
+
+    if (
+      !user ||
+      user.passwordResetVersion !== payload.version
+    ) {
+      throw new BadRequestException(
+        'Şifre yenileme oturumu geçersiz veya daha önce kullanılmıştır.',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+
+    const updateResult = await this.prisma.user.updateMany({
+      where: {
+        id: user.id,
+        passwordResetVersion: payload.version,
+      },
+      data: {
+        passwordHash,
+        passwordResetCodeHash: null,
+        passwordResetExpiresAt: null,
+        passwordResetAttempts: 0,
+        passwordResetLastSentAt: null,
+        passwordResetVersion: {
+          increment: 1,
+        },
+      },
+    });
+
+    if (updateResult.count !== 1) {
+      throw new BadRequestException(
+        'Şifre yenileme oturumu geçersiz veya daha önce kullanılmıştır.',
+      );
+    }
+
+    try {
+      await this.mailService.sendPasswordChangedNotification({
+        email: user.email,
+        firstName: user.firstName,
+      });
+    } catch (error) {
+      console.error(
+        'Şifre değişikliği bilgilendirme e-postası gönderilemedi:',
+        error instanceof Error ? error.message : 'Bilinmeyen hata',
+      );
+    }
+
+    return {
+      success: true,
+      message:
+        'Şifreniz başarıyla yenilendi. Yeni şifrenizle giriş yapabilirsiniz.',
+    };
+  }
   async login(dto: LoginDto) {
     const email = this.normalizeEmail(dto.email);
     const user = await this.usersService.findByEmail(email);
