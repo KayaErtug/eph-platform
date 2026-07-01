@@ -619,7 +619,40 @@ function StokPageInner() {
     setShowModal(true);
   };
 
+  const hasUnsavedCreateData = () => {
+    if (editingUnit) return false;
+
+    return Boolean(
+      selectedProjectId ||
+      String(projectForm.name || "").trim() ||
+      String(projectForm.district || "").trim() ||
+      String(projectForm.address || "").trim() ||
+      String(unitForm.area || "").trim() ||
+      String(unitForm.price || "").trim() ||
+      String(unitForm.floorLabel || "").trim() ||
+      String(unitForm.totalFloors || "").trim() ||
+      String(unitForm.description || "").trim() ||
+      String((unitForm as any).buildingAge || "").trim() ||
+      galleryImages.length > 0
+    );
+  };
+
+  const closeModalAfterSave = () => {
+    setShowModal(false);
+    resetForm();
+  };
+
   const closeModal = () => {
+    if (formLoading) return;
+
+    if (hasUnsavedCreateData()) {
+      const shouldDiscard = window.confirm(
+        "Girdiğiniz portföy bilgileri henüz kaydedilmedi. Formdan çıkarsanız bilgiler silinir. Çıkmak istediğinize emin misiniz?",
+      );
+
+      if (!shouldDiscard) return;
+    }
+
     setShowModal(false);
     resetForm();
   };
@@ -764,7 +797,7 @@ function StokPageInner() {
         }
 
         window.setTimeout(
-          () => closeModal(),
+          () => closeModalAfterSave(),
           failedPhotoCount > 0 ? 5500 : 2400,
         );
         return;
@@ -824,7 +857,7 @@ function StokPageInner() {
           // Kayıt tamamlandı; liste yenileme hatası sonucu başarısız gösterilmez.
         }
 
-        window.setTimeout(() => closeModal(), 6000);
+        window.setTimeout(() => closeModalAfterSave(), 6000);
         return;
       }
 
@@ -861,7 +894,7 @@ function StokPageInner() {
       }
 
       window.setTimeout(
-        () => closeModal(),
+        () => closeModalAfterSave(),
         failedPhotoCount > 0 ? 5500 : 2400,
       );
     } catch (error: any) {

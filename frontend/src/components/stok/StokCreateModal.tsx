@@ -1051,6 +1051,7 @@ export default function StokCreateModal({
   onSubmit,
 }: Props) {
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
+  const modalBodyRef = useRef<HTMLDivElement | null>(null);
 
   const [imageError, setImageError] = useState("");
   const [localError, setLocalError] = useState("");
@@ -1571,30 +1572,68 @@ export default function StokCreateModal({
     return "";
   };
 
-  const handleSubmit = () => {
+  const scrollToValidationMessage = () => {
+    if (typeof window === "undefined") return;
+
+    window.requestAnimationFrame(() => {
+      modalBodyRef.current?.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    });
+  };
+
+  const handleSubmit = (
+    event?: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+
     setLocalError("");
     const error = validateSmartForm();
 
     if (error) {
       setLocalError(error);
+      scrollToValidationMessage();
       return;
     }
 
-    onSubmit();
+    void onSubmit();
+  };
+
+  const handleCloseClick = (
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onClose();
   };
 
   const footerAlertMessage = localError || formError || imageError || "";
 
   return (
-    <div className="stock-modal-v2-backdrop" onClick={onClose}>
+    <div className="stock-modal-v2-backdrop">
       <div
         className="stock-modal-v2 stock-modal-v10"
-        onClick={(e) => e.stopPropagation()}
-        onTouchMove={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+        onTouchStart={(event) => event.stopPropagation()}
+        onTouchMove={(event) => event.stopPropagation()}
       >
-        <button className="stock-modal-v10-close" onClick={onClose} aria-label="Kapat">×</button>
+        <button
+          type="button"
+          className="stock-modal-v10-close"
+          onClick={handleCloseClick}
+          aria-label="Kapat"
+        >
+          ×
+        </button>
 
-        <div className="stock-modal-v2-body stock-modal-v10-body" style={{ paddingBottom: "156px" }}>
+        <div
+          ref={modalBodyRef}
+          className="stock-modal-v2-body stock-modal-v10-body"
+          style={{ paddingBottom: "156px" }}
+        >
           {formSuccess && formSuccessMessage && (
             <div className="stock-form-success whitespace-pre-line text-center">
               {formSuccessMessage}
@@ -2560,11 +2599,16 @@ export default function StokCreateModal({
               </div>
             )}
 
-            <button className="stock-cancel-btn" onClick={onClose}>
+            <button
+              type="button"
+              className="stock-cancel-btn"
+              onClick={handleCloseClick}
+            >
               İptal
             </button>
 
             <button
+              type="button"
               className="stock-save-btn"
               onClick={handleSubmit}
               disabled={formLoading || checkingImages}
