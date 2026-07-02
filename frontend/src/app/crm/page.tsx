@@ -1185,8 +1185,16 @@ export default function CrmPage() {
   }
 
   const currentUserRole = String(user?.role || "").toUpperCase();
-  const hasTeamLeaderDashboardAccess = userHasCapability(user, ["TEAM_LEADER", "TAKIM_LIDERI"]);
-  const hasOfficeOwnerDashboardAccess = userHasCapability(user, ["OFFICE_OWNER", "OFIS_SAHIBI"]);
+  const isOrganizationAdmin =
+    currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN";
+
+  const hasTeamLeaderDashboardAccess =
+    isOrganizationAdmin ||
+    userHasCapability(user, ["TEAM_LEADER", "TAKIM_LIDERI"]);
+
+  const hasOfficeOwnerDashboardAccess =
+    isOrganizationAdmin ||
+    userHasCapability(user, ["OFFICE_OWNER", "OFIS_SAHIBI"]);
 
   const crmDashboardCards = [
     hasTeamLeaderDashboardAccess
