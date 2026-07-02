@@ -20,6 +20,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ProjectMediaZipService } from './project-media-zip.service';
+import { ProjectSalesDashboardService } from './project-sales-dashboard.service';
 import { ProjectSalesImportService } from './project-sales-import.service';
 import { ProjectSalesService } from './project-sales.service';
 
@@ -47,7 +48,13 @@ export class ProjectSalesController {
     private readonly projectSalesService: ProjectSalesService,
     private readonly projectSalesImportService: ProjectSalesImportService,
     private readonly projectMediaZipService: ProjectMediaZipService,
+    private readonly projectSalesDashboardService: ProjectSalesDashboardService,
   ) {}
+
+  @Get('dashboard')
+  getDashboard(@CurrentUser() user: any) {
+    return this.projectSalesDashboardService.getDashboard(user.id);
+  }
 
   @Get('imports/config')
   getImportConfig() {

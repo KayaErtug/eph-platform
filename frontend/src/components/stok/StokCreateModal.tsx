@@ -1500,9 +1500,16 @@ export default function StokCreateModal({
     if (!isLandType(unitForm.type) && /^\d{5,}$/.test(number)) {
       return "Bağımsız bölüm / kapı numarası olağan dışı görünüyor. Lütfen değeri kontrol ediniz.";
     }
+    const isRentalStatus = ["KIRALIK", "GUNLUK_KIRALIK", "DEVREN_KIRALIK"].includes(
+      String(unitForm.status || ""),
+    );
+    const minimumPrice = isRentalStatus ? 5000 : 100000;
+    const maximumPrice = isRentalStatus ? 5000000 : 5000000000;
 
-    if (price && (price < 100000 || price > 5000000000)) {
-      return "Fiyat değeri olağan dışı görünüyor. Lütfen para birimini ve tutarı kontrol ediniz.";
+    if (price && (price < minimumPrice || price > maximumPrice)) {
+      return isRentalStatus
+        ? "Kiralık portföy fiyatı 5.000 ₺ ile 5.000.000 ₺ arasında olmalıdır."
+        : "Fiyat değeri olağan dışı görünüyor. Lütfen para birimini ve tutarı kontrol ediniz.";
     }
 
     if (isRequiredField("roomCount") && !String(unitForm.roomCount || "").trim()) {
