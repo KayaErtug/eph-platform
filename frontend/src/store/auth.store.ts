@@ -7,6 +7,7 @@ interface User {
   lastName: string;
   email: string;
   role: string;
+  capabilities?: string[];
   isApproved?: boolean;
   referralCode?: string | null;
   nominationPoints?: number;

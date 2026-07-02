@@ -891,10 +891,24 @@ export class AuthService {
       );
     }
 
+    const capabilities = await this.prisma.userCapability.findMany({
+      where: {
+        userId: user.id,
+      },
+      select: {
+        capability: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+    const capabilityKeys = capabilities.map((item) => item.capability);
+
     const token = this.jwtService.sign({
       sub: user.id,
       email: user.email,
       role: user.role,
+      capabilities: capabilityKeys,
     });
 
     return {
@@ -905,6 +919,7 @@ export class AuthService {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
+        capabilities: capabilityKeys,
         isApproved: user.isApproved,
         isVerified: user.isVerified,
         referralCode: user.referralCode,
