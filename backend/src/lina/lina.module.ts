@@ -5,6 +5,7 @@ import { NetworkModule } from "../network/network.module";
 import { PrismaService } from "../prisma/prisma.service";
 
 import { LinaActionEngineService } from "./actions/lina-action-engine.service";
+import { LinaCrmOwnerActionService } from "./actions/lina-crm-owner-action.service";
 import { LinaController } from "./lina.controller";
 import { LinaService } from "./lina.service";
 import { LinaAccessService } from "./lina-access.service";
@@ -29,6 +30,7 @@ import { LinaDocumentTkgmService } from "./document/lina-document-tkgm.service";
     PrismaService,
     LinaService,
     LinaActionEngineService,
+    LinaCrmOwnerActionService,
     LinaAccessService,
     LinaKvkkService,
     LinaAuditService,
@@ -44,6 +46,7 @@ import { LinaDocumentTkgmService } from "./document/lina-document-tkgm.service";
   exports: [
     LinaService,
     LinaActionEngineService,
+    LinaCrmOwnerActionService,
     LinaAccessService,
     LinaKvkkService,
     LinaAuditService,

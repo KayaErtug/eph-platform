@@ -35,8 +35,30 @@ function readEnvValue(key: string) {
   }
 }
 
+function normalizeMeasurementNumber(value: string) {
+  const text = String(value || "").trim();
+
+  if (/^\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(text)) {
+    return text.replace(/\./g, "");
+  }
+
+  return text;
+}
+
 function normalizeVoiceText(text: string) {
   return String(text || "")
+    .replace(
+      /(\d[\d.]*(?:,\d+)?)\s*(?:km²|km2|km\^2)/gi,
+      (_, value: string) =>
+        `${normalizeMeasurementNumber(value)} kilometrekare`,
+    )
+    .replace(/(?:km²|km2|km\^2)/gi, "kilometrekare")
+    .replace(
+      /(\d[\d.]*(?:,\d+)?)\s*(?:m²|m2|m\^2)/gi,
+      (_, value: string) =>
+        `${normalizeMeasurementNumber(value)} metrekare`,
+    )
+    .replace(/(?:m²|m2|m\^2)/gi, "metrekare")
     .replace(/\bEPH\b/g, "Emlak Portföy Havuzu")
     .replace(/\beph\b/g, "Emlak Portföy Havuzu")
     .replace(/\bTRY\b/g, "Türk Lirası")

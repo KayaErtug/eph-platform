@@ -15,6 +15,7 @@ import { Request } from "express";
 
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { LinaActionEngineService } from "./actions/lina-action-engine.service";
+import { LinaCrmOwnerActionService } from "./actions/lina-crm-owner-action.service";
 import { LinaActionSourceModule } from "./actions/lina-action.types";
 import { LinaChatDto } from "./dto/lina-chat.dto";
 import { LinaPreferencesDto } from "./dto/lina-preferences.dto";
@@ -42,6 +43,7 @@ export class LinaController {
   constructor(
     private readonly linaService: LinaService,
     private readonly linaMemoryService: LinaMemoryService,
+    private readonly linaCrmOwnerActionService: LinaCrmOwnerActionService,
     private readonly linaActionEngineService: LinaActionEngineService,
   ) {}
 
@@ -58,6 +60,30 @@ export class LinaController {
   ) {
     const user = this.extractUser(request);
     const sourceModule = this.normalizeSourceModule(body?.sourceModule);
+
+    const ownerActionResult =
+      await this.linaCrmOwnerActionService.tryExecute(
+        body?.message,
+        user,
+        sourceModule,
+        body?.history,
+      );
+
+    if (ownerActionResult.handled) {
+      return {
+        success: Boolean(ownerActionResult.success),
+        message:
+          ownerActionResult.message ||
+          "Lina işlemi tamamladı ancak sonuç mesajı oluşturamadı.",
+        provider: "local" as const,
+        kvkkFiltered: false,
+        detectedTypes: [],
+        action: ownerActionResult.action,
+        requiresConfirmation:
+          ownerActionResult.requiresConfirmation ?? false,
+        data: ownerActionResult.data,
+      };
+    }
 
     const actionResult = await this.linaActionEngineService.tryExecute(
       body?.message,
