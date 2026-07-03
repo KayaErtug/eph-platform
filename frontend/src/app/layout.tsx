@@ -5,6 +5,8 @@ import { ThemeProvider } from "../components/ThemeProvider";
 import { PWARegister } from "../components/PWARegister";
 import { EPHMobileShell } from "../components/EPHMobileShell";
 
+const ORGANIZATION_MODULE_ENABLED = false;
+
 export const metadata: Metadata = {
   title: "EPH Platform — Emlak Portföy Havuzu",
   description: "Türkiye'nin kapalı devre B2B emlak ekosistemi.",
@@ -26,6 +28,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+        {!ORGANIZATION_MODULE_ENABLED && (
+          <style>{`
+            a[href="/admin/organization"],
+            a[href^="/admin/organization/"] {
+              display: none !important;
+            }
+          `}</style>
+        )}
       </head>
       <body>
         <ThemeProvider>
