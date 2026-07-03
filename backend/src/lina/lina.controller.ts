@@ -20,6 +20,8 @@ import { LinaActionSourceModule } from "./actions/lina-action.types";
 import { LinaChatDto } from "./dto/lina-chat.dto";
 import { LinaPreferencesDto } from "./dto/lina-preferences.dto";
 import { LinaVoiceDto } from "./dto/lina-voice.dto";
+import { LinaDistanceRequestDto } from "./geo/lina-distance.dto";
+import { LinaDistanceService } from "./geo/lina-distance.service";
 import { LinaMemoryService } from "./lina-memory.service";
 import { LinaService } from "./lina.service";
 
@@ -45,11 +47,20 @@ export class LinaController {
     private readonly linaMemoryService: LinaMemoryService,
     private readonly linaCrmOwnerActionService: LinaCrmOwnerActionService,
     private readonly linaActionEngineService: LinaActionEngineService,
+    private readonly linaDistanceService: LinaDistanceService,
   ) {}
 
   @Get("status")
   getStatus() {
     return this.linaService.getStatus();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("distance/calculate")
+  async calculateDistance(
+    @Body() body: LinaDistanceRequestDto,
+  ) {
+    return this.linaDistanceService.calculate(body);
   }
 
   @UseGuards(JwtAuthGuard)
