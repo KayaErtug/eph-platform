@@ -2538,38 +2538,121 @@ function CustomerCard({ customer, onClick }: { customer: Customer; onClick: () =
   );
 }
 
+const CUSTOMER_PASTEL_TONES = [
+  { border: "#BFD7FF", background: "#F4F8FF", soft: "#E7F0FF", accent: "#1D4ED8" },
+  { border: "#B8E0D2", background: "#F2FBF7", soft: "#DDF5E9", accent: "#047857" },
+  { border: "#E7D2FF", background: "#FAF7FF", soft: "#F0E6FF", accent: "#7C3AED" },
+  { border: "#F6D2A9", background: "#FFF9F2", soft: "#FDEBD3", accent: "#C2410C" },
+  { border: "#F3C4D5", background: "#FFF6F9", soft: "#FCE4EC", accent: "#BE185D" },
+  { border: "#C9D7E8", background: "#F7F9FC", soft: "#E8EEF6", accent: "#334155" },
+] as const;
+
+function customerPastelTone(customer: Customer) {
+  const source = `${customer.id}-${customer.firstName}-${customer.lastName}`;
+  const hash = Array.from(source).reduce((total, character) => total + character.charCodeAt(0), 0);
+  return CUSTOMER_PASTEL_TONES[hash % CUSTOMER_PASTEL_TONES.length];
+}
+
 function CustomerListRow({ customer, onClick }: { customer: Customer; onClick: () => void }) {
+  const [expanded, setExpanded] = useState(false);
   const stage = stageInfo(customer.status);
   const latestActivity = getLatestActivity(customer);
   const nextTask = getNextTask(customer);
   const nextTaskSoon = isTaskSoon(nextTask?.dueDate);
+  const tone = customerPastelTone(customer);
+  const roles = customer.roles || [];
+  const initials = `${customer.firstName?.[0] || ""}${customer.lastName?.[0] || ""}`.toLocaleUpperCase("tr-TR");
+  const summary = [customer.phone, customer.city, money(customer.budget)].filter((item) => item && item !== "—").join(" • ");
 
   return (
-    <button onClick={onClick} className="eph-crm-list-row w-full max-w-full overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white p-4 text-center transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="min-w-0 break-words text-[16px] font-black leading-tight text-[#06194A]">{customer.firstName} {customer.lastName}</h3>
-            <span className="shrink-0 rounded-full px-3 py-1 text-[10px] font-black" style={{ background: stage.bg, color: stage.color }}>{stage.label}</span>
-            {(customer.roles || []).slice(0, 3).map((role) => <RolePill key={role} role={role} />)}
+    <article
+      className="eph-crm-list-row w-full max-w-full overflow-hidden rounded-[20px] border-2 text-left shadow-[0_7px_18px_rgba(15,23,42,0.045)] transition"
+      style={{ borderColor: tone.border, background: tone.background }}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((current) => !current)}
+        aria-expanded={expanded}
+        className="grid w-full grid-cols-[38px_minmax(0,1fr)_auto] items-center gap-2.5 px-3 py-2.5 text-left transition hover:bg-white/55 active:bg-white/80"
+      >
+        <span
+          className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-2xl text-[12px] font-black"
+          style={{ background: tone.soft, color: tone.accent }}
+        >
+          {initials || "CRM"}
+        </span>
+
+        <span className="min-w-0">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="break-words text-[14px] font-black leading-tight text-[#06194A]">
+              {customer.firstName} {customer.lastName}
+            </span>
+            <span className="rounded-full px-2 py-0.5 text-[9px] font-black" style={{ background: stage.bg, color: stage.color }}>
+              {stage.label}
+            </span>
+          </span>
+
+          <span className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] font-bold leading-4 text-slate-500">
+            <span>{roles.length ? roleLabel(roles[0]) : "Rol yok"}</span>
+            {roles.length > 1 && <span style={{ color: tone.accent }}>+{roles.length - 1}</span>}
+            {summary && <span>• {summary}</span>}
+          </span>
+        </span>
+
+        <span
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-transform ${expanded ? "rotate-90" : ""}`}
+          style={{ background: tone.soft, color: tone.accent }}
+        >
+          <ChevronRight size={17} />
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="border-t px-3 pb-3 pt-2.5" style={{ borderColor: tone.border }}>
+          <div className="grid gap-2 md:grid-cols-2">
+            <InsightBox
+              title="Son Aktivite"
+              badge={activityTypeLabel(latestActivity?.type)}
+              text={latestActivity?.note || "Aktivite yok"}
+            />
+            <InsightBox
+              title="Sonraki Görev"
+              badge={nextTask?.dueDate ? formatShortDate(nextTask.dueDate) : "Plan yok"}
+              text={nextTask?.title || "Planlı görev yok"}
+              urgent={nextTaskSoon}
+            />
           </div>
 
-          <p className="mt-1 break-words break-words text-xs font-bold leading-5 text-slate-500">{[customer.phone, customer.city, money(customer.budget)].filter(Boolean).join(" · ")}</p>
+          <div className="mt-2 grid grid-cols-4 gap-1.5">
+            <MiniCounter label="Aktivite" value={String(customer._count?.activities || 0)} />
+            <MiniCounter label="Görev" value={String(customer._count?.tasks || 0)} />
+            <MiniCounter label="Talep" value={String(customer._count?.interests || 0)} />
+            <MiniCounter label="Portföy" value={String(customer._count?.properties || 0)} />
+          </div>
 
-          <div className="mt-3 grid gap-2 md:grid-cols-2">
-            <InsightBox title="Son Aktivite" badge={activityTypeLabel(latestActivity?.type)} text={latestActivity?.note || "Aktivite yok"} />
-            <InsightBox title="Sonraki Görev" badge={nextTask?.dueDate ? formatShortDate(nextTask.dueDate) : "Plan yok"} text={nextTask?.title || "Planlı görev yok"} urgent={nextTaskSoon} />
+          <div className="mt-2 grid grid-cols-5 gap-1.5">
+            {[
+              { label: "Detay", icon: <FileText size={15} /> },
+              { label: "Görev", icon: <Clock3 size={15} /> },
+              { label: "Teklif", icon: <WalletCards size={15} /> },
+              { label: "Eşleşme", icon: <Target size={15} /> },
+              { label: "Aşama", icon: <ChevronRight size={15} /> },
+            ].map((action) => (
+              <button
+                key={action.label}
+                type="button"
+                onClick={onClick}
+                className="flex min-h-[48px] min-w-0 flex-col items-center justify-center rounded-2xl border bg-white px-1.5 py-1.5 text-center text-[9px] font-black leading-tight transition active:scale-[0.98]"
+                style={{ borderColor: tone.border, color: tone.accent }}
+              >
+                {action.icon}
+                <span className="mt-1 break-words">{action.label}</span>
+              </button>
+            ))}
           </div>
         </div>
-
-        <div className="grid grid-cols-4 gap-2 lg:w-[300px]">
-          <MiniCounter label="Aktivite" value={String(customer._count?.activities || 0)} />
-          <MiniCounter label="Görev" value={String(customer._count?.tasks || 0)} />
-          <MiniCounter label="Talep" value={String(customer._count?.interests || 0)} />
-          <MiniCounter label="Portföy" value={String(customer._count?.properties || 0)} />
-        </div>
-      </div>
-    </button>
+      )}
+    </article>
   );
 }
 
