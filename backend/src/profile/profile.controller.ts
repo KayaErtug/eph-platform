@@ -44,6 +44,31 @@ export class ProfileController {
     return res.sendFile(filePath);
   }
 
+  @Get('cover-file/:userId')
+  getCoverFile(@Param('userId') userId: string, @Res() res: Response) {
+    const safeUserId = path.basename(userId);
+
+    if (!safeUserId || safeUserId !== userId) {
+      throw new NotFoundException('Kapak görseli bulunamadı.');
+    }
+
+    const coverDir = path.resolve(
+      process.cwd(),
+      'public',
+      'profile-covers',
+    );
+
+    const filePath = ['jpg', 'png', 'webp']
+      .map((extension) => path.join(coverDir, `${safeUserId}.${extension}`))
+      .find((candidate) => fs.existsSync(candidate));
+
+    if (!filePath) {
+      throw new NotFoundException('Kapak görseli bulunamadı.');
+    }
+
+    return res.sendFile(filePath);
+  }
+
   @Get()
   @UseGuards(JwtAuthGuard)
   getProfile(@CurrentUser() user: any) {
@@ -79,6 +104,21 @@ export class ProfileController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.profileService.uploadAvatar(user.id, file);
+  }
+
+  @Post('cover')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 8 * 1024 * 1024 },
+    }),
+  )
+  uploadCover(
+    @CurrentUser() user: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.profileService.uploadCover(user.id, file);
   }
 
   @Post('documents')

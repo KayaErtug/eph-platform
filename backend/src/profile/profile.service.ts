@@ -45,6 +45,27 @@ export class ProfileService {
     };
   }
 
+  private async getCoverImageUrl(userId: string) {
+    const coverDir = path.resolve(
+      process.cwd(),
+      'public',
+      'profile-covers',
+    );
+
+    for (const extension of ['jpg', 'png', 'webp']) {
+      const filePath = path.join(coverDir, `${userId}.${extension}`);
+
+      try {
+        const stat = await fs.stat(filePath);
+        return `/api/profile/cover-file/${userId}?v=${Math.floor(stat.mtimeMs)}`;
+      } catch {
+        continue;
+      }
+    }
+
+    return null;
+  }
+
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -53,7 +74,7 @@ export class ProfileService {
 
     if (!user) return null;
 
-    const [wallet, membership] = await Promise.all([
+    const [wallet, membership, coverImageUrl] = await Promise.all([
       this.prisma.kontorCuzdani.findUnique({
         where: { kullaniciId: userId },
         select: {
@@ -75,6 +96,7 @@ export class ProfileService {
           testPaketiMi: true,
         },
       }),
+      this.getCoverImageUrl(userId),
     ]);
 
     const packageInfo = membership
@@ -91,6 +113,7 @@ export class ProfileService {
 
     return {
       ...user,
+      coverImageUrl,
       referenceCount: user.nominationPoints,
       kontorCuzdani: wallet,
       currentMembership: membership
@@ -149,7 +172,9 @@ export class ProfileService {
     if ('phone' in safeData && safeData.phone) {
       const phone = String(safeData.phone).trim();
       if (!/^\+90 5\d{2} \d{3} \d{2} \d{2}$/.test(phone)) {
-        throw new BadRequestException('Telefon formatı +90 5xx xxx xx xx olmalıdır.');
+        throw new BadRequestException(
+          'Telefon formatı +90 5xx xxx xx xx olmalıdır.',
+        );
       }
     }
 
@@ -169,11 +194,15 @@ export class ProfileService {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
     if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException('Sadece JPG, PNG veya WEBP yüklenebilir.');
+      throw new BadRequestException(
+        'Sadece JPG, PNG veya WEBP yüklenebilir.',
+      );
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      throw new BadRequestException('Profil fotoğrafı 5MB den büyük olamaz.');
+      throw new BadRequestException(
+        'Profil fotoğrafı 5MB den büyük olamaz.',
+      );
     }
 
     const safeExt =
@@ -204,6 +233,58 @@ export class ProfileService {
     return this.getProfile(userId);
   }
 
+  async uploadCover(userId: string, file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Kapak görseli seçilmedi.');
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Kapak görseli JPG, PNG veya WEBP olmalıdır.',
+      );
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      throw new BadRequestException(
+        'Kapak görseli 8MB den büyük olamaz.',
+      );
+    }
+
+    const safeExt =
+      file.mimetype === 'image/png'
+        ? 'png'
+        : file.mimetype === 'image/webp'
+          ? 'webp'
+          : 'jpg';
+
+    const uploadDir = path.resolve(
+      process.cwd(),
+      'public',
+      'profile-covers',
+    );
+
+    await fs.mkdir(uploadDir, { recursive: true });
+
+    await Promise.all(
+      ['jpg', 'png', 'webp'].map(async (extension) => {
+        try {
+          await fs.unlink(path.join(uploadDir, `${userId}.${extension}`));
+        } catch {
+          return;
+        }
+      }),
+    );
+
+    await fs.writeFile(
+      path.join(uploadDir, `${userId}.${safeExt}`),
+      file.buffer,
+    );
+
+    return this.getProfile(userId);
+  }
+
   async uploadDocument(
     userId: string,
     type: DocumentType,
@@ -213,7 +294,11 @@ export class ProfileService {
       throw new BadRequestException('Dosya seçilmedi.');
     }
 
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    const allowedTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+    ];
 
     if (!allowedTypes.includes(file.mimetype)) {
       throw new BadRequestException(
@@ -222,7 +307,9 @@ export class ProfileService {
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      throw new BadRequestException('Dosya boyutu 5MB den büyük olamaz.');
+      throw new BadRequestException(
+        'Dosya boyutu 5MB den büyük olamaz.',
+      );
     }
 
     const ext = file.originalname.split('.').pop();
@@ -235,7 +322,10 @@ export class ProfileService {
       file.mimetype,
     );
 
-    const fileUrl = this.supabase.getPublicUrl('documents', filePath);
+    const fileUrl = this.supabase.getPublicUrl(
+      'documents',
+      filePath,
+    );
 
     const existing = await this.prisma.document.findFirst({
       where: { userId, type },
@@ -244,12 +334,21 @@ export class ProfileService {
     if (existing) {
       return this.prisma.document.update({
         where: { id: existing.id },
-        data: { fileUrl, fileName: file.originalname, status: 'PENDING' },
+        data: {
+          fileUrl,
+          fileName: file.originalname,
+          status: 'PENDING',
+        },
       });
     }
 
     return this.prisma.document.create({
-      data: { userId, type, fileUrl, fileName: file.originalname },
+      data: {
+        userId,
+        type,
+        fileUrl,
+        fileName: file.originalname,
+      },
     });
   }
 }

@@ -62,6 +62,7 @@ type SafeUser = {
   plan?: string;
   membershipType?: string;
   profileImageUrl?: string;
+  coverImageUrl?: string;
   city?: string;
   district?: string;
   kontorCuzdani?: {
@@ -416,6 +417,7 @@ export default function ProfilPage() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
 
   const [hydrated, setHydrated] = useState(false);
   const [profile, setProfile] = useState<SafeUser | null>(null);
@@ -423,6 +425,8 @@ export default function ProfilPage() {
   const [detailPanel, setDetailPanel] = useState<DetailPanel>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState("");
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState("");
   const [saveLoading, setSaveLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
@@ -518,8 +522,9 @@ export default function ProfilPage() {
   useEffect(() => {
     return () => {
       if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+      if (coverPreview) URL.revokeObjectURL(coverPreview);
     };
-  }, [avatarPreview]);
+  }, [avatarPreview, coverPreview]);
 
   const safeUser = (profile || user) as SafeUser | null;
   const displayName = useMemo(() => getDisplayName(safeUser), [safeUser]);
@@ -549,6 +554,7 @@ export default function ProfilPage() {
     .filter(Boolean)
     .join(" / ");
   const profileImageUrl = safeUser?.profileImageUrl || "";
+  const coverImageUrl = safeUser?.coverImageUrl || "";
   const kontorBalance = safeUser?.kontorCuzdani?.bakiye;
 
   const openEditModal = () => {
@@ -561,6 +567,8 @@ export default function ProfilPage() {
     });
     setAvatarFile(null);
     setAvatarPreview("");
+    setCoverFile(null);
+    setCoverPreview("");
     setFormError("");
     setFormSuccess("");
     setEditOpen(true);
@@ -572,6 +580,8 @@ export default function ProfilPage() {
     setEditOpen(false);
     setAvatarFile(null);
     setAvatarPreview("");
+    setCoverFile(null);
+    setCoverPreview("");
     setFormError("");
     setFormSuccess("");
   };
@@ -596,6 +606,29 @@ export default function ProfilPage() {
 
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
+    setFormError("");
+  };
+
+  const handleCoverChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
+      setFormError("Kapak görseli JPG, PNG veya WEBP olmalıdır.");
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      setFormError("Kapak görseli en fazla 8 MB olabilir.");
+      return;
+    }
+
+    if (coverPreview) URL.revokeObjectURL(coverPreview);
+
+    setCoverFile(file);
+    setCoverPreview(URL.createObjectURL(file));
     setFormError("");
   };
 
@@ -646,6 +679,15 @@ export default function ProfilPage() {
         });
       }
 
+      if (coverFile) {
+        const payload = new FormData();
+        payload.append("file", coverFile);
+
+        response = await api.post("/profile/cover", payload, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
       setProfile(response.data);
       setFormSuccess("Profil bilgileri güncellendi.");
 
@@ -677,56 +719,81 @@ export default function ProfilPage() {
   return (
     <main className="h-[calc(100dvh-72px)] overflow-hidden bg-[#111318] text-[#1F2937]">
       <section className="mx-auto flex h-full max-w-[430px] flex-col overflow-hidden">
-        <section className="relative flex h-[174px] shrink-0 flex-col items-center justify-center overflow-hidden px-5 pb-5 pt-3 text-center text-white">
-          <div className="pointer-events-none absolute -left-20 -top-24 h-52 w-52 rounded-full bg-[#2563EB]/20 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-28 -right-20 h-52 w-52 rounded-full bg-[#0EA5E9]/15 blur-3xl" />
-
-          <div className="relative">
-            {profileImageUrl ? (
+        <section className="relative h-[242px] shrink-0 overflow-hidden text-center text-white">
+          <div className="absolute inset-x-0 top-0 h-[118px] overflow-hidden bg-gradient-to-br from-[#1D4ED8] via-[#111827] to-[#0F172A]">
+            {coverImageUrl ? (
               <img
-                src={profileImageUrl}
-                alt={displayName}
-                className="h-[78px] w-[78px] rounded-full border-[3px] border-white/90 object-cover shadow-[0_14px_34px_rgba(0,0,0,0.32)]"
+                src={coverImageUrl}
+                alt="Profil kapak görseli"
+                className="h-full w-full object-cover"
               />
             ) : (
-              <div className="flex h-[78px] w-[78px] items-center justify-center rounded-full border-[3px] border-white/90 bg-[#2563EB] text-[24px] font-black text-white shadow-[0_14px_34px_rgba(0,0,0,0.32)]">
-                {normalizedRole === "SUPER_ADMIN" ? (
-                  <Crown size={32} />
-                ) : (
-                  initials
-                )}
-              </div>
+              <>
+                <div className="absolute -left-16 -top-20 h-48 w-48 rounded-full bg-[#60A5FA]/30 blur-3xl" />
+                <div className="absolute -bottom-24 -right-12 h-48 w-48 rounded-full bg-[#2563EB]/30 blur-3xl" />
+              </>
             )}
-
-            <button
-              type="button"
-              onClick={openEditModal}
-              className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-[3px] border-[#111318] bg-white text-[#2563EB] shadow-md transition active:scale-95"
-              aria-label="Profil bilgilerini düzenle"
-            >
-              <Camera size={14} strokeWidth={2.5} />
-            </button>
+            <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/5 to-[#111318]/65" />
           </div>
-
-          <h1 className="mt-2.5 max-w-full truncate text-[18px] font-black tracking-[-0.025em]">
-            {displayName}
-          </h1>
-
-          <p className="mt-0.5 max-w-full truncate text-[10px] font-semibold text-white/65">
-            {safeUser.email || shortUserId(safeUser.id, safeUser.memberCode)}
-          </p>
 
           <button
             type="button"
-            onClick={() => setDetailPanel("membership")}
-            className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[10px] font-black text-white/90 backdrop-blur-sm"
+            onClick={openEditModal}
+            className="absolute right-3 top-3 z-20 inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-white/35 bg-black/35 px-3 text-[10px] font-black text-white shadow-lg backdrop-blur-md transition active:scale-95"
+            aria-label="Kapak görselini düzenle"
           >
-            <BadgeCheck size={13} className="shrink-0 text-[#60A5FA]" />
-            <span className="truncate">{roleLabel}</span>
+            <Camera size={14} strokeWidth={2.5} />
+            Kapak
           </button>
+
+          <div className="relative z-10 flex h-full flex-col items-center px-5 pt-[74px]">
+            <div className="relative shrink-0">
+              {profileImageUrl ? (
+                <img
+                  src={profileImageUrl}
+                  alt={displayName}
+                  className="h-[82px] w-[82px] rounded-full border-4 border-white object-cover shadow-[0_14px_34px_rgba(0,0,0,0.34)]"
+                />
+              ) : (
+                <div className="flex h-[82px] w-[82px] items-center justify-center rounded-full border-4 border-white bg-[#2563EB] text-[25px] font-black text-white shadow-[0_14px_34px_rgba(0,0,0,0.34)]">
+                  {normalizedRole === "SUPER_ADMIN" ? (
+                    <Crown size={34} />
+                  ) : (
+                    initials
+                  )}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={openEditModal}
+                className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-[3px] border-[#111318] bg-white text-[#2563EB] shadow-md transition active:scale-95"
+                aria-label="Profil fotoğrafını düzenle"
+              >
+                <Camera size={14} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <h1 className="mt-2 w-full max-w-[340px] break-words text-center text-[19px] font-black leading-[23px] tracking-[-0.025em] text-white">
+              {displayName}
+            </h1>
+
+            <p className="mt-0.5 w-full max-w-[330px] truncate text-center text-[10px] font-semibold leading-4 text-white/70">
+              {safeUser.email || shortUserId(safeUser.id, safeUser.memberCode)}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setDetailPanel("membership")}
+              className="mt-1.5 inline-flex max-w-[310px] items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[10px] font-black leading-4 text-white/95 backdrop-blur-sm"
+            >
+              <BadgeCheck size={13} className="shrink-0 text-[#60A5FA]" />
+              <span className="truncate">{roleLabel}</span>
+            </button>
+          </div>
         </section>
 
-        <section className="relative -mt-3 flex min-h-0 flex-1 flex-col gap-2.5 rounded-t-[30px] bg-white px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-4 shadow-[0_-14px_36px_rgba(0,0,0,0.12)]">
+        <section className="relative -mt-4 flex min-h-0 flex-1 flex-col gap-2.5 rounded-t-[30px] bg-white px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-4 shadow-[0_-14px_36px_rgba(0,0,0,0.12)]">
           <section
             className="grid min-h-0 flex-[4] overflow-hidden rounded-[18px] bg-[#F6F7F9] px-1.5"
             style={{ gridTemplateRows: "repeat(4, minmax(0, 1fr))" }}
@@ -812,8 +879,11 @@ export default function ProfilPage() {
       {editOpen && (
         <EditProfileSheet
           avatarInputRef={avatarInputRef}
+          coverInputRef={coverInputRef}
           avatarPreview={avatarPreview}
+          coverPreview={coverPreview}
           profileImageUrl={profileImageUrl}
+          coverImageUrl={coverImageUrl}
           initials={initials}
           form={form}
           formError={formError}
@@ -827,7 +897,9 @@ export default function ProfilPage() {
           onClose={closeEditModal}
           onSave={handleSaveProfile}
           onAvatarChange={handleAvatarChange}
+          onCoverChange={handleCoverChange}
           onAvatarSelect={() => avatarInputRef.current?.click()}
+          onCoverSelect={() => coverInputRef.current?.click()}
           onFormChange={(nextForm) => setForm(nextForm)}
         />
       )}
@@ -1038,8 +1110,11 @@ function DetailLine({
 
 function EditProfileSheet({
   avatarInputRef,
+  coverInputRef,
   avatarPreview,
+  coverPreview,
   profileImageUrl,
+  coverImageUrl,
   initials,
   form,
   formError,
@@ -1053,12 +1128,17 @@ function EditProfileSheet({
   onClose,
   onSave,
   onAvatarChange,
+  onCoverChange,
   onAvatarSelect,
+  onCoverSelect,
   onFormChange,
 }: {
   avatarInputRef: React.RefObject<HTMLInputElement | null>;
+  coverInputRef: React.RefObject<HTMLInputElement | null>;
   avatarPreview: string;
+  coverPreview: string;
   profileImageUrl: string;
+  coverImageUrl: string;
   initials: string;
   form: ProfileForm;
   formError: string;
@@ -1072,7 +1152,9 @@ function EditProfileSheet({
   onClose: () => void;
   onSave: () => void;
   onAvatarChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onCoverChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onAvatarSelect: () => void;
+  onCoverSelect: () => void;
   onFormChange: (form: ProfileForm) => void;
 }) {
   return (
@@ -1117,7 +1199,43 @@ function EditProfileSheet({
           onChange={onAvatarChange}
         />
 
-        <div className="mt-5 text-center">
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={onCoverChange}
+        />
+
+        <div className="relative mt-5 h-[118px] overflow-hidden rounded-[22px] bg-gradient-to-br from-[#1D4ED8] via-[#111827] to-[#0F172A]">
+          {coverPreview || coverImageUrl ? (
+            <img
+              src={coverPreview || coverImageUrl}
+              alt="Kapak görseli"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <>
+              <div className="absolute -left-12 -top-16 h-36 w-36 rounded-full bg-[#60A5FA]/35 blur-3xl" />
+              <div className="absolute -bottom-16 -right-10 h-36 w-36 rounded-full bg-[#2563EB]/35 blur-3xl" />
+            </>
+          )}
+          <div className="absolute inset-0 bg-black/15" />
+          <button
+            type="button"
+            onClick={onCoverSelect}
+            className="absolute bottom-3 right-3 inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] border border-white/35 bg-black/40 px-3 text-[11px] font-black text-white backdrop-blur-md"
+          >
+            <Camera size={15} />
+            Kapak Görseli Seç
+          </button>
+        </div>
+
+        <p className="mt-2 text-center text-[10px] font-bold text-[#64748B]">
+          Kapak: JPG, PNG veya WEBP · Maksimum 8 MB
+        </p>
+
+        <div className="mt-4 text-center">
           <div className="relative mx-auto h-24 w-24">
             {avatarPreview || profileImageUrl ? (
               <img
