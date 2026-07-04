@@ -1638,7 +1638,7 @@ export default function CrmPage() {
                       <span className="text-base font-black" style={{ color: stage.color }}>{stageCustomers.length}</span>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       {stageCustomers.map((customer) => <CustomerCard key={customer.id} customer={customer} onClick={() => openCustomer(customer.id)} />)}
                       {stageCustomers.length === 0 && <div className="rounded-[20px] border-2 border-dashed border-[#C7D6E8] bg-white p-5 text-center text-sm font-bold text-slate-400">Boş</div>}
                     </div>
@@ -1656,7 +1656,7 @@ export default function CrmPage() {
                 <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">Yeni müşteri ekleyebilir veya arama filtresini temizleyebilirsin.</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {filteredCustomers.map((customer) => <CustomerListRow key={customer.id} customer={customer} onClick={() => openCustomer(customer.id)} />)}
               </div>
             )}
@@ -2500,41 +2500,97 @@ function KpiCard({ title, value, icon }: { title: string; value: string; icon: R
 }
 
 function CustomerCard({ customer, onClick }: { customer: Customer; onClick: () => void }) {
+  const [expanded, setExpanded] = useState(false);
   const stage = stageInfo(customer.status);
   const latestActivity = getLatestActivity(customer);
   const nextTask = getNextTask(customer);
   const nextTaskSoon = isTaskSoon(nextTask?.dueDate);
+  const tone = customerPastelTone(customer);
+  const initials = `${customer.firstName?.[0] || ""}${customer.lastName?.[0] || ""}`.toLocaleUpperCase("tr-TR");
+  const compactSummary = [
+    customer.roles?.length ? roleLabel(customer.roles[0]) : "Rol yok",
+    customer.city,
+    money(customer.budget),
+  ]
+    .filter((item) => item && item !== "—")
+    .join(" • ");
 
   return (
-    <button onClick={onClick} className="eph-crm-customer-card w-full max-w-full overflow-hidden rounded-[24px] border-2 border-[#C7D6E8] bg-white p-4 text-center transition hover:border-[#1557D6] hover:bg-[#F8FAFC]">
-      <div className="mb-3 flex min-w-0 items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <h3 className="break-words break-words text-[16px] font-black leading-tight text-[#06194A]">{customer.firstName} {customer.lastName}</h3>
-          {customer.phone && <p className="mt-1 flex min-w-0 items-center gap-1 text-xs font-bold text-slate-500"><Phone size={13} className="shrink-0" /><span className="min-w-0 break-words">{customer.phone}</span></p>}
+    <article
+      className="w-full max-w-full overflow-hidden rounded-[14px] border text-left shadow-[0_4px_12px_rgba(15,23,42,0.04)]"
+      style={{ borderColor: tone.border, background: tone.background }}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((current) => !current)}
+        aria-expanded={expanded}
+        className="grid h-[50px] w-full grid-cols-[28px_minmax(0,1fr)_24px] items-center gap-2 px-2.5 text-left transition hover:bg-white/55 active:bg-white/80"
+      >
+        <span
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] text-[9px] font-black"
+          style={{ background: tone.soft, color: tone.accent }}
+        >
+          {initials || "CRM"}
+        </span>
+
+        <span className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
+          <span className="min-w-0 truncate text-[11px] font-black leading-none text-[#06194A]">
+            {customer.firstName} {customer.lastName}
+          </span>
+          <span
+            className="shrink-0 rounded-full px-1.5 py-0.5 text-[7.5px] font-black leading-none"
+            style={{ background: stage.bg, color: stage.color }}
+          >
+            {stage.label}
+          </span>
+          <span className="hidden min-w-0 flex-1 truncate text-[8.5px] font-bold text-slate-500 min-[390px]:inline">
+            • {compactSummary}
+          </span>
+        </span>
+
+        <span
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-transform ${expanded ? "rotate-90" : ""}`}
+          style={{ background: tone.soft, color: tone.accent }}
+        >
+          <ChevronRight size={14} />
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="border-t px-2.5 pb-2.5 pt-2" style={{ borderColor: tone.border }}>
+          <div className="grid gap-1.5">
+            <InsightBox
+              title="Son Aktivite"
+              badge={activityTypeLabel(latestActivity?.type)}
+              text={latestActivity?.note || "Henüz aktivite yok"}
+            />
+            <InsightBox
+              title="Sonraki Görev"
+              badge={nextTask?.dueDate ? formatShortDate(nextTask.dueDate) : "Plan yok"}
+              text={nextTask?.title || "Planlı görev yok"}
+              urgent={nextTaskSoon}
+            />
+          </div>
+
+          <div className="mt-1.5 grid grid-cols-4 gap-1">
+            <MiniCounter label="Aktivite" value={String(customer._count?.activities || 0)} />
+            <MiniCounter label="Görev" value={String(customer._count?.tasks || 0)} />
+            <MiniCounter label="Talep" value={String(customer._count?.interests || 0)} />
+            <MiniCounter label="Portföy" value={String(customer._count?.properties || 0)} />
+          </div>
+
+          <button
+            type="button"
+            onClick={onClick}
+            className="mt-1.5 flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border bg-white px-3 text-[10px] font-black transition active:scale-[0.99]"
+            style={{ borderColor: tone.border, color: tone.accent }}
+          >
+            <FileText size={14} />
+            Müşteri Detayını Aç
+          </button>
         </div>
-
-        <span className="shrink-0 rounded-full px-2 py-1 text-[10px] font-black" style={{ background: stage.bg, color: stage.color }}>{stage.label}</span>
-      </div>
-
-      <div className="flex flex-wrap gap-1">
-        {(customer.roles || []).slice(0, 3).map((role) => <RolePill key={role} role={role} />)}
-        {!customer.roles?.length && <RolePill role="BELIRSIZ" label="Rol Yok" />}
-      </div>
-
-      <p className="mt-3 break-words text-[18px] font-black leading-tight text-[#1557D6]">{money(customer.budget)}</p>
-
-      <div className="mt-3 grid gap-2">
-        <InsightBox title="Son Aktivite" badge={activityTypeLabel(latestActivity?.type)} text={latestActivity?.note || "Henüz aktivite yok"} />
-        <InsightBox title="Sonraki Görev" badge={nextTask?.dueDate ? formatShortDate(nextTask.dueDate) : "Plan yok"} text={nextTask?.title || "Planlı görev yok"} urgent={nextTaskSoon} />
-      </div>
-
-      <div className="mt-4 grid grid-cols-4 gap-2 border-t border-slate-100 pt-3 text-center">
-        <MiniCounter label="Aktivite" value={String(customer._count?.activities || 0)} />
-        <MiniCounter label="Görev" value={String(customer._count?.tasks || 0)} />
-        <MiniCounter label="Talep" value={String(customer._count?.interests || 0)} />
-        <MiniCounter label="Portföy" value={String(customer._count?.properties || 0)} />
-      </div>
-    </button>
+      )}
+    </article>
   );
 }
 
@@ -2562,54 +2618,67 @@ function CustomerListRow({ customer, onClick }: { customer: Customer; onClick: (
   const tone = customerPastelTone(customer);
   const roles = customer.roles || [];
   const initials = `${customer.firstName?.[0] || ""}${customer.lastName?.[0] || ""}`.toLocaleUpperCase("tr-TR");
-  const summary = [customer.phone, customer.city, money(customer.budget)].filter((item) => item && item !== "—").join(" • ");
+  const compactSummary = [
+    roles.length ? roleLabel(roles[0]) : "Rol yok",
+    customer.phone,
+    customer.city,
+    money(customer.budget),
+  ]
+    .filter((item) => item && item !== "—")
+    .join(" • ");
 
   return (
     <article
-      className="eph-crm-list-row w-full max-w-full overflow-hidden rounded-[20px] border-2 text-left shadow-[0_7px_18px_rgba(15,23,42,0.045)] transition"
+      className="eph-crm-list-row w-full max-w-full overflow-hidden rounded-[14px] border text-left shadow-[0_4px_12px_rgba(15,23,42,0.04)] transition"
       style={{ borderColor: tone.border, background: tone.background }}
     >
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
-        className="grid w-full grid-cols-[38px_minmax(0,1fr)_auto] items-center gap-2.5 px-3 py-2.5 text-left transition hover:bg-white/55 active:bg-white/80"
+        aria-label={`${customer.firstName} ${customer.lastName} detaylarını ${expanded ? "kapat" : "aç"}`}
+        className="grid h-[52px] w-full grid-cols-[30px_minmax(0,1fr)_24px] items-center gap-2 px-2.5 text-left transition hover:bg-white/55 active:bg-white/80"
       >
         <span
-          className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-2xl text-[12px] font-black"
+          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] text-[9px] font-black"
           style={{ background: tone.soft, color: tone.accent }}
         >
           {initials || "CRM"}
         </span>
 
-        <span className="min-w-0">
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="break-words text-[14px] font-black leading-tight text-[#06194A]">
-              {customer.firstName} {customer.lastName}
-            </span>
-            <span className="rounded-full px-2 py-0.5 text-[9px] font-black" style={{ background: stage.bg, color: stage.color }}>
-              {stage.label}
-            </span>
+        <span className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
+          <span className="min-w-0 truncate text-[12px] font-black leading-none text-[#06194A]">
+            {customer.firstName} {customer.lastName}
           </span>
 
-          <span className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] font-bold leading-4 text-slate-500">
-            <span>{roles.length ? roleLabel(roles[0]) : "Rol yok"}</span>
-            {roles.length > 1 && <span style={{ color: tone.accent }}>+{roles.length - 1}</span>}
-            {summary && <span>• {summary}</span>}
+          <span
+            className="shrink-0 rounded-full px-1.5 py-0.5 text-[7.5px] font-black leading-none"
+            style={{ background: stage.bg, color: stage.color }}
+          >
+            {stage.label}
+          </span>
+
+          <span className="hidden min-w-0 flex-1 truncate text-[8.5px] font-bold text-slate-500 min-[390px]:inline">
+            • {compactSummary}
           </span>
         </span>
 
         <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-transform ${expanded ? "rotate-90" : ""}`}
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-transform ${expanded ? "rotate-90" : ""}`}
           style={{ background: tone.soft, color: tone.accent }}
         >
-          <ChevronRight size={17} />
+          <ChevronRight size={14} />
         </span>
       </button>
 
       {expanded && (
-        <div className="border-t px-3 pb-3 pt-2.5" style={{ borderColor: tone.border }}>
-          <div className="grid gap-2 md:grid-cols-2">
+        <div className="border-t px-2.5 pb-2.5 pt-2" style={{ borderColor: tone.border }}>
+          <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[9px] font-bold text-slate-500">
+            <span>{compactSummary || "Ek bilgi yok"}</span>
+            {roles.length > 1 && <span style={{ color: tone.accent }}>+{roles.length - 1} rol</span>}
+          </div>
+
+          <div className="grid gap-1.5 md:grid-cols-2">
             <InsightBox
               title="Son Aktivite"
               badge={activityTypeLabel(latestActivity?.type)}
@@ -2623,33 +2692,22 @@ function CustomerListRow({ customer, onClick }: { customer: Customer; onClick: (
             />
           </div>
 
-          <div className="mt-2 grid grid-cols-4 gap-1.5">
+          <div className="mt-1.5 grid grid-cols-4 gap-1">
             <MiniCounter label="Aktivite" value={String(customer._count?.activities || 0)} />
             <MiniCounter label="Görev" value={String(customer._count?.tasks || 0)} />
             <MiniCounter label="Talep" value={String(customer._count?.interests || 0)} />
             <MiniCounter label="Portföy" value={String(customer._count?.properties || 0)} />
           </div>
 
-          <div className="mt-2 grid grid-cols-5 gap-1.5">
-            {[
-              { label: "Detay", icon: <FileText size={15} /> },
-              { label: "Görev", icon: <Clock3 size={15} /> },
-              { label: "Teklif", icon: <WalletCards size={15} /> },
-              { label: "Eşleşme", icon: <Target size={15} /> },
-              { label: "Aşama", icon: <ChevronRight size={15} /> },
-            ].map((action) => (
-              <button
-                key={action.label}
-                type="button"
-                onClick={onClick}
-                className="flex min-h-[48px] min-w-0 flex-col items-center justify-center rounded-2xl border bg-white px-1.5 py-1.5 text-center text-[9px] font-black leading-tight transition active:scale-[0.98]"
-                style={{ borderColor: tone.border, color: tone.accent }}
-              >
-                {action.icon}
-                <span className="mt-1 break-words">{action.label}</span>
-              </button>
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={onClick}
+            className="mt-1.5 flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border bg-white px-3 text-[10px] font-black transition active:scale-[0.99]"
+            style={{ borderColor: tone.border, color: tone.accent }}
+          >
+            <FileText size={14} />
+            Müşteri Detayını Aç
+          </button>
         </div>
       )}
     </article>
