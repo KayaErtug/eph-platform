@@ -230,6 +230,47 @@ export function EPHMobileShell({
   }, [pathname]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("from") !== "profil") return;
+
+    const handleProfileReturn = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const trigger = target?.closest<HTMLElement>("a, button");
+
+      if (!trigger) return;
+
+      const ariaLabel = String(
+        trigger.getAttribute("aria-label") || "",
+      ).toLocaleLowerCase("tr-TR");
+
+      const href =
+        trigger instanceof HTMLAnchorElement
+          ? String(trigger.getAttribute("href") || "")
+          : "";
+
+      const isReturnAction =
+        ariaLabel.includes("geri") ||
+        ariaLabel.includes("dön") ||
+        href === "/giris" ||
+        href === "/crm" ||
+        href === "/uretkenlik";
+
+      if (!isReturnAction) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      router.replace("/profil");
+    };
+
+    document.addEventListener("click", handleProfileReturn, true);
+
+    return () => {
+      document.removeEventListener("click", handleProfileReturn, true);
+    };
+  }, [pathname, router]);
+
+  useEffect(() => {
     if (!showShell || !user?.id) {
       setUnreadMessages(0);
       return;

@@ -799,7 +799,7 @@ export default function ProfilPage() {
             style={{ gridTemplateRows: "repeat(4, minmax(0, 1fr))" }}
           >
             <MenuLink
-              href="/kontor"
+              href="/kontor?from=profil"
               icon={<WalletCards size={18} />}
               title="Kontör Cüzdanı"
             />
@@ -830,22 +830,22 @@ export default function ProfilPage() {
             }}
           >
             <MenuLink
-              href="/notification-settings"
+              href="/notification-settings?from=profil"
               icon={<Bell size={18} />}
               title="Bildirim Ayarları"
             />
             <MenuLink
-              href="/sifremi-unuttum"
+              href="/sifremi-unuttum?from=profil"
               icon={<KeyRound size={18} />}
               title="Güvenlik ve Şifre"
             />
             <MenuLink
-              href="/portfoy/quality"
+              href="/portfoy/quality?from=profil"
               icon={<FileText size={18} />}
               title="Belgelerim"
             />
             <MenuLink
-              href="/help-center"
+              href="/help-center?from=profil"
               icon={<HelpCircle size={18} />}
               title="Yardım Merkezi"
               last={!isAdmin}
@@ -853,7 +853,7 @@ export default function ProfilPage() {
 
             {isAdmin && (
               <MenuLink
-                href="/admin"
+                href="/admin?from=profil"
                 icon={<ShieldCheck size={18} />}
                 title="Yönetim Merkezi"
                 last
