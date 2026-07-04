@@ -27,7 +27,12 @@ import {
   X,
 } from "lucide-react";
 
+import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
+
+type Conversation = {
+  unreadCount?: number | null;
+};
 
 const MAIN_ROUTES = [
   "/dashboard",
@@ -42,7 +47,9 @@ const MAIN_ROUTES = [
 function getTitle(pathname: string) {
   if (pathname.startsWith("/crm")) return "CRM";
   if (pathname.startsWith("/portfoy")) return "PORTFÖY";
-  if (pathname.startsWith("/forum") || pathname.startsWith("/network")) return "FORUM";
+  if (pathname.startsWith("/forum") || pathname.startsWith("/network")) {
+    return "FORUM";
+  }
   if (pathname.startsWith("/havuz")) return "HAVUZ";
   if (pathname.startsWith("/messages")) return "MESAJLAR";
   if (pathname.startsWith("/profil")) return "PROFİL";
@@ -81,21 +88,30 @@ function shouldShowBottomNav(pathname: string) {
   return MAIN_ROUTES.some((route) => pathname.startsWith(route));
 }
 
-function getDisplayName(user?: {
-  firstName?: string | null;
-  lastName?: string | null;
-  email?: string | null;
-} | null) {
-  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
+function getDisplayName(
+  user?: {
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+  } | null,
+) {
+  const fullName = [user?.firstName, user?.lastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 
   return fullName || user?.email?.split("@")[0] || "EPH Üyesi";
 }
 
-function getInitial(user?: {
-  firstName?: string | null;
-  email?: string | null;
-} | null) {
-  return (user?.firstName?.[0] || user?.email?.[0] || "E").toLocaleUpperCase("tr-TR");
+function getInitial(
+  user?: {
+    firstName?: string | null;
+    email?: string | null;
+  } | null,
+) {
+  return (user?.firstName?.[0] || user?.email?.[0] || "E").toLocaleUpperCase(
+    "tr-TR",
+  );
 }
 
 function roleLabel(role?: string | null) {
@@ -104,31 +120,85 @@ function roleLabel(role?: string | null) {
   if (normalized === "ADMIN") return "Admin";
   if (normalized === "SUPER_ADMIN") return "Yazılım Ekibi";
   if (normalized === "EMLAKCI") return "Emlakçı";
-  if (["MUTEAHHIT", "MÜTEAHHİT", "MÜTAHHİT"].includes(normalized)) return "Müteahhit";
-  if (["INSAAT_FIRMASI", "İNŞAAT_FİRMASI"].includes(normalized)) return "İnşaat Firması";
+
+  if (
+    ["MUTEAHHIT", "MÜTEAHHİT", "MÜTAHHİT"].includes(normalized)
+  ) {
+    return "Müteahhit";
+  }
+
+  if (
+    ["INSAAT_FIRMASI", "İNŞAAT_FİRMASI"].includes(normalized)
+  ) {
+    return "İnşaat Firması";
+  }
 
   return "EPH Üyesi";
 }
 
-export function EPHMobileShell({ children }: { children: React.ReactNode }) {
+function readConversations(payload: unknown): Conversation[] {
+  if (Array.isArray(payload)) {
+    return payload as Conversation[];
+  }
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    Array.isArray((payload as { items?: unknown[] }).items)
+  ) {
+    return (payload as { items: Conversation[] }).items;
+  }
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    Array.isArray((payload as { conversations?: unknown[] }).conversations)
+  ) {
+    return (payload as { conversations: Conversation[] }).conversations;
+  }
+
+  return [];
+}
+
+function formatUnreadCount(value: number) {
+  return value > 99 ? "99+" : String(value);
+}
+
+export function EPHMobileShell({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLinaFab, setShowLinaFab] = useState(true);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   const showShell = shouldShowShell(pathname);
   const showBottomNav = shouldShowBottomNav(pathname);
   const title = useMemo(() => getTitle(pathname), [pathname]);
+  const unreadBadge = unreadMessages > 0
+    ? formatUnreadCount(unreadMessages)
+    : undefined;
 
   useEffect(() => {
     const setViewportVars = () => {
-      const viewportHeight = window.visualViewport?.height || window.innerHeight;
-      const viewportWidth = window.visualViewport?.width || window.innerWidth;
+      const viewportHeight =
+        window.visualViewport?.height || window.innerHeight;
+      const viewportWidth =
+        window.visualViewport?.width || window.innerWidth;
 
-      document.documentElement.style.setProperty("--eph-vvh", `${viewportHeight}px`);
-      document.documentElement.style.setProperty("--eph-vvw", `${viewportWidth}px`);
+      document.documentElement.style.setProperty(
+        "--eph-vvh",
+        `${viewportHeight}px`,
+      );
+      document.documentElement.style.setProperty(
+        "--eph-vvw",
+        `${viewportWidth}px`,
+      );
     };
 
     setViewportVars();
@@ -159,6 +229,60 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [pathname]);
 
+  useEffect(() => {
+    if (!showShell || !user?.id) {
+      setUnreadMessages(0);
+      return;
+    }
+
+    let active = true;
+
+    const fetchUnreadMessages = async () => {
+      try {
+        const response = await api.get(
+          `/conversations?userId=${encodeURIComponent(String(user.id))}`,
+        );
+
+        const conversations = readConversations(response.data);
+        const total = conversations.reduce((sum, conversation) => {
+          const unread = Number(conversation.unreadCount || 0);
+          return sum + (Number.isFinite(unread) ? unread : 0);
+        }, 0);
+
+        if (active) {
+          setUnreadMessages(Math.max(0, total));
+        }
+      } catch {
+        if (active) {
+          setUnreadMessages(0);
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchUnreadMessages();
+      }
+    };
+
+    fetchUnreadMessages();
+
+    const interval = window.setInterval(fetchUnreadMessages, 30000);
+
+    window.addEventListener("focus", fetchUnreadMessages);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", fetchUnreadMessages);
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange,
+      );
+    };
+  }, [pathname, showShell, user?.id]);
+
   const go = (href: string) => {
     setMenuOpen(false);
     router.push(href);
@@ -171,7 +295,9 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
 
   const feedbackMail = (subject: string) => {
     setMenuOpen(false);
-    window.location.href = `mailto:mustafaertugkaya@gmail.com?subject=${encodeURIComponent(subject)}`;
+    window.location.href = `mailto:mustafaertugkaya@gmail.com?subject=${encodeURIComponent(
+      subject,
+    )}`;
   };
 
   const comingSoon = (message: string) => {
@@ -206,11 +332,15 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             className="eph-mobile-icon-button eph-mobile-bell-button"
-            aria-label="Bildirimler"
+            aria-label={
+              unreadMessages > 0
+                ? `${unreadMessages} okunmamış mesaj`
+                : "Mesajlar"
+            }
             onClick={() => router.push("/messages")}
           >
             <Bell size={24} strokeWidth={2.35} />
-            <span>3</span>
+            {unreadBadge && <span>{unreadBadge}</span>}
           </button>
 
           <button
@@ -225,14 +355,22 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {menuOpen && (
-        <div className="eph-mobile-menu-overlay" onClick={() => setMenuOpen(false)}>
-          <aside className="eph-mobile-menu-drawer" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="eph-mobile-menu-overlay"
+          onClick={() => setMenuOpen(false)}
+        >
+          <aside
+            className="eph-mobile-menu-drawer"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="eph-mobile-menu-hero">
               <div className="eph-mobile-menu-hero-circle one" />
               <div className="eph-mobile-menu-hero-circle two" />
 
               <div className="eph-mobile-menu-user-row">
-                <div className="eph-mobile-menu-avatar">{getInitial(user)}</div>
+                <div className="eph-mobile-menu-avatar">
+                  {getInitial(user)}
+                </div>
 
                 <div className="eph-mobile-menu-user-text">
                   <p>EPH Platform</p>
@@ -250,7 +388,11 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
                 </button>
               </div>
 
-              <button type="button" onClick={() => go("/profil")} className="eph-mobile-menu-account">
+              <button
+                type="button"
+                onClick={() => go("/profil")}
+                className="eph-mobile-menu-account"
+              >
                 <div>
                   <p>Hesap Merkezi</p>
                   <span>Profil ve üyelik bilgileri</span>
@@ -261,25 +403,62 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
 
             <div className="eph-mobile-menu-scroll">
               <MenuSection title="Operasyon Merkezi">
-                <MenuRow icon={<Home size={17} />} label="Anasayfa" onClick={() => go("/dashboard")} />
-                <MenuRow icon={<UsersRound size={17} />} label="CRM" onClick={() => go("/crm")} />
-                <MenuRow icon={<Building2 size={17} />} label="Portföy" onClick={() => go("/portfoy")} />
-                <MenuRow icon={<MessageSquare size={17} />} label="Forum" onClick={() => go("/network")} />
-                <MenuRow icon={<Target size={17} />} label="Havuz" onClick={() => go("/havuz")} />
-                <MenuRow icon={<Bell size={17} />} label="Mesajlar" badge="Yeni" onClick={() => go("/messages")} />
+                <MenuRow
+                  icon={<Home size={17} />}
+                  label="Anasayfa"
+                  onClick={() => go("/dashboard")}
+                />
+                <MenuRow
+                  icon={<UsersRound size={17} />}
+                  label="CRM"
+                  onClick={() => go("/crm")}
+                />
+                <MenuRow
+                  icon={<Building2 size={17} />}
+                  label="Portföy"
+                  onClick={() => go("/portfoy")}
+                />
+                <MenuRow
+                  icon={<MessageSquare size={17} />}
+                  label="Forum"
+                  onClick={() => go("/network")}
+                />
+                <MenuRow
+                  icon={<Target size={17} />}
+                  label="Havuz"
+                  onClick={() => go("/havuz")}
+                />
+                <MenuRow
+                  icon={<Bell size={17} />}
+                  label="Mesajlar"
+                  badge={unreadBadge}
+                  onClick={() => go("/messages")}
+                />
               </MenuSection>
 
               <MenuSection title="Lina">
-                <MenuRow icon={<Bot size={17} />} label="Lina Asistan" onClick={openLina} />
+                <MenuRow
+                  icon={<Bot size={17} />}
+                  label="Lina Asistan"
+                  onClick={openLina}
+                />
                 <MenuRow
                   icon={<Sparkles size={17} />}
                   label="Lina Fırsatları"
-                  onClick={() => comingSoon("Lina Fırsatları ekranını sıradaki adımda açacağız.")}
+                  onClick={() =>
+                    comingSoon(
+                      "Lina Fırsatları ekranını sıradaki adımda açacağız.",
+                    )
+                  }
                 />
               </MenuSection>
 
               <MenuSection title="EPH">
-                <MenuRow icon={<ShoppingBag size={17} />} label="Market" onClick={() => go("/ucretlendirme")} />
+                <MenuRow
+                  icon={<ShoppingBag size={17} />}
+                  label="Market"
+                  onClick={() => go("/ucretlendirme")}
+                />
                 <MenuRow
                   icon={<FileSpreadsheet size={17} />}
                   label="Proje Satış Excel Şablonu"
@@ -288,7 +467,9 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
                 <MenuRow
                   icon={<Star size={17} />}
                   label="Duyurular"
-                  onClick={() => comingSoon("Duyurular bölümü yakında aktif olacak.")}
+                  onClick={() =>
+                    comingSoon("Duyurular bölümü yakında aktif olacak.")
+                  }
                 />
               </MenuSection>
 
@@ -311,7 +492,11 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
               </MenuSection>
 
               <MenuSection title="Hesap">
-                <MenuRow icon={<User size={17} />} label="Profil" onClick={() => go("/profil")} />
+                <MenuRow
+                  icon={<User size={17} />}
+                  label="Profil"
+                  onClick={() => go("/profil")}
+                />
                 <MenuRow
                   icon={<Settings size={17} />}
                   label="Bildirim Ayarları"
@@ -322,14 +507,25 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
                   label="Yardım Merkezi"
                   onClick={() => go("/help-center")}
                 />
-                <MenuRow danger icon={<LogOut size={17} />} label="Çıkış Yap" onClick={handleLogout} />
+                <MenuRow
+                  danger
+                  icon={<LogOut size={17} />}
+                  label="Çıkış Yap"
+                  onClick={handleLogout}
+                />
               </MenuSection>
             </div>
           </aside>
         </div>
       )}
 
-      <main className={showBottomNav ? "eph-mobile-content with-bottom-nav" : "eph-mobile-content"}>
+      <main
+        className={
+          showBottomNav
+            ? "eph-mobile-content with-bottom-nav"
+            : "eph-mobile-content"
+        }
+      >
         {children}
       </main>
 
@@ -350,7 +546,13 @@ export function EPHMobileShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function MenuSection({ title, children }: { title: string; children: React.ReactNode }) {
+function MenuSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="eph-mobile-menu-section">
       <h3>{title}</h3>
@@ -373,7 +575,15 @@ function MenuRow({
   onClick: () => void;
 }) {
   return (
-    <button type="button" onClick={onClick} className={danger ? "eph-mobile-menu-row danger" : "eph-mobile-menu-row"}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        danger
+          ? "eph-mobile-menu-row danger"
+          : "eph-mobile-menu-row"
+      }
+    >
       <span className="eph-mobile-menu-row-left">
         <span className="eph-mobile-menu-row-icon">{icon}</span>
         <span className="eph-mobile-menu-row-label">{label}</span>
@@ -410,7 +620,10 @@ function EPHMobileBottomNav({ pathname }: { pathname: string }) {
       />
       <BottomItem
         href="/network"
-        active={pathname.startsWith("/network") || pathname.startsWith("/forum")}
+        active={
+          pathname.startsWith("/network") ||
+          pathname.startsWith("/forum")
+        }
         icon={<MessageSquare size={25} strokeWidth={2.35} />}
         label="Forum"
       />
@@ -436,7 +649,14 @@ function BottomItem({
   label: string;
 }) {
   return (
-    <Link href={href} className={active ? "eph-mobile-nav-item active" : "eph-mobile-nav-item"}>
+    <Link
+      href={href}
+      className={
+        active
+          ? "eph-mobile-nav-item active"
+          : "eph-mobile-nav-item"
+      }
+    >
       {icon}
       <span>{label}</span>
     </Link>
