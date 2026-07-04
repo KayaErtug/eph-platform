@@ -610,11 +610,17 @@ export default function HavuzPage() {
   const [successToast, setSuccessToast] = useState<SuccessToast | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("LIST");
   const [selectedMapUnitId, setSelectedMapUnitId] = useState("");
+  const [requestedDetailUnitId, setRequestedDetailUnitId] = useState("");
 
   const builder = isBuilderRole(user?.role);
 
   useEffect(() => {
     fetchData();
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setRequestedDetailUnitId(params.get("detail")?.trim() || "");
   }, []);
 
   useEffect(() => {
@@ -669,6 +675,38 @@ export default function HavuzPage() {
       .map((unit) => ({ unit, match: calculateMatch(unit, customers) }))
       .sort((a, b) => b.match.score - a.match.score);
   }, [customers, eligibleUnits]);
+
+  useEffect(() => {
+    if (!requestedDetailUnitId || loading || detailSelection) {
+      return;
+    }
+
+    const requestedItem = matchedUnits.find(
+      ({ unit }) => unit.id === requestedDetailUnitId,
+    );
+
+    if (!requestedItem) {
+      setErrorMessage("İstenen Havuz portföyü bulunamadı veya görüntüleme yetkiniz yok.");
+      setRequestedDetailUnitId("");
+      return;
+    }
+
+    setSelectedMapUnitId(requestedItem.unit.id);
+    setDetailSelection(requestedItem);
+    setRequestedDetailUnitId("");
+  }, [detailSelection, loading, matchedUnits, requestedDetailUnitId]);
+
+  const closeDetailSelection = () => {
+    setDetailSelection(null);
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("detail");
+    window.history.replaceState(
+      {},
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  };
 
   const filteredPoolItems = useMemo(
     () => applyHavuzFilters(matchedUnits, filters, search),
@@ -1004,7 +1042,7 @@ export default function HavuzPage() {
           unit={detailSelection.unit}
           match={detailSelection.match}
           busyAction={busyAction}
-          onClose={() => setDetailSelection(null)}
+          onClose={closeDetailSelection}
           onMessage={() =>
             startPoolMessage(detailSelection.unit, detailSelection.match.score)
           }

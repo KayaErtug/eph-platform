@@ -17,15 +17,12 @@ import { LinaVoiceService } from "./lina-voice.service";
 import { LinaPortfolioSessionService } from "./portfolio/lina-portfolio-session.service";
 import { LinaPortfolioEngineService } from "./portfolio/lina-portfolio-engine.service";
 import { LinaGeoService } from "./geo/lina-geo.service";
-import { LinaDistanceService } from "./geo/lina-distance.service";
+import { LinaDistanceModule } from "./geo/lina-distance.module";
 import { LinaDocumentPrecheckService } from "./document/lina-document-precheck.service";
 import { LinaDocumentTkgmService } from "./document/lina-document-tkgm.service";
 
 @Module({
-  imports: [
-    CrmModule,
-    NetworkModule,
-  ],
+  imports: [CrmModule, NetworkModule, LinaDistanceModule],
   controllers: [LinaController],
   providers: [
     PrismaService,
@@ -41,7 +38,6 @@ import { LinaDocumentTkgmService } from "./document/lina-document-tkgm.service";
     LinaPortfolioSessionService,
     LinaPortfolioEngineService,
     LinaGeoService,
-    LinaDistanceService,
     LinaDocumentPrecheckService,
     LinaDocumentTkgmService,
   ],
@@ -58,7 +54,7 @@ import { LinaDocumentTkgmService } from "./document/lina-document-tkgm.service";
     LinaPortfolioSessionService,
     LinaPortfolioEngineService,
     LinaGeoService,
-    LinaDistanceService,
+    LinaDistanceModule,
     LinaDocumentPrecheckService,
     LinaDocumentTkgmService,
   ],

@@ -128,6 +128,18 @@ interface CustomerProperty {
   };
 }
 
+interface HavuzMatchDistance {
+  decisionReady: boolean;
+  drivingDistanceKm: number | null;
+  durationMinutes: number | null;
+  staticDurationMinutes: number | null;
+  straightLineDistanceKm: number | null;
+  detourFactor: number | null;
+  roadNetworkBarrierSignal: boolean;
+  errorCode: string | null;
+  message: string | null;
+}
+
 interface HavuzMatch {
   unitId: string;
   projectName?: string;
@@ -144,6 +156,7 @@ interface HavuzMatch {
   matchLevel: string;
   matchReasons: string[];
   yetkiVerified?: boolean;
+  distance?: HavuzMatchDistance;
 }
 
 const PIPELINE_STAGES = [
@@ -3331,10 +3344,31 @@ function HavuzMatchesTab({ customer }: { customer: Customer }) {
 }
 
 function HavuzMatchCard({ match }: { match: HavuzMatch }) {
-  const scoreTone = match.matchScore >= 75 ? "text-emerald-700 bg-emerald-50" : match.matchScore >= 40 ? "text-amber-700 bg-amber-50" : "text-slate-600 bg-[#F8FAFC]";
+  const scoreTone =
+    match.matchScore >= 75
+      ? "text-emerald-700 bg-emerald-50"
+      : match.matchScore >= 40
+        ? "text-amber-700 bg-amber-50"
+        : "text-slate-600 bg-[#F8FAFC]";
   const title = match.projectName || "Havuz Portföyü";
-  const location = [match.city, match.district, match.neighborhood].filter(Boolean).join(" / ") || "Konum belirtilmedi";
-  const detailUrl = `/havuz/${match.unitId}`;
+  const location =
+    [match.city, match.district, match.neighborhood]
+      .filter(Boolean)
+      .join(" / ") || "Konum belirtilmedi";
+  const detailUrl = `/havuz?detail=${encodeURIComponent(match.unitId)}`;
+  const distanceReady =
+    match.distance?.decisionReady === true &&
+    typeof match.distance.drivingDistanceKm === "number";
+  const drivingDistanceText = distanceReady
+    ? `${match.distance!.drivingDistanceKm!.toLocaleString("tr-TR", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      })} km`
+    : null;
+  const durationText =
+    distanceReady && typeof match.distance?.durationMinutes === "number"
+      ? `${match.distance.durationMinutes} dk`
+      : "Süre yok";
 
   return (
     <article className="overflow-hidden rounded-[26px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
@@ -3347,7 +3381,7 @@ function HavuzMatchCard({ match }: { match: HavuzMatch }) {
       <div className="space-y-3 p-4">
         <div className="grid grid-cols-[1fr_auto] items-start gap-3">
           <div className="min-w-0">
-            <p className="break-words break-words text-[15px] font-black leading-tight text-[#06194A]">{title}</p>
+            <p className="break-words text-[15px] font-black leading-tight text-[#06194A]">{title}</p>
             <p className="mt-1 flex min-w-0 items-center justify-center gap-1 text-center text-xs font-bold leading-5 text-[#64748B] sm:justify-start sm:text-left">
               <MapPin size={13} className="shrink-0" />
               <span className="min-w-0 break-words">{location}</span>
@@ -3367,10 +3401,33 @@ function HavuzMatchCard({ match }: { match: HavuzMatch }) {
           <MiniCounter label="m²" value={match.area ? `${match.area}` : "—"} />
         </div>
 
+        {distanceReady && (
+          <div className="grid grid-cols-2 gap-2 rounded-2xl border-2 border-[#BFDBFE] bg-[#EFF6FF] p-2">
+            <div className="flex min-w-0 items-center justify-center gap-2 rounded-xl bg-white px-2 py-2 text-center">
+              <MapPin size={15} className="shrink-0 text-[#1557D6]" />
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-wide text-[#64748B]">Araç mesafesi</p>
+                <p className="mt-0.5 break-words text-xs font-black text-[#06194A]">{drivingDistanceText}</p>
+              </div>
+            </div>
+
+            <div className="flex min-w-0 items-center justify-center gap-2 rounded-xl bg-white px-2 py-2 text-center">
+              <Clock3 size={15} className="shrink-0 text-[#1557D6]" />
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-wide text-[#64748B]">Trafik süresi</p>
+                <p className="mt-0.5 break-words text-xs font-black text-[#06194A]">{durationText}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
           {match.type && <Chip>{optionLabel(PROPERTY_TYPE_OPTIONS, match.type)}</Chip>}
           {match.status && <Chip>{optionLabel(UNIT_STATUS_OPTIONS, match.status)}</Chip>}
           <Chip>{match.yetkiVerified ? "Yetki doğrulandı" : "Havuz portföyü"}</Chip>
+          {distanceReady && match.distance?.roadNetworkBarrierSignal && (
+            <Chip>Yol ağı / coğrafi engel</Chip>
+          )}
         </div>
 
         {match.matchReasons?.length > 0 && (

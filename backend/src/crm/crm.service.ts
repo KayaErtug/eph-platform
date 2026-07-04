@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { LinaDistanceService } from '../lina/geo/lina-distance.service';
 import {
   ActivityType,
   CustomerInterestPriority,
@@ -16,7 +17,10 @@ import {
 
 @Injectable()
 export class CrmService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly linaDistanceService: LinaDistanceService,
+  ) {}
 
   private canAccessCustomer(customerOwnerId: string, userId: string, userRole: Role) {
     return userRole === Role.SUPER_ADMIN || customerOwnerId === userId;
@@ -456,12 +460,197 @@ export class CrmService {
    
 
 
-    private getMatchLevel(score: number) {
+  private getMatchLevel(score: number) {
     if (score >= 90) return 'Mükemmel';
     if (score >= 75) return 'Çok Güçlü';
     if (score >= 60) return 'Güçlü';
     if (score >= 40) return 'Uygun';
     return 'Zayıf';
+  }
+
+  private normalizeLocationText(value: unknown) {
+    return String(value ?? '')
+      .trim()
+      .toLocaleLowerCase('tr-TR')
+      .replace(/\s+/g, ' ');
+  }
+
+  private isSameLocationValue(left: unknown, right: unknown) {
+    const normalizedLeft = this.normalizeLocationText(left);
+    const normalizedRight = this.normalizeLocationText(right);
+
+    return Boolean(
+      normalizedLeft &&
+        normalizedRight &&
+        normalizedLeft === normalizedRight,
+    );
+  }
+
+  private isNeighborhoodMatch(
+    interestNeighborhood: unknown,
+    projectAddress: unknown,
+  ) {
+    const neighborhood = this.normalizeLocationText(interestNeighborhood);
+    const address = this.normalizeLocationText(projectAddress);
+
+    if (!neighborhood || !address) {
+      return false;
+    }
+
+    return (
+      neighborhood === address ||
+      address.includes(neighborhood) ||
+      neighborhood.includes(address)
+    );
+  }
+
+  private buildInterestDistancePoint(interest: {
+    title?: string | null;
+    city?: string | null;
+    district?: string | null;
+    neighborhood?: string | null;
+  }) {
+    const addressParts = [
+      interest.neighborhood,
+      interest.district,
+      interest.city,
+      'Türkiye',
+    ].filter((value): value is string => Boolean(value?.trim()));
+
+    if (addressParts.length <= 1) {
+      return null;
+    }
+
+    return {
+      label: interest.title?.trim() || 'CRM ilgi bölgesi',
+      address: addressParts.join(', '),
+      city: interest.city || undefined,
+      district: interest.district || undefined,
+      neighborhood: interest.neighborhood || undefined,
+    };
+  }
+
+  private buildUnitDistancePoint(unit: {
+    id: string;
+    project?: {
+      name?: string | null;
+      city?: string | null;
+      district?: string | null;
+      address?: string | null;
+      mapAddress?: string | null;
+      placeId?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+    } | null;
+  }) {
+    const project = unit.project;
+
+    if (!project) {
+      return null;
+    }
+
+    const hasCoordinates =
+      typeof project.latitude === 'number' &&
+      Number.isFinite(project.latitude) &&
+      typeof project.longitude === 'number' &&
+      Number.isFinite(project.longitude);
+
+    const address =
+      project.mapAddress?.trim() ||
+      [project.address, project.district, project.city, 'Türkiye']
+        .filter((value): value is string => Boolean(value?.trim()))
+        .join(', ');
+
+    if (!hasCoordinates && !project.placeId?.trim() && !address) {
+      return null;
+    }
+
+    return {
+      label: project.name?.trim() || `Portföy ${unit.id.slice(0, 8)}`,
+      latitude: hasCoordinates ? project.latitude ?? undefined : undefined,
+      longitude: hasCoordinates ? project.longitude ?? undefined : undefined,
+      address: address || undefined,
+      city: project.city || undefined,
+      district: project.district || undefined,
+      neighborhood: project.address || undefined,
+      placeId: project.placeId?.trim() || undefined,
+    };
+  }
+
+  private getDistanceScore(distanceKm: number) {
+    if (distanceKm <= 3) {
+      return {
+        score: 20,
+        reason: `Araçla çok yakın (${distanceKm.toLocaleString('tr-TR')} km)`,
+      };
+    }
+
+    if (distanceKm <= 7) {
+      return {
+        score: 18,
+        reason: `Araçla yakın (${distanceKm.toLocaleString('tr-TR')} km)`,
+      };
+    }
+
+    if (distanceKm <= 15) {
+      return {
+        score: 15,
+        reason: `Araçla erişilebilir (${distanceKm.toLocaleString('tr-TR')} km)`,
+      };
+    }
+
+    if (distanceKm <= 30) {
+      return {
+        score: 10,
+        reason: `Araçla makul mesafe (${distanceKm.toLocaleString('tr-TR')} km)`,
+      };
+    }
+
+    if (distanceKm <= 50) {
+      return {
+        score: 5,
+        reason: `Araçla ${distanceKm.toLocaleString('tr-TR')} km`,
+      };
+    }
+
+    return {
+      score: 0,
+      reason: `Araçla ${distanceKm.toLocaleString('tr-TR')} km`,
+    };
+  }
+
+  private async mapWithConcurrency<T, R>(
+    items: T[],
+    concurrency: number,
+    mapper: (item: T, index: number) => Promise<R>,
+  ): Promise<R[]> {
+    if (items.length === 0) {
+      return [];
+    }
+
+    const results = new Array<R>(items.length);
+    let cursor = 0;
+    const workerCount = Math.max(
+      1,
+      Math.min(concurrency, items.length),
+    );
+
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const index = cursor;
+        cursor += 1;
+
+        if (index >= items.length) {
+          return;
+        }
+
+        results[index] = await mapper(items[index], index);
+      }
+    });
+
+    await Promise.all(workers);
+
+    return results;
   }
 
   async getCustomerInterestMatches(
@@ -493,27 +682,36 @@ export class CrmService {
       },
     });
 
-    const results = poolUnits.map((unit) => {
+    const preliminaryResults = poolUnits.map((unit) => {
       let score = 0;
       const reasons: string[] = [];
 
-      if (
-        interest.city &&
-        unit.project?.city &&
-        interest.city.toLowerCase() === unit.project.city.toLowerCase()
-      ) {
-        score += 20;
+      const sameCity = this.isSameLocationValue(
+        interest.city,
+        unit.project?.city,
+      );
+      const sameDistrict = this.isSameLocationValue(
+        interest.district,
+        unit.project?.district,
+      );
+      const sameNeighborhood = this.isNeighborhoodMatch(
+        interest.neighborhood,
+        unit.project?.address,
+      );
+
+      if (sameCity) {
+        score += 10;
         reasons.push('Aynı il');
       }
 
-      if (
-        interest.district &&
-        unit.project?.district &&
-        interest.district.toLowerCase() ===
-          unit.project.district.toLowerCase()
-      ) {
-        score += 20;
+      if (sameDistrict) {
+        score += 15;
         reasons.push('Aynı ilçe');
+      }
+
+      if (sameNeighborhood) {
+        score += 15;
+        reasons.push('Aynı mahalle');
       }
 
       if (
@@ -568,37 +766,163 @@ export class CrmService {
       const featureMatches =
         Array.isArray(interest.features) &&
         Array.isArray(unit.features)
-          ? interest.features.filter((f) =>
-              unit.features.includes(f),
+          ? interest.features.filter((feature) =>
+              unit.features.includes(feature),
             ).length
           : 0;
 
       if (featureMatches > 0) {
         score += 2;
-        reasons.push(
-          `${featureMatches} ortak özellik bulundu`,
-        );
+        reasons.push(`${featureMatches} ortak özellik bulundu`);
       }
 
       return {
-        unitId: unit.id,
-        projectName: unit.project?.name,
-        city: unit.project?.city,
-        district: unit.project?.district,
-        price: unit.price,
-        roomCount: unit.roomCount,
-        area: unit.area,
-        coverImage:
-          unit.images?.[0]?.url || null,
-        matchScore: Math.min(score, 100),
-        matchLevel: this.getMatchLevel(score),
-        matchReasons: reasons,
+        unit,
+        score,
+        reasons,
+        sameCity,
+        distance: {
+          decisionReady: false,
+          drivingDistanceKm: null as number | null,
+          durationMinutes: null as number | null,
+          staticDurationMinutes: null as number | null,
+          straightLineDistanceKm: null as number | null,
+          detourFactor: null as number | null,
+          roadNetworkBarrierSignal: false,
+          errorCode: null as string | null,
+          message: null as string | null,
+        },
       };
     });
 
-    return results.sort(
-      (a, b) => b.matchScore - a.matchScore,
+    const origin = this.buildInterestDistancePoint(interest);
+    const distanceCandidates = origin
+      ? preliminaryResults
+          .filter((result) => {
+            const destination = this.buildUnitDistancePoint(result.unit);
+
+            if (!destination) {
+              return false;
+            }
+
+            if (interest.city) {
+              return result.sameCity;
+            }
+
+            return true;
+          })
+          .sort((left, right) => right.score - left.score)
+          .slice(0, 12)
+      : [];
+
+    await this.mapWithConcurrency(
+      distanceCandidates,
+      4,
+      async (result) => {
+        const destination = this.buildUnitDistancePoint(result.unit);
+
+        if (!origin || !destination) {
+          return;
+        }
+
+        try {
+          const distanceResult: any =
+            await this.linaDistanceService.calculate({
+              origin,
+              destination,
+              routingPreference: 'TRAFFIC_AWARE',
+              avoidFerries: true,
+              avoidTolls: false,
+              avoidHighways: false,
+            });
+
+          const decisionReady =
+            distanceResult?.decision?.ready === true &&
+            distanceResult?.driving?.available === true &&
+            typeof distanceResult?.decision?.primaryDistanceKm === 'number';
+
+          if (!decisionReady) {
+            result.distance.errorCode =
+              distanceResult?.driving?.errorCode || 'DRIVING_ROUTE_NOT_READY';
+            result.distance.message =
+              distanceResult?.driving?.message ||
+              'Araç rotası alınamadığı için yakınlık kararı verilmedi.';
+            return;
+          }
+
+          const drivingDistanceKm = Number(
+            distanceResult.decision.primaryDistanceKm,
+          );
+          const distanceScore = this.getDistanceScore(drivingDistanceKm);
+
+          result.score += distanceScore.score;
+          result.reasons.push(distanceScore.reason);
+          result.distance = {
+            decisionReady: true,
+            drivingDistanceKm,
+            durationMinutes:
+              typeof distanceResult?.driving?.durationMinutes === 'number'
+                ? distanceResult.driving.durationMinutes
+                : null,
+            staticDurationMinutes:
+              typeof distanceResult?.driving?.staticDurationMinutes ===
+              'number'
+                ? distanceResult.driving.staticDurationMinutes
+                : null,
+            straightLineDistanceKm:
+              typeof distanceResult?.straightLine?.distanceKm === 'number'
+                ? distanceResult.straightLine.distanceKm
+                : null,
+            detourFactor:
+              typeof distanceResult?.comparison?.detourFactor === 'number'
+                ? distanceResult.comparison.detourFactor
+                : null,
+            roadNetworkBarrierSignal:
+              distanceResult?.comparison?.roadNetworkBarrierSignal === true,
+            errorCode: null,
+            message: null,
+          };
+        } catch (error) {
+          result.distance.errorCode = 'DISTANCE_ENGINE_ERROR';
+          result.distance.message =
+            error instanceof Error
+              ? error.message
+              : 'Mesafe motoru çalıştırılamadı.';
+        }
+      },
     );
+
+    await this.prisma.customerInterest.update({
+      where: {
+        id: interest.id,
+      },
+      data: {
+        lastMatchedAt: new Date(),
+      },
+    });
+
+    return preliminaryResults
+      .map((result) => {
+        const unit = result.unit;
+        const matchScore = Math.min(result.score, 100);
+
+        return {
+          unitId: unit.id,
+          projectName: unit.project?.name,
+          city: unit.project?.city,
+          district: unit.project?.district,
+          neighborhood: unit.project?.address,
+          price: unit.price,
+          roomCount: unit.roomCount,
+          area: unit.area,
+          coverImage: unit.images?.[0]?.url || null,
+          matchScore,
+          matchLevel: this.getMatchLevel(matchScore),
+          matchReasons: result.reasons,
+          distance: result.distance,
+        };
+      })
+      .sort((left, right) => right.matchScore - left.matchScore);
   }
 
 
