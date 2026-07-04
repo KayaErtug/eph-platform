@@ -184,7 +184,8 @@ const CUSTOMER_ROLES = [
   { key: "ALICI", label: "Alıcı" },
   { key: "SATICI", label: "Satıcı" },
   { key: "KIRACI", label: "Kiracı" },
-  { key: "MAL_SAHIBI", label: "Mal Sahibi" },
+  { key: "MAL_SAHIBI", label: "Kiraya Veren" },
+  { key: "KIRAYA_VEREN", label: "Kiraya Veren" },
   { key: "YATIRIMCI", label: "Yatırımcı" },
   { key: "MUTEAHHIT", label: "Müteahhit" },
   { key: "INSAAT_FIRMASI", label: "İnşaat Firması" },
@@ -556,6 +557,64 @@ function stageInfo(status: string) {
 function roleLabel(role?: string) {
   if (!role) return "—";
   return CUSTOMER_ROLES.find((item) => item.key === role)?.label || role;
+}
+
+function normalizeCustomerRole(role?: string) {
+  const normalized = String(role || "").trim().toUpperCase();
+  if (normalized === "MAL_SAHIBI") return "KIRAYA_VEREN";
+  return normalized;
+}
+
+function getCustomerDisplayRoles(customer: Customer) {
+  const explicitRoles = (customer.roles || [])
+    .map(normalizeCustomerRole)
+    .filter(Boolean);
+
+  if (explicitRoles.length > 0) {
+    return Array.from(new Set(explicitRoles));
+  }
+
+  const inferredRoles: string[] = [];
+
+  (customer.interests || []).forEach((interest) => {
+    const intent = String(interest.purchaseIntent || "").toUpperCase();
+    const statuses = (interest.statuses || []).map((status) => String(status).toUpperCase());
+
+    if (intent === "KIRALAMA" || statuses.includes("KIRALIK")) inferredRoles.push("KIRACI");
+    if (["SATIN_ALMA", "YATIRIM"].includes(intent) || statuses.includes("SATILIK")) inferredRoles.push("ALICI");
+  });
+
+  (customer.properties || []).forEach((property) => {
+    const relation = String(property.relationType || "").toUpperCase();
+    const unitStatus = String(property.unit?.status || "").toUpperCase();
+
+    if (relation.includes("KIRAYA") || relation.includes("KIRALAYAN") || unitStatus === "KIRALIK") inferredRoles.push("KIRAYA_VEREN");
+    if (relation.includes("SATIS") || relation.includes("SATICI") || unitStatus === "SATILIK") inferredRoles.push("SATICI");
+  });
+
+  return Array.from(new Set(inferredRoles));
+}
+
+function normalizeCustomerGroupKey(customer: Customer) {
+  return `${customer.firstName || ""} ${customer.lastName || ""}`
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replace(/\s+/g, " ");
+}
+
+function groupCustomersByPerson(customers: Customer[]) {
+  const groups = new Map<string, Customer[]>();
+
+  customers.forEach((customer) => {
+    const key = normalizeCustomerGroupKey(customer) || customer.id;
+    const current = groups.get(key) || [];
+    current.push(customer);
+    groups.set(key, current);
+  });
+
+  return Array.from(groups.values()).map((group) =>
+    [...group].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+  );
 }
 
 function optionLabel(options: { key: string; label: string }[], key?: string) {
@@ -1083,6 +1142,11 @@ export default function CrmPage() {
   }, [customers, search, roleFilter, quickFilter]);
 
 
+  const groupedFilteredCustomers = useMemo(
+    () => groupCustomersByPerson(filteredCustomers),
+    [filteredCustomers],
+  );
+
   const developerCustomers = useMemo(() => {
     const hasTag = (customer: Customer, keywords: string[]) =>
       [customer.profession, customer.company, customer.source, customer.notes, ...(customer.tags || [])]
@@ -1100,7 +1164,7 @@ export default function CrmPage() {
         .includes(keywords.join(" "));
 
     return customers.filter((customer) => {
-      const roles = customer.roles || [];
+      const roles = getCustomerDisplayRoles(customer);
       if (developerSegment === "ALICI_ADAYI") return roles.includes("ALICI");
       if (developerSegment === "ARSA_SAHIBI") return roles.includes("ARSA_SAHIBI") || roles.includes("MAL_SAHIBI");
       if (developerSegment === "PORTFOY_ORTAGI") return roles.includes("MUTEAHHIT") || roles.includes("INSAAT_FIRMASI") || hasAnyText(customer, ["portföy ortağı"]);
@@ -1445,7 +1509,7 @@ export default function CrmPage() {
   }
 
   return (
-    <main className="eph-v4-shell min-h-[100dvh] bg-[#F4F8FF] text-[#27364F]">
+    <main className="eph-v4-shell eph-crm-approved-dark min-h-[100dvh] bg-[#031226] text-[#EAF3FF]">
       {showAddModal && <AddCustomerModal form={form} setForm={setForm} formLoading={formLoading} provinceOptions={provinceOptions} provinceLoading={provinceLoading} onSubmit={handleAddCustomer} onClose={() => setShowAddModal(false)} />}
       {showCreditModal && <CreditCalculatorModal selectedCustomer={selectedCustomer} saving={activityLoading} onSave={handleSaveCreditCalculation} onClose={() => setShowCreditModal(false)} />}
       {showQuickNoteModal && <QuickNoteModal customers={customers} saving={activityLoading} onSave={handleSaveQuickNote} onClose={() => setShowQuickNoteModal(false)} />}
@@ -1486,141 +1550,94 @@ export default function CrmPage() {
           <TeamLeaderModeSwitch activeView={teamLeaderView} onChange={setTeamLeaderView} />
         )}
 
-        <header className="eph-crm-compact-head mb-3 overflow-hidden rounded-[26px] border-2 border-[#C7D6E8] bg-white p-3 text-center shadow-[0_10px_30px_rgba(15,23,42,0.07)] md:p-4">
-          <div className="flex items-center justify-center gap-2">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#EFF6FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#1557D6]">
-              <BriefcaseBusiness size={13} />
-              CRM V1.1
+        <header className="mb-3 overflow-hidden rounded-[28px] border border-[#244667] bg-[linear-gradient(145deg,#0A2342_0%,#081C36_55%,#07172C_100%)] p-3 text-center shadow-[0_18px_45px_rgba(0,0,0,0.25)] md:p-4">
+          <div className="flex items-center justify-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#2B5D87] bg-[#0A2949] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#65B9FF]">
+              <Sparkles size={13} />
+              Akıllı CRM · V2
             </div>
           </div>
 
-          <div className="mt-2 text-center">
-            <h1 className="text-[23px] font-black leading-tight tracking-tight text-[#06194A] md:text-[32px]">CRM Merkezi</h1>
-            <p className="mx-auto mt-1 max-w-xl text-[11px] font-bold leading-5 text-[#64748B] md:text-sm">
-              {customers.length} müşteri • {activeCount} aktif lead • {shortMoney(totalBudget)} toplam bütçe
-            </p>
-          </div>
+          <p className="mx-auto mt-3 max-w-xl text-[11px] font-semibold leading-5 text-[#B9CBE0] md:text-sm">
+            <span className="text-[#71C2FF]">{customers.length} müşteri</span> • {activeCount} aktif lead • {shortMoney(totalBudget)} toplam bütçe
+          </p>
 
-          <div className="eph-crm-top-grid mt-3 grid grid-cols-5 gap-1.5">
+          <div className="mt-3 grid grid-cols-5 gap-1.5 md:gap-2">
             <TopCrmCard title="Toplam Kayıt" value={String(customers.length)} icon={<UsersRound size={16} />} onClick={showAllCustomers} />
             <TopCrmCard title="Eksik Bilgili" value={String(incompleteCount)} icon={<Target size={16} />} onClick={showIncompleteCustomers} />
-            <TopCrmCard title="Hızlı Not" value="Sesli Not" icon={<FileText size={16} />} onClick={() => setShowQuickNoteModal(true)} />
-            <TopCrmCard title="Akbank Kredi" value="Hesapla" icon={<WalletCards size={16} />} onClick={() => setShowCreditModal(true)} highlight />
+            <TopCrmCard title="Sesli Not" value="Not" icon={<FileText size={16} />} onClick={() => setShowQuickNoteModal(true)} />
+            <TopCrmCard title="Kredi" value="Hesapla" icon={<WalletCards size={16} />} onClick={() => setShowCreditModal(true)} highlight />
             <TopCrmCard title="Yeni Kayıt" value="Ekle" icon={<Plus size={16} />} onClick={() => setShowAddModal(true)} />
-          </div>
-
-          <CrmSmartBand todayTasks={todayTasks.length} plannedCalls={plannedCallsToday} overdueTasks={overdueTasks.length} warmLeadCount={warmLeadCustomers.length} onShowCustomers={showWarmLeadCustomers} onAddCustomer={() => setShowAddModal(true)} />
-
-          {crmDashboardCards.length > 0 && (
-            <section className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {crmDashboardCards.map((card) => (
-                <button
-                  key={card.key}
-                  type="button"
-                  onClick={() => router.push(card.href)}
-                  className="grid min-h-[86px] grid-cols-[42px_1fr_18px] items-center gap-2 rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-3 py-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)] transition hover:border-[#1557D6] hover:bg-white active:scale-[0.99]"
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-sm">{card.icon}</span>
-                  <span className="min-w-0">
-                    <span className="block text-[13px] font-black leading-tight text-[#06194A]">{card.title}</span>
-                    <span className="mt-0.5 block text-[11px] font-black leading-tight text-[#1557D6]">{card.subtitle}</span>
-                    <span className="mt-1 block text-[11px] font-bold leading-4 text-[#64748B]">{card.desc}</span>
-                  </span>
-                  <ChevronRight size={17} className="shrink-0 justify-self-end text-[#64748B]" />
-                </button>
-              ))}
-            </section>
-          )}
-
-          <div className="mt-3 grid grid-cols-4 gap-2">
-            <QuickActionCard icon={<Flame size={18} />} title="Sıcak Lead" subtitle="Liste" onClick={showWarmLeadCustomers} />
-            <QuickActionCard icon={<PhoneCall size={18} />} title="Görüşme" subtitle="Müşteri seç" onClick={() => setQuickPickMode("GORUSME")} />
-            <QuickActionCard icon={<Clock3 size={18} />} title="Görev" subtitle="Müşteri seç" onClick={() => setQuickPickMode("GOREV")} />
-            <QuickActionCard icon={<ListFilter size={18} />} title={view === "pipeline" ? "Liste" : "Pipeline"} subtitle="Görünüm" onClick={() => setView(view === "pipeline" ? "list" : "pipeline")} />
           </div>
         </header>
 
-        <section className="eph-crm-time-panel mb-3 rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
-          <div className="grid grid-cols-4 gap-2">
-            {[
-              { key: "today", label: "Bugün" },
-              { key: "7", label: "7 Gün" },
-              { key: "15", label: "15 Gün" },
-              { key: "30", label: "30 Gün" },
-            ].map((item) => (
-              <button
-                key={item.key}
-                onClick={() => setTimeRange(item.key as "today" | "7" | "15" | "30")}
-                className={`flex h-10 items-center justify-center gap-1 rounded-2xl text-[11px] font-black transition ${timeRange === item.key ? "bg-[#1557D6] text-white shadow-[0_8px_18px_rgba(37,99,235,0.2)]" : "bg-[#F8FAFC] text-slate-600"}`}
-              >
-                <CalendarDays size={14} />
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-2 rounded-2xl bg-[#F8FAFC] px-3 py-2 text-center text-[11px] font-black text-slate-600">
-            Bu ay: <span className="text-[#1557D6]">{rangeClosedCount} kapandı</span> • <span className="text-emerald-600">{rangeActiveCount} aktif</span> • Hedef: <span className="text-[#06194A]">%{targetRate}</span>
-          </div>
-        </section>
-
         {warmLeadCustomers.length > 0 && (
           <button
-            onClick={() => {
-              setView("list");
-              setRoleFilter("TUMU");
-            }}
-            className="eph-crm-hotlead-card mb-3 flex w-full items-center justify-between gap-3 rounded-[22px] border-2 border-[#FED7AA] bg-[#FFF7ED] px-4 py-3 text-center shadow-[0_8px_24px_rgba(234,88,12,0.08)]"
+            type="button"
+            onClick={showWarmLeadCustomers}
+            className="mb-3 grid w-full grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-3 rounded-[20px] border border-[#A95A19] bg-[linear-gradient(90deg,#271B18_0%,#171A24_100%)] px-3 py-2.5 text-left shadow-[0_12px_28px_rgba(0,0,0,0.18)]"
           >
-            <span className="flex min-w-0 items-center gap-2 text-sm font-black text-orange-700">
-              <Flame size={18} className="shrink-0" />
-              <span className="break-words">{warmLeadCustomers.length} müşteri 48 saattir bekliyor</span>
+            <span className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-[#D56B20] bg-[#3B2017] text-[#FF7A1A] shadow-[0_0_18px_rgba(255,122,26,0.22)]">
+              <Flame size={20} />
             </span>
-            <span className="shrink-0 text-xs font-black text-orange-600">Görüntüle →</span>
+            <span className="min-w-0">
+              <span className="block truncate text-[13px] font-extrabold text-white">{warmLeadCustomers.length} müşteri 48 saattir bekliyor</span>
+              <span className="mt-0.5 block truncate text-[10px] font-medium text-[#D8C8BE]">Lead’ler soğumadan harekete geçin.</span>
+            </span>
+            <span className="flex h-9 items-center gap-1 rounded-full border border-[#8F4D1D] px-3 text-[11px] font-extrabold text-[#FF9A45]">
+              Görüntüle <ChevronRight size={14} />
+            </span>
           </button>
         )}
 
-        <section className="eph-crm-segments mb-3 rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_9px_26px_rgba(15,23,42,0.07)]">
-          <div className="grid grid-cols-6 gap-2">
-            {roleTabs.map((tab, index) => {
+        <section className="mb-3 overflow-hidden rounded-[22px] border border-[#244667] bg-[#071B33] p-2 shadow-[0_12px_28px_rgba(0,0,0,0.18)]">
+          <div className="grid grid-cols-5 divide-x divide-[#24415F]">
+            {roleTabs.map((tab) => {
               const count = customers.filter((customer) => (customer.roles || []).includes(tab.key)).length;
-              const gridClass = index === 3 ? "col-span-2 col-start-2" : "col-span-2";
               return (
-                <div key={tab.key} className={gridClass}>
-                  <RoleSegmentButton
-                    label={tab.label}
-                    count={count}
-                    icon={tab.icon}
-                    active={roleFilter === tab.key}
-                    tone={tab.tone}
-                    onClick={() => handleRoleFilterChange(tab.key)}
-                  />
-                </div>
+                <RoleSegmentButton
+                  key={tab.key}
+                  label={tab.label}
+                  count={count}
+                  icon={tab.icon}
+                  active={roleFilter === tab.key}
+                  tone={tab.tone}
+                  onClick={() => handleRoleFilterChange(tab.key)}
+                />
               );
             })}
           </div>
         </section>
 
         {quickFilter !== "TUMU" && (
-          <button type="button" onClick={showAllCustomers} className="mb-3 flex w-full items-center justify-center rounded-2xl border-2 border-[#C7D6E8] bg-white px-3 py-2 text-xs font-black text-[#1557D6] shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+          <button
+            type="button"
+            onClick={showAllCustomers}
+            className="mb-3 flex w-full items-center justify-center rounded-2xl border border-[#2D6692] bg-[#092440] px-3 py-2 text-[11px] font-extrabold text-[#71C2FF]"
+          >
             {quickFilter === "EKSIK" ? "Eksik bilgili kayıtlar gösteriliyor" : "Sıcak lead listesi gösteriliyor"} • Filtreyi temizle
           </button>
         )}
 
-        <section className="eph-crm-filterbar mb-3 rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
+        <section className="mb-3 rounded-[20px] border border-[#244667] bg-[#071B33] p-2 shadow-[0_10px_24px_rgba(0,0,0,0.16)]">
           <div className="flex gap-2">
             <div className="relative min-w-0 flex-1">
-              <Search className="absolute left-3 top-3 text-slate-400" size={17} />
-              <input id="crm-search-input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Müşteri ara..." className="h-11 w-full rounded-2xl border-2 border-[#C7D6E8] bg-[#F8FAFC] pl-10 pr-3 text-sm font-bold text-slate-700 outline-none focus:border-[#1557D6]" />
+              <Search className="absolute left-3 top-3 text-[#7E9AB8]" size={17} />
+              <input
+                id="crm-search-input"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="CRM kayıtlarında ara..."
+                className="h-11 w-full rounded-[14px] border border-[#294B6B] bg-[#0A213B] pl-10 pr-3 text-[13px] font-semibold text-white outline-none placeholder:text-[#7E9AB8] focus:border-[#3FA7F5]"
+              />
             </div>
-
-            <button type="button" onClick={() => alert("Sesli arama tarayıcı desteği kontrol ediliyor. Bu özellik CRM V1.2 fazında aktif edilecek.")} className="flex h-11 w-12 shrink-0 items-center justify-center rounded-2xl border-2 border-[#C7D6E8] bg-white text-[#06194A]">
-              <Mic size={18} />
-            </button>
-
-            <button onClick={() => setView(view === "pipeline" ? "list" : "pipeline")} className="flex h-11 shrink-0 items-center justify-center gap-1 rounded-2xl border-2 border-[#C7D6E8] bg-white px-3 text-xs font-black text-[#06194A]">
-              {view === "pipeline" ? <FileText size={16} /> : <ListFilter size={16} />}
-              {view === "pipeline" ? "Liste" : "Pipeline"}
+            <button
+              type="button"
+              onClick={() => setView(view === "pipeline" ? "list" : "pipeline")}
+              className="flex h-11 w-12 shrink-0 items-center justify-center rounded-[14px] border border-[#294B6B] bg-[#0A213B] text-[#71C2FF]"
+              aria-label="Liste veya pipeline görünümünü değiştir"
+            >
+              {view === "pipeline" ? <FileText size={17} /> : <ListFilter size={17} />}
             </button>
           </div>
         </section>
@@ -1633,14 +1650,14 @@ export default function CrmPage() {
 
                 return (
                   <div key={stage.key} className="eph-crm-stage w-[280px] shrink-0">
-                    <div className="mb-2 flex items-center justify-between rounded-2xl px-3 py-2" style={{ background: stage.bg }}>
-                      <span className="text-[11px] font-black uppercase tracking-wide" style={{ color: stage.color }}>{stage.label}</span>
-                      <span className="text-base font-black" style={{ color: stage.color }}>{stageCustomers.length}</span>
+                    <div className="mb-2 flex items-center justify-between rounded-2xl border border-[#294B6B] bg-[#0A213B] px-3 py-2">
+                      <span className="text-[11px] font-black uppercase tracking-wide text-[#8FCBFF]">{stage.label}</span>
+                      <span className="text-base font-black text-[#DCEEFF]">{stageCustomers.length}</span>
                     </div>
 
                     <div className="space-y-1.5">
                       {stageCustomers.map((customer) => <CustomerCard key={customer.id} customer={customer} onClick={() => openCustomer(customer.id)} />)}
-                      {stageCustomers.length === 0 && <div className="rounded-[20px] border-2 border-dashed border-[#C7D6E8] bg-white p-5 text-center text-sm font-bold text-slate-400">Boş</div>}
+                      {stageCustomers.length === 0 && <div className="rounded-[18px] border border-dashed border-[#294B6B] bg-[#071B33] p-5 text-center text-sm font-bold text-[#6F8AA6]">Boş</div>}
                     </div>
                   </div>
                 );
@@ -1648,16 +1665,16 @@ export default function CrmPage() {
             </div>
           </section>
         ) : (
-          <section className="eph-crm-list rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_8px_24px_rgba(15,23,42,0.055)]">
+          <section className="eph-crm-list rounded-[22px] border border-[#244667] bg-[#06172C] p-2 shadow-[0_14px_32px_rgba(0,0,0,0.22)]">
             {filteredCustomers.length === 0 ? (
               <div className="flex h-[240px] flex-col items-center justify-center text-center">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#EFF6FF] text-[#1557D6]"><UsersRound size={26} /></div>
-                <div className="text-lg font-black text-[#06194A]">Müşteri bulunamadı</div>
-                <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">Yeni müşteri ekleyebilir veya arama filtresini temizleyebilirsin.</p>
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#0C2A48] text-[#71C2FF]"><UsersRound size={26} /></div>
+                <div className="text-lg font-black text-white">Müşteri bulunamadı</div>
+                <p className="mt-2 max-w-md text-sm leading-6 text-[#8EA6BF]">Yeni müşteri ekleyebilir veya arama filtresini temizleyebilirsin.</p>
               </div>
             ) : (
               <div className="space-y-1.5">
-                {filteredCustomers.map((customer) => <CustomerListRow key={customer.id} customer={customer} onClick={() => openCustomer(customer.id)} />)}
+                {groupedFilteredCustomers.map((group) => <CustomerGroupRow key={normalizeCustomerGroupKey(group[0]) || group[0].id} customers={group} onOpen={openCustomer} />)}
               </div>
             )}
           </section>
@@ -1909,6 +1926,216 @@ export default function CrmPage() {
             padding: 11px 12px;
             font-size: 13px;
           }
+        }
+
+
+        .eph-crm-approved-dark {
+          background:
+            radial-gradient(circle at 50% -10%, rgba(38, 117, 178, 0.24), transparent 36%),
+            linear-gradient(180deg, #031226 0%, #04182d 52%, #020e1e 100%);
+          color: #eaf3ff;
+        }
+
+        .eph-crm-approved-dark .eph-crm-page {
+          background: transparent;
+        }
+
+        .eph-crm-approved-dark .eph-crm-list-row .border,
+        .eph-crm-approved-dark .eph-crm-customer-card .border {
+          border-color: #294b6b;
+        }
+
+        .eph-crm-approved-dark .eph-crm-list-row [class*="bg-white"],
+        .eph-crm-approved-dark .eph-crm-customer-card [class*="bg-white"] {
+          background-color: #0a2949 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-list-row [class*="text-[#06194A]"],
+        .eph-crm-approved-dark .eph-crm-customer-card [class*="text-[#06194A]"] {
+          color: #eaf3ff !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-list-row [class*="text-slate-"],
+        .eph-crm-approved-dark .eph-crm-customer-card [class*="text-slate-"] {
+          color: #8ea6bf !important;
+        }
+
+
+        /* CRM KILCAL DAMAR TEMA KATMANI: tüm modal, sekme, form ve detay yüzeyleri */
+        .eph-crm-approved-dark .eph-crm-modal-overlay {
+          background: rgba(1, 9, 20, 0.82) !important;
+          backdrop-filter: blur(10px);
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel,
+        .eph-crm-approved-dark .eph-crm-detail-panel {
+          border-color: #2d5578 !important;
+          background:
+            radial-gradient(circle at 50% -8%, rgba(34, 123, 190, 0.2), transparent 34%),
+            linear-gradient(180deg, #071b31 0%, #06172b 58%, #041225 100%) !important;
+          color: #eaf3ff !important;
+          box-shadow: 0 -22px 60px rgba(0, 0, 0, 0.44) !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-body {
+          border-top: 1px solid #315f88;
+          background: #0b2948 !important;
+          box-shadow: inset 0 14px 28px rgba(1, 9, 20, 0.18) !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-body > section,
+        .eph-crm-approved-dark .eph-crm-modal-body > div,
+        .eph-crm-approved-dark .eph-crm-modal-body > form {
+          border-color: #4b7da8 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-body [class*="rounded-2xl"],
+        .eph-crm-approved-dark .eph-crm-modal-body [class*="rounded-[24px]"],
+        .eph-crm-approved-dark .eph-crm-modal-body [class*="rounded-[26px]"] {
+          box-shadow: 0 10px 22px rgba(1, 9, 20, 0.2);
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="bg-white"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="bg-white"] {
+          background-color: #12395f !important;
+          border-color: #4b7da8 !important;
+          box-shadow: 0 10px 24px rgba(1, 9, 20, 0.24) !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="bg-[#F8FAFC]"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="bg-[#F8FAFC]"],
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="bg-[#EEF3F8]"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="bg-[#EEF3F8]"],
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="bg-[#EFF6FF]"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="bg-[#EFF6FF]"] {
+          background-color: #17466f !important;
+          border-color: #5a8eb8 !important;
+          box-shadow: 0 10px 22px rgba(1, 9, 20, 0.22) !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="border-[#C7D6E8]"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="border-[#C7D6E8]"],
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="border-slate-"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="border-slate-"] {
+          border-color: #4f81ad !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="text-[#1F2937]"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="text-[#1F2937]"],
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="text-[#06194A]"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="text-[#06194A]"] {
+          color: #f3f8ff !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="text-[#64748B]"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="text-[#64748B]"],
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="text-slate-4"],
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="text-slate-5"],
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="text-slate-6"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="text-slate-4"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="text-slate-5"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="text-slate-6"] {
+          color: #9eb4c9 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel .premium-input,
+        .eph-crm-approved-dark .eph-crm-detail-panel .premium-input,
+        .eph-crm-approved-dark .eph-crm-modal-panel input,
+        .eph-crm-approved-dark .eph-crm-modal-panel textarea,
+        .eph-crm-approved-dark .eph-crm-modal-panel select,
+        .eph-crm-approved-dark .eph-crm-detail-panel input,
+        .eph-crm-approved-dark .eph-crm-detail-panel textarea,
+        .eph-crm-approved-dark .eph-crm-detail-panel select {
+          border-color: #5b91bd !important;
+          background: #0d3153 !important;
+          color: #eef6ff !important;
+          caret-color: #6ec5ff;
+          box-shadow: none !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel input::placeholder,
+        .eph-crm-approved-dark .eph-crm-modal-panel textarea::placeholder,
+        .eph-crm-approved-dark .eph-crm-detail-panel input::placeholder,
+        .eph-crm-approved-dark .eph-crm-detail-panel textarea::placeholder {
+          color: #6f8aa4 !important;
+          opacity: 1;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel option,
+        .eph-crm-approved-dark .eph-crm-detail-panel option {
+          background: #0d3153;
+          color: #eef6ff;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="sticky"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="sticky"] {
+          border-color: #416f98 !important;
+          background: rgba(8, 35, 63, 0.98) !important;
+          box-shadow: 0 10px 26px rgba(1, 9, 20, 0.28) !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="shadow"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="shadow"] {
+          --tw-shadow-color: rgba(0, 0, 0, 0.24) !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel section,
+        .eph-crm-approved-dark .eph-crm-detail-panel section {
+          color: #eaf3ff;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel hr,
+        .eph-crm-approved-dark .eph-crm-detail-panel hr,
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="bg-[#E5EDF7]"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="bg-[#E5EDF7]"] {
+          border-color: #4d7da8 !important;
+          background-color: #4d7da8 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel button[class*="bg-[#1557D6]"],
+        .eph-crm-approved-dark .eph-crm-detail-panel button[class*="bg-[#1557D6]"],
+        .eph-crm-approved-dark .eph-crm-modal-panel button[class*="bg-[#2563EB]"],
+        .eph-crm-approved-dark .eph-crm-detail-panel button[class*="bg-[#2563EB]"] {
+          background: linear-gradient(135deg, #2387d8 0%, #1266b5 100%) !important;
+          color: #ffffff !important;
+          border-color: #58b9f3 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel button[class*="bg-red-50"],
+        .eph-crm-approved-dark .eph-crm-detail-panel button[class*="bg-red-50"],
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="bg-red-50"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="bg-red-50"] {
+          background-color: rgba(127, 29, 29, 0.34) !important;
+          border-color: #7f3b45 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="bg-emerald-50"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="bg-emerald-50"] {
+          background-color: rgba(6, 78, 59, 0.34) !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="bg-violet-50"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="bg-violet-50"] {
+          background-color: rgba(76, 29, 149, 0.28) !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel [class*="rounded-full"][class*="border-2"],
+        .eph-crm-approved-dark .eph-crm-detail-panel [class*="rounded-full"][class*="border-2"] {
+          border-color: #5b91bd !important;
+          background: #12395f !important;
+          color: #a9d9ff !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel ::-webkit-scrollbar,
+        .eph-crm-approved-dark .eph-crm-detail-panel ::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        .eph-crm-approved-dark .eph-crm-modal-panel ::-webkit-scrollbar-thumb,
+        .eph-crm-approved-dark .eph-crm-detail-panel ::-webkit-scrollbar-thumb {
+          border: 2px solid #071b31;
+          border-radius: 999px;
+          background: #315a7e;
         }
       `}</style>
     </main>
@@ -2355,27 +2582,23 @@ function TopCrmCard({
   onClick?: () => void;
   highlight?: boolean;
 }) {
-  const className = `min-w-0 rounded-[18px] border px-1.5 py-2 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)] transition ${
-    highlight ? "border-[#8B5CF6] bg-white text-[#6D28D9]" : "border-[#C7D6E8] bg-[#F8FAFC] text-[#1557D6]"
-  }`;
-
   const content = (
     <>
-      <div className="mx-auto mb-1.5 flex h-8 w-8 items-center justify-center rounded-2xl bg-white shadow-sm">{icon}</div>
-      <p className="mx-auto min-h-[24px] max-w-full text-[8px] font-black uppercase leading-[1.15] text-slate-500">{title}</p>
-      <p className="mt-1 text-[12px] font-black leading-tight text-[#06194A]">{value}</p>
+      <span className={`mx-auto flex h-8 w-8 items-center justify-center rounded-xl border ${highlight ? "border-[#2FAE72] bg-[#0C302A] text-[#63E6A6]" : "border-[#2D5C86] bg-[#0A2949] text-[#65B9FF]"}`}>
+        {icon}
+      </span>
+      <span className="mt-1.5 block min-h-[21px] text-[7.5px] font-bold uppercase leading-[1.15] tracking-[0.03em] text-[#9FB3C9]">{title}</span>
+      <span className="mt-1 block truncate text-[12px] font-extrabold leading-none text-white">{value}</span>
     </>
   );
 
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} className={className}>
-        {content}
-      </button>
-    );
-  }
+  const className = "min-w-0 rounded-[15px] border border-[#294B6B] bg-[linear-gradient(145deg,#102B4A_0%,#0A203A_100%)] px-1.5 py-2.5 text-center transition hover:border-[#3F84B9] active:scale-[0.98]";
 
-  return <div className={className}>{content}</div>;
+  return onClick ? (
+    <button type="button" onClick={onClick} className={className}>{content}</button>
+  ) : (
+    <div className={className}>{content}</div>
+  );
 }
 
 function CrmSmartBand({
@@ -2439,16 +2662,12 @@ function CrmSmartBand({
 }
 
 function segmentToneClasses(tone?: string, active?: boolean) {
-  if (active) return "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]";
-
-  if (tone === "green") return "border-[#C7D6E8] bg-white text-emerald-700";
-  if (tone === "orange") return "border-[#C7D6E8] bg-white text-orange-700";
-  if (tone === "purple") return "border-[#C7D6E8] bg-white text-purple-700";
-  if (tone === "red") return "border-[#C7D6E8] bg-white text-red-600";
-  if (tone === "sky") return "border-[#C7D6E8] bg-white text-sky-700";
-  if (tone === "emerald") return "border-[#C7D6E8] bg-white text-emerald-700";
-
-  return "border-[#C7D6E8] bg-white text-[#1557D6]";
+  if (active) return "bg-[#0D3154] text-[#7AC7FF]";
+  if (tone === "green" || tone === "emerald") return "text-[#54D98A]";
+  if (tone === "orange") return "text-[#FF9A45]";
+  if (tone === "purple") return "text-[#86BFFF]";
+  if (tone === "red") return "text-[#FF7B7B]";
+  return "text-[#55B8FF]";
 }
 
 function RoleSegmentButton({
@@ -2470,21 +2689,21 @@ function RoleSegmentButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex min-h-[78px] w-full min-w-0 flex-col items-center justify-center rounded-[20px] border px-2.5 py-3 text-center shadow-[0_9px_24px_rgba(15,23,42,0.07)] transition ${segmentToneClasses(tone, active)}`}
+      className={`flex min-h-[70px] min-w-0 flex-col items-center justify-center px-1.5 py-2 text-center transition ${segmentToneClasses(tone, active)}`}
     >
-      <span className="mb-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#F8FAFC] shadow-sm">{icon}</span>
-      <span className="block w-full min-w-0 text-center text-[10.5px] font-black leading-[1.15] text-[#06194A]">{label}</span>
-      <span className="mt-1 block text-center text-[12px] font-black leading-none opacity-75">({count})</span>
+      <span className="flex h-7 w-7 items-center justify-center">{icon}</span>
+      <span className="mt-1 block w-full truncate text-[8.5px] font-bold leading-tight text-[#DCEAFF]">{label}</span>
+      <span className="mt-0.5 text-[10px] font-extrabold opacity-90">({count})</span>
     </button>
   );
 }
 
 function QuickActionCard({ icon, title, subtitle, onClick }: { icon: ReactNode; title: string; subtitle: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="min-w-0 rounded-[20px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-2 py-3 text-center shadow-[0_8px_20px_rgba(15,23,42,0.045)] transition hover:border-[#1557D6] hover:bg-white">
-      <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-sm">{icon}</div>
-      <p className="mt-2 break-words text-[11px] font-black leading-tight text-[#06194A]">{title}</p>
-      <p className="mt-0.5 break-words text-[10px] font-black leading-tight text-slate-400">{subtitle}</p>
+    <button onClick={onClick} className="min-w-0 rounded-[16px] border border-[#294B6B] bg-[#0A213B] px-2 py-2.5 text-center transition hover:border-[#3F84B9] active:scale-[0.98]">
+      <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-xl border border-[#2D5C86] bg-[#0A2949] text-[#65B9FF]">{icon}</div>
+      <p className="mt-1.5 truncate text-[9px] font-extrabold leading-tight text-white">{title}</p>
+      <p className="mt-0.5 truncate text-[8px] font-semibold leading-tight text-[#7892AD]">{subtitle}</p>
     </button>
   );
 }
@@ -2501,92 +2720,36 @@ function KpiCard({ title, value, icon }: { title: string; value: string; icon: R
 
 function CustomerCard({ customer, onClick }: { customer: Customer; onClick: () => void }) {
   const [expanded, setExpanded] = useState(false);
-  const stage = stageInfo(customer.status);
   const latestActivity = getLatestActivity(customer);
   const nextTask = getNextTask(customer);
-  const nextTaskSoon = isTaskSoon(nextTask?.dueDate);
-  const tone = customerPastelTone(customer);
   const initials = `${customer.firstName?.[0] || ""}${customer.lastName?.[0] || ""}`.toLocaleUpperCase("tr-TR");
-  const compactSummary = [
-    customer.roles?.length ? roleLabel(customer.roles[0]) : "Rol yok",
-    customer.city,
-    money(customer.budget),
-  ]
-    .filter((item) => item && item !== "—")
-    .join(" • ");
+  const roles = customer.roles || [];
 
   return (
-    <article
-      className="w-full max-w-full overflow-hidden rounded-[14px] border text-left shadow-[0_4px_12px_rgba(15,23,42,0.04)]"
-      style={{ borderColor: tone.border, background: tone.background }}
-    >
+    <article className={`overflow-hidden rounded-[14px] border bg-[#081D35] ${expanded ? "border-[#3D82B7]" : "border-[#294B6B]"}`}>
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
-        className="grid h-[50px] w-full grid-cols-[28px_minmax(0,1fr)_24px] items-center gap-2 px-2.5 text-left transition hover:bg-white/55 active:bg-white/80"
+        className="grid h-[48px] w-full grid-cols-[30px_minmax(0,1fr)_22px] items-center gap-2 px-2.5 text-left"
       >
-        <span
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] text-[9px] font-black"
-          style={{ background: tone.soft, color: tone.accent }}
-        >
-          {initials || "CRM"}
-        </span>
-
+        <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[linear-gradient(145deg,#79C8FF,#3E78D8)] text-[9px] font-extrabold text-white">{initials || "CRM"}</span>
         <span className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
-          <span className="min-w-0 truncate text-[11px] font-black leading-none text-[#06194A]">
-            {customer.firstName} {customer.lastName}
-          </span>
-          <span
-            className="shrink-0 rounded-full px-1.5 py-0.5 text-[7.5px] font-black leading-none"
-            style={{ background: stage.bg, color: stage.color }}
-          >
-            {stage.label}
-          </span>
-          <span className="hidden min-w-0 flex-1 truncate text-[8.5px] font-bold text-slate-500 min-[390px]:inline">
-            • {compactSummary}
-          </span>
+          <span className="min-w-0 truncate text-[10.5px] font-extrabold text-white">{customer.firstName} {customer.lastName}</span>
+          {roles.slice(0, 2).map((role) => <RolePill key={role} role={role} />)}
+          <span className="hidden min-w-0 flex-1 truncate text-[8px] font-medium text-[#8EA6BF] min-[390px]:inline">{customer.city ? `• ${customer.city}` : ""} {customer.budget ? `• ${money(customer.budget)}` : ""}</span>
         </span>
-
-        <span
-          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-transform ${expanded ? "rotate-90" : ""}`}
-          style={{ background: tone.soft, color: tone.accent }}
-        >
-          <ChevronRight size={14} />
-        </span>
+        <ChevronRight className={`h-4 w-4 text-[#A8C1D9] transition-transform ${expanded ? "rotate-90" : ""}`} />
       </button>
 
       {expanded && (
-        <div className="border-t px-2.5 pb-2.5 pt-2" style={{ borderColor: tone.border }}>
-          <div className="grid gap-1.5">
-            <InsightBox
-              title="Son Aktivite"
-              badge={activityTypeLabel(latestActivity?.type)}
-              text={latestActivity?.note || "Henüz aktivite yok"}
-            />
-            <InsightBox
-              title="Sonraki Görev"
-              badge={nextTask?.dueDate ? formatShortDate(nextTask.dueDate) : "Plan yok"}
-              text={nextTask?.title || "Planlı görev yok"}
-              urgent={nextTaskSoon}
-            />
+        <div className="border-t border-[#244667] bg-[#06172C] p-2.5">
+          <div className="grid gap-2">
+            <InsightBox title="Son Aktivite" badge={activityTypeLabel(latestActivity?.type)} text={latestActivity?.note || "Henüz aktivite yok"} />
+            <InsightBox title="Sonraki Görev" badge={nextTask?.dueDate ? formatShortDate(nextTask.dueDate) : "Plan yok"} text={nextTask?.title || "Planlı görev yok"} />
           </div>
-
-          <div className="mt-1.5 grid grid-cols-4 gap-1">
-            <MiniCounter label="Aktivite" value={String(customer._count?.activities || 0)} />
-            <MiniCounter label="Görev" value={String(customer._count?.tasks || 0)} />
-            <MiniCounter label="Talep" value={String(customer._count?.interests || 0)} />
-            <MiniCounter label="Portföy" value={String(customer._count?.properties || 0)} />
-          </div>
-
-          <button
-            type="button"
-            onClick={onClick}
-            className="mt-1.5 flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border bg-white px-3 text-[10px] font-black transition active:scale-[0.99]"
-            style={{ borderColor: tone.border, color: tone.accent }}
-          >
-            <FileText size={14} />
-            Müşteri Detayını Aç
+          <button type="button" onClick={onClick} className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-[#2D6692] bg-[#0A2949] text-[10px] font-extrabold text-[#71C2FF]">
+            <FileText size={14} /> Müşteri Detayını Aç
           </button>
         </div>
       )}
@@ -2594,120 +2757,88 @@ function CustomerCard({ customer, onClick }: { customer: Customer; onClick: () =
   );
 }
 
-const CUSTOMER_PASTEL_TONES = [
-  { border: "#BFD7FF", background: "#F4F8FF", soft: "#E7F0FF", accent: "#1D4ED8" },
-  { border: "#B8E0D2", background: "#F2FBF7", soft: "#DDF5E9", accent: "#047857" },
-  { border: "#E7D2FF", background: "#FAF7FF", soft: "#F0E6FF", accent: "#7C3AED" },
-  { border: "#F6D2A9", background: "#FFF9F2", soft: "#FDEBD3", accent: "#C2410C" },
-  { border: "#F3C4D5", background: "#FFF6F9", soft: "#FCE4EC", accent: "#BE185D" },
-  { border: "#C9D7E8", background: "#F7F9FC", soft: "#E8EEF6", accent: "#334155" },
-] as const;
-
-function customerPastelTone(customer: Customer) {
-  const source = `${customer.id}-${customer.firstName}-${customer.lastName}`;
-  const hash = Array.from(source).reduce((total, character) => total + character.charCodeAt(0), 0);
-  return CUSTOMER_PASTEL_TONES[hash % CUSTOMER_PASTEL_TONES.length];
-}
-
-function CustomerListRow({ customer, onClick }: { customer: Customer; onClick: () => void }) {
+function CustomerGroupRow({ customers, onOpen }: { customers: Customer[]; onOpen: (customerId: string) => void }) {
   const [expanded, setExpanded] = useState(false);
-  const stage = stageInfo(customer.status);
-  const latestActivity = getLatestActivity(customer);
-  const nextTask = getNextTask(customer);
-  const nextTaskSoon = isTaskSoon(nextTask?.dueDate);
-  const tone = customerPastelTone(customer);
-  const roles = customer.roles || [];
-  const initials = `${customer.firstName?.[0] || ""}${customer.lastName?.[0] || ""}`.toLocaleUpperCase("tr-TR");
-  const compactSummary = [
-    roles.length ? roleLabel(roles[0]) : "Rol yok",
-    customer.phone,
-    customer.city,
-    money(customer.budget),
-  ]
-    .filter((item) => item && item !== "—")
-    .join(" • ");
+  const primaryCustomer = customers[0];
+  const initials = `${primaryCustomer.firstName?.[0] || ""}${primaryCustomer.lastName?.[0] || ""}`.toLocaleUpperCase("tr-TR");
+  const groupRoles = Array.from(new Set(customers.flatMap(getCustomerDisplayRoles)));
+  const isGroup = customers.length > 1;
+  const totalBudget = customers.reduce((sum, customer) => sum + (customer.budget || 0), 0);
 
   return (
-    <article
-      className="eph-crm-list-row w-full max-w-full overflow-hidden rounded-[14px] border text-left shadow-[0_4px_12px_rgba(15,23,42,0.04)] transition"
-      style={{ borderColor: tone.border, background: tone.background }}
-    >
+    <article className={`eph-crm-list-row overflow-hidden rounded-[14px] border bg-[#081D35] transition ${expanded ? "border-[#3D82B7] shadow-[0_0_0_1px_rgba(61,130,183,0.15)]" : "border-[#294B6B]"}`}>
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
-        aria-label={`${customer.firstName} ${customer.lastName} detaylarını ${expanded ? "kapat" : "aç"}`}
-        className="grid h-[52px] w-full grid-cols-[30px_minmax(0,1fr)_24px] items-center gap-2 px-2.5 text-left transition hover:bg-white/55 active:bg-white/80"
+        className="grid h-[50px] w-full grid-cols-[32px_minmax(0,1fr)_22px] items-center gap-2 px-2.5 text-left"
       >
-        <span
-          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] text-[9px] font-black"
-          style={{ background: tone.soft, color: tone.accent }}
-        >
+        <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[linear-gradient(145deg,#80D0FF,#4578DB)] text-[9px] font-extrabold text-white shadow-[0_4px_12px_rgba(35,118,190,0.25)]">
           {initials || "CRM"}
+          {isGroup && (
+            <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-[#081D35] bg-[#2563EB] px-1 text-[7px] font-black text-white">
+              {customers.length}
+            </span>
+          )}
         </span>
 
         <span className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
-          <span className="min-w-0 truncate text-[12px] font-black leading-none text-[#06194A]">
-            {customer.firstName} {customer.lastName}
+          <span className="min-w-0 truncate text-[11px] font-extrabold text-white">
+            {primaryCustomer.firstName} {primaryCustomer.lastName}
           </span>
-
-          <span
-            className="shrink-0 rounded-full px-1.5 py-0.5 text-[7.5px] font-black leading-none"
-            style={{ background: stage.bg, color: stage.color }}
-          >
-            {stage.label}
-          </span>
-
-          <span className="hidden min-w-0 flex-1 truncate text-[8.5px] font-bold text-slate-500 min-[390px]:inline">
-            • {compactSummary}
+          {groupRoles.slice(0, 2).map((role) => <RolePill key={role} role={role} />)}
+          {groupRoles.length > 2 && <span className="shrink-0 text-[7.5px] font-extrabold text-[#71C2FF]">+{groupRoles.length - 2}</span>}
+          <span className="hidden min-w-0 flex-1 truncate text-right text-[8.5px] font-medium text-[#9CB1C8] min-[390px]:inline">
+            {isGroup ? `${customers.length} CRM kaydı` : primaryCustomer.city || "Konum yok"}
+            {totalBudget > 0 ? ` • ${money(totalBudget)}` : ""}
           </span>
         </span>
 
-        <span
-          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-transform ${expanded ? "rotate-90" : ""}`}
-          style={{ background: tone.soft, color: tone.accent }}
-        >
-          <ChevronRight size={14} />
-        </span>
+        <ChevronRight className={`h-4 w-4 text-[#A8C1D9] transition-transform ${expanded ? "rotate-90" : ""}`} />
       </button>
 
       {expanded && (
-        <div className="border-t px-2.5 pb-2.5 pt-2" style={{ borderColor: tone.border }}>
-          <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[9px] font-bold text-slate-500">
-            <span>{compactSummary || "Ek bilgi yok"}</span>
-            {roles.length > 1 && <span style={{ color: tone.accent }}>+{roles.length - 1} rol</span>}
-          </div>
+        <div className="border-t border-[#244667] bg-[#06172C] px-2.5 pb-2.5 pt-2">
+          {isGroup && (
+            <div className="mb-2 flex items-center justify-between rounded-xl border border-[#294B6B] bg-[#0A213B] px-3 py-2">
+              <span className="flex items-center gap-2 text-[9px] font-extrabold text-[#A9C4DE]">
+                <UsersRound size={13} className="text-[#71C2FF]" />
+                Aynı kişiye ait CRM kayıtları
+              </span>
+              <span className="rounded-full bg-[#0A2B50] px-2 py-0.5 text-[8px] font-black text-[#78C4FF]">{customers.length}</span>
+            </div>
+          )}
 
-          <div className="grid gap-1.5 md:grid-cols-2">
-            <InsightBox
-              title="Son Aktivite"
-              badge={activityTypeLabel(latestActivity?.type)}
-              text={latestActivity?.note || "Aktivite yok"}
-            />
-            <InsightBox
-              title="Sonraki Görev"
-              badge={nextTask?.dueDate ? formatShortDate(nextTask.dueDate) : "Plan yok"}
-              text={nextTask?.title || "Planlı görev yok"}
-              urgent={nextTaskSoon}
-            />
-          </div>
+          <div className="space-y-1.5">
+            {customers.map((customer, index) => {
+              const roles = getCustomerDisplayRoles(customer);
+              const latestActivity = getLatestActivity(customer);
+              const recordLabel = customer.interestedType || customer.company || customer.profession || `CRM Kaydı ${index + 1}`;
 
-          <div className="mt-1.5 grid grid-cols-4 gap-1">
-            <MiniCounter label="Aktivite" value={String(customer._count?.activities || 0)} />
-            <MiniCounter label="Görev" value={String(customer._count?.tasks || 0)} />
-            <MiniCounter label="Talep" value={String(customer._count?.interests || 0)} />
-            <MiniCounter label="Portföy" value={String(customer._count?.properties || 0)} />
+              return (
+                <button
+                  key={customer.id}
+                  type="button"
+                  onClick={() => onOpen(customer.id)}
+                  className="grid min-h-[48px] w-full grid-cols-[minmax(0,1fr)_auto_18px] items-center gap-2 rounded-xl border border-[#244667] bg-[#081D35] px-2.5 py-2 text-left transition hover:border-[#3D82B7]"
+                >
+                  <span className="min-w-0">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="min-w-0 truncate text-[9.5px] font-extrabold text-white">{recordLabel}</span>
+                      {roles.slice(0, 2).map((role) => <RolePill key={role} role={role} />)}
+                    </span>
+                    <span className="mt-1 block truncate text-[7.5px] font-semibold text-[#8EA6BF]">
+                      {latestActivity ? `Son görüşme: ${formatShortDate(latestActivity.createdAt)}` : customer.city || "Ek bilgi yok"}
+                    </span>
+                  </span>
+                  <span className="max-w-[105px] truncate text-right text-[8px] font-semibold text-[#A9C4DE]">
+                    {customer.city || ""}{customer.budget ? ` • ${money(customer.budget)}` : ""}
+                  </span>
+                  <ChevronRight size={14} className="text-[#A8C1D9]" />
+                </button>
+              );
+            })}
           </div>
-
-          <button
-            type="button"
-            onClick={onClick}
-            className="mt-1.5 flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border bg-white px-3 text-[10px] font-black transition active:scale-[0.99]"
-            style={{ borderColor: tone.border, color: tone.accent }}
-          >
-            <FileText size={14} />
-            Müşteri Detayını Aç
-          </button>
         </div>
       )}
     </article>
@@ -2715,26 +2846,35 @@ function CustomerListRow({ customer, onClick }: { customer: Customer; onClick: (
 }
 
 function RolePill({ role, label }: { role: string; label?: string }) {
-  return <span className="max-w-full break-words rounded-full border-2 border-[#C7D6E8] bg-blue-50 px-2 py-1 text-[10px] font-black leading-4 text-blue-700">{label || roleLabel(role)}</span>;
+  const normalized = role.toUpperCase();
+  const tone = normalized.includes("SATICI") || normalized.includes("MAL_SAHIBI") || normalized.includes("KIRAYA_VEREN")
+    ? "border-[#236B50] bg-[#0B342B] text-[#68E0A4]"
+    : normalized.includes("KIRACI")
+      ? "border-[#8A531E] bg-[#342414] text-[#FFAA55]"
+      : normalized.includes("ALICI")
+        ? "border-[#285E93] bg-[#0A2B50] text-[#78C4FF]"
+        : "border-[#3A5571] bg-[#10283F] text-[#B8CCE0]";
+
+  return <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[7.5px] font-extrabold leading-none ${tone}`}>{label || roleLabel(role)}</span>;
 }
 
 function InsightBox({ title, badge, text, urgent }: { title: string; badge: string; text: string; urgent?: boolean }) {
   return (
-    <div className={`min-w-0 overflow-hidden rounded-2xl p-3 ${urgent ? "bg-red-50" : "bg-[#F8FAFC]"}`}>
+    <div className={`min-w-0 overflow-hidden rounded-xl border p-2.5 ${urgent ? "border-[#8C402A] bg-[#2A1715]" : "border-[#244667] bg-[#081D35]"}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className={`min-w-0 break-words text-[10px] font-black uppercase tracking-wide ${urgent ? "text-red-500" : "text-slate-400"}`}>{title}</span>
-        <span className={`max-w-[52%] shrink-0 break-words rounded-full bg-white px-2 py-1 text-[9px] font-black ${urgent ? "text-red-600" : "text-slate-500"}`}>{badge}</span>
+        <span className={`min-w-0 truncate text-[8px] font-extrabold uppercase tracking-wide ${urgent ? "text-[#FF906C]" : "text-[#7FA2C2]"}`}>{title}</span>
+        <span className={`max-w-[52%] shrink-0 truncate rounded-full border px-2 py-0.5 text-[7.5px] font-extrabold ${urgent ? "border-[#8C402A] bg-[#3A1D18] text-[#FF9B79]" : "border-[#294B6B] bg-[#0A2949] text-[#A9C4DE]"}`}>{badge}</span>
       </div>
-      <p className={`mt-2 break-words break-words text-xs font-bold leading-5 ${urgent ? "text-red-700" : "text-slate-600"}`}>{text}</p>
+      <p className={`mt-1.5 line-clamp-2 text-[9px] font-semibold leading-4 ${urgent ? "text-[#FFD0C0]" : "text-[#B8CADE]"}`}>{text}</p>
     </div>
   );
 }
 
 function MiniCounter({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-[#F8FAFC] px-2 py-2 text-center">
-      <p className="break-words break-words text-sm font-black leading-tight text-[#06194A]">{value}</p>
-      <p className="mt-0.5 break-words text-[9px] font-black uppercase text-slate-400">{label}</p>
+    <div className="rounded-lg border border-[#244667] bg-[#081D35] px-1 py-1.5 text-center">
+      <p className="text-[11px] font-extrabold leading-none text-white">{value}</p>
+      <p className="mt-1 truncate text-[7px] font-bold uppercase text-[#7892AD]">{label}</p>
     </div>
   );
 }
@@ -2939,7 +3079,7 @@ function AddCustomerModal({
 
               <div className="mt-3 grid grid-cols-3 gap-2 md:grid-cols-6">
                 {BUDGET_PRESETS.map((preset) => (
-                  <button key={preset.value} type="button" onClick={() => setField("budget", preset.value)} className={`rounded-2xl border px-2 py-2 text-xs font-black ${form.budget === preset.value ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]" : "border-slate-200 bg-white text-slate-500"}`}>
+                  <button key={preset.value} type="button" onClick={() => setField("budget", preset.value)} className={`rounded-2xl border px-2 py-2 text-xs font-black ${form.budget === preset.value ? "border-[#1557D6] bg-[#0C2A48] text-[#71C2FF]" : "border-slate-200 bg-white text-slate-500"}`}>
                     {preset.label}
                   </button>
                 ))}
@@ -3085,12 +3225,22 @@ function CustomerDetailModal({
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-7">
-            {tabs.map((tab) => (
-              <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`rounded-2xl px-2 py-3 text-[11px] font-black ${activeTab === tab.key ? "bg-[#1557D6] text-white" : "bg-[#F8FAFC] text-slate-500"}`}>
-                {tab.label}
-              </button>
-            ))}
+          <div className="mt-4 rounded-[28px] border border-[#123C66] bg-[#041B35] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_12px_28px_rgba(2,12,27,0.34)]">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-7">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex min-h-[56px] items-center justify-center rounded-[18px] border px-2 py-3 text-center text-[11px] font-black leading-tight transition ${
+                    activeTab === tab.key
+                      ? "border-[#63B3FF] bg-[linear-gradient(180deg,#2F8FFF_0%,#1564D8_100%)] text-white shadow-[0_0_0_1px_rgba(99,179,255,0.28),0_10px_24px_rgba(21,100,216,0.42)]"
+                      : "border-[#1E4E80] bg-[#082544] text-[#D3E1F7] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_8px_18px_rgba(2,12,27,0.35)] hover:border-[#2E6EAF] hover:text-white"
+                  }`}
+                >
+                  <span className="block max-w-full break-words">{tab.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -3427,7 +3577,7 @@ function HavuzMatchesTab({ customer }: { customer: Customer }) {
   return (
     <div className="space-y-4">
       <section className="rounded-[26px] border-2 border-[#C7D6E8] bg-white p-4 text-center shadow-[0_10px_28px_rgba(15,23,42,0.055)]">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0C2A48] text-[#71C2FF]">
           <Home size={23} />
         </div>
         <h3 className="mt-3 text-center text-lg font-black text-[#06194A]">Havuz Eşleşmeleri</h3>
@@ -3690,7 +3840,7 @@ function MultiOptionGrid({ options, value, onChange }: { options: { key: string;
       {options.map((option) => {
         const active = value.includes(option.key);
         return (
-          <button key={option.key} type="button" onClick={() => onChange(active ? value.filter((item) => item !== option.key) : [...value, option.key])} className={`min-h-[42px] rounded-2xl border px-2 py-2 text-center text-[11px] font-black leading-4 md:px-3 md:py-3 md:text-xs ${active ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]" : "border-slate-200 bg-white text-slate-500"}`}>
+          <button key={option.key} type="button" onClick={() => onChange(active ? value.filter((item) => item !== option.key) : [...value, option.key])} className={`min-h-[42px] rounded-2xl border px-2 py-2 text-center text-[11px] font-black leading-4 md:px-3 md:py-3 md:text-xs ${active ? "border-[#1557D6] bg-[#0C2A48] text-[#71C2FF]" : "border-slate-200 bg-white text-slate-500"}`}>
             {option.label}
           </button>
         );
