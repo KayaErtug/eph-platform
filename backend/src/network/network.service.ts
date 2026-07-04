@@ -161,6 +161,47 @@ const FORUM_CATEGORY_LABELS: Record<string, string> = {
   SEKTOREL_SORU: "Sektörel Soru",
 };
 
+const FORUM_REQUEST_TYPES_BY_CATEGORY: Record<string, string[]> = {
+  PORTFOY_ARIYORUM: ["PORTFOY_KIRALIK", "PORTFOY_SATILIK"],
+  KAT_KARSILIGI_ARSA_ARIYORUM: ["ARSA_KONUT_PROJESI", "ARSA_TICARI_PROJE", "ARSA_KARMA_PROJE", "ARSA_KENTSEL_DONUSUM"],
+  BOLGESEL_SATIS_OFISI_ARIYORUM: ["SATIS_OFISI_PROJE", "SATIS_OFISI_BOLGESEL_PARTNER", "SATIS_OFISI_TEK_YETKILI", "SATIS_OFISI_BAYILIK_TEMSILCILIK"],
+  IS_ORTAGI_ARIYORUM: ["IS_ORTAGI_PORTFOY", "IS_ORTAGI_PROJE", "IS_ORTAGI_COZUM", "IS_ORTAGI_YUKLENICI_TASERON"],
+  YATIRIMCI_ARIYORUM: ["YATIRIMCI_ARSA", "YATIRIMCI_PROJE", "YATIRIMCI_FINANSMAN", "YATIRIMCI_KURUMSAL"],
+  SEKTOREL_IHTIYACLAR: ["HIZMET_EKSPERTIZ", "HIZMET_TAPU_HUKUK", "HIZMET_FOTOGRAF_DRONE", "HIZMET_MIMARLIK_MUHENDISLIK", "HIZMET_REKLAM_PAZARLAMA", "HIZMET_DIGER"],
+  DUYURU: ["DUYURU_GENEL", "DUYURU_ETKINLIK_EGITIM", "DUYURU_PLATFORM", "DUYURU_BOLGESEL"],
+  KAMPANYA_DUYURU: ["KAMPANYA_LANSMAN", "KAMPANYA_SATIS", "KAMPANYA_FIYAT_GUNCELLEME", "KAMPANYA_ETKINLIK_TANITIM"],
+  DIGER: ["DIGER_GENEL_TALEP", "DIGER_BILGI_DESTEK", "DIGER_LISTE_DISI"],
+};
+
+const FORUM_REQUEST_TYPE_ALIASES: Record<string, string> = {
+  "kiralık arıyorum": "PORTFOY_KIRALIK",
+  "kiralik ariyorum": "PORTFOY_KIRALIK",
+  "kiralık portföy arıyorum": "PORTFOY_KIRALIK",
+  "satılık arıyorum": "PORTFOY_SATILIK",
+  "satilik ariyorum": "PORTFOY_SATILIK",
+  "satılık portföy arıyorum": "PORTFOY_SATILIK",
+};
+
+function normalizeForumRequestType(value?: string | null) {
+  const raw = cleanForumText(value);
+  if (!raw) return "";
+  const upper = raw.toUpperCase();
+  if (Object.values(FORUM_REQUEST_TYPES_BY_CATEGORY).some((items) => items.includes(upper))) return upper;
+  return FORUM_REQUEST_TYPE_ALIASES[raw.toLocaleLowerCase("tr-TR")] || raw;
+}
+
+function buildForumTags(category: string, requestType: string, tags?: string[] | null) {
+  const cleaned = (tags || [])
+    .map((item) => cleanForumText(item))
+    .filter(Boolean)
+    .filter((item) => !item.startsWith("Talep Türü:"))
+    .filter((item) => !FORUM_CATEGORY_LABELS[normalizeForumCategory(item)]);
+
+  return [FORUM_CATEGORY_LABELS[category], `Talep Türü:${requestType}`, ...cleaned]
+    .filter(Boolean)
+    .slice(0, 10);
+}
+
 const ROLE_FORUM_CATEGORIES: Record<string, string[]> = {
   EMLAKCI: [
     "PORTFOY_ARIYORUM",
@@ -185,7 +226,7 @@ const ROLE_FORUM_CATEGORIES: Record<string, string[]> = {
     "DIGER",
   ],
   ADMIN: ["DUYURU", "SEKTOREL_IHTIYACLAR"],
-  SUPER_ADMIN: ["DUYURU", "SEKTOREL_IHTIYACLAR", "DIGER"],
+  SUPER_ADMIN: Object.keys(FORUM_CATEGORY_LABELS),
 };
 
 function normalizeRoleName(role?: string | null) {
@@ -243,6 +284,7 @@ export class NetworkService {
   private async validateForumPostInput(
     dto: CreateNetworkPostDto | UpdateNetworkPostDto,
     mode: "create" | "update",
+    permissionUserId?: string,
   ) {
     const userId = cleanForumText(dto.userId);
 
@@ -252,12 +294,12 @@ export class NetworkService {
       );
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+    const permissionUser = await this.prisma.user.findUnique({
+      where: { id: cleanForumText(permissionUserId) || userId },
       select: { id: true, role: true },
     });
 
-    if (!user) {
+    if (!permissionUser) {
       throw new BadRequestException("Forum talebi için kullanıcı bulunamadı.");
     }
 
@@ -267,12 +309,31 @@ export class NetworkService {
       throw new BadRequestException("Lütfen talep kategorisini seçin.");
     }
 
+    const normalizedPermissionRole = normalizeRoleName(permissionUser.role);
     const allowedCategories =
-      ROLE_FORUM_CATEGORIES[normalizeRoleName(user.role)] ||
+      ROLE_FORUM_CATEGORIES[normalizedPermissionRole] ||
       ROLE_FORUM_CATEGORIES.EMLAKCI;
 
-    if (!allowedCategories.includes(category)) {
+    if (normalizedPermissionRole !== "SUPER_ADMIN" && !allowedCategories.includes(category)) {
       throw new BadRequestException("Bu kategori rolünüz için uygun değil.");
+    }
+
+    const requestType = normalizeForumRequestType(
+      cleanForumText(
+        (dto as CreateNetworkPostDto).tags?.find((item) =>
+          cleanForumText(item).startsWith("Talep Türü:"),
+        ) || "",
+      ).replace(/^Talep Türü:\s*/i, ""),
+    );
+
+    const allowedRequestTypes = FORUM_REQUEST_TYPES_BY_CATEGORY[category] || [];
+
+    if (!requestType) {
+      throw new BadRequestException("Lütfen talep türünü seçin.");
+    }
+
+    if (!allowedRequestTypes.includes(requestType)) {
+      throw new BadRequestException("Seçilen talep türü bu kategoriyle uyumlu değil.");
     }
 
     const title = cleanForumText(dto.title);
@@ -322,6 +383,7 @@ export class NetworkService {
         return (
           cleanItem &&
           !cleanItem.startsWith("Döviz:") &&
+          !cleanItem.startsWith("Talep Türü:") &&
           !FORUM_CATEGORY_LABELS[normalizeForumCategory(cleanItem)]
         );
       }) || "",
@@ -335,6 +397,7 @@ export class NetworkService {
 
     return {
       category,
+      requestType,
       title,
       description,
     };
@@ -1049,8 +1112,10 @@ export class NetworkService {
         title: dto.title ?? existing.title,
         description: dto.description ?? existing.description,
         city: dto.city ?? existing.city,
+        tags: dto.tags ?? existing.tags,
       },
       "update",
+      actionUser.id,
     );
 
     const nextData = {
@@ -1065,7 +1130,11 @@ export class NetworkService {
       budget: dto.budget ?? existing.budget,
       urgency: dto.urgency ?? existing.urgency,
       visibility: (dto.visibility as any) ?? existing.visibility,
-      tags: dto.tags ?? existing.tags,
+      tags: buildForumTags(
+        validated.category,
+        validated.requestType,
+        dto.tags ?? existing.tags,
+      ),
       expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : existing.expiresAt,
     };
 
@@ -1203,9 +1272,11 @@ export class NetworkService {
         budget: dto.budget || null,
         urgency: dto.urgency || "Normal",
         visibility: (dto.visibility as any) || "TUM_EPH",
-        tags: [FORUM_CATEGORY_LABELS[validated.category], ...(dto.tags || [])]
-          .filter(Boolean)
-          .slice(0, 10),
+        tags: buildForumTags(
+          validated.category,
+          validated.requestType,
+          dto.tags,
+        ),
         expiresAt: dto.expiresAt
           ? new Date(dto.expiresAt)
           : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),

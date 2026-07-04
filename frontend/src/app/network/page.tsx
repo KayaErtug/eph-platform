@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -15,9 +15,29 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
-  X,
 } from "lucide-react";
 
+import ForumAdvancedFilter, {
+  applyForumAdvancedFilters,
+  countForumAdvancedFilters,
+  createEmptyForumAdvancedFilters,
+  type ForumAdvancedFilterState,
+} from "@/components/forum/ForumAdvancedFilter";
+import {
+  SchemaFormEngine,
+  type EPHSchemaDefinition,
+  type EPHSchemaState,
+} from "@/components/schema-engine";
+import {
+  FORUM_REQUEST_CATEGORY_OPTIONS,
+  FORUM_REQUEST_VISIBILITY_OPTIONS,
+  getForumRequestCategoryVisual,
+  getForumRequestIntentVisual,
+  getForumRequestTypeLabel,
+  getForumRequestTypeOptions,
+  normalizeForumRequestTypeCode,
+  forumRequestSchema,
+} from "@/schemas/forum/forum-request.schema";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -74,6 +94,7 @@ type TopicForm = {
   requestIntent: string;
   city: string;
   district: string;
+  neighborhood: string;
   budget: string;
   currency: string;
   detail: string;
@@ -100,7 +121,7 @@ const REQUEST_TABS = [
   {
     key: "Tüm Talepler",
     label: "Tümü",
-    countTone: "bg-blue-100 text-blue-700",
+    countTone: "bg-orange-100 text-blue-700",
   },
   {
     key: "Portföy Arıyorum",
@@ -120,7 +141,7 @@ const REQUEST_TABS = [
   {
     key: "İş Ortağı Arıyorum",
     label: "İş Ortağı Arıyorum",
-    countTone: "bg-blue-100 text-blue-700",
+    countTone: "bg-orange-100 text-blue-700",
   },
   {
     key: "Yatırımcı Arıyorum",
@@ -136,7 +157,11 @@ const REQUEST_TABS = [
   { key: "Diğer", label: "Diğer", countTone: "bg-slate-100 text-slate-700" },
 ] as const;
 
-const PERSONAL_TABS: { key: PersonalTabKey; label: string; icon: string }[] = [
+const PERSONAL_TABS: {
+  key: PersonalTabKey;
+  label: string;
+  icon: string;
+}[] = [
   { key: "ALL", label: "Tüm Talepler", icon: "🌐" },
   { key: "MINE", label: "Taleplerim", icon: "📌" },
   { key: "SAVED", label: "Kaydettiklerim", icon: "⭐" },
@@ -238,124 +263,21 @@ const ROLE_CATEGORY_MAP: Record<string, ForumCategory[]> = {
   ],
 };
 
-const REQUEST_INTENT_OPTIONS = [
-  "Tümü",
-  "Kiralık Arıyorum",
-  "Satılık Arıyorum",
-  "Arıyorum",
-];
-const CREATE_REQUEST_INTENT_OPTIONS = [
-  "Kiralık Arıyorum",
-  "Satılık Arıyorum",
-  "Arıyorum",
-];
-const VALID_OPTIONS = ["3 gün", "7 gün", "15 gün", "30 gün"];
-const URGENCY_OPTIONS = ["Normal", "Acil", "Müşteri Hazır", "Sıcak Talep"];
-const CURRENCY_OPTIONS = ["TRY", "USD", "EUR", "GBP"];
-
-const VISIBILITY_OPTIONS = [
-  { label: "Tüm EPH", value: "TUM_EPH" },
-  { label: "Sadece emlakçılar", value: "SADECE_EMLAKCILAR" },
-  {
-    label: "Sadece müteahhitler / inşaat firmaları",
-    value: "SADECE_MUTEAHHITLER",
-  },
-  { label: "Sadece bağlantılarım", value: "SADECE_BAGLANTILARIM" },
+const REQUEST_TYPE_FILTER_OPTIONS = [
+  { value: "Tümü", label: "Tümü" },
+  { value: "PORTFOY_KIRALIK", label: "Kiralık Portföy" },
+  { value: "PORTFOY_SATILIK", label: "Satılık Portföy" },
+  { value: "DIGER_TURLER", label: "Diğer Talep Türleri" },
 ];
 
-const CITY_OPTIONS = [
-  "K.K.T.C.",
-  "Adana",
-  "Adıyaman",
-  "Afyonkarahisar",
-  "Ağrı",
-  "Aksaray",
-  "Amasya",
-  "Ankara",
-  "Antalya",
-  "Aydın",
-  "Balıkesir",
-  "Bolu",
-  "Bursa",
-  "Çanakkale",
-  "Denizli",
-  "Diyarbakır",
-  "Edirne",
-  "Elazığ",
-  "Erzurum",
-  "Eskişehir",
-  "Gaziantep",
-  "Hatay",
-  "İstanbul",
-  "İzmir",
-  "Kayseri",
-  "Kocaeli",
-  "Konya",
-  "Kütahya",
-  "Malatya",
-  "Manisa",
-  "Mardin",
-  "Mersin",
-  "Muğla",
-  "Sakarya",
-  "Samsun",
-  "Tekirdağ",
-  "Trabzon",
-  "Van",
-];
-
-const DISTRICT_OPTIONS_BY_CITY: Record<string, string[]> = {
-  "K.K.T.C.": [
-    "Lefkoşa",
-    "Girne",
-    "Gazimağusa",
-    "Güzelyurt",
-    "İskele",
-    "Lefke",
-  ],
-  Denizli: [
-    "Merkezefendi",
-    "Pamukkale",
-    "Acıpayam",
-    "Buldan",
-    "Çal",
-    "Çameli",
-    "Çardak",
-    "Çivril",
-    "Honaz",
-    "Sarayköy",
-    "Tavas",
-  ],
-  İstanbul: [
-    "Kadıköy",
-    "Ataşehir",
-    "Üsküdar",
-    "Beşiktaş",
-    "Şişli",
-    "Bakırköy",
-    "Beylikdüzü",
-    "Esenyurt",
-    "Sarıyer",
-  ],
-  Ankara: [
-    "Çankaya",
-    "Keçiören",
-    "Yenimahalle",
-    "Etimesgut",
-    "Mamak",
-    "Gölbaşı",
-    "Sincan",
-  ],
-  İzmir: ["Konak", "Karşıyaka", "Bornova", "Buca", "Çiğli", "Bayraklı", "Urla"],
-  Antalya: ["Muratpaşa", "Konyaaltı", "Kepez", "Alanya", "Manavgat", "Serik"],
-};
-
+const QUICK_REQUEST_TYPE_FILTERS = REQUEST_TYPE_FILTER_OPTIONS.slice(1);
 const DEFAULT_FORM: TopicForm = {
   title: "",
   category: "",
   requestIntent: "",
   city: "",
   district: "",
+  neighborhood: "",
   budget: "",
   currency: "TRY",
   detail: "",
@@ -462,22 +384,15 @@ function getRequestIntentFromPost(post: NetworkPost) {
   const tag = (post.tags || []).find((item) =>
     String(item || "").startsWith("Talep Türü:"),
   );
-  const value = String(tag || "")
-    .replace("Talep Türü:", "")
-    .trim();
-
-  if (CREATE_REQUEST_INTENT_OPTIONS.includes(value)) return value;
-
-  const text = normalizeText(
-    [post.title, post.description, ...(post.tags || [])].join(" "),
+  const explicit = normalizeForumRequestTypeCode(
+    String(tag || "").replace("Talep Türü:", "").trim(),
   );
+  if (explicit) return explicit;
 
-  if (text.includes("kiralık") || text.includes("kiralik"))
-    return "Kiralık Arıyorum";
-  if (text.includes("satılık") || text.includes("satilik"))
-    return "Satılık Arıyorum";
-
-  return "Arıyorum";
+  const text = normalizeText([post.title, post.description, ...(post.tags || [])].join(" "));
+  if (text.includes("kiralık") || text.includes("kiralik")) return "PORTFOY_KIRALIK";
+  if (text.includes("satılık") || text.includes("satilik")) return "PORTFOY_SATILIK";
+  return getForumRequestTypeOptions(getCategoryOption(post.type).value)[0]?.value || "DIGER_GENEL_TALEP";
 }
 
 function postMatchesCategory(post: NetworkPost, filter: string) {
@@ -488,8 +403,9 @@ function postMatchesCategory(post: NetworkPost, filter: string) {
 
 function postMatchesIntent(post: NetworkPost, filter: string) {
   if (filter === "Tümü") return true;
-
-  return getRequestIntentFromPost(post) === filter;
+  const requestType = getRequestIntentFromPost(post);
+  if (filter === "DIGER_TURLER") return !["PORTFOY_KIRALIK", "PORTFOY_SATILIK"].includes(requestType);
+  return requestType === filter;
 }
 
 function tabCount(posts: NetworkPost[], key: string) {
@@ -568,20 +484,6 @@ function expiresAtFromValidFor(value: string) {
   return date.toISOString();
 }
 
-function isHotPost(post: NetworkPost) {
-  const text = normalizeText(
-    [post.urgency, post.title, post.description].filter(Boolean).join(" "),
-  );
-
-  return (
-    text.includes("acil") ||
-    text.includes("sıcak") ||
-    text.includes("sicak") ||
-    text.includes("hazır") ||
-    text.includes("hazir")
-  );
-}
-
 function getRoleCategories(role?: string | null) {
   const normalized = normalizeRole(role);
   const values = ROLE_CATEGORY_MAP[normalized] || ROLE_CATEGORY_MAP.EMLAKCI;
@@ -589,10 +491,6 @@ function getRoleCategories(role?: string | null) {
   return values
     .map((value) => ALL_CATEGORY_OPTIONS.find((item) => item.value === value))
     .filter(Boolean) as ForumCategoryOption[];
-}
-
-function getDistrictOptions(city: string) {
-  return DISTRICT_OPTIONS_BY_CITY[city] || ["Merkez"];
 }
 
 function canManagePost(
@@ -634,6 +532,7 @@ function formFromPost(post: NetworkPost): TopicForm {
     requestIntent: getRequestIntentFromPost(post),
     city: post.city || "",
     district: post.district || "",
+    neighborhood: post.neighborhood || "",
     budget: post.budget ? formatBudgetInput(String(post.budget)) : "",
     currency: budgetCurrencyFromPost(post),
     detail: post.description || "",
@@ -693,10 +592,11 @@ export default function NetworkPage() {
   const [intentFilter, setIntentFilter] = useState("Tümü");
   const [personalFilter, setPersonalFilter] = useState<PersonalTabKey>("ALL");
   const [search, setSearch] = useState("");
-  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
-  const [cityFilter, setCityFilter] = useState("");
-  const [urgencyFilter, setUrgencyFilter] = useState("Tümü");
-  const [budgetMaxFilter, setBudgetMaxFilter] = useState("");
+  const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
+  const [advancedFilters, setAdvancedFilters] =
+    useState<ForumAdvancedFilterState>(() =>
+      createEmptyForumAdvancedFilters(),
+    );
   const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
   const [interestedPostIds, setInterestedPostIds] = useState<Set<string>>(
     new Set(),
@@ -752,65 +652,38 @@ export default function NetworkPage() {
   }, [user?.id]);
 
   const baseFilteredPosts = useMemo(() => {
-    const keyword = normalizeText(search);
-
-    return posts
+    return applyForumAdvancedFilters(posts, advancedFilters, search)
       .filter((post) => postMatchesCategory(post, flowFilter))
-      .filter((post) => postMatchesIntent(post, intentFilter))
-      .filter((post) => {
-        if (!cityFilter) return true;
+      .filter((post) => postMatchesIntent(post, intentFilter));
+  }, [advancedFilters, flowFilter, intentFilter, posts, search]);
 
-        return post.city === cityFilter;
-      })
-      .filter((post) => {
-        if (urgencyFilter === "Tümü") return true;
+  const advancedFilterCount = useMemo(
+    () => countForumAdvancedFilters(advancedFilters),
+    [advancedFilters],
+  );
 
-        return String(post.urgency || "Normal") === urgencyFilter;
-      })
-      .filter((post) => {
-        const budgetMax = Number(
-          String(budgetMaxFilter || "").replace(/\D/g, ""),
-        );
+  const locationFilterLabel = useMemo(() => {
+    if (advancedFilters.neighborhoods.length > 0) {
+      return `${advancedFilters.neighborhoods.length} mahalle`;
+    }
 
-        if (!budgetMax) return true;
-        if (!post.budget) return false;
+    if (advancedFilters.districts.length > 0) {
+      return `${advancedFilters.districts.length} ilçe`;
+    }
 
-        return post.budget <= budgetMax;
-      })
-      .filter((post) => {
-        if (!keyword) return true;
+    if (advancedFilters.cities.length === 1) {
+      return advancedFilters.cities[0];
+    }
 
-        const haystack = normalizeText(
-          [
-            post.title,
-            post.description,
-            post.type,
-            post.city,
-            post.district,
-            post.neighborhood,
-            ...(post.tags || []),
-          ]
-            .filter(Boolean)
-            .join(" "),
-        );
+    if (advancedFilters.cities.length > 1) {
+      return `${advancedFilters.cities.length} il`;
+    }
 
-        return haystack.includes(keyword);
-      })
-      .sort((a, b) => {
-        if (isHotPost(a) !== isHotPost(b)) return isHotPost(a) ? -1 : 1;
-
-        return String(b.createdAt || "").localeCompare(
-          String(a.createdAt || ""),
-        );
-      });
+    return "Konum";
   }, [
-    budgetMaxFilter,
-    cityFilter,
-    flowFilter,
-    intentFilter,
-    posts,
-    search,
-    urgencyFilter,
+    advancedFilters.cities,
+    advancedFilters.districts,
+    advancedFilters.neighborhoods,
   ]);
 
   const filteredPosts = useMemo(() => {
@@ -864,7 +737,11 @@ export default function NetworkPage() {
       return;
     }
 
-    const allowedCategories = getRoleCategories(user.role);
+    const normalizedUserRole = normalizeRole(user.role);
+    const allowedCategories =
+      normalizedUserRole === "SUPER_ADMIN"
+        ? ALL_CATEGORY_OPTIONS
+        : getRoleCategories(user.role);
     const selectedCategory = allowedCategories.find(
       (item) => item.value === form.category,
     );
@@ -900,6 +777,7 @@ export default function NetworkPage() {
       form.urgency,
       form.city,
       form.district,
+      form.neighborhood,
       form.budget ? `Döviz:${form.currency}` : "",
     ]
       .filter(Boolean)
@@ -912,7 +790,7 @@ export default function NetworkPage() {
       description: form.detail.trim(),
       city: form.city.trim() || null,
       district: form.district.trim() || null,
-      neighborhood: null,
+      neighborhood: form.neighborhood.trim() || null,
       budget: form.budget ? Number(form.budget.replace(/\D/g, "")) : null,
       urgency: form.urgency,
       visibility: form.visibility,
@@ -1047,7 +925,7 @@ export default function NetworkPage() {
       id: "total",
       label: "Toplam Talep",
       value: posts.length,
-      tone: "text-[#1557D6]",
+      tone: "text-[#EA580C]",
     },
     {
       id: "mine",
@@ -1089,7 +967,7 @@ export default function NetworkPage() {
 
   return (
     <main
-      className="min-h-[calc(100dvh-64px)] bg-[#F4F8FF] px-2 pt-2 text-[#06194A] sm:px-3"
+      className="min-h-[calc(100dvh-64px)] bg-[#FFF1D6] px-2 pt-2 text-[#3A2208] sm:px-3"
       style={{
         paddingBottom: "calc(112px + env(safe-area-inset-bottom, 0px))",
       }}
@@ -1132,299 +1010,331 @@ export default function NetworkPage() {
           animation-play-state: paused;
         }
 
+        @keyframes forumSilverShine {
+          0% {
+            background-position: 210% center;
+          }
+          100% {
+            background-position: -210% center;
+          }
+        }
+
+        .forum-command-shell {
+          background:
+            radial-gradient(
+              circle at 92% 4%,
+              rgba(255, 255, 255, 0.92),
+              transparent 32%
+            ),
+            radial-gradient(
+              circle at 4% 94%,
+              rgba(251, 146, 60, 0.30),
+              transparent 34%
+            ),
+            linear-gradient(155deg, #FFF4E5 0%, #FFE4B8 52%, #FFD28A 100%);
+        }
+
+        .forum-command-grid {
+          background-image:
+            linear-gradient(rgba(234, 88, 12, 0.055) 1px, transparent 1px),
+            linear-gradient(
+              90deg,
+              rgba(234, 88, 12, 0.055) 1px,
+              transparent 1px
+            );
+          background-size: 24px 24px;
+        }
+
+        .forum-silver-text {
+          color: #475569;
+          background-image: linear-gradient(
+            110deg,
+            #334155 0%,
+            #64748b 30%,
+            #f8fafc 47%,
+            #ffffff 50%,
+            #94a3b8 58%,
+            #334155 100%
+          );
+          background-size: 240% 100%;
+          background-clip: text;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: forumSilverShine 4.8s linear infinite;
+        }
+
+        .forum-scrollbar {
+          scrollbar-width: none;
+        }
+
+        .forum-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .talep-marquee-track {
             animation: none;
             overflow-x: auto;
             width: 100%;
           }
+
+          .forum-silver-text {
+            animation: none;
+            background-image: none;
+            -webkit-text-fill-color: #475569;
+          }
         }
       `}</style>
 
       <div className="mx-auto w-full max-w-[430px] space-y-3 overflow-hidden">
-        <section className="rounded-[28px] border border-white bg-white/95 px-4 py-4 text-center shadow-[0_16px_44px_rgba(15,23,42,0.08)]">
-          <h1 className="text-center text-[32px] font-black leading-none tracking-[-0.06em] text-[#06194A]">
-            Talep Merkezi
-          </h1>
-          <p className="mx-auto mt-2 max-w-[330px] text-center text-[14px] font-extrabold leading-5 text-[#475569]">
-            Elinizdekini değil, ihtiyacınızı paylaşın.
-          </p>
-          <span className="mx-auto mt-3 block h-1 w-10 rounded-full bg-[#1557D6]" />
-        </section>
+        <section className="forum-command-shell relative overflow-hidden rounded-[30px] border border-[#F5A94A] shadow-[0_20px_48px_rgba(194,65,12,0.18)]">
+          <div className="forum-command-grid pointer-events-none absolute inset-0 opacity-65" />
+          <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full border border-white/70" />
+          <div className="pointer-events-none absolute -left-20 bottom-16 h-48 w-48 rounded-full border border-orange-300/35" />
 
-        <section className="rounded-[26px] border border-white bg-white/95 p-2 shadow-[0_14px_34px_rgba(15,23,42,0.075)]">
-          <div className="grid grid-cols-4 gap-1.5">
-            {PERSONAL_TABS.map((tab) => {
-              const active = personalFilter === tab.key;
+          <div className="relative space-y-3 p-3">
+            <header className="rounded-[26px] border border-[#FED7AA] bg-[#FFFBF5]/95 px-4 py-4 text-center shadow-[0_14px_34px_rgba(194,65,12,0.12)] backdrop-blur">
+              <h1 className="text-center text-[31px] font-black leading-none tracking-[-0.06em] text-[#3A2208]">
+                Talep Merkezi
+              </h1>
+              <p className="forum-silver-text mx-auto mt-2 max-w-[340px] text-center text-[13.5px] font-black leading-5">
+                Elinizdekini değil, ihtiyacınızı paylaşın.
+              </p>
+              <span className="mx-auto mt-3 block h-1 w-12 rounded-full bg-gradient-to-r from-[#C2410C] via-[#F59E0B] to-[#EA580C] shadow-[0_0_14px_rgba(56,189,248,0.45)]" />
+            </header>
 
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setPersonalFilter(tab.key)}
-                  className={`min-h-[58px] rounded-[20px] border px-1.5 py-2 text-center transition active:scale-[0.98] ${
-                    active
-                      ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
-                      : "border-[#E2EAF5] bg-white text-[#06194A]"
-                  }`}
-                >
-                  <span className="block text-center text-[16px] leading-none">
-                    {tab.icon}
-                  </span>
-                  <span className="mt-1 block text-center text-[9.5px] font-black leading-[11px]">
-                    {tab.label}
-                  </span>
-                  <span className="mt-1 inline-flex min-w-[22px] justify-center rounded-full bg-white px-1.5 text-[10px] font-black text-[#1557D6]">
-                    {personalTabCounts[tab.key]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+            <section className="rounded-[25px] border border-[#FED7AA] bg-[#FFFBF5]/95 p-2 shadow-[0_14px_32px_rgba(194,65,12,0.11)] backdrop-blur">
+              <div className="grid grid-cols-4 gap-1.5">
+                {PERSONAL_TABS.map((tab) => {
+                  const active = personalFilter === tab.key;
 
-        <section className="-mx-2 overflow-hidden pl-2">
-          <MarqueeRow duration={42}>
-            {REQUEST_TABS.map((tab, index) => {
-              const active = flowFilter === tab.key;
-
-              return (
-                <button
-                  key={`request-tab-${tab.key}-${index}`}
-                  type="button"
-                  onClick={() => setFlowFilter(tab.key)}
-                  className={`min-h-[148px] w-[104px] shrink-0 overflow-hidden rounded-[22px] border bg-white text-center shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition active:scale-[0.98] ${
-                    active
-                      ? "border-[#1557D6] ring-2 ring-blue-100"
-                      : "border-[#E2EAF5]"
-                  }`}
-                >
-                  <div className="relative h-[72px] w-full overflow-hidden bg-[#EEF5FF]">
-                    <Image
-                      src={
-                        CATEGORY_IMAGES[tab.key] ||
-                        CATEGORY_IMAGES["Tüm Talepler"]
-                      }
-                      alt={tab.label}
-                      fill
-                      sizes="104px"
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="flex min-h-[52px] items-center justify-center px-1.5">
-                    <p className="text-center text-[11.5px] font-black leading-[14px] tracking-[-0.02em] text-[#06194A]">
-                      {tab.label}
-                    </p>
-                  </div>
-                  <span
-                    className={`mx-auto inline-flex min-h-[24px] min-w-[34px] items-center justify-center rounded-full px-2 text-[13px] font-black ${tab.countTone}`}
-                  >
-                    {tabCount(posts, tab.key)}
-                  </span>
-                </button>
-              );
-            })}
-          </MarqueeRow>
-        </section>
-
-        <section className="rounded-[26px] border border-white bg-white/95 p-3 shadow-[0_14px_34px_rgba(15,23,42,0.075)]">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex h-12 min-w-0 flex-[1_1_100%] items-center gap-2 rounded-[24px] bg-[#F1F5FB] px-3">
-              <Search size={18} className="shrink-0 text-[#64748B]" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-left text-[13px] font-bold text-[#06194A] outline-none placeholder:text-[#94A3B8]"
-                placeholder="Talep başlığı, şehir, ilçe..."
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setFilterPanelOpen((current) => !current)}
-              className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[22px] border px-3 text-[12px] font-black ${
-                cityFilter
-                  ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
-                  : "border-[#DDE7F3] bg-white text-[#06194A]"
-              }`}
-            >
-              <MapPin size={16} className="text-[#1557D6]" />
-              <span className="max-w-[92px] truncate">
-                {cityFilter || "Şehir"}
-              </span>
-              <ChevronDown size={14} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setFilterPanelOpen((current) => !current)}
-              className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[22px] border px-3 text-[12px] font-black ${
-                filterPanelOpen ||
-                cityFilter ||
-                urgencyFilter !== "Tümü" ||
-                budgetMaxFilter
-                  ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
-                  : "border-[#DDE7F3] bg-white text-[#06194A]"
-              }`}
-            >
-              <SlidersHorizontal size={15} className="text-[#1557D6]" />
-              Filtrele
-            </button>
-          </div>
-        </section>
-
-        {filterPanelOpen && (
-          <section className="rounded-[26px] border border-[#DDE7F3] bg-white/95 p-3 shadow-[0_14px_34px_rgba(15,23,42,0.075)]">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <FieldLabel title="Şehir" />
-                <select
-                  value={cityFilter}
-                  onChange={(event) => setCityFilter(event.target.value)}
-                  className="h-11 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-center text-[12px] font-black text-[#06194A] outline-none"
-                >
-                  <option value="">Tüm şehirler</option>
-                  {CITY_OPTIONS.map((city, index) => (
-                    <option key={`filter-city-${city}-${index}`} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <FieldLabel title="Aciliyet" />
-                <select
-                  value={urgencyFilter}
-                  onChange={(event) => setUrgencyFilter(event.target.value)}
-                  className="h-11 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-center text-[12px] font-black text-[#06194A] outline-none"
-                >
-                  <option value="Tümü">Tümü</option>
-                  {URGENCY_OPTIONS.map((item, index) => (
-                    <option
-                      key={`filter-urgency-${item}-${index}`}
-                      value={item}
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setPersonalFilter(tab.key)}
+                      className={`min-h-[65px] rounded-[19px] border px-1 py-2 text-center transition active:scale-[0.98] ${
+                        active
+                          ? "border-[#EA580C] bg-[#FFF1E8] text-[#EA580C] shadow-[0_8px_18px_rgba(21,87,214,0.13)]"
+                          : "border-[#FED7AA] bg-white text-[#3A2208]"
+                      }`}
                     >
-                      {item}
-                    </option>
-                  ))}
-                </select>
+                      <span className="block text-center text-[17px] leading-none">
+                        {tab.icon}
+                      </span>
+                      <span className="mt-1 block min-h-[20px] text-center text-[9px] font-black leading-[10px]">
+                        {tab.label}
+                      </span>
+                      <span className="mt-1 inline-flex min-w-[22px] justify-center rounded-full bg-white px-1.5 text-[10px] font-black text-[#EA580C] shadow-[0_2px_7px_rgba(15,23,42,0.08)]">
+                        {personalTabCounts[tab.key]}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-            </div>
+            </section>
 
-            <div className="mt-2 grid grid-cols-[1fr_104px] gap-2">
-              <div>
-                <FieldLabel title="Azami Bütçe" />
+            <section className="-mx-1 overflow-hidden pl-1">
+              <MarqueeRow duration={42}>
+                {REQUEST_TABS.map((tab, index) => {
+                  const active = flowFilter === tab.key;
+
+                  return (
+                    <button
+                      key={`request-tab-${tab.key}-${index}`}
+                      type="button"
+                      onClick={() => setFlowFilter(tab.key)}
+                      className={`min-h-[148px] w-[104px] shrink-0 overflow-hidden rounded-[22px] border bg-white text-center shadow-[0_12px_30px_rgba(194,65,12,0.12)] transition active:scale-[0.98] ${
+                        active
+                          ? "border-[#EA580C] ring-2 ring-orange-100"
+                          : "border-[#FED7AA]"
+                      }`}
+                    >
+                      <div className="relative h-[72px] w-full overflow-hidden bg-[#EEF5FF]">
+                        <Image
+                          src={
+                            CATEGORY_IMAGES[tab.key] ||
+                            CATEGORY_IMAGES["Tüm Talepler"]
+                          }
+                          alt={tab.label}
+                          fill
+                          sizes="104px"
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="flex min-h-[52px] items-center justify-center px-1.5">
+                        <p className="text-center text-[11px] font-black leading-[13px] tracking-[-0.02em] text-[#3A2208]">
+                          {tab.label}
+                        </p>
+                      </div>
+                      <span
+                        className={`mx-auto inline-flex min-h-[24px] min-w-[34px] items-center justify-center rounded-full px-2 text-[13px] font-black ${tab.countTone}`}
+                      >
+                        {tabCount(posts, tab.key)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </MarqueeRow>
+            </section>
+
+            <section className="rounded-[25px] border border-[#FED7AA] bg-[#FFFBF5]/95 p-3 shadow-[0_14px_32px_rgba(194,65,12,0.11)] backdrop-blur">
+              <div className="flex h-12 items-center gap-2 rounded-[21px] bg-[#FFF7ED] px-3 ring-1 ring-[#FED7AA]">
+                <Search size={17} className="shrink-0 text-[#7C5A36]" />
                 <input
-                  value={budgetMaxFilter}
-                  onChange={(event) =>
-                    setBudgetMaxFilter(formatBudgetInput(event.target.value))
-                  }
-                  className="h-11 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-center text-[12px] font-black text-[#06194A] outline-none placeholder:text-[#94A3B8]"
-                  placeholder="Örn: 9.000.000"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-left text-[12px] font-bold text-[#3A2208] outline-none placeholder:text-[#94A3B8]"
+                  placeholder="Talep başlığı, şehir, ilçe..."
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setCityFilter("");
-                  setUrgencyFilter("Tümü");
-                  setBudgetMaxFilter("");
-                }}
-                className="mt-6 h-11 rounded-[18px] border border-[#DDE7F3] bg-[#F8FBFF] px-3 text-[12px] font-black text-[#06194A]"
-              >
-                Temizle
-              </button>
-            </div>
-          </section>
-        )}
-
-        <section className="rounded-[26px] border border-white bg-white/95 p-3 shadow-[0_14px_34px_rgba(15,23,42,0.075)]">
-          <div className="flex items-center gap-2">
-            <p className="w-[86px] shrink-0 text-center text-[13px] font-black leading-4 text-[#06194A]">
-              Talep Türü
-            </p>
-            <select
-              value={intentFilter}
-              onChange={(event) => setIntentFilter(event.target.value)}
-              className="h-11 min-w-0 flex-1 rounded-[18px] border border-[#1557D6] bg-white px-3 text-center text-[13px] font-black text-[#06194A] outline-none"
-            >
-              {REQUEST_INTENT_OPTIONS.map((item, index) => (
-                <option key={`intent-filter-${item}-${index}`} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {CREATE_REQUEST_INTENT_OPTIONS.map((item, index) => {
-              const active = intentFilter === item;
-
-              return (
+              <div className="mt-2 grid grid-cols-2 gap-2">
                 <button
-                  key={`intent-button-${item}-${index}`}
                   type="button"
-                  onClick={() => setIntentFilter(active ? "Tümü" : item)}
-                  className={`flex h-11 items-center justify-center rounded-[18px] border px-2 text-center text-[11px] font-black leading-3 transition active:scale-[0.98] ${
-                    active
-                      ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
-                      : "border-[#E2EAF5] bg-white text-[#06194A]"
+                  onClick={() => setAdvancedFilterOpen(true)}
+                  className={`relative flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-[19px] border px-2 text-[11px] font-black transition active:scale-[0.98] ${
+                    advancedFilters.cities.length > 0 ||
+                    advancedFilters.districts.length > 0 ||
+                    advancedFilters.neighborhoods.length > 0
+                      ? "border-[#EA580C] bg-[#FFF1E8] text-[#C2410C]"
+                      : "border-[#FED7AA] bg-white text-[#3A2208]"
                   }`}
                 >
-                  {item}
+                  <MapPin size={15} className="shrink-0 text-[#EA580C]" />
+                  <span className="min-w-0 truncate">{locationFilterLabel}</span>
+                  <ChevronDown size={13} className="shrink-0" />
                 </button>
-              );
-            })}
+
+                <button
+                  type="button"
+                  onClick={() => setAdvancedFilterOpen(true)}
+                  className={`relative flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-[19px] border px-2 text-[11px] font-black transition active:scale-[0.98] ${
+                    advancedFilterOpen || advancedFilterCount > 0
+                      ? "border-[#EA580C] bg-[#FFF1E8] text-[#EA580C]"
+                      : "border-[#FED7AA] bg-white text-[#3A2208]"
+                  }`}
+                >
+                  <SlidersHorizontal
+                    size={15}
+                    className="shrink-0 text-[#EA580C]"
+                  />
+                  Gelişmiş Filtre
+                  {advancedFilterCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#EA580C] px-1 text-[9px] font-black text-white">
+                      {advancedFilterCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </section>
+
+            <section className="rounded-[25px] border border-[#FED7AA] bg-[#FFFBF5]/95 p-3 shadow-[0_14px_32px_rgba(194,65,12,0.11)] backdrop-blur">
+              <div className="flex items-center gap-2">
+                <div className="w-[88px] shrink-0 text-center">
+                  <p className="text-center text-[8px] font-black uppercase tracking-[0.13em] text-[#EA580C]">
+                    Akıllı Filtre
+                  </p>
+                  <p className="mt-0.5 text-center text-[12px] font-black text-[#3A2208]">
+                    Talep Türü
+                  </p>
+                </div>
+
+                <select
+                  value={intentFilter}
+                  onChange={(event) => setIntentFilter(event.target.value)}
+                  className="h-11 min-w-0 flex-1 rounded-[18px] border border-[#EA580C] bg-white px-3 text-center text-[12px] font-black text-[#3A2208] outline-none"
+                >
+                  {REQUEST_TYPE_FILTER_OPTIONS.map((item, index) => (
+                    <option
+                      key={`intent-filter-${item.value}-${index}`}
+                      value={item.value}
+                    >
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {QUICK_REQUEST_TYPE_FILTERS.map((item, index) => {
+                  const active = intentFilter === item.value;
+                  const intentVisual =
+                    item.value === "DIGER_TURLER"
+                      ? getForumRequestCategoryVisual("DIGER")
+                      : getForumRequestIntentVisual(item.value);
+
+                  return (
+                    <button
+                      key={`intent-button-${item.value}-${index}`}
+                      type="button"
+                      onClick={() =>
+                        setIntentFilter(active ? "Tümü" : item.value)
+                      }
+                      className="flex min-h-[43px] items-center justify-center rounded-[16px] border px-1.5 text-center text-[9px] font-black leading-[11px] transition active:scale-[0.98]"
+                      style={{
+                        borderColor: intentVisual.borderColor,
+                        borderWidth: `${active ? intentVisual.borderWidth || 2 : 1}px`,
+                        backgroundColor: active
+                          ? intentVisual.selectedBackgroundColor
+                          : intentVisual.backgroundColor,
+                        color: intentVisual.textColor,
+                        boxShadow: active ? intentVisual.shadow : "none",
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="grid grid-cols-4 overflow-hidden rounded-[22px] border border-[#FED7AA] bg-[#FFFBF5]/95 shadow-[0_14px_32px_rgba(194,65,12,0.11)] backdrop-blur">
+              {metrics.slice(0, 4).map((metric, index) => (
+                <MetricBox
+                  key={`metric-${metric.id}-${index}`}
+                  label={metric.label}
+                  value={metric.value}
+                  tone={metric.tone}
+                />
+              ))}
+            </section>
+
+            <section className="rounded-[25px] border border-[#FED7AA] bg-[#FFFBF5]/95 p-3 shadow-[0_14px_32px_rgba(194,65,12,0.11)] backdrop-blur">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1 text-center">
+                  <h2 className="text-center text-[21px] font-black tracking-[-0.04em] text-[#3A2208]">
+                    {PERSONAL_TABS.find(
+                      (item) => item.key === personalFilter,
+                    )?.label || "Tüm Talepler"}
+                  </h2>
+                  <p className="text-center text-[10px] font-bold text-[#7C5A36]">
+                    {filteredPosts.length} profesyonel talep listeleniyor
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={openCreateModal}
+                  className="inline-flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-[22px] bg-gradient-to-b from-[#2563EB] to-[#EA580C] px-3.5 text-[11px] font-black text-white shadow-[0_12px_25px_rgba(21,87,214,0.24)] transition active:scale-[0.98]"
+                >
+                  <Plus size={16} />
+                  Yeni Talep
+                </button>
+              </div>
+            </section>
           </div>
         </section>
 
-        <section className="-mx-2 overflow-hidden pl-2">
-          <MarqueeRow duration={28}>
-            {metrics.map((metric, index) => (
-              <MetricBox
-                key={`metric-${metric.id}-${index}`}
-                label={metric.label}
-                value={metric.value}
-                tone={metric.tone}
-              />
-            ))}
-          </MarqueeRow>
-        </section>
-
-        <section className="rounded-[26px] border border-white bg-white/95 p-3 shadow-[0_14px_34px_rgba(15,23,42,0.075)]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1 text-center">
-              <h2 className="text-center text-[22px] font-black tracking-[-0.04em] text-[#06194A]">
-                {PERSONAL_TABS.find((item) => item.key === personalFilter)
-                  ?.label || "Tüm Talepler"}
-              </h2>
-              <p className="text-center text-[11px] font-bold text-[#64748B]">
-                {filteredPosts.length} talep listeleniyor
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={openCreateModal}
-              className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-[24px] bg-[#1557D6] px-4 text-[13px] font-black text-white shadow-[0_12px_26px_rgba(21,87,214,0.25)]"
-            >
-              <Plus size={18} />
-              Yeni Talep
-            </button>
-          </div>
-        </section>
-
-        <section className="overflow-hidden rounded-[26px] border border-[#E2EAF5] bg-white shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
+        <section className="overflow-hidden rounded-[26px] border border-[#F5A94A] bg-[#FFF8EE] shadow-[0_18px_44px_rgba(194,65,12,0.12)]">
           {loading ? (
             <div className="flex min-h-[320px] items-center justify-center">
               <div className="text-center">
                 <Loader2
-                  className="mx-auto animate-spin text-[#1557D6]"
+                  className="mx-auto animate-spin text-[#EA580C]"
                   size={30}
                 />
-                <p className="mt-3 text-center text-[12px] font-black text-[#64748B]">
+                <p className="mt-3 text-center text-[12px] font-black text-[#7C5A36]">
                   Talep merkezi yükleniyor...
                 </p>
               </div>
@@ -1472,6 +1382,17 @@ export default function NetworkPage() {
         <span className="mt-1 text-[13px] font-black">Lina</span>
       </button>
 
+      <ForumAdvancedFilter
+        open={advancedFilterOpen}
+        posts={posts}
+        value={advancedFilters}
+        onApply={(nextFilters) => {
+          setAdvancedFilters(nextFilters);
+          setAdvancedFilterOpen(false);
+        }}
+        onClose={() => setAdvancedFilterOpen(false)}
+      />
+
       {modalOpen && (
         <TopicModal
           mode={editingPost ? "edit" : "create"}
@@ -1500,12 +1421,12 @@ function MetricBox({
   tone: string;
 }) {
   return (
-    <div className="min-h-[76px] w-[104px] shrink-0 rounded-[22px] border border-white bg-white px-1.5 py-3 text-center shadow-[0_12px_28px_rgba(15,23,42,0.07)]">
-      <p className="text-center text-[8.5px] font-black uppercase leading-[12px] tracking-[-0.01em] text-[#06194A]">
+    <div className="min-w-0 border-r border-[#E2EAF5] px-1 py-2.5 text-center last:border-r-0">
+      <p className="text-center text-[7.5px] font-black uppercase leading-[10px] tracking-[0.02em] text-[#6F4E2B]">
         {label}
       </p>
       <p
-        className={`mt-1 text-center text-[25px] font-black leading-none ${tone}`}
+        className={`mt-1 text-center text-[21px] font-black leading-none ${tone}`}
       >
         {value}
       </p>
@@ -1537,120 +1458,289 @@ function RequestCard({
   onToggleSave: () => void;
 }) {
   const category = categoryLabel(post.type);
-  const location = [post.city, post.district].filter(Boolean).join(" / ");
+  const categoryValue = getCategoryOption(post.type).value;
+  const categoryVisual = getForumRequestCategoryVisual(categoryValue);
+  const requestIntentCode = getRequestIntentFromPost(post);
+  const requestIntent = getForumRequestTypeLabel(requestIntentCode);
+  const intentVisual = getForumRequestIntentVisual(requestIntentCode);
+  const hasPortfolioIntent =
+    categoryValue === "PORTFOY_ARIYORUM" &&
+    ["PORTFOY_KIRALIK", "PORTFOY_SATILIK"].includes(requestIntentCode);
+  const portfolioFoil =
+    requestIntentCode === "PORTFOY_SATILIK"
+      ? "ALTIN"
+      : requestIntentCode === "PORTFOY_KIRALIK"
+        ? "GÜMÜŞ"
+        : "";
+  const urgency = String(post.urgency || "Normal");
+  const location = [post.city, post.district, post.neighborhood]
+    .filter(Boolean)
+    .join(" / ");
   const budget = post.budget
     ? formatMoney(post.budget, budgetCurrencyFromPost(post))
-    : "Bütçe yok";
+    : "Bütçe belirtilmedi";
   const remaining = remainingTime(post.expiresAt);
+  const remainingMatch = remaining.match(/\d+/);
+  const remainingDay = remainingMatch ? Number(remainingMatch[0]) : null;
   const remainingDanger =
-    remaining.includes("3 gün") || remaining.includes("Süre doldu");
+    remaining.includes("Süre doldu") ||
+    (remainingDay !== null && remainingDay <= 3);
   const image = getCategoryImage(post.type);
+  const owner = post.user || post.User;
+  const ownerName =
+    [owner?.firstName, owner?.lastName].filter(Boolean).join(" ") ||
+    "EPH Üyesi";
+  const ownerRoleCode = normalizeRole(owner?.role);
+  const ownerRoleLabels: Record<string, string> = {
+    EMLAKCI: "Emlakçı",
+    MUTEAHHIT: "Müteahhit",
+    INSAAT_FIRMASI: "İnşaat Firması",
+    ADMIN: "Admin",
+    SUPER_ADMIN: "Yazılım Ekibi",
+  };
+  const ownerRole = ownerRoleLabels[ownerRoleCode] || "EPH Üyesi";
+  const visibility =
+    FORUM_REQUEST_VISIBILITY_OPTIONS.find(
+      (item) => item.value === post.visibility,
+    )?.label ||
+    "Tüm EPH";
+  const createdDate = (() => {
+    if (!post.createdAt) return "Tarih yok";
+
+    const date = new Date(post.createdAt);
+
+    if (Number.isNaN(date.getTime())) return "Tarih yok";
+
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = String(date.getFullYear()).slice(-2);
+
+    return `${day}.${month}.${year}`;
+  })();
+
+  const urgencyClass =
+    urgency === "Acil"
+      ? "border-red-200 bg-red-50 text-red-600"
+      : urgency === "Sıcak Talep"
+        ? "border-orange-200 bg-orange-50 text-orange-700"
+        : urgency === "Müşteri Hazır"
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-slate-200 bg-slate-50 text-slate-600";
 
   return (
-    <article className="grid min-h-[146px] grid-cols-[82px_minmax(0,1fr)] gap-2 border-b border-[#E7EEF8] bg-white px-2.5 py-3 last:border-b-0">
+    <article
+      className="relative mx-1.5 my-1.5 overflow-hidden rounded-[18px] px-2 py-2"
+      style={{
+        borderColor: categoryVisual.borderColor,
+        borderStyle: "solid",
+        borderWidth: `${categoryVisual.borderWidth || 2}px`,
+        backgroundColor: categoryVisual.backgroundColor,
+        boxShadow: [
+          categoryVisual.shadow ||
+            "0 6px 16px rgba(15, 23, 42, 0.06)",
+          `inset 6px 0 0 ${categoryVisual.accentColor}`,
+        ]
+          .filter(Boolean)
+          .join(", "),
+      }}
+    >
+      {hasPortfolioIntent && (
+        <>
+          <span
+            className="pointer-events-none absolute left-0 top-0 h-9 w-9 rounded-tl-[15px] border-l-[5px] border-t-[5px]"
+            style={{ borderColor: intentVisual.accentColor }}
+            aria-hidden="true"
+          />
+          <span
+            className="pointer-events-none absolute bottom-0 right-0 h-9 w-9 rounded-br-[15px] border-b-[5px] border-r-[5px]"
+            style={{ borderColor: intentVisual.accentColor }}
+            aria-hidden="true"
+          />
+          <span
+            className="pointer-events-none absolute right-2 top-1 rounded-full border px-1.5 py-0.5 text-[7px] font-black tracking-[0.08em]"
+            style={{
+              borderColor: intentVisual.borderColor,
+              backgroundColor: intentVisual.selectedBackgroundColor,
+              color: intentVisual.textColor,
+              boxShadow: intentVisual.shadow,
+            }}
+            aria-hidden="true"
+          >
+            {portfolioFoil}
+          </span>
+        </>
+      )}
+
+      <div className="grid grid-cols-[68px_minmax(0,1fr)] gap-2">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="relative h-[68px] w-[68px] overflow-hidden rounded-[15px] bg-[#EEF5FF] shadow-[0_7px_16px_rgba(15,23,42,0.10)]"
+          aria-label={`${post.title} talebini aç`}
+        >
+          <Image
+            src={image}
+            alt={category}
+            fill
+            sizes="68px"
+            className="object-cover"
+          />
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpen}
+          className="min-w-0 text-left"
+        >
+          <div className="flex flex-wrap items-center gap-1">
+            <span
+              className="inline-flex max-w-full rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase leading-3"
+              style={{
+                borderColor: categoryVisual.borderColor,
+                backgroundColor: categoryVisual.selectedBackgroundColor,
+                color: categoryVisual.textColor,
+              }}
+            >
+              <span className="break-words">{category}</span>
+            </span>
+
+            <span
+              className="inline-flex rounded-full border px-1.5 py-0.5 text-[8px] font-black leading-3"
+              style={{
+                borderColor: intentVisual.borderColor,
+                borderWidth: `${hasPortfolioIntent ? 2 : 1}px`,
+                backgroundColor: intentVisual.selectedBackgroundColor,
+                color: intentVisual.textColor,
+                boxShadow: hasPortfolioIntent ? intentVisual.shadow : "none",
+              }}
+            >
+              {requestIntent}
+            </span>
+
+            <span
+              className={`inline-flex rounded-full border px-1.5 py-0.5 text-[8px] font-black leading-3 ${urgencyClass}`}
+            >
+              {urgency}
+            </span>
+
+            {isMine && <StatusBadge tone="mine" label="Benim" />}
+            {isSaved && <StatusBadge tone="saved" label="Kayıtlı" />}
+            {isInterested && (
+              <StatusBadge tone="interested" label="İlgili" />
+            )}
+          </div>
+
+          <h3 className="mt-1 break-words text-left text-[12.5px] font-black leading-[16px] tracking-[-0.025em] text-[#3A2208]">
+            {post.title}
+          </h3>
+
+          <p className="mt-0.5 flex min-w-0 items-start gap-1 text-left text-[9.5px] font-bold leading-3 text-[#7C5A36]">
+            <MapPin size={11} className="mt-px shrink-0" />
+            <span className="min-w-0 break-words">
+              {location || "Konum belirtilmedi"}
+            </span>
+          </p>
+        </button>
+      </div>
+
       <button
         type="button"
         onClick={onOpen}
-        className="relative mt-1 h-[72px] w-[82px] overflow-hidden rounded-[16px] bg-[#EEF5FF] shadow-[0_8px_18px_rgba(15,23,42,0.10)]"
+        className="mt-1.5 grid w-full grid-cols-2 gap-x-2 gap-y-1 rounded-[12px] px-2 py-1.5 text-left"
+        style={{
+          backgroundColor: hasPortfolioIntent
+            ? intentVisual.backgroundColor
+            : categoryVisual.selectedBackgroundColor,
+          border: `1px solid ${
+            hasPortfolioIntent
+              ? intentVisual.borderColor
+              : categoryVisual.borderColor
+          }`,
+        }}
       >
-        <Image
-          src={image}
-          alt={category}
-          fill
-          sizes="82px"
-          className="object-cover"
-        />
+        <span className="min-w-0 break-words text-[9.5px] font-black leading-3 text-[#EA580C]">
+          {budget}
+        </span>
+
+        <span
+          className={`min-w-0 break-words text-right text-[9.5px] font-black leading-3 ${
+            remainingDanger ? "text-red-500" : "text-emerald-600"
+          }`}
+        >
+          {remaining}
+        </span>
+
+        <span className="min-w-0 break-words text-[9px] font-bold leading-3 text-[#6F4E2B]">
+          👤 {ownerName} · {ownerRole}
+        </span>
+
+        <span className="min-w-0 break-words text-right text-[9px] font-bold leading-3 text-[#7C5A36]">
+          {createdDate} · {visibility}
+        </span>
       </button>
 
-      <button type="button" onClick={onOpen} className="min-w-0 text-left">
-        <div className="flex flex-wrap gap-1">
-          <span
-            className={`inline-flex max-w-full rounded-full border px-2 py-0.5 text-[9px] font-black uppercase leading-4 ${categoryBadgeClass(post.type)}`}
-          >
-            <span className="truncate">{category}</span>
+      <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2 rounded-[12px] border border-white/80 bg-white/88 px-1.5 py-1.5 shadow-[0_3px_10px_rgba(15,23,42,0.06)]">
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="inline-flex h-7 items-center rounded-full bg-[#F8FBFF] px-2 text-[9px] font-black text-[#7C5A36]">
+            👁 {post.viewCount || 0}
           </span>
-
-          {isMine && <StatusBadge tone="mine" label="Benim Talebim" />}
-          {isSaved && <StatusBadge tone="saved" label="Kaydedildi" />}
-          {isInterested && (
-            <StatusBadge tone="interested" label="İlgilenildi" />
-          )}
-        </div>
-
-        <h3 className="mt-1 line-clamp-2 text-left text-[14px] font-black leading-5 tracking-[-0.03em] text-[#06194A]">
-          {post.title}
-        </h3>
-
-        <p className="mt-0.5 flex items-center gap-1 text-left text-[10.5px] font-bold text-[#64748B]">
-          <MapPin size={12} />
-          <span className="truncate">{location || "Konum belirtilmedi"}</span>
-        </p>
-
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-[10.5px] font-black">
-          <span className="text-[#1557D6]">{budget}</span>
-          <span
-            className={remainingDanger ? "text-red-500" : "text-emerald-600"}
-          >
-            • {remaining}
+          <span className="inline-flex h-7 items-center rounded-full bg-[#FFF8E8] px-2 text-[9px] font-black text-amber-700">
+            ⭐ {post.followerCount || 0}
+          </span>
+          <span className="inline-flex h-7 items-center rounded-full bg-[#ECFDF5] px-2 text-[9px] font-black text-emerald-700">
+            🤝 {post.requestCount || (isInterested ? 1 : 0)}
           </span>
         </div>
 
-        <div className="mt-1 flex items-center gap-2 text-[10px] font-black text-[#64748B]">
-          <span>👁 {post.viewCount || 0}</span>
-          <span>⭐ {post.followerCount || 0}</span>
-          <span>🤝 {post.requestCount || (isInterested ? 1 : 0)}</span>
-        </div>
-      </button>
-
-      <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 border-t border-[#EEF5FF] pt-2">
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={onToggleSave}
-            className={`flex h-9 w-9 items-center justify-center rounded-full border ${
+            className={`flex h-8 w-8 items-center justify-center rounded-full border ${
               isSaved
-                ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
-                : "border-[#E2EAF5] bg-white text-[#06194A]"
+                ? "border-[#EA580C] bg-[#FFF1E8] text-[#EA580C]"
+                : "border-[#F6C98B] bg-[#FFFBF5] text-[#3A2208]"
             }`}
+            aria-label={isSaved ? "Kaydı kaldır" : "Talebi kaydet"}
           >
-            <Bookmark size={17} fill={isSaved ? "currentColor" : "none"} />
+            <Bookmark size={14} fill={isSaved ? "currentColor" : "none"} />
           </button>
 
           <button
             type="button"
             onClick={onOpen}
-            className="inline-flex h-9 min-w-[58px] items-center justify-center rounded-full border border-[#DDE7F3] bg-[#F4F8FF] px-2 text-[11px] font-black text-[#1557D6]"
+            className="inline-flex h-8 items-center justify-center rounded-full border border-[#DDE7F3] bg-[#FFF1D6] px-2.5 text-[9.5px] font-black text-[#EA580C]"
           >
             İncele
           </button>
+
+          {canManage && (
+            <>
+              <button
+                type="button"
+                onClick={onEdit}
+                className="flex h-8 items-center justify-center gap-1 rounded-full border border-orange-100 bg-blue-50 px-2 text-[9px] font-black text-[#EA580C]"
+              >
+                <Edit3 size={11} />
+                Düzenle
+              </button>
+
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={deleting}
+                className="flex h-8 items-center justify-center gap-1 rounded-full border border-red-100 bg-red-50 px-2 text-[9px] font-black text-red-600 disabled:opacity-60"
+              >
+                {deleting ? (
+                  <Loader2 size={11} className="animate-spin" />
+                ) : (
+                  <Trash2 size={11} />
+                )}
+                Sil
+              </button>
+            </>
+          )}
         </div>
-
-        {canManage && (
-          <div className="grid grid-cols-2 gap-1.5">
-            <button
-              type="button"
-              onClick={onEdit}
-              className="flex h-9 items-center justify-center gap-1 rounded-[14px] border border-blue-100 bg-blue-50 text-[10px] font-black text-[#1557D6]"
-            >
-              <Edit3 size={13} />
-              Düzenle
-            </button>
-
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={deleting}
-              className="flex h-9 items-center justify-center gap-1 rounded-[14px] border border-red-100 bg-red-50 text-[10px] font-black text-red-600 disabled:opacity-60"
-            >
-              {deleting ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <Trash2 size={13} />
-              )}
-              Sil
-            </button>
-          </div>
-        )}
       </div>
     </article>
   );
@@ -1707,25 +1797,90 @@ function EmptyForumState({
   return (
     <div className="flex min-h-[300px] items-center justify-center p-5">
       <div className="mx-auto max-w-[300px] text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#EFF6FF] text-[#1557D6]">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#FFF1E8] text-[#EA580C]">
           <Bell size={28} />
         </div>
-        <h3 className="mt-4 text-center text-[20px] font-black tracking-[-0.04em] text-[#06194A]">
+        <h3 className="mt-4 text-center text-[20px] font-black tracking-[-0.04em] text-[#3A2208]">
           {title}
         </h3>
-        <p className="mt-2 text-center text-[13px] font-bold leading-5 text-[#64748B]">
+        <p className="mt-2 text-center text-[13px] font-bold leading-5 text-[#7C5A36]">
           {text}
         </p>
         <button
           type="button"
           onClick={onCreate}
-          className="mt-4 inline-flex h-11 items-center justify-center rounded-[22px] bg-[#1557D6] px-5 text-[13px] font-black text-white"
+          className="mt-4 inline-flex h-11 items-center justify-center rounded-[22px] bg-[#EA580C] px-5 text-[13px] font-black text-white"
         >
           Yeni Talep Oluştur
         </button>
       </div>
     </div>
   );
+}
+
+function topicFormToSchemaState(form: TopicForm): EPHSchemaState {
+  return {
+    category: form.category,
+    requestIntent: form.requestIntent,
+    title: form.title,
+    city: form.city,
+    district: form.district,
+    neighborhood: form.neighborhood,
+    budget: form.budget,
+    currency: form.currency,
+    urgency: form.urgency,
+    validFor: form.validFor,
+    visibility: form.visibility,
+    description: form.detail,
+  };
+}
+
+function schemaStateToTopicForm(state: EPHSchemaState): TopicForm {
+  return {
+    category: String(state.category || "") as ForumCategory | "",
+    requestIntent: String(state.requestIntent || ""),
+    title: String(state.title || ""),
+    city: String(state.city || ""),
+    district: String(state.district || ""),
+    neighborhood: String(state.neighborhood || ""),
+    budget: String(state.budget || ""),
+    currency: String(state.currency || "TRY"),
+    urgency: String(state.urgency || "Normal"),
+    validFor: String(state.validFor || "7 gün"),
+    visibility: String(state.visibility || "TUM_EPH"),
+    detail: String(state.description || ""),
+  };
+}
+
+function createRoleAwareForumSchema(
+  categories: ForumCategoryOption[],
+): EPHSchemaDefinition {
+  return {
+    ...forumRequestSchema,
+    sections: forumRequestSchema.sections.map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => {
+        if (
+          field.id === "forum-category-form" &&
+          field.type === "single-select"
+        ) {
+          return {
+            ...field,
+            options: categories.map((category) => ({
+              value: category.value,
+              label: category.label,
+              hint: category.hint,
+              visual: FORUM_REQUEST_CATEGORY_OPTIONS.find(
+                (option) => option.value === category.value,
+              )?.visual,
+            })),
+          };
+        }
+
+        return field;
+      }),
+    })),
+  };
 }
 
 function TopicModal({
@@ -1745,322 +1900,42 @@ function TopicModal({
   onClose: () => void;
   onSave: (form: TopicForm) => void;
 }) {
-  const safeCategories = useMemo(() => {
-    const roleBasedCategories = getRoleCategories(userRole);
-    const incomingValues = new Set(categories.map((item) => item.value));
-    const finalList = roleBasedCategories.filter(
-      (item) => incomingValues.has(item.value) || categories.length === 0,
-    );
-
-    return finalList.length > 0 ? finalList : roleBasedCategories;
-  }, [categories, userRole]);
-
-  const correctedInitialForm = useMemo(() => {
-    const allowed = safeCategories.some(
-      (item) => item.value === initialForm.category,
-    );
-
-    return {
-      ...initialForm,
-      category: allowed ? initialForm.category : "",
-    };
-  }, [initialForm, safeCategories]);
-
-  const [form, setForm] = useState<TopicForm>(correctedInitialForm);
-  const districtOptions = useMemo(
-    () => getDistrictOptions(form.city),
-    [form.city],
-  );
-  const selectedCategory = safeCategories.find(
-    (item) => item.value === form.category,
+  const [initialState] = useState<EPHSchemaState>(() =>
+    topicFormToSchemaState(initialForm),
   );
 
-  const updateForm = (patch: Partial<TopicForm>) => {
-    setForm((current) => ({ ...current, ...patch }));
-  };
+  const schema = useMemo(
+    () => createRoleAwareForumSchema(categories),
+    [categories],
+  );
+
+  const role = normalizeRole(userRole);
+  const subtitle =
+    role === "ADMIN" || role === "SUPER_ADMIN"
+      ? "Admin yetkisiyle tüm kategoriler açık."
+      : "Rolünüze uygun alanları ortak EPH veri sistemiyle doldurun.";
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#06194A]/38 px-2 backdrop-blur-sm"
-      style={{
-        paddingTop: "max(10px, env(safe-area-inset-top, 0px))",
-        paddingBottom: "max(10px, env(safe-area-inset-bottom, 0px))",
+    <SchemaFormEngine
+      open
+      schema={schema}
+      value={initialState}
+      title={mode === "edit" ? "Talebi Düzenle" : "Yeni Talep Oluştur"}
+      subtitle={subtitle}
+      submitLabel={mode === "edit" ? "Talebi Güncelle" : "Talebi Yayınla"}
+      cancelLabel="Vazgeç"
+      saving={saving}
+      theme={{
+        accent: "#EA580C",
+        accentSoft: "#FFF0DC",
+        accentText: "#9A3412",
+        panel: "#FFF4E3",
+        surfaceSoft: "#FFE4B8",
+        border: "#F5A94A",
       }}
-    >
-      <section
-        className="flex w-full max-w-[430px] flex-col overflow-hidden rounded-[30px] border border-white bg-white shadow-[0_24px_70px_rgba(15,23,42,0.22)]"
-        style={{ maxHeight: "min(88dvh, 720px)" }}
-      >
-        <div className="flex items-center justify-between border-b border-[#E2EAF5] px-4 py-3">
-          <div className="min-w-0 flex-1 text-center">
-            <h2 className="text-center text-[21px] font-black tracking-[-0.05em] text-[#06194A]">
-              {mode === "edit" ? "Talebi Düzenle" : "Yeni Talep Oluştur"}
-            </h2>
-            <p className="text-center text-[11px] font-bold text-[#64748B]">
-              {normalizeRole(userRole) === "ADMIN" ||
-              normalizeRole(userRole) === "SUPER_ADMIN"
-                ? "Admin yetkisiyle tüm kategoriler açık."
-                : "Sadece rolünüze uygun kategoriler gösteriliyor."}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F1F5FB] text-[#06194A]"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-          <FieldLabel title="Talep Kategorisi" required />
-          <div className="grid grid-cols-1 gap-2">
-            {safeCategories.map((category, index) => {
-              const active = form.category === category.value;
-
-              return (
-                <button
-                  key={`modal-category-${category.value}-${index}`}
-                  type="button"
-                  onClick={() => updateForm({ category: category.value })}
-                  className={`rounded-[20px] border p-3 text-left transition active:scale-[0.99] ${
-                    active
-                      ? "border-[#1557D6] bg-[#EFF6FF]"
-                      : "border-[#E2EAF5] bg-white"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-[16px] bg-[#EEF5FF]">
-                      <Image
-                        src={getCategoryImage(category.value)}
-                        alt={category.label}
-                        fill
-                        sizes="48px"
-                        className="object-cover"
-                      />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-left text-[14px] font-black text-[#06194A]">
-                        {category.label}
-                      </span>
-                      <span className="mt-0.5 block text-left text-[11px] font-bold leading-4 text-[#64748B]">
-                        {category.hint}
-                      </span>
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {selectedCategory && (
-            <div className="rounded-[22px] border border-[#DDE7F3] bg-[#F8FBFF] p-3 text-center">
-              <p className="text-center text-[12px] font-black text-[#1557D6]">
-                {selectedCategory.label}
-              </p>
-              <p className="mt-1 text-center text-[11px] font-bold leading-4 text-[#64748B]">
-                {selectedCategory.hint}
-              </p>
-            </div>
-          )}
-
-          <FieldLabel title="Talep Türü" required />
-          <select
-            value={form.requestIntent}
-            onChange={(event) =>
-              updateForm({ requestIntent: event.target.value })
-            }
-            className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-black text-[#06194A] outline-none"
-          >
-            <option value="">Talep türü seçin</option>
-            {CREATE_REQUEST_INTENT_OPTIONS.map((item, index) => (
-              <option key={`modal-intent-${item}-${index}`} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-
-          <FieldLabel title="Talep Başlığı" required />
-          <input
-            value={form.title}
-            onChange={(event) =>
-              updateForm({ title: event.target.value.slice(0, 80) })
-            }
-            className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none placeholder:text-[#94A3B8]"
-            placeholder="Örn: Merkezefendi 3+1 daire arıyorum"
-          />
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <FieldLabel title="İl" />
-              <select
-                value={form.city}
-                onChange={(event) =>
-                  updateForm({ city: event.target.value, district: "" })
-                }
-                className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none"
-              >
-                <option value="">İl seçin</option>
-                {CITY_OPTIONS.map((city, index) => (
-                  <option key={`city-${city}-${index}`} value={city}>
-                    {city}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <FieldLabel title="İlçe" />
-              <select
-                value={form.district}
-                onChange={(event) =>
-                  updateForm({ district: event.target.value })
-                }
-                className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none"
-              >
-                <option value="">İlçe seçin</option>
-                {districtOptions.map((district, index) => (
-                  <option
-                    key={`district-${district}-${index}`}
-                    value={district}
-                  >
-                    {district}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-[1fr_92px] gap-2">
-            <div>
-              <FieldLabel title="Bütçe" />
-              <input
-                value={form.budget}
-                onChange={(event) =>
-                  updateForm({ budget: formatBudgetInput(event.target.value) })
-                }
-                className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none placeholder:text-[#94A3B8]"
-                placeholder="9.000.000"
-              />
-            </div>
-
-            <div>
-              <FieldLabel title="Para" />
-              <select
-                value={form.currency}
-                onChange={(event) =>
-                  updateForm({ currency: event.target.value })
-                }
-                className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none"
-              >
-                {CURRENCY_OPTIONS.map((currency, index) => (
-                  <option
-                    key={`currency-${currency}-${index}`}
-                    value={currency}
-                  >
-                    {currency}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <FieldLabel title="Aciliyet" />
-              <select
-                value={form.urgency}
-                onChange={(event) =>
-                  updateForm({ urgency: event.target.value })
-                }
-                className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none"
-              >
-                {URGENCY_OPTIONS.map((item, index) => (
-                  <option key={`urgency-${item}-${index}`} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <FieldLabel title="Süre" />
-              <select
-                value={form.validFor}
-                onChange={(event) =>
-                  updateForm({ validFor: event.target.value })
-                }
-                className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none"
-              >
-                {VALID_OPTIONS.map((item, index) => (
-                  <option key={`valid-${item}-${index}`} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <FieldLabel title="Görünürlük" />
-          <select
-            value={form.visibility}
-            onChange={(event) => updateForm({ visibility: event.target.value })}
-            className="h-12 w-full rounded-[18px] border border-[#DDE7F3] bg-white px-3 text-[13px] font-bold text-[#06194A] outline-none"
-          >
-            {VISIBILITY_OPTIONS.map((item, index) => (
-              <option
-                key={`visibility-${item.value}-${index}`}
-                value={item.value}
-              >
-                {item.label}
-              </option>
-            ))}
-          </select>
-
-          <FieldLabel title="Açıklama" required />
-          <textarea
-            value={form.detail}
-            onChange={(event) =>
-              updateForm({ detail: event.target.value.slice(0, 200) })
-            }
-            className="min-h-[110px] w-full resize-none rounded-[20px] border border-[#DDE7F3] bg-white px-3 py-3 text-[13px] font-bold leading-5 text-[#06194A] outline-none placeholder:text-[#94A3B8]"
-            placeholder="Talebinizi kısa, net ve profesyonel şekilde yazın."
-          />
-          <p className="text-right text-[11px] font-bold text-[#64748B]">
-            {form.detail.length}/200
-          </p>
-
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => onSave(form)}
-            className="flex h-13 min-h-[52px] w-full items-center justify-center rounded-[24px] bg-[#1557D6] px-5 text-[14px] font-black text-white shadow-[0_14px_30px_rgba(21,87,214,0.28)] disabled:opacity-70"
-          >
-            {saving ? (
-              <Loader2 size={20} className="animate-spin" />
-            ) : mode === "edit" ? (
-              "Talebi Güncelle"
-            ) : (
-              "Talebi Yayınla"
-            )}
-          </button>
-        </div>
-      </section>
-    </div>
+      onClose={onClose}
+      onSubmit={(state) => onSave(schemaStateToTopicForm(state))}
+    />
   );
 }
 
-function FieldLabel({
-  title,
-  required = false,
-}: {
-  title: string;
-  required?: boolean;
-}) {
-  return (
-    <label className="mb-1 mt-1 block text-left text-[12px] font-black text-[#06194A]">
-      {title}
-      {required && <span className="text-red-500"> *</span>}
-    </label>
-  );
-}

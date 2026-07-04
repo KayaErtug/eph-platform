@@ -515,10 +515,10 @@ export default function NetworkPostDetailPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-[calc(100dvh-64px)] items-center justify-center bg-[#F4F8FF] px-3 pb-20 text-[#06194A]">
+      <main className="flex min-h-[calc(100dvh-64px)] items-center justify-center bg-[#FFF1D6] px-3 pb-20 text-[#3A2208]">
         <div className="text-center">
-          <Loader2 className="mx-auto animate-spin text-[#1557D6]" size={32} />
-          <p className="mt-3 text-center text-[13px] font-black text-[#64748B]">
+          <Loader2 className="mx-auto animate-spin text-[#EA580C]" size={32} />
+          <p className="mt-3 text-center text-[13px] font-black text-[#7C5A36]">
             Talep detayı yükleniyor...
           </p>
         </div>
@@ -528,18 +528,18 @@ export default function NetworkPostDetailPage() {
 
   if (!post) {
     return (
-      <main className="flex min-h-[calc(100dvh-64px)] items-center justify-center bg-[#F4F8FF] px-3 pb-20 text-[#06194A]">
+      <main className="flex min-h-[calc(100dvh-64px)] items-center justify-center bg-[#FFF1D6] px-3 pb-20 text-[#3A2208]">
         <div className="mx-auto max-w-[320px] rounded-[28px] border border-white bg-white p-5 text-center shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
-          <Bookmark className="mx-auto text-[#1557D6]" size={34} />
+          <Bookmark className="mx-auto text-[#EA580C]" size={34} />
           <h1 className="mt-3 text-center text-[22px] font-black">
             Talep bulunamadı
           </h1>
           <button
             type="button"
             onClick={() => router.push("/network")}
-            className="mt-4 h-11 rounded-[22px] bg-[#1557D6] px-5 text-[13px] font-black text-white"
+            className="mt-4 h-11 rounded-[22px] bg-[#EA580C] px-5 text-[13px] font-black text-white"
           >
-            Pazaryerine Dön
+            Foruma Dön
           </button>
         </div>
       </main>
@@ -548,7 +548,7 @@ export default function NetworkPostDetailPage() {
 
   return (
     <main
-      className="min-h-[calc(100dvh-64px)] bg-[#F4F8FF] px-2 pt-2 text-[#06194A]"
+      className="min-h-[calc(100dvh-64px)] bg-[#FFF1D6] px-2 pt-2 text-[#3A2208]"
       style={{ paddingBottom: "calc(96px + env(safe-area-inset-bottom, 0px))" }}
     >
       {successToast && <KontorSuccessToast toast={successToast} />}
@@ -559,16 +559,16 @@ export default function NetworkPostDetailPage() {
             <button
               type="button"
               onClick={() => router.push("/network")}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border border-[#DDE7F3] bg-[#F8FBFF] text-[#06194A]"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border border-[#FED7AA] bg-[#FFF9F0] text-[#3A2208]"
             >
               <ArrowLeft size={19} />
             </button>
 
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-left text-[19px] font-black tracking-[-0.04em] text-[#06194A]">
-                Pazaryeri Detayı
+              <h1 className="truncate text-left text-[19px] font-black tracking-[-0.04em] text-[#3A2208]">
+                Forum Talep Detayı
               </h1>
-              <p className="truncate text-left text-[10px] font-bold text-[#64748B]">
+              <p className="truncate text-left text-[10px] font-bold text-[#7C5A36]">
                 {location || "Konum belirtilmedi"}
               </p>
             </div>
@@ -578,8 +578,8 @@ export default function NetworkPostDetailPage() {
               onClick={handleSave}
               className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] border ${
                 saved
-                  ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
-                  : "border-[#DDE7F3] bg-white text-[#06194A]"
+                  ? "border-[#EA580C] bg-[#FFF1E8] text-[#EA580C]"
+                  : "border-[#FED7AA] bg-white text-[#3A2208]"
               }`}
               aria-label="Talebi kaydet"
             >
@@ -590,7 +590,7 @@ export default function NetworkPostDetailPage() {
               type="button"
               onClick={() => openForumAction("MESSAGE")}
               disabled={actionLoading}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] border border-[#DDE7F3] bg-white text-[#06194A] disabled:opacity-60"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] border border-[#FED7AA] bg-white text-[#3A2208] disabled:opacity-60"
               aria-label="Görüşme başlat"
             >
               {actionLoading ? (
@@ -604,7 +604,7 @@ export default function NetworkPostDetailPage() {
 
         <section className="overflow-hidden rounded-[24px] border border-white bg-white shadow-[0_14px_32px_rgba(15,23,42,0.08)]">
           <div className="grid grid-cols-[112px_1fr] gap-0">
-            <div className="relative min-h-[138px] bg-[#EEF5FF]">
+            <div className="relative min-h-[138px] bg-[#FFEDD5]">
               <Image
                 src={image}
                 alt={category}
@@ -628,18 +628,18 @@ export default function NetworkPostDetailPage() {
                 <span className="truncate">{category}</span>
               </span>
 
-              <h2 className="line-clamp-2 text-left text-[18px] font-black leading-[21px] tracking-[-0.05em] text-[#06194A]">
+              <h2 className="line-clamp-2 text-left text-[18px] font-black leading-[21px] tracking-[-0.05em] text-[#3A2208]">
                 {post.title}
               </h2>
 
-              <p className="mt-1 flex items-center gap-1 text-left text-[10.5px] font-bold leading-4 text-[#64748B]">
-                <MapPin size={12} className="shrink-0 text-[#6D5DFB]" />
+              <p className="mt-1 flex items-center gap-1 text-left text-[10.5px] font-bold leading-4 text-[#7C5A36]">
+                <MapPin size={12} className="shrink-0 text-[#F97316]" />
                 <span className="line-clamp-1">
                   {location || "Konum belirtilmedi"}
                 </span>
               </p>
 
-              <p className="mt-0.5 text-left text-[9.5px] font-black text-[#64748B]">
+              <p className="mt-0.5 text-left text-[9.5px] font-black text-[#7C5A36]">
                 No: #{post.id.slice(0, 8).toUpperCase()}
               </p>
 
@@ -649,8 +649,8 @@ export default function NetworkPostDetailPage() {
                   onClick={handleSave}
                   className={`flex h-9 items-center justify-center gap-1 rounded-[14px] border px-1 text-[9.5px] font-black ${
                     saved
-                      ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
-                      : "border-[#DDE7F3] bg-white text-[#06194A]"
+                      ? "border-[#EA580C] bg-[#FFF1E8] text-[#EA580C]"
+                      : "border-[#FED7AA] bg-white text-[#3A2208]"
                   }`}
                 >
                   <Bookmark size={13} />
@@ -660,7 +660,7 @@ export default function NetworkPostDetailPage() {
                 <button
                   type="button"
                   onClick={handleShare}
-                  className="flex h-9 items-center justify-center gap-1 rounded-[14px] border border-[#DDE7F3] bg-white px-1 text-[9.5px] font-black text-[#06194A]"
+                  className="flex h-9 items-center justify-center gap-1 rounded-[14px] border border-[#FED7AA] bg-white px-1 text-[9.5px] font-black text-[#3A2208]"
                 >
                   <Share2 size={13} />
                   Paylaş
@@ -670,7 +670,7 @@ export default function NetworkPostDetailPage() {
                   type="button"
                   onClick={() => openForumAction("INTEREST")}
                   disabled={actionLoading}
-                  className="flex h-9 items-center justify-center gap-1 rounded-[14px] bg-[#1557D6] px-1 text-[9.5px] font-black text-white shadow-[0_8px_16px_rgba(21,87,214,0.22)] disabled:opacity-70"
+                  className="flex h-9 items-center justify-center gap-1 rounded-[14px] bg-[#EA580C] px-1 text-[9.5px] font-black text-white shadow-[0_8px_16px_rgba(234,88,12,0.24)] disabled:opacity-70"
                 >
                   {actionLoading ? (
                     <Loader2 size={13} className="animate-spin" />
@@ -683,8 +683,8 @@ export default function NetworkPostDetailPage() {
             </div>
           </div>
 
-          <div className="border-t border-[#E7EEF8] p-2">
-            <div className="rounded-[18px] border border-[#DDE7F3] bg-[#F8FBFF] p-2.5">
+          <div className="border-t border-[#FDE1BF] p-2">
+            <div className="rounded-[18px] border border-[#FED7AA] bg-[#FFF9F0] p-2.5">
               <div className="flex gap-2">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-white text-[20px] shadow-[0_6px_14px_rgba(15,23,42,0.07)]">
                   🎯
@@ -743,12 +743,12 @@ export default function NetworkPostDetailPage() {
 
         <section className="rounded-[20px] border border-white bg-white px-2.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-[#EFF6FF] text-[#1557D6]">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-[#FFF1E8] text-[#EA580C]">
               <CheckCircle2 size={18} />
             </div>
 
             <div className="min-w-0 flex-1">
-              <h3 className="text-left text-[12.5px] font-black text-[#06194A]">
+              <h3 className="text-left text-[12.5px] font-black text-[#3A2208]">
                 Aranan Kriterler
               </h3>
               <div className="mt-1 flex flex-wrap gap-1">
@@ -768,11 +768,11 @@ export default function NetworkPostDetailPage() {
 
         <section className="grid grid-cols-1 gap-1.5">
           <div className="rounded-[20px] border border-white bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-            <h3 className="text-center text-[12.5px] font-black text-[#06194A]">
+            <h3 className="text-center text-[12.5px] font-black text-[#3A2208]">
               Forum İşlemleri
             </h3>
 
-            <p className="mt-1 text-center text-[9.5px] font-bold text-[#64748B]">
+            <p className="mt-1 text-center text-[9.5px] font-bold text-[#7C5A36]">
               Okuma, paylaşım ve takip ücretsizdir.
             </p>
 
@@ -781,7 +781,7 @@ export default function NetworkPostDetailPage() {
                 type="button"
                 onClick={() => openForumAction("MESSAGE")}
                 disabled={actionLoading}
-                className="flex min-h-11 items-center justify-center gap-1 rounded-[16px] bg-[#1557D6] px-2 text-[11px] font-black text-white disabled:opacity-60"
+                className="flex min-h-11 items-center justify-center gap-1 rounded-[16px] bg-[#EA580C] px-2 text-[11px] font-black text-white disabled:opacity-60"
               >
                 <MessageCircle size={14} />
                 Mesaj 3K
@@ -791,7 +791,7 @@ export default function NetworkPostDetailPage() {
                 type="button"
                 onClick={() => openForumAction("INTEREST")}
                 disabled={actionLoading}
-                className="flex min-h-11 items-center justify-center gap-1 rounded-[16px] border-2 border-[#2563EB] bg-[#EFF6FF] px-2 text-[11px] font-black text-[#1D4ED8] disabled:opacity-60"
+                className="flex min-h-11 items-center justify-center gap-1 rounded-[16px] border-2 border-[#2563EB] bg-[#FFF1E8] px-2 text-[11px] font-black text-[#1D4ED8] disabled:opacity-60"
               >
                 <CheckCircle2 size={14} />
                 İlgilen 10K
@@ -813,8 +813,8 @@ export default function NetworkPostDetailPage() {
                 disabled={actionLoading}
                 className={`flex min-h-11 items-center justify-center gap-1 rounded-[16px] border px-2 text-[11px] font-black disabled:opacity-60 ${
                   saved
-                    ? "border-[#1557D6] bg-[#EFF6FF] text-[#1557D6]"
-                    : "border-[#DDE7F3] bg-[#F8FBFF] text-[#06194A]"
+                    ? "border-[#EA580C] bg-[#FFF1E8] text-[#EA580C]"
+                    : "border-[#FED7AA] bg-[#FFF9F0] text-[#3A2208]"
                 }`}
               >
                 <Bookmark
@@ -954,7 +954,7 @@ function ForumActionModal({
               İşlem Özeti
             </p>
 
-            <p className="mt-1 text-[12px] font-bold leading-5 text-[#475569]">
+            <p className="mt-1 text-[12px] font-bold leading-5 text-[#6F4E2B]">
               Bu işlem {config.cost} kontör harcar. Onaydan sonra paylaşım
               sahibine bildirim gönderilir ve işlem cüzdan hareketlerine
               kaydedilir.
@@ -1010,16 +1010,16 @@ function InfoCard({
     <div className="min-h-[58px] rounded-[18px] border border-white bg-white px-1.5 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.055)]">
       <div className="flex flex-col items-center justify-center text-center">
         <div
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] ${danger ? "bg-red-50 text-red-600" : "bg-[#EFF6FF] text-[#1557D6]"}`}
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] ${danger ? "bg-red-50 text-red-600" : "bg-[#FFF1E8] text-[#EA580C]"}`}
         >
           {icon}
         </div>
 
-        <p className="mt-1 text-center text-[8.5px] font-black leading-3 text-[#64748B]">
+        <p className="mt-1 text-center text-[8.5px] font-black leading-3 text-[#7C5A36]">
           {label}
         </p>
         <p
-          className={`mt-0.5 line-clamp-1 text-center text-[10px] font-black leading-3 ${danger ? "text-red-600" : "text-[#06194A]"}`}
+          className={`mt-0.5 line-clamp-1 text-center text-[10px] font-black leading-3 ${danger ? "text-red-600" : "text-[#3A2208]"}`}
         >
           {value}
         </p>
