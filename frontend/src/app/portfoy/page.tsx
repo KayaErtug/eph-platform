@@ -7,11 +7,14 @@ import {
   Bell,
   Building2,
   ChevronDown,
+  ChevronUp,
   Edit3,
   Eye,
+  Heart,
   Loader2,
   Map as MapIcon,
   MapPin,
+  MoreVertical,
   Navigation,
   Plus,
   Send,
@@ -35,7 +38,8 @@ import PortfolioFilterCenter, {
   applyPortfolioFilters,
   countPortfolioFilters,
   createEmptyPortfolioFilters,
-  getPortfolioFilterChips,
+  getPortfolioFilterChipEntries,
+  removePortfolioFilterChip,
   type PortfolioFilterState,
 } from "@/components/portfolio/PortfolioFilterCenter";
 import type {
@@ -439,7 +443,7 @@ function StokPageInner() {
   );
 
   const activeFilterCount = countPortfolioFilters(portfolioFilters);
-  const activeFilterChips = getPortfolioFilterChips(portfolioFilters);
+  const activeFilterChips = getPortfolioFilterChipEntries(portfolioFilters);
 
   const mapUnits = useMemo(() => {
     return filteredUnits.filter(
@@ -1030,9 +1034,9 @@ function StokPageInner() {
 
   if (!hydrated || loading) {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center overflow-y-auto bg-[#F7FBFF] text-[#06194A]">
+      <main className="flex min-h-[100dvh] items-center justify-center overflow-y-auto bg-[#F7F5FF] text-[#2E1065]">
         <div className="text-center">
-          <Loader2 className="mx-auto animate-spin text-[#1557D6]" size={32} />
+          <Loader2 className="mx-auto animate-spin text-[#7C3AED]" size={32} />
           <p className="mt-3 text-[12px] font-black text-[#64748B]">
             Portföy merkezi yükleniyor...
           </p>
@@ -1042,30 +1046,34 @@ function StokPageInner() {
   }
 
   return (
-    <main className="min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#F7FBFF] pb-[calc(144px+env(safe-area-inset-bottom))] text-[#06194A]">
+    <main className="min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#F7F5FF] pb-[calc(144px+env(safe-area-inset-bottom))] text-[#2E1065]">
       <div className="mx-auto w-full max-w-[430px] overflow-x-hidden px-3 pt-3">
-        <section className="rounded-[28px] border border-[#DDE7F3] bg-white p-3 shadow-[0_16px_38px_rgba(15,23,42,0.06)]">
+        <section className="rounded-[28px] border border-[#DDD6FE] bg-[linear-gradient(180deg,#FFFFFF_0%,#FBFAFF_100%)] p-3 shadow-[0_16px_38px_rgba(76,29,149,0.08)]">
           <div className="flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={() => router.back()}
-              className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#F8FBFF] text-[#06194A] active:scale-[0.98]"
+              className="flex h-11 w-11 items-center justify-center rounded-[18px] border border-[#EDE9FE] bg-white/80 text-[#2E1065] shadow-sm active:scale-[0.98]"
               aria-label="Geri dön"
             >
               <ArrowLeft size={20} />
             </button>
-            <div className="text-center">
-              <h1 className="text-[22px] font-black tracking-[-0.05em] text-[#06194A]">
-                PORTFÖY
-              </h1>
+            <div className="min-w-0 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-[13px] text-[#A78BFA]" aria-hidden="true">✦</span>
+                <h1 className="text-[22px] font-black tracking-[-0.05em] text-[#2E1065]">
+                  PORTFÖY
+                </h1>
+                <span className="text-[13px] text-[#A78BFA]" aria-hidden="true">✦</span>
+              </div>
               <p className="text-[10px] font-bold text-[#64748B]">
-                Harita + ultra compact liste
+                Harita + ultra kompakt liste
               </p>
             </div>
             <button
               type="button"
               onClick={() => router.push("/messages")}
-              className="relative flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#F8FBFF] text-[#06194A] active:scale-[0.98]"
+              className="relative flex h-11 w-11 items-center justify-center rounded-[18px] border border-[#EDE9FE] bg-white/80 text-[#2E1065] shadow-sm active:scale-[0.98]"
               aria-label="Mesajlar"
             >
               <Bell size={20} />
@@ -1078,14 +1086,14 @@ function StokPageInner() {
           </div>
 
           <div className="mt-3 flex items-center gap-2">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[18px] border border-[#DDE7F3] bg-[#F8FBFF] px-3 py-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[18px] border border-[#DDD6FE] bg-[#FBFAFF] px-3 py-2">
               <Search size={17} className="shrink-0 text-[#64748B]" />
               <input
                 ref={searchInputRef}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Portföy, il, ilçe, mahalle ara..."
-                className="h-8 min-w-0 flex-1 bg-transparent text-[13px] font-bold outline-none placeholder:text-[#94A3B8]"
+                placeholder="Portföy, il, ilçe, mahalle ara"
+                className="h-8 min-w-0 flex-1 bg-transparent text-[12.5px] font-bold outline-none placeholder:text-[#8B83A8]"
               />
               {search && (
                 <button
@@ -1103,14 +1111,14 @@ function StokPageInner() {
               onClick={() => setFilterOpen(true)}
               className={`relative flex h-12 min-w-[104px] items-center justify-center gap-2 rounded-[18px] border px-3 text-[12px] font-black active:scale-[0.98] ${
                 filterOpen || activeFilterCount > 0
-                  ? "border-[#1557D6] bg-[#1557D6] text-white"
-                  : "border-[#DDE7F3] bg-white text-[#06194A]"
+                  ? "border-[#7C3AED] bg-[#7C3AED] text-white"
+                  : "border-[#DDD6FE] bg-white text-[#2E1065]"
               }`}
             >
               <SlidersHorizontal size={17} />
               Filtrele
               {activeFilterCount > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-[10px] font-black text-[#1557D6]">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-[10px] font-black text-[#7C3AED]">
                   {activeFilterCount}
                 </span>
               )}
@@ -1119,17 +1127,25 @@ function StokPageInner() {
 
           {activeFilterChips.length > 0 && (
             <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
-              {activeFilterChips.slice(0, 12).map((chip, index) => (
-                <span
-                  key={`${chip}-${index}`}
-                  className="shrink-0 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-1 text-[9.5px] font-black text-[#1D4ED8]"
+              {activeFilterChips.slice(0, 12).map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() =>
+                    setPortfolioFilters((current) =>
+                      removePortfolioFilterChip(current, chip),
+                    )
+                  }
+                  className="flex shrink-0 items-center gap-1 rounded-full border border-[#C4B5FD] bg-[#F5F3FF] px-2.5 py-1 text-[9.5px] font-black text-[#6D28D9] active:scale-[0.98]"
+                  aria-label={`${chip.label} filtresini kaldır`}
                 >
-                  {chip}
-                </span>
+                  <span>{chip.label}</span>
+                  <X size={11} strokeWidth={2.6} />
+                </button>
               ))}
 
               {activeFilterChips.length > 12 && (
-                <span className="shrink-0 rounded-full border border-[#C7D6E8] bg-white px-2.5 py-1 text-[9.5px] font-black text-[#64748B]">
+                <span className="shrink-0 rounded-full border border-[#C4B5FD] bg-white px-2.5 py-1 text-[9.5px] font-black text-[#64748B]">
                   +{activeFilterChips.length - 12}
                 </span>
               )}
@@ -1146,16 +1162,16 @@ function StokPageInner() {
             </div>
           )}
 
-          <div className="mt-2 flex items-center justify-between rounded-[16px] border border-[#DDE7F3] bg-[#F8FBFF] px-3 py-2">
+          <div className="mt-2 flex items-center justify-between rounded-[16px] border border-[#DDD6FE] bg-[#FBFAFF] px-3 py-2">
             <span className="text-[10px] font-black text-[#64748B]">
               Aktif filtre sonucu
             </span>
-            <strong className="text-[14px] font-black text-[#1557D6]">
+            <strong className="text-[14px] font-black text-[#7C3AED]">
               {filteredUnits.length} Portföy
             </strong>
           </div>
 
-          <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#E2EAF5] bg-white text-center">
+          <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#EDE9FE] bg-white text-center">
             <MiniMetric label="Portföy" value={units.length} />
             <MiniMetric
               label="Ort. Fiyat"
@@ -1171,20 +1187,20 @@ function StokPageInner() {
         <button
           type="button"
           onClick={() => setMapOpen((current) => !current)}
-          className="mt-3 flex h-13 min-h-[52px] w-full items-center justify-between rounded-[22px] border border-[#DDE7F3] bg-white px-4 text-[14px] font-black shadow-[0_12px_28px_rgba(15,23,42,0.05)]"
+          className="mt-3 flex h-13 min-h-[52px] w-full items-center justify-center gap-2 rounded-[22px] border border-[#C4B5FD] bg-[linear-gradient(90deg,#FFFFFF_0%,#F5F3FF_50%,#FFFFFF_100%)] px-4 text-[14px] font-black text-[#2E1065] shadow-[0_12px_28px_rgba(76,29,149,0.07)]"
         >
           <span className="inline-flex items-center gap-2">
-            <MapIcon size={19} className="text-[#1557D6]" />{" "}
+            <MapIcon size={19} className="text-[#7C3AED]" />{" "}
             {mapOpen ? "Haritayı Kapat" : "Haritayı Göster"}
           </span>
           <ChevronDown
             size={19}
-            className={mapOpen ? "rotate-180 transition" : "transition"}
+            className={mapOpen ? "rotate-180 text-[#7C3AED] transition" : "text-[#7C3AED] transition"}
           />
         </button>
 
         {mapOpen && (
-          <section className="mt-3 overflow-hidden rounded-[26px] border border-[#DDE7F3] bg-white shadow-[0_18px_42px_rgba(15,23,42,0.08)]">
+          <section className="mt-3 overflow-hidden rounded-[26px] border border-[#DDD6FE] bg-white shadow-[0_18px_42px_rgba(15,23,42,0.08)]">
             <PortfolioMap
               units={mapUnits}
               selectedUnitId={selectedMapUnit?.id || ""}
@@ -1202,7 +1218,7 @@ function StokPageInner() {
               <button
                 type="button"
                 onClick={() => setShowMapPins((current) => !current)}
-                className="min-h-[34px] rounded-[14px] border border-[#DDE7F3] bg-[#F8FBFF] px-3 text-[11px] font-black text-[#1557D6] shadow-sm active:scale-[0.98]"
+                className="min-h-[34px] rounded-[14px] border border-[#DDD6FE] bg-[#FBFAFF] px-3 text-[11px] font-black text-[#7C3AED] shadow-sm active:scale-[0.98]"
               >
                 {showMapPins ? "Pinleri Gizle" : "Pinleri Göster"}
               </button>
@@ -1212,12 +1228,12 @@ function StokPageInner() {
             </div>
 
             {selectedMapUnit ? (
-              <div className="border-t border-[#E2EAF5] bg-[#F8FBFF] p-3">
-                <div className="rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
-                  <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#EAF2FF] text-[#1557D6]">
+              <div className="border-t border-[#EDE9FE] bg-[#FBFAFF] p-3">
+                <div className="rounded-[22px] border border-[#DDD6FE] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+                  <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-[16px] bg-[#EDE9FE] text-[#7C3AED]">
                     <MapPin size={19} />
                   </div>
-                  <h3 className="text-[14px] font-black leading-5 text-[#06194A]">
+                  <h3 className="text-[14px] font-black leading-5 text-[#2E1065]">
                     {selectedMapUnit.project?.name || "Seçili Portföy"}
                   </h3>
                   <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
@@ -1230,7 +1246,7 @@ function StokPageInner() {
                       .join(" / ") || "Konum bilgisi yok"}
                   </p>
 
-                  <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[18px] border border-[#E2EAF5] bg-[#F8FBFF]">
+                  <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[18px] border border-[#EDE9FE] bg-[#FBFAFF]">
                     <MiniMetric
                       label="Fiyat"
                       value={formatCompactPrice(
@@ -1268,7 +1284,7 @@ function StokPageInner() {
                       onClick={() =>
                         router.push(`/portfoy/${selectedMapUnit.id}`)
                       }
-                      className="min-h-[44px] rounded-[18px] bg-[#1557D6] px-3 text-[12px] font-black text-white active:scale-[0.98]"
+                      className="min-h-[44px] rounded-[18px] bg-[#7C3AED] px-3 text-[12px] font-black text-white active:scale-[0.98]"
                     >
                       Portföyü Aç
                     </button>
@@ -1276,9 +1292,9 @@ function StokPageInner() {
                 </div>
               </div>
             ) : (
-              <div className="border-t border-[#E2EAF5] bg-[#F8FBFF] p-4 text-center">
-                <MapPin className="mx-auto text-[#1557D6]" size={26} />
-                <p className="mt-2 text-[12px] font-black text-[#06194A]">
+              <div className="border-t border-[#EDE9FE] bg-[#FBFAFF] p-4 text-center">
+                <MapPin className="mx-auto text-[#7C3AED]" size={26} />
+                <p className="mt-2 text-[12px] font-black text-[#2E1065]">
                   Pinli gösterilecek konumlu portföy yok.
                 </p>
                 <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
@@ -1289,7 +1305,7 @@ function StokPageInner() {
             )}
 
             {missingLocationCount > 0 && (
-              <div className="border-t border-[#E2EAF5] bg-amber-50 px-3 py-2 text-center text-[11px] font-black leading-4 text-amber-700">
+              <div className="border-t border-[#EDE9FE] bg-amber-50 px-3 py-2 text-center text-[11px] font-black leading-4 text-amber-700">
                 {missingLocationCount} portföyde harita konumu yok. Güncelle
                 ekranından konum seçilirse pinli haritada görünür.
               </div>
@@ -1297,24 +1313,24 @@ function StokPageInner() {
           </section>
         )}
 
-        <section className="mt-4 space-y-4">
-          <div className="flex items-center justify-between px-1">
-            <p className="text-[13px] font-black text-[#64748B]">
+        <section className="mt-3 space-y-2">
+          <div className="flex items-center justify-between gap-3 px-1">
+            <p className="min-w-0 text-[13px] font-black leading-4 text-[#64748B]">
               {filteredUnits.length} portföy listeleniyor
             </p>
             <button
               type="button"
               onClick={openCreateModal}
               disabled={!canAddUnit && user?.role !== "ADMIN"}
-              className="inline-flex h-10 items-center gap-1 rounded-[18px] bg-[#1557D6] px-3 text-[12px] font-black text-white disabled:opacity-50"
+              className="inline-flex h-10 shrink-0 items-center gap-1 rounded-[18px] bg-[linear-gradient(135deg,#7C3AED_0%,#5B21B6_100%)] px-3 text-[12px] font-black text-white shadow-[0_10px_24px_rgba(124,58,237,0.24)] disabled:opacity-50"
             >
               <Plus size={17} /> Yeni Portföy
             </button>
           </div>
 
           {filteredUnits.length === 0 ? (
-            <div className="rounded-[26px] border border-[#DDE7F3] bg-white p-6 text-center shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
-              <Building2 className="mx-auto text-[#1557D6]" size={34} />
+            <div className="rounded-[26px] border border-[#DDD6FE] bg-white p-6 text-center shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+              <Building2 className="mx-auto text-[#7C3AED]" size={34} />
               <h2 className="mt-3 text-[20px] font-black">
                 Portföy bulunamadı
               </h2>
@@ -1344,14 +1360,6 @@ function StokPageInner() {
         </section>
 
       </div>
-
-      <button
-        type="button"
-        onClick={openCreateModal}
-        className="fixed bottom-[86px] right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#1557D6] text-white shadow-[0_18px_38px_rgba(21,87,214,0.34)]"
-      >
-        <Plus size={28} />
-      </button>
 
       <PortfolioFilterCenter
         open={filterOpen}
@@ -1407,13 +1415,13 @@ function MiniMetric({
     tone === "green"
       ? "text-emerald-600"
       : tone === "blue"
-        ? "text-[#1557D6]"
+        ? "text-[#7C3AED]"
         : tone === "orange"
           ? "text-orange-600"
-          : "text-[#06194A]";
+          : "text-[#2E1065]";
 
   return (
-    <div className="border-r border-[#E2EAF5] px-1.5 py-2 last:border-r-0">
+    <div className="border-r border-[#EDE9FE] px-1.5 py-2 last:border-r-0">
       <p className={`text-[15px] font-black leading-none ${color}`}>{value}</p>
       <p className="mt-1 text-[9px] font-black text-[#64748B]">{label}</p>
     </div>
@@ -1471,6 +1479,172 @@ function getPortfolioHighlight(unit: MapUnit) {
   return "Portföy Detayı";
 }
 
+type PortfolioVisualTheme = {
+  frameGradient: string;
+  frameShadow: string;
+  transactionLabel: string;
+  typeColor: string;
+  typeSoft: string;
+  typeBorder: string;
+};
+
+type PortfolioStatusTone = {
+  label: string;
+  borderColor: string;
+  backgroundColor: string;
+  color: string;
+};
+
+function normalizePortfolioVisualValue(value?: string | null) {
+  return String(value || "")
+    .toLocaleUpperCase("tr-TR")
+    .replaceAll("İ", "I")
+    .replaceAll("Ü", "U")
+    .replaceAll("Ş", "S")
+    .replaceAll("Ö", "O")
+    .replaceAll("Ç", "C")
+    .replaceAll("Ğ", "G");
+}
+
+function getPortfolioStatusTone(status?: string | null): PortfolioStatusTone {
+  const normalized = normalizePortfolioVisualValue(status);
+  const label = statusLabels[status || ""] || status || "Portföy";
+
+  if (["KIRALIK", "GUNLUK_KIRALIK", "DEVREN_KIRALIK", "KIRALANDI"].includes(normalized)) {
+    return {
+      label,
+      borderColor: "#B8C2D1",
+      backgroundColor: "#F8FAFC",
+      color: "#475569",
+    };
+  }
+
+  if (["SATILIK", "DEVREN_SATILIK", "ON_SATIS", "YAKINDA_SATISTA", "HEMEN_TESLIM", "SATILDI"].includes(normalized)) {
+    return {
+      label,
+      borderColor: "#E7C766",
+      backgroundColor: "#FFF8DB",
+      color: "#A16207",
+    };
+  }
+
+  return {
+    label,
+    borderColor: "#DDD6FE",
+    backgroundColor: "#F5F3FF",
+    color: "#6D28D9",
+  };
+}
+
+function getPortfolioVisualTheme(unit: MapUnit): PortfolioVisualTheme {
+  const status = normalizePortfolioVisualValue(unit.status);
+  const type = normalizePortfolioVisualValue(unit.type);
+  const source = normalizePortfolioVisualValue(
+    [unit.type, unit.project?.name, unit.description].filter(Boolean).join(" "),
+  );
+
+  const rentalStatuses = [
+    "KIRALIK",
+    "GUNLUK_KIRALIK",
+    "DEVREN_KIRALIK",
+    "KIRALANDI",
+  ];
+  const saleStatuses = [
+    "SATILIK",
+    "DEVREN_SATILIK",
+    "ON_SATIS",
+    "YAKINDA_SATISTA",
+    "HEMEN_TESLIM",
+    "SATILDI",
+  ];
+
+  let frameGradient =
+    "linear-gradient(135deg,#5B21B6 0%,#C4B5FD 22%,#7C3AED 48%,#EDE9FE 70%,#4C1D95 100%)";
+  let frameShadow = "0 14px 30px rgba(91,33,182,0.16)";
+  let transactionLabel = "Portföy";
+
+  if (rentalStatuses.includes(status)) {
+    frameGradient =
+      "linear-gradient(135deg,#64748B 0%,#F8FAFC 18%,#A8B3C5 42%,#FFFFFF 62%,#7C8798 100%)";
+    frameShadow = "0 14px 30px rgba(100,116,139,0.22)";
+    transactionLabel = "Gümüş Varak";
+  } else if (saleStatuses.includes(status)) {
+    frameGradient =
+      "linear-gradient(135deg,#7A5A10 0%,#F9E7A4 18%,#B88922 42%,#FFF5C7 62%,#8A6617 100%)";
+    frameShadow = "0 14px 32px rgba(184,137,34,0.24)";
+    transactionLabel = "Altın Varak";
+  }
+
+  let typeColor = "#6D28D9";
+  let typeSoft = "#F5F3FF";
+  let typeBorder = "#DDD6FE";
+
+  if (
+    ["ARSA"].includes(type) ||
+    source.includes(" ARSA") ||
+    source.startsWith("ARSA")
+  ) {
+    typeColor = "#B45309";
+    typeSoft = "#FFF7ED";
+    typeBorder = "#FED7AA";
+  } else if (
+    ["TARLA", "BAG", "BAHCE", "ZEYTINLIK"].some((item) =>
+      source.includes(item),
+    )
+  ) {
+    typeColor = "#4D7C0F";
+    typeSoft = "#F7FEE7";
+    typeBorder = "#D9F99D";
+  } else if (
+    ["VILLA", "MUSTAKIL", "YALI", "KONAK"].some((item) =>
+      source.includes(item),
+    )
+  ) {
+    typeColor = "#047857";
+    typeSoft = "#ECFDF5";
+    typeBorder = "#A7F3D0";
+  } else if (
+    ["DUKKAN", "MAGAZA", "OFIS", "PLAZA", "SHOWROOM", "ISYERI"].some(
+      (item) => source.includes(item),
+    )
+  ) {
+    typeColor = "#0369A1";
+    typeSoft = "#F0F9FF";
+    typeBorder = "#BAE6FD";
+  } else if (
+    ["FABRIKA", "DEPO", "ATOLYE", "SANAYI", "ANTREPO"].some((item) =>
+      source.includes(item),
+    )
+  ) {
+    typeColor = "#475569";
+    typeSoft = "#F1F5F9";
+    typeBorder = "#CBD5E1";
+  } else if (
+    ["OTEL", "PANSIYON", "MOTEL", "TURISTIK"].some((item) =>
+      source.includes(item),
+    )
+  ) {
+    typeColor = "#BE123C";
+    typeSoft = "#FFF1F2";
+    typeBorder = "#FECDD3";
+  } else if (
+    ["DAIRE", "REZIDANS", "APART"].some((item) => source.includes(item))
+  ) {
+    typeColor = "#6D28D9";
+    typeSoft = "#F5F3FF";
+    typeBorder = "#DDD6FE";
+  }
+
+  return {
+    frameGradient,
+    frameShadow,
+    transactionLabel,
+    typeColor,
+    typeSoft,
+    typeBorder,
+  };
+}
+
 function CompactPortfolioCard({
   index,
   unit,
@@ -1498,6 +1672,10 @@ function CompactPortfolioCard({
   onRemoveFromPool: () => void;
   onWhatsappLocation: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [favorite, setFavorite] = useState(false);
+
   const image = getUnitCoverImage(unit);
   const imageCount = getUnitImages(unit).length;
   const status = statusLabels[unit.status] || unit.status || "Portföy";
@@ -1527,6 +1705,43 @@ function CompactPortfolioCard({
     text.includes("tarla") ||
     text.includes("bağ") ||
     text.includes("bag");
+  const visualTheme = getPortfolioVisualTheme(unit);
+  const statusTone = getPortfolioStatusTone(unit.status);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("eph-favorite-portfolios-v1");
+      const ids = raw ? (JSON.parse(raw) as string[]) : [];
+      setFavorite(ids.includes(String(unit.id)));
+    } catch {
+      setFavorite(false);
+    }
+  }, [unit.id]);
+
+  useEffect(() => {
+    if (selected) setExpanded(true);
+  }, [selected]);
+
+  const toggleFavorite = () => {
+    setFavorite((current) => {
+      const next = !current;
+
+      try {
+        const raw = window.localStorage.getItem("eph-favorite-portfolios-v1");
+        const ids = raw ? (JSON.parse(raw) as string[]) : [];
+        const nextIds = next
+          ? Array.from(new Set([...ids, String(unit.id)]))
+          : ids.filter((id) => id !== String(unit.id));
+
+        window.localStorage.setItem(
+          "eph-favorite-portfolios-v1",
+          JSON.stringify(nextIds),
+        );
+      } catch {}
+
+      return next;
+    });
+  };
 
   const quickSpecs = isLand
     ? [
@@ -1589,6 +1804,10 @@ function CompactPortfolioCard({
             unit.tapuVerified || unit.isVerified ? "Doğrulandı" : "Kontrol",
         },
         {
+          label: "Fotoğraf",
+          value: `${imageCount} adet`,
+        },
+        {
           label: "Havuz",
           value: isPoolVisible ? "Havuzda" : "Havuz Dışı",
         },
@@ -1617,246 +1836,330 @@ function CompactPortfolioCard({
         },
       ];
 
-  const mediaBadges = [
-    {
-      icon: "▣",
-      label: `${imageCount} Fotoğraf`,
-      className: "bg-slate-900 text-white",
-    },
-    {
-      icon: "⌖",
-      label: hasLocation ? "Konumlu" : "Konumsuz",
-      className: hasLocation
-        ? "bg-blue-50 text-[#1557D6]"
-        : "bg-slate-100 text-slate-600",
-    },
-    {
-      icon: "✓",
-      label: isVerified ? "Yetkili" : "Kontrol",
-      className: isVerified
-        ? "bg-emerald-50 text-emerald-700"
-        : "bg-amber-50 text-amber-700",
-    },
-    {
-      icon: "◆",
-      label: isPoolVisible ? "Havuzda" : "Havuz Dışı",
-      className: isPoolVisible
-        ? "bg-violet-50 text-violet-700"
-        : "bg-slate-100 text-slate-600",
-    },
-  ];
+  const summarySpecs = specs.slice(0, 3);
+  const description = String(unit.description || "").trim();
 
   return (
     <article
       id={`portfolio-card-${unit.id}`}
       data-card-index={index}
       data-unit-id={unit.id}
-      className={`scroll-mt-24 w-full max-w-full overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.07)] transition-all duration-500 ${
-        selected
-          ? "border-[#1557D6] ring-4 ring-[#A9C8FF] shadow-[0_18px_42px_rgba(21,87,214,0.24)]"
-          : ""
+      className={`relative scroll-mt-24 w-full max-w-full overflow-hidden rounded-[18px] border-[3px] border-transparent bg-white transition-all duration-300 ${
+        selected ? "ring-4 ring-[#DDD6FE]" : ""
       }`}
+      style={{
+        background: `linear-gradient(#FFFFFF,#FFFFFF) padding-box, ${visualTheme.frameGradient} border-box`,
+        boxShadow: `${visualTheme.frameShadow}, inset 6px 0 0 ${visualTheme.typeColor}`,
+      }}
+      title={`${visualTheme.transactionLabel} · ${typeChip}`}
     >
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onOpen}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") onOpen();
-        }}
-        className="grid h-[316px] cursor-pointer grid-cols-[45%_55%] gap-1.5 overflow-hidden p-1.5 active:scale-[0.995]"
+      <button
+        type="button"
+        onClick={() => setExpanded((current) => !current)}
+        aria-expanded={expanded}
+        className="grid w-full grid-cols-[88px_minmax(0,1fr)_24px] gap-2 p-2 text-left active:bg-[#FBFAFF]"
       >
-        <div className="flex h-full min-w-0 flex-col overflow-hidden rounded-[16px] border border-[#E2EAF5] bg-[#F8FAFC]">
-          <div className="relative h-[232px] flex-none overflow-hidden bg-[#EEF3F8]">
-            {image ? (
-              <img
-                src={image}
-                alt={unit.project?.name || "Portföy"}
-                className="absolute inset-0 h-full w-full object-cover object-center"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-[#2563EB]">
-                <Building2 size={34} />
-              </div>
-            )}
-
-            <div
-              className={`absolute left-2 top-2 max-w-[calc(100%-16px)] truncate rounded-full px-2.5 py-1 text-[8px] font-black text-white shadow-sm ${
-                isVerified ? "bg-emerald-600" : "bg-amber-500"
-              }`}
-            >
-              {isVerified ? "EPH Onaylı" : "Onay Bekliyor"}
+        <div
+          className="relative h-[96px] overflow-hidden rounded-[13px] border-2 bg-[#F3F0FF]"
+          style={{ borderColor: visualTheme.typeBorder }}
+        >
+          {image ? (
+            <img
+              src={image}
+              alt={unit.project?.name || "Portföy"}
+              className="absolute inset-0 h-full w-full object-cover object-center"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-[#7C3AED]">
+              <Building2 size={28} />
             </div>
+          )}
 
-            <div className="absolute bottom-2 right-2 max-w-[calc(100%-16px)] truncate rounded-full bg-white/95 px-2.5 py-1 text-[8px] font-black text-[#2563EB] shadow-sm">
-              {status}
-            </div>
-          </div>
+          <span
+            className={`absolute left-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[6.5px] font-black text-white shadow-sm ${
+              isVerified ? "bg-emerald-600" : "bg-amber-500"
+            }`}
+          >
+            {isVerified ? "EPH Onaylı" : "Onay Bekliyor"}
+          </span>
 
-          <div className="grid h-[70px] flex-none grid-cols-2 gap-1 p-1.5">
-            {mediaBadges.map((badge) => (
-              <div
-                key={`${badge.icon}-${badge.label}`}
-                className={`flex min-h-0 min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[9px] px-1.5 text-center ${badge.className}`}
-              >
-                <span className="shrink-0 text-[9px] font-black leading-none">
-                  {badge.icon}
-                </span>
-                <span className="min-w-0 truncate text-[8px] font-black leading-none">
-                  {badge.label}
-                </span>
-              </div>
-            ))}
-          </div>
+          <span
+            className="absolute bottom-1.5 right-1.5 rounded-full border bg-white/95 px-1.5 py-0.5 text-[7px] font-black shadow-sm"
+            style={{
+              borderColor: visualTheme.typeBorder,
+              color: visualTheme.typeColor,
+            }}
+          >
+            {status}
+          </span>
         </div>
 
-        <div className="grid h-full min-w-0 grid-rows-[98px_28px_62px_80px_32px] overflow-hidden rounded-[16px] border-2 border-[#C7D6E8] bg-white text-center">
-          <div className="flex min-h-0 min-w-0 flex-col items-center justify-center overflow-hidden px-2.5 py-1.5">
-            <p className="max-w-full truncate text-[9px] font-black uppercase leading-none tracking-[0.11em] text-[#2563EB]">
+        <div className="min-w-0 py-0.5">
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <p
+              className="min-w-0 truncate rounded-full border-2 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.11em]"
+              style={{
+                backgroundColor: visualTheme.typeSoft,
+                borderColor: visualTheme.typeBorder,
+                color: visualTheme.typeColor,
+              }}
+            >
               {typeChip}
             </p>
-
-            <h3 className="mt-1 max-w-full line-clamp-2 break-words text-[14px] font-black leading-[1.05] tracking-[-0.035em] text-[#0F172A] [overflow-wrap:anywhere]">
-              {unit.project?.name || "EPH Portföy"}
-            </h3>
-
-            <p className="mt-1 flex max-w-full min-w-0 items-center justify-center gap-1 text-[8.5px] font-bold leading-[1.1] text-[#64748B]">
-              <MapPin size={10} className="shrink-0" />
-              <span className="min-w-0 line-clamp-2 break-words [overflow-wrap:anywhere]">
-                {location}
-              </span>
-            </p>
-
-            <p className="mt-1.5 max-w-full truncate text-[20px] font-black leading-none tracking-[-0.05em] text-[#0F172A]">
-              {formatCompactPrice(unit.price, unit.priceCurrency)}
-            </p>
+            <span
+              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[7px] font-black ${
+                isPoolVisible
+                  ? "bg-violet-50 text-violet-700"
+                  : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {isPoolVisible ? "Havuzda" : "Havuz Dışı"}
+            </span>
           </div>
 
-          <div className="flex min-h-0 min-w-0 items-center justify-center gap-1 overflow-hidden px-1.5">
-            {specs.map((spec) => (
+          <h3 className="mt-0.5 line-clamp-2 min-w-0 break-words text-[12.5px] font-black leading-[1.08] tracking-[-0.025em] text-[#111827] [overflow-wrap:anywhere]">
+            {unit.project?.name || "EPH Portföy"}
+          </h3>
+
+          <p className="mt-1 flex min-w-0 items-center gap-1 text-[7.5px] font-bold text-[#64748B]">
+            <MapPin size={9} className="shrink-0" />
+            <span className="min-w-0 truncate">{location}</span>
+          </p>
+
+          <div className="mt-1 flex min-w-0 items-center gap-1.5">
+            <span className="text-[6.5px] font-black uppercase tracking-[0.12em] text-[#64748B]">
+              Durum
+            </span>
+            <span
+              className="inline-flex min-h-[18px] items-center rounded-full border px-2 py-0.5 text-[7px] font-black"
+              style={{
+                borderColor: statusTone.borderColor,
+                backgroundColor: statusTone.backgroundColor,
+                color: statusTone.color,
+              }}
+            >
+              {statusTone.label}
+            </span>
+          </div>
+
+          <div className="mt-1 flex min-w-0 items-end justify-between gap-2">
+            <p className="min-w-0 truncate text-[17px] font-black leading-none tracking-[-0.05em] text-[#111827]">
+              {formatCompactPrice(unit.price, unit.priceCurrency)}
+            </p>
+            <span
+              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[7px] font-black ${
+                isVerified
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              {isVerified ? "Yetkili" : "Kontrol"}
+            </span>
+          </div>
+
+          <div className="mt-1.5 grid min-w-0 grid-cols-3 gap-1">
+            {summarySpecs.map((spec) => (
               <span
                 key={spec}
-                className="min-w-0 max-w-[32%] truncate rounded-full bg-[#F8FAFC] px-1.5 py-1 text-[8px] font-black leading-none text-[#334155]"
+                className="flex min-h-[24px] min-w-0 items-center justify-center rounded-[8px] border-2 px-1 text-center text-[7px] font-black leading-[1.05] [overflow-wrap:anywhere]"
+                style={{
+                  backgroundColor: visualTheme.typeSoft,
+                  borderColor: visualTheme.typeBorder,
+                  color: visualTheme.typeColor,
+                }}
               >
                 {spec}
               </span>
             ))}
           </div>
+        </div>
 
-          <div className="grid min-h-0 grid-cols-2 gap-1 overflow-hidden px-1.5 py-1">
+        <div
+          className="flex h-full items-center justify-center"
+          style={{ color: visualTheme.typeColor }}
+        >
+          {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </div>
+      </button>
+
+      <div className="grid grid-cols-4 gap-1 border-t border-[#EDE9FE] bg-[#FBFAFF] p-1.5">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex min-h-[34px] items-center justify-center gap-1 rounded-[10px] bg-[#F5F3FF] px-1 text-[8px] font-black text-[#6D28D9] active:scale-[0.98]"
+        >
+          <Eye size={13} />
+          Aç
+        </button>
+
+        <button
+          type="button"
+          onClick={hasLocation ? onWhatsappLocation : onShare}
+          className="flex min-h-[34px] items-center justify-center gap-1 rounded-[10px] bg-emerald-50 px-1 text-[8px] font-black text-emerald-700 active:scale-[0.98]"
+        >
+          {hasLocation ? <Navigation size={13} /> : <Share2 size={13} />}
+          {hasLocation ? "Konum" : "Paylaş"}
+        </button>
+
+        <button
+          type="button"
+          onClick={toggleFavorite}
+          aria-pressed={favorite}
+          className={`flex min-h-[34px] items-center justify-center gap-1 rounded-[10px] px-1 text-[8px] font-black active:scale-[0.98] ${
+            favorite
+              ? "bg-rose-50 text-rose-600"
+              : "bg-white text-[#64748B]"
+          }`}
+        >
+          <Heart size={13} fill={favorite ? "currentColor" : "none"} />
+          Favori
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMenuOpen((current) => !current)}
+          aria-expanded={menuOpen}
+          className="flex min-h-[34px] items-center justify-center gap-1 rounded-[10px] bg-white px-1 text-[8px] font-black text-[#475569] active:scale-[0.98]"
+        >
+          <MoreVertical size={14} />
+          Menü
+        </button>
+      </div>
+
+      {menuOpen && (
+        <div className="grid grid-cols-3 gap-1.5 border-t border-[#EDE9FE] bg-white p-2">
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              onUpdate();
+            }}
+            className="flex min-h-[38px] items-center justify-center gap-1 rounded-[11px] bg-[#F5F3FF] px-2 text-[8.5px] font-black text-[#6D28D9] active:scale-[0.98]"
+          >
+            <Edit3 size={14} />
+            Güncelle
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              onShare();
+            }}
+            className="flex min-h-[38px] items-center justify-center gap-1 rounded-[11px] bg-sky-50 px-2 text-[8.5px] font-black text-sky-700 active:scale-[0.98]"
+          >
+            <Share2 size={14} />
+            Paylaş
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              onDelete();
+            }}
+            disabled={deleting}
+            className="flex min-h-[38px] items-center justify-center gap-1 rounded-[11px] bg-red-50 px-2 text-[8.5px] font-black text-red-600 disabled:opacity-50"
+          >
+            {deleting ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Trash2 size={14} />
+            )}
+            Sil
+          </button>
+        </div>
+      )}
+
+      {expanded && (
+        <div className="border-t border-[#EDE9FE] bg-white p-2.5">
+          <div className="grid grid-cols-4 gap-1">
             {quickSpecs.map((item) => (
               <div
                 key={`${item.icon}-${item.label}`}
-                className="flex min-h-0 min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[9px] bg-[#F8FAFC] px-1"
+                className="flex min-h-[43px] min-w-0 flex-col items-center justify-center rounded-[10px] bg-[#F8FAFC] px-1 text-center"
               >
-                <span className="shrink-0 text-[10px] font-black leading-none text-[#2563EB]">
+                <span
+                  className="text-[10px] font-black leading-none"
+                  style={{ color: visualTheme.typeColor }}
+                >
                   {item.icon}
                 </span>
-                <span className="min-w-0 line-clamp-2 break-words text-[8px] font-black leading-[1.05] text-[#334155] [overflow-wrap:anywhere]">
+                <span className="mt-1 line-clamp-2 min-w-0 text-[7px] font-black leading-[1.05] text-[#334155] [overflow-wrap:anywhere]">
                   {item.label}
                 </span>
               </div>
             ))}
           </div>
 
-          <div className="grid min-h-0 grid-cols-2 gap-1 overflow-hidden px-1.5 py-1">
+          <div className="mt-1.5 grid grid-cols-3 gap-1">
             {detailSpecs.map((item) => (
               <div
                 key={item.label}
-                className="flex min-h-0 min-w-0 flex-col items-center justify-center overflow-hidden rounded-[8px] bg-[#FBFDFF] px-1 py-0.5"
+                className="flex min-h-[48px] min-w-0 flex-col items-center justify-center rounded-[10px] border border-[#EDE9FE] bg-[#FBFAFF] px-1 py-1 text-center"
               >
-                <span className="max-w-full truncate text-[7px] font-black uppercase leading-none tracking-[0.04em] text-[#64748B]">
+                <span className="text-[6.5px] font-black uppercase tracking-[0.04em] text-[#64748B]">
                   {item.label}
                 </span>
-                <span className="mt-0.5 max-w-full line-clamp-2 break-words text-[8px] font-black leading-[1.05] text-[#1F2937] [overflow-wrap:anywhere]">
+                <span className="mt-0.5 line-clamp-2 min-w-0 text-[7.5px] font-black leading-[1.05] text-[#1F2937] [overflow-wrap:anywhere]">
                   {item.value}
                 </span>
               </div>
             ))}
           </div>
 
-          <div className="flex min-h-0 min-w-0 items-center justify-center overflow-hidden border-t border-[#E2EAF5] bg-[#F8FAFC] px-1.5 text-[8px] font-black text-[#2563EB]">
-            <span className="max-w-full truncate">✨ {highlight}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-4 gap-1.5 border-t border-[#E2EAF5] bg-[#FBFDFF] p-2">
-        <button
-          type="button"
-          onClick={onOpen}
-          className="flex min-h-[38px] flex-col items-center justify-center gap-0.5 rounded-[12px] bg-[#EFF6FF] px-1 text-[9px] font-black text-[#1557D6] active:scale-[0.98]"
-        >
-          <Eye size={15} />
-          Aç
-        </button>
-
-        <button
-          type="button"
-          onClick={onUpdate}
-          className="flex min-h-[38px] flex-col items-center justify-center gap-0.5 rounded-[12px] bg-blue-50 px-1 text-[9px] font-black text-[#1557D6] active:scale-[0.98]"
-        >
-          <Edit3 size={15} />
-          Güncelle
-        </button>
-
-        <button
-          type="button"
-          onClick={hasLocation ? onWhatsappLocation : onShare}
-          className="flex min-h-[38px] flex-col items-center justify-center gap-0.5 rounded-[12px] bg-emerald-50 px-1 text-[9px] font-black text-emerald-700 active:scale-[0.98]"
-        >
-          {hasLocation ? <Navigation size={15} /> : <Share2 size={15} />}
-          {hasLocation ? "Konum" : "Paylaş"}
-        </button>
-
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={deleting}
-          className="flex min-h-[38px] flex-col items-center justify-center gap-0.5 rounded-[12px] bg-red-50 px-1 text-[9px] font-black text-red-600 disabled:opacity-50"
-        >
-          {deleting ? (
-            <Loader2 size={15} className="animate-spin" />
-          ) : (
-            <Trash2 size={15} />
+          {description && (
+            <p className="mt-1.5 rounded-[10px] bg-[#F8FAFC] px-2 py-1.5 text-[8px] font-bold leading-3 text-[#475569]">
+              {description}
+            </p>
           )}
-          Sil
-        </button>
-      </div>
 
-      {(canSendToPool || canRemoveFromPool) && (
-        <div className="border-t border-[#E2EAF5] bg-white p-2">
-          {canSendToPool ? (
-            <button
-              type="button"
-              onClick={onSendToPool}
-              disabled={poolBusy}
-              className="flex min-h-[40px] w-full items-center justify-center gap-2 rounded-[14px] bg-emerald-600 px-3 text-[11px] font-black text-white shadow-[0_10px_22px_rgba(5,150,105,0.18)] disabled:opacity-60"
-            >
-              {poolBusy ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Send size={14} />
-              )}
-              Havuza Gönder
-            </button>
-          ) : null}
+          <div
+            className="mt-1.5 flex min-h-[28px] items-center justify-center rounded-[10px] border px-2 text-center text-[8px] font-black"
+            style={{
+              backgroundColor: visualTheme.typeSoft,
+              borderColor: visualTheme.typeBorder,
+              color: visualTheme.typeColor,
+            }}
+          >
+            ✦ {highlight}
+          </div>
 
-          {canRemoveFromPool ? (
-            <button
-              type="button"
-              onClick={onRemoveFromPool}
-              disabled={poolBusy}
-              className="flex min-h-[40px] w-full items-center justify-center gap-2 rounded-[14px] border border-amber-200 bg-amber-50 px-3 text-[11px] font-black text-amber-800 disabled:opacity-60"
-            >
-              {poolBusy ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <X size={14} />
-              )}
-              Havuzdan Kaldır
-            </button>
-          ) : null}
+          {(canSendToPool || canRemoveFromPool) && (
+            <div className="mt-2">
+              {canSendToPool ? (
+                <button
+                  type="button"
+                  onClick={onSendToPool}
+                  disabled={poolBusy}
+                  className="flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[12px] bg-emerald-600 px-3 text-[10px] font-black text-white shadow-[0_8px_18px_rgba(5,150,105,0.16)] disabled:opacity-60"
+                >
+                  {poolBusy ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Send size={14} />
+                  )}
+                  Havuza Gönder
+                </button>
+              ) : null}
+
+              {canRemoveFromPool ? (
+                <button
+                  type="button"
+                  onClick={onRemoveFromPool}
+                  disabled={poolBusy}
+                  className="flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[12px] border border-amber-200 bg-amber-50 px-3 text-[10px] font-black text-amber-800 disabled:opacity-60"
+                >
+                  {poolBusy ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <X size={14} />
+                  )}
+                  Havuzdan Kaldır
+                </button>
+              ) : null}
+            </div>
+          )}
         </div>
       )}
     </article>
@@ -1992,7 +2295,7 @@ function PortfolioMap({
           .join(" / ") || "Konum bilgisi yok";
       const infoHtml = `
         <div style="width:220px;padding:4px 2px;font-family:Arial,sans-serif;color:#0F172A">
-          <div style="font-size:10px;font-weight:900;letter-spacing:.08em;color:#1557D6;text-transform:uppercase">
+          <div style="font-size:10px;font-weight:900;letter-spacing:.08em;color:#7C3AED;text-transform:uppercase">
             EPH Portföy
           </div>
           <div style="margin-top:4px;font-size:14px;font-weight:900;line-height:1.2">
@@ -2001,7 +2304,7 @@ function PortfolioMap({
           <div style="margin-top:5px;font-size:11px;font-weight:700;line-height:1.35;color:#64748B">
             ${escapeMapHtml(location)}
           </div>
-          <div style="margin-top:7px;font-size:15px;font-weight:900;color:#06194A">
+          <div style="margin-top:7px;font-size:15px;font-weight:900;color:#2E1065">
             ${escapeMapHtml(formatCompactPrice(unit.price, unit.priceCurrency))}
           </div>
           <div style="margin-top:4px;font-size:10px;font-weight:800;color:#475569">
@@ -2009,7 +2312,7 @@ function PortfolioMap({
               statusLabels[unit.status] || unit.status || "Portföy",
             )}
           </div>
-          <div style="margin-top:7px;border-top:1px solid #DCE8F7;padding-top:6px;font-size:10px;font-weight:900;color:#1557D6">
+          <div style="margin-top:7px;border-top:1px solid #DCE8F7;padding-top:6px;font-size:10px;font-weight:900;color:#7C3AED">
             Kartı görmek için pine tıklayın
           </div>
         </div>
@@ -2044,14 +2347,14 @@ function PortfolioMap({
   ]);
 
   return (
-    <div className="relative h-[360px] bg-[#EEF5FF]">
+    <div className="relative h-[360px] bg-[#F3F0FF]">
       <div ref={mapRef} className="h-full w-full" />
       {(loading || error) && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/76 backdrop-blur-sm">
           <div className="max-w-[260px] text-center">
             {loading && (
               <Loader2
-                className="mx-auto animate-spin text-[#1557D6]"
+                className="mx-auto animate-spin text-[#7C3AED]"
                 size={28}
               />
             )}

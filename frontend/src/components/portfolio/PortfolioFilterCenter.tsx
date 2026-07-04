@@ -1,15 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  Check,
-  ChevronDown,
-  RotateCcw,
-  Search,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+import { useMemo } from "react";
 
+import {
+  AdvancedFilterCenter,
+  createDistrictLocationKey,
+  createNeighborhoodLocationKey,
+  locationSelectionLabel,
+  type AdvancedFilterOption,
+  type AdvancedFilterSection,
+  type AdvancedFilterState,
+} from "@/components/advanced-filter";
 import {
   STATUS_LABELS,
   TYPE_LABELS,
@@ -21,7 +22,7 @@ export type PortfolioSortMode =
   | "PRICE_DESC"
   | "AREA_DESC";
 
-export type PortfolioFilterState = {
+export type PortfolioFilterState = AdvancedFilterState & {
   types: string[];
   statuses: string[];
   cities: string[];
@@ -34,6 +35,11 @@ export type PortfolioFilterState = {
   approvalStatuses: string[];
   locationStates: string[];
   dateRanges: string[];
+  floors: string[];
+  deedStates: string[];
+  creditStates: string[];
+  swapStates: string[];
+  advisors: string[];
   minPrice: string;
   maxPrice: string;
   minArea: string;
@@ -51,12 +57,23 @@ export type PortfolioFilterUnit = {
   priceCurrency?: string | null;
   description?: string | null;
   createdAt?: string | null;
+  floor?: number | null;
+  floorLabel?: string | null;
+  totalFloors?: number | null;
   isVerified?: boolean;
   isPoolVisible?: boolean;
   approvalStatus?: string | null;
   tapuVerified?: boolean;
   photoVerified?: boolean;
   yetkiVerified?: boolean;
+  availableCreditAmount?: number | null;
+  creditEligible?: boolean | null;
+  swapAvailable?: boolean | null;
+  owner?: {
+    id?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  } | null;
   project?: {
     name?: string | null;
     city?: string | null;
@@ -64,6 +81,11 @@ export type PortfolioFilterUnit = {
     address?: string | null;
     latitude?: number | null;
     longitude?: number | null;
+    owner?: {
+      id?: string | null;
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
   } | null;
 };
 
@@ -71,6 +93,42 @@ type Option = {
   value: string;
   label: string;
 };
+
+type ArrayFilterKey =
+  | "types"
+  | "statuses"
+  | "cities"
+  | "districts"
+  | "neighborhoods"
+  | "rooms"
+  | "currencies"
+  | "verification"
+  | "poolStates"
+  | "approvalStatuses"
+  | "locationStates"
+  | "dateRanges"
+  | "floors"
+  | "deedStates"
+  | "creditStates"
+  | "swapStates"
+  | "advisors";
+
+type StoredFilter = {
+  id: string;
+  name: string;
+  filters: PortfolioFilterState;
+  createdAt: number;
+};
+
+export type PortfolioFilterChip = {
+  id: string;
+  key: ArrayFilterKey | "minPrice" | "maxPrice" | "minArea" | "maxArea" | "sort";
+  value: string;
+  label: string;
+};
+
+const SAVED_FILTERS_KEY = "eph-portfolio-saved-filters-v1";
+const RECENT_FILTERS_KEY = "eph-portfolio-recent-filters-v1";
 
 const VERIFICATION_OPTIONS: Option[] = [
   { value: "EPH_APPROVED", label: "EPH Onaylı" },
@@ -91,50 +149,75 @@ const LOCATION_OPTIONS: Option[] = [
 ];
 
 const DATE_OPTIONS: Option[] = [
-  { value: "TODAY", label: "Bugün eklenenler" },
-  { value: "LAST_7_DAYS", label: "Son 7 gün" },
-  { value: "LAST_30_DAYS", label: "Son 30 gün" },
+  { value: "TODAY", label: "Bugün" },
+  { value: "LAST_7_DAYS", label: "Son 7 Gün" },
+  { value: "LAST_30_DAYS", label: "Son 30 Gün" },
 ];
 
 const CURRENCY_OPTIONS: Option[] = [
-  { value: "TRY", label: "Türk Lirası (₺)" },
-  { value: "USD", label: "Dolar ($)" },
-  { value: "EUR", label: "Euro (€)" },
-  { value: "GBP", label: "Sterlin (£)" },
+  { value: "TRY", label: "Türk Lirası" },
+  { value: "USD", label: "Dolar" },
+  { value: "EUR", label: "Euro" },
+  { value: "GBP", label: "Sterlin" },
+];
+
+const DEED_OPTIONS: Option[] = [
+  { value: "DEED_VERIFIED", label: "Tapu Doğrulandı" },
+  { value: "DEED_PENDING", label: "Tapu Kontrol Bekliyor" },
+];
+
+const CREDIT_OPTIONS: Option[] = [
+  { value: "CREDIT_AVAILABLE", label: "Krediye Uygun" },
+  { value: "CREDIT_UNAVAILABLE", label: "Kredi Bilgisi Yok" },
+];
+
+const SWAP_OPTIONS: Option[] = [
+  { value: "SWAP_AVAILABLE", label: "Takasa Uygun" },
+  { value: "SWAP_UNAVAILABLE", label: "Takas Yok" },
 ];
 
 const SORT_OPTIONS: Array<{ value: PortfolioSortMode; label: string }> = [
-  { value: "NEWEST", label: "En yeni portföyler" },
-  { value: "PRICE_ASC", label: "Fiyat düşükten yükseğe" },
-  { value: "PRICE_DESC", label: "Fiyat yüksekten düşüğe" },
-  { value: "AREA_DESC", label: "Metrekare büyükten küçüğe" },
+  { value: "NEWEST", label: "En Yeni" },
+  { value: "PRICE_ASC", label: "Fiyat Artan" },
+  { value: "PRICE_DESC", label: "Fiyat Azalan" },
+  { value: "AREA_DESC", label: "m² Büyükten Küçüğe" },
 ];
 
 const APPROVAL_LABELS: Record<string, string> = {
   TASLAK: "Taslak",
   YETKI_BELGESI_BEKLIYOR: "Yetki Belgesi Bekliyor",
+  INCELEMEYE_GONDERILDI: "İncelemeye Gönderildi",
   INCELEMEDE: "İncelemede",
   ONAYLANDI: "Onaylandı",
   REDDEDILDI: "Reddedildi",
   HAVUZDA: "Havuzda",
   EKSIK_BILGI: "Eksik Bilgi",
+  EKSIK_BILGI_BEKLENIYOR: "Eksik Bilgi Bekleniyor",
 };
 
-const VERIFICATION_LABELS = Object.fromEntries(
-  VERIFICATION_OPTIONS.map((item) => [item.value, item.label]),
-);
-
-const POOL_LABELS = Object.fromEntries(
-  POOL_OPTIONS.map((item) => [item.value, item.label]),
-);
-
-const LOCATION_LABELS = Object.fromEntries(
-  LOCATION_OPTIONS.map((item) => [item.value, item.label]),
-);
-
-const DATE_LABELS = Object.fromEntries(
-  DATE_OPTIONS.map((item) => [item.value, item.label]),
-);
+const LABEL_MAPS: Record<string, Record<string, string>> = {
+  verification: Object.fromEntries(
+    VERIFICATION_OPTIONS.map((item) => [item.value, item.label]),
+  ),
+  poolStates: Object.fromEntries(
+    POOL_OPTIONS.map((item) => [item.value, item.label]),
+  ),
+  locationStates: Object.fromEntries(
+    LOCATION_OPTIONS.map((item) => [item.value, item.label]),
+  ),
+  dateRanges: Object.fromEntries(
+    DATE_OPTIONS.map((item) => [item.value, item.label]),
+  ),
+  deedStates: Object.fromEntries(
+    DEED_OPTIONS.map((item) => [item.value, item.label]),
+  ),
+  creditStates: Object.fromEntries(
+    CREDIT_OPTIONS.map((item) => [item.value, item.label]),
+  ),
+  swapStates: Object.fromEntries(
+    SWAP_OPTIONS.map((item) => [item.value, item.label]),
+  ),
+};
 
 export function createEmptyPortfolioFilters(): PortfolioFilterState {
   return {
@@ -150,11 +233,23 @@ export function createEmptyPortfolioFilters(): PortfolioFilterState {
     approvalStatuses: [],
     locationStates: [],
     dateRanges: [],
+    floors: [],
+    deedStates: [],
+    creditStates: [],
+    swapStates: [],
+    advisors: [],
     minPrice: "",
     maxPrice: "",
     minArea: "",
     maxArea: "",
     sort: "NEWEST",
+  };
+}
+
+function hydrateFilters(value?: Partial<PortfolioFilterState> | null) {
+  return {
+    ...createEmptyPortfolioFilters(),
+    ...(value || {}),
   };
 }
 
@@ -200,9 +295,62 @@ function isUnitVerified(unit: PortfolioFilterUnit) {
   );
 }
 
+function hasLocation(unit: PortfolioFilterUnit) {
+  return Boolean(
+    Number(unit.project?.latitude) && Number(unit.project?.longitude),
+  );
+}
+
+function isInPool(unit: PortfolioFilterUnit) {
+  return Boolean(
+    unit.isPoolVisible || String(unit.approvalStatus || "") === "HAVUZDA",
+  );
+}
+
+function isCreditAvailable(unit: PortfolioFilterUnit) {
+  return Boolean(
+    Number(unit.availableCreditAmount || 0) > 0 || unit.creditEligible,
+  );
+}
+
+function readSwapState(unit: PortfolioFilterUnit) {
+  if (typeof unit.swapAvailable === "boolean") return unit.swapAvailable;
+
+  const text = normalize(
+    [unit.description, ...(Array.isArray((unit as any).features) ? (unit as any).features : [])]
+      .filter(Boolean)
+      .join(" "),
+  );
+
+  return text.includes("takas");
+}
+
+function readFloor(unit: PortfolioFilterUnit) {
+  if (unit.floorLabel) return String(unit.floorLabel);
+  if (unit.floor != null) return `${unit.floor}. Kat`;
+  return "";
+}
+
+function readAdvisor(unit: PortfolioFilterUnit) {
+  const source = (unit.owner || unit.project?.owner || (unit as any).user || null) as
+    | {
+        id?: string | null;
+        firstName?: string | null;
+        lastName?: string | null;
+      }
+    | null;
+
+  const name = [source?.firstName, source?.lastName].filter(Boolean).join(" ").trim();
+  if (!name) return "";
+  return source?.id ? `${source.id}::${name}` : name;
+}
+
+function advisorLabel(value: string) {
+  return value.includes("::") ? value.split("::").slice(1).join("::") : value;
+}
+
 function isInDateRange(value: string | null | undefined, range: string) {
   const createdAt = new Date(String(value || "")).getTime();
-
   if (!Number.isFinite(createdAt)) return false;
 
   const now = Date.now();
@@ -211,7 +359,6 @@ function isInDateRange(value: string | null | undefined, range: string) {
   if (range === "TODAY") {
     const created = new Date(createdAt);
     const today = new Date();
-
     return (
       created.getFullYear() === today.getFullYear() &&
       created.getMonth() === today.getMonth() &&
@@ -221,7 +368,6 @@ function isInDateRange(value: string | null | undefined, range: string) {
 
   if (range === "LAST_7_DAYS") return createdAt >= now - 7 * day;
   if (range === "LAST_30_DAYS") return createdAt >= now - 30 * day;
-
   return false;
 }
 
@@ -230,11 +376,12 @@ export function applyPortfolioFilters<T extends PortfolioFilterUnit>(
   filters: PortfolioFilterState,
   keyword = "",
 ): T[] {
+  const hydrated = hydrateFilters(filters);
   const query = normalize(keyword);
-  const minPrice = parseNumber(filters.minPrice);
-  const maxPrice = parseNumber(filters.maxPrice);
-  const minArea = parseNumber(filters.minArea);
-  const maxArea = parseNumber(filters.maxArea);
+  const minPrice = parseNumber(hydrated.minPrice);
+  const maxPrice = parseNumber(hydrated.maxPrice);
+  const minArea = parseNumber(hydrated.minArea);
+  const maxArea = parseNumber(hydrated.maxArea);
 
   const filtered = units.filter((unit) => {
     const type = String(unit.type || "");
@@ -248,38 +395,45 @@ export function applyPortfolioFilters<T extends PortfolioFilterUnit>(
     const price = Number(unit.price || 0);
     const area = Number(unit.area || 0);
     const verified = isUnitVerified(unit);
-    const inPool = Boolean(
-      unit.isPoolVisible || approvalStatus === "HAVUZDA",
-    );
-    const hasLocation = Boolean(
-      Number(unit.project?.latitude) &&
-        Number(unit.project?.longitude),
+    const pool = isInPool(unit);
+    const location = hasLocation(unit);
+    const floor = readFloor(unit);
+    const advisor = readAdvisor(unit);
+    const credit = isCreditAvailable(unit);
+    const swap = readSwapState(unit);
+
+    if (hydrated.types.length > 0 && !hydrated.types.includes(type)) return false;
+    if (hydrated.statuses.length > 0 && !hydrated.statuses.includes(status)) return false;
+    const districtKey = createDistrictLocationKey(city, district);
+    const neighborhoodKey = createNeighborhoodLocationKey(
+      city,
+      district,
+      neighborhood,
     );
 
-    if (filters.types.length > 0 && !filters.types.includes(type)) return false;
-    if (filters.statuses.length > 0 && !filters.statuses.includes(status))
-      return false;
-    if (filters.cities.length > 0 && !filters.cities.includes(city)) return false;
+    if (hydrated.cities.length > 0 && !hydrated.cities.includes(city)) return false;
     if (
-      filters.districts.length > 0 &&
-      !filters.districts.includes(district)
+      hydrated.districts.length > 0 &&
+      !hydrated.districts.includes(districtKey) &&
+      !hydrated.districts.includes(district)
     )
       return false;
     if (
-      filters.neighborhoods.length > 0 &&
-      !filters.neighborhoods.includes(neighborhood)
+      hydrated.neighborhoods.length > 0 &&
+      !hydrated.neighborhoods.includes(neighborhoodKey) &&
+      !hydrated.neighborhoods.includes(neighborhood)
     )
       return false;
-    if (filters.rooms.length > 0 && !filters.rooms.includes(room)) return false;
-    if (
-      filters.currencies.length > 0 &&
-      !filters.currencies.includes(currency)
-    )
+    if (hydrated.rooms.length > 0 && !hydrated.rooms.includes(room)) return false;
+    if (hydrated.currencies.length > 0 && !hydrated.currencies.includes(currency))
       return false;
     if (
-      filters.approvalStatuses.length > 0 &&
-      !filters.approvalStatuses.includes(approvalStatus)
+      hydrated.approvalStatuses.length > 0 &&
+      !hydrated.approvalStatuses.includes(approvalStatus)
     )
+      return false;
+    if (hydrated.floors.length > 0 && !hydrated.floors.includes(floor)) return false;
+    if (hydrated.advisors.length > 0 && !hydrated.advisors.includes(advisor))
       return false;
 
     if (minPrice && price < minPrice) return false;
@@ -288,11 +442,10 @@ export function applyPortfolioFilters<T extends PortfolioFilterUnit>(
     if (maxArea && area > maxArea) return false;
 
     if (
-      filters.verification.length > 0 &&
-      !filters.verification.some((flag) => {
+      hydrated.verification.length > 0 &&
+      !hydrated.verification.some((flag) => {
         if (flag === "EPH_APPROVED") return verified;
-        if (flag === "TAPU_VERIFIED")
-          return Boolean(unit.tapuVerified || unit.isVerified);
+        if (flag === "TAPU_VERIFIED") return Boolean(unit.tapuVerified || unit.isVerified);
         if (flag === "AUTHORITY_VERIFIED")
           return Boolean(unit.yetkiVerified || unit.isVerified);
         if (flag === "PHOTO_VERIFIED")
@@ -304,30 +457,64 @@ export function applyPortfolioFilters<T extends PortfolioFilterUnit>(
       return false;
 
     if (
-      filters.poolStates.length > 0 &&
-      !filters.poolStates.some((flag) => {
-        if (flag === "IN_POOL") return inPool;
-        if (flag === "OUT_POOL") return !inPool;
-        return false;
-      })
-    )
-      return false;
-
-    if (
-      filters.locationStates.length > 0 &&
-      !filters.locationStates.some((flag) => {
-        if (flag === "WITH_LOCATION") return hasLocation;
-        if (flag === "WITHOUT_LOCATION") return !hasLocation;
-        return false;
-      })
-    )
-      return false;
-
-    if (
-      filters.dateRanges.length > 0 &&
-      !filters.dateRanges.some((range) =>
-        isInDateRange(unit.createdAt, range),
+      hydrated.poolStates.length > 0 &&
+      !hydrated.poolStates.some((flag) =>
+        flag === "IN_POOL" ? pool : flag === "OUT_POOL" ? !pool : false,
       )
+    )
+      return false;
+
+    if (
+      hydrated.locationStates.length > 0 &&
+      !hydrated.locationStates.some((flag) =>
+        flag === "WITH_LOCATION"
+          ? location
+          : flag === "WITHOUT_LOCATION"
+            ? !location
+            : false,
+      )
+    )
+      return false;
+
+    if (
+      hydrated.deedStates.length > 0 &&
+      !hydrated.deedStates.some((flag) =>
+        flag === "DEED_VERIFIED"
+          ? Boolean(unit.tapuVerified || unit.isVerified)
+          : flag === "DEED_PENDING"
+            ? !Boolean(unit.tapuVerified || unit.isVerified)
+            : false,
+      )
+    )
+      return false;
+
+    if (
+      hydrated.creditStates.length > 0 &&
+      !hydrated.creditStates.some((flag) =>
+        flag === "CREDIT_AVAILABLE"
+          ? credit
+          : flag === "CREDIT_UNAVAILABLE"
+            ? !credit
+            : false,
+      )
+    )
+      return false;
+
+    if (
+      hydrated.swapStates.length > 0 &&
+      !hydrated.swapStates.some((flag) =>
+        flag === "SWAP_AVAILABLE"
+          ? swap
+          : flag === "SWAP_UNAVAILABLE"
+            ? !swap
+            : false,
+      )
+    )
+      return false;
+
+    if (
+      hydrated.dateRanges.length > 0 &&
+      !hydrated.dateRanges.some((range) => isInDateRange(unit.createdAt, range))
     )
       return false;
 
@@ -335,16 +522,17 @@ export function applyPortfolioFilters<T extends PortfolioFilterUnit>(
       const haystack = normalize(
         [
           unit.project?.name,
-          city,
-          district,
-          neighborhood,
-          unit.type,
+          unit.project?.city,
+          unit.project?.district,
+          unit.project?.address,
           typeLabel(type),
-          unit.status,
           statusLabel(status),
-          room,
+          unit.roomCount,
           unit.description,
-        ].join(" "),
+          advisorLabel(advisor),
+        ]
+          .filter(Boolean)
+          .join(" "),
       );
 
       if (!haystack.includes(query)) return false;
@@ -354,214 +542,206 @@ export function applyPortfolioFilters<T extends PortfolioFilterUnit>(
   });
 
   return [...filtered].sort((a, b) => {
-    if (filters.sort === "PRICE_ASC") {
+    if (hydrated.sort === "PRICE_ASC")
       return Number(a.price || 0) - Number(b.price || 0);
-    }
-
-    if (filters.sort === "PRICE_DESC") {
+    if (hydrated.sort === "PRICE_DESC")
       return Number(b.price || 0) - Number(a.price || 0);
-    }
-
-    if (filters.sort === "AREA_DESC") {
+    if (hydrated.sort === "AREA_DESC")
       return Number(b.area || 0) - Number(a.area || 0);
-    }
 
-    return String(b.createdAt || "").localeCompare(
-      String(a.createdAt || ""),
+    return (
+      new Date(String(b.createdAt || 0)).getTime() -
+      new Date(String(a.createdAt || 0)).getTime()
     );
   });
 }
 
 export function countPortfolioFilters(filters: PortfolioFilterState) {
+  const hydrated = hydrateFilters(filters);
   const arrayCount = [
-    filters.types,
-    filters.statuses,
-    filters.cities,
-    filters.districts,
-    filters.neighborhoods,
-    filters.rooms,
-    filters.currencies,
-    filters.verification,
-    filters.poolStates,
-    filters.approvalStatuses,
-    filters.locationStates,
-    filters.dateRanges,
-  ].reduce((total, list) => total + list.length, 0);
+    hydrated.types,
+    hydrated.statuses,
+    hydrated.cities,
+    hydrated.districts,
+    hydrated.neighborhoods,
+    hydrated.rooms,
+    hydrated.currencies,
+    hydrated.verification,
+    hydrated.poolStates,
+    hydrated.approvalStatuses,
+    hydrated.locationStates,
+    hydrated.dateRanges,
+    hydrated.floors,
+    hydrated.deedStates,
+    hydrated.creditStates,
+    hydrated.swapStates,
+    hydrated.advisors,
+  ].reduce((total, values) => total + values.length, 0);
 
-  const rangeCount = [
-    filters.minPrice,
-    filters.maxPrice,
-    filters.minArea,
-    filters.maxArea,
-  ].filter(Boolean).length;
-
-  return arrayCount + rangeCount + (filters.sort !== "NEWEST" ? 1 : 0);
+  return (
+    arrayCount +
+    Number(Boolean(hydrated.minPrice)) +
+    Number(Boolean(hydrated.maxPrice)) +
+    Number(Boolean(hydrated.minArea)) +
+    Number(Boolean(hydrated.maxArea)) +
+    Number(hydrated.sort !== "NEWEST")
+  );
 }
 
-export function getPortfolioFilterChips(filters: PortfolioFilterState) {
-  const chips: string[] = [];
+function labelForFilter(key: ArrayFilterKey, value: string) {
+  if (key === "types") return typeLabel(value);
+  if (key === "statuses") return statusLabel(value);
+  if (key === "districts" || key === "neighborhoods")
+    return locationSelectionLabel(value);
+  if (key === "approvalStatuses") return approvalLabel(value);
+  if (key === "advisors") return `Danışman: ${advisorLabel(value)}`;
+  if (key === "floors") return `Kat: ${value}`;
+  if (key === "rooms") return `Oda: ${value}`;
+  if (key === "currencies")
+    return CURRENCY_OPTIONS.find((item) => item.value === value)?.label || value;
+  return LABEL_MAPS[key]?.[value] || value;
+}
 
-  filters.types.forEach((value) => chips.push(typeLabel(value)));
-  filters.statuses.forEach((value) => chips.push(statusLabel(value)));
-  filters.cities.forEach((value) => chips.push(value));
-  filters.districts.forEach((value) => chips.push(value));
-  filters.neighborhoods.forEach((value) => chips.push(value));
-  filters.rooms.forEach((value) => chips.push(value));
-  filters.currencies.forEach((value) => chips.push(value));
-  filters.verification.forEach((value) =>
-    chips.push(VERIFICATION_LABELS[value] || value),
-  );
-  filters.poolStates.forEach((value) =>
-    chips.push(POOL_LABELS[value] || value),
-  );
-  filters.approvalStatuses.forEach((value) =>
-    chips.push(approvalLabel(value)),
-  );
-  filters.locationStates.forEach((value) =>
-    chips.push(LOCATION_LABELS[value] || value),
-  );
-  filters.dateRanges.forEach((value) =>
-    chips.push(DATE_LABELS[value] || value),
-  );
+const ARRAY_FILTER_KEYS: ArrayFilterKey[] = [
+  "types",
+  "statuses",
+  "cities",
+  "districts",
+  "neighborhoods",
+  "rooms",
+  "currencies",
+  "verification",
+  "poolStates",
+  "approvalStatuses",
+  "locationStates",
+  "dateRanges",
+  "floors",
+  "deedStates",
+  "creditStates",
+  "swapStates",
+  "advisors",
+];
 
-  if (filters.minPrice) chips.push(`Min. ${filters.minPrice} ₺`);
-  if (filters.maxPrice) chips.push(`Maks. ${filters.maxPrice} ₺`);
-  if (filters.minArea) chips.push(`Min. ${filters.minArea} m²`);
-  if (filters.maxArea) chips.push(`Maks. ${filters.maxArea} m²`);
+export function getPortfolioFilterChipEntries(
+  filters: PortfolioFilterState,
+): PortfolioFilterChip[] {
+  const hydrated = hydrateFilters(filters);
+  const chips: PortfolioFilterChip[] = [];
+
+  ARRAY_FILTER_KEYS.forEach((key) => {
+    hydrated[key].forEach((value) => {
+      chips.push({
+        id: `${key}:${value}`,
+        key,
+        value,
+        label: labelForFilter(key, value),
+      });
+    });
+  });
+
+  if (hydrated.minPrice) {
+    chips.push({
+      id: "minPrice",
+      key: "minPrice",
+      value: hydrated.minPrice,
+      label: `Min. ${Number(hydrated.minPrice).toLocaleString("tr-TR")} ₺`,
+    });
+  }
+
+  if (hydrated.maxPrice) {
+    chips.push({
+      id: "maxPrice",
+      key: "maxPrice",
+      value: hydrated.maxPrice,
+      label: `Maks. ${Number(hydrated.maxPrice).toLocaleString("tr-TR")} ₺`,
+    });
+  }
+
+  if (hydrated.minArea) {
+    chips.push({
+      id: "minArea",
+      key: "minArea",
+      value: hydrated.minArea,
+      label: `Min. ${hydrated.minArea} m²`,
+    });
+  }
+
+  if (hydrated.maxArea) {
+    chips.push({
+      id: "maxArea",
+      key: "maxArea",
+      value: hydrated.maxArea,
+      label: `Maks. ${hydrated.maxArea} m²`,
+    });
+  }
+
+  if (hydrated.sort !== "NEWEST") {
+    chips.push({
+      id: "sort",
+      key: "sort",
+      value: hydrated.sort,
+      label:
+        SORT_OPTIONS.find((item) => item.value === hydrated.sort)?.label ||
+        hydrated.sort,
+    });
+  }
 
   return chips;
 }
 
-function formatNumericInput(value: string) {
-  const digits = String(value || "").replace(/\D/g, "");
-  return digits ? Number(digits).toLocaleString("tr-TR") : "";
+export function getPortfolioFilterChips(filters: PortfolioFilterState) {
+  return getPortfolioFilterChipEntries(filters).map((chip) => chip.label);
 }
 
-function MultiSelectSection({
-  title,
-  options,
-  selected,
-  onChange,
-  open = false,
-  searchable = true,
-}: {
-  title: string;
-  options: Option[];
-  selected: string[];
-  onChange: (next: string[]) => void;
-  open?: boolean;
-  searchable?: boolean;
-}) {
-  const [query, setQuery] = useState("");
+export function removePortfolioFilterChip(
+  filters: PortfolioFilterState,
+  chip: PortfolioFilterChip,
+): PortfolioFilterState {
+  const hydrated = hydrateFilters(filters);
 
-  const visibleOptions = useMemo(() => {
-    const normalizedQuery = normalize(query);
+  if (ARRAY_FILTER_KEYS.includes(chip.key as ArrayFilterKey)) {
+    const key = chip.key as ArrayFilterKey;
 
-    if (!normalizedQuery) return options;
+    return {
+      ...hydrated,
+      [key]: hydrated[key].filter((value) => value !== chip.value),
+    } as PortfolioFilterState;
+  }
 
-    return options.filter((option) =>
-      normalize(option.label).includes(normalizedQuery),
-    );
-  }, [options, query]);
+  if (chip.key === "sort") {
+    return {
+      ...hydrated,
+      sort: "NEWEST",
+    };
+  }
 
-  const toggle = (value: string) => {
-    onChange(
-      selected.includes(value)
-        ? selected.filter((item) => item !== value)
-        : [...selected, value],
-    );
-  };
+  return {
+    ...hydrated,
+    [chip.key]: "",
+  } as PortfolioFilterState;
+}
 
-  return (
-    <details
-      open={open}
-      className="group overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white"
-    >
-      <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between gap-2 bg-[#F8FAFC] px-3 py-2">
-        <div className="min-w-0">
-          <p className="text-[13px] font-black text-[#1F2937]">{title}</p>
-          <p className="mt-0.5 text-[10px] font-bold text-[#64748B]">
-            {selected.length > 0
-              ? `${selected.length} seçim aktif`
-              : "Çoklu seçim yapılabilir"}
-          </p>
-        </div>
-        <ChevronDown
-          size={16}
-          className="shrink-0 text-[#2563EB] transition-transform group-open:rotate-180"
-        />
-      </summary>
+function addCounts(
+  options: AdvancedFilterOption[],
+  values: string[],
+): AdvancedFilterOption[] {
+  return options.map((option) => ({
+    ...option,
+    count: values.filter((value) => value === option.value).length,
+  }));
+}
 
-      <div className="border-t-2 border-[#E2EAF5] p-2.5">
-        {searchable && options.length > 6 && (
-          <div className="mb-2 flex items-center gap-2 rounded-[14px] border-2 border-[#C7D6E8] bg-[#EEF3F8] px-2.5">
-            <Search size={14} className="text-[#64748B]" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={`${title} içinde ara`}
-              className="h-10 min-w-0 flex-1 bg-transparent text-[11px] font-bold text-[#1F2937] outline-none"
-            />
-          </div>
-        )}
+function optionsFromRecord(
+  labels: Record<string, string>,
+  values: string[],
+): AdvancedFilterOption[] {
+  const optionValues = unique([...Object.keys(labels), ...values]);
 
-        <div className="mb-2 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => onChange(options.map((option) => option.value))}
-            className="min-h-[36px] rounded-[13px] border-2 border-[#C7D6E8] bg-white px-2 text-[10px] font-black text-[#2563EB]"
-          >
-            Tümünü Seç
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange([])}
-            className="min-h-[36px] rounded-[13px] border-2 border-[#C7D6E8] bg-white px-2 text-[10px] font-black text-[#64748B]"
-          >
-            Seçimi Temizle
-          </button>
-        </div>
-
-        <div className="grid max-h-[250px] grid-cols-2 gap-2 overflow-y-auto pr-0.5">
-          {visibleOptions.map((option) => {
-            const checked = selected.includes(option.value);
-
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => toggle(option.value)}
-                className={`flex min-h-[42px] min-w-0 items-center gap-2 rounded-[14px] border-2 px-2 text-left text-[10.5px] font-black leading-4 ${
-                  checked
-                    ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]"
-                    : "border-[#D7E3F2] bg-white text-[#334155]"
-                }`}
-              >
-                <span
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[7px] border-2 ${
-                    checked
-                      ? "border-[#2563EB] bg-[#2563EB] text-white"
-                      : "border-[#B8C9DD] bg-white text-transparent"
-                  }`}
-                >
-                  <Check size={12} />
-                </span>
-                <span className="min-w-0 break-words [overflow-wrap:anywhere]">
-                  {option.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {visibleOptions.length === 0 && (
-          <p className="py-4 text-center text-[11px] font-bold text-[#64748B]">
-            Eşleşen seçenek bulunamadı.
-          </p>
-        )}
-      </div>
-    </details>
-  );
+  return optionValues.map((value) => ({
+    value,
+    label: labels[value] || value.replaceAll("_", " "),
+    count: values.filter((item) => item === value).length,
+  }));
 }
 
 export default function PortfolioFilterCenter({
@@ -579,418 +759,268 @@ export default function PortfolioFilterCenter({
   onChange: (filters: PortfolioFilterState) => void;
   onClose: () => void;
 }) {
-  const typeOptions = useMemo<Option[]>(
-    () =>
-      unique(units.map((unit) => unit.type)).map((value) => ({
-        value,
-        label: typeLabel(value),
-      })),
-    [units],
-  );
-
-  const statusOptions = useMemo<Option[]>(
-    () =>
-      unique(units.map((unit) => unit.status)).map((value) => ({
-        value,
-        label: statusLabel(value),
-      })),
-    [units],
-  );
-
-  const cityOptions = useMemo<Option[]>(
-    () =>
-      unique(units.map((unit) => unit.project?.city)).map((value) => ({
-        value,
-        label: value,
-      })),
-    [units],
-  );
-
-  const districtOptions = useMemo<Option[]>(() => {
-    const list = units.filter(
-      (unit) =>
-        filters.cities.length === 0 ||
-        filters.cities.includes(String(unit.project?.city || "")),
-    );
-
-    return unique(list.map((unit) => unit.project?.district)).map(
-      (value) => ({
-        value,
-        label: value,
-      }),
-    );
-  }, [filters.cities, units]);
-
-  const neighborhoodOptions = useMemo<Option[]>(() => {
-    const list = units.filter((unit) => {
-      const city = String(unit.project?.city || "");
-      const district = String(unit.project?.district || "");
-
-      if (filters.cities.length > 0 && !filters.cities.includes(city))
-        return false;
-      if (
-        filters.districts.length > 0 &&
-        !filters.districts.includes(district)
-      )
-        return false;
-
-      return true;
+  const sections = useMemo<AdvancedFilterSection[]>(() => {
+    const types = units.map((unit) => String(unit.type || "").trim()).filter(Boolean);
+    const statuses = units
+      .map((unit) => String(unit.status || "").trim())
+      .filter(Boolean);
+    const rooms = units
+      .map((unit) => String(unit.roomCount || "").trim())
+      .filter(Boolean);
+    const floors = units.map(readFloor).filter(Boolean);
+    const currencies = units
+      .map((unit) => String(unit.priceCurrency || "TRY").trim())
+      .filter(Boolean);
+    const approvals = units
+      .map((unit) => String(unit.approvalStatus || "").trim())
+      .filter(Boolean);
+    const advisors = units.map(readAdvisor).filter(Boolean);
+    const verificationValues = units.flatMap((unit) => {
+      const values: string[] = [];
+      if (isUnitVerified(unit)) values.push("EPH_APPROVED");
+      if (unit.tapuVerified || unit.isVerified) values.push("TAPU_VERIFIED");
+      if (unit.yetkiVerified || unit.isVerified)
+        values.push("AUTHORITY_VERIFIED");
+      if (unit.photoVerified || unit.isVerified) values.push("PHOTO_VERIFIED");
+      if (!isUnitVerified(unit)) values.push("UNVERIFIED");
+      return values;
     });
-
-    return unique(list.map((unit) => unit.project?.address)).map(
-      (value) => ({
-        value,
-        label: value,
-      }),
+    const poolValues = units.map((unit) =>
+      isInPool(unit) ? "IN_POOL" : "OUT_POOL",
     );
-  }, [filters.cities, filters.districts, units]);
-
-  const roomOptions = useMemo<Option[]>(
-    () =>
-      unique(units.map((unit) => unit.roomCount)).map((value) => ({
-        value,
-        label: value,
-      })),
-    [units],
-  );
-
-  const currencyOptions = useMemo<Option[]>(() => {
-    const available = new Set(
-      unique(units.map((unit) => unit.priceCurrency || "TRY")),
+    const locationValues = units.map((unit) =>
+      hasLocation(unit) ? "WITH_LOCATION" : "WITHOUT_LOCATION",
+    );
+    const deedValues = units.map((unit) =>
+      unit.tapuVerified || unit.isVerified ? "DEED_VERIFIED" : "DEED_PENDING",
+    );
+    const creditValues = units.map((unit) =>
+      isCreditAvailable(unit) ? "CREDIT_AVAILABLE" : "CREDIT_UNAVAILABLE",
+    );
+    const swapValues = units.map((unit) =>
+      readSwapState(unit) ? "SWAP_AVAILABLE" : "SWAP_UNAVAILABLE",
     );
 
-    return CURRENCY_OPTIONS.filter((option) => available.has(option.value));
+    const roomOptions = unique(rooms).map((value) => ({
+      value,
+      label: value,
+      count: rooms.filter((item) => item === value).length,
+    }));
+    const floorOptions = unique(floors).map((value) => ({
+      value,
+      label: value,
+      count: floors.filter((item) => item === value).length,
+    }));
+    const advisorOptions = unique(advisors).map((value) => ({
+      value,
+      label: advisorLabel(value),
+      count: advisors.filter((item) => item === value).length,
+    }));
+
+    return [
+      {
+        id: "location",
+        title: "Adres",
+        description: "Birden fazla il, ilçe ve mahalle seçebilirsiniz.",
+        defaultOpen: true,
+        fields: [
+          {
+            id: "portfolio-location",
+            type: "location",
+            label: "Konum",
+            cityKey: "cities",
+            districtKey: "districts",
+            neighborhoodKey: "neighborhoods",
+            multiple: true,
+            showNeighborhood: true,
+          },
+        ],
+      },
+      {
+        id: "portfolio",
+        title: "Portföy Bilgileri",
+        fields: [
+          {
+            id: "portfolio-types",
+            type: "multi-select",
+            label: "Portföy Türü",
+            valueKey: "types",
+            options: optionsFromRecord(
+              TYPE_LABELS as Record<string, string>,
+              types,
+            ),
+            searchable: true,
+            searchPlaceholder: "Portföy türü ara...",
+          },
+          {
+            id: "portfolio-statuses",
+            type: "multi-select",
+            label: "İlan Durumu",
+            valueKey: "statuses",
+            options: optionsFromRecord(
+              STATUS_LABELS as Record<string, string>,
+              statuses,
+            ),
+          },
+          {
+            id: "portfolio-rooms",
+            type: "multi-select",
+            label: "Oda Sayısı",
+            valueKey: "rooms",
+            options: roomOptions,
+            searchable: true,
+            searchPlaceholder: "Oda sayısı ara...",
+          },
+          {
+            id: "portfolio-floors",
+            type: "multi-select",
+            label: "Kat Bilgisi",
+            valueKey: "floors",
+            options: floorOptions,
+            searchable: true,
+            searchPlaceholder: "Kat bilgisi ara...",
+          },
+        ],
+      },
+      {
+        id: "price-area",
+        title: "Fiyat ve Alan",
+        fields: [
+          {
+            id: "portfolio-price-range",
+            type: "range",
+            label: "Fiyat Aralığı",
+            minKey: "minPrice",
+            maxKey: "maxPrice",
+            minPlaceholder: "Minimum",
+            maxPlaceholder: "Maksimum",
+            inputMode: "numeric",
+          },
+          {
+            id: "portfolio-currencies",
+            type: "multi-select",
+            label: "Para Birimi",
+            valueKey: "currencies",
+            options: addCounts(CURRENCY_OPTIONS, currencies),
+          },
+          {
+            id: "portfolio-area-range",
+            type: "range",
+            label: "Metrekare Aralığı",
+            minKey: "minArea",
+            maxKey: "maxArea",
+            minPlaceholder: "Minimum",
+            maxPlaceholder: "Maksimum",
+            inputMode: "numeric",
+            suffix: "m²",
+          },
+        ],
+      },
+      {
+        id: "verification",
+        title: "Yetki ve Yayın Bilgileri",
+        fields: [
+          {
+            id: "portfolio-verification",
+            type: "multi-select",
+            label: "Doğrulama",
+            valueKey: "verification",
+            options: addCounts(VERIFICATION_OPTIONS, verificationValues),
+          },
+          {
+            id: "portfolio-pool",
+            type: "multi-select",
+            label: "Havuz Durumu",
+            valueKey: "poolStates",
+            options: addCounts(POOL_OPTIONS, poolValues),
+          },
+          {
+            id: "portfolio-approval",
+            type: "multi-select",
+            label: "Onay Durumu",
+            valueKey: "approvalStatuses",
+            options: optionsFromRecord(APPROVAL_LABELS, approvals),
+          },
+          {
+            id: "portfolio-location-state",
+            type: "multi-select",
+            label: "Harita Konumu",
+            valueKey: "locationStates",
+            options: addCounts(LOCATION_OPTIONS, locationValues),
+          },
+          {
+            id: "portfolio-deed",
+            type: "multi-select",
+            label: "Tapu",
+            valueKey: "deedStates",
+            options: addCounts(DEED_OPTIONS, deedValues),
+          },
+          {
+            id: "portfolio-credit",
+            type: "multi-select",
+            label: "Kredi",
+            valueKey: "creditStates",
+            options: addCounts(CREDIT_OPTIONS, creditValues),
+          },
+          {
+            id: "portfolio-swap",
+            type: "multi-select",
+            label: "Takas",
+            valueKey: "swapStates",
+            options: addCounts(SWAP_OPTIONS, swapValues),
+          },
+          {
+            id: "portfolio-advisors",
+            type: "multi-select",
+            label: "Danışman",
+            valueKey: "advisors",
+            options: advisorOptions,
+            searchable: true,
+            searchPlaceholder: "Danışman ara...",
+          },
+          {
+            id: "portfolio-created-date",
+            type: "multi-select",
+            label: "Eklenme Tarihi",
+            valueKey: "dateRanges",
+            options: DATE_OPTIONS,
+          },
+          {
+            id: "portfolio-sort",
+            type: "single-select",
+            label: "Sıralama",
+            valueKey: "sort",
+            options: SORT_OPTIONS,
+            placeholder: "En Yeni Portföyler",
+          },
+        ],
+      },
+    ];
   }, [units]);
 
-  const approvalOptions = useMemo<Option[]>(
-    () =>
-      unique(units.map((unit) => unit.approvalStatus)).map((value) => ({
-        value,
-        label: approvalLabel(value),
-      })),
-    [units],
-  );
-
-  if (!open) return null;
-
-  const setFilter = (
-    key: keyof PortfolioFilterState,
-    value: PortfolioFilterState[keyof PortfolioFilterState],
-  ) => {
-    onChange({ ...filters, [key]: value } as PortfolioFilterState);
-  };
-
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/60 sm:items-center sm:p-4">
-      <section className="flex h-[100dvh] w-full max-w-[460px] flex-col overflow-hidden bg-[#F4F8FF] shadow-[0_24px_70px_rgba(15,23,42,0.36)] sm:h-[min(94dvh,860px)] sm:rounded-[30px] sm:border-2 sm:border-[#C7D6E8]">
-        <header className="shrink-0 border-b-2 border-[#C7D6E8] bg-white px-3 pb-3 pt-[max(12px,env(safe-area-inset-top))]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#2563EB]">
-                Portföy Arama Merkezi
-              </p>
-              <h2 className="mt-1 text-[21px] font-black tracking-[-0.04em] text-[#1F2937]">
-                Gelişmiş Filtreler
-              </h2>
-              <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
-                Aynı grupta VEYA, farklı gruplar arasında VE uygulanır.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#2563EB]"
-              aria-label="Filtreleri kapat"
-            >
-              <X size={19} />
-            </button>
-          </div>
-        </header>
-
-        <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
-          <MultiSelectSection
-            title="Portföy Türü"
-            options={typeOptions}
-            selected={filters.types}
-            onChange={(value) => setFilter("types", value)}
-            open
-          />
-
-          <MultiSelectSection
-            title="İşlem Türü"
-            options={statusOptions}
-            selected={filters.statuses}
-            onChange={(value) => setFilter("statuses", value)}
-            open
-          />
-
-          <MultiSelectSection
-            title="İl"
-            options={cityOptions}
-            selected={filters.cities}
-            onChange={(value) => {
-              const allowedDistricts = new Set(
-                units
-                  .filter(
-                    (unit) =>
-                      value.length === 0 ||
-                      value.includes(String(unit.project?.city || "")),
-                  )
-                  .map((unit) => String(unit.project?.district || "")),
-              );
-
-              onChange({
-                ...filters,
-                cities: value,
-                districts: filters.districts.filter((item) =>
-                  allowedDistricts.has(item),
-                ),
-                neighborhoods: [],
-              });
-            }}
-            open
-          />
-
-          <MultiSelectSection
-            title="İlçe"
-            options={districtOptions}
-            selected={filters.districts}
-            onChange={(value) =>
-              onChange({
-                ...filters,
-                districts: value,
-                neighborhoods: [],
-              })
-            }
-            open
-          />
-
-          <MultiSelectSection
-            title="Mahalle / Köy / Mevki"
-            options={neighborhoodOptions}
-            selected={filters.neighborhoods}
-            onChange={(value) => setFilter("neighborhoods", value)}
-            open
-          />
-
-          <MultiSelectSection
-            title="Oda Sayısı"
-            options={roomOptions}
-            selected={filters.rooms}
-            onChange={(value) => setFilter("rooms", value)}
-          />
-
-          <MultiSelectSection
-            title="Para Birimi"
-            options={currencyOptions}
-            selected={filters.currencies}
-            onChange={(value) => setFilter("currencies", value)}
-            searchable={false}
-          />
-
-          <MultiSelectSection
-            title="Doğrulama Durumu"
-            options={VERIFICATION_OPTIONS}
-            selected={filters.verification}
-            onChange={(value) => setFilter("verification", value)}
-            searchable={false}
-          />
-
-          <MultiSelectSection
-            title="Havuz Durumu"
-            options={POOL_OPTIONS}
-            selected={filters.poolStates}
-            onChange={(value) => setFilter("poolStates", value)}
-            searchable={false}
-          />
-
-          <MultiSelectSection
-            title="Onay Süreci"
-            options={approvalOptions}
-            selected={filters.approvalStatuses}
-            onChange={(value) => setFilter("approvalStatuses", value)}
-          />
-
-          <MultiSelectSection
-            title="Harita Konumu"
-            options={LOCATION_OPTIONS}
-            selected={filters.locationStates}
-            onChange={(value) => setFilter("locationStates", value)}
-            searchable={false}
-          />
-
-          <MultiSelectSection
-            title="Eklenme Tarihi"
-            options={DATE_OPTIONS}
-            selected={filters.dateRanges}
-            onChange={(value) => setFilter("dateRanges", value)}
-            searchable={false}
-          />
-
-          <details
-            open
-            className="group overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white"
-          >
-            <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between gap-2 bg-[#F8FAFC] px-3 py-2">
-              <div>
-                <p className="text-[13px] font-black text-[#1F2937]">
-                  Fiyat ve Metrekare
-                </p>
-                <p className="mt-0.5 text-[10px] font-bold text-[#64748B]">
-                  Alt ve üst sınırlar birlikte kullanılabilir
-                </p>
-              </div>
-              <ChevronDown
-                size={16}
-                className="text-[#2563EB] transition-transform group-open:rotate-180"
-              />
-            </summary>
-
-            <div className="grid grid-cols-2 gap-2 border-t-2 border-[#E2EAF5] p-2.5">
-              <label className="min-w-0">
-                <span className="mb-1 block text-[9px] font-black uppercase text-[#64748B]">
-                  Min. Fiyat
-                </span>
-                <input
-                  inputMode="numeric"
-                  value={filters.minPrice}
-                  onChange={(event) =>
-                    setFilter(
-                      "minPrice",
-                      formatNumericInput(event.target.value),
-                    )
-                  }
-                  placeholder="0"
-                  className="h-11 w-full rounded-[14px] border-2 border-[#C7D6E8] bg-white px-2 text-[11px] font-black outline-none focus:border-[#2563EB]"
-                />
-              </label>
-
-              <label className="min-w-0">
-                <span className="mb-1 block text-[9px] font-black uppercase text-[#64748B]">
-                  Maks. Fiyat
-                </span>
-                <input
-                  inputMode="numeric"
-                  value={filters.maxPrice}
-                  onChange={(event) =>
-                    setFilter(
-                      "maxPrice",
-                      formatNumericInput(event.target.value),
-                    )
-                  }
-                  placeholder="Sınırsız"
-                  className="h-11 w-full rounded-[14px] border-2 border-[#C7D6E8] bg-white px-2 text-[11px] font-black outline-none focus:border-[#2563EB]"
-                />
-              </label>
-
-              <label className="min-w-0">
-                <span className="mb-1 block text-[9px] font-black uppercase text-[#64748B]">
-                  Min. m²
-                </span>
-                <input
-                  inputMode="numeric"
-                  value={filters.minArea}
-                  onChange={(event) =>
-                    setFilter(
-                      "minArea",
-                      formatNumericInput(event.target.value),
-                    )
-                  }
-                  placeholder="0"
-                  className="h-11 w-full rounded-[14px] border-2 border-[#C7D6E8] bg-white px-2 text-[11px] font-black outline-none focus:border-[#2563EB]"
-                />
-              </label>
-
-              <label className="min-w-0">
-                <span className="mb-1 block text-[9px] font-black uppercase text-[#64748B]">
-                  Maks. m²
-                </span>
-                <input
-                  inputMode="numeric"
-                  value={filters.maxArea}
-                  onChange={(event) =>
-                    setFilter(
-                      "maxArea",
-                      formatNumericInput(event.target.value),
-                    )
-                  }
-                  placeholder="Sınırsız"
-                  className="h-11 w-full rounded-[14px] border-2 border-[#C7D6E8] bg-white px-2 text-[11px] font-black outline-none focus:border-[#2563EB]"
-                />
-              </label>
-            </div>
-          </details>
-
-          <details
-            open
-            className="group overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white"
-          >
-            <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between gap-2 bg-[#F8FAFC] px-3 py-2">
-              <div>
-                <p className="text-[13px] font-black text-[#1F2937]">
-                  Sıralama
-                </p>
-                <p className="mt-0.5 text-[10px] font-bold text-[#64748B]">
-                  Sonuçların gösterim önceliği
-                </p>
-              </div>
-              <ChevronDown
-                size={16}
-                className="text-[#2563EB] transition-transform group-open:rotate-180"
-              />
-            </summary>
-
-            <div className="space-y-2 border-t-2 border-[#E2EAF5] p-2.5">
-              {SORT_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setFilter("sort", option.value)}
-                  className={`flex min-h-[42px] w-full items-center gap-2 rounded-[14px] border-2 px-2.5 text-left text-[10.5px] font-black ${
-                    filters.sort === option.value
-                      ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]"
-                      : "border-[#D7E3F2] bg-white text-[#334155]"
-                  }`}
-                >
-                  <span
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-                      filters.sort === option.value
-                        ? "border-[#2563EB] bg-[#2563EB] text-white"
-                        : "border-[#B8C9DD] text-transparent"
-                    }`}
-                  >
-                    <Check size={11} />
-                  </span>
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </details>
-        </div>
-
-        <footer className="shrink-0 border-t-2 border-[#C7D6E8] bg-white p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
-          <div className="grid grid-cols-[0.9fr_1.1fr] gap-2">
-            <button
-              type="button"
-              onClick={() => onChange(createEmptyPortfolioFilters())}
-              className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-[16px] border-2 border-[#C7D6E8] bg-white px-2 text-[11px] font-black text-[#2563EB]"
-            >
-              <RotateCcw size={15} />
-              Temizle
-            </button>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-[16px] bg-[#2563EB] px-2 text-[11px] font-black text-white shadow-[0_10px_22px_rgba(37,99,235,0.24)]"
-            >
-              <SlidersHorizontal size={15} />
-              {resultCount} Portföyü Göster
-            </button>
-          </div>
-        </footer>
-      </section>
-    </div>
+    <AdvancedFilterCenter
+      open={open}
+      title="Portföy Gelişmiş Filtre"
+      subtitle="Portföyleri konum, tür, fiyat ve doğrulama bilgilerine göre süzün."
+      sections={sections}
+      value={filters}
+      defaultValue={createEmptyPortfolioFilters()}
+      resultCount={resultCount}
+      clearLabel="Tümünü Temizle"
+      theme={{
+        accent: "#7C3AED",
+        accentSoft: "#F3E8FF",
+        accentText: "#6D28D9",
+        panel: "#FAF7FF",
+        surfaceSoft: "#EDE9FE",
+        border: "#DDD6FE",
+      }}
+      onApply={(nextValue) => {
+        onChange(nextValue as PortfolioFilterState);
+        onClose();
+      }}
+      onClose={onClose}
+    />
   );
 }
