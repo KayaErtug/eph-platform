@@ -4,28 +4,43 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  BarChart3,
   Bell,
   Bot,
-  BriefcaseBusiness,
   Building2,
+  CalendarDays,
   ClipboardCheck,
   Clock3,
   FileText,
+  Filter,
+  Headphones,
+  Heart,
   KeyRound,
   LayoutDashboard,
+  ListChecks,
   Loader2,
+  Map,
   MessageCircle,
+  Plus,
+  Search,
+  Settings,
   ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
   Target,
   UserCog,
   UserPlus,
   UsersRound,
+  Waves,
 } from "lucide-react";
 
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 
-type Conversation = { id: string; unreadCount?: number };
+type Conversation = {
+  id: string;
+  unreadCount?: number;
+};
 
 type DashboardSummary = {
   stats?: {
@@ -36,67 +51,30 @@ type DashboardSummary = {
   };
 };
 
-type CrmDashboardCustomer = {
+type CrmCustomer = {
   id: string;
-  firstName: string;
-  lastName: string;
-  phone?: string | null;
-  city?: string | null;
-  status: string;
   tasks?: Array<{
     id: string;
-    title: string;
     dueDate?: string | null;
     status: string;
   }>;
 };
 
-type NetworkNotification = {
-  id: string;
-  title: string;
-  message: string;
-  isRead: boolean;
-  createdAt: string;
-};
-
-type NetworkNotificationResponse = {
-  unreadCount: number;
-  items: NetworkNotification[];
-};
-
-type FeaturedNetworkPost = {
+type NetworkPost = {
   id: string;
   userId?: string | null;
-  title: string;
-  type: string;
-  city?: string | null;
-  district?: string | null;
-  budget?: number | null;
-  score: number;
-  viewCount: number;
-  followerCount: number;
-  requestCount: number;
-  user?: {
-    id?: string | null;
-    firstName: string;
-    lastName: string;
-    role: string;
-  };
+  user?: { id?: string | null } | null;
 };
 
-type DashboardTask = {
-  id: string;
-  title: string;
-  dueDate?: string | null;
-  customerId: string;
-  customerName: string;
-  customerPhone?: string | null;
+type NotificationResponse = {
+  unreadCount: number;
+  items?: Array<{ id: string; title?: string; isRead?: boolean }>;
 };
 
-type QuickAccessItem = {
+type DashboardItem = {
   href: string;
   label: string;
-  desc: string;
+  value: string;
   icon: ReactNode;
   roles?: string[];
 };
@@ -106,101 +84,48 @@ function normalizeRole(role?: string | null) {
 }
 
 function roleLabel(role?: string | null) {
-  const normalizedRole = normalizeRole(role);
+  const value = normalizeRole(role);
 
-  if (normalizedRole === "SUPER_ADMIN") return "Yazılım Ekibi";
-  if (normalizedRole === "ADMIN") return "Admin";
-  if (normalizedRole === "MODERATOR") return "Moderatör";
-  if (["MUTEAHHIT", "MÜTEAHHİT", "MÜTAHHİT"].includes(normalizedRole)) return "Müteahhit";
-  if (["INSAAT_FIRMASI", "İNŞAAT_FİRMASI"].includes(normalizedRole)) return "İnşaat Firması";
+  if (value === "SUPER_ADMIN") return "Yazılım Ekibi";
+  if (value === "ADMIN") return "Admin";
+  if (value === "MODERATOR") return "Moderatör";
+  if (value.includes("MUTEAHHIT") || value.includes("MÜTEAHHİT")) return "Müteahhit";
+  if (value.includes("INSAAT") || value.includes("İNŞAAT")) return "İnşaat Firması";
+  if (value.includes("OFIS") || value.includes("OFFICE")) return "Ofis Sahibi";
+  if (value.includes("TAKIM") || value.includes("TEAM")) return "Takım Lideri";
 
   return "Gayrimenkul Danışmanı";
 }
 
-function getFirstName(user?: { firstName?: string | null; email?: string | null } | null) {
+function firstName(user?: { firstName?: string | null; email?: string | null } | null) {
   return user?.firstName?.trim() || user?.email?.split("@")[0] || "EPH Üyesi";
 }
 
-function formatBudget(value?: number | null) {
-  if (!value) return "Bütçe yok";
+function countTodayTasks(customers: CrmCustomer[]) {
+  const now = new Date();
+  const start = new Date(now);
+  const end = new Date(now);
 
-  if (value >= 1000000) {
-    const compact = value / 1000000;
-    return `${compact.toLocaleString("tr-TR", {
-      maximumFractionDigits: compact >= 10 ? 0 : 1,
-    })}M TL`;
-  }
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
 
-  return `${value.toLocaleString("tr-TR")} TL`;
+  return customers.reduce((total, customer) => {
+    const count = (customer.tasks || []).filter((task) => {
+      if (task.status !== "BEKLIYOR" || !task.dueDate) return false;
+      const due = new Date(task.dueDate);
+      return due >= start && due <= end;
+    }).length;
+
+    return total + count;
+  }, 0);
 }
 
-function formatTaskDate(value?: string | null) {
-  if (!value) return "Saat yok";
-
-  const date = new Date(value);
-  const today = new Date();
-  const tomorrow = new Date();
-  tomorrow.setDate(today.getDate() + 1);
-
-  const time = date.toLocaleTimeString("tr-TR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-  if (date.toDateString() === today.toDateString()) return `Bugün ${time}`;
-  if (date.toDateString() === tomorrow.toDateString()) return `Yarın ${time}`;
-
-  return `${date.toLocaleDateString("tr-TR", {
-    day: "2-digit",
-    month: "short",
-  })} · ${time}`;
-}
-
-function flattenCustomerTasks(customers: CrmDashboardCustomer[]) {
-  return customers
-    .flatMap((customer) =>
-      (customer.tasks || [])
-        .filter((task) => task.status === "BEKLIYOR")
-        .map((task) => ({
-          ...task,
-          customerId: customer.id,
-          customerName: `${customer.firstName} ${customer.lastName}`.trim(),
-          customerPhone: customer.phone,
-        })),
-    )
-    .sort((a, b) => {
-      const aTime = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
-      const bTime = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
-
-      return aTime - bTime;
-    });
-}
-
-function startOfToday() {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function endOfToday() {
-  const date = new Date();
-  date.setHours(23, 59, 59, 999);
-  return date;
-}
-
-function centeredGridItemClass(index: number, total: number) {
-  const columns = 4;
-  const remainder = total % columns;
-
-  if (remainder === 1 && index === total - 1) {
-    return "col-span-2 col-start-2";
-  }
-
-  if (remainder === 2 && index === total - 2) {
-    return "col-start-2";
-  }
-
-  return "";
+function countAllTasks(customers: CrmCustomer[]) {
+  return customers.reduce(
+    (total, customer) =>
+      total + (customer.tasks || []).filter((task) => task.status === "BEKLIYOR").length,
+    0,
+  );
 }
 
 export default function DashboardPage() {
@@ -210,14 +135,13 @@ export default function DashboardPage() {
   const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [crmCustomers, setCrmCustomers] = useState<CrmDashboardCustomer[]>([]);
-  const [featuredPosts, setFeaturedPosts] = useState<FeaturedNetworkPost[]>([]);
-  const [networkNotifications, setNetworkNotifications] = useState<NetworkNotificationResponse>({ unreadCount: 0, items: [] });
+  const [customers, setCustomers] = useState<CrmCustomer[]>([]);
+  const [posts, setPosts] = useState<NetworkPost[]>([]);
+  const [notifications, setNotifications] = useState<NotificationResponse>({
+    unreadCount: 0,
+    items: [],
+  });
   const [unreadMessages, setUnreadMessages] = useState(0);
-
-  const firstName = getFirstName(user);
-  const roleName = roleLabel(user?.role);
-  const normalizedRole = normalizeRole(user?.role);
 
   useEffect(() => {
     setHydrated(true);
@@ -231,581 +155,563 @@ export default function DashboardPage() {
       return;
     }
 
-    fetchDashboardData();
-  }, [hydrated, user, router]);
+    void fetchDashboard();
+  }, [hydrated, router, user]);
 
-  const fetchDashboardData = async () => {
+  async function fetchDashboard() {
     setLoading(true);
 
     try {
-      const [summaryRes, conversationsRes, notificationsRes, featuredRes, crmCustomersRes] =
+      const [summaryResult, customerResult, postResult, notificationResult, conversationResult] =
         await Promise.allSettled([
           api.get("/dashboard/summary"),
-          user?.id ? api.get(`/conversations?userId=${user.id}`) : Promise.resolve({ data: [] }),
-          user?.id ? api.get(`/network/notifications?userId=${user.id}`) : Promise.resolve({ data: { unreadCount: 0, items: [] } }),
-          api.get("/network/posts/featured"),
           api.get("/crm/customers"),
+          api.get("/network/posts/featured"),
+          user?.id
+            ? api.get(`/network/notifications?userId=${user.id}`)
+            : Promise.resolve({ data: { unreadCount: 0, items: [] } }),
+          user?.id
+            ? api.get(`/conversations?userId=${user.id}`)
+            : Promise.resolve({ data: [] }),
         ]);
 
-      setSummary(summaryRes.status === "fulfilled" ? summaryRes.value.data : null);
+      setSummary(summaryResult.status === "fulfilled" ? summaryResult.value.data : null);
 
-      if (conversationsRes.status === "fulfilled") {
-        const conversations = Array.isArray(conversationsRes.value.data)
-          ? (conversationsRes.value.data as Conversation[])
-          : [];
+      setCustomers(
+        customerResult.status === "fulfilled" && Array.isArray(customerResult.value.data)
+          ? customerResult.value.data
+          : [],
+      );
 
-        setUnreadMessages(conversations.reduce((sum, item) => sum + (item.unreadCount || 0), 0));
-      } else {
-        setUnreadMessages(0);
-      }
+      setPosts(
+        postResult.status === "fulfilled" && Array.isArray(postResult.value.data)
+          ? postResult.value.data
+          : [],
+      );
 
-      setNetworkNotifications(
-        notificationsRes.status === "fulfilled"
-          ? notificationsRes.value.data || { unreadCount: 0, items: [] }
+      setNotifications(
+        notificationResult.status === "fulfilled"
+          ? notificationResult.value.data || { unreadCount: 0, items: [] }
           : { unreadCount: 0, items: [] },
       );
 
-      setFeaturedPosts(
-        featuredRes.status === "fulfilled" && Array.isArray(featuredRes.value.data)
-          ? featuredRes.value.data
-          : [],
-      );
-
-      setCrmCustomers(
-        crmCustomersRes.status === "fulfilled" && Array.isArray(crmCustomersRes.value.data)
-          ? crmCustomersRes.value.data
-          : [],
-      );
+      if (conversationResult.status === "fulfilled" && Array.isArray(conversationResult.value.data)) {
+        const total = (conversationResult.value.data as Conversation[]).reduce(
+          (sum, conversation) => sum + Number(conversation.unreadCount || 0),
+          0,
+        );
+        setUnreadMessages(total);
+      } else {
+        setUnreadMessages(0);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const crmTasks = useMemo(() => flattenCustomerTasks(crmCustomers), [crmCustomers]);
-  const todayStart = startOfToday();
-  const todayEnd = endOfToday();
+  const normalizedRole = normalizeRole(user?.role);
+  const role = roleLabel(user?.role);
+  const name = firstName(user);
+  const stats = summary?.stats || {};
+  const todayTasks = useMemo(() => countTodayTasks(customers), [customers]);
+  const allTasks = useMemo(() => countAllTasks(customers), [customers]);
 
-  const urgentTasks = useMemo(() => {
-    const overdue = crmTasks.filter((task) => {
-      if (!task.dueDate) return false;
-      return new Date(task.dueDate).getTime() < todayStart.getTime();
-    });
-
-    const today = crmTasks.filter((task) => {
-      if (!task.dueDate) return false;
-      const dueDate = new Date(task.dueDate);
-      return dueDate >= todayStart && dueDate <= todayEnd;
-    });
-
-    const future = crmTasks.filter((task) => {
-      if (!task.dueDate) return false;
-      return new Date(task.dueDate).getTime() > todayEnd.getTime();
-    });
-
-    return [...overdue, ...today, ...future].slice(0, 2);
-  }, [crmTasks, todayEnd, todayStart]);
-
-  const visibleForumRequests = useMemo(() => {
-    return featuredPosts
-      .filter((post) => {
+  const visiblePosts = useMemo(
+    () =>
+      posts.filter((post) => {
         const ownerId = post.userId || post.user?.id;
         return !user?.id || !ownerId || ownerId !== user.id;
-      })
-      .slice(0, 2);
-  }, [featuredPosts, user?.id]);
+      }),
+    [posts, user?.id],
+  );
 
-  const latestNotifications = useMemo(() => {
-    return networkNotifications.items.slice(0, 1);
-  }, [networkNotifications.items]);
+  const dashboardText =
+    todayTasks || unreadMessages || visiblePosts.length
+      ? `Bugün ${todayTasks} görev, ${unreadMessages} mesaj ve ${visiblePosts.length} talep görünüyor.`
+      : "Bugün paneliniz sakin görünüyor.";
 
-  const stats = summary?.stats || {
-    totalUnits: 0,
-    totalCustomers: 0,
-    totalVisits: 0,
-    totalProjects: 0,
-  };
+  const portfolioItems: DashboardItem[] = [
+    {
+      href: "/portfoy",
+      label: "Portföy",
+      value: String(stats.totalUnits || 0),
+      icon: <Building2 size={18} />,
+    },
+    {
+      href: "/portfoy?status=SATILIK",
+      label: "Satılık",
+      value: "Liste",
+      icon: <KeyRound size={18} />,
+    },
+    {
+      href: "/portfoy?status=KIRALIK",
+      label: "Kiralık",
+      value: "Liste",
+      icon: <KeyRound size={18} />,
+    },
+    {
+      href: "/portfoy?favorites=1",
+      label: "Favorilerim",
+      value: "Kayıtlar",
+      icon: <Heart size={18} />,
+    },
+    {
+      href: "/portfoy?sort=newest",
+      label: "Son Eklenenler",
+      value: "Yeni",
+      icon: <Clock3 size={18} />,
+    },
+    {
+      href: "/reports",
+      label: "Raporlar",
+      value: "Analiz",
+      icon: <BarChart3 size={18} />,
+    },
+    {
+      href: "/portfoy?map=1",
+      label: "Harita",
+      value: "Aç",
+      icon: <Map size={18} />,
+    },
+  ];
 
-  const quickAccessItems = useMemo<QuickAccessItem[]>(() => {
-    const items: QuickAccessItem[] = [
-      {
-        href: "/stok",
-        label: "Portföy",
-        desc: String(stats.totalUnits || 0),
-        icon: <Building2 size={16} />,
-      },
-      {
-        href: "/crm",
-        label: "CRM",
-        desc: `${crmTasks.length} görev`,
-        icon: <UsersRound size={16} />,
-      },
-      {
-        href: "/network",
-        label: "Forum",
-        desc: `${visibleForumRequests.length} talep`,
-        icon: <MessageCircle size={16} />,
-      },
-      {
-        href: "/havuz",
-        label: "Havuz",
-        desc: "Eşleşme",
-        icon: <Target size={16} />,
-      },
-      {
-        href: "/lina",
-        label: "Lina",
-        desc: "Asistan",
-        icon: <Bot size={16} />,
-      },
-      {
-        href: "/uretkenlik",
-        label: "Üretkenlik",
-        desc: "Belge Merkezi",
-        icon: <FileText size={16} />,
-      },
-      {
-        href: "/messages",
-        label: "Mesajlar",
-        desc: unreadMessages > 0 ? `${unreadMessages} yeni` : "0 yeni",
-        icon: <MessageCircle size={16} />,
-      },
-      {
-        href: "/notification-settings",
-        label: "Bildirimler",
-        desc: networkNotifications.unreadCount > 0 ? `${networkNotifications.unreadCount} yeni` : "Ayarlar",
-        icon: <Bell size={16} />,
-      },
-      {
-        href: "/kayit",
-        label: "Kayıt Merkezi",
-        desc: "Üyelik",
-        icon: <UserPlus size={16} />,
-        roles: ["MODERATOR", "ADMIN", "SUPER_ADMIN"],
-      },
-      {
-        href: "/admin/katilim-talepleri",
-        label: "Başvuru Merkezi",
-        desc: "Onay",
-        icon: <ClipboardCheck size={16} />,
-        roles: ["MODERATOR", "ADMIN", "SUPER_ADMIN"],
-      },
-      {
-        href: "/admin/referrals",
-        label: "Referans Kodları",
-        desc: "Davet",
-        icon: <KeyRound size={16} />,
-        roles: ["ADMIN", "SUPER_ADMIN"],
-      },
-      {
-        href: "/admin",
-        label: "Admin Paneli",
-        desc: "Yönetim",
-        icon: <LayoutDashboard size={16} />,
-        roles: ["ADMIN", "SUPER_ADMIN"],
-      },
-      {
-        href: "/admin",
-        label: "Kullanıcı Yönetimi",
-        desc: "Tam yetki",
-        icon: <UserCog size={16} />,
-        roles: ["SUPER_ADMIN"],
-      },
-    ];
+  const crmItems: DashboardItem[] = [
+    {
+      href: "/crm",
+      label: "CRM",
+      value: `${allTasks} görev`,
+      icon: <UsersRound size={18} />,
+    },
+    {
+      href: "/crm",
+      label: "Akıllı CRM",
+      value: "V2",
+      icon: <Sparkles size={18} />,
+    },
+    {
+      href: "/crm",
+      label: "Müşteriler",
+      value: String(stats.totalCustomers || 0),
+      icon: <UserPlus size={18} />,
+    },
+    {
+      href: "/crm",
+      label: "Teklifler",
+      value: "Kayıtlar",
+      icon: <FileText size={18} />,
+    },
+    {
+      href: "/crm",
+      label: "Takvim",
+      value: "Bugün",
+      icon: <CalendarDays size={18} />,
+    },
+    {
+      href: "/crm",
+      label: "Aramalar",
+      value: "Takip",
+      icon: <MessageCircle size={18} />,
+    },
+    {
+      href: "/crm",
+      label: "Notlar",
+      value: "Kayıtlar",
+      icon: <ListChecks size={18} />,
+    },
+  ];
 
-    return items.filter((item) => {
-      if (!item.roles) return true;
-      return item.roles.includes(normalizedRole);
-    });
-  }, [
-    crmTasks.length,
-    networkNotifications.unreadCount,
-    normalizedRole,
-    stats.totalUnits,
-    unreadMessages,
-    visibleForumRequests.length,
-  ]);
+  const forumItems: DashboardItem[] = [
+    {
+      href: "/network",
+      label: "Talep Merkezi",
+      value: String(visiblePosts.length),
+      icon: <Target size={18} />,
+    },
+    {
+      href: "/network?tab=mine",
+      label: "Taleplerim",
+      value: "Kayıtlar",
+      icon: <FileText size={18} />,
+    },
+    {
+      href: "/network?tab=saved",
+      label: "Kaydettiklerim",
+      value: "Kayıtlar",
+      icon: <Heart size={18} />,
+    },
+    {
+      href: "/network?tab=interested",
+      label: "İlgilendiklerim",
+      value: "Takip",
+      icon: <UsersRound size={18} />,
+    },
+    {
+      href: "/notification-settings",
+      label: "Bildirimler",
+      value: String(notifications.unreadCount || 0),
+      icon: <Bell size={18} />,
+    },
+    {
+      href: "/messages",
+      label: "Mesajlar",
+      value: String(unreadMessages),
+      icon: <MessageCircle size={18} />,
+    },
+    {
+      href: "/network?create=1",
+      label: "Yeni Talep",
+      value: "Oluştur",
+      icon: <Plus size={18} />,
+    },
+  ];
 
-  const todayTaskCount = crmTasks.filter((task) => {
-    if (!task.dueDate) return false;
-    const dueDate = new Date(task.dueDate);
-    return dueDate >= todayStart && dueDate <= todayEnd;
-  }).length;
+  const poolItems: DashboardItem[] = [
+    {
+      href: "/havuz",
+      label: "Havuz",
+      value: "Aç",
+      icon: <Waves size={18} />,
+    },
+    {
+      href: "/havuz",
+      label: "Havuzdaki Portföyler",
+      value: "Liste",
+      icon: <Building2 size={18} />,
+    },
+    {
+      href: "/havuz",
+      label: "Akış",
+      value: "Güncel",
+      icon: <Waves size={18} />,
+    },
+    {
+      href: "/havuz",
+      label: "Katılanlar",
+      value: "Üyeler",
+      icon: <UsersRound size={18} />,
+    },
+    {
+      href: "/havuz",
+      label: "İstatistikler",
+      value: "Analiz",
+      icon: <BarChart3 size={18} />,
+    },
+    {
+      href: "/havuz",
+      label: "Kurallar",
+      value: "Bilgi",
+      icon: <ShieldCheck size={18} />,
+    },
+    {
+      href: "/havuz",
+      label: "Ayarlar",
+      value: "Düzenle",
+      icon: <Settings size={18} />,
+    },
+  ];
 
-  const dashboardSummaryText = useMemo(() => {
-    const parts: string[] = [];
-
-    if (todayTaskCount > 0) {
-      parts.push(`${todayTaskCount} görev`);
-    }
-
-    if (unreadMessages > 0) {
-      parts.push(`${unreadMessages} mesaj`);
-    }
-
-    if (visibleForumRequests.length > 0) {
-      parts.push(`${visibleForumRequests.length} uygun talep`);
-    }
-
-    if (parts.length === 0) {
-      return "Bugün paneliniz sakin görünüyor.";
-    }
-
-    if (parts.length === 1) {
-      return `Bugün ${parts[0]} görünüyor.`;
-    }
-
-    const lastPart = parts.pop();
-
-    return `Bugün ${parts.join(", ")} ve ${lastPart} görünüyor.`;
-  }, [todayTaskCount, unreadMessages, visibleForumRequests.length]);
+  const managementItems: DashboardItem[] = [
+    {
+      href: "/admin",
+      label: "Kullanıcılar",
+      value: "Yönetim",
+      icon: <UserCog size={18} />,
+      roles: ["ADMIN", "SUPER_ADMIN"],
+    },
+    {
+      href: "/admin",
+      label: "Roller",
+      value: "Yetki",
+      icon: <ShieldCheck size={18} />,
+      roles: ["ADMIN", "SUPER_ADMIN"],
+    },
+    {
+      href: "/admin",
+      label: "Yetkiler",
+      value: "Kontrol",
+      icon: <KeyRound size={18} />,
+      roles: ["SUPER_ADMIN"],
+    },
+    {
+      href: "/settings",
+      label: "Ayarlar",
+      value: "Genel",
+      icon: <SlidersHorizontal size={18} />,
+    },
+    {
+      href: "/admin/audit-logs",
+      label: "Sistem Logları",
+      value: "Kayıtlar",
+      icon: <FileText size={18} />,
+      roles: ["ADMIN", "SUPER_ADMIN"],
+    },
+    {
+      href: "/help-center",
+      label: "Destek Talepleri",
+      value: "Destek",
+      icon: <Headphones size={18} />,
+    },
+    {
+      href: "/admin/announcements",
+      label: "Duyurular",
+      value: "Yayın",
+      icon: <Bell size={18} />,
+      roles: ["ADMIN", "SUPER_ADMIN"],
+    },
+  ].filter((item) => !item.roles || item.roles.includes(normalizedRole));
 
   if (!hydrated || loading) {
     return (
-      <main className="flex min-h-[calc(100dvh-74px)] items-center justify-center bg-[#F4F8FF] px-4">
-        <div className="flex flex-col items-center gap-4 text-center text-[#27364F]">
-          <Loader2 className="animate-spin text-[#1557D6]" size={30} />
-          <p className="text-sm font-black">Dashboard hazırlanıyor...</p>
+      <main className="flex min-h-[calc(100dvh-74px)] items-center justify-center bg-[#F7F7FF] px-4">
+        <div className="flex flex-col items-center gap-3 text-center text-[#0F1D45]">
+          <Loader2 className="animate-spin text-[#6D28D9]" size={28} />
+          <p className="text-[13px] font-black">Ana sayfa hazırlanıyor...</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-[calc(100dvh-74px)] bg-[#F4F8FF] px-3 pb-24 pt-2 text-[#06194A]">
-      <div className="mx-auto w-full max-w-[430px] space-y-2.5">
-        <section className="rounded-[26px] border-2 border-[#C7D6E8] bg-white px-4 py-4 text-center shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
-          <p className="mx-auto inline-flex min-h-[26px] items-center justify-center rounded-full bg-[#EFF6FF] px-4 text-[11px] font-black text-[#1557D6]">
-            {roleName}
-          </p>
+    <main className="min-h-[calc(100dvh-74px)] bg-[radial-gradient(circle_at_top,#FFFFFF_0%,#F7F7FF_54%,#F1F3FF_100%)] px-3 pb-24 pt-2 text-[#0F1D45]">
+      <div className="mx-auto w-full max-w-[430px] space-y-3">
+        <section className="overflow-hidden rounded-[24px] border border-[#E2E4F5] bg-white shadow-[0_14px_34px_rgba(45,49,112,0.08)]">
+          <div className="relative min-h-[132px] overflow-hidden px-4 py-4">
+            <div className="relative z-10 max-w-[58%]">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#6D28D9]">
+                {role}
+              </p>
+              <h1 className="mt-1.5 text-[25px] font-black leading-[1.02] tracking-[-0.045em] text-[#0F1D45]">
+                Merhaba {name}
+              </h1>
+              <p className="mt-2 text-[11px] font-bold leading-4 text-[#64748B]">
+                {dashboardText}
+              </p>
+            </div>
 
-          <h1 className="mx-auto mt-2 max-w-[360px] text-center text-[25px] font-black leading-[0.98] tracking-[-0.055em] text-[#06194A]">
-            Merhaba {firstName}
-          </h1>
+            <img
+              src="/dashboard/eph-istanbul-banner.png"
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute bottom-0 right-[-10px] h-[116px] w-[72%] object-contain object-right-bottom opacity-95"
+            />
+          </div>
 
-          <p className="mx-auto mt-2 max-w-[340px] text-center text-[12px] font-extrabold leading-5 text-[#64748B]">
-            {dashboardSummaryText}
-          </p>
-
-          <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-[#FBFDFF]">
-            <HeroStat label="Görev" value={todayTaskCount} />
-            <HeroStat label="Mesaj" value={unreadMessages} />
-            <HeroStat label="Talep" value={visibleForumRequests.length} />
+          <div className="grid grid-cols-3 border-t border-[#E9EAF4] bg-white">
+            <HeroStat icon={<ClipboardCheck size={16} />} label="Görev" value={todayTasks} />
+            <HeroStat icon={<MessageCircle size={16} />} label="Mesaj" value={unreadMessages} />
+            <HeroStat icon={<Target size={16} />} label="Talep" value={visiblePosts.length} />
           </div>
         </section>
 
-        <QuickAccessCenter items={quickAccessItems} />
-
-        <SectionBlock icon={<Clock3 size={16} />} title="Acil İşler" actionHref="/crm" actionLabel="Tümü">
-          {urgentTasks.length > 0 ? (
-            <div className="grid gap-2">
-              {urgentTasks.map((task) => (
-                <UrgentTaskCard key={task.id} task={task} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState text="Bugün için acil görev görünmüyor." />
-          )}
-        </SectionBlock>
-
-        <SectionBlock icon={<MessageCircle size={16} />} title="Uygun Talepler" actionHref="/network" actionLabel="Forum">
-          {visibleForumRequests.length > 0 ? (
-            <div className="grid gap-2">
-              {visibleForumRequests.map((post) => (
-                <ForumRequestCard key={post.id} post={post} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState text="Şu anda size uygun yeni talep yok." />
-          )}
-        </SectionBlock>
-
         <section className="grid grid-cols-2 gap-2">
-          <SummaryMiniCard
-            icon={<Building2 size={15} />}
-            title="Portföy"
-            rows={[
-              ["Toplam", String(stats.totalUnits || 0)],
-              ["Proje", String(stats.totalProjects || 0)],
-            ]}
+          <ActionButton
+            href="/crm?new=1"
+            icon={<UserPlus size={15} />}
+            label="Yeni CRM Kaydı"
+            tone="blue"
+            delay={0}
           />
-
-          <SummaryMiniCard
-            icon={<BriefcaseBusiness size={15} />}
-            title="CRM"
-            rows={[
-              ["Müşteri", String(stats.totalCustomers || 0)],
-              ["Görev", String(crmTasks.length)],
-            ]}
+          <ActionButton
+            href="/portfoy?create=1"
+            icon={<Plus size={15} />}
+            label="Yeni Portföy"
+            tone="violet"
+            delay={500}
+          />
+          <ActionButton
+            href="/network?create=1"
+            icon={<FileText size={15} />}
+            label="Talep Oluştur"
+            tone="orange"
+            delay={1000}
+          />
+          <ActionButton
+            href="/havuz"
+            icon={<Waves size={15} />}
+            label="Havuzu Kontrol Et"
+            tone="green"
+            delay={1500}
           />
         </section>
 
-        <SectionBlock icon={<Target size={16} />} title="Havuz Eşleşmeleri" actionHref="/havuz" actionLabel="Havuz">
-          <PoolSuggestionCard />
-        </SectionBlock>
+        <DashboardSection title="Portföyler" icon={<Building2 size={15} />} items={portfolioItems} />
+        <DashboardSection title="CRM" icon={<UsersRound size={15} />} items={crmItems} />
+        <DashboardSection title="Forum" icon={<MessageCircle size={15} />} items={forumItems} />
+        <DashboardSection title="Havuz" icon={<Waves size={15} />} items={poolItems} />
 
-        <section className="grid grid-cols-2 gap-2">
-          <CompactInfoCard href="/lina" icon={<Bot size={14} />} title="Lina" desc="Asistan" />
-
-          <CompactInfoCard
-            href="/messages"
-            icon={<Bell size={14} />}
-            title="Bildirimler"
-            desc={latestNotifications.length > 0 ? latestNotifications[0].title : "Yeni bildirim yok."}
+        {managementItems.length > 0 && (
+          <DashboardSection
+            title="Yönetim"
+            icon={<Settings size={15} />}
+            items={managementItems}
           />
-        </section>
+        )}
       </div>
+
+      <style jsx global>{`
+        @keyframes dashboardCtaShine {
+          0%,
+          58% {
+            transform: translateX(0) skewX(-18deg);
+            opacity: 0;
+          }
+          66% {
+            opacity: 0.72;
+          }
+          84% {
+            transform: translateX(430%) skewX(-18deg);
+            opacity: 0;
+          }
+          100% {
+            transform: translateX(430%) skewX(-18deg);
+            opacity: 0;
+          }
+        }
+
+
+        @media (prefers-reduced-motion: reduce) {
+          .dashboard-cta-motion {
+            animation: none !important;
+          }
+        }
+      `}</style>
     </main>
   );
 }
 
-function HeroStat({ label, value }: { label: string; value: number | string }) {
+function HeroStat({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: number | string;
+}) {
   return (
-    <div className="min-h-[58px] px-2 py-2.5 text-center [&:not(:last-child)]:border-r-2 [&:not(:last-child)]:border-[#C7D6E8]">
-      <p className="text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#64748B]">
-        {label}
-      </p>
-      <p className="mt-1 text-center text-[24px] font-black leading-none text-[#06194A]">
-        {value}
-      </p>
+    <div className="flex min-h-[72px] items-center justify-center gap-2 px-2 py-2.5 [&:not(:last-child)]:border-r [&:not(:last-child)]:border-[#E9EAF4]">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-[#F3F0FF] text-[#4F46E5]">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="text-[8px] font-black uppercase tracking-[0.08em] text-[#64748B]">
+          {label}
+        </p>
+        <p className="mt-0.5 text-[20px] font-black leading-none text-[#0F1D45]">
+          {value}
+        </p>
+      </div>
     </div>
   );
 }
 
-function QuickAccessCenter({ items }: { items: QuickAccessItem[] }) {
-  return (
-    <section className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_12px_26px_rgba(15,23,42,0.055)]">
-      <div className="mb-2 text-center">
-        <p className="text-center text-[9px] font-black uppercase tracking-[0.22em] text-[#1557D6]">
-          Hızlı Erişim
-        </p>
-        <h2 className="mt-0.5 text-center text-[18px] font-black tracking-[-0.04em] text-[#06194A]">
-          Kolay Menü
-        </h2>
-      </div>
-
-      <div className="grid grid-cols-4 gap-1.5">
-        {items.map((item, index) => (
-          <QuickAccessCard
-            key={`${item.href}-${item.label}`}
-            item={item}
-            className={centeredGridItemClass(index, items.length)}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function QuickAccessCard({ item, className }: { item: QuickAccessItem; className?: string }) {
-  return (
-    <Link
-      href={item.href}
-      className={`flex min-h-[76px] flex-col items-center justify-center rounded-[18px] border-2 border-[#C7D6E8] bg-[#FBFDFF] px-1.5 py-2 text-center transition active:scale-[0.98] hover:border-[#1557D6]/60 hover:bg-[#EFF6FF] ${className || ""}`}
-    >
-      <span className="flex h-7 w-7 items-center justify-center rounded-[12px] bg-[#EFF6FF] text-[#1557D6]">
-        {item.icon}
-      </span>
-      <span className="mt-1 flex min-h-[28px] w-full items-center justify-center text-center text-[9.5px] font-black leading-[13px] text-[#06194A]">
-        <span className="break-words text-center">{item.label}</span>
-      </span>
-      <span className="mt-0.5 inline-flex min-h-[17px] max-w-full items-center justify-center rounded-full bg-white px-1.5 text-center text-[8px] font-black leading-[10px] text-[#1557D6]">
-        <span className="break-words text-center">{item.desc}</span>
-      </span>
-    </Link>
-  );
-}
-
-function SectionBlock({
-  icon,
-  title,
-  actionHref,
-  actionLabel,
-  children,
-}: {
-  icon: ReactNode;
-  title: string;
-  actionHref: string;
-  actionLabel: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-[22px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_12px_26px_rgba(15,23,42,0.055)]">
-      <div className="mb-2 grid grid-cols-[34px_1fr_54px] items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-[13px] bg-[#EFF6FF] text-[#1557D6]">
-          {icon}
-        </span>
-        <h2 className="min-w-0 text-center text-[18px] font-black tracking-[-0.04em] text-[#06194A]">
-          {title}
-        </h2>
-        <Link
-          href={actionHref}
-          className="inline-flex min-h-[30px] items-center justify-center rounded-full bg-[#EFF6FF] px-2 text-center text-[11px] font-black text-[#1557D6]"
-        >
-          {actionLabel}
-        </Link>
-      </div>
-
-      {children}
-    </section>
-  );
-}
-
-function UrgentTaskCard({ task }: { task: DashboardTask }) {
-  return (
-    <Link
-      href="/crm"
-      className="grid min-h-[72px] grid-cols-[48px_1fr] items-center gap-2 rounded-[18px] border-2 border-[#C7D6E8] bg-[#FBFDFF] p-2.5"
-    >
-      <div className="flex h-10 w-10 flex-col items-center justify-center rounded-[14px] bg-[#FFF7ED] text-[#EA580C]">
-        <Clock3 size={15} />
-        <span className="mt-0.5 text-[8px] font-black">ACİL</span>
-      </div>
-
-      <div className="min-w-0 text-left">
-        <p className="text-left text-[10px] font-black text-[#1557D6]">
-          {formatTaskDate(task.dueDate)}
-        </p>
-        <h3 className="mt-0.5 break-words text-left text-[14px] font-black leading-[17px] text-[#06194A]">
-          {task.title}
-        </h3>
-        <p className="mt-0.5 break-words text-left text-[11px] font-bold leading-4 text-[#64748B]">
-          {task.customerName}
-          {task.customerPhone ? ` · ${task.customerPhone}` : ""}
-        </p>
-      </div>
-    </Link>
-  );
-}
-
-function ForumRequestCard({ post }: { post: FeaturedNetworkPost }) {
-  const location = [post.city, post.district].filter(Boolean).join(" / ");
-  const categoryText = post.type
-    ? post.type
-        .replaceAll("_", " ")
-        .toLocaleLowerCase("tr-TR")
-        .replace(/(^|\s)\S/g, (letter) => letter.toLocaleUpperCase("tr-TR"))
-    : "Talep";
-
-  return (
-    <Link href={`/network/${post.id}`} className="block min-h-[96px] rounded-[18px] border-2 border-[#C7D6E8] bg-[#FBFDFF] p-2.5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1 text-left">
-          <p className="break-words text-left text-[9px] font-black uppercase tracking-[0.12em] text-[#1557D6]">
-            {categoryText}
-          </p>
-          <h3 className="mt-0.5 break-words text-left text-[14px] font-black leading-[17px] text-[#06194A]">
-            {post.title}
-          </h3>
-          <p className="mt-0.5 break-words text-left text-[11px] font-bold leading-4 text-[#64748B]">
-            {location || "Konum bilgisi yok"}
-          </p>
-        </div>
-
-        <div className="shrink-0 rounded-[13px] bg-[#EFF6FF] px-2 py-1 text-center">
-          <p className="text-[12px] font-black text-[#1557D6]">{post.score || 0}</p>
-          <p className="text-[7px] font-black text-[#64748B]">PUAN</p>
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <p className="break-words text-left text-[11px] font-black text-[#1557D6]">
-          {formatBudget(post.budget)}
-        </p>
-        <span className="inline-flex min-h-[28px] shrink-0 items-center justify-center rounded-full bg-[#1557D6] px-3 text-[10px] font-black text-white">
-          İncele
-        </span>
-      </div>
-    </Link>
-  );
-}
-
-function SummaryMiniCard({
-  icon,
-  title,
-  rows,
-}: {
-  icon: ReactNode;
-  title: string;
-  rows: Array<[string, string]>;
-}) {
-  return (
-    <section className="min-h-[108px] rounded-[20px] border-2 border-[#C7D6E8] bg-white p-2.5 text-center shadow-[0_10px_24px_rgba(15,23,42,0.055)]">
-      <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-[13px] bg-[#EFF6FF] text-[#1557D6]">
-        {icon}
-      </div>
-
-      <h3 className="mt-1.5 text-center text-[14px] font-black text-[#06194A]">{title}</h3>
-
-      <div className="mt-1.5 grid gap-1">
-        {rows.map(([label, value]) => (
-          <div key={label} className="grid grid-cols-[1fr_auto] items-center gap-2">
-            <span className="break-words text-left text-[10px] font-bold text-[#64748B]">{label}</span>
-            <span className="break-words text-right text-[12px] font-black text-[#06194A]">{value}</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function PoolSuggestionCard() {
-  return (
-    <Link
-      href="/havuz"
-      className="grid min-h-[72px] grid-cols-[46px_1fr] items-center gap-2 rounded-[18px] border-2 border-[#C7D6E8] bg-[#FBFDFF] p-2.5"
-    >
-      <div className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-[#EFF6FF] text-[#1557D6]">
-        <Target size={18} />
-      </div>
-
-      <div className="min-w-0 text-left">
-        <p className="break-words text-left text-[10px] font-black uppercase tracking-[0.12em] text-[#1557D6]">
-          Yetkili Portföy
-        </p>
-        <h3 className="mt-0.5 break-words text-left text-[14px] font-black leading-[17px] text-[#06194A]">
-          Lina eşleştirme bekliyor
-        </h3>
-        <p className="mt-0.5 break-words text-left text-[11px] font-bold leading-4 text-[#64748B]">
-          Size uygun portföyler burada listelenecek.
-        </p>
-      </div>
-    </Link>
-  );
-}
-
-function CompactInfoCard({
+function ActionButton({
   href,
   icon,
-  title,
-  desc,
+  label,
+  tone,
+  delay,
 }: {
   href: string;
   icon: ReactNode;
-  title: string;
-  desc: string;
+  label: string;
+  tone: "violet" | "blue" | "orange" | "green";
+  delay: number;
 }) {
+  const styles = {
+    violet: "from-[#7C3AED] to-[#5B21B6]",
+    blue: "from-[#3B82F6] to-[#2563EB]",
+    orange: "from-[#F59E0B] to-[#EA580C]",
+    green: "from-[#22C55E] to-[#16A34A]",
+  };
+
   return (
     <Link
       href={href}
-      className="min-h-[82px] rounded-[20px] border-2 border-[#C7D6E8] bg-white p-2.5 text-center shadow-[0_10px_24px_rgba(15,23,42,0.055)]"
+      className={`group relative flex min-h-[48px] overflow-hidden items-center justify-center gap-2 rounded-[15px] bg-gradient-to-r ${styles[tone]} px-3 text-center text-[11px] font-black text-white shadow-[0_10px_20px_rgba(15,23,42,0.09)] active:scale-[0.98]`}
     >
-      <div className="mx-auto flex h-7 w-7 items-center justify-center rounded-[12px] bg-[#EFF6FF] text-[#1557D6]">
+      <span className="pointer-events-none absolute inset-y-0 left-[-45%] w-[36%] skew-x-[-18deg] bg-white/25 blur-[1px] animate-[dashboardCtaShine_3.4s_ease-in-out_infinite]" />
+      <span className="relative z-10 shrink-0 transition-transform duration-200 group-active:scale-90">
         {icon}
-      </div>
-
-      <h3 className="mt-1.5 text-center text-[13px] font-black text-[#06194A]">{title}</h3>
-
-      <p className="mt-0.5 break-words text-center text-[10px] font-bold leading-4 text-[#64748B]">
-        {desc}
-      </p>
+      </span>
+      <TypewriterLabel text={label} delay={delay} />
     </Link>
   );
 }
 
-function EmptyState({ text }: { text: string }) {
+function TypewriterLabel({ text, delay }: { text: string; delay: number }) {
+  const [visibleText, setVisibleText] = useState("");
+
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const timeoutId = window.setTimeout(() => {
+      let index = 0;
+
+      intervalId = setInterval(() => {
+        index += 1;
+        setVisibleText(text.slice(0, index));
+
+        if (index >= text.length && intervalId) {
+          clearInterval(intervalId);
+        }
+      }, 58);
+    }, delay);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [delay, text]);
+
   return (
-    <div className="rounded-[18px] border-2 border-[#C7D6E8] bg-[#FBFDFF] px-3 py-3">
-      <p className="text-center text-[12px] font-bold leading-5 text-[#64748B]">{text}</p>
-    </div>
+    <span className="relative z-10 inline-flex min-w-0 items-center whitespace-nowrap">
+      <span>{visibleText}</span>
+    </span>
+  );
+}
+
+function DashboardSection({
+  title,
+  icon,
+  items,
+}: {
+  title: string;
+  icon: ReactNode;
+  items: DashboardItem[];
+}) {
+  return (
+    <section>
+      <div className="mb-2 flex items-center gap-2 px-1">
+        <span className="text-[#4F46E5]">{icon}</span>
+        <h2 className="text-[14px] font-black uppercase tracking-[0.035em] text-[#1E2B67]">
+          {title}
+        </h2>
+      </div>
+
+      <div className="grid grid-cols-4 gap-2">
+        {items.map((item) => (
+          <DashboardTile key={`${item.href}-${item.label}`} item={item} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DashboardTile({ item }: { item: DashboardItem }) {
+  return (
+    <Link
+      href={item.href}
+      className="flex min-h-[92px] min-w-0 flex-col items-center justify-center rounded-[17px] border border-[#E2E4F0] bg-white px-1.5 py-2 text-center shadow-[0_7px_18px_rgba(45,49,112,0.055)] transition active:scale-[0.98]"
+    >
+      <span className="flex h-8 w-8 items-center justify-center rounded-[11px] bg-[#F5F3FF] text-[#4338CA]">
+        {item.icon}
+      </span>
+      <span className="mt-1.5 flex min-h-[28px] items-center justify-center text-[9px] font-black leading-[12px] text-[#0F1D45] [overflow-wrap:anywhere]">
+        {item.label}
+      </span>
+      <span className="mt-0.5 text-[8px] font-bold leading-[10px] text-[#4F46E5]">
+        {item.value}
+      </span>
+    </Link>
   );
 }
