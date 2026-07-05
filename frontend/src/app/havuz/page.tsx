@@ -7,6 +7,7 @@ import {
   BadgeCheck,
   Building2,
   CheckCircle2,
+  Crosshair,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -16,8 +17,11 @@ import {
   MessageCircle,
   Navigation,
   Search,
+  SlidersHorizontal,
   Sparkles,
+  Target,
   Users,
+  WalletCards,
   X,
 } from "lucide-react";
 
@@ -119,6 +123,19 @@ type PoolMapItem = {
   lng: number;
   isApprox: boolean;
   locationLabel: string;
+  distanceKm?: number | null;
+};
+
+type UserLocation = {
+  lat: number;
+  lng: number;
+  accuracy: number;
+};
+
+type NearbyPoolItem = {
+  unit: Unit;
+  match: { score: number; customer: Customer | null; budgetDiff: number };
+  distanceKm: number | null;
 };
 
 declare global {
@@ -130,6 +147,44 @@ declare global {
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 const DEFAULT_MAP_CENTER = { lat: 39.0, lng: 35.0 };
+const NEARBY_RADIUS_OPTIONS = [1, 5, 10, 25] as const;
+const EPH_HAVUZ_PREMIUM_V1_YAKINIMDA = true;
+
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
+}
+
+function calculateDistanceKm(
+  origin: Pick<UserLocation, "lat" | "lng">,
+  target: { lat: number; lng: number },
+) {
+  const earthRadiusKm = 6371;
+  const latDifference = toRadians(target.lat - origin.lat);
+  const lngDifference = toRadians(target.lng - origin.lng);
+  const originLat = toRadians(origin.lat);
+  const targetLat = toRadians(target.lat);
+
+  const value =
+    Math.sin(latDifference / 2) ** 2 +
+    Math.cos(originLat) *
+      Math.cos(targetLat) *
+      Math.sin(lngDifference / 2) ** 2;
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
+
+function formatNearbyDistance(distanceKm?: number | null) {
+  if (distanceKm === null || distanceKm === undefined) return "";
+
+  if (distanceKm < 1) {
+    return `${Math.max(1, Math.round(distanceKm * 1000))} metre uzaklıkta`;
+  }
+
+  return `${distanceKm.toLocaleString("tr-TR", {
+    minimumFractionDigits: distanceKm < 10 ? 1 : 0,
+    maximumFractionDigits: 1,
+  })} km uzaklıkta`;
+}
 
 
 const POOL_CARD_STYLES = [
@@ -516,7 +571,14 @@ function getTrustBadges(unit: Unit, matchScore: number) {
   return badges.slice(0, 3);
 }
 
-function calculateMatch(unit: Unit, customers: Customer[]) {
+function calculateMatch(
+  unit: Unit,
+  customers: Customer[],
+): {
+  score: number;
+  customer: Customer | null;
+  budgetDiff: number;
+} {
   const unitCity = String(unit.project?.city || "").toLocaleLowerCase("tr-TR");
   const unitDistrict = String(unit.project?.district || "").toLocaleLowerCase(
     "tr-TR",
@@ -611,6 +673,11 @@ export default function HavuzPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("LIST");
   const [selectedMapUnitId, setSelectedMapUnitId] = useState("");
   const [requestedDetailUnitId, setRequestedDetailUnitId] = useState("");
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [nearbyActive, setNearbyActive] = useState(false);
+  const [nearbyRadiusKm, setNearbyRadiusKm] = useState<number>(1);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [nearbyError, setNearbyError] = useState("");
 
   const builder = isBuilderRole(user?.role);
 
@@ -708,10 +775,46 @@ export default function HavuzPage() {
     );
   };
 
-  const filteredPoolItems = useMemo(
+  const baseFilteredPoolItems = useMemo(
     () => applyHavuzFilters(matchedUnits, filters, search),
     [filters, matchedUnits, search],
   );
+
+  const filteredPoolItems = useMemo<NearbyPoolItem[]>(() => {
+    const items = baseFilteredPoolItems.map(({ unit, match }) => {
+      const lat = Number(unit.project?.latitude || 0);
+      const lng = Number(unit.project?.longitude || 0);
+      const hasCoordinates =
+        Number.isFinite(lat) && Number.isFinite(lng) && Boolean(lat && lng);
+
+      return {
+        unit,
+        match,
+        distanceKm:
+          userLocation && hasCoordinates
+            ? calculateDistanceKm(userLocation, { lat, lng })
+            : null,
+      };
+    });
+
+    if (!nearbyActive || !userLocation) return items;
+
+    return items
+      .filter(
+        (item) =>
+          item.distanceKm !== null && item.distanceKm <= nearbyRadiusKm,
+      )
+      .sort(
+        (first, second) =>
+          Number(first.distanceKm ?? Number.MAX_SAFE_INTEGER) -
+          Number(second.distanceKm ?? Number.MAX_SAFE_INTEGER),
+      );
+  }, [
+    baseFilteredPoolItems,
+    nearbyActive,
+    nearbyRadiusKm,
+    userLocation,
+  ]);
 
   const activeFilterCount = countHavuzFilters(filters);
   const activeFilterChips = getHavuzFilterChips(filters);
@@ -723,9 +826,112 @@ export default function HavuzPage() {
 
   const poolMapItems = useMemo(() => {
     return filteredPoolItems
-      .map(({ unit, match }) => getPoolMapPoint({ unit, match }))
-      .filter((item): item is PoolMapItem => Boolean(item));
+      .map(({ unit, match, distanceKm }) => {
+        const point = getPoolMapPoint({ unit, match });
+        return point ? { ...point, distanceKm } : null;
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
   }, [filteredPoolItems]);
+
+  const verifiedPoolCount = useMemo(
+    () => eligibleUnits.filter((unit) => hasEphApproval(unit)).length,
+    [eligibleUnits],
+  );
+
+  const strongMatchCount = useMemo(
+    () => matchedUnits.filter((item) => item.match.score >= 80).length,
+    [matchedUnits],
+  );
+
+  const matchedCustomerCount = useMemo(
+    () =>
+      new Set(
+        matchedUnits.flatMap((item) =>
+          item.match.customer?.id ? [item.match.customer.id] : [],
+        ),
+      ).size,
+    [matchedUnits],
+  );
+
+  const bestMatchScore = useMemo(
+    () =>
+      matchedUnits.reduce(
+        (highest, item) => Math.max(highest, item.match.score),
+        0,
+      ),
+    [matchedUnits],
+  );
+
+  const requestNearbySearch = (radius = nearbyRadiusKm) => {
+    setNearbyRadiusKm(radius);
+    setNearbyError("");
+
+    if (!navigator.geolocation) {
+      setNearbyError("Bu cihaz konum özelliğini desteklemiyor.");
+      return;
+    }
+
+    setNearbyLoading(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        };
+
+        setUserLocation(nextLocation);
+        setNearbyActive(true);
+        setNearbyLoading(false);
+        setViewMode("MAP");
+        setErrorMessage("");
+
+        window.setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }, 80);
+      },
+      (error) => {
+        setNearbyLoading(false);
+
+        if (error.code === error.PERMISSION_DENIED) {
+          setNearbyError(
+            "Konum izni verilmedi. Tarayıcı ayarlarından konum iznini açabilirsiniz.",
+          );
+          return;
+        }
+
+        if (error.code === error.TIMEOUT) {
+          setNearbyError("Konum alınamadı. Lütfen tekrar deneyin.");
+          return;
+        }
+
+        setNearbyError("Mevcut konum belirlenemedi.");
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 12000,
+        maximumAge: 60000,
+      },
+    );
+  };
+
+  const changeNearbyRadius = (radius: number) => {
+    if (!userLocation) {
+      requestNearbySearch(radius);
+      return;
+    }
+
+    setNearbyRadiusKm(radius);
+    setNearbyActive(true);
+    setNearbyError("");
+    setViewMode("MAP");
+  };
+
+  const clearNearbySearch = () => {
+    setNearbyActive(false);
+    setNearbyError("");
+  };
 
   const showKontorSuccess = (input: {
     title: string;
@@ -878,8 +1084,88 @@ export default function HavuzPage() {
     <main className="min-h-[calc(100dvh-64px)] overflow-y-auto bg-[#F4F8FF] px-3 pb-[calc(104px+env(safe-area-inset-bottom,0px))] pt-2 text-[#1F2937]">
       {successToast && <KontorSuccessToast toast={successToast} />}
 
-      <div className="mx-auto w-full max-w-[430px] space-y-2">
-        <section className="rounded-[22px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+      <div className="mx-auto w-full max-w-[430px] space-y-3">
+        <section className="overflow-hidden rounded-[28px] border border-[#B8E5E2] bg-[linear-gradient(145deg,#FFFFFF_0%,#F0FDFA_48%,#EFF6FF_100%)] p-3 shadow-[0_18px_42px_rgba(8,145,178,0.10)]">
+          <div className="grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-3">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="flex h-11 w-11 items-center justify-center rounded-[18px] border border-[#C7E8E5] bg-white/90 text-[#0F766E] shadow-sm active:scale-[0.98]"
+              aria-label="Geri dön"
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            <div className="min-w-0 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-[12px] text-[#14B8A6]" aria-hidden="true">
+                  ✦
+                </span>
+                <h1 className="text-[22px] font-black tracking-[-0.05em] text-[#083344]">
+                  HAVUZ
+                </h1>
+                <span className="text-[12px] text-[#14B8A6]" aria-hidden="true">
+                  ✦
+                </span>
+              </div>
+              <p className="mt-0.5 text-[9.5px] font-black text-[#64748B]">
+                Yetkili portföy ve CRM eşleşme merkezi
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => router.push("/messages")}
+              className="flex h-11 w-11 items-center justify-center rounded-[18px] border border-[#C7E8E5] bg-white/90 text-[#0F766E] shadow-sm active:scale-[0.98]"
+              aria-label="Mesajlar"
+            >
+              <MessageCircle size={20} />
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] border border-[#B8E5E2] bg-white/85 px-3 py-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-[#CCFBF1] text-[#0F766E]">
+                <WalletCards size={18} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#64748B]">
+                  Kontör Bakiyesi
+                </p>
+                <p className="truncate text-[14px] font-black text-[#083344]">
+                  {walletBalance === null
+                    ? "Kontrol ediliyor"
+                    : `${walletBalance.toLocaleString("tr-TR")} kontör`}
+                </p>
+              </div>
+            </div>
+
+            <span className="shrink-0 rounded-full bg-[#0F766E] px-3 py-1.5 text-[9.5px] font-black text-white">
+              İş fırsatı merkezi
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#D7E9E7] bg-white text-center">
+            <PoolMetric label="Havuz" value={eligibleUnits.length} tone="teal" />
+            <PoolMetric label="Güçlü Eşleşme" value={strongMatchCount} tone="blue" />
+            <PoolMetric label="EPH Onaylı" value={verifiedPoolCount} tone="green" />
+            <PoolMetric label="Haritada" value={poolMapItems.length} tone="orange" />
+          </div>
+
+          <div className="mt-3 rounded-[18px] border border-[#B8E5E2] bg-[#F0FDFA] px-3 py-2.5 text-center">
+            <div className="flex items-center justify-center gap-2 text-[#0F766E]">
+              <Target size={16} />
+              <p className="text-[11px] font-black">
+                CRM kayıtlarınla {strongMatchCount} güçlü portföy eşleşmesi
+              </p>
+            </div>
+            <p className="mt-1 text-[9.5px] font-bold leading-4 text-[#64748B]">
+              En yüksek uyum %{bestMatchScore} · {matchedCustomerCount} uygun müşteri
+            </p>
+          </div>
+        </section>
+
+        <section className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
           <div className="flex items-center gap-2 rounded-[17px] border-2 border-[#C7D6E8] bg-[#EEF3F8] px-3 py-2">
             <Search size={16} className="text-[#64748B]" />
             <input
@@ -890,13 +1176,84 @@ export default function HavuzPage() {
             />
           </div>
 
+          <div className="mt-2 rounded-[18px] border-2 border-[#B8E5E2] bg-[#F0FDFA] p-2">
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <button
+                type="button"
+                onClick={() => requestNearbySearch()}
+                disabled={nearbyLoading}
+                className={`flex min-h-[44px] items-center justify-center gap-2 rounded-[15px] px-3 text-[12px] font-black transition active:scale-[0.98] disabled:opacity-60 ${
+                  nearbyActive
+                    ? "bg-[#0F766E] text-white"
+                    : "border-2 border-[#14B8A6] bg-white text-[#0F766E]"
+                }`}
+              >
+                {nearbyLoading ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <Crosshair size={17} />
+                )}
+                {nearbyActive ? "Konumum Aktif" : "Yakınımda Ara"}
+              </button>
+
+              {nearbyActive && (
+                <button
+                  type="button"
+                  onClick={clearNearbySearch}
+                  className="flex h-11 w-11 items-center justify-center rounded-[15px] border-2 border-rose-200 bg-white text-rose-600"
+                  aria-label="Yakınlık filtresini kaldır"
+                >
+                  <X size={17} />
+                </button>
+              )}
+            </div>
+
+            <div className="mt-2 grid grid-cols-4 gap-1.5">
+              {NEARBY_RADIUS_OPTIONS.map((radius) => {
+                const active = nearbyActive && nearbyRadiusKm === radius;
+
+                return (
+                  <button
+                    key={radius}
+                    type="button"
+                    onClick={() => changeNearbyRadius(radius)}
+                    className={`min-h-[35px] rounded-[13px] border text-[10.5px] font-black ${
+                      active
+                        ? "border-[#0F766E] bg-[#0F766E] text-white"
+                        : "border-[#B8E5E2] bg-white text-[#0F766E]"
+                    }`}
+                  >
+                    {radius} km
+                  </button>
+                );
+              })}
+            </div>
+
+            {nearbyActive && (
+              <div className="mt-2 flex items-center justify-between gap-2 rounded-[13px] bg-white px-2.5 py-2">
+                <span className="min-w-0 text-[9.5px] font-black text-[#0F766E]">
+                  📍 Yakınımda · {nearbyRadiusKm} km
+                </span>
+                <strong className="shrink-0 text-[10px] font-black text-[#083344]">
+                  {filteredPoolItems.length} sonuç
+                </strong>
+              </div>
+            )}
+
+            {nearbyError && (
+              <p className="mt-2 rounded-[13px] border border-amber-200 bg-amber-50 px-2.5 py-2 text-center text-[9.5px] font-black leading-4 text-amber-700">
+                {nearbyError}
+              </p>
+            )}
+          </div>
+
           <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
             <button
               type="button"
               onClick={() => setFilterOpen(true)}
               className="flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] border-2 border-[#2563EB] bg-[#EFF6FF] px-3 text-[12px] font-black text-[#1D4ED8]"
             >
-              <span>⚙️</span>
+              <SlidersHorizontal size={16} />
               Gelişmiş Filtreler
               {activeFilterCount > 0 && (
                 <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[#2563EB] px-1.5 text-[10px] font-black text-white">
@@ -915,8 +1272,19 @@ export default function HavuzPage() {
             </div>
           </div>
 
-          {activeFilterChips.length > 0 && (
+          {(activeFilterChips.length > 0 || nearbyActive) && (
             <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+              {nearbyActive && (
+                <button
+                  type="button"
+                  onClick={clearNearbySearch}
+                  className="flex shrink-0 items-center gap-1 rounded-full border border-[#99F6E4] bg-[#F0FDFA] px-2.5 py-1 text-[9.5px] font-black text-[#0F766E]"
+                >
+                  <span>📍 Yakınımda · {nearbyRadiusKm} km</span>
+                  <X size={11} />
+                </button>
+              )}
+
               {activeFilterChips.slice(0, 12).map((chip, index) => (
                 <span
                   key={`${chip}-${index}`}
@@ -973,6 +1341,8 @@ export default function HavuzPage() {
         {viewMode === "MAP" && (
           <PoolMapSection
             items={poolMapItems}
+            userLocation={nearbyActive ? userLocation : null}
+            nearbyRadiusKm={nearbyActive ? nearbyRadiusKm : null}
             selectedUnitId={selectedMapUnitId}
             onSelectUnit={setSelectedMapUnitId}
             onNavigateToCard={focusPoolCard}
@@ -993,20 +1363,33 @@ export default function HavuzPage() {
 
         <section className="space-y-3">
           {displayedUnits.length > 0 ? (
-            displayedUnits.map(({ unit, match }, index) => (
-              <PoolUnitCard
-                key={unit.id}
-                index={index}
-                unit={unit}
-                match={match}
-                selected={selectedMapUnitId === unit.id}
-                busyAction={busyAction}
-                onDetail={() => setDetailSelection({ unit, match })}
-                onMessage={() => startPoolMessage(unit, match.score)}
-                onAction={(type) =>
-                  setSelectedAction({ type, unit, score: match.score })
-                }
-              />
+            displayedUnits.map(({ unit, match, distanceKm }, index) => (
+              <div key={unit.id} className="space-y-2">
+                {nearbyActive && distanceKm !== null && (
+                  <div className="flex items-center justify-between gap-2 rounded-[16px] border border-[#99F6E4] bg-[#F0FDFA] px-3 py-2 text-[#0F766E]">
+                    <span className="flex min-w-0 items-center gap-1.5 text-[10.5px] font-black">
+                      <Crosshair size={14} className="shrink-0" />
+                      {formatNearbyDistance(distanceKm)}
+                    </span>
+                    <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[9px] font-black text-[#64748B]">
+                      {nearbyRadiusKm} km alanı
+                    </span>
+                  </div>
+                )}
+
+                <PoolUnitCard
+                  index={index}
+                  unit={unit}
+                  match={match}
+                  selected={selectedMapUnitId === unit.id}
+                  busyAction={busyAction}
+                  onDetail={() => setDetailSelection({ unit, match })}
+                  onMessage={() => startPoolMessage(unit, match.score)}
+                  onAction={(type) =>
+                    setSelectedAction({ type, unit, score: match.score })
+                  }
+                />
+              </div>
             ))
           ) : (
             <section className="rounded-[24px] border-2 border-dashed border-[#C7D6E8] bg-white p-6 text-center">
@@ -1070,8 +1453,38 @@ export default function HavuzPage() {
   );
 }
 
+function PoolMetric({
+  label,
+  value,
+  tone = "teal",
+}: {
+  label: string;
+  value: string | number;
+  tone?: "teal" | "blue" | "green" | "orange";
+}) {
+  const color =
+    tone === "blue"
+      ? "text-[#2563EB]"
+      : tone === "green"
+        ? "text-emerald-600"
+        : tone === "orange"
+          ? "text-orange-600"
+          : "text-[#0F766E]";
+
+  return (
+    <div className="border-r border-[#E2F1EF] px-1 py-2 last:border-r-0">
+      <p className={`text-[15px] font-black leading-none ${color}`}>{value}</p>
+      <p className="mt-1 break-words text-[8px] font-black leading-3 text-[#64748B]">
+        {label}
+      </p>
+    </div>
+  );
+}
+
 function PoolMapSection({
   items,
+  userLocation,
+  nearbyRadiusKm,
   selectedUnitId,
   busyAction,
   onSelectUnit,
@@ -1081,6 +1494,8 @@ function PoolMapSection({
   onAction,
 }: {
   items: PoolMapItem[];
+  userLocation: UserLocation | null;
+  nearbyRadiusKm: number | null;
   selectedUnitId: string;
   busyAction: string | null;
   onSelectUnit: (unitId: string) => void;
@@ -1102,6 +1517,8 @@ function PoolMapSection({
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerRefs = useRef<any[]>([]);
+  const userMarkerRef = useRef<any>(null);
+  const radiusCircleRef = useRef<any>(null);
   const infoWindowRef = useRef<any>(null);
   const [mapError, setMapError] = useState("");
   const [mapReady, setMapReady] = useState(false);
@@ -1155,6 +1572,10 @@ function PoolMapSection({
 
     markerRefs.current.forEach((marker) => marker.setMap(null));
     markerRefs.current = [];
+    userMarkerRef.current?.setMap?.(null);
+    radiusCircleRef.current?.setMap?.(null);
+    userMarkerRef.current = null;
+    radiusCircleRef.current = null;
     infoWindowRef.current?.close?.();
 
     const bounds = new googleMaps.LatLngBounds();
@@ -1240,11 +1661,55 @@ function PoolMapSection({
       bounds.extend({ lat: item.lat, lng: item.lng });
     });
 
-    if (items.length > 1) {
+    if (userLocation) {
+      const currentPosition = {
+        lat: userLocation.lat,
+        lng: userLocation.lng,
+      };
+
+      userMarkerRef.current = new googleMaps.Marker({
+        position: currentPosition,
+        map,
+        title: "Buradasınız",
+        zIndex: 120,
+        icon: {
+          path: googleMaps.SymbolPath.CIRCLE,
+          scale: 9,
+          fillColor: "#0F766E",
+          fillOpacity: 1,
+          strokeColor: "#FFFFFF",
+          strokeWeight: 4,
+        },
+      });
+
+      if (nearbyRadiusKm) {
+        radiusCircleRef.current = new googleMaps.Circle({
+          map,
+          center: currentPosition,
+          radius: nearbyRadiusKm * 1000,
+          fillColor: "#14B8A6",
+          fillOpacity: 0.09,
+          strokeColor: "#0F766E",
+          strokeOpacity: 0.8,
+          strokeWeight: 2,
+          clickable: false,
+        });
+      }
+
+      bounds.extend(currentPosition);
+    }
+
+    if (
+      items.length > 1 ||
+      (items.length > 0 && Boolean(userLocation))
+    ) {
       map.fitBounds(bounds, 44);
     } else if (items.length === 1) {
       map.setCenter({ lat: items[0].lat, lng: items[0].lng });
       map.setZoom(13);
+    } else if (userLocation) {
+      map.setCenter({ lat: userLocation.lat, lng: userLocation.lng });
+      map.setZoom(15);
     } else {
       map.setCenter(DEFAULT_MAP_CENTER);
       map.setZoom(6);
@@ -1252,9 +1717,12 @@ function PoolMapSection({
   }, [
     items,
     mapReady,
+    nearbyRadiusKm,
     onNavigateToCard,
     onSelectUnit,
     selectedUnitId,
+    userLocation?.lat,
+    userLocation?.lng,
   ]);
 
   useEffect(() => {
@@ -1271,7 +1739,9 @@ function PoolMapSection({
             Havuz Haritası
           </h2>
           <p className="mt-0.5 text-[10px] font-bold leading-4 text-[#64748B]">
-            Sadece gerçek koordinatı olan portföyler gösterilir.
+            {userLocation
+              ? `Konumunuz ve ${nearbyRadiusKm || 1} km yarıçapındaki gerçek koordinatlar.`
+              : "Sadece gerçek koordinatı olan portföyler gösterilir."}
           </p>
         </div>
         <div className="shrink-0 rounded-[15px] border-2 border-[#C7D6E8] bg-white px-2.5 py-1.5 text-center">

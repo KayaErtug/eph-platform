@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ChevronDown,
+  ChevronRight,
   Loader2,
+  MapPin,
   RotateCcw,
   Search,
   SlidersHorizontal,
@@ -148,6 +150,10 @@ type DynamicSpecialField = PortfolioSpecialField & {
 };
 
 const LOCATION_SEPARATOR = "|||";
+
+function getHavuzCityDisplayName(value?: string | null) {
+  return String(value || "").trim();
+}
 
 const FLOOR_LABEL_OPTIONS = [
   "Kot -1",
@@ -731,7 +737,7 @@ export function getHavuzFilterChips(filters: HavuzFilterState) {
 
   filters.types.forEach((value) => chips.push(typeLabel(value)));
   filters.statuses.forEach((value) => chips.push(statusLabel(value)));
-  filters.cities.forEach((value) => chips.push(value));
+  filters.cities.forEach((value) => chips.push(getHavuzCityDisplayName(value)));
   filters.districts.forEach((value) =>
     chips.push(parseDistrictKey(value).district || value),
   );
@@ -880,8 +886,10 @@ function MultiSelectSection({
       open={defaultOpen}
       className="group overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white"
     >
-      <summary className="flex min-h-[54px] cursor-pointer list-none items-center justify-between gap-2 bg-[#F8FAFC] px-3 py-2">
-        <div className="min-w-0">
+      <summary className="grid min-h-[58px] cursor-pointer list-none grid-cols-[20px_minmax(0,1fr)_20px] items-center gap-2 bg-[#F8FAFC] px-3 py-2">
+        <span className="h-5 w-5" aria-hidden="true" />
+
+        <div className="min-w-0 text-center">
           <p className="text-[13px] font-black text-[#1F2937]">{title}</p>
           <p className="mt-0.5 text-[10px] font-bold leading-4 text-[#64748B]">
             {selected.length > 0
@@ -889,6 +897,7 @@ function MultiSelectSection({
               : hint || "Birden fazla seçim yapılabilir"}
           </p>
         </div>
+
         <ChevronDown
           size={17}
           className="shrink-0 text-[#2563EB] transition-transform group-open:rotate-180"
@@ -999,6 +1008,544 @@ function MultiSelectSection({
   );
 }
 
+
+function PremiumCitySelector({
+  options,
+  selected,
+  onChange,
+  loading,
+}: {
+  options: Option[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  loading: boolean;
+}) {
+  const [quickQuery, setQuickQuery] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState("");
+  const [activeLetter, setActiveLetter] = useState("");
+  const [draftSelected, setDraftSelected] = useState<string[]>(selected);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    setDraftSelected(selected);
+    setPickerQuery("");
+    setActiveLetter("");
+  }, [pickerOpen, selected]);
+
+  const quickCityValues = ["İstanbul", "Ankara", "İzmir", "Antalya", "Denizli"];
+
+  const quickCities = useMemo(
+    () =>
+      quickCityValues
+        .map((value) => options.find((option) => option.value === value))
+        .filter((option): option is Option => Boolean(option)),
+    [options],
+  );
+
+  const quickMatches = useMemo(() => {
+    const query = normalize(quickQuery);
+
+    if (!query) return [];
+
+    return options
+      .filter((option) =>
+        normalize(`${option.label} ${option.value}`).includes(query),
+      )
+      .sort(
+        (first, second) =>
+          Number(second.count || 0) - Number(first.count || 0) ||
+          first.label.localeCompare(second.label, "tr-TR"),
+      )
+      .slice(0, 6);
+  }, [options, quickQuery]);
+
+  const letters = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          options
+            .map((option) =>
+              option.label
+                .trim()
+                .charAt(0)
+                .toLocaleUpperCase("tr-TR"),
+            )
+            .filter(Boolean),
+        ),
+      ).sort((first, second) => first.localeCompare(second, "tr-TR")),
+    [options],
+  );
+
+  const pickerOptions = useMemo(() => {
+    const query = normalize(pickerQuery);
+
+    return options
+      .filter((option) => {
+        const matchesQuery =
+          !query ||
+          normalize(`${option.label} ${option.value}`).includes(query);
+        const matchesLetter =
+          !activeLetter ||
+          option.label
+            .trim()
+            .charAt(0)
+            .toLocaleUpperCase("tr-TR") === activeLetter;
+
+        return matchesQuery && matchesLetter;
+      })
+      .sort((first, second) => {
+        const firstHasPortfolio = Number(first.count || 0) > 0;
+        const secondHasPortfolio = Number(second.count || 0) > 0;
+
+        if (firstHasPortfolio !== secondHasPortfolio) {
+          return firstHasPortfolio ? -1 : 1;
+        }
+
+        if (firstHasPortfolio && secondHasPortfolio) {
+          const countDifference =
+            Number(second.count || 0) - Number(first.count || 0);
+
+          if (countDifference !== 0) return countDifference;
+        }
+
+        return first.label.localeCompare(second.label, "tr-TR");
+      });
+  }, [activeLetter, options, pickerQuery]);
+
+  const portfolioCities = pickerOptions.filter(
+    (option) => Number(option.count || 0) > 0,
+  );
+  const otherCities = pickerOptions.filter(
+    (option) => Number(option.count || 0) === 0,
+  );
+
+  const toggleImmediate = (value: string) => {
+    onChange(
+      selected.includes(value)
+        ? selected.filter((item) => item !== value)
+        : [...selected, value],
+    );
+    setQuickQuery("");
+  };
+
+  const toggleDraft = (value: string) => {
+    setDraftSelected((current) =>
+      current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value],
+    );
+  };
+
+  const renderCityRow = (option: Option) => {
+    const checked = draftSelected.includes(option.value);
+    const count = Number(option.count || 0);
+
+    return (
+      <button
+        key={option.value}
+        type="button"
+        onClick={() => toggleDraft(option.value)}
+        className={`grid min-h-[50px] w-full grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2 rounded-[15px] border px-3 text-left transition active:scale-[0.99] ${
+          checked
+            ? "border-[#0F766E] bg-[#F0FDFA] shadow-[0_8px_20px_rgba(15,118,110,0.10)]"
+            : "border-[#D7E3F2] bg-white"
+        }`}
+      >
+        <span
+          className={`flex h-6 w-6 items-center justify-center rounded-[8px] border ${
+            checked
+              ? "border-[#0F766E] bg-[#0F766E] text-white"
+              : "border-[#B8C9DD] bg-white text-transparent"
+          }`}
+        >
+          <Check size={14} />
+        </span>
+
+        <span className="min-w-0">
+          <span
+            className={`block whitespace-normal break-normal text-[12px] font-black leading-4 [overflow-wrap:normal] [word-break:normal] ${
+              checked ? "text-[#0F766E]" : "text-[#1F2937]"
+            }`}
+          >
+            {option.label}
+          </span>
+          {option.label !== option.value && (
+            <span className="mt-0.5 block text-[8.5px] font-bold text-[#94A3B8]">
+              Resmî ad: {option.value}
+            </span>
+          )}
+        </span>
+
+        <span
+          className={`min-w-8 rounded-full px-2 py-1 text-center text-[9px] font-black ${
+            count > 0
+              ? "bg-[#DBEAFE] text-[#1D4ED8]"
+              : "bg-[#F1F5F9] text-[#94A3B8]"
+          }`}
+        >
+          {count}
+        </span>
+      </button>
+    );
+  };
+
+  return (
+    <>
+      <section className="overflow-hidden rounded-[24px] border border-[#A7E5DF] bg-[linear-gradient(145deg,#FFFFFF_0%,#F0FDFA_55%,#EFF6FF_100%)] p-3 shadow-[0_14px_34px_rgba(15,118,110,0.09)]">
+        <div className="grid grid-cols-[40px_minmax(0,1fr)_40px] items-center gap-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] bg-[#CCFBF1] text-[#0F766E]">
+            <MapPin size={19} />
+          </span>
+
+          <div className="min-w-0 text-center">
+            <p className="text-[13px] font-black text-[#083344]">Konum</p>
+            <p className="mt-0.5 text-[9.5px] font-bold text-[#64748B]">
+              {selected.length > 0
+                ? `${selected.length} il seçildi`
+                : "İl seçerek bölgeyi daraltın"}
+            </p>
+          </div>
+
+          {selected.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => onChange([])}
+              className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-rose-200 bg-white text-rose-600"
+              aria-label="Konum seçimlerini temizle"
+            >
+              <RotateCcw size={15} />
+            </button>
+          ) : (
+            <div className="h-10 w-10" aria-hidden="true" />
+          )}
+        </div>
+
+        <div className="relative mt-3">
+          <div className="flex min-h-[46px] items-center gap-2 rounded-[16px] border border-[#B8E5E2] bg-white px-3 shadow-inner">
+            {loading ? (
+              <Loader2 size={16} className="animate-spin text-[#0F766E]" />
+            ) : (
+              <Search size={16} className="text-[#0F766E]" />
+            )}
+            <input
+              value={quickQuery}
+              onChange={(event) => setQuickQuery(event.target.value)}
+              placeholder="İl veya bölge ara..."
+              className="h-11 min-w-0 flex-1 bg-transparent text-[12px] font-bold text-[#1F2937] outline-none placeholder:text-[#94A3B8]"
+            />
+            {quickQuery && (
+              <button
+                type="button"
+                onClick={() => setQuickQuery("")}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F1F5F9] text-[#64748B]"
+                aria-label="İl aramasını temizle"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {quickQuery && (
+            <div className="absolute inset-x-0 top-[52px] z-20 overflow-hidden rounded-[18px] border border-[#B8E5E2] bg-white p-1.5 shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
+              {quickMatches.length > 0 ? (
+                quickMatches.map((option) => {
+                  const checked = selected.includes(option.value);
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => toggleImmediate(option.value)}
+                      className={`flex min-h-[42px] w-full items-center justify-between gap-2 rounded-[13px] px-2.5 text-left ${
+                        checked ? "bg-[#F0FDFA]" : "bg-white"
+                      }`}
+                    >
+                      <span
+                        className={`min-w-0 whitespace-normal break-normal text-[11px] font-black [overflow-wrap:normal] [word-break:normal] ${
+                          checked ? "text-[#0F766E]" : "text-[#334155]"
+                        }`}
+                      >
+                        {option.label}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span className="rounded-full bg-[#EFF6FF] px-2 py-1 text-[8.5px] font-black text-[#1D4ED8]">
+                          {option.count || 0}
+                        </span>
+                        {checked && <Check size={14} className="text-[#0F766E]" />}
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="px-3 py-4 text-center text-[10px] font-bold text-[#64748B]">
+                  Aramanızla eşleşen il bulunamadı.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {quickCities.length > 0 && (
+          <div className="mt-3">
+            <p className="mb-2 text-center text-[8.5px] font-black uppercase tracking-[0.12em] text-[#64748B]">
+              Hızlı Seçim
+            </p>
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {quickCities.map((option) => {
+                const checked = selected.includes(option.value);
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => toggleImmediate(option.value)}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-[9.5px] font-black ${
+                      checked
+                        ? "border-[#0F766E] bg-[#0F766E] text-white"
+                        : "border-[#B8E5E2] bg-white text-[#0F766E]"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {selected.length > 0 && (
+          <div className="mt-3 rounded-[16px] border border-[#C8E7E4] bg-white/90 p-2.5">
+            <p className="mb-2 text-center text-[8.5px] font-black uppercase tracking-[0.12em] text-[#64748B]">
+              Seçili Konumlar
+            </p>
+            <div className="flex max-h-[74px] flex-wrap gap-1.5 overflow-y-auto">
+              {selected.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => toggleImmediate(value)}
+                  className="flex items-center gap-1 rounded-full bg-[#E6FFFB] px-2.5 py-1.5 text-[9.5px] font-black text-[#0F766E]"
+                >
+                  <span>{getHavuzCityDisplayName(value)}</span>
+                  <X size={11} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="mt-3 flex min-h-[46px] w-full items-center justify-between gap-3 rounded-[16px] border border-[#0F766E] bg-white px-3 text-left text-[#0F766E] shadow-[0_8px_20px_rgba(15,118,110,0.08)] active:scale-[0.99]"
+        >
+          <span>
+            <span className="block text-[11px] font-black">Tüm İlleri Gör</span>
+            <span className="mt-0.5 block text-[8.5px] font-bold text-[#64748B]">
+              {options.length || 81} il ve KKTC bölgeleri
+            </span>
+          </span>
+          <ChevronRight size={17} className="shrink-0" />
+        </button>
+      </section>
+
+      {pickerOpen && (
+        <div className="fixed inset-0 z-[140] flex items-end justify-center bg-[#062925]/70 backdrop-blur-[2px] sm:items-center sm:p-4">
+          <section className="flex h-[100dvh] w-full max-w-[460px] flex-col overflow-hidden bg-[#F6FBFB] shadow-[0_24px_70px_rgba(6,41,37,0.42)] sm:h-[min(92dvh,860px)] sm:rounded-[30px] sm:border sm:border-[#99F6E4]">
+            <header className="shrink-0 border-b border-[#C8E7E4] bg-[linear-gradient(145deg,#FFFFFF_0%,#F0FDFA_100%)] px-3 pb-3 pt-[max(12px,env(safe-area-inset-top))]">
+              <div className="grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
+                <div className="h-11 w-11" aria-hidden="true" />
+                <div className="min-w-0 text-center">
+                  <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#0F766E]">
+                    PREMIUM KONUM SEÇİCİ
+                  </p>
+                  <h3 className="mt-1 text-[19px] font-black tracking-[-0.04em] text-[#083344]">
+                    İl Seçimi
+                  </h3>
+                  <p className="mt-0.5 text-[9px] font-bold text-[#64748B]">
+                    Çoklu seçim · {draftSelected.length} il seçili
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(false)}
+                  className="flex h-11 w-11 items-center justify-center rounded-[17px] border border-[#99F6E4] bg-white text-[#0F766E]"
+                  aria-label="İl seçiciyi kapat"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="mt-3 flex min-h-[46px] items-center gap-2 rounded-[16px] border border-[#B8E5E2] bg-white px-3 shadow-inner">
+                <Search size={16} className="text-[#0F766E]" />
+                <input
+                  value={pickerQuery}
+                  onChange={(event) => {
+                    setPickerQuery(event.target.value);
+                    setActiveLetter("");
+                  }}
+                  placeholder="İl ara..."
+                  className="h-11 min-w-0 flex-1 bg-transparent text-[12px] font-bold outline-none placeholder:text-[#94A3B8]"
+                  autoFocus
+                />
+                {(pickerQuery || activeLetter) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPickerQuery("");
+                      setActiveLetter("");
+                    }}
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F1F5F9] text-[#64748B]"
+                    aria-label="İl filtresini temizle"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {draftSelected.length > 0 && (
+                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+                  {draftSelected.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => toggleDraft(value)}
+                      className="flex shrink-0 items-center gap-1 rounded-full bg-[#E6FFFB] px-2.5 py-1.5 text-[9px] font-black text-[#0F766E]"
+                    >
+                      {getHavuzCityDisplayName(value)}
+                      <X size={10} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-2 flex gap-1 overflow-x-auto pb-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveLetter("")}
+                  className={`flex h-8 min-w-10 shrink-0 items-center justify-center rounded-[11px] border px-2 text-[9px] font-black ${
+                    !activeLetter
+                      ? "border-[#0F766E] bg-[#0F766E] text-white"
+                      : "border-[#B8E5E2] bg-white text-[#0F766E]"
+                  }`}
+                >
+                  Tümü
+                </button>
+                {letters.map((letter) => (
+                  <button
+                    key={letter}
+                    type="button"
+                    onClick={() => {
+                      setActiveLetter(letter);
+                      setPickerQuery("");
+                    }}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] border text-[9px] font-black ${
+                      activeLetter === letter
+                        ? "border-[#0F766E] bg-[#0F766E] text-white"
+                        : "border-[#B8E5E2] bg-white text-[#0F766E]"
+                    }`}
+                  >
+                    {letter}
+                  </button>
+                ))}
+              </div>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+              {loading ? (
+                <div className="flex min-h-[180px] items-center justify-center gap-2 text-[11px] font-black text-[#0F766E]">
+                  <Loader2 size={18} className="animate-spin" />
+                  İl listesi yükleniyor...
+                </div>
+              ) : pickerOptions.length > 0 ? (
+                <div className="space-y-4">
+                  {portfolioCities.length > 0 && (
+                    <section>
+                      <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                        <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#0F766E]">
+                          Portföylü İller
+                        </p>
+                        <span className="rounded-full bg-[#DBEAFE] px-2 py-1 text-[8px] font-black text-[#1D4ED8]">
+                          {portfolioCities.length}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {portfolioCities.map(renderCityRow)}
+                      </div>
+                    </section>
+                  )}
+
+                  {otherCities.length > 0 && (
+                    <section>
+                      <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                        <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[#64748B]">
+                          Diğer İller
+                        </p>
+                        <span className="rounded-full bg-[#F1F5F9] px-2 py-1 text-[8px] font-black text-[#64748B]">
+                          {otherCities.length}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {otherCities.map(renderCityRow)}
+                      </div>
+                    </section>
+                  )}
+                </div>
+              ) : (
+                <div className="flex min-h-[180px] items-center justify-center rounded-[22px] border border-dashed border-[#B8E5E2] bg-white px-6 text-center">
+                  <p className="text-[11px] font-bold leading-5 text-[#64748B]">
+                    Aramanızla eşleşen il bulunamadı.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <footer className="shrink-0 border-t border-[#C8E7E4] bg-white p-3 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-12px_30px_rgba(6,41,37,0.06)]">
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-[14px] bg-[#F0FDFA] px-3 py-2">
+                <span className="text-[9.5px] font-black text-[#64748B]">
+                  {draftSelected.length} il seçildi
+                </span>
+                {draftSelected.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setDraftSelected([])}
+                    className="text-[9px] font-black text-rose-600"
+                  >
+                    Seçimi Temizle
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-[0.8fr_1.2fr] gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(false)}
+                  className="min-h-[50px] rounded-[16px] border border-[#C7D6E8] bg-white text-[11px] font-black text-[#64748B]"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(draftSelected);
+                    setPickerOpen(false);
+                  }}
+                  className="min-h-[50px] rounded-[16px] bg-[linear-gradient(135deg,#0F766E_0%,#0891B2_100%)] px-2 text-[11px] font-black text-white shadow-[0_10px_24px_rgba(15,118,110,0.25)]"
+                >
+                  {draftSelected.length > 0
+                    ? `${draftSelected.length} İli Uygula`
+                    : "Tüm İlleri Göster"}
+                </button>
+              </div>
+            </footer>
+          </section>
+        </div>
+      )}
+    </>
+  );
+}
+
 function NumericRangeSection({
   filters,
   onChange,
@@ -1071,15 +1618,18 @@ function NumericRangeSection({
       open
       className="group overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white"
     >
-      <summary className="flex min-h-[54px] cursor-pointer list-none items-center justify-between gap-2 bg-[#F8FAFC] px-3 py-2">
-        <div>
+      <summary className="grid min-h-[58px] cursor-pointer list-none grid-cols-[20px_minmax(0,1fr)_20px] items-center gap-2 bg-[#F8FAFC] px-3 py-2">
+        <span className="h-5 w-5" aria-hidden="true" />
+
+        <div className="min-w-0 text-center">
           <p className="text-[13px] font-black text-[#1F2937]">
             Sayısal Aralıklar
           </p>
-          <p className="mt-0.5 text-[10px] font-bold text-[#64748B]">
+          <p className="mt-0.5 text-[10px] font-bold leading-4 text-[#64748B]">
             Minimum ve maksimum değerleri birlikte kullanabilirsiniz
           </p>
         </div>
+
         <ChevronDown
           size={17}
           className="text-[#2563EB] transition-transform group-open:rotate-180"
@@ -1332,7 +1882,7 @@ export default function HavuzFilterCenter({
     () =>
       provinceOptions.map((option) => ({
         value: option.name,
-        label: option.name,
+        label: getHavuzCityDisplayName(option.name),
         count: optionCount(
           items,
           (item) => String(item.unit.project?.city || "") === option.name,
@@ -1346,7 +1896,7 @@ export default function HavuzFilterCenter({
       districtOptions.map((option) => ({
         value: option.key,
         label: option.name,
-        group: option.city,
+        group: getHavuzCityDisplayName(option.city),
         count: optionCount(
           items,
           (item) =>
@@ -1362,7 +1912,7 @@ export default function HavuzFilterCenter({
       placeOptions.map((option) => ({
         value: option.key,
         label: option.name,
-        group: `${option.city} / ${option.district}`,
+        group: `${getHavuzCityDisplayName(option.city)} / ${option.district}`,
         count: optionCount(
           items,
           (item) =>
@@ -1573,12 +2123,11 @@ export default function HavuzFilterCenter({
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/60 sm:items-center sm:p-4">
       <section className="flex h-[100dvh] w-full max-w-[480px] flex-col overflow-hidden bg-[#F4F8FF] shadow-[0_24px_70px_rgba(15,23,42,0.36)] sm:h-[min(95dvh,900px)] sm:rounded-[30px] sm:border-2 sm:border-[#C7D6E8]">
         <header className="shrink-0 border-b-2 border-[#C7D6E8] bg-white px-3 pb-3 pt-[max(12px,env(safe-area-inset-top))]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#2563EB]">
-                Patron Standardı • V2
-              </p>
-              <h2 className="mt-1 text-[21px] font-black tracking-[-0.04em] text-[#1F2937]">
+          <div className="grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2">
+            <div className="h-11 w-11" aria-hidden="true" />
+
+            <div className="min-w-0 text-center">
+              <h2 className="text-[21px] font-black tracking-[-0.04em] text-[#1F2937]">
                 Havuz Detaylı Filtre
               </h2>
               <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
@@ -1602,47 +2151,38 @@ export default function HavuzFilterCenter({
         </header>
 
         <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
-          <section className="rounded-[20px] border-2 border-[#93C5FD] bg-gradient-to-br from-[#EFF6FF] to-white p-3 text-center">
-            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[#2563EB]">
-              Konum Evreni
-            </p>
-            <p className="mt-1 text-[12px] font-black text-[#1F2937]">
-              81 İl + KKTC • Çoklu seçim
-            </p>
-          </section>
-
-          <MultiSelectSection
-            title="İl"
+          <PremiumCitySelector
             options={cityOptions}
             selected={filters.cities}
             onChange={handleCityChange}
-            defaultOpen
             loading={provinceLoading}
-            emptyText="İl listesi yüklenemedi."
-            hint="Tüm iller her zaman gösterilir"
           />
 
-          <MultiSelectSection
-            title="İlçe"
-            options={districtFilterOptions}
-            selected={filters.districts}
-            onChange={handleDistrictChange}
-            defaultOpen={filters.cities.length > 0}
-            loading={districtLoading}
-            emptyText="İlçe görmek için önce bir veya birkaç il seçiniz."
-            hint="Seçilen illerin bütün ilçeleri"
-          />
+          {filters.cities.length > 0 && (
+            <MultiSelectSection
+              title="İlçe"
+              options={districtFilterOptions}
+              selected={filters.districts}
+              onChange={handleDistrictChange}
+              defaultOpen
+              loading={districtLoading}
+              emptyText="Seçtiğiniz iller için ilçe bulunamadı."
+              hint={`${filters.cities.length} il için ilçe seçimi`}
+            />
+          )}
 
-          <MultiSelectSection
-            title="Mahalle / Köy / Mevki"
-            options={neighborhoodFilterOptions}
-            selected={filters.neighborhoods}
-            onChange={(value) => set("neighborhoods", value)}
-            defaultOpen={filters.districts.length > 0}
-            loading={placeLoading}
-            emptyText="Mahalle, köy ve mevki görmek için ilçe seçiniz."
-            hint="Seçilen ilçelerin bütün yerleşimleri"
-          />
+          {filters.districts.length > 0 && (
+            <MultiSelectSection
+              title="Mahalle / Köy / Mevki"
+              options={neighborhoodFilterOptions}
+              selected={filters.neighborhoods}
+              onChange={(value) => set("neighborhoods", value)}
+              defaultOpen
+              loading={placeLoading}
+              emptyText="Seçtiğiniz ilçeler için yerleşim bulunamadı."
+              hint={`${filters.districts.length} ilçe için yerleşim seçimi`}
+            />
+          )}
 
           <section className="rounded-[20px] border-2 border-[#C4B5FD] bg-gradient-to-br from-violet-50 to-white p-3 text-center">
             <p className="text-[10px] font-black uppercase tracking-[0.1em] text-violet-700">
@@ -1829,15 +2369,18 @@ export default function HavuzFilterCenter({
             open
             className="group overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white"
           >
-            <summary className="flex min-h-[54px] cursor-pointer list-none items-center justify-between gap-2 bg-[#F8FAFC] px-3 py-2">
-              <div>
+            <summary className="grid min-h-[58px] cursor-pointer list-none grid-cols-[20px_minmax(0,1fr)_20px] items-center gap-2 bg-[#F8FAFC] px-3 py-2">
+              <span className="h-5 w-5" aria-hidden="true" />
+
+              <div className="min-w-0 text-center">
                 <p className="text-[13px] font-black text-[#1F2937]">
                   Sıralama
                 </p>
-                <p className="mt-0.5 text-[10px] font-bold text-[#64748B]">
+                <p className="mt-0.5 text-[10px] font-bold leading-4 text-[#64748B]">
                   Sonuçların gösterim önceliği
                 </p>
               </div>
+
               <ChevronDown
                 size={17}
                 className="text-[#2563EB] transition-transform group-open:rotate-180"
