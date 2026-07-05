@@ -38,6 +38,7 @@ import HavuzFilterCenter, {
   getHavuzFilterChips,
   type HavuzFilterState,
 } from "@/components/havuz/HavuzFilterCenter";
+import PremiumPropertyImage from "@/components/media/PremiumPropertyImage";
 
 type Unit = {
   id: string;
@@ -2434,20 +2435,16 @@ function PoolUnitCard({
       >
         <div className="grid h-full min-w-0 grid-rows-[1fr_68px] overflow-hidden rounded-[16px] border border-[#E2EAF5] bg-[#EEF3F8]">
           <div className="relative min-h-0 overflow-hidden bg-[#EAF1F8]">
-            {image ? (
-              <img
-                src={image}
-                alt={unit.project?.name || "Portföy"}
-                className="absolute inset-0 block h-full w-full object-cover object-center"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-[#2563EB]">
-                <Building2 size={34} />
-              </div>
-            )}
+            <PremiumPropertyImage
+              src={image}
+              alt={unit.project?.name || "Portföy"}
+              className="h-full w-full"
+              fallback={<Building2 size={34} />}
+              fallbackClassName="text-[#2563EB]"
+            />
 
             <div
-              className={`absolute left-2 top-2 max-w-[calc(100%-16px)] truncate rounded-full px-2.5 py-1 text-[8px] font-black text-white shadow-sm ${
+              className={`absolute left-2 top-2 z-10 max-w-[calc(100%-16px)] truncate rounded-full px-2.5 py-1 text-[8px] font-black text-white shadow-sm ${
                 isVerified(unit) ? "bg-emerald-600" : "bg-amber-500"
               }`}
             >
@@ -2629,19 +2626,16 @@ function PoolDetailModal({
           <div className="mx-auto mt-2 h-1.5 w-11 rounded-full bg-[#CBD5E1]" />
 
           <div className="relative mt-2 h-[320px] overflow-hidden bg-gradient-to-br from-[#EAF1FB] via-white to-[#EEF3F8] sm:h-[340px]">
-            {image ? (
-              <img
-                src={image}
-                alt={unit.project?.name || "Portföy"}
-                className="h-full w-full object-contain"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-[#2563EB]">
-                <Building2 size={40} />
-              </div>
-            )}
+            <PremiumPropertyImage
+              src={image}
+              alt={unit.project?.name || "Portföy"}
+              className="h-full w-full"
+              loading="eager"
+              fallback={<Building2 size={40} />}
+              fallbackClassName="text-[#2563EB]"
+            />
 
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/20 via-transparent to-slate-950/35" />
+            <div className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-b from-slate-950/20 via-transparent to-slate-950/35" />
 
             <div className="absolute left-3 top-3 rounded-full bg-slate-950/82 px-3 py-1.5 text-[11px] font-black text-white shadow-[0_8px_18px_rgba(15,23,42,0.22)]">
               {imageCount || 1} Fotoğraf
@@ -2669,35 +2663,55 @@ function PoolDetailModal({
             )}
 
             {galleryImages.length > 1 && (
-              <div className="absolute inset-x-2 bottom-2 flex gap-1.5 overflow-x-auto pb-0.5">
-                {galleryImages.slice(0, 5).map((item, index) => (
+              <div className="absolute inset-x-3 bottom-3 z-[4] flex items-center justify-center gap-2 overflow-hidden">
+                {galleryImages.slice(0, 4).map((item, index) => (
                   <button
                     key={`${item}-${index}`}
                     type="button"
                     onClick={() => setGalleryIndex(index)}
-                    className={`h-[54px] min-w-[68px] overflow-hidden rounded-[12px] border-2 bg-white shadow-[0_8px_16px_rgba(15,23,42,0.18)] ${
+                    className={`relative flex-none overflow-hidden rounded-[12px] border-2 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.24)] transition ${
                       galleryIndex === index
-                        ? "border-[#2563EB]"
+                        ? "border-[#2563EB] ring-2 ring-white/90"
                         : "border-white/85"
                     }`}
+                    style={{
+                      width: "68px",
+                      minWidth: "68px",
+                      height: "52px",
+                      flex: "0 0 68px",
+                    }}
                     aria-label={`${index + 1}. fotoğraf`}
                   >
-                    <img
+                    <PremiumPropertyImage
                       src={item}
                       alt={`${unit.project?.name || "Portföy"} ${index + 1}`}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full"
                     />
+                    <span className="absolute bottom-1 right-1 z-[2] flex h-4 min-w-4 items-center justify-center rounded-full bg-slate-950/75 px-1 text-[8px] font-black text-white">
+                      {index + 1}
+                    </span>
                   </button>
                 ))}
-                {galleryImages.length > 5 && (
+
+                {galleryImages.length > 4 && (
                   <button
                     type="button"
-                    onClick={() => setGalleryIndex(5)}
-                    className="flex h-[54px] min-w-[68px] flex-col items-center justify-center rounded-[12px] border-2 border-white/85 bg-slate-950/78 text-center text-white shadow-[0_8px_16px_rgba(15,23,42,0.18)]"
+                    onClick={() => setGalleryIndex(4)}
+                    className={`flex flex-none flex-col items-center justify-center rounded-[12px] border-2 text-center text-white shadow-[0_8px_18px_rgba(15,23,42,0.24)] transition ${
+                      galleryIndex >= 4
+                        ? "border-[#2563EB] bg-[#1D4ED8] ring-2 ring-white/90"
+                        : "border-white/85 bg-slate-950/82"
+                    }`}
+                    style={{
+                      width: "60px",
+                      minWidth: "60px",
+                      height: "52px",
+                      flex: "0 0 60px",
+                    }}
                     aria-label="Diğer fotoğraflar"
                   >
                     <span className="text-[14px] font-black leading-none">
-                      +{galleryImages.length - 5}
+                      +{galleryImages.length - 4}
                     </span>
                     <span className="mt-0.5 text-[9px] font-black">Daha</span>
                   </button>
