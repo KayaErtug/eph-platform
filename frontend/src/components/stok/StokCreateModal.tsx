@@ -327,8 +327,16 @@ function getFieldLabel(field: PortfolioFieldKey, type: string, required: boolean
   if (field === "buildingAge") return `Bina Yaşı${requiredMark}`;
   if (field === "floor") return `Bulunduğu Kat${requiredMark}`;
   if (field === "totalFloors") return `${isVillaType(type) ? "Yapı Kat Sayısı" : "Toplam Kat Sayısı"}${requiredMark}`;
-  if (field === "adaNo") return `Ada No${requiredMark}`;
-  if (field === "parselNo") return `Parsel No${requiredMark}`;
+  if (field === "adaNo") {
+    return isResidentialDetailType(type)
+      ? "Ada No (Opsiyonel)"
+      : `Ada No${requiredMark}`;
+  }
+  if (field === "parselNo") {
+    return isResidentialDetailType(type)
+      ? "Parsel No (Opsiyonel)"
+      : `Parsel No${requiredMark}`;
+  }
   if (field === "number") return `${getNumberLabel(type).replace(" *", "")}${requiredMark}`;
   if (field === "price") return `Fiyat${requiredMark}`;
   if (field === "description") return `Açıklama${requiredMark}`;
@@ -1117,7 +1125,16 @@ export default function StokCreateModal({
   const descriptionLength = unitForm.description.length;
   const fieldRule = getFieldRule(unitForm.type);
   const specialFields = getSpecialFields(unitForm.type);
-  const isRequiredField = (field: PortfolioFieldKey) => fieldRule.requiredFields.includes(field);
+  const isRequiredField = (field: PortfolioFieldKey) => {
+    if (
+      isResidentialDetailType(unitForm.type) &&
+      (field === "adaNo" || field === "parselNo")
+    ) {
+      return false;
+    }
+
+    return fieldRule.requiredFields.includes(field);
+  };
   const isVisibleField = (field: PortfolioFieldKey) => shouldShowField(unitForm.type, field);
   const showRoomCountField = isVisibleField("roomCount");
   const showBuildingAgeField = isVisibleField("buildingAge");

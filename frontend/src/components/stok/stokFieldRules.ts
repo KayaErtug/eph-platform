@@ -120,14 +120,14 @@ export const FIELD_RULES: Record<string, PortfolioFieldRule> = {
   REZIDANS: {
     type: "REZIDANS",
     requiredFields: ["roomCount", "area", "buildingAge", "floor", "totalFloors", "price"],
-    optionalFields: ["number", "description", "availableCreditAmount"],
+    optionalFields: ["number", "description", "availableCreditAmount", "adaNo", "parselNo"],
     specialFields: [],
   },
 
   VILLA: {
     type: "VILLA",
     requiredFields: ["roomCount", "area", "buildingAge", "price"],
-    optionalFields: ["number", "description", "availableCreditAmount"],
+    optionalFields: ["number", "description", "availableCreditAmount", "adaNo", "parselNo"],
     specialFields: [
       { key: "villaType", label: "Villa Tipi", options: VILLA_TYPE_OPTIONS, required: true },
       { key: "layoutType", label: "Nizam Tipi", options: VILLA_LAYOUT_OPTIONS, required: true },
@@ -139,7 +139,7 @@ export const FIELD_RULES: Record<string, PortfolioFieldRule> = {
   YAZLIK: {
     type: "YAZLIK",
     requiredFields: ["roomCount", "area", "buildingAge", "price"],
-    optionalFields: ["number", "description", "availableCreditAmount"],
+    optionalFields: ["number", "description", "availableCreditAmount", "adaNo", "parselNo"],
     specialFields: [
       { key: "summerHouseType", label: "Yazlık Türü", options: YAZLIK_TYPE_OPTIONS, required: true },
       { key: "buildingStyle", label: "Yapı Tipi", options: HOME_TYPE_OPTIONS },
@@ -149,7 +149,7 @@ export const FIELD_RULES: Record<string, PortfolioFieldRule> = {
   MUSTAK_EV: {
     type: "MUSTAK_EV",
     requiredFields: ["roomCount", "area", "buildingAge", "price"],
-    optionalFields: ["number", "description", "availableCreditAmount"],
+    optionalFields: ["number", "description", "availableCreditAmount", "adaNo", "parselNo"],
     specialFields: [
       { key: "homeType", label: "Ev Tipi", options: HOME_TYPE_OPTIONS, required: true },
       { key: "layoutType", label: "Nizam Tipi", options: BUILDING_ORDER_OPTIONS },
@@ -159,7 +159,7 @@ export const FIELD_RULES: Record<string, PortfolioFieldRule> = {
   KOY_EVI: {
     type: "KOY_EVI",
     requiredFields: ["roomCount", "area", "price"],
-    optionalFields: ["number", "description"],
+    optionalFields: ["number", "description", "adaNo", "parselNo"],
     specialFields: [
       { key: "buildingStyle", label: "Yapı Tipi", options: RURAL_BUILDING_TYPE_OPTIONS, required: true },
     ],
@@ -168,7 +168,7 @@ export const FIELD_RULES: Record<string, PortfolioFieldRule> = {
   DAG_EVI_YAYLA_EVI: {
     type: "DAG_EVI_YAYLA_EVI",
     requiredFields: ["roomCount", "area", "price"],
-    optionalFields: ["number", "description"],
+    optionalFields: ["number", "description", "adaNo", "parselNo"],
     specialFields: [
       { key: "buildingStyle", label: "Yapı Tipi", options: RURAL_BUILDING_TYPE_OPTIONS, required: true },
       { key: "accessSeason", label: "Ulaşım Durumu", options: ACCESS_SEASON_OPTIONS },
@@ -341,7 +341,7 @@ export const FIELD_RULES: Record<string, PortfolioFieldRule> = {
   KONUT_PROJESI: {
     type: "KONUT_PROJESI",
     requiredFields: ["area", "price"],
-    optionalFields: ["roomCount", "description"],
+    optionalFields: ["roomCount", "description", "adaNo", "parselNo"],
     specialFields: [
       { key: "projectStatus", label: "Proje Durumu", options: ["Ön Satış", "İnşaat Halinde", "Teslime Hazır", "Hemen Teslim"] },
     ],
@@ -350,7 +350,7 @@ export const FIELD_RULES: Record<string, PortfolioFieldRule> = {
   REZIDANS_PROJESI: {
     type: "REZIDANS_PROJESI",
     requiredFields: ["area", "price"],
-    optionalFields: ["roomCount", "description"],
+    optionalFields: ["roomCount", "description", "adaNo", "parselNo"],
     specialFields: [
       { key: "projectStatus", label: "Proje Durumu", options: ["Ön Satış", "İnşaat Halinde", "Teslime Hazır", "Hemen Teslim"] },
     ],
@@ -359,7 +359,7 @@ export const FIELD_RULES: Record<string, PortfolioFieldRule> = {
   VILLA_PROJESI: {
     type: "VILLA_PROJESI",
     requiredFields: ["area", "price"],
-    optionalFields: ["roomCount", "description"],
+    optionalFields: ["roomCount", "description", "adaNo", "parselNo"],
     specialFields: [
       { key: "villaType", label: "Villa Tipleri", options: VILLA_TYPE_OPTIONS },
       { key: "layoutType", label: "Nizam Tipleri", options: VILLA_LAYOUT_OPTIONS },

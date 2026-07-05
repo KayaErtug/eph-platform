@@ -235,11 +235,6 @@ function formatCompactPrice(value?: number, currency?: string) {
 
   if (!numeric) return "—";
 
-  if (numeric >= 1000000) {
-    const compact = numeric / 1000000;
-    return `${compact.toLocaleString("tr-TR", { maximumFractionDigits: compact >= 10 ? 0 : 1 })}M ${symbol}`;
-  }
-
   return `${numeric.toLocaleString("tr-TR")} ${symbol}`;
 }
 
@@ -1049,41 +1044,6 @@ function StokPageInner() {
     <main className="min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#F7F5FF] pb-[calc(144px+env(safe-area-inset-bottom))] text-[#2E1065]">
       <div className="mx-auto w-full max-w-[430px] overflow-x-hidden px-3 pt-3">
         <section className="rounded-[28px] border border-[#DDD6FE] bg-[linear-gradient(180deg,#FFFFFF_0%,#FBFAFF_100%)] p-3 shadow-[0_16px_38px_rgba(76,29,149,0.08)]">
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="flex h-11 w-11 items-center justify-center rounded-[18px] border border-[#EDE9FE] bg-white/80 text-[#2E1065] shadow-sm active:scale-[0.98]"
-              aria-label="Geri dön"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div className="min-w-0 text-center">
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-[13px] text-[#A78BFA]" aria-hidden="true">✦</span>
-                <h1 className="text-[22px] font-black tracking-[-0.05em] text-[#2E1065]">
-                  PORTFÖY
-                </h1>
-                <span className="text-[13px] text-[#A78BFA]" aria-hidden="true">✦</span>
-              </div>
-              <p className="text-[10px] font-bold text-[#64748B]">
-                Harita + ultra kompakt liste
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => router.push("/messages")}
-              className="relative flex h-11 w-11 items-center justify-center rounded-[18px] border border-[#EDE9FE] bg-white/80 text-[#2E1065] shadow-sm active:scale-[0.98]"
-              aria-label="Mesajlar"
-            >
-              <Bell size={20} />
-              {unreadMessages > 0 && (
-                <span className="absolute right-2 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">
-                  {unreadMessages > 99 ? "99+" : unreadMessages}
-                </span>
-              )}
-            </button>
-          </div>
 
           <div className="mt-3 flex items-center gap-2">
             <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[18px] border border-[#DDD6FE] bg-[#FBFAFF] px-3 py-2">
@@ -1844,12 +1804,14 @@ function CompactPortfolioCard({
       id={`portfolio-card-${unit.id}`}
       data-card-index={index}
       data-unit-id={unit.id}
-      className={`relative scroll-mt-24 w-full max-w-full overflow-hidden rounded-[18px] border-[3px] border-transparent bg-white transition-all duration-300 ${
+      className={`relative scroll-mt-24 w-full max-w-full overflow-hidden rounded-[22px] border-[3px] border-transparent bg-white transition-all duration-300 ${
         selected ? "ring-4 ring-[#DDD6FE]" : ""
       }`}
       style={{
         background: `linear-gradient(#FFFFFF,#FFFFFF) padding-box, ${visualTheme.frameGradient} border-box`,
         boxShadow: `${visualTheme.frameShadow}, inset 6px 0 0 ${visualTheme.typeColor}`,
+        fontFamily:
+          '"Segoe UI Variable", "Segoe UI", Inter, ui-sans-serif, system-ui, sans-serif',
       }}
       title={`${visualTheme.transactionLabel} · ${typeChip}`}
     >
@@ -1857,47 +1819,75 @@ function CompactPortfolioCard({
         type="button"
         onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
-        className="grid w-full grid-cols-[88px_minmax(0,1fr)_24px] gap-2 p-2 text-left active:bg-[#FBFAFF]"
+        className="block w-full text-left active:bg-[#FBFAFF]"
       >
         <div
-          className="relative h-[96px] overflow-hidden rounded-[13px] border-2 bg-[#F3F0FF]"
-          style={{ borderColor: visualTheme.typeBorder }}
+          className="relative aspect-[16/10] min-h-[190px] w-full overflow-hidden bg-[#F3F0FF]"
+          style={{ borderBottom: `2px solid ${visualTheme.typeBorder}` }}
         >
           {image ? (
-            <img
-              src={image}
-              alt={unit.project?.name || "Portföy"}
-              className="absolute inset-0 h-full w-full object-cover object-center"
-            />
+            <>
+              <img
+                src={image}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 h-full w-full scale-110 object-cover object-center blur-xl opacity-55"
+              />
+              <img
+                src={image}
+                alt={unit.project?.name || "Portföy"}
+                className="absolute inset-0 h-full w-full object-contain object-center"
+              />
+            </>
           ) : (
             <div className="flex h-full w-full items-center justify-center text-[#7C3AED]">
-              <Building2 size={28} />
+              <Building2 size={42} />
             </div>
           )}
 
-          <span
-            className={`absolute left-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[6.5px] font-black text-white shadow-sm ${
-              isVerified ? "bg-emerald-600" : "bg-amber-500"
-            }`}
-          >
-            {isVerified ? "EPH Onaylı" : "Onay Bekliyor"}
-          </span>
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.08)_0%,transparent_45%,rgba(15,23,42,0.48)_100%)]" />
 
-          <span
-            className="absolute bottom-1.5 right-1.5 rounded-full border bg-white/95 px-1.5 py-0.5 text-[7px] font-black shadow-sm"
-            style={{
-              borderColor: visualTheme.typeBorder,
-              color: visualTheme.typeColor,
-            }}
-          >
-            {status}
-          </span>
+          <div className="absolute left-2.5 right-2.5 top-2.5 flex items-start justify-between gap-2">
+            <span
+              className={`rounded-full border border-white/80 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] backdrop-blur-md ${
+                isVerified ? "bg-emerald-600/90" : "bg-amber-500/90"
+              }`}
+            >
+              {isVerified ? "EPH Onaylı" : "Onay Bekliyor"}
+            </span>
+
+            <span className="rounded-full border border-white/80 bg-slate-950/60 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] backdrop-blur-md">
+              {imageCount} Fotoğraf
+            </span>
+          </div>
+
+          <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-end justify-between gap-2">
+            <span
+              className="rounded-full border-2 bg-white/95 px-3 py-1 text-[11px] font-extrabold shadow-md backdrop-blur-md"
+              style={{
+                borderColor: statusTone.borderColor,
+                color: statusTone.color,
+              }}
+            >
+              {statusTone.label}
+            </span>
+
+            <span
+              className="rounded-full border-2 bg-white/95 px-3 py-1 text-[11px] font-extrabold shadow-md backdrop-blur-md"
+              style={{
+                borderColor: visualTheme.typeBorder,
+                color: visualTheme.typeColor,
+              }}
+            >
+              {status}
+            </span>
+          </div>
         </div>
 
-        <div className="min-w-0 py-0.5">
-          <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="p-3.5">
+          <div className="flex min-w-0 items-center gap-2">
             <p
-              className="min-w-0 truncate rounded-full border-2 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.11em]"
+              className="min-w-0 flex-1 truncate rounded-full border-2 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.08em]"
               style={{
                 backgroundColor: visualTheme.typeSoft,
                 borderColor: visualTheme.typeBorder,
@@ -1906,8 +1896,9 @@ function CompactPortfolioCard({
             >
               {typeChip}
             </p>
+
             <span
-              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[7px] font-black ${
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-extrabold ${
                 isPoolVisible
                   ? "bg-violet-50 text-violet-700"
                   : "bg-slate-100 text-slate-600"
@@ -1915,39 +1906,46 @@ function CompactPortfolioCard({
             >
               {isPoolVisible ? "Havuzda" : "Havuz Dışı"}
             </span>
+
+            <span
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+              style={{
+                backgroundColor: visualTheme.typeSoft,
+                color: visualTheme.typeColor,
+              }}
+            >
+              {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </span>
           </div>
 
-          <h3 className="mt-0.5 line-clamp-2 min-w-0 break-words text-[12.5px] font-black leading-[1.08] tracking-[-0.025em] text-[#111827] [overflow-wrap:anywhere]">
+          <h3 className="mt-2 line-clamp-2 min-w-0 break-words text-[17px] font-extrabold leading-[1.2] tracking-[-0.02em] text-[#111827] [overflow-wrap:anywhere]">
             {unit.project?.name || "EPH Portföy"}
           </h3>
 
-          <p className="mt-1 flex min-w-0 items-center gap-1 text-[7.5px] font-bold text-[#64748B]">
-            <MapPin size={9} className="shrink-0" />
-            <span className="min-w-0 truncate">{location}</span>
+          <p className="mt-2 flex min-w-0 items-start gap-1.5 text-[12px] font-semibold leading-4 text-[#64748B]">
+            <MapPin size={15} className="mt-0.5 shrink-0" />
+            <span className="min-w-0 line-clamp-2">{location}</span>
           </p>
 
-          <div className="mt-1 flex min-w-0 items-center gap-1.5">
-            <span className="text-[6.5px] font-black uppercase tracking-[0.12em] text-[#64748B]">
-              Durum
-            </span>
-            <span
-              className="inline-flex min-h-[18px] items-center rounded-full border px-2 py-0.5 text-[7px] font-black"
-              style={{
-                borderColor: statusTone.borderColor,
-                backgroundColor: statusTone.backgroundColor,
-                color: statusTone.color,
-              }}
-            >
-              {statusTone.label}
-            </span>
-          </div>
+          <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#64748B]">
+                Durum
+              </span>
+              <span
+                className="inline-flex min-h-[24px] items-center rounded-full border px-2.5 py-1 text-[10.5px] font-extrabold"
+                style={{
+                  borderColor: statusTone.borderColor,
+                  backgroundColor: statusTone.backgroundColor,
+                  color: statusTone.color,
+                }}
+              >
+                {statusTone.label}
+              </span>
+            </div>
 
-          <div className="mt-1 flex min-w-0 items-end justify-between gap-2">
-            <p className="min-w-0 truncate text-[17px] font-black leading-none tracking-[-0.05em] text-[#111827]">
-              {formatCompactPrice(unit.price, unit.priceCurrency)}
-            </p>
             <span
-              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[7px] font-black ${
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-extrabold ${
                 isVerified
                   ? "bg-emerald-50 text-emerald-700"
                   : "bg-amber-50 text-amber-700"
@@ -1957,11 +1955,15 @@ function CompactPortfolioCard({
             </span>
           </div>
 
-          <div className="mt-1.5 grid min-w-0 grid-cols-3 gap-1">
+          <p className="mt-2.5 min-w-0 truncate text-[22px] font-extrabold leading-none tracking-[-0.035em] text-[#111827]">
+            {formatCompactPrice(unit.price, unit.priceCurrency)}
+          </p>
+
+          <div className="mt-3 grid min-w-0 grid-cols-3 gap-1.5">
             {summarySpecs.map((spec) => (
               <span
                 key={spec}
-                className="flex min-h-[24px] min-w-0 items-center justify-center rounded-[8px] border-2 px-1 text-center text-[7px] font-black leading-[1.05] [overflow-wrap:anywhere]"
+                className="flex min-h-[38px] min-w-0 items-center justify-center rounded-[11px] border-2 px-1.5 text-center text-[10px] font-extrabold leading-[1.15] [overflow-wrap:anywhere]"
                 style={{
                   backgroundColor: visualTheme.typeSoft,
                   borderColor: visualTheme.typeBorder,
@@ -1973,31 +1975,24 @@ function CompactPortfolioCard({
             ))}
           </div>
         </div>
-
-        <div
-          className="flex h-full items-center justify-center"
-          style={{ color: visualTheme.typeColor }}
-        >
-          {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-        </div>
       </button>
 
-      <div className="grid grid-cols-4 gap-1 border-t border-[#EDE9FE] bg-[#FBFAFF] p-1.5">
+      <div className="grid grid-cols-4 gap-1.5 border-t border-[#EDE9FE] bg-[#FBFAFF] p-2">
         <button
           type="button"
           onClick={onOpen}
-          className="flex min-h-[34px] items-center justify-center gap-1 rounded-[10px] bg-[#F5F3FF] px-1 text-[8px] font-black text-[#6D28D9] active:scale-[0.98]"
+          className="flex min-h-[42px] items-center justify-center gap-1.5 rounded-[12px] bg-[#F5F3FF] px-1.5 text-[11px] font-extrabold text-[#6D28D9] active:scale-[0.98]"
         >
-          <Eye size={13} />
+          <Eye size={15} />
           Aç
         </button>
 
         <button
           type="button"
           onClick={hasLocation ? onWhatsappLocation : onShare}
-          className="flex min-h-[34px] items-center justify-center gap-1 rounded-[10px] bg-emerald-50 px-1 text-[8px] font-black text-emerald-700 active:scale-[0.98]"
+          className="flex min-h-[42px] items-center justify-center gap-1.5 rounded-[12px] bg-emerald-50 px-1.5 text-[11px] font-extrabold text-emerald-700 active:scale-[0.98]"
         >
-          {hasLocation ? <Navigation size={13} /> : <Share2 size={13} />}
+          {hasLocation ? <Navigation size={15} /> : <Share2 size={15} />}
           {hasLocation ? "Konum" : "Paylaş"}
         </button>
 
@@ -2005,13 +2000,13 @@ function CompactPortfolioCard({
           type="button"
           onClick={toggleFavorite}
           aria-pressed={favorite}
-          className={`flex min-h-[34px] items-center justify-center gap-1 rounded-[10px] px-1 text-[8px] font-black active:scale-[0.98] ${
+          className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-[12px] px-1.5 text-[11px] font-extrabold active:scale-[0.98] ${
             favorite
               ? "bg-rose-50 text-rose-600"
               : "bg-white text-[#64748B]"
           }`}
         >
-          <Heart size={13} fill={favorite ? "currentColor" : "none"} />
+          <Heart size={15} fill={favorite ? "currentColor" : "none"} />
           Favori
         </button>
 
@@ -2019,24 +2014,24 @@ function CompactPortfolioCard({
           type="button"
           onClick={() => setMenuOpen((current) => !current)}
           aria-expanded={menuOpen}
-          className="flex min-h-[34px] items-center justify-center gap-1 rounded-[10px] bg-white px-1 text-[8px] font-black text-[#475569] active:scale-[0.98]"
+          className="flex min-h-[42px] items-center justify-center gap-1.5 rounded-[12px] bg-white px-1.5 text-[11px] font-extrabold text-[#475569] active:scale-[0.98]"
         >
-          <MoreVertical size={14} />
+          <MoreVertical size={16} />
           Menü
         </button>
       </div>
 
       {menuOpen && (
-        <div className="grid grid-cols-3 gap-1.5 border-t border-[#EDE9FE] bg-white p-2">
+        <div className="grid grid-cols-3 gap-2 border-t border-[#EDE9FE] bg-white p-2.5">
           <button
             type="button"
             onClick={() => {
               setMenuOpen(false);
               onUpdate();
             }}
-            className="flex min-h-[38px] items-center justify-center gap-1 rounded-[11px] bg-[#F5F3FF] px-2 text-[8.5px] font-black text-[#6D28D9] active:scale-[0.98]"
+            className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-[12px] bg-[#F5F3FF] px-2 text-[11.5px] font-extrabold text-[#6D28D9] active:scale-[0.98]"
           >
-            <Edit3 size={14} />
+            <Edit3 size={15} />
             Güncelle
           </button>
 
@@ -2046,9 +2041,9 @@ function CompactPortfolioCard({
               setMenuOpen(false);
               onShare();
             }}
-            className="flex min-h-[38px] items-center justify-center gap-1 rounded-[11px] bg-sky-50 px-2 text-[8.5px] font-black text-sky-700 active:scale-[0.98]"
+            className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-[12px] bg-sky-50 px-2 text-[11.5px] font-extrabold text-sky-700 active:scale-[0.98]"
           >
-            <Share2 size={14} />
+            <Share2 size={15} />
             Paylaş
           </button>
 
@@ -2059,12 +2054,12 @@ function CompactPortfolioCard({
               onDelete();
             }}
             disabled={deleting}
-            className="flex min-h-[38px] items-center justify-center gap-1 rounded-[11px] bg-red-50 px-2 text-[8.5px] font-black text-red-600 disabled:opacity-50"
+            className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-[12px] bg-red-50 px-2 text-[11.5px] font-extrabold text-red-600 disabled:opacity-50"
           >
             {deleting ? (
-              <Loader2 size={14} className="animate-spin" />
+              <Loader2 size={15} className="animate-spin" />
             ) : (
-              <Trash2 size={14} />
+              <Trash2 size={15} />
             )}
             Sil
           </button>
@@ -2072,36 +2067,36 @@ function CompactPortfolioCard({
       )}
 
       {expanded && (
-        <div className="border-t border-[#EDE9FE] bg-white p-2.5">
-          <div className="grid grid-cols-4 gap-1">
+        <div className="border-t border-[#EDE9FE] bg-white p-3">
+          <div className="grid grid-cols-4 gap-1.5">
             {quickSpecs.map((item) => (
               <div
                 key={`${item.icon}-${item.label}`}
-                className="flex min-h-[43px] min-w-0 flex-col items-center justify-center rounded-[10px] bg-[#F8FAFC] px-1 text-center"
+                className="flex min-h-[58px] min-w-0 flex-col items-center justify-center rounded-[12px] bg-[#F8FAFC] px-1.5 text-center"
               >
                 <span
-                  className="text-[10px] font-black leading-none"
+                  className="text-[14px] font-extrabold leading-none"
                   style={{ color: visualTheme.typeColor }}
                 >
                   {item.icon}
                 </span>
-                <span className="mt-1 line-clamp-2 min-w-0 text-[7px] font-black leading-[1.05] text-[#334155] [overflow-wrap:anywhere]">
+                <span className="mt-1.5 line-clamp-2 min-w-0 text-[10px] font-extrabold leading-[1.15] text-[#334155] [overflow-wrap:anywhere]">
                   {item.label}
                 </span>
               </div>
             ))}
           </div>
 
-          <div className="mt-1.5 grid grid-cols-3 gap-1">
+          <div className="mt-2 grid grid-cols-3 gap-1.5">
             {detailSpecs.map((item) => (
               <div
                 key={item.label}
-                className="flex min-h-[48px] min-w-0 flex-col items-center justify-center rounded-[10px] border border-[#EDE9FE] bg-[#FBFAFF] px-1 py-1 text-center"
+                className="flex min-h-[64px] min-w-0 flex-col items-center justify-center rounded-[12px] border border-[#EDE9FE] bg-[#FBFAFF] px-1.5 py-1.5 text-center"
               >
-                <span className="text-[6.5px] font-black uppercase tracking-[0.04em] text-[#64748B]">
+                <span className="text-[9px] font-extrabold uppercase tracking-[0.05em] text-[#64748B]">
                   {item.label}
                 </span>
-                <span className="mt-0.5 line-clamp-2 min-w-0 text-[7.5px] font-black leading-[1.05] text-[#1F2937] [overflow-wrap:anywhere]">
+                <span className="mt-1 line-clamp-2 min-w-0 text-[10.5px] font-extrabold leading-[1.15] text-[#1F2937] [overflow-wrap:anywhere]">
                   {item.value}
                 </span>
               </div>
@@ -2109,13 +2104,13 @@ function CompactPortfolioCard({
           </div>
 
           {description && (
-            <p className="mt-1.5 rounded-[10px] bg-[#F8FAFC] px-2 py-1.5 text-[8px] font-bold leading-3 text-[#475569]">
+            <p className="mt-2 rounded-[12px] bg-[#F8FAFC] px-3 py-2.5 text-[11.5px] font-semibold leading-[1.55] text-[#475569]">
               {description}
             </p>
           )}
 
           <div
-            className="mt-1.5 flex min-h-[28px] items-center justify-center rounded-[10px] border px-2 text-center text-[8px] font-black"
+            className="mt-2 flex min-h-[38px] items-center justify-center rounded-[12px] border px-3 text-center text-[11px] font-extrabold"
             style={{
               backgroundColor: visualTheme.typeSoft,
               borderColor: visualTheme.typeBorder,
@@ -2126,18 +2121,18 @@ function CompactPortfolioCard({
           </div>
 
           {(canSendToPool || canRemoveFromPool) && (
-            <div className="mt-2">
+            <div className="mt-2.5">
               {canSendToPool ? (
                 <button
                   type="button"
                   onClick={onSendToPool}
                   disabled={poolBusy}
-                  className="flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[12px] bg-emerald-600 px-3 text-[10px] font-black text-white shadow-[0_8px_18px_rgba(5,150,105,0.16)] disabled:opacity-60"
+                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[13px] bg-emerald-600 px-3 text-[12px] font-extrabold text-white shadow-[0_8px_18px_rgba(5,150,105,0.16)] disabled:opacity-60"
                 >
                   {poolBusy ? (
-                    <Loader2 size={14} className="animate-spin" />
+                    <Loader2 size={15} className="animate-spin" />
                   ) : (
-                    <Send size={14} />
+                    <Send size={15} />
                   )}
                   Havuza Gönder
                 </button>
@@ -2148,12 +2143,12 @@ function CompactPortfolioCard({
                   type="button"
                   onClick={onRemoveFromPool}
                   disabled={poolBusy}
-                  className="flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[12px] border border-amber-200 bg-amber-50 px-3 text-[10px] font-black text-amber-800 disabled:opacity-60"
+                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[13px] border border-amber-200 bg-amber-50 px-3 text-[12px] font-extrabold text-amber-800 disabled:opacity-60"
                 >
                   {poolBusy ? (
-                    <Loader2 size={14} className="animate-spin" />
+                    <Loader2 size={15} className="animate-spin" />
                   ) : (
-                    <X size={14} />
+                    <X size={15} />
                   )}
                   Havuzdan Kaldır
                 </button>
@@ -2375,3 +2370,5 @@ export default function StokPage() {
     </Suspense>
   );
 }
+
+
