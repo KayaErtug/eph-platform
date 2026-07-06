@@ -202,22 +202,33 @@ export class ProjectMediaZipService {
     input: MediaZipInput,
   ): Promise<ProjectMediaZipUploadResult> {
     const uploadedAssets: UploadedAsset[] = [];
+    let currentStage = 'ZIP doğrulama';
 
     try {
+      this.logger.log(
+        `Proje görsel yüklemesi başladı: projectCode=${input.projectCode}, ` +
+          `file=${input.file?.originalname || 'yok'}, ` +
+          `size=${input.file?.size || 0}, replaceExisting=${Boolean(input.replaceExisting)}`,
+      );
+
       this.validateZipFile(input.file);
 
+      currentStage = 'proje yetki kontrolü';
       const project = await this.findProject(
         input.userId,
         input.userRole,
         input.projectCode,
       );
+      currentStage = 'fotoğraf paketi tanımlarını okuma';
       const definitions = await this.loadPackageDefinitions(
         project.id,
       );
+      currentStage = 'ZIP içeriğini ayrıştırma';
       const parsed = await this.parseZip(
         input.file,
         definitions,
       );
+      currentStage = 'ZIP önizleme doğrulaması';
       const preview = this.buildPreview(
         project,
         input.file,
@@ -236,9 +247,25 @@ export class ProjectMediaZipService {
       const batchCode =
         `${Date.now()}-${randomUUID().slice(0, 8)}`;
 
+      currentStage = 'Supabase Storage görsel yükleme';
+
       for (const mediaPackage of parsed.packages) {
+        this.logger.log(
+          `Paket yükleniyor: ${mediaPackage.code}, görsel=${mediaPackage.files.length}`,
+        );
+
         for (const image of mediaPackage.files) {
-          const buffer = await image.entry.buffer();
+          currentStage =
+            `görseli okuma: ${image.originalPath}`;
+          let buffer: Buffer;
+
+          try {
+            buffer = await image.entry.buffer();
+          } catch (error) {
+            throw new BadRequestException(
+              `${image.originalPath} ZIP içinden okunamadı: ${this.errorMessage(error)}`,
+            );
+          }
 
           if (
             !this.matchesImageSignature(
@@ -260,12 +287,21 @@ export class ProjectMediaZipService {
             `${this.slugifyCode(mediaPackage.code)}/` +
             `${batchCode}-${String(image.sortOrder + 1).padStart(2, '0')}-${safeFileName}`;
 
-          await this.supabaseService.uploadFile(
-            this.bucket,
-            path,
-            buffer,
-            image.mimetype,
-          );
+          currentStage =
+            `Supabase Storage yükleme: ${image.originalPath}`;
+
+          try {
+            await this.supabaseService.uploadFile(
+              this.bucket,
+              path,
+              buffer,
+              image.mimetype,
+            );
+          } catch (error) {
+            throw new BadRequestException(
+              `${image.originalPath} depoya yüklenemedi. ${this.errorMessage(error)}`,
+            );
+          }
 
           uploadedAssets.push({
             packageId: mediaPackage.packageId,
@@ -296,6 +332,7 @@ export class ProjectMediaZipService {
           return definition?.assets.map((asset) => asset.path) ?? [];
         });
 
+      currentStage = 'veritabanı medya kayıtları';
       const transactionResult = await this.prisma.$transaction(
         async (tx) => {
           const packages: ProjectMediaZipUploadResult['packages'] = [];
@@ -386,6 +423,11 @@ export class ProjectMediaZipService {
         }
       }
 
+      this.logger.log(
+        `Proje görselleri başarıyla yüklendi: project=${project.code}, ` +
+          `package=${transactionResult.packages.length}, asset=${uploadedAssets.length}`,
+      );
+
       return {
         success: true,
         project: {
@@ -407,6 +449,12 @@ export class ProjectMediaZipService {
         ),
       };
     } catch (error) {
+      this.logger.error(
+        `Proje görsel yüklemesi başarısız. Aşama: ${currentStage}. ` +
+          `Hata: ${this.errorMessage(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+
       if (uploadedAssets.length > 0) {
         try {
           await this.supabaseService.removeFile(
@@ -420,7 +468,13 @@ export class ProjectMediaZipService {
         }
       }
 
-      throw error;
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new BadRequestException(
+        `Görseller "${currentStage}" aşamasında yüklenemedi. ${this.errorMessage(error)}`,
+      );
     } finally {
       await this.removeTempFile(input.file?.path);
     }
@@ -693,7 +747,7 @@ export class ProjectMediaZipService {
           level: 'ERROR',
           code: 'UNKNOWN_MEDIA_FOLDER',
           message:
-            'ZIP klasörü Excel V4 ile tanımlanan aktif fotoğraf paketlerinden biri olmalıdır.',
+            'ZIP klasörü ekranda gösterilen aktif fotoğraf paketlerinden biri olmalıdır.',
           path: normalized.originalPath,
           value: {
             folder: folderName,
@@ -950,7 +1004,7 @@ export class ProjectMediaZipService {
 
     if (definitions.length === 0) {
       throw new BadRequestException(
-        'Projede fotoğraf paketi tanımı bulunamadı. Önce Excel V4 içe aktarma işlemi tamamlanmalıdır.',
+        'Projede fotoğraf paketi tanımı bulunamadı. Önce Görselleri Yönet ekranını yeniden açın.',
       );
     }
 

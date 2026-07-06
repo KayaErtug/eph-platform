@@ -71,6 +71,8 @@ model User {
   portfolioAuthorityApprovals PortfolioAuthorityDocument[] @relation("PortfolioAuthorityApprover")
   projects                    Project[]
   projectInventoryBatches     ProjectInventoryBatch[]      @relation("ProjectInventoryBatchCreator")
+  projectDesignReviewRequests ProjectDesignReviewRequest[] @relation("ProjectDesignReviewRequester")
+  projectDesignReviews        ProjectDesignReviewRequest[] @relation("ProjectDesignReviewReviewer")
   salesUnits                  Unit[]                       @relation("UnitSalesRepresentative")
   pushSubscriptions           PushSubscription[]
   reportsCreated              Report[]                     @relation("ReportReporter")
@@ -238,55 +240,75 @@ model Document {
 }
 
 model Project {
-  id                  String                  @id @default(uuid())
-  name                String
-  code                String?
-  description         String?
-  city                String
-  district            String
-  address             String
-  ownerId             String
-  completionPercent   Int?
-  defaultDeliveryDate DateTime?
-  isActive            Boolean                 @default(true)
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
-  latitude            Float?
-  longitude           Float?
-  mapAddress          String?
-  placeId             String?
-  owner               User                    @relation(fields: [ownerId], references: [id])
-  units               Unit[]
-  blocks              ProjectBlock[]
-  inventoryBatches    ProjectInventoryBatch[]
-  mediaPackages       ProjectMediaPackage[]
+  id                           String                       @id @default(uuid())
+  name                         String
+  code                         String?
+  description                  String?
+  city                         String
+  district                     String
+  neighborhood                 String?
+  address                      String
+  adaNo                        String?
+  parselNo                     String?
+  ownerId                      String
+  completionPercent            Int?
+  defaultDeliveryDate          DateTime?
+  declaredIndependentUnitCount Int?
+  declaredSalesInventoryCount  Int?
+  plannedUnitTypes             UnitType[]                   @default([])
+  geometryType                 ProjectGeometryType          @default(DIKDORTGEN)
+  wizardStep                   ProjectWizardStep            @default(PROJE_BILGILERI)
+  setupStatus                  ProjectSetupStatus           @default(TASLAK)
+  needsSoftwareTeamReview      Boolean                      @default(false)
+  isActive                     Boolean                      @default(true)
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime                     @updatedAt
+  latitude                     Float?
+  longitude                    Float?
+  mapAddress                   String?
+  placeId                      String?
+  owner                        User                         @relation(fields: [ownerId], references: [id])
+  units                        Unit[]
+  blocks                       ProjectBlock[]
+  spaces                       ProjectSpace[]
+  designReviewRequests         ProjectDesignReviewRequest[]
+  inventoryBatches             ProjectInventoryBatch[]
+  mediaPackages                ProjectMediaPackage[]
 
   @@unique([ownerId, code])
   @@index([ownerId])
   @@index([latitude, longitude])
-  @@index([city, district])
+  @@index([city, district, neighborhood])
+  @@index([geometryType])
+  @@index([wizardStep])
+  @@index([setupStatus])
+  @@index([needsSoftwareTeamReview])
   @@index([isActive])
 }
 
 model ProjectBlock {
-  id             String                 @id @default(uuid())
-  projectId      String
-  sourceBatchId  String?
-  code           String
-  normalizedCode String
-  name           String?
-  sortOrder      Int                    @default(0)
-  isActive       Boolean                @default(true)
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
-  project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  sourceBatch    ProjectInventoryBatch? @relation("ProjectBlockSourceBatch", fields: [sourceBatchId], references: [id], onDelete: SetNull)
-  floors         ProjectFloor[]
-  units          Unit[]
+  id              String                 @id @default(uuid())
+  projectId       String
+  sourceBatchId   String?
+  code            String
+  normalizedCode  String
+  name            String?
+  geometryType    ProjectGeometryType    @default(DIKDORTGEN)
+  facadeViewCount Int                    @default(1)
+  sortOrder       Int                    @default(0)
+  isActive        Boolean                @default(true)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  project         Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceBatch     ProjectInventoryBatch? @relation("ProjectBlockSourceBatch", fields: [sourceBatchId], references: [id], onDelete: SetNull)
+  floors          ProjectFloor[]
+  units           Unit[]
+  spaces          ProjectSpace[]
 
   @@unique([projectId, normalizedCode])
   @@index([projectId, sortOrder])
   @@index([sourceBatchId])
+  @@index([geometryType])
   @@index([isActive])
 }
 
@@ -304,12 +326,72 @@ model ProjectFloor {
   block         ProjectBlock           @relation(fields: [blockId], references: [id], onDelete: Cascade)
   sourceBatch   ProjectInventoryBatch? @relation("ProjectFloorSourceBatch", fields: [sourceBatchId], references: [id], onDelete: SetNull)
   units         Unit[]
+  spaces        ProjectSpace[]
 
   @@unique([blockId, level])
   @@index([blockId, sortOrder])
   @@index([sourceBatchId])
   @@index([floorType])
   @@index([isActive])
+}
+
+model ProjectSpace {
+  id                String                   @id @default(uuid())
+  projectId         String
+  blockId           String?
+  floorId           String?
+  code              String
+  name              String
+  spaceType         ProjectSpaceType
+  customTypeName    String?
+  legalStatus       ProjectLegalStatus
+  commercialPurpose ProjectCommercialPurpose
+  grossArea         Float?
+  description       String?
+  isCustomerVisible Boolean                  @default(true)
+  sortOrder         Int                      @default(0)
+  isActive          Boolean                  @default(true)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  project           Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  block             ProjectBlock?            @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  floor             ProjectFloor?            @relation(fields: [floorId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, code])
+  @@index([projectId])
+  @@index([blockId])
+  @@index([floorId])
+  @@index([spaceType])
+  @@index([legalStatus])
+  @@index([commercialPurpose])
+  @@index([isCustomerVisible])
+  @@index([isActive])
+}
+
+model ProjectDesignReviewRequest {
+  id               String                    @id @default(uuid())
+  projectId        String
+  requestedById    String
+  reviewedById     String?
+  status           ProjectDesignReviewStatus @default(BEKLIYOR)
+  geometryNotes    String?
+  userMessage      String?
+  softwareTeamNote String?
+  attachments      Json?
+  requestedAt      DateTime                  @default(now())
+  reviewedAt       DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  project          Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy      User                      @relation("ProjectDesignReviewRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy       User?                     @relation("ProjectDesignReviewReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([requestedById])
+  @@index([reviewedById])
+  @@index([status])
+  @@index([requestedAt])
 }
 
 model ProjectMediaPackage {
@@ -447,9 +529,13 @@ model Unit {
   externalRef            String?
   inventorySortOrder     Int                          @default(0)
   type                   UnitType                     @default(DAIRE)
+  legalStatus            ProjectLegalStatus           @default(TAPUDA_BAGIMSIZ_BOLUM)
+  commercialPurpose      ProjectCommercialPurpose     @default(SATISA_SUNULACAK)
+  isSalesInventory       Boolean                      @default(true)
   floor                  Int?
   number                 String?
   roomCount              String?
+  conceptLabel           String?
   area                   Float?
   netArea                Float?
   grossArea              Float?
@@ -502,6 +588,9 @@ model Unit {
   @@unique([projectId, blockId, floorId, number])
   @@index([projectId, blockId, floorId])
   @@index([projectId, status])
+  @@index([projectId, isSalesInventory])
+  @@index([legalStatus])
+  @@index([commercialPurpose])
   @@index([blockId])
   @@index([floorId])
   @@index([sourceBatchId])
@@ -2727,6 +2816,122 @@ enum PortfolioAuthorityType {
   TAPU_SAHIBI_KIMLIK
 }
 
+enum ProjectGeometryType {
+  TEK_CEPHELI_STANDART
+  CIFT_CEPHELI_STANDART
+  UC_CEPHELI_STANDART
+  DORT_CEPHELI_STANDART
+  DIKDORTGEN
+  KARE
+  L_PLAN
+  U_PLAN
+  BIRDEN_FAZLA_STANDART_BLOK
+  BESGEN
+  ALTIGEN
+  YILDIZ
+  DAIRESEL
+  KIRIK_CEPHELI
+  COK_KANATLI
+  BAGLANTILI_KULELER
+  OZEL_KARMASIK
+}
+
+enum ProjectWizardStep {
+  PROJE_BILGILERI
+  PROJE_YAPISI
+  MEKAN_ENVANTERI
+  GEOMETRI
+  BLOKLAR
+  KATLAR
+  KAT_DAGILIMI
+  NUMARALANDIRMA
+  KONTROL
+  TAMAMLANDI
+}
+
+enum ProjectSetupStatus {
+  TASLAK
+  YAPI_OLUSTURULUYOR
+  BILGI_GIRISI_EKSIK
+  KONTROLE_HAZIR
+  TAMAMLANDI
+  ARSIVLENDI
+}
+
+enum ProjectLegalStatus {
+  TAPUDA_BAGIMSIZ_BOLUM
+  ORTAK_KULLANIM_ALANI
+  BAGIMSIZ_BOLUM_EKLENTISI
+  TEKNIK_HIZMET_ALANI
+  ACIK_ALAN_SOSYAL_DONATI
+}
+
+enum ProjectCommercialPurpose {
+  SATISA_SUNULACAK
+  KIRAYA_VERILECEK
+  SATIS_VEYA_KIRALAMA_STOGU
+  ARSA_SAHIBINE_AYRILMIS
+  FIRMA_KULLANIMINA_AYRILMIS
+  SITE_ISLETMESINE_AYRILMIS
+  ORTAK_KULLANIMA_AYRILMIS
+  TEKNIK_KULLANIM
+  SATIS_DISI
+}
+
+enum ProjectSpaceType {
+  KAPALI_HAVUZ
+  ACIK_HAVUZ
+  SAUNA
+  SPA
+  HAMAM
+  BUHAR_ODASI
+  SPOR_SALONU
+  KRES
+  COCUK_OYUN_ALANI
+  SINEMA_SALONU
+  HOBI_ODASI
+  TOPLANTI_SALONU
+  KUTUPHANE
+  ORTAK_TERAS
+  LOBI
+  RESEPSIYON
+  SITE_YONETIM_OFISI
+  ORTAK_BAHCE
+  SITE_MARKETI
+  KAFETERYA
+  DINLENME_SALONU
+  MISAFIR_SALONU
+  ELEKTRIK_ODASI
+  MEKANIK_ODA
+  JENERATOR_ODASI
+  SU_DEPOSU
+  SIGINAK
+  GUVENLIK_ODASI
+  PERSONEL_ODASI
+  COP_ODASI
+  TEKNIK_DEPO
+  KAPALI_OTOPARK
+  ACIK_OTOPARK
+  SERVIS_ALANI
+  YURUYUS_PARKURU
+  BASKETBOL_SAHASI
+  TENIS_KORTU
+  COCUK_PARKI
+  PEYZAJ_ALANI
+  DINLENME_ALANI
+  SUS_HAVUZU
+  DIGER
+}
+
+enum ProjectDesignReviewStatus {
+  BEKLIYOR
+  INCELEMEDE
+  EK_BILGI_BEKLENIYOR
+  ONAYLANDI
+  REDDEDILDI
+  TAMAMLANDI
+}
+
 enum ProjectMediaPackageType {
   PROJECT_GENERAL
   UNIT_STANDARD
@@ -2814,6 +3019,7 @@ enum UnitStatus {
 
 enum UnitType {
   DAIRE
+  STUDYO
   VILLA
   REZIDANS
   MUSTAK_EV
@@ -2821,6 +3027,7 @@ enum UnitType {
   CIFTLIK_EVI
   PREFABRIK_EV
   DUKKAN_MAGAZA
+  MARKET
   OFIS_BURO
   PLAZA_KATI
   DEPO_ANTREPO
@@ -2855,6 +3062,9 @@ enum UnitType {
   KONAK
   PENTHOUSE
   LOFT
+  TERAS_LOFT
+  DUBLEKS
+  TRIPLEKS
   LOFT_DUBLEKS
   MARINA_RESIDENCE
   GOLF_RESIDENCE
@@ -2866,6 +3076,8 @@ enum UnitType {
   AKILLI_VILLA
   ULTRA_LUKS_VILLA
   HOME_OFFICE
+  MUAYENEHANE
+  KLINIK
   SHOWROOM
   IS_HANI_KATI
   IS_MERKEZI
@@ -2874,6 +3086,7 @@ enum UnitType {
   URETIM_TESISI
   AKARYAKIT_ISTASYONU
   APART_OTEL
+  OTEL_ODASI
   RESTORAN
   KAFE
   SPOR_TESISI

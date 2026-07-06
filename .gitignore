@@ -8,3 +8,5 @@ build/
 
 # Backend runtime profile uploads
 backend/public/profile-images/
+
+*.bak
