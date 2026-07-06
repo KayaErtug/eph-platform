@@ -7112,6 +7112,12 @@ function ProjectMediaCenterView({
             const cover =
               mediaPackage.assets.find((asset) => asset.isCover) ||
               mediaPackage.assets[0];
+            const coverUrl =
+              cover?.supabaseUrl || cover?.url || "";
+            const fallbackCoverUrl =
+              cover?.supabaseUrl && cover?.url !== cover.supabaseUrl
+                ? cover.url
+                : "";
 
             return (
               <article
@@ -7133,12 +7139,26 @@ function ProjectMediaCenterView({
                     background: "#E2E8F0",
                   }}
                 >
-                  {cover ? (
+                  {cover && coverUrl ? (
                     <>
                       <img
-                        src={cover.url}
+                        src={coverUrl}
+                        data-fallback={fallbackCoverUrl}
                         alt=""
                         aria-hidden="true"
+                        onError={(event) => {
+                          const image = event.currentTarget;
+                          const fallback =
+                            image.dataset.fallback || "";
+
+                          if (fallback) {
+                            image.dataset.fallback = "";
+                            image.src = fallback;
+                            return;
+                          }
+
+                          image.style.display = "none";
+                        }}
                         style={{
                           position: "absolute",
                           inset: "-12%",
@@ -7150,8 +7170,22 @@ function ProjectMediaCenterView({
                         }}
                       />
                       <img
-                        src={cover.url}
+                        src={coverUrl}
+                        data-fallback={fallbackCoverUrl}
                         alt={mediaPackage.name}
+                        onError={(event) => {
+                          const image = event.currentTarget;
+                          const fallback =
+                            image.dataset.fallback || "";
+
+                          if (fallback) {
+                            image.dataset.fallback = "";
+                            image.src = fallback;
+                            return;
+                          }
+
+                          image.style.display = "none";
+                        }}
                         style={{
                           position: "absolute",
                           inset: 0,

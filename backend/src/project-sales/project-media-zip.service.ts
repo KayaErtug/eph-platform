@@ -46,7 +46,18 @@ type MediaPackageDefinition = {
   roomCount: string | null;
   isDefault: boolean;
   sortOrder: number;
-  assets: Array<{ path: string }>;
+  assets: Array<{
+    id: string;
+    url: string;
+    supabaseUrl: string | null;
+    path: string;
+    bucket: string;
+    originalName: string | null;
+    mimetype: string | null;
+    size: number | null;
+    isCover: boolean;
+    sortOrder: number;
+  }>;
   _count: {
     assets: number;
     units: number;
@@ -85,6 +96,7 @@ type UploadedAsset = {
   packageId: string;
   path: string;
   url: string;
+  supabaseUrl: string;
   originalName: string;
   mimetype: string;
   size: number;
@@ -303,13 +315,19 @@ export class ProjectMediaZipService {
             );
           }
 
+          const supabaseUrl =
+            this.supabaseService.getPublicUrl(
+              this.bucket,
+              path,
+            );
+          const displayUrl =
+            this.supabaseService.getImageDomainUrl(path);
+
           uploadedAssets.push({
             packageId: mediaPackage.packageId,
             path,
-            url: this.supabaseService.getPublicUrl(
-              this.bucket,
-              path,
-            ),
+            url: displayUrl,
+            supabaseUrl,
             originalName: image.fileName,
             mimetype: image.mimetype,
             size: image.size,
@@ -369,7 +387,7 @@ export class ProjectMediaZipService {
               data: packageUploads.map((asset) => ({
                 packageId: parsedPackage.packageId,
                 url: asset.url,
-                supabaseUrl: asset.url,
+                supabaseUrl: asset.supabaseUrl,
                 path: asset.path,
                 bucket: this.bucket,
                 originalName: asset.originalName,
@@ -494,16 +512,72 @@ export class ProjectMediaZipService {
       project.id,
     );
 
+    const normalizedPackages = packages.map((item) => ({
+      ...item,
+      assets: item.assets.map((asset) => {
+        const displayUrl =
+          this.supabaseService.getImageDomainUrl(asset.path);
+        const supabaseUrl =
+          asset.supabaseUrl ||
+          (asset.url.includes('/storage/v1/object/')
+            ? asset.url
+            : this.supabaseService.getPublicUrl(
+                asset.bucket || this.bucket,
+                asset.path,
+              ));
+
+        return {
+          ...asset,
+          url: displayUrl,
+          supabaseUrl,
+        };
+      }),
+      zipFolder: this.slugifyCode(item.code),
+    }));
+
+    const repairOperations = normalizedPackages.flatMap(
+      (item) =>
+        item.assets
+          .filter((asset) => {
+            const original = packages
+              .find((candidate) => candidate.id === item.id)
+              ?.assets.find(
+                (candidate) => candidate.id === asset.id,
+              );
+
+            return (
+              original?.url !== asset.url ||
+              original?.supabaseUrl !== asset.supabaseUrl
+            );
+          })
+          .map((asset) =>
+            this.prisma.projectMediaAsset.update({
+              where: {
+                id: asset.id,
+              },
+              data: {
+                url: asset.url,
+                supabaseUrl: asset.supabaseUrl,
+              },
+            }),
+          ),
+    );
+
+    if (repairOperations.length > 0) {
+      await this.prisma.$transaction(repairOperations);
+
+      this.logger.log(
+        `${repairOperations.length} proje görselinin URL kaydı otomatik düzeltildi.`,
+      );
+    }
+
     return {
       project: {
         id: project.id,
         code: project.code,
         name: project.name,
       },
-      packages: packages.map((item) => ({
-        ...item,
-        zipFolder: this.slugifyCode(item.code),
-      })),
+      packages: normalizedPackages,
     };
   }
 
@@ -986,8 +1060,28 @@ export class ProjectMediaZipService {
         include: {
           assets: {
             select: {
+              id: true,
+              url: true,
+              supabaseUrl: true,
               path: true,
+              bucket: true,
+              originalName: true,
+              mimetype: true,
+              size: true,
+              isCover: true,
+              sortOrder: true,
             },
+            orderBy: [
+              {
+                isCover: 'desc',
+              },
+              {
+                sortOrder: 'asc',
+              },
+              {
+                createdAt: 'asc',
+              },
+            ],
           },
           _count: {
             select: {
