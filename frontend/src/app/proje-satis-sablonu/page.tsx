@@ -115,6 +115,14 @@ type PageMode =
   | "sales"
   | "media";
 
+type WizardStep = 1 | 2 | 3 | 4 | 5;
+type ProjectSaveDestination =
+  | "stay"
+  | "structure"
+  | "inventory"
+  | "spaces"
+  | "completion";
+
 type ProjectFloorSummary = {
   id: string;
   level: number;
@@ -2882,7 +2890,7 @@ export default function ProjectSalesCenterPage() {
     geometryType: form.geometryType,
   });
 
-  const saveProject = async (destination: "stay" | "structure") => {
+  const saveProject = async (destination: ProjectSaveDestination) => {
     setBusyAction("save");
 
     try {
@@ -2903,15 +2911,21 @@ export default function ProjectSalesCenterPage() {
         tone: "success",
         title: "Proje Kaydedildi",
         message:
-          destination === "structure"
-            ? "Proje bilgileri kaydedildi. Blok ve kat kurulumuna geçiliyor."
-            : "Proje bilgileri taslak olarak kaydedildi.",
+          destination === "stay"
+            ? "Proje bilgileri taslak olarak kaydedildi."
+            : "Proje bilgileri kaydedildi. Seçilen kurulum adımına geçiliyor.",
       });
 
       await loadProjects();
 
       if (destination === "structure") {
         await openStructure(savedProject);
+      } else if (destination === "inventory") {
+        await openInventory(savedProject);
+      } else if (destination === "spaces") {
+        await openSpaces(savedProject);
+      } else if (destination === "completion") {
+        await openCompletion(savedProject);
       }
     } catch (error) {
       setNotice({
@@ -2922,6 +2936,64 @@ export default function ProjectSalesCenterPage() {
     } finally {
       setBusyAction(null);
     }
+  };
+
+  const currentWizardProject =
+    mode === "form"
+      ? editingProject
+      : mode === "structure"
+        ? structureProject
+        : mode === "inventory"
+          ? inventoryProject
+          : mode === "spaces"
+            ? spacesProject
+            : mode === "completion"
+              ? completionProject
+              : null;
+
+  const handleWizardStepChange = (step: WizardStep) => {
+    if (busyAction) return;
+
+    if (mode === "form") {
+      if (step === 1) return;
+
+      const destinationByStep: Record<
+        Exclude<WizardStep, 1>,
+        Exclude<ProjectSaveDestination, "stay">
+      > = {
+        2: "structure",
+        3: "inventory",
+        4: "spaces",
+        5: "completion",
+      };
+
+      void saveProject(destinationByStep[step]);
+      return;
+    }
+
+    if (!currentWizardProject) return;
+
+    if (step === 1) {
+      editProject(currentWizardProject);
+      return;
+    }
+
+    if (step === 2) {
+      void openStructure(currentWizardProject);
+      return;
+    }
+
+    if (step === 3) {
+      void openInventory(currentWizardProject);
+      return;
+    }
+
+    if (step === 4) {
+      void openSpaces(currentWizardProject);
+      return;
+    }
+
+    void openCompletion(currentWizardProject);
   };
 
   const spacesStepCompleted = Boolean(
@@ -3203,6 +3275,7 @@ export default function ProjectSalesCenterPage() {
             onToggleUnitType={toggleUnitType}
             onUseCurrentLocation={useCurrentLocation}
             onSave={saveProject}
+            onStepChange={handleWizardStepChange}
           />
         ) : mode === "structure" && structureProject ? (
           <ProjectStructureView
@@ -3216,6 +3289,7 @@ export default function ProjectSalesCenterPage() {
             onPreview={previewStructure}
             onApply={applyStructure}
             onContinue={() => void openInventory(structureProject)}
+            onStepChange={handleWizardStepChange}
           />
         ) : mode === "inventory" && inventoryProject ? (
           <ProjectInventoryView
@@ -3236,6 +3310,7 @@ export default function ProjectSalesCenterPage() {
             onStartEdit={startInventoryEdit}
             onCancelEdit={cancelInventoryEdit}
             onContinue={() => void openSpaces(inventoryProject)}
+            onStepChange={handleWizardStepChange}
           />
         ) : mode === "spaces" && spacesProject ? (
           <ProjectSpacesView
@@ -3249,6 +3324,7 @@ export default function ProjectSalesCenterPage() {
             onPreview={previewProjectSpaces}
             onApply={applyProjectSpaces}
             onContinue={() => void openCompletion(spacesProject)}
+            onStepChange={handleWizardStepChange}
           />
         ) : mode === "media" &&
           mediaProject &&
@@ -3299,6 +3375,7 @@ export default function ProjectSalesCenterPage() {
               setMode("list");
               void loadProjects();
             }}
+            onStepChange={handleWizardStepChange}
           />
         ) : null}
       </section>
@@ -3878,6 +3955,7 @@ function ProjectFormView({
   onToggleUnitType,
   onUseCurrentLocation,
   onSave,
+  onStepChange,
 }: {
   form: ProjectForm;
   editingProject: ProjectSummary | null;
@@ -3888,7 +3966,8 @@ function ProjectFormView({
   ) => void;
   onToggleUnitType: (unitType: string) => void;
   onUseCurrentLocation: () => void;
-  onSave: (destination: "stay" | "structure") => void;
+  onSave: (destination: ProjectSaveDestination) => void;
+  onStepChange: (step: WizardStep) => void;
 }) {
   const [provinceOptions, setProvinceOptions] = useState<LocationOption[]>([]);
   const [districtOptions, setDistrictOptions] = useState<LocationOption[]>([]);
@@ -4035,7 +4114,12 @@ function ProjectFormView({
 
   return (
     <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-      <WizardProgress activeStep={1} />
+      <WizardProgress
+        activeStep={1}
+        project={editingProject}
+        navigationLocked={Boolean(busyAction)}
+        onStepChange={onStepChange}
+      />
 
       <section style={{ ...cardStyle, padding: 13 }}>
         <SectionTitle
@@ -4046,11 +4130,13 @@ function ProjectFormView({
 
         <div
           style={{
+            width: "100%",
+            maxWidth: 560,
+            margin: "12px auto 0",
             display: "grid",
             gridTemplateColumns:
               "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
             gap: 10,
-            marginTop: 12,
           }}
         >
           <Field label="Proje adı *">
@@ -4070,76 +4156,190 @@ function ProjectFormView({
               style={inputStyle}
             />
           </Field>
+        </div>
 
-          <Field label="İl *">
-            <select
-              value={form.city}
-              onChange={(event) => {
-                onChange("city", event.target.value);
-                onChange("district", "");
-                onChange("neighborhood", "");
+        <div
+          style={{
+            marginTop: 10,
+            border: "2px solid #8CC8F6",
+            borderRadius: 18,
+            background: "#EDF8FF",
+            padding: 12,
+            boxShadow: "0 12px 26px rgba(2, 132, 199, 0.08)",
+          }}
+        >
+            <div
+              style={{
+                borderRadius: 14,
+                background: "#0284C7",
+                color: "#FFFFFF",
+                padding: "8px 12px",
+                textAlign: "center",
+                fontSize: 11,
+                fontWeight: 950,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
               }}
-              disabled={locationLoading.province}
-              style={inputStyle}
             >
-              <option value="">
-                {locationLoading.province ? "İller yükleniyor" : "İl seçin"}
-              </option>
-              {visibleProvinceOptions.map((option) => (
-                <option key={option.id} value={option.name}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+              Adres Bilgileri — 81 İl + KKTC
+            </div>
 
-          <Field label="İlçe *">
-            <select
-              value={form.district}
-              onChange={(event) => {
-                onChange("district", event.target.value);
-                onChange("neighborhood", "");
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                gap: 10,
+                marginTop: 10,
               }}
-              disabled={!form.city || locationLoading.district}
-              style={inputStyle}
             >
-              <option value="">
-                {!form.city
-                  ? "Önce il seçin"
-                  : locationLoading.district
-                    ? "İlçeler yükleniyor"
-                    : "İlçe seçin"}
-              </option>
-              {visibleDistrictOptions.map((option) => (
-                <option key={option.id} value={option.name}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+              <Field label="İl / KKTC *">
+                <select
+                  value={form.city}
+                  onChange={(event) => {
+                    onChange("city", event.target.value);
+                    onChange("district", "");
+                    onChange("neighborhood", "");
+                  }}
+                  disabled={locationLoading.province}
+                  style={inputStyle}
+                >
+                  <option value="">
+                    {locationLoading.province
+                      ? "İller ve KKTC yükleniyor"
+                      : "İl / KKTC seçin"}
+                  </option>
+                  {visibleProvinceOptions.map((option) => (
+                    <option key={option.id} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
-          <Field label="Mahalle / Köy / Mevki *">
-            <select
-              value={form.neighborhood}
-              onChange={(event) => onChange("neighborhood", event.target.value)}
-              disabled={!form.city || !form.district || locationLoading.place}
-              style={inputStyle}
+              <Field
+                label={
+                  form.city === "KKTC"
+                    ? "KKTC Bölgesi *"
+                    : "İlçe *"
+                }
+              >
+                {!form.city ||
+                locationLoading.district ||
+                visibleDistrictOptions.length > 0 ? (
+                  <select
+                    value={form.district}
+                    onChange={(event) => {
+                      onChange("district", event.target.value);
+                      onChange("neighborhood", "");
+                    }}
+                    disabled={!form.city || locationLoading.district}
+                    style={inputStyle}
+                  >
+                    <option value="">
+                      {!form.city
+                        ? "Önce il / KKTC seçin"
+                        : locationLoading.district
+                          ? form.city === "KKTC"
+                            ? "KKTC bölgeleri yükleniyor"
+                            : "İlçeler yükleniyor"
+                          : form.city === "KKTC"
+                            ? "KKTC bölgesi seçin"
+                            : "İlçe seçin"}
+                    </option>
+                    {visibleDistrictOptions.map((option) => (
+                      <option key={option.id} value={option.name}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={form.district}
+                    onChange={(event) => {
+                      onChange("district", event.target.value);
+                      onChange("neighborhood", "");
+                    }}
+                    placeholder="İlçe / bölge adını yazın"
+                    style={inputStyle}
+                  />
+                )}
+              </Field>
+
+              <Field label="Mahalle / Köy / Mevki *">
+                {!form.city ||
+                !form.district ||
+                locationLoading.place ||
+                visiblePlaceOptions.length > 0 ? (
+                  <select
+                    value={form.neighborhood}
+                    onChange={(event) =>
+                      onChange("neighborhood", event.target.value)
+                    }
+                    disabled={
+                      !form.city ||
+                      !form.district ||
+                      locationLoading.place
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="">
+                      {!form.district
+                        ? "Önce ilçe / bölge seçin"
+                        : locationLoading.place
+                          ? "Mahalle / köy / mevki yükleniyor"
+                          : "Mahalle / köy / mevki seçin"}
+                    </option>
+                    {visiblePlaceOptions.map((option) => (
+                      <option key={option.id} value={option.name}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={form.neighborhood}
+                    onChange={(event) =>
+                      onChange("neighborhood", event.target.value)
+                    }
+                    placeholder="Mahalle / köy / mevki adını yazın"
+                    style={inputStyle}
+                  />
+                )}
+              </Field>
+            </div>
+
+            <div
+              style={{
+                marginTop: 9,
+                border: "1px solid #BAE6FD",
+                borderRadius: 12,
+                background: "#F8FDFF",
+                color: "#075985",
+                padding: "8px 10px",
+                textAlign: "center",
+                fontSize: 11,
+                fontWeight: 850,
+                lineHeight: 1.45,
+              }}
             >
-              <option value="">
-                {!form.district
-                  ? "Önce ilçe seçin"
-                  : locationLoading.place
-                    ? "Konumlar yükleniyor"
-                    : "Mahalle / köy / mevki seçin"}
-              </option>
-              {visiblePlaceOptions.map((option) => (
-                <option key={option.id} value={option.name}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+              Portföy girişindeki ortak locationData.ts sistemi kullanılır.
+              İl değişince ilçe ve mahalle; ilçe değişince mahalle otomatik
+              temizlenir. Liste alınamazsa manuel giriş alanı açılır.
+            </div>
+          </div>
 
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 820,
+            margin: "10px auto 0",
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+            gap: 10,
+          }}
+        >
           <Field label="Proje geometrisi / cephe yapısı *">
             <select
               value={form.geometryType}
@@ -4420,6 +4620,7 @@ function ProjectStructureView({
   onPreview,
   onApply,
   onContinue,
+  onStepChange,
 }: {
   project: ProjectSummary;
   blocks: BlockForm[];
@@ -4435,6 +4636,7 @@ function ProjectStructureView({
   onPreview: () => void;
   onApply: () => void;
   onContinue: () => void;
+  onStepChange: (step: WizardStep) => void;
 }) {
   const previewing = busyAction === "structure-preview";
   const applying = busyAction === "structure-apply";
@@ -4452,7 +4654,12 @@ function ProjectStructureView({
 
   return (
     <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-      <WizardProgress activeStep={2} />
+      <WizardProgress
+        activeStep={2}
+        project={project}
+        navigationLocked={Boolean(busyAction)}
+        onStepChange={onStepChange}
+      />
 
       <section
         style={{
@@ -4906,6 +5113,7 @@ function ProjectInventoryView({
   onStartEdit,
   onCancelEdit,
   onContinue,
+  onStepChange,
 }: {
   project: ProjectSetupResponse;
   floorPlans: FloorPlanForm[];
@@ -4940,6 +5148,7 @@ function ProjectInventoryView({
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onContinue: () => void;
+  onStepChange: (step: WizardStep) => void;
 }) {
   const previewing = busyAction === "inventory-preview";
   const applying =
@@ -4990,7 +5199,12 @@ function ProjectInventoryView({
 
   return (
     <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-      <WizardProgress activeStep={3} />
+      <WizardProgress
+        activeStep={3}
+        project={project}
+        navigationLocked={Boolean(busyAction) || editMode}
+        onStepChange={onStepChange}
+      />
 
       <section
         style={{
@@ -5976,6 +6190,7 @@ function ProjectSpacesView({
   onPreview,
   onApply,
   onContinue,
+  onStepChange,
 }: {
   project: ProjectSetupResponse;
   spaces: ProjectSpaceForm[];
@@ -5991,6 +6206,7 @@ function ProjectSpacesView({
   onPreview: () => void;
   onApply: () => void;
   onContinue: () => void;
+  onStepChange: (step: WizardStep) => void;
 }) {
   const previewing = busyAction === "spaces-preview";
   const applying = busyAction === "spaces-apply";
@@ -6007,7 +6223,12 @@ function ProjectSpacesView({
 
   return (
     <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-      <WizardProgress activeStep={4} />
+      <WizardProgress
+        activeStep={4}
+        project={project}
+        navigationLocked={Boolean(busyAction)}
+        onStepChange={onStepChange}
+      />
 
       <section
         style={{
@@ -8364,6 +8585,7 @@ function ProjectCompletionView({
   onRequestReview,
   onComplete,
   onBackToList,
+  onStepChange,
 }: {
   project: ProjectSetupResponse;
   preview: CompletionPreview;
@@ -8374,6 +8596,7 @@ function ProjectCompletionView({
   onRequestReview: () => void;
   onComplete: () => void;
   onBackToList: () => void;
+  onStepChange: (step: WizardStep) => void;
 }) {
   const refreshing = busyAction === "completion-load";
   const requestingReview = busyAction === "design-review";
@@ -8395,7 +8618,12 @@ function ProjectCompletionView({
 
   return (
     <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-      <WizardProgress activeStep={5} />
+      <WizardProgress
+        activeStep={5}
+        project={project}
+        navigationLocked={Boolean(busyAction)}
+        onStepChange={onStepChange}
+      />
 
       <section
         style={{
@@ -8724,10 +8952,16 @@ function ProjectCompletionView({
 
 function WizardProgress({
   activeStep,
+  project,
+  navigationLocked,
+  onStepChange,
 }: {
-  activeStep: 1 | 2 | 3 | 4 | 5;
+  activeStep: WizardStep;
+  project: ProjectSummary | null;
+  navigationLocked: boolean;
+  onStepChange: (step: WizardStep) => void;
 }) {
-  const steps = [
+  const steps: Array<{ number: WizardStep; label: string }> = [
     { number: 1, label: "Proje Bilgileri" },
     { number: 2, label: "Blok ve Katlar" },
     { number: 3, label: "Bağımsız Bölümler" },
@@ -8735,22 +8969,43 @@ function WizardProgress({
     { number: 5, label: "Son Kontrol" },
   ];
 
+  const isStepAvailable = (step: WizardStep) => {
+    if (step === 1) return true;
+    if (!project) return false;
+    if (step === 2) return true;
+    if (step === 3) return project._count.blocks > 0;
+    return project._count.units > 0;
+  };
+
   return (
     <section style={{ ...cardStyle, padding: 9 }}>
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
           gap: 6,
         }}
       >
         {steps.map((step) => {
           const active = step.number === activeStep;
           const completed = step.number < activeStep;
+          const available = isStepAvailable(step.number);
+          const clickable = available && !active && !navigationLocked;
 
           return (
-            <div
+            <button
               key={step.number}
+              type="button"
+              onClick={() => onStepChange(step.number)}
+              disabled={!clickable}
+              aria-current={active ? "step" : undefined}
+              title={
+                active
+                  ? "Bu adımdasınız"
+                  : available
+                    ? `${step.label} adımına git`
+                    : "Önce önceki adımı tamamlayın"
+              }
               style={{
                 minWidth: 0,
                 minHeight: 52,
@@ -8761,15 +9016,24 @@ function WizardProgress({
                     : "1.5px solid #D6E2F0",
                 borderRadius: 13,
                 display: "grid",
-                gridTemplateColumns: "28px minmax(0, 1fr)",
-                alignItems: "center",
-                gap: 6,
+                gridTemplateRows: "28px minmax(22px, auto)",
+                placeItems: "center",
+                alignContent: "center",
+                gap: 4,
                 background: active
                   ? "#EFF6FF"
                   : completed
                     ? "#F0FDF4"
                     : "#F8FAFC",
                 padding: 7,
+                fontFamily: "inherit",
+                opacity: available ? 1 : 0.62,
+                cursor: clickable ? "pointer" : "default",
+                boxShadow: clickable
+                  ? "0 6px 14px rgba(37, 99, 235, 0.08)"
+                  : "none",
+                transition:
+                  "border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease",
               }}
             >
               <span
@@ -8802,13 +9066,15 @@ function WizardProgress({
                   fontSize: 9,
                   lineHeight: 1.25,
                   fontWeight: 900,
+                  width: "100%",
                   textAlign: "center",
-                  overflowWrap: "anywhere",
+                  overflowWrap: "normal",
+                  wordBreak: "normal",
                 }}
               >
                 {step.label}
               </span>
-            </div>
+            </button>
           );
         })}
       </div>
