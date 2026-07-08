@@ -472,10 +472,75 @@ function CustomerSection() {
   );
 }
 
+
+const teamworkTypewriterText =
+  'Bir araya gelebilmek bir başlangıçtır, birlik olup fikir üretmek ilerlemedir, birlikte çalışmak ise başarıdır.\n\nUnutmayın ki; "Bütün"; parçalarının toplamından daha büyüktür.';
+
+function TeamworkTypewriter() {
+  const [visibleText, setVisibleText] = useState("");
+
+  useEffect(() => {
+    let characterIndex = 0;
+    let typingTimer: ReturnType<typeof setTimeout> | null = null;
+    let restartTimer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    const typeNextCharacter = () => {
+      if (cancelled) return;
+
+      characterIndex += 1;
+      setVisibleText(teamworkTypewriterText.slice(0, characterIndex));
+
+      if (characterIndex < teamworkTypewriterText.length) {
+        const currentCharacter = teamworkTypewriterText[characterIndex - 1];
+        const delay =
+          currentCharacter === "." || currentCharacter === ";"
+            ? 390
+            : currentCharacter === ","
+              ? 220
+              : currentCharacter === "\n"
+                ? 520
+                : 42;
+
+        typingTimer = setTimeout(typeNextCharacter, delay);
+        return;
+      }
+
+      restartTimer = setTimeout(() => {
+        if (cancelled) return;
+        characterIndex = 0;
+        setVisibleText("");
+        typingTimer = setTimeout(typeNextCharacter, 900);
+      }, 9000);
+    };
+
+    typingTimer = setTimeout(typeNextCharacter, 700);
+
+    return () => {
+      cancelled = true;
+      if (typingTimer) clearTimeout(typingTimer);
+      if (restartTimer) clearTimeout(restartTimer);
+    };
+  }, []);
+
+  return (
+    <div
+      className="whitespace-pre-line text-[17px] font-medium leading-[1.7] tracking-[-0.01em] text-white sm:text-[20px] md:text-[22px]"
+      aria-label={teamworkTypewriterText}
+    >
+      <span aria-hidden="true">{visibleText}</span>
+      <span
+        aria-hidden="true"
+        className="ml-1 inline-block h-[1.15em] w-[2px] translate-y-[0.16em] animate-pulse bg-[#93C5FD]"
+      />
+    </div>
+  );
+}
+
 function AnalyticsSection() {
   return (
     <section id="blog" data-reveal className="relative overflow-hidden border-b border-white/10 bg-[#0B1730] px-5 py-16 md:px-10">
-      <div className="mx-auto grid max-w-[1180px] items-center gap-12 md:grid-cols-[380px_1fr]">
+      <div className="mx-auto grid max-w-[1180px] items-center gap-14 lg:grid-cols-[380px_1fr]">
         <div>
           <div className="mb-4 text-[12px] font-semibold uppercase tracking-[0.22em] text-[#60A5FA]">⌘ Pazar Analizi</div>
           <h2 className="text-left text-[32px] font-light leading-[1.14] tracking-[-0.04em] text-white md:text-[42px]">
@@ -497,9 +562,26 @@ function AnalyticsSection() {
           </Link>
         </div>
 
-        <div className="relative">
-          <div className="absolute -inset-4 rounded-[34px] bg-[#60A5FA]/12 blur-[50px]" />
-          <img src="/landing/dashboard-premium.webp" alt="EPH pazar analizi dashboard" className="relative w-full rounded-[34px] border border-white/14 shadow-[0_28px_110px_rgba(0,0,0,.40)] transition duration-700 hover:-translate-y-2 hover:scale-[1.015] hover:[transform:perspective(1000px)_rotateY(3deg)_rotateX(1deg)]" />
+        <div className="relative mx-auto w-full max-w-[620px]">
+          <div className="absolute -inset-5 rounded-[38px] bg-[#60A5FA]/14 blur-[58px]" />
+
+          <div className="group relative aspect-[9/16] max-h-[760px] overflow-hidden rounded-[34px] border border-white/14 bg-[#071326] shadow-[0_28px_110px_rgba(0,0,0,.46)]">
+            <img
+              src="/landing/teamwork-pamukkale.webp"
+              alt="Pamukkale manzaralı ofiste birlikte proje geliştiren gayrimenkul profesyonelleri"
+              className="absolute inset-0 h-full w-full object-cover transition duration-1000 group-hover:scale-[1.025]"
+            />
+
+            <div className="absolute inset-0 bg-gradient-to-t from-[#041023]/95 via-[#071326]/34 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8 md:p-10">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/16 bg-[#071326]/58 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#BFDBFE] backdrop-blur-xl">
+                <UsersRound size={15} />
+                Birlikte Daha Güçlü
+              </div>
+
+              <TeamworkTypewriter />
+            </div>
+          </div>
         </div>
       </div>
     </section>
