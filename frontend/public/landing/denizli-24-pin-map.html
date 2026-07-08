@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EPH Denizli Harita Keşfi</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <style>
+    :root {
+      --navy: #061a3a;
+      --teal: #00afa5;
+      --blue: #2563eb;
+      --panel: rgba(7, 19, 38, 0.86);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      overflow: hidden;
+      background: #dce7f4;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+      background: #dce7f4;
+    }
+
+    .map-vignette {
+      position: absolute;
+      inset: 0;
+      z-index: 350;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(7,19,38,.22) 0%, transparent 18%, transparent 72%, rgba(7,19,38,.36) 100%),
+        linear-gradient(90deg, rgba(7,19,38,.08), transparent 18%, transparent 82%, rgba(7,19,38,.08));
+    }
+
+    .top-panel {
+      position: absolute;
+      top: 18px;
+      left: 14px;
+      right: 14px;
+      z-index: 600;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      pointer-events: none;
+    }
+
+    .search-card {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid rgba(15,30,53,.09);
+      border-radius: 16px;
+      background: rgba(255,255,255,.95);
+      color: #0f1e35;
+      box-shadow: 0 14px 32px rgba(15,30,53,.18);
+      backdrop-filter: blur(16px);
+    }
+
+    .search-icon {
+      display: grid;
+      flex: 0 0 auto;
+      width: 31px;
+      height: 31px;
+      place-items: center;
+      border-radius: 50%;
+      background: #eaf2ff;
+      color: var(--blue);
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .search-copy {
+      min-width: 0;
+    }
+
+    .search-copy strong {
+      display: block;
+      overflow: hidden;
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .search-copy span {
+      display: block;
+      margin-top: 3px;
+      overflow: hidden;
+      color: #64748b;
+      font-size: 9px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .menu-button {
+      display: grid;
+      flex: 0 0 auto;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(255,255,255,.95);
+      color: #0f1e35;
+      box-shadow: 0 14px 32px rgba(15,30,53,.18);
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    .district-chip {
+      position: absolute;
+      z-index: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 9px;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 999px;
+      background: rgba(7,19,38,.78);
+      color: white;
+      box-shadow: 0 10px 24px rgba(0,0,0,.20);
+      backdrop-filter: blur(12px);
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .district-chip::before {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #60a5fa;
+      content: "";
+      box-shadow: 0 0 0 4px rgba(96,165,250,.16);
+    }
+
+    .district-chip.merkezefendi { top: 37%; left: 6%; }
+    .district-chip.pamukkale { top: 24%; right: 6%; }
+
+    .bottom-panel {
+      position: absolute;
+      right: 13px;
+      bottom: 13px;
+      left: 13px;
+      z-index: 600;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: 0 18px 42px rgba(0,0,0,.30);
+      backdrop-filter: blur(18px);
+    }
+
+    .bottom-copy strong {
+      display: block;
+      color: white;
+      font-size: 12px;
+    }
+
+    .bottom-copy span {
+      display: block;
+      margin-top: 4px;
+      color: rgba(255,255,255,.62);
+      font-size: 9px;
+    }
+
+    .replay-button {
+      min-width: 84px;
+      height: 39px;
+      border: 0;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: white;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 800;
+      box-shadow: 0 11px 26px rgba(37,99,235,.32);
+    }
+
+    .eph-div-icon {
+      border: 0 !important;
+      background: transparent !important;
+    }
+
+    .eph-pin-shell {
+      position: relative;
+      width: 72px;
+      height: 104px;
+      opacity: 0;
+      transform-origin: 50% 84%;
+      animation:
+        eph-pin-drop 1.28s cubic-bezier(.34,1.56,.64,1) var(--delay) both,
+        eph-pin-float 6.4s ease-in-out calc(var(--delay) + 1.45s) infinite alternate;
+      will-change: transform, opacity;
+    }
+
+    .eph-pin-shell.hero {
+      width: 80px;
+      height: 112px;
+    }
+
+    .eph-pin-shadow {
+      position: absolute;
+      bottom: 5px;
+      left: 50%;
+      width: 30px;
+      height: 9px;
+      border-radius: 50%;
+      background: rgba(6,26,58,.28);
+      filter: blur(4px);
+      transform: translateX(-50%);
+      animation: shadow-pulse 6.4s ease-in-out calc(var(--delay) + 1.45s) infinite alternate;
+    }
+
+    .eph-pin-svg {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 72px;
+      height: 88px;
+      transform: translateX(-50%);
+      filter: drop-shadow(0 8px 7px rgba(6,26,58,.24));
+    }
+
+    .hero .eph-pin-svg {
+      width: 80px;
+      height: 98px;
+    }
+
+    .eph-price {
+      position: absolute;
+      top: 77px;
+      left: 50%;
+      min-width: 50px;
+      padding: 5px 7px;
+      border: 2px solid white;
+      border-radius: 999px;
+      background: #071326;
+      color: white;
+      box-shadow: 0 8px 18px rgba(7,19,38,.30);
+      font-size: 8px;
+      font-weight: 900;
+      line-height: 1;
+      text-align: center;
+      transform: translateX(-50%);
+      white-space: nowrap;
+    }
+
+    .hero .eph-price {
+      top: 86px;
+      padding: 6px 8px;
+      font-size: 9px;
+    }
+
+    @keyframes eph-pin-drop {
+      0% {
+        opacity: 0;
+        transform: translateY(-48px) scale(.34);
+      }
+      62% {
+        opacity: 1;
+        transform: translateY(4px) scale(1.11);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes eph-pin-float {
+      from { transform: translateY(0); }
+      to { transform: translateY(-5px); }
+    }
+
+    @keyframes shadow-pulse {
+      from {
+        opacity: .55;
+        transform: translateX(-50%) scale(1);
+      }
+      to {
+        opacity: .25;
+        transform: translateX(-50%) scale(.74);
+      }
+    }
+
+    .leaflet-control-attribution {
+      padding: 2px 5px !important;
+      border-radius: 6px 0 0 0;
+      background: rgba(255,255,255,.82) !important;
+      font-size: 7px !important;
+    }
+
+    .leaflet-control-zoom {
+      margin-top: 76px !important;
+      border: 0 !important;
+      box-shadow: 0 9px 22px rgba(15,30,53,.18) !important;
+    }
+
+    .leaflet-control-zoom a {
+      color: #0f1e35 !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .eph-pin-shell {
+        opacity: 1;
+        animation: none;
+      }
+
+      .eph-pin-shadow {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <div class="map-vignette"></div>
+
+  <div class="top-panel">
+    <div class="search-card">
+      <div class="search-icon">⌕</div>
+      <div class="search-copy">
+        <strong>Denizli Portföyleri</strong>
+        <span>Merkezefendi · Pamukkale</span>
+      </div>
+    </div>
+    <div class="menu-button">☰</div>
+  </div>
+
+  <div class="district-chip merkezefendi">Merkezefendi</div>
+  <div class="district-chip pamukkale">Pamukkale</div>
+
+  <div class="bottom-panel">
+    <div class="bottom-copy">
+      <strong>Haritada 24 portföy</strong>
+      <span>Sıralı EPH pin animasyonu</span>
+    </div>
+    <button id="replayButton" class="replay-button" type="button">Tekrar Oynat</button>
+  </div>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <script>
+    const map = L.map("map", {
+      center: [37.7767, 29.0865],
+      zoom: 12.7,
+      zoomControl: true,
+      attributionControl: true,
+      preferCanvas: true
+    });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap katkıda bulunanlar"
+    }).addTo(map);
+
+    const pinData = [
+      { lat: 37.7798, lng: 29.0408, price: "4,9 M", district: "Merkezefendi" },
+      { lat: 37.7841, lng: 29.0524, price: "6,2 M", district: "Merkezefendi" },
+      { lat: 37.7704, lng: 29.0571, price: "7,5 M", district: "Merkezefendi" },
+      { lat: 37.7652, lng: 29.0688, price: "5,8 M", district: "Merkezefendi" },
+      { lat: 37.7910, lng: 29.0663, price: "8,4 M", district: "Merkezefendi" },
+      { lat: 37.7760, lng: 29.0740, price: "12 M", district: "Merkezefendi", hero: true },
+      { lat: 37.7589, lng: 29.0784, price: "3,9 M", district: "Merkezefendi" },
+      { lat: 37.8035, lng: 29.0737, price: "9,6 M", district: "Merkezefendi" },
+      { lat: 37.7862, lng: 29.0821, price: "6,9 M", district: "Merkezefendi" },
+      { lat: 37.7692, lng: 29.0875, price: "11 M", district: "Merkezefendi" },
+      { lat: 37.7534, lng: 29.0920, price: "5,4 M", district: "Merkezefendi" },
+      { lat: 37.7976, lng: 29.0911, price: "14 M", district: "Merkezefendi" },
+      { lat: 37.7898, lng: 29.0994, price: "7,8 M", district: "Pamukkale" },
+      { lat: 37.7788, lng: 29.1057, price: "10 M", district: "Pamukkale" },
+      { lat: 37.8007, lng: 29.1109, price: "6,6 M", district: "Pamukkale" },
+      { lat: 37.7676, lng: 29.1150, price: "4,7 M", district: "Pamukkale" },
+      { lat: 37.8113, lng: 29.1202, price: "15 M", district: "Pamukkale", hero: true },
+      { lat: 37.7851, lng: 29.1234, price: "8,9 M", district: "Pamukkale" },
+      { lat: 37.7556, lng: 29.1288, price: "5,2 M", district: "Pamukkale" },
+      { lat: 37.7953, lng: 29.1331, price: "13 M", district: "Pamukkale" },
+      { lat: 37.7720, lng: 29.1380, price: "7,1 M", district: "Pamukkale" },
+      { lat: 37.8162, lng: 29.1436, price: "9,9 M", district: "Pamukkale" },
+      { lat: 37.7625, lng: 29.1472, price: "4,3 M", district: "Pamukkale" },
+      { lat: 37.7887, lng: 29.1515, price: "18 M", district: "Pamukkale" }
+    ];
+
+    const markerLayer = L.layerGroup().addTo(map);
+    let mapMotionTimer = null;
+
+    function buildPinSequence(items) {
+      const sortedByLng = [...items].sort((a, b) => a.lng - b.lng);
+      const sequence = [];
+      let left = 0;
+      let right = sortedByLng.length - 1;
+      let takeRight = true;
+
+      while (left <= right) {
+        if (takeRight) {
+          sequence.push(sortedByLng[right]);
+          right -= 1;
+        } else {
+          sequence.push(sortedByLng[left]);
+          left += 1;
+        }
+
+        takeRight = !takeRight;
+      }
+
+      const step = 0.52;
+
+      return sequence.map((item, index) => ({
+        ...item,
+        delay: Number((index * step).toFixed(2))
+      }));
+    }
+
+    function originalEphPinSvg(item, index) {
+      const gradientId = `ephPinGradient-${index}`;
+      const shadowId = `ephPinShadow-${index}`;
+      const selected = item.hero === true;
+      const glow = selected ? "0.38" : "0.24";
+      const strokeWidth = selected ? 3 : 2;
+
+      return `
+        <svg class="eph-pin-svg" viewBox="0 0 72 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="${gradientId}" x1="18" y1="6" x2="56" y2="76" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#00AFA5"/>
+              <stop offset="1" stop-color="#061A3A"/>
+            </linearGradient>
+            <filter id="${shadowId}" x="-35%" y="-20%" width="170%" height="175%">
+              <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#061A3A" flood-opacity="${glow}"/>
+            </filter>
+          </defs>
+
+          <path
+            filter="url(#${shadowId})"
+            d="M36 84C36 84 65 52.4 65 30C65 13.5 52 2 36 2C20 2 7 13.5 7 30C7 52.4 36 84 36 84Z"
+            fill="url(#${gradientId})"
+            stroke="white"
+            stroke-width="${strokeWidth}"
+          />
+
+          <circle cx="36" cy="31" r="23" fill="white" fill-opacity="0.98"/>
+          <circle cx="36" cy="31" r="20.5" fill="#EFF6FF" stroke="#B9D2F3" stroke-width="1.5"/>
+          <image href="/LOGO_EPH.png" x="19" y="14" width="34" height="34" preserveAspectRatio="xMidYMid meet"/>
+          <circle
+            cx="36"
+            cy="31"
+            r="24.5"
+            fill="none"
+            stroke="${selected ? "#FFC107" : "#D9E8FA"}"
+            stroke-width="${selected ? 3 : 1}"
+          />
+        </svg>
+      `;
+    }
+
+    function pinHtml(item, index) {
+      const heroClass = item.hero ? " hero" : "";
+
+      return `
+        <div class="eph-pin-shell${heroClass}" style="--delay:${item.delay}s">
+          <div class="eph-pin-shadow"></div>
+          ${originalEphPinSvg(item, index)}
+          <div class="eph-price">${item.price}</div>
+        </div>
+      `;
+    }
+
+    function renderPins() {
+      markerLayer.clearLayers();
+
+      const orderedPins = buildPinSequence(pinData);
+
+      orderedPins.forEach((item, index) => {
+        const icon = L.divIcon({
+          className: "eph-div-icon",
+          html: pinHtml(item, index),
+          iconSize: item.hero ? [80, 112] : [72, 104],
+          iconAnchor: item.hero ? [40, 101] : [36, 94],
+          popupAnchor: [0, -76]
+        });
+
+        L.marker([item.lat, item.lng], {
+          icon,
+          keyboard: false,
+          riseOnHover: true
+        })
+          .bindTooltip(
+            `<strong>${item.price} ₺</strong><br>${item.district}`,
+            {
+              direction: "top",
+              offset: [0, -70],
+              opacity: 0.92
+            }
+          )
+          .addTo(markerLayer);
+      });
+    }
+
+    function playMapMotion() {
+      if (mapMotionTimer) {
+        window.clearTimeout(mapMotionTimer);
+      }
+
+      map.setView([37.7767, 29.0865], 12.7, { animate: false });
+
+      mapMotionTimer = window.setTimeout(() => {
+        map.flyTo([37.7830, 29.0990], 13.05, {
+          animate: true,
+          duration: 6.2,
+          easeLinearity: 0.25
+        });
+      }, 2600);
+    }
+
+    function replay() {
+      renderPins();
+      playMapMotion();
+    }
+
+    document.getElementById("replayButton").addEventListener("click", replay);
+
+    window.addEventListener("load", () => {
+      window.setTimeout(() => {
+        map.invalidateSize();
+        replay();
+      }, 120);
+    });
+  </script>
+</body>
+</html>

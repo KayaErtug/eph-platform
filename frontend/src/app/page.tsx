@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -12,24 +12,39 @@ import {
   CirclePlay,
   Cookie,
   Home,
+  LogIn,
+  MapPin,
   Menu,
   Phone,
   PieChart,
   ShieldCheck,
+  Sparkles,
   UsersRound,
   X,
 } from "lucide-react";
 
-const whatsappNumber = "+90 535 79 09 374";
-const whatsappUrl = "https://wa.me/905357909374";
+const whatsappNumber = "+90 535 794 46 94";
+const whatsappUrl = "https://wa.me/905357944694";
 
-const portfolioCards = [
-  { title: "Levent’te Lüks Residence", location: "İstanbul / Beşiktaş", price: "35.000.000 ₺", detail: "450 m²", room: "5+1", image: "/gorseller/ilan-10.jpg" },
-  { title: "Nişantaşı’nda 3+1 Daire", location: "İstanbul / Şişli", price: "30.000.000 ₺", detail: "180 m²", room: "3+1", image: "/gorseller/ilan-11.jpg" },
-  { title: "Bebek’te Yalı Dairesi", location: "İstanbul / Beşiktaş", price: "32.000.000 ₺", detail: "220 m²", room: "4+1", image: "/gorseller/ilan-12.jpg" },
-  { title: "Zekeriyaköy Villa", location: "İstanbul / Sarıyer", price: "45.000.000 ₺", detail: "600 m²", room: "6+2", image: "/gorseller/ilan-13.jpg" },
-  { title: "Ataşehir’de Residence", location: "İstanbul / Ataşehir", price: "28.000.000 ₺", detail: "150 m²", room: "2+1", image: "/gorseller/ilan-14.jpg" },
-];
+const portfolioCards = Array.from({ length: 19 }, (_, index) => {
+  const number = String(index + 1).padStart(2, "0");
+
+  return {
+    id: `portfolio-horizontal-${number}`,
+    image: `/landing/portfolio-horizontal/portfolio-${number}.webp`,
+    alt: `EPH portföy görseli ${number}`,
+  };
+});
+
+const marqueeCards = Array.from({ length: 17 }, (_, index) => {
+  const number = String(index + 1).padStart(2, "0");
+
+  return {
+    id: `marquee-vertical-${number}`,
+    image: `/landing/marquee-vertical/vertical-${number}.webp`,
+    alt: `EPH dikey vitrin görseli ${number}`,
+  };
+});
 
 const stats = [
   { icon: Building2, value: "25.000+", label: "Aktif Portföy" },
@@ -38,34 +53,207 @@ const stats = [
   { icon: ShieldCheck, value: "7/24", label: "Canlı Destek" },
 ];
 
+const heroWords = ["Dijital Merkezi", "Akıllı CRM’i", "Ortak Portföy Ağı", "Yeni Nesil Havuzu"];
+
+function useScrollReveal() {
+  useEffect(() => {
+    const elements = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      elements.forEach((element) => element.classList.add("is-visible"));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.14, rootMargin: "0px 0px -8% 0px" },
+    );
+
+    elements.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, []);
+}
+
+function PremiumPropertyImage({ src, alt }: { src: string; alt: string }) {
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-[#09172D]">
+      <img src={src} alt={alt} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.045]" />
+    </div>
+  );
+}
+
+function TiltPortfolioCard({
+  item,
+}: {
+  item: (typeof portfolioCards)[number];
+}) {
+  const [transform, setTransform] = useState("perspective(900px) rotateX(0deg) rotateY(0deg) translateY(0px) scale(1)");
+
+  const handleMove = (event: MouseEvent<HTMLElement>) => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const rotateY = ((x - rect.width / 2) / rect.width) * 10;
+    const rotateX = ((y - rect.height / 2) / rect.height) * -8;
+
+    setTransform(
+      `perspective(900px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-6px) scale(1.018)`,
+    );
+  };
+
+  const reset = () => {
+    setTransform("perspective(900px) rotateX(0deg) rotateY(0deg) translateY(0px) scale(1)");
+  };
+
+  return (
+    <article
+      onMouseMove={handleMove}
+      onMouseLeave={reset}
+      onBlur={reset}
+      style={{ transform }}
+      className="group relative aspect-[16/10] w-[260px] shrink-0 snap-center overflow-hidden rounded-[18px] border border-white/14 bg-[#10213B]/92 shadow-[0_18px_50px_rgba(0,0,0,.24)] transition-[transform,border-color,box-shadow] duration-200 ease-out hover:border-[#60A5FA]/70 hover:shadow-[0_28px_80px_rgba(37,99,235,.28)] lg:w-auto"
+    >
+      <PremiumPropertyImage src={item.image} alt={item.alt} />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_28%,rgba(255,255,255,.13)_44%,transparent_60%)] bg-[length:220%_100%] opacity-0 transition-opacity duration-300 group-hover:animate-[card-shine_1.05s_ease-out] group-hover:opacity-100" />
+    </article>
+  );
+}
+
+function TiltMarqueeCard({
+  item,
+}: {
+  item: (typeof marqueeCards)[number];
+}) {
+  const [transform, setTransform] = useState("perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0px) scale(1)");
+
+  const handleMove = (event: MouseEvent<HTMLElement>) => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const rotateY = ((x - rect.width / 2) / rect.width) * 9;
+    const rotateX = ((y - rect.height / 2) / rect.height) * -8;
+
+    setTransform(
+      `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-7px) scale(1.018)`,
+    );
+  };
+
+  const reset = () => {
+    setTransform("perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0px) scale(1)");
+  };
+
+  return (
+    <article
+      onMouseMove={handleMove}
+      onMouseLeave={reset}
+      onBlur={reset}
+      style={{ transform }}
+      className="group relative aspect-[4/5] overflow-hidden rounded-[18px] border border-white/14 bg-[#0F203C]/92 shadow-[0_16px_44px_rgba(0,0,0,.24)] transition-[transform,border-color,box-shadow] duration-200 ease-out hover:border-[#60A5FA]/70 hover:shadow-[0_28px_74px_rgba(37,99,235,.28)] sm:rounded-[22px]"
+    >
+      <img
+        src={item.image}
+        alt={item.alt}
+        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.045]"
+      />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,transparent_24%,rgba(255,255,255,.14)_44%,transparent_62%)] bg-[length:220%_100%] opacity-0 transition-opacity duration-300 group-hover:animate-[card-shine_1.05s_ease-out] group-hover:opacity-100" />
+    </article>
+  );
+}
+
+function VerticalMarquee() {
+  const [randomizedCards, setRandomizedCards] = useState(marqueeCards);
+
+  useEffect(() => {
+    const shuffled = [...marqueeCards];
+
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const randomIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+    }
+
+    setRandomizedCards(shuffled);
+  }, []);
+
+  const firstColumn = randomizedCards.filter((_, index) => index % 3 === 0);
+  const secondColumn = randomizedCards.filter((_, index) => index % 3 === 1);
+  const thirdColumn = randomizedCards.filter((_, index) => index % 3 === 2);
+
+  const renderSet = (items: typeof marqueeCards, prefix: string) => (
+    <div className="grid gap-2.5 pb-2.5 sm:gap-3 sm:pb-3">
+      {items.map((item, index) => <TiltMarqueeCard key={`${prefix}-${item.id}-${index}`} item={item} />)}
+    </div>
+  );
+
+  return (
+    <div className="relative mx-auto h-[430px] w-full max-w-[720px] overflow-hidden rounded-[30px] border border-white/12 bg-[#071326]/46 p-2.5 shadow-[0_38px_120px_rgba(0,0,0,.35)] backdrop-blur-xl sm:h-[540px] sm:p-3 lg:h-[650px]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-20 bg-gradient-to-b from-[#09172D] to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-20 bg-gradient-to-t from-[#09172D] to-transparent" />
+
+      <div className="grid h-full grid-cols-3 gap-2 sm:gap-3">
+        <div className="marquee-column overflow-hidden pt-5 sm:pt-7">
+          <div className="vertical-marquee-track vertical-marquee-left">
+            {renderSet(firstColumn, "first-a")}
+            {renderSet(firstColumn, "first-b")}
+          </div>
+        </div>
+        <div className="marquee-column overflow-hidden pt-12 sm:pt-16">
+          <div className="vertical-marquee-track vertical-marquee-middle">
+            {renderSet(secondColumn, "second-a")}
+            {renderSet(secondColumn, "second-b")}
+          </div>
+        </div>
+        <div className="marquee-column overflow-hidden pt-1 sm:pt-3">
+          <div className="vertical-marquee-track vertical-marquee-right">
+            {renderSet(thirdColumn, "third-a")}
+            {renderSet(thirdColumn, "third-b")}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Header() {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-[#0A1830]/70 backdrop-blur-2xl">
-        <div className="mx-auto flex h-[76px] max-w-[1380px] items-center justify-between px-5 md:px-10">
-          <Link href="/" className="flex items-center gap-3">
-            <img src="/LOGO_EPH.png" alt="EPH" className="h-11 w-11 object-contain" />
-            <div className="leading-none">
-              <div className="text-[25px] font-black tracking-[0.2em] text-white">E.P.H.</div>
-              <div className="mt-1 text-[11px] font-medium text-white/76">Emlak Portföy Havuzu</div>
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-[#071326]/76 backdrop-blur-2xl">
+        <div className="mx-auto flex h-[72px] max-w-[1380px] items-center justify-between px-4 sm:px-5 md:h-[76px] md:px-10">
+          <Link href="/" className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+            <img src="/LOGO_EPH.png" alt="EPH" className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11" />
+            <div className="min-w-0 leading-none">
+              <div className="text-[21px] font-black tracking-[0.17em] text-white sm:text-[25px] sm:tracking-[0.2em]">E.P.H.</div>
+              <div className="mt-1 hidden text-[11px] font-medium text-white/76 xs:block sm:block">Emlak Portföy Havuzu</div>
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-12 text-[13px] font-medium text-white/78 lg:flex">
+          <nav className="hidden items-center gap-10 text-[13px] font-medium text-white/78 lg:flex">
             <a href="#ozellikler" className="transition hover:text-white">Özellikler</a>
             <a href="#fiyatlandirma" className="transition hover:text-white">Fiyatlandırma</a>
             <a href="#blog" className="transition hover:text-white">Blog</a>
             <a href="#iletisim" className="transition hover:text-white">İletişim</a>
           </nav>
 
-          <div className="flex items-center gap-4">
-            <Link href="/giris" className="hidden h-11 items-center justify-center rounded-[10px] border border-white/18 bg-white/8 px-7 text-[13px] font-medium text-white transition hover:border-[#3B82F6] md:flex">
-              Giriş Yap
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <Link href="/giris" className="shine-button relative inline-flex h-10 items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-blue-300/35 bg-[#2563EB] px-3.5 text-[12px] font-semibold text-white shadow-[0_12px_34px_rgba(37,99,235,.30)] transition hover:-translate-y-0.5 hover:bg-[#1D4ED8] sm:h-11 sm:px-6 sm:text-[13px]">
+              <LogIn size={16} />
+              <span className="sm:hidden">Giriş</span>
+              <span className="hidden sm:inline">Giriş Yap</span>
             </Link>
-            <button type="button" onClick={() => setOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-[10px] text-white/82 transition hover:bg-white/8" aria-label="Menü">
-              <Menu size={25} strokeWidth={1.7} />
+            <button type="button" onClick={() => setOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-white/10 text-white/82 transition hover:bg-white/8 sm:h-11 sm:w-11" aria-label="Menü">
+              <Menu size={23} strokeWidth={1.7} />
             </button>
           </div>
         </div>
@@ -90,45 +278,67 @@ function Header() {
 }
 
 function Hero() {
+  const [wordIndex, setWordIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setWordIndex((value) => (value + 1) % heroWords.length), 2600);
+    return () => window.clearInterval(timer);
+  }, []);
+
   return (
-    <section className="relative min-h-[760px] overflow-hidden border-b border-white/10 bg-[#0B1730]">
+    <section className="relative min-h-[920px] overflow-hidden border-b border-white/10 bg-[#09172D] lg:min-h-[810px]">
       <div className="absolute inset-0">
-        <img src="/landing/hero-city-villa-4k.webp" alt="EPH premium gayrimenkul" className="h-full w-full object-cover object-[66%_center] opacity-100" />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(8,19,37,.66)_0%,rgba(8,19,37,.46)_34%,rgba(8,19,37,.18)_62%,rgba(8,19,37,.04)_100%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,19,37,.16)_0%,transparent_48%,rgba(8,19,37,.62)_100%)]" />
+        <img src="/landing/hero-city-villa-4k.webp" alt="EPH premium gayrimenkul" className="h-full w-full object-cover object-[62%_center] opacity-70" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,15,31,.94)_0%,rgba(6,17,35,.84)_42%,rgba(6,17,35,.55)_68%,rgba(6,17,35,.35)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,17,35,.28)_0%,rgba(6,17,35,.16)_45%,rgba(6,17,35,.88)_100%)]" />
+        <div className="absolute -left-32 top-24 h-96 w-96 rounded-full bg-blue-500/18 blur-[120px]" />
+        <div className="absolute right-0 top-40 h-80 w-80 rounded-full bg-violet-500/14 blur-[120px]" />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-[760px] max-w-[1380px] flex-col justify-center px-5 pb-20 pt-28 md:px-10">
-        <div className="max-w-[565px]">
-          <h1 className="text-[43px] font-light leading-[1.08] tracking-[-0.055em] text-white sm:text-[54px] md:text-[68px]">
-            Gayrimenkul
-            <span className="block">Profesyonellerinin</span>
-            <span className="block font-medium text-[#60A5FA]">Dijital Merkezi</span>
-          </h1>
-
-          <p className="mt-7 max-w-[515px] text-[15px] font-normal leading-8 text-white/78 md:text-[17px]">
-            Portföy, müşteri, CRM, pazar analizi ve yapay zeka tek platformda.
-            İşinizi büyütmenin en akıllı yolu.
-          </p>
-
-          <div className="mt-9 flex flex-col gap-4 sm:flex-row">
-            <Link href="/kayit" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[10px] bg-[#2563EB] px-8 text-[15px] font-semibold text-white shadow-[0_16px_42px_rgba(37,99,235,.34)] transition hover:bg-[#1D4ED8]">
-              Ücretsiz Başvur <ArrowRight size={18} />
-            </Link>
-            <button type="button" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[10px] border border-white/22 bg-white/8 px-8 text-[15px] font-medium text-white/92 backdrop-blur-md transition hover:border-[#60A5FA]">
-              <CirclePlay size={20} strokeWidth={1.7} /> Platformu İzle
-            </button>
+      <div className="relative z-10 mx-auto grid min-h-[920px] max-w-[1380px] items-center gap-12 px-5 pb-16 pt-28 md:px-10 lg:min-h-[810px] lg:grid-cols-[0.9fr_1.1fr] lg:gap-16 lg:pb-10 lg:pt-24">
+        <div className="mx-auto max-w-[650px] text-center lg:mx-0 lg:text-left" data-reveal>
+          <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-white/[0.07] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#BFDBFE] backdrop-blur-xl lg:mx-0">
+            <Sparkles size={15} /> Türkiye’nin Gayrimenkul Profesyonel Ağı
           </div>
 
-          <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-3 text-[14px] text-white/66">
-            <span className="inline-flex items-center gap-2"><Check size={16} /> Kredi kartı gerektirmez</span>
-            <span className="hidden text-white/38 sm:inline">•</span>
-            <span>30 gün ücretsiz</span>
+          <h1 className="text-[42px] font-light leading-[1.07] tracking-[-0.055em] text-white sm:text-[56px] md:text-[68px] lg:text-[72px]">
+            Gayrimenkul
+            <span className="block">Profesyonellerinin</span>
+            <span key={heroWords[wordIndex]} className="hero-gradient-text mt-2 block min-h-[1.12em] font-semibold">
+              {heroWords[wordIndex]}
+            </span>
+          </h1>
+
+          <p className="mx-auto mt-7 max-w-[590px] text-[15px] font-normal leading-8 text-white/76 md:text-[17px] lg:mx-0">
+            Portföy, müşteri, CRM, pazar analizi ve yapay zekâ tek platformda.
+            İşinizi büyüten bağlantılar, fırsatlar ve veriler tek merkezde.
+          </p>
+
+          <div className="mt-9 grid gap-3 sm:flex sm:flex-wrap sm:justify-center lg:justify-start">
+            <Link href="/giris" className="shine-button relative inline-flex h-[56px] items-center justify-center gap-3 overflow-hidden rounded-[12px] bg-[#2563EB] px-8 text-[15px] font-semibold text-white shadow-[0_18px_48px_rgba(37,99,235,.38)] transition hover:-translate-y-1 hover:bg-[#1D4ED8]">
+              <LogIn size={19} /> Giriş Yap
+            </Link>
+            <Link href="/kayit" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[12px] border border-white/22 bg-white/8 px-8 text-[15px] font-semibold text-white/94 backdrop-blur-md transition hover:-translate-y-1 hover:border-[#60A5FA] hover:bg-white/12">
+              Ücretsiz Başvur <ArrowRight size={18} />
+            </Link>
+            <a href="#ozellikler" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[12px] border border-white/12 bg-[#071326]/38 px-6 text-[14px] font-medium text-white/82 backdrop-blur-md transition hover:border-white/28 hover:text-white">
+              <CirclePlay size={19} strokeWidth={1.7} /> Platformu Keşfet
+            </a>
+          </div>
+
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-[13px] text-white/64 lg:justify-start">
+            <span className="inline-flex items-center gap-2"><Check size={15} className="text-emerald-400" /> Kredi kartı gerekmez</span>
+            <span className="inline-flex items-center gap-2"><Check size={15} className="text-emerald-400" /> 30 gün ücretsiz</span>
+            <span className="inline-flex items-center gap-2"><Check size={15} className="text-emerald-400" /> Mobil öncelikli</span>
           </div>
         </div>
 
-        <div className="absolute bottom-7 left-1/2 hidden -translate-x-1/2 text-center text-[12px] text-white/60 md:block">
-          <Home className="mx-auto mb-2" size={22} strokeWidth={1.4} />
+        <div className="relative" data-reveal>
+          <VerticalMarquee />
+        </div>
+
+        <div className="absolute bottom-7 left-1/2 hidden -translate-x-1/2 text-center text-[12px] text-white/54 lg:block">
+          <Home className="mx-auto mb-2 animate-bounce" size={21} strokeWidth={1.4} />
           Aşağı Kaydırın
         </div>
       </div>
@@ -139,62 +349,56 @@ function Hero() {
 function PortfolioSlider() {
   const [active, setActive] = useState(0);
   const list = useMemo(() => portfolioCards, []);
+  const visibleCards = useMemo(
+    () => Array.from({ length: 5 }, (_, offset) => list[(active + offset) % list.length]),
+    [active, list],
+  );
 
   useEffect(() => {
-    const timer = window.setInterval(() => setActive((value) => (value + 1) % list.length), 4200);
+    const timer = window.setInterval(() => setActive((value) => (value + 1) % list.length), 2400);
     return () => window.clearInterval(timer);
   }, [list.length]);
 
+  const previous = () => setActive((value) => (value - 1 + list.length) % list.length);
+  const next = () => setActive((value) => (value + 1) % list.length);
+
   return (
-    <section id="ozellikler" className="relative overflow-hidden border-b border-white/10 bg-[#0B1730] px-5 py-10 md:px-10">
+    <section id="ozellikler" data-reveal className="relative overflow-hidden border-b border-white/10 bg-[#0B1730] px-5 py-16 md:px-10">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_22%,rgba(37,99,235,.18),transparent_30%)]" />
-      <div className="relative mx-auto grid max-w-[1380px] items-center gap-9 lg:grid-cols-[300px_1fr]">
-        <div>
-          <div className="mb-4 text-[12px] font-semibold uppercase tracking-[0.22em] text-[#60A5FA]">✣ Yapay Zeka</div>
-          <h2 className="text-left text-[34px] font-light leading-[1.12] tracking-[-0.04em] text-white md:text-[42px]">
+      <div className="relative mx-auto grid max-w-[1380px] items-center gap-10 lg:grid-cols-[310px_1fr]">
+        <div className="text-center lg:text-left">
+          <div className="mb-4 text-[12px] font-semibold uppercase tracking-[0.22em] text-[#60A5FA]">✣ Yapay Zekâ</div>
+          <h2 className="text-[34px] font-light leading-[1.12] tracking-[-0.04em] text-white md:text-[44px]">
             EPH Size
-            <span className="block">Portföy Bulur.</span>
+            <span className="hero-gradient-text block font-medium">Portföy Bulur.</span>
           </h2>
-          <p className="mt-5 max-w-[280px] text-[14px] leading-7 text-white/64">
-            CRM kayıtlarınızı tarar, portföyleri analiz eder ve size en uygun fırsatları sunar.
+          <p className="mx-auto mt-5 max-w-[310px] text-[14px] leading-7 text-white/64 lg:mx-0">
+            CRM kayıtlarınızı tarar, portföyleri analiz eder ve en güçlü fırsatları önünüze getirir.
           </p>
 
-          <div className="mt-8 grid gap-4 text-[14px] text-white/72">
-            {["CRM kayıtlarınızı tarar", "Piyasadaki portföyleri analiz eder", "Size uygun fırsatları anlık sunar"].map((item) => (
+          <div className="mx-auto mt-8 grid max-w-[330px] gap-4 text-left text-[14px] text-white/72 lg:mx-0">
+            {["CRM kayıtlarınızı tarar", "Piyasadaki portföyleri analiz eder", "Uygun fırsatları anlık sunar"].map((item) => (
               <div key={item} className="flex items-center gap-3"><Check size={17} className="text-[#60A5FA]" />{item}</div>
             ))}
           </div>
         </div>
 
-        <div className="relative rounded-[22px] border border-blue-300/24 bg-white/[0.055] p-4 shadow-[0_24px_90px_rgba(0,0,0,.24)] backdrop-blur-xl md:p-5">
-          <button onClick={() => setActive((active - 1 + list.length) % list.length)} className="absolute -left-4 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/14 bg-[#10213B]/94 text-white" aria-label="Önceki">
+        <div className="relative rounded-[26px] border border-blue-300/24 bg-white/[0.055] p-4 shadow-[0_24px_90px_rgba(0,0,0,.24)] backdrop-blur-xl md:p-5">
+          <button onClick={previous} className="absolute -left-2 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/14 bg-[#10213B]/94 text-white shadow-lg transition hover:scale-105 md:-left-4" aria-label="Önceki görsel">
             <ChevronLeft size={23} />
           </button>
 
-          <div className="flex snap-x gap-4 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-5 lg:overflow-visible lg:pb-0">
-            {list.map((item, index) => (
-              <article key={item.title} className={`w-[245px] shrink-0 snap-center overflow-hidden rounded-[13px] border bg-[#10213B]/90 transition duration-300 lg:w-auto ${active === index ? "border-[#60A5FA]/80 shadow-[0_0_40px_rgba(96,165,250,.18)]" : "border-white/12"}`}>
-                <div className="relative h-[150px] overflow-hidden">
-                  <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#10213B] via-transparent to-transparent" />
-                  <span className="absolute left-3 top-3 rounded-full bg-[#2563EB] px-3 py-1 text-[11px] font-bold text-white">{item.price}</span>
-                </div>
-                <div className="p-4">
-                  <h3 className="line-clamp-1 text-[13px] font-semibold text-white">{item.title}</h3>
-                  <p className="mt-2 text-[12px] text-white/62">{item.location}</p>
-                  <div className="mt-4 flex items-center gap-4 text-[12px] text-white/76"><span>{item.detail}</span><span>⌂ {item.room}</span></div>
-                </div>
-              </article>
-            ))}
+          <div key={active} className="portfolio-window flex snap-x gap-4 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-5 lg:overflow-visible">
+            {visibleCards.map((item) => <TiltPortfolioCard key={item.id} item={item} />)}
           </div>
 
-          <button onClick={() => setActive((active + 1) % list.length)} className="absolute -right-4 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/14 bg-[#10213B]/94 text-white" aria-label="Sonraki">
+          <button onClick={next} className="absolute -right-2 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/14 bg-[#10213B]/94 text-white shadow-lg transition hover:scale-105 md:-right-4" aria-label="Sonraki görsel">
             <ChevronRight size={23} />
           </button>
 
-          <div className="mt-6 flex justify-center gap-3">
-            {list.map((item, index) => (
-              <button key={item.title} onClick={() => setActive(index)} className={`h-2.5 rounded-full transition ${active === index ? "w-6 bg-[#60A5FA]" : "w-2.5 bg-white/24"}`} aria-label={`${index + 1}. slayt`} />
+          <div className="mt-5 flex items-center justify-center gap-2">
+            {Array.from({ length: 5 }, (_, index) => (
+              <span key={index} className={`h-2 rounded-full transition-all ${index === 0 ? "w-7 bg-[#60A5FA]" : "w-2 bg-white/24"}`} />
             ))}
           </div>
         </div>
@@ -205,32 +409,59 @@ function PortfolioSlider() {
 
 function CustomerSection() {
   return (
-    <section className="relative overflow-hidden border-b border-white/10 bg-[#0E1E38] px-5 py-16 md:px-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_35%,rgba(37,99,235,.16),transparent_30%)]" />
-      <div className="relative mx-auto grid max-w-[1120px] items-center gap-14 md:grid-cols-[420px_1fr]">
-        <div className="relative mx-auto w-full max-w-[360px]">
-          <div className="absolute -inset-6 rounded-full bg-[#60A5FA]/16 blur-[70px]" />
-          <img src="/landing/iphone-premium.webp" alt="EPH müşteri eşleşme mobil ekranı" className="relative w-full drop-shadow-[0_28px_70px_rgba(0,0,0,.36)]" />
+    <section data-reveal className="relative overflow-hidden border-b border-white/10 bg-[#0E1E38] px-5 py-16 md:px-10">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_35%,rgba(37,99,235,.18),transparent_30%)]" />
+      <div className="absolute right-[-120px] top-[-120px] h-[320px] w-[320px] rounded-full bg-cyan-400/10 blur-[110px]" />
+
+      <div className="relative mx-auto grid max-w-[1180px] items-center gap-14 lg:grid-cols-[430px_1fr]">
+        <div className="relative mx-auto w-full max-w-[390px]">
+          <div className="absolute -inset-7 rounded-[48px] bg-[#60A5FA]/14 blur-[70px]" />
+
+          <div className="relative overflow-hidden rounded-[42px] border-[7px] border-[#050B15] bg-[#DCE7F4] shadow-[0_34px_90px_rgba(0,0,0,.46)] transition duration-700 hover:-translate-y-2 hover:scale-[1.012]">
+            <div className="pointer-events-none absolute left-1/2 top-2 z-20 h-5 w-24 -translate-x-1/2 rounded-full bg-[#050B15]" />
+            <iframe
+              src="/landing/denizli-24-pin-map.html"
+              title="Denizli Merkezefendi ve Pamukkale EPH harita keşfi"
+              className="block aspect-[9/16] w-full border-0"
+              loading="lazy"
+              allow="geolocation"
+            />
+          </div>
         </div>
 
-        <div>
-          <div className="mb-4 text-[12px] font-semibold uppercase tracking-[0.22em] text-[#60A5FA]">▥ Müşteri Yönetimi</div>
-          <h2 className="text-left text-[34px] font-light leading-[1.13] tracking-[-0.04em] text-white md:text-[44px]">
-            EPH Size
-            <span className="block">Müşteri Bulur.</span>
+        <div className="text-center lg:text-left">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-white/[0.06] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#BFDBFE]">
+            <MapPin size={15} /> EPH Harita Keşfi
+          </div>
+
+          <h2 className="text-[34px] font-light leading-[1.12] tracking-[-0.04em] text-white md:text-[46px]">
+            Denizli’deki Portföyleri
+            <span className="hero-gradient-text block font-medium">Harita Üzerinden Keşfedin.</span>
           </h2>
-          <p className="mt-6 max-w-[420px] text-[16px] leading-8 text-white/66">
-            İhtiyaçlara uygun müşterileri eşleştirir, sizi doğru alıcıyla buluşturur.
+
+          <p className="mx-auto mt-6 max-w-[560px] text-[16px] leading-8 text-white/66 lg:mx-0">
+            Merkezefendi ve Pamukkale’deki portföyleri gerçek harita üzerinde görün.
+            EPH pinleri fiyatları, bölgeleri ve fırsat yoğunluğunu ilk bakışta gösterir.
           </p>
 
-          <div className="mt-8 grid gap-4 text-[15px] text-white/74">
-            {["Müşteri ihtiyaçlarını analiz eder", "Portföylerle akıllı eşleşme yapar", "Doğru müşteriyi size önerir"].map((item) => (
-              <div key={item} className="flex items-center gap-3"><Check size={18} className="text-[#60A5FA]" />{item}</div>
+          <div className="mx-auto mt-8 grid max-w-[560px] gap-4 text-left text-[15px] text-white/76 lg:mx-0">
+            {[
+              "24 portföy pini sırayla ve uzak konumlar dönüşümlü iner",
+              "Merkezefendi ve Pamukkale aynı kadrajda gösterilir",
+              "EPH’nin özgün harita pini ve fiyat etiketi kullanılır",
+            ].map((item) => (
+              <div key={item} className="flex items-start gap-3">
+                <Check size={18} className="mt-1 shrink-0 text-[#60A5FA]" />
+                <span>{item}</span>
+              </div>
             ))}
           </div>
 
-          <Link href="/kayit" className="mt-8 inline-flex items-center gap-3 text-[14px] font-medium text-[#93C5FD]">
-            Detaylı Bilgi <ArrowRight size={17} />
+          <Link
+            href="/giris"
+            className="shine-button relative mt-9 inline-flex h-[54px] items-center justify-center gap-3 overflow-hidden rounded-[12px] bg-[#2563EB] px-7 text-[14px] font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,.34)] transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
+          >
+            Portföyleri Keşfet <ArrowRight size={18} />
           </Link>
         </div>
       </div>
@@ -240,7 +471,7 @@ function CustomerSection() {
 
 function AnalyticsSection() {
   return (
-    <section id="blog" className="relative overflow-hidden border-b border-white/10 bg-[#0B1730] px-5 py-16 md:px-10">
+    <section id="blog" data-reveal className="relative overflow-hidden border-b border-white/10 bg-[#0B1730] px-5 py-16 md:px-10">
       <div className="mx-auto grid max-w-[1180px] items-center gap-12 md:grid-cols-[380px_1fr]">
         <div>
           <div className="mb-4 text-[12px] font-semibold uppercase tracking-[0.22em] text-[#60A5FA]">⌘ Pazar Analizi</div>
@@ -265,7 +496,7 @@ function AnalyticsSection() {
 
         <div className="relative">
           <div className="absolute -inset-4 rounded-[34px] bg-[#60A5FA]/12 blur-[50px]" />
-          <img src="/landing/dashboard-premium.webp" alt="EPH pazar analizi dashboard" className="relative w-full rounded-[34px] border border-white/14 shadow-[0_28px_110px_rgba(0,0,0,.40)]" />
+          <img src="/landing/dashboard-premium.webp" alt="EPH pazar analizi dashboard" className="relative w-full rounded-[34px] border border-white/14 shadow-[0_28px_110px_rgba(0,0,0,.40)] transition duration-700 hover:-translate-y-2 hover:scale-[1.015] hover:[transform:perspective(1000px)_rotateY(3deg)_rotateX(1deg)]" />
         </div>
       </div>
     </section>
@@ -274,7 +505,7 @@ function AnalyticsSection() {
 
 function StatsBand() {
   return (
-    <section id="fiyatlandirma" className="bg-[#0E1E38] px-5 py-8 md:px-10">
+    <section id="fiyatlandirma" data-reveal className="bg-[#0E1E38] px-5 py-8 md:px-10">
       <div className="mx-auto grid max-w-[1380px] overflow-hidden rounded-[14px] border border-white/12 bg-white/[0.055] md:grid-cols-4">
         {stats.map((item) => (
           <div key={item.label} className="flex items-center justify-center gap-5 border-b border-white/10 px-7 py-6 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
@@ -431,6 +662,8 @@ function CookieBanner() {
 }
 
 export default function LandingPage() {
+  useScrollReveal();
+
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#0B1730] text-white">
       <Header />
@@ -460,9 +693,9 @@ export default function LandingPage() {
             <div className="text-center md:text-right">
               <div className="text-[15px] font-bold text-[#0F1E35]">Bize Ulaşın</div>
               <div className="mt-4 grid gap-3 text-[14px] font-semibold text-[#1F3B64]">
-                <a href="tel:+905357909374" className="inline-flex items-center justify-center gap-2 md:justify-end">
+                <a href="tel:+905357944694" className="inline-flex items-center justify-center gap-2 md:justify-end">
                   <Phone size={16} className="text-[#2563EB]" />
-                  +90 535 790 93 74
+                  +90 535 794 46 94
                 </a>
                 <a href="mailto:info@emlakportfoyhavuzu.com" className="inline-flex items-center justify-center gap-2 break-all md:justify-end">
                   <span className="text-[#2563EB]">@</span>
@@ -479,33 +712,53 @@ export default function LandingPage() {
           <div className="text-[16px] font-bold text-[#0F1E35]">Bizi Takip Edin</div>
 
           <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-            {/* Facebook */}
-            <a href="https://www.facebook.com/profile.php?id=61590178241390&locale=tr_TR" target="_blank" rel="noreferrer" aria-label="Facebook" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1877F2] text-white shadow-[0_10px_26px_rgba(24,119,242,.28)] transition hover:-translate-y-1 hover:scale-105">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
-            </a>
-            {/* Instagram */}
-            <a href="https://www.instagram.com/ephplatform" target="_blank" rel="noreferrer" aria-label="Instagram" className="flex h-11 w-11 items-center justify-center rounded-full text-white shadow-[0_10px_26px_rgba(221,42,123,.28)] transition hover:-translate-y-1 hover:scale-105" style={{background:"linear-gradient(135deg,#F58529,#DD2A7B,#8134AF,#515BD4)"}}>
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="2" width="20" height="20" rx="5"/>
-                <circle cx="12" cy="12" r="4.5"/>
-                <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>
+            <a
+              href="https://www.facebook.com/profile.php?id=61590178241390&locale=tr_TR"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Facebook"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-[#1877F2] text-white shadow-[0_12px_28px_rgba(24,119,242,.28)] transition hover:-translate-y-1 hover:scale-105"
+            >
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+                <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.099 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.413c0-3.024 1.792-4.695 4.533-4.695 1.312 0 2.686.235 2.686.235v2.974h-1.513c-1.49 0-1.956.931-1.956 1.887v2.259h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.099 24 12.073z" />
               </svg>
             </a>
-            {/* LinkedIn */}
-            <button type="button" aria-label="LinkedIn" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#0A66C2] text-white shadow-[0_10px_26px_rgba(10,102,194,.28)] transition hover:-translate-y-1 hover:scale-105">
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/>
-                <rect x="2" y="9" width="4" height="12"/>
-                <circle cx="4" cy="4" r="2"/>
+            <a
+              href="https://www.instagram.com/ephplatform"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Instagram"
+              className="flex h-12 w-12 items-center justify-center rounded-full text-white shadow-[0_12px_28px_rgba(221,42,123,.28)] transition hover:-translate-y-1 hover:scale-105"
+              style={{ background: "linear-gradient(135deg,#F58529 0%,#DD2A7B 48%,#8134AF 72%,#515BD4 100%)" }}
+            >
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+                <path d="M12 0C8.741 0 8.332.014 7.052.072 2.695.272.273 2.69.073 7.052.014 8.332 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.332 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.668-.072-4.948C23.728 2.698 21.31.273 16.948.073 15.668.014 15.259 0 12 0zm0 2.163c3.204 0 3.584.012 4.849.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.849.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069z" />
+                <path d="M12 5.838A6.162 6.162 0 1 0 12 18.162 6.162 6.162 0 0 0 12 5.838zm0 10.162a4 4 0 1 1 0-8 4 4 0 0 1 0 8z" />
+                <circle cx="18.406" cy="5.595" r="1.44" />
               </svg>
-            </button>
-            {/* YouTube */}
-            <button type="button" aria-label="YouTube" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FF0000] text-white shadow-[0_10px_26px_rgba(255,0,0,.24)] transition hover:-translate-y-1 hover:scale-105">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.96-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/>
-                <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/>
+            </a>
+            <a
+              href="https://www.linkedin.com/"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="LinkedIn"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0A66C2] text-white shadow-[0_12px_28px_rgba(10,102,194,.28)] transition hover:-translate-y-1 hover:scale-105"
+            >
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 4.128 0c0 1.14-.925 2.065-2.065 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.225 0z" />
               </svg>
-            </button>
+            </a>
+            <a
+              href="https://www.youtube.com/"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="YouTube"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-[#FF0000] text-white shadow-[0_12px_28px_rgba(255,0,0,.24)] transition hover:-translate-y-1 hover:scale-105"
+            >
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+              </svg>
+            </a>
           </div>
 
           <button
@@ -529,6 +782,106 @@ export default function LandingPage() {
         html { scroll-behavior: smooth; }
         body { background: #0B1730; }
         ::selection { background: rgba(37, 99, 235, 0.45); color: #ffffff; }
+
+        .portfolio-window {
+          animation: portfolio-window-enter .38s cubic-bezier(.2,.72,.2,1) both;
+        }
+
+        .hero-gradient-text {
+          color: transparent;
+          background: linear-gradient(90deg, #60A5FA 0%, #E0F2FE 22%, #A78BFA 48%, #38BDF8 72%, #60A5FA 100%);
+          background-size: 250% auto;
+          -webkit-background-clip: text;
+          background-clip: text;
+          animation: moving-gradient 5.8s linear infinite, word-enter .58s cubic-bezier(.2,.75,.2,1) both;
+          filter: drop-shadow(0 10px 28px rgba(96, 165, 250, .22));
+        }
+
+        .shine-button::after {
+          content: "";
+          position: absolute;
+          inset: -120% auto -120% -45%;
+          width: 34%;
+          transform: rotate(18deg);
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,.62), transparent);
+          animation: light-sweep 3.6s ease-in-out infinite;
+        }
+
+        .vertical-marquee-track {
+          will-change: transform;
+        }
+
+        .vertical-marquee-left {
+          animation: vertical-marquee 17s linear infinite;
+        }
+
+        .vertical-marquee-middle {
+          animation: vertical-marquee 19s linear infinite reverse;
+        }
+
+        .vertical-marquee-right {
+          animation: vertical-marquee 15s linear infinite;
+        }
+
+        .marquee-column:hover .vertical-marquee-track {
+          animation-play-state: paused;
+        }
+
+        [data-reveal] {
+          opacity: 0;
+          transform: translateY(34px);
+          transition: opacity .8s ease, transform .8s cubic-bezier(.2,.72,.2,1);
+        }
+
+        [data-reveal].is-visible {
+          opacity: 1;
+          transform: translateY(0);
+        }
+
+        @keyframes portfolio-window-enter {
+          from { opacity: 0; transform: translateX(18px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes moving-gradient {
+          from { background-position: 0% center; }
+          to { background-position: 250% center; }
+        }
+
+        @keyframes word-enter {
+          from { opacity: 0; transform: translateY(18px); filter: blur(8px); }
+          to { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+
+        @keyframes light-sweep {
+          0%, 56% { left: -45%; opacity: 0; }
+          62% { opacity: 1; }
+          84%, 100% { left: 122%; opacity: 0; }
+        }
+
+        @keyframes vertical-marquee {
+          from { transform: translateY(0); }
+          to { transform: translateY(-50%); }
+        }
+
+        @keyframes card-shine {
+          from { background-position: 190% 0; }
+          to { background-position: -30% 0; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            scroll-behavior: auto !important;
+            animation-duration: .01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: .01ms !important;
+          }
+
+          [data-reveal] {
+            opacity: 1;
+            transform: none;
+          }
+        }
       `}</style>
     </main>
   );
