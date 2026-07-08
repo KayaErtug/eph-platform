@@ -60,6 +60,16 @@
       align-items: center;
       gap: 9px;
       pointer-events: none;
+      opacity: 1;
+      transform: translateY(0);
+      transition:
+        opacity 0.7s ease,
+        transform 0.7s ease;
+    }
+
+    .top-panel.is-hidden {
+      opacity: 0;
+      transform: translateY(-16px);
     }
 
     .search-card {
@@ -158,49 +168,6 @@
     .district-chip.merkezefendi { top: 37%; left: 6%; }
     .district-chip.pamukkale { top: 24%; right: 6%; }
 
-    .bottom-panel {
-      position: absolute;
-      right: 13px;
-      bottom: 13px;
-      left: 13px;
-      z-index: 600;
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 10px;
-      align-items: center;
-      padding: 12px;
-      border: 1px solid rgba(255,255,255,.16);
-      border-radius: 18px;
-      background: var(--panel);
-      box-shadow: 0 18px 42px rgba(0,0,0,.30);
-      backdrop-filter: blur(18px);
-    }
-
-    .bottom-copy strong {
-      display: block;
-      color: white;
-      font-size: 12px;
-    }
-
-    .bottom-copy span {
-      display: block;
-      margin-top: 4px;
-      color: rgba(255,255,255,.62);
-      font-size: 9px;
-    }
-
-    .replay-button {
-      min-width: 84px;
-      height: 39px;
-      border: 0;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
-      color: white;
-      cursor: pointer;
-      font-size: 10px;
-      font-weight: 800;
-      box-shadow: 0 11px 26px rgba(37,99,235,.32);
-    }
 
     .eph-div-icon {
       border: 0 !important;
@@ -209,61 +176,61 @@
 
     .eph-pin-shell {
       position: relative;
-      width: 72px;
-      height: 104px;
+      width: 36px;
+      height: 52px;
       opacity: 0;
       transform-origin: 50% 84%;
       animation:
-        eph-pin-drop 1.28s cubic-bezier(.34,1.56,.64,1) var(--delay) both,
-        eph-pin-float 6.4s ease-in-out calc(var(--delay) + 1.45s) infinite alternate;
+        eph-pin-drop 2.56s cubic-bezier(.34,1.56,.64,1) var(--delay) both,
+        eph-pin-float 12.8s ease-in-out calc(var(--delay) + 2.9s) infinite alternate;
       will-change: transform, opacity;
     }
 
     .eph-pin-shell.hero {
-      width: 80px;
-      height: 112px;
+      width: 40px;
+      height: 56px;
     }
 
     .eph-pin-shadow {
       position: absolute;
-      bottom: 5px;
+      bottom: 2px;
       left: 50%;
-      width: 30px;
-      height: 9px;
+      width: 15px;
+      height: 5px;
       border-radius: 50%;
       background: rgba(6,26,58,.28);
-      filter: blur(4px);
+      filter: blur(3px);
       transform: translateX(-50%);
-      animation: shadow-pulse 6.4s ease-in-out calc(var(--delay) + 1.45s) infinite alternate;
+      animation: shadow-pulse 12.8s ease-in-out calc(var(--delay) + 2.9s) infinite alternate;
     }
 
     .eph-pin-svg {
       position: absolute;
       top: 0;
       left: 50%;
-      width: 72px;
-      height: 88px;
+      width: 36px;
+      height: 44px;
       transform: translateX(-50%);
-      filter: drop-shadow(0 8px 7px rgba(6,26,58,.24));
+      filter: drop-shadow(0 4px 4px rgba(6,26,58,.24));
     }
 
     .hero .eph-pin-svg {
-      width: 80px;
-      height: 98px;
+      width: 40px;
+      height: 49px;
     }
 
     .eph-price {
       position: absolute;
-      top: 77px;
+      top: 38px;
       left: 50%;
-      min-width: 50px;
-      padding: 5px 7px;
-      border: 2px solid white;
+      min-width: 31px;
+      padding: 3px 4px;
+      border: 1px solid white;
       border-radius: 999px;
       background: #071326;
       color: white;
-      box-shadow: 0 8px 18px rgba(7,19,38,.30);
-      font-size: 8px;
+      box-shadow: 0 4px 9px rgba(7,19,38,.30);
+      font-size: 6px;
       font-weight: 900;
       line-height: 1;
       text-align: center;
@@ -272,9 +239,9 @@
     }
 
     .hero .eph-price {
-      top: 86px;
-      padding: 6px 8px;
-      font-size: 9px;
+      top: 43px;
+      padding: 3px 5px;
+      font-size: 6px;
     }
 
     @keyframes eph-pin-drop {
@@ -356,13 +323,6 @@
   <div class="district-chip merkezefendi">Merkezefendi</div>
   <div class="district-chip pamukkale">Pamukkale</div>
 
-  <div class="bottom-panel">
-    <div class="bottom-copy">
-      <strong>Haritada 24 portföy</strong>
-      <span>Sıralı EPH pin animasyonu</span>
-    </div>
-    <button id="replayButton" class="replay-button" type="button">Tekrar Oynat</button>
-  </div>
 
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -433,7 +393,7 @@
         takeRight = !takeRight;
       }
 
-      const step = 0.52;
+      const step = 1.04;
 
       return sequence.map((item, index) => ({
         ...item,
@@ -504,9 +464,9 @@
         const icon = L.divIcon({
           className: "eph-div-icon",
           html: pinHtml(item, index),
-          iconSize: item.hero ? [80, 112] : [72, 104],
-          iconAnchor: item.hero ? [40, 101] : [36, 94],
-          popupAnchor: [0, -76]
+          iconSize: item.hero ? [40, 56] : [36, 52],
+          iconAnchor: item.hero ? [20, 50] : [18, 47],
+          popupAnchor: [0, -38]
         });
 
         L.marker([item.lat, item.lng], {
@@ -518,7 +478,7 @@
             `<strong>${item.price} ₺</strong><br>${item.district}`,
             {
               direction: "top",
-              offset: [0, -70],
+              offset: [0, -35],
               opacity: 0.92
             }
           )
@@ -536,10 +496,10 @@
       mapMotionTimer = window.setTimeout(() => {
         map.flyTo([37.7830, 29.0990], 13.05, {
           animate: true,
-          duration: 6.2,
+          duration: 12.4,
           easeLinearity: 0.25
         });
-      }, 2600);
+      }, 5200);
     }
 
     function replay() {
@@ -547,12 +507,29 @@
       playMapMotion();
     }
 
-    document.getElementById("replayButton").addEventListener("click", replay);
+    let automaticReplayTimer = null;
+
+    function startAutomaticReplay() {
+      if (automaticReplayTimer) {
+        window.clearInterval(automaticReplayTimer);
+      }
+
+      automaticReplayTimer = window.setInterval(() => {
+        replay();
+      }, 30000);
+    }
 
     window.addEventListener("load", () => {
+      const topPanel = document.querySelector(".top-panel");
+
+      window.setTimeout(() => {
+        topPanel?.classList.add("is-hidden");
+      }, 2000);
+
       window.setTimeout(() => {
         map.invalidateSize();
         replay();
+        startAutomaticReplay();
       }, 120);
     });
   </script>
