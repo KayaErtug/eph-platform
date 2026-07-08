@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { Roboto } from "next/font/google";
 import {
   BriefcaseBusiness,
   Building2,
@@ -35,6 +36,12 @@ import GoogleGeoPicker from "@/components/stok/GoogleGeoPicker";
 import { useAuthStore } from "@/store/auth.store";
 import CrmInsaatFirmasiPanel from "./components/CrmInsaatFirmasiPanel";
 import CrmTakimLideriPanel from "./components/CrmTakimLideriPanel";
+
+const crmRoboto = Roboto({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "700", "900"],
+  display: "swap",
+});
 
 interface Customer {
   id: string;
@@ -184,7 +191,6 @@ const CUSTOMER_ROLES = [
   { key: "ALICI", label: "Alıcı" },
   { key: "SATICI", label: "Satıcı" },
   { key: "KIRACI", label: "Kiracı" },
-  { key: "MAL_SAHIBI", label: "Kiraya Veren" },
   { key: "KIRAYA_VEREN", label: "Kiraya Veren" },
   { key: "YATIRIMCI", label: "Yatırımcı" },
   { key: "MUTEAHHIT", label: "Müteahhit" },
@@ -259,6 +265,12 @@ const CRM_QUICK_AREA_HINTS = ["Denizli", "İzmir", "İstanbul", "Muğla", "Antal
 type GeoOption = {
   id: string;
   name: string;
+};
+
+type CustomerInterestAreaDraft = {
+  city: string;
+  district: string;
+  neighborhood: string;
 };
 
 const TURKIYE_API_BASE_URL = "https://api.turkiyeapi.dev/v1";
@@ -544,6 +556,38 @@ function buildInterestedArea(city?: string, district?: string, neighborhood?: st
   return [city, district, neighborhood].filter(Boolean).join(" / ");
 }
 
+function interestAreaKey(area: CustomerInterestAreaDraft) {
+  return [area.city, area.district, area.neighborhood]
+    .map((value) => String(value || "").trim().toLocaleLowerCase("tr-TR"))
+    .join("|");
+}
+
+function normalizeCustomerInterestAreas(value: unknown): CustomerInterestAreaDraft[] {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set<string>();
+
+  return value
+    .map((item) => ({
+      city: String(item?.city || "").trim(),
+      district: String(item?.district || "").trim(),
+      neighborhood: String(item?.neighborhood || "").trim(),
+    }))
+    .filter((item) => item.city && item.district)
+    .filter((item) => {
+      const key = interestAreaKey(item);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function buildInterestedAreaSummary(areas: unknown) {
+  return normalizeCustomerInterestAreas(areas)
+    .map((area) => buildInterestedArea(area.city, area.district, area.neighborhood))
+    .join(" | ");
+}
+
 function shortMoney(value: number) {
   if (!value) return "—";
   if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M ₺`;
@@ -556,7 +600,8 @@ function stageInfo(status: string) {
 
 function roleLabel(role?: string) {
   if (!role) return "—";
-  return CUSTOMER_ROLES.find((item) => item.key === role)?.label || role;
+  const normalizedRole = normalizeCustomerRole(role);
+  return CUSTOMER_ROLES.find((item) => item.key === normalizedRole)?.label || normalizedRole;
 }
 
 function normalizeCustomerRole(role?: string) {
@@ -756,6 +801,7 @@ export default function CrmPage() {
     interestedCity: "",
     interestedDistrict: "",
     interestedNeighborhood: "",
+    interestAreas: [] as CustomerInterestAreaDraft[],
     interestedType: "",
     source: "",
     notes: "",
@@ -899,6 +945,7 @@ export default function CrmPage() {
       interestedCity: "",
       interestedDistrict: "",
       interestedNeighborhood: "",
+      interestAreas: [] as CustomerInterestAreaDraft[],
       interestedType: "",
       source: "",
       notes: "",
@@ -908,15 +955,73 @@ export default function CrmPage() {
     });
   };
 
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") !== "1") return;
+
+    setForm({
+      firstName: "",
+      lastName: "",
+      phone: "",
+      email: "",
+      city: "",
+      profession: "",
+      company: "",
+      budget: "",
+      interestedArea: "",
+      interestedCity: "",
+      interestedDistrict: "",
+      interestedNeighborhood: "",
+      interestAreas: [] as CustomerInterestAreaDraft[],
+      interestedType: "",
+      source: "",
+      notes: "",
+      status: "YENI_LEAD",
+      roles: [],
+      tags: [],
+    });
+    setSelectedCustomer(null);
+    setShowAddModal(true);
+
+    params.delete("new");
+    const nextQuery = params.toString();
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash}`;
+    window.history.replaceState(window.history.state, "", nextUrl);
+  }, [hydrated]);
+
   const handleAddCustomer = async () => {
     if (!form.firstName || !form.lastName) return;
     setFormLoading(true);
 
     try {
-      const { interestedCity, interestedDistrict, interestedNeighborhood, ...payload } = form;
+      const pickerArea =
+        form.interestedCity && form.interestedDistrict
+          ? [
+              {
+                city: form.interestedCity,
+                district: form.interestedDistrict,
+                neighborhood: form.interestedNeighborhood,
+              },
+            ]
+          : [];
+
+      const savedInterestAreas = normalizeCustomerInterestAreas([
+        ...(Array.isArray(form.interestAreas) ? form.interestAreas : []),
+        ...pickerArea,
+      ]);
+
+      const payload: any = { ...form };
+      delete payload.interestedCity;
+      delete payload.interestedDistrict;
+      delete payload.interestedNeighborhood;
+      delete payload.interestAreas;
+
       await api.post("/crm/customers", {
         ...payload,
-        interestedArea: form.interestedArea || buildInterestedArea(interestedCity, interestedDistrict, interestedNeighborhood),
+        interestedArea: buildInterestedAreaSummary(savedInterestAreas),
+        interestAreas: savedInterestAreas,
         budget: form.budget ? Number(onlyDigits(form.budget)) : undefined,
       });
       await fetchAll();
@@ -1252,7 +1357,7 @@ export default function CrmPage() {
 
   if (!hydrated || loading) {
     return (
-      <main className="eph-v4-shell flex min-h-[100dvh] items-center justify-center bg-[#F4F8FF] text-[#06194A]">
+      <main className={`${crmRoboto.className} eph-v4-shell flex min-h-[100dvh] items-center justify-center bg-[#F4F8FF] text-[#06194A]`}>
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="animate-spin text-[#1557D6]" size={34} />
           <p className="text-xs font-black uppercase tracking-[0.26em] text-slate-500">CRM verileri yükleniyor</p>
@@ -1298,7 +1403,7 @@ export default function CrmPage() {
 
   if (currentUserRole === "TAKIM_LIDERI" && teamLeaderView === "team") {
     return (
-      <main className="min-h-[100dvh] bg-[#F4F8FF] text-[#1F2937]">
+      <main className={`${crmRoboto.className} min-h-[100dvh] bg-[#F4F8FF] text-[#1F2937]`}>
         <section className="mx-auto w-full max-w-7xl px-3 pt-3 sm:px-5 lg:px-6">
           <TeamLeaderModeSwitch activeView={teamLeaderView} onChange={setTeamLeaderView} />
         </section>
@@ -1313,7 +1418,7 @@ export default function CrmPage() {
 
   if (currentUserRole === "MUTEAHHIT") {
     return (
-      <main className="eph-v4-shell min-h-[100dvh] bg-[#F4F8FF] text-[#1F2937]">
+      <main className={`${crmRoboto.className} eph-v4-shell min-h-[100dvh] bg-[#F4F8FF] text-[#1F2937]`}>
         {showAddModal && <AddCustomerModal form={form} setForm={setForm} formLoading={formLoading} provinceOptions={provinceOptions} provinceLoading={provinceLoading} onSubmit={handleAddCustomer} onClose={() => setShowAddModal(false)} />}
         {showCreditModal && <CreditCalculatorModal selectedCustomer={selectedCustomer} saving={activityLoading} onSave={handleSaveCreditCalculation} onClose={() => setShowCreditModal(false)} />}
         {quickPickMode && <QuickPickCustomerModal mode={quickPickMode} customers={customers} onSelect={handleOpenCustomerForAction} onClose={() => setQuickPickMode(null)} />}
@@ -1509,7 +1614,7 @@ export default function CrmPage() {
   }
 
   return (
-    <main className="eph-v4-shell eph-crm-approved-dark min-h-[100dvh] bg-[#031226] text-[#EAF3FF]">
+    <main className={`${crmRoboto.className} eph-v4-shell eph-crm-approved-dark min-h-[100dvh] bg-[#031226] text-[#EAF3FF]`}>
       {showAddModal && <AddCustomerModal form={form} setForm={setForm} formLoading={formLoading} provinceOptions={provinceOptions} provinceLoading={provinceLoading} onSubmit={handleAddCustomer} onClose={() => setShowAddModal(false)} />}
       {showCreditModal && <CreditCalculatorModal selectedCustomer={selectedCustomer} saving={activityLoading} onSave={handleSaveCreditCalculation} onClose={() => setShowCreditModal(false)} />}
       {showQuickNoteModal && <QuickNoteModal customers={customers} saving={activityLoading} onSave={handleSaveQuickNote} onClose={() => setShowQuickNoteModal(false)} />}
@@ -1551,25 +1656,31 @@ export default function CrmPage() {
         )}
 
         <header className="mb-3 overflow-hidden rounded-[28px] border border-[#244667] bg-[linear-gradient(145deg,#0A2342_0%,#081C36_55%,#07172C_100%)] p-3 text-center shadow-[0_18px_45px_rgba(0,0,0,0.25)] md:p-4">
-          <div className="flex items-center justify-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#2B5D87] bg-[#0A2949] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#65B9FF]">
-              <Sparkles size={13} />
-              Akıllı CRM · V2
-            </div>
-          </div>
-
-          <p className="mx-auto mt-3 max-w-xl text-[11px] font-semibold leading-5 text-[#B9CBE0] md:text-sm">
+          <p className="mx-auto max-w-xl text-[12px] font-black leading-5 text-[#FFF8E7] md:text-sm">
             <span className="text-[#71C2FF]">{customers.length} müşteri</span> • {activeCount} aktif lead • {shortMoney(totalBudget)} toplam bütçe
           </p>
 
           <div className="mt-3 grid grid-cols-5 gap-1.5 md:gap-2">
-            <TopCrmCard title="Toplam Kayıt" value={String(customers.length)} icon={<UsersRound size={16} />} onClick={showAllCustomers} />
-            <TopCrmCard title="Eksik Bilgili" value={String(incompleteCount)} icon={<Target size={16} />} onClick={showIncompleteCustomers} />
-            <TopCrmCard title="Sesli Not" value="Not" icon={<FileText size={16} />} onClick={() => setShowQuickNoteModal(true)} />
-            <TopCrmCard title="Kredi" value="Hesapla" icon={<WalletCards size={16} />} onClick={() => setShowCreditModal(true)} highlight />
-            <TopCrmCard title="Yeni Kayıt" value="Ekle" icon={<Plus size={16} />} onClick={() => setShowAddModal(true)} />
+            <TopCrmCard title="Toplam Kayıt" value={String(customers.length)} icon={<UsersRound size={19} strokeWidth={2.8} />} onClick={showAllCustomers} />
+            <TopCrmCard title="Eksik Bilgi" value={String(incompleteCount)} icon={<Target size={19} strokeWidth={2.8} />} onClick={showIncompleteCustomers} />
+            <TopCrmCard title="Sesli Not" value="Not" icon={<FileText size={19} strokeWidth={2.8} />} onClick={() => setShowQuickNoteModal(true)} />
+            <TopCrmCard title="Kredi" value="Hesapla" icon={<WalletCards size={19} strokeWidth={2.8} />} onClick={() => setShowCreditModal(true)} highlight />
+            <TopCrmCard title="Yeni Kayıt" value="Ekle" icon={<Plus size={19} strokeWidth={2.8} />} onClick={() => setShowAddModal(true)} />
           </div>
         </header>
+
+        <button
+          type="button"
+          onClick={() => {
+            resetForm();
+            setSelectedCustomer(null);
+            setShowAddModal(true);
+          }}
+          className="eph-crm-new-customer-button mb-3 flex min-h-[56px] w-full items-center justify-center gap-3 rounded-[18px] border-2 border-[#FFF8E7] bg-[linear-gradient(90deg,#1D4ED8_0%,#2563EB_52%,#1E40AF_100%)] px-4 py-3 text-center text-[16px] font-black text-[#FFF8E7] shadow-[0_14px_34px_rgba(37,99,235,0.34)] transition active:scale-[0.985]"
+        >
+          <Plus size={22} strokeWidth={3} />
+          <span>Yeni Müşteri Ekle</span>
+        </button>
 
         {warmLeadCustomers.length > 0 && (
           <button
@@ -1682,6 +1793,31 @@ export default function CrmPage() {
       </section>
 
       <style jsx global>{`
+        .eph-crm-approved-dark .eph-crm-page button,
+        .eph-crm-approved-dark .eph-crm-page a,
+        .eph-crm-approved-dark .eph-crm-page p,
+        .eph-crm-approved-dark .eph-crm-page span,
+        .eph-crm-approved-dark .eph-crm-page h1,
+        .eph-crm-approved-dark .eph-crm-page h2,
+        .eph-crm-approved-dark .eph-crm-page h3,
+        .eph-crm-approved-dark .eph-crm-page h4,
+        .eph-crm-approved-dark .eph-crm-page label {
+          color: #fff8e7 !important;
+          font-weight: 800 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-page svg {
+          color: #fff8e7 !important;
+          stroke-width: 2.6 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-new-customer-button,
+        .eph-crm-approved-dark .eph-crm-new-customer-button span,
+        .eph-crm-approved-dark .eph-crm-new-customer-button svg {
+          color: #fff8e7 !important;
+          font-weight: 900 !important;
+        }
+
         .premium-input {
           width: 100%;
           border-radius: 18px;
@@ -2584,15 +2720,15 @@ function TopCrmCard({
 }) {
   const content = (
     <>
-      <span className={`mx-auto flex h-8 w-8 items-center justify-center rounded-xl border ${highlight ? "border-[#2FAE72] bg-[#0C302A] text-[#63E6A6]" : "border-[#2D5C86] bg-[#0A2949] text-[#65B9FF]"}`}>
+      <span className={`mx-auto flex h-10 w-10 items-center justify-center rounded-xl border text-[#FFF8E7] ${highlight ? "border-[#4CCB8B] bg-[#0C302A]" : "border-[#4A759C] bg-[#0A2949]"}`}>
         {icon}
       </span>
-      <span className="mt-1.5 block min-h-[21px] text-[7.5px] font-bold uppercase leading-[1.15] tracking-[0.03em] text-[#9FB3C9]">{title}</span>
-      <span className="mt-1 block truncate text-[12px] font-extrabold leading-none text-white">{value}</span>
+      <span className="mt-2 block min-h-[24px] text-[10px] font-black uppercase leading-[1.2] tracking-[0.02em] text-[#FFF8E7]">{title}</span>
+      <span className="mt-1 block truncate text-[13px] font-black leading-none text-[#FFF8E7]">{value}</span>
     </>
   );
 
-  const className = "min-w-0 rounded-[15px] border border-[#294B6B] bg-[linear-gradient(145deg,#102B4A_0%,#0A203A_100%)] px-1.5 py-2.5 text-center transition hover:border-[#3F84B9] active:scale-[0.98]";
+  const className = "min-w-0 rounded-[15px] border border-[#3B6285] bg-[linear-gradient(145deg,#123252_0%,#0A203A_100%)] px-1.5 py-3 text-center shadow-[0_8px_20px_rgba(0,0,0,0.18)] transition hover:border-[#6AA8D6] active:scale-[0.98]";
 
   return onClick ? (
     <button type="button" onClick={onClick} className={className}>{content}</button>
@@ -2903,20 +3039,92 @@ function AddCustomerModal({
   const [customerDistrictLoading, setCustomerDistrictLoading] = useState(false);
   const [customerNeighborhoodLoading, setCustomerNeighborhoodLoading] = useState(false);
 
+  const selectedInterestAreas = normalizeCustomerInterestAreas(form.interestAreas);
+  const groupedInterestAreas = Array.from(
+    selectedInterestAreas
+      .reduce(
+        (
+          groups,
+          area,
+        ) => {
+          const key = [area.city, area.district]
+            .map((value) => value.toLocaleLowerCase("tr-TR"))
+            .join("|");
+          const current = groups.get(key) || {
+            city: area.city,
+            district: area.district,
+            areas: [] as CustomerInterestAreaDraft[],
+          };
+
+          current.areas.push(area);
+          groups.set(key, current);
+          return groups;
+        },
+        new Map<
+          string,
+          {
+            city: string;
+            district: string;
+            areas: CustomerInterestAreaDraft[];
+          }
+        >(),
+      )
+      .values(),
+  );
+
   const setField = (key: string, value: string) => {
     setForm((current: any) => ({ ...current, [key]: value }));
   };
 
-  const setInterestedGeo = (patch: Partial<{ interestedCity: string; interestedDistrict: string; interestedNeighborhood: string }>) => {
+  const setInterestPicker = (
+    patch: Partial<{
+      interestedCity: string;
+      interestedDistrict: string;
+      interestedNeighborhood: string;
+    }>,
+  ) => {
+    setForm((current: any) => ({
+      ...current,
+      ...patch,
+    }));
+  };
+
+  const addInterestArea = () => {
     setForm((current: any) => {
-      const next = {
+      if (!current.interestedCity || !current.interestedDistrict) {
+        return current;
+      }
+
+      const nextAreas = normalizeCustomerInterestAreas([
+        ...(Array.isArray(current.interestAreas) ? current.interestAreas : []),
+        {
+          city: current.interestedCity,
+          district: current.interestedDistrict,
+          neighborhood: current.interestedNeighborhood,
+        },
+      ]);
+
+      return {
         ...current,
-        ...patch,
+        interestAreas: nextAreas,
+        interestedArea: buildInterestedAreaSummary(nextAreas),
+        interestedNeighborhood: "",
       };
+    });
+  };
 
-      next.interestedArea = buildInterestedArea(next.interestedCity, next.interestedDistrict, next.interestedNeighborhood);
+  const removeInterestArea = (areaToRemove: CustomerInterestAreaDraft) => {
+    setForm((current: any) => {
+      const removeKey = interestAreaKey(areaToRemove);
+      const nextAreas = normalizeCustomerInterestAreas(current.interestAreas).filter(
+        (area) => interestAreaKey(area) !== removeKey,
+      );
 
-      return next;
+      return {
+        ...current,
+        interestAreas: nextAreas,
+        interestedArea: buildInterestedAreaSummary(nextAreas),
+      };
     });
   };
 
@@ -3043,7 +3251,7 @@ function AddCustomerModal({
                   <select
                     className="premium-input"
                     value={form.interestedCity}
-                    onChange={(event) => setInterestedGeo({ interestedCity: event.target.value, interestedDistrict: "", interestedNeighborhood: "" })}
+                    onChange={(event) => setInterestPicker({ interestedCity: event.target.value, interestedDistrict: "", interestedNeighborhood: "" })}
                   >
                     <option value="">{provinceLoading ? "İller yükleniyor..." : "İl seç"}</option>
                     {provinceOptions.map((option) => <option key={option.id} value={option.name}>{option.name}</option>)}
@@ -3053,7 +3261,7 @@ function AddCustomerModal({
                   <select
                     className="premium-input"
                     value={form.interestedDistrict}
-                    onChange={(event) => setInterestedGeo({ interestedDistrict: event.target.value, interestedNeighborhood: "" })}
+                    onChange={(event) => setInterestPicker({ interestedDistrict: event.target.value, interestedNeighborhood: "" })}
                     disabled={!form.interestedCity || customerDistrictLoading}
                   >
                     <option value="">{customerDistrictLoading ? "İlçeler yükleniyor..." : "İlçe seç"}</option>
@@ -3064,7 +3272,7 @@ function AddCustomerModal({
                   <select
                     className="premium-input"
                     value={form.interestedNeighborhood}
-                    onChange={(event) => setInterestedGeo({ interestedNeighborhood: event.target.value })}
+                    onChange={(event) => setInterestPicker({ interestedNeighborhood: event.target.value })}
                     disabled={!form.interestedCity || !form.interestedDistrict || customerNeighborhoodLoading}
                   >
                     <option value="">{customerNeighborhoodLoading ? "Mahalleler yükleniyor..." : "Mahalle seç"}</option>
@@ -3073,8 +3281,68 @@ function AddCustomerModal({
                 </Field>
               </div>
 
-              <div className="mt-3 rounded-2xl border-2 border-[#C7D6E8] bg-white px-3 py-2 text-center text-xs font-black text-slate-500">
-                Seçili bölge: <span className="text-[#1557D6]">{form.interestedArea || "Henüz seçilmedi"}</span>
+              <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+                <button
+                  type="button"
+                  onClick={addInterestArea}
+                  disabled={!form.interestedCity || !form.interestedDistrict}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#1557D6] px-4 py-2 text-sm font-black text-white shadow-[0_10px_24px_rgba(21,87,214,0.22)] disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <Plus size={17} />
+                  İlgi Bölgesini Ekle
+                </button>
+                <div className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-[#C7D6E8] bg-white px-4 text-xs font-black text-[#1557D6]">
+                  {selectedInterestAreas.length} bölge seçildi
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-[22px] border-2 border-[#C7D6E8] bg-white p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black text-[#06194A]">Seçilen İlgi Bölgeleri</p>
+                    <p className="mt-0.5 text-[11px] font-bold leading-4 text-slate-500">
+                      Aynı ilçeden birden fazla mahalle ekleyebilirsiniz. Mahalle seçmeden eklerseniz ilçenin tamamı kaydedilir.
+                    </p>
+                  </div>
+                  <MapPin className="shrink-0 text-[#1557D6]" size={20} />
+                </div>
+
+                {groupedInterestAreas.length === 0 ? (
+                  <div className="rounded-2xl border-2 border-dashed border-[#C7D6E8] bg-[#F8FAFC] px-3 py-4 text-center text-xs font-black text-slate-400">
+                    İlgi bölgesi eklemek isteğe bağlıdır.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {groupedInterestAreas.map((group) => (
+                      <div
+                        key={`${group.city}-${group.district}`}
+                        className="rounded-2xl border border-[#C7D6E8] bg-[#F8FAFC] p-2.5"
+                      >
+                        <div className="flex items-center justify-center gap-2 text-center text-xs font-black text-[#06194A]">
+                          <MapPin size={15} className="text-[#1557D6]" />
+                          {group.city} / {group.district}
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap justify-center gap-2">
+                          {group.areas.map((area) => (
+                            <button
+                              key={interestAreaKey(area)}
+                              type="button"
+                              onClick={() => removeInterestArea(area)}
+                              className="inline-flex max-w-full items-center gap-1.5 rounded-full border-2 border-[#9FC0F4] bg-white px-3 py-1.5 text-[11px] font-black text-[#1557D6]"
+                              title="Bu ilgi bölgesini kaldır"
+                            >
+                              <span className="break-words">
+                                {area.neighborhood || "İlçenin tamamı"}
+                              </span>
+                              <X size={13} className="shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="mt-3 grid grid-cols-3 gap-2 md:grid-cols-6">
@@ -3314,7 +3582,7 @@ function GeneralTab({ customer }: { customer: Customer }) {
 }
 
 function RolesTab({ customer, onUpdateRoles }: { customer: Customer; onUpdateRoles: (roles: string[]) => void }) {
-  const selectedRoles = customer.roles || [];
+  const selectedRoles = Array.from(new Set((customer.roles || []).map(normalizeCustomerRole)));
   return (
     <FormSection title="Müşteri Rolleri">
       <p className="mb-4 text-center text-sm font-semibold leading-6 text-slate-500">Bir müşteri aynı anda alıcı, satıcı, yatırımcı veya mal sahibi olabilir. Lina eşleşme motoru bu rolleri dikkate alır.</p>
@@ -3930,3 +4198,5 @@ function TeamLeaderModeSwitch({
     </section>
   );
 }
+
+

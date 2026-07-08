@@ -48,6 +48,42 @@ export class CrmService {
       .filter(Boolean);
   }
 
+  private normalizeCustomerInterestAreas(value: unknown) {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    const seen = new Set<string>();
+
+    return value
+      .map((item) => ({
+        city: String(item?.city ?? '').trim(),
+        district: String(item?.district ?? '').trim(),
+        neighborhood: String(item?.neighborhood ?? '').trim(),
+      }))
+      .filter((item) => item.city && item.district)
+      .filter((item) => {
+        const key = [item.city, item.district, item.neighborhood]
+          .map((part) => part.toLocaleLowerCase('tr-TR'))
+          .join('|');
+
+        if (seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+        return true;
+      });
+  }
+
+  private buildCustomerInterestAreaSummary(
+    areas: Array<{ city: string; district: string; neighborhood: string }>,
+  ) {
+    return areas
+      .map((area) => [area.city, area.district, area.neighborhood].filter(Boolean).join(' / '))
+      .join(' | ');
+  }
+
   private normalizeEnumArray<T extends string>(value: unknown, allowedValues: readonly T[]): T[] | undefined {
     if (value === undefined) {
       return undefined;
@@ -211,7 +247,7 @@ export class CrmService {
         owner: { select: { firstName: true, lastName: true, role: true } },
         activities: { orderBy: { createdAt: 'desc' }, take: 1 },
         tasks: { where: { status: TaskStatus.BEKLIYOR }, orderBy: { dueDate: 'asc' } },
-        interests: { where: { isActive: true }, orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }], take: 3 },
+        interests: { where: { isActive: true }, orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }] },
         properties: { include: { unit: { include: { project: true } } }, take: 3 },
         _count: { select: { activities: true, tasks: true, interests: true, properties: true } },
       },
@@ -220,8 +256,57 @@ export class CrmService {
   }
 
   async createCustomer(userId: string, data: any) {
-    return this.prisma.customer.create({
-      data: { ...this.cleanCustomerData(data), ownerId: userId } as Prisma.CustomerUncheckedCreateInput,
+    const interestAreas = this.normalizeCustomerInterestAreas(data?.interestAreas);
+    const interestedArea =
+      interestAreas.length > 0
+        ? this.buildCustomerInterestAreaSummary(interestAreas)
+        : data?.interestedArea;
+
+    return this.prisma.$transaction(async (transaction) => {
+      const customer = await transaction.customer.create({
+        data: {
+          ...this.cleanCustomerData({
+            ...data,
+            interestedArea,
+          }),
+          ownerId: userId,
+        } as Prisma.CustomerUncheckedCreateInput,
+      });
+
+      if (interestAreas.length > 0) {
+        await transaction.customerInterest.createMany({
+          data: interestAreas.map((area) => ({
+            customerId: customer.id,
+            title: [area.city, area.district, area.neighborhood].filter(Boolean).join(' / '),
+            city: area.city,
+            district: area.district,
+            neighborhood: area.neighborhood || null,
+            propertyTypes: [],
+            statuses: [],
+            minBudget: null,
+            maxBudget: null,
+            priceCurrency: 'TRY',
+            minArea: null,
+            maxArea: null,
+            roomCounts: [],
+            features: [],
+            purchaseIntent: CustomerPurchaseIntent.BELIRSIZ,
+            priority: CustomerInterestPriority.NORMAL,
+            notes: null,
+            isActive: true,
+          })),
+        });
+      }
+
+      return transaction.customer.findUnique({
+        where: { id: customer.id },
+        include: {
+          interests: {
+            where: { isActive: true },
+            orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
+          },
+        },
+      });
     });
   }
 
