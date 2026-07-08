@@ -41,7 +41,10 @@ const marqueeCards = Array.from({ length: 17 }, (_, index) => {
 
   return {
     id: `marquee-vertical-${number}`,
-    image: `/landing/marquee-vertical/vertical-${number}.webp`,
+    image:
+      number === "09"
+        ? "/landing/marquee-vertical/vertical-09-clean.webp"
+        : `/landing/marquee-vertical/vertical-${number}.webp`,
     alt: `EPH dikey vitrin görseli ${number}`,
   };
 });
