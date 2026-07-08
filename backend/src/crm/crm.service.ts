@@ -261,6 +261,16 @@ export class CrmService {
       interestAreas.length > 0
         ? this.buildCustomerInterestAreaSummary(interestAreas)
         : data?.interestedArea;
+    const minBudget = this.normalizeOptionalNumber(data?.minBudget);
+    const maxBudget = this.normalizeOptionalNumber(data?.maxBudget);
+    const hasBudgetRange = minBudget !== undefined && minBudget !== null || maxBudget !== undefined && maxBudget !== null;
+
+    const interestRows =
+      interestAreas.length > 0
+        ? interestAreas
+        : hasBudgetRange
+          ? [{ city: null, district: null, neighborhood: null }]
+          : [];
 
     return this.prisma.$transaction(async (transaction) => {
       const customer = await transaction.customer.create({
@@ -273,18 +283,18 @@ export class CrmService {
         } as Prisma.CustomerUncheckedCreateInput,
       });
 
-      if (interestAreas.length > 0) {
+      if (interestRows.length > 0) {
         await transaction.customerInterest.createMany({
-          data: interestAreas.map((area) => ({
+          data: interestRows.map((area) => ({
             customerId: customer.id,
-            title: [area.city, area.district, area.neighborhood].filter(Boolean).join(' / '),
+            title: [area.city, area.district, area.neighborhood].filter(Boolean).join(' / ') || 'Genel talep profili',
             city: area.city,
             district: area.district,
             neighborhood: area.neighborhood || null,
             propertyTypes: [],
             statuses: [],
-            minBudget: null,
-            maxBudget: null,
+            minBudget: minBudget ?? null,
+            maxBudget: maxBudget ?? null,
             priceCurrency: 'TRY',
             minArea: null,
             maxArea: null,

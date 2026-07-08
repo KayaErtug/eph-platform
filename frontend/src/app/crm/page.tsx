@@ -237,7 +237,7 @@ const PRIORITIES = [
 const ROOM_OPTIONS = ["1+1", "2+1", "3+1", "4+1", "5+1", "Villa", "Stüdyo"];
 const FEATURE_OPTIONS = ["Asansör", "Kapalı Otopark", "Güvenlik", "Site İçerisinde", "Yerden Isıtma", "Jeneratör", "Havuz", "Spa", "Köşe Parsel"];
 
-const TAGS = ["Yatırımcı", "Acil Alıcı", "Nakit Hazır", "Takas", "Yüksek Bütçe", "Sıcak Lead", "Soğuk Lead"];
+const TAGS = ["Yatırımcı", "Acil Alıcı", "Nakit Hazır", "Takasa açık", "Kredi kullanacak", "Yüksek Bütçe", "Sıcak Lead", "Soğuk Lead"];
 
 const LEAD_SOURCE_OPTIONS = [
   "Referans",
@@ -251,13 +251,13 @@ const LEAD_SOURCE_OPTIONS = [
   "Diğer",
 ];
 
-const BUDGET_PRESETS = [
-  { label: "1M", value: "1000000" },
-  { label: "2.5M", value: "2500000" },
-  { label: "5M", value: "5000000" },
-  { label: "10M", value: "10000000" },
-  { label: "25M", value: "25000000" },
-  { label: "50M+", value: "50000000" },
+const BUDGET_RANGE_PRESETS = [
+  { label: "1–2,5M", min: "1000000", max: "2500000" },
+  { label: "2,5–5M", min: "2500000", max: "5000000" },
+  { label: "5–10M", min: "5000000", max: "10000000" },
+  { label: "10–25M", min: "10000000", max: "25000000" },
+  { label: "25–50M", min: "25000000", max: "50000000" },
+  { label: "50M+", min: "50000000", max: "" },
 ];
 
 const CRM_QUICK_AREA_HINTS = ["Denizli", "İzmir", "İstanbul", "Muğla", "Antalya", "K.K.T.C."];
@@ -552,6 +552,35 @@ function formatBudgetInput(value?: string | number | null) {
   return `${Number(digits).toLocaleString("tr-TR")} TL`;
 }
 
+function formatTurkishPhoneInput(value?: string | null) {
+  const digits = onlyDigits(String(value || "")).slice(0, 11);
+  if (!digits) return "";
+
+  return [digits.slice(0, 4), digits.slice(4, 7), digits.slice(7, 9), digits.slice(9, 11)]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function splitCustomerFullName(value?: string | null) {
+  const parts = String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .filter(Boolean);
+
+  if (parts.length < 2) {
+    return {
+      firstName: parts[0] || "",
+      lastName: "",
+    };
+  }
+
+  return {
+    firstName: parts.slice(0, -1).join(" "),
+    lastName: parts[parts.length - 1],
+  };
+}
+
 function buildInterestedArea(city?: string, district?: string, neighborhood?: string) {
   return [city, district, neighborhood].filter(Boolean).join(" / ");
 }
@@ -789,6 +818,7 @@ export default function CrmPage() {
   const [teamLeaderView, setTeamLeaderView] = useState<"personal" | "team">("team");
 
   const [form, setForm] = useState({
+    fullName: "",
     firstName: "",
     lastName: "",
     phone: "",
@@ -797,6 +827,8 @@ export default function CrmPage() {
     profession: "",
     company: "",
     budget: "",
+    minBudget: "",
+    maxBudget: "",
     interestedArea: "",
     interestedCity: "",
     interestedDistrict: "",
@@ -933,6 +965,7 @@ export default function CrmPage() {
 
   const resetForm = () => {
     setForm({
+      fullName: "",
       firstName: "",
       lastName: "",
       phone: "",
@@ -941,6 +974,8 @@ export default function CrmPage() {
       profession: "",
       company: "",
       budget: "",
+      minBudget: "",
+      maxBudget: "",
       interestedArea: "",
       interestedCity: "",
       interestedDistrict: "",
@@ -962,6 +997,7 @@ export default function CrmPage() {
     if (params.get("new") !== "1") return;
 
     setForm({
+      fullName: "",
       firstName: "",
       lastName: "",
       phone: "",
@@ -970,6 +1006,8 @@ export default function CrmPage() {
       profession: "",
       company: "",
       budget: "",
+      minBudget: "",
+      maxBudget: "",
       interestedArea: "",
       interestedCity: "",
       interestedDistrict: "",
@@ -992,7 +1030,17 @@ export default function CrmPage() {
   }, [hydrated]);
 
   const handleAddCustomer = async () => {
-    if (!form.firstName || !form.lastName) return;
+    const { firstName, lastName } = splitCustomerFullName(form.fullName);
+    if (!firstName || !lastName) return;
+
+    const minBudgetValue = form.minBudget ? Number(onlyDigits(form.minBudget)) : undefined;
+    const maxBudgetValue = form.maxBudget ? Number(onlyDigits(form.maxBudget)) : undefined;
+
+    if (minBudgetValue && maxBudgetValue && minBudgetValue > maxBudgetValue) {
+      alert("Minimum bütçe, maksimum bütçeden büyük olamaz.");
+      return;
+    }
+
     setFormLoading(true);
 
     try {
@@ -1012,7 +1060,13 @@ export default function CrmPage() {
         ...pickerArea,
       ]);
 
-      const payload: any = { ...form };
+      const payload: any = {
+        ...form,
+        firstName,
+        lastName,
+        phone: onlyDigits(form.phone).slice(0, 11) || undefined,
+      };
+      delete payload.fullName;
       delete payload.interestedCity;
       delete payload.interestedDistrict;
       delete payload.interestedNeighborhood;
@@ -1022,7 +1076,9 @@ export default function CrmPage() {
         ...payload,
         interestedArea: buildInterestedAreaSummary(savedInterestAreas),
         interestAreas: savedInterestAreas,
-        budget: form.budget ? Number(onlyDigits(form.budget)) : undefined,
+        budget: maxBudgetValue || minBudgetValue,
+        minBudget: minBudgetValue,
+        maxBudget: maxBudgetValue,
       });
       await fetchAll();
       setShowAddModal(false);
@@ -2273,6 +2329,128 @@ export default function CrmPage() {
           border-radius: 999px;
           background: #315a7e;
         }
+
+
+        /* YENI MUSTERI FORMU: premium acik tema */
+        .eph-crm-approved-dark .eph-crm-customer-create-panel {
+          border-color: #b8cce2 !important;
+          background: #f4f8ff !important;
+          color: #1f2937 !important;
+          box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24) !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel .eph-crm-modal-header,
+        .eph-crm-approved-dark .eph-crm-customer-create-panel > [class*="sticky"][class*="bottom-0"] {
+          border-color: #c7d6e8 !important;
+          background: rgba(255, 255, 255, 0.97) !important;
+          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06) !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel .eph-crm-modal-body {
+          border-top-color: #c7d6e8 !important;
+          background: #f4f8ff !important;
+          box-shadow: none !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel .eph-crm-create-basic {
+          border-color: #bfd5ec !important;
+          background: #f7fbff !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel .eph-crm-create-roles {
+          border-color: #d8c9ee !important;
+          background: #faf7ff !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel .eph-crm-create-interest {
+          border-color: #b9ddcb !important;
+          background: #f3fbf7 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel .eph-crm-create-tags {
+          border-color: #efd3a9 !important;
+          background: #fff9f0 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel .premium-input,
+        .eph-crm-approved-dark .eph-crm-customer-create-panel input,
+        .eph-crm-approved-dark .eph-crm-customer-create-panel textarea,
+        .eph-crm-approved-dark .eph-crm-customer-create-panel select {
+          border-color: #b8cbe0 !important;
+          background: #ffffff !important;
+          color: #1f2937 !important;
+          caret-color: #2563eb !important;
+          box-shadow: none !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel .premium-input:focus,
+        .eph-crm-approved-dark .eph-crm-customer-create-panel input:focus,
+        .eph-crm-approved-dark .eph-crm-customer-create-panel textarea:focus,
+        .eph-crm-approved-dark .eph-crm-customer-create-panel select:focus {
+          border-color: #2563eb !important;
+          box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1) !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel input::placeholder,
+        .eph-crm-approved-dark .eph-crm-customer-create-panel textarea::placeholder {
+          color: #94a3b8 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel option {
+          background: #ffffff !important;
+          color: #1f2937 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel [class*="text-[#06194A]"],
+        .eph-crm-approved-dark .eph-crm-customer-create-panel [class*="text-[#1F2937]"] {
+          color: #1f2937 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel [class*="text-[#64748B]"],
+        .eph-crm-approved-dark .eph-crm-customer-create-panel [class*="text-slate-4"],
+        .eph-crm-approved-dark .eph-crm-customer-create-panel [class*="text-slate-5"],
+        .eph-crm-approved-dark .eph-crm-customer-create-panel [class*="text-slate-6"] {
+          color: #64748b !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel [class*="bg-[#FFFFFF]"],
+        .eph-crm-approved-dark .eph-crm-customer-create-panel [class*="bg-white"] {
+          background-color: #ffffff !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel [class*="border-[#C7D6E8]"] {
+          border-color: #c7d6e8 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel .eph-crm-create-close {
+          border-color: #d5e0ec !important;
+          background: #f8fafc !important;
+          color: #64748b !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel .eph-crm-multiselect-chip {
+          border-color: var(--eph-select-accent) !important;
+          background: #ffffff !important;
+          color: var(--eph-select-accent) !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel .eph-crm-interest-chip {
+          border-color: #9ecdb8 !important;
+          background: #ffffff !important;
+          color: #047857 !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel button[class*="bg-[#2563EB]"] {
+          border-color: #2563eb !important;
+          background: #2563eb !important;
+          color: #ffffff !important;
+        }
+
+        .eph-crm-approved-dark .eph-crm-customer-create-panel button[class*="bg-[#059669]"] {
+          border-color: #059669 !important;
+          background: #059669 !important;
+          color: #ffffff !important;
+        }
       `}</style>
     </main>
   );
@@ -3033,6 +3211,10 @@ function AddCustomerModal({
   onClose: () => void;
 }) {
   const selectedStatus = PIPELINE_STAGES.find((stage) => stage.key === form.status) || PIPELINE_STAGES[0];
+  const parsedFullName = splitCustomerFullName(form.fullName);
+  const minBudgetNumber = form.minBudget ? Number(onlyDigits(form.minBudget)) : 0;
+  const maxBudgetNumber = form.maxBudget ? Number(onlyDigits(form.maxBudget)) : 0;
+  const budgetRangeInvalid = Boolean(minBudgetNumber && maxBudgetNumber && minBudgetNumber > maxBudgetNumber);
 
   const [customerDistrictOptions, setCustomerDistrictOptions] = useState<GeoOption[]>([]);
   const [customerNeighborhoodOptions, setCustomerNeighborhoodOptions] = useState<GeoOption[]>([]);
@@ -3074,6 +3256,25 @@ function AddCustomerModal({
 
   const setField = (key: string, value: string) => {
     setForm((current: any) => ({ ...current, [key]: value }));
+  };
+
+  const setFullName = (value: string) => {
+    const nextFullName = value.replace(/\s{2,}/g, " ").slice(0, 80);
+    const names = splitCustomerFullName(nextFullName);
+
+    setForm((current: any) => ({
+      ...current,
+      fullName: nextFullName,
+      firstName: names.firstName,
+      lastName: names.lastName,
+    }));
+  };
+
+  const setPhone = (value: string) => {
+    setForm((current: any) => ({
+      ...current,
+      phone: onlyDigits(value).slice(0, 11),
+    }));
   };
 
   const setInterestPicker = (
@@ -3183,70 +3384,136 @@ function AddCustomerModal({
   }, [form.interestedCity, form.interestedDistrict, form.interestedNeighborhood, customerDistrictOptions]);
 
   return (
-    <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-end justify-center bg-[#06194A]/60 p-0 backdrop-blur-sm md:items-center md:p-4" onClick={onClose}>
+    <div className="eph-crm-modal-overlay fixed inset-0 z-[9999] flex items-end justify-center bg-[#1F2937]/45 p-0 backdrop-blur-sm md:items-center md:p-4" onClick={onClose}>
       <div
-        className="eph-crm-modal-panel flex h-[min(94dvh,820px)] w-full max-w-3xl flex-col overflow-hidden rounded-t-[30px] border-2 border-[#C7D6E8] bg-white shadow-2xl md:h-auto md:max-h-[92dvh] md:rounded-[32px]"
+        className="eph-crm-modal-panel eph-crm-customer-create-panel flex h-[min(94dvh,860px)] w-full max-w-4xl flex-col overflow-hidden rounded-t-[30px] border-[3px] border-[#B8CCE2] bg-[#F4F8FF] shadow-[0_24px_70px_rgba(15,23,42,0.22)] md:h-auto md:max-h-[94dvh] md:rounded-[32px]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="eph-crm-modal-header sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 pb-4 pt-[calc(14px+env(safe-area-inset-top,0px))] backdrop-blur md:p-5">
-          <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-slate-200 md:hidden" />
+        <div className="eph-crm-modal-header sticky top-0 z-20 border-b-2 border-[#C7D6E8] bg-[#FFFFFF]/95 px-4 pb-4 pt-[calc(14px+env(safe-area-inset-top,0px))] backdrop-blur md:p-5">
+          <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-[#D8E3EF] md:hidden" />
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 text-center">
-              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#1557D6]">CRM V2</p>
-              <h2 className="mt-1 text-[22px] font-black tracking-tight text-[#06194A] md:text-[25px]">Yeni Müşteri Ekle</h2>
-              <p className="mx-auto mt-2 max-w-xl text-xs font-bold leading-5 text-slate-500">
-                Önce kimlik ve iletişim, sonra rol + talep profili. Boş bırakılan alanlar CRM kartında gizlenir.
+              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#2563EB]">CRM Müşteri Kartı</p>
+              <h2 className="mt-1 text-[22px] font-black tracking-tight text-[#1F2937] md:text-[26px]">Yeni Müşteri Ekle</h2>
+              <p className="mx-auto mt-2 max-w-xl text-xs font-bold leading-5 text-[#64748B]">
+                Bilgileri hızlıca girin; ilgi bölgeleri, roller ve etiketler isteğe bağlıdır.
               </p>
             </div>
 
-            <button type="button" onClick={onClose} className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 md:static">
+            <button type="button" onClick={onClose} className="eph-crm-create-close absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-2xl border-2 border-[#D5E0EC] bg-[#F8FAFC] text-[#64748B] md:static">
               <X size={20} />
             </button>
           </div>
         </div>
 
-        <div className="eph-crm-modal-body flex-1 space-y-5 overflow-y-auto px-4 py-5 md:px-5">
-          <FormSection title="1. Temel Bilgiler">
-            <div className="rounded-[24px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3 md:p-4">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <Field label="Ad *"><input className="premium-input" placeholder="Örn. Ahmet" value={form.firstName} onChange={(event) => setField("firstName", event.target.value)} /></Field>
-                <Field label="Soyad *"><input className="premium-input" placeholder="Örn. Yılmaz" value={form.lastName} onChange={(event) => setField("lastName", event.target.value)} /></Field>
-                <Field label="Telefon"><input className="premium-input" inputMode="tel" placeholder="05xx xxx xx xx" value={form.phone} onChange={(event) => setField("phone", event.target.value)} /></Field>
-                <Field label="E-posta"><input className="premium-input" type="email" inputMode="email" placeholder="ornek@mail.com" value={form.email} onChange={(event) => setField("email", event.target.value)} /></Field>
+        <div className="eph-crm-modal-body flex-1 space-y-5 overflow-y-auto bg-[#F4F8FF] px-4 py-5 md:px-5">
+          <FormSection title="1. Müşteri Kartı">
+            <div className="eph-crm-create-section eph-crm-create-basic rounded-[24px] border-[3px] border-[#BFD5EC] bg-[#F7FBFF] p-3 shadow-[0_12px_28px_rgba(37,99,235,0.07)] md:p-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Ad Soyad *">
+                  <input
+                    className="premium-input"
+                    placeholder="Örn. Ahmet Yılmaz"
+                    value={form.fullName}
+                    maxLength={80}
+                    onChange={(event) => setFullName(event.target.value)}
+                  />
+                </Field>
+                <Field label="Telefon (11 hane)">
+                  <input
+                    className="premium-input"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    placeholder="05xx xxx xx xx"
+                    value={formatTurkishPhoneInput(form.phone)}
+                    maxLength={14}
+                    onChange={(event) => setPhone(event.target.value)}
+                  />
+                </Field>
+                <Field label="E-posta">
+                  <input className="premium-input" type="email" inputMode="email" placeholder="ornek@mail.com" value={form.email} onChange={(event) => setField("email", event.target.value)} />
+                </Field>
                 <Field label="Şehir">
                   <select className="premium-input" value={form.city} onChange={(event) => setField("city", event.target.value)}>
                     <option value="">{provinceLoading ? "Şehirler yükleniyor..." : "Şehir seç"}</option>
                     {provinceOptions.map((option) => <option key={option.id} value={option.name}>{option.name}</option>)}
                   </select>
                 </Field>
-                <Field label="Meslek / Ünvan"><input className="premium-input" placeholder="Örn. Öğretmen, yatırımcı" value={form.profession} onChange={(event) => setField("profession", event.target.value)} /></Field>
-                <div className="md:col-span-2">
-                  <Field label="Firma"><input className="premium-input" placeholder="Varsa firma / ofis adı" value={form.company} onChange={(event) => setField("company", event.target.value)} /></Field>
-                </div>
+                <Field label="Meslek / Ünvan">
+                  <input className="premium-input" placeholder="Örn. Öğretmen, yatırımcı" value={form.profession} onChange={(event) => setField("profession", event.target.value)} />
+                </Field>
+                <Field label="Firma / Ofis">
+                  <input className="premium-input" placeholder="Varsa firma veya ofis adı" value={form.company} onChange={(event) => setField("company", event.target.value)} />
+                </Field>
               </div>
+              {form.fullName && !parsedFullName.lastName && (
+                <p className="mt-2 text-center text-[11px] font-black text-[#B45309]">Ad ve soyadı birlikte yazın.</p>
+              )}
             </div>
           </FormSection>
 
           <FormSection title="2. Müşteri Rolleri">
-            <div className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-3 md:p-4">
-              <p className="mb-3 text-center text-xs font-bold leading-5 text-slate-500">Bir müşteri aynı anda alıcı, satıcı, yatırımcı veya mal sahibi olabilir.</p>
-              <MultiOptionGrid options={CUSTOMER_ROLES} value={form.roles} onChange={(roles) => setForm((current: any) => ({ ...current, roles }))} />
+            <div className="eph-crm-create-section eph-crm-create-roles rounded-[24px] border-[3px] border-[#D8C9EE] bg-[#FAF7FF] p-3 shadow-[0_12px_28px_rgba(124,58,237,0.07)] md:p-4">
+              <MultiSelectDropdown
+                label="Müşteri Rolleri"
+                placeholder="Rol seçin"
+                helper="Bir müşteri için birden fazla rol seçebilirsiniz."
+                options={CUSTOMER_ROLES}
+                value={form.roles}
+                onChange={(roles) => setForm((current: any) => ({ ...current, roles }))}
+                accent="#7C3AED"
+              />
             </div>
           </FormSection>
 
           <FormSection title="3. İlgi & Bütçe">
-            <div className="rounded-[24px] border-2 border-[#C7D6E8] bg-[#F8FAFC] p-3 md:p-4">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <Field label="Bütçe">
+            <div className="eph-crm-create-section eph-crm-create-interest rounded-[24px] border-[3px] border-[#B9DDCB] bg-[#F3FBF7] p-3 shadow-[0_12px_28px_rgba(5,150,105,0.07)] md:p-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Minimum Bütçe">
+                  <input
+                    className="premium-input"
+                    inputMode="numeric"
+                    type="text"
+                    placeholder="Örn. 2.500.000 TL"
+                    value={formatBudgetInput(form.minBudget)}
+                    onChange={(event) => setField("minBudget", onlyDigits(event.target.value))}
+                  />
+                </Field>
+                <Field label="Maksimum Bütçe">
                   <input
                     className="premium-input"
                     inputMode="numeric"
                     type="text"
                     placeholder="Örn. 5.000.000 TL"
-                    value={formatBudgetInput(form.budget)}
-                    onChange={(event) => setField("budget", onlyDigits(event.target.value))}
+                    value={formatBudgetInput(form.maxBudget)}
+                    onChange={(event) => setField("maxBudget", onlyDigits(event.target.value))}
                   />
                 </Field>
+              </div>
+
+              {budgetRangeInvalid && (
+                <p className="mt-2 rounded-xl border-2 border-[#F2B8B5] bg-[#FFF1F0] px-3 py-2 text-center text-xs font-black text-[#B42318]">
+                  Minimum bütçe maksimum bütçeden büyük olamaz.
+                </p>
+              )}
+
+              <div className="mt-3 grid grid-cols-3 gap-2 md:grid-cols-6">
+                {BUDGET_RANGE_PRESETS.map((preset) => {
+                  const active = form.minBudget === preset.min && form.maxBudget === preset.max;
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setForm((current: any) => ({ ...current, minBudget: preset.min, maxBudget: preset.max }))}
+                      className={`rounded-2xl border-2 px-2 py-2 text-xs font-black transition ${active ? "border-[#059669] bg-[#DDF7EA] text-[#047857]" : "border-[#C7D6E8] bg-[#FFFFFF] text-[#64748B]"}`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="İlgilendiği İl">
                   <select
                     className="premium-input"
@@ -3279,36 +3546,42 @@ function AddCustomerModal({
                     {customerNeighborhoodOptions.map((option) => <option key={option.id} value={option.name}>{option.name}</option>)}
                   </select>
                 </Field>
+                <Field label="Mülk Tipi">
+                  <select className="premium-input" value={form.interestedType} onChange={(event) => setField("interestedType", event.target.value)}>
+                    <option value="">Mülk tipi seç</option>
+                    {PROPERTY_TYPE_OPTIONS.map((item) => <option key={item.key} value={item.label}>{item.label}</option>)}
+                  </select>
+                </Field>
               </div>
 
-              <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
                 <button
                   type="button"
                   onClick={addInterestArea}
                   disabled={!form.interestedCity || !form.interestedDistrict}
-                  className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#1557D6] px-4 py-2 text-sm font-black text-white shadow-[0_10px_24px_rgba(21,87,214,0.22)] disabled:cursor-not-allowed disabled:opacity-45"
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#059669] px-4 py-2 text-sm font-black text-white shadow-[0_10px_24px_rgba(5,150,105,0.20)] disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Plus size={17} />
                   İlgi Bölgesini Ekle
                 </button>
-                <div className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-[#C7D6E8] bg-white px-4 text-xs font-black text-[#1557D6]">
+                <div className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-[#A7D7C2] bg-[#FFFFFF] px-4 text-xs font-black text-[#047857]">
                   {selectedInterestAreas.length} bölge seçildi
                 </div>
               </div>
 
-              <div className="mt-3 rounded-[22px] border-2 border-[#C7D6E8] bg-white p-3">
+              <div className="mt-3 rounded-[22px] border-[3px] border-[#C4DED2] bg-[#FFFFFF] p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-black text-[#06194A]">Seçilen İlgi Bölgeleri</p>
-                    <p className="mt-0.5 text-[11px] font-bold leading-4 text-slate-500">
+                    <p className="text-sm font-black text-[#1F2937]">Seçilen İlgi Bölgeleri</p>
+                    <p className="mt-0.5 text-[11px] font-bold leading-4 text-[#64748B]">
                       Aynı ilçeden birden fazla mahalle ekleyebilirsiniz. Mahalle seçmeden eklerseniz ilçenin tamamı kaydedilir.
                     </p>
                   </div>
-                  <MapPin className="shrink-0 text-[#1557D6]" size={20} />
+                  <MapPin className="shrink-0 text-[#059669]" size={20} />
                 </div>
 
                 {groupedInterestAreas.length === 0 ? (
-                  <div className="rounded-2xl border-2 border-dashed border-[#C7D6E8] bg-[#F8FAFC] px-3 py-4 text-center text-xs font-black text-slate-400">
+                  <div className="rounded-2xl border-2 border-dashed border-[#B9DDCB] bg-[#F7FCF9] px-3 py-4 text-center text-xs font-black text-[#7A9186]">
                     İlgi bölgesi eklemek isteğe bağlıdır.
                   </div>
                 ) : (
@@ -3316,10 +3589,10 @@ function AddCustomerModal({
                     {groupedInterestAreas.map((group) => (
                       <div
                         key={`${group.city}-${group.district}`}
-                        className="rounded-2xl border border-[#C7D6E8] bg-[#F8FAFC] p-2.5"
+                        className="rounded-2xl border-2 border-[#C4DED2] bg-[#F7FCF9] p-2.5"
                       >
-                        <div className="flex items-center justify-center gap-2 text-center text-xs font-black text-[#06194A]">
-                          <MapPin size={15} className="text-[#1557D6]" />
+                        <div className="flex items-center justify-center gap-2 text-center text-xs font-black text-[#1F2937]">
+                          <MapPin size={15} className="text-[#059669]" />
                           {group.city} / {group.district}
                         </div>
 
@@ -3329,7 +3602,7 @@ function AddCustomerModal({
                               key={interestAreaKey(area)}
                               type="button"
                               onClick={() => removeInterestArea(area)}
-                              className="inline-flex max-w-full items-center gap-1.5 rounded-full border-2 border-[#9FC0F4] bg-white px-3 py-1.5 text-[11px] font-black text-[#1557D6]"
+                              className="eph-crm-interest-chip inline-flex max-w-full items-center gap-1.5 rounded-full border-2 border-[#9ECDB8] bg-[#FFFFFF] px-3 py-1.5 text-[11px] font-black text-[#047857]"
                               title="Bu ilgi bölgesini kaldır"
                             >
                               <span className="break-words">
@@ -3345,59 +3618,61 @@ function AddCustomerModal({
                 )}
               </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-2 md:grid-cols-6">
-                {BUDGET_PRESETS.map((preset) => (
-                  <button key={preset.value} type="button" onClick={() => setField("budget", preset.value)} className={`rounded-2xl border px-2 py-2 text-xs font-black ${form.budget === preset.value ? "border-[#1557D6] bg-[#0C2A48] text-[#71C2FF]" : "border-slate-200 bg-white text-slate-500"}`}>
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-
-
-              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                <Field label="Mülk Tipi">
-                  <select className="premium-input" value={form.interestedType} onChange={(event) => setField("interestedType", event.target.value)}>
-                    <option value="">Mülk tipi seç</option>
-                    {PROPERTY_TYPE_OPTIONS.map((item) => <option key={item.key} value={item.label}>{item.label}</option>)}
-                  </select>
-                </Field>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Lead Kaynağı">
                   <select className="premium-input" value={form.source} onChange={(event) => setField("source", event.target.value)}>
                     <option value="">Kaynak seç</option>
                     {LEAD_SOURCE_OPTIONS.map((source) => <option key={source} value={source}>{source}</option>)}
                   </select>
                 </Field>
-                <div className="md:col-span-2">
-                  <Field label="Durum">
-                    <select className="premium-input" value={form.status} onChange={(event) => setField("status", event.target.value)}>
-                      {PIPELINE_STAGES.map((stage) => <option key={stage.key} value={stage.key}>{stage.label}</option>)}
-                    </select>
-                  </Field>
-                  <div className="mt-2 rounded-2xl px-3 py-2 text-center text-xs font-black" style={{ backgroundColor: selectedStatus.bg, color: selectedStatus.color }}>
-                    CRM aşaması: {selectedStatus.label}
-                  </div>
-                </div>
+                <Field label="CRM Durumu">
+                  <select className="premium-input" value={form.status} onChange={(event) => setField("status", event.target.value)}>
+                    {PIPELINE_STAGES.map((stage) => <option key={stage.key} value={stage.key}>{stage.label}</option>)}
+                  </select>
+                </Field>
+              </div>
+
+              <div className="mt-2 rounded-2xl border-2 border-[#C7D6E8] px-3 py-2 text-center text-xs font-black" style={{ backgroundColor: selectedStatus.bg, color: selectedStatus.color }}>
+                CRM aşaması: {selectedStatus.label}
               </div>
             </div>
           </FormSection>
 
-          <FormSection title="4. Etiketler">
-            <div className="rounded-[24px] border-2 border-[#C7D6E8] bg-white p-3 md:p-4">
-              <MultiOptionGrid options={TAGS.map((tag) => ({ key: tag, label: tag }))} value={form.tags} onChange={(tags) => setForm((current: any) => ({ ...current, tags }))} />
+          <FormSection title="4. Etiketler & Notlar">
+            <div className="eph-crm-create-section eph-crm-create-tags rounded-[24px] border-[3px] border-[#EFD3A9] bg-[#FFF9F0] p-3 shadow-[0_12px_28px_rgba(217,119,6,0.07)] md:p-4">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <MultiSelectDropdown
+                  label="Etiketler"
+                  placeholder="Etiket seçin"
+                  helper="Birden fazla etiket seçebilirsiniz."
+                  options={TAGS.map((tag) => ({ key: tag, label: tag }))}
+                  value={form.tags}
+                  onChange={(tags) => setForm((current: any) => ({ ...current, tags }))}
+                  accent="#D97706"
+                />
+                <Field label="Müşteri Notu">
+                  <textarea
+                    className="premium-input min-h-[132px] resize-none py-3 text-left"
+                    placeholder="Müşterinin özel notu, beklentisi, randevu bilgisi..."
+                    value={form.notes}
+                    onChange={(event) => setField("notes", event.target.value)}
+                  />
+                </Field>
+              </div>
             </div>
-          </FormSection>
-
-          <FormSection title="5. Not">
-            <textarea className="premium-input min-h-[104px] resize-none py-3 text-left" placeholder="Müşterinin özel notu, beklentisi, randevu bilgisi..." value={form.notes} onChange={(event) => setField("notes", event.target.value)} />
           </FormSection>
         </div>
 
-        <div className="sticky bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 pb-[calc(14px+env(safe-area-inset-bottom,0px))] pt-4 backdrop-blur md:p-5">
+        <div className="sticky bottom-0 z-20 border-t-2 border-[#C7D6E8] bg-[#FFFFFF]/95 px-4 pb-[calc(14px+env(safe-area-inset-bottom,0px))] pt-4 backdrop-blur md:p-5">
           <div className="grid grid-cols-[1fr_auto] gap-3">
-            <button onClick={onSubmit} disabled={formLoading || !form.firstName || !form.lastName} className="flex h-12 items-center justify-center rounded-2xl bg-[#1557D6] px-4 text-sm font-black text-white disabled:opacity-50">
+            <button
+              onClick={onSubmit}
+              disabled={formLoading || !parsedFullName.firstName || !parsedFullName.lastName || budgetRangeInvalid}
+              className="flex h-12 items-center justify-center rounded-2xl bg-[#2563EB] px-4 text-sm font-black text-white shadow-[0_10px_22px_rgba(37,99,235,0.22)] disabled:opacity-50"
+            >
               {formLoading ? "Kaydediliyor..." : "Müşteri Ekle"}
             </button>
-            <button onClick={onClose} className="flex h-12 items-center justify-center rounded-2xl border-2 border-[#C7D6E8] px-5 text-sm font-black text-slate-500">İptal</button>
+            <button onClick={onClose} className="flex h-12 items-center justify-center rounded-2xl border-2 border-[#C7D6E8] bg-[#FFFFFF] px-5 text-sm font-black text-[#64748B]">İptal</button>
           </div>
         </div>
       </div>
@@ -4099,6 +4374,87 @@ function TasksTab({ customer, taskForm, setTaskForm, taskLoading, onAddTask, onT
         }) : <EmptyBox text="Henüz görev yok" />}
       </div>
     </FormSection>
+  );
+}
+
+function MultiSelectDropdown({
+  label,
+  placeholder,
+  helper,
+  options,
+  value,
+  onChange,
+  accent,
+}: {
+  label: string;
+  placeholder: string;
+  helper?: string;
+  options: { key: string; label: string }[];
+  value: string[];
+  onChange: (value: string[]) => void;
+  accent: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedOptions = options.filter((option) => value.includes(option.key));
+
+  return (
+    <div className="w-full">
+      <p className="mb-2 text-center text-xs font-black text-[#475569]">{label}</p>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+        className="flex min-h-[48px] w-full items-center justify-between gap-3 rounded-[18px] border-2 border-[#B8CBE0] bg-[#FFFFFF] px-4 py-3 text-left shadow-[0_6px_16px_rgba(15,23,42,0.04)]"
+      >
+        <span className={`min-w-0 flex-1 break-words text-sm font-black ${selectedOptions.length ? "text-[#1F2937]" : "text-[#94A3B8]"}`}>
+          {selectedOptions.length ? `${selectedOptions.length} seçim yapıldı` : placeholder}
+        </span>
+        <ChevronRight size={18} className={`shrink-0 text-[#64748B] transition ${open ? "rotate-90" : ""}`} />
+      </button>
+
+      {helper && <p className="mt-2 text-center text-[11px] font-bold leading-4 text-[#64748B]">{helper}</p>}
+
+      {selectedOptions.length > 0 && (
+        <div className="mt-2 flex flex-wrap justify-center gap-2">
+          {selectedOptions.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => onChange(value.filter((item) => item !== option.key))}
+              className="eph-crm-multiselect-chip inline-flex max-w-full items-center gap-1.5 rounded-full border-2 bg-[#FFFFFF] px-3 py-1.5 text-[11px] font-black"
+              style={{ "--eph-select-accent": accent } as any}
+            >
+              <span className="break-words">{option.label}</span>
+              <X size={13} className="shrink-0" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div className="mt-3 grid grid-cols-1 gap-2 rounded-[20px] border-2 border-[#C7D6E8] bg-[#FFFFFF] p-2 sm:grid-cols-2">
+          {options.map((option) => {
+            const active = value.includes(option.key);
+            return (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => onChange(active ? value.filter((item) => item !== option.key) : [...value, option.key])}
+                className="flex min-h-[44px] items-center justify-between gap-3 rounded-2xl border-2 px-3 py-2 text-left text-xs font-black transition"
+                style={{
+                  borderColor: active ? accent : "#D5E0EC",
+                  backgroundColor: active ? `${accent}14` : "#F8FAFC",
+                  color: active ? accent : "#475569",
+                }}
+              >
+                <span className="break-words">{option.label}</span>
+                {active && <CheckCircle2 size={17} className="shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
