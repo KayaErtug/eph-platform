@@ -11,6 +11,7 @@ import {
   KontorHareketTuru,
   KontorIslemTuru,
   PortfolioApprovalStatus,
+  ProjectSetupStatus,
   Role,
   UnitStatus,
   UnitType,
@@ -307,6 +308,76 @@ export class UnitsService {
     };
   }
 
+  private getPortfolioVisibleProjectWhere() {
+    return {
+      OR: [
+        {
+          code: null,
+          declaredIndependentUnitCount: null,
+          declaredSalesInventoryCount: null,
+          plannedUnitTypes: {
+            isEmpty: true,
+          },
+          blocks: {
+            none: {},
+          },
+          mediaPackages: {
+            none: {},
+          },
+          designReviewRequests: {
+            none: {},
+          },
+        },
+        {
+          setupStatus: ProjectSetupStatus.TAMAMLANDI,
+        },
+      ],
+    };
+  }
+
+  private isProjectVisibleInPortfolio(project: {
+    code?: string | null;
+    declaredIndependentUnitCount?: number | null;
+    declaredSalesInventoryCount?: number | null;
+    plannedUnitTypes?: unknown[] | null;
+    setupStatus?: ProjectSetupStatus | string | null;
+    _count?: {
+      blocks?: number;
+      mediaPackages?: number;
+      designReviewRequests?: number;
+    } | null;
+  }) {
+    const looksLikeProjectSalesProject = Boolean(
+      project.code ||
+        project.declaredIndependentUnitCount !== null ||
+        project.declaredSalesInventoryCount !== null ||
+        (Array.isArray(project.plannedUnitTypes) &&
+          project.plannedUnitTypes.length > 0) ||
+        Number(project._count?.blocks || 0) > 0 ||
+        Number(project._count?.mediaPackages || 0) > 0 ||
+        Number(project._count?.designReviewRequests || 0) > 0,
+    );
+
+    return (
+      !looksLikeProjectSalesProject ||
+      project.setupStatus === ProjectSetupStatus.TAMAMLANDI
+    );
+  }
+
+  private ensureProjectVisibleForPortfolioActions(project: {
+    code?: string | null;
+    declaredIndependentUnitCount?: number | null;
+    declaredSalesInventoryCount?: number | null;
+    plannedUnitTypes?: unknown[] | null;
+    setupStatus?: ProjectSetupStatus | string | null;
+  }) {
+    if (this.isProjectVisibleInPortfolio(project)) return;
+
+    throw new BadRequestException(
+      'Proje satış modülündeki projeler tamamlanmadan portföyde yayınlanamaz veya paylaşılamaz.',
+    );
+  }
+
   private async getUnitWithProjectOrFail(id: string) {
     const unit = await this.prisma.unit.findUnique({
       where: { id },
@@ -342,6 +413,8 @@ export class UnitsService {
     if (!unit) {
       throw new NotFoundException('Portföy bulunamadı.');
     }
+
+    this.ensureProjectVisibleForPortfolioActions(unit.project);
 
     if (!unit.isPoolVisible || unit.approvalStatus !== PortfolioApprovalStatus.HAVUZDA) {
       throw new BadRequestException('Bu portföy şu anda Havuz içinde aktif değil.');
@@ -1142,7 +1215,26 @@ export class UnitsService {
   async findOne(user: CurrentUserPayload, id: string) {
     const unit = await this.prisma.unit.findUnique({
       where: { id },
-      include: unitInclude,
+      include: {
+        ...unitInclude,
+        project: {
+          select: {
+            ...unitInclude.project.select,
+            code: true,
+            declaredIndependentUnitCount: true,
+            declaredSalesInventoryCount: true,
+            plannedUnitTypes: true,
+            setupStatus: true,
+            _count: {
+              select: {
+                blocks: true,
+                mediaPackages: true,
+                designReviewRequests: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!unit) {
@@ -1150,6 +1242,10 @@ export class UnitsService {
     }
 
     this.ensureCanViewUnit(user, unit.project.ownerId);
+
+    if (!this.isProjectVisibleInPortfolio(unit.project)) {
+      throw new NotFoundException('Portföy bulunamadı.');
+    }
 
     return this.redactDoorAccessInfo(user, unit);
   }
@@ -1182,6 +1278,7 @@ export class UnitsService {
         approvalStatus: approvalStatus || {
           in: approvalStatuses,
         },
+        project: this.getPortfolioVisibleProjectWhere(),
       },
       include: unitInclude,
       orderBy: [
@@ -1201,7 +1298,22 @@ export class UnitsService {
   ) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true, ownerId: true },
+      select: {
+        id: true,
+        ownerId: true,
+        code: true,
+        declaredIndependentUnitCount: true,
+        declaredSalesInventoryCount: true,
+        plannedUnitTypes: true,
+        setupStatus: true,
+        _count: {
+          select: {
+            blocks: true,
+            mediaPackages: true,
+            designReviewRequests: true,
+          },
+        },
+      },
     });
 
     if (!project) {
@@ -1209,6 +1321,10 @@ export class UnitsService {
     }
 
     this.ensureCanViewUnit(user, project.ownerId);
+
+    if (!this.isProjectVisibleInPortfolio(project)) {
+      throw new NotFoundException('Proje bulunamadı.');
+    }
 
     const units = await this.prisma.unit.findMany({
       where: {
@@ -1242,6 +1358,7 @@ export class UnitsService {
           ...(this.isSuperAdmin(user) || this.isAdmin(user) || this.isModerator(user)
             ? {}
             : { ownerId: user.id }),
+          ...this.getPortfolioVisibleProjectWhere(),
           isActive: true,
           city: filters?.city
             ? { contains: filters.city, mode: 'insensitive' }
@@ -1270,6 +1387,7 @@ export class UnitsService {
         status: filters?.status,
         type: filters?.type,
         project: {
+          ...this.getPortfolioVisibleProjectWhere(),
           isActive: true,
           city: filters?.city
             ? { contains: filters.city, mode: 'insensitive' }
@@ -1527,15 +1645,130 @@ export class UnitsService {
 
     const unit = await this.prisma.unit.findUnique({
       where: { id: shareLink.unitId },
-      include: unitInclude,
+      include: {
+        ...unitInclude,
+        project: {
+          select: {
+            ...unitInclude.project.select,
+            code: true,
+            declaredIndependentUnitCount: true,
+            declaredSalesInventoryCount: true,
+            plannedUnitTypes: true,
+            setupStatus: true,
+          },
+        },
+      },
     });
 
     if (
       !unit ||
       !unit.isPoolVisible ||
-      unit.approvalStatus !== PortfolioApprovalStatus.HAVUZDA
+      unit.approvalStatus !== PortfolioApprovalStatus.HAVUZDA ||
+      !this.isProjectVisibleInPortfolio(unit.project)
     ) {
       throw new NotFoundException('Bu portföy artık Havuz içinde aktif değil.');
+    }
+
+    const sharedBy = await this.prisma.user.findUnique({
+      where: { id: shareLink.sharedById },
+      select: { firstName: true, lastName: true, phone: true },
+    });
+
+    await this.prisma.poolShareLink.update({
+      where: { id: shareLink.id },
+      data: { viewCount: { increment: 1 } },
+    });
+
+    return {
+      ephId: this.getEphId(unit.id),
+      type: unit.type,
+      status: unit.status,
+      roomCount: unit.roomCount,
+      area: unit.area,
+      netArea: unit.netArea,
+      grossArea: unit.grossArea,
+      floor: unit.floor,
+      floorLabel: unit.floorLabel,
+      totalFloors: unit.totalFloors,
+      conceptLabel: unit.conceptLabel,
+      facades: unit.facades,
+      features: unit.features,
+      price: unit.price,
+      priceCurrency: unit.priceCurrency,
+      description: unit.description,
+      images: unit.images,
+      isVerified: unit.isVerified,
+      tapuVerified: unit.tapuVerified,
+      photoVerified: unit.photoVerified,
+      yetkiVerified: unit.yetkiVerified,
+      project: {
+        name: unit.project?.name || null,
+        city: unit.project?.city || null,
+        district: unit.project?.district || null,
+      },
+      sharedBy: sharedBy
+        ? {
+            fullName:
+              this.cleanText(`${sharedBy.firstName} ${sharedBy.lastName}`) ||
+              'EPH Yetkilisi',
+            phone: this.normalizePhone(sharedBy.phone) || null,
+          }
+        : null,
+    };
+  }
+
+  async createPortfolioShareLink(id: string, user: CurrentUserPayload) {
+    const unit = await this.getUnitWithProjectOrFail(id);
+
+    this.ensureCanManageUnit(user, unit.project.ownerId);
+    this.ensureProjectVisibleForPortfolioActions(unit.project);
+
+    const shareLink = await this.prisma.poolShareLink.create({
+      data: {
+        token: randomUUID(),
+        unitId: unit.id,
+        sharedById: user.id,
+      },
+    });
+
+    return {
+      token: shareLink.token,
+      url: `${PLATFORM_URL}/portfoy-paylasim/${shareLink.token}`,
+    };
+  }
+
+  async getPortfolioShareByToken(token: string) {
+    const shareLink = await this.prisma.poolShareLink.findUnique({
+      where: { token },
+    });
+
+    if (!shareLink) {
+      throw new NotFoundException('Paylaşım bağlantısı bulunamadı.');
+    }
+
+    const unit = await this.prisma.unit.findUnique({
+      where: { id: shareLink.unitId },
+      include: {
+        ...unitInclude,
+        project: {
+          select: {
+            ...unitInclude.project.select,
+            code: true,
+            declaredIndependentUnitCount: true,
+            declaredSalesInventoryCount: true,
+            plannedUnitTypes: true,
+            setupStatus: true,
+          },
+        },
+      },
+    });
+
+    if (!unit) {
+      throw new NotFoundException('Bu portföy artık mevcut değil.');
+    }
+
+    if (!this.isProjectVisibleInPortfolio(unit.project)) {
+      throw new NotFoundException('Bu portföy artık mevcut değil.');
     }
 
     const sharedBy = await this.prisma.user.findUnique({
@@ -1590,6 +1823,7 @@ export class UnitsService {
     const unit = await this.getUnitWithProjectOrFail(id);
 
     this.ensureCanManageUnit(user, unit.project.ownerId);
+    this.ensureProjectVisibleForPortfolioActions(unit.project);
 
     if (!this.hasApprovalDocument(unit)) {
       return this.prisma.unit.update({
@@ -1711,6 +1945,8 @@ export class UnitsService {
       this.ensureCanManageUnit(user, unit.project.ownerId);
     }
 
+    this.ensureProjectVisibleForPortfolioActions(unit.project);
+
     if (unit.approvalStatus !== PortfolioApprovalStatus.ONAYLANDI) {
       throw new BadRequestException(
         'Sadece onaylanmış portföyler havuza gönderilebilir.',
@@ -1755,6 +1991,7 @@ export class UnitsService {
     const unit = await this.getUnitWithProjectOrFail(id);
 
     this.ensureCanManageUnit(user, unit.project.ownerId);
+    this.ensureProjectVisibleForPortfolioActions(unit.project);
 
     return this.prisma.unit.update({
       where: { id },
@@ -1897,6 +2134,7 @@ export class UnitsService {
           ...(this.isSuperAdmin(user) || this.isAdmin(user) || this.isModerator(user)
             ? {}
             : { ownerId: user.id }),
+          ...this.getPortfolioVisibleProjectWhere(),
           isActive: true,
         },
       },

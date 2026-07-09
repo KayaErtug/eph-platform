@@ -117,6 +117,13 @@ export class UnitsController {
     return this.unitsService.createPoolShareLink(id, user);
   }
 
+  @Post('portfolio/:id/share')
+  @UseGuards(RolesGuard)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  createPortfolioShareLink(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.unitsService.createPortfolioShareLink(id, user);
+  }
+
   @Get('admin/portfolio-approvals')
   @UseGuards(RolesGuard)
   @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
