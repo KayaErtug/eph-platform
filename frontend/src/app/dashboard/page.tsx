@@ -8,16 +8,13 @@ import {
   Bell,
   Bot,
   Building2,
-  CalendarDays,
   ClipboardCheck,
-  Clock3,
   FileText,
   Filter,
   Headphones,
   Heart,
   KeyRound,
   LayoutDashboard,
-  ListChecks,
   Loader2,
   Map,
   MessageCircle,
@@ -26,7 +23,6 @@ import {
   Settings,
   ShieldCheck,
   SlidersHorizontal,
-  Sparkles,
   Target,
   UserCog,
   UserPlus,
@@ -214,7 +210,6 @@ export default function DashboardPage() {
   const name = firstName(user);
   const stats = summary?.stats || {};
   const todayTasks = useMemo(() => countTodayTasks(customers), [customers]);
-  const allTasks = useMemo(() => countAllTasks(customers), [customers]);
 
   const visiblePosts = useMemo(
     () =>
@@ -250,18 +245,6 @@ export default function DashboardPage() {
       icon: <KeyRound size={18} />,
     },
     {
-      href: "/portfoy?favorites=1",
-      label: "Favorilerim",
-      value: "Kayıtlar",
-      icon: <Heart size={18} />,
-    },
-    {
-      href: "/portfoy?sort=newest",
-      label: "Son Eklenenler",
-      value: "Yeni",
-      icon: <Clock3 size={18} />,
-    },
-    {
       href: "/reports",
       label: "Raporlar",
       value: "Analiz",
@@ -278,45 +261,15 @@ export default function DashboardPage() {
   const crmItems: DashboardItem[] = [
     {
       href: "/crm",
-      label: "CRM",
-      value: `${allTasks} görev`,
+      label: "Müşteriler",
+      value: String(stats.totalCustomers || 0),
       icon: <UsersRound size={18} />,
     },
     {
-      href: "/crm",
-      label: "Akıllı CRM",
-      value: "V2",
-      icon: <Sparkles size={18} />,
-    },
-    {
-      href: "/crm",
-      label: "Müşteriler",
-      value: String(stats.totalCustomers || 0),
+      href: "/crm?new=1",
+      label: "Yeni Müşteri",
+      value: "Oluştur",
       icon: <UserPlus size={18} />,
-    },
-    {
-      href: "/crm",
-      label: "Teklifler",
-      value: "Kayıtlar",
-      icon: <FileText size={18} />,
-    },
-    {
-      href: "/crm",
-      label: "Takvim",
-      value: "Bugün",
-      icon: <CalendarDays size={18} />,
-    },
-    {
-      href: "/crm",
-      label: "Aramalar",
-      value: "Takip",
-      icon: <MessageCircle size={18} />,
-    },
-    {
-      href: "/crm",
-      label: "Notlar",
-      value: "Kayıtlar",
-      icon: <ListChecks size={18} />,
     },
   ];
 
@@ -377,36 +330,6 @@ export default function DashboardPage() {
       label: "Havuzdaki Portföyler",
       value: "Liste",
       icon: <Building2 size={18} />,
-    },
-    {
-      href: "/havuz",
-      label: "Akış",
-      value: "Güncel",
-      icon: <Waves size={18} />,
-    },
-    {
-      href: "/havuz",
-      label: "Katılanlar",
-      value: "Üyeler",
-      icon: <UsersRound size={18} />,
-    },
-    {
-      href: "/havuz",
-      label: "İstatistikler",
-      value: "Analiz",
-      icon: <BarChart3 size={18} />,
-    },
-    {
-      href: "/havuz",
-      label: "Kurallar",
-      value: "Bilgi",
-      icon: <ShieldCheck size={18} />,
-    },
-    {
-      href: "/havuz",
-      label: "Ayarlar",
-      value: "Düzenle",
-      icon: <Settings size={18} />,
     },
   ];
 

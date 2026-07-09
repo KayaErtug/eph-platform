@@ -409,12 +409,21 @@ function StokPageInner() {
 
   useEffect(() => {
     if (!hydrated || !user) return;
-    if (searchParams.get("create") !== "1") return;
+
+    const createParam = searchParams.get("create");
+    const statusParam = searchParams.get("status");
+    const mapParam = searchParams.get("map");
+    if (createParam !== "1" && !statusParam && mapParam !== "1") return;
+
+    if (mapParam === "1") setMapOpen(true);
+    if (statusParam === "SATILIK" || statusParam === "KIRALIK") {
+      setPortfolioFilters((prev) => ({ ...prev, statuses: [statusParam] }));
+    }
+    if (createParam === "1" && !showModal && canAddUnit) {
+      openCreateModal();
+    }
 
     router.replace("/portfoy", { scroll: false });
-
-    if (showModal || !canAddUnit) return;
-    openCreateModal();
   }, [hydrated, user, searchParams, showModal, canAddUnit, router]);
 
   const fetchData = async () => {

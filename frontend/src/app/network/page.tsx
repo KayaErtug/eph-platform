@@ -924,11 +924,21 @@ export default function NetworkPage() {
     if (typeof window === "undefined") return;
 
     const params = new URLSearchParams(window.location.search);
-    if (params.get("create") !== "1") return;
+    const createParam = params.get("create");
+    const tabParam = params.get("tab");
+    if (createParam !== "1" && !tabParam) return;
 
-    openCreateModal();
+    if (createParam === "1") openCreateModal();
+
+    const tabMap: Record<string, PersonalTabKey> = {
+      mine: "MINE",
+      saved: "SAVED",
+      interested: "INTERESTED",
+    };
+    if (tabParam && tabMap[tabParam]) setPersonalFilter(tabMap[tabParam]);
 
     params.delete("create");
+    params.delete("tab");
     const nextQuery = params.toString();
     const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash}`;
     window.history.replaceState(window.history.state, "", nextUrl);
