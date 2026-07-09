@@ -1037,6 +1037,7 @@ model NetworkPost {
   maxRoom      Int?
   minBudget    Float?
   maxBudget    Float?
+  areas        Json?
   urgency      String?
   visibility   NetworkVisibility      @default(TUM_EPH)
   tags         String[]

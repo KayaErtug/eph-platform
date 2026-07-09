@@ -34,6 +34,11 @@ type CreateNetworkPostDto = {
   maxRoom?: number | null;
   minBudget?: number | null;
   maxBudget?: number | null;
+  areas?: Array<{
+    city?: string | null;
+    district?: string | null;
+    neighborhood?: string | null;
+  }> | null;
   urgency?: string | null;
   visibility?: string;
   tags?: string[];
@@ -67,6 +72,11 @@ type UpdateNetworkPostDto = {
   maxRoom?: number | null;
   minBudget?: number | null;
   maxBudget?: number | null;
+  areas?: Array<{
+    city?: string | null;
+    district?: string | null;
+    neighborhood?: string | null;
+  }> | null;
   urgency?: string | null;
   visibility?: string;
   tags?: string[];
@@ -1223,9 +1233,12 @@ export class NetworkService {
       description: dto.description
         ? validated.description
         : existing.description,
-      city: dto.city ?? existing.city,
-      district: dto.district ?? existing.district,
-      neighborhood: dto.neighborhood ?? existing.neighborhood,
+      city: dto.areas?.[0]?.city ?? dto.city ?? existing.city,
+      district: dto.areas?.[0]?.district ?? dto.district ?? existing.district,
+      neighborhood:
+        dto.areas?.[0]?.neighborhood ??
+        dto.neighborhood ??
+        existing.neighborhood,
       budget: dto.budget ?? existing.budget,
       minArea: dto.minArea ?? existing.minArea,
       maxArea: dto.maxArea ?? existing.maxArea,
@@ -1233,6 +1246,9 @@ export class NetworkService {
       maxRoom: dto.maxRoom ?? existing.maxRoom,
       minBudget: dto.minBudget ?? existing.minBudget,
       maxBudget: dto.maxBudget ?? existing.maxBudget,
+      ...(dto.areas
+        ? { areas: dto.areas as unknown as Prisma.InputJsonValue }
+        : {}),
       urgency: dto.urgency ?? existing.urgency,
       visibility: (dto.visibility as any) ?? existing.visibility,
       tags: buildForumTags(
@@ -1374,9 +1390,9 @@ export class NetworkService {
         type: validated.category,
         title: validated.title,
         description: validated.description,
-        city: dto.city || null,
-        district: dto.district || null,
-        neighborhood: dto.neighborhood || null,
+        city: dto.areas?.[0]?.city || dto.city || null,
+        district: dto.areas?.[0]?.district || dto.district || null,
+        neighborhood: dto.areas?.[0]?.neighborhood || dto.neighborhood || null,
         budget: dto.budget || null,
         minArea: dto.minArea ?? null,
         maxArea: dto.maxArea ?? null,
@@ -1384,6 +1400,9 @@ export class NetworkService {
         maxRoom: dto.maxRoom ?? null,
         minBudget: dto.minBudget ?? null,
         maxBudget: dto.maxBudget ?? null,
+        areas: dto.areas
+          ? (dto.areas as unknown as Prisma.InputJsonValue)
+          : undefined,
         urgency: dto.urgency || "Normal",
         visibility: (dto.visibility as any) || "TUM_EPH",
         tags: buildForumTags(

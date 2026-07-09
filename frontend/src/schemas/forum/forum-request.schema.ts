@@ -745,15 +745,12 @@ export const forumRequestSchema: EPHSchemaDefinition = {
       fields: [
         {
           id: "forum-location-form",
-          key: "location",
-          label: "Konum",
-          type: "location",
+          key: "areas",
+          label: "Konum (çoklu il / ilçe / mahalle)",
+          type: "location-multi",
           modes: ["form"],
           order: 5,
-          cityKey: "city",
-          districtKey: "district",
-          neighborhoodKey: "neighborhood",
-          multipleInFilter: false,
+          areasKey: "areas",
           showNeighborhood: true,
         },
         {

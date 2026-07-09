@@ -41,6 +41,7 @@ export type EPHSchemaFieldType =
   | "single-select"
   | "multi-select"
   | "location"
+  | "location-multi"
   | "range"
   | "boolean"
   | "date"
@@ -120,6 +121,12 @@ export type EPHSchemaLocationField = EPHSchemaFieldBase<"location"> & {
   showNeighborhood?: boolean;
 };
 
+export type EPHSchemaLocationMultiField =
+  EPHSchemaFieldBase<"location-multi"> & {
+    areasKey: string;
+    showNeighborhood?: boolean;
+  };
+
 export type EPHSchemaRangeField = EPHSchemaFieldBase<"range"> & {
   minKey: string;
   maxKey: string;
@@ -151,6 +158,7 @@ export type EPHSchemaField =
   | EPHSchemaTextField
   | EPHSchemaChoiceField
   | EPHSchemaLocationField
+  | EPHSchemaLocationMultiField
   | EPHSchemaRangeField
   | EPHSchemaBooleanField
   | EPHSchemaMoneyField

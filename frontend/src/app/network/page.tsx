@@ -68,6 +68,11 @@ type NetworkPost = {
   maxRoom?: number | null;
   minBudget?: number | null;
   maxBudget?: number | null;
+  areas?: Array<{
+    city?: string | null;
+    district?: string | null;
+    neighborhood?: string | null;
+  }> | null;
   visibility?: string | null;
   tags?: string[] | null;
   expiresAt?: string | null;
@@ -94,10 +99,30 @@ type ForumCategoryOption = {
   hint: string;
 };
 
+type ForumAreaEntry = {
+  city: string;
+  district: string;
+  neighborhood: string;
+};
+
+function normalizeForumAreas(value: unknown): ForumAreaEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => ({
+      city: String((item as { city?: unknown })?.city || "").trim(),
+      district: String((item as { district?: unknown })?.district || "").trim(),
+      neighborhood: String(
+        (item as { neighborhood?: unknown })?.neighborhood || "",
+      ).trim(),
+    }))
+    .filter((item) => item.city && item.district);
+}
+
 type TopicForm = {
   title: string;
   category: ForumCategory | "";
   requestIntent: string;
+  areas: ForumAreaEntry[];
   city: string;
   district: string;
   neighborhood: string;
@@ -287,6 +312,7 @@ const DEFAULT_FORM: TopicForm = {
   title: "",
   category: "",
   requestIntent: "",
+  areas: [],
   city: "",
   district: "",
   neighborhood: "",
@@ -548,6 +574,7 @@ function formFromPost(post: NetworkPost): TopicForm {
     title: post.title || "",
     category: getCategoryOption(post.type).value,
     requestIntent: getRequestIntentFromPost(post),
+    areas: normalizeForumAreas(post.areas),
     city: post.city || "",
     district: post.district || "",
     neighborhood: post.neighborhood || "",
@@ -822,6 +849,7 @@ export default function NetworkPage() {
       maxRoom: form.maxRoom ? Number(form.maxRoom.replace(/\D/g, "")) : null,
       minBudget: form.minBudget ? Number(form.minBudget.replace(/\D/g, "")) : null,
       maxBudget: form.maxBudget ? Number(form.maxBudget.replace(/\D/g, "")) : null,
+      areas: form.areas,
       urgency: form.urgency,
       visibility: form.visibility,
       tags,
@@ -1816,6 +1844,7 @@ function topicFormToSchemaState(form: TopicForm): EPHSchemaState {
   return {
     category: form.category,
     requestIntent: form.requestIntent,
+    areas: form.areas as unknown as string[],
     title: form.title,
     city: form.city,
     district: form.district,
@@ -1839,6 +1868,7 @@ function schemaStateToTopicForm(state: EPHSchemaState): TopicForm {
   return {
     category: String(state.category || "") as ForumCategory | "",
     requestIntent: String(state.requestIntent || ""),
+    areas: normalizeForumAreas(state.areas),
     title: String(state.title || ""),
     city: String(state.city || ""),
     district: String(state.district || ""),
