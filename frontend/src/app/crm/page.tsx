@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -272,6 +272,57 @@ type CustomerInterestAreaDraft = {
   district: string;
   neighborhood: string;
 };
+
+type CrmQuickFilter = "TUMU" | "EKSIK" | "SICAK" | "AKTIF" | "KAPANDI" | "KAYBEDILDI";
+
+type CrmAdvancedFilters = {
+  roles: string[];
+  statuses: string[];
+  cities: string[];
+  districts: string[];
+  neighborhoods: string[];
+  interestArea: string;
+  minBudget: string;
+  maxBudget: string;
+  propertyTypes: string[];
+  tags: string[];
+  sources: string[];
+  dateFrom: string;
+  dateTo: string;
+};
+
+type CrmMultiFilterField =
+  | "roles"
+  | "statuses"
+  | "cities"
+  | "districts"
+  | "neighborhoods"
+  | "propertyTypes"
+  | "tags"
+  | "sources";
+
+type CrmDropdownOption = {
+  key: string;
+  label: string;
+};
+
+function emptyCrmAdvancedFilters(): CrmAdvancedFilters {
+  return {
+    roles: [],
+    statuses: [],
+    cities: [],
+    districts: [],
+    neighborhoods: [],
+    interestArea: "",
+    minBudget: "",
+    maxBudget: "",
+    propertyTypes: [],
+    tags: [],
+    sources: [],
+    dateFrom: "",
+    dateTo: "",
+  };
+}
 
 const TURKIYE_API_BASE_URL = "https://api.turkiyeapi.dev/v1";
 const KKTC_PROVINCE_NAME = "K.K.T.C.";
@@ -730,6 +781,43 @@ function getNextTask(customer: Customer) {
   );
 }
 
+function isCustomerIncomplete(customer: Customer) {
+  const hasContact = Boolean(customer.phone || customer.email);
+  const hasRole = getCustomerDisplayRoles(customer).length > 0;
+  const hasNeedProfile = Boolean(
+    customer._count?.interests ||
+      customer.interests?.length ||
+      customer.interestedArea ||
+      customer.interestedType,
+  );
+
+  return !hasContact || !hasRole || !hasNeedProfile;
+}
+
+function isCustomerWarm(customer: Customer) {
+  if (["KAPANDI", "KAYBEDILDI"].includes(customer.status)) return false;
+
+  const lastTouch = customer.lastContactedAt || getLatestActivity(customer)?.createdAt || customer.updatedAt;
+  if (!lastTouch) return false;
+
+  return (Date.now() - new Date(lastTouch).getTime()) / (1000 * 60 * 60) >= 48;
+}
+
+function getCustomerBudgetBounds(customer: Customer) {
+  const minimumValues = (customer.interests || [])
+    .map((interest) => Number(interest.minBudget || 0))
+    .filter((value) => value > 0);
+  const maximumValues = (customer.interests || [])
+    .map((interest) => Number(interest.maxBudget || 0))
+    .filter((value) => value > 0);
+  const fallbackBudget = Number(customer.budget || 0);
+
+  return {
+    min: minimumValues.length ? Math.min(...minimumValues) : fallbackBudget,
+    max: maximumValues.length ? Math.max(...maximumValues) : fallbackBudget,
+  };
+}
+
 function activityTypeLabel(type?: string) {
   if (!type) return "Aktivite yok";
   return ACTIVITY_TYPES.find((item) => item.key === type)?.label || type;
@@ -792,6 +880,106 @@ function userHasCapability(user: unknown, acceptedKeys: string[]) {
 }
 
 
+function CrmMultiSelectDropdown({
+  label,
+  options,
+  selected,
+  onToggle,
+  disabled = false,
+  emptyText = "Seçenek bulunamadı",
+}: {
+  label: string;
+  options: CrmDropdownOption[];
+  selected: string[];
+  onToggle: (value: string) => void;
+  disabled?: boolean;
+  emptyText?: string;
+}) {
+  const selectedLabels = options
+    .filter((option) => selected.includes(option.key))
+    .map((option) => option.label);
+
+  return (
+    <details
+      className={`eph-crm-multi-dropdown relative rounded-[14px] border-2 border-[#C7D6E8] bg-white ${
+        disabled ? "pointer-events-none opacity-55" : ""
+      }`}
+    >
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2">
+        <span className="min-w-0">
+          <span className="block text-[10px] font-black uppercase tracking-[0.08em] text-[#64748B]">
+            {label}
+          </span>
+          <span className="mt-0.5 block truncate text-[12px] font-black text-[#1F2937]">
+            {selectedLabels.length === 0
+              ? "Tümü"
+              : selectedLabels.length === 1
+                ? selectedLabels[0]
+                : `${selectedLabels.length} seçim`}
+          </span>
+        </span>
+
+        <ChevronRight
+          size={16}
+          className="shrink-0 text-[#2563EB] transition-transform"
+        />
+      </summary>
+
+      <div className="eph-crm-dropdown-menu absolute left-0 right-0 top-[calc(100%+6px)] z-[130] max-h-60 overflow-y-auto rounded-[16px] border-2 border-[#C7D6E8] bg-white p-2 shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
+        <div className="sticky top-0 z-10 mb-2 flex items-center justify-between gap-2 rounded-[12px] border border-[#C7D6E8] bg-[#F8FAFC] px-3 py-2 shadow-sm">
+          <span className="text-[11px] font-black text-[#334155]">{label}</span>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.currentTarget.closest("details")?.removeAttribute("open");
+            }}
+            className="flex h-8 items-center gap-1 rounded-[10px] border border-[#C7D6E8] bg-white px-2.5 text-[10px] font-black text-[#1F2937]"
+          >
+            <X size={13} />
+            Kapat
+          </button>
+        </div>
+
+        {options.length === 0 ? (
+          <div className="rounded-[12px] bg-[#F8FAFC] px-3 py-3 text-center text-xs font-bold text-[#64748B]">
+            {emptyText}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {options.map((option) => {
+              const active = selected.includes(option.key);
+
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => onToggle(option.key)}
+                  className={`flex min-h-10 w-full items-center justify-between gap-2 rounded-[12px] border px-3 py-2 text-left text-[12px] font-black transition ${
+                    active
+                      ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]"
+                      : "border-transparent bg-white text-[#334155] hover:bg-[#F8FAFC]"
+                  }`}
+                >
+                  <span className="min-w-0 break-words">{option.label}</span>
+                  <span
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+                      active
+                        ? "border-[#2563EB] bg-[#2563EB] text-white"
+                        : "border-[#C7D6E8] bg-white text-transparent"
+                    }`}
+                  >
+                    <CheckCircle2 size={13} />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </details>
+  );
+}
+
 export default function CrmPage() {
   const { user } = useAuthStore();
   const router = useRouter();
@@ -804,17 +992,19 @@ export default function CrmPage() {
   const [timeRange, setTimeRange] = useState<"today" | "7" | "15" | "30">("today");
   const [roleFilter, setRoleFilter] = useState<string>("TUMU");
   const [developerSegment, setDeveloperSegment] = useState<string>("ALICI_ADAYI");
-  const [quickFilter, setQuickFilter] = useState<"TUMU" | "EKSIK" | "SICAK">("TUMU");
+  const [quickFilter, setQuickFilter] = useState<CrmQuickFilter>("TUMU");
   const [showQuickNoteModal, setShowQuickNoteModal] = useState(false);
   const [quickPickMode, setQuickPickMode] = useState<"GORUSME" | "GOREV" | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCreditModal, setShowCreditModal] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
   const [taskLoading, setTaskLoading] = useState(false);
   const [interestLoading, setInterestLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [advancedFilters, setAdvancedFilters] = useState<CrmAdvancedFilters>(emptyCrmAdvancedFilters());
   const [teamLeaderView, setTeamLeaderView] = useState<"personal" | "team">("team");
 
   const [form, setForm] = useState({
@@ -1198,6 +1388,8 @@ export default function CrmPage() {
     setQuickFilter("TUMU");
     setRoleFilter("TUMU");
     setSearch("");
+    setAdvancedFilters(emptyCrmAdvancedFilters());
+    setShowFilterModal(false);
     setView("list");
   };
 
@@ -1215,10 +1407,104 @@ export default function CrmPage() {
     setView("list");
   };
 
+  const handleQuickFilterChange = (filter: CrmQuickFilter) => {
+    setQuickFilter(filter);
+    setView("list");
+  };
+
   const handleRoleFilterChange = (role: string) => {
     setQuickFilter("TUMU");
-    setRoleFilter(role);
+    setRoleFilter(roleFilter === role ? "TUMU" : role);
     setView("list");
+  };
+
+  const toggleAdvancedArrayFilter = (field: CrmMultiFilterField, value: string) => {
+    if (field === "roles") {
+      setRoleFilter("TUMU");
+    }
+
+    if (
+      field === "statuses" &&
+      ["AKTIF", "KAPANDI", "KAYBEDILDI"].includes(quickFilter)
+    ) {
+      setQuickFilter("TUMU");
+    }
+
+    setAdvancedFilters((current) => {
+      const values = current[field];
+      const nextValues = values.includes(value)
+        ? values.filter((item) => item !== value)
+        : [...values, value];
+
+      const next: CrmAdvancedFilters = {
+        ...current,
+        [field]: nextValues,
+      };
+
+      if (field === "cities") {
+        if (nextValues.length === 0) {
+          next.districts = [];
+          next.neighborhoods = [];
+          return next;
+        }
+
+        const validDistricts = new Set(
+          customers.flatMap((customer) =>
+            (customer.interests || [])
+              .filter((interest) => nextValues.includes(String(interest.city || "")))
+              .map((interest) => String(interest.district || ""))
+              .filter(Boolean),
+          ),
+        );
+
+        next.districts = current.districts.filter((district) =>
+          validDistricts.has(district),
+        );
+
+        const validNeighborhoods = new Set(
+          customers.flatMap((customer) =>
+            (customer.interests || [])
+              .filter(
+                (interest) =>
+                  nextValues.includes(String(interest.city || "")) &&
+                  next.districts.includes(String(interest.district || "")),
+              )
+              .map((interest) => String(interest.neighborhood || ""))
+              .filter(Boolean),
+          ),
+        );
+
+        next.neighborhoods = current.neighborhoods.filter((neighborhood) =>
+          validNeighborhoods.has(neighborhood),
+        );
+      }
+
+      if (field === "districts") {
+        if (nextValues.length === 0) {
+          next.neighborhoods = [];
+          return next;
+        }
+
+        const validNeighborhoods = new Set(
+          customers.flatMap((customer) =>
+            (customer.interests || [])
+              .filter(
+                (interest) =>
+                  current.cities.includes(String(interest.city || "")) &&
+                  nextValues.includes(String(interest.district || "")),
+              )
+              .map((interest) => String(interest.neighborhood || ""))
+              .filter(Boolean),
+          ),
+        );
+
+        next.neighborhoods = current.neighborhoods.filter((neighborhood) =>
+          validNeighborhoods.has(neighborhood),
+        );
+      }
+
+      return next;
+    });
   };
 
   const handleOpenCustomerForAction = async (customerId: string) => {
@@ -1262,24 +1548,377 @@ export default function CrmPage() {
     [],
   );
 
+  const filterLocationOptions = useMemo(() => {
+    const cities = new Set<string>();
+    const districts = new Set<string>();
+    const neighborhoods = new Set<string>();
+
+    customers.forEach((customer) => {
+      if (customer.city) cities.add(customer.city);
+
+      (customer.interests || []).forEach((interest) => {
+        if (interest.city) cities.add(interest.city);
+
+        if (
+          advancedFilters.cities.length > 0 &&
+          interest.city &&
+          advancedFilters.cities.includes(interest.city) &&
+          interest.district
+        ) {
+          districts.add(interest.district);
+        }
+
+        if (
+          advancedFilters.cities.length > 0 &&
+          advancedFilters.districts.length > 0 &&
+          interest.city &&
+          advancedFilters.cities.includes(interest.city) &&
+          interest.district &&
+          advancedFilters.districts.includes(interest.district) &&
+          interest.neighborhood
+        ) {
+          neighborhoods.add(interest.neighborhood);
+        }
+      });
+    });
+
+    const sortValues = (values: Set<string>) =>
+      Array.from(values).sort((a, b) => a.localeCompare(b, "tr"));
+
+    return {
+      cities: sortValues(cities),
+      districts: sortValues(districts),
+      neighborhoods: sortValues(neighborhoods),
+    };
+  }, [advancedFilters.cities, advancedFilters.districts, customers]);
+
+  const advancedFilterCount = useMemo(() => {
+    return (
+      advancedFilters.roles.length +
+      advancedFilters.statuses.length +
+      advancedFilters.cities.length +
+      advancedFilters.districts.length +
+      advancedFilters.neighborhoods.length +
+      advancedFilters.propertyTypes.length +
+      advancedFilters.tags.length +
+      advancedFilters.sources.length +
+      [
+        advancedFilters.interestArea,
+        advancedFilters.minBudget,
+        advancedFilters.maxBudget,
+        advancedFilters.dateFrom,
+        advancedFilters.dateTo,
+      ].filter(Boolean).length
+    );
+  }, [advancedFilters]);
+
+  const activeFilterCount =
+    advancedFilterCount +
+    (quickFilter !== "TUMU" ? 1 : 0) +
+    (roleFilter !== "TUMU" ? 1 : 0);
+
+  const activeFilterChips = useMemo(() => {
+    const chips: { key: string; label: string }[] = [];
+
+    if (search.trim()) chips.push({ key: "search", label: `Arama: ${search.trim()}` });
+
+    if (quickFilter !== "TUMU") {
+      const quickLabels: Record<Exclude<CrmQuickFilter, "TUMU">, string> = {
+        EKSIK: "Eksik bilgili",
+        SICAK: "Sıcak lead",
+        AKTIF: "Aktif",
+        KAPANDI: "Kapanmış",
+        KAYBEDILDI: "Kaybedilmiş",
+      };
+      chips.push({ key: "quick", label: quickLabels[quickFilter] });
+    }
+
+    if (roleFilter !== "TUMU") {
+      chips.push({ key: "segment-role", label: roleLabel(roleFilter) });
+    }
+
+    advancedFilters.roles.forEach((role) => {
+      chips.push({ key: `role:${role}`, label: roleLabel(role) });
+    });
+
+    advancedFilters.statuses.forEach((status) => {
+      chips.push({ key: `status:${status}`, label: stageInfo(status).label });
+    });
+
+    advancedFilters.cities.forEach((city) => {
+      chips.push({ key: `city:${city}`, label: city });
+    });
+
+    advancedFilters.districts.forEach((district) => {
+      chips.push({ key: `district:${district}`, label: district });
+    });
+
+    advancedFilters.neighborhoods.forEach((neighborhood) => {
+      chips.push({ key: `neighborhood:${neighborhood}`, label: neighborhood });
+    });
+
+    advancedFilters.propertyTypes.forEach((propertyType) => {
+      chips.push({
+        key: `property-type:${propertyType}`,
+        label: optionLabel(PROPERTY_TYPE_OPTIONS, propertyType),
+      });
+    });
+
+    advancedFilters.tags.forEach((tag) => {
+      chips.push({ key: `tag:${tag}`, label: tag });
+    });
+
+    advancedFilters.sources.forEach((source) => {
+      chips.push({ key: `source:${source}`, label: source });
+    });
+
+    if (advancedFilters.interestArea) {
+      chips.push({
+        key: "interest-area",
+        label: `İlgi: ${advancedFilters.interestArea}`,
+      });
+    }
+
+    if (advancedFilters.minBudget) {
+      chips.push({
+        key: "min-budget",
+        label: `Min ${formatBudgetInput(advancedFilters.minBudget)}`,
+      });
+    }
+
+    if (advancedFilters.maxBudget) {
+      chips.push({
+        key: "max-budget",
+        label: `Maks ${formatBudgetInput(advancedFilters.maxBudget)}`,
+      });
+    }
+
+    if (advancedFilters.dateFrom) {
+      chips.push({
+        key: "date-from",
+        label: `Başlangıç ${advancedFilters.dateFrom}`,
+      });
+    }
+
+    if (advancedFilters.dateTo) {
+      chips.push({
+        key: "date-to",
+        label: `Bitiş ${advancedFilters.dateTo}`,
+      });
+    }
+
+    return chips;
+  }, [advancedFilters, quickFilter, roleFilter, search]);
+
+  const removeFilterChip = (key: string) => {
+    if (key === "search") {
+      setSearch("");
+      return;
+    }
+
+    if (key === "quick") {
+      setQuickFilter("TUMU");
+      return;
+    }
+
+    if (key === "segment-role") {
+      setRoleFilter("TUMU");
+      return;
+    }
+
+    const arrayPrefixes: {
+      prefix: string;
+      field: CrmMultiFilterField;
+    }[] = [
+      { prefix: "role:", field: "roles" },
+      { prefix: "status:", field: "statuses" },
+      { prefix: "city:", field: "cities" },
+      { prefix: "district:", field: "districts" },
+      { prefix: "neighborhood:", field: "neighborhoods" },
+      { prefix: "property-type:", field: "propertyTypes" },
+      { prefix: "tag:", field: "tags" },
+      { prefix: "source:", field: "sources" },
+    ];
+
+    const arrayMatch = arrayPrefixes.find((item) => key.startsWith(item.prefix));
+
+    if (arrayMatch) {
+      toggleAdvancedArrayFilter(
+        arrayMatch.field,
+        key.slice(arrayMatch.prefix.length),
+      );
+      return;
+    }
+
+    const fieldMap: Record<string, keyof CrmAdvancedFilters> = {
+      "interest-area": "interestArea",
+      "min-budget": "minBudget",
+      "max-budget": "maxBudget",
+      "date-from": "dateFrom",
+      "date-to": "dateTo",
+    };
+
+    const field = fieldMap[key];
+    if (!field) return;
+
+    setAdvancedFilters((current) => ({
+      ...current,
+      [field]: "",
+    }));
+  };
+
   const filteredCustomers = useMemo(() => {
-    const keyword = search.toLowerCase().trim();
+    const keyword = search.toLocaleLowerCase("tr-TR").trim();
+    const minimumBudget = Number(advancedFilters.minBudget || 0);
+    const maximumBudget = Number(advancedFilters.maxBudget || 0);
+    const dateFrom = advancedFilters.dateFrom
+      ? new Date(`${advancedFilters.dateFrom}T00:00:00`).getTime()
+      : 0;
+    const dateTo = advancedFilters.dateTo
+      ? new Date(`${advancedFilters.dateTo}T23:59:59`).getTime()
+      : 0;
 
     return customers.filter((customer) => {
-      const hasContact = Boolean(customer.phone || customer.email);
-      const hasRole = Boolean(customer.roles?.length);
-      const hasNeedProfile = Boolean(customer._count?.interests || customer.interests?.length || customer.interestedArea || customer.interestedType);
-      const isIncomplete = !hasContact || !hasRole || !hasNeedProfile;
+      const displayRoles = getCustomerDisplayRoles(customer);
+      const interests = customer.interests || [];
+      const customerTags = customer.tags || [];
+      const customerUpdatedAt = new Date(customer.updatedAt).getTime();
+      const effectiveRoleFilters =
+        roleFilter === "TUMU"
+          ? advancedFilters.roles
+          : Array.from(new Set([roleFilter, ...advancedFilters.roles]));
 
-      const lastTouch = customer.lastContactedAt || getLatestActivity(customer)?.createdAt || customer.updatedAt;
-      const warmDiffHours = lastTouch ? (Date.now() - new Date(lastTouch).getTime()) / (1000 * 60 * 60) : 0;
-      const isWarm = !["KAPANDI", "KAYBEDILDI"].includes(customer.status) && warmDiffHours >= 48;
+      if (quickFilter === "EKSIK" && !isCustomerIncomplete(customer)) return false;
+      if (quickFilter === "SICAK" && !isCustomerWarm(customer)) return false;
+      if (
+        quickFilter === "AKTIF" &&
+        ["KAPANDI", "KAYBEDILDI"].includes(customer.status)
+      ) {
+        return false;
+      }
+      if (quickFilter === "KAPANDI" && customer.status !== "KAPANDI") return false;
+      if (quickFilter === "KAYBEDILDI" && customer.status !== "KAYBEDILDI") {
+        return false;
+      }
 
-      if (quickFilter === "EKSIK" && !isIncomplete) return false;
-      if (quickFilter === "SICAK" && !isWarm) return false;
+      if (
+        effectiveRoleFilters.length > 0 &&
+        !effectiveRoleFilters.some((role) => displayRoles.includes(role))
+      ) {
+        return false;
+      }
 
-      const roleMatched = roleFilter === "TUMU" || (customer.roles || []).includes(roleFilter);
-      if (!roleMatched) return false;
+      if (
+        advancedFilters.statuses.length > 0 &&
+        !advancedFilters.statuses.includes(customer.status)
+      ) {
+        return false;
+      }
+
+      if (advancedFilters.cities.length > 0) {
+        const customerCities = [
+          customer.city,
+          ...interests.map((interest) => interest.city),
+        ].filter(Boolean);
+
+        if (
+          !customerCities.some((city) =>
+            advancedFilters.cities.includes(String(city)),
+          )
+        ) {
+          return false;
+        }
+      }
+
+      if (
+        advancedFilters.districts.length > 0 &&
+        !interests.some(
+          (interest) =>
+            interest.district &&
+            advancedFilters.districts.includes(interest.district),
+        )
+      ) {
+        return false;
+      }
+
+      if (
+        advancedFilters.neighborhoods.length > 0 &&
+        !interests.some(
+          (interest) =>
+            interest.neighborhood &&
+            advancedFilters.neighborhoods.includes(interest.neighborhood),
+        )
+      ) {
+        return false;
+      }
+
+      if (advancedFilters.interestArea) {
+        const areaKeyword = advancedFilters.interestArea
+          .toLocaleLowerCase("tr-TR")
+          .trim();
+
+        const areaText = [
+          customer.interestedArea,
+          ...interests.flatMap((interest) => [
+            interest.city,
+            interest.district,
+            interest.neighborhood,
+            interest.title,
+          ]),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLocaleLowerCase("tr-TR");
+
+        if (!areaText.includes(areaKeyword)) return false;
+      }
+
+      if (advancedFilters.propertyTypes.length > 0) {
+        const customerPropertyTypes = [
+          customer.interestedType,
+          ...interests.flatMap((interest) => interest.propertyTypes || []),
+        ].filter(Boolean);
+
+        if (
+          !advancedFilters.propertyTypes.some((propertyType) =>
+            customerPropertyTypes.includes(propertyType),
+          )
+        ) {
+          return false;
+        }
+      }
+
+      if (
+        advancedFilters.tags.length > 0 &&
+        !advancedFilters.tags.some((tag) => customerTags.includes(tag))
+      ) {
+        return false;
+      }
+
+      if (
+        advancedFilters.sources.length > 0 &&
+        (!customer.source || !advancedFilters.sources.includes(customer.source))
+      ) {
+        return false;
+      }
+
+      const budgetBounds = getCustomerBudgetBounds(customer);
+
+      if (minimumBudget && budgetBounds.max && budgetBounds.max < minimumBudget) {
+        return false;
+      }
+
+      if (maximumBudget && budgetBounds.min && budgetBounds.min > maximumBudget) {
+        return false;
+      }
+
+      if ((minimumBudget || maximumBudget) && !budgetBounds.min && !budgetBounds.max) {
+        return false;
+      }
+
+      if (dateFrom && customerUpdatedAt < dateFrom) return false;
+      if (dateTo && customerUpdatedAt > dateTo) return false;
+
       if (!keyword) return true;
 
       return [
@@ -1292,16 +1931,23 @@ export default function CrmPage() {
         customer.company,
         customer.interestedArea,
         customer.interestedType,
-        ...(customer.roles || []).map(roleLabel),
-        ...(customer.interests || []).flatMap((interest) => [interest.city, interest.district, interest.neighborhood, interest.title]),
+        customer.source,
+        ...displayRoles.map(roleLabel),
+        ...customerTags,
+        ...interests.flatMap((interest) => [
+          interest.city,
+          interest.district,
+          interest.neighborhood,
+          interest.title,
+          ...(interest.propertyTypes || []),
+        ]),
       ]
         .filter(Boolean)
         .join(" ")
-        .toLowerCase()
+        .toLocaleLowerCase("tr-TR")
         .includes(keyword);
     });
-  }, [customers, search, roleFilter, quickFilter]);
-
+  }, [advancedFilters, customers, quickFilter, roleFilter, search]);
 
   const groupedFilteredCustomers = useMemo(
     () => groupCustomersByPerson(filteredCustomers),
@@ -1670,11 +2316,233 @@ export default function CrmPage() {
   }
 
   return (
-    <main className={`${crmRoboto.className} eph-v4-shell eph-crm-approved-dark min-h-[100dvh] bg-[#031226] text-[#EAF3FF]`}>
+    <main className={`${crmRoboto.className} eph-v4-shell eph-crm-premium-light min-h-[100dvh] bg-[#F4F8FF] text-[#1F2937]`}>
       {showAddModal && <AddCustomerModal form={form} setForm={setForm} formLoading={formLoading} provinceOptions={provinceOptions} provinceLoading={provinceLoading} onSubmit={handleAddCustomer} onClose={() => setShowAddModal(false)} />}
       {showCreditModal && <CreditCalculatorModal selectedCustomer={selectedCustomer} saving={activityLoading} onSave={handleSaveCreditCalculation} onClose={() => setShowCreditModal(false)} />}
       {showQuickNoteModal && <QuickNoteModal customers={customers} saving={activityLoading} onSave={handleSaveQuickNote} onClose={() => setShowQuickNoteModal(false)} />}
       {quickPickMode && <QuickPickCustomerModal mode={quickPickMode} customers={customers} onSelect={handleOpenCustomerForAction} onClose={() => setQuickPickMode(null)} />}
+      {showFilterModal && (
+        <div className="eph-crm-modal-overlay fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/35 p-0 backdrop-blur-[4px] md:items-center md:p-5">
+          <button
+            type="button"
+            onClick={() => setShowFilterModal(false)}
+            className="fixed right-3 top-[calc(12px+env(safe-area-inset-top,0px))] z-[220] flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-[#1F2937] text-white shadow-[0_12px_32px_rgba(15,23,42,0.35)]"
+            aria-label="Filtre ekranını kapat"
+            title="Kapat"
+          >
+            <X size={20} />
+          </button>
+
+          <div className="eph-crm-filter-modal flex max-h-[94dvh] w-full max-w-4xl flex-col overflow-hidden rounded-t-[28px] border-2 border-[#C7D6E8] bg-[#F4F8FF] shadow-[0_28px_80px_rgba(15,23,42,0.22)] md:rounded-[28px]">
+            <div className="flex items-center justify-between gap-3 border-b-2 border-[#C7D6E8] bg-white px-4 py-3">
+              <div className="min-w-0">
+                <h2 className="text-[19px] font-black text-[#1F2937]">
+                  CRM Filtre Merkezi
+                </h2>
+                <p className="mt-0.5 text-[11px] font-bold text-[#64748B]">
+                  Aynı dropdown içinde VEYA • Alanlar arasında VE
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowFilterModal(false)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border-2 border-[#C7D6E8] bg-[#F8FAFC] text-[#1F2937]"
+                aria-label="Filtreleri kapat"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <CrmMultiSelectDropdown
+                  label="Müşteri Rolü"
+                  options={CUSTOMER_ROLES}
+                  selected={advancedFilters.roles}
+                  onToggle={(value) => toggleAdvancedArrayFilter("roles", value)}
+                />
+
+                <CrmMultiSelectDropdown
+                  label="CRM Durumu"
+                  options={PIPELINE_STAGES.map((item) => ({
+                    key: item.key,
+                    label: item.label,
+                  }))}
+                  selected={advancedFilters.statuses}
+                  onToggle={(value) => toggleAdvancedArrayFilter("statuses", value)}
+                />
+
+                <CrmMultiSelectDropdown
+                  label="İl"
+                  options={filterLocationOptions.cities.map((city) => ({
+                    key: city,
+                    label: city,
+                  }))}
+                  selected={advancedFilters.cities}
+                  onToggle={(value) => toggleAdvancedArrayFilter("cities", value)}
+                />
+
+                <CrmMultiSelectDropdown
+                  label="İlçe"
+                  options={filterLocationOptions.districts.map((district) => ({
+                    key: district,
+                    label: district,
+                  }))}
+                  selected={advancedFilters.districts}
+                  onToggle={(value) => toggleAdvancedArrayFilter("districts", value)}
+                  disabled={advancedFilters.cities.length === 0}
+                  emptyText="Önce il seçin"
+                />
+
+                <CrmMultiSelectDropdown
+                  label="Mahalle"
+                  options={filterLocationOptions.neighborhoods.map((neighborhood) => ({
+                    key: neighborhood,
+                    label: neighborhood,
+                  }))}
+                  selected={advancedFilters.neighborhoods}
+                  onToggle={(value) =>
+                    toggleAdvancedArrayFilter("neighborhoods", value)
+                  }
+                  disabled={advancedFilters.districts.length === 0}
+                  emptyText="Önce ilçe seçin"
+                />
+
+                <CrmMultiSelectDropdown
+                  label="Mülk Tipi"
+                  options={PROPERTY_TYPE_OPTIONS}
+                  selected={advancedFilters.propertyTypes}
+                  onToggle={(value) =>
+                    toggleAdvancedArrayFilter("propertyTypes", value)
+                  }
+                />
+
+                <CrmMultiSelectDropdown
+                  label="Etiket"
+                  options={TAGS.map((tag) => ({ key: tag, label: tag }))}
+                  selected={advancedFilters.tags}
+                  onToggle={(value) => toggleAdvancedArrayFilter("tags", value)}
+                />
+
+                <CrmMultiSelectDropdown
+                  label="Lead Kaynağı"
+                  options={LEAD_SOURCE_OPTIONS.map((source) => ({
+                    key: source,
+                    label: source,
+                  }))}
+                  selected={advancedFilters.sources}
+                  onToggle={(value) => toggleAdvancedArrayFilter("sources", value)}
+                />
+              </div>
+
+              <div className="mt-2 grid gap-2 lg:grid-cols-[1.1fr_1fr_1fr]">
+                <input
+                  value={advancedFilters.interestArea}
+                  onChange={(event) =>
+                    setAdvancedFilters((current) => ({
+                      ...current,
+                      interestArea: event.target.value,
+                    }))
+                  }
+                  placeholder="İlgi bölgesinde ara"
+                  className="premium-input min-h-11"
+                />
+
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-[14px] border-2 border-[#C7D6E8] bg-white px-2">
+                  <input
+                    inputMode="numeric"
+                    value={formatBudgetInput(advancedFilters.minBudget)}
+                    onChange={(event) =>
+                      setAdvancedFilters((current) => ({
+                        ...current,
+                        minBudget: onlyDigits(event.target.value),
+                      }))
+                    }
+                    placeholder="Min bütçe"
+                    className="min-h-10 min-w-0 bg-transparent px-1 text-[12px] font-black text-[#1F2937] outline-none placeholder:text-[#94A3B8]"
+                  />
+                  <span className="font-black text-[#94A3B8]">—</span>
+                  <input
+                    inputMode="numeric"
+                    value={formatBudgetInput(advancedFilters.maxBudget)}
+                    onChange={(event) =>
+                      setAdvancedFilters((current) => ({
+                        ...current,
+                        maxBudget: onlyDigits(event.target.value),
+                      }))
+                    }
+                    placeholder="Maks bütçe"
+                    className="min-h-10 min-w-0 bg-transparent px-1 text-[12px] font-black text-[#1F2937] outline-none placeholder:text-[#94A3B8]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-[14px] border-2 border-[#C7D6E8] bg-white px-2">
+                  <input
+                    type="date"
+                    value={advancedFilters.dateFrom}
+                    onChange={(event) =>
+                      setAdvancedFilters((current) => ({
+                        ...current,
+                        dateFrom: event.target.value,
+                      }))
+                    }
+                    className="min-h-10 min-w-0 bg-transparent px-1 text-[11px] font-black text-[#1F2937] outline-none"
+                  />
+                  <span className="font-black text-[#94A3B8]">—</span>
+                  <input
+                    type="date"
+                    value={advancedFilters.dateTo}
+                    onChange={(event) =>
+                      setAdvancedFilters((current) => ({
+                        ...current,
+                        dateTo: event.target.value,
+                      }))
+                    }
+                    className="min-h-10 min-w-0 bg-transparent px-1 text-[11px] font-black text-[#1F2937] outline-none"
+                  />
+                </div>
+              </div>
+
+              {activeFilterChips.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5 rounded-[16px] border-2 border-[#C7D6E8] bg-white p-2">
+                  {activeFilterChips.map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      onClick={() => removeFilterChip(chip.key)}
+                      className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-full border border-[#B7CCE4] bg-[#EFF6FF] px-2.5 py-1 text-[10px] font-black text-[#1D4ED8]"
+                    >
+                      <span className="break-words">{chip.label}</span>
+                      <X size={12} className="shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 border-t-2 border-[#C7D6E8] bg-white p-3">
+              <button
+                type="button"
+                onClick={showAllCustomers}
+                className="min-h-11 rounded-[14px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-3 text-[12px] font-black text-[#334155]"
+              >
+                Temizle
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFilterModal(false);
+                  setView("list");
+                }}
+                className="min-h-11 rounded-[14px] border-2 border-[#1D4ED8] bg-[#2563EB] px-3 text-[12px] font-black text-white"
+              >
+                {filteredCustomers.length} Kaydı Göster
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedCustomer && (
         <CustomerDetailModal
@@ -1757,47 +2625,34 @@ export default function CrmPage() {
           </button>
         )}
 
-        <section className="mb-3 overflow-hidden rounded-[22px] border border-[#244667] bg-[#071B33] p-2 shadow-[0_12px_28px_rgba(0,0,0,0.18)]">
-          <div className="grid grid-cols-5 divide-x divide-[#24415F]">
-            {roleTabs.map((tab) => {
-              const count = customers.filter((customer) => (customer.roles || []).includes(tab.key)).length;
-              return (
-                <RoleSegmentButton
-                  key={tab.key}
-                  label={tab.label}
-                  count={count}
-                  icon={tab.icon}
-                  active={roleFilter === tab.key}
-                  tone={tab.tone}
-                  onClick={() => handleRoleFilterChange(tab.key)}
-                />
-              );
-            })}
-          </div>
-        </section>
 
-        {quickFilter !== "TUMU" && (
-          <button
-            type="button"
-            onClick={showAllCustomers}
-            className="mb-3 flex w-full items-center justify-center rounded-2xl border border-[#2D6692] bg-[#092440] px-3 py-2 text-[11px] font-extrabold text-[#71C2FF]"
-          >
-            {quickFilter === "EKSIK" ? "Eksik bilgili kayıtlar gösteriliyor" : "Sıcak lead listesi gösteriliyor"} • Filtreyi temizle
-          </button>
-        )}
 
-        <section className="mb-3 rounded-[20px] border border-[#244667] bg-[#071B33] p-2 shadow-[0_10px_24px_rgba(0,0,0,0.16)]">
-          <div className="flex gap-2">
-            <div className="relative min-w-0 flex-1">
-              <Search className="absolute left-3 top-3 text-[#7E9AB8]" size={17} />
+        <section className="eph-crm-filterbar mb-3 rounded-[22px] border border-[#244667] bg-[#071B33] p-2.5 shadow-[0_10px_24px_rgba(0,0,0,0.16)]">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2">
+            <div className="relative min-w-0">
+              <Search className="absolute left-3 top-3.5 text-[#7E9AB8]" size={17} />
               <input
                 id="crm-search-input"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="CRM kayıtlarında ara..."
+                placeholder="Ad, telefon, firma veya bölge ara..."
                 className="h-11 w-full rounded-[14px] border border-[#294B6B] bg-[#0A213B] pl-10 pr-3 text-[13px] font-semibold text-white outline-none placeholder:text-[#7E9AB8] focus:border-[#3FA7F5]"
               />
             </div>
+
+            <button
+              type="button"
+              onClick={() => setShowFilterModal(true)}
+              className={`flex h-11 min-w-[104px] items-center justify-center gap-2 rounded-[14px] border px-3 text-[11px] font-black ${
+                activeFilterCount > 0
+                  ? "border-[#71C2FF] bg-[#1557D6] text-white"
+                  : "border-[#294B6B] bg-[#0A213B] text-[#71C2FF]"
+              }`}
+            >
+              <ListFilter size={16} />
+              <span>Filtreler{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setView(view === "pipeline" ? "list" : "pipeline")}
@@ -1806,6 +2661,63 @@ export default function CrmPage() {
             >
               {view === "pipeline" ? <FileText size={17} /> : <ListFilter size={17} />}
             </button>
+          </div>
+
+          <div className="mt-2 grid grid-cols-3 gap-1.5">
+            {[
+              { key: "TUMU", label: "Tümü" },
+              { key: "SICAK", label: "Sıcak Lead" },
+              { key: "EKSIK", label: "Eksik Bilgi" },
+              { key: "AKTIF", label: "Aktif" },
+              { key: "KAPANDI", label: "Kapanmış" },
+              { key: "KAYBEDILDI", label: "Kaybedilmiş" },
+            ].map((item) => {
+              const active = quickFilter === item.key;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => handleQuickFilterChange(item.key as CrmQuickFilter)}
+                  className={`min-h-10 rounded-[13px] border px-2 py-2 text-[10px] font-black transition ${
+                    active
+                      ? "border-[#71C2FF] bg-[#1557D6] text-white"
+                      : "border-[#294B6B] bg-[#0A213B] text-[#B8D9F5]"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {activeFilterChips.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {activeFilterChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => removeFilterChip(chip.key)}
+                  className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-full border border-[#3C719D] bg-[#0D3153] px-2.5 py-1 text-[10px] font-black text-[#DCEEFF]"
+                  title="Filtreyi kaldır"
+                >
+                  <span className="break-words">{chip.label}</span>
+                  <X size={12} className="shrink-0" />
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={showAllCustomers}
+                className="min-h-8 rounded-full border border-[#8F4D1D] bg-[#3B2017] px-2.5 py-1 text-[10px] font-black text-[#FF9A45]"
+              >
+                Tümünü Temizle
+              </button>
+            </div>
+          )}
+
+          <div className="mt-2 flex items-center justify-between gap-2 border-t border-[#244667] pt-2 text-[10px] font-black text-[#9EB4C9]">
+            <span>{filteredCustomers.length} kayıt bulundu</span>
+            <span>{view === "list" ? "Liste görünümü" : "Pipeline görünümü"}</span>
           </div>
         </section>
 
@@ -1837,7 +2749,16 @@ export default function CrmPage() {
               <div className="flex h-[240px] flex-col items-center justify-center text-center">
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#0C2A48] text-[#71C2FF]"><UsersRound size={26} /></div>
                 <div className="text-lg font-black text-white">Müşteri bulunamadı</div>
-                <p className="mt-2 max-w-md text-sm leading-6 text-[#8EA6BF]">Yeni müşteri ekleyebilir veya arama filtresini temizleyebilirsin.</p>
+                <p className="mt-2 max-w-md text-sm leading-6 text-[#8EA6BF]">Yeni müşteri ekleyebilir veya aktif filtreleri temizleyebilirsin.</p>
+                {(activeFilterCount > 0 || search.trim()) && (
+                  <button
+                    type="button"
+                    onClick={showAllCustomers}
+                    className="mt-4 min-h-10 rounded-[14px] border-2 border-[#1D4ED8] bg-[#2563EB] px-5 text-[12px] font-black text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)]"
+                  >
+                    Filtreleri Temizle
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-1.5">
@@ -2450,6 +3371,381 @@ export default function CrmPage() {
           border-color: #059669 !important;
           background: #059669 !important;
           color: #ffffff !important;
+        }
+        /* CRM Final Premium Polish V11 */
+        .eph-crm-premium-light .eph-crm-page > header > .mt-3.grid.grid-cols-5 {
+          gap: 6px !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page > header > .mt-3.grid.grid-cols-5 > button {
+          min-height: 86px !important;
+          border: 2px solid #c7d6e8 !important;
+          border-radius: 18px !important;
+          background:
+            linear-gradient(145deg, #ffffff 0%, #f5f9ff 58%, #edf4ff 100%) !important;
+          padding: 8px 4px !important;
+          color: #0f2f5c !important;
+          box-shadow:
+            0 8px 20px rgba(15, 23, 42, 0.07),
+            inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page > header > .mt-3.grid.grid-cols-5 > button * {
+          color: #0f2f5c !important;
+          opacity: 1 !important;
+          text-shadow: none !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page > header > .mt-3.grid.grid-cols-5 > button > :first-child {
+          border: 1px solid #bfd2e8 !important;
+          background: #ffffff !important;
+          color: #1557d6 !important;
+          box-shadow: 0 5px 12px rgba(37, 99, 235, 0.1) !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page > header > .mt-3.grid.grid-cols-5 > button > :first-child svg {
+          color: #1557d6 !important;
+          stroke: #1557d6 !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page > header > .mt-3.grid.grid-cols-5 > button p,
+        .eph-crm-premium-light .eph-crm-page > header > .mt-3.grid.grid-cols-5 > button span {
+          line-height: 1.15 !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-new-customer-button + button {
+          border: 2px solid #55342c !important;
+          background:
+            linear-gradient(100deg, #2a1814 0%, #171821 58%, #10131b 100%) !important;
+          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16) !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-new-customer-button + button span {
+          color: #ffffff !important;
+          opacity: 1 !important;
+          text-shadow: none !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-new-customer-button + button span span:last-child {
+          color: #ffe1c7 !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-new-customer-button + button > span:last-child {
+          border-color: #ff9a45 !important;
+          background: rgba(255, 255, 255, 0.05) !important;
+          color: #ffb06e !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-list {
+          padding: 6px !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-list > div.space-y-1\.5 {
+          display: grid !important;
+          gap: 6px !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-list-row,
+        .eph-crm-premium-light .eph-crm-customer-card {
+          min-height: 66px !important;
+          border: 1.5px solid #c7d6e8 !important;
+          border-radius: 16px !important;
+          background:
+            linear-gradient(145deg, #ffffff 0%, #fbfdff 100%) !important;
+          padding: 8px 10px !important;
+          box-shadow: 0 5px 14px rgba(15, 23, 42, 0.045) !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-list-row [class*="truncate"],
+        .eph-crm-premium-light .eph-crm-customer-card [class*="truncate"] {
+          overflow: visible !important;
+          white-space: normal !important;
+          text-overflow: clip !important;
+          overflow-wrap: anywhere !important;
+          line-height: 1.25 !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-list-row p,
+        .eph-crm-premium-light .eph-crm-list-row span,
+        .eph-crm-premium-light .eph-crm-customer-card p,
+        .eph-crm-premium-light .eph-crm-customer-card span {
+          color: #1f2937 !important;
+          opacity: 1 !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-list-row [class*="text-[#64748B]"],
+        .eph-crm-premium-light .eph-crm-customer-card [class*="text-[#64748B]"],
+        .eph-crm-premium-light .eph-crm-list-row [class*="text-slate-"],
+        .eph-crm-premium-light .eph-crm-customer-card [class*="text-slate-"] {
+          color: #64748b !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-filterbar {
+          border-radius: 18px !important;
+          padding: 8px !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-filterbar > .grid:first-child {
+          grid-template-columns: minmax(0, 1fr) auto auto !important;
+          gap: 6px !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-filterbar input {
+          height: 44px !important;
+          border-radius: 14px !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-filterbar > .grid:first-child > button {
+          height: 44px !important;
+          border-radius: 14px !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-filterbar .grid.grid-cols-3 > button {
+          min-height: 34px !important;
+          border-radius: 12px !important;
+          font-size: 10px !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-list > .flex.h-\[240px\] {
+          height: 220px !important;
+          border-radius: 18px !important;
+          background:
+            radial-gradient(circle at 50% 35%, rgba(37, 99, 235, 0.06), transparent 32%),
+            #ffffff !important;
+        }
+
+        @media (max-width: 768px) {
+          .eph-crm-premium-light .eph-crm-page > header > .mt-3.grid.grid-cols-5 > button {
+            min-height: 80px !important;
+            border-radius: 16px !important;
+            padding: 7px 3px !important;
+          }
+
+          .eph-crm-premium-light .eph-crm-page > header > .mt-3.grid.grid-cols-5 > button > :first-child {
+            width: 38px !important;
+            height: 38px !important;
+            margin-bottom: 4px !important;
+            border-radius: 13px !important;
+          }
+
+          .eph-crm-premium-light .eph-crm-page > header > .mt-3.grid.grid-cols-5 > button p,
+          .eph-crm-premium-light .eph-crm-page > header > .mt-3.grid.grid-cols-5 > button span {
+            font-size: 9px !important;
+          }
+
+          .eph-crm-premium-light .eph-crm-list-row,
+          .eph-crm-premium-light .eph-crm-customer-card {
+            min-height: 64px !important;
+            padding: 8px !important;
+          }
+        }
+
+        /* CRM Filter Close Safety V10 */
+        .eph-crm-filter-modal > div:first-of-type {
+          position: sticky;
+          top: 0;
+          z-index: 160;
+        }
+
+        @media (max-width: 768px) {
+          .eph-crm-dropdown-menu {
+            top: calc(72px + env(safe-area-inset-top, 0px)) !important;
+            max-height: calc(100dvh - 150px) !important;
+          }
+        }
+
+        /* CRM Premium Compact V7 */
+        .eph-crm-premium-light {
+          background:
+            radial-gradient(circle at 50% -12%, rgba(37, 99, 235, 0.08), transparent 34%),
+            #f4f8ff !important;
+          color: #1f2937 !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page {
+          color: #1f2937 !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page > header {
+          border: 2px solid #c7d6e8 !important;
+          background: linear-gradient(135deg, #ffffff 0%, #f8fbff 55%, #eef5ff 100%) !important;
+          box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07) !important;
+          padding: 10px !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page > header p,
+        .eph-crm-premium-light .eph-crm-page > header span {
+          color: #334155 !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page > header [class*="text-[#71C2FF]"] {
+          color: #2563eb !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page [class*="bg-[#071B33]"],
+        .eph-crm-premium-light .eph-crm-page [class*="bg-[#06172C]"],
+        .eph-crm-premium-light .eph-crm-page [class*="bg-[#0A213B]"],
+        .eph-crm-premium-light .eph-crm-page [class*="bg-[#0A2949]"],
+        .eph-crm-premium-light .eph-crm-page [class*="bg-[#092440]"] {
+          border-color: #c7d6e8 !important;
+          background: #ffffff !important;
+          box-shadow: 0 9px 24px rgba(15, 23, 42, 0.06) !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page [class*="bg-[#0D3153]"],
+        .eph-crm-premium-light .eph-crm-page [class*="bg-[#0C2A48]"] {
+          border-color: #c7d6e8 !important;
+          background: #eef3f8 !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page [class*="border-[#244667]"],
+        .eph-crm-premium-light .eph-crm-page [class*="border-[#294B6B]"],
+        .eph-crm-premium-light .eph-crm-page [class*="border-[#2D6692]"],
+        .eph-crm-premium-light .eph-crm-page [class*="border-[#3C719D]"] {
+          border-color: #c7d6e8 !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page [class*="text-white"],
+        .eph-crm-premium-light .eph-crm-page [class*="text-[#FFF8E7]"],
+        .eph-crm-premium-light .eph-crm-page [class*="text-[#DCEEFF]"],
+        .eph-crm-premium-light .eph-crm-page [class*="text-[#B8D9F5]"],
+        .eph-crm-premium-light .eph-crm-page [class*="text-[#EAF3FF]"] {
+          color: #1f2937 !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page [class*="text-[#8EA6BF]"],
+        .eph-crm-premium-light .eph-crm-page [class*="text-[#7E9AB8]"],
+        .eph-crm-premium-light .eph-crm-page [class*="text-[#9EB4C9]"],
+        .eph-crm-premium-light .eph-crm-page [class*="text-[#6F8AA6]"] {
+          color: #64748b !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page input,
+        .eph-crm-premium-light .eph-crm-page select,
+        .eph-crm-premium-light .eph-crm-page textarea {
+          border-color: #c7d6e8 !important;
+          background: #eef3f8 !important;
+          color: #1f2937 !important;
+          caret-color: #2563eb !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page input::placeholder,
+        .eph-crm-premium-light .eph-crm-page textarea::placeholder {
+          color: #94a3b8 !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page button[class*="bg-[#1557D6]"],
+        .eph-crm-premium-light .eph-crm-page button[class*="bg-[#2563EB]"],
+        .eph-crm-premium-light .eph-crm-page .eph-crm-new-customer-button {
+          border-color: #1d4ed8 !important;
+          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+          color: #ffffff !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-page button[class*="bg-[#1557D6]"] *,
+        .eph-crm-premium-light .eph-crm-page button[class*="bg-[#2563EB]"] *,
+        .eph-crm-premium-light .eph-crm-page .eph-crm-new-customer-button * {
+          color: #ffffff !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-filterbar {
+          border: 2px solid #c7d6e8 !important;
+          border-radius: 18px !important;
+          background: #ffffff !important;
+          padding: 8px !important;
+          box-shadow: 0 9px 24px rgba(15, 23, 42, 0.06) !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-filterbar .grid.grid-cols-3 {
+          display: flex !important;
+          gap: 6px !important;
+          overflow-x: auto;
+          padding-bottom: 2px;
+          scrollbar-width: none;
+        }
+
+        .eph-crm-premium-light .eph-crm-filterbar .grid.grid-cols-3::-webkit-scrollbar {
+          display: none;
+        }
+
+        .eph-crm-premium-light .eph-crm-filterbar .grid.grid-cols-3 > button {
+          min-width: max-content;
+          min-height: 34px !important;
+          padding: 6px 10px !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-list {
+          border: 2px solid #c7d6e8 !important;
+          border-radius: 20px !important;
+          background: #ffffff !important;
+          padding: 7px !important;
+          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07) !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-list-row,
+        .eph-crm-premium-light .eph-crm-customer-card {
+          border-color: #c7d6e8 !important;
+          border-radius: 16px !important;
+          background: #ffffff !important;
+          padding: 9px 10px !important;
+          box-shadow: 0 5px 14px rgba(15, 23, 42, 0.045) !important;
+        }
+
+        .eph-crm-premium-light .eph-crm-filter-modal,
+        .eph-crm-premium-light .eph-crm-filter-modal * {
+          color: #1f2937;
+        }
+
+        .eph-crm-premium-light .eph-crm-filter-modal input {
+          border-color: #c7d6e8 !important;
+          background: transparent !important;
+          color: #1f2937 !important;
+        }
+
+        .eph-crm-multi-dropdown[open] > summary svg {
+          transform: rotate(90deg);
+        }
+
+        .eph-crm-multi-dropdown summary::-webkit-details-marker {
+          display: none;
+        }
+
+        @media (max-width: 768px) {
+          .eph-crm-premium-light .eph-crm-page {
+            padding-left: 10px;
+            padding-right: 10px;
+            padding-top: 10px;
+          }
+
+          .eph-crm-premium-light .eph-crm-page > header {
+            border-radius: 20px !important;
+            padding: 8px !important;
+          }
+
+          .eph-crm-premium-light .eph-crm-new-customer-button {
+            min-height: 48px !important;
+            margin-bottom: 8px !important;
+            border-radius: 15px !important;
+            padding: 9px 12px !important;
+            font-size: 14px !important;
+          }
+
+          .eph-crm-premium-light .eph-crm-filterbar {
+            margin-bottom: 8px !important;
+          }
+
+          .eph-crm-premium-light .eph-crm-list-row,
+          .eph-crm-premium-light .eph-crm-customer-card {
+            padding: 8px !important;
+          }
+
+          .eph-crm-dropdown-menu {
+            position: fixed !important;
+            left: 12px !important;
+            right: 12px !important;
+            top: 18% !important;
+            max-height: 60dvh !important;
+          }
         }
       `}</style>
     </main>
