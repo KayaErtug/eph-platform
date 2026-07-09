@@ -920,6 +920,20 @@ export default function NetworkPage() {
     setModalOpen(true);
   };
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") !== "1") return;
+
+    openCreateModal();
+
+    params.delete("create");
+    const nextQuery = params.toString();
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash}`;
+    window.history.replaceState(window.history.state, "", nextUrl);
+  }, [user?.id]);
+
   const metrics = [
     {
       id: "total",

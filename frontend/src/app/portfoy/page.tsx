@@ -407,6 +407,16 @@ function StokPageInner() {
     }
   }, [router, searchParams, showModal, units]);
 
+  useEffect(() => {
+    if (!hydrated || !user) return;
+    if (searchParams.get("create") !== "1") return;
+
+    router.replace("/portfoy", { scroll: false });
+
+    if (showModal || !canAddUnit) return;
+    openCreateModal();
+  }, [hydrated, user, searchParams, showModal, canAddUnit, router]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
