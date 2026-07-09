@@ -1253,66 +1253,6 @@ export default function NetworkPage() {
               </div>
             </section>
 
-            <section className="rounded-[25px] border border-[#FED7AA] bg-[#FFFBF5]/95 p-3 shadow-[0_14px_32px_rgba(194,65,12,0.11)] backdrop-blur">
-              <div className="flex items-center gap-2">
-                <div className="w-[88px] shrink-0 text-center">
-                  <p className="text-center text-[8px] font-black uppercase tracking-[0.13em] text-[#EA580C]">
-                    Akıllı Filtre
-                  </p>
-                  <p className="mt-0.5 text-center text-[12px] font-black text-[#3A2208]">
-                    Talep Türü
-                  </p>
-                </div>
-
-                <select
-                  value={intentFilter}
-                  onChange={(event) => setIntentFilter(event.target.value)}
-                  className="h-11 min-w-0 flex-1 rounded-[18px] border border-[#EA580C] bg-white px-3 text-center text-[12px] font-black text-[#3A2208] outline-none"
-                >
-                  {REQUEST_TYPE_FILTER_OPTIONS.map((item, index) => (
-                    <option
-                      key={`intent-filter-${item.value}-${index}`}
-                      value={item.value}
-                    >
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {QUICK_REQUEST_TYPE_FILTERS.map((item, index) => {
-                  const active = intentFilter === item.value;
-                  const intentVisual =
-                    item.value === "DIGER_TURLER"
-                      ? getForumRequestCategoryVisual("DIGER")
-                      : getForumRequestIntentVisual(item.value);
-
-                  return (
-                    <button
-                      key={`intent-button-${item.value}-${index}`}
-                      type="button"
-                      onClick={() =>
-                        setIntentFilter(active ? "Tümü" : item.value)
-                      }
-                      className="flex min-h-[43px] items-center justify-center rounded-[16px] border px-1.5 text-center text-[9px] font-black leading-[11px] transition active:scale-[0.98]"
-                      style={{
-                        borderColor: intentVisual.borderColor,
-                        borderWidth: `${active ? intentVisual.borderWidth || 2 : 1}px`,
-                        backgroundColor: active
-                          ? intentVisual.selectedBackgroundColor
-                          : intentVisual.backgroundColor,
-                        color: intentVisual.textColor,
-                        boxShadow: active ? intentVisual.shadow : "none",
-                      }}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
             <section className="grid grid-cols-4 overflow-hidden rounded-[22px] border border-[#FED7AA] bg-[#FFFBF5]/95 shadow-[0_14px_32px_rgba(194,65,12,0.11)] backdrop-blur">
               {metrics.slice(0, 4).map((metric, index) => (
                 <MetricBox
