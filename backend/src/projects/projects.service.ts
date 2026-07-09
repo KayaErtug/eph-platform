@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ProjectSetupStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 type ProjectLocationData = {
@@ -62,6 +63,33 @@ function cleanCreateLocationData(data: CreateProjectData) {
 export class ProjectsService {
   constructor(private prisma: PrismaService) {}
 
+  private getPortfolioVisibleProjectWhere() {
+    return {
+      OR: [
+        {
+          code: null,
+          declaredIndependentUnitCount: null,
+          declaredSalesInventoryCount: null,
+          plannedUnitTypes: {
+            isEmpty: true,
+          },
+          blocks: {
+            none: {},
+          },
+          mediaPackages: {
+            none: {},
+          },
+          designReviewRequests: {
+            none: {},
+          },
+        },
+        {
+          setupStatus: ProjectSetupStatus.TAMAMLANDI,
+        },
+      ],
+    };
+  }
+
   async create(ownerId: string, data: CreateProjectData) {
     return this.prisma.project.create({
       data: {
@@ -89,6 +117,7 @@ export class ProjectsService {
   async findAll(filters?: { city?: string; district?: string; isActive?: boolean }) {
     return this.prisma.project.findMany({
       where: {
+        ...this.getPortfolioVisibleProjectWhere(),
         isActive: filters?.isActive ?? true,
         city: filters?.city ? { contains: filters.city, mode: 'insensitive' } : undefined,
         district: filters?.district ? { contains: filters.district, mode: 'insensitive' } : undefined,
@@ -116,9 +145,10 @@ export class ProjectsService {
   }
 
   async findOne(id: string) {
-    const project = await this.prisma.project.findUnique({
+    const project = await this.prisma.project.findFirst({
       where: {
         id,
+        ...this.getPortfolioVisibleProjectWhere(),
       },
       include: {
         owner: {
@@ -208,6 +238,7 @@ export class ProjectsService {
   async myProjects(ownerId: string) {
     return this.prisma.project.findMany({
       where: {
+        ...this.getPortfolioVisibleProjectWhere(),
         ownerId,
       },
       include: {

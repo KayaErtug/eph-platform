@@ -27,6 +27,7 @@ import { ProjectSalesCompletionService } from './project-sales-completion.servic
 import { ProjectSalesDashboardService } from './project-sales-dashboard.service';
 import { ProjectSalesImportService } from './project-sales-import.service';
 import { ProjectSalesInventoryService } from './project-sales-inventory.service';
+import { ProjectSalesLaunchService } from './project-sales-launch.service';
 import { ProjectSalesMediaSetupService } from './project-sales-media-setup.service';
 import { ProjectSalesSetupService } from './project-sales-setup.service';
 import { ProjectSalesSpacesService } from './project-sales-spaces.service';
@@ -58,6 +59,7 @@ export class ProjectSalesController {
     private readonly projectSalesCompletionService: ProjectSalesCompletionService,
     private readonly projectSalesImportService: ProjectSalesImportService,
     private readonly projectSalesInventoryService: ProjectSalesInventoryService,
+    private readonly projectSalesLaunchService: ProjectSalesLaunchService,
     private readonly projectSalesMediaSetupService: ProjectSalesMediaSetupService,
     private readonly projectMediaZipService: ProjectMediaZipService,
     private readonly projectSalesDashboardService: ProjectSalesDashboardService,
@@ -334,6 +336,54 @@ export class ProjectSalesController {
   @Get('dashboard')
   getDashboard(@CurrentUser() user: any) {
     return this.projectSalesDashboardService.getDashboard(user.id);
+  }
+
+  @Get('projects/:projectId/launch')
+  getProjectLaunchCenter(
+    @CurrentUser() user: any,
+    @Param('projectId') projectId: string,
+  ) {
+    return this.projectSalesLaunchService.getLaunchCenter(
+      projectId,
+      user.id,
+      user.role,
+    );
+  }
+
+  @Post('projects/:projectId/launch/render-work-order')
+  createProjectRenderWorkOrder(
+    @CurrentUser() user: any,
+    @Param('projectId') projectId: string,
+  ) {
+    return this.projectSalesLaunchService.createRenderWorkOrder(
+      projectId,
+      user.id,
+      user.role,
+    );
+  }
+
+  @Post('projects/:projectId/launch/presentation-link')
+  createProjectPresentationLink(
+    @CurrentUser() user: any,
+    @Param('projectId') projectId: string,
+  ) {
+    return this.projectSalesLaunchService.createPresentationShareLink(
+      projectId,
+      user.id,
+      user.role,
+    );
+  }
+
+  @Post('projects/:projectId/launch/publish-to-pool')
+  publishProjectToPool(
+    @CurrentUser() user: any,
+    @Param('projectId') projectId: string,
+  ) {
+    return this.projectSalesLaunchService.publishToPool(
+      projectId,
+      user.id,
+      user.role,
+    );
   }
 
   @Get('imports/config')

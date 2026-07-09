@@ -18,7 +18,6 @@ import {
   Phone,
   PieChart,
   ShieldCheck,
-  Sparkles,
   UsersRound,
   X,
 } from "lucide-react";
@@ -56,7 +55,19 @@ const stats = [
   { icon: ShieldCheck, value: "7/24", label: "Canlı Destek" },
 ];
 
-const heroWords = ["Dijital Merkezi", "Akıllı CRM’i", "Ortak Portföy Ağı", "Yeni Nesil Havuzu"];
+const heroWords = ["Kapalı İş Ağı", "Akıllı CRM’i", "Ortak Portföy Havuzu", "Talep Eşleşmesi"];
+
+const heroTrustSignals = [
+  "Admin onaylı üyelik",
+  "Doğrulanmış profesyoneller",
+  "KVKK ve güvenli veri akışı",
+];
+
+const heroProofPoints = [
+  { value: "25.000+", label: "paylaşıma hazır portföy" },
+  { value: "10.000+", label: "doğrulanmış üye" },
+  { value: "1.500+", label: "günlük talep hareketi" },
+];
 
 function useScrollReveal() {
   useEffect(() => {
@@ -185,7 +196,8 @@ function VerticalMarquee() {
       [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
     }
 
-    setRandomizedCards(shuffled);
+    const timer = window.setTimeout(() => setRandomizedCards(shuffled), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const firstColumn = randomizedCards.filter((_, index) => index % 3 === 0);
@@ -250,10 +262,13 @@ function Header() {
           </nav>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <Link href="/giris" className="shine-button relative inline-flex h-10 items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-blue-300/35 bg-[#2563EB] px-3.5 text-[12px] font-semibold text-white shadow-[0_12px_34px_rgba(37,99,235,.30)] transition hover:-translate-y-0.5 hover:bg-[#1D4ED8] sm:h-11 sm:px-6 sm:text-[13px]">
-              <LogIn size={16} />
-              <span className="sm:hidden">Giriş</span>
-              <span className="hidden sm:inline">Giriş Yap</span>
+            <Link href="/kayit" className="shine-button relative inline-flex h-10 items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-blue-300/35 bg-[#2563EB] px-3.5 text-[12px] font-semibold text-white shadow-[0_12px_34px_rgba(37,99,235,.30)] transition hover:-translate-y-0.5 hover:bg-[#1D4ED8] sm:h-11 sm:px-5 sm:text-[13px]">
+              Başvur
+              <ArrowRight size={15} />
+            </Link>
+            <Link href="/giris" className="hidden h-10 items-center justify-center gap-2 rounded-[10px] border border-white/12 bg-white/[0.05] px-3.5 text-[12px] font-semibold text-white/84 transition hover:-translate-y-0.5 hover:border-white/24 hover:bg-white/[0.09] md:inline-flex md:h-11 md:px-5 md:text-[13px]">
+              <LogIn size={15} />
+              Giriş
             </Link>
             <button type="button" onClick={() => setOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-white/10 text-white/82 transition hover:bg-white/8 sm:h-11 sm:w-11" aria-label="Menü">
               <Menu size={23} strokeWidth={1.7} />
@@ -272,8 +287,8 @@ function Header() {
           <a onClick={() => setOpen(false)} href="#fiyatlandirma">Fiyatlandırma</a>
           <a onClick={() => setOpen(false)} href="#blog">Blog</a>
           <a onClick={() => setOpen(false)} href="#iletisim">İletişim</a>
-          <Link href="/giris" className="mt-4 rounded-[12px] border border-white/16 px-4 py-3 text-center">Giriş Yap</Link>
-          <Link href="/kayit" className="rounded-[12px] bg-[#2563EB] px-4 py-3 text-center">Ücretsiz Başvur</Link>
+          <Link href="/kayit" className="mt-4 rounded-[12px] bg-[#2563EB] px-4 py-3 text-center">Ücretsiz Başvur</Link>
+          <Link href="/giris" className="rounded-[12px] border border-white/16 px-4 py-3 text-center text-white/82">Giriş Yap</Link>
         </div>
       </aside>
     </>
@@ -301,7 +316,7 @@ function Hero() {
       <div className="relative z-10 mx-auto grid min-h-[920px] max-w-[1380px] items-center gap-12 px-5 pb-16 pt-28 md:px-10 lg:min-h-[810px] lg:grid-cols-[0.9fr_1.1fr] lg:gap-16 lg:pb-10 lg:pt-24">
         <div className="mx-auto max-w-[650px] text-center lg:mx-0 lg:text-left" data-reveal>
           <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-white/[0.07] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#BFDBFE] backdrop-blur-xl lg:mx-0">
-            <Sparkles size={15} /> Türkiye’nin Gayrimenkul Profesyonel Ağı
+            <ShieldCheck size={15} /> Admin onaylı kapalı devre profesyonel ağ
           </div>
 
           <h1 className="text-[42px] font-light leading-[1.07] tracking-[-0.055em] text-white sm:text-[56px] md:text-[68px] lg:text-[72px]">
@@ -313,26 +328,38 @@ function Hero() {
           </h1>
 
           <p className="mx-auto mt-7 max-w-[590px] text-[15px] font-normal leading-8 text-white/76 md:text-[17px] lg:mx-0">
-            Portföy, müşteri, CRM, pazar analizi ve yapay zekâ tek platformda.
-            İşinizi büyüten bağlantılar, fırsatlar ve veriler tek merkezde.
+            Portföylerinizi doğrulanmış gayrimenkul profesyonelleriyle paylaşın, doğru talep ve alıcılarla daha hızlı eşleşin.
+            CRM, portföy havuzu, pazar analizi ve Lina AI tek merkezde.
           </p>
 
           <div className="mt-9 grid gap-3 sm:flex sm:flex-wrap sm:justify-center lg:justify-start">
-            <Link href="/giris" className="shine-button relative inline-flex h-[56px] items-center justify-center gap-3 overflow-hidden rounded-[12px] bg-[#2563EB] px-8 text-[15px] font-semibold text-white shadow-[0_18px_48px_rgba(37,99,235,.38)] transition hover:-translate-y-1 hover:bg-[#1D4ED8]">
-              <LogIn size={19} /> Giriş Yap
+            <Link href="/kayit" className="shine-button relative inline-flex h-[56px] items-center justify-center gap-3 overflow-hidden rounded-[12px] bg-[#2563EB] px-8 text-[15px] font-semibold text-white shadow-[0_18px_48px_rgba(37,99,235,.38)] transition hover:-translate-y-1 hover:bg-[#1D4ED8]">
+              Üyelik Başvurusu Yap <ArrowRight size={18} />
             </Link>
-            <Link href="/kayit" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[12px] border border-white/22 bg-white/8 px-8 text-[15px] font-semibold text-white/94 backdrop-blur-md transition hover:-translate-y-1 hover:border-[#60A5FA] hover:bg-white/12">
-              Ücretsiz Başvur <ArrowRight size={18} />
+            <Link href="/giris" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[12px] border border-white/22 bg-white/8 px-8 text-[15px] font-semibold text-white/94 backdrop-blur-md transition hover:-translate-y-1 hover:border-[#60A5FA] hover:bg-white/12">
+              <LogIn size={19} /> Üye Girişi
             </Link>
             <a href="#ozellikler" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[12px] border border-white/12 bg-[#071326]/38 px-6 text-[14px] font-medium text-white/82 backdrop-blur-md transition hover:border-white/28 hover:text-white">
               <CirclePlay size={19} strokeWidth={1.7} /> Platformu Keşfet
             </a>
           </div>
 
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-[13px] text-white/64 lg:justify-start">
-            <span className="inline-flex items-center gap-2"><Check size={15} className="text-emerald-400" /> Kredi kartı gerekmez</span>
-            <span className="inline-flex items-center gap-2"><Check size={15} className="text-emerald-400" /> 30 gün ücretsiz</span>
-            <span className="inline-flex items-center gap-2"><Check size={15} className="text-emerald-400" /> Mobil öncelikli</span>
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-[13px] text-white/66 lg:justify-start">
+            {heroTrustSignals.map((item) => (
+              <span key={item} className="inline-flex items-center gap-2">
+                <Check size={15} className="text-emerald-400" />
+                {item}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-7 grid gap-3 sm:grid-cols-3">
+            {heroProofPoints.map((item) => (
+              <div key={item.label} className="rounded-[14px] border border-white/12 bg-white/[0.065] px-4 py-3 backdrop-blur-md">
+                <div className="text-[24px] font-semibold tracking-[-0.03em] text-white">{item.value}</div>
+                <div className="mt-1 text-[12px] font-medium leading-5 text-white/58">{item.label}</div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -717,7 +744,10 @@ function CookieBanner() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    setVisible(window.localStorage.getItem("eph-cookie-consent") !== "accepted");
+    const timer = window.setTimeout(() => {
+      setVisible(window.localStorage.getItem("eph-cookie-consent") !== "accepted");
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   if (!visible) return null;

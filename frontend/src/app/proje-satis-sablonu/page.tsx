@@ -6,7 +6,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -48,1006 +47,88 @@ import {
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 
-type NoticeState = {
-  tone: "success" | "warning" | "error";
-  title: string;
-  message: string;
-} | null;
+import type {
+  BlockForm,
+  CompletionPreview,
+  FloorCopyOptions,
+  FloorPlanForm,
+  InventoryPreview,
+  NoticeState,
+  PageMode,
+  ProjectForm,
+  ProjectLaunchCenterResponse,
+  ProjectMediaConfig,
+  ProjectMediaEnsureResponse,
+  ProjectMediaPackagesResponse,
+  ProjectMediaPreview,
+  ProjectPresentationLinkResponse,
+  ProjectPublishToPoolResponse,
+  ProjectRenderWorkOrderResponse,
+  ProjectSalesStockDraft,
+  ProjectSalesStockResponse,
+  ProjectSalesStockUnit,
+  ProjectSaveDestination,
+  ProjectSetupResponse,
+  ProjectSpaceForm,
+  ProjectSpacesPreview,
+  ProjectSummary,
+  ProjectUnitSummary,
+  StructurePreview,
+  UnitGroupForm,
+  WizardStep,
+} from "./lib/projectSalesTypes";
 
-type ProjectCount = {
-  blocks: number;
-  units: number;
-  spaces: number;
-  designReviewRequests: number;
-};
-
-type ProjectSummary = {
-  id: string;
-  name: string;
-  code: string | null;
-  description: string | null;
-  city: string;
-  district: string;
-  neighborhood: string | null;
-  address: string;
-  adaNo: string | null;
-  parselNo: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  mapAddress: string | null;
-  declaredIndependentUnitCount: number | null;
-  declaredSalesInventoryCount: number | null;
-  plannedUnitTypes: string[];
-  geometryType: string;
-  setupStatus: string;
-  wizardStep: string;
-  needsSoftwareTeamReview: boolean;
-  updatedAt: string;
-  _count: ProjectCount;
-};
-
-type ProjectForm = {
-  name: string;
-  code: string;
-  description: string;
-  city: string;
-  district: string;
-  neighborhood: string;
-  address: string;
-  adaNo: string;
-  parselNo: string;
-  latitude: string;
-  longitude: string;
-  mapAddress: string;
-  declaredIndependentUnitCount: string;
-  declaredSalesInventoryCount: string;
-  geometryType: string;
-  plannedUnitTypes: string[];
-};
-
-type PageMode =
-  | "list"
-  | "form"
-  | "structure"
-  | "inventory"
-  | "spaces"
-  | "completion"
-  | "sales"
-  | "media";
-
-type WizardStep = 1 | 2 | 3 | 4 | 5;
-type ProjectSaveDestination =
-  | "stay"
-  | "structure"
-  | "inventory"
-  | "spaces"
-  | "completion";
-
-type ProjectFloorSummary = {
-  id: string;
-  level: number;
-  label: string;
-  floorType: string;
-  sortOrder: number;
-};
-
-type ProjectBlockSummary = {
-  id: string;
-  code: string;
-  normalizedCode: string;
-  name: string | null;
-  geometryType: string;
-  facadeViewCount: number;
-  sortOrder: number;
-  floors: ProjectFloorSummary[];
-};
-
-type ProjectSpaceSummary = {
-  id: string;
-  blockId: string | null;
-  floorId: string | null;
-  code: string;
-  name: string;
-  spaceType: string;
-  customTypeName: string | null;
-  legalStatus: string;
-  commercialPurpose: string;
-  grossArea: number | null;
-  description: string | null;
-  isCustomerVisible: boolean;
-  sortOrder: number;
-};
-
-type ProjectUnitSummary = {
-  id: string;
-  blockId: string | null;
-  floorId: string | null;
-  inventoryCode: string | null;
-  inventorySortOrder: number;
-  type: string;
-  floor: number | null;
-  floorLabel: string | null;
-  number: string | null;
-  roomCount: string | null;
-  netArea: number | null;
-  grossArea: number | null;
-  facades: string[];
-  conceptLabel: string | null;
-  legalStatus: string;
-  commercialPurpose: string;
-  isSalesInventory: boolean;
-};
-
-type ProjectSetupResponse = ProjectSummary & {
-  blocks: ProjectBlockSummary[];
-  units: ProjectUnitSummary[];
-  spaces: ProjectSpaceSummary[];
-};
-
-type ProjectSalesStockUnit = {
-  id: string;
-  projectId: string;
-  blockId: string | null;
-  floorId: string | null;
-  inventoryCode: string | null;
-  inventorySortOrder: number;
-  type: string;
-  legalStatus: string;
-  commercialPurpose: string;
-  floor: number | null;
-  floorLabel: string | null;
-  number: string | null;
-  roomCount: string | null;
-  conceptLabel: string | null;
-  netArea: number | null;
-  grossArea: number | null;
-  facades: string[];
-  deliveryDate: string | null;
-  price: number;
-  priceCurrency: string | null;
-  status: string;
-  isOffMarket: boolean;
-  updatedAt: string;
-  block: {
-    id: string;
-    code: string;
-    name: string | null;
-    sortOrder: number;
-  } | null;
-  projectFloor: {
-    id: string;
-    level: number;
-    label: string;
-    sortOrder: number;
-  } | null;
-};
-
-type ProjectSalesStockResponse = {
-  project: {
-    id: string;
-    name: string;
-    code: string | null;
-    city: string;
-    district: string;
-    neighborhood: string | null;
-    setupStatus: string;
-    wizardStep: string;
-    declaredSalesInventoryCount: number | null;
-    updatedAt: string;
-  };
-  summary: {
-    total: number;
-    available: number;
-    reserved: number;
-    closed: number;
-    passive: number;
-    priced: number;
-    totalListValue: number;
-  };
-  units: ProjectSalesStockUnit[];
-};
-
-type ProjectSalesStockDraft = {
-  price: string;
-  status: string;
-};
-
-type ProjectMediaFolder = {
-  packageId: string;
-  code: string;
-  folder: string;
-  name: string;
-  type: string;
-  unitType: string | null;
-  roomCount: string | null;
-  isDefault: boolean;
-  existingAssetCount: number;
-  assignedUnitCount: number;
-};
-
-type ProjectMediaConfig = {
-  project: {
-    id: string;
-    code: string;
-    name: string;
-  };
-  limits: {
-    maxZipSizeMb: number;
-    maxImageSizeMb: number;
-    maxImageCount: number;
-    maxPackageCount: number;
-    allowedImageExtensions: string[];
-    generalImageCount: {
-      min: number;
-      max: number;
-    };
-    recommendedStandardImageCount: number;
-    maxStandardImageCount: number;
-  };
-  folders: ProjectMediaFolder[];
-};
-
-type ProjectMediaIssue = {
-  level: "ERROR" | "WARNING" | string;
-  code: string;
-  message: string;
-  path?: string | null;
-  value?: unknown;
-};
-
-type ProjectMediaPreviewPackage = {
-  packageId: string;
-  sourceFolder: string;
-  code: string;
-  name: string;
-  type: string;
-  unitType: string | null;
-  roomCount: string | null;
-  fileCount: number;
-  totalSize: number;
-  existingAssetCount: number;
-  assignedUnitCount: number;
-  action: string;
-  files: Array<{
-    fileName: string;
-    originalPath: string;
-    size: number;
-    mimetype: string;
-    isCover: boolean;
-    sortOrder: number;
-  }>;
-};
-
-type ProjectMediaPreview = {
-  valid: boolean;
-  project: {
-    id: string;
-    code: string;
-    name: string;
-  };
-  archive: {
-    fileName: string;
-    fileSize: number;
-    totalImageSize: number;
-    compressionRatio: number;
-  };
-  summary: {
-    packageCount: number;
-    imageCount: number;
-    totalImageSize: number;
-    existingPackageCount: number;
-    existingAssetCount: number;
-    assignedUnitCount: number;
-    errorCount: number;
-    warningCount: number;
-  };
-  packages: ProjectMediaPreviewPackage[];
-  issues: ProjectMediaIssue[];
-};
-
-type ProjectMediaAsset = {
-  id: string;
-  url: string;
-  supabaseUrl: string | null;
-  path: string;
-  originalName: string | null;
-  mimetype: string | null;
-  size: number | null;
-  isCover: boolean;
-  sortOrder: number;
-};
-
-type ProjectMediaPackageRecord = {
-  id: string;
-  code: string;
-  name: string;
-  type: string;
-  unitType: string | null;
-  roomCount: string | null;
-  isDefault: boolean;
-  sortOrder: number;
-  assets: ProjectMediaAsset[];
-  _count: {
-    assets: number;
-    units: number;
-  };
-  zipFolder: string;
-};
-
-type ProjectMediaPackagesResponse = {
-  project: {
-    id: string;
-    code: string;
-    name: string;
-  };
-  packages: ProjectMediaPackageRecord[];
-};
-
-type ProjectMediaEnsureResponse = {
-  success: boolean;
-  project: {
-    id: string;
-    code: string;
-    name: string;
-    setupStatus: string;
-  };
-  summary: {
-    packageCount: number;
-    standardPackageCount: number;
-    assignedUnitCount: number;
-  };
-};
-
-type BlockForm = {
-  key: string;
-  code: string;
-  name: string;
-  geometryType: string;
-  facadeViewCount: string;
-  basementFloorCount: string;
-  hasGroundFloor: boolean;
-  normalFloorCount: string;
-};
-
-type StructurePreview = {
-  valid: boolean;
-  summary: {
-    blockCount: number;
-    floorCount: number;
-    complexGeometryDetected: boolean;
-  };
-};
-
-type UnitGroupForm = {
-  key: string;
-  type: string;
-  count: string;
-  roomCount: string;
-  netArea: string;
-  grossArea: string;
-  commercialPurpose: string;
-  facades: string[];
-  conceptLabel: string;
-};
-
-type FloorPlanForm = {
-  key: string;
-  blockCode: string;
-  blockName: string;
-  floorLevel: number;
-  floorLabel: string;
-  numberPrefix: string;
-  startingSequence: string;
-  unitGroups: UnitGroupForm[];
-};
-
-type FloorCopyOptions = {
-  unitGroups: boolean;
-  numberPrefix: boolean;
-  startingSequence: boolean;
-};
-
-type InventoryPreview = {
-  valid: boolean;
-  summary: {
-    independentUnitCount: number;
-    salesInventoryCount: number;
-    nonSalesIndependentUnitCount: number;
-    projectSpaceCount: number;
-    commonSpaceCount: number;
-    technicalSpaceCount: number;
-    openAmenityCount: number;
-  };
-};
-
-type ProjectSpaceForm = {
-  key: string;
-  name: string;
-  spaceType: string;
-  customTypeName: string;
-  count: string;
-  blockCode: string;
-  floorLevel: string;
-  grossArea: string;
-  legalStatus: string;
-  commercialPurpose: string;
-  description: string;
-  isCustomerVisible: boolean;
-};
-
-type ProjectSpacesPreview = {
-  valid: boolean;
-  summary: {
-    projectSpaceCount: number;
-    commonSpaceCount: number;
-    technicalSpaceCount: number;
-    openAmenityCount: number;
-    attachmentCount: number;
-    customerVisibleCount: number;
-  };
-};
-
-type CompletionIssue = {
-  code: string;
-  message: string;
-};
-
-type DesignReviewSummary = {
-  id: string;
-  status: string;
-  geometryNotes: string | null;
-  userMessage: string | null;
-  softwareTeamNote: string | null;
-  requestedAt: string;
-  reviewedAt: string | null;
-  completedAt: string | null;
-};
-
-type CompletionPreview = {
-  ready: boolean;
-  issues: CompletionIssue[];
-  summary: {
-    blockCount: number;
-    floorCount: number;
-    independentUnitCount: number;
-    salesInventoryCount: number;
-    nonSalesIndependentUnitCount: number;
-    projectSpaceCount: number;
-    declaredIndependentUnitCount: number | null;
-    declaredSalesInventoryCount: number | null;
-    geometryType: string;
-    needsSoftwareTeamReview: boolean;
-    setupStatus: string;
-    wizardStep: string;
-  };
-  latestDesignReview: DesignReviewSummary | null;
-};
-
-const FACADE_GEOMETRY_OPTIONS = [
-  { value: "TEK_CEPHELI_STANDART", label: "Tek cepheli proje" },
-  { value: "CIFT_CEPHELI_STANDART", label: "Çift cepheli proje" },
-  { value: "UC_CEPHELI_STANDART", label: "Üç cepheli proje" },
-  { value: "DORT_CEPHELI_STANDART", label: "Dört cepheli proje" },
-];
-
-const ADVANCED_GEOMETRY_OPTIONS = [
-  { value: "DIKDORTGEN", label: "Dikdörtgen yapı" },
-  { value: "KARE", label: "Kare yapı" },
-  { value: "L_PLAN", label: "L plan" },
-  { value: "U_PLAN", label: "U plan" },
-  {
-    value: "BIRDEN_FAZLA_STANDART_BLOK",
-    label: "Birden fazla standart blok",
-  },
-  { value: "BESGEN", label: "Beşgen yapı" },
-  { value: "ALTIGEN", label: "Altıgen yapı" },
-  { value: "YILDIZ", label: "Yıldız plan" },
-  { value: "DAIRESEL", label: "Dairesel yapı" },
-  { value: "KIRIK_CEPHELI", label: "Kırık cepheli yapı" },
-  { value: "COK_KANATLI", label: "Çok kanatlı yapı" },
-  { value: "BAGLANTILI_KULELER", label: "Bağlantılı kuleler" },
-  { value: "OZEL_KARMASIK", label: "Özel / karmaşık geometri" },
-];
-
-const COMPLEX_GEOMETRIES = new Set([
-  "BESGEN",
-  "ALTIGEN",
-  "YILDIZ",
-  "DAIRESEL",
-  "KIRIK_CEPHELI",
-  "COK_KANATLI",
-  "BAGLANTILI_KULELER",
-  "OZEL_KARMASIK",
-]);
-
-const UNIT_TYPE_OPTIONS = [
-  { value: "DAIRE", label: "Daire" },
-  { value: "STUDYO", label: "Stüdyo" },
-  { value: "REZIDANS", label: "Rezidans" },
-  { value: "VILLA", label: "Villa" },
-  { value: "MUSTAK_EV", label: "Müstakil Ev" },
-  { value: "PENTHOUSE", label: "Penthouse" },
-  { value: "LOFT", label: "Loft" },
-  { value: "TERAS_LOFT", label: "Teras Loft" },
-  { value: "DUBLEKS", label: "Dubleks" },
-  { value: "TRIPLEKS", label: "Tripleks" },
-  { value: "DUKKAN_MAGAZA", label: "Dükkan / Mağaza" },
-  { value: "MARKET", label: "Market" },
-  { value: "OFIS_BURO", label: "Ofis / Büro" },
-  { value: "HOME_OFFICE", label: "Home Office" },
-  { value: "DEPO_ANTREPO", label: "Depo / Antrepo" },
-  { value: "ATOLYE", label: "Atölye" },
-  { value: "SHOWROOM", label: "Showroom" },
-  { value: "MUAYENEHANE", label: "Muayenehane" },
-  { value: "KLINIK", label: "Klinik" },
-  { value: "OTEL_ODASI", label: "Otel Odası" },
-];
-
-const COMMERCIAL_PURPOSE_OPTIONS = [
-  { value: "SATISA_SUNULACAK", label: "Satışa sunulacak" },
-  { value: "KIRAYA_VERILECEK", label: "Kiraya verilecek" },
-  {
-    value: "SATIS_VEYA_KIRALAMA_STOGU",
-    label: "Satış veya kiralama stoku",
-  },
-  { value: "ARSA_SAHIBINE_AYRILMIS", label: "Arsa sahibine ayrılmış" },
-  { value: "FIRMA_KULLANIMINA_AYRILMIS", label: "Firma kullanımına ayrılmış" },
-  { value: "SITE_ISLETMESINE_AYRILMIS", label: "Site işletmesine ayrılmış" },
-  { value: "SATIS_DISI", label: "Satış dışı" },
-];
-
-const SALES_COMMERCIAL_PURPOSES = new Set([
-  "SATISA_SUNULACAK",
-  "KIRAYA_VERILECEK",
-  "SATIS_VEYA_KIRALAMA_STOGU",
-]);
-
-const PROJECT_SPACE_TYPE_OPTIONS = [
-  { value: "KAPALI_HAVUZ", label: "Kapalı Havuz" },
-  { value: "ACIK_HAVUZ", label: "Açık Havuz" },
-  { value: "SAUNA", label: "Sauna" },
-  { value: "SPA", label: "Spa" },
-  { value: "HAMAM", label: "Hamam" },
-  { value: "BUHAR_ODASI", label: "Buhar Odası" },
-  { value: "SPOR_SALONU", label: "Spor Salonu" },
-  { value: "KRES", label: "Kreş" },
-  { value: "COCUK_OYUN_ALANI", label: "Çocuk Oyun Alanı" },
-  { value: "SINEMA_SALONU", label: "Sinema Salonu" },
-  { value: "HOBI_ODASI", label: "Hobi Odası" },
-  { value: "TOPLANTI_SALONU", label: "Toplantı Salonu" },
-  { value: "KUTUPHANE", label: "Kütüphane" },
-  { value: "ORTAK_TERAS", label: "Ortak Teras" },
-  { value: "LOBI", label: "Lobi" },
-  { value: "RESEPSIYON", label: "Resepsiyon" },
-  { value: "SITE_YONETIM_OFISI", label: "Site Yönetim Ofisi" },
-  { value: "ORTAK_BAHCE", label: "Ortak Bahçe" },
-  { value: "SITE_MARKETI", label: "Site Marketi" },
-  { value: "KAFETERYA", label: "Kafeterya" },
-  { value: "DINLENME_SALONU", label: "Dinlenme Salonu" },
-  { value: "MISAFIR_SALONU", label: "Misafir Salonu" },
-  { value: "ELEKTRIK_ODASI", label: "Elektrik Odası" },
-  { value: "MEKANIK_ODA", label: "Mekanik Oda" },
-  { value: "JENERATOR_ODASI", label: "Jeneratör Odası" },
-  { value: "SU_DEPOSU", label: "Su Deposu" },
-  { value: "SIGINAK", label: "Sığınak" },
-  { value: "GUVENLIK_ODASI", label: "Güvenlik Odası" },
-  { value: "PERSONEL_ODASI", label: "Personel Odası" },
-  { value: "COP_ODASI", label: "Çöp Odası" },
-  { value: "TEKNIK_DEPO", label: "Teknik Depo" },
-  { value: "KAPALI_OTOPARK", label: "Kapalı Otopark" },
-  { value: "ACIK_OTOPARK", label: "Açık Otopark" },
-  { value: "SERVIS_ALANI", label: "Servis Alanı" },
-  { value: "YURUYUS_PARKURU", label: "Yürüyüş Parkuru" },
-  { value: "BASKETBOL_SAHASI", label: "Basketbol Sahası" },
-  { value: "TENIS_KORTU", label: "Tenis Kortu" },
-  { value: "COCUK_PARKI", label: "Çocuk Parkı" },
-  { value: "PEYZAJ_ALANI", label: "Peyzaj Alanı" },
-  { value: "DINLENME_ALANI", label: "Dinlenme Alanı" },
-  { value: "SUS_HAVUZU", label: "Süs Havuzu" },
-  { value: "DIGER", label: "Diğer" },
-];
-
-const SPACE_LEGAL_STATUS_OPTIONS = [
-  { value: "ORTAK_KULLANIM_ALANI", label: "Ortak Kullanım Alanı" },
-  { value: "BAGIMSIZ_BOLUM_EKLENTISI", label: "Bağımsız Bölüm Eklentisi" },
-  { value: "TEKNIK_HIZMET_ALANI", label: "Teknik / Hizmet Alanı" },
-  { value: "ACIK_ALAN_SOSYAL_DONATI", label: "Açık Alan / Sosyal Donatı" },
-];
-
-const SPACE_COMMERCIAL_PURPOSE_OPTIONS = [
-  {
-    value: "ORTAK_KULLANIMA_AYRILMIS",
-    label: "Ortak kullanıma ayrılmış",
-  },
-  { value: "TEKNIK_KULLANIM", label: "Teknik kullanım" },
-  {
-    value: "FIRMA_KULLANIMINA_AYRILMIS",
-    label: "Firma kullanımına ayrılmış",
-  },
-  {
-    value: "SITE_ISLETMESINE_AYRILMIS",
-    label: "Site işletmesine ayrılmış",
-  },
-  { value: "SATIS_DISI", label: "Satış dışı" },
-];
-
-const TECHNICAL_SPACE_TYPES = new Set([
-  "ELEKTRIK_ODASI",
-  "MEKANIK_ODA",
-  "JENERATOR_ODASI",
-  "SU_DEPOSU",
-  "SIGINAK",
-  "GUVENLIK_ODASI",
-  "PERSONEL_ODASI",
-  "COP_ODASI",
-  "TEKNIK_DEPO",
-  "SERVIS_ALANI",
-]);
-
-const OPEN_AMENITY_SPACE_TYPES = new Set([
-  "ACIK_HAVUZ",
-  "ORTAK_BAHCE",
-  "ACIK_OTOPARK",
-  "YURUYUS_PARKURU",
-  "BASKETBOL_SAHASI",
-  "TENIS_KORTU",
-  "COCUK_PARKI",
-  "PEYZAJ_ALANI",
-  "DINLENME_ALANI",
-  "SUS_HAVUZU",
-  "COCUK_OYUN_ALANI",
-]);
-
-const NO_FACADE_OPTION = "Cephesi Yok / Kör Cephe";
-
-const FACADE_OPTIONS = [
-  "Kuzey",
-  "Güney",
-  "Doğu",
-  "Batı",
-  "Kuzeydoğu",
-  "Kuzeybatı",
-  "Güneydoğu",
-  "Güneybatı",
+import {
+  FLOOR_CARD_PALETTES,
+  PROJECT_SPACE_CARD_PALETTES,
+  UNIT_GROUP_PALETTES,
+  cardStyle,
+  inputStyle,
+  primaryButtonStyle,
+  secondaryButtonStyle,
+} from "./lib/projectSalesStyles";
+import { DeleteProjectModal, NoticeModal } from "./components/ProjectSalesModals";
+import { Field, InfoBand, Metric, SectionTitle } from "./components/ProjectSalesPrimitives";
+import { ProjectMediaCenterView } from "./components/ProjectMediaCenterView";
+import { ProjectSalesLaunchFlowView } from "./components/ProjectSalesLaunchFlowView";
+import { ProjectSalesStockView } from "./components/ProjectSalesStockView";
+import {
+  ADVANCED_GEOMETRY_OPTIONS,
+  COMMERCIAL_PURPOSE_OPTIONS,
+  COMPLEX_GEOMETRIES,
+  FACADE_GEOMETRY_OPTIONS,
+  FACADE_OPTIONS,
   NO_FACADE_OPTION,
-];
+  OPEN_AMENITY_SPACE_TYPES,
+  PROJECT_SPACE_TYPE_OPTIONS,
+  SALES_COMMERCIAL_PURPOSES,
+  SALES_STATUS_OPTIONS,
+  SPACE_COMMERCIAL_PURPOSE_OPTIONS,
+  SPACE_LEGAL_STATUS_OPTIONS,
+  TECHNICAL_SPACE_TYPES,
+  UNIT_TYPE_OPTIONS,
+} from "./lib/projectSalesOptions";
+import {
+  apiMessage,
+  designReviewStatusLabel,
+  formatBytes,
+  formatCurrency,
+  formatDate,
+  formatSalesPriceInput,
+  isEligibleRole,
+  isSalesDraftDirty,
+  mediaActionLabel,
+  parseSalesPrice,
+  roleLabel,
+  salesPriceDigits,
+  salesStatusLabel,
+  salesStatusPalette,
+  salesUnitCardPalette,
+  salesUnitIdentity,
+  statusLabel,
+  unitTypeLabel,
+} from "./lib/projectSalesFormatters";
 
-const SALES_STATUS_OPTIONS = [
-  { value: "SATILIK", label: "Satılık" },
-  { value: "KIRALIK", label: "Kiralık" },
-  { value: "ON_SATIS", label: "Ön satış" },
-  { value: "YAKINDA_SATISTA", label: "Yakında satışta" },
-  { value: "INSAAT_HALINDE", label: "İnşaat halinde" },
-  { value: "TESLIME_HAZIR", label: "Teslime hazır" },
-  { value: "HEMEN_TESLIM", label: "Hemen teslim" },
-  { value: "REZERVE", label: "Rezerve" },
-  { value: "OPSIYONLU", label: "Opsiyonlu" },
-  { value: "SATILDI", label: "Satıldı" },
-  { value: "KIRALANDII", label: "Kiralandı" },
-  { value: "PROJE_ASAMASI", label: "Proje aşaması" },
-  { value: "PASIF", label: "Pasif" },
-];
-
-const inputStyle: CSSProperties = {
-  width: "100%",
-  minWidth: 0,
-  minHeight: 44,
-  boxSizing: "border-box",
-  border: "1.5px solid #C7D6E8",
-  borderRadius: 13,
-  background: "#EEF3F8",
-  color: "#1F2937",
-  padding: "10px 12px",
-  fontSize: 13,
-  fontWeight: 750,
-  outline: "none",
-};
-
-const cardStyle: CSSProperties = {
-  border: "1.5px solid #C7D6E8",
-  borderRadius: 20,
-  background: "#FFFFFF",
-  boxShadow: "0 10px 28px rgba(15, 23, 42, 0.06)",
-};
-
-const FLOOR_CARD_PALETTES = [
-  { background: "#DCEAFF", border: "#77A7E8", badgeBackground: "#BDD7FA", badgeColor: "#123F91" },
-  { background: "#D9F0E2", border: "#72B58F", badgeBackground: "#BCE2CC", badgeColor: "#075E38" },
-  { background: "#F6E3BE", border: "#D3A653", badgeBackground: "#ECD092", badgeColor: "#7A4307" },
-  { background: "#E8DCF7", border: "#A886D5", badgeBackground: "#D3BFEF", badgeColor: "#55218C" },
-  { background: "#F5D9E3", border: "#D887A4", badgeBackground: "#EDBFD0", badgeColor: "#8E1949" },
-];
-
-const UNIT_GROUP_PALETTES = [
-  { background: "#FFFFFF", border: "#BCD4F3" },
-  { background: "#F3FCF7", border: "#B7E4CC" },
-  { background: "#FFF9EF", border: "#EFD2A3" },
-  { background: "#FAF7FF", border: "#D6C3F0" },
-];
-
-const PROJECT_SPACE_CARD_PALETTES = [
-  {
-    background: "#F3FCF7",
-    border: "#A7DFC2",
-    badgeBackground: "#DDF8E9",
-    badgeColor: "#047857",
-  },
-  {
-    background: "#F6FAFF",
-    border: "#BAD4F4",
-    badgeBackground: "#E2EFFF",
-    badgeColor: "#1557D6",
-  },
-  {
-    background: "#FFF9EF",
-    border: "#EED2A5",
-    badgeBackground: "#FEF3C7",
-    badgeColor: "#B45309",
-  },
-  {
-    background: "#FAF7FF",
-    border: "#D5C2EF",
-    badgeBackground: "#EDE9FE",
-    badgeColor: "#6D28D9",
-  },
-];
-
-const primaryButtonStyle: CSSProperties = {
-  minHeight: 44,
-  border: "none",
-  borderRadius: 13,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 7,
-  background: "linear-gradient(135deg, #1557D6, #2563EB)",
-  color: "#FFFFFF",
-  padding: "9px 14px",
-  fontSize: 12,
-  fontWeight: 950,
-  cursor: "pointer",
-  boxShadow: "0 10px 24px rgba(37, 99, 235, 0.20)",
-};
-
-const secondaryButtonStyle: CSSProperties = {
-  minHeight: 44,
-  border: "1.5px solid #C7D6E8",
-  borderRadius: 13,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 7,
-  background: "#FFFFFF",
-  color: "#334155",
-  padding: "9px 13px",
-  fontSize: 12,
-  fontWeight: 900,
-  cursor: "pointer",
-  boxSizing: "border-box",
-};
-
-function normalizeRole(role?: string | null) {
-  return String(role || "")
-    .toLocaleUpperCase("tr-TR")
-    .trim();
-}
-
-function isEligibleRole(role?: string | null) {
-  return ["MUTEAHHIT", "INSAAT_FIRMASI", "SUPER_ADMIN"].includes(
-    normalizeRole(role),
-  );
-}
-
-function roleLabel(role?: string | null) {
-  const roleValue = normalizeRole(role);
-
-  if (roleValue === "MUTEAHHIT") return "Müteahhit";
-  if (roleValue === "INSAAT_FIRMASI") return "İnşaat Firması";
-  if (roleValue === "SUPER_ADMIN") return "Yazılım Ekibi";
-
-  return "EPH Üyesi";
-}
-
-function statusLabel(status?: string | null) {
-  const labels: Record<string, string> = {
-    TASLAK: "Taslak",
-    YAPI_OLUSTURULUYOR: "Yapı oluşturuluyor",
-    BILGI_GIRISI_EKSIK: "Bilgi girişi eksik",
-    KONTROLE_HAZIR: "Kontrole hazır",
-    TAMAMLANDI: "Tamamlandı",
-    ARSIVLENDI: "Arşivlendi",
-  };
-
-  return labels[String(status || "")] || "Taslak";
-}
-
-function salesStatusLabel(status?: string | null) {
-  return (
-    SALES_STATUS_OPTIONS.find((option) => option.value === status)?.label ||
-    String(status || "Durum yok")
-  );
-}
-
-function unitTypeLabel(unitType?: string | null) {
-  return (
-    UNIT_TYPE_OPTIONS.find((option) => option.value === unitType)?.label ||
-    String(unitType || "Bağımsız bölüm")
-  );
-}
-
-function formatCurrency(value?: number | null) {
-  const amount = Number(value || 0);
-
-  if (!Number.isFinite(amount)) return "0 TL";
-
-  return `${new Intl.NumberFormat("tr-TR", {
-    maximumFractionDigits: 0,
-  }).format(amount)} TL`;
-}
-
-function salesPriceDigits(value: string | number | null | undefined) {
-  return String(value ?? "").replace(/\D/g, "");
-}
-
-function parseSalesPrice(value: string) {
-  const digits = salesPriceDigits(value);
-
-  if (!digits) return null;
-
-  const parsed = Number(digits);
-
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function formatSalesPriceInput(value: string | number | null | undefined) {
-  const digits = salesPriceDigits(value);
-
-  if (!digits) return "";
-
-  return new Intl.NumberFormat("tr-TR", {
-    maximumFractionDigits: 0,
-  }).format(Number(digits));
-}
-
-function salesUnitIdentity(unit: ProjectSalesStockUnit) {
-  return [
-    unit.type,
-    unit.roomCount || "",
-    unit.netArea ?? "",
-    unit.grossArea ?? "",
-    unit.commercialPurpose,
-    unit.conceptLabel || "",
-  ].join("|");
-}
-
-const SALES_UNIT_CARD_PALETTES = [
-  { background: "#DCEAFF", border: "#6F9FDB", accent: "#194E93" },
-  { background: "#D9F0E2", border: "#6DAF88", accent: "#0A603B" },
-  { background: "#F6E3BE", border: "#D1A14B", accent: "#784307" },
-  { background: "#E8DCF7", border: "#A37FCE", accent: "#5B278F" },
-  { background: "#F5D9E3", border: "#D47C9C", accent: "#8D1E4B" },
-  { background: "#DCEFEF", border: "#6CA8A8", accent: "#165D5D" },
-  { background: "#F2DED1", border: "#C58E69", accent: "#793E1E" },
-  { background: "#E0E6F7", border: "#8296D0", accent: "#304A94" },
-  { background: "#E7E3CF", border: "#AAA066", accent: "#645C20" },
-  { background: "#E2DCE8", border: "#9982AA", accent: "#5A3D6B" },
-];
-
-function salesUnitCardPalette(unit: ProjectSalesStockUnit) {
-  const signature = salesUnitIdentity(unit);
-  let hash = 0;
-
-  for (let index = 0; index < signature.length; index += 1) {
-    hash = (hash * 31 + signature.charCodeAt(index)) >>> 0;
-  }
-
-  return SALES_UNIT_CARD_PALETTES[hash % SALES_UNIT_CARD_PALETTES.length];
-}
-
-function isSalesDraftDirty(
-  unit: ProjectSalesStockUnit,
-  draft: ProjectSalesStockDraft,
-) {
-  return (
-    (parseSalesPrice(draft.price) ?? 0) !== Number(unit.price || 0) ||
-    draft.status !== unit.status
-  );
-}
-
-function salesStatusPalette(status?: string | null) {
-  if (["SATILDI", "KIRALANDII"].includes(String(status || ""))) {
-    return {
-      background: "#DCFCE7",
-      border: "#86EFAC",
-      color: "#166534",
-    };
-  }
-
-  if (["REZERVE", "OPSIYONLU"].includes(String(status || ""))) {
-    return {
-      background: "#FEF3C7",
-      border: "#FCD34D",
-      color: "#92400E",
-    };
-  }
-
-  if (status === "PASIF") {
-    return {
-      background: "#F1F5F9",
-      border: "#CBD5E1",
-      color: "#64748B",
-    };
-  }
-
-  return {
-    background: "#EAF2FF",
-    border: "#93C5FD",
-    color: "#1557D6",
-  };
-}
-
-function designReviewStatusLabel(status?: string | null) {
-  const labels: Record<string, string> = {
-    BEKLIYOR: "İnceleme bekliyor",
-    INCELEMEDE: "İnceleniyor",
-    EK_BILGI_BEKLENIYOR: "Ek bilgi bekleniyor",
-    ONAYLANDI: "Onaylandı",
-    REDDEDILDI: "Reddedildi",
-    TAMAMLANDI: "Tamamlandı",
-    IPTAL_EDILDI: "İptal edildi",
-  };
-
-  return labels[String(status || "")] || "İnceleme bekliyor";
-}
-
-function formatBytes(value?: number | null) {
-  const size = Number(value || 0);
-
-  if (!Number.isFinite(size) || size <= 0) return "0 KB";
-
-  if (size < 1024 * 1024) {
-    return `${Math.max(1, Math.round(size / 1024))} KB`;
-  }
-
-  return `${(size / (1024 * 1024)).toLocaleString("tr-TR", {
-    maximumFractionDigits: 1,
-  })} MB`;
-}
-
-function mediaActionLabel(action?: string | null) {
-  if (action === "CREATE_ASSETS") return "Yeni görseller";
-  if (action === "REPLACE_ASSETS") return "Mevcutları değiştir";
-  if (action === "BLOCKED") return "Değiştirme izni gerekli";
-
-  return String(action || "Hazır");
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return new Intl.DateTimeFormat("tr-TR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
-function apiMessage(error: unknown) {
-  const candidate = error as {
-    response?: { data?: { message?: unknown } };
-    message?: string;
-  };
-  const message = candidate?.response?.data?.message;
-
-  if (Array.isArray(message)) return message.join(" ");
-  if (message) return String(message);
-  if (candidate?.message) return candidate.message;
-
-  return "İşlem tamamlanamadı. Lütfen tekrar deneyin.";
-}
 
 function facadeCountForGeometry(geometryType: string) {
   const counts: Record<string, number> = {
@@ -1296,7 +377,6 @@ function floorPlansFromSetup(setup: ProjectSetupResponse): FloorPlanForm[] {
     }),
   );
 }
-
 function positiveInteger(value: string, fallback = 1) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
@@ -1496,6 +576,14 @@ export default function ProjectSalesCenterPage() {
     useState<ProjectMediaPreview | null>(null);
   const [mediaReplaceExisting, setMediaReplaceExisting] =
     useState(false);
+  const [launchProject, setLaunchProject] =
+    useState<ProjectSummary | null>(null);
+  const [launchCenter, setLaunchCenter] =
+    useState<ProjectLaunchCenterResponse | null>(null);
+  const [renderWorkOrder, setRenderWorkOrder] =
+    useState<ProjectRenderWorkOrderResponse | null>(null);
+  const [presentationLink, setPresentationLink] =
+    useState<ProjectPresentationLinkResponse | null>(null);
 
   const eligible = useMemo(() => isEligibleRole(user?.role), [user?.role]);
 
@@ -1629,6 +717,123 @@ export default function ProjectSalesCenterPage() {
       setNotice({
         tone: "error",
         title: "Görsel Merkezi Açılamadı",
+        message: apiMessage(error),
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const openLaunchFlow = async (
+    project: ProjectSummary,
+    destination: Extract<PageMode, "render" | "presentation" | "publish">,
+  ) => {
+    setBusyAction(`launch-${destination}`);
+
+    try {
+      const response = await api.get<ProjectLaunchCenterResponse>(
+        `/project-sales/projects/${project.id}/launch`,
+      );
+
+      setLaunchProject(project);
+      setLaunchCenter(response.data);
+      setRenderWorkOrder(null);
+      setPresentationLink(null);
+      setMode(destination);
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        title: "Lansman Merkezi Açılamadı",
+        message: apiMessage(error),
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const createRenderWorkOrder = async () => {
+    if (!launchProject) return;
+
+    setBusyAction("render-work-order");
+
+    try {
+      const response = await api.post<ProjectRenderWorkOrderResponse>(
+        `/project-sales/projects/${launchProject.id}/launch/render-work-order`,
+      );
+      setRenderWorkOrder(response.data);
+      setNotice({
+        tone: "success",
+        title: "Render İş Emri Hazır",
+        message: `${response.data.scenes.length} sahne için üretim brief'i hazırlandı.`,
+      });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        title: "Render İş Emri Oluşturulamadı",
+        message: apiMessage(error),
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const createPresentationLink = async () => {
+    if (!launchProject) return;
+
+    setBusyAction("presentation-link");
+
+    try {
+      const response = await api.post<ProjectPresentationLinkResponse>(
+        `/project-sales/projects/${launchProject.id}/launch/presentation-link`,
+      );
+      setPresentationLink(response.data);
+
+      try {
+        await navigator.clipboard.writeText(response.data.url);
+      } catch {
+        // Clipboard permission may be blocked; the link is still shown on screen.
+      }
+
+      setNotice({
+        tone: "success",
+        title: "Müşteri Sunum Linki Hazır",
+        message: "Güvenli sunum linki oluşturuldu ve panoya kopyalanmaya çalışıldı.",
+      });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        title: "Sunum Linki Oluşturulamadı",
+        message: apiMessage(error),
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const publishProjectToPool = async () => {
+    if (!launchProject) return;
+
+    setBusyAction("publish-to-pool");
+
+    try {
+      const response = await api.post<ProjectPublishToPoolResponse>(
+        `/project-sales/projects/${launchProject.id}/launch/publish-to-pool`,
+      );
+      const launchResponse = await api.get<ProjectLaunchCenterResponse>(
+        `/project-sales/projects/${launchProject.id}/launch`,
+      );
+
+      setLaunchCenter(launchResponse.data);
+      setNotice({
+        tone: "success",
+        title: "Proje Havuza Yayınlandı",
+        message: `${response.data.publishedUnitCount} bağımsız bölüm havuz görünürlüğüne açıldı.`,
+      });
+      void loadProjects();
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        title: "Proje Havuza Yayınlanamadı",
         message: apiMessage(error),
       });
     } finally {
@@ -3018,7 +2223,10 @@ export default function ProjectSalesCenterPage() {
         !inventoryEditMode &&
         Boolean(inventoryProject?._count.units)) ||
       (mode === "spaces" && spacesStepCompleted) ||
-      (mode === "completion" && completionStepCompleted));
+      (mode === "completion" && completionStepCompleted) ||
+      (mode === "render" && Boolean(launchProject && launchCenter)) ||
+      (mode === "presentation" && Boolean(launchProject && launchCenter)) ||
+      (mode === "publish" && Boolean(launchProject && launchCenter)));
 
   const handleForwardNavigation = () => {
     if (!canNavigateForward) return;
@@ -3044,6 +2252,22 @@ export default function ProjectSalesCenterPage() {
     }
 
     if (mode === "completion" && completionStepCompleted) {
+      setMode("list");
+      void loadProjects();
+      return;
+    }
+
+    if (mode === "render") {
+      setMode("presentation");
+      return;
+    }
+
+    if (mode === "presentation") {
+      setMode("publish");
+      return;
+    }
+
+    if (mode === "publish") {
       setMode("list");
       void loadProjects();
     }
@@ -3122,6 +2346,21 @@ export default function ProjectSalesCenterPage() {
           <button
             type="button"
             onClick={() => {
+              if (mode === "publish") {
+                setMode("presentation");
+                return;
+              }
+
+              if (mode === "presentation") {
+                setMode("render");
+                return;
+              }
+
+              if (mode === "render") {
+                setMode("media");
+                return;
+              }
+
               if (mode === "media") {
                 setMode("list");
                 return;
@@ -3210,6 +2449,12 @@ export default function ProjectSalesCenterPage() {
                           ? `${salesStock?.project.name || "Proje"} • Satış stoku`
                           : mode === "media"
                             ? `${mediaProject?.name || "Proje"} • Görsel paketleri`
+                            : mode === "render"
+                              ? `${launchProject?.name || "Proje"} • 3D render`
+                              : mode === "presentation"
+                                ? `${launchProject?.name || "Proje"} • Müşteri sunumu`
+                                : mode === "publish"
+                                  ? `${launchProject?.name || "Proje"} • Havuza yayın`
                     : editingProject
                     ? editingProject.name
                     : "Yeni proje"}
@@ -3264,6 +2509,7 @@ export default function ProjectSalesCenterPage() {
             onCompletion={openCompletion}
             onSalesStock={openSalesStock}
             onMedia={openMediaCenter}
+            onLaunchFlow={openLaunchFlow}
             onDelete={setDeleteTarget}
           />
         ) : mode === "form" ? (
@@ -3358,6 +2604,23 @@ export default function ProjectSalesCenterPage() {
             onApplyDrafts={applySalesStockDrafts}
             onSaveUnits={saveSalesStockUnits}
             onSaveUnit={saveSalesStockUnit}
+          />
+        ) : (mode === "render" ||
+            mode === "presentation" ||
+            mode === "publish") &&
+          launchProject &&
+          launchCenter ? (
+          <ProjectSalesLaunchFlowView
+            project={launchProject}
+            launch={launchCenter}
+            mode={mode}
+            onModeChange={(nextMode) => setMode(nextMode)}
+            onCreateRenderWorkOrder={createRenderWorkOrder}
+            onCreatePresentationLink={createPresentationLink}
+            onPublishToPool={publishProjectToPool}
+            renderWorkOrder={renderWorkOrder}
+            presentationLink={presentationLink}
+            busyAction={busyAction}
           />
         ) : mode === "completion" &&
           completionProject &&
@@ -3485,6 +2748,7 @@ function ProjectList({
   onCompletion,
   onSalesStock,
   onMedia,
+  onLaunchFlow,
   onDelete,
 }: {
   projects: ProjectSummary[];
@@ -3498,6 +2762,10 @@ function ProjectList({
   onCompletion: (project: ProjectSummary) => void;
   onSalesStock: (project: ProjectSummary) => void;
   onMedia: (project: ProjectSummary) => void;
+  onLaunchFlow: (
+    project: ProjectSummary,
+    destination: Extract<PageMode, "render" | "presentation" | "publish">,
+  ) => void;
   onDelete: (project: ProjectSummary) => void;
 }) {
   return (
@@ -3917,6 +3185,69 @@ function ProjectList({
                       )}
                       Görselleri Yönet
                     </button>
+                  )}
+
+                {project.setupStatus === "TAMAMLANDI" &&
+                  project._count.units > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onLaunchFlow(project, "render")}
+                      disabled={Boolean(busyAction)}
+                      style={{
+                        ...primaryButtonStyle,
+                        width: "100%",
+                        background:
+                          "linear-gradient(135deg, #1D4ED8, #7C3AED)",
+                        boxShadow:
+                          "0 10px 24px rgba(37, 99, 235, 0.2)",
+                      }}
+                    >
+                      <Sparkles size={18} />
+                      3D Render Oluştur
+                    </button>
+                  )}
+
+                {project.setupStatus === "TAMAMLANDI" &&
+                  project._count.units > 0 && (
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                        gap: 7,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onLaunchFlow(project, "presentation")}
+                        disabled={Boolean(busyAction)}
+                        style={{
+                          ...secondaryButtonStyle,
+                          width: "100%",
+                          borderColor: "#BFDBFE",
+                          background: "#EFF6FF",
+                          color: "#1D4ED8",
+                        }}
+                      >
+                        <ClipboardList size={17} />
+                        Sunum Önizle
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onLaunchFlow(project, "publish")}
+                        disabled={Boolean(busyAction)}
+                        style={{
+                          ...secondaryButtonStyle,
+                          width: "100%",
+                          borderColor: "#A7F3D0",
+                          background: "#F0FDF4",
+                          color: "#047857",
+                        }}
+                      >
+                        <UploadCloud size={17} />
+                        Havuza Yayınla
+                      </button>
+                    </div>
                   )}
 
                 <button 
@@ -6774,1807 +6105,6 @@ function ProjectSpacesView({
 }
 
 
-function ProjectMediaCenterView({
-  project,
-  config,
-  packages,
-  selectedFile,
-  preview,
-  replaceExisting,
-  busyAction,
-  onFileChange,
-  onReplaceExistingChange,
-  onPreview,
-  onUpload,
-}: {
-  project: ProjectSummary;
-  config: ProjectMediaConfig;
-  packages: ProjectMediaPackagesResponse;
-  selectedFile: File | null;
-  preview: ProjectMediaPreview | null;
-  replaceExisting: boolean;
-  busyAction: string | null;
-  onFileChange: (file: File | null) => void;
-  onReplaceExistingChange: (checked: boolean) => void;
-  onPreview: () => void;
-  onUpload: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
-  const previewing = busyAction === "media-preview";
-  const uploading = busyAction === "media-upload";
-
-  const folderPlan = config.folders
-    .map((folder) => {
-      const countText =
-        folder.type === "PROJECT_GENERAL"
-          ? `${config.limits.generalImageCount.min}-${config.limits.generalImageCount.max} görsel`
-          : `önerilen ${config.limits.recommendedStandardImageCount}, en fazla ${config.limits.maxStandardImageCount} görsel`;
-
-      return `${folder.folder}/  (${folder.name} • ${countText})`;
-    })
-    .join("\n");
-
-  const copyFolderPlan = async () => {
-    try {
-      await navigator.clipboard.writeText(folderPlan);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setCopied(false);
-    }
-  };
-
-  const totalExistingAssets = config.folders.reduce(
-    (total, folder) => total + folder.existingAssetCount,
-    0,
-  );
-  const totalAssignedUnits = config.folders.reduce(
-    (total, folder) => total + folder.assignedUnitCount,
-    0,
-  );
-
-  return (
-    <div
-      style={{
-        display: "grid",
-        gap: 12,
-        marginTop: 12,
-        paddingBottom: "calc(80px + env(safe-area-inset-bottom))",
-      }}
-    >
-      <section
-        style={{
-          ...cardStyle,
-          borderColor: "#C4B5FD",
-          background:
-            "linear-gradient(135deg, #F5F3FF 0%, #FFFFFF 52%, #FFF7ED 100%)",
-          padding: 13,
-        }}
-      >
-        <SectionTitle
-          icon={<Images size={22} />}
-          title="Toplu Proje Görselleri"
-          subtitle={`${project.name} • Daire tiplerine göre tek ZIP ile toplu yükleme`}
-        />
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 140px), 1fr))",
-            gap: 7,
-            marginTop: 12,
-          }}
-        >
-          <Metric label="Fotoğraf Paketi" value={config.folders.length} />
-          <Metric label="Bağlı Bağımsız" value={totalAssignedUnits} />
-          <Metric label="Mevcut Görsel" value={totalExistingAssets} />
-          <Metric
-            label="ZIP Limiti"
-            value={`${config.limits.maxZipSizeMb} MB`}
-          />
-        </div>
-
-        <div
-          style={{
-            marginTop: 10,
-            border: "1.5px solid #C4B5FD",
-            borderRadius: 16,
-            background: "#FFFFFF",
-            padding: 11,
-            color: "#475569",
-            fontSize: 10,
-            lineHeight: 1.6,
-            fontWeight: 750,
-          }}
-        >
-          Proje genel fotoğraflarını ayrı klasöre; 2+1, 3+1, 4+1,
-          dükkan ve diğer bağımsız bölüm gruplarını kendi klasörlerine
-          koyun. Aynı pakete bağlı bütün bağımsız bölümlerde aynı
-          görseller ortak kullanılır.
-        </div>
-      </section>
-
-      <section style={{ ...cardStyle, padding: 13 }}>
-        <SectionTitle
-          icon={<FolderOpen size={21} />}
-          title="ZIP Klasör Planı"
-          subtitle="Aşağıdaki klasör adlarını değiştirmeden ZIP dosyasının köküne yerleştirin."
-        />
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 230px), 1fr))",
-            gap: 9,
-            marginTop: 12,
-          }}
-        >
-          {config.folders.map((folder, index) => {
-            const palette =
-              folder.type === "PROJECT_GENERAL"
-                ? {
-                    background: "#EDE9FE",
-                    border: "#A78BFA",
-                    color: "#5B21B6",
-                  }
-                : index % 3 === 0
-                  ? {
-                      background: "#DCFCE7",
-                      border: "#86EFAC",
-                      color: "#166534",
-                    }
-                  : index % 3 === 1
-                    ? {
-                        background: "#DBEAFE",
-                        border: "#93C5FD",
-                        color: "#1D4ED8",
-                      }
-                    : {
-                        background: "#FEF3C7",
-                        border: "#FCD34D",
-                        color: "#92400E",
-                      };
-
-            return (
-              <article
-                key={folder.packageId}
-                style={{
-                  minWidth: 0,
-                  border: `1.5px solid ${palette.border}`,
-                  borderRadius: 17,
-                  background: palette.background,
-                  padding: 11,
-                  display: "grid",
-                  gap: 8,
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 9,
-                    minWidth: 0,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 38,
-                      height: 38,
-                      flex: "0 0 38px",
-                      display: "grid",
-                      placeItems: "center",
-                      borderRadius: 12,
-                      background: "#FFFFFF",
-                      color: palette.color,
-                    }}
-                  >
-                    <Archive size={20} />
-                  </div>
-
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div
-                      style={{
-                        color: palette.color,
-                        fontSize: 12,
-                        lineHeight: 1.35,
-                        fontWeight: 950,
-                        overflowWrap: "anywhere",
-                      }}
-                    >
-                      {folder.folder}/
-                    </div>
-                    <div
-                      style={{
-                        marginTop: 2,
-                        color: "#475569",
-                        fontSize: 9,
-                        lineHeight: 1.4,
-                        fontWeight: 750,
-                      }}
-                    >
-                      {folder.name}
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                    gap: 6,
-                  }}
-                >
-                  <Metric
-                    label="Bağlı Bölüm"
-                    value={folder.assignedUnitCount}
-                  />
-                  <Metric
-                    label="Mevcut Görsel"
-                    value={folder.existingAssetCount}
-                  />
-                </div>
-
-                <p
-                  style={{
-                    margin: 0,
-                    color: "#475569",
-                    fontSize: 9,
-                    lineHeight: 1.5,
-                    fontWeight: 700,
-                  }}
-                >
-                  {folder.type === "PROJECT_GENERAL"
-                    ? `Zorunlu ilk paket: ${config.limits.generalImageCount.min}-${config.limits.generalImageCount.max} proje görseli.`
-                    : `Önerilen ${config.limits.recommendedStandardImageCount}, en fazla ${config.limits.maxStandardImageCount} görsel.`}
-                </p>
-              </article>
-            );
-          })}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => void copyFolderPlan()}
-          style={{
-            ...secondaryButtonStyle,
-            width: "100%",
-            marginTop: 10,
-            borderColor: "#C4B5FD",
-            background: "#F5F3FF",
-            color: "#6D28D9",
-          }}
-        >
-          {copied ? <Check size={18} /> : <Copy size={18} />}
-          {copied ? "Klasör Listesi Kopyalandı" : "Klasör Listesini Kopyala"}
-        </button>
-      </section>
-
-      <section
-        style={{
-          ...cardStyle,
-          borderColor: "#93C5FD",
-          background: "#F8FBFF",
-          padding: 13,
-        }}
-      >
-        <SectionTitle
-          icon={<UploadCloud size={22} />}
-          title="ZIP Dosyasını Yükle"
-          subtitle={`En fazla ${config.limits.maxZipSizeMb} MB • JPG, PNG ve WEBP`}
-        />
-
-        <label
-          style={{
-            marginTop: 12,
-            minHeight: 110,
-            border: selectedFile
-              ? "2px solid #2563EB"
-              : "2px dashed #93C5FD",
-            borderRadius: 18,
-            background: selectedFile ? "#EAF2FF" : "#FFFFFF",
-            display: "grid",
-            placeItems: "center",
-            gap: 5,
-            padding: 14,
-            textAlign: "center",
-            cursor: uploading || previewing ? "not-allowed" : "pointer",
-          }}
-        >
-          <input
-            type="file"
-            accept=".zip,application/zip,application/x-zip-compressed"
-            disabled={uploading || previewing}
-            onChange={(event) =>
-              onFileChange(event.target.files?.[0] || null)
-            }
-            style={{ display: "none" }}
-          />
-
-          <Archive size={30} color="#2563EB" />
-
-          <strong
-            style={{
-              color: "#1D4ED8",
-              fontSize: 12,
-              fontWeight: 950,
-            }}
-          >
-            {selectedFile
-              ? selectedFile.name
-              : "ZIP dosyasını seçmek için dokunun"}
-          </strong>
-
-          <span
-            style={{
-              color: "#64748B",
-              fontSize: 10,
-              fontWeight: 700,
-            }}
-          >
-            {selectedFile
-              ? formatBytes(selectedFile.size)
-              : "Klasörleri tek ZIP içinde yükleyin"}
-          </span>
-        </label>
-
-        <label
-          style={{
-            marginTop: 10,
-            border: "1.5px solid #F3C97B",
-            borderRadius: 14,
-            background: "#FFF8E7",
-            padding: 10,
-            display: "flex",
-            alignItems: "center",
-            gap: 9,
-            color: "#7A4307",
-            fontSize: 10,
-            lineHeight: 1.45,
-            fontWeight: 800,
-            cursor: "pointer",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={replaceExisting}
-            onChange={(event) =>
-              onReplaceExistingChange(event.target.checked)
-            }
-          />
-          Mevcut paket görsellerini bu ZIP içeriğiyle değiştir
-        </label>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 190px), 1fr))",
-            gap: 8,
-            marginTop: 10,
-          }}
-        >
-          <button
-            type="button"
-            onClick={onPreview}
-            disabled={!selectedFile || previewing || uploading}
-            style={{
-              ...secondaryButtonStyle,
-              width: "100%",
-              minHeight: 48,
-              borderColor: "#93C5FD",
-              background: "#EFF6FF",
-              color: "#1D4ED8",
-            }}
-          >
-            {previewing ? (
-              <Loader2 size={18} className="eph-spin" />
-            ) : (
-              <ClipboardList size={18} />
-            )}
-            ZIP Dosyasını Önizle
-          </button>
-
-          <button
-            type="button"
-            onClick={onUpload}
-            disabled={!preview?.valid || uploading || previewing}
-            style={{
-              ...primaryButtonStyle,
-              width: "100%",
-              minHeight: 48,
-              background: preview?.valid
-                ? "linear-gradient(135deg, #6D28D9, #8B5CF6)"
-                : "#94A3B8",
-              cursor: preview?.valid ? "pointer" : "not-allowed",
-            }}
-          >
-            {uploading ? (
-              <Loader2 size={18} className="eph-spin" />
-            ) : (
-              <UploadCloud size={18} />
-            )}
-            Görselleri Toplu Yükle
-          </button>
-        </div>
-      </section>
-
-      {preview && (
-        <section
-          style={{
-            ...cardStyle,
-            borderColor: preview.valid ? "#86EFAC" : "#FCA5A5",
-            background: preview.valid ? "#F0FDF4" : "#FFF7F7",
-            padding: 13,
-          }}
-        >
-          <SectionTitle
-            icon={
-              preview.valid ? (
-                <CheckCircle2 size={21} />
-              ) : (
-                <AlertTriangle size={21} />
-              )
-            }
-            title={
-              preview.valid
-                ? "ZIP Önizlemesi Onaylandı"
-                : "ZIP Dosyasında Düzeltilecekler Var"
-            }
-            subtitle={preview.archive.fileName}
-          />
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(min(100%, 130px), 1fr))",
-              gap: 7,
-              marginTop: 11,
-            }}
-          >
-            <Metric label="Paket" value={preview.summary.packageCount} />
-            <Metric label="Görsel" value={preview.summary.imageCount} />
-            <Metric
-              label="Toplam Boyut"
-              value={formatBytes(preview.summary.totalImageSize)}
-            />
-            <Metric label="Hata" value={preview.summary.errorCount} />
-            <Metric label="Uyarı" value={preview.summary.warningCount} />
-          </div>
-
-          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-            {preview.packages.map((mediaPackage) => (
-              <div
-                key={mediaPackage.packageId}
-                style={{
-                  border: "1.5px solid #C7D6E8",
-                  borderRadius: 14,
-                  background: "#FFFFFF",
-                  padding: 10,
-                  display: "grid",
-                  gridTemplateColumns:
-                    "minmax(0, 1fr) repeat(2, minmax(78px, auto))",
-                  gap: 8,
-                  alignItems: "center",
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <strong
-                    style={{
-                      color: "#1F2937",
-                      fontSize: 11,
-                      fontWeight: 950,
-                    }}
-                  >
-                    {mediaPackage.sourceFolder}/
-                  </strong>
-                  <div
-                    style={{
-                      marginTop: 2,
-                      color: "#64748B",
-                      fontSize: 9,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {mediaPackage.name}
-                  </div>
-                </div>
-
-                <Metric
-                  label="Görsel"
-                  value={mediaPackage.fileCount}
-                />
-                <Metric
-                  label="İşlem"
-                  value={mediaActionLabel(mediaPackage.action)}
-                />
-              </div>
-            ))}
-          </div>
-
-          {preview.issues.length > 0 && (
-            <div style={{ display: "grid", gap: 7, marginTop: 10 }}>
-              {preview.issues.map((issue, index) => (
-                <InfoBand
-                  key={`${issue.code}-${index}`}
-                  tone={issue.level === "ERROR" ? "error" : "warning"}
-                >
-                  {issue.message}
-                  {issue.path ? ` • ${issue.path}` : ""}
-                </InfoBand>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      <section style={{ ...cardStyle, padding: 13 }}>
-        <SectionTitle
-          icon={<Images size={21} />}
-          title="Yüklü Görsel Paketleri"
-          subtitle={`${packages.packages.reduce(
-            (total, item) => total + item._count.assets,
-            0,
-          )} görsel kayıtlı`}
-        />
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
-            gap: 9,
-            marginTop: 11,
-          }}
-        >
-          {packages.packages.map((mediaPackage) => {
-            const cover =
-              mediaPackage.assets.find((asset) => asset.isCover) ||
-              mediaPackage.assets[0];
-            const coverUrl =
-              cover?.supabaseUrl || cover?.url || "";
-            const fallbackCoverUrl =
-              cover?.supabaseUrl && cover?.url !== cover.supabaseUrl
-                ? cover.url
-                : "";
-
-            return (
-              <article
-                key={mediaPackage.id}
-                style={{
-                  minWidth: 0,
-                  border: "1.5px solid #C7D6E8",
-                  borderRadius: 17,
-                  background: "#F8FAFC",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    aspectRatio: "16 / 10",
-                    overflow: "hidden",
-                    background: "#E2E8F0",
-                  }}
-                >
-                  {cover && coverUrl ? (
-                    <>
-                      <img
-                        src={coverUrl}
-                        data-fallback={fallbackCoverUrl}
-                        alt=""
-                        aria-hidden="true"
-                        onError={(event) => {
-                          const image = event.currentTarget;
-                          const fallback =
-                            image.dataset.fallback || "";
-
-                          if (fallback) {
-                            image.dataset.fallback = "";
-                            image.src = fallback;
-                            return;
-                          }
-
-                          image.style.display = "none";
-                        }}
-                        style={{
-                          position: "absolute",
-                          inset: "-12%",
-                          width: "124%",
-                          height: "124%",
-                          objectFit: "cover",
-                          filter: "blur(18px)",
-                          opacity: 0.55,
-                        }}
-                      />
-                      <img
-                        src={coverUrl}
-                        data-fallback={fallbackCoverUrl}
-                        alt={mediaPackage.name}
-                        onError={(event) => {
-                          const image = event.currentTarget;
-                          const fallback =
-                            image.dataset.fallback || "";
-
-                          if (fallback) {
-                            image.dataset.fallback = "";
-                            image.src = fallback;
-                            return;
-                          }
-
-                          image.style.display = "none";
-                        }}
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "contain",
-                        }}
-                      />
-                    </>
-                  ) : (
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        display: "grid",
-                        placeItems: "center",
-                        color: "#94A3B8",
-                      }}
-                    >
-                      <Images size={34} />
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ padding: 10 }}>
-                  <strong
-                    style={{
-                      display: "block",
-                      color: "#1F2937",
-                      fontSize: 11,
-                      lineHeight: 1.4,
-                      fontWeight: 950,
-                      overflowWrap: "anywhere",
-                    }}
-                  >
-                    {mediaPackage.name}
-                  </strong>
-
-                  <div
-                    style={{
-                      marginTop: 5,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 8,
-                      color: "#64748B",
-                      fontSize: 9,
-                      lineHeight: 1.4,
-                      fontWeight: 750,
-                    }}
-                  >
-                    <span>{mediaPackage.zipFolder}/</span>
-                    <span>
-                      {mediaPackage._count.assets} görsel •{" "}
-                      {mediaPackage._count.units} bölüm
-                    </span>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function ProjectSalesStockView({
-  stock,
-  drafts,
-  busyAction,
-  onDraftChange,
-  onApplyDrafts,
-  onSaveUnits,
-  onSaveUnit,
-}: {
-  stock: ProjectSalesStockResponse;
-  drafts: Record<string, ProjectSalesStockDraft>;
-  busyAction: string | null;
-  onDraftChange: (
-    unitId: string,
-    field: keyof ProjectSalesStockDraft,
-    value: string,
-  ) => void;
-  onApplyDrafts: (
-    unitIds: string[],
-    patch: Partial<ProjectSalesStockDraft>,
-  ) => void;
-  onSaveUnits: (
-    unitIds: string[],
-    patch?: Partial<ProjectSalesStockDraft>,
-  ) => void;
-  onSaveUnit: (unitId: string) => void;
-}) {
-  const [search, setSearch] = useState("");
-  const [blockFilter, setBlockFilter] = useState("TUMU");
-  const [statusFilter, setStatusFilter] = useState("TUMU");
-  const [typeFilter, setTypeFilter] = useState("TUMU");
-  const [roomFilter, setRoomFilter] = useState("TUMU");
-  const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([]);
-  const [bulkPrice, setBulkPrice] = useState("");
-  const [bulkStatus, setBulkStatus] = useState("DEGISTIRME");
-
-  const savingBulk = busyAction === "sales-stock-bulk-save";
-
-  useEffect(() => {
-    const validIds = new Set(stock.units.map((unit) => unit.id));
-
-    setSelectedUnitIds((current) =>
-      current.filter((unitId) => validIds.has(unitId)),
-    );
-  }, [stock.units]);
-
-  const blockOptions = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          stock.units
-            .filter((unit) => unit.block)
-            .map((unit) => [
-              unit.block!.id,
-              {
-                value: unit.block!.id,
-                label: unit.block!.name || `${unit.block!.code} Blok`,
-              },
-            ]),
-        ).values(),
-      ),
-    [stock.units],
-  );
-
-  const typeOptions = useMemo(
-    () => Array.from(new Set(stock.units.map((unit) => unit.type))).sort(),
-    [stock.units],
-  );
-
-  const roomOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          stock.units
-            .map((unit) => unit.roomCount)
-            .filter((value): value is string => Boolean(value)),
-        ),
-      ).sort((first, second) => first.localeCompare(second, "tr")),
-    [stock.units],
-  );
-
-  const identityPaletteMap = useMemo(() => {
-    const signatures = Array.from(
-      new Set(stock.units.map((unit) => salesUnitIdentity(unit))),
-    ).sort();
-
-    return new Map(
-      signatures.map((signature, index) => {
-        const hue = (index * 137.508) % 360;
-
-        return [
-          signature,
-          {
-            background: `hsl(${hue.toFixed(1)} 55% 82%)`,
-            border: `hsl(${hue.toFixed(1)} 52% 55%)`,
-            accent: `hsl(${hue.toFixed(1)} 65% 28%)`,
-          },
-        ] as const;
-      }),
-    );
-  }, [stock.units]);
-
-  const filteredUnits = useMemo(() => {
-    const normalizedSearch = search
-      .trim()
-      .toLocaleLowerCase("tr-TR");
-
-    return stock.units.filter((unit) => {
-      if (blockFilter !== "TUMU" && unit.blockId !== blockFilter) {
-        return false;
-      }
-
-      if (statusFilter !== "TUMU" && unit.status !== statusFilter) {
-        return false;
-      }
-
-      if (typeFilter !== "TUMU" && unit.type !== typeFilter) {
-        return false;
-      }
-
-      if (roomFilter !== "TUMU" && unit.roomCount !== roomFilter) {
-        return false;
-      }
-
-      if (!normalizedSearch) return true;
-
-      return [
-        unit.inventoryCode,
-        unit.number,
-        unit.block?.code,
-        unit.block?.name,
-        unit.floorLabel,
-        unit.roomCount,
-        unit.conceptLabel,
-        unitTypeLabel(unit.type),
-      ]
-        .filter(Boolean)
-        .some((value) =>
-          String(value)
-            .toLocaleLowerCase("tr-TR")
-            .includes(normalizedSearch),
-        );
-    });
-  }, [
-    blockFilter,
-    roomFilter,
-    search,
-    statusFilter,
-    stock.units,
-    typeFilter,
-  ]);
-
-  const selectedSet = useMemo(
-    () => new Set(selectedUnitIds),
-    [selectedUnitIds],
-  );
-
-  const dirtyUnitIds = useMemo(
-    () =>
-      stock.units
-        .filter((unit) => {
-          const draft = drafts[unit.id];
-
-          return draft ? isSalesDraftDirty(unit, draft) : false;
-        })
-        .map((unit) => unit.id),
-    [drafts, stock.units],
-  );
-
-  const allFilteredSelected =
-    filteredUnits.length > 0 &&
-    filteredUnits.every((unit) => selectedSet.has(unit.id));
-
-  const toggleUnitSelection = (unitId: string) => {
-    setSelectedUnitIds((current) =>
-      current.includes(unitId)
-        ? current.filter((currentId) => currentId !== unitId)
-        : [...current, unitId],
-    );
-  };
-
-  const toggleFilteredSelection = () => {
-    const visibleIds = filteredUnits.map((unit) => unit.id);
-
-    setSelectedUnitIds((current) => {
-      const currentSet = new Set(current);
-
-      if (visibleIds.every((unitId) => currentSet.has(unitId))) {
-        return current.filter((unitId) => !visibleIds.includes(unitId));
-      }
-
-      return Array.from(new Set([...current, ...visibleIds]));
-    });
-  };
-
-  const bulkPatch = () => {
-    const patch: Partial<ProjectSalesStockDraft> = {};
-
-    if (salesPriceDigits(bulkPrice)) {
-      patch.price = salesPriceDigits(bulkPrice);
-    }
-
-    if (bulkStatus !== "DEGISTIRME") {
-      patch.status = bulkStatus;
-    }
-
-    return patch;
-  };
-
-  const applyBulkDraft = () => {
-    const patch = bulkPatch();
-
-    if (selectedUnitIds.length === 0) return;
-    if (patch.price === undefined && patch.status === undefined) return;
-
-    onApplyDrafts(selectedUnitIds, patch);
-  };
-
-  const applyAndSaveBulk = () => {
-    const patch = bulkPatch();
-
-    if (selectedUnitIds.length === 0) return;
-    if (patch.price === undefined && patch.status === undefined) return;
-
-    void onSaveUnits(selectedUnitIds, patch);
-  };
-
-  const applyToIdenticalUnits = (sourceUnit: ProjectSalesStockUnit) => {
-    const draft = drafts[sourceUnit.id];
-
-    if (!draft) return;
-
-    const signature = salesUnitIdentity(sourceUnit);
-    const matchingIds = stock.units
-      .filter((unit) => salesUnitIdentity(unit) === signature)
-      .map((unit) => unit.id);
-
-    onApplyDrafts(matchingIds, draft);
-    setSelectedUnitIds((current) =>
-      Array.from(new Set([...current, ...matchingIds])),
-    );
-  };
-
-  return (
-    <div
-      style={{
-        display: "grid",
-        gap: 12,
-        marginTop: 12,
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom))",
-      }}
-    >
-      <section
-        style={{
-          ...cardStyle,
-          borderColor: "#A7E4CB",
-          background:
-            "linear-gradient(135deg, #F0FDF4 0%, #FFFFFF 55%, #ECFDF5 100%)",
-          padding: 13,
-        }}
-      >
-        <SectionTitle
-          icon={<BadgeDollarSign size={21} />}
-          title="Satış Stoku Merkezi"
-          subtitle={`${stock.project.name} • Fiyat ve satış durumu yönetimi`}
-        />
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 125px), 1fr))",
-            gap: 7,
-            marginTop: 12,
-          }}
-        >
-          <Metric label="Satış Stoku" value={stock.summary.total} />
-          <Metric label="Aktif" value={stock.summary.available} />
-          <Metric label="Rezerve" value={stock.summary.reserved} />
-          <Metric label="Satıldı/Kiralandı" value={stock.summary.closed} />
-          <Metric label="Fiyat Girilen" value={stock.summary.priced} />
-        </div>
-
-        <div
-          style={{
-            marginTop: 9,
-            border: "1.5px solid #A7E4CB",
-            borderRadius: 15,
-            background: "#FFFFFF",
-            padding: 11,
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              color: "#64748B",
-              fontSize: 10,
-              fontWeight: 850,
-            }}
-          >
-            Toplam Liste Değeri
-          </div>
-          <div
-            style={{
-              marginTop: 3,
-              color: "#047857",
-              fontSize: 20,
-              lineHeight: 1.2,
-              fontWeight: 950,
-              overflowWrap: "anywhere",
-            }}
-          >
-            {formatCurrency(stock.summary.totalListValue)}
-          </div>
-        </div>
-      </section>
-
-      <section
-        style={{
-          ...cardStyle,
-          borderColor: "#93C5FD",
-          background:
-            "linear-gradient(135deg, #EAF2FF 0%, #FFFFFF 58%, #EEF6FF 100%)",
-          padding: 13,
-        }}
-      >
-        <SectionTitle
-          icon={<Layers3 size={20} />}
-          title="Toplu Fiyat ve Durum İşlemleri"
-          subtitle="Filtreleyin, seçin ve yüzlerce bağımsız bölümü tek işlemde kaydedin."
-        />
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 150px), 1fr))",
-            gap: 7,
-            marginTop: 11,
-          }}
-        >
-          <Metric label="Görünen" value={filteredUnits.length} />
-          <Metric label="Seçili" value={selectedUnitIds.length} />
-          <Metric label="Değişen" value={dirtyUnitIds.length} />
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 190px), 1fr))",
-            gap: 8,
-            marginTop: 10,
-          }}
-        >
-          <Field label="Toplu liste fiyatı">
-            <div style={{ position: "relative" }}>
-              <input
-                value={formatSalesPriceInput(bulkPrice)}
-                onChange={(event) =>
-                  setBulkPrice(salesPriceDigits(event.target.value))
-                }
-                inputMode="numeric"
-                placeholder="Ör. 12.000.000"
-                disabled={savingBulk}
-                style={{ ...inputStyle, paddingRight: 48 }}
-              />
-              <span
-                style={{
-                  position: "absolute",
-                  top: "50%",
-                  right: 13,
-                  transform: "translateY(-50%)",
-                  color: "#1557D6",
-                  fontSize: 11,
-                  fontWeight: 950,
-                  pointerEvents: "none",
-                }}
-              >
-                TL
-              </span>
-            </div>
-          </Field>
-
-          <Field label="Toplu satış durumu">
-            <select
-              value={bulkStatus}
-              onChange={(event) => setBulkStatus(event.target.value)}
-              disabled={savingBulk}
-              style={inputStyle}
-            >
-              <option value="DEGISTIRME">Durumu değiştirme</option>
-              {SALES_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
-            gap: 8,
-            marginTop: 10,
-          }}
-        >
-          <button
-            type="button"
-            onClick={toggleFilteredSelection}
-            disabled={filteredUnits.length === 0 || savingBulk}
-            style={{
-              ...secondaryButtonStyle,
-              width: "100%",
-              borderColor: "#93C5FD",
-              color: "#1557D6",
-            }}
-          >
-            <Check size={17} />
-            {allFilteredSelected
-              ? "Görünen Seçimi Kaldır"
-              : "Görünenlerin Tümünü Seç"}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedUnitIds([])}
-            disabled={selectedUnitIds.length === 0 || savingBulk}
-            style={{
-              ...secondaryButtonStyle,
-              width: "100%",
-            }}
-          >
-            <X size={17} />
-            Seçimi Temizle
-          </button>
-
-          <button
-            type="button"
-            onClick={applyBulkDraft}
-            disabled={
-              selectedUnitIds.length === 0 ||
-              (!salesPriceDigits(bulkPrice) &&
-                bulkStatus === "DEGISTIRME") ||
-              savingBulk
-            }
-            style={{
-              ...secondaryButtonStyle,
-              width: "100%",
-              borderColor: "#A78BFA",
-              background: "#F5F3FF",
-              color: "#6D28D9",
-            }}
-          >
-            <ClipboardList size={17} />
-            Seçilen Formlara Uygula
-          </button>
-
-          <button
-            type="button"
-            onClick={applyAndSaveBulk}
-            disabled={
-              selectedUnitIds.length === 0 ||
-              (!salesPriceDigits(bulkPrice) &&
-                bulkStatus === "DEGISTIRME") ||
-              savingBulk
-            }
-            style={{
-              ...primaryButtonStyle,
-              width: "100%",
-              background:
-                "linear-gradient(135deg, #047857, #10B981)",
-            }}
-          >
-            {savingBulk ? (
-              <Loader2 size={18} className="eph-spin" />
-            ) : (
-              <Save size={18} />
-            )}
-            Uygula ve Tek Seferde Kaydet
-          </button>
-        </div>
-
-        <p
-          style={{
-            margin: "10px 0 0",
-            color: "#475569",
-            fontSize: 10,
-            lineHeight: 1.55,
-            textAlign: "center",
-            fontWeight: 750,
-          }}
-        >
-          Örnek: Oda sayısından “2+1” seçin, görünenlerin tümünü işaretleyin,
-          fiyatı girin ve tek tuşla kaydedin. Fiyatı boş bırakırsanız yalnız
-          durum; durumu değiştirmezseniz yalnız fiyat uygulanır.
-        </p>
-      </section>
-
-      <section
-        aria-label="Satış stoku toplu kayıt paneli"
-        style={{
-          ...cardStyle,
-          borderColor:
-            dirtyUnitIds.length > 0 ? "#10B981" : "#94A3B8",
-          background:
-            dirtyUnitIds.length > 0
-              ? "linear-gradient(135deg, #ECFDF5, #FFFFFF)"
-              : "#F8FAFC",
-          padding: 12,
-          boxShadow: "0 12px 28px rgba(15, 23, 42, 0.10)",
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-            alignItems: "center",
-            gap: 9,
-          }}
-        >
-          <div
-            style={{
-              minWidth: 0,
-              textAlign: "center",
-            }}
-          >
-            <div
-              style={{
-                color:
-                  dirtyUnitIds.length > 0 ? "#047857" : "#64748B",
-                fontSize: 12,
-                lineHeight: 1.4,
-                fontWeight: 950,
-              }}
-            >
-              {dirtyUnitIds.length > 0
-                ? `${dirtyUnitIds.length} kaydedilmemiş değişiklik`
-                : "Tüm değişiklikler kaydedildi"}
-            </div>
-
-            <div
-              style={{
-                marginTop: 3,
-                color: "#64748B",
-                fontSize: 10,
-                lineHeight: 1.4,
-                fontWeight: 750,
-              }}
-            >
-              Seçili: {selectedUnitIds.length} • Toplam stok:{" "}
-              {stock.units.length}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => void onSaveUnits(dirtyUnitIds)}
-            disabled={savingBulk || dirtyUnitIds.length === 0}
-            style={{
-              ...primaryButtonStyle,
-              width: "100%",
-              minHeight: 50,
-              background:
-                dirtyUnitIds.length > 0
-                  ? "linear-gradient(135deg, #047857, #10B981)"
-                  : "#94A3B8",
-              boxShadow:
-                dirtyUnitIds.length > 0
-                  ? "0 10px 24px rgba(16, 185, 129, 0.22)"
-                  : "none",
-              cursor:
-                savingBulk || dirtyUnitIds.length === 0
-                  ? "not-allowed"
-                  : "pointer",
-            }}
-          >
-            {savingBulk ? (
-              <Loader2 size={18} className="eph-spin" />
-            ) : dirtyUnitIds.length > 0 ? (
-              <Save size={18} />
-            ) : (
-              <Check size={18} />
-            )}
-
-            {savingBulk
-              ? "Kaydediliyor"
-              : dirtyUnitIds.length > 0
-                ? `Tüm Değişiklikleri Kaydet (${dirtyUnitIds.length})`
-                : "Tüm Değişiklikler Kaydedildi"}
-          </button>
-        </div>
-      </section>
-
-      <section style={{ ...cardStyle, padding: 13 }}>
-        <SectionTitle
-          icon={<Search size={20} />}
-          title="Stok Filtreleri"
-          subtitle={`${filteredUnits.length} bağımsız bölüm gösteriliyor`}
-        />
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 190px), 1fr))",
-            gap: 8,
-            marginTop: 11,
-          }}
-        >
-          <Field label="Ara">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="No, kod, oda veya konsept"
-              style={inputStyle}
-            />
-          </Field>
-
-          <Field label="Blok">
-            <select
-              value={blockFilter}
-              onChange={(event) => setBlockFilter(event.target.value)}
-              style={inputStyle}
-            >
-              <option value="TUMU">Tüm bloklar</option>
-              {blockOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Durum">
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              style={inputStyle}
-            >
-              <option value="TUMU">Tüm durumlar</option>
-              {SALES_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Bağımsız bölüm türü">
-            <select
-              value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value)}
-              style={inputStyle}
-            >
-              <option value="TUMU">Tüm türler</option>
-              {typeOptions.map((unitType) => (
-                <option key={unitType} value={unitType}>
-                  {unitTypeLabel(unitType)}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Oda sayısı">
-            <select
-              value={roomFilter}
-              onChange={(event) => setRoomFilter(event.target.value)}
-              style={inputStyle}
-            >
-              <option value="TUMU">Tüm oda tipleri</option>
-              {roomOptions.map((roomCount) => (
-                <option key={roomCount} value={roomCount}>
-                  {roomCount}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-      </section>
-
-
-      {filteredUnits.length === 0 ? (
-        <section
-          style={{
-            ...cardStyle,
-            padding: 18,
-            textAlign: "center",
-          }}
-        >
-          <AlertTriangle size={25} color="#B45309" />
-          <h3
-            style={{
-              margin: "8px 0 0",
-              color: "#334155",
-              fontSize: 14,
-              fontWeight: 950,
-            }}
-          >
-            Filtreye uygun stok bulunamadı
-          </h3>
-        </section>
-      ) : (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
-            gap: 10,
-          }}
-        >
-          {filteredUnits.map((unit, index) => {
-            const draft = drafts[unit.id] || {
-              price: unit.price > 0 ? salesPriceDigits(unit.price) : "",
-              status: unit.status,
-            };
-            const statusPalette = salesStatusPalette(draft.status);
-            const cardPalette =
-              identityPaletteMap.get(salesUnitIdentity(unit)) ||
-              salesUnitCardPalette(unit);
-            const saving = savingBulk;
-            const selected = selectedSet.has(unit.id);
-            const dirty = isSalesDraftDirty(unit, draft);
-            const matchingCount = stock.units.filter(
-              (candidate) =>
-                salesUnitIdentity(candidate) === salesUnitIdentity(unit),
-            ).length;
-
-            return (
-              <article
-                key={unit.id}
-                style={{
-                  minWidth: 0,
-                  border: `${selected ? 3 : 1.5}px solid ${
-                    selected ? "#2563EB" : cardPalette.border
-                  }`,
-                  borderRadius: 18,
-                  background: cardPalette.background,
-                  padding: 12,
-                  display: "grid",
-                  gap: 10,
-                  boxShadow: selected
-                    ? "0 14px 32px rgba(37, 99, 235, 0.24)"
-                    : "0 10px 26px rgba(15, 23, 42, 0.08)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 9,
-                    minWidth: 0,
-                  }}
-                >
-                  <label
-                    style={{
-                      width: 24,
-                      height: 24,
-                      flex: "0 0 24px",
-                      borderRadius: 8,
-                      display: "grid",
-                      placeItems: "center",
-                      border: selected
-                        ? "1.5px solid #2563EB"
-                        : `1.5px solid ${cardPalette.border}`,
-                      background: selected ? "#2563EB" : "#FFFFFF",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={() => toggleUnitSelection(unit.id)}
-                      style={{ position: "absolute", opacity: 0 }}
-                    />
-                    {selected && <Check size={16} color="#FFFFFF" />}
-                  </label>
-
-                  <div
-                    style={{
-                      width: 46,
-                      height: 46,
-                      flex: "0 0 46px",
-                      borderRadius: 13,
-                      display: "grid",
-                      placeItems: "center",
-                      background: "rgba(255,255,255,0.72)",
-                      color: cardPalette.accent,
-                      border: `1px solid ${cardPalette.border}`,
-                      fontSize: 11,
-                      fontWeight: 950,
-                      overflowWrap: "anywhere",
-                      textAlign: "center",
-                    }}
-                  >
-                    {unit.number || index + 1}
-                  </div>
-
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <h3
-                      style={{
-                        margin: 0,
-                        color: cardPalette.accent,
-                        fontSize: 14,
-                        lineHeight: 1.35,
-                        fontWeight: 950,
-                        overflowWrap: "anywhere",
-                      }}
-                    >
-                      {unit.inventoryCode || unit.number || "Bağımsız Bölüm"}
-                    </h3>
-                    <p
-                      style={{
-                        margin: "3px 0 0",
-                        color: "#475569",
-                        fontSize: 10,
-                        lineHeight: 1.45,
-                        fontWeight: 800,
-                      }}
-                    >
-                      {[
-                        unit.block?.name || unit.block?.code,
-                        unit.projectFloor?.label || unit.floorLabel,
-                        unitTypeLabel(unit.type),
-                        unit.roomCount,
-                      ]
-                        .filter(Boolean)
-                        .join(" • ")}
-                    </p>
-                  </div>
-
-                  <span
-                    style={{
-                      border: `1px solid ${statusPalette.border}`,
-                      borderRadius: 999,
-                      background: statusPalette.background,
-                      color: statusPalette.color,
-                      padding: "5px 8px",
-                      fontSize: 9,
-                      fontWeight: 950,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {salesStatusLabel(draft.status)}
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                    gap: 7,
-                  }}
-                >
-                  <Metric
-                    label="Net Alan"
-                    value={
-                      unit.netArea === null ? "—" : `${unit.netArea} m²`
-                    }
-                  />
-                  <Metric
-                    label="Brüt Alan"
-                    value={
-                      unit.grossArea === null ? "—" : `${unit.grossArea} m²`
-                    }
-                  />
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fit, minmax(min(100%, 145px), 1fr))",
-                    gap: 8,
-                  }}
-                >
-                  <Field label="Liste fiyatı">
-                    <div style={{ position: "relative" }}>
-                      <input
-                        value={formatSalesPriceInput(draft.price)}
-                        onChange={(event) =>
-                          onDraftChange(
-                            unit.id,
-                            "price",
-                            salesPriceDigits(event.target.value),
-                          )
-                        }
-                        inputMode="numeric"
-                        placeholder="Ör. 4.750.000"
-                        disabled={saving}
-                        style={{
-                          ...inputStyle,
-                          paddingRight: 48,
-                          background: "rgba(255,255,255,0.78)",
-                        }}
-                      />
-                      <span
-                        style={{
-                          position: "absolute",
-                          top: "50%",
-                          right: 13,
-                          transform: "translateY(-50%)",
-                          color: cardPalette.accent,
-                          fontSize: 11,
-                          fontWeight: 950,
-                          pointerEvents: "none",
-                        }}
-                      >
-                        TL
-                      </span>
-                    </div>
-                  </Field>
-
-                  <Field label="Satış durumu">
-                    <select
-                      value={draft.status}
-                      onChange={(event) =>
-                        onDraftChange(
-                          unit.id,
-                          "status",
-                          event.target.value,
-                        )
-                      }
-                      disabled={saving}
-                      style={{
-                        ...inputStyle,
-                        background: "rgba(255,255,255,0.78)",
-                      }}
-                    >
-                      {SALES_STATUS_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fit, minmax(min(100%, 150px), 1fr))",
-                    gap: 8,
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => applyToIdenticalUnits(unit)}
-                    disabled={saving || matchingCount <= 1}
-                    style={{
-                      ...secondaryButtonStyle,
-                      width: "100%",
-                      borderColor: cardPalette.border,
-                      background: "rgba(255,255,255,0.72)",
-                      color: cardPalette.accent,
-                    }}
-                  >
-                    <Sparkles size={17} />
-                    Aynı Özelliktekilere Uygula ({matchingCount})
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => void onSaveUnit(unit.id)}
-                    disabled={saving || !dirty}
-                    style={{
-                      ...primaryButtonStyle,
-                      width: "100%",
-                      background: dirty
-                        ? "linear-gradient(135deg, #047857, #10B981)"
-                        : "#94A3B8",
-                      boxShadow: dirty
-                        ? "0 10px 24px rgba(16, 185, 129, 0.20)"
-                        : "none",
-                    }}
-                  >
-                    {saving ? (
-                      <Loader2 size={18} className="eph-spin" />
-                    ) : (
-                      <Save size={18} />
-                    )}
-                    Bu Kartı Kaydet
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
-
-
-      <section
-        aria-label="Satış stoku toplu kayıt paneli"
-        style={{
-          ...cardStyle,
-          borderColor:
-            dirtyUnitIds.length > 0 ? "#10B981" : "#94A3B8",
-          background:
-            dirtyUnitIds.length > 0
-              ? "linear-gradient(135deg, #ECFDF5, #FFFFFF)"
-              : "#F8FAFC",
-          padding: 12,
-          boxShadow: "0 12px 28px rgba(15, 23, 42, 0.10)",
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-            alignItems: "center",
-            gap: 9,
-          }}
-        >
-          <div
-            style={{
-              minWidth: 0,
-              textAlign: "center",
-            }}
-          >
-            <div
-              style={{
-                color:
-                  dirtyUnitIds.length > 0 ? "#047857" : "#64748B",
-                fontSize: 12,
-                lineHeight: 1.4,
-                fontWeight: 950,
-              }}
-            >
-              {dirtyUnitIds.length > 0
-                ? `${dirtyUnitIds.length} kaydedilmemiş değişiklik`
-                : "Tüm değişiklikler kaydedildi"}
-            </div>
-
-            <div
-              style={{
-                marginTop: 3,
-                color: "#64748B",
-                fontSize: 10,
-                lineHeight: 1.4,
-                fontWeight: 750,
-              }}
-            >
-              Seçili: {selectedUnitIds.length} • Toplam stok:{" "}
-              {stock.units.length}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => void onSaveUnits(dirtyUnitIds)}
-            disabled={savingBulk || dirtyUnitIds.length === 0}
-            style={{
-              ...primaryButtonStyle,
-              width: "100%",
-              minHeight: 50,
-              background:
-                dirtyUnitIds.length > 0
-                  ? "linear-gradient(135deg, #047857, #10B981)"
-                  : "#94A3B8",
-              boxShadow:
-                dirtyUnitIds.length > 0
-                  ? "0 10px 24px rgba(16, 185, 129, 0.22)"
-                  : "none",
-              cursor:
-                savingBulk || dirtyUnitIds.length === 0
-                  ? "not-allowed"
-                  : "pointer",
-            }}
-          >
-            {savingBulk ? (
-              <Loader2 size={18} className="eph-spin" />
-            ) : dirtyUnitIds.length > 0 ? (
-              <Save size={18} />
-            ) : (
-              <Check size={18} />
-            )}
-
-            {savingBulk
-              ? "Kaydediliyor"
-              : dirtyUnitIds.length > 0
-                ? `Tüm Değişiklikleri Kaydet (${dirtyUnitIds.length})`
-                : "Tüm Değişiklikler Kaydedildi"}
-          </button>
-        </div>
-      </section>
-
-      <div
-        aria-hidden="true"
-        style={{
-          height: "calc(36px + env(safe-area-inset-bottom))",
-        }}
-      />
-    </div>
-  );
-}
-
 function ProjectCompletionView({
   project,
   preview,
@@ -9270,181 +6800,6 @@ function UnitTypeMultiSelect({
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label
-      style={{
-        display: "grid",
-        gap: 6,
-        minWidth: 0,
-        color: "#334155",
-        fontSize: 12,
-        fontWeight: 900,
-      }}
-    >
-      <span>{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function SectionTitle({
-  icon,
-  title,
-  subtitle,
-}: {
-  icon: ReactNode;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "42px minmax(0, 1fr) 42px",
-        alignItems: "center",
-        gap: 9,
-      }}
-    >
-      <div
-        style={{
-          width: 42,
-          height: 42,
-          display: "grid",
-          placeItems: "center",
-          borderRadius: 13,
-          background: "#EAF2FF",
-          color: "#1557D6",
-        }}
-      >
-        {icon}
-      </div>
-
-      <div style={{ minWidth: 0, textAlign: "center" }}>
-        <h2
-          style={{
-            margin: 0,
-            color: "#1F2937",
-            fontSize: 15,
-            lineHeight: 1.3,
-            fontWeight: 950,
-          }}
-        >
-          {title}
-        </h2>
-        <p
-          style={{
-            margin: "3px 0 0",
-            color: "#64748B",
-            fontSize: 10,
-            lineHeight: 1.45,
-            fontWeight: 700,
-          }}
-        >
-          {subtitle}
-        </p>
-      </div>
-
-      <div aria-hidden="true" style={{ width: 42, height: 42 }} />
-    </div>
-  );
-}
-
-function Metric({
-  label,
-  value,
-}: {
-  label: string;
-  value: ReactNode;
-}) {
-  return (
-    <div
-      style={{
-        border: "1px solid #D6E2F0",
-        borderRadius: 12,
-        background: "#FFFFFF",
-        padding: "7px 5px",
-        textAlign: "center",
-      }}
-    >
-      <strong
-        style={{
-          display: "block",
-          color: "#1F2937",
-          fontSize: 14,
-          fontWeight: 950,
-        }}
-      >
-        {value}
-      </strong>
-      <span
-        style={{
-          display: "block",
-          marginTop: 2,
-          color: "#64748B",
-          fontSize: 9,
-          fontWeight: 800,
-        }}
-      >
-        {label}
-      </span>
-    </div>
-  );
-}
-
-function InfoBand({
-  tone,
-  children,
-}: {
-  tone: "info" | "warning" | "error";
-  children: ReactNode;
-}) {
-  const palette =
-    tone === "error"
-      ? {
-          border: "#FCA5A5",
-          background: "#FEF2F2",
-          color: "#B91C1C",
-        }
-      : tone === "warning"
-        ? {
-            border: "#FED7AA",
-            background: "#FFF7ED",
-            color: "#9A3412",
-          }
-        : {
-            border: "#BFDBFE",
-            background: "#EFF6FF",
-            color: "#1D4ED8",
-          };
-
-  return (
-    <div
-      style={{
-        marginTop: 10,
-        border: `1.5px solid ${palette.border}`,
-        borderRadius: 14,
-        background: palette.background,
-        color: palette.color,
-        padding: 10,
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 8,
-        fontSize: 11,
-        lineHeight: 1.5,
-        fontWeight: 800,
-      }}
-    >
-      {tone === "info" ? (
-        <Sparkles size={18} style={{ flex: "0 0 auto" }} />
-      ) : (
-        <AlertTriangle size={18} style={{ flex: "0 0 auto" }} />
-      )}
-      <span>{children}</span>
-    </div>
-  );
-}
-
 function CenteredState({
   icon,
   title,
@@ -9515,261 +6870,5 @@ function CenteredState({
         {action && <div style={{ marginTop: 14 }}>{action}</div>}
       </section>
     </main>
-  );
-}
-
-function DeleteProjectModal({
-  project,
-  deleting,
-  onCancel,
-  onConfirm,
-}: {
-  project: ProjectSummary;
-  deleting: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 10060,
-        overflowY: "auto",
-        display: "grid",
-        placeItems: "center",
-        padding:
-          "calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))",
-        background: "rgba(15, 23, 42, 0.66)",
-        backdropFilter: "blur(8px)",
-      }}
-    >
-      <section
-        style={{
-          width: "100%",
-          maxWidth: 440,
-          borderRadius: 22,
-          border: "1px solid #FECACA",
-          background: "#FFFFFF",
-          padding: 17,
-          boxShadow: "0 26px 80px rgba(15, 23, 42, 0.30)",
-        }}
-      >
-        <div
-          style={{
-            width: 52,
-            height: 52,
-            margin: "0 auto",
-            display: "grid",
-            placeItems: "center",
-            borderRadius: 16,
-            background: "#FEE2E2",
-            color: "#B91C1C",
-          }}
-        >
-          <Trash2 size={25} />
-        </div>
-
-        <h2
-          style={{
-            margin: "12px 0 0",
-            textAlign: "center",
-            color: "#1F2937",
-            fontSize: 17,
-            lineHeight: 1.35,
-            fontWeight: 950,
-          }}
-        >
-          Projeyi kalıcı olarak sil?
-        </h2>
-
-        <p
-          style={{
-            margin: "7px 0 0",
-            textAlign: "center",
-            color: "#64748B",
-            fontSize: 12,
-            lineHeight: 1.6,
-            fontWeight: 700,
-          }}
-        >
-          <strong style={{ color: "#334155" }}>{project.name}</strong> ile
-          birlikte blok, kat, bağımsız bölüm ve proje alanları silinir. Bu işlem
-          geri alınamaz.
-        </p>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            gap: 8,
-            marginTop: 15,
-          }}
-        >
-          <button 
-            type="button"
-            onClick={onCancel}
-            disabled={deleting}
-            style={{ ...secondaryButtonStyle, width: "100%" }}
-          >
-            Vazgeç
-          </button>
-
-          <button 
-            type="button"
-            onClick={onConfirm}
-            disabled={deleting}
-            style={{
-              ...primaryButtonStyle,
-              width: "100%",
-              background: "linear-gradient(135deg, #DC2626, #B91C1C)",
-              boxShadow: "0 10px 24px rgba(185, 28, 28, 0.20)",
-            }}
-          >
-            {deleting ? (
-              <Loader2 size={18} className="eph-spin" />
-            ) : (
-              <Trash2 size={18} />
-            )}
-            {deleting ? "Siliniyor" : "Projeyi Sil"}
-          </button>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function NoticeModal({
-  notice,
-  onClose,
-}: {
-  notice: Exclude<NoticeState, null>;
-  onClose: () => void;
-}) {
-  const tone = {
-    success: {
-      background: "#DCFCE7",
-      color: "#15803D",
-      icon: <CheckCircle2 size={24} />,
-    },
-    warning: {
-      background: "#FFEDD5",
-      color: "#C2410C",
-      icon: <AlertTriangle size={24} />,
-    },
-    error: {
-      background: "#FEE2E2",
-      color: "#B91C1C",
-      icon: <AlertTriangle size={24} />,
-    },
-  }[notice.tone];
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 10050,
-        overflowY: "auto",
-        display: "grid",
-        placeItems: "center",
-        padding:
-          "calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))",
-        background: "rgba(15, 23, 42, 0.60)",
-        backdropFilter: "blur(8px)",
-      }}
-    >
-      <section
-        onClick={(event) => event.stopPropagation()}
-        style={{
-          width: "100%",
-          maxWidth: 430,
-          borderRadius: 22,
-          border: "1px solid #D6E2F0",
-          background: "#FFFFFF",
-          padding: 17,
-          boxShadow: "0 26px 80px rgba(15, 23, 42, 0.28)",
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "44px minmax(0, 1fr) 36px",
-            alignItems: "start",
-            gap: 10,
-          }}
-        >
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              display: "grid",
-              placeItems: "center",
-              borderRadius: 14,
-              background: tone.background,
-              color: tone.color,
-            }}
-          >
-            {tone.icon}
-          </div>
-
-          <div style={{ minWidth: 0 }}>
-            <h2
-              style={{
-                margin: 0,
-                color: "#1F2937",
-                fontSize: 16,
-                fontWeight: 950,
-              }}
-            >
-              {notice.title}
-            </h2>
-            <p
-              style={{
-                margin: "6px 0 0",
-                color: "#64748B",
-                fontSize: 12,
-                lineHeight: 1.6,
-                fontWeight: 700,
-              }}
-            >
-              {notice.message}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Pencereyi kapat"
-            style={{
-              width: 36,
-              height: 36,
-              border: "1.5px solid #D6E2F0",
-              borderRadius: 12,
-              display: "grid",
-              placeItems: "center",
-              background: "#F8FAFC",
-              color: "#334155",
-              cursor: "pointer",
-            }}
-          >
-            <X size={17} />
-          </button>
-        </div>
-
-        <button 
-          type="button"
-          onClick={onClose}
-          style={{ ...primaryButtonStyle, width: "100%", marginTop: 14 }}
-        >
-          Tamam
-        </button>
-      </section>
-    </div>
   );
 }
