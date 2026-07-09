@@ -71,6 +71,8 @@ function shouldShowShell(pathname: string) {
   if (pathname.startsWith("/platform-anayasasi")) return false;
   if (pathname.startsWith("/gizlilik-politikasi")) return false;
   if (pathname.startsWith("/cerez-politikasi")) return false;
+  if (pathname.startsWith("/paylasim")) return false;
+  if (pathname.startsWith("/talep-paylasim")) return false;
 
   return true;
 }
@@ -171,7 +173,7 @@ export function EPHMobileShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user, logout, hasHydrated } = useAuthStore();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLinaFab, setShowLinaFab] = useState(true);
@@ -183,6 +185,14 @@ export function EPHMobileShell({
   const unreadBadge = unreadMessages > 0
     ? formatUnreadCount(unreadMessages)
     : undefined;
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (!showShell) return;
+    if (user) return;
+
+    router.replace("/giris");
+  }, [hasHydrated, showShell, user, router]);
 
   useEffect(() => {
     const setViewportVars = () => {

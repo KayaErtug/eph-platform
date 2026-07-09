@@ -13,6 +13,12 @@ import { randomUUID } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { PushService } from "../push/push.service";
 
+const PLATFORM_URL =
+  process.env.FRONTEND_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.APP_URL ||
+  "https://emlakportfoyhavuzu.com";
+
 type CreateNetworkPostDto = {
   userId: string;
   type: string;
@@ -454,6 +460,87 @@ export class NetworkService {
     }
 
     return post;
+  }
+
+  async createNetworkPostShareLink(id: string, actionUserId: string) {
+    const post = await this.prisma.networkPost.findFirst({
+      where: {
+        id,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+
+    if (!post) {
+      throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
+    }
+
+    const shareLink = await this.prisma.networkPostShareLink.create({
+      data: {
+        token: randomUUID(),
+        postId: post.id,
+        sharedById: actionUserId,
+      },
+    });
+
+    return {
+      token: shareLink.token,
+      url: `${PLATFORM_URL}/talep-paylasim/${shareLink.token}`,
+    };
+  }
+
+  async getNetworkPostShareByToken(token: string) {
+    const shareLink = await this.prisma.networkPostShareLink.findUnique({
+      where: { token },
+    });
+
+    if (!shareLink) {
+      throw new NotFoundException("Paylaşım bağlantısı bulunamadı.");
+    }
+
+    const post = await this.prisma.networkPost.findFirst({
+      where: {
+        id: shareLink.postId,
+        isActive: true,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException("Bu talep artık aktif değil.");
+    }
+
+    const sharedBy = await this.prisma.user.findUnique({
+      where: { id: shareLink.sharedById },
+      select: { firstName: true, lastName: true, phone: true },
+    });
+
+    await this.prisma.networkPostShareLink.update({
+      where: { id: shareLink.id },
+      data: { viewCount: { increment: 1 } },
+    });
+
+    return {
+      id: post.id,
+      type: post.type,
+      title: post.title,
+      description: post.description,
+      city: post.city,
+      district: post.district,
+      neighborhood: post.neighborhood,
+      budget: post.budget,
+      urgency: post.urgency,
+      tags: post.tags,
+      createdAt: post.createdAt,
+      sharedBy: sharedBy
+        ? {
+            fullName:
+              this.cleanForumActionText(
+                `${sharedBy.firstName} ${sharedBy.lastName}`,
+              ) || "EPH Yetkilisi",
+            phone: sharedBy.phone || null,
+          }
+        : null,
+    };
   }
 
   async getPostStats(id: string) {
@@ -1089,7 +1176,7 @@ export class NetworkService {
     throw new ForbiddenException("Bu paylaşım için işlem yetkiniz yok.");
   }
 
-  async update(id: string, dto: UpdateNetworkPostDto) {
+  async update(id: string, dto: UpdateNetworkPostDto, actionUserId: string) {
     const existing = await this.prisma.networkPost.findFirst({
       where: {
         id,
@@ -1101,7 +1188,7 @@ export class NetworkService {
       throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
     }
 
-    const actionUser = await this.getNetworkActionUser(dto.userId);
+    const actionUser = await this.getNetworkActionUser(actionUserId);
     this.ensureCanManageNetworkPost(existing.userId, actionUser);
 
     const validated = await this.validateForumPostInput(
@@ -1256,13 +1343,16 @@ export class NetworkService {
     };
   }
 
-  async create(dto: CreateNetworkPostDto) {
-    const validated = await this.validateForumPostInput(dto, "create");
+  async create(dto: CreateNetworkPostDto, actionUserId: string) {
+    const validated = await this.validateForumPostInput(
+      { ...dto, userId: actionUserId },
+      "create",
+    );
 
     return this.prisma.networkPost.create({
       data: {
         id: randomUUID(),
-        userId: dto.userId,
+        userId: actionUserId,
         type: validated.category,
         title: validated.title,
         description: validated.description,

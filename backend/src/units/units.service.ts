@@ -19,6 +19,12 @@ import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
 
+const PLATFORM_URL =
+  process.env.FRONTEND_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.APP_URL ||
+  'https://emlakportfoyhavuzu.com';
+
 type CurrentUserPayload = {
   id: string;
   role?: Role | string;
@@ -866,15 +872,23 @@ export class UnitsService {
     return this.isSuperAdmin(user) || Boolean(ownerId && this.isOwner(user, ownerId));
   }
 
-  private redactDoorAccessInfo<T extends { doorAccessInfo?: string | null; project?: { ownerId?: string | null } | null }>(
-    user: CurrentUserPayload,
-    unit: T,
-  ): T {
+  private redactDoorAccessInfo<
+    T extends {
+      doorAccessInfo?: string | null;
+      deedOwnerFullName?: string | null;
+      deedOwnerPhone?: string | null;
+      deedOwnerEmail?: string | null;
+      project?: { ownerId?: string | null } | null;
+    },
+  >(user: CurrentUserPayload, unit: T): T {
     if (this.canSeeDoorAccessInfo(user, unit.project?.ownerId)) return unit;
 
     return {
       ...unit,
       doorAccessInfo: null,
+      deedOwnerFullName: null,
+      deedOwnerPhone: null,
+      deedOwnerEmail: null,
     };
   }
 
@@ -1282,14 +1296,46 @@ export class UnitsService {
       this.cleanText(body?.message) ||
       `Merhaba, ${ephId} numaralı Havuz portföyü hakkında bilgi almak istiyorum.`;
 
-    const kontorResult = await this.spendKontor({
-      userId: user.id,
-      amount: 3,
-      islemTuru: KontorIslemTuru.HAVUZ_MESAJ,
-      aciklama: `${ephId} için Havuz mesajı başlatıldı.`,
-      ilgiliKayitTuru: 'UNIT',
-      ilgiliKayitId: unit.id,
+    const dedupWindowStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentCharge = await this.prisma.kontorHareketi.findFirst({
+      where: {
+        kullaniciId: user.id,
+        hareketTuru: KontorHareketTuru.HARCAMA,
+        islemTuru: KontorIslemTuru.HAVUZ_MESAJ,
+        ilgiliKayitTuru: 'UNIT',
+        ilgiliKayitId: unit.id,
+        olusturulmaTarihi: { gte: dedupWindowStart },
+      },
+      orderBy: { olusturulmaTarihi: 'desc' },
     });
+
+    let cost = 3;
+    let spent = 0;
+    let previousBalance: number;
+    let remainingBalance: number;
+    let responseMessage: string;
+
+    if (recentCharge) {
+      const wallet = await this.prisma.kontorCuzdani.findUnique({
+        where: { kullaniciId: user.id },
+      });
+      previousBalance = wallet?.bakiye ?? 0;
+      remainingBalance = wallet?.bakiye ?? 0;
+      responseMessage = 'Bu Havuz ilanı için 24 saat içinde zaten kontör harcadınız, tekrar düşülmedi.';
+    } else {
+      const kontorResult = await this.spendKontor({
+        userId: user.id,
+        amount: 3,
+        islemTuru: KontorIslemTuru.HAVUZ_MESAJ,
+        aciklama: `${ephId} için Havuz mesajı başlatıldı.`,
+        ilgiliKayitTuru: 'UNIT',
+        ilgiliKayitId: unit.id,
+      });
+      spent = 3;
+      previousBalance = kontorResult.movement.oncekiBakiye;
+      remainingBalance = kontorResult.wallet.bakiye;
+      responseMessage = 'Mesaj başlatıldı. 3 kontör harcandı.';
+    }
 
     const conversation = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.conversation.findFirst({
@@ -1366,12 +1412,12 @@ export class UnitsService {
 
     return {
       ok: true,
-      message: 'Mesaj başlatıldı. 3 kontör harcandı.',
-      cost: 3,
-      spent: 3,
-      previousBalance: kontorResult.movement.oncekiBakiye,
-      remainingBalance: kontorResult.wallet.bakiye,
-      balance: kontorResult.wallet.bakiye,
+      message: responseMessage,
+      cost,
+      spent,
+      previousBalance,
+      remainingBalance,
+      balance: remainingBalance,
       conversationId: conversation.id,
       url: `/messages/${conversation.id}`,
     };
@@ -1450,6 +1496,85 @@ export class UnitsService {
       previousBalance: kontorResult.movement.oncekiBakiye,
       remainingBalance: kontorResult.wallet.bakiye,
       balance: kontorResult.wallet.bakiye,
+    };
+  }
+
+  async createPoolShareLink(id: string, user: CurrentUserPayload) {
+    const unit = await this.getPoolUnitWithProjectOrFail(id);
+
+    const shareLink = await this.prisma.poolShareLink.create({
+      data: {
+        token: randomUUID(),
+        unitId: unit.id,
+        sharedById: user.id,
+      },
+    });
+
+    return {
+      token: shareLink.token,
+      url: `${PLATFORM_URL}/paylasim/${shareLink.token}`,
+    };
+  }
+
+  async getPoolShareByToken(token: string) {
+    const shareLink = await this.prisma.poolShareLink.findUnique({
+      where: { token },
+    });
+
+    if (!shareLink) {
+      throw new NotFoundException('Paylaşım bağlantısı bulunamadı.');
+    }
+
+    const unit = await this.prisma.unit.findUnique({
+      where: { id: shareLink.unitId },
+      include: unitInclude,
+    });
+
+    if (
+      !unit ||
+      !unit.isPoolVisible ||
+      unit.approvalStatus !== PortfolioApprovalStatus.HAVUZDA
+    ) {
+      throw new NotFoundException('Bu portföy artık Havuz içinde aktif değil.');
+    }
+
+    const sharedBy = await this.prisma.user.findUnique({
+      where: { id: shareLink.sharedById },
+      select: { firstName: true, lastName: true, phone: true },
+    });
+
+    await this.prisma.poolShareLink.update({
+      where: { id: shareLink.id },
+      data: { viewCount: { increment: 1 } },
+    });
+
+    return {
+      ephId: this.getEphId(unit.id),
+      type: unit.type,
+      status: unit.status,
+      roomCount: unit.roomCount,
+      area: unit.area,
+      price: unit.price,
+      priceCurrency: unit.priceCurrency,
+      description: unit.description,
+      images: unit.images,
+      isVerified: unit.isVerified,
+      tapuVerified: unit.tapuVerified,
+      photoVerified: unit.photoVerified,
+      yetkiVerified: unit.yetkiVerified,
+      project: {
+        name: unit.project?.name || null,
+        city: unit.project?.city || null,
+        district: unit.project?.district || null,
+      },
+      sharedBy: sharedBy
+        ? {
+            fullName:
+              this.cleanText(`${sharedBy.firstName} ${sharedBy.lastName}`) ||
+              'EPH Yetkilisi',
+            phone: this.normalizePhone(sharedBy.phone) || null,
+          }
+        : null,
     };
   }
 

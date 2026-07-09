@@ -328,6 +328,7 @@ export default function NetworkPostDetailPage() {
   const [selectedAction, setSelectedAction] =
     useState<ForumActionType | null>(null);
   const [saved, setSaved] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
   const [successToast, setSuccessToast] =
     useState<KontorSuccessToastState | null>(null);
 
@@ -387,24 +388,34 @@ export default function NetworkPostDetailPage() {
   };
 
   const handleShare = async () => {
-    if (!post) return;
+    if (!post || shareBusy) return;
 
-    const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+    setShareBusy(true);
 
     try {
+      const response = await api.post(`/network/posts/${post.id}/share`);
+      const url = String(response.data?.url || "").trim();
+
+      if (!url) {
+        throw new Error("Paylaşım bağlantısı oluşturulamadı.");
+      }
+
+      const message = `Merhaba, "${post.title}" başlıklı Forum talebini sizinle paylaşmak istiyorum: ${url}`;
+
       if (navigator.share) {
-        await navigator.share({
-          title: post.title,
-          text: post.description || post.title,
-          url: shareUrl,
-        });
+        await navigator.share({ title: post.title, text: message, url });
         return;
       }
 
-      await navigator.clipboard.writeText(shareUrl);
-      alert("Talep bağlantısı kopyalandı.");
-    } catch {
-      alert("Paylaşım tamamlanamadı.");
+      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+    } catch (err: any) {
+      alert(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Paylaşım tamamlanamadı.",
+      );
+    } finally {
+      setShareBusy(false);
     }
   };
 
@@ -660,10 +671,11 @@ export default function NetworkPostDetailPage() {
                 <button
                   type="button"
                   onClick={handleShare}
-                  className="flex h-9 items-center justify-center gap-1 rounded-[14px] border border-[#FED7AA] bg-white px-1 text-[9.5px] font-black text-[#3A2208]"
+                  disabled={shareBusy}
+                  className="flex h-9 items-center justify-center gap-1 rounded-[14px] border border-[#FED7AA] bg-white px-1 text-[9.5px] font-black text-[#3A2208] disabled:opacity-60"
                 >
                   <Share2 size={13} />
-                  Paylaş
+                  {shareBusy ? "Hazırlanıyor" : "Paylaş"}
                 </button>
 
                 <button

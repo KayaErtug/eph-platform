@@ -1292,6 +1292,30 @@ model KontorHareketi {
   @@index([olusturulmaTarihi])
 }
 
+model PoolShareLink {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  unitId     String
+  sharedById String
+  viewCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([unitId])
+  @@index([sharedById])
+}
+
+model NetworkPostShareLink {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  postId     String
+  sharedById String
+  viewCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([postId])
+  @@index([sharedById])
+}
+
 model KotaKullanimi {
   id                String     @id @default(uuid())
   kullaniciId       String

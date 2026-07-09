@@ -110,6 +110,13 @@ export class UnitsController {
     return this.unitsService.poolMatchingCustomer(id, user, body);
   }
 
+  @Post('pool/:id/share')
+  @UseGuards(RolesGuard)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  createPoolShareLink(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.unitsService.createPoolShareLink(id, user);
+  }
+
   @Get('admin/portfolio-approvals')
   @UseGuards(RolesGuard)
   @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)

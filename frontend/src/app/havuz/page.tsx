@@ -17,6 +17,7 @@ import {
   MessageCircle,
   Navigation,
   Search,
+  Share2,
   SlidersHorizontal,
   Sparkles,
   Target,
@@ -288,6 +289,25 @@ function isBuilderRole(role?: string | null) {
   ].includes(normalized);
 }
 
+function isConstructionCompanyRole(role?: string | null) {
+  const normalized = normalizeRole(role);
+  return ["INSAAT_FIRMASI", "İNŞAAT_FİRMASI"].includes(normalized);
+}
+
+function getPortfolioSourceLabel(unit: Unit) {
+  const role = unit.project?.owner?.role;
+  if (isConstructionCompanyRole(role)) return "İnşaat Firması Portföyü";
+  if (isBuilderRole(role)) return "Müteahhit Portföyü";
+  return "Emlakçı Yetkili Portföyü";
+}
+
+function getPortfolioSourceBadgeLabel(unit: Unit) {
+  const role = unit.project?.owner?.role;
+  if (isConstructionCompanyRole(role)) return "İnşaat Firması";
+  if (isBuilderRole(role)) return "Müteahhit";
+  return "Emlakçı Yetkili";
+}
+
 function isVerified(unit: Unit) {
   return Boolean(
     unit.isVerified ||
@@ -315,10 +335,6 @@ function compactMoney(value?: number | null, currency?: string | null) {
   const numeric = Number(value || 0);
   if (!numeric) return "Fiyat yok";
   const symbol = CURRENCY_SYMBOLS[currency || "TRY"] || "₺";
-
-  if (numeric >= 1000000) {
-    return `${(numeric / 1000000).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}M ${symbol}`;
-  }
 
   return `${numeric.toLocaleString("tr-TR")} ${symbol}`;
 }
@@ -949,14 +965,21 @@ export default function HavuzPage() {
       setWalletBalance(nextBalance);
     }
 
-    void playKontorHarcamaSound();
+    if (spent > 0) {
+      void playKontorHarcamaSound();
+    }
+
+    const backendMessage =
+      typeof input.data?.message === "string" ? input.data.message : "";
 
     setSuccessToast({
       title: input.title,
       message:
-        nextBalance === null
-          ? `${spent} kontör harcandı.`
-          : `${spent} kontör harcandı. Kalan bakiyen ${nextBalance} kontör.`,
+        spent === 0 && backendMessage
+          ? backendMessage
+          : nextBalance === null
+            ? `${spent} kontör harcandı.`
+            : `${spent} kontör harcandı. Kalan bakiyen ${nextBalance} kontör.`,
       spent,
       balance: nextBalance,
     });
@@ -969,7 +992,7 @@ export default function HavuzPage() {
     setBusyAction(`MESSAGE_${unit.id}`);
 
     try {
-      const message = `Merhaba, ${getEphId(unit.id)} numaralı Havuz portföyü için görüşmek istiyorum.`;
+      const message = `Merhaba, ${getEphId(unit.id)} numaralı Havuz portföyünün sahibiyle iletişime geçmek istiyorum.`;
       let conversationId = "";
 
       try {
@@ -979,7 +1002,7 @@ export default function HavuzPage() {
         });
         conversationId = getConversationId(response.data);
         showKontorSuccess({
-          title: "Mesaj Başlatıldı",
+          title: "İletişim Başlatıldı",
           data: response.data,
           fallbackSpent: 3,
         });
@@ -1426,6 +1449,11 @@ export default function HavuzPage() {
           unit={detailSelection.unit}
           match={detailSelection.match}
           busyAction={busyAction}
+          isOwnPortfolio={Boolean(
+            user?.id &&
+              (detailSelection.unit.project?.ownerId === user.id ||
+                detailSelection.unit.project?.owner?.id === user.id),
+          )}
           onClose={closeDetailSelection}
           onMessage={() =>
             startPoolMessage(detailSelection.unit, detailSelection.match.score)
@@ -1839,7 +1867,7 @@ function PoolMapSection({
                 disabled={Boolean(busyAction)}
                 className="flex min-h-[36px] items-center justify-center gap-1 rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#1F2937] disabled:opacity-60"
               >
-                <MessageCircle size={13} className="text-[#2563EB]" /> Mesaj 3K
+                <MessageCircle size={13} className="text-[#2563EB]" /> İletişime Geç 3K
               </button>
               <button
                 type="button"
@@ -2143,6 +2171,7 @@ function getPremiumSpecs(unit: Unit): PremiumSpec[] {
       icon: "◆",
     },
     { label: "Bölge", value: getLocation(unit), icon: "⌖" },
+    { label: "Kaynak", value: getPortfolioSourceLabel(unit), icon: "🏢" },
   ];
 
   if (unit.roomCount) {
@@ -2163,76 +2192,7 @@ function getPremiumSpecs(unit: Unit): PremiumSpec[] {
     icon: "▣",
   });
 
-  return specs.slice(0, 6);
-}
-
-function getCollaborationOpportunities(unit: Unit): PremiumHighlight[] {
-  const text = [unit.type, unit.status, unit.description, unit.project?.name]
-    .join(" ")
-    .toLocaleLowerCase("tr-TR");
-  const opportunities: PremiumHighlight[] = [
-    {
-      icon: "🤝",
-      title: "Ortak Çalışmaya Açık",
-      text: "Meslektaş görüşmesi başlatılabilir",
-    },
-    {
-      icon: "📣",
-      title: "Paylaşıma Uygun",
-      text: "Havuz içinde iş fırsatı oluşturur",
-    },
-  ];
-
-  if (
-    text.includes("arsa") ||
-    text.includes("kat karşılığı") ||
-    text.includes("kat karsiligi")
-  ) {
-    opportunities.push({
-      icon: "🏗️",
-      title: "Proje Fırsatı",
-      text: "Müteahhit ve arsa çalışmasına uygun",
-    });
-  } else if (
-    text.includes("ticari") ||
-    text.includes("dükkan") ||
-    text.includes("dukkan") ||
-    text.includes("ofis") ||
-    text.includes("mağaza") ||
-    text.includes("magaza")
-  ) {
-    opportunities.push({
-      icon: "🏢",
-      title: "Ticari Potansiyel",
-      text: "Kurumsal müşteriyle değerlendirilebilir",
-    });
-  } else {
-    opportunities.push({
-      icon: "🏠",
-      title: "Alıcı Adayına Uygun",
-      text: "Konut arayan müşteriyle değerlendirilebilir",
-    });
-  }
-
-  opportunities.push(
-    {
-      icon: "⚡",
-      title: "Hızlı Görüşme",
-      text: "Mesaj, ilgi ve müşteri bildirimi hazır",
-    },
-    {
-      icon: "🧭",
-      title: "Saha Takibi",
-      text: "Bölge bazlı portföy çalışmasına uygun",
-    },
-    {
-      icon: "🔑",
-      title: "Sunuma Hazır",
-      text: "Müşteriye anlatılabilir net bilgi akışı",
-    },
-  );
-
-  return opportunities.slice(0, 3);
+  return specs.slice(0, 7);
 }
 
 function getPrimarySpecs(unit: Unit) {
@@ -2265,6 +2225,32 @@ function getTypeChip(unit: Unit) {
   if (label.includes("PROJE")) return "PROJE";
   if (label.includes("KİRA")) return "KİRALIK";
   return label.length > 16 ? "PORTFÖY" : label || "PORTFÖY";
+}
+
+const MAX_CREDIT_LTV_RATE = 0.8;
+
+function isLandUnit(unit: Unit) {
+  const chip = getTypeChip(unit);
+  const text = [unit.type, unit.status, unit.description, unit.project?.name]
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
+
+  return (
+    chip.includes("ARSA") ||
+    text.includes("arsa") ||
+    text.includes("tarla") ||
+    text.includes("bağ") ||
+    text.includes("bag")
+  );
+}
+
+function getEstimatedCreditAmount(unit: Unit): number | null {
+  if (isLandUnit(unit)) return null;
+
+  const price = Number(unit.price || 0);
+  if (!price) return null;
+
+  return Math.round(price * MAX_CREDIT_LTV_RATE);
 }
 
 function CompactFeaturePill({ text }: { text: string }) {
@@ -2352,12 +2338,7 @@ function PoolUnitCard({
     .join(" ")
     .toLocaleLowerCase("tr-TR");
 
-  const isLand =
-    typeChip.includes("ARSA") ||
-    text.includes("arsa") ||
-    text.includes("tarla") ||
-    text.includes("bağ") ||
-    text.includes("bag");
+  const isLand = isLandUnit(unit);
 
   const highlight = features[0] || "Havuz Detayı";
   const busy = Boolean(busyAction);
@@ -2409,7 +2390,10 @@ function PoolUnitCard({
               ? "Doğrulandı"
               : "Belirtilmedi",
         },
-        { label: "Kredi", value: "Uygun" },
+        {
+          label: "Kredi",
+          value: getEstimatedCreditAmount(unit) ? "~%80" : "Belirtilmedi",
+        },
         { label: "Kullanım", value: "Belirtilmedi" },
       ];
 
@@ -2449,6 +2433,10 @@ function PoolUnitCard({
               }`}
             >
               {isVerified(unit) ? "EPH Onaylı" : "Kontrol Bekliyor"}
+            </div>
+
+            <div className="absolute right-2 top-2 z-10 max-w-[calc(100%-16px)] truncate rounded-full bg-slate-950/82 px-2.5 py-1 text-[8px] font-black text-white shadow-sm">
+              {getPortfolioSourceBadgeLabel(unit)}
             </div>
           </div>
 
@@ -2572,6 +2560,7 @@ function PoolDetailModal({
   unit,
   match,
   busyAction,
+  isOwnPortfolio,
   onClose,
   onMessage,
   onAction,
@@ -2579,6 +2568,7 @@ function PoolDetailModal({
   unit: Unit;
   match: { score: number; customer: Customer | null; budgetDiff: number };
   busyAction: string | null;
+  isOwnPortfolio: boolean;
   onClose: () => void;
   onMessage: () => void;
   onAction: (type: PoolAction) => void;
@@ -2593,17 +2583,40 @@ function PoolDetailModal({
   const [galleryIndex, setGalleryIndex] = useState(0);
   const image = galleryImages[galleryIndex] || galleryImages[0] || "";
   const specs = getPremiumSpecs(unit);
+  const estimatedCreditAmount = getEstimatedCreditAmount(unit);
   const portfolioHighlights = getPremiumPortfolioHighlights(unit);
-  const collaborationHighlights = getCollaborationOpportunities(unit);
   const imageCount =
     galleryImages.length ||
     (Array.isArray(unit.images) ? unit.images.length : 0) ||
     0;
   const messageBusy = busyAction === `MESSAGE_${unit.id}`;
+  const [shareBusy, setShareBusy] = useState(false);
 
   useEffect(() => {
     setGalleryIndex(0);
   }, [unit.id]);
+
+  const handleShare = async () => {
+    if (shareBusy) return;
+
+    setShareBusy(true);
+
+    try {
+      const response = await api.post(`/units/pool/${unit.id}/share`);
+      const url = String(response.data?.url || "").trim();
+
+      if (!url) {
+        throw new Error("Paylaşım bağlantısı oluşturulamadı.");
+      }
+
+      const message = `Merhaba, ${getEphId(unit.id)} numaralı Havuz portföyünü sizinle paylaşmak istiyorum: ${url}`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+    } catch (error) {
+      alert(getErrorMessage(error));
+    } finally {
+      setShareBusy(false);
+    }
+  };
 
   const goPrevImage = () => {
     if (galleryImages.length <= 1) return;
@@ -2772,6 +2785,34 @@ function PoolDetailModal({
             </p>
           </section>
 
+          {estimatedCreditAmount !== null && (
+            <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white text-center shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
+              <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
+                <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+                  Tahmini Kredi Kullanımı
+                </p>
+                <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
+                  İlan fiyatı üzerinden kaba bir üst sınır tahmini
+                </p>
+              </div>
+              <div className="px-3 py-3 text-center">
+                <p className="text-[20px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">
+                  ~{compactMoney(estimatedCreditAmount, unit.priceCurrency)}
+                </p>
+                <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
+                  Ekspertiz değerinin en fazla %80'i (banka uygulaması)
+                </p>
+                <p className="mx-auto mt-2.5 max-w-[370px] text-center text-[10.5px] font-bold leading-5 text-[#94A3B8] break-words [overflow-wrap:anywhere]">
+                  Bu tutar yalnızca ilan fiyatı üzerinden yapılan kaba bir
+                  tahmindir. Gerçek kredi tutarı bankanın ekspertiz
+                  değerine, güncel faiz oranlarına ve başvuru sahibinin
+                  kredibilitesine göre değişir. Kesin tutar için
+                  bankanızla görüşün.
+                </p>
+              </div>
+            </section>
+          )}
+
           <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
             <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
               <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
@@ -2788,60 +2829,58 @@ function PoolDetailModal({
             </div>
           </section>
 
-          <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-[#F8FAFC] shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
-            <div className="border-b-2 border-[#E2EAF5] bg-white px-3 py-2.5 text-center">
-              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-                İş Birliği Fırsatı
-              </p>
-              <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
-                Havuz mantığına uygun meslektaş çalışma başlıkları
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-1.5 p-2.5">
-              {collaborationHighlights.map((item) => (
-                <PremiumHighlightCard key={item.title} item={item} dense />
-              ))}
-            </div>
-          </section>
-
-
-
 
 
 
         </div>
 
         <div className="shrink-0 border-t-2 border-[#C7D6E8] bg-white/95 p-2.5 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-12px_28px_rgba(15,23,42,0.08)]">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={onMessage}
-              disabled={Boolean(busyAction)}
-              className="flex min-h-[42px] items-center justify-center gap-1 rounded-[15px] border-2 border-[#C7D6E8] bg-white text-[12px] font-black text-[#1F2937] disabled:opacity-60"
-            >
-              <MessageCircle size={14} className="text-[#2563EB]" />
-              {messageBusy ? "Açılıyor" : "Mesaj 3K"}
-            </button>
+          {isOwnPortfolio ? (
+            <div className="flex min-h-[48px] items-center justify-center rounded-[15px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-3 text-center text-[11px] font-black leading-4 text-[#64748B]">
+              Bu portföy size ait. İletişim aksiyonları diğer kullanıcılar için gösterilir.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={onMessage}
+                disabled={Boolean(busyAction)}
+                className="flex min-h-[42px] items-center justify-center gap-1 rounded-[15px] border-2 border-[#C7D6E8] bg-white text-[12px] font-black text-[#1F2937] disabled:opacity-60"
+              >
+                <MessageCircle size={14} className="text-[#2563EB]" />
+                {messageBusy ? "Açılıyor" : "İletişime Geç 3K"}
+              </button>
 
-            <button
-              type="button"
-              onClick={() => onAction("INTEREST")}
-              disabled={Boolean(busyAction)}
-              className="min-h-[42px] rounded-[15px] border-2 border-[#2563EB] bg-[#EFF6FF] text-[12px] font-black text-[#1D4ED8] disabled:opacity-60"
-            >
-              İlgilen 10K
-            </button>
+              <button
+                type="button"
+                onClick={() => onAction("INTEREST")}
+                disabled={Boolean(busyAction)}
+                className="min-h-[42px] rounded-[15px] border-2 border-[#2563EB] bg-[#EFF6FF] text-[12px] font-black text-[#1D4ED8] disabled:opacity-60"
+              >
+                İlgilen 10K
+              </button>
 
-            <button
-              type="button"
-              onClick={() => onAction("LEAD")}
-              disabled={Boolean(busyAction)}
-              className="col-span-2 flex min-h-[44px] items-center justify-center gap-1 rounded-[15px] border-2 border-[#2563EB] bg-[#2563EB] text-[12px] font-black text-white disabled:opacity-60"
-            >
-              <Users size={14} />
-              Müşterim Var 20K
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => onAction("LEAD")}
+                disabled={Boolean(busyAction)}
+                className="col-span-2 flex min-h-[44px] items-center justify-center gap-1 rounded-[15px] border-2 border-[#2563EB] bg-[#2563EB] text-[12px] font-black text-white disabled:opacity-60"
+              >
+                <Users size={14} />
+                Müşterim Var 20K
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleShare}
+            disabled={shareBusy}
+            className="mt-2 flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-[15px] border-2 border-[#16A34A] bg-[#F0FDF4] text-[12px] font-black text-[#15803D] disabled:opacity-60"
+          >
+            <Share2 size={14} />
+            {shareBusy ? "Bağlantı Oluşturuluyor..." : "Müşterime Paylaş"}
+          </button>
         </div>
       </section>
     </div>

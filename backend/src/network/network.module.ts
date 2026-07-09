@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { PrismaModule } from "../prisma/prisma.module";
 import { PushModule } from "../push/push.module";
 import { NetworkController } from "./network.controller";
+import { NetworkPostShareController } from "./network-post-share.controller";
 import { NetworkService } from "./network.service";
 
 @Module({
@@ -10,7 +11,7 @@ import { NetworkService } from "./network.service";
     PrismaModule,
     PushModule,
   ],
-  controllers: [NetworkController],
+  controllers: [NetworkController, NetworkPostShareController],
   providers: [NetworkService],
   exports: [NetworkService],
 })

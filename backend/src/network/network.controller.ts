@@ -6,7 +6,6 @@ import {
   Param,
   Patch,
   Post,
-  Query,
   UseGuards,
 } from '@nestjs/common';
 import { NetworkService } from './network.service';
@@ -14,6 +13,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('network')
+@UseGuards(JwtAuthGuard)
 export class NetworkController {
   constructor(private readonly networkService: NetworkService) {}
 
@@ -23,8 +23,8 @@ export class NetworkController {
   }
 
   @Get('posts/followed')
-  getFollowedPosts(@Query('userId') userId: string) {
-    return this.networkService.getFollowedPosts(userId);
+  getFollowedPosts(@CurrentUser() user: any) {
+    return this.networkService.getFollowedPosts(user.id);
   }
 
   @Get('posts/featured')
@@ -33,13 +33,13 @@ export class NetworkController {
   }
 
   @Get('notifications')
-  getNotifications(@Query('userId') userId: string) {
-    return this.networkService.getNotifications(userId);
+  getNotifications(@CurrentUser() user: any) {
+    return this.networkService.getNotifications(user.id);
   }
 
   @Post('notifications/read')
-  markNotificationsAsRead(@Body() body: { userId: string }) {
-    return this.networkService.markNotificationsAsRead(body.userId);
+  markNotificationsAsRead(@CurrentUser() user: any) {
+    return this.networkService.markNotificationsAsRead(user.id);
   }
 
   @Get('posts/:id/stats')
@@ -53,13 +53,13 @@ export class NetworkController {
   }
 
   @Post('posts/:id/view')
-  recordPostView(@Param('id') id: string, @Body() body: { userId?: string }) {
-    return this.networkService.recordPostView(id, body?.userId);
+  recordPostView(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.networkService.recordPostView(id, user.id);
   }
 
   @Get('posts/:id/follow-status')
-  getFollowStatus(@Param('id') id: string, @Query('userId') userId?: string) {
-    return this.networkService.getFollowStatus(id, userId);
+  getFollowStatus(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.networkService.getFollowStatus(id, user.id);
   }
 
   @Get('posts/:id/followers')
@@ -68,13 +68,13 @@ export class NetworkController {
   }
 
   @Post('posts/:id/follow')
-  followPost(@Param('id') id: string, @Body() body: { userId: string }) {
-    return this.networkService.followPost(id, body.userId);
+  followPost(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.networkService.followPost(id, user.id);
   }
 
   @Delete('posts/:id/follow')
-  unfollowPost(@Param('id') id: string, @Body() body: { userId: string }) {
-    return this.networkService.unfollowPost(id, body.userId);
+  unfollowPost(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.networkService.unfollowPost(id, user.id);
   }
 
   @Get('posts/:id')
@@ -82,27 +82,31 @@ export class NetworkController {
     return this.networkService.findOne(id);
   }
 
+  @Post('posts/:id/share')
+  createShareLink(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.networkService.createNetworkPostShareLink(id, user.id);
+  }
+
   @Patch('posts/:id')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.networkService.update(id, body);
+  update(
+    @Param('id') id: string,
+    @Body() body: any,
+    @CurrentUser() user: any,
+  ) {
+    return this.networkService.update(id, body, user.id);
   }
 
   @Delete('posts/:id')
-  remove(
-    @Param('id') id: string,
-    @Body() body?: { userId?: string },
-    @Query('userId') queryUserId?: string,
-  ) {
-    return this.networkService.remove(id, body?.userId || queryUserId || '');
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.networkService.remove(id, user.id);
   }
 
   @Post('posts')
-  create(@Body() body: any) {
-    return this.networkService.create(body);
+  create(@Body() body: any, @CurrentUser() user: any) {
+    return this.networkService.create(body, user.id);
   }
 
   @Post('posts/:id/message')
-  @UseGuards(JwtAuthGuard)
   messagePost(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -112,7 +116,6 @@ export class NetworkController {
   }
 
   @Post('posts/:id/interest')
-  @UseGuards(JwtAuthGuard)
   interestPost(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -122,7 +125,6 @@ export class NetworkController {
   }
 
   @Post('posts/:id/help')
-  @UseGuards(JwtAuthGuard)
   helpPost(
     @Param('id') id: string,
     @CurrentUser() user: any,
@@ -130,6 +132,4 @@ export class NetworkController {
   ) {
     return this.networkService.helpPost(id, user, body);
   }
-
-
 }
