@@ -1519,7 +1519,7 @@ export default function StokDetailPage() {
                 }
                 className="absolute right-3 top-3 inline-flex min-h-[32px] items-center justify-center gap-1 rounded-full bg-white/95 px-3 text-[10px] font-black text-[#1557D6] shadow-[0_10px_20px_rgba(15,23,42,0.16)] backdrop-blur"
               >
-                Aç <ExternalLink size={11} />
+                Konuma Git <ExternalLink size={11} />
               </button>
             )}
           </div>
