@@ -8,6 +8,7 @@ import {
   KontorHareketTuru,
   KontorIslemTuru,
   Prisma,
+  UyelikDurumu,
 } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
@@ -1383,7 +1384,34 @@ export class NetworkService {
       "create",
     );
 
-    return this.prisma.networkPost.create({
+    return this.prisma.$transaction(async (tx) => {
+      // Madde 33: aylik forum talebi limiti asilinca her yeni talep 20 kontor
+      const aktifPaket = await tx.kullaniciUyelikPaketi.findFirst({
+        where: { kullaniciId: actionUserId, durum: UyelikDurumu.AKTIF },
+        orderBy: { baslangicTarihi: "desc" },
+      });
+      const paket = aktifPaket
+        ? await tx.uyelikPaketi.findUnique({
+            where: { id: aktifPaket.paketId },
+          })
+        : null;
+      const aylikLimit = paket?.aylikForumKonusuLimiti ?? null;
+
+      const now = new Date();
+      const ayBasi = new Date(now.getFullYear(), now.getMonth(), 1);
+      const buAyTalepSayisi =
+        aylikLimit == null
+          ? 0
+          : await tx.networkPost.count({
+              where: {
+                userId: actionUserId,
+                createdAt: { gte: ayBasi },
+              },
+            });
+      const limitAsildi =
+        aylikLimit != null && buAyTalepSayisi >= aylikLimit;
+
+      const post = await tx.networkPost.create({
       data: {
         id: randomUUID(),
         userId: actionUserId,
@@ -1426,6 +1454,19 @@ export class NetworkService {
           },
         },
       },
+      });
+
+      if (limitAsildi) {
+        await this.spendForumKontor(tx, {
+          userId: actionUserId,
+          amount: 20,
+          islemTuru: KontorIslemTuru.FORUM_TALEP_OLUSTURMA,
+          aciklama: `Aylik forum talebi limiti (${aylikLimit}) asildigi icin talep olusturma bedeli: 20 kontor.`,
+          postId: post.id,
+        });
+      }
+
+      return post;
     });
   }
 
