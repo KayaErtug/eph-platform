@@ -31,6 +31,7 @@ type CustomerLike = {
   city?: string | null;
   budget?: number | null;
   status?: CustomerStatus;
+  roles?: CustomerRole[];
   notes?: string | null;
   interests?: Array<{
     id: string;
@@ -62,26 +63,52 @@ type ParsedCustomerFields = {
   notes?: string;
 };
 
+// Lina CRM Confirmation And Fixed Voice V1
+// Lina CRM Role First V2
 type ParsedNaturalCrmLead = {
   fullName: string;
   firstName: string;
   lastName: string;
+  phone?: string;
+  email?: string;
   city?: string;
   district?: string;
   neighborhood?: string;
+  minBudget?: number;
   maxBudget?: number;
   roomCounts: string[];
   propertyTypes: UnitType[];
   statuses: UnitStatus[];
   purchaseIntent: CustomerPurchaseIntent;
   customerRole: CustomerRole;
+  customerRoles: CustomerRole[];
   originalText: string;
+};
+
+type PendingDirectCrmCustomer = {
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  email?: string;
+  city?: string;
+  budget?: number;
+  notes?: string;
+  roles?: CustomerRole[];
 };
 
 type PendingCrmCreation = {
   userId: string;
   createdAt: number;
   expiresAt: number;
+  mode:
+    | "select-role"
+    | "collecting"
+    | "confirm-natural"
+    | "confirm-direct";
+  sourceModule: LinaActionSourceModule;
+  selectedRoles?: CustomerRole[];
+  lead?: ParsedNaturalCrmLead;
+  customer?: PendingDirectCrmCustomer;
 };
 
 
@@ -277,7 +304,10 @@ export class LinaActionEngineService {
       .replace(/[.!?]+$/g, "")
       .trim();
     const isStartCommand =
-      /^(lina\s+)?(?:yeni\s+)?(?:crm|musteri)\s+(?:kaydi|kayit)\s+(?:olusturalim|acalim|ekleyelim|olustur|ac)$/.test(
+      /^(lina\s+)?(?:yeni\s+)?(?:crm|musteri)\s+(?:kaydi|kayit|girisi|giris)\s+(?:yapalim|olusturalim|acalim|ekleyelim|olustur|ac|yap)$/.test(
+        normalized,
+      ) ||
+      /^(lina\s+)?(?:crm|musteri)\s+(?:girisi|giris)\s+(?:yapalim|baslatalim|yap|baslat)$/.test(
         normalized,
       ) ||
       /^(lina\s+)?crm(?:de|e)?\s+(?:yeni\s+)?musteri\s+(?:olusturalim|ekleyelim|olustur)$/.test(
@@ -294,6 +324,8 @@ export class LinaActionEngineService {
       userId: user.id,
       createdAt: now,
       expiresAt: now + PENDING_CRM_CREATION_TTL_MS,
+      mode: "select-role",
+      sourceModule,
     });
 
     this.audit(user, sourceModule, "crm_customer_create_prepare", "success");
@@ -302,11 +334,9 @@ export class LinaActionEngineService {
       handled: true,
       success: true,
       action: "crm_customer_create",
-      message:
-        "Elbette. CRM kaydı oluşturacağım. Müşterinin ad-soyadını; varsa telefonunu, aradığı il-ilçe-mahalleyi, bütçesini, oda sayısını ve gayrimenkul türünü tek cümlede söyleyin.",
+      message: this.buildCrmRoleSelectionMessage(),
     };
   }
-
   private hasCrmCreationContext(
     userId: string,
     currentMessage: string,
@@ -372,24 +402,29 @@ export class LinaActionEngineService {
       return false;
     }
 
-    return (
-      /(satin almak istiyor|kiralamak istiyor|yatirim yapmak istiyor|daire ariyor|villa ariyor|arsa ariyor|gayrimenkul ariyor)/.test(
+    const transactionSignal =
+      /(satin almak istiyor|kiralamak istiyor|yatirim yapmak istiyor|satmak istiyor|kiraya vermek istiyor|satisa cikarmak istiyor|kat karsiligi vermek istiyor|daire ariyor|villa ariyor|arsa ariyor|gayrimenkul ariyor)/.test(
         normalized,
-      ) ||
-      (
-        /(milyon|bin|tl|₺|butce|kadar)/.test(normalized) &&
-        /(daire|villa|rezidans|mustakil ev|arsa|tarla|dukkan|ofis)/.test(
-          normalized,
-        )
-      )
-    );
-  }
+      );
+    const ownershipSignal =
+      /(arsasi var|tarlasi var|dairesi var|villasi var|dukkanı var|dukkani var|ofisi var|gayrimenkulu var|mulku var)/.test(
+        normalized,
+      );
+    const moneyAndPropertySignal =
+      /(milyon|bin|tl|₺|butce|kadar|bedel|fiyat)/.test(normalized) &&
+      /(daire|villa|rezidans|mustakil ev|arsa|tarla|dukkan|ofis|gayrimenkul)/.test(
+        normalized,
+      );
 
+    return transactionSignal || ownershipSignal || moneyAndPropertySignal;
+  }
   private async createCrmCustomerFromNaturalLead(
     message: string,
     user: LinaResolvedUser,
     sourceModule: LinaActionSourceModule,
   ): Promise<LinaActionExecutionResult> {
+    const pendingCrm = this.pendingCrmCreations.get(user.id);
+    const selectedRoles = pendingCrm?.selectedRoles || [];
     const lead = this.parseNaturalCrmLead(message);
 
     if (!lead) {
@@ -397,61 +432,36 @@ export class LinaActionEngineService {
         handled: true,
         success: false,
         message:
-          "CRM kaydını oluşturmak istediğinizi anladım; ancak müşteri adı veya talep ayrıntılarından bazılarını ayıramadım. Ad-soyadı, konum, bütçe ve gayrimenkul türünü tek cümlede tekrar söyleyin.",
+          "CRM bilgilerini ayıramadım. Müşterinin ad-soyadını, telefonunu ve seçtiğimiz role uygun gayrimenkul ayrıntılarını tek cümlede tekrar söyleyin.",
       };
     }
 
-    const customers = (await this.crmService.getCustomers(
-      user.id,
-      user.role,
-    )) as CustomerLike[];
+    if (selectedRoles.length > 0) {
+      lead.customerRoles = [...selectedRoles];
+      lead.customerRole = selectedRoles[0];
 
-    const existingCustomer = customers.find(
-      (customer) =>
-        this.normalize(this.customerFullName(customer)) ===
-        this.normalize(lead.fullName),
+      if (this.isSupplySideCrmRoles(selectedRoles)) {
+        lead.purchaseIntent = CustomerPurchaseIntent.BELIRSIZ;
+        lead.statuses =
+          /(kiraya vermek|kiralik)/.test(this.normalize(message))
+            ? [UnitStatus.KIRALIK]
+            : [UnitStatus.SATILIK];
+      }
+    }
+
+    const existingCustomer = await this.findExistingCustomerForNaturalLead(
+      lead,
+      user,
+    );
+    const isSupplySide = this.isSupplySideCrmRoles(
+      lead.customerRoles,
     );
 
-    let customer: CustomerLike;
-    let createdNewCustomer = false;
-
-    if (existingCustomer) {
-      customer = (await this.crmService.getCustomer(
-        existingCustomer.id,
-        user.id,
-        user.role,
-      )) as CustomerLike;
-
-      const duplicateInterest = customer.interests?.find((interest) => {
-        const sameCity =
-          this.normalize(interest.city || "") ===
-          this.normalize(lead.city || "");
-        const sameDistrict =
-          this.normalize(interest.district || "") ===
-          this.normalize(lead.district || "");
-        const sameNeighborhood =
-          this.normalize(interest.neighborhood || "") ===
-          this.normalize(lead.neighborhood || "");
-        const sameRoom =
-          lead.roomCounts.length === 0 ||
-          lead.roomCounts.some((roomCount) =>
-            interest.roomCounts?.includes(roomCount),
-          );
-        const sameType =
-          lead.propertyTypes.length === 0 ||
-          lead.propertyTypes.some((propertyType) =>
-            interest.propertyTypes?.includes(propertyType),
-          );
-
-        return (
-          interest.isActive !== false &&
-          sameCity &&
-          sameDistrict &&
-          sameNeighborhood &&
-          sameRoom &&
-          sameType
-        );
-      });
+    if (existingCustomer && !isSupplySide) {
+      const duplicateInterest = this.findDuplicateNaturalLeadInterest(
+        existingCustomer,
+        lead,
+      );
 
       if (duplicateInterest) {
         this.pendingCrmCreations.delete(user.id);
@@ -460,35 +470,209 @@ export class LinaActionEngineService {
           handled: true,
           success: true,
           action: "crm_customer_create_with_interest",
-          message: `${lead.fullName} için aynı konum ve özelliklerde aktif bir CRM talebi zaten bulunuyor. Tekrar kayıt oluşturmadım.`,
+          message: `${this.customerFullName(existingCustomer)} için aynı konum ve özelliklerde aktif bir CRM talebi zaten bulunuyor. Tekrar kayıt oluşturmadım.`,
           data: {
-            customerId: customer.id,
+            customerId: existingCustomer.id,
             interestId: duplicateInterest.id,
+            crmUrl: "/crm",
             reusedCustomer: true,
           },
         };
       }
-    } else {
-      customer = (await this.crmService.createCustomer(user.id, {
-        firstName: lead.firstName,
-        lastName: lead.lastName,
-        city: lead.city,
-        budget: lead.maxBudget,
-        interestedArea: [lead.city, lead.district, lead.neighborhood]
-          .filter(Boolean)
-          .join(" / "),
-        interestedType: lead.propertyTypes[0],
-        source: "LINA",
-        status: CustomerStatus.YENI_LEAD,
-        roles: [lead.customerRole],
-        notes: lead.originalText,
-      })) as CustomerLike;
-
-      createdNewCustomer = true;
     }
 
-    try {
-      const interest = await this.crmService.addCustomerInterest(
+    const now = Date.now();
+
+    this.pendingCrmCreations.set(user.id, {
+      userId: user.id,
+      createdAt: now,
+      expiresAt: now + PENDING_CRM_CREATION_TTL_MS,
+      mode: "confirm-natural",
+      sourceModule,
+      selectedRoles: lead.customerRoles,
+      lead,
+    });
+
+    this.audit(
+      user,
+      sourceModule,
+      isSupplySide
+        ? "crm_owner_customer_create_prepare"
+        : "crm_customer_create_with_interest_prepare",
+      "success",
+    );
+
+    return {
+      handled: true,
+      success: true,
+      action: isSupplySide
+        ? "crm_customer_create"
+        : "crm_customer_create_with_interest",
+      requiresConfirmation: true,
+      message: this.buildNaturalLeadConfirmationMessage(
+        lead,
+        existingCustomer
+          ? this.customerFullName(existingCustomer)
+          : undefined,
+      ),
+      data: {
+        confirmationType: isSupplySide
+          ? "crm_customer_create"
+          : "crm_customer_create_with_interest",
+        confirmLabel: "Kaydı Onayla",
+        cancelLabel: "İptal Et",
+        reusedCustomer: Boolean(existingCustomer),
+        draft: {
+          fullName: lead.fullName,
+          phone: lead.phone,
+          email: lead.email,
+          roles: lead.customerRoles,
+          city: lead.city,
+          district: lead.district,
+          neighborhood: lead.neighborhood,
+          minBudget: lead.minBudget,
+          maxBudget: lead.maxBudget,
+          roomCounts: lead.roomCounts,
+          propertyTypes: lead.propertyTypes,
+          statuses: lead.statuses,
+          purchaseIntent: lead.purchaseIntent,
+        },
+      },
+    };
+  }
+
+  private async findExistingCustomerForNaturalLead(
+    lead: ParsedNaturalCrmLead,
+    user: LinaResolvedUser,
+  ): Promise<CustomerLike | null> {
+    const customers = (await this.crmService.getCustomers(
+      user.id,
+      user.role,
+    )) as CustomerLike[];
+
+    const existing = customers.find((customer) => {
+      const sameName =
+        this.normalize(this.customerFullName(customer)) ===
+        this.normalize(lead.fullName);
+      const samePhone =
+        Boolean(lead.phone && customer.phone) &&
+        this.onlyDigits(lead.phone || "") ===
+          this.onlyDigits(customer.phone || "");
+      const sameEmail =
+        Boolean(lead.email && customer.email) &&
+        String(lead.email).toLocaleLowerCase("tr-TR") ===
+          String(customer.email).toLocaleLowerCase("tr-TR");
+
+      return sameName || samePhone || sameEmail;
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    return (await this.crmService.getCustomer(
+      existing.id,
+      user.id,
+      user.role,
+    )) as CustomerLike;
+  }
+
+  private findDuplicateNaturalLeadInterest(
+    customer: CustomerLike,
+    lead: ParsedNaturalCrmLead,
+  ) {
+    return customer.interests?.find((interest) => {
+      const sameCity =
+        this.normalize(interest.city || "") ===
+        this.normalize(lead.city || "");
+      const sameDistrict =
+        this.normalize(interest.district || "") ===
+        this.normalize(lead.district || "");
+      const sameNeighborhood =
+        this.normalize(interest.neighborhood || "") ===
+        this.normalize(lead.neighborhood || "");
+      const sameRoom =
+        lead.roomCounts.length === 0 ||
+        lead.roomCounts.some((roomCount) =>
+          interest.roomCounts?.includes(roomCount),
+        );
+      const sameType =
+        lead.propertyTypes.length === 0 ||
+        lead.propertyTypes.some((propertyType) =>
+          interest.propertyTypes?.includes(propertyType),
+        );
+
+      return (
+        interest.isActive !== false &&
+        sameCity &&
+        sameDistrict &&
+        sameNeighborhood &&
+        sameRoom &&
+        sameType
+      );
+    });
+  }
+
+  private async executeNaturalCrmLeadCreation(
+    lead: ParsedNaturalCrmLead,
+    user: LinaResolvedUser,
+    sourceModule: LinaActionSourceModule,
+  ): Promise<LinaActionExecutionResult> {
+    if (this.isSupplySideCrmRoles(lead.customerRoles)) {
+      return this.executeSupplySideCrmCreation(
+        lead,
+        user,
+        sourceModule,
+      );
+    }
+
+    const existingCustomer = await this.findExistingCustomerForNaturalLead(
+      lead,
+      user,
+    );
+
+    if (existingCustomer) {
+      const duplicateInterest = this.findDuplicateNaturalLeadInterest(
+        existingCustomer,
+        lead,
+      );
+
+      if (duplicateInterest) {
+        return {
+          handled: true,
+          success: true,
+          action: "crm_customer_create_with_interest",
+          message: `${this.customerFullName(existingCustomer)} için aynı konum ve özelliklerde aktif bir CRM talebi zaten bulunuyor. Tekrar kayıt oluşturmadım.`,
+          data: {
+            customerId: existingCustomer.id,
+            interestId: duplicateInterest.id,
+            crmUrl: "/crm",
+            reusedCustomer: true,
+          },
+        };
+      }
+    }
+
+    let customer: CustomerLike;
+    let interest: { id?: string } | undefined;
+    const reusedCustomer = Boolean(existingCustomer);
+
+    if (existingCustomer) {
+      const mergedRoles = Array.from(
+        new Set([
+          ...(existingCustomer.roles || []),
+          ...lead.customerRoles,
+        ]),
+      );
+
+      customer = (await this.crmService.updateCustomer(
+        existingCustomer.id,
+        user.id,
+        user.role,
+        { roles: mergedRoles },
+      )) as CustomerLike;
+
+      interest = await this.crmService.addCustomerInterest(
         customer.id,
         user.id,
         user.role,
@@ -499,6 +683,7 @@ export class LinaActionEngineService {
           neighborhood: lead.neighborhood,
           propertyTypes: lead.propertyTypes,
           statuses: lead.statuses,
+          minBudget: lead.minBudget,
           maxBudget: lead.maxBudget,
           priceCurrency: "TRY",
           roomCounts: lead.roomCounts,
@@ -508,69 +693,368 @@ export class LinaActionEngineService {
           isActive: true,
         },
       );
+    } else {
+      customer = (await this.crmService.createCustomer(user.id, {
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        phone: lead.phone,
+        email: lead.email,
+        city: lead.city,
+        budget: lead.maxBudget || lead.minBudget,
+        interestedArea: [lead.city, lead.district, lead.neighborhood]
+          .filter(Boolean)
+          .join(" / "),
+        interestedType:
+          lead.propertyTypes
+            .map((type) => this.propertyTypeLabel(type))
+            .join(", ") || undefined,
+        source: "LINA",
+        status: CustomerStatus.YENI_LEAD,
+        roles: lead.customerRoles,
+        notes: lead.originalText,
+        interestAreas:
+          lead.city && lead.district
+            ? [
+                {
+                  city: lead.city,
+                  district: lead.district,
+                  neighborhood: lead.neighborhood || "",
+                },
+              ]
+            : [],
+        minBudget: lead.minBudget,
+        maxBudget: lead.maxBudget,
+        propertyTypes: lead.propertyTypes,
+        interestStatuses: lead.statuses,
+        roomCounts: lead.roomCounts,
+        purchaseIntent: lead.purchaseIntent,
+        priority: CustomerInterestPriority.NORMAL,
+        interestTitle: this.buildNaturalLeadTitle(lead),
+        interestNotes: lead.originalText,
+      })) as CustomerLike;
 
-      this.pendingCrmCreations.delete(user.id);
-      this.audit(
-        user,
-        sourceModule,
-        "crm_customer_create_with_interest",
-        "success",
-      );
+      interest = customer.interests?.[0];
+    }
 
-      const locationText = [
-        lead.city,
-        lead.district,
-        lead.neighborhood,
+    this.audit(
+      user,
+      sourceModule,
+      "crm_customer_create_with_interest",
+      "success",
+    );
+
+    const locationText = [
+      lead.city,
+      lead.district,
+      lead.neighborhood,
+    ]
+      .filter(Boolean)
+      .join(" / ");
+    const budgetText = this.formatBudgetRange(
+      lead.minBudget,
+      lead.maxBudget,
+    );
+    const roomText =
+      lead.roomCounts.length > 0
+        ? lead.roomCounts.join(", ")
+        : "Oda sayısı belirtilmedi";
+    const propertyText = lead.propertyTypes
+      .map((type) => this.propertyTypeLabel(type))
+      .join(", ");
+
+    return {
+      handled: true,
+      success: true,
+      action: "crm_customer_create_with_interest",
+      message: [
+        `${this.customerFullName(customer)} için CRM kaydı ve müşteri talebi oluşturuldu.`,
+        `Rol: ${this.crmRoleListLabel(lead.customerRoles)}`,
+        locationText ? `Konum: ${locationText}` : null,
+        `Talep: ${roomText} ${propertyText || "gayrimenkul"}`,
+        `Bütçe: ${budgetText}`,
       ]
         .filter(Boolean)
-        .join(" / ");
-      const budgetText =
-        typeof lead.maxBudget === "number"
-          ? `${new Intl.NumberFormat("tr-TR").format(lead.maxBudget)} ₺`
-          : "Belirtilmedi";
-      const roomText =
-        lead.roomCounts.length > 0
-          ? lead.roomCounts.join(", ")
-          : "Oda sayısı belirtilmedi";
-      const propertyText = lead.propertyTypes
-        .map((type) => this.propertyTypeLabel(type))
-        .join(", ");
-
-      return {
-        handled: true,
-        success: true,
-        action: "crm_customer_create_with_interest",
-        message: [
-          `${lead.fullName} için CRM kaydı ve müşteri talebi oluşturuldu.`,
-          locationText ? `Konum: ${locationText}` : null,
-          `Talep: ${roomText} ${propertyText || "gayrimenkul"}`,
-          `Üst bütçe: ${budgetText}`,
-        ]
-          .filter(Boolean)
-          .join("\n"),
-        data: {
-          customer,
-          interest,
-          reusedCustomer: !createdNewCustomer,
-        },
-      };
-    } catch (error) {
-      if (createdNewCustomer) {
-        try {
-          await this.crmService.deleteCustomer(
-            customer.id,
-            user.id,
-            user.role,
-          );
-        } catch {
-          // Asıl hata korunur; geri alma hatası kullanıcıya ayrıca yansıtılmaz.
-        }
-      }
-
-      throw error;
-    }
+        .join("\n"),
+      data: {
+        customerId: customer.id,
+        interestId: interest?.id,
+        crmUrl: "/crm",
+        reusedCustomer,
+      },
+    };
   }
 
+  private async executeSupplySideCrmCreation(
+    lead: ParsedNaturalCrmLead,
+    user: LinaResolvedUser,
+    sourceModule: LinaActionSourceModule,
+  ): Promise<LinaActionExecutionResult> {
+    const existingCustomer = await this.findExistingCustomerForNaturalLead(
+      lead,
+      user,
+    );
+    const mergedRoles = Array.from(
+      new Set([
+        ...(existingCustomer?.roles || []),
+        ...lead.customerRoles,
+      ]),
+    );
+    const mergedNotes = [
+      existingCustomer?.notes,
+      lead.originalText,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    let customer: CustomerLike;
+
+    if (existingCustomer) {
+      customer = (await this.crmService.updateCustomer(
+        existingCustomer.id,
+        user.id,
+        user.role,
+        {
+          roles: mergedRoles,
+          phone: lead.phone || existingCustomer.phone,
+          email: lead.email || existingCustomer.email,
+          city: lead.city || existingCustomer.city,
+          budget:
+            lead.maxBudget ||
+            lead.minBudget ||
+            existingCustomer.budget,
+          notes: mergedNotes,
+        },
+      )) as CustomerLike;
+    } else {
+      customer = (await this.crmService.createCustomer(user.id, {
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        phone: lead.phone,
+        email: lead.email,
+        city: lead.city,
+        budget: lead.maxBudget || lead.minBudget,
+        source: "LINA",
+        status: CustomerStatus.YENI_LEAD,
+        roles: lead.customerRoles,
+        notes: lead.originalText,
+      })) as CustomerLike;
+    }
+
+    this.audit(
+      user,
+      sourceModule,
+      "crm_owner_customer_create",
+      "success",
+    );
+
+    const locationText = [
+      lead.city,
+      lead.district,
+      lead.neighborhood,
+    ]
+      .filter(Boolean)
+      .join(" / ");
+    const propertyText =
+      lead.propertyTypes
+        .map((type) => this.propertyTypeLabel(type))
+        .join(", ") || "Gayrimenkul";
+    const transactionText = lead.statuses.includes(UnitStatus.KIRALIK)
+      ? "Kiraya verilecek"
+      : "Satılacak";
+
+    return {
+      handled: true,
+      success: true,
+      action: "crm_customer_create",
+      message: [
+        `${this.customerFullName(customer)} için CRM kaydı oluşturuldu.`,
+        `Rol: ${this.crmRoleListLabel(lead.customerRoles)}`,
+        `Gayrimenkul: ${transactionText} ${propertyText}`,
+        locationText ? `Konum: ${locationText}` : null,
+        `İstenen Bedel: ${this.formatBudgetRange(
+          lead.minBudget,
+          lead.maxBudget,
+        )}`,
+        "Gayrimenkul bilgileri müşteri notlarına eklendi; alıcı talebi oluşturulmadı.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      data: {
+        customerId: customer.id,
+        crmUrl: "/crm",
+        reusedCustomer: Boolean(existingCustomer),
+      },
+    };
+  }
+
+  private buildNaturalLeadConfirmationMessage(
+    lead: ParsedNaturalCrmLead,
+    reusedCustomerName?: string,
+  ): string {
+    const isSupplySide = this.isSupplySideCrmRoles(
+      lead.customerRoles,
+    );
+    const locationText = [
+      lead.city,
+      lead.district,
+      lead.neighborhood,
+    ]
+      .filter(Boolean)
+      .join(" / ");
+    const propertyText =
+      lead.propertyTypes
+        .map((type) => this.propertyTypeLabel(type))
+        .join(", ") || "Belirtilmedi";
+    const roomText =
+      lead.roomCounts.length > 0
+        ? lead.roomCounts.join(", ")
+        : "Belirtilmedi";
+
+    return [
+      "CRM kayıt taslağı hazır.",
+      `Ad Soyad: ${lead.fullName}`,
+      lead.phone ? `Telefon: ${lead.phone}` : null,
+      lead.email ? `E-posta: ${lead.email}` : null,
+      `Rol: ${this.crmRoleListLabel(lead.customerRoles)}`,
+      `Kayıt Türü: ${
+        isSupplySide
+          ? "Gayrimenkul sahibi / satıcı kaydı"
+          : "Gayrimenkul talebi"
+      }`,
+      `Konum: ${locationText || "Belirtilmedi"}`,
+      `${
+        isSupplySide ? "İstenen Bedel" : "Bütçe"
+      }: ${this.formatBudgetRange(lead.minBudget, lead.maxBudget)}`,
+      `Mülk Tipi: ${propertyText}`,
+      !isSupplySide ? `Oda Sayısı: ${roomText}` : null,
+      reusedCustomerName
+        ? `Mevcut CRM kaydı güncellenecek: ${reusedCustomerName}`
+        : "Yeni CRM kaydı oluşturulacak.",
+      "Bilgiler doğruysa “Kaydı Onayla”, vazgeçmek için “İptal Et” seçeneğini kullanın.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  private extractCrmCustomerRoles(message: string): CustomerRole[] {
+    const normalized = this.normalize(message);
+    const mappings: Array<[RegExp, CustomerRole]> = [
+      [/\binsaat firmasi\b/, CustomerRole.INSAAT_FIRMASI],
+      [/\bmuteahhit\b/, CustomerRole.MUTEAHHIT],
+      [/\barsa sahibi\b/, CustomerRole.ARSA_SAHIBI],
+      [
+        /\bmal sahibi\b|\bmulk sahibi\b|\bev sahibi\b|\bkiraya veren\b/,
+        CustomerRole.MAL_SAHIBI,
+      ],
+      [
+        /\bsatici\b|\bsatmak istiyor\b|\bsatisa cikarmak istiyor\b/,
+        CustomerRole.SATICI,
+      ],
+      [/\bkiraci\b|\bkiralamak istiyor\b/, CustomerRole.KIRACI],
+      [
+        /\byatirimci\b|\byatirim yapmak istiyor\b/,
+        CustomerRole.YATIRIMCI,
+      ],
+      [/\balici\b|\bsatin almak istiyor\b/, CustomerRole.ALICI],
+    ];
+
+    return Array.from(
+      new Set(
+        mappings
+          .filter(([pattern]) => pattern.test(normalized))
+          .map(([, role]) => role),
+      ),
+    );
+  }
+
+  private buildCrmRoleSelectionMessage(): string {
+    return [
+      "Önce CRM kaydı yapılacak kişinin rolünü belirleyelim.",
+      "Bir kişi birden fazla role sahip olabilir.",
+      "Roller: Alıcı, Satıcı, Kiracı, Mal Sahibi / Kiraya Veren, Yatırımcı, Müteahhit, İnşaat Firması, Arsa Sahibi.",
+      "Müşterinin rolü veya rolleri nedir?",
+    ].join("\n");
+  }
+
+  private buildCrmRoleDetailPrompt(roles: CustomerRole[]): string {
+    const roleText = this.crmRoleListLabel(roles);
+
+    if (this.isSupplySideCrmRoles(roles)) {
+      return [
+        `Rol kaydedildi: ${roleText}.`,
+        "Şimdi ad-soyadını, varsa telefonunu; sahip olduğu gayrimenkulün türünü, il-ilçe-mahalleyi, satılık mı kiralık mı olduğunu, istenen bedeli ve varsa m² bilgisini tek cümlede söyleyin.",
+      ].join("\n");
+    }
+
+    if (
+      roles.includes(CustomerRole.MUTEAHHIT) ||
+      roles.includes(CustomerRole.INSAAT_FIRMASI)
+    ) {
+      return [
+        `Rol kaydedildi: ${roleText}.`,
+        "Şimdi kişi veya firma adını, telefonu, faaliyet bölgesini ve CRM'e kaydedilecek proje, arsa, iş birliği veya talep ayrıntılarını tek cümlede söyleyin.",
+      ].join("\n");
+    }
+
+    return [
+      `Rol kaydedildi: ${roleText}.`,
+      "Şimdi ad-soyadını, varsa telefonunu; aradığı il-ilçe-mahalleyi, satılık mı kiralık mı olduğunu, gayrimenkul türünü, oda sayısını ve bütçesini tek cümlede söyleyin.",
+    ].join("\n");
+  }
+
+  private isSupplySideCrmRoles(roles: CustomerRole[]): boolean {
+    const supplySideRoles = new Set<CustomerRole>([
+      CustomerRole.SATICI,
+      CustomerRole.MAL_SAHIBI,
+      CustomerRole.ARSA_SAHIBI,
+    ]);
+
+    return roles.some((role) => supplySideRoles.has(role));
+  }
+
+  private crmRoleListLabel(roles: CustomerRole[]): string {
+    if (roles.length === 0) {
+      return "Belirtilmedi";
+    }
+
+    return roles.map((role) => this.crmRoleLabel(role)).join(", ");
+  }
+
+  private crmRoleLabel(role: CustomerRole): string {
+    const labels: Record<CustomerRole, string> = {
+      [CustomerRole.ALICI]: "Alıcı",
+      [CustomerRole.SATICI]: "Satıcı",
+      [CustomerRole.KIRACI]: "Kiracı",
+      [CustomerRole.MAL_SAHIBI]: "Mal Sahibi / Kiraya Veren",
+      [CustomerRole.YATIRIMCI]: "Yatırımcı",
+      [CustomerRole.MUTEAHHIT]: "Müteahhit",
+      [CustomerRole.INSAAT_FIRMASI]: "İnşaat Firması",
+      [CustomerRole.ARSA_SAHIBI]: "Arsa Sahibi",
+    };
+
+    return labels[role] || role;
+  }
+  private formatBudgetRange(
+    minBudget?: number,
+    maxBudget?: number,
+  ): string {
+    const format = (value: number) =>
+      `${new Intl.NumberFormat("tr-TR").format(value)} ₺`;
+
+    if (minBudget && maxBudget) {
+      return `${format(minBudget)} – ${format(maxBudget)}`;
+    }
+
+    if (maxBudget) {
+      return `En fazla ${format(maxBudget)}`;
+    }
+
+    if (minBudget) {
+      return `En az ${format(minBudget)}`;
+    }
+
+    return "Belirtilmedi";
+  }
   private parseNaturalCrmLead(
     message: string,
   ): ParsedNaturalCrmLead | null {
@@ -585,8 +1069,12 @@ export class LinaActionEngineService {
     }
 
     const normalized = this.normalize(text);
+    const customerFields = this.extractCustomerFields(text);
     const locationMatch = text.match(
       /,\s*([A-Za-zÇĞİÖŞÜçğıöşü-]+)\s+([A-Za-zÇĞİÖŞÜçğıöşü\s-]+?)\s+ilçesi\s+([A-Za-zÇĞİÖŞÜçğıöşü0-9\s-]+?)\s+mahallesi(?:nde|nda|de|da)?\b/i,
+    );
+    const budgetRangeMatch = text.match(
+      /([\d.,]+)\s*(milyon|bin)?\s*(?:-|–|ile)\s*([\d.,]+)\s*(milyon|bin)?\s*(?:tl|₺|türk lirası)?/i,
     );
     const budgetMatch = text.match(
       /([\d.,]+)\s*(milyon|bin)?\s*(?:tl|₺|türk lirası)?(?:['’]?(?:ye|ya|e|a))?\s+kadar/i,
@@ -612,12 +1100,25 @@ export class LinaActionEngineService {
       fullName: this.titleCase(fullName),
       firstName: nameParts.firstName,
       lastName: nameParts.lastName,
-      city: locationMatch?.[1]?.trim(),
+      phone: customerFields.phone,
+      email: customerFields.email,
+      city: locationMatch?.[1]?.trim() || customerFields.city,
       district: locationMatch?.[2]?.trim(),
       neighborhood: locationMatch?.[3]?.trim(),
-      maxBudget: budgetMatch
-        ? this.parseTurkishMoney(budgetMatch[1], budgetMatch[2])
+      minBudget: budgetRangeMatch
+        ? this.parseTurkishMoney(
+            budgetRangeMatch[1],
+            budgetRangeMatch[2] || budgetRangeMatch[4],
+          )
         : undefined,
+      maxBudget: budgetRangeMatch
+        ? this.parseTurkishMoney(
+            budgetRangeMatch[3],
+            budgetRangeMatch[4] || budgetRangeMatch[2],
+          )
+        : budgetMatch
+          ? this.parseTurkishMoney(budgetMatch[1], budgetMatch[2])
+          : customerFields.budget,
       roomCounts: roomMatch
         ? [roomMatch[1].replace(/\s+/g, "").replace(",", ".")]
         : [],
@@ -625,6 +1126,7 @@ export class LinaActionEngineService {
       statuses,
       purchaseIntent,
       customerRole,
+      customerRoles: [customerRole],
       originalText: text,
     };
   }
@@ -945,40 +1447,8 @@ export class LinaActionEngineService {
       };
     }
 
-    const customers = (await this.crmService.getCustomers(
-      user.id,
-      user.role,
-    )) as CustomerLike[];
-
-    const duplicate = customers.find((customer) => {
-      const sameName =
-        this.normalize(this.customerFullName(customer)) ===
-        this.normalize(`${nameParts.firstName} ${nameParts.lastName}`);
-      const samePhone =
-        fields.phone &&
-        customer.phone &&
-        this.onlyDigits(fields.phone) === this.onlyDigits(customer.phone);
-      const sameEmail =
-        fields.email &&
-        customer.email &&
-        fields.email.toLocaleLowerCase("tr-TR") ===
-          customer.email.toLocaleLowerCase("tr-TR");
-
-      return sameName || samePhone || sameEmail;
-    });
-
-    if (duplicate) {
-      return {
-        handled: true,
-        success: false,
-        message: `${this.customerFullName(duplicate)} adına ait bir CRM kaydı zaten bulunuyor. Tekrar kayıt oluşturmadım.`,
-        data: {
-          customerId: duplicate.id,
-        },
-      };
-    }
-
-    const created = (await this.crmService.createCustomer(user.id, {
+    const roles = this.extractCrmCustomerRoles(message);
+    const draft: PendingDirectCrmCustomer = {
       firstName: nameParts.firstName,
       lastName: nameParts.lastName,
       phone: fields.phone,
@@ -986,7 +1456,165 @@ export class LinaActionEngineService {
       city: fields.city,
       budget: fields.budget,
       notes: fields.notes,
+      roles,
+    };
+    const now = Date.now();
+
+    if (roles.length === 0) {
+      this.pendingCrmCreations.set(user.id, {
+        userId: user.id,
+        createdAt: now,
+        expiresAt: now + PENDING_CRM_CREATION_TTL_MS,
+        mode: "select-role",
+        sourceModule,
+        customer: draft,
+      });
+
+      return {
+        handled: true,
+        success: true,
+        action: "crm_customer_create",
+        message: [
+          `${draft.firstName} ${draft.lastName} için temel bilgileri aldım.`,
+          this.buildCrmRoleSelectionMessage(),
+        ].join("\n"),
+      };
+    }
+
+    const duplicate = await this.findDuplicateDirectCustomer(draft, user);
+
+    if (duplicate) {
+      return {
+        handled: true,
+        success: false,
+        message: `${this.customerFullName(duplicate)} adına ait veya aynı telefon/e-posta bilgisine sahip bir CRM kaydı zaten bulunuyor. Tekrar kayıt oluşturmadım.`,
+        data: {
+          customerId: duplicate.id,
+          crmUrl: "/crm",
+        },
+      };
+    }
+
+    this.pendingCrmCreations.set(user.id, {
+      userId: user.id,
+      createdAt: now,
+      expiresAt: now + PENDING_CRM_CREATION_TTL_MS,
+      mode: "confirm-direct",
+      sourceModule,
+      selectedRoles: roles,
+      customer: draft,
+    });
+
+    this.audit(
+      user,
+      sourceModule,
+      "crm_customer_create_prepare",
+      "success",
+    );
+
+    return this.buildDirectCrmConfirmationResponse(draft);
+  }
+
+  private buildDirectCrmConfirmationResponse(
+    draft: PendingDirectCrmCustomer,
+  ): LinaActionExecutionResult {
+    const fullName = `${draft.firstName} ${draft.lastName}`.trim();
+
+    return {
+      handled: true,
+      success: true,
+      action: "crm_customer_create",
+      requiresConfirmation: true,
+      message: [
+        "CRM kayıt taslağı hazır.",
+        `Ad Soyad: ${fullName}`,
+        `Rol: ${this.crmRoleListLabel(draft.roles || [])}`,
+        draft.phone ? `Telefon: ${draft.phone}` : null,
+        draft.email ? `E-posta: ${draft.email}` : null,
+        draft.city ? `Şehir: ${draft.city}` : null,
+        draft.budget
+          ? `Bütçe / Bedel: ${new Intl.NumberFormat("tr-TR").format(draft.budget)} ₺`
+          : null,
+        "Bilgiler doğruysa “Kaydı Onayla”, vazgeçmek için “İptal Et” seçeneğini kullanın.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      data: {
+        confirmationType: "crm_customer_create",
+        confirmLabel: "Kaydı Onayla",
+        cancelLabel: "İptal Et",
+        draft: {
+          fullName,
+          roles: draft.roles || [],
+          phone: draft.phone,
+          email: draft.email,
+          city: draft.city,
+          budget: draft.budget,
+          notes: draft.notes,
+        },
+      },
+    };
+  }
+
+  private async findDuplicateDirectCustomer(
+    draft: PendingDirectCrmCustomer,
+    user: LinaResolvedUser,
+  ): Promise<CustomerLike | null> {
+    const customers = (await this.crmService.getCustomers(
+      user.id,
+      user.role,
+    )) as CustomerLike[];
+    const fullName = `${draft.firstName} ${draft.lastName}`.trim();
+
+    return (
+      customers.find((customer) => {
+        const sameName =
+          this.normalize(this.customerFullName(customer)) ===
+          this.normalize(fullName);
+        const samePhone =
+          Boolean(draft.phone && customer.phone) &&
+          this.onlyDigits(draft.phone || "") ===
+            this.onlyDigits(customer.phone || "");
+        const sameEmail =
+          Boolean(draft.email && customer.email) &&
+          String(draft.email).toLocaleLowerCase("tr-TR") ===
+            String(customer.email).toLocaleLowerCase("tr-TR");
+
+        return sameName || samePhone || sameEmail;
+      }) || null
+    );
+  }
+
+  private async executeDirectCrmCustomerCreation(
+    draft: PendingDirectCrmCustomer,
+    user: LinaResolvedUser,
+    sourceModule: LinaActionSourceModule,
+  ): Promise<LinaActionExecutionResult> {
+    const duplicate = await this.findDuplicateDirectCustomer(draft, user);
+
+    if (duplicate) {
+      return {
+        handled: true,
+        success: false,
+        message: `${this.customerFullName(duplicate)} adına ait veya aynı telefon/e-posta bilgisine sahip bir CRM kaydı zaten bulunuyor. Tekrar kayıt oluşturmadım.`,
+        data: {
+          customerId: duplicate.id,
+          crmUrl: "/crm",
+        },
+      };
+    }
+
+    const created = (await this.crmService.createCustomer(user.id, {
+      firstName: draft.firstName,
+      lastName: draft.lastName,
+      phone: draft.phone,
+      email: draft.email,
+      city: draft.city,
+      budget: draft.budget,
+      notes: draft.notes,
+      roles: draft.roles || [],
       source: "LINA",
+      status: CustomerStatus.YENI_LEAD,
     })) as CustomerLike;
 
     this.audit(user, sourceModule, "crm_customer_create", "success");
@@ -995,11 +1623,16 @@ export class LinaActionEngineService {
       handled: true,
       success: true,
       action: "crm_customer_create",
-      message: `${this.customerFullName(created)} CRM’e başarıyla eklendi.`,
-      data: created,
+      message: [
+        `${this.customerFullName(created)} CRM’e başarıyla eklendi.`,
+        `Rol: ${this.crmRoleListLabel(draft.roles || [])}`,
+      ].join("\n"),
+      data: {
+        customerId: created.id,
+        crmUrl: "/crm",
+      },
     };
   }
-
   private async updateCrmCustomer(
     message: string,
     user: LinaResolvedUser,
@@ -1283,6 +1916,159 @@ export class LinaActionEngineService {
     user: LinaResolvedUser,
     sourceModule: LinaActionSourceModule,
   ): Promise<LinaActionExecutionResult> {
+    const pendingCrm = this.pendingCrmCreations.get(user.id);
+
+    if (pendingCrm) {
+      if (pendingCrm.expiresAt < Date.now()) {
+        this.pendingCrmCreations.delete(user.id);
+
+        if (
+          this.isConfirmationWord(message) ||
+          this.isCancellationWord(message)
+        ) {
+          return {
+            handled: true,
+            success: false,
+            message:
+              "Bekleyen CRM kayıt taslağının onay süresi doldu. Kaydı yeniden başlatın.",
+          };
+        }
+      } else if (this.isCancellationWord(message)) {
+        this.pendingCrmCreations.delete(user.id);
+        this.audit(
+          user,
+          pendingCrm.sourceModule || sourceModule,
+          "crm_customer_create_cancel",
+          "success",
+        );
+
+        return {
+          handled: true,
+          success: true,
+          action: "confirmation_cancelled",
+          message: "Bekleyen CRM kayıt taslağı iptal edildi.",
+        };
+      } else if (pendingCrm.mode === "select-role") {
+        if (this.isConfirmationWord(message)) {
+          return {
+            handled: true,
+            success: false,
+            message:
+              "Henüz müşteri rolü seçilmedi. Önce Alıcı, Satıcı, Kiracı, Mal Sahibi, Yatırımcı, Müteahhit, İnşaat Firması veya Arsa Sahibi rollerinden birini söyleyin.",
+          };
+        }
+
+        const selectedRoles = this.extractCrmCustomerRoles(message);
+
+        if (selectedRoles.length === 0) {
+          return {
+            handled: true,
+            success: false,
+            action: "crm_customer_create",
+            message: this.buildCrmRoleSelectionMessage(),
+          };
+        }
+
+        pendingCrm.selectedRoles = selectedRoles;
+        pendingCrm.expiresAt =
+          Date.now() + PENDING_CRM_CREATION_TTL_MS;
+
+        if (pendingCrm.customer) {
+          pendingCrm.customer.roles = selectedRoles;
+          pendingCrm.mode = "confirm-direct";
+          this.pendingCrmCreations.set(user.id, pendingCrm);
+
+          return this.buildDirectCrmConfirmationResponse(
+            pendingCrm.customer,
+          );
+        }
+
+        pendingCrm.mode = "collecting";
+        this.pendingCrmCreations.set(user.id, pendingCrm);
+
+        return {
+          handled: true,
+          success: true,
+          action: "crm_customer_create",
+          message: this.buildCrmRoleDetailPrompt(selectedRoles),
+          data: {
+            selectedRoles,
+          },
+        };
+      } else if (pendingCrm.mode === "collecting") {
+        if (this.isConfirmationWord(message)) {
+          return {
+            handled: true,
+            success: false,
+            message:
+              "Henüz onaylanacak CRM taslağı oluşmadı. Önce seçilen role uygun müşteri ve gayrimenkul bilgilerini söyleyin.",
+          };
+        }
+
+        if (!pendingCrm.selectedRoles?.length) {
+          pendingCrm.mode = "select-role";
+          this.pendingCrmCreations.set(user.id, pendingCrm);
+
+          return {
+            handled: true,
+            success: false,
+            message: this.buildCrmRoleSelectionMessage(),
+          };
+        }
+      } else {
+        if (!this.isConfirmationWord(message)) {
+          return {
+            handled: true,
+            success: true,
+            action:
+              pendingCrm.mode === "confirm-natural"
+                ? this.isSupplySideCrmRoles(
+                    pendingCrm.lead?.customerRoles || [],
+                  )
+                  ? "crm_customer_create"
+                  : "crm_customer_create_with_interest"
+                : "crm_customer_create",
+            requiresConfirmation: true,
+            message:
+              "Bekleyen CRM kayıt taslağı henüz onaylanmadı. Devam etmek için “Kaydı Onayla”, vazgeçmek için “İptal Et” seçeneğini kullanın.",
+          };
+        }
+
+        this.pendingCrmCreations.delete(user.id);
+        const originalSourceModule =
+          pendingCrm.sourceModule || sourceModule;
+
+        if (
+          pendingCrm.mode === "confirm-natural" &&
+          pendingCrm.lead
+        ) {
+          return this.executeNaturalCrmLeadCreation(
+            pendingCrm.lead,
+            user,
+            originalSourceModule,
+          );
+        }
+
+        if (
+          pendingCrm.mode === "confirm-direct" &&
+          pendingCrm.customer
+        ) {
+          return this.executeDirectCrmCustomerCreation(
+            pendingCrm.customer,
+            user,
+            originalSourceModule,
+          );
+        }
+
+        return {
+          handled: true,
+          success: false,
+          message:
+            "CRM kayıt taslağı okunamadı. Kaydı yeniden başlatın.",
+        };
+      }
+    }
+
     const pending = this.pendingActions.get(user.id);
 
     if (!pending) {
@@ -1292,11 +2078,15 @@ export class LinaActionEngineService {
     if (pending.expiresAt < Date.now()) {
       this.pendingActions.delete(user.id);
 
-      if (this.isConfirmationWord(message) || this.isCancellationWord(message)) {
+      if (
+        this.isConfirmationWord(message) ||
+        this.isCancellationWord(message)
+      ) {
         return {
           handled: true,
           success: false,
-          message: "Bekleyen işlem onay süresi doldu. İşlemi yeniden söyleyin.",
+          message:
+            "Bekleyen işlem onay süresi doldu. İşlemi yeniden söyleyin.",
         };
       }
 
@@ -1305,7 +2095,12 @@ export class LinaActionEngineService {
 
     if (this.isCancellationWord(message)) {
       this.pendingActions.delete(user.id);
-      this.audit(user, sourceModule, "lina_action_cancel", "success");
+      this.audit(
+        user,
+        sourceModule,
+        "lina_action_cancel",
+        "success",
+      );
 
       return {
         handled: true,
@@ -1327,7 +2122,14 @@ export class LinaActionEngineService {
       );
 
       this.pendingActions.delete(user.id);
-      this.audit(user, sourceModule, "crm_customer_delete", "success", undefined, 3);
+      this.audit(
+        user,
+        sourceModule,
+        "crm_customer_delete",
+        "success",
+        undefined,
+        3,
+      );
 
       return {
         handled: true,
@@ -1339,7 +2141,6 @@ export class LinaActionEngineService {
 
     return { handled: false };
   }
-
   private async resolveCustomer(
     nameQuery: string,
     user: LinaResolvedUser,
@@ -1685,7 +2486,7 @@ export class LinaActionEngineService {
   }
 
   private isConfirmationWord(message: string): boolean {
-    return /^(onayla|onayliyorum|evet|tamam|devam et)$/i.test(
+    return /^(onayla|kaydi onayla|kaydı onayla|onayliyorum|evet|tamam|devam et)$/i.test(
       this.normalize(message),
     );
   }

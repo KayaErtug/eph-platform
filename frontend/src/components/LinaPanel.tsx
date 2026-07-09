@@ -26,9 +26,23 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 
+// Lina CRM Confirmation And Fixed Voice V1
+type LinaActionData = {
+  customerId?: string;
+  interestId?: string;
+  crmUrl?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  draft?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
 type Message = {
   role: "user" | "lina";
   text: string;
+  action?: string;
+  requiresConfirmation?: boolean;
+  data?: LinaActionData;
 };
 
 type LinaPanelProps = {
@@ -41,6 +55,9 @@ type LinaChatResponse = {
   message?: string;
   reply?: string;
   error?: string;
+  action?: string;
+  requiresConfirmation?: boolean;
+  data?: LinaActionData;
 };
 
 type LinaEndOfDayChoice =
@@ -558,7 +575,10 @@ export default function LinaPanel({
 
   if (!open) return null;
 
-  const callLinaBackend = async (text: string, history: Message[]) => {
+  const callLinaBackend = async (
+    text: string,
+    history: Message[],
+  ): Promise<LinaChatResponse> => {
     const token = getAuthToken(user);
     const endpoints = getLinaChatEndpoints();
 
@@ -599,7 +619,10 @@ export default function LinaPanel({
         const reply = data?.message || data?.reply;
 
         if (reply?.trim()) {
-          return reply.trim();
+          return {
+            ...data,
+            message: reply.trim(),
+          };
         }
 
         lastError = "Lina boş cevap döndürdü.";
@@ -700,9 +723,23 @@ export default function LinaPanel({
     setLoading(true);
 
     try {
-      const reply = await callLinaBackend(text, newMessages);
+      const response = await callLinaBackend(text, newMessages);
+      const reply =
+        response.message ||
+        response.reply ||
+        "Lina işlemi tamamladı ancak sonuç mesajı oluşturamadı.";
 
-      setMessages((prev) => [...prev, { role: "lina", text: reply }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "lina",
+          text: reply,
+          action: response.action,
+          requiresConfirmation:
+            response.requiresConfirmation ?? false,
+          data: response.data,
+        },
+      ]);
 
       await speakWithElevenLabs(reply);
       await fetchEndOfDayReview();
@@ -1182,14 +1219,71 @@ export default function LinaPanel({
                         </p>
 
                         {isLina && (
-                          <button
-                            type="button"
-                            onClick={() => speakWithElevenLabs(messageItem.text)}
-                            className="mt-3 inline-flex items-center justify-center gap-2 rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] px-4 py-2 text-xs font-black text-[#1557D6]"
-                          >
-                            <Volume2 size={14} />
-                            {speaking ? "Çalıyor" : "Dinle"}
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                speakWithElevenLabs(messageItem.text)
+                              }
+                              className="mt-3 inline-flex items-center justify-center gap-2 rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] px-4 py-2 text-xs font-black text-[#1557D6]"
+                            >
+                              <Volume2 size={14} />
+                              {speaking ? "Çalıyor" : "Dinle"}
+                            </button>
+
+                            {messageItem.requiresConfirmation &&
+                              index === messages.length - 1 && (
+                                <div className="mt-3 grid grid-cols-2 gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      sendMessage("Kaydı Onayla")
+                                    }
+                                    disabled={loading}
+                                    className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#059669] px-3 text-xs font-black text-white shadow-[0_8px_20px_rgba(5,150,105,0.20)] disabled:opacity-50"
+                                  >
+                                    <CheckCircle2 size={16} />
+                                    {messageItem.data?.confirmLabel ||
+                                      "Kaydı Onayla"}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      sendMessage("İptal Et")
+                                    }
+                                    disabled={loading}
+                                    className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-[#F2B8B5] bg-[#FFF5F5] px-3 text-xs font-black text-[#B42318] disabled:opacity-50"
+                                  >
+                                    {messageItem.data?.cancelLabel ||
+                                      "İptal Et"}
+                                  </button>
+                                </div>
+                              )}
+
+                            {!messageItem.requiresConfirmation &&
+                              Boolean(messageItem.data?.customerId) &&
+                              (
+                                messageItem.action ===
+                                  "crm_customer_create" ||
+                                messageItem.action ===
+                                  "crm_customer_create_with_interest"
+                              ) && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    window.location.assign(
+                                      messageItem.data?.crmUrl ||
+                                        "/crm",
+                                    )
+                                  }
+                                  className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border-2 border-[#BFD5EC] bg-[#EEF5FF] px-4 text-xs font-black text-[#1557D6]"
+                                >
+                                  CRM’de Görüntüle
+                                  <ChevronRight size={16} />
+                                </button>
+                              )}
+                          </>
                         )}
                       </div>
                     </div>

@@ -638,18 +638,18 @@ export class LinaService {
     const apiKey =
       this.configService.get<string>("ELEVENLABS_API_KEY") ||
       process.env.ELEVENLABS_API_KEY;
+    // Lina Fixed Voice V2
     const voiceId =
+      this.configService.get<string>("LINA_FIXED_VOICE_ID") ||
+      process.env.LINA_FIXED_VOICE_ID ||
       this.configService.get<string>("ELEVENLABS_VOICE_ID") ||
       process.env.ELEVENLABS_VOICE_ID;
+    const modelId = "eleven_multilingual_v2";
+    const voiceSeed = 20260628;
 
     if (!apiKey || !voiceId) {
       throw new Error("ELEVENLABS_CONFIG_MISSING");
     }
-
-    const modelId =
-      this.configService.get<string>("ELEVENLABS_MODEL_ID") ||
-      process.env.ELEVENLABS_MODEL_ID ||
-      "eleven_multilingual_v2";
 
     const voiceText = this.normalizeVoiceTextForRealEstate(text);
 
@@ -665,11 +665,14 @@ export class LinaService {
         body: JSON.stringify({
           text: voiceText,
           model_id: modelId,
+          language_code: "tr",
+          seed: voiceSeed,
           voice_settings: {
-            stability: 0.92,
-            similarity_boost: 0.98,
-            style: 0.05,
+            stability: 0.88,
+            similarity_boost: 0.95,
+            style: 0,
             use_speaker_boost: true,
+            speed: 1.03,
           },
         }),
       },
@@ -677,6 +680,11 @@ export class LinaService {
 
     if (!response.ok) {
       const detail = await response.text();
+      console.error(
+        "[LINA_FIXED_VOICE_V2_BACKEND_ERROR]",
+        response.status,
+        detail,
+      );
       throw new Error(`ELEVENLABS_ERROR_${response.status}: ${detail}`);
     }
 
@@ -1260,6 +1268,7 @@ export class LinaService {
       ["core", "Lina_V5_Constitution.md"],
       this.getFallbackV5Constitution(),
     );
+    const personalityLayer = this.buildPersonalityLayer();
 
     const resolvedMemorySnapshot =
       memorySnapshot || (await this.safeGetMemorySnapshot(user?.id));
@@ -1274,7 +1283,7 @@ export class LinaService {
       "# LINA V5 SYSTEM PROMPT",
       "",
       "Aşağıdaki bölümleri bu öncelik sırasıyla kullan.",
-      "Öncelik sırası: Core Prompt > Güvenlik/KVKK > Lina V5 Constitution > Role Prompt > Current Module > Live Database Context > Memory. Portfolio Runtime Context yalnız aktifse uygulanır.",
+      "Öncelik sırası: Core Prompt > Sabit Lina Kimliği > Güvenlik/KVKK > Lina V5 Constitution > Role Prompt > Current Module > Live Database Context > Memory. Portfolio Runtime Context yalnız aktifse uygulanır.",
       "Sistemde olmayan veriyi uydurma. Veri yoksa bunu kısa ve dürüst şekilde söyle.",
       "Kullanıcı açıkça portföy veya ilan oluşturma istemedikçe portföy akışı başlatma.",
       "Konum, fiyat, ilçe, mahalle veya gayrimenkul kelimesi tek başına portföy oluşturma niyeti değildir.",
@@ -1287,40 +1296,52 @@ export class LinaService {
       "",
       "---",
       "",
-      "# 2) LINA V5 CONSTITUTION",
+      "# 2) SABİT LINA KİMLİĞİ VE KONUŞMA TONU",
+      personalityLayer,
+      "",
+      "---",
+      "",
+      "# 3) LINA V5 CONSTITUTION",
       v5Constitution,
       "",
       "---",
       "",
-      "# 3) PORTFOLIO RUNTIME CONTEXT",
+      "# 4) PORTFOLIO RUNTIME CONTEXT",
       portfolioRuntimeContext.trim()
         ? portfolioRuntimeContext
         : "Aktif portföy oluşturma konuşması algılanmadı.",
       "",
       "---",
       "",
-      "# 4) ROLE PROMPT",
+      "# 5) ROLE PROMPT",
       rolePrompt,
       "",
       "---",
       "",
-      "# 5) CURRENT MODULE",
+      "# 6) CURRENT MODULE",
       currentModuleContext,
       "",
       "---",
       "",
-      "# 6) LIVE DATABASE CONTEXT",
+      "# 7) LIVE DATABASE CONTEXT",
       liveDatabaseContext,
       "",
       "---",
       "",
-      "# 7) MEMORY",
+      "# 8) MEMORY",
       memoryContext,
       "",
       "---",
       "",
-      "# 8) FINAL ANSWER RULES",
+      "# 9) FINAL ANSWER RULES",
       "- Her zaman Türkçe cevap ver.",
+      "- Kimliğin daima Lina'dır. Başka bir kişi, çalışan, karakter, marka temsilcisi veya farklı bir asistanmış gibi konuşma.",
+      "- Birinci tekil şahısla, aynı sakin, sıcak, profesyonel ve ciddi tonda konuş. Kişilik, hitap biçimi ve cinsiyet değiştirme.",
+      "- Kullanıcı kim olduğunu sorarsa yalnızca EPH Platform'un Lina isimli dijital operasyon asistanı olduğunu söyle.",
+      "- CRM kaydı başlatıldığında ilk iş müşterinin rolünü belirlemektir. Rol belirlenmeden ad, bölge, bütçe veya gayrimenkul talebi isteme ve kayıt taslağı oluşturma.",
+      "- CRM rolleri: Alıcı, Satıcı, Kiracı, Mal Sahibi/Kiraya Veren, Yatırımcı, Müteahhit, İnşaat Firması ve Arsa Sahibi. Bir müşterinin birden fazla rolü olabilir.",
+      "- Alıcı, Kiracı ve Yatırımcı için aranan gayrimenkul ve bütçe bilgilerini; Satıcı, Mal Sahibi ve Arsa Sahibi için sahip olunan gayrimenkul, satış/kiralama durumu ve istenen bedel bilgilerini sor.",
+      "- Satıcı, Mal Sahibi veya Arsa Sahibi kaydını alıcı talebi gibi yorumlama; bu kişiler için sahte müşteri talebi oluşturma.",
       "- Cevapları kısa, net, doğal ve kullanıcının gerçek niyetine uygun üret.",
       "- Portfolio Runtime Context aktif değilse bağımsız sohbet et; portföy formu soruları sorma.",
       "- Yalnız aktif portföy oluşturma akışında aynı bilgiyi tekrar sorma.",
@@ -1617,6 +1638,10 @@ export class LinaService {
     return [
       "Sen ChatGPT değilsin.",
       "Sen EPH Platform içinde çalışan Lina isimli premium dijital operasyon müdürüsün.",
+      "Tek ve değişmez kimliğin Lina'dır.",
+      "Başka bir kişi, çalışan, müşteri temsilcisi, farklı bir kadın/erkek karakter veya başka bir yapay zeka gibi konuşamazsın.",
+      "Tüm konuşmalarda aynı sakin, sıcak, profesyonel, ciddi ve güven veren üslubu korursun.",
+      "Kendinden söz ederken birinci tekil şahıs kullanırsın; kimliğini gereksiz yere tekrar etmezsin.",
       "",
       "Ana karakterin:",
       "- Sakin",

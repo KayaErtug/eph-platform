@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   Req,
+  ServiceUnavailableException,
   UnauthorizedException,
   UseGuards,
 } from "@nestjs/common";
@@ -50,8 +51,22 @@ export class LinaController {
     private readonly linaDistanceService: LinaDistanceService,
   ) {}
 
+  // Lina Temporary Passive Mode V1
+  private readonly linaTemporarilyDisabled = true;
+  private readonly linaTemporarilyDisabledMessage =
+    "Lina geçici olarak pasif durumdadır. Platformdaki diğer geliştirmeler tamamlandıktan sonra yeniden devreye alınacaktır.";
+
   @Get("status")
   getStatus() {
+    if (this.linaTemporarilyDisabled) {
+      return {
+        enabled: false,
+        status: "PASIF",
+        temporarilyDisabled: true,
+        message: this.linaTemporarilyDisabledMessage,
+      };
+    }
+
     return this.linaService.getStatus();
   }
 
@@ -69,6 +84,19 @@ export class LinaController {
     @Body() body: LinaChatDto,
     @Req() request: RequestWithUser,
   ) {
+    if (this.linaTemporarilyDisabled) {
+      return {
+        success: false,
+        enabled: false,
+        temporarilyDisabled: true,
+        message: this.linaTemporarilyDisabledMessage,
+        provider: "disabled" as const,
+        kvkkFiltered: false,
+        detectedTypes: [],
+        requiresConfirmation: false,
+      };
+    }
+
     const user = this.extractUser(request);
     const sourceModule = this.normalizeSourceModule(body?.sourceModule);
 
@@ -127,6 +155,12 @@ export class LinaController {
     @Body() body: LinaVoiceDto,
     @Req() request: RequestWithUser,
   ) {
+    if (this.linaTemporarilyDisabled) {
+      throw new ServiceUnavailableException(
+        this.linaTemporarilyDisabledMessage,
+      );
+    }
+
     return this.linaService.createVoice(
       body,
       this.extractUser(request),
