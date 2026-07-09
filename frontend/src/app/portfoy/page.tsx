@@ -383,6 +383,11 @@ function StokPageInner() {
     user?.role === "EMLAKCI" ||
     user?.role === "SUPER_ADMIN";
 
+  const canBulkEntry =
+    user?.role === "MUTEAHHIT" ||
+    user?.role === "INSAAT_FIRMASI" ||
+    user?.role === "SUPER_ADMIN";
+
   useEffect(() => setHydrated(true), []);
 
   useEffect(() => {
@@ -1297,14 +1302,25 @@ function StokPageInner() {
             <p className="min-w-0 text-[13px] font-black leading-4 text-[#64748B]">
               {filteredUnits.length} portföy listeleniyor
             </p>
-            <button
-              type="button"
-              onClick={openCreateModal}
-              disabled={!canAddUnit && user?.role !== "ADMIN"}
-              className="inline-flex h-10 shrink-0 items-center gap-1 rounded-[18px] bg-[linear-gradient(135deg,#7C3AED_0%,#5B21B6_100%)] px-3 text-[12px] font-black text-white shadow-[0_10px_24px_rgba(124,58,237,0.24)] disabled:opacity-50"
-            >
-              <Plus size={17} /> Yeni Portföy
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {canBulkEntry && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/proje-satis-sablonu")}
+                  className="inline-flex h-10 shrink-0 items-center gap-1 rounded-[18px] border border-[#7C3AED] bg-white px-3 text-[12px] font-black text-[#6D28D9] shadow-[0_8px_18px_rgba(124,58,237,0.12)]"
+                >
+                  <Building2 size={16} /> Çoklu Portföy Girişi
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={openCreateModal}
+                disabled={!canAddUnit && user?.role !== "ADMIN"}
+                className="inline-flex h-10 shrink-0 items-center gap-1 rounded-[18px] bg-[linear-gradient(135deg,#7C3AED_0%,#5B21B6_100%)] px-3 text-[12px] font-black text-white shadow-[0_10px_24px_rgba(124,58,237,0.24)] disabled:opacity-50"
+              >
+                <Plus size={17} /> Yeni Portföy
+              </button>
+            </div>
           </div>
 
           {filteredUnits.length === 0 ? (
