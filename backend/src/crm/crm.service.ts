@@ -255,20 +255,77 @@ export class CrmService {
     });
   }
 
+  // CRM Madde 19 Form Detail Sync V3
   async createCustomer(userId: string, data: any) {
     const interestAreas = this.normalizeCustomerInterestAreas(data?.interestAreas);
     const interestedArea =
       interestAreas.length > 0
         ? this.buildCustomerInterestAreaSummary(interestAreas)
         : data?.interestedArea;
+
     const minBudget = this.normalizeOptionalNumber(data?.minBudget);
     const maxBudget = this.normalizeOptionalNumber(data?.maxBudget);
-    const hasBudgetRange = minBudget !== undefined && minBudget !== null || maxBudget !== undefined && maxBudget !== null;
+    const minArea = this.normalizeOptionalNumber(data?.minArea);
+    const maxArea = this.normalizeOptionalNumber(data?.maxArea);
 
-    const interestRows =
+    const propertyTypes =
+      this.normalizeEnumArray<UnitType>(
+        data?.propertyTypes,
+        Object.values(UnitType),
+      ) ?? [];
+    const statuses =
+      this.normalizeEnumArray<UnitStatus>(
+        data?.interestStatuses,
+        Object.values(UnitStatus),
+      ) ?? [];
+    const roomCounts = this.normalizeStringArray(data?.roomCounts) ?? [];
+    const features = this.normalizeStringArray(data?.features) ?? [];
+
+    const requestedIntent = String(
+      data?.purchaseIntent ?? CustomerPurchaseIntent.BELIRSIZ,
+    );
+    const purchaseIntent = Object.values(CustomerPurchaseIntent).includes(
+      requestedIntent as CustomerPurchaseIntent,
+    )
+      ? (requestedIntent as CustomerPurchaseIntent)
+      : CustomerPurchaseIntent.BELIRSIZ;
+
+    const requestedPriority = String(
+      data?.priority ?? CustomerInterestPriority.NORMAL,
+    );
+    const priority = Object.values(CustomerInterestPriority).includes(
+      requestedPriority as CustomerInterestPriority,
+    )
+      ? (requestedPriority as CustomerInterestPriority)
+      : CustomerInterestPriority.NORMAL;
+
+    const interestTitle = String(data?.interestTitle ?? '').trim();
+    const interestNotes = String(data?.interestNotes ?? '').trim();
+
+    const hasInterestProfileData = Boolean(
+      interestAreas.length > 0 ||
+        minBudget !== undefined && minBudget !== null ||
+        maxBudget !== undefined && maxBudget !== null ||
+        minArea !== undefined && minArea !== null ||
+        maxArea !== undefined && maxArea !== null ||
+        propertyTypes.length > 0 ||
+        statuses.length > 0 ||
+        roomCounts.length > 0 ||
+        features.length > 0 ||
+        interestTitle ||
+        interestNotes ||
+        purchaseIntent !== CustomerPurchaseIntent.BELIRSIZ ||
+        priority !== CustomerInterestPriority.NORMAL,
+    );
+
+    const interestRows: Array<{
+      city: string | null;
+      district: string | null;
+      neighborhood: string | null;
+    }> =
       interestAreas.length > 0
         ? interestAreas
-        : hasBudgetRange
+        : hasInterestProfileData
           ? [{ city: null, district: null, neighborhood: null }]
           : [];
 
@@ -285,26 +342,32 @@ export class CrmService {
 
       if (interestRows.length > 0) {
         await transaction.customerInterest.createMany({
-          data: interestRows.map((area) => ({
-            customerId: customer.id,
-            title: [area.city, area.district, area.neighborhood].filter(Boolean).join(' / ') || 'Genel talep profili',
-            city: area.city,
-            district: area.district,
-            neighborhood: area.neighborhood || null,
-            propertyTypes: [],
-            statuses: [],
-            minBudget: minBudget ?? null,
-            maxBudget: maxBudget ?? null,
-            priceCurrency: 'TRY',
-            minArea: null,
-            maxArea: null,
-            roomCounts: [],
-            features: [],
-            purchaseIntent: CustomerPurchaseIntent.BELIRSIZ,
-            priority: CustomerInterestPriority.NORMAL,
-            notes: null,
-            isActive: true,
-          })),
+          data: interestRows.map((area) => {
+            const locationTitle = [area.city, area.district, area.neighborhood]
+              .filter(Boolean)
+              .join(' / ');
+
+            return {
+              customerId: customer.id,
+              title: interestTitle || locationTitle || 'Genel talep profili',
+              city: area.city,
+              district: area.district,
+              neighborhood: area.neighborhood || null,
+              propertyTypes,
+              statuses,
+              minBudget: minBudget ?? null,
+              maxBudget: maxBudget ?? null,
+              priceCurrency: 'TRY',
+              minArea: minArea ?? null,
+              maxArea: maxArea ?? null,
+              roomCounts,
+              features,
+              purchaseIntent,
+              priority,
+              notes: interestNotes || null,
+              isActive: true,
+            };
+          }),
         });
       }
 

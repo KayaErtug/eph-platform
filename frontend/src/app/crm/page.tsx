@@ -1025,6 +1025,16 @@ export default function CrmPage() {
     interestedNeighborhood: "",
     interestAreas: [] as CustomerInterestAreaDraft[],
     interestedType: "",
+    interestTitle: "",
+    propertyTypes: [] as string[],
+    interestStatuses: [] as string[],
+    minArea: "",
+    maxArea: "",
+    roomCounts: [] as string[],
+    features: [] as string[],
+    purchaseIntent: "BELIRSIZ",
+    priority: "NORMAL",
+    interestNotes: "",
     source: "",
     notes: "",
     status: "YENI_LEAD",
@@ -1172,6 +1182,16 @@ export default function CrmPage() {
       interestedNeighborhood: "",
       interestAreas: [] as CustomerInterestAreaDraft[],
       interestedType: "",
+      interestTitle: "",
+      propertyTypes: [] as string[],
+      interestStatuses: [] as string[],
+      minArea: "",
+      maxArea: "",
+      roomCounts: [] as string[],
+      features: [] as string[],
+      purchaseIntent: "BELIRSIZ",
+      priority: "NORMAL",
+      interestNotes: "",
       source: "",
       notes: "",
       status: "YENI_LEAD",
@@ -1204,6 +1224,16 @@ export default function CrmPage() {
       interestedNeighborhood: "",
       interestAreas: [] as CustomerInterestAreaDraft[],
       interestedType: "",
+      interestTitle: "",
+      propertyTypes: [] as string[],
+      interestStatuses: [] as string[],
+      minArea: "",
+      maxArea: "",
+      roomCounts: [] as string[],
+      features: [] as string[],
+      purchaseIntent: "BELIRSIZ",
+      priority: "NORMAL",
+      interestNotes: "",
       source: "",
       notes: "",
       status: "YENI_LEAD",
@@ -1265,10 +1295,26 @@ export default function CrmPage() {
       await api.post("/crm/customers", {
         ...payload,
         interestedArea: buildInterestedAreaSummary(savedInterestAreas),
+        interestedType:
+          form.propertyTypes
+            .map((type: string) => optionLabel(PROPERTY_TYPE_OPTIONS, type))
+            .join(", ") ||
+          form.interestedType ||
+          undefined,
         interestAreas: savedInterestAreas,
         budget: maxBudgetValue || minBudgetValue,
         minBudget: minBudgetValue,
         maxBudget: maxBudgetValue,
+        interestTitle: form.interestTitle.trim() || undefined,
+        propertyTypes: form.propertyTypes,
+        interestStatuses: form.interestStatuses,
+        minArea: form.minArea ? Number(onlyDigits(form.minArea)) : undefined,
+        maxArea: form.maxArea ? Number(onlyDigits(form.maxArea)) : undefined,
+        roomCounts: form.roomCounts,
+        features: form.features,
+        purchaseIntent: form.purchaseIntent,
+        priority: form.priority,
+        interestNotes: form.interestNotes.trim() || undefined,
       });
       await fetchAll();
       setShowAddModal(false);
@@ -3372,6 +3418,19 @@ export default function CrmPage() {
           background: #059669 !important;
           color: #ffffff !important;
         }
+        /* CRM Madde 19 Form Detail Sync V3 */
+        .eph-crm-customer-create-panel details > summary::-webkit-details-marker {
+          display: none;
+        }
+
+        .eph-crm-customer-create-panel details[open] > summary {
+          background: #eef5ff;
+        }
+
+        .eph-crm-customer-create-panel details .premium-input {
+          min-width: 0;
+        }
+
         /* CRM Final Premium Polish V11 */
         .eph-crm-premium-light .eph-crm-page > header > .mt-3.grid.grid-cols-5 {
           gap: 6px !important;
@@ -4842,11 +4901,13 @@ function AddCustomerModal({
                     {customerNeighborhoodOptions.map((option) => <option key={option.id} value={option.name}>{option.name}</option>)}
                   </select>
                 </Field>
-                <Field label="Mülk Tipi">
-                  <select className="premium-input" value={form.interestedType} onChange={(event) => setField("interestedType", event.target.value)}>
-                    <option value="">Mülk tipi seç</option>
-                    {PROPERTY_TYPE_OPTIONS.map((item) => <option key={item.key} value={item.label}>{item.label}</option>)}
-                  </select>
+                <Field label="Talep Profili Başlığı">
+                  <input
+                    className="premium-input"
+                    placeholder="Örn. Merkezefendi 3+1 yatırım"
+                    value={form.interestTitle}
+                    onChange={(event) => setField("interestTitle", event.target.value)}
+                  />
                 </Field>
               </div>
 
@@ -4913,6 +4974,126 @@ function AddCustomerModal({
                   </div>
                 )}
               </div>
+
+              <details className="mt-4 overflow-visible rounded-[22px] border-[3px] border-[#BFD5EC] bg-[#F7FBFF]">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-[#1557D6]">
+                  <span>Gelişmiş Talep Profili</span>
+                  <span className="rounded-full border border-[#BFD5EC] bg-white px-2.5 py-1 text-[10px] font-black text-[#64748B]">
+                    İsteğe bağlı
+                  </span>
+                </summary>
+
+                <div className="space-y-4 border-t-2 border-[#D7E5F3] p-3 md:p-4">
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <MultiSelectDropdown
+                      label="Mülk Tipleri"
+                      placeholder="Mülk tipi seçin"
+                      helper="Birden fazla mülk tipi seçebilirsiniz."
+                      options={PROPERTY_TYPE_OPTIONS}
+                      value={form.propertyTypes}
+                      onChange={(propertyTypes) =>
+                        setForm((current: any) => ({ ...current, propertyTypes }))
+                      }
+                      accent="#2563EB"
+                    />
+
+                    <MultiSelectDropdown
+                      label="İlan Durumları"
+                      placeholder="Satılık / kiralık seçin"
+                      helper="Birden fazla ilan durumu seçebilirsiniz."
+                      options={UNIT_STATUS_OPTIONS}
+                      value={form.interestStatuses}
+                      onChange={(interestStatuses) =>
+                        setForm((current: any) => ({ ...current, interestStatuses }))
+                      }
+                      accent="#059669"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Minimum m²">
+                      <input
+                        className="premium-input"
+                        inputMode="numeric"
+                        placeholder="Örn. 100"
+                        value={form.minArea}
+                        onChange={(event) => setField("minArea", onlyDigits(event.target.value))}
+                      />
+                    </Field>
+
+                    <Field label="Maksimum m²">
+                      <input
+                        className="premium-input"
+                        inputMode="numeric"
+                        placeholder="Örn. 180"
+                        value={form.maxArea}
+                        onChange={(event) => setField("maxArea", onlyDigits(event.target.value))}
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <MultiSelectDropdown
+                      label="Oda Sayıları"
+                      placeholder="Oda sayısı seçin"
+                      helper="Birden fazla oda seçebilirsiniz."
+                      options={ROOM_OPTIONS.map((item) => ({ key: item, label: item }))}
+                      value={form.roomCounts}
+                      onChange={(roomCounts) =>
+                        setForm((current: any) => ({ ...current, roomCounts }))
+                      }
+                      accent="#7C3AED"
+                    />
+
+                    <MultiSelectDropdown
+                      label="Ek Özellikler"
+                      placeholder="Özellik seçin"
+                      helper="Birden fazla özellik seçebilirsiniz."
+                      options={FEATURE_OPTIONS.map((item) => ({ key: item, label: item }))}
+                      value={form.features}
+                      onChange={(features) =>
+                        setForm((current: any) => ({ ...current, features }))
+                      }
+                      accent="#D97706"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Satın Alma Niyeti">
+                      <select
+                        className="premium-input"
+                        value={form.purchaseIntent}
+                        onChange={(event) => setField("purchaseIntent", event.target.value)}
+                      >
+                        {PURCHASE_INTENTS.map((item) => (
+                          <option key={item.key} value={item.key}>{item.label}</option>
+                        ))}
+                      </select>
+                    </Field>
+
+                    <Field label="Öncelik">
+                      <select
+                        className="premium-input"
+                        value={form.priority}
+                        onChange={(event) => setField("priority", event.target.value)}
+                      >
+                        {PRIORITIES.map((item) => (
+                          <option key={item.key} value={item.key}>{item.label}</option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+
+                  <Field label="Talep Profili Notu">
+                    <textarea
+                      className="premium-input min-h-[96px] resize-none py-3 text-left"
+                      placeholder="Aranan portföyün özel koşulları, tercihleri ve beklentileri..."
+                      value={form.interestNotes}
+                      onChange={(event) => setField("interestNotes", event.target.value)}
+                    />
+                  </Field>
+                </div>
+              </details>
 
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Lead Kaynağı">
@@ -5113,20 +5294,43 @@ function CustomerDetailModal({
 }
 
 function GeneralTab({ customer }: { customer: Customer }) {
+  const budgetBounds = getCustomerBudgetBounds(customer);
+  const propertyTypeLabels = Array.from(
+    new Set(
+      (customer.interests || []).flatMap((interest) => interest.propertyTypes || []),
+    ),
+  ).map((type) => optionLabel(PROPERTY_TYPE_OPTIONS, type));
+
+  const propertyTypeSummary =
+    propertyTypeLabels.join(", ") ||
+    customer.interestedType ||
+    "—";
+
   return (
     <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {[
-          { label: "Bütçe", value: money(customer.budget) },
+          { label: "Telefon", value: customer.phone ? formatTurkishPhoneInput(customer.phone) : "—" },
+          { label: "E-posta", value: customer.email || "—" },
+          { label: "Şehir", value: customer.city || "—" },
+          { label: "Minimum Bütçe", value: money(budgetBounds.min) },
+          { label: "Maksimum Bütçe", value: money(budgetBounds.max) },
           { label: "İlgilendiği Bölge", value: customer.interestedArea || "—" },
-          { label: "Mülk Tipi", value: customer.interestedType || "—" },
-          { label: "Kaynak", value: customer.source || "—" },
-          { label: "Meslek", value: customer.profession || "—" },
-          { label: "Firma", value: customer.company || "—" },
+          { label: "Mülk Tipleri", value: propertyTypeSummary },
+          { label: "Lead Kaynağı", value: customer.source || "—" },
+          { label: "Meslek / Ünvan", value: customer.profession || "—" },
+          { label: "Firma / Ofis", value: customer.company || "—" },
         ].map((item) => (
-          <div key={item.label} className="rounded-2xl bg-[#F8FAFC] p-4 text-center">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-400">{item.label}</p>
-            <p className="mt-2 break-words text-sm font-black leading-5 text-[#06194A]">{item.value}</p>
+          <div
+            key={item.label}
+            className="rounded-2xl border-2 border-[#D8E3EF] bg-[#F8FAFC] p-4 text-center"
+          >
+            <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+              {item.label}
+            </p>
+            <p className="mt-2 break-words text-sm font-black leading-5 text-[#06194A]">
+              {item.value}
+            </p>
           </div>
         ))}
       </div>
