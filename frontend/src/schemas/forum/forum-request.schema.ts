@@ -169,6 +169,12 @@ export type ForumRequestFormState = EPHSchemaState & {
   district: string;
   neighborhood: string;
   budget: string;
+  minArea: string;
+  maxArea: string;
+  minRoom: string;
+  maxRoom: string;
+  minBudget: string;
+  maxBudget: string;
   currency: string;
   urgency: string;
   validFor: string;
@@ -508,6 +514,12 @@ export function createEmptyForumRequestFormState(): ForumRequestFormState {
     district: "",
     neighborhood: "",
     budget: "",
+    minArea: "",
+    maxArea: "",
+    minRoom: "",
+    maxRoom: "",
+    minBudget: "",
+    maxBudget: "",
     currency: "TRY",
     urgency: "Normal",
     validFor: "7 gün",
@@ -641,6 +653,87 @@ export const forumRequestSchema: EPHSchemaDefinition = {
             searchable: true,
             comparable: false,
           },
+        },
+      ],
+    },
+    {
+      id: "criteria",
+      title: "Arama Kriterleri",
+      description:
+        "Kategori ve tür seçildikten sonra aranan portföy kriterlerini belirtin.",
+      order: 15,
+      fields: [
+        {
+          id: "forum-min-area",
+          key: "minArea",
+          label: "Minimum m²",
+          type: "number",
+          modes: ["form", "detail"],
+          order: 10,
+          placeholder: "Örn: 90",
+          hidden: (state) =>
+            String(state.category || "") !== "PORTFOY_ARIYORUM" ||
+            !String(state.requestIntent || ""),
+        },
+        {
+          id: "forum-max-area",
+          key: "maxArea",
+          label: "Maksimum m²",
+          type: "number",
+          modes: ["form", "detail"],
+          order: 20,
+          placeholder: "Örn: 160",
+          hidden: (state) =>
+            String(state.category || "") !== "PORTFOY_ARIYORUM" ||
+            !String(state.requestIntent || ""),
+        },
+        {
+          id: "forum-min-room",
+          key: "minRoom",
+          label: "Minimum Oda Sayısı",
+          type: "number",
+          modes: ["form", "detail"],
+          order: 30,
+          placeholder: "Örn: 2",
+          hidden: (state) =>
+            String(state.category || "") !== "PORTFOY_ARIYORUM" ||
+            !String(state.requestIntent || ""),
+        },
+        {
+          id: "forum-max-room",
+          key: "maxRoom",
+          label: "Maksimum Oda Sayısı",
+          type: "number",
+          modes: ["form", "detail"],
+          order: 40,
+          placeholder: "Örn: 4",
+          hidden: (state) =>
+            String(state.category || "") !== "PORTFOY_ARIYORUM" ||
+            !String(state.requestIntent || ""),
+        },
+        {
+          id: "forum-min-budget",
+          key: "minBudget",
+          label: "Minimum Bütçe (₺)",
+          type: "number",
+          modes: ["form", "detail"],
+          order: 50,
+          placeholder: "Örn: 2000000",
+          hidden: (state) =>
+            String(state.category || "") !== "PORTFOY_ARIYORUM" ||
+            !String(state.requestIntent || ""),
+        },
+        {
+          id: "forum-max-budget",
+          key: "maxBudget",
+          label: "Maksimum Bütçe (₺)",
+          type: "number",
+          modes: ["form", "detail"],
+          order: 60,
+          placeholder: "Örn: 5000000",
+          hidden: (state) =>
+            String(state.category || "") !== "PORTFOY_ARIYORUM" ||
+            !String(state.requestIntent || ""),
         },
       ],
     },

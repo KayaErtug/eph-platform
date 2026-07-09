@@ -1031,6 +1031,12 @@ model NetworkPost {
   district     String?
   neighborhood String?
   budget       Float?
+  minArea      Float?
+  maxArea      Float?
+  minRoom      Int?
+  maxRoom      Int?
+  minBudget    Float?
+  maxBudget    Float?
   urgency      String?
   visibility   NetworkVisibility      @default(TUM_EPH)
   tags         String[]

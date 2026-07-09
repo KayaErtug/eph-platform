@@ -28,6 +28,12 @@ type CreateNetworkPostDto = {
   district?: string | null;
   neighborhood?: string | null;
   budget?: number | null;
+  minArea?: number | null;
+  maxArea?: number | null;
+  minRoom?: number | null;
+  maxRoom?: number | null;
+  minBudget?: number | null;
+  maxBudget?: number | null;
   urgency?: string | null;
   visibility?: string;
   tags?: string[];
@@ -55,6 +61,12 @@ type UpdateNetworkPostDto = {
   district?: string | null;
   neighborhood?: string | null;
   budget?: number | null;
+  minArea?: number | null;
+  maxArea?: number | null;
+  minRoom?: number | null;
+  maxRoom?: number | null;
+  minBudget?: number | null;
+  maxBudget?: number | null;
   urgency?: string | null;
   visibility?: string;
   tags?: string[];
@@ -1215,6 +1227,12 @@ export class NetworkService {
       district: dto.district ?? existing.district,
       neighborhood: dto.neighborhood ?? existing.neighborhood,
       budget: dto.budget ?? existing.budget,
+      minArea: dto.minArea ?? existing.minArea,
+      maxArea: dto.maxArea ?? existing.maxArea,
+      minRoom: dto.minRoom ?? existing.minRoom,
+      maxRoom: dto.maxRoom ?? existing.maxRoom,
+      minBudget: dto.minBudget ?? existing.minBudget,
+      maxBudget: dto.maxBudget ?? existing.maxBudget,
       urgency: dto.urgency ?? existing.urgency,
       visibility: (dto.visibility as any) ?? existing.visibility,
       tags: buildForumTags(
@@ -1360,6 +1378,12 @@ export class NetworkService {
         district: dto.district || null,
         neighborhood: dto.neighborhood || null,
         budget: dto.budget || null,
+        minArea: dto.minArea ?? null,
+        maxArea: dto.maxArea ?? null,
+        minRoom: dto.minRoom ?? null,
+        maxRoom: dto.maxRoom ?? null,
+        minBudget: dto.minBudget ?? null,
+        maxBudget: dto.maxBudget ?? null,
         urgency: dto.urgency || "Normal",
         visibility: (dto.visibility as any) || "TUM_EPH",
         tags: buildForumTags(

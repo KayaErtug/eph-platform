@@ -62,6 +62,12 @@ type NetworkPost = {
   district?: string | null;
   neighborhood?: string | null;
   budget?: number | null;
+  minArea?: number | null;
+  maxArea?: number | null;
+  minRoom?: number | null;
+  maxRoom?: number | null;
+  minBudget?: number | null;
+  maxBudget?: number | null;
   visibility?: string | null;
   tags?: string[] | null;
   expiresAt?: string | null;
@@ -96,6 +102,12 @@ type TopicForm = {
   district: string;
   neighborhood: string;
   budget: string;
+  minArea: string;
+  maxArea: string;
+  minRoom: string;
+  maxRoom: string;
+  minBudget: string;
+  maxBudget: string;
   currency: string;
   detail: string;
   urgency: string;
@@ -279,6 +291,12 @@ const DEFAULT_FORM: TopicForm = {
   district: "",
   neighborhood: "",
   budget: "",
+  minArea: "",
+  maxArea: "",
+  minRoom: "",
+  maxRoom: "",
+  minBudget: "",
+  maxBudget: "",
   currency: "TRY",
   detail: "",
   urgency: "Normal",
@@ -534,6 +552,12 @@ function formFromPost(post: NetworkPost): TopicForm {
     district: post.district || "",
     neighborhood: post.neighborhood || "",
     budget: post.budget ? formatBudgetInput(String(post.budget)) : "",
+    minArea: post.minArea != null ? String(post.minArea) : "",
+    maxArea: post.maxArea != null ? String(post.maxArea) : "",
+    minRoom: post.minRoom != null ? String(post.minRoom) : "",
+    maxRoom: post.maxRoom != null ? String(post.maxRoom) : "",
+    minBudget: post.minBudget ? formatBudgetInput(String(post.minBudget)) : "",
+    maxBudget: post.maxBudget ? formatBudgetInput(String(post.maxBudget)) : "",
     currency: budgetCurrencyFromPost(post),
     detail: post.description || "",
     urgency: post.urgency || "Normal",
@@ -792,6 +816,12 @@ export default function NetworkPage() {
       district: form.district.trim() || null,
       neighborhood: form.neighborhood.trim() || null,
       budget: form.budget ? Number(form.budget.replace(/\D/g, "")) : null,
+      minArea: form.minArea ? Number(form.minArea.replace(/\D/g, "")) : null,
+      maxArea: form.maxArea ? Number(form.maxArea.replace(/\D/g, "")) : null,
+      minRoom: form.minRoom ? Number(form.minRoom.replace(/\D/g, "")) : null,
+      maxRoom: form.maxRoom ? Number(form.maxRoom.replace(/\D/g, "")) : null,
+      minBudget: form.minBudget ? Number(form.minBudget.replace(/\D/g, "")) : null,
+      maxBudget: form.maxBudget ? Number(form.maxBudget.replace(/\D/g, "")) : null,
       urgency: form.urgency,
       visibility: form.visibility,
       tags,
@@ -1791,6 +1821,12 @@ function topicFormToSchemaState(form: TopicForm): EPHSchemaState {
     district: form.district,
     neighborhood: form.neighborhood,
     budget: form.budget,
+    minArea: form.minArea,
+    maxArea: form.maxArea,
+    minRoom: form.minRoom,
+    maxRoom: form.maxRoom,
+    minBudget: form.minBudget,
+    maxBudget: form.maxBudget,
     currency: form.currency,
     urgency: form.urgency,
     validFor: form.validFor,
@@ -1808,6 +1844,12 @@ function schemaStateToTopicForm(state: EPHSchemaState): TopicForm {
     district: String(state.district || ""),
     neighborhood: String(state.neighborhood || ""),
     budget: String(state.budget || ""),
+    minArea: String(state.minArea || ""),
+    maxArea: String(state.maxArea || ""),
+    minRoom: String(state.minRoom || ""),
+    maxRoom: String(state.maxRoom || ""),
+    minBudget: String(state.minBudget || ""),
+    maxBudget: String(state.maxBudget || ""),
     currency: String(state.currency || "TRY"),
     urgency: String(state.urgency || "Normal"),
     validFor: String(state.validFor || "7 gün"),

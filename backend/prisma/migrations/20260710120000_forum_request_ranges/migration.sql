@@ -1,0 +1,7 @@
+-- Madde 31: Forum talebine min/max m², oda ve bütçe aralıkları (eklemeli, nullable)
+ALTER TABLE "NetworkPost" ADD COLUMN IF NOT EXISTS "minArea" DOUBLE PRECISION;
+ALTER TABLE "NetworkPost" ADD COLUMN IF NOT EXISTS "maxArea" DOUBLE PRECISION;
+ALTER TABLE "NetworkPost" ADD COLUMN IF NOT EXISTS "minRoom" INTEGER;
+ALTER TABLE "NetworkPost" ADD COLUMN IF NOT EXISTS "maxRoom" INTEGER;
+ALTER TABLE "NetworkPost" ADD COLUMN IF NOT EXISTS "minBudget" DOUBLE PRECISION;
+ALTER TABLE "NetworkPost" ADD COLUMN IF NOT EXISTS "maxBudget" DOUBLE PRECISION;
