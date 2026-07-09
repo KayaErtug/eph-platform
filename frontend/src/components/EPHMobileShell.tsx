@@ -10,7 +10,6 @@ import {
   Bot,
   Building2,
   ChevronRight,
-  FileSpreadsheet,
   HelpCircle,
   Home,
   Lightbulb,
@@ -460,14 +459,14 @@ export function EPHMobileShell({
                   onClick={() => go("/dashboard")}
                 />
                 <MenuRow
-                  icon={<UsersRound size={17} />}
-                  label="CRM"
-                  onClick={() => go("/crm")}
-                />
-                <MenuRow
                   icon={<Building2 size={17} />}
                   label="Portföy"
                   onClick={() => go("/portfoy")}
+                />
+                <MenuRow
+                  icon={<UsersRound size={17} />}
+                  label="CRM"
+                  onClick={() => go("/crm")}
                 />
                 <MenuRow
                   icon={<MessageSquare size={17} />}
@@ -509,11 +508,6 @@ export function EPHMobileShell({
                   icon={<ShoppingBag size={17} />}
                   label="Market"
                   onClick={() => go("/ucretlendirme")}
-                />
-                <MenuRow
-                  icon={<FileSpreadsheet size={17} />}
-                  label="Proje Satış Excel Şablonu"
-                  onClick={() => go("/proje-satis-sablonu")}
                 />
                 <MenuRow
                   icon={<Star size={17} />}
@@ -658,16 +652,16 @@ function EPHMobileBottomNav({ pathname }: { pathname: string }) {
         label="Anasayfa"
       />
       <BottomItem
-        href="/crm"
-        active={pathname.startsWith("/crm")}
-        icon={<UsersRound size={25} strokeWidth={2.35} />}
-        label="CRM"
-      />
-      <BottomItem
         href="/portfoy"
         active={pathname.startsWith("/portfoy")}
         icon={<Building2 size={25} strokeWidth={2.35} />}
         label="Portföy"
+      />
+      <BottomItem
+        href="/crm"
+        active={pathname.startsWith("/crm")}
+        icon={<UsersRound size={25} strokeWidth={2.35} />}
+        label="CRM"
       />
       <BottomItem
         href="/network"
