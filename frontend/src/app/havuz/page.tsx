@@ -40,6 +40,11 @@ import HavuzFilterCenter, {
   type HavuzFilterState,
 } from "@/components/havuz/HavuzFilterCenter";
 import PremiumPropertyImage from "@/components/media/PremiumPropertyImage";
+import {
+  decodePortfolioMetadataState,
+  getFeatureLabels,
+  getMetadataLabel,
+} from "@/components/stok/portfolioFeatureMetadata";
 
 type Unit = {
   id: string;
@@ -47,6 +52,16 @@ type Unit = {
   status?: string | null;
   roomCount?: string | null;
   area?: number | null;
+  netArea?: number | null;
+  grossArea?: number | null;
+  floor?: number | null;
+  floorLabel?: string | null;
+  totalFloors?: number | null;
+  conceptLabel?: string | null;
+  facades?: string[] | null;
+  features?: string[] | null;
+  adaNo?: string | null;
+  parselNo?: string | null;
   price?: number | null;
   priceCurrency?: string | null;
   description?: string | null;
@@ -1928,36 +1943,7 @@ function KontorSuccessToast({ toast }: { toast: SuccessToast }) {
 }
 
 function getHighlightFeatures(unit: Unit) {
-  const text = [
-    unit.type,
-    unit.status,
-    unit.roomCount,
-    unit.description,
-    unit.project?.name,
-    unit.project?.address,
-  ]
-    .join(" ")
-    .toLocaleLowerCase("tr-TR");
-
-  const features: string[] = [];
-
-  if (text.includes("deniz")) features.push("Deniz Manzaralı");
-  if (text.includes("havuz")) features.push("Yüzme Havuzu");
-  if (text.includes("bahçe") || text.includes("bahce"))
-    features.push("Geniş Bahçe");
-  if (text.includes("otopark") || text.includes("garaj"))
-    features.push("Otopark");
-  if (text.includes("güvenlik") || text.includes("guvenlik"))
-    features.push("Güvenlikli");
-  if (text.includes("site")) features.push("Site İçerisinde");
-  if (text.includes("yatırım") || text.includes("yatirim"))
-    features.push("Yatırıma Uygun");
-  if (text.includes("merkez") || unit.project?.district)
-    features.push("Merkezi Konum");
-
-  return Array.from(new Set(features)).slice(0, 3).length
-    ? Array.from(new Set(features)).slice(0, 3)
-    : ["Merkezi Konum", "Yatırıma Uygun", "Ortak Çalışmaya Uygun"];
+  return getFeatureLabels(unit.features).slice(0, 3);
 }
 
 type PremiumHighlight = {
@@ -1967,22 +1953,12 @@ type PremiumHighlight = {
 };
 
 function getPremiumPortfolioHighlights(unit: Unit): PremiumHighlight[] {
-  const text = [
-    unit.type,
-    unit.status,
-    unit.roomCount,
-    unit.description,
-    unit.project?.name,
-    unit.project?.address,
-  ]
-    .join(" ")
-    .toLocaleLowerCase("tr-TR");
   const highlights: PremiumHighlight[] = [];
 
   if (unit.project?.district || unit.project?.city) {
     highlights.push({
       icon: "📍",
-      title: "Konum Avantajı",
+      title: "Konum",
       text: getLocation(unit),
     });
   }
@@ -1990,109 +1966,73 @@ function getPremiumPortfolioHighlights(unit: Unit): PremiumHighlight[] {
   if (unit.area) {
     highlights.push({
       icon: "📐",
-      title: "Net Kullanım Alanı",
+      title: "Alan",
       text: `${Number(unit.area).toLocaleString("tr-TR")} m²`,
+    });
+  }
+
+  if (unit.netArea) {
+    highlights.push({
+      icon: "📏",
+      title: "Net Alan",
+      text: `${Number(unit.netArea).toLocaleString("tr-TR")} m²`,
     });
   }
 
   if (unit.roomCount) {
     highlights.push({
       icon: "🏡",
-      title: "Kullanım Planı",
+      title: "Oda Planı",
       text: unit.roomCount,
     });
   }
 
-  if (text.includes("yatırım") || text.includes("yatirim")) {
+  if (unit.floorLabel || (unit.floor !== null && unit.floor !== undefined)) {
     highlights.push({
-      icon: "💰",
-      title: "Yatırım Potansiyeli",
-      text: "Al-sat ve uzun vadeli değer için uygun",
+      icon: "🏢",
+      title: "Kat",
+      text: unit.floorLabel || String(unit.floor),
     });
   }
 
-  if (text.includes("merkez") || unit.project?.district) {
+  if (unit.totalFloors) {
     highlights.push({
-      icon: "🎯",
-      title: "Talep Gören Bölge",
-      text: "Bölge odaklı müşteri eşleştirmesine uygun",
+      icon: "🏗️",
+      title: "Toplam Kat",
+      text: String(unit.totalFloors),
     });
   }
 
-  if (text.includes("otopark") || text.includes("garaj")) {
+  if (unit.conceptLabel) {
     highlights.push({
-      icon: "🚗",
-      title: "Otopark Avantajı",
-      text: "Araç kullanımına uygun portföy",
+      icon: "✨",
+      title: "Konsept",
+      text: unit.conceptLabel,
     });
   }
 
-  if (text.includes("bahçe") || text.includes("bahce")) {
+  if (Array.isArray(unit.facades) && unit.facades.length > 0) {
     highlights.push({
-      icon: "🌿",
-      title: "Açık Alan Kullanımı",
-      text: "Bahçe ve dış yaşam beklentisine uygun",
+      icon: "🧭",
+      title: "Cephe",
+      text: unit.facades.join(", "),
     });
   }
 
-  if (text.includes("deniz")) {
-    highlights.push({
-      icon: "🌅",
-      title: "Manzara Değeri",
-      text: "Vitrin etkisi yüksek portföy",
-    });
-  }
+  const metadata = decodePortfolioMetadataState(unit.features);
+  Object.entries(metadata).forEach(([key, value]) => {
+    highlights.push({ icon: "🏷️", title: getMetadataLabel(key), text: value });
+  });
 
-  if (text.includes("havuz")) {
-    highlights.push({
-      icon: "🏊",
-      title: "Sosyal Donatı",
-      text: "Havuz beklentisi olan müşteriye uygun",
-    });
-  }
-
-  if (
-    text.includes("güvenlik") ||
-    text.includes("guvenlik") ||
-    text.includes("site")
-  ) {
-    highlights.push({
-      icon: "🛡️",
-      title: "Site Yaşamı",
-      text: "Güvenli yaşam beklentisine uygun",
-    });
-  }
+  getFeatureLabels(unit.features).forEach((feature) => {
+    highlights.push({ icon: "✅", title: feature, text: "Bu portföyde mevcut" });
+  });
 
   const fallback: PremiumHighlight[] = [
-    {
-      icon: "🤝",
-      title: "İş Birliğine Uygun",
-      text: "Meslektaş paylaşımına açık portföy",
-    },
     {
       icon: "🔑",
       title: "Satışa Hazır Sunum",
       text: "Havuz görüşmesi için sade ve net bilgi",
-    },
-    {
-      icon: "📌",
-      title: "Envanter Değeri",
-      text: "Bölge portföy havuzunu güçlendirir",
-    },
-    {
-      icon: "🏡",
-      title: "Kullanıma Hazır",
-      text: "Hemen görüşmeye uygun durumda",
-    },
-    {
-      icon: "📈",
-      title: "Yatırım Potansiyeli",
-      text: "Talep oluşturabilecek portföy",
-    },
-    {
-      icon: "⚡",
-      title: "Hızlı Değerlendirme",
-      text: "Saha görüşmesi için net özet",
     },
   ];
 
@@ -2201,13 +2141,8 @@ function getPrimarySpecs(unit: Unit) {
   if (unit.roomCount) specs.push(unit.roomCount);
   if (unit.area) specs.push(`${Number(unit.area).toLocaleString("tr-TR")} m²`);
 
-  const text = [unit.description, unit.type, unit.project?.name]
-    .join(" ")
-    .toLocaleLowerCase("tr-TR");
-
-  if (text.includes("otopark")) specs.push("Otopark");
-  else if (text.includes("arsa")) specs.push("İmarlı");
-  else specs.push("Portföy");
+  const feature = getFeatureLabels(unit.features)[0];
+  specs.push(feature || typeLabel(unit.type));
 
   return specs.slice(0, 3);
 }
@@ -2334,68 +2269,75 @@ function PoolUnitCard({
   const specs = getPrimarySpecs(unit);
   const imageCount = Array.isArray(unit.images) ? unit.images.length : 0;
   const typeChip = getTypeChip(unit);
-  const text = [unit.type, unit.status, unit.description, unit.project?.name]
-    .join(" ")
-    .toLocaleLowerCase("tr-TR");
 
   const isLand = isLandUnit(unit);
 
   const highlight = features[0] || "Havuz Detayı";
   const busy = Boolean(busyAction);
   const location = getLocation(unit);
+  const metadata = decodePortfolioMetadataState(unit.features);
 
   const quickSpecs = isLand
-    ? [
-        { icon: "▴", label: "Yol Var" },
-        { icon: "○", label: "Su" },
-        { icon: "ϟ", label: "Elektrik" },
-        { icon: "♨", label: "Doğalgaz" },
-      ]
+    ? getFeatureLabels(unit.features)
+        .slice(0, 4)
+        .map((label) => ({ icon: "✓", label }))
     : [
-        { icon: "▦", label: unit.roomCount || "Oda" },
+        { icon: "▦", label: unit.roomCount || "Oda belirtilmedi" },
         {
           icon: "□",
           label: unit.area
             ? `${Number(unit.area).toLocaleString("tr-TR")} m²`
-            : "Alan",
+            : "Alan belirtilmedi",
         },
-        { icon: "☼", label: "Güney" },
-        { icon: "▥", label: "Balkon" },
+        ...getFeatureLabels(unit.features)
+          .slice(0, 2)
+          .map((label) => ({ icon: "✓", label })),
       ];
 
-  const detailSpecs = isLand
+  const detailSpecs: { label: string; value: string }[] = isLand
     ? [
-        {
-          label: "İmar Durumu",
-          value:
-            text.includes("imarlı") || text.includes("imarli")
-              ? "İmarlı"
-              : "Belirtilmedi",
-        },
-        { label: "TAKS/KAKS", value: "Belirtilmedi" },
-        { label: "Cephe", value: "Belirtilmedi" },
-        { label: "Ada / Parsel", value: "Belirtilmedi" },
-      ]
+        metadata.zoningType
+          ? { label: "İmar Durumu", value: metadata.zoningType }
+          : null,
+        unit.adaNo || unit.parselNo
+          ? {
+              label: "Ada / Parsel",
+              value: [unit.adaNo, unit.parselNo].filter(Boolean).join(" / "),
+            }
+          : null,
+        Array.isArray(unit.facades) && unit.facades.length > 0
+          ? { label: "Cephe", value: unit.facades.join(", ") }
+          : null,
+      ].filter((item): item is { label: string; value: string } => Boolean(item))
     : [
-        { label: "Bina Yaşı", value: "Belirtilmedi" },
-        {
-          label: "Isınma",
-          value: text.includes("kombi") ? "Kombi" : "Belirtilmedi",
-        },
-        { label: "Aidat", value: "Belirtilmedi" },
-        {
-          label: "Tapu",
-          value:
-            unit.tapuVerified || unit.isVerified
-              ? "Doğrulandı"
-              : "Belirtilmedi",
-        },
-        {
-          label: "Kredi",
-          value: getEstimatedCreditAmount(unit) ? "~%80" : "Belirtilmedi",
-        },
-        { label: "Kullanım", value: "Belirtilmedi" },
-      ];
+        metadata.buildingAge
+          ? { label: "Bina Yaşı", value: metadata.buildingAge }
+          : null,
+        unit.floorLabel || (unit.floor !== null && unit.floor !== undefined)
+          ? { label: "Kat", value: unit.floorLabel || String(unit.floor) }
+          : null,
+        unit.totalFloors
+          ? { label: "Toplam Kat", value: String(unit.totalFloors) }
+          : null,
+        unit.netArea
+          ? { label: "Net Alan", value: `${Number(unit.netArea).toLocaleString("tr-TR")} m²` }
+          : null,
+        unit.conceptLabel
+          ? { label: "Konsept", value: unit.conceptLabel }
+          : null,
+      ]
+        .filter((item): item is { label: string; value: string } => Boolean(item))
+        .slice(0, 4);
+
+  detailSpecs.push({
+    label: "Tapu",
+    value:
+      unit.tapuVerified || unit.isVerified ? "Doğrulandı" : "Kontrol Bekliyor",
+  });
+
+  if (getEstimatedCreditAmount(unit)) {
+    detailSpecs.push({ label: "Kredi", value: "~%80" });
+  }
 
   return (
     <article

@@ -142,3 +142,94 @@ export function mergePortfolioFeatureMetadata(
     ]),
   );
 }
+
+export const FEATURE_LABELS: Record<string, string> = {
+  ASANSOR: "Asansör",
+  KAPALI_OTOPARK: "Kapalı Otopark",
+  ACIK_OTOPARK: "Açık Otopark",
+  GUVENLIK: "Güvenlik",
+  SITE_ICERISINDE: "Site İçerisinde",
+  JENERATOR: "Jeneratör",
+  YANGIN_MERDIVENI: "Yangın Merdiveni",
+  KAMERA_SISTEMI: "Kamera Sistemi",
+  SU_DEPOSU: "Su Deposu",
+  HIDROFOR: "Hidrofor",
+  FIBER_INTERNET: "Fiber İnternet",
+  EBEVEYN_BANYOSU: "Ebeveyn Banyosu",
+  BALKON: "Balkon",
+  TERAS: "Teras",
+  KILER: "Kiler",
+  GIYINME_ODASI: "Giyinme Odası",
+  ANKASTRE_MUTFAK: "Ankastre Mutfak",
+  AKILLI_EV: "Akıllı Ev Sistemi",
+  SOMINE: "Şömine",
+  KLIMA: "Klima",
+  ISI_YALITIMI: "Isı Yalıtımı",
+  SES_YALITIMI: "Ses Yalıtımı",
+  DENIZ_MANZARASI: "Deniz Manzarası",
+  DOGA_MANZARASI: "Doğa Manzarası",
+  SEHIR_MANZARASI: "Şehir Manzarası",
+  YUKLEME_RAMPASI: "Yükleme Rampası",
+  TIR_GIRISI: "TIR Girişi",
+  VINC_SISTEMI: "Vinç Sistemi",
+  SANAYI_ELEKTRIGI: "Sanayi Elektriği",
+  FORKLIFT_ALANI: "Forklift Alanı",
+  DEPOLAMA_ALANI: "Depolama Alanı",
+  YANGIN_SONDURME_SISTEMI: "Yangın Söndürme Sistemi",
+  YOLU_ACIK: "Yolu Açık",
+  KADASTRO_YOLU: "Kadastro Yolu Var",
+  ELEKTRIK_VAR: "Elektrik Var",
+  SU_VAR: "Su Var",
+  SONDAJ_VAR: "Sondaj Var",
+  CEVRILI: "Çevrili",
+  KOSE_PARSEL: "Köşe Parsel",
+  IFRAZLI: "İfrazlı",
+  HISSELI: "Hisseli",
+};
+
+export function getFeatureLabel(code: string) {
+  return FEATURE_LABELS[code] || code;
+}
+
+export function getFeatureLabels(features?: unknown): string[] {
+  return getPublicPortfolioFeatures(features).map(getFeatureLabel);
+}
+
+export const METADATA_KEY_LABELS: Record<string, string> = {
+  buildingAge: "Bina Yaşı",
+  openArea: "Açık Alan",
+  closedArea: "Kapalı Alan",
+  bedCount: "Yatak Sayısı",
+  villaType: "Villa Tipi",
+  layoutType: "Yerleşim Tipi",
+  poolType: "Havuz Tipi",
+  summerHouseType: "Yazlık Tipi",
+  buildingStyle: "Bina Stili",
+  homeType: "Ev Tipi",
+  accessSeason: "Ulaşım Sezonu",
+  buildingUsage: "Kullanım Amacı",
+  plazaClass: "Plaza Sınıfı",
+  hotelBuildingStatus: "Otel Bina Durumu",
+  industrialBuildingType: "Sanayi Yapı Tipi",
+  workshopType: "Atölye Tipi",
+  businessType: "İşletme Tipi",
+  warehouseType: "Depo Tipi",
+  shopType: "Dükkan Tipi",
+  officeType: "Ofis Tipi",
+  stationType: "İstasyon Tipi",
+  zoningType: "İmar Durumu",
+  fieldType: "Tarla Tipi",
+  vineyardType: "Bağ Tipi",
+  gardenType: "Bahçe Tipi",
+  oliveGroveType: "Zeytinlik Tipi",
+  projectStatus: "Proje Durumu",
+  hotelSubType: "Otel Alt Tipi",
+  pensionType: "Pansiyon Tipi",
+  campType: "Kamp Tipi",
+  resortType: "Tatil Köyü Tipi",
+  periodType: "Dönem Tipi",
+};
+
+export function getMetadataLabel(key: string) {
+  return METADATA_KEY_LABELS[key] || key;
+}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { FileText, MapPin, MessageCircle } from "lucide-react";
+import { Clock, FileText, MapPin, MessageCircle } from "lucide-react";
 
 import api from "@/lib/api";
 
@@ -21,6 +21,8 @@ type SharedPost = {
   sharedBy?: { fullName: string; phone: string | null } | null;
 };
 
+type SpecItem = { label: string; value: string };
+
 function typeLabel(value?: string | null) {
   if (!value) return "Forum Talebi";
   return String(value).replaceAll("_", " ");
@@ -29,6 +31,41 @@ function typeLabel(value?: string | null) {
 function formatBudget(value?: number | null) {
   if (!value) return "";
   return `${Number(value).toLocaleString("tr-TR")} ₺`;
+}
+
+function formatRequestDate(value?: string | null) {
+  if (!value) return "Tarih yok";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Tarih yok";
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+
+  return `${day}.${month}.${year}`;
+}
+
+function getUrgencyStyle(value?: string | null) {
+  const urgency = String(value || "Normal").trim();
+
+  if (urgency === "Acil") {
+    return { label: urgency, className: "border-red-200 bg-red-50 text-red-600" };
+  }
+  if (urgency === "Sıcak Talep") {
+    return { label: urgency, className: "border-orange-200 bg-orange-50 text-orange-700" };
+  }
+  if (urgency === "Müşteri Hazır") {
+    return { label: urgency, className: "border-emerald-200 bg-emerald-50 text-emerald-700" };
+  }
+  return { label: urgency, className: "border-slate-200 bg-slate-50 text-slate-600" };
+}
+
+function getSpecs(post: SharedPost): SpecItem[] {
+  return [
+    { label: "Talep Türü", value: typeLabel(post.type) },
+    { label: "Yayın Tarihi", value: formatRequestDate(post.createdAt) },
+  ];
 }
 
 function getWhatsAppLink(phone: string, title: string) {
@@ -94,6 +131,8 @@ export default function NetworkPostSharePage() {
     [post.city, post.district, post.neighborhood].filter(Boolean).join(" / ") ||
     "Konum belirtilmemiş";
   const sharerPhone = post.sharedBy?.phone || "";
+  const specs = getSpecs(post);
+  const urgencyStyle = getUrgencyStyle(post.urgency);
 
   return (
     <div className="min-h-screen bg-[#FFF1D6] px-3 py-6">
@@ -121,6 +160,31 @@ export default function NetworkPostSharePage() {
             )}
           </div>
 
+          <div className="flex flex-wrap justify-center gap-1.5 border-t-2 border-[#F5A94A]/40 bg-[#FFFBF3] px-3 py-2.5">
+            <span
+              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[9.5px] font-black ${urgencyStyle.className}`}
+            >
+              <Clock size={11} />
+              {urgencyStyle.label}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 border-t-2 border-[#F5A94A]/40 bg-[#FFFBF3] p-2.5">
+            {specs.map((spec) => (
+              <div
+                key={spec.label}
+                className="rounded-[14px] bg-white px-2 py-2 text-center"
+              >
+                <p className="text-[8.5px] font-black uppercase tracking-[0.05em] text-[#B08A52]">
+                  {spec.label}
+                </p>
+                <p className="mt-0.5 text-[11px] font-black text-[#3A2208]">
+                  {spec.value}
+                </p>
+              </div>
+            ))}
+          </div>
+
           {post.description && (
             <div className="border-t-2 border-[#F5A94A]/40 px-4 py-3 text-center text-[12.5px] font-bold leading-5 text-[#5C4419]">
               {post.description}
@@ -129,7 +193,7 @@ export default function NetworkPostSharePage() {
 
           {Array.isArray(post.tags) && post.tags.length > 0 && (
             <div className="flex flex-wrap justify-center gap-1.5 border-t-2 border-[#F5A94A]/40 px-4 py-3">
-              {post.tags.slice(0, 6).map((tag) => (
+              {post.tags.map((tag) => (
                 <span
                   key={tag}
                   className="rounded-full bg-[#FFE4B8] px-2.5 py-1 text-[10px] font-black text-[#7A5A22]"
