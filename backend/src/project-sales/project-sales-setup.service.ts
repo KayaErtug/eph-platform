@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -60,24 +60,24 @@ export class ProjectSalesSetupService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createProjectDraft(userId: string, body: ProjectDraftBody) {
-    const name = this.requiredText(body.name, 'Proje adı zorunludur.');
-    const city = this.requiredText(body.city, 'İl zorunludur.');
-    const district = this.requiredText(body.district, 'İlçe zorunludur.');
+    const name = this.requiredText(body.name, 'Proje adÄ± zorunludur.');
+    const city = this.requiredText(body.city, 'Ä°l zorunludur.');
+    const district = this.requiredText(body.district, 'Ä°lÃ§e zorunludur.');
     const neighborhood = this.requiredText(
       body.neighborhood,
       'Mahalle zorunludur.',
     );
-    const address = this.requiredText(body.address, 'Açık adres zorunludur.');
+    const address = this.requiredText(body.address, 'AÃ§Ä±k adres zorunludur.');
     const code = body.code
       ? this.normalizeProjectCode(body.code)
       : await this.generateUniqueProjectCode(userId, name);
     const declaredIndependentUnitCount = this.optionalNonNegativeInteger(
       body.declaredIndependentUnitCount,
-      'Toplam bağımsız bölüm sayısı',
+      'Toplam baÄŸÄ±msÄ±z bÃ¶lÃ¼m sayÄ±sÄ±',
     );
     const declaredSalesInventoryCount = this.optionalNonNegativeInteger(
       body.declaredSalesInventoryCount,
-      'Satış veya kiralama stoku sayısı',
+      'SatÄ±ÅŸ veya kiralama stoku sayÄ±sÄ±',
     );
 
     this.validateDeclaredCounts(
@@ -88,7 +88,7 @@ export class ProjectSalesSetupService {
     const geometryType = this.optionalEnum(
       ProjectGeometryType,
       body.geometryType,
-      'Geçersiz proje geometrisi.',
+      'GeÃ§ersiz proje geometrisi.',
     ) ?? ProjectGeometryType.DIKDORTGEN;
 
     await this.ensureProjectCodeAvailable(userId, code);
@@ -130,11 +130,14 @@ export class ProjectSalesSetupService {
     });
   }
 
-  async listProjectDrafts(userId: string) {
+  async listProjectDrafts(userId: string, userRole: Role) {
     return this.prisma.project.findMany({
-      where: {
-        ownerId: userId,
-      },
+      where:
+        userRole === Role.SUPER_ADMIN
+          ? {}
+          : {
+              ownerId: userId,
+            },
       select: this.projectListSelect(),
       orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
     });
@@ -236,7 +239,7 @@ export class ProjectSalesSetupService {
     });
 
     if (!project) {
-      throw new NotFoundException('Proje bulunamadı.');
+      throw new NotFoundException('Proje bulunamadÄ±.');
     }
 
     this.ensureProjectAccess(project.ownerId, userId, userRole);
@@ -257,7 +260,7 @@ export class ProjectSalesSetupService {
     });
 
     if (!project) {
-      throw new NotFoundException('Proje bulunamadı.');
+      throw new NotFoundException('Proje bulunamadÄ±.');
     }
 
     this.ensureProjectAccess(project.ownerId, userId, userRole);
@@ -265,7 +268,7 @@ export class ProjectSalesSetupService {
     const data: Prisma.ProjectUpdateInput = {};
 
     if (this.hasOwn(body, 'name')) {
-      data.name = this.requiredText(body.name, 'Proje adı zorunludur.');
+      data.name = this.requiredText(body.name, 'Proje adÄ± zorunludur.');
     }
 
     if (this.hasOwn(body, 'code')) {
@@ -279,11 +282,11 @@ export class ProjectSalesSetupService {
     }
 
     if (this.hasOwn(body, 'city')) {
-      data.city = this.requiredText(body.city, 'İl zorunludur.');
+      data.city = this.requiredText(body.city, 'Ä°l zorunludur.');
     }
 
     if (this.hasOwn(body, 'district')) {
-      data.district = this.requiredText(body.district, 'İlçe zorunludur.');
+      data.district = this.requiredText(body.district, 'Ä°lÃ§e zorunludur.');
     }
 
     if (this.hasOwn(body, 'neighborhood')) {
@@ -294,7 +297,7 @@ export class ProjectSalesSetupService {
     }
 
     if (this.hasOwn(body, 'address')) {
-      data.address = this.requiredText(body.address, 'Açık adres zorunludur.');
+      data.address = this.requiredText(body.address, 'AÃ§Ä±k adres zorunludur.');
     }
 
     if (this.hasOwn(body, 'adaNo')) {
@@ -332,7 +335,7 @@ export class ProjectSalesSetupService {
     )
       ? this.optionalNonNegativeInteger(
           body.declaredIndependentUnitCount,
-          'Toplam bağımsız bölüm sayısı',
+          'Toplam baÄŸÄ±msÄ±z bÃ¶lÃ¼m sayÄ±sÄ±',
         )
       : project.declaredIndependentUnitCount;
     const declaredSalesInventoryCount = this.hasOwn(
@@ -341,7 +344,7 @@ export class ProjectSalesSetupService {
     )
       ? this.optionalNonNegativeInteger(
           body.declaredSalesInventoryCount,
-          'Satış veya kiralama stoku sayısı',
+          'SatÄ±ÅŸ veya kiralama stoku sayÄ±sÄ±',
         )
       : project.declaredSalesInventoryCount;
 
@@ -366,7 +369,7 @@ export class ProjectSalesSetupService {
       const geometryType = this.requiredEnum(
         ProjectGeometryType,
         body.geometryType,
-        'Geçersiz proje geometrisi.',
+        'GeÃ§ersiz proje geometrisi.',
       );
 
       data.geometryType = geometryType;
@@ -377,7 +380,7 @@ export class ProjectSalesSetupService {
       data.wizardStep = this.requiredEnum(
         ProjectWizardStep,
         body.wizardStep,
-        'Geçersiz proje sihirbazı adımı.',
+        'GeÃ§ersiz proje sihirbazÄ± adÄ±mÄ±.',
       );
     }
 
@@ -385,12 +388,12 @@ export class ProjectSalesSetupService {
       const setupStatus = this.requiredEnum(
         ProjectSetupStatus,
         body.setupStatus,
-        'Geçersiz proje kurulum durumu.',
+        'GeÃ§ersiz proje kurulum durumu.',
       );
 
       if (!USER_EDITABLE_SETUP_STATUSES.has(setupStatus)) {
         throw new BadRequestException(
-          'Bu proje kurulum durumu doğrudan değiştirilemez.',
+          'Bu proje kurulum durumu doÄŸrudan deÄŸiÅŸtirilemez.',
         );
       }
 
@@ -398,7 +401,7 @@ export class ProjectSalesSetupService {
     }
 
     if (Object.keys(data).length === 0) {
-      throw new BadRequestException('Güncellenecek proje bilgisi bulunamadı.');
+      throw new BadRequestException('GÃ¼ncellenecek proje bilgisi bulunamadÄ±.');
     }
 
     return this.prisma.project.update({
@@ -427,7 +430,7 @@ export class ProjectSalesSetupService {
     });
 
     if (!project) {
-      throw new NotFoundException('Proje bulunamadı.');
+      throw new NotFoundException('Proje bulunamadÄ±.');
     }
 
     this.ensureProjectAccess(project.ownerId, userId, userRole);
@@ -442,7 +445,7 @@ export class ProjectSalesSetupService {
       success: true,
       projectId: project.id,
       projectName: project.name,
-      message: 'Proje ve projeye bağlı tüm kayıtlar silindi.',
+      message: 'Proje ve projeye baÄŸlÄ± tÃ¼m kayÄ±tlar silindi.',
     };
   }
 
@@ -494,7 +497,7 @@ export class ProjectSalesSetupService {
       return;
     }
 
-    throw new ForbiddenException('Bu projeye erişim yetkiniz yok.');
+    throw new ForbiddenException('Bu projeye eriÅŸim yetkiniz yok.');
   }
 
   private async ensureProjectCodeAvailable(
@@ -519,7 +522,7 @@ export class ProjectSalesSetupService {
 
     if (existing) {
       throw new BadRequestException(
-        'Bu proje kodu daha önce kullanılmış. Farklı bir proje kodu girin.',
+        'Bu proje kodu daha Ã¶nce kullanÄ±lmÄ±ÅŸ. FarklÄ± bir proje kodu girin.',
       );
     }
   }
@@ -545,26 +548,26 @@ export class ProjectSalesSetupService {
       }
     }
 
-    throw new BadRequestException('Proje kodu üretilemedi. Tekrar deneyin.');
+    throw new BadRequestException('Proje kodu Ã¼retilemedi. Tekrar deneyin.');
   }
 
   private normalizeProjectCode(value: unknown) {
     const normalized = this.requiredText(
       value,
-      'Proje kodu boş bırakılamaz.',
+      'Proje kodu boÅŸ bÄ±rakÄ±lamaz.',
     )
       .toLocaleUpperCase('tr-TR')
-      .replace(/Ç/g, 'C')
-      .replace(/Ğ/g, 'G')
-      .replace(/İ/g, 'I')
-      .replace(/Ö/g, 'O')
-      .replace(/Ş/g, 'S')
-      .replace(/Ü/g, 'U')
+      .replace(/Ã‡/g, 'C')
+      .replace(/Ä/g, 'G')
+      .replace(/Ä°/g, 'I')
+      .replace(/Ã–/g, 'O')
+      .replace(/Å/g, 'S')
+      .replace(/Ãœ/g, 'U')
       .replace(/[^A-Z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
 
     if (!normalized) {
-      throw new BadRequestException('Geçerli bir proje kodu girin.');
+      throw new BadRequestException('GeÃ§erli bir proje kodu girin.');
     }
 
     return normalized.slice(0, 40);
@@ -580,7 +583,7 @@ export class ProjectSalesSetupService {
       salesInventoryCount > independentUnitCount
     ) {
       throw new BadRequestException(
-        'Satış veya kiralama stoku sayısı toplam bağımsız bölüm sayısından büyük olamaz.',
+        'SatÄ±ÅŸ veya kiralama stoku sayÄ±sÄ± toplam baÄŸÄ±msÄ±z bÃ¶lÃ¼m sayÄ±sÄ±ndan bÃ¼yÃ¼k olamaz.',
       );
     }
   }
@@ -588,7 +591,7 @@ export class ProjectSalesSetupService {
   private parseUnitTypes(value: unknown): UnitType[] {
     if (!Array.isArray(value)) {
       throw new BadRequestException(
-        'Planlanan bağımsız bölüm tipleri liste biçiminde olmalıdır.',
+        'Planlanan baÄŸÄ±msÄ±z bÃ¶lÃ¼m tipleri liste biÃ§iminde olmalÄ±dÄ±r.',
       );
     }
 
@@ -596,7 +599,7 @@ export class ProjectSalesSetupService {
     const result = Array.from(
       new Set(
         value.map((item) =>
-          this.requiredText(item, 'Bağımsız bölüm tipi boş olamaz.')
+          this.requiredText(item, 'BaÄŸÄ±msÄ±z bÃ¶lÃ¼m tipi boÅŸ olamaz.')
             .trim()
             .toUpperCase(),
         ),
@@ -605,20 +608,20 @@ export class ProjectSalesSetupService {
 
     if (result.length === 0) {
       throw new BadRequestException(
-        'En az bir planlanan bağımsız bölüm tipi seçilmelidir.',
+        'En az bir planlanan baÄŸÄ±msÄ±z bÃ¶lÃ¼m tipi seÃ§ilmelidir.',
       );
     }
 
     if (result.length > 30) {
       throw new BadRequestException(
-        'En fazla 30 planlanan bağımsız bölüm tipi seçilebilir.',
+        'En fazla 30 planlanan baÄŸÄ±msÄ±z bÃ¶lÃ¼m tipi seÃ§ilebilir.',
       );
     }
 
     for (const item of result) {
       if (!allowed.has(item as UnitType)) {
         throw new BadRequestException(
-          `Geçersiz bağımsız bölüm tipi: ${item}`,
+          `GeÃ§ersiz baÄŸÄ±msÄ±z bÃ¶lÃ¼m tipi: ${item}`,
         );
       }
     }
@@ -639,7 +642,7 @@ export class ProjectSalesSetupService {
     const parsed = Number(value);
 
     if (!Number.isFinite(parsed) || parsed < minimum || parsed > maximum) {
-      throw new BadRequestException(`${label} değeri geçersiz.`);
+      throw new BadRequestException(`${label} deÄŸeri geÃ§ersiz.`);
     }
 
     return parsed;
@@ -654,7 +657,7 @@ export class ProjectSalesSetupService {
 
     if (!Number.isInteger(parsed) || parsed < 0) {
       throw new BadRequestException(
-        `${label} sıfır veya sıfırdan büyük tam sayı olmalıdır.`,
+        `${label} sÄ±fÄ±r veya sÄ±fÄ±rdan bÃ¼yÃ¼k tam sayÄ± olmalÄ±dÄ±r.`,
       );
     }
 
@@ -719,3 +722,5 @@ export class ProjectSalesSetupService {
     return Object.prototype.hasOwnProperty.call(object, key);
   }
 }
+
+

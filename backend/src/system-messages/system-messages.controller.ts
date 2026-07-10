@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Get,
@@ -7,17 +7,22 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { SystemMessagesService } from './system-messages.service';
-import { SendSystemMessageDto } from './dto/send-system-message.dto';
+import { Role } from '@prisma/client';
 
-@UseGuards(JwtAuthGuard)
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { SendSystemMessageDto } from './dto/send-system-message.dto';
+import { SystemMessagesService } from './system-messages.service';
+
 @Controller('system-messages')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class SystemMessagesController {
   constructor(private readonly systemMessagesService: SystemMessagesService) {}
 
   @Post('send')
+  @Roles(Role.SUPER_ADMIN)
   send(@Body() dto: SendSystemMessageDto, @CurrentUser() user: any) {
     return this.systemMessagesService.send(dto, user);
   }
@@ -28,6 +33,7 @@ export class SystemMessagesController {
   }
 
   @Get('admin/all')
+  @Roles(Role.SUPER_ADMIN)
   findAllForSuperAdmin(@CurrentUser() user: any) {
     return this.systemMessagesService.findAllForSuperAdmin(user);
   }
