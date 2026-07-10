@@ -73,6 +73,7 @@ function shouldShowShell(pathname: string) {
   if (pathname.startsWith("/cerez-politikasi")) return false;
   if (pathname.startsWith("/paylasim")) return false;
   if (pathname.startsWith("/talep-paylasim")) return false;
+  if (pathname.startsWith("/portfoy-paylasim")) return false;
 
   return true;
 }
