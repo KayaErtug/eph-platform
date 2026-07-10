@@ -10,6 +10,7 @@ import {
   Bot,
   Building2,
   ChevronRight,
+  FileSpreadsheet,
   HelpCircle,
   Home,
   Lightbulb,
@@ -135,6 +136,19 @@ function roleLabel(role?: string | null) {
   }
 
   return "EPH Üyesi";
+}
+
+function canUseProjectSales(role?: string | null) {
+  const normalized = String(role || "").toLocaleUpperCase("tr-TR");
+
+  return (
+    normalized === "SUPER_ADMIN" ||
+    normalized === "MUTEAHHIT" ||
+    normalized === "MÜTEAHHİT" ||
+    normalized === "MÜTAHHİT" ||
+    normalized === "INSAAT_FIRMASI" ||
+    normalized === "İNŞAAT_FİRMASI"
+  );
 }
 
 function readConversations(payload: unknown): Conversation[] {
@@ -504,6 +518,18 @@ export function EPHMobileShell({
               </MenuSection>
 
               <MenuSection title="EPH">
+                <MenuRow
+                  icon={<Sparkles size={17} />}
+                  label="Üretkenlik"
+                  onClick={() => go("/uretkenlik")}
+                />
+                {canUseProjectSales(user?.role) && (
+                  <MenuRow
+                    icon={<FileSpreadsheet size={17} />}
+                    label="Proje Satış Merkezi"
+                    onClick={() => go("/proje-satis-sablonu")}
+                  />
+                )}
                 <MenuRow
                   icon={<ShoppingBag size={17} />}
                   label="Market"

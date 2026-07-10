@@ -50,6 +50,19 @@ function isUnitVerified(unit: ProductivityUnit) {
   );
 }
 
+function canUseProjectSales(role?: string | null) {
+  const normalized = String(role || "").toLocaleUpperCase("tr-TR");
+
+  return (
+    normalized === "SUPER_ADMIN" ||
+    normalized === "MUTEAHHIT" ||
+    normalized === "MÜTEAHHİT" ||
+    normalized === "MÜTAHHİT" ||
+    normalized === "INSAAT_FIRMASI" ||
+    normalized === "İNŞAAT_FİRMASI"
+  );
+}
+
 function onlyDigits(value: string) {
   return value.replace(/\D/g, "");
 }
@@ -120,6 +133,7 @@ export default function UretkenlikPage() {
   );
 
   const waitingCount = Math.max(0, units.length - verifiedCount);
+  const canOpenProjectSales = canUseProjectSales(user?.role);
 
   if (!hydrated || loading) {
     return (
@@ -204,36 +218,38 @@ export default function UretkenlikPage() {
             </div>
           </button>
 
-          <button
-            type="button"
-            onClick={() => router.push("/proje-satis-sablonu")}
-            className="mt-3 w-full rounded-[26px] border-2 border-[#C4B5FD] bg-gradient-to-br from-white via-[#FAF8FF] to-[#F5F3FF] p-4 text-center shadow-[0_16px_34px_rgba(124,58,237,0.12)] active:scale-[0.99]"
-          >
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#7C3AED] text-white shadow-[0_10px_22px_rgba(124,58,237,0.24)]">
-              <FileSpreadsheet size={23} />
-            </div>
+          {canOpenProjectSales && (
+            <button
+              type="button"
+              onClick={() => router.push("/proje-satis-sablonu")}
+              className="mt-3 w-full rounded-[26px] border-2 border-[#C4B5FD] bg-gradient-to-br from-white via-[#FAF8FF] to-[#F5F3FF] p-4 text-center shadow-[0_16px_34px_rgba(124,58,237,0.12)] active:scale-[0.99]"
+            >
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#7C3AED] text-white shadow-[0_10px_22px_rgba(124,58,237,0.24)]">
+                <FileSpreadsheet size={23} />
+              </div>
 
-            <h2 className="mt-3 text-center text-[18px] font-black tracking-[-0.03em]">
-              Proje Satış Excel Şablonu
-            </h2>
+              <h2 className="mt-3 text-center text-[18px] font-black tracking-[-0.03em]">
+                Proje Satış Merkezi
+              </h2>
 
-            <p className="mx-auto mt-1 max-w-[340px] text-center text-[11px] font-bold leading-[1.55] text-[#64748B]">
-              Proje, blok, kat ve bağımsız bölümleri tek Excel dosyasıyla topluca
-              hazırlayın.
-            </p>
+              <p className="mx-auto mt-1 max-w-[340px] text-center text-[11px] font-bold leading-[1.55] text-[#64748B]">
+                Proje, blok, kat, bağımsız bölüm, görsel ve lansman akışını
+                tek merkezden yönetin.
+              </p>
 
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <MiniFeature text="Toplu portföy girişi" tone="purple" />
-              <MiniFeature text="Esnek proje yapısı" tone="purple" />
-              <MiniFeature text="Fotoğraf paketleri" tone="purple" />
-              <MiniFeature text="Güvenli aktarım" tone="purple" />
-            </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <MiniFeature text="Görselleri Yönet" tone="purple" />
+                <MiniFeature text="3D Render Oluştur" tone="purple" />
+                <MiniFeature text="Sunum Önizle" tone="purple" />
+                <MiniFeature text="Havuza Yayınla" tone="purple" />
+              </div>
 
-            <div className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-[17px] bg-[#7C3AED] px-4 text-[13px] font-black text-white shadow-[0_10px_22px_rgba(124,58,237,0.22)]">
-              <FileSpreadsheet size={17} />
-              Excel Şablonunu Aç
-            </div>
-          </button>
+              <div className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-[17px] bg-[#7C3AED] px-4 text-[13px] font-black text-white shadow-[0_10px_22px_rgba(124,58,237,0.22)]">
+                <FileSpreadsheet size={17} />
+                Proje Satış Merkezini Aç
+              </div>
+            </button>
+          )}
 
           <button
             type="button"

@@ -383,11 +383,6 @@ function StokPageInner() {
     user?.role === "EMLAKCI" ||
     user?.role === "SUPER_ADMIN";
 
-  const canBulkEntry =
-    user?.role === "MUTEAHHIT" ||
-    user?.role === "INSAAT_FIRMASI" ||
-    user?.role === "SUPER_ADMIN";
-
   useEffect(() => setHydrated(true), []);
 
   useEffect(() => {
@@ -1303,15 +1298,6 @@ function StokPageInner() {
               {filteredUnits.length} portföy listeleniyor
             </p>
             <div className="flex shrink-0 items-center gap-2">
-              {canBulkEntry && (
-                <button
-                  type="button"
-                  onClick={() => router.push("/proje-satis-sablonu")}
-                  className="inline-flex h-10 shrink-0 items-center gap-1 rounded-[18px] border border-[#7C3AED] bg-white px-3 text-[12px] font-black text-[#6D28D9] shadow-[0_8px_18px_rgba(124,58,237,0.12)]"
-                >
-                  <Building2 size={16} /> Çoklu Portföy Girişi
-                </button>
-              )}
               <button
                 type="button"
                 onClick={openCreateModal}
@@ -2405,5 +2391,3 @@ export default function StokPage() {
     </Suspense>
   );
 }
-
-
