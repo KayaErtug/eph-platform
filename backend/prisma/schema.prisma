@@ -162,6 +162,50 @@ model TeamMember {
   @@index([isActive])
 }
 
+model PendingRegistration {
+  id                  String  @id @default(uuid())
+  firstName           String
+  lastName            String
+  email               String  @unique
+  phone               String  @unique
+  passwordHash        String
+  city                String
+  role                Role
+  registrationType    String?
+  inviteCode          String?
+  referralCandidateId String?
+
+  status PendingRegistrationStatus @default(PHONE_VERIFICATION_PENDING)
+
+  phoneVerified               Boolean   @default(false)
+  phoneVerifiedAt             DateTime?
+  phoneVerificationCodeHash   String?
+  phoneVerificationExpiresAt  DateTime?
+  phoneVerificationAttempts   Int       @default(0)
+  phoneVerificationLastSentAt DateTime?
+
+  emailVerified               Boolean   @default(false)
+  emailVerifiedAt             DateTime?
+  emailVerificationCodeHash   String?
+  emailVerificationExpiresAt  DateTime?
+  emailVerificationAttempts   Int       @default(0)
+  emailVerificationLastSentAt DateTime?
+
+  ipAddress   String?
+  userAgent   String?
+  expiresAt   DateTime
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([role])
+  @@index([inviteCode])
+  @@index([referralCandidateId])
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
 model UserCapability {
   id          String     @id @default(uuid())
   userId      String
@@ -2701,6 +2745,15 @@ model EPHAuthorityLetter {
 
   @@index([unitId])
   @@index([status])
+}
+
+enum PendingRegistrationStatus {
+  PHONE_VERIFICATION_PENDING
+  EMAIL_VERIFICATION_PENDING
+  READY_TO_CREATE_USER
+  COMPLETED
+  EXPIRED
+  CANCELLED
 }
 
 enum Role {

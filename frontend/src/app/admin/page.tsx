@@ -532,6 +532,16 @@ export default function AdminPage() {
         ]
       : []),
     {
+      title: "Belge Doğrulama Merkezi",
+      desc: "Mesleki belgeleri resmî kurum servislerinden kontrol edin",
+      href: "/admin/document-verification",
+      icon: <ClipboardCheck size={30} />,
+      tone: "blue",
+      count: 7,
+      countTone: "green",
+      isNew: true,
+    },
+    {
       title: "Raporlar",
       desc: "Trafik, kullanıcı ve işlem raporlarını inceleyin",
       href: "/admin/reports",

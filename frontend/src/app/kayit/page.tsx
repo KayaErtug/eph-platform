@@ -343,10 +343,15 @@ function KayitForm() {
 
       const res = await api.post("/auth/register", payload);
 
-      if (res.data?.requiresEmailVerification || res.data?.success) {
+      if (
+        res.data?.success &&
+        res.data?.pendingRegistrationId &&
+        res.data?.requiresPhoneVerification
+      ) {
         const params = new URLSearchParams({
-          email: res.data?.email || normalizedEmail,
-          sent: res.data?.verificationEmailSent === false ? "0" : "1",
+          pending: String(res.data.pendingRegistrationId),
+          phone: String(res.data.phone || payload.phone),
+          email: normalizedEmail,
         });
 
         router.push(`/kayit/dogrula?${params.toString()}`);
@@ -383,7 +388,12 @@ function KayitForm() {
         .hero h1{font-size:46px;line-height:1.05;margin:28px 0 0;font-weight:900;letter-spacing:-.055em}
         .hero p{margin-top:18px;line-height:1.7;color:rgba(255,255,255,.78)}
         .pill{display:inline-flex;gap:8px;align-items:center;border:1px solid rgba(255,255,255,.20);padding:9px 14px;border-radius:999px;font-size:13px;font-weight:900;background:rgba(255,255,255,.08)}
-        .feature{margin-top:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);padding:16px;border-radius:20px;font-weight:800}
+        .feature{margin-top:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);padding:14px 16px;border-radius:18px;font-weight:850;line-height:1.45}
+        .trust-box{margin-top:16px;border:1px solid #BFDBFE;background:linear-gradient(135deg,#EFF6FF,#F8FBFF);border-radius:20px;padding:15px 16px;text-align:center;color:#1E3A8A;font-size:12px;font-weight:850;line-height:1.6;box-shadow:0 10px 24px rgba(37,99,235,.08)}
+        .trust-title{display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:5px;color:#1557D6;font-size:13px;font-weight:950}
+        .verification-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:14px}
+        .verification-step{border:1px solid #DBEAFE;background:#FFFFFF;border-radius:15px;padding:10px 7px;text-align:center;color:#475569;font-size:10px;font-weight:900;line-height:1.35}
+        .verification-step strong{display:block;margin-bottom:3px;color:#1557D6;font-size:12px}
         .right{display:flex;align-items:center;justify-content:center;padding:42px;background:#FAFCFF}
         .card{width:100%;max-width:500px}
         .title{text-align:center;font-size:34px;font-weight:950;color:#06194A;letter-spacing:-.045em}
@@ -425,6 +435,8 @@ function KayitForm() {
           .row-label{font-size:11px}
           .input{font-size:14px}
           .requirements-grid{grid-template-columns:96px 1fr}
+          .verification-steps{grid-template-columns:repeat(3,minmax(0,1fr))}
+          .trust-box{margin-top:14px;padding:14px 12px;font-size:11px}
         }
       `}</style>
 
@@ -448,13 +460,20 @@ function KayitForm() {
               <h1>Türkiye’nin yeni nesil emlak ağına katılın.</h1>
 
               <p>
-                Referans kodunuz varsa bilgileriniz otomatik doldurulur.
-                Referansınız yoksa normal üyelik başvurusu yapabilirsiniz.
+                Referans kodunuz varsa bilgileriniz otomatik doldurulur ve
+                başvurunuz referanslı olarak değerlendirilir. Tüm üyeler aynı
+                güvenlik ve mesleki doğrulama süreçlerinden geçer.
               </p>
 
-              <div className="feature">✓ E-posta doğrulamalı güvenli kayıt</div>
-              <div className="feature">✓ Mesleğe özel belge kontrolü</div>
-              <div className="feature">✓ Profesyonel emlak ağı</div>
+              <div className="feature">
+                ✓ Telefon ve e-posta doğrulamalı güvenli kayıt
+              </div>
+              <div className="feature">
+                ✓ Mesleki belge doğrulama ve yönetici onayı
+              </div>
+              <div className="feature">
+                ✓ Sadece doğrulanmış gayrimenkul profesyonelleri
+              </div>
             </div>
 
             <div style={{ opacity: 0.5, fontSize: 13 }}>
@@ -467,8 +486,23 @@ function KayitForm() {
               <div className="title">Hesap oluştur</div>
 
               <div className="subtitle">
-                Bilgilerinizi tamamlayın. Başvuru sonrasında e-posta
-                adresinize 6 haneli doğrulama kodu gönderilecektir.
+                Bilgilerinizi tamamlayın. Telefonunuza SMS doğrulama kodu,
+                e-posta adresinize 6 haneli doğrulama kodu gönderilecektir.
+              </div>
+
+              <div className="verification-steps">
+                <div className="verification-step">
+                  <strong>1</strong>
+                  Telefon doğrulama
+                </div>
+                <div className="verification-step">
+                  <strong>2</strong>
+                  E-posta doğrulama
+                </div>
+                <div className="verification-step">
+                  <strong>3</strong>
+                  Belge inceleme
+                </div>
               </div>
 
               <form onSubmit={handleSubmit(onSubmit)}>
@@ -500,9 +534,9 @@ function KayitForm() {
                           {ROLE_LABELS[detectedRole]} referans kaydı bulundu.
                         </div>
                         <div className="hint">
-                          Ad, soyad, e-posta ve meslek bilgisi güvenlik için
-                          kilitlendi. Telefon ve şifre alanını siz
-                          belirleyebilirsiniz.
+                          Referans bilgileriniz doğrulandı. Telefon ve e-posta
+                          doğrulamasını tamamladıktan sonra başvurunuz mesleki
+                          belge inceleme sürecine alınacaktır.
                         </div>
                       </>
                     )}
@@ -726,10 +760,20 @@ function KayitForm() {
                   disabled={loading}
                 >
                   {loading
-                    ? "Başvuru oluşturuluyor..."
-                    : "Üyelik Başvurusu Gönder"}
+                    ? "Doğrulama hazırlanıyor..."
+                    : "Doğrulamaya Devam Et"}
                 </button>
               </form>
+
+              <div className="trust-box">
+                <div className="trust-title">
+                  <ShieldCheck size={16} />
+                  Profesyonel ve kapalı devre platform
+                </div>
+                EPH Platform kapalı devre çalışan profesyonel bir gayrimenkul
+                ağıdır. Platforma yalnız doğrulanmış emlak danışmanları, emlak
+                ofisleri, müteahhitler ve inşaat firmaları kabul edilir.
+              </div>
 
               <div className="bottom">
                 Zaten hesabınız var mı?{" "}
