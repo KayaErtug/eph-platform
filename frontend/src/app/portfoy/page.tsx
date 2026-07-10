@@ -1892,16 +1892,6 @@ function CompactPortfolioCard({
             >
               {statusTone.label}
             </span>
-
-            <span
-              className="rounded-full border-2 bg-white/95 px-3 py-1 text-[11px] font-extrabold shadow-md backdrop-blur-md"
-              style={{
-                borderColor: visualTheme.typeBorder,
-                color: visualTheme.typeColor,
-              }}
-            >
-              {status}
-            </span>
           </div>
         </div>
 
