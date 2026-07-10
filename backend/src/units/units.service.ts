@@ -308,31 +308,63 @@ export class UnitsService {
     };
   }
 
-  private getPortfolioVisibleProjectWhere() {
+  private getClassicPortfolioProjectWhere() {
+    return {
+      code: null,
+      declaredIndependentUnitCount: null,
+      declaredSalesInventoryCount: null,
+      plannedUnitTypes: {
+        isEmpty: true,
+      },
+      blocks: {
+        none: {},
+      },
+      mediaPackages: {
+        none: {},
+      },
+      designReviewRequests: {
+        none: {},
+      },
+    };
+  }
+
+  private getPoolVisibleProjectWhere() {
     return {
       OR: [
-        {
-          code: null,
-          declaredIndependentUnitCount: null,
-          declaredSalesInventoryCount: null,
-          plannedUnitTypes: {
-            isEmpty: true,
-          },
-          blocks: {
-            none: {},
-          },
-          mediaPackages: {
-            none: {},
-          },
-          designReviewRequests: {
-            none: {},
-          },
-        },
+        this.getClassicPortfolioProjectWhere(),
         {
           setupStatus: ProjectSetupStatus.TAMAMLANDI,
         },
       ],
     };
+  }
+
+  private getPortfolioVisibleProjectWhere() {
+    return this.getClassicPortfolioProjectWhere();
+  }
+
+  private isProjectSalesProject(project: {
+    code?: string | null;
+    declaredIndependentUnitCount?: number | null;
+    declaredSalesInventoryCount?: number | null;
+    plannedUnitTypes?: unknown[] | null;
+    setupStatus?: ProjectSetupStatus | string | null;
+    _count?: {
+      blocks?: number;
+      mediaPackages?: number;
+      designReviewRequests?: number;
+    } | null;
+  }) {
+    return Boolean(
+      project.code ||
+        project.declaredIndependentUnitCount !== null ||
+        project.declaredSalesInventoryCount !== null ||
+        (Array.isArray(project.plannedUnitTypes) &&
+          project.plannedUnitTypes.length > 0) ||
+        Number(project._count?.blocks || 0) > 0 ||
+        Number(project._count?.mediaPackages || 0) > 0 ||
+        Number(project._count?.designReviewRequests || 0) > 0,
+    );
   }
 
   private isProjectVisibleInPortfolio(project: {
@@ -347,19 +379,23 @@ export class UnitsService {
       designReviewRequests?: number;
     } | null;
   }) {
-    const looksLikeProjectSalesProject = Boolean(
-      project.code ||
-        project.declaredIndependentUnitCount !== null ||
-        project.declaredSalesInventoryCount !== null ||
-        (Array.isArray(project.plannedUnitTypes) &&
-          project.plannedUnitTypes.length > 0) ||
-        Number(project._count?.blocks || 0) > 0 ||
-        Number(project._count?.mediaPackages || 0) > 0 ||
-        Number(project._count?.designReviewRequests || 0) > 0,
-    );
+    return !this.isProjectSalesProject(project);
+  }
 
+  private isProjectVisibleInPool(project: {
+    code?: string | null;
+    declaredIndependentUnitCount?: number | null;
+    declaredSalesInventoryCount?: number | null;
+    plannedUnitTypes?: unknown[] | null;
+    setupStatus?: ProjectSetupStatus | string | null;
+    _count?: {
+      blocks?: number;
+      mediaPackages?: number;
+      designReviewRequests?: number;
+    } | null;
+  }) {
     return (
-      !looksLikeProjectSalesProject ||
+      !this.isProjectSalesProject(project) ||
       project.setupStatus === ProjectSetupStatus.TAMAMLANDI
     );
   }
@@ -414,7 +450,9 @@ export class UnitsService {
       throw new NotFoundException('Portföy bulunamadı.');
     }
 
-    this.ensureProjectVisibleForPortfolioActions(unit.project);
+    if (!this.isProjectVisibleInPool(unit.project)) {
+      throw new BadRequestException('Bu portfÃ¶y ÅŸu anda Havuz iÃ§inde aktif deÄŸil.');
+    }
 
     if (!unit.isPoolVisible || unit.approvalStatus !== PortfolioApprovalStatus.HAVUZDA) {
       throw new BadRequestException('Bu portföy şu anda Havuz içinde aktif değil.');
@@ -1387,7 +1425,7 @@ export class UnitsService {
         status: filters?.status,
         type: filters?.type,
         project: {
-          ...this.getPortfolioVisibleProjectWhere(),
+          ...this.getPoolVisibleProjectWhere(),
           isActive: true,
           city: filters?.city
             ? { contains: filters.city, mode: 'insensitive' }
@@ -1664,7 +1702,7 @@ export class UnitsService {
       !unit ||
       !unit.isPoolVisible ||
       unit.approvalStatus !== PortfolioApprovalStatus.HAVUZDA ||
-      !this.isProjectVisibleInPortfolio(unit.project)
+      !this.isProjectVisibleInPool(unit.project)
     ) {
       throw new NotFoundException('Bu portföy artık Havuz içinde aktif değil.');
     }
