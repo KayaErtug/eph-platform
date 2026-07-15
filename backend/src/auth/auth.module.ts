@@ -9,6 +9,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { EmailVerificationV2Service } from './email/email-verification-v2.service';
 import { FirebasePhoneVerificationService } from './firebase/firebase-phone-verification.service';
+import { PhoneVerificationSecurityService } from './firebase/phone-verification-security.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { NetgsmService } from './otp/netgsm.service';
@@ -31,10 +32,15 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     AuthService,
     RegistrationV2Service,
     PendingRegistrationService,
+
     PhoneOtpService,
     NetgsmService,
+
     FirebasePhoneVerificationService,
+    PhoneVerificationSecurityService,
+
     EmailVerificationV2Service,
+
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
@@ -47,6 +53,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     JwtModule,
     RegistrationV2Service,
     FirebasePhoneVerificationService,
+    PhoneVerificationSecurityService,
   ],
 })
 export class AuthModule {}
