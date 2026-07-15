@@ -823,7 +823,7 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           key: "budget",
           label: "Bütçe",
           type: "money",
-          modes: ["form", "detail", "lina"],
+          modes: ["detail", "lina"],
           order: 10,
           currencyKey: "currency",
           currencies: FORUM_REQUEST_CURRENCY_OPTIONS,
