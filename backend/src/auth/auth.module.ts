@@ -8,6 +8,7 @@ import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { EmailVerificationV2Service } from './email/email-verification-v2.service';
+import { FirebasePhoneVerificationService } from './firebase/firebase-phone-verification.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { NetgsmService } from './otp/netgsm.service';
@@ -22,9 +23,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     InvitationsModule,
     PassportModule,
     JwtModule.register({
-      secret:
-        process.env.JWT_SECRET ||
-        'sm-super-secret-jwt-key-degistirin',
+      secret: process.env.JWT_SECRET || 'sm-super-secret-jwt-key-degistirin',
       signOptions: { expiresIn: '7d' },
     }),
   ],
@@ -34,6 +33,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     PendingRegistrationService,
     PhoneOtpService,
     NetgsmService,
+    FirebasePhoneVerificationService,
     EmailVerificationV2Service,
     JwtStrategy,
     JwtAuthGuard,
@@ -46,6 +46,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     RolesGuard,
     JwtModule,
     RegistrationV2Service,
+    FirebasePhoneVerificationService,
   ],
 })
 export class AuthModule {}
