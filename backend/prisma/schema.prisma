@@ -163,7 +163,7 @@ model TeamMember {
 }
 
 model PendingRegistration {
-  id                  String  @id @default(uuid())
+  id                  String  @id @default(dbgenerated("(gen_random_uuid())::text"))
   firstName           String
   lastName            String
   email               String  @unique
@@ -204,6 +204,41 @@ model PendingRegistration {
   @@index([referralCandidateId])
   @@index([expiresAt])
   @@index([createdAt])
+}
+
+model PhoneVerificationSecurity {
+  phone                       String  @id
+  activePendingRegistrationId String?
+
+  failedAttempts      Int       @default(0)
+  totalFailedAttempts Int       @default(0)
+  lastAttemptAt       DateTime?
+
+  lockedAt     DateTime?
+  lockedUntil  DateTime?
+  suspiciousAt DateTime?
+
+  lastSmsSentAt    DateTime?
+  nextSmsAllowedAt DateTime?
+
+  lastIpAddress String?
+  lastUserAgent String?
+
+  firebaseVerificationIdHash String?
+  firebaseSessionStartedAt   DateTime?
+  firebaseSessionExpiresAt   DateTime?
+  firebaseSessionConsumedAt  DateTime?
+  firebaseUid                String?
+
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([activePendingRegistrationId])
+  @@index([lockedUntil])
+  @@index([nextSmsAllowedAt])
+  @@index([suspiciousAt])
+  @@index([lastIpAddress, updatedAt])
 }
 
 model UserCapability {
