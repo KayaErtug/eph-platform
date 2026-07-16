@@ -17,7 +17,10 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
+type ProjectNumberingMode = 'FLOOR_CODED' | 'CONTINUOUS';
+
 type InventoryBody = {
+  numberingMode?: unknown;
   floorPlans?: unknown;
   projectSpaces?: unknown;
 };
@@ -525,6 +528,7 @@ export class ProjectSalesInventoryService {
     );
     const floorPlans = this.arrayValue(body.floorPlans, 'Kat dağılımı');
     const projectSpaces = this.optionalArrayValue(body.projectSpaces);
+    const numberingMode = this.projectNumberingMode(body.numberingMode);
 
     if (floorPlans.length === 0) {
       throw new BadRequestException(
@@ -533,6 +537,7 @@ export class ProjectSalesInventoryService {
     }
 
     const usedFloorKeys = new Set<string>();
+    const continuousSequences = new Map<string, number>();
     const units: PreparedUnit[] = [];
     const spaces: PreparedSpace[] = [];
     let unitSortOrder = 0;
@@ -571,13 +576,14 @@ export class ProjectSalesInventoryService {
       const numberPrefix =
         this.optionalText(rawFloorPlan.numberPrefix) ??
         block.normalizedCode;
-      let sequence = this.integerValue(
+      let floorSequence = this.integerValue(
         rawFloorPlan.startingSequence,
         1,
         9999,
         `${block.code} ${floor.label} başlangıç sıra numarası`,
         1,
       );
+      let continuousSequence = continuousSequences.get(block.id) ?? 1;
 
       for (let groupIndex = 0; groupIndex < unitGroups.length; groupIndex += 1) {
         const rawGroup = this.objectValue(
@@ -640,10 +646,15 @@ export class ProjectSalesInventoryService {
         const description = this.optionalText(rawGroup.description);
 
         for (let itemIndex = 0; itemIndex < count; itemIndex += 1) {
+          const sequence =
+            numberingMode === 'CONTINUOUS' && floor.level >= 0
+              ? continuousSequence
+              : floorSequence;
           const number = this.createUnitNumber(
             numberPrefix,
             floor.level,
             sequence,
+            numberingMode,
           );
 
           units.push({
@@ -673,9 +684,17 @@ export class ProjectSalesInventoryService {
             isPoolVisible: false,
           });
 
-          sequence += 1;
+          if (numberingMode === 'CONTINUOUS' && floor.level >= 0) {
+            continuousSequence += 1;
+          } else {
+            floorSequence += 1;
+          }
           unitSortOrder += 1;
         }
+      }
+
+      if (numberingMode === 'CONTINUOUS' && floor.level >= 0) {
+        continuousSequences.set(block.id, continuousSequence);
       }
     }
 
@@ -901,19 +920,35 @@ export class ProjectSalesInventoryService {
     prefix: string,
     floorLevel: number,
     sequence: number,
+    numberingMode: ProjectNumberingMode,
   ) {
     const normalizedPrefix = this.normalizeCode(prefix);
-    const itemSequence = String(sequence).padStart(2, '0');
 
     if (floorLevel < 0) {
-      return `${normalizedPrefix}-B${Math.abs(floorLevel)}${itemSequence}`;
+      return `${normalizedPrefix}-B${Math.abs(floorLevel)}-${sequence}`;
     }
 
     if (floorLevel === 0) {
-      return `${normalizedPrefix}-Z${itemSequence}`;
+      return `${normalizedPrefix}-Z-${sequence}`;
     }
 
-    return `${normalizedPrefix}-${floorLevel}${itemSequence}`;
+    if (numberingMode === 'CONTINUOUS') {
+      return `${normalizedPrefix}-${sequence}`;
+    }
+
+    return `${normalizedPrefix}-${floorLevel}${String(sequence).padStart(2, '0')}`;
+  }
+
+  private projectNumberingMode(value: unknown): ProjectNumberingMode {
+    if (value === null || value === undefined || value === '') {
+      return 'FLOOR_CODED';
+    }
+
+    if (value === 'FLOOR_CODED' || value === 'CONTINUOUS') {
+      return value;
+    }
+
+    throw new BadRequestException('Geçersiz bağımsız bölüm numaralandırma yöntemi.');
   }
 
   private defaultSpaceLegalStatus(spaceType: ProjectSpaceType) {

@@ -57,6 +57,7 @@ import type {
   PageMode,
   ProjectForm,
   ProjectLaunchCenterResponse,
+  ProjectNumberingMode,
   ProjectMediaConfig,
   ProjectMediaEnsureResponse,
   ProjectMediaPackagesResponse,
@@ -90,6 +91,7 @@ import {
 import { DeleteProjectModal, NoticeModal } from "./components/ProjectSalesModals";
 import { Field, InfoBand, Metric, SectionTitle } from "./components/ProjectSalesPrimitives";
 import { ProjectMediaCenterView } from "./components/ProjectMediaCenterView";
+import { ProjectInventoryNumberingPanel } from "./components/ProjectInventoryNumberingPanel";
 import { ProjectSalesLaunchFlowView } from "./components/ProjectSalesLaunchFlowView";
 import { ProjectSalesStockView } from "./components/ProjectSalesStockView";
 import {
@@ -128,6 +130,10 @@ import {
   statusLabel,
   unitTypeLabel,
 } from "./lib/projectSalesFormatters";
+import {
+  defaultNumberPrefix,
+  inferProjectNumberingMode,
+} from "./lib/projectSalesNumbering";
 
 
 function facadeCountForGeometry(geometryType: string) {
@@ -268,25 +274,49 @@ function floorNumberingFromUnits(
     };
   }
 
-  const floorMarker =
-    floorLevel < 0
-      ? `-B${Math.abs(floorLevel)}`
-      : floorLevel === 0
-        ? "-Z"
-        : `-${floorLevel}`;
-  const markerIndex = firstNumber.lastIndexOf(floorMarker);
+  if (floorLevel <= 0) {
+    const markers =
+      floorLevel < 0
+        ? [`-B${Math.abs(floorLevel)}-`, `-B${Math.abs(floorLevel)}`]
+        : ["-Z-", "-Z"];
+    const marker = markers.find((candidate) => firstNumber.includes(candidate));
+    const markerIndex = marker ? firstNumber.lastIndexOf(marker) : -1;
 
-  if (markerIndex <= 0) {
+    if (!marker || markerIndex <= 0) {
+      return {
+        numberPrefix: fallbackPrefix,
+        startingSequence: "1",
+      };
+    }
+
+    const rawSequence = firstNumber.slice(markerIndex + marker.length).trim();
+    const parsedSequence = Number(rawSequence);
+
+    return {
+      numberPrefix: firstNumber.slice(0, markerIndex).trim() || fallbackPrefix,
+      startingSequence:
+        Number.isInteger(parsedSequence) && parsedSequence > 0
+          ? String(parsedSequence)
+          : "1",
+    };
+  }
+
+  const lastDashIndex = firstNumber.lastIndexOf("-");
+
+  if (lastDashIndex <= 0) {
     return {
       numberPrefix: fallbackPrefix,
       startingSequence: "1",
     };
   }
 
-  const numberPrefix = firstNumber.slice(0, markerIndex).trim();
-  const rawSequence = firstNumber
-    .slice(markerIndex + floorMarker.length)
-    .trim();
+  const numberPrefix = firstNumber.slice(0, lastDashIndex).trim();
+  const tail = firstNumber.slice(lastDashIndex + 1).trim();
+  const floorCode = String(floorLevel);
+  const rawSequence =
+    tail.startsWith(floorCode) && tail.length > floorCode.length
+      ? tail.slice(floorCode.length)
+      : tail;
   const parsedSequence = Number(rawSequence);
 
   return {
@@ -361,7 +391,7 @@ function floorPlansFromSetup(setup: ProjectSetupResponse): FloorPlanForm[] {
       const numbering = floorNumberingFromUnits(
         floorUnits,
         floor.level,
-        block.normalizedCode || block.code,
+        defaultNumberPrefix(block.normalizedCode || block.code),
       );
 
       return {
@@ -549,6 +579,8 @@ export default function ProjectSalesCenterPage() {
   const [inventoryPreview, setInventoryPreview] =
     useState<InventoryPreview | null>(null);
   const [inventoryEditMode, setInventoryEditMode] = useState(false);
+  const [numberingMode, setNumberingMode] =
+    useState<ProjectNumberingMode>("FLOOR_CODED");
   const [spacesProject, setSpacesProject] =
     useState<ProjectSetupResponse | null>(null);
   const [projectSpaces, setProjectSpaces] = useState<ProjectSpaceForm[]>([]);
@@ -1214,6 +1246,7 @@ export default function ProjectSalesCenterPage() {
       setInventoryProject(setup);
       setStructureProject(setup);
       setEditingProject(setup);
+      setNumberingMode(inferProjectNumberingMode(setup.units));
       setFloorPlans(floorPlansFromSetup(setup));
       setInventoryPreview(null);
       setInventoryEditMode(false);
@@ -1694,11 +1727,14 @@ export default function ProjectSalesCenterPage() {
   };
 
   const buildInventoryPayload = () => ({
+    numberingMode,
     floorPlans: floorPlans
       .map((floorPlan) => ({
         blockCode: floorPlan.blockCode,
         floorLevel: floorPlan.floorLevel,
-        numberPrefix: floorPlan.numberPrefix.trim() || floorPlan.blockCode,
+        numberPrefix:
+          floorPlan.numberPrefix.trim() ||
+          defaultNumberPrefix(floorPlan.blockCode),
         startingSequence: positiveInteger(floorPlan.startingSequence),
         unitGroups: floorPlan.unitGroups
           .filter((group) => countValue(group.count) > 0)
@@ -1875,6 +1911,7 @@ export default function ProjectSalesCenterPage() {
       setInventoryProject(refreshedSetup);
       setStructureProject(refreshedSetup);
       setEditingProject(refreshedSetup);
+      setNumberingMode(inferProjectNumberingMode(refreshedSetup.units));
       setFloorPlans(floorPlansFromSetup(refreshedSetup));
       setInventoryPreview(null);
       setInventoryEditMode(false);
@@ -2544,12 +2581,17 @@ export default function ProjectSalesCenterPage() {
             preview={inventoryPreview}
             busyAction={busyAction}
             editMode={inventoryEditMode}
+            numberingMode={numberingMode}
             onUpdateFloorPlan={updateFloorPlan}
             onUpdateUnitGroup={updateUnitGroup}
             onToggleFacade={toggleUnitFacade}
             onAddUnitGroup={addUnitGroup}
             onRemoveUnitGroup={removeUnitGroup}
             onCopyToAll={copyFloorDistributionToAll}
+            onNumberingModeChange={(nextMode) => {
+              setNumberingMode(nextMode);
+              setInventoryPreview(null);
+            }}
             onPreview={previewInventory}
             onApply={applyInventory}
             onReplace={replaceInventory}
@@ -4432,12 +4474,14 @@ function ProjectInventoryView({
   preview,
   busyAction,
   editMode,
+  numberingMode,
   onUpdateFloorPlan,
   onUpdateUnitGroup,
   onToggleFacade,
   onAddUnitGroup,
   onRemoveUnitGroup,
   onCopyToAll,
+  onNumberingModeChange,
   onPreview,
   onApply,
   onReplace,
@@ -4451,6 +4495,7 @@ function ProjectInventoryView({
   preview: InventoryPreview | null;
   busyAction: string | null;
   editMode: boolean;
+  numberingMode: ProjectNumberingMode;
   onUpdateFloorPlan: <K extends keyof FloorPlanForm>(
     floorKey: string,
     field: K,
@@ -4473,6 +4518,7 @@ function ProjectInventoryView({
     floorKey: string,
     options: FloorCopyOptions,
   ) => void;
+  onNumberingModeChange: (mode: ProjectNumberingMode) => void;
   onPreview: () => void;
   onApply: () => void;
   onReplace: () => void;
@@ -4650,6 +4696,13 @@ function ProjectInventoryView({
           </InfoBand>
         )}
       </section>
+
+      <ProjectInventoryNumberingPanel
+        floorPlans={floorPlans}
+        numberingMode={numberingMode}
+        disabled={inventoryLocked || Boolean(busyAction)}
+        onChange={onNumberingModeChange}
+      />
 
       <section
         style={{
@@ -4984,7 +5037,12 @@ function ProjectInventoryView({
                         event.target.value,
                       )
                     }
-                    disabled={inventoryLocked}
+                    disabled={inventoryLocked || numberingMode === "CONTINUOUS"}
+                    title={
+                      numberingMode === "CONTINUOUS"
+                        ? "Sıralı yöntemde başlangıç numarası önceki kattan otomatik hesaplanır."
+                        : undefined
+                    }
                     style={inputStyle}
                   />
                 </Field>

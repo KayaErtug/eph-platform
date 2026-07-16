@@ -1,4 +1,4 @@
-﻿export type NoticeState = {
+export type NoticeState = {
   tone: "success" | "warning" | "error";
   title: string;
   message: string;
@@ -69,6 +69,7 @@ export type PageMode =
   | "publish";
 
 export type WizardStep = 1 | 2 | 3 | 4 | 5;
+export type ProjectNumberingMode = "FLOOR_CODED" | "CONTINUOUS";
 export type ProjectSaveDestination =
   | "stay"
   | "structure"
