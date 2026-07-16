@@ -22,3 +22,9 @@ CREATE UNIQUE INDEX "ProjectScene_projectId_key" ON "ProjectScene"("projectId");
 
 -- CreateIndex
 CREATE INDEX "ProjectScene_status_idx" ON "ProjectScene"("status");
+
+-- AddForeignKey
+ALTER TABLE "ProjectScene"
+ADD CONSTRAINT "ProjectScene_projectId_fkey"
+FOREIGN KEY ("projectId") REFERENCES "Project"("id")
+ON DELETE CASCADE ON UPDATE CASCADE;
