@@ -4,7 +4,12 @@ import {
   HttpStatus,
   Injectable,
 } from '@nestjs/common';
-import { AuditAction, PhoneVerificationSecurity, Prisma } from '@prisma/client';
+import {
+  AuditAction,
+  PendingRegistrationStatus,
+  PhoneVerificationSecurity,
+  Prisma,
+} from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { FirebasePhoneVerificationService } from './firebase-phone-verification.service';
@@ -457,6 +462,21 @@ export class PhoneVerificationSecurityService {
 
           lastIpAddress: context.ipAddress,
           lastUserAgent: context.userAgent,
+        },
+      });
+
+      await tx.pendingRegistration.update({
+        where: {
+          id: pendingRegistrationId,
+        },
+        data: {
+          phoneVerified: true,
+          phoneVerifiedAt: now,
+          phoneVerificationCodeHash: null,
+          phoneVerificationExpiresAt: null,
+          phoneVerificationAttempts: 0,
+          phoneVerificationLastSentAt: null,
+          status: PendingRegistrationStatus.EMAIL_VERIFICATION_PENDING,
         },
       });
 

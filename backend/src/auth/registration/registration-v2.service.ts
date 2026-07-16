@@ -1,16 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Capability, Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
-import {
-  RegistrationType,
-  RegisterDto,
-} from '../dto/register.dto';
+import { RegistrationType, RegisterDto } from '../dto/register.dto';
 import { EmailVerificationV2Service } from '../email/email-verification-v2.service';
-import { PhoneOtpService } from '../otp/phone-otp.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UsersService } from '../../users/users.service';
 import { PendingRegistrationService } from './pending-registration.service';
@@ -27,12 +20,13 @@ export class RegistrationV2Service {
     private readonly usersService: UsersService,
     private readonly prisma: PrismaService,
     private readonly pendingService: PendingRegistrationService,
-    private readonly phoneOtpService: PhoneOtpService,
     private readonly emailVerificationService: EmailVerificationV2Service,
   ) {}
 
   private normalizeEmail(email: string) {
-    return String(email || '').trim().toLowerCase();
+    return String(email || '')
+      .trim()
+      .toLowerCase();
   }
 
   private resolveMailRegistrationType(
@@ -59,9 +53,7 @@ export class RegistrationV2Service {
     let code = 'EPH-';
 
     for (let index = 0; index < 8; index += 1) {
-      code += chars.charAt(
-        Math.floor(Math.random() * chars.length),
-      );
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
 
     return code;
@@ -86,25 +78,20 @@ export class RegistrationV2Service {
     const email = this.normalizeEmail(dto.email);
     const phone = String(dto.phone || '').trim();
 
-    const [existingEmail, existingPhone] =
-      await Promise.all([
-        this.usersService.findByEmail(email),
-        this.prisma.user.findUnique({
-          where: { phone },
-          select: { id: true },
-        }),
-      ]);
+    const [existingEmail, existingPhone] = await Promise.all([
+      this.usersService.findByEmail(email),
+      this.prisma.user.findUnique({
+        where: { phone },
+        select: { id: true },
+      }),
+    ]);
 
     if (existingEmail) {
-      throw new BadRequestException(
-        'Bu e-posta zaten kayıtlı.',
-      );
+      throw new BadRequestException('Bu e-posta zaten kayıtlı.');
     }
 
     if (existingPhone) {
-      throw new BadRequestException(
-        'Bu telefon numarası zaten kayıtlı.',
-      );
+      throw new BadRequestException('Bu telefon numarası zaten kayıtlı.');
     }
 
     const allowedRoles: Role[] = [
@@ -120,151 +107,60 @@ export class RegistrationV2Service {
     if (dto.inviteCode?.trim()) {
       inviteCode = dto.inviteCode.trim().toUpperCase();
 
-      const referral =
-        await this.prisma.referralCandidate.findFirst({
-          where: {
-            referralCode: inviteCode,
-            isActive: true,
-            usedAt: null,
-          },
-        });
+      const referral = await this.prisma.referralCandidate.findFirst({
+        where: {
+          referralCode: inviteCode,
+          isActive: true,
+          usedAt: null,
+        },
+      });
 
       if (!referral) {
-        throw new BadRequestException(
-          'Referans kodu bulunamadı.',
-        );
+        throw new BadRequestException('Referans kodu bulunamadı.');
       }
 
       role = referral.role;
       referralCandidateId = referral.id;
     } else if (!allowedRoles.includes(role)) {
-      throw new BadRequestException(
-        'Geçerli bir meslek seçiniz.',
-      );
+      throw new BadRequestException('Geçerli bir meslek seçiniz.');
     }
 
-    const passwordHash = await bcrypt.hash(
-      dto.password,
-      10,
-    );
+    const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    const pending =
-      await this.pendingService.createOrReplace({
-        firstName: dto.firstName.trim(),
-        lastName: dto.lastName.trim(),
-        email,
-        phone,
-        passwordHash,
-        city: dto.city.trim(),
-        role,
-        registrationType:
-          dto.registrationType ||
-          RegistrationType.EMLAK_DANISMANI,
-        inviteCode,
-        referralCandidateId,
-      });
-
-    await this.phoneOtpService.send(pending.id);
+    const pending = await this.pendingService.createOrReplace({
+      firstName: dto.firstName.trim(),
+      lastName: dto.lastName.trim(),
+      email,
+      phone,
+      passwordHash,
+      city: dto.city.trim(),
+      role,
+      registrationType:
+        dto.registrationType || RegistrationType.EMLAK_DANISMANI,
+      inviteCode,
+      referralCandidateId,
+    });
 
     return {
       success: true,
       pendingRegistrationId: pending.id,
       requiresPhoneVerification: true,
+      firebasePhoneVerificationRequired: true,
       phone: pending.phone,
-      message: 'Telefon doğrulama kodu gönderildi.',
-    };
-  }
-
-  async verifyPhoneOtp(
-    pendingRegistrationId: string,
-    code: string,
-  ) {
-    const pending =
-      await this.pendingService.findById(
-        pendingRegistrationId,
-      );
-
-    if (!pending) {
-      throw new BadRequestException(
-        'Kayıt doğrulama oturumu bulunamadı.',
-      );
-    }
-
-    if (pending.phoneVerified) {
-      return {
-        success: true,
-        alreadyVerified: true,
-        pendingRegistrationId: pending.id,
-        requiresEmailVerification: true,
-        message:
-          'Telefon numaranız zaten doğrulanmış.',
-      };
-    }
-
-    await this.phoneOtpService.verify(
-      pendingRegistrationId,
-      code,
-    );
-
-    const updated =
-      await this.pendingService.markPhoneVerified(
-        pendingRegistrationId,
-      );
-
-    return {
-      success: true,
-      pendingRegistrationId: updated.id,
-      phoneVerified: true,
-      requiresEmailVerification: true,
-      email: updated.email,
       message:
-        'Telefon numaranız doğrulandı. E-posta doğrulamasına devam ediniz.',
+        'Üyelik bilgileriniz kaydedildi. Firebase telefon doğrulamasına devam ediniz.',
     };
   }
 
-  async resendPhoneOtp(
-    pendingRegistrationId: string,
-  ) {
-    const pending =
-      await this.pendingService.findById(
-        pendingRegistrationId,
-      );
+  async sendEmailCode(pendingRegistrationId: string) {
+    const pending = await this.pendingService.findById(pendingRegistrationId);
 
     if (!pending) {
-      throw new BadRequestException(
-        'Kayıt doğrulama oturumu bulunamadı.',
-      );
-    }
-
-    if (pending.phoneVerified) {
-      throw new BadRequestException(
-        'Telefon numarası zaten doğrulanmış.',
-      );
-    }
-
-    return this.phoneOtpService.send(
-      pendingRegistrationId,
-    );
-  }
-
-  async sendEmailCode(
-    pendingRegistrationId: string,
-  ) {
-    const pending =
-      await this.pendingService.findById(
-        pendingRegistrationId,
-      );
-
-    if (!pending) {
-      throw new BadRequestException(
-        'Kayıt doğrulama oturumu bulunamadı.',
-      );
+      throw new BadRequestException('Kayıt doğrulama oturumu bulunamadı.');
     }
 
     if (!pending.phoneVerified) {
-      throw new BadRequestException(
-        'Önce telefon doğrulamasını tamamlayınız.',
-      );
+      throw new BadRequestException('Önce telefon doğrulamasını tamamlayınız.');
     }
 
     if (pending.emailVerified) {
@@ -272,51 +168,37 @@ export class RegistrationV2Service {
         success: true,
         alreadyVerified: true,
         pendingRegistrationId: pending.id,
-        message:
-          'E-posta adresiniz zaten doğrulanmış.',
+        message: 'E-posta adresiniz zaten doğrulanmış.',
       };
     }
 
-    const registrationType =
-      this.resolveMailRegistrationType(
-        pending.role,
-        pending.registrationType,
-      );
+    const registrationType = this.resolveMailRegistrationType(
+      pending.role,
+      pending.registrationType,
+    );
 
-    const result =
-      await this.emailVerificationService.send(
-        pending.id,
-        registrationType,
-      );
+    const result = await this.emailVerificationService.send(
+      pending.id,
+      registrationType,
+    );
 
     return {
       ...result,
       pendingRegistrationId: pending.id,
       email: pending.email,
-      message:
-        'E-posta doğrulama kodu gönderildi.',
+      message: 'E-posta doğrulama kodu gönderildi.',
     };
   }
 
-  async verifyEmailV2(
-    pendingRegistrationId: string,
-    code: string,
-  ) {
-    const pending =
-      await this.pendingService.findById(
-        pendingRegistrationId,
-      );
+  async verifyEmailV2(pendingRegistrationId: string, code: string) {
+    const pending = await this.pendingService.findById(pendingRegistrationId);
 
     if (!pending) {
-      throw new BadRequestException(
-        'Kayıt doğrulama oturumu bulunamadı.',
-      );
+      throw new BadRequestException('Kayıt doğrulama oturumu bulunamadı.');
     }
 
     if (!pending.phoneVerified) {
-      throw new BadRequestException(
-        'Önce telefon doğrulamasını tamamlayınız.',
-      );
+      throw new BadRequestException('Önce telefon doğrulamasını tamamlayınız.');
     }
 
     if (pending.emailVerified) {
@@ -325,20 +207,15 @@ export class RegistrationV2Service {
         alreadyVerified: true,
         pendingRegistrationId: pending.id,
         readyToComplete: true,
-        message:
-          'E-posta adresiniz zaten doğrulanmış.',
+        message: 'E-posta adresiniz zaten doğrulanmış.',
       };
     }
 
-    await this.emailVerificationService.verify(
-      pendingRegistrationId,
-      code,
-    );
+    await this.emailVerificationService.verify(pendingRegistrationId, code);
 
-    const updated =
-      await this.pendingService.markEmailVerified(
-        pendingRegistrationId,
-      );
+    const updated = await this.pendingService.markEmailVerified(
+      pendingRegistrationId,
+    );
 
     return {
       success: true,
@@ -350,18 +227,11 @@ export class RegistrationV2Service {
     };
   }
 
-  async completeRegistration(
-    pendingRegistrationId: string,
-  ) {
-    const pending =
-      await this.pendingService.findById(
-        pendingRegistrationId,
-      );
+  async completeRegistration(pendingRegistrationId: string) {
+    const pending = await this.pendingService.findById(pendingRegistrationId);
 
     if (!pending) {
-      throw new BadRequestException(
-        'Kayıt doğrulama oturumu bulunamadı.',
-      );
+      throw new BadRequestException('Kayıt doğrulama oturumu bulunamadı.');
     }
 
     if (!pending.phoneVerified || !pending.emailVerified) {
@@ -371,22 +241,18 @@ export class RegistrationV2Service {
     }
 
     if (pending.completedAt) {
-      const existingUser =
-        await this.prisma.user.findFirst({
-          where: {
-            OR: [
-              { email: pending.email },
-              { phone: pending.phone },
-            ],
-          },
-          select: {
-            id: true,
-            email: true,
-            phone: true,
-            isApproved: true,
-            isVerified: true,
-          },
-        });
+      const existingUser = await this.prisma.user.findFirst({
+        where: {
+          OR: [{ email: pending.email }, { phone: pending.phone }],
+        },
+        select: {
+          id: true,
+          email: true,
+          phone: true,
+          isApproved: true,
+          isVerified: true,
+        },
+      });
 
       if (existingUser) {
         return {
@@ -395,24 +261,19 @@ export class RegistrationV2Service {
           userId: existingUser.id,
           isApproved: existingUser.isApproved,
           isVerified: existingUser.isVerified,
-          message:
-            'Üyelik kaydınız daha önce tamamlanmış.',
+          message: 'Üyelik kaydınız daha önce tamamlanmış.',
         };
       }
     }
 
-    const duplicateUser =
-      await this.prisma.user.findFirst({
-        where: {
-          OR: [
-            { email: pending.email },
-            { phone: pending.phone },
-          ],
-        },
-        select: {
-          id: true,
-        },
-      });
+    const duplicateUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email: pending.email }, { phone: pending.phone }],
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (duplicateUser) {
       throw new BadRequestException(
@@ -420,8 +281,7 @@ export class RegistrationV2Service {
       );
     }
 
-    const referralCode =
-      await this.generateUniqueReferralCode();
+    const referralCode = await this.generateUniqueReferralCode();
 
     const user = await this.prisma.user.create({
       data: {
@@ -433,17 +293,13 @@ export class RegistrationV2Service {
         passwordHash: pending.passwordHash,
         role: pending.role,
         isVerified: true,
-        emailVerifiedAt:
-          pending.emailVerifiedAt || new Date(),
+        emailVerifiedAt: pending.emailVerifiedAt || new Date(),
         isApproved: false,
         referralCode,
       },
     });
 
-    if (
-      pending.registrationType ===
-      RegistrationType.EMLAK_OFISI
-    ) {
+    if (pending.registrationType === RegistrationType.EMLAK_OFISI) {
       await this.prisma.userCapability.upsert({
         where: {
           userId_capability: {
@@ -474,9 +330,7 @@ export class RegistrationV2Service {
       });
     }
 
-    await this.pendingService.markCompleted(
-      pending.id,
-    );
+    await this.pendingService.markCompleted(pending.id);
 
     return {
       success: true,

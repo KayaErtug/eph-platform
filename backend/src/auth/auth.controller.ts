@@ -17,14 +17,13 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { PrepareFirebasePhoneVerificationDto } from './dto/prepare-firebase-phone-verification.dto';
 import { RegisterDto } from './dto/register.dto';
-import { ResendPhoneOtpDto } from './dto/resend-phone-otp.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SendEmailCodeDto } from './dto/send-email-code.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { VerifyEmailV2Dto } from './dto/verify-email-v2.dto';
 import { VerifyPasswordResetCodeDto } from './dto/verify-password-reset-code.dto';
-import { VerifyPhoneOtpDto } from './dto/verify-phone-otp.dto';
+import { VerifyFirebasePhoneOtpDto } from './dto/verify-firebase-phone-otp.dto';
 import { FirebasePhoneRegistrationService } from './firebase/firebase-phone-registration.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -74,17 +73,20 @@ export class AuthController {
     );
   }
 
-  @Post('verify-phone-otp')
-  verifyPhoneOtp(@Body() dto: VerifyPhoneOtpDto) {
-    return this.registrationV2Service.verifyPhoneOtp(
+  @Post('verify-firebase-phone-otp')
+  verifyFirebasePhoneOtp(
+    @Body() dto: VerifyFirebasePhoneOtpDto,
+    @Headers('x-forwarded-for')
+    forwardedFor: HeaderValue,
+    @Headers('user-agent')
+    userAgent: HeaderValue,
+  ) {
+    return this.firebasePhoneRegistrationService.verifyCode(
       dto.pendingRegistrationId,
+      dto.sessionInfo,
       dto.code,
+      this.buildRequestContext(forwardedFor, userAgent),
     );
-  }
-
-  @Post('resend-phone-otp')
-  resendPhoneOtp(@Body() dto: ResendPhoneOtpDto) {
-    return this.registrationV2Service.resendPhoneOtp(dto.pendingRegistrationId);
   }
 
   @Post('send-email-code')

@@ -13,8 +13,6 @@ import { FirebasePhoneVerificationService } from './firebase/firebase-phone-veri
 import { PhoneVerificationSecurityService } from './firebase/phone-verification-security.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
-import { NetgsmService } from './otp/netgsm.service';
-import { PhoneOtpService } from './otp/phone-otp.service';
 import { PendingRegistrationService } from './registration/pending-registration.service';
 import { RegistrationV2Service } from './registration/registration-v2.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -33,9 +31,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     AuthService,
     RegistrationV2Service,
     PendingRegistrationService,
-
-    PhoneOtpService,
-    NetgsmService,
 
     FirebasePhoneVerificationService,
     PhoneVerificationSecurityService,
