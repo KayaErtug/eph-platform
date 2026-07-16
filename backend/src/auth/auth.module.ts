@@ -8,6 +8,7 @@ import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { EmailVerificationV2Service } from './email/email-verification-v2.service';
+import { FirebasePhoneRegistrationService } from './firebase/firebase-phone-registration.service';
 import { FirebasePhoneVerificationService } from './firebase/firebase-phone-verification.service';
 import { PhoneVerificationSecurityService } from './firebase/phone-verification-security.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -38,6 +39,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 
     FirebasePhoneVerificationService,
     PhoneVerificationSecurityService,
+    FirebasePhoneRegistrationService,
 
     EmailVerificationV2Service,
 
@@ -54,6 +56,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     RegistrationV2Service,
     FirebasePhoneVerificationService,
     PhoneVerificationSecurityService,
+    FirebasePhoneRegistrationService,
   ],
 })
 export class AuthModule {}
