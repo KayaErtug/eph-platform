@@ -21,12 +21,12 @@ export class ProjectSalesSetupFilteredService extends ProjectSalesSetupService {
               ownerId: userId,
             }),
       },
-      select: this.projectListSelect(),
+      select: this.filteredProjectListSelect(),
       orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
     });
   }
 
-  private projectListSelect(): Prisma.ProjectSelect {
+  private filteredProjectListSelect(): Prisma.ProjectSelect {
     return {
       id: true,
       name: true,
