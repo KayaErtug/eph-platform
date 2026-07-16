@@ -1,0 +1,117 @@
+name: One-shot Project 3D Schema
+
+on:
+  push:
+    branches:
+      - feature/project-3d-phase1
+    paths:
+      - .github/workflows/one-shot-project-3d-schema.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/project-3d-phase1
+          fetch-depth: 0
+
+      - name: Update Prisma schema
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('backend/prisma/schema.prisma')
+          text = path.read_text(encoding='utf-8-sig')
+
+          project_anchor = '  mediaPackages                ProjectMediaPackage[]\n'
+          if 'scene                        ProjectScene?' not in text:
+              if project_anchor not in text:
+                  raise SystemExit('Project relation anchor not found')
+              text = text.replace(
+                  project_anchor,
+                  project_anchor + '  scene                        ProjectScene?\n',
+                  1,
+              )
+
+          if 'model ProjectScene {' not in text:
+              model_anchor = 'model ProjectBlock {'
+              if model_anchor not in text:
+                  raise SystemExit('ProjectBlock anchor not found')
+              scene_model = '''model ProjectScene {
+  id            String             @id @default(uuid())
+  projectId     String             @unique
+  schemaVersion Int                @default(1)
+  version       Int                @default(1)
+  status        ProjectSceneStatus @default(TASLAK)
+  sceneData     Json
+  thumbnailUrl  String?
+  completedAt   DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  project       Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+'''
+              text = text.replace(model_anchor, scene_model + model_anchor, 1)
+
+          if '  MODEL_3D\n' not in text:
+              wizard_anchor = '  NUMARALANDIRMA\n  KONTROL\n'
+              if wizard_anchor not in text:
+                  raise SystemExit('Wizard enum anchor not found')
+              text = text.replace(
+                  wizard_anchor,
+                  '  NUMARALANDIRMA\n  MODEL_3D\n  KONTROL\n',
+                  1,
+              )
+
+          if 'enum ProjectSceneStatus {' not in text:
+              status_anchor = 'enum ProjectLegalStatus {'
+              if status_anchor not in text:
+                  raise SystemExit('Legal status enum anchor not found')
+              scene_status = '''enum ProjectSceneStatus {
+  TASLAK
+  TAMAMLANDI
+  ATLANDI
+}
+
+'''
+              text = text.replace(status_anchor, scene_status + status_anchor, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Format and validate Prisma
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/eph
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/eph
+        run: |
+          npx prisma format --schema prisma/schema.prisma
+          npx prisma validate --schema prisma/schema.prisma
+          npx prisma generate --schema prisma/schema.prisma
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Commit schema and remove workflow
+        shell: bash
+        run: |
+          git config user.name "EPH Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/workflows/one-shot-project-3d-schema.yml
+          git add backend/prisma/schema.prisma
+          git commit -m "feat: add project 3d scene schema"
+          git push origin HEAD:feature/project-3d-phase1
