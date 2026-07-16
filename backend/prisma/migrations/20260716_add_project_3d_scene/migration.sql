@@ -1,9 +1,6 @@
 -- CreateEnum
 CREATE TYPE "ProjectSceneStatus" AS ENUM ('TASLAK', 'TAMAMLANDI', 'ATLANDI');
 
--- AlterEnum
-ALTER TYPE "ProjectWizardStep" ADD VALUE IF NOT EXISTS 'MODEL_3D' BEFORE 'KONTROL';
-
 -- CreateTable
 CREATE TABLE "ProjectScene" (
     "id" TEXT NOT NULL,
@@ -25,6 +22,3 @@ CREATE UNIQUE INDEX "ProjectScene_projectId_key" ON "ProjectScene"("projectId");
 
 -- CreateIndex
 CREATE INDEX "ProjectScene_status_idx" ON "ProjectScene"("status");
-
--- AddForeignKey
-ALTER TABLE "ProjectScene" ADD CONSTRAINT "ProjectScene_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
