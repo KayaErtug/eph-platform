@@ -1,0 +1,20 @@
+enum ProjectSceneStatus {
+  TASLAK
+  TAMAMLANDI
+  ATLANDI
+}
+
+model ProjectScene {
+  id            String             @id @default(uuid())
+  projectId     String             @unique
+  schemaVersion Int                @default(1)
+  version       Int                @default(1)
+  status        ProjectSceneStatus @default(TASLAK)
+  sceneData     Json
+  thumbnailUrl  String?
+  completedAt   DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([status])
+}
