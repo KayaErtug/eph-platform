@@ -8,6 +8,7 @@ import { ProjectSalesInventoryService } from './project-sales-inventory.service'
 import { ProjectSalesLaunchService } from './project-sales-launch.service';
 import { ProjectSalesMediaSetupService } from './project-sales-media-setup.service';
 import { ProjectSalesPresentationShareController } from './project-sales-presentation-share.controller';
+import { ProjectSalesSetupFilteredService } from './project-sales-setup-filtered.service';
 import { ProjectSalesSetupService } from './project-sales-setup.service';
 import { ProjectSalesSpacesService } from './project-sales-spaces.service';
 import { ProjectSalesStockService } from './project-sales-stock.service';
@@ -25,7 +26,10 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesMediaSetupService,
     ProjectMediaZipService,
     ProjectSalesDashboardService,
-    ProjectSalesSetupService,
+    {
+      provide: ProjectSalesSetupService,
+      useClass: ProjectSalesSetupFilteredService,
+    },
     ProjectSalesSpacesService,
     ProjectSalesStockService,
     ProjectSalesStructureService,
