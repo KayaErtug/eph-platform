@@ -22,3 +22,17 @@ CREATE UNIQUE INDEX "ProjectScene_projectId_key" ON "ProjectScene"("projectId");
 
 -- CreateIndex
 CREATE INDEX "ProjectScene_status_idx" ON "ProjectScene"("status");
+
+-- Keep scene cleanup aligned with project deletion without coupling Prisma models.
+CREATE OR REPLACE FUNCTION "cleanupProjectSceneOnProjectDelete"()
+RETURNS TRIGGER AS $$
+BEGIN
+    DELETE FROM "ProjectScene" WHERE "projectId" = OLD."id";
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "ProjectScene_project_delete_cleanup"
+BEFORE DELETE ON "Project"
+FOR EACH ROW
+EXECUTE FUNCTION "cleanupProjectSceneOnProjectDelete"();
