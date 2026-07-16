@@ -6,12 +6,16 @@ on:
       - feature/project-auto-numbering
     paths:
       - .github/workflows/one-shot-project-auto-numbering.yml
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   patch-build-commit:
+    if: github.event_name == 'push' || github.head_ref == 'feature/project-auto-numbering'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout branch
