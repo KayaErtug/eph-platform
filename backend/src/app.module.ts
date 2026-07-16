@@ -35,6 +35,7 @@ import { LinaModule } from './lina/lina.module';
 import { TuranModule } from './turan/turan.module';
 import { ProjectSalesModule } from './project-sales/project-sales.module';
 import { ProjectSalesTemplatesModule } from './project-sales-templates/project-sales-templates.module';
+import { ProjectSceneModule } from './project-scene/project-scene.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { ProjectSalesTemplatesModule } from './project-sales-templates/project-s
     UnitsModule,
     ProjectSalesModule,
     ProjectSalesTemplatesModule,
+    ProjectSceneModule,
 
     NominationsModule,
     ApplicationsModule,
