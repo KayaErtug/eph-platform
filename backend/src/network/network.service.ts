@@ -13,6 +13,8 @@ import {
 import { randomUUID } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { PropertyCriteriaService } from "../property-criteria/property-criteria.service";
+import { PropertyValidationService } from "../property-validation/property-validation.service";
+import { PropertyValidationContext } from "../property-validation/property-validation.types";
 import { PushService } from "../push/push.service";
 
 const PLATFORM_URL =
@@ -40,6 +42,7 @@ type CreateNetworkPostDto = {
   roomCounts?: string[] | null;
   features?: string[] | null;
   priceCurrency?: string | null;
+  acknowledgedWarningCodes?: string[] | null;
   areas?: Array<{
     city?: string | null;
     district?: string | null;
@@ -82,6 +85,7 @@ type UpdateNetworkPostDto = {
   roomCounts?: string[] | null;
   features?: string[] | null;
   priceCurrency?: string | null;
+  acknowledgedWarningCodes?: string[] | null;
   areas?: Array<{
     city?: string | null;
     district?: string | null;
@@ -318,6 +322,7 @@ export class NetworkService {
     private readonly prisma: PrismaService,
     private readonly pushService: PushService,
     private readonly propertyCriteriaService: PropertyCriteriaService,
+    private readonly propertyValidationService: PropertyValidationService,
   ) {}
 
   private normalizeNetworkPostCriteria(
@@ -352,6 +357,61 @@ export class NetworkService {
       criteria,
       exactBudget,
     };
+  }
+
+  private validatePropertyDemandInput(
+    category: string,
+    dto: CreateNetworkPostDto | UpdateNetworkPostDto,
+  ) {
+    if (category !== "PORTFOY_ARIYORUM") {
+      return;
+    }
+
+    const propertyTypes = this.propertyCriteriaService.normalize({
+      recordKind: "DEMAND",
+      source: "REQUEST_CENTER",
+      propertyTypes: dto.propertyTypes,
+      isActive: true,
+    }).propertyTypes;
+
+    const result = this.propertyValidationService.validate({
+      context: PropertyValidationContext.DEMAND,
+      recordKind: "DEMAND",
+      source: "REQUEST_CENTER",
+      propertyTypes,
+      acknowledgedWarningCodes: dto.acknowledgedWarningCodes ?? [],
+      values: {
+        minArea: dto.minArea,
+        maxArea: dto.maxArea,
+        minBudget: dto.minBudget ?? dto.budget,
+        maxBudget: dto.maxBudget ?? dto.budget,
+        roomCounts: dto.roomCounts,
+      },
+    });
+
+    if (!result.valid) {
+      const blockingIssues = result.issues.filter(
+        (issue) => issue.blocking,
+      );
+
+      throw new BadRequestException({
+        code: "PROPERTY_VALIDATION_FAILED",
+        message:
+          blockingIssues[0]?.message ||
+          "Gayrimenkul kriterlerinde geçersiz değerler bulunmaktadır.",
+        issues: blockingIssues,
+      });
+    }
+
+    if (result.requiresConfirmation) {
+      throw new BadRequestException({
+        code: "PROPERTY_VALIDATION_CONFIRMATION_REQUIRED",
+        message:
+          result.warnings[0]?.message ||
+          "Olağan dışı gayrimenkul kriterleri için kullanıcı onayı gereklidir.",
+        issues: result.warnings,
+      });
+    }
   }
 
   private async validateForumPostInput(
@@ -1275,6 +1335,31 @@ export class NetworkService {
       actionUser.id,
     );
 
+    this.validatePropertyDemandInput(validated.category, {
+      ...dto,
+      userId: existing.userId,
+      type: dto.type ?? existing.type,
+      title: dto.title ?? existing.title,
+      description: dto.description ?? existing.description,
+      city: dto.city ?? existing.city,
+      district: dto.district ?? existing.district,
+      neighborhood: dto.neighborhood ?? existing.neighborhood,
+      budget: dto.budget ?? existing.budget,
+      minArea: dto.minArea ?? existing.minArea,
+      maxArea: dto.maxArea ?? existing.maxArea,
+      minBudget: dto.minBudget ?? existing.minBudget,
+      maxBudget: dto.maxBudget ?? existing.maxBudget,
+      propertyTypes: dto.propertyTypes ?? existing.propertyTypes,
+      roomCounts: dto.roomCounts ?? existing.roomCounts,
+      features: dto.features ?? existing.features,
+      priceCurrency: dto.priceCurrency ?? existing.priceCurrency,
+      areas:
+        dto.areas ??
+        (Array.isArray(existing.areas)
+          ? (existing.areas as CreateNetworkPostDto["areas"])
+          : null),
+    });
+
     const { criteria, exactBudget } =
       this.normalizeNetworkPostCriteria({
         ...dto,
@@ -1464,6 +1549,8 @@ export class NetworkService {
       { ...dto, userId: actionUserId },
       "create",
     );
+
+    this.validatePropertyDemandInput(validated.category, dto);
 
     const { criteria, exactBudget } =
       this.normalizeNetworkPostCriteria(dto);
