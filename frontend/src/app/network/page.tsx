@@ -68,6 +68,10 @@ type NetworkPost = {
   maxRoom?: number | null;
   minBudget?: number | null;
   maxBudget?: number | null;
+  propertyTypes?: string[] | null;
+  roomCounts?: string[] | null;
+  features?: string[] | null;
+  priceCurrency?: string | null;
   areas?: Array<{
     city?: string | null;
     district?: string | null;
@@ -122,6 +126,7 @@ type TopicForm = {
   title: string;
   category: ForumCategory | "";
   requestIntent: string;
+  propertyType: string;
   areas: ForumAreaEntry[];
   city: string;
   district: string;
@@ -312,6 +317,7 @@ const DEFAULT_FORM: TopicForm = {
   title: "",
   category: "",
   requestIntent: "",
+  propertyType: "",
   areas: [],
   city: "",
   district: "",
@@ -574,6 +580,10 @@ function formFromPost(post: NetworkPost): TopicForm {
     title: post.title || "",
     category: getCategoryOption(post.type).value,
     requestIntent: getRequestIntentFromPost(post),
+    propertyType:
+      Array.isArray(post.propertyTypes) && post.propertyTypes.length > 0
+        ? String(post.propertyTypes[0] || "")
+        : "",
     areas: normalizeForumAreas(post.areas),
     city: post.city || "",
     district: post.district || "",
@@ -585,7 +595,7 @@ function formFromPost(post: NetworkPost): TopicForm {
     maxRoom: post.maxRoom != null ? String(post.maxRoom) : "",
     minBudget: post.minBudget ? formatBudgetInput(String(post.minBudget)) : "",
     maxBudget: post.maxBudget ? formatBudgetInput(String(post.maxBudget)) : "",
-    currency: budgetCurrencyFromPost(post),
+    currency: post.priceCurrency || budgetCurrencyFromPost(post),
     detail: post.description || "",
     urgency: post.urgency || "Normal",
     validFor: validForFromExpiresAt(post.expiresAt),
@@ -807,6 +817,14 @@ export default function NetworkPage() {
       return;
     }
 
+    if (
+      form.category === "PORTFOY_ARIYORUM" &&
+      !form.propertyType
+    ) {
+      alert("Lütfen gayrimenkul tipini seçin.");
+      return;
+    }
+
     if (!form.title.trim()) {
       alert("Lütfen talep başlığını yazın.");
       return;
@@ -837,6 +855,11 @@ export default function NetworkPage() {
     const payload = {
       userId: user.id,
       type: selectedCategory.value,
+      propertyTypes:
+        form.category === "PORTFOY_ARIYORUM" && form.propertyType
+          ? [form.propertyType]
+          : [],
+      priceCurrency: form.currency,
       title: form.title.trim(),
       description: form.detail.trim(),
       city: form.city.trim() || null,
@@ -1844,6 +1867,7 @@ function topicFormToSchemaState(form: TopicForm): EPHSchemaState {
   return {
     category: form.category,
     requestIntent: form.requestIntent,
+    propertyType: form.propertyType,
     areas: form.areas as unknown as string[],
     title: form.title,
     city: form.city,
@@ -1868,6 +1892,7 @@ function schemaStateToTopicForm(state: EPHSchemaState): TopicForm {
   return {
     category: String(state.category || "") as ForumCategory | "",
     requestIntent: String(state.requestIntent || ""),
+    propertyType: String(state.propertyType || ""),
     areas: normalizeForumAreas(state.areas),
     title: String(state.title || ""),
     city: String(state.city || ""),

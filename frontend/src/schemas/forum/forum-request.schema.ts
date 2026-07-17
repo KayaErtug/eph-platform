@@ -5,6 +5,11 @@ import {
   type EPHSchemaOptionVisual,
   type EPHSchemaState,
 } from "@/components/schema-engine";
+import {
+  PROPERTY_TYPE_OPTIONS,
+  isKnownPropertyType,
+  propertyTypeSupportsRoomCount,
+} from "@/components/property-type-schema";
 
 export type ForumRequestCategory =
   | "PORTFOY_ARIYORUM"
@@ -164,6 +169,7 @@ export function getForumRequestCategoryVisual(
 export type ForumRequestFormState = EPHSchemaState & {
   category: ForumRequestCategory | "";
   requestIntent: string;
+  propertyType: string;
   title: string;
   city: string;
   district: string;
@@ -376,6 +382,13 @@ export function getForumRequestIntentVisual(intent?: string | null): EPHSchemaOp
   return FORUM_ALL_REQUEST_TYPE_OPTIONS.find((option) => option.value === normalized)?.visual || FORUM_REQUEST_CATEGORY_VISUALS.DIGER;
 }
 
+export const FORUM_PROPERTY_TYPE_OPTIONS: EPHSchemaOption[] =
+  PROPERTY_TYPE_OPTIONS.map((option) => ({
+    value: option.type,
+    label: option.label,
+    hint: `${option.mainCategory} / ${option.subCategory}`,
+  }));
+
 export const FORUM_REQUEST_CURRENCY_OPTIONS: EPHSchemaOption[] = [
   { value: "TRY", label: "Türk Lirası (₺)" },
   { value: "USD", label: "Dolar ($)" },
@@ -509,6 +522,7 @@ export function createEmptyForumRequestFormState(): ForumRequestFormState {
   return {
     category: "",
     requestIntent: "",
+    propertyType: "",
     title: "",
     city: "",
     district: "",
@@ -575,7 +589,12 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           order: 10,
           options: FORUM_REQUEST_CATEGORY_OPTIONS,
           searchable: true,
-          resetKeysOnChange: ["requestIntent"],
+          resetKeysOnChange: [
+            "requestIntent",
+            "propertyType",
+            "minRoom",
+            "maxRoom",
+          ],
           validation: {
             required: true,
             message: "Lütfen talep kategorisini seçin.",
@@ -635,6 +654,35 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           options: FORUM_ALL_REQUEST_TYPE_OPTIONS,
         },
         {
+          id: "forum-property-type",
+          key: "propertyType",
+          label: "Gayrimenkul Tipi",
+          type: "single-select",
+          modes: ["form", "detail", "lina"],
+          order: 25,
+          options: FORUM_PROPERTY_TYPE_OPTIONS,
+          searchable: true,
+          hidden: (state) =>
+            String(state.category || "") !== "PORTFOY_ARIYORUM" ||
+            !String(state.requestIntent || ""),
+          resetKeysOnChange: ["minRoom", "maxRoom"],
+          validation: {
+            required: true,
+            message: "Lütfen gayrimenkul tipini seçin.",
+            validate: (value) =>
+              isKnownPropertyType(String(value || ""))
+                ? null
+                : "Geçerli bir gayrimenkul tipi seçin.",
+          },
+          lina: {
+            meaning: "Talepte aranan gayrimenkul tipi",
+            analyticsKey: "forum_property_type",
+            entityPath: "forum.request.propertyType",
+            comparable: true,
+            synonyms: ["gayrimenkul tipi", "portföy tipi", "taşınmaz türü"],
+          },
+        },
+        {
           id: "forum-title",
           key: "title",
           label: "Talep Başlığı",
@@ -673,7 +721,8 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           placeholder: "Örn: 90",
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
-            !String(state.requestIntent || ""),
+            !String(state.requestIntent || "") ||
+            !String(state.propertyType || ""),
         },
         {
           id: "forum-max-area",
@@ -685,7 +734,8 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           placeholder: "Örn: 160",
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
-            !String(state.requestIntent || ""),
+            !String(state.requestIntent || "") ||
+            !String(state.propertyType || ""),
         },
         {
           id: "forum-min-room",
@@ -697,7 +747,12 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           placeholder: "Örn: 2",
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
-            !String(state.requestIntent || ""),
+            !String(state.requestIntent || "") ||
+            !String(state.propertyType || "") ||
+            !propertyTypeSupportsRoomCount(
+              String(state.propertyType || ""),
+              "DEMAND",
+            ),
         },
         {
           id: "forum-max-room",
@@ -709,7 +764,12 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           placeholder: "Örn: 4",
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
-            !String(state.requestIntent || ""),
+            !String(state.requestIntent || "") ||
+            !String(state.propertyType || "") ||
+            !propertyTypeSupportsRoomCount(
+              String(state.propertyType || ""),
+              "DEMAND",
+            ),
         },
         {
           id: "forum-min-budget",
@@ -721,7 +781,8 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           placeholder: "Örn: 2000000",
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
-            !String(state.requestIntent || ""),
+            !String(state.requestIntent || "") ||
+            !String(state.propertyType || ""),
         },
         {
           id: "forum-max-budget",
@@ -733,7 +794,8 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           placeholder: "Örn: 5000000",
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
-            !String(state.requestIntent || ""),
+            !String(state.requestIntent || "") ||
+            !String(state.propertyType || ""),
         },
       ],
     },
