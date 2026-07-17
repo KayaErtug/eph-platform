@@ -104,25 +104,53 @@ export class PropertyValidationService {
         issue.severity === PropertyValidationSeverity.DYNAMIC_INFORMATION,
     );
 
-    const acknowledgedWarningCodes = new Set(
-      input.acknowledgedWarningCodes ?? [],
+    const suppliedAcknowledgedWarningCodes = [
+      ...new Set(
+        (input.acknowledgedWarningCodes ?? [])
+          .filter((code): code is string => typeof code === 'string')
+          .map((code) => code.trim())
+          .filter(Boolean),
+      ),
+    ];
+
+    const currentWarningCodes = new Set(
+      warnings.map((warning) => warning.code),
     );
 
-    const requiresConfirmation = warnings.some(
-      (issue) => !acknowledgedWarningCodes.has(issue.code),
+    const acknowledgedWarningCodes =
+      suppliedAcknowledgedWarningCodes.filter((code) =>
+        currentWarningCodes.has(code),
+      );
+
+    const acknowledgedWarningCodeSet = new Set(
+      acknowledgedWarningCodes,
     );
+
+    const pendingWarnings = warnings.filter(
+      (warning) =>
+        !acknowledgedWarningCodeSet.has(warning.code),
+    );
+
+    const requiredWarningCodes = [
+      ...new Set(
+        pendingWarnings.map((warning) => warning.code),
+      ),
+    ];
 
     return {
       version: PROPERTY_VALIDATION_VERSION,
       valid: !issues.some((issue) => issue.blocking),
-      requiresConfirmation,
+      requiresConfirmation: pendingWarnings.length > 0,
       requiresEvidence: evidenceRequests.length > 0,
       issues,
       errors,
       conflicts,
       warnings,
+      pendingWarnings,
       evidenceRequests,
       dynamicInformation,
+      requiredWarningCodes,
+      acknowledgedWarningCodes,
     };
   }
 

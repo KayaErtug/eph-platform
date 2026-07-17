@@ -5,7 +5,7 @@ import type {
   PropertyCriteriaSource,
 } from '../property-criteria/property-criteria.types';
 
-export const PROPERTY_VALIDATION_VERSION = '1.0.0' as const;
+export const PROPERTY_VALIDATION_VERSION = '2.1.0' as const;
 
 export enum PropertyValidationSeverity {
   ERROR = 'ERROR',
@@ -86,8 +86,12 @@ export type PropertyValidationResult = {
   errors: PropertyValidationIssue[];
   conflicts: PropertyValidationIssue[];
   warnings: PropertyValidationIssue[];
+  pendingWarnings: PropertyValidationIssue[];
   evidenceRequests: PropertyValidationIssue[];
   dynamicInformation: PropertyValidationIssue[];
+
+  requiredWarningCodes: string[];
+  acknowledgedWarningCodes: string[];
 };
 
 export type PropertyValidationRule = {

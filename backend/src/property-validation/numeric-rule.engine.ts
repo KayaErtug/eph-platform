@@ -112,34 +112,74 @@ export class NumericRuleEngine {
       }
 
       if (rule.softMin !== undefined && value < rule.softMin) {
+        const baseCode = 'VALUE_BELOW_SOFT_MIN';
+
         issues.push(
           this.createIssue({
             input,
             propertyType,
             rule,
-            code: 'VALUE_BELOW_SOFT_MIN',
+            code: this.createWarningCode(
+              propertyType,
+              rule.field,
+              baseCode,
+            ),
             severity: PropertyValidationSeverity.WARNING,
-            message: `${rule.label} olağan değerlerin altında görünüyor.`,
+            message:
+              `${rule.label} olağan değerlerin altında görünüyor. ` +
+              'Değer doğruysa kullanıcı teyidiyle devam edilebilir.',
             actualValue: value,
             expected: {
               min: rule.softMin,
+            },
+            metadata: {
+              baseCode,
+              warningType: 'UNUSUAL_NUMERIC_VALUE',
+              linaTitle: 'Lina olağan dışı bir değer fark etti',
+              linaExplanation:
+                `${rule.label} için girilen ` +
+                `${this.formatNumber(value)} değeri, ` +
+                `${this.formatNumber(rule.softMin)} olağan alt sınırının altında. ` +
+                'Bu değer mümkün olabilir; yazım hatası olmadığını kontrol edin.',
+              confirmationText:
+                'Bu değerin doğru olduğunu onaylıyorum',
             },
           }),
         );
       }
 
       if (rule.softMax !== undefined && value > rule.softMax) {
+        const baseCode = 'VALUE_ABOVE_SOFT_MAX';
+
         issues.push(
           this.createIssue({
             input,
             propertyType,
             rule,
-            code: 'VALUE_ABOVE_SOFT_MAX',
+            code: this.createWarningCode(
+              propertyType,
+              rule.field,
+              baseCode,
+            ),
             severity: PropertyValidationSeverity.WARNING,
-            message: `${rule.label} olağan değerlerin üzerinde görünüyor.`,
+            message:
+              `${rule.label} olağan değerlerin üzerinde görünüyor. ` +
+              'Değer doğruysa kullanıcı teyidiyle devam edilebilir.',
             actualValue: value,
             expected: {
               max: rule.softMax,
+            },
+            metadata: {
+              baseCode,
+              warningType: 'UNUSUAL_NUMERIC_VALUE',
+              linaTitle: 'Lina olağan dışı bir değer fark etti',
+              linaExplanation:
+                `${rule.label} için girilen ` +
+                `${this.formatNumber(value)} değeri, ` +
+                `${this.formatNumber(rule.softMax)} olağan üst sınırının üzerinde. ` +
+                'Bu değer mümkün olabilir; yazım hatası olmadığını kontrol edin.',
+              confirmationText:
+                'Bu değerin doğru olduğunu onaylıyorum',
             },
           }),
         );
@@ -161,6 +201,7 @@ export class NumericRuleEngine {
       min?: number;
       max?: number;
     };
+    metadata?: Readonly<Record<string, unknown>>;
   }): PropertyValidationIssue {
     return {
       ruleId: `numeric.${params.rule.field}.${params.code.toLowerCase()}`,
@@ -174,7 +215,29 @@ export class NumericRuleEngine {
       message: params.message,
       actualValue: params.actualValue,
       expected: params.expected,
+      metadata: params.metadata,
     };
+  }
+
+  private createWarningCode(
+    propertyType: UnitType,
+    field: string,
+    baseCode: string,
+  ): string {
+    return [
+      'PROPERTY_WARNING',
+      String(propertyType).toUpperCase(),
+      this.toCodeSegment(field),
+      baseCode,
+    ].join('_');
+  }
+
+  private toCodeSegment(value: string): string {
+    return value
+      .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+      .replace(/[^A-Za-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toUpperCase();
   }
 
   private toNumber(value: unknown): number | null {

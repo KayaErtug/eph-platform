@@ -400,6 +400,8 @@ export class NetworkService {
 
       throw new BadRequestException({
         code: "PROPERTY_VALIDATION_FAILED",
+        validationVersion: result.version,
+        requiresConfirmation: false,
         message:
           blockingIssues[0]?.message ||
           "Gayrimenkul kriterlerinde geçersiz değerler bulunmaktadır.",
@@ -408,12 +410,27 @@ export class NetworkService {
     }
 
     if (result.requiresConfirmation) {
+      const firstWarning = result.pendingWarnings[0];
+
       throw new BadRequestException({
         code: "PROPERTY_VALIDATION_CONFIRMATION_REQUIRED",
+        validationVersion: result.version,
+        requiresConfirmation: true,
         message:
-          result.warnings[0]?.message ||
+          firstWarning?.message ||
           "Olağan dışı gayrimenkul kriterleri için kullanıcı onayı gereklidir.",
-        issues: result.warnings,
+        linaTitle:
+          firstWarning?.metadata?.linaTitle ||
+          "Lina olağan dışı bir değer fark etti",
+        confirmationText:
+          firstWarning?.metadata?.confirmationText ||
+          "Bu değerin doğru olduğunu onaylıyorum",
+        requiredWarningCodes:
+          result.requiredWarningCodes,
+        acknowledgedWarningCodes:
+          result.acknowledgedWarningCodes,
+        warnings: result.pendingWarnings,
+        issues: result.pendingWarnings,
       });
     }
   }

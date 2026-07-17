@@ -21,6 +21,7 @@ describe('PropertyValidationService', () => {
   function createDemandInput(
     values: Record<string, unknown>,
     propertyType: UnitType = UnitType.DAIRE,
+    acknowledgedWarningCodes: readonly string[] = [],
   ): PropertyValidationInput {
     return {
       context: PropertyValidationContext.DEMAND,
@@ -28,6 +29,7 @@ describe('PropertyValidationService', () => {
       source: 'REQUEST_CENTER',
       propertyTypes: [propertyType],
       values,
+      acknowledgedWarningCodes,
     };
   }
 
@@ -148,15 +150,100 @@ describe('PropertyValidationService', () => {
 
     expect(result.valid).toBe(true);
     expect(result.requiresConfirmation).toBe(true);
-    expect(result.warnings).toEqual(
+    expect(result.requiredWarningCodes).toEqual([
+      'PROPERTY_WARNING_DAIRE_MAX_AREA_VALUE_ABOVE_SOFT_MAX',
+    ]);
+    expect(result.pendingWarnings).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'VALUE_ABOVE_SOFT_MAX',
+          code:
+            'PROPERTY_WARNING_DAIRE_MAX_AREA_VALUE_ABOVE_SOFT_MAX',
           field: 'maxArea',
           blocking: false,
+          metadata: expect.objectContaining({
+            baseCode: 'VALUE_ABOVE_SOFT_MAX',
+            linaTitle:
+              'Lina olağan dışı bir değer fark etti',
+            confirmationText:
+              'Bu değerin doğru olduğunu onaylıyorum',
+          }),
         }),
       ]),
     );
+  });
+
+  it('doğru warning kodu teyit edilince yeniden onay istemez', () => {
+    const values = {
+      minArea: 100,
+      maxArea: 2_000,
+      roomCounts: ['5+2'],
+    };
+
+    const firstResult = service.validate(
+      createDemandInput(values),
+    );
+
+    const confirmedResult = service.validate(
+      createDemandInput(
+        values,
+        UnitType.DAIRE,
+        firstResult.requiredWarningCodes,
+      ),
+    );
+
+    expect(confirmedResult.valid).toBe(true);
+    expect(confirmedResult.requiresConfirmation).toBe(false);
+    expect(confirmedResult.pendingWarnings).toHaveLength(0);
+    expect(confirmedResult.acknowledgedWarningCodes).toEqual(
+      firstResult.requiredWarningCodes,
+    );
+  });
+
+  it('yalnız teyit edilen warning kodunu düşürür', () => {
+    const values = {
+      minArea: 150,
+      maxArea: 7_500,
+      minRoom: 4,
+      maxRoom: 20,
+      minBudget: 11_000_000,
+      maxBudget: 25_000_000,
+    };
+
+    const firstResult = service.validate(
+      createDemandInput(
+        values,
+        UnitType.VILLA,
+      ),
+    );
+
+    const areaWarningCode =
+      firstResult.requiredWarningCodes.find(
+        (code) => code.includes('MAX_AREA'),
+      );
+
+    expect(areaWarningCode).toBeDefined();
+    expect(firstResult.requiredWarningCodes).toHaveLength(2);
+
+    const partialResult = service.validate(
+      createDemandInput(
+        values,
+        UnitType.VILLA,
+        [areaWarningCode as string],
+      ),
+    );
+
+    expect(partialResult.requiresConfirmation).toBe(true);
+    expect(partialResult.acknowledgedWarningCodes).toEqual([
+      areaWarningCode,
+    ]);
+    expect(partialResult.requiredWarningCodes).toEqual([
+      'PROPERTY_WARNING_VILLA_MAX_ROOM_VALUE_ABOVE_SOFT_MAX',
+    ]);
+    expect(partialResult.pendingWarnings).toEqual([
+      expect.objectContaining({
+        field: 'maxRoom',
+      }),
+    ]);
   });
 
   it('geçersiz oda tipini reddeder', () => {
