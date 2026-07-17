@@ -12,6 +12,7 @@ import {
 } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
+import { PropertyCriteriaService } from "../property-criteria/property-criteria.service";
 import { PushService } from "../push/push.service";
 
 const PLATFORM_URL =
@@ -308,7 +309,38 @@ export class NetworkService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pushService: PushService,
+    private readonly propertyCriteriaService: PropertyCriteriaService,
   ) {}
+
+  private normalizeNetworkPostCriteria(
+    dto: CreateNetworkPostDto | UpdateNetworkPostDto,
+  ) {
+    const criteria = this.propertyCriteriaService.normalize({
+      recordKind: "DEMAND",
+      source: "REQUEST_CENTER",
+      areas: dto.areas,
+      city: dto.city,
+      district: dto.district,
+      neighborhood: dto.neighborhood,
+      minBudget: dto.minBudget,
+      maxBudget: dto.maxBudget,
+      minArea: dto.minArea,
+      maxArea: dto.maxArea,
+      isActive: true,
+    });
+
+    const exactBudget = this.propertyCriteriaService.normalize({
+      recordKind: "DEMAND",
+      source: "REQUEST_CENTER",
+      price: dto.budget,
+      isActive: true,
+    }).budget.min;
+
+    return {
+      criteria,
+      exactBudget,
+    };
+  }
 
   private async validateForumPostInput(
     dto: CreateNetworkPostDto | UpdateNetworkPostDto,
@@ -390,7 +422,10 @@ export class NetworkService {
       );
     }
 
-    if (requiresForumCity(category) && !cleanForumText(dto.city)) {
+    const normalizedLocation =
+      this.normalizeNetworkPostCriteria(dto).criteria.areas;
+
+    if (requiresForumCity(category) && normalizedLocation.length === 0) {
       throw new BadRequestException("Şehir alanı zorunludur.");
     }
 
@@ -1384,6 +1419,10 @@ export class NetworkService {
       "create",
     );
 
+    const { criteria, exactBudget } =
+      this.normalizeNetworkPostCriteria(dto);
+    const primaryArea = criteria.areas[0] ?? null;
+
     return this.prisma.$transaction(async (tx) => {
       // Madde 33: aylik forum talebi limiti asilinca her yeni talep 20 kontor
       const aktifPaket = await tx.kullaniciUyelikPaketi.findFirst({
@@ -1418,19 +1457,20 @@ export class NetworkService {
         type: validated.category,
         title: validated.title,
         description: validated.description,
-        city: dto.areas?.[0]?.city || dto.city || null,
-        district: dto.areas?.[0]?.district || dto.district || null,
-        neighborhood: dto.areas?.[0]?.neighborhood || dto.neighborhood || null,
-        budget: dto.budget || null,
-        minArea: dto.minArea ?? null,
-        maxArea: dto.maxArea ?? null,
+        city: primaryArea?.city || null,
+        district: primaryArea?.district || null,
+        neighborhood: primaryArea?.neighborhood || null,
+        budget: exactBudget,
+        minArea: criteria.grossArea.min,
+        maxArea: criteria.grossArea.max,
         minRoom: dto.minRoom ?? null,
         maxRoom: dto.maxRoom ?? null,
-        minBudget: dto.minBudget ?? null,
-        maxBudget: dto.maxBudget ?? null,
-        areas: dto.areas
-          ? (dto.areas as unknown as Prisma.InputJsonValue)
-          : undefined,
+        minBudget: criteria.budget.min,
+        maxBudget: criteria.budget.max,
+        areas:
+          criteria.areas.length > 0
+            ? (criteria.areas as unknown as Prisma.InputJsonValue)
+            : undefined,
         urgency: dto.urgency || "Normal",
         visibility: (dto.visibility as any) || "TUM_EPH",
         tags: buildForumTags(
