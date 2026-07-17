@@ -1117,6 +1117,10 @@ model NetworkPost {
   minBudget    Float?
   maxBudget    Float?
   areas        Json?
+  propertyTypes UnitType[]             @default([])
+  roomCounts    String[]               @default([])
+  features      String[]               @default([])
+  priceCurrency String                 @default("TRY")
   urgency      String?
   visibility   NetworkVisibility      @default(TUM_EPH)
   tags         String[]

@@ -36,6 +36,10 @@ type CreateNetworkPostDto = {
   maxRoom?: number | null;
   minBudget?: number | null;
   maxBudget?: number | null;
+  propertyTypes?: string[] | null;
+  roomCounts?: string[] | null;
+  features?: string[] | null;
+  priceCurrency?: string | null;
   areas?: Array<{
     city?: string | null;
     district?: string | null;
@@ -74,6 +78,10 @@ type UpdateNetworkPostDto = {
   maxRoom?: number | null;
   minBudget?: number | null;
   maxBudget?: number | null;
+  propertyTypes?: string[] | null;
+  roomCounts?: string[] | null;
+  features?: string[] | null;
+  priceCurrency?: string | null;
   areas?: Array<{
     city?: string | null;
     district?: string | null;
@@ -322,10 +330,14 @@ export class NetworkService {
       city: dto.city,
       district: dto.district,
       neighborhood: dto.neighborhood,
+      propertyTypes: dto.propertyTypes,
       minBudget: dto.minBudget,
       maxBudget: dto.maxBudget,
+      priceCurrency: dto.priceCurrency,
       minArea: dto.minArea,
       maxArea: dto.maxArea,
+      roomCounts: dto.roomCounts,
+      features: dto.features,
       isActive: true,
     });
 
@@ -1263,27 +1275,57 @@ export class NetworkService {
       actionUser.id,
     );
 
+    const { criteria, exactBudget } =
+      this.normalizeNetworkPostCriteria({
+        ...dto,
+        userId: existing.userId,
+        type: dto.type ?? existing.type,
+        title: dto.title ?? existing.title,
+        description: dto.description ?? existing.description,
+        city: dto.city ?? existing.city,
+        district: dto.district ?? existing.district,
+        neighborhood: dto.neighborhood ?? existing.neighborhood,
+        budget: dto.budget ?? existing.budget,
+        minArea: dto.minArea ?? existing.minArea,
+        maxArea: dto.maxArea ?? existing.maxArea,
+        minBudget: dto.minBudget ?? existing.minBudget,
+        maxBudget: dto.maxBudget ?? existing.maxBudget,
+        propertyTypes: dto.propertyTypes ?? existing.propertyTypes,
+        roomCounts: dto.roomCounts ?? existing.roomCounts,
+        features: dto.features ?? existing.features,
+        priceCurrency: dto.priceCurrency ?? existing.priceCurrency,
+        areas:
+          dto.areas ??
+          (Array.isArray(existing.areas)
+            ? (existing.areas as CreateNetworkPostDto["areas"])
+            : null),
+      });
+    const primaryArea = criteria.areas[0] ?? null;
+
     const nextData = {
       type: validated.category,
       title: dto.title ? validated.title : existing.title,
       description: dto.description
         ? validated.description
         : existing.description,
-      city: dto.areas?.[0]?.city ?? dto.city ?? existing.city,
-      district: dto.areas?.[0]?.district ?? dto.district ?? existing.district,
-      neighborhood:
-        dto.areas?.[0]?.neighborhood ??
-        dto.neighborhood ??
-        existing.neighborhood,
-      budget: dto.budget ?? existing.budget,
-      minArea: dto.minArea ?? existing.minArea,
-      maxArea: dto.maxArea ?? existing.maxArea,
+      city: primaryArea?.city ?? existing.city,
+      district: primaryArea?.district ?? existing.district,
+      neighborhood: primaryArea?.neighborhood ?? existing.neighborhood,
+      budget: exactBudget,
+      minArea: criteria.grossArea.min,
+      maxArea: criteria.grossArea.max,
       minRoom: dto.minRoom ?? existing.minRoom,
       maxRoom: dto.maxRoom ?? existing.maxRoom,
-      minBudget: dto.minBudget ?? existing.minBudget,
-      maxBudget: dto.maxBudget ?? existing.maxBudget,
-      ...(dto.areas
-        ? { areas: dto.areas as unknown as Prisma.InputJsonValue }
+      minBudget: criteria.budget.min,
+      maxBudget: criteria.budget.max,
+      propertyTypes: criteria.propertyTypes,
+      roomCounts: criteria.roomCounts,
+      features: criteria.features,
+      priceCurrency: criteria.priceCurrency,
+      ...(criteria.areas.length > 0
+        ? {
+            areas: criteria.areas as unknown as Prisma.InputJsonValue,
+          }
         : {}),
       urgency: dto.urgency ?? existing.urgency,
       visibility: (dto.visibility as any) ?? existing.visibility,
@@ -1308,6 +1350,10 @@ export class NetworkService {
       { field: "district", label: "İlçe" },
       { field: "neighborhood", label: "Mahalle" },
       { field: "budget", label: "Bütçe" },
+      { field: "propertyTypes", label: "Gayrimenkul tipleri" },
+      { field: "roomCounts", label: "Oda seçenekleri" },
+      { field: "features", label: "Gayrimenkul özellikleri" },
+      { field: "priceCurrency", label: "Para birimi" },
       { field: "urgency", label: "Aciliyet" },
       { field: "visibility", label: "Görünürlük" },
       { field: "tags", label: "Etiketler" },
@@ -1471,6 +1517,10 @@ export class NetworkService {
           criteria.areas.length > 0
             ? (criteria.areas as unknown as Prisma.InputJsonValue)
             : undefined,
+        propertyTypes: criteria.propertyTypes,
+        roomCounts: criteria.roomCounts,
+        features: criteria.features,
+        priceCurrency: criteria.priceCurrency,
         urgency: dto.urgency || "Normal",
         visibility: (dto.visibility as any) || "TUM_EPH",
         tags: buildForumTags(

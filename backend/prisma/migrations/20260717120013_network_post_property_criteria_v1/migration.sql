@@ -1,0 +1,5 @@
+ALTER TABLE "NetworkPost"
+ADD COLUMN "propertyTypes" "UnitType"[] NOT NULL DEFAULT ARRAY[]::"UnitType"[],
+ADD COLUMN "roomCounts" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN "features" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN "priceCurrency" TEXT NOT NULL DEFAULT 'TRY';
