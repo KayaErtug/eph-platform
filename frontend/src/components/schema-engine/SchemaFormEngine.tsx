@@ -106,6 +106,24 @@ function fieldSummary(
     return values.join(" / ") || "Konum seçin";
   }
 
+  if (field.type === "location-multi") {
+    const areas = normalizeLocationAreas(state[field.areasKey]);
+
+    if (areas.length === 0) {
+      return field.placeholder || "Konum seçin";
+    }
+
+    if (areas.length === 1) {
+      const [area] = areas;
+
+      return `${area.city} / ${area.district}${
+        area.neighborhood ? ` / ${area.neighborhood}` : ""
+      }`;
+    }
+
+    return `${areas.length} bölge seçildi`;
+  }
+
   if (field.type === "money") {
     const amount = asString(value);
     const currency = field.currencyKey
