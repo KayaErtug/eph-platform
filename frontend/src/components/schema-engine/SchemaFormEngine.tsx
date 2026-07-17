@@ -17,6 +17,11 @@ import {
 
 import type { AdvancedFilterTheme } from "@/components/advanced-filter";
 import {
+  EPHLocationMultiField,
+  formatLocationArea,
+  normalizeLocationAreas,
+} from "@/components/create-system";
+import {
   fetchDistrictOptions,
   fetchPlaceOptions,
   fetchProvinceOptions,
@@ -28,7 +33,6 @@ import type {
   EPHSchemaDefinition,
   EPHSchemaField,
   EPHSchemaLocationField,
-  EPHSchemaLocationMultiField,
   EPHSchemaMoneyField,
   EPHSchemaOption,
   EPHSchemaState,
@@ -116,9 +120,7 @@ function fieldSummary(
     if (areas.length === 1) {
       const [area] = areas;
 
-      return `${area.city} / ${area.district}${
-        area.neighborhood ? ` / ${area.neighborhood}` : ""
-      }`;
+      return formatLocationArea(area);
     }
 
     return `${areas.length} bölge seçildi`;
@@ -619,7 +621,16 @@ function FormFieldContent({
 
   if (field.type === "location-multi") {
     return (
-      <LocationMultiField field={field} state={state} setValue={setValue} />
+      <EPHLocationMultiField
+        value={state[field.areasKey]}
+        showNeighborhood={field.showNeighborhood}
+        onChange={(areas) =>
+          setValue(
+            field.areasKey,
+            areas as unknown as EPHSchemaValue,
+          )
+        }
+      />
     );
   }
 
@@ -1075,372 +1086,6 @@ function TextInput({
       placeholder={placeholder}
       className="h-12 w-full rounded-[18px] border border-[var(--af-border)] bg-[var(--af-surface)] px-3 text-center text-[13px] font-black outline-none placeholder:text-[var(--af-muted)]"
     />
-  );
-}
-
-type LocationAreaEntry = {
-  city: string;
-  district: string;
-  neighborhood: string;
-};
-
-function normalizeLocationAreas(value: unknown): LocationAreaEntry[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => ({
-      city: String((item as { city?: unknown })?.city || "").trim(),
-      district: String((item as { district?: unknown })?.district || "").trim(),
-      neighborhood: String(
-        (item as { neighborhood?: unknown })?.neighborhood || "",
-      ).trim(),
-    }))
-    .filter((item) => item.city && item.district);
-}
-
-function locationAreaKey(area: LocationAreaEntry) {
-  return `${area.city}|${area.district}|${area.neighborhood}`;
-}
-
-function LocationMultiField({
-  field,
-  state,
-  setValue,
-}: {
-  field: EPHSchemaLocationMultiField;
-  state: EPHSchemaState;
-  setValue: (key: string, value: EPHSchemaValue) => void;
-}) {
-  const areas = normalizeLocationAreas(state[field.areasKey]);
-
-  const [cities, setCities] = useState<LocationOption[]>([]);
-  const [districts, setDistricts] = useState<DistrictOption[]>([]);
-  const [places, setPlaces] = useState<PlaceOption[]>([]);
-
-  const [loadingCities, setLoadingCities] = useState(true);
-  const [loadingDistricts, setLoadingDistricts] = useState(false);
-  const [loadingPlaces, setLoadingPlaces] = useState(false);
-
-  const [tempCity, setTempCity] = useState("");
-  const [tempDistrict, setTempDistrict] = useState("");
-  const [tempNeighborhood, setTempNeighborhood] = useState("");
-
-  useEffect(() => {
-    let active = true;
-
-    setLoadingCities(true);
-
-    fetchProvinceOptions()
-      .then((items) => {
-        if (active) setCities(items);
-      })
-      .catch(() => {
-        if (active) setCities([]);
-      })
-      .finally(() => {
-        if (active) setLoadingCities(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    setDistricts([]);
-    setPlaces([]);
-
-    if (!tempCity) {
-      setLoadingDistricts(false);
-      return;
-    }
-
-    setLoadingDistricts(true);
-
-    fetchDistrictOptions(tempCity)
-      .then((items) => {
-        if (!active) return;
-
-        setDistricts(
-          items.map((item) => ({
-            ...item,
-            city: tempCity,
-          })),
-        );
-      })
-      .catch(() => {
-        if (active) setDistricts([]);
-      })
-      .finally(() => {
-        if (active) setLoadingDistricts(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [tempCity]);
-
-  useEffect(() => {
-    let active = true;
-
-    setPlaces([]);
-
-    if (!field.showNeighborhood || !tempCity || !tempDistrict) {
-      setLoadingPlaces(false);
-      return;
-    }
-
-    const districtOption = districts.find(
-      (item) => item.name === tempDistrict,
-    );
-
-    setLoadingPlaces(true);
-
-    fetchPlaceOptions(tempCity, tempDistrict, districtOption?.id)
-      .then((items) => {
-        if (!active) return;
-
-        setPlaces(
-          items.map((item) => ({
-            ...item,
-            city: tempCity,
-            district: tempDistrict,
-          })),
-        );
-      })
-      .catch(() => {
-        if (active) setPlaces([]);
-      })
-      .finally(() => {
-        if (active) setLoadingPlaces(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [tempCity, tempDistrict, districts, field.showNeighborhood]);
-
-  const addArea = () => {
-    if (!tempCity || !tempDistrict) return;
-
-    const entry: LocationAreaEntry = {
-      city: tempCity,
-      district: tempDistrict,
-      neighborhood: tempNeighborhood,
-    };
-
-    if (
-      areas.some(
-        (item) => locationAreaKey(item) === locationAreaKey(entry),
-      )
-    ) {
-      return;
-    }
-
-    setValue(
-      field.areasKey,
-      [...areas, entry] as unknown as EPHSchemaValue,
-    );
-
-    setTempNeighborhood("");
-  };
-
-  const removeArea = (target: LocationAreaEntry) => {
-    setValue(
-      field.areasKey,
-      areas.filter(
-        (item) => locationAreaKey(item) !== locationAreaKey(target),
-      ) as unknown as EPHSchemaValue,
-    );
-  };
-
-  const groups: {
-    city: string;
-    district: string;
-    items: LocationAreaEntry[];
-  }[] = [];
-
-  areas.forEach((area) => {
-    let group = groups.find(
-      (item) =>
-        item.city === area.city &&
-        item.district === area.district,
-    );
-
-    if (!group) {
-      group = {
-        city: area.city,
-        district: area.district,
-        items: [],
-      };
-
-      groups.push(group);
-    }
-
-    group.items.push(area);
-  });
-
-  const selectClassName =
-    "h-12 w-full rounded-[16px] border border-[var(--af-border)] bg-[var(--af-surface)] px-3 text-[12px] font-black outline-none disabled:cursor-not-allowed disabled:opacity-45";
-
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <label className="block">
-          <span className="mb-1 block text-[10px] font-black text-[var(--af-muted)]">
-            İl
-          </span>
-
-          <select
-            value={tempCity}
-            disabled={loadingCities}
-            onChange={(event) => {
-              setTempCity(event.target.value);
-              setTempDistrict("");
-              setTempNeighborhood("");
-            }}
-            className={selectClassName}
-          >
-            <option value="">
-              {loadingCities ? "İller yükleniyor..." : "İl seçin"}
-            </option>
-
-            {cities.map((item) => (
-              <option key={item.id} value={item.name}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
-          <span className="mb-1 block text-[10px] font-black text-[var(--af-muted)]">
-            İlçe
-          </span>
-
-          <select
-            value={tempDistrict}
-            disabled={!tempCity || loadingDistricts}
-            onChange={(event) => {
-              setTempDistrict(event.target.value);
-              setTempNeighborhood("");
-            }}
-            className={selectClassName}
-          >
-            <option value="">
-              {loadingDistricts
-                ? "İlçeler yükleniyor..."
-                : tempCity
-                  ? "İlçe seçin"
-                  : "Önce il seçin"}
-            </option>
-
-            {districts.map((item) => (
-              <option key={item.id} value={item.name}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {field.showNeighborhood && (
-          <label className="block">
-            <span className="mb-1 block text-[10px] font-black text-[var(--af-muted)]">
-              Mahalle
-            </span>
-
-            <select
-              value={tempNeighborhood}
-              disabled={!tempDistrict || loadingPlaces}
-              onChange={(event) =>
-                setTempNeighborhood(event.target.value)
-              }
-              className={selectClassName}
-            >
-              <option value="">
-                {loadingPlaces
-                  ? "Mahalleler yükleniyor..."
-                  : tempDistrict
-                    ? "İlçenin tamamı"
-                    : "Önce ilçe seçin"}
-              </option>
-
-              {places.map((item) => (
-                <option key={item.id} value={item.name}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-      </div>
-
-      <button
-        type="button"
-        onClick={addArea}
-        disabled={!tempCity || !tempDistrict}
-        className="flex h-12 w-full items-center justify-center gap-2 rounded-[16px] border border-[var(--af-accent)] bg-[var(--af-accent-soft)] px-3 text-[12px] font-black text-[var(--af-accent-text)] disabled:opacity-40"
-      >
-        Bölgeyi Ekle
-        {tempCity && tempDistrict
-          ? ` · ${tempCity} / ${tempDistrict}${
-              tempNeighborhood ? ` / ${tempNeighborhood}` : ""
-            }`
-          : ""}
-      </button>
-
-      <div className="rounded-[16px] border border-[var(--af-border)] bg-[var(--af-surface)] p-2.5">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-[11px] font-black text-[var(--af-accent-text)]">
-            Seçilen Bölgeler
-          </p>
-
-          <span className="text-[10px] font-black text-[var(--af-accent-text)]">
-            {areas.length} bölge
-          </span>
-        </div>
-
-        {groups.length === 0 ? (
-          <div className="rounded-[12px] border border-dashed border-[var(--af-border)] px-3 py-3 text-center text-[11px] font-bold text-[var(--af-muted)]">
-            Mahalle seçmeden eklerseniz ilçenin tamamı kaydedilir.
-            Birden fazla il, ilçe ve mahalle ekleyebilirsiniz.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {groups.map((group) => (
-              <div
-                key={`${group.city}-${group.district}`}
-                className="rounded-[12px] border border-[var(--af-border)] bg-white p-2"
-              >
-                <div className="flex items-center gap-1.5 text-[11px] font-black text-[var(--af-accent-text)]">
-                  <MapPin size={13} />
-                  {group.city} / {group.district}
-                </div>
-
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {group.items.map((area) => (
-                    <button
-                      key={locationAreaKey(area)}
-                      type="button"
-                      onClick={() => removeArea(area)}
-                      title="Kaldır"
-                      className="inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--af-border)] bg-[var(--af-surface)] px-2.5 py-1 text-[10.5px] font-black text-[var(--af-accent-text)]"
-                    >
-                      <span className="break-words">
-                        {area.neighborhood || "İlçenin tamamı"}
-                      </span>
-
-                      <X size={12} className="shrink-0" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 

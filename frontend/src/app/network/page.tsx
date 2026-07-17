@@ -29,6 +29,10 @@ import {
   type EPHSchemaState,
 } from "@/components/schema-engine";
 import {
+  deriveLegacyLocationFields,
+  normalizeLocationAreas as normalizeEPHLocationAreas,
+} from "@/components/create-system";
+import {
   FORUM_REQUEST_CATEGORY_OPTIONS,
   FORUM_REQUEST_VISIBILITY_OPTIONS,
   getForumRequestCategoryVisual,
@@ -109,17 +113,16 @@ type ForumAreaEntry = {
   neighborhood: string;
 };
 
-function normalizeForumAreas(value: unknown): ForumAreaEntry[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => ({
-      city: String((item as { city?: unknown })?.city || "").trim(),
-      district: String((item as { district?: unknown })?.district || "").trim(),
-      neighborhood: String(
-        (item as { neighborhood?: unknown })?.neighborhood || "",
-      ).trim(),
-    }))
-    .filter((item) => item.city && item.district);
+function normalizeForumAreas(
+  value: unknown,
+): ForumAreaEntry[] {
+  return normalizeEPHLocationAreas(value).map(
+    (area) => ({
+      city: area.city,
+      district: area.district,
+      neighborhood: area.neighborhood,
+    }),
+  );
 }
 
 type TopicForm = {
@@ -477,6 +480,60 @@ function formatMoney(value?: string | number | null, currency = "TRY") {
   return `${numeric.toLocaleString("tr-TR")} ${currency === "TRY" ? "TL" : currency}`;
 }
 
+function formatPostBudget(post: NetworkPost) {
+  const currency = budgetCurrencyFromPost(post);
+
+  const minBudget =
+    post.minBudget != null && Number(post.minBudget) > 0
+      ? Number(post.minBudget)
+      : null;
+
+  const maxBudget =
+    post.maxBudget != null && Number(post.maxBudget) > 0
+      ? Number(post.maxBudget)
+      : null;
+
+  if (
+    minBudget !== null &&
+    maxBudget !== null
+  ) {
+    if (minBudget === maxBudget) {
+      return formatMoney(minBudget, currency);
+    }
+
+    return `${formatMoney(
+      minBudget,
+      currency,
+    )} – ${formatMoney(
+      maxBudget,
+      currency,
+    )}`;
+  }
+
+  if (minBudget !== null) {
+    return `${formatMoney(
+      minBudget,
+      currency,
+    )} ve üzeri`;
+  }
+
+  if (maxBudget !== null) {
+    return `${formatMoney(
+      maxBudget,
+      currency,
+    )}'a kadar`;
+  }
+
+  if (
+    post.budget != null &&
+    Number(post.budget) > 0
+  ) {
+    return formatMoney(post.budget, currency);
+  }
+
+  return "Bütçe belirtilmedi";
+}
+
 function formatBudgetInput(value: string) {
   const digits = String(value || "")
     .replace(/\D/g, "")
@@ -593,8 +650,18 @@ function formFromPost(post: NetworkPost): TopicForm {
     maxArea: post.maxArea != null ? String(post.maxArea) : "",
     minRoom: post.minRoom != null ? String(post.minRoom) : "",
     maxRoom: post.maxRoom != null ? String(post.maxRoom) : "",
-    minBudget: post.minBudget ? formatBudgetInput(String(post.minBudget)) : "",
-    maxBudget: post.maxBudget ? formatBudgetInput(String(post.maxBudget)) : "",
+    minBudget:
+      post.minBudget
+        ? formatBudgetInput(String(post.minBudget))
+        : post.budget
+          ? formatBudgetInput(String(post.budget))
+          : "",
+    maxBudget:
+      post.maxBudget
+        ? formatBudgetInput(String(post.maxBudget))
+        : post.budget
+          ? formatBudgetInput(String(post.budget))
+          : "",
     currency: post.priceCurrency || budgetCurrencyFromPost(post),
     detail: post.description || "",
     urgency: post.urgency || "Normal",
@@ -847,10 +914,27 @@ export default function NetworkPage() {
       form.city,
       form.district,
       form.neighborhood,
-      form.budget ? `Döviz:${form.currency}` : "",
+      form.budget || form.minBudget || form.maxBudget
+        ? `Döviz:${form.currency}`
+        : "",
     ]
       .filter(Boolean)
       .slice(0, 8);
+
+    const minBudgetValue = form.minBudget
+      ? Number(form.minBudget.replace(/\D/g, ""))
+      : null;
+
+    const maxBudgetValue = form.maxBudget
+      ? Number(form.maxBudget.replace(/\D/g, ""))
+      : null;
+
+    const legacyBudgetValue =
+      maxBudgetValue ||
+      minBudgetValue ||
+      (form.budget
+        ? Number(form.budget.replace(/\D/g, ""))
+        : null);
 
     const payload = {
       userId: user.id,
@@ -865,13 +949,13 @@ export default function NetworkPage() {
       city: form.city.trim() || null,
       district: form.district.trim() || null,
       neighborhood: form.neighborhood.trim() || null,
-      budget: form.budget ? Number(form.budget.replace(/\D/g, "")) : null,
+      budget: legacyBudgetValue,
       minArea: form.minArea ? Number(form.minArea.replace(/\D/g, "")) : null,
       maxArea: form.maxArea ? Number(form.maxArea.replace(/\D/g, "")) : null,
       minRoom: form.minRoom ? Number(form.minRoom.replace(/\D/g, "")) : null,
       maxRoom: form.maxRoom ? Number(form.maxRoom.replace(/\D/g, "")) : null,
-      minBudget: form.minBudget ? Number(form.minBudget.replace(/\D/g, "")) : null,
-      maxBudget: form.maxBudget ? Number(form.maxBudget.replace(/\D/g, "")) : null,
+      minBudget: minBudgetValue,
+      maxBudget: maxBudgetValue,
       areas: form.areas,
       urgency: form.urgency,
       visibility: form.visibility,
@@ -1521,9 +1605,7 @@ function RequestCard({
   const location = [post.city, post.district, post.neighborhood]
     .filter(Boolean)
     .join(" / ");
-  const budget = post.budget
-    ? formatMoney(post.budget, budgetCurrencyFromPost(post))
-    : "Bütçe belirtilmedi";
+  const budget = formatPostBudget(post);
   const remaining = remainingTime(post.expiresAt);
   const remainingMatch = remaining.match(/\d+/);
   const remainingDay = remainingMatch ? Number(remainingMatch[0]) : null;
@@ -1888,16 +1970,28 @@ function topicFormToSchemaState(form: TopicForm): EPHSchemaState {
   };
 }
 
-function schemaStateToTopicForm(state: EPHSchemaState): TopicForm {
+function schemaStateToTopicForm(
+  state: EPHSchemaState,
+): TopicForm {
+  const areas = normalizeForumAreas(state.areas);
+  const primaryLocation =
+    deriveLegacyLocationFields(areas);
+
   return {
     category: String(state.category || "") as ForumCategory | "",
     requestIntent: String(state.requestIntent || ""),
     propertyType: String(state.propertyType || ""),
-    areas: normalizeForumAreas(state.areas),
+    areas,
     title: String(state.title || ""),
-    city: String(state.city || ""),
-    district: String(state.district || ""),
-    neighborhood: String(state.neighborhood || ""),
+    city:
+      primaryLocation.city ||
+      String(state.city || ""),
+    district:
+      primaryLocation.district ||
+      String(state.district || ""),
+    neighborhood:
+      primaryLocation.neighborhood ||
+      String(state.neighborhood || ""),
     budget: String(state.budget || ""),
     minArea: String(state.minArea || ""),
     maxArea: String(state.maxArea || ""),
