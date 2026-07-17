@@ -10,6 +10,11 @@ import {
   isKnownPropertyType,
   propertyTypeSupportsRoomCount,
 } from "@/components/property-type-schema";
+import {
+  getFirstBlockingTextSafetyMessage,
+  validateEPHPublicDescription,
+  validateEPHPublicTitle,
+} from "@/components/create-system";
 
 export type ForumRequestCategory =
   | "PORTFOY_ARIYORUM"
@@ -692,7 +697,12 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           placeholder: "Örn: Merkezefendi 3+1 daire arıyorum",
           validation: {
             required: true,
+            minLength: 5,
             maxLength: 50,
+            validate: (value) =>
+              getFirstBlockingTextSafetyMessage(
+                validateEPHPublicTitle(value),
+              ),
           },
           lina: {
             meaning: "Forum talebinin kısa ve kullanıcı tarafından yazılmış başlığı",
@@ -1066,6 +1076,12 @@ export const forumRequestSchema: EPHSchemaDefinition = {
             required: true,
             minLength: 12,
             maxLength: 200,
+            validate: (value) =>
+              getFirstBlockingTextSafetyMessage(
+                validateEPHPublicDescription(
+                  value,
+                ),
+              ),
           },
           lina: {
             meaning: "Talebin serbest metin ayrıntıları",

@@ -34,3 +34,11 @@ export {
   normalizeLocationArea,
   normalizeLocationAreas,
 } from "./location.utils";
+
+export {
+  getFirstBlockingTextSafetyMessage,
+  validateEPHPublicDescription,
+  validateEPHPublicTitle,
+  type EPHTextSafetyIssue,
+  type EPHTextSafetyResult,
+} from "./text-safety";

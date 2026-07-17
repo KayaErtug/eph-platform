@@ -15,6 +15,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { PropertyCriteriaService } from "../property-criteria/property-criteria.service";
 import { PropertyValidationService } from "../property-validation/property-validation.service";
 import { PropertyValidationContext } from "../property-validation/property-validation.types";
+import { TextSafetyService } from "../text-safety/text-safety.service";
 import { PushService } from "../push/push.service";
 
 const PLATFORM_URL =
@@ -323,6 +324,7 @@ export class NetworkService {
     private readonly pushService: PushService,
     private readonly propertyCriteriaService: PropertyCriteriaService,
     private readonly propertyValidationService: PropertyValidationService,
+    private readonly textSafetyService: TextSafetyService,
   ) {}
 
   private normalizeNetworkPostCriteria(
@@ -492,6 +494,34 @@ export class NetworkService {
       throw new BadRequestException(
         `Talep açıklaması en fazla ${MAX_FORUM_DESCRIPTION_LENGTH} karakter olabilir.`,
       );
+    }
+
+    const titleSafety =
+      this.textSafetyService.validatePublicTitle(title);
+
+    if (!titleSafety.valid) {
+      throw new BadRequestException({
+        code: "TEXT_SAFETY_FAILED",
+        message:
+          titleSafety.errors[0]?.message ||
+          "Talep başlığı güvenlik kontrolünden geçemedi.",
+        issues: titleSafety.errors,
+      });
+    }
+
+    const descriptionSafety =
+      this.textSafetyService.validatePublicDescription(
+        description,
+      );
+
+    if (!descriptionSafety.valid) {
+      throw new BadRequestException({
+        code: "TEXT_SAFETY_FAILED",
+        message:
+          descriptionSafety.errors[0]?.message ||
+          "Talep açıklaması güvenlik kontrolünden geçemedi.",
+        issues: descriptionSafety.errors,
+      });
     }
 
     const normalizedLocation =
