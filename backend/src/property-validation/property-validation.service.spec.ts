@@ -20,12 +20,13 @@ describe('PropertyValidationService', () => {
 
   function createDemandInput(
     values: Record<string, unknown>,
+    propertyType: UnitType = UnitType.DAIRE,
   ): PropertyValidationInput {
     return {
       context: PropertyValidationContext.DEMAND,
       recordKind: 'DEMAND',
       source: 'REQUEST_CENTER',
-      propertyTypes: [UnitType.DAIRE],
+      propertyTypes: [propertyType],
       values,
     };
   }
@@ -177,4 +178,155 @@ describe('PropertyValidationService', () => {
       ]),
     );
   });
+  it('villa için astronomik metrekareyi reddeder', () => {
+    const result = service.validate(
+      createDemandInput(
+        {
+          minArea: 150,
+          maxArea: 36_963_696_666,
+          minRoom: 4,
+          maxRoom: 8,
+        },
+        UnitType.VILLA,
+      ),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'VALUE_ABOVE_HARD_MAX',
+          field: 'maxArea',
+          blocking: true,
+        }),
+      ]),
+    );
+  });
+
+  it('villa için astronomik oda sayısını reddeder', () => {
+    const result = service.validate(
+      createDemandInput(
+        {
+          minArea: 150,
+          maxArea: 250,
+          minRoom: 4,
+          maxRoom: 36_363_636_363,
+        },
+        UnitType.VILLA,
+      ),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'VALUE_ABOVE_HARD_MAX',
+          field: 'maxRoom',
+          blocking: true,
+        }),
+      ]),
+    );
+  });
+
+  it('normal villa talebini kabul eder', () => {
+    const result = service.validate(
+      createDemandInput(
+        {
+          minArea: 150,
+          maxArea: 250,
+          minRoom: 4,
+          maxRoom: 8,
+          minBudget: 11_000_000,
+          maxBudget: 25_000_000,
+        },
+        UnitType.VILLA,
+      ),
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+    expect(result.conflicts).toHaveLength(0);
+  });
+
+  it('arsa talebinde oda sayısını reddeder', () => {
+    const result = service.validate(
+      createDemandInput(
+        {
+          minArea: 500,
+          maxArea: 5_000,
+          minRoom: 2,
+          maxRoom: 4,
+        },
+        UnitType.ARSA,
+      ),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code:
+            'FIELD_NOT_ALLOWED_FOR_PROPERTY_TYPE',
+          field: 'minRoom',
+          blocking: true,
+        }),
+        expect.objectContaining({
+          code:
+            'FIELD_NOT_ALLOWED_FOR_PROPERTY_TYPE',
+          field: 'maxRoom',
+          blocking: true,
+        }),
+      ]),
+    );
+  });
+
+  it('minimum bütçe maksimum bütçeden büyükse engeller', () => {
+    const result = service.validate(
+      createDemandInput(
+        {
+          minArea: 100,
+          maxArea: 200,
+          minBudget: 30_000_000,
+          maxBudget: 10_000_000,
+        },
+        UnitType.DAIRE,
+      ),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.conflicts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'MINIMUM_GREATER_THAN_MAXIMUM',
+          field: 'minBudget',
+          relatedFields: ['maxBudget'],
+        }),
+      ]),
+    );
+  });
+
+  it('sıfır bütçeyi reddeder', () => {
+    const result = service.validate(
+      createDemandInput(
+        {
+          minArea: 100,
+          maxArea: 200,
+          minBudget: 0,
+          maxBudget: 10_000_000,
+        },
+        UnitType.DAIRE,
+      ),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'ZERO_VALUE_NOT_ALLOWED',
+          field: 'minBudget',
+        }),
+      ]),
+    );
+  });
+
 });

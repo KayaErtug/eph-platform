@@ -11,6 +11,7 @@ import {
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
 } from "react";
@@ -27,6 +28,8 @@ import {
   fetchProvinceOptions,
   type LocationOption,
 } from "@/components/stok/locationData";
+
+import { getEPHCriteriaFieldVisual } from "./criteria-field-visuals";
 
 import type {
   EPHSchemaChoiceField,
@@ -189,13 +192,33 @@ export default function SchemaFormEngine({
   );
   const [activeField, setActiveField] = useState<EPHSchemaField | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const wasOpenRef = useRef(false);
+  const previousSchemaRef = useRef(schema);
 
   useEffect(() => {
-    if (!open) return;
+    const justOpened =
+      open && !wasOpenRef.current;
 
-    setDraft(createSchemaInitialState(schema, value, "form"));
-    setErrors({});
-    setActiveField(null);
+    const schemaChanged =
+      previousSchemaRef.current !== schema;
+
+    if (
+      open &&
+      (justOpened || schemaChanged)
+    ) {
+      setDraft(
+        createSchemaInitialState(
+          schema,
+          value,
+          "form",
+        ),
+      );
+      setErrors({});
+      setActiveField(null);
+    }
+
+    wasOpenRef.current = open;
+    previousSchemaRef.current = schema;
   }, [open, schema, value]);
 
   useEffect(() => {
@@ -246,45 +269,92 @@ export default function SchemaFormEngine({
     "--af-danger": mergedTheme.danger,
   } as CSSProperties;
 
-  const setValue = (key: string, nextValue: EPHSchemaValue) => {
-    setDraft((current) => {
-      const next = {
-        ...current,
-        [key]: Array.isArray(nextValue) ? [...nextValue] : nextValue,
-      };
+  const relatedValidationKeys:
+    Record<string, string[]> = {
+      minArea: ["maxArea"],
+      maxArea: ["minArea"],
+      minRoom: ["maxRoom"],
+      maxRoom: ["minRoom"],
+      minBudget: ["maxBudget"],
+      maxBudget: ["minBudget"],
+    };
 
-      onChange?.(cloneSchemaState(next));
-      return next;
+  const updateLiveErrors = (
+    nextState: EPHSchemaState,
+    changedKeys: string[],
+  ) => {
+    const keys = new Set(changedKeys);
+
+    changedKeys.forEach((key) => {
+      relatedValidationKeys[key]?.forEach(
+        (relatedKey) => keys.add(relatedKey),
+      );
     });
 
+    if (keys.has("propertyType")) {
+      [
+        "minArea",
+        "maxArea",
+        "minRoom",
+        "maxRoom",
+        "minBudget",
+        "maxBudget",
+      ].forEach((key) => keys.add(key));
+    }
+
+    const result = validateSchemaState(
+      schema,
+      nextState,
+      "form",
+    );
+
     setErrors((current) => {
-      if (!current[key]) return current;
-      const next = { ...current };
-      delete next[key];
-      return next;
+      const nextErrors = { ...current };
+
+      keys.forEach((key) => {
+        const error = result.errors[key];
+
+        if (error) {
+          nextErrors[key] = error;
+        } else {
+          delete nextErrors[key];
+        }
+      });
+
+      return nextErrors;
     });
   };
 
-  const patchValues = (values: EPHSchemaState) => {
-    setDraft((current) => {
-      const next = {
-        ...current,
-        ...values,
-      };
+  const setValue = (
+    key: string,
+    nextValue: EPHSchemaValue,
+  ) => {
+    const next = {
+      ...draft,
+      [key]: Array.isArray(nextValue)
+        ? [...nextValue]
+        : nextValue,
+    };
 
-      onChange?.(cloneSchemaState(next));
-      return next;
-    });
+    setDraft(next);
+    onChange?.(cloneSchemaState(next));
+    updateLiveErrors(next, [key]);
+  };
 
-    setErrors((current) => {
-      const next = { ...current };
+  const patchValues = (
+    values: EPHSchemaState,
+  ) => {
+    const next = {
+      ...draft,
+      ...values,
+    };
 
-      for (const key of Object.keys(values)) {
-        delete next[key];
-      }
-
-      return next;
-    });
+    setDraft(next);
+    onChange?.(cloneSchemaState(next));
+    updateLiveErrors(
+      next,
+      Object.keys(values),
+    );
   };
 
   const submit = async () => {
@@ -383,6 +453,11 @@ export default function SchemaFormEngine({
                         errors[field.neighborhoodKey]
                       : "");
 
+                  const visual =
+                    getEPHCriteriaFieldVisual(
+                      field.key,
+                    );
+
                   if (field.type === "boolean") {
                     const active = Boolean(draft[field.key]);
 
@@ -426,17 +501,37 @@ export default function SchemaFormEngine({
                       type="button"
                       disabled={disabled}
                       onClick={() => setActiveField(field)}
-                      className={`grid min-h-[58px] w-full grid-cols-[128px_minmax(0,1fr)] items-center gap-3 px-3 text-left disabled:opacity-45 ${
+                      className={`grid min-h-[62px] w-full grid-cols-[128px_minmax(0,1fr)] items-center gap-3 px-3 text-left transition-colors disabled:opacity-45 ${
                         fieldIndex === 0
                           ? ""
-                          : "border-t border-[var(--af-border)]"
-                      } ${error ? "bg-red-50" : ""}`}
+                          : visual?.separatorClassName ||
+                            "border-t border-[var(--af-border)]"
+                      } ${
+                        error
+                          ? "bg-red-50 shadow-[inset_4px_0_0_#DC2626]"
+                          : visual?.rowClassName || ""
+                      }`}
                     >
                       <span className="min-w-0">
-                        <span className="block text-[12px] font-black">
+                        <span
+                          className={`block text-[12px] font-black ${
+                            error
+                              ? "text-red-700"
+                              : visual?.labelClassName || ""
+                          }`}
+                        >
                           {field.label}
                           {field.validation?.required ? " *" : ""}
                         </span>
+
+                        {visual?.showBadge && !error && (
+                          <span
+                            className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[8px] font-black tracking-[0.06em] ${visual.badgeClassName}`}
+                          >
+                            {visual.badge}
+                          </span>
+                        )}
+
                         {error && (
                           <span className="mt-0.5 block text-[9px] font-bold leading-3 text-red-600">
                             {error}
@@ -449,14 +544,20 @@ export default function SchemaFormEngine({
                           className={`min-w-0 truncate text-right text-[11.5px] font-bold ${
                             error
                               ? "text-red-600"
-                              : "text-[var(--af-accent-text)]"
+                              : visual?.valueClassName ||
+                                "text-[var(--af-accent-text)]"
                           }`}
                         >
                           {fieldSummary(field, draft)}
                         </span>
                         <ChevronDown
                           size={16}
-                          className="shrink-0 text-[var(--af-muted)]"
+                          className={`shrink-0 ${
+                            error
+                              ? "text-red-500"
+                              : visual?.chevronClassName ||
+                                "text-[var(--af-muted)]"
+                          }`}
                         />
                       </span>
                     </button>
@@ -481,7 +582,10 @@ export default function SchemaFormEngine({
             <button
               type="button"
               onClick={submit}
-              disabled={saving}
+              disabled={
+                saving ||
+                Object.keys(errors).length > 0
+              }
               className="flex h-12 items-center justify-center gap-2 rounded-[18px] bg-[var(--af-accent)] px-4 text-[13px] font-black text-white disabled:opacity-55"
             >
               {saving && <Loader2 size={17} className="animate-spin" />}

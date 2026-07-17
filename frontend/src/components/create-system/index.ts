@@ -42,3 +42,10 @@ export {
   type EPHTextSafetyIssue,
   type EPHTextSafetyResult,
 } from "./text-safety";
+
+export {
+  isEPHLandPropertyType,
+  propertyTypeSupportsEPHDemandRoomRange,
+  validateEPHPropertyField,
+  type EPHPropertyNumericField,
+} from "./property-validation";

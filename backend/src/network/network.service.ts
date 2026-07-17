@@ -385,6 +385,8 @@ export class NetworkService {
       values: {
         minArea: dto.minArea,
         maxArea: dto.maxArea,
+        minRoom: dto.minRoom,
+        maxRoom: dto.maxRoom,
         minBudget: dto.minBudget ?? dto.budget,
         maxBudget: dto.maxBudget ?? dto.budget,
         roomCounts: dto.roomCounts,

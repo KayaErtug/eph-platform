@@ -8,10 +8,11 @@ import {
 import {
   PROPERTY_TYPE_OPTIONS,
   isKnownPropertyType,
-  propertyTypeSupportsRoomCount,
 } from "@/components/property-type-schema";
 import {
   getFirstBlockingTextSafetyMessage,
+  propertyTypeSupportsEPHDemandRoomRange,
+  validateEPHPropertyField,
   validateEPHPublicDescription,
   validateEPHPublicTitle,
 } from "@/components/create-system";
@@ -729,6 +730,14 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           modes: ["form", "detail"],
           order: 10,
           placeholder: "Örn: 90",
+          validation: {
+            validate: (value, state) =>
+              validateEPHPropertyField(
+                "minArea",
+                value,
+                state,
+              ),
+          },
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
             !String(state.requestIntent || "") ||
@@ -742,6 +751,14 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           modes: ["form", "detail"],
           order: 20,
           placeholder: "Örn: 160",
+          validation: {
+            validate: (value, state) =>
+              validateEPHPropertyField(
+                "maxArea",
+                value,
+                state,
+              ),
+          },
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
             !String(state.requestIntent || "") ||
@@ -755,11 +772,19 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           modes: ["form", "detail"],
           order: 30,
           placeholder: "Örn: 2",
+          validation: {
+            validate: (value, state) =>
+              validateEPHPropertyField(
+                "minRoom",
+                value,
+                state,
+              ),
+          },
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
             !String(state.requestIntent || "") ||
             !String(state.propertyType || "") ||
-            !propertyTypeSupportsRoomCount(
+            !propertyTypeSupportsEPHDemandRoomRange(
               String(state.propertyType || ""),
               "DEMAND",
             ),
@@ -772,11 +797,19 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           modes: ["form", "detail"],
           order: 40,
           placeholder: "Örn: 4",
+          validation: {
+            validate: (value, state) =>
+              validateEPHPropertyField(
+                "maxRoom",
+                value,
+                state,
+              ),
+          },
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
             !String(state.requestIntent || "") ||
             !String(state.propertyType || "") ||
-            !propertyTypeSupportsRoomCount(
+            !propertyTypeSupportsEPHDemandRoomRange(
               String(state.propertyType || ""),
               "DEMAND",
             ),
@@ -789,6 +822,14 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           modes: ["form", "detail"],
           order: 50,
           placeholder: "Örn: 2000000",
+          validation: {
+            validate: (value, state) =>
+              validateEPHPropertyField(
+                "minBudget",
+                value,
+                state,
+              ),
+          },
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
             !String(state.requestIntent || "") ||
@@ -802,6 +843,14 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           modes: ["form", "detail"],
           order: 60,
           placeholder: "Örn: 5000000",
+          validation: {
+            validate: (value, state) =>
+              validateEPHPropertyField(
+                "maxBudget",
+                value,
+                state,
+              ),
+          },
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
             !String(state.requestIntent || "") ||

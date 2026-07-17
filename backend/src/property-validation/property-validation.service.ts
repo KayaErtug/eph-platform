@@ -50,6 +50,14 @@ export class PropertyValidationService {
       }
 
       issues.push(
+        ...this.validateForbiddenFields(
+          input,
+          propertyType,
+          contextRule.forbiddenFields,
+        ),
+      );
+
+      issues.push(
         ...this.numericRuleEngine.validate(
           input,
           propertyType,
@@ -116,6 +124,48 @@ export class PropertyValidationService {
       evidenceRequests,
       dynamicInformation,
     };
+  }
+
+  private validateForbiddenFields(
+    input: PropertyValidationInput,
+    propertyType: UnitType,
+    rules: readonly {
+      field: string;
+      label: string;
+    }[],
+  ): PropertyValidationIssue[] {
+    const issues: PropertyValidationIssue[] = [];
+
+    for (const rule of rules) {
+      const value = input.values[rule.field];
+
+      const exists = Array.isArray(value)
+        ? value.length > 0
+        : value !== undefined &&
+          value !== null &&
+          String(value).trim() !== '';
+
+      if (!exists) {
+        continue;
+      }
+
+      issues.push({
+        ruleId:
+          `property-type.${propertyType}.${rule.field}.not-allowed`,
+        code: 'FIELD_NOT_ALLOWED_FOR_PROPERTY_TYPE',
+        severity: PropertyValidationSeverity.ERROR,
+        blocking: true,
+        context: input.context,
+        propertyType,
+        field: rule.field,
+        relatedFields: [],
+        message:
+          `${rule.label} bu gayrimenkul türünde kullanılamaz.`,
+        actualValue: value,
+      });
+    }
+
+    return issues;
   }
 
   private validateSelections(

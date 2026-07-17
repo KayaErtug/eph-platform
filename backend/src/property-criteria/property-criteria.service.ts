@@ -10,6 +10,17 @@ import {
   PropertyCriteriaRange,
 } from './property-criteria.types';
 
+const UNIT_TYPE_ALIASES: Record<string, UnitType> = {
+  DAG_EVI_YAYLA_EVI: UnitType.DAG_EVI,
+  APARTMAN: UnitType.KOMPLE_BINA,
+  IS_HANI: UnitType.IS_MERKEZI,
+  PLAZA_BINA: UnitType.IS_MERKEZI,
+  REZIDANS_BINA: UnitType.KOMPLE_BINA,
+  OTEL_BINASI: UnitType.OTEL_PANSIYON,
+  BENZIN_ISTASYONU: UnitType.AKARYAKIT_ISTASYONU,
+};
+
+
 @Injectable()
 export class PropertyCriteriaService {
   normalize(input: PropertyCriteriaInput): NormalizedPropertyCriteria {
@@ -32,9 +43,8 @@ export class PropertyCriteriaService {
         longitude: input.longitude,
       }),
 
-      propertyTypes: this.normalizeEnumArray(
+      propertyTypes: this.normalizeUnitTypes(
         input.propertyTypes ?? input.propertyType,
-        Object.values(UnitType),
       ),
 
       statuses: this.normalizeEnumArray(
@@ -131,6 +141,38 @@ export class PropertyCriteriaService {
       )
       .filter(Boolean)
       .join(' | ');
+  }
+
+  private normalizeUnitTypes(
+    value: unknown,
+  ): UnitType[] {
+    const allowed = new Set<string>(
+      Object.values(UnitType),
+    );
+    const seen = new Set<UnitType>();
+    const result: UnitType[] = [];
+
+    for (const item of this.toArray(value)) {
+      const raw =
+        this.toNullableString(item)?.toUpperCase();
+
+      if (!raw) {
+        continue;
+      }
+
+      const normalized = allowed.has(raw)
+        ? (raw as UnitType)
+        : UNIT_TYPE_ALIASES[raw];
+
+      if (!normalized || seen.has(normalized)) {
+        continue;
+      }
+
+      seen.add(normalized);
+      result.push(normalized);
+    }
+
+    return result;
   }
 
   private normalizeEnumArray<T extends string>(
