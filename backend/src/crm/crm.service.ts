@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { LinaDistanceService } from '../lina/geo/lina-distance.service';
+import { PropertyCriteriaService } from '../property-criteria/property-criteria.service';
 import {
   ActivityType,
   CustomerInterestPriority,
@@ -20,6 +21,7 @@ export class CrmService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly linaDistanceService: LinaDistanceService,
+    private readonly propertyCriteriaService: PropertyCriteriaService,
   ) {}
 
   private canAccessCustomer(customerOwnerId: string, userId: string, userRole: Role) {
@@ -46,42 +48,6 @@ export class CrmService {
     return value
       .map((item) => String(item ?? '').trim())
       .filter(Boolean);
-  }
-
-  private normalizeCustomerInterestAreas(value: unknown) {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    const seen = new Set<string>();
-
-    return value
-      .map((item) => ({
-        city: String(item?.city ?? '').trim(),
-        district: String(item?.district ?? '').trim(),
-        neighborhood: String(item?.neighborhood ?? '').trim(),
-      }))
-      .filter((item) => item.city && item.district)
-      .filter((item) => {
-        const key = [item.city, item.district, item.neighborhood]
-          .map((part) => part.toLocaleLowerCase('tr-TR'))
-          .join('|');
-
-        if (seen.has(key)) {
-          return false;
-        }
-
-        seen.add(key);
-        return true;
-      });
-  }
-
-  private buildCustomerInterestAreaSummary(
-    areas: Array<{ city: string; district: string; neighborhood: string }>,
-  ) {
-    return areas
-      .map((area) => [area.city, area.district, area.neighborhood].filter(Boolean).join(' / '))
-      .join(' | ');
   }
 
   private normalizeEnumArray<T extends string>(value: unknown, allowedValues: readonly T[]): T[] | undefined {
@@ -257,29 +223,39 @@ export class CrmService {
 
   // CRM Madde 19 Form Detail Sync V3
   async createCustomer(userId: string, data: any) {
-    const interestAreas = this.normalizeCustomerInterestAreas(data?.interestAreas);
+    const normalizedCriteria = this.propertyCriteriaService.normalize({
+      recordKind: 'DEMAND',
+      source: 'CRM',
+      areas: data?.interestAreas,
+      propertyTypes: data?.propertyTypes,
+      statuses: data?.interestStatuses,
+      minBudget: data?.minBudget,
+      maxBudget: data?.maxBudget,
+      minArea: data?.minArea,
+      maxArea: data?.maxArea,
+      roomCounts: data?.roomCounts,
+      features: data?.features,
+      priceCurrency: data?.priceCurrency,
+      isActive: true,
+    });
+
+    const interestAreas = normalizedCriteria.areas.filter(
+      (area) => area.city && area.district,
+    );
+
     const interestedArea =
       interestAreas.length > 0
-        ? this.buildCustomerInterestAreaSummary(interestAreas)
+        ? this.propertyCriteriaService.buildAreaSummary(interestAreas)
         : data?.interestedArea;
 
-    const minBudget = this.normalizeOptionalNumber(data?.minBudget);
-    const maxBudget = this.normalizeOptionalNumber(data?.maxBudget);
-    const minArea = this.normalizeOptionalNumber(data?.minArea);
-    const maxArea = this.normalizeOptionalNumber(data?.maxArea);
-
-    const propertyTypes =
-      this.normalizeEnumArray<UnitType>(
-        data?.propertyTypes,
-        Object.values(UnitType),
-      ) ?? [];
-    const statuses =
-      this.normalizeEnumArray<UnitStatus>(
-        data?.interestStatuses,
-        Object.values(UnitStatus),
-      ) ?? [];
-    const roomCounts = this.normalizeStringArray(data?.roomCounts) ?? [];
-    const features = this.normalizeStringArray(data?.features) ?? [];
+    const minBudget = normalizedCriteria.budget.min;
+    const maxBudget = normalizedCriteria.budget.max;
+    const minArea = normalizedCriteria.grossArea.min;
+    const maxArea = normalizedCriteria.grossArea.max;
+    const propertyTypes = normalizedCriteria.propertyTypes;
+    const statuses = normalizedCriteria.statuses;
+    const roomCounts = normalizedCriteria.roomCounts;
+    const features = normalizedCriteria.features;
 
     const requestedIntent = String(
       data?.purchaseIntent ?? CustomerPurchaseIntent.BELIRSIZ,
@@ -357,7 +333,7 @@ export class CrmService {
               statuses,
               minBudget: minBudget ?? null,
               maxBudget: maxBudget ?? null,
-              priceCurrency: 'TRY',
+              priceCurrency: normalizedCriteria.priceCurrency,
               minArea: minArea ?? null,
               maxArea: maxArea ?? null,
               roomCounts,
