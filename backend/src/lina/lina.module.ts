@@ -16,6 +16,7 @@ import { LinaMemoryService } from "./lina-memory.service";
 import { LinaNotificationService } from "./lina-notification.service";
 import { LinaPropertyValidationService } from "./lina-property-validation.service";
 import { LinaVoiceService } from "./lina-voice.service";
+import { LinaPortfolioApprovalValidationService } from "./portfolio/lina-portfolio-approval-validation.service";
 import { LinaPortfolioSessionService } from "./portfolio/lina-portfolio-session.service";
 import { LinaPortfolioEngineService } from "./portfolio/lina-portfolio-engine.service";
 import { LinaGeoService } from "./geo/lina-geo.service";
@@ -43,6 +44,7 @@ import { LinaDocumentTkgmService } from "./document/lina-document-tkgm.service";
     LinaNotificationService,
     LinaPropertyValidationService,
     LinaVoiceService,
+    LinaPortfolioApprovalValidationService,
     LinaPortfolioSessionService,
     LinaPortfolioEngineService,
     LinaGeoService,
@@ -60,6 +62,7 @@ import { LinaDocumentTkgmService } from "./document/lina-document-tkgm.service";
     LinaNotificationService,
     LinaPropertyValidationService,
     LinaVoiceService,
+    LinaPortfolioApprovalValidationService,
     LinaPortfolioSessionService,
     LinaPortfolioEngineService,
     LinaGeoService,
