@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   Bookmark,
+  CheckCircle2,
   ChevronDown,
   Edit3,
   Loader2,
@@ -15,6 +16,8 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  TriangleAlert,
+  X,
 } from "lucide-react";
 
 import ForumAdvancedFilter, {
@@ -146,6 +149,24 @@ type TopicForm = {
   urgency: string;
   validFor: string;
   visibility: string;
+};
+
+type PropertyValidationWarningIssue = {
+  code: string;
+  field?: string;
+  message?: string;
+  metadata?: {
+    linaExplanation?: string;
+    [key: string]: unknown;
+  };
+};
+
+type PropertyValidationConfirmation = {
+  form: TopicForm;
+  linaTitle: string;
+  confirmationText: string;
+  requiredWarningCodes: string[];
+  warnings: PropertyValidationWarningIssue[];
 };
 
 type PersonalTabKey = "ALL" | "MINE" | "SAVED" | "INTERESTED";
@@ -715,6 +736,8 @@ export default function NetworkPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<NetworkPost | null>(null);
   const [saving, setSaving] = useState(false);
+  const [propertyValidationConfirmation, setPropertyValidationConfirmation] =
+    useState<PropertyValidationConfirmation | null>(null);
   const [deletingId, setDeletingId] = useState("");
   const [flowFilter, setFlowFilter] = useState("Tüm Talepler");
   const [intentFilter, setIntentFilter] = useState("Tümü");
@@ -858,7 +881,10 @@ export default function NetworkPage() {
     INTERESTED: interestedCount,
   };
 
-  const saveTopic = async (form: TopicForm) => {
+  const saveTopic = async (
+    form: TopicForm,
+    acknowledgedWarningCodes: string[] = [],
+  ) => {
     if (!user?.id) {
       alert("Oturum bulunamadı. Lütfen tekrar giriş yapın.");
       router.push("/giris");
@@ -961,6 +987,7 @@ export default function NetworkPage() {
       visibility: form.visibility,
       tags,
       expiresAt: expiresAtFromValidFor(form.validFor),
+      acknowledgedWarningCodes,
     };
 
     try {
@@ -973,10 +1000,46 @@ export default function NetworkPage() {
       }
 
       await fetchPosts();
+      setPropertyValidationConfirmation(null);
       setModalOpen(false);
       setEditingPost(null);
     } catch (error: any) {
-      alert(error?.response?.data?.message || "Talep kaydedilemedi.");
+      const responseData = error?.response?.data;
+
+      if (
+        responseData?.code ===
+        "PROPERTY_VALIDATION_CONFIRMATION_REQUIRED"
+      ) {
+        const requiredWarningCodes = Array.isArray(
+          responseData.requiredWarningCodes,
+        )
+          ? responseData.requiredWarningCodes.filter(
+              (code: unknown): code is string =>
+                typeof code === "string" && Boolean(code.trim()),
+            )
+          : [];
+
+        const warnings = Array.isArray(responseData.warnings)
+          ? responseData.warnings
+          : [];
+
+        if (requiredWarningCodes.length > 0) {
+          setPropertyValidationConfirmation({
+            form,
+            linaTitle:
+              responseData.linaTitle ||
+              "Lina olağan dışı bir değer fark etti",
+            confirmationText:
+              responseData.confirmationText ||
+              "Bu değerin doğru olduğunu onaylıyorum",
+            requiredWarningCodes,
+            warnings,
+          });
+          return;
+        }
+      }
+
+      alert(responseData?.message || "Talep kaydedilemedi.");
     } finally {
       setSaving(false);
     }
@@ -1530,13 +1593,164 @@ export default function NetworkPage() {
           categories={roleCategories}
           userRole={user?.role}
           onClose={() => {
+            setPropertyValidationConfirmation(null);
             setModalOpen(false);
             setEditingPost(null);
           }}
           onSave={saveTopic}
         />
       )}
+
+      {propertyValidationConfirmation && (
+        <LinaPropertyValidationModal
+          warning={propertyValidationConfirmation}
+          saving={saving}
+          onClose={() =>
+            setPropertyValidationConfirmation(null)
+          }
+          onConfirm={async () => {
+            const currentWarning =
+              propertyValidationConfirmation;
+
+            setPropertyValidationConfirmation(null);
+
+            await saveTopic(
+              currentWarning.form,
+              currentWarning.requiredWarningCodes,
+            );
+          }}
+        />
+      )}
     </main>
+  );
+}
+
+function LinaPropertyValidationModal({
+  warning,
+  saving,
+  onClose,
+  onConfirm,
+}: {
+  warning: PropertyValidationConfirmation;
+  saving: boolean;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
+}) {
+  const [confirmed, setConfirmed] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-[2px] sm:items-center sm:p-5">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="lina-property-warning-title"
+        className="max-h-[92dvh] w-full overflow-y-auto rounded-t-[30px] border border-amber-300 bg-[#FFFBEB] shadow-[0_28px_90px_rgba(15,23,42,0.35)] sm:max-w-[560px] sm:rounded-[30px]"
+      >
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-amber-200 bg-[#FFFBEB]/95 px-5 py-5 backdrop-blur sm:px-6">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+              <Sparkles size={25} />
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-amber-700">
+                Lina Kontrolü
+              </p>
+              <h2
+                id="lina-property-warning-title"
+                className="mt-1 text-[20px] font-black leading-tight text-slate-900"
+              >
+                {warning.linaTitle}
+              </h2>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            aria-label="Uyarıyı kapat"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-white text-slate-600 disabled:opacity-50"
+          >
+            <X size={19} />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-5 py-5 sm:px-6">
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-100/70 p-4">
+            <TriangleAlert
+              size={22}
+              className="mt-0.5 shrink-0 text-amber-700"
+            />
+            <p className="text-[13px] font-semibold leading-6 text-amber-950">
+              Girdiğiniz değer mümkün görünüyor; ancak olağan aralığın
+              dışında. Yazım hatası olmadığını kontrol edin.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {warning.warnings.map((issue, index) => (
+              <div
+                key={`${issue.code}-${index}`}
+                className="rounded-2xl border border-amber-200 bg-white p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                    <TriangleAlert size={16} />
+                  </div>
+
+                  <p className="text-[13px] font-bold leading-6 text-slate-800">
+                    {issue.metadata?.linaExplanation ||
+                      issue.message ||
+                      "Olağan dışı bir kriter değeri tespit edildi."}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-amber-300 bg-white p-4">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(event) =>
+                setConfirmed(event.target.checked)
+              }
+              disabled={saving}
+              className="mt-1 h-5 w-5 shrink-0 accent-amber-600"
+            />
+            <span className="text-[13px] font-black leading-6 text-slate-900">
+              {warning.confirmationText}
+            </span>
+          </label>
+
+          <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="h-12 rounded-2xl border border-slate-300 bg-white px-4 text-[13px] font-black text-slate-700 disabled:opacity-50"
+            >
+              Değeri Düzelt
+            </button>
+
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={!confirmed || saving}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-amber-600 px-4 text-[13px] font-black text-white shadow-lg shadow-amber-600/20 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {saving ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <CheckCircle2 size={18} />
+              )}
+              Onayla ve Devam Et
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
