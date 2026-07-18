@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { CrmModule } from "../crm/crm.module";
 import { NetworkModule } from "../network/network.module";
 import { PrismaService } from "../prisma/prisma.service";
+import { PropertyValidationModule } from "../property-validation/property-validation.module";
 
 import { LinaActionEngineService } from "./actions/lina-action-engine.service";
 import { LinaCrmOwnerActionService } from "./actions/lina-crm-owner-action.service";
@@ -13,6 +14,7 @@ import { LinaKvkkService } from "./lina-kvkk.service";
 import { LinaAuditService } from "./lina-audit.service";
 import { LinaMemoryService } from "./lina-memory.service";
 import { LinaNotificationService } from "./lina-notification.service";
+import { LinaPropertyValidationService } from "./lina-property-validation.service";
 import { LinaVoiceService } from "./lina-voice.service";
 import { LinaPortfolioSessionService } from "./portfolio/lina-portfolio-session.service";
 import { LinaPortfolioEngineService } from "./portfolio/lina-portfolio-engine.service";
@@ -22,7 +24,12 @@ import { LinaDocumentPrecheckService } from "./document/lina-document-precheck.s
 import { LinaDocumentTkgmService } from "./document/lina-document-tkgm.service";
 
 @Module({
-  imports: [CrmModule, NetworkModule, LinaDistanceModule],
+  imports: [
+    CrmModule,
+    NetworkModule,
+    PropertyValidationModule,
+    LinaDistanceModule,
+  ],
   controllers: [LinaController],
   providers: [
     PrismaService,
@@ -34,6 +41,7 @@ import { LinaDocumentTkgmService } from "./document/lina-document-tkgm.service";
     LinaAuditService,
     LinaMemoryService,
     LinaNotificationService,
+    LinaPropertyValidationService,
     LinaVoiceService,
     LinaPortfolioSessionService,
     LinaPortfolioEngineService,
@@ -50,6 +58,7 @@ import { LinaDocumentTkgmService } from "./document/lina-document-tkgm.service";
     LinaAuditService,
     LinaMemoryService,
     LinaNotificationService,
+    LinaPropertyValidationService,
     LinaVoiceService,
     LinaPortfolioSessionService,
     LinaPortfolioEngineService,
