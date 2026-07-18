@@ -10,14 +10,20 @@ const OPENAI_TTS_VOICE = "marin";
 const OPENAI_TTS_SPEED = 1;
 
 const OPENAI_TTS_INSTRUCTIONS = `
-Türkçe konuş.
-Samimi, doğal, sıcak ve güven veren yetişkin bir kadın sesi kullan.
+Türkiye Türkçesiyle konuş.
+Doğal, akıcı ve yerel İstanbul Türkçesine yakın bir telaffuz kullan.
+Yabancı aksan, İngilizce tonlama veya yapay hece vurgusu kullanma.
+Türkçe kelimeleri Türkiye'de günlük konuşmada kullanıldığı biçimde telaffuz et.
+Samimi, doğal, sıcak ve güven veren bir ses karakteri kullan.
 Konuşma hızını orta seviyede ve sabit tut.
 Tüm yanıtlarda aynı ses karakterini, ritmi ve sakin tonu koru.
-Robotik, resmi, haber spikeri gibi veya aşırı neşeli konuşma.
-Ani ton değişiklikleri, yapay vurgular, dramatik iniş çıkışlar ve gereksiz uzatmalar yapma.
-Soruları doğal bir sohbet içindeymiş gibi, anlaşılır ve yumuşak biçimde söyle.
+Robotik, aşırı resmî, haber spikeri gibi veya aşırı neşeli konuşma.
+Ani ton değişiklikleri, dramatik iniş çıkışlar ve gereksiz uzatmalar yapma.
+Soruları doğal bir sohbet içindeymiş gibi anlaşılır ve yumuşak biçimde söyle.
+Cümle sonlarını doğal biçimde tamamla.
 Noktalama işaretlerinde kısa ve doğal duraklamalar kullan.
+Sayıları, para birimlerini, şehir ve ilçe adlarını Türkiye Türkçesiyle telaffuz et.
+Gayrimenkul terimlerinde doğal sektör telaffuzu kullan.
 `.trim();
 
 function readEnvValue(key: string) {
