@@ -2,10 +2,13 @@ import { Injectable } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 
+import type { PropertyValidationResult } from '../../property-validation/property-validation.types';
+import { LinaPortfolioApprovalValidationService } from './lina-portfolio-approval-validation.service';
 import {
   LinaPortfolioDraftInput,
   LinaPortfolioSessionContext,
   LinaPortfolioSessionService,
+  LinaPortfolioValidationState,
 } from './lina-portfolio-session.service';
 
 type CityRecord = {
@@ -25,6 +28,7 @@ export class LinaPortfolioEngineService {
 
   constructor(
     private readonly linaPortfolioSessionService: LinaPortfolioSessionService,
+    private readonly linaPortfolioApprovalValidationService: LinaPortfolioApprovalValidationService,
   ) {}
 
   async processUserMessage(
@@ -43,7 +47,7 @@ export class LinaPortfolioEngineService {
         currentSession.step === 'CONFIRMATION') &&
       confirmation === 'APPROVED'
     ) {
-      return this.linaPortfolioSessionService.markApproved(userId);
+      return this.handleApproval(userId, currentSession);
     }
 
     if (
@@ -67,6 +71,81 @@ export class LinaPortfolioEngineService {
     }
 
     return this.linaPortfolioSessionService.getOrCreateActiveSession(userId);
+  }
+
+  private async handleApproval(
+    userId: string,
+    session: LinaPortfolioSessionContext,
+  ): Promise<LinaPortfolioSessionContext> {
+    const pendingValidation = session.state.validation;
+
+    const acknowledgedWarningCodes =
+      session.step === 'CONFIRMATION' &&
+      pendingValidation?.status ===
+        'WARNING_CONFIRMATION_REQUIRED'
+        ? pendingValidation.requiredWarningCodes
+        : [];
+
+    const result =
+      this.linaPortfolioApprovalValidationService.validateForApproval(
+        session,
+        acknowledgedWarningCodes,
+      );
+
+    if (!result.valid) {
+      return this.linaPortfolioSessionService.saveValidationState(
+        userId,
+        this.createValidationState(result, 'BLOCKED'),
+      );
+    }
+
+    if (result.requiresConfirmation) {
+      return this.linaPortfolioSessionService.saveValidationState(
+        userId,
+        this.createValidationState(
+          result,
+          'WARNING_CONFIRMATION_REQUIRED',
+        ),
+      );
+    }
+
+    return this.linaPortfolioSessionService.markApproved(
+      userId,
+      result.acknowledgedWarningCodes,
+    );
+  }
+
+  private createValidationState(
+    result: PropertyValidationResult,
+    status:
+      | 'BLOCKED'
+      | 'WARNING_CONFIRMATION_REQUIRED',
+  ): LinaPortfolioValidationState {
+    const relevantIssues =
+      status === 'WARNING_CONFIRMATION_REQUIRED'
+        ? result.pendingWarnings
+        : result.issues.filter((issue) => issue.blocking);
+
+    const messages = [
+      ...new Set(
+        relevantIssues
+          .map((issue) => String(issue.message || '').trim())
+          .filter(Boolean),
+      ),
+    ];
+
+    return {
+      version: result.version,
+      status,
+      messages,
+      requiredWarningCodes:
+        status === 'WARNING_CONFIRMATION_REQUIRED'
+          ? [...result.requiredWarningCodes]
+          : [],
+      acknowledgedWarningCodes: [
+        ...result.acknowledgedWarningCodes,
+      ],
+    };
   }
 
   buildEnginePrompt(session: LinaPortfolioSessionContext): string {
@@ -119,7 +198,42 @@ export class LinaPortfolioEngineService {
       return 'Portföy bilgilerini onayladım. Portföy taslağınız hazır.';
     }
 
-    if (session.step === 'SUMMARY' || session.step === 'CONFIRMATION') {
+    const validation = session.state.validation;
+
+    if (validation?.status === 'BLOCKED') {
+      return [
+        this.buildSummary(session),
+        '',
+        'Bu bilgilerle portföyü onaylayamam:',
+        ...validation.messages.map(
+          (message) => `• ${message}`,
+        ),
+        '',
+        'Hatalı değeri düzelterek tekrar gönderin.',
+      ].join('\n');
+    }
+
+    if (
+      session.step === 'CONFIRMATION' &&
+      validation?.status ===
+        'WARNING_CONFIRMATION_REQUIRED'
+    ) {
+      return [
+        this.buildSummary(session),
+        '',
+        'Lina olağan dışı bir değer fark etti:',
+        ...validation.messages.map(
+          (message) => `• ${message}`,
+        ),
+        '',
+        'Bu değerlerin doğru olduğunu onaylıyor musunuz?',
+      ].join('\n');
+    }
+
+    if (
+      session.step === 'SUMMARY' ||
+      session.step === 'CONFIRMATION'
+    ) {
       return `${this.buildSummary(session)}\n\nBilgileri onaylıyor musunuz?`;
     }
 
