@@ -36,6 +36,7 @@ import { TuranModule } from './turan/turan.module';
 import { ProjectSalesModule } from './project-sales/project-sales.module';
 import { ProjectSalesTemplatesModule } from './project-sales-templates/project-sales-templates.module';
 import { ProjectSceneModule } from './project-scene/project-scene.module';
+import { MapsModule } from './maps/maps.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { ProjectSceneModule } from './project-scene/project-scene.module';
     ProjectSalesModule,
     ProjectSalesTemplatesModule,
     ProjectSceneModule,
+    MapsModule,
 
     NominationsModule,
     ApplicationsModule,
