@@ -79,7 +79,7 @@ function normalizeVoiceText(text: string) {
 
 export async function POST(req: NextRequest) {
   // Lina Temporary Passive Mode V1
-  const linaTemporarilyDisabled = true;
+  const linaTemporarilyDisabled = false;
 
   if (linaTemporarilyDisabled) {
     return NextResponse.json(

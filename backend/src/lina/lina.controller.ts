@@ -52,7 +52,7 @@ export class LinaController {
   ) {}
 
   // Lina Temporary Passive Mode V1
-  private readonly linaTemporarilyDisabled = true;
+  private readonly linaTemporarilyDisabled = false;
   private readonly linaTemporarilyDisabledMessage =
     "Lina geçici olarak pasif durumdadır. Platformdaki diğer geliştirmeler tamamlandıktan sonra yeniden devreye alınacaktır.";
 
