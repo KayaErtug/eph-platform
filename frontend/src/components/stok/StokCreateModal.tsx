@@ -2180,6 +2180,34 @@ export default function StokCreateModal({
                 </>
               )}
 
+              {showAvailableCreditAmountField && (
+                <label className="stock-form-field full">
+                  <span>
+                    {getFieldLabel(
+                      "availableCreditAmount",
+                      unitForm.type,
+                      isRequiredField("availableCreditAmount"),
+                    )} ({getCurrencySymbol(selectedCurrency)})
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={availableCreditAmountDisplay}
+                    onChange={(e) =>
+                      setUnitField(
+                        "availableCreditAmount",
+                        parseFormattedNumber(e.target.value),
+                      )
+                    }
+                    placeholder="Örn: 7.500.000"
+                  />
+                  <p className="mt-2 text-xs font-bold leading-5 text-[#64748B]">
+                    Banka ekspertizi ve kredi değerlendirmesine göre kullanılabilecek
+                    tahmini üst tutarı girin. Satış fiyatını aşamaz.
+                  </p>
+                </label>
+              )}
+
               {showDescriptionField && (
                 <label className="stock-form-field full">
                   <span>{getFieldLabel("description", unitForm.type, isRequiredField("description"))}</span>
