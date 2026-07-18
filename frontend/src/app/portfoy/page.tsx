@@ -993,16 +993,20 @@ function StokPageInner() {
   };
 
   const handleRemoveFromPool = async (unit: MapUnit) => {
+    const confirmed = window.confirm(
+      "İlan havuzdan kaldırılacak ve Taslak durumuna dönecek.\n\nFiyat, açıklama, fotoğraf ve belgeleri güncelleyebilirsiniz.\n\nTekrar yayınlanması için yeniden admin onayı gerekecek.",
+    );
+
+    if (!confirmed) return;
+
     try {
       setPoolActionUnitId(unit.id);
       await api.post(`/units/${unit.id}/remove-from-pool`);
       await fetchData();
-      alert(
-        "Portföy havuzdan kaldırıldı. Yeniden yayın için bilgileri kontrol edip admin incelemesine gönderin.",
-      );
+      router.push(`/portfoy?edit=${unit.id}`);
     } catch (error: any) {
       alert(
-        error?.response?.data?.message || "Portföy havuzdan kaldırılamadı.",
+        error?.response?.data?.message || "İlan havuzdan geri çekilemedi.",
       );
     } finally {
       setPoolActionUnitId("");
@@ -1310,6 +1314,7 @@ function StokPageInner() {
                 selected={mapSelectedUnitId === unit.id}
                 deleting={deletingUnitId === unit.id}
                 poolBusy={poolActionUnitId === unit.id}
+                currentUserId={String(user?.id || "")}
                 onOpen={() => router.push(`/portfoy/${unit.id}`)}
                 onUpdate={() => openEditModal(unit)}
                 onShare={() => handlePortfolioShare(unit)}
@@ -1613,6 +1618,7 @@ function CompactPortfolioCard({
   selected,
   deleting,
   poolBusy,
+  currentUserId,
   onOpen,
   onUpdate,
   onShare,
@@ -1625,6 +1631,7 @@ function CompactPortfolioCard({
   selected: boolean;
   deleting: boolean;
   poolBusy: boolean;
+  currentUserId: string;
   onOpen: () => void;
   onUpdate: () => void;
   onShare: () => void;
@@ -1653,7 +1660,21 @@ function CompactPortfolioCard({
   const isPoolVisible = Boolean(
     (unit as any).isPoolVisible || approvalStatus === "HAVUZDA",
   );
-  const canRemoveFromPool = approvalStatus === "HAVUZDA" || isPoolVisible;
+  const possibleOwnerIds = [
+    (unit as any)?.userId,
+    (unit as any)?.ownerId,
+    (unit as any)?.createdById,
+    (unit as any)?.project?.userId,
+    (unit as any)?.project?.ownerId,
+    (unit as any)?.project?.createdById,
+    (unit as any)?.project?.owner?.id,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value));
+  const isPortfolioOwner = possibleOwnerIds.includes(currentUserId);
+  const canRemoveFromPool =
+    isPortfolioOwner &&
+    (approvalStatus === "HAVUZDA" || isPoolVisible);
   const isVerified = isUnitVerified(unit);
   const text = [unit.type, unit.description, unit.project?.name]
     .join(" ")
@@ -2116,14 +2137,14 @@ function CompactPortfolioCard({
                   type="button"
                   onClick={onRemoveFromPool}
                   disabled={poolBusy}
-                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[13px] border border-amber-200 bg-amber-50 px-3 text-[12px] font-extrabold text-amber-800 disabled:opacity-60"
+                  className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[13px] border border-amber-200 bg-amber-50 px-3 text-center text-[11px] font-extrabold leading-4 text-amber-800 disabled:opacity-60"
                 >
                   {poolBusy ? (
                     <Loader2 size={15} className="animate-spin" />
                   ) : (
                     <X size={15} />
                   )}
-                  Havuzdan Kaldır
+                  İlanı Geri Çek ve Güncelle
                 </button>
               ) : null}
             </div>

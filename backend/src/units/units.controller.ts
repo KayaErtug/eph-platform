@@ -206,7 +206,7 @@ export class UnitsController {
 
   @Post(':id/remove-from-pool')
   @UseGuards(RolesGuard)
-  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI)
   removeFromPool(@Param('id') id: string, @CurrentUser() user: any) {
     return this.unitsService.removeFromPool(id, user);
   }

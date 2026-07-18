@@ -543,6 +543,27 @@ function formatFileSize(size?: number | null) {
 
 
 
+function isDetailUnitOwner(
+  unit?: DetailUnit | null,
+  user?: { id?: string | null } | null,
+) {
+  if (!unit || !user?.id) return false;
+
+  const possibleOwnerIds = [
+    (unit as any)?.userId,
+    (unit as any)?.ownerId,
+    (unit as any)?.createdById,
+    (unit as any)?.project?.userId,
+    (unit as any)?.project?.ownerId,
+    (unit as any)?.project?.createdById,
+    (unit as any)?.project?.owner?.id,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value));
+
+  return possibleOwnerIds.includes(String(user.id));
+}
+
 function canEditDetailUnit(
   unit?: DetailUnit | null,
   user?: { id?: string | null; role?: string | null } | null,
@@ -653,6 +674,7 @@ export default function StokDetailPage() {
   const [doorAccessVisible, setDoorAccessVisible] = useState(false);
   const [managementOpen, setManagementOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [poolWithdrawLoading, setPoolWithdrawLoading] = useState(false);
   const [actionError, setActionError] = useState("");
   const [imageUploadLoading, setImageUploadLoading] = useState("");
   const [imageActionLoading, setImageActionLoading] = useState("");
@@ -1172,6 +1194,31 @@ export default function StokDetailPage() {
     }
   };
 
+  const handleWithdrawFromPool = async () => {
+    if (!unit || !isDetailUnitOwner(unit, user)) return;
+
+    const confirmed = window.confirm(
+      "İlan havuzdan kaldırılacak ve Taslak durumuna dönecek.\n\nFiyat, açıklama, fotoğraf ve belgeleri güncelleyebilirsiniz.\n\nTekrar yayınlanması için yeniden admin onayı gerekecek.",
+    );
+
+    if (!confirmed) return;
+
+    setActionError("");
+
+    try {
+      setPoolWithdrawLoading(true);
+      await api.post(`/units/${unit.id}/remove-from-pool`);
+      router.push(`/portfoy?edit=${unit.id}`);
+    } catch (err: any) {
+      setActionError(
+        err?.response?.data?.message ||
+          "İlan havuzdan geri çekilemedi.",
+      );
+    } finally {
+      setPoolWithdrawLoading(false);
+    }
+  };
+
   const handleApprovalAction = async (
     nextStatus:
       | "INCELEMEDE"
@@ -1270,9 +1317,13 @@ export default function StokDetailPage() {
   const style = statusStyle(unit.status);
   const canEditPortfolio = canEditDetailUnit(unit, user);
   const canReviewPortfolio = canReviewDetailUnit(user);
+  const isPortfolioOwner = isDetailUnitOwner(unit, user);
   const approvalStatus = String(
     unit.approvalStatus || "TASLAK",
   ).toUpperCase();
+  const canWithdrawFromPool =
+    isPortfolioOwner &&
+    (approvalStatus === "HAVUZDA" || Boolean(unit.isPoolVisible));
   const canSeeDoorAccessInfo = canViewDoorAccessInfo(unit, user);
   const availableCreditAmount = Number((unit as any)?.availableCreditAmount || 0);
   const doorAccessInfo = String((unit as any)?.doorAccessInfo || "").trim();
@@ -1536,6 +1587,38 @@ export default function StokDetailPage() {
             )}
           </div>
         </section>
+
+        {canWithdrawFromPool && (
+          <section className="mt-2 rounded-[22px] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-blue-50 p-3 text-center shadow-[0_12px_28px_rgba(217,119,6,0.12)]">
+            <div className="flex items-center justify-center gap-2">
+              <Edit3 size={18} className="shrink-0 text-amber-700" />
+              <h2 className="text-[15px] font-black text-[#06194A]">
+                İlanınızı Güncellemek mi İstiyorsunuz?
+              </h2>
+            </div>
+
+            <p className="mx-auto mt-1.5 max-w-[350px] text-[11px] font-bold leading-5 text-[#64748B]">
+              İlan havuzdan kaldırılarak Taslak durumuna döner. Yaptığınız
+              değişikliklerden sonra yeniden admin onayına göndermeniz gerekir.
+            </p>
+
+            <button
+              type="button"
+              onClick={handleWithdrawFromPool}
+              disabled={poolWithdrawLoading}
+              className="mt-3 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[16px] bg-amber-600 px-3 text-[12px] font-black leading-4 text-white shadow-[0_12px_24px_rgba(217,119,6,0.20)] disabled:opacity-60"
+            >
+              {poolWithdrawLoading ? (
+                "İlan Geri Çekiliyor..."
+              ) : (
+                <>
+                  <Edit3 size={16} />
+                  İlanı Geri Çek ve Güncelle
+                </>
+              )}
+            </button>
+          </section>
+        )}
 
         {canReviewPortfolio && (
           <PortfolioApprovalCenter

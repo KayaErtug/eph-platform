@@ -2052,8 +2052,10 @@ export class UnitsService {
   async removeFromPool(id: string, user: CurrentUserPayload) {
     const unit = await this.getUnitWithProjectOrFail(id);
 
-    if (!this.isApprovalManager(user)) {
-      this.ensureCanManageUnit(user, unit.project.ownerId);
+    if (!this.isOwner(user, unit.project.ownerId)) {
+      throw new ForbiddenException(
+        'Bu ilanı yalnızca portföy sahibi geri çekebilir.',
+      );
     }
 
     if (!unit.isPoolVisible) {
