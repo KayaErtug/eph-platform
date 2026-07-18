@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Loader2, MapPin, Search, X } from "lucide-react";
+import {
+  CheckCircle2,
+  Link2,
+  Loader2,
+  MapPin,
+  Search,
+  X,
+} from "lucide-react";
 
 type GoogleGeoLocation = {
   latitude: number;
@@ -179,6 +186,9 @@ export default function GoogleGeoPicker({
       : null,
   );
   const [selectedMapType, setSelectedMapType] = useState<MapTypeKey>("roadmap");
+  const [sharedLocationValue, setSharedLocationValue] = useState("");
+  const [resolvingSharedLocation, setResolvingSharedLocation] =
+    useState(false);
 
   const searchAddress = useMemo(() => normalizeAddress([address, district, city, "Türkiye"]), [address, city, district]);
   const selectedLocationText = mapAddress || pendingLocation?.mapAddress || "Henüz harita konumu seçilmedi.";
@@ -275,6 +285,67 @@ export default function GoogleGeoPicker({
     });
   };
 
+
+  const resolveSharedLocation = async () => {
+    const value = sharedLocationValue.trim();
+
+    if (!value) {
+      setError(
+        "WhatsApp’tan gelen Google Maps bağlantısını veya koordinatı girin.",
+      );
+      return;
+    }
+
+    setResolvingSharedLocation(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/maps/resolve", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ value }),
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          result?.message ||
+            "Paylaşılan konum bağlantısı çözümlenemedi.",
+        );
+      }
+
+      const importedLatitude = Number(result?.latitude);
+      const importedLongitude = Number(result?.longitude);
+
+      if (
+        !Number.isFinite(importedLatitude) ||
+        !Number.isFinite(importedLongitude)
+      ) {
+        throw new Error(
+          "Bağlantının içinde geçerli koordinat bulunamadı.",
+        );
+      }
+
+      reverseGeocode(importedLatitude, importedLongitude);
+
+      mapRef.current?.setCenter?.({
+        lat: importedLatitude,
+        lng: importedLongitude,
+      });
+      mapRef.current?.setZoom?.(18);
+    } catch (resolveError) {
+      setError(
+        resolveError instanceof Error
+          ? resolveError.message
+          : "Paylaşılan konum bağlantısı çözümlenemedi.",
+      );
+    } finally {
+      setResolvingSharedLocation(false);
+    }
+  };
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -465,6 +536,54 @@ export default function GoogleGeoPicker({
                 <button type="button" onClick={geocodeCurrentAddress} className="rounded-[14px] bg-[#EFF6FF] px-3 py-2 text-[11px] font-black text-[#1557D6]">
                   Bul
                 </button>
+              </div>
+
+              <div className="rounded-[20px] border border-[#DDE7F3] bg-[#F8FBFF] p-2.5">
+                <p className="mb-2 text-center text-[11px] font-black text-[#1557D6]">
+                  WhatsApp’tan Gelen Konumu Aktar
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <Link2 size={17} className="shrink-0 text-[#64748B]" />
+
+                  <input
+                    type="text"
+                    value={sharedLocationValue}
+                    onChange={(event) =>
+                      setSharedLocationValue(event.target.value)
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void resolveSharedLocation();
+                      }
+                    }}
+                    disabled={resolvingSharedLocation}
+                    className="min-w-0 flex-1 bg-transparent text-[13px] font-bold text-[#06194A] outline-none"
+                    placeholder="Google Maps linkini veya koordinatı yapıştır"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => void resolveSharedLocation()}
+                    disabled={
+                      resolvingSharedLocation ||
+                      !sharedLocationValue.trim()
+                    }
+                    className="inline-flex min-h-[40px] shrink-0 items-center justify-center rounded-[14px] bg-[#1557D6] px-3 text-[11px] font-black text-white disabled:opacity-45"
+                  >
+                    {resolvingSharedLocation ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      "Aktar"
+                    )}
+                  </button>
+                </div>
+
+                <p className="mt-2 text-center text-[10px] font-bold leading-4 text-[#64748B]">
+                  WhatsApp’tan kopyalanan Google Maps bağlantıları ve
+                  enlem-boylam değerleri desteklenir.
+                </p>
               </div>
 
               <button
