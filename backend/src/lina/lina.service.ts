@@ -1,8 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import * as fs from "fs";
-import * as path from "path";
-
 import { LinaChatDto } from "./dto/lina-chat.dto";
 import { LinaVoiceDto } from "./dto/lina-voice.dto";
 import { LinaPreferencesDto } from "./dto/lina-preferences.dto";
@@ -23,6 +20,7 @@ import {
 import { LinaPortfolioSessionService } from "./portfolio/lina-portfolio-session.service";
 import { LinaPortfolioEngineService } from "./portfolio/lina-portfolio-engine.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
 
 type LinaApiUser = LinaAccessUser & {
   email?: string;
@@ -37,7 +35,7 @@ type LinaStatusResponse = {
 type LinaChatResponse = {
   success: boolean;
   message: string;
-  provider: "openai" | "claude" | "local";
+  provider: "openai" | "local";
   kvkkFiltered: boolean;
   detectedTypes: string[];
 };
@@ -60,8 +58,6 @@ type LinaProviderAnswer = {
 
 @Injectable()
 export class LinaService {
-  private readonly promptCache = new Map<string, string>();
-
   constructor(
     private readonly configService: ConfigService,
     private readonly linaAccessService: LinaAccessService,
@@ -70,6 +66,7 @@ export class LinaService {
     private readonly linaMemoryService: LinaMemoryService,
     private readonly linaPortfolioSessionService: LinaPortfolioSessionService,
     private readonly linaPortfolioEngineService: LinaPortfolioEngineService,
+    private readonly linaV7PromptService: LinaV7PromptService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -77,7 +74,7 @@ export class LinaService {
     return {
       success: true,
       message:
-        "Lina v5 aktif. Karar motoru, portföy oturum hafızası, canlı veri bağlamı ve tek anayasa katmanı AI sağlayıcısına bağlandı.",
+        "Lina V7 aktif. OpenAI konuşma katmanı; EPH backend karar motoru, canlı veri bağlamı, hafıza ve portföy işlem bağlamıyla birlikte çalışıyor.",
       provider: this.getAiProvider(),
     };
   }
@@ -145,72 +142,16 @@ export class LinaService {
     const deterministicPortfolioReply =
       this.extractPortfolioExactReply(portfolioRuntimeContext);
 
-    if (deterministicPortfolioReply) {
-      const outputFilter = this.linaKvkkService.filterText(
-        deterministicPortfolioReply,
-      );
-      const kvkkFiltered = outputFilter.filtered || inputFilter.filtered;
-
-      await this.rememberPortfolioAssistantMessage(
-        outputFilter.safeText,
-        portfolioFlowActive,
-        user,
-      );
-
-      await this.safeRecordConversation({
-        preparation: chatPreparation,
-        user,
-        sourceModule,
-        userMessage: safeUserMessage,
-        assistantMessage: outputFilter.safeText,
-        inputTokenCount: 0,
-        outputTokenCount: 0,
-      });
-
-      this.linaAuditService.log({
-        userId: user?.id,
-        role: user?.role,
-        module: sourceModule,
-        action: "lina_portfolio_flow",
-        result: kvkkFiltered ? "filtered" : "success",
-        riskLevel: kvkkFiltered ? 2 : 0,
-        kvkkFiltered,
-      });
-
-      return {
-        success: true,
-        message: outputFilter.safeText,
-        provider: "local",
-        kvkkFiltered,
-        detectedTypes: Array.from(
-          new Set([
-            ...inputFilter.detectedTypes,
-            ...outputFilter.detectedTypes,
-          ]),
-        ),
-      };
-    }
-
     try {
       const provider = this.getAiProvider();
-      const providerAnswer =
-        provider === "claude"
-          ? await this.askClaude(
-              safeUserMessage,
-              sourceModule,
-              user,
-              portfolioRuntimeContext,
-              chatPreparation?.history || [],
-              chatPreparation?.memorySnapshot,
-            )
-          : await this.askOpenAi(
-              safeUserMessage,
-              sourceModule,
-              user,
-              portfolioRuntimeContext,
-              chatPreparation?.history || [],
-              chatPreparation?.memorySnapshot,
-            );
+      const providerAnswer = await this.askOpenAi(
+        safeUserMessage,
+        sourceModule,
+        user,
+        portfolioRuntimeContext,
+        chatPreparation?.history || [],
+        chatPreparation?.memorySnapshot,
+      );
       const rawAnswer = providerAnswer.content;
 
       const outputFilter = this.linaKvkkService.filterText(rawAnswer);
@@ -255,6 +196,55 @@ export class LinaService {
         ),
       };
     } catch (error) {
+      if (deterministicPortfolioReply) {
+        const outputFilter = this.linaKvkkService.filterText(
+          deterministicPortfolioReply,
+        );
+        const kvkkFiltered =
+          outputFilter.filtered || inputFilter.filtered;
+
+        await this.rememberPortfolioAssistantMessage(
+          outputFilter.safeText,
+          portfolioFlowActive,
+          user,
+        );
+
+        await this.safeRecordConversation({
+          preparation: chatPreparation,
+          user,
+          sourceModule,
+          userMessage: safeUserMessage,
+          assistantMessage: outputFilter.safeText,
+          inputTokenCount: 0,
+          outputTokenCount: 0,
+        });
+
+        this.linaAuditService.log({
+          userId: user?.id,
+          role: user?.role,
+          module: sourceModule,
+          action: "lina_portfolio_flow_fallback",
+          result: kvkkFiltered ? "filtered" : "success",
+          riskLevel: kvkkFiltered ? 2 : 1,
+          reason:
+            error instanceof Error ? error.message : "UNKNOWN_ERROR",
+          kvkkFiltered,
+        });
+
+        return {
+          success: true,
+          message: outputFilter.safeText,
+          provider: "local",
+          kvkkFiltered,
+          detectedTypes: Array.from(
+            new Set([
+              ...inputFilter.detectedTypes,
+              ...outputFilter.detectedTypes,
+            ]),
+          ),
+        };
+      }
+
       this.linaAuditService.log({
         userId: user?.id,
         role: user?.role,
@@ -451,15 +441,7 @@ export class LinaService {
     }
   }
 
-  private getAiProvider(): "openai" | "claude" {
-    const provider = String(
-      this.configService.get<string>("LINA_AI_PROVIDER") || "openai",
-    ).toLowerCase();
-
-    if (provider === "claude") {
-      return "claude";
-    }
-
+  private getAiProvider(): "openai" {
     return "openai";
   }
 
@@ -547,90 +529,6 @@ export class LinaService {
       content,
       inputTokens: data.usage?.prompt_tokens || 0,
       outputTokens: data.usage?.completion_tokens || 0,
-    };
-  }
-
-  private async askClaude(
-    message: string,
-    sourceModule: LinaModuleName,
-    user?: LinaApiUser,
-    portfolioRuntimeContext = "",
-    history: LinaHistoryMessage[] = [],
-    memorySnapshot?: LinaPromptMemorySnapshot,
-  ): Promise<LinaProviderAnswer> {
-    const apiKey =
-      this.configService.get<string>("ANTHROPIC_API_KEY") ||
-      process.env.ANTHROPIC_API_KEY;
-
-    if (!apiKey) {
-      return {
-        content: this.localFallbackAnswer(message),
-        inputTokens: 0,
-        outputTokens: 0,
-      };
-    }
-
-    const model =
-      this.configService.get<string>("ANTHROPIC_MODEL") ||
-      process.env.ANTHROPIC_MODEL ||
-      "claude-3-5-haiku-latest";
-    const systemPrompt = await this.buildSystemPrompt(
-      sourceModule,
-      user,
-      portfolioRuntimeContext,
-      memorySnapshot,
-    );
-
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 900,
-        temperature: 0.18,
-        system: systemPrompt,
-        messages: [
-          ...history,
-          {
-            role: "user",
-            content: message,
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const detail = await response.text();
-      throw new Error(`CLAUDE_ERROR_${response.status}: ${detail}`);
-    }
-
-    const data = (await response.json()) as {
-      content?: Array<{
-        type?: string;
-        text?: string;
-      }>;
-      usage?: {
-        input_tokens?: number;
-        output_tokens?: number;
-      };
-    };
-
-    const content = data?.content
-      ?.find((item) => item.type === "text")
-      ?.text?.trim();
-
-    if (!content) {
-      throw new Error("CLAUDE_EMPTY_RESPONSE");
-    }
-
-    return {
-      content,
-      inputTokens: data.usage?.input_tokens || 0,
-      outputTokens: data.usage?.output_tokens || 0,
     };
   }
 
@@ -1016,12 +914,15 @@ export class LinaService {
         "SON KULLANICI MESAJLARI",
         recentConversation || "Henüz kayıtlı mesaj yok.",
         "",
-        "MANUEL PORTFÖY FORMU KURALLARI",
-        "- Engine tarafından üretilen PORTFOLIO_EXACT_REPLY metnini değiştirme.",
-        "- Alan sırası: Portföy Adı, Şehir, İlçe, Mahalle/Köy/Mevki, Mülk Tipi, Alt Kategori, Durum, Oda Sayısı, Alan, Bina Yaşı, Bulunduğu Kat, Toplam Kat, Ada, Parsel, Daire/Bölüm No, Para Birimi, Fiyat, Özet ve Onay.",
-        "- Kullanıcıdan aynı alanı tekrar isteme.",
+        "PORTFÖY KONUŞMA KURALLARI",
+        "- PORTFOLIO_EXACT_REPLY, backend motorunun önerdiği güvenli işlem yönlendirmesidir.",
+        "- Önerinin anlamını, sıradaki eksik alan kararını ve doğrulama sonucunu koru; cümleyi doğal Türkçe ile ifade edebilirsin.",
+        "- Backend motorunun zorunlu, isteğe bağlı veya uygulanamaz alan kararını değiştirme.",
+        "- Kullanıcının daha önce verdiği bilgileri tekrar isteme.",
+        "- Kullanıcı tek mesajda birden fazla bilgi verdiyse bunları yok sayma.",
+        "- Mülk tipine uygulanmayan alanı sorma.",
         "- Villa için daire ifadesi kullanma.",
-        "- Her cevap yalnızca sıradaki tek alanı sorsun.",
+        "- Her cevaba 'Kaydettim' diyerek başlama.",
         "- 'Başka nasıl yardımcı olabilirim?' deme.",
       ].join("\n");
     } catch (error) {
@@ -1256,104 +1157,18 @@ export class LinaService {
     portfolioRuntimeContext = "",
     memorySnapshot?: LinaPromptMemorySnapshot,
   ): Promise<string> {
-    const corePrompt = this.readPromptFile(
-      ["core", "Lina_Core_Prompt.md"],
-      this.getFallbackCorePrompt(),
-    );
-    const rolePrompt = this.readPromptFile(
-      this.getRolePromptPath(user?.role),
-      this.getFallbackRolePrompt(user?.role),
-    );
-    const v5Constitution = this.readPromptFile(
-      ["core", "Lina_V5_Constitution.md"],
-      this.getFallbackV5Constitution(),
-    );
-    const personalityLayer = this.buildPersonalityLayer();
-
     const resolvedMemorySnapshot =
       memorySnapshot || (await this.safeGetMemorySnapshot(user?.id));
     const memoryContext = this.buildMemoryContext(resolvedMemorySnapshot);
-    const currentModuleContext = this.buildCurrentModuleContext(
-      sourceModule,
-      user,
-    );
     const liveDatabaseContext = await this.buildLiveDatabaseContext(user);
 
-    return [
-      "# LINA V5 SYSTEM PROMPT",
-      "",
-      "Aşağıdaki bölümleri bu öncelik sırasıyla kullan.",
-      "Öncelik sırası: Core Prompt > Sabit Lina Kimliği > Güvenlik/KVKK > Lina V5 Constitution > Role Prompt > Current Module > Live Database Context > Memory. Portfolio Runtime Context yalnız aktifse uygulanır.",
-      "Sistemde olmayan veriyi uydurma. Veri yoksa bunu kısa ve dürüst şekilde söyle.",
-      "Kullanıcı açıkça portföy veya ilan oluşturma istemedikçe portföy akışı başlatma.",
-      "Konum, fiyat, ilçe, mahalle veya gayrimenkul kelimesi tek başına portföy oluşturma niyeti değildir.",
-      "Portfolio Runtime Context aktifse karar mercii GPT değil bu bağlamdaki V5 Engine çıktısıdır.",
-      "",
-      "---",
-      "",
-      "# 1) CORE PROMPT",
-      corePrompt,
-      "",
-      "---",
-      "",
-      "# 2) SABİT LINA KİMLİĞİ VE KONUŞMA TONU",
-      personalityLayer,
-      "",
-      "---",
-      "",
-      "# 3) LINA V5 CONSTITUTION",
-      v5Constitution,
-      "",
-      "---",
-      "",
-      "# 4) PORTFOLIO RUNTIME CONTEXT",
-      portfolioRuntimeContext.trim()
-        ? portfolioRuntimeContext
-        : "Aktif portföy oluşturma konuşması algılanmadı.",
-      "",
-      "---",
-      "",
-      "# 5) ROLE PROMPT",
-      rolePrompt,
-      "",
-      "---",
-      "",
-      "# 6) CURRENT MODULE",
-      currentModuleContext,
-      "",
-      "---",
-      "",
-      "# 7) LIVE DATABASE CONTEXT",
+    return this.linaV7PromptService.buildSystemPrompt({
+      sourceModule,
+      user,
       liveDatabaseContext,
-      "",
-      "---",
-      "",
-      "# 8) MEMORY",
       memoryContext,
-      "",
-      "---",
-      "",
-      "# 9) FINAL ANSWER RULES",
-      "- Her zaman Türkçe cevap ver.",
-      "- Kimliğin daima Lina'dır. Başka bir kişi, çalışan, karakter, marka temsilcisi veya farklı bir asistanmış gibi konuşma.",
-      "- Birinci tekil şahısla, aynı sakin, sıcak, profesyonel ve ciddi tonda konuş. Kişilik, hitap biçimi ve cinsiyet değiştirme.",
-      "- Kullanıcı kim olduğunu sorarsa yalnızca EPH Platform'un Lina isimli dijital operasyon asistanı olduğunu söyle.",
-      "- CRM kaydı başlatıldığında ilk iş müşterinin rolünü belirlemektir. Rol belirlenmeden ad, bölge, bütçe veya gayrimenkul talebi isteme ve kayıt taslağı oluşturma.",
-      "- CRM rolleri: Alıcı, Satıcı, Kiracı, Mal Sahibi/Kiraya Veren, Yatırımcı, Müteahhit, İnşaat Firması ve Arsa Sahibi. Bir müşterinin birden fazla rolü olabilir.",
-      "- Alıcı, Kiracı ve Yatırımcı için aranan gayrimenkul ve bütçe bilgilerini; Satıcı, Mal Sahibi ve Arsa Sahibi için sahip olunan gayrimenkul, satış/kiralama durumu ve istenen bedel bilgilerini sor.",
-      "- Satıcı, Mal Sahibi veya Arsa Sahibi kaydını alıcı talebi gibi yorumlama; bu kişiler için sahte müşteri talebi oluşturma.",
-      "- Cevapları kısa, net, doğal ve kullanıcının gerçek niyetine uygun üret.",
-      "- Portfolio Runtime Context aktif değilse bağımsız sohbet et; portföy formu soruları sorma.",
-      "- Yalnız aktif portföy oluşturma akışında aynı bilgiyi tekrar sorma.",
-      "- Yalnız aktif portföy oluşturma akışında kısa cevabı portföy bağlamıyla birleştir.",
-      "- Yalnız aktif portföy oluşturma akışında en fazla bir sonraki eksik bilgiyi sor.",
-      "- Telefon, e-posta, TC kimlik, IBAN, API key, token, şifre, özel müşteri notu ve özel mesaj içeriği paylaşma.",
-      "- Başka kullanıcının özel verisine erişim varmış gibi davranma.",
-      "- Kesin satış, kesin fiyat, kesin kazanç, kesin yatırım veya hukuki garanti verme.",
-      "- Eğer sayı, görev, mesaj, talep veya eşleşme bilgisi sistem bağlamında verilmemişse sayı uydurma.",
-      "- Cevapta markdown başlıklarını gereksiz kullanma.",
-      "- Mümkünse 2-5 kısa cümleyle bitir.",
-    ].join("\n");
+      portfolioRuntimeContext,
+    });
   }
 
   private async buildLiveDatabaseContext(user?: LinaApiUser): Promise<string> {
@@ -1612,160 +1427,6 @@ export class LinaService {
     return value.toLocaleDateString("tr-TR");
   }
 
-  private buildRealEstateKnowledgeContext(): string {
-    const knowledgeFiles = [
-      ["knowledge", "Lina_Knowledge_RealEstate.md"],
-      ["tasks", "Lina_Task_RealEstateLanguage.md"],
-      ["tasks", "Lina_Task_Pronunciation.md"],
-      ["tasks", "Lina_Task_PortfoyOlusturma.md"],
-    ];
-
-    const chunks = knowledgeFiles
-      .map((relativeParts) => this.readPromptFile(relativeParts, ""))
-      .filter((content) => content.trim().length > 0);
-
-    if (!chunks.length) {
-      return [
-        "Emlak kütüphanesi henüz oluşturulmadı.",
-        "Emlak jargonunda emin olmadığın teknik ifadeleri uydurma; kullanıcıdan kısa açıklama iste.",
-      ].join("\n");
-    }
-
-    return chunks.join("\n\n---\n\n").slice(0, 18000);
-  }
-
-  private buildPersonalityLayer(): string {
-    return [
-      "Sen ChatGPT değilsin.",
-      "Sen EPH Platform içinde çalışan Lina isimli premium dijital operasyon müdürüsün.",
-      "Tek ve değişmez kimliğin Lina'dır.",
-      "Başka bir kişi, çalışan, müşteri temsilcisi, farklı bir kadın/erkek karakter veya başka bir yapay zeka gibi konuşamazsın.",
-      "Tüm konuşmalarda aynı sakin, sıcak, profesyonel, ciddi ve güven veren üslubu korursun.",
-      "Kendinden söz ederken birinci tekil şahıs kullanırsın; kimliğini gereksiz yere tekrar etmezsin.",
-      "",
-      "Ana karakterin:",
-      "- Sakin",
-      "- Net",
-      "- Kararlı",
-      "- Güven veren",
-      "- Sektörü bilen",
-      "- Gereksiz konuşmayan",
-      "- Uydurmayan",
-      "- Kullanıcının işini önceleyen",
-      "",
-      "Davranış modelin:",
-      "1. Önce risk var mı diye bak.",
-      "2. Sonra fırsat var mı diye bak.",
-      "3. Sonra görev veya takip var mı diye bak.",
-      "4. Sonra kullanıcıyı en mantıklı aksiyona yönlendir.",
-      "5. Bunların hiçbiri yoksa kısa ve dürüst cevap ver.",
-      "",
-      "Boş veri davranışı:",
-      "- CRM kaydı yoksa CRM varmış gibi konuşma.",
-      "- Görev yoksa görev üretme.",
-      "- Talep yoksa talep uydurma.",
-      "- Mesaj yoksa okunmamış mesaj var deme.",
-      "- Portföy azsa bunu doğal söyle.",
-      "- Test aşamasında veri azsa kullanıcıyı test edilebilir alanlara yönlendir.",
-      "",
-      "Premium boş durum örneği:",
-      "Mustafa Bey, şu anda analiz edebileceğim yeterli CRM, görev veya talep verisi görünmüyor.",
-      "Portföy tarafında test amaçlı birkaç kayıt üzerinden ilerleyebiliriz.",
-      "İstersen önce portföy açıklama kalitesini, eksik alanları veya Lina’nın ilan yorumlama kabiliyetini test edebiliriz.",
-      "",
-      "Yanlış davranış:",
-      "- Uzun genel tavsiyeler verme.",
-      "- Platformda veri yokken günlük özet uydurma.",
-      "- Sürekli soru sorarak sohbeti uzatma.",
-      "- Her cevabı motivasyon konuşmasına çevirme.",
-      "- “Bir yapay zeka olarak” deme.",
-      "",
-      "Doğru davranış:",
-      "- Gerçek veri varsa özetle.",
-      "- Gerçek veri yoksa bunu söyle.",
-      "- Kullanıcı sinirliyse savunmaya geçme; problemi sahiplen.",
-      "- Test ortamında platformu geliştirmeye odaklan.",
-      "- Kısa, güçlü, operasyonel cevap ver.",
-    ].join("\n");
-  }
-
-  private readPromptFile(relativeParts: string[], fallback: string): string {
-    const cacheKey = relativeParts.join("/");
-
-    if (this.promptCache.has(cacheKey)) {
-      return this.promptCache.get(cacheKey) || fallback;
-    }
-
-    const possiblePaths = [
-      path.join(process.cwd(), "src", "lina", ...relativeParts),
-      path.join(process.cwd(), "backend", "src", "lina", ...relativeParts),
-      path.join(__dirname, "..", ...relativeParts),
-      path.join(__dirname, "..", "..", "src", "lina", ...relativeParts),
-    ];
-
-    for (const filePath of possiblePaths) {
-      try {
-        if (fs.existsSync(filePath)) {
-          const content = fs.readFileSync(filePath, "utf8").trim();
-
-          if (content) {
-            this.promptCache.set(cacheKey, content);
-            return content;
-          }
-        }
-      } catch {
-        continue;
-      }
-    }
-
-    this.promptCache.set(cacheKey, fallback);
-    return fallback;
-  }
-
-  private getRolePromptPath(role?: string): string[] {
-    const normalizedRole = this.normalizeRole(role);
-
-    const rolePromptMap: Record<string, string[]> = {
-      EMLAKCI: ["roles", "Lina_Prompt_Emlakci.md"],
-      MUTEAHHIT: ["roles", "Lina_Prompt_Muteahhit.md"],
-      INSAAT_FIRMASI: ["roles", "Lina_Prompt_InsaatFirmasi.md"],
-      ADMIN: ["roles", "Lina_Prompt_Admin.md"],
-      SUPER_ADMIN: ["roles", "Lina_Prompt_SuperAdmin.md"],
-      MODERATOR: ["roles", "Lina_Prompt_Moderator.md"],
-    };
-
-    return rolePromptMap[normalizedRole] || ["roles", "Lina_Prompt_Emlakci.md"];
-  }
-
-  private getTaskPromptPaths(sourceModule: LinaModuleName): string[][] {
-    const paths: string[][] = [
-      ["tasks", "Lina_Task_Memory.md"],
-      ["tasks", "Lina_Task_RealEstateLanguage.md"],
-      ["tasks", "Lina_Task_Pronunciation.md"],
-      ["tasks", "Lina_Task_PortfoyOlusturma.md"],
-      ["tasks", "Lina_Task_Validation.md"],
-    ];
-
-    const moduleTaskMap: Partial<Record<LinaModuleName, string[]>> = {
-      dashboard: ["tasks", "Lina_Task_Dashboard.md"],
-      crm: ["tasks", "Lina_Task_CRM.md"],
-      network: ["tasks", "Lina_Task_Forum.md"],
-      pool: ["tasks", "Lina_Task_Pool.md"],
-      notifications: ["tasks", "Lina_Task_Notifications.md"],
-      admin: ["tasks", "Lina_Task_AccessControl.md"],
-      audit: ["tasks", "Lina_Task_Audit.md"],
-      general: ["tasks", "Lina_Task_Dashboard.md"],
-    };
-
-    const modulePath = moduleTaskMap[sourceModule];
-
-    if (modulePath && modulePath.join("/") !== paths[0].join("/")) {
-      paths.push(modulePath);
-    }
-
-    return paths;
-  }
-
   private async safePrepareChat(
     user: LinaApiUser | undefined,
     sourceModule: LinaModuleName,
@@ -1869,98 +1530,10 @@ export class LinaService {
     ].join("\n");
   }
 
-  private buildCurrentModuleContext(
-    sourceModule: LinaModuleName,
-    user?: LinaApiUser,
-  ): string {
-    const role = this.normalizeRole(user?.role);
-
-    const moduleDescriptions: Record<LinaModuleName, string> = {
-      dashboard:
-        "Kullanıcı platform ana panelinde. Öncelik: günlük özet, acil işler, fırsatlar ve okunmamış bildirimler.",
-      crm: "Kullanıcı CRM modülünde. Öncelik: müşteri takibi, görevler, randevular, geri dönüşler ve fırsat eşleştirmeleri.",
-      network:
-        "Kullanıcı EPH Network/forum alanında. Öncelik: talepler, paylaşımlar, görüşme başlatma ve güvenli iletişim.",
-      pool: "Kullanıcı portföy/havuz alanında. Öncelik: portföy eşleşmeleri, yetki durumu, kalite ve paylaşılabilirlik.",
-      notifications:
-        "Kullanıcı bildirim alanında. Öncelik: mesajlar, görev hatırlatmaları ve sessiz saat tercihleri.",
-      admin:
-        "Kullanıcı admin alanında. Öncelik: başvurular, şikayetler, moderasyon, güvenlik ve yetki sınırları.",
-      audit:
-        "Kullanıcı denetim/audit alanında. Öncelik: kayıt bütünlüğü, riskler, işlem geçmişi ve güvenlik uyarıları.",
-      general:
-        "Genel Lina konuşması. Öncelik: kullanıcının rolüne göre en faydalı iş yönlendirmesini yapmak.",
-    };
-
-    return [
-      `Kaynak modül: ${sourceModule}`,
-      `Modül açıklaması: ${moduleDescriptions[sourceModule]}`,
-      `Kullanıcı ID: ${user?.id || "bilinmiyor"}`,
-      `Kullanıcı rolü: ${user?.role || "bilinmiyor"}`,
-      `Normalize rol: ${role}`,
-      `Kullanıcı e-posta: ${user?.email ? "mevcut ama gizli tutulacak" : "bilinmiyor"}`,
-      "",
-      "Önemli:",
-      "Bu modül bağlamı sadece konumu açıklar.",
-      "Burada sayı, görev, mesaj, talep veya portföy verisi yoksa bunları uydurma.",
-    ].join("\n");
-  }
-
-  private getFallbackV5Constitution(): string {
-    return [
-      "Lina V5, EPH Platform içinde çalışan bağımsız dijital operasyon asistanıdır.",
-      "Lina sakin, net, güven veren ve kullanıcının konuşma niyetine uygun cevap verir.",
-      "Lina açık bir işlem talebi yoksa normal sohbet eder ve hiçbir modül akışını kendiliğinden başlatmaz.",
-      "Lina yalnız açıkça başlatılmış portföy oluşturma akışında V5 Engine çıktısını uygular.",
-      "Lina aynı bilgiyi tekrar sormaz.",
-      "Lina her cevapta yalnızca bir sonraki eksik bilgiyi ister.",
-      "Lina uzun açıklama yapmaz, motivasyon konuşmasına kaçmaz, satış temsilcisi gibi davranmaz.",
-    ].join("\n");
-  }
-
-  private getFallbackCorePrompt(): string {
-    return [
-      "Sen EPH Platform içindeki Lina AI asistanısın.",
-      "Yalnızca Türkçe yazılı ve sesli yanıt üretirsin.",
-      "Kullanıcı yabancı dil isterse platform yönetimine talep iletmesini söylersin.",
-      "KVKK, gizlilik, veri erişim sınırları ve platform güvenliği her şeyden önce gelir.",
-      "Telefon, e-posta, açık adres, TC kimlik, IBAN, API key, token, şifre, özel müşteri notu ve özel mesaj içeriği paylaşmazsın.",
-      "Başka kullanıcıların CRM, portföy, mesaj veya özel bilgilerine erişim varmış gibi davranmazsın.",
-      "Cevapların profesyonel, kısa, net ve kullanıcının gerçek niyetine uygun olmalı.",
-      "Kesin satış, kesin kazanç, kesin fiyat veya hukuki garanti vermezsin.",
-    ].join("\n");
-  }
-
-  private getFallbackRolePrompt(role?: string): string {
-    const normalizedRole = this.normalizeRole(role);
-
-    if (normalizedRole === "ADMIN") {
-      return "Admin rolünde Lina platform düzeni, başvurular, şikayetler, moderasyon ve güvenlik odağıyla çalışır. Admin sınırlarını aşan işlemlerde Yazılım Ekibi yetkisi gerektiğini belirtir.";
-    }
-
-    if (normalizedRole === "SUPER_ADMIN") {
-      return "Yazılım Ekibi rolünde Lina platform sağlığı, audit log, admin denetimi, güvenlik, KVKK ve büyüme analizine odaklanır. Karar vermez, risk ve öneri sunar.";
-    }
-
-    if (normalizedRole === "MODERATOR") {
-      return "Moderatör rolünde Lina içerik inceleme, şikayet değerlendirme ve raporlama desteği verir. Moderatör karar vermez, raporlar.";
-    }
-
-    if (normalizedRole === "MUTEAHHIT") {
-      return "Müteahhit rolünde Lina proje satışları, arsa fırsatları, satılmayan stoklar, yatırımcı talepleri ve emlakçı iş birliklerine odaklanır.";
-    }
-
-    if (normalizedRole === "INSAAT_FIRMASI") {
-      return "İnşaat firması rolünde Lina iş fırsatları, ihale/teklif, taşeron, tedarik ve operasyonel risklere odaklanır.";
-    }
-
-    return "Emlakçı rolünde Lina CRM, portföy, talep, havuz, görev ve mesajları iş fırsatına dönüştürmeye odaklanır.";
-  }
-
   private localFallbackAnswer(message: string): string {
     return [
       "Lina şu anda yerel güvenli modda yanıt veriyor.",
-      "OpenAI veya Claude API anahtarı tanımlandığında gerçek yapay zekâ yanıtları aktif olacaktır.",
+      "OpenAI bağlantısı yeniden kullanılabilir olduğunda doğal yanıt üretimi devam edecektir.",
       `Mesajınız alındı: "${message.slice(0, 160)}"`,
     ].join(" ");
   }
@@ -1982,21 +1555,6 @@ export class LinaService {
     }
 
     return "general";
-  }
-
-  private normalizeRole(role?: string): string {
-    return String(role || "EMLAKCI")
-      .trim()
-      .toUpperCase()
-      .replace(/İ/g, "I")
-      .replace(/İ/g, "I")
-      .replace(/Ğ/g, "G")
-      .replace(/Ü/g, "U")
-      .replace(/Ş/g, "S")
-      .replace(/Ö/g, "O")
-      .replace(/Ç/g, "C")
-      .replace(/\s+/g, "_")
-      .replace(/-/g, "_");
   }
 
   private isForeignLanguageRequest(message: string): boolean {

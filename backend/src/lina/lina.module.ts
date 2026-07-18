@@ -23,6 +23,7 @@ import { LinaGeoService } from "./geo/lina-geo.service";
 import { LinaDistanceModule } from "./geo/lina-distance.module";
 import { LinaDocumentPrecheckService } from "./document/lina-document-precheck.service";
 import { LinaDocumentTkgmService } from "./document/lina-document-tkgm.service";
+import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { LinaDocumentTkgmService } from "./document/lina-document-tkgm.service";
     LinaGeoService,
     LinaDocumentPrecheckService,
     LinaDocumentTkgmService,
+    LinaV7PromptService,
   ],
   exports: [
     LinaService,
@@ -69,6 +71,7 @@ import { LinaDocumentTkgmService } from "./document/lina-document-tkgm.service";
     LinaDistanceModule,
     LinaDocumentPrecheckService,
     LinaDocumentTkgmService,
+    LinaV7PromptService,
   ],
 })
 export class LinaModule {}
