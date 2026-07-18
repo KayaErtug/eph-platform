@@ -292,6 +292,38 @@ export class UnitsService {
     }
   }
 
+  private isPortfolioContentLocked(
+    approvalStatus?: PortfolioApprovalStatus | string | null,
+  ) {
+    const normalizedStatus = String(approvalStatus || '').toUpperCase();
+
+    const lockedStatuses = new Set<PortfolioApprovalStatus>([
+      PortfolioApprovalStatus.INCELEMEYE_GONDERILDI,
+      PortfolioApprovalStatus.INCELEMEDE,
+      PortfolioApprovalStatus.ONAYLANDI,
+      PortfolioApprovalStatus.HAVUZDA,
+    ]);
+
+    return lockedStatuses.has(
+      normalizedStatus as PortfolioApprovalStatus,
+    );
+  }
+
+  private ensurePortfolioContentEditable(
+    user: CurrentUserPayload,
+    unit: {
+      approvalStatus?: PortfolioApprovalStatus | string | null;
+    },
+  ) {
+    if (this.isSuperAdmin(user)) return;
+
+    if (this.isPortfolioContentLocked(unit.approvalStatus)) {
+      throw new ForbiddenException(
+        'Portföy incelemeye gönderildikten sonra bilgileri değiştirilemez. Düzeltme gerekiyorsa portföyün Eksik Bilgi durumuna alınması gerekir.',
+      );
+    }
+  }
+
   private getPrivateUnitWhere(user: CurrentUserPayload) {
     if (this.isSuperAdmin(user)) return {};
 
@@ -1861,6 +1893,7 @@ export class UnitsService {
     const unit = await this.getUnitWithProjectOrFail(id);
 
     this.ensureCanManageUnit(user, unit.project.ownerId);
+    this.ensurePortfolioContentEditable(user, unit);
     this.ensureProjectVisibleForPortfolioActions(unit.project);
 
     if (!this.hasApprovalDocument(unit)) {
@@ -1943,16 +1976,31 @@ export class UnitsService {
       );
     }
 
+    const approvableStatuses = new Set<PortfolioApprovalStatus>([
+      PortfolioApprovalStatus.INCELEMEYE_GONDERILDI,
+      PortfolioApprovalStatus.INCELEMEDE,
+    ]);
+
+    if (!approvableStatuses.has(unit.approvalStatus)) {
+      throw new BadRequestException(
+        'Yalnızca kullanıcı tarafından incelemeye gönderilmiş portföyler onaylanabilir.',
+      );
+    }
+
     return this.prisma.unit.update({
       where: { id },
       data: {
-        approvalStatus: PortfolioApprovalStatus.ONAYLANDI,
+        approvalStatus: PortfolioApprovalStatus.HAVUZDA,
         approvedAt: new Date(),
         rejectedAt: null,
-        approvalNote: body?.note || null,
+        approvalNote:
+          body?.note ||
+          'Portföy onaylandı ve otomatik olarak havuzda yayınlandı.',
         isVerified: true,
         verifiedAt: new Date(),
-        isPoolVisible: false,
+        isPoolVisible: true,
+        poolPublishedAt: new Date(),
+        poolRemovedAt: null,
       },
       include: unitInclude,
     });
@@ -1979,9 +2027,7 @@ export class UnitsService {
   async sendToPool(id: string, user: CurrentUserPayload) {
     const unit = await this.getUnitWithProjectOrFail(id);
 
-    if (!this.isApprovalManager(user)) {
-      this.ensureCanManageUnit(user, unit.project.ownerId);
-    }
+    this.ensureApprovalManager(user);
 
     this.ensureProjectVisibleForPortfolioActions(unit.project);
 
@@ -2017,9 +2063,14 @@ export class UnitsService {
     return this.prisma.unit.update({
       where: { id },
       data: {
-        approvalStatus: PortfolioApprovalStatus.ONAYLANDI,
+        approvalStatus: PortfolioApprovalStatus.TASLAK,
         isPoolVisible: false,
+        approvedAt: null,
+        isVerified: false,
+        verifiedAt: null,
         poolRemovedAt: new Date(),
+        approvalNote:
+          'Portföy havuzdan kaldırıldı. Yeniden yayın için bilgileri kontrol edip admin incelemesine gönderin.',
       },
       include: unitInclude,
     });
@@ -2029,6 +2080,7 @@ export class UnitsService {
     const unit = await this.getUnitWithProjectOrFail(id);
 
     this.ensureCanManageUnit(user, unit.project.ownerId);
+    this.ensurePortfolioContentEditable(user, unit);
     this.ensureProjectVisibleForPortfolioActions(unit.project);
 
     return this.prisma.unit.update({
@@ -2042,6 +2094,7 @@ export class UnitsService {
     const unit = await this.getUnitWithProjectOrFail(id);
 
     this.ensureCanManageUnit(user, unit.project.ownerId);
+    this.ensurePortfolioContentEditable(user, unit);
 
     const protectedFields = [
       'approvalStatus',
@@ -2229,6 +2282,7 @@ export class UnitsService {
     const unit = await this.getUnitWithProjectOrFail(id);
 
     this.ensureCanManageUnit(user, unit.project.ownerId);
+    this.ensurePortfolioContentEditable(user, unit);
 
     return this.prisma.unit.delete({
       where: { id },

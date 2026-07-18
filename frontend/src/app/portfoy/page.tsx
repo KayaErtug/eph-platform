@@ -992,31 +992,13 @@ function StokPageInner() {
     }
   };
 
-  const handleSendToPool = async (unit: MapUnit) => {
-    if ((unit as any).approvalStatus !== "ONAYLANDI") {
-      alert("Sadece onaylanmış portföyler havuza gönderilebilir.");
-      return;
-    }
-
-    try {
-      setPoolActionUnitId(unit.id);
-      await api.post(`/units/${unit.id}/send-to-pool`);
-      await fetchData();
-      alert("Portföy havuza gönderildi.");
-    } catch (error: any) {
-      alert(error?.response?.data?.message || "Portföy havuza gönderilemedi.");
-    } finally {
-      setPoolActionUnitId("");
-    }
-  };
-
   const handleRemoveFromPool = async (unit: MapUnit) => {
     try {
       setPoolActionUnitId(unit.id);
       await api.post(`/units/${unit.id}/remove-from-pool`);
       await fetchData();
       alert(
-        "Portföy havuzdan kaldırıldı. Onaylı durumda kalır, istediğiniz zaman tekrar havuza gönderebilirsiniz.",
+        "Portföy havuzdan kaldırıldı. Yeniden yayın için bilgileri kontrol edip admin incelemesine gönderin.",
       );
     } catch (error: any) {
       alert(
@@ -1332,7 +1314,6 @@ function StokPageInner() {
                 onUpdate={() => openEditModal(unit)}
                 onShare={() => handlePortfolioShare(unit)}
                 onDelete={() => handleDeleteUnit(unit)}
-                onSendToPool={() => handleSendToPool(unit)}
                 onRemoveFromPool={() => handleRemoveFromPool(unit)}
                 onWhatsappLocation={() => handleWhatsappLocation(unit)}
               />
@@ -1636,7 +1617,6 @@ function CompactPortfolioCard({
   onUpdate,
   onShare,
   onDelete,
-  onSendToPool,
   onRemoveFromPool,
   onWhatsappLocation,
 }: {
@@ -1649,7 +1629,6 @@ function CompactPortfolioCard({
   onUpdate: () => void;
   onShare: () => void;
   onDelete: () => void;
-  onSendToPool: () => void;
   onRemoveFromPool: () => void;
   onWhatsappLocation: () => void;
 }) {
@@ -1674,7 +1653,6 @@ function CompactPortfolioCard({
   const isPoolVisible = Boolean(
     (unit as any).isPoolVisible || approvalStatus === "HAVUZDA",
   );
-  const canSendToPool = approvalStatus === "ONAYLANDI" && !isPoolVisible;
   const canRemoveFromPool = approvalStatus === "HAVUZDA" || isPoolVisible;
   const isVerified = isUnitVerified(unit);
   const text = [unit.type, unit.description, unit.project?.name]
@@ -2131,24 +2109,8 @@ function CompactPortfolioCard({
             ✦ {highlight}
           </div>
 
-          {(canSendToPool || canRemoveFromPool) && (
+          {canRemoveFromPool && (
             <div className="mt-2.5">
-              {canSendToPool ? (
-                <button
-                  type="button"
-                  onClick={onSendToPool}
-                  disabled={poolBusy}
-                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[13px] bg-emerald-600 px-3 text-[12px] font-extrabold text-white shadow-[0_8px_18px_rgba(5,150,105,0.16)] disabled:opacity-60"
-                >
-                  {poolBusy ? (
-                    <Loader2 size={15} className="animate-spin" />
-                  ) : (
-                    <Send size={15} />
-                  )}
-                  Havuza Gönder
-                </button>
-              ) : null}
-
               {canRemoveFromPool ? (
                 <button
                   type="button"

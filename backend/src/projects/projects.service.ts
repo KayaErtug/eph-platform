@@ -1,5 +1,8 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ProjectSetupStatus } from '@prisma/client';
+import {
+  PortfolioApprovalStatus,
+  ProjectSetupStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 type ProjectLocationData = {
@@ -62,6 +65,31 @@ function cleanCreateLocationData(data: CreateProjectData) {
 @Injectable()
 export class ProjectsService {
   constructor(private prisma: PrismaService) {}
+
+  private ensureProjectContentEditable(
+    units: Array<{
+      approvalStatus?: PortfolioApprovalStatus | string | null;
+    }>,
+  ) {
+    const lockedStatuses = new Set<string>([
+      PortfolioApprovalStatus.INCELEMEYE_GONDERILDI,
+      PortfolioApprovalStatus.INCELEMEDE,
+      PortfolioApprovalStatus.ONAYLANDI,
+      PortfolioApprovalStatus.HAVUZDA,
+    ]);
+
+    const hasLockedPortfolio = units.some((unit) =>
+      lockedStatuses.has(
+        String(unit.approvalStatus || '').toUpperCase(),
+      ),
+    );
+
+    if (hasLockedPortfolio) {
+      throw new ForbiddenException(
+        'İncelemeye gönderilmiş veya havuzda yayınlanan portföyün adres ve harita konumu değiştirilemez. Düzeltme için portföyün Eksik Bilgi durumuna alınması gerekir.',
+      );
+    }
+  }
 
   private getPortfolioVisibleProjectWhere() {
     return {
@@ -184,6 +212,13 @@ export class ProjectsService {
       where: {
         id,
       },
+      include: {
+        units: {
+          select: {
+            approvalStatus: true,
+          },
+        },
+      },
     });
 
     if (!project) {
@@ -193,6 +228,8 @@ export class ProjectsService {
     if (project.ownerId !== userId) {
       throw new ForbiddenException('Bu projeyi duzenleme yetkiniz yok.');
     }
+
+    this.ensureProjectContentEditable(project.units);
 
     return this.prisma.project.update({
       where: {
@@ -218,6 +255,13 @@ export class ProjectsService {
       where: {
         id,
       },
+      include: {
+        units: {
+          select: {
+            approvalStatus: true,
+          },
+        },
+      },
     });
 
     if (!project) {
@@ -227,6 +271,8 @@ export class ProjectsService {
     if (project.ownerId !== userId) {
       throw new ForbiddenException('Bu projeyi silme yetkiniz yok.');
     }
+
+    this.ensureProjectContentEditable(project.units);
 
     return this.prisma.project.delete({
       where: {

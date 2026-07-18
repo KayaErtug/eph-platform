@@ -317,24 +317,28 @@ export default function PortfolioApprovalsPage() {
 
       if (action === "approve") {
         await api.post(`/units/${id}/approve`, {
-          note: "Portföy admin onay merkezinden onaylandı.",
+          note: "Portföy admin onay merkezinden onaylandı ve havuzda yayınlandı.",
         });
         setItems((current) =>
           current.map((item) =>
             item.id === id
               ? {
                   ...item,
-                  approvalStatus: "ONAYLANDI",
+                  approvalStatus: "HAVUZDA",
                   isVerified: true,
                   yetkiVerified: true,
-                  isPoolVisible: false,
+                  isPoolVisible: true,
                   approvedAt: new Date().toISOString(),
-                  approvalNote: "Portföy admin onay merkezinden onaylandı.",
+                  poolPublishedAt: new Date().toISOString(),
+                  approvalNote:
+                    "Portföy admin onay merkezinden onaylandı ve havuzda yayınlandı.",
                 }
               : item,
           ),
         );
-        setSuccess("Portföy onaylandı. Onaylanacak listesinden çıkarıldı.");
+        setSuccess(
+          "Portföy onaylandı ve otomatik olarak havuzda yayınlandı.",
+        );
       }
 
       if (action === "reject") {
@@ -342,23 +346,6 @@ export default function PortfolioApprovalsPage() {
           note: "Portföy admin onay merkezinden reddedildi.",
         });
         setSuccess("Portföy reddedildi.");
-      }
-
-      if (action === "pool") {
-        await api.post(`/units/${id}/send-to-pool`);
-        setItems((current) =>
-          current.map((item) =>
-            item.id === id
-              ? {
-                  ...item,
-                  approvalStatus: "HAVUZDA",
-                  isPoolVisible: true,
-                  poolPublishedAt: new Date().toISOString(),
-                }
-              : item,
-          ),
-        );
-        setSuccess("Portföy havuza alındı.");
       }
 
       await fetchItems();
@@ -674,7 +661,7 @@ function PortfolioCard({
         </p>
       ) : null}
 
-      <div className="mt-2 grid grid-cols-3 gap-1.5 md:grid-cols-6">
+      <div className="mt-2 grid grid-cols-3 gap-1.5 md:grid-cols-5">
         <ActionButton
           label="İncele"
           icon={<Eye size={15} />}
@@ -692,7 +679,13 @@ function PortfolioCard({
           className="bg-amber-50 text-amber-700"
         />
         <ActionButton
-          label={isFinalApproved ? "Onaylandı" : "Onay"}
+          label={
+            isPool
+              ? "Yayınlandı"
+              : isFinalApproved
+                ? "Onaylandı"
+                : "Onayla ve Yayınla"
+          }
           icon={<CheckCircle2 size={15} />}
           loading={actionLoading === `${item.id}-approve`}
           disabled={!isWaitingAction || isFinalApproved}
@@ -706,14 +699,6 @@ function PortfolioCard({
           disabled={!isWaitingAction || isRejected}
           onClick={() => onAction(item.id, "reject")}
           className="bg-rose-50 text-rose-700"
-        />
-        <ActionButton
-          label={isPool ? "Havuzda" : isFinalApproved ? "Sahip Yayınlar" : "Havuz"}
-          icon={<Send size={15} />}
-          loading={actionLoading === `${item.id}-pool`}
-          disabled
-          onClick={() => onAction(item.id, "pool")}
-          className="bg-purple-50 text-purple-700"
         />
         <Link
           href={`/stok/${item.id}`}

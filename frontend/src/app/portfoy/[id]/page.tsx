@@ -550,7 +550,20 @@ function canEditDetailUnit(
   const role = String(user?.role || "").toUpperCase();
 
   if (!unit || !user?.id) return false;
-  if (role === "ADMIN" || role === "SUPER_ADMIN") return true;
+  if (role === "SUPER_ADMIN") return true;
+
+  const approvalStatus = String(
+    unit.approvalStatus || "TASLAK",
+  ).toUpperCase();
+
+  const contentLocked = [
+    "INCELEMEYE_GONDERILDI",
+    "INCELEMEDE",
+    "ONAYLANDI",
+    "HAVUZDA",
+  ].includes(approvalStatus);
+
+  if (contentLocked) return false;
 
   const possibleOwnerIds = [
     (unit as any)?.userId,
@@ -1164,7 +1177,6 @@ export default function StokDetailPage() {
       | "INCELEMEDE"
       | "EKSIK_BILGI_BEKLENIYOR"
       | "ONAYLANDI"
-      | "HAVUZDA"
       | "REDDEDILDI",
   ) => {
     if (!unit) return;
@@ -1173,7 +1185,6 @@ export default function StokDetailPage() {
       INCELEMEDE: "mark-reviewing",
       EKSIK_BILGI_BEKLENIYOR: "request-missing-info",
       ONAYLANDI: "approve",
-      HAVUZDA: "send-to-pool",
       REDDEDILDI: "reject",
     };
 
@@ -1181,8 +1192,7 @@ export default function StokDetailPage() {
       INCELEMEDE: "Portföy incelemeye alındı.",
       EKSIK_BILGI_BEKLENIYOR:
         "EPH inceleme ekibi bu portföy için ek bilgi veya belge bekliyor.",
-      ONAYLANDI: "Portföy onaylandı.",
-      HAVUZDA: "Portföy havuza aktarıldı.",
+      ONAYLANDI: "Portföy onaylandı ve otomatik olarak havuzda yayınlandı.",
       REDDEDILDI: "Portföy doğrulama sürecinde reddedildi.",
     };
 
@@ -1263,10 +1273,6 @@ export default function StokDetailPage() {
   const approvalStatus = String(
     unit.approvalStatus || "TASLAK",
   ).toUpperCase();
-  const canPublishApprovedPortfolio =
-    canEditPortfolio &&
-    !canReviewPortfolio &&
-    approvalStatus === "ONAYLANDI";
   const canSeeDoorAccessInfo = canViewDoorAccessInfo(unit, user);
   const availableCreditAmount = Number((unit as any)?.availableCreditAmount || 0);
   const doorAccessInfo = String((unit as any)?.doorAccessInfo || "").trim();
@@ -1281,16 +1287,9 @@ export default function StokDetailPage() {
     ? safeDescription
     : shortDescription;
   const encodedShareText = encodeURIComponent(makeShareText(unit));
-  const encodedShareUrl = encodeURIComponent(shareUrl);
 
   return (
-    <main
-      className={`min-h-[100dvh] overflow-y-auto bg-[#F7FBFF] text-[#27364F] ${
-        canPublishApprovedPortfolio
-          ? "pb-[calc(220px+env(safe-area-inset-bottom))]"
-          : "pb-[calc(112px+env(safe-area-inset-bottom))]"
-      }`}
-    >
+    <main className="min-h-[100dvh] overflow-y-auto bg-[#F7FBFF] pb-[calc(112px+env(safe-area-inset-bottom))] text-[#27364F]">
       <input
         ref={galleryInputRef}
         type="file"
@@ -1552,16 +1551,11 @@ export default function StokDetailPage() {
 
         <section className="mt-2 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
           <PremiumSectionHeading icon={<Share2 size={18} />} title="Paylaş" compact />
-          <div className="mt-3 grid grid-cols-4 gap-2">
+          <div className="mt-3 grid grid-cols-3 gap-2">
             <ShareLink
               href={`https://wa.me/?text=${encodedShareText}`}
               label="WhatsApp"
               icon={<MessageCircle size={17} />}
-            />
-            <ShareLink
-              href={`https://t.me/share/url?url=${encodedShareUrl}&text=${encodedShareText}`}
-              label="Telegram"
-              icon={<Send size={17} />}
             />
             <button
               onClick={handleCopyLink}
@@ -1815,67 +1809,6 @@ export default function StokDetailPage() {
               </button>
             </div>
           </section>
-        )}
-        {canPublishApprovedPortfolio && (
-          <>
-            <section className="mt-3 hidden rounded-[24px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-blue-50 p-4 text-center shadow-[0_16px_34px_rgba(16,185,129,0.16)] md:block">
-              <div className="flex items-center justify-center gap-2 text-emerald-700">
-                <CheckCircle2 size={22} />
-                <h2 className="text-[17px] font-black text-[#06194A]">
-                  Portföyünüz onaylandı
-                </h2>
-              </div>
-
-              <p className="mx-auto mt-2 max-w-[340px] text-[12px] font-bold leading-5 text-[#475569]">
-                Portföyünüz admin kontrolünden geçti. Havuzda yayınlamak için
-                aşağıdaki butona dokunun.
-              </p>
-
-              <button
-                type="button"
-                onClick={() => handleApprovalAction("HAVUZDA")}
-                disabled={Boolean(approvalActionLoading)}
-                className="mt-3 flex min-h-[54px] w-full items-center justify-center gap-2 rounded-[18px] bg-[#1557D6] px-4 text-[14px] font-black text-white shadow-[0_14px_28px_rgba(21,87,214,0.28)] transition active:scale-[0.99] disabled:opacity-60"
-              >
-                <Send size={18} />
-                {approvalActionLoading === "HAVUZDA"
-                  ? "Havuza Gönderiliyor..."
-                  : "Havuza Gönder"}
-              </button>
-            </section>
-
-            <div className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] left-1/2 z-[80] w-[calc(100%-20px)] max-w-[410px] -translate-x-1/2 md:hidden">
-              <section className="rounded-[22px] border border-emerald-200 bg-white/95 p-3 text-center shadow-[0_18px_46px_rgba(15,23,42,0.24)] backdrop-blur">
-                <div className="flex items-center justify-center gap-2">
-                  <CheckCircle2
-                    size={19}
-                    className="shrink-0 text-emerald-600"
-                  />
-
-                  <div className="min-w-0 text-left">
-                    <p className="text-[13px] font-black leading-4 text-[#06194A]">
-                      Portföyünüz onaylandı
-                    </p>
-                    <p className="mt-0.5 text-[10px] font-bold leading-4 text-[#64748B]">
-                      Havuzda yayınlamak için butona dokunun.
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleApprovalAction("HAVUZDA")}
-                  disabled={Boolean(approvalActionLoading)}
-                  className="mt-2 flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[17px] bg-[#1557D6] px-4 text-[13px] font-black text-white shadow-[0_12px_26px_rgba(21,87,214,0.28)] active:scale-[0.99] disabled:opacity-60"
-                >
-                  <Send size={17} />
-                  {approvalActionLoading === "HAVUZDA"
-                    ? "Havuza Gönderiliyor..."
-                    : "Havuza Gönder"}
-                </button>
-              </section>
-            </div>
-          </>
         )}
 
       </section>
@@ -2210,7 +2143,7 @@ function PortfolioDocumentsCenter({
         {isSubmittedForApproval
           ? "Portföy incelemeye gönderildi. Admin onayı bekleniyor."
           : isApprovedForPool
-            ? "Portföy onaylandı. Aşağıdaki belirgin Havuza Gönder kartını kullanabilirsiniz."
+            ? "Portföy onaylandı ve otomatik olarak havuzda yayınlandı."
             : isInPool
               ? "Portföy havuzda yayında."
               : "Yetki belgesi veya tapu yüklenince portföy incelemeye gönderilebilir."}
@@ -2393,7 +2326,6 @@ function PortfolioApprovalCenter({
       | "INCELEMEDE"
       | "EKSIK_BILGI_BEKLENIYOR"
       | "ONAYLANDI"
-      | "HAVUZDA"
       | "REDDEDILDI",
   ) => void;
 }) {

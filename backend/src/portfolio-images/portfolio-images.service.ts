@@ -4,7 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PortfolioAuthorityType } from '@prisma/client';
+import {
+  PortfolioApprovalStatus,
+  PortfolioAuthorityType,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../supabase/supabase.service';
 
@@ -226,11 +229,16 @@ export class PortfolioImagesService {
       );
     }
 
-    await this.assertCanManageSensitivePortfolio({
+    const unit = await this.assertCanManageSensitivePortfolio({
       userId,
       userRole: input.userRole,
       portfolioId,
     });
+
+    this.ensurePortfolioContentEditable(
+      input.userRole,
+      unit.approvalStatus,
+    );
 
     const extension = this.getDocumentExtension(file.originalname, file.mimetype);
     const safeUserId = this.slugify(userId);
@@ -355,6 +363,11 @@ export class PortfolioImagesService {
     if (document.approved && !isSuperAdmin) {
       throw new ForbiddenException('Onaylı belge sadece Yazılım Ekibi tarafından silinebilir.');
     }
+
+    this.ensurePortfolioContentEditable(
+      input.userRole,
+      document.unit.approvalStatus,
+    );
 
     await this.tryRemoveStorageFile(this.bucket, this.getPathFromPublicUrl(document.fileUrl));
 
@@ -503,6 +516,36 @@ export class PortfolioImagesService {
 
 
 
+  private ensurePortfolioContentEditable(
+    userRole: string | undefined,
+    approvalStatus?: PortfolioApprovalStatus | string | null,
+  ) {
+    if (String(userRole || '').toUpperCase() === 'SUPER_ADMIN') {
+      return;
+    }
+
+    const normalizedStatus = String(
+      approvalStatus || '',
+    ).toUpperCase();
+
+    const lockedStatuses = new Set<PortfolioApprovalStatus>([
+      PortfolioApprovalStatus.INCELEMEYE_GONDERILDI,
+      PortfolioApprovalStatus.INCELEMEDE,
+      PortfolioApprovalStatus.ONAYLANDI,
+      PortfolioApprovalStatus.HAVUZDA,
+    ]);
+
+    const contentLocked = lockedStatuses.has(
+      normalizedStatus as PortfolioApprovalStatus,
+    );
+
+    if (contentLocked) {
+      throw new ForbiddenException(
+        'Portföy incelemeye gönderildikten sonra fotoğraf veya belge değiştirilemez. Düzeltme için portföyün Eksik Bilgi durumuna alınması gerekir.',
+      );
+    }
+  }
+
   private async assertCanManageSensitivePortfolio(input: {
     userId: string;
     userRole?: string;
@@ -594,6 +637,11 @@ export class PortfolioImagesService {
     if (!isSuperAdmin && !isOwner) {
       throw new ForbiddenException('Bu portföyün görsellerini yönetemezsiniz.');
     }
+
+    this.ensurePortfolioContentEditable(
+      input.userRole,
+      unit.approvalStatus,
+    );
 
     return unit;
   }

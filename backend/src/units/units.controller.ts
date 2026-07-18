@@ -199,7 +199,7 @@ export class UnitsController {
 
   @Post(':id/send-to-pool')
   @UseGuards(RolesGuard)
-  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   sendToPool(@Param('id') id: string, @CurrentUser() user: any) {
     return this.unitsService.sendToPool(id, user);
   }

@@ -254,6 +254,11 @@ export class PortfolioDocumentsService {
       throw new ForbiddenException('Bu belgeyi silme yetkiniz yok.');
     }
 
+    this.ensurePortfolioContentEditable(
+      input.userRole,
+      document.unit.approvalStatus,
+    );
+
     await this.tryRemoveStorageFile(this.bucket, this.extractPath(document.fileUrl));
 
     await this.prisma.portfolioAuthorityDocument.delete({
@@ -315,6 +320,36 @@ export class PortfolioDocumentsService {
     return unit;
   }
 
+  private ensurePortfolioContentEditable(
+    userRole: string | undefined,
+    approvalStatus?: PortfolioApprovalStatus | string | null,
+  ) {
+    if (String(userRole || '').toUpperCase() === 'SUPER_ADMIN') {
+      return;
+    }
+
+    const normalizedStatus = String(
+      approvalStatus || '',
+    ).toUpperCase();
+
+    const lockedStatuses = new Set<PortfolioApprovalStatus>([
+      PortfolioApprovalStatus.INCELEMEYE_GONDERILDI,
+      PortfolioApprovalStatus.INCELEMEDE,
+      PortfolioApprovalStatus.ONAYLANDI,
+      PortfolioApprovalStatus.HAVUZDA,
+    ]);
+
+    const contentLocked = lockedStatuses.has(
+      normalizedStatus as PortfolioApprovalStatus,
+    );
+
+    if (contentLocked) {
+      throw new ForbiddenException(
+        'Portföy incelemeye gönderildikten sonra belge değiştirilemez. Düzeltme için portföyün Eksik Bilgi durumuna alınması gerekir.',
+      );
+    }
+  }
+
   private async assertCanManagePortfolio(input: PortfolioDocumentInput) {
     const unit = await this.prisma.unit.findUnique({
       where: { id: input.portfolioId },
@@ -332,6 +367,11 @@ export class PortfolioDocumentsService {
     if (!isOwner && !isSuperAdmin) {
       throw new ForbiddenException('Bu portföy belgelerini yönetme yetkiniz yok.');
     }
+
+    this.ensurePortfolioContentEditable(
+      input.userRole,
+      unit.approvalStatus,
+    );
 
     return unit;
   }
