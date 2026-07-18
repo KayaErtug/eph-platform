@@ -5,10 +5,20 @@ import path from "path";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Lina CRM Confirmation And Fixed Voice V1
-// Lina Fixed Voice V2
-const FIXED_LINA_MODEL_ID = "eleven_multilingual_v2";
-const FIXED_LINA_VOICE_SEED = 20260628;
+const OPENAI_TTS_MODEL = "gpt-4o-mini-tts";
+const OPENAI_TTS_VOICE = "marin";
+const OPENAI_TTS_SPEED = 1;
+
+const OPENAI_TTS_INSTRUCTIONS = `
+Türkçe konuş.
+Samimi, doğal, sıcak ve güven veren yetişkin bir kadın sesi kullan.
+Konuşma hızını orta seviyede ve sabit tut.
+Tüm yanıtlarda aynı ses karakterini, ritmi ve sakin tonu koru.
+Robotik, resmi, haber spikeri gibi veya aşırı neşeli konuşma.
+Ani ton değişiklikleri, yapay vurgular, dramatik iniş çıkışlar ve gereksiz uzatmalar yapma.
+Soruları doğal bir sohbet içindeymiş gibi, anlaşılır ve yumuşak biçimde söyle.
+Noktalama işaretlerinde kısa ve doğal duraklamalar kullan.
+`.trim();
 
 function readEnvValue(key: string) {
   const fromProcess = process.env[key];
@@ -60,39 +70,20 @@ function normalizeVoiceText(text: string) {
         `${normalizeMeasurementNumber(value)} metrekare`,
     )
     .replace(/(?:m²|m2|m\^2)/gi, "metrekare")
-    .replace(/\bEPH\b/g, "Emlak Portföy Havuzu")
-    .replace(/\beph\b/g, "Emlak Portföy Havuzu")
+    .replace(/\bEPH\b/gi, "Emlak Portföy Havuzu")
     .replace(/\bTRY\b/g, "Türk Lirası")
     .replace(/\bTL\b/g, "Türk Lirası")
     .replace(/₺/g, " Türk Lirası ")
     .replace(/\b0\s*km\b/gi, "sıfır kilometre")
-    .replace(/\b0km\b/gi, "sıfır kilometre")
     .replace(/\b(\d+)\s*[,.]\s*5\s*\+\s*(\d+)\b/g, "$1 buçuk artı $2")
     .replace(/\b(\d+)\s*\+\s*(\d+)\b/g, "$1 artı $2")
-    .replace(/\n/g, ". ")
-    .replace(/\. \. /g, ". ")
-    .replace(/\. /g, ". ")
-    .replace(/, /g, ", ")
+    .replace(/\n+/g, ". ")
+    .replace(/\.{2,}/g, ".")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
 
 export async function POST(req: NextRequest) {
-  // Lina Temporary Passive Mode V1
-  const linaTemporarilyDisabled = false;
-
-  if (linaTemporarilyDisabled) {
-    return NextResponse.json(
-      {
-        error:
-          "Lina geçici olarak pasif durumdadır. Platformdaki diğer geliştirmeler tamamlandıktan sonra yeniden devreye alınacaktır.",
-        code: "LINA_TEMPORARILY_DISABLED",
-      },
-      { status: 503 },
-    );
-  }
-
-  // Lina Fixed Voice V4 Diagnostic
   try {
     let payload: { text?: unknown };
 
@@ -102,67 +93,50 @@ export async function POST(req: NextRequest) {
       const detail =
         error instanceof Error ? error.message : String(error);
 
-      console.error(
-        "[LINA_FIXED_VOICE_V4_INVALID_JSON]",
-        detail,
-      );
+      console.error("[LINA_OPENAI_TTS_INVALID_JSON]", detail);
 
       return NextResponse.json(
         {
           error: "Lina ses isteğinin JSON gövdesi okunamadı.",
           code: "LINA_VOICE_INVALID_JSON",
-          detail:
-            process.env.NODE_ENV === "development"
-              ? detail
-              : undefined,
         },
         { status: 400 },
       );
     }
 
-    const { text } = payload;
-
-    const cleanText =
-      typeof text === "string" && text.trim().length > 0
-        ? normalizeVoiceText(text.trim())
+    const rawText =
+      typeof payload.text === "string" && payload.text.trim().length > 0
+        ? payload.text.trim()
         : "Merhaba, ben Lina. Size nasıl yardımcı olabilirim?";
 
-    const apiKey = readEnvValue("ELEVENLABS_API_KEY");
-    const voiceId =
-      readEnvValue("LINA_FIXED_VOICE_ID") ||
-      readEnvValue("ELEVENLABS_VOICE_ID");
-    const modelId = FIXED_LINA_MODEL_ID;
+    const cleanText = normalizeVoiceText(rawText).slice(0, 4096);
+    const apiKey = readEnvValue("OPENAI_API_KEY");
 
-    if (!apiKey || !voiceId) {
+    if (!apiKey) {
       return NextResponse.json(
         {
-          error:
-            "ELEVENLABS_API_KEY veya ELEVENLABS_VOICE_ID eksik.",
+          error: "OPENAI_API_KEY eksik.",
+          code: "OPENAI_API_KEY_MISSING",
         },
         { status: 500 },
       );
     }
 
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+      "https://api.openai.com/v1/audio/speech",
       {
         method: "POST",
         headers: {
+          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
-          "xi-api-key": apiKey,
         },
         body: JSON.stringify({
-          text: cleanText,
-          model_id: modelId,
-          language_code: "tr",
-          seed: FIXED_LINA_VOICE_SEED,
-          voice_settings: {
-            stability: 0.88,
-            similarity_boost: 0.95,
-            style: 0,
-            use_speaker_boost: true,
-            speed: 1.03,
-          },
+          model: OPENAI_TTS_MODEL,
+          voice: OPENAI_TTS_VOICE,
+          input: cleanText,
+          instructions: OPENAI_TTS_INSTRUCTIONS,
+          response_format: "mp3",
+          speed: OPENAI_TTS_SPEED,
         }),
       },
     );
@@ -171,7 +145,7 @@ export async function POST(req: NextRequest) {
       const detail = await response.text();
 
       console.error(
-        "[LINA_FIXED_VOICE_V2_FRONTEND_ERROR]",
+        "[LINA_OPENAI_TTS_ERROR]",
         response.status,
         detail,
       );
@@ -179,9 +153,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: "Lina sesi üretilemedi.",
-          detail,
+          code: "LINA_OPENAI_TTS_ERROR",
         },
-        { status: 500 },
+        { status: response.status },
       );
     }
 
@@ -192,9 +166,10 @@ export async function POST(req: NextRequest) {
       headers: {
         "Content-Type": "audio/mpeg",
         "Cache-Control": "no-store",
-        "X-Lina-Voice-Id": voiceId,
-        "X-Lina-Voice-Seed": String(FIXED_LINA_VOICE_SEED),
-        "X-Lina-Voice-Speed": "1.03",
+        "X-Lina-Voice-Provider": "openai",
+        "X-Lina-Voice-Model": OPENAI_TTS_MODEL,
+        "X-Lina-Voice-Id": OPENAI_TTS_VOICE,
+        "X-Lina-Voice-Speed": String(OPENAI_TTS_SPEED),
       },
     });
   } catch (error) {
@@ -202,32 +177,13 @@ export async function POST(req: NextRequest) {
       error instanceof Error
         ? `${error.name}: ${error.message}`
         : String(error);
-    const cause =
-      error instanceof Error &&
-      "cause" in error &&
-      error.cause
-        ? String(error.cause)
-        : "";
 
-    console.error(
-      "[LINA_FIXED_VOICE_V4_UNHANDLED]",
-      detail,
-      cause,
-      error,
-    );
+    console.error("[LINA_OPENAI_TTS_UNHANDLED]", detail);
 
     return NextResponse.json(
       {
         error: "Lina ses servisi çalışırken beklenmeyen hata oluştu.",
         code: "LINA_VOICE_UNHANDLED",
-        detail:
-          process.env.NODE_ENV === "development"
-            ? detail
-            : undefined,
-        cause:
-          process.env.NODE_ENV === "development" && cause
-            ? cause
-            : undefined,
       },
       { status: 500 },
     );
