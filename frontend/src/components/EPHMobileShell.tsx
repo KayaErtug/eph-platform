@@ -152,6 +152,12 @@ function canUseProjectSales(role?: string | null) {
   );
 }
 
+function canUseAdminTools(role?: string | null) {
+  const normalized = String(role || "").toLocaleUpperCase("tr-TR");
+
+  return normalized === "ADMIN" || normalized === "SUPER_ADMIN";
+}
+
 function readConversations(payload: unknown): Conversation[] {
   if (Array.isArray(payload)) {
     return payload as Conversation[];
@@ -365,10 +371,6 @@ export function EPHMobileShell({
     )}`;
   };
 
-  const comingSoon = (message: string) => {
-    alert(message);
-  };
-
   const handleLogout = () => {
     setMenuOpen(false);
     logout();
@@ -510,11 +512,7 @@ export function EPHMobileShell({
                 <MenuRow
                   icon={<Sparkles size={17} />}
                   label="Lina Fırsatları"
-                  onClick={() =>
-                    comingSoon(
-                      "Lina Fırsatları ekranını sıradaki adımda açacağız.",
-                    )
-                  }
+                  onClick={openLina}
                 />
               </MenuSection>
 
@@ -536,13 +534,13 @@ export function EPHMobileShell({
                   label="Market"
                   onClick={() => go("/ucretlendirme")}
                 />
-                <MenuRow
-                  icon={<Star size={17} />}
-                  label="Duyurular"
-                  onClick={() =>
-                    comingSoon("Duyurular bölümü yakında aktif olacak.")
-                  }
-                />
+                {canUseAdminTools(user?.role) && (
+                  <MenuRow
+                    icon={<Star size={17} />}
+                    label="Duyurular"
+                    onClick={() => go("/admin/announcements")}
+                  />
+                )}
               </MenuSection>
 
               <MenuSection title="Geri Bildirim">
@@ -551,11 +549,13 @@ export function EPHMobileShell({
                   label="Öneri Gönder"
                   onClick={() => feedbackMail("EPH Öneri")}
                 />
-                <MenuRow
-                  icon={<UsersRound size={17} />}
-                  label="Davet Et ve Kazan"
-                  onClick={() => go("/admin/referrals")}
-                />
+                {canUseAdminTools(user?.role) && (
+                  <MenuRow
+                    icon={<UsersRound size={17} />}
+                    label="Referans Kodları"
+                    onClick={() => go("/admin/referrals")}
+                  />
+                )}
                 <MenuRow
                   icon={<AlertTriangle size={17} />}
                   label="Sorun Bildir / Şikayet"

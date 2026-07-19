@@ -305,12 +305,6 @@ export default function DashboardPage() {
       icon: <KeyRound size={18} />,
     },
     {
-      href: "/reports",
-      label: "Raporlar",
-      value: "Analiz",
-      icon: <BarChart3 size={18} />,
-    },
-    {
       href: "/portfoy?map=1",
       label: "Harita",
       value: "Aç",
@@ -416,17 +410,17 @@ export default function DashboardPage() {
       roles: ["SUPER_ADMIN"],
     },
     {
-      href: "/settings",
-      label: "Ayarlar",
-      value: "Genel",
+      href: "/profil",
+      label: "Profil ve Ayarlar",
+      value: "Hesap",
       icon: <SlidersHorizontal size={18} />,
     },
     {
-      href: "/admin/audit-logs",
+      href: "/admin/audit-log",
       label: "Sistem Logları",
       value: "Kayıtlar",
       icon: <FileText size={18} />,
-      roles: ["ADMIN", "SUPER_ADMIN"],
+      roles: ["SUPER_ADMIN"],
     },
     {
       href: "/help-center",
