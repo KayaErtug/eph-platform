@@ -337,10 +337,18 @@ function getPortfolioSourceBadgeLabel(unit: Unit) {
 }
 
 function isVerified(unit: Unit) {
+  const approvalStatus = String(
+    unit.approvalStatus || "",
+  ).toUpperCase();
+
   return Boolean(
-    unit.isVerified ||
-    unit.yetkiVerified ||
-    (unit.tapuVerified && unit.photoVerified && unit.yetkiVerified),
+    unit.isPoolVisible ||
+      approvalStatus === "HAVUZDA" ||
+      unit.isVerified ||
+      unit.yetkiVerified ||
+      (unit.tapuVerified &&
+        unit.photoVerified &&
+        unit.yetkiVerified),
   );
 }
 
@@ -587,7 +595,7 @@ function getPoolQualityTone(score: number) {
 
 
 function hasEphApproval(unit: Unit) {
-  return Boolean(unit.isVerified || (unit.tapuVerified && unit.yetkiVerified));
+  return isVerified(unit);
 }
 
 function getTrustBadges(unit: Unit, matchScore: number) {
@@ -603,7 +611,7 @@ function getTrustBadges(unit: Unit, matchScore: number) {
 
   if (matchScore >= 80) {
     badges.push({
-      label: "Havuza Hazır",
+      label: "Güçlü Müşteri Eşleşmesi",
       className: "border-blue-200 bg-blue-50 text-blue-700",
     });
   }
@@ -624,10 +632,14 @@ function calculateMatch(
   customer: Customer | null;
   budgetDiff: number;
 } {
-  const unitCity = String(unit.project?.city || "").toLocaleLowerCase("tr-TR");
-  const unitDistrict = String(unit.project?.district || "").toLocaleLowerCase(
-    "tr-TR",
-  );
+  const unitCity = String(
+    unit.project?.city || "",
+  ).toLocaleLowerCase("tr-TR");
+
+  const unitDistrict = String(
+    unit.project?.district || "",
+  ).toLocaleLowerCase("tr-TR");
+
   const unitText = [
     unit.project?.name,
     unit.project?.city,
@@ -636,62 +648,108 @@ function calculateMatch(
     unit.roomCount,
     unit.description,
   ]
+    .filter(Boolean)
     .join(" ")
     .toLocaleLowerCase("tr-TR");
 
   let bestScore = 0;
   let bestCustomer: Customer | null = null;
-  let budgetDiff = 0;
+  let bestBudgetDiff = 0;
 
   customers.forEach((customer) => {
     let score = 0;
-    const customerCity = String(customer.city || "").toLocaleLowerCase("tr-TR");
+    let customerBudgetDiff = 0;
+
+    const customerCity = String(
+      customer.city || "",
+    ).toLocaleLowerCase("tr-TR");
+
     const interestedArea = String(
       customer.interestedArea || "",
     ).toLocaleLowerCase("tr-TR");
+
     const interestedType = String(
       customer.interestedType || "",
     ).toLocaleLowerCase("tr-TR");
-    const notes = String(customer.notes || "").toLocaleLowerCase("tr-TR");
 
-    if (customerCity && unitCity && customerCity === unitCity) score += 30;
+    const notes = String(
+      customer.notes || "",
+    ).toLocaleLowerCase("tr-TR");
+
+    if (
+      customerCity &&
+      unitCity &&
+      customerCity === unitCity
+    ) {
+      score += 30;
+    }
+
     if (
       interestedArea &&
       (unitDistrict.includes(interestedArea) ||
         unitText.includes(interestedArea))
-    )
+    ) {
       score += 30;
-    if (interestedType && unitText.includes(interestedType)) score += 15;
+    }
+
+    if (
+      interestedType &&
+      unitText.includes(interestedType)
+    ) {
+      score += 15;
+    }
 
     if (customer.budget && unit.price) {
-      const diff = Math.abs(Number(customer.budget) - Number(unit.price));
-      const ratio =
-        diff / Math.max(Number(customer.budget), Number(unit.price));
-      budgetDiff = Math.round(ratio * 100);
+      const customerBudget =
+        Number(customer.budget);
 
-      if (ratio <= 0.1) score += 15;
-      else if (ratio <= 0.2) score += 10;
-      else if (ratio <= 0.35) score += 5;
+      const unitPrice =
+        Number(unit.price);
+
+      const difference = Math.abs(
+        customerBudget - unitPrice,
+      );
+
+      const ratio =
+        difference /
+        Math.max(customerBudget, unitPrice);
+
+      customerBudgetDiff =
+        Math.round(ratio * 100);
+
+      if (ratio <= 0.1) {
+        score += 15;
+      } else if (ratio <= 0.2) {
+        score += 10;
+      } else if (ratio <= 0.35) {
+        score += 5;
+      }
     }
 
     if (
       notes &&
       unitText
-        .split(" ")
-        .some((word) => word.length > 3 && notes.includes(word))
-    )
+        .split(/\s+/)
+        .some(
+          (word) =>
+            word.length > 3 &&
+            notes.includes(word),
+        )
+    ) {
       score += 10;
+    }
 
     if (score > bestScore) {
       bestScore = score;
       bestCustomer = customer;
+      bestBudgetDiff = customerBudgetDiff;
     }
   });
 
   return {
-    score: Math.min(bestScore || 64, 96),
+    score: Math.min(bestScore, 96),
     customer: bestCustomer,
-    budgetDiff,
+    budgetDiff: bestBudgetDiff,
   };
 }
 
@@ -726,7 +784,6 @@ export default function HavuzPage() {
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyError, setNearbyError] = useState("");
 
-  const builder = isBuilderRole(user?.role);
   const canUsePoolActions = membershipAccess?.allowed === true;
   const poolActionLockMessage =
     membershipAccess?.message ||
@@ -791,9 +848,7 @@ export default function HavuzPage() {
     }
   };
 
-  const eligibleUnits = useMemo(() => {
-    return units.filter((unit) => builder || isVerified(unit));
-  }, [builder, units]);
+  const eligibleUnits = units;
 
   const matchedUnits = useMemo(() => {
     return eligibleUnits
@@ -1035,6 +1090,17 @@ export default function HavuzPage() {
       return;
     }
 
+    if (
+      walletBalance !== null &&
+      walletBalance < 3
+    ) {
+      setErrorMessage(
+        `Bu işlem için 3 kontör gerekir. Mevcut bakiyeniz ${walletBalance} kontör.`,
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     setErrorMessage("");
     setBusyAction(`MESSAGE_${unit.id}`);
 
@@ -1076,7 +1142,25 @@ export default function HavuzPage() {
       return;
     }
 
-    const endpoint = action.type === "LEAD" ? "matching-customer" : "interest";
+    const requiredCredit =
+      action.type === "LEAD" ? 20 : 10;
+
+    if (
+      walletBalance !== null &&
+      walletBalance < requiredCredit
+    ) {
+      setSelectedAction(null);
+      setErrorMessage(
+        `Bu işlem için ${requiredCredit} kontör gerekir. Mevcut bakiyeniz ${walletBalance} kontör.`,
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    const endpoint =
+      action.type === "LEAD"
+        ? "matching-customer"
+        : "interest";
     const busyKey = `${action.type}_${action.unit.id}`;
 
     setErrorMessage("");
@@ -2779,19 +2863,57 @@ function PoolDetailModal({
       return;
     }
 
+    const shareTarget =
+      window.open("", "_blank");
+
+    if (shareTarget) {
+      shareTarget.opener = null;
+    }
+
     setShareBusy(true);
 
     try {
-      const response = await api.post(`/units/pool/${unit.id}/share`);
-      const url = String(response.data?.url || "").trim();
+      const response = await api.post(
+        `/units/pool/${unit.id}/share`,
+      );
+
+      const url = String(
+        response.data?.url || "",
+      ).trim();
 
       if (!url) {
-        throw new Error("Paylaşım bağlantısı oluşturulamadı.");
+        throw new Error(
+          "Paylaşım bağlantısı oluşturulamadı.",
+        );
       }
 
-      const message = `Merhaba, ${getEphId(unit.id)} numaralı Havuz portföyünü sizinle paylaşmak istiyorum: ${url}`;
-      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+      const message =
+        `Merhaba, ${getEphId(unit.id)} numaralı ` +
+        `Havuz portföyünü sizinle paylaşmak ` +
+        `istiyorum: ${url}`;
+
+      const whatsappUrl =
+        `https://wa.me/?text=${encodeURIComponent(message)}`;
+
+      if (
+        shareTarget &&
+        !shareTarget.closed
+      ) {
+        shareTarget.location.href =
+          whatsappUrl;
+      } else {
+        window.location.assign(
+          whatsappUrl,
+        );
+      }
     } catch (error) {
+      if (
+        shareTarget &&
+        !shareTarget.closed
+      ) {
+        shareTarget.close();
+      }
+
       alert(getErrorMessage(error));
     } finally {
       setShareBusy(false);
