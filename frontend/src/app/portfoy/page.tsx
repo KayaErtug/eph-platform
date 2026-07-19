@@ -285,6 +285,34 @@ function getPortfolioNo(unit: Unit) {
   return `EPH-${raw.slice(0, 4).toLocaleUpperCase("tr-TR") || "PORT"}-${raw.slice(-4).toLocaleUpperCase("tr-TR") || "0001"}`;
 }
 
+
+function calculatePortfolioScore(unit?: Unit | null) {
+  if (!unit) return 0;
+
+  let score = 0;
+  const imageCount = getUnitImages(unit).length;
+
+  if (unit.project?.name) score += 14;
+  if (unit.project?.city && unit.project?.district) score += 14;
+  if (unit.price) score += 14;
+  if (unit.area) score += 12;
+  if (unit.roomCount) score += 10;
+  if (unit.description) score += 12;
+  if (unit.tapuVerified) score += 7;
+  if (unit.photoVerified || imageCount > 0) score += 7;
+  if (unit.yetkiVerified || unit.isVerified) score += 10;
+
+  return Math.min(score, 100);
+}
+
+function getPortfolioScoreLabel(score: number) {
+  if (score >= 90) return "Pekiyi";
+  if (score >= 80) return "Çok İyi";
+  if (score >= 70) return "İyi";
+  if (score >= 60) return "Geliştirilebilir";
+  return "Eksik";
+}
+
 function getShareUrl(unit: Unit) {
   if (typeof window === "undefined") return "";
   return `${window.location.origin}/portfoy/${unit.id}`;
@@ -338,6 +366,7 @@ function StokPageInner() {
   const [poolActionUnitId, setPoolActionUnitId] = useState("");
   const [editingUnit, setEditingUnit] = useState<MapUnit | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [consultantPhone, setConsultantPhone] = useState("");
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [projectForm, setProjectForm] = useState<ProjectFormState>({
@@ -429,15 +458,25 @@ function StokPageInner() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [projectRes, unitRes, crmRes, conversationsRes] = await Promise.all([
+      const [
+        projectRes,
+        unitRes,
+        crmRes,
+        conversationsRes,
+        profileRes,
+      ] = await Promise.all([
         api.get("/projects/my"),
         api.get("/units"),
         api.get("/crm/customers").catch(() => ({ data: [] })),
-        user?.id ? api.get(`/conversations?userId=${user.id}`).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+        user?.id
+          ? api.get(`/conversations?userId=${user.id}`).catch(() => ({ data: [] }))
+          : Promise.resolve({ data: [] }),
+        api.get("/profile").catch(() => ({ data: null })),
       ]);
       setProjects(projectRes.data || []);
       setUnits(unitRes.data || []);
       setCrmCustomers(Array.isArray(crmRes.data) ? crmRes.data : []);
+      setConsultantPhone(String(profileRes.data?.phone || "").trim());
 
       const conversations = Array.isArray(conversationsRes.data)
         ? (conversationsRes.data as Conversation[])
@@ -564,17 +603,7 @@ function StokPageInner() {
   };
 
   const openCreateModal = () => {
-    const currentRole = String(user?.role || "").toUpperCase();
-
-    if (currentRole === "ADMIN") {
-      window.alert("Rolünüz Admin olduğu için portföy girişi yapamazsınız.");
-      return;
-    }
-
-    if (!canAddUnit) {
-      window.alert("Bu kullanıcı rolüyle portföy girişi yapamazsınız.");
-      return;
-    }
+    if (!canAddUnit) return;
 
     resetForm();
     setShowModal(true);
@@ -928,11 +957,13 @@ function StokPageInner() {
       [unit.project?.city, unit.project?.district, unit.project?.address]
         .filter(Boolean)
         .join(" / ") || "Konum bilgisi yok";
+    const score = calculatePortfolioScore(unit);
 
     return {
       id: unit.id,
       title,
       location,
+      status: statusLabels[unit.status] || unit.status || "Portföy",
       price: unit.price
         ? formatPrice(unit.price, unit.priceCurrency)
         : "Fiyat bilgisi yok",
@@ -945,10 +976,10 @@ function StokPageInner() {
       consultantName:
         [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
         "EPH Üyesi",
-      consultantPhone: "Telefon bilgisi",
+      consultantPhone: consultantPhone || "Telefon paylaşılmadı",
       portfolioNo: getPortfolioNo(unit),
-      score: 86,
-      scoreLabel: "Çok İyi",
+      score,
+      scoreLabel: getPortfolioScoreLabel(score),
       shortDescription:
         unit.description ||
         "Yetkili portföy statüsünde paylaşım için hazır gayrimenkul kaydı.",
@@ -963,7 +994,7 @@ function StokPageInner() {
               ? "Yetkili Portföy"
               : "Yetki Kontrol",
         },
-        { icon: "smart", label: "Lina Kartı" },
+        { icon: "smart", label: "Dijital Portföy Kartı" },
         { icon: "car", label: "Portföy Kaydı" },
         {
           icon: "pool",
@@ -1284,14 +1315,15 @@ function StokPageInner() {
               {filteredUnits.length} portföy listeleniyor
             </p>
             <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={openCreateModal}
-                disabled={!canAddUnit && user?.role !== "ADMIN"}
-                className="inline-flex h-10 shrink-0 items-center gap-1 rounded-[18px] bg-[linear-gradient(135deg,#7C3AED_0%,#5B21B6_100%)] px-3 text-[12px] font-black text-white shadow-[0_10px_24px_rgba(124,58,237,0.24)] disabled:opacity-50"
-              >
-                <Plus size={17} /> Yeni Portföy
-              </button>
+              {canAddUnit && (
+                <button
+                  type="button"
+                  onClick={openCreateModal}
+                  className="inline-flex h-10 shrink-0 items-center gap-1 rounded-[18px] bg-[linear-gradient(135deg,#7C3AED_0%,#5B21B6_100%)] px-3 text-[12px] font-black text-white shadow-[0_10px_24px_rgba(124,58,237,0.24)]"
+                >
+                  <Plus size={17} /> Yeni Portföy
+                </button>
+              )}
             </div>
           </div>
 

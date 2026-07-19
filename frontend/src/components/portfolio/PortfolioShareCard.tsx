@@ -22,6 +22,7 @@ export type PortfolioShareData = {
   id: string;
   title: string;
   location: string;
+  status?: string;
   price: string;
   roomCount: string;
   area: string;
@@ -38,69 +39,14 @@ export type PortfolioShareData = {
   features?: PortfolioShareFeature[];
 };
 
-function getLinaMarketingLabels(data: PortfolioShareData) {
-  const source = [
-    data.title,
-    data.location,
-    data.shortDescription,
-    data.longDescription,
-    ...(data.features || []).map((feature) => feature.label),
-  ]
-    .join(" ")
-    .toLocaleLowerCase("tr-TR");
+function getShareFeatureLabels(data: PortfolioShareData) {
+  const labels = (data.features || [])
+    .map((feature) => String(feature.label || "").trim())
+    .filter(Boolean);
 
-  const hasAny = (keywords: string[]) =>
-    keywords.some((keyword) => source.includes(keyword));
-
-  if (hasAny(["arsa", "arazi", "tarla", "parsel", "imar", "bağ", "bahçe"])) {
-    return [
-      "İmarlı",
-      "Yolu Açık",
-      "Elektrik Var",
-      "Su Var",
-      "Kadastro Yolu",
-      "Köşe Parsel",
-      "Yatırıma Uygun",
-      "Gelişen Bölge",
-    ];
-  }
-
-  if (hasAny(["fabrika", "depo", "sanayi", "üretim", "lojistik", "antrepo"])) {
-    return [
-      "Tır Girişi",
-      "Yükleme Rampası",
-      "Sanayi Elektriği",
-      "Yüksek Tavan",
-      "Geniş Depolama",
-      "Lojistik Avantaj",
-      "Güvenlik",
-      "Forklift Alanı",
-    ];
-  }
-
-  if (hasAny(["dükkan", "mağaza", "ofis", "büro", "plaza", "showroom", "ticari"])) {
-    return [
-      "Cadde Üzeri",
-      "Yüksek Tabela Değeri",
-      "Otopark",
-      "Yoğun Yaya Trafiği",
-      "Kurumsal Kiracıya Uygun",
-      "Geniş Vitrin",
-      "Merkezi Konum",
-      "Hızlı Ulaşım",
-    ];
-  }
-
-  return [
-    "Kapalı Otopark",
-    "7/24 Güvenlik",
-    "Açık Yüzme Havuzu",
-    "Kapalı Yüzme Havuzu",
-    "Fitness Merkezi",
-    "Hamam & Sauna",
-    "Elektrikli Araç Şarjı",
-    "Akıllı Ev Sistemi",
-  ];
+  return labels.length > 0
+    ? labels.slice(0, 8)
+    : ["Portföy Bilgisi"];
 }
 
 function getFeatureIcon(label: string) {
@@ -122,7 +68,7 @@ export default function PortfolioShareCard({
 }: {
   data: PortfolioShareData;
 }) {
-  const marketingLabels = getLinaMarketingLabels(data);
+  const marketingLabels = getShareFeatureLabels(data);
 
   return (
     <div
@@ -146,11 +92,13 @@ export default function PortfolioShareCard({
         <div className="absolute inset-0 bg-gradient-to-t from-[#06194A]/72 via-[#06194A]/10 to-transparent" />
 
         <div className="absolute left-4 top-4 rounded-full bg-white/92 px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-[#1557D6] shadow-lg">
-          EPH Yetkili Portföy
+          {data.authorization === "Yetkili"
+            ? "EPH Yetkili Portföy"
+            : "EPH Portföy"}
         </div>
 
         <div className="absolute right-4 top-4 rounded-full bg-[#1557D6] px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-white shadow-lg">
-          Satılık
+          {data.status || "Portföy"}
         </div>
 
         <div className="absolute bottom-4 left-4 right-4">
@@ -206,7 +154,7 @@ export default function PortfolioShareCard({
         <div className="mt-5 rounded-[24px] border border-[#DDE7F3] bg-white p-4">
           <p className="line-clamp-2 text-sm font-bold leading-6 text-[#475569]">
             {data.shortDescription ||
-              "Site içerisinde, sosyal donatıları güçlü, premium yaşam alanı sunan seçkin portföy."}
+              "Bu portföy için açıklama paylaşılmadı."}
           </p>
         </div>
 
@@ -215,7 +163,7 @@ export default function PortfolioShareCard({
             {data.consultantName || "EPH Danışmanı"}
           </p>
           <p className="mt-1 text-xs font-bold text-white/75">
-            {data.consultantPhone || "Telefon bilgisi"}
+            {data.consultantPhone || "Telefon paylaşılmadı"}
           </p>
         </div>
       </div>

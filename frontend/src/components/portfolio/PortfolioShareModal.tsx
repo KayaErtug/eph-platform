@@ -34,69 +34,14 @@ function truncateText(text: string, maxLength: number) {
   return `${text.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
 }
 
-function getLinaMarketingLabels(data: PortfolioShareData) {
-  const source = [
-    data.title,
-    data.location,
-    data.shortDescription,
-    data.longDescription,
-    ...(data.features || []).map((feature) => feature.label),
-  ]
-    .join(" ")
-    .toLocaleLowerCase("tr-TR");
+function getShareFeatureLabels(data: PortfolioShareData) {
+  const labels = (data.features || [])
+    .map((feature) => String(feature.label || "").trim())
+    .filter(Boolean);
 
-  const hasAny = (keywords: string[]) =>
-    keywords.some((keyword) => source.includes(keyword));
-
-  if (hasAny(["arsa", "arazi", "tarla", "parsel", "imar", "bağ", "bahçe"])) {
-    return [
-      "İmarlı",
-      "Yolu Açık",
-      "Elektrik Var",
-      "Su Var",
-      "Kadastro Yolu",
-      "Köşe Parsel",
-      "Yatırıma Uygun",
-      "Gelişen Bölge",
-    ];
-  }
-
-  if (hasAny(["fabrika", "depo", "sanayi", "üretim", "lojistik", "antrepo"])) {
-    return [
-      "Tır Girişi",
-      "Yükleme Rampası",
-      "Sanayi Elektriği",
-      "Yüksek Tavan",
-      "Geniş Depolama",
-      "Lojistik Avantaj",
-      "Güvenlik",
-      "Forklift Alanı",
-    ];
-  }
-
-  if (hasAny(["dükkan", "mağaza", "ofis", "büro", "plaza", "showroom", "ticari"])) {
-    return [
-      "Cadde Üzeri",
-      "Yüksek Tabela Değeri",
-      "Otopark",
-      "Yoğun Yaya Trafiği",
-      "Kurumsal Kiracıya Uygun",
-      "Geniş Vitrin",
-      "Merkezi Konum",
-      "Hızlı Ulaşım",
-    ];
-  }
-
-  return [
-    "Kapalı Otopark",
-    "7/24 Güvenlik",
-    "Açık Yüzme Havuzu",
-    "Kapalı Yüzme Havuzu",
-    "Fitness Merkezi",
-    "Hamam & Sauna",
-    "Elektrikli Araç Şarjı",
-    "Akıllı Ev Sistemi",
-  ];
+  return labels.length > 0
+    ? labels.slice(0, 8)
+    : ["Portföy Bilgisi"];
 }
 
 
@@ -492,15 +437,20 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
   });
 
   const featureY = infoY + infoBoxHeight + 16;
-  const featureItems = getLinaMarketingLabels(data);
+  const featureItems = getShareFeatureLabels(data);
 
-  for (let index = 0; index < 8; index += 1) {
+  const visibleFeatureItems = featureItems.slice(0, 8);
+  const featureRows = Math.max(
+    1,
+    Math.ceil(visibleFeatureItems.length / 2),
+  );
+
+  visibleFeatureItems.forEach((text, index) => {
     const col = index % 2;
     const row = Math.floor(index / 2);
     const boxWidth = (bodyWidth - 10) / 2;
     const x = bodyX + col * (boxWidth + 10);
     const y = featureY + row * 42;
-    const text = featureItems[index] || "Premium Yaşam";
 
     ctx.fillStyle = "#FFFFFF";
     drawRoundRect(ctx, x, y, boxWidth, 34, 16);
@@ -509,10 +459,19 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    drawText(ctx, truncateText(text, 24), x + boxWidth / 2, y + 10, boxWidth - 16, "900 11px Arial", "#27364F", "center");
-  }
+    drawText(
+      ctx,
+      truncateText(text, 24),
+      x + boxWidth / 2,
+      y + 10,
+      boxWidth - 16,
+      "900 11px Arial",
+      "#27364F",
+      "center",
+    );
+  });
 
-  const descY = featureY + 178;
+  const descY = featureY + featureRows * 42 + 10;
 
   ctx.fillStyle = "#FFFFFF";
   drawRoundRect(ctx, bodyX, descY, bodyWidth, 76, 24);
@@ -553,7 +512,7 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
   );
   drawText(
     ctx,
-    normalizeText(data.consultantPhone, "Telefon bilgisi"),
+    normalizeText(data.consultantPhone, "Telefon paylaşılmadı"),
     bodyX + 18,
     advisorY + 52,
     bodyWidth - 116,
@@ -578,7 +537,7 @@ async function drawShareCanvas(data: PortfolioShareData, mode: ShareMode) {
   );
   drawText(
     ctx,
-    normalizeText(data.consultantPhone, "Telefon bilgisi"),
+    normalizeText(data.consultantPhone, "Telefon paylaşılmadı"),
     width / 2,
     footerY + 32,
     width - padding * 2 - 24,

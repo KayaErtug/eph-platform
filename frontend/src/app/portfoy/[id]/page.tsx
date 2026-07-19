@@ -507,7 +507,7 @@ function calculatePortfolioScore(unit?: DetailUnit | null) {
   if (unit.tapuVerified) score += 7;
   if (unit.photoVerified || imageCount > 0) score += 7;
   if (unit.yetkiVerified || unit.isVerified) score += 10;
-  return Math.min(score || 70, 100);
+  return Math.min(score, 100);
 }
 
 function getPortfolioScoreLabel(score: number) {
@@ -668,6 +668,7 @@ export default function StokDetailPage() {
   const [linkShareBusy, setLinkShareBusy] = useState(false);
   const [authorityLetterOpen, setAuthorityLetterOpen] = useState(false);
   const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
+  const [consultantPhone, setConsultantPhone] = useState("");
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
@@ -692,6 +693,26 @@ export default function StokDetailPage() {
     if (!unitId) return;
     fetchUnit();
   }, [unitId]);
+
+  useEffect(() => {
+    let active = true;
+
+    api
+      .get("/profile")
+      .then((response) => {
+        if (!active) return;
+        setConsultantPhone(
+          String(response.data?.phone || "").trim(),
+        );
+      })
+      .catch(() => {
+        if (active) setConsultantPhone("");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -1103,6 +1124,7 @@ export default function StokDetailPage() {
     id: item.id,
     title: item.project?.name || "EPH Portföy",
     location: locationText,
+    status: statusLabel(item.status),
     price: item.price
       ? formatMoney(item.price, item.priceCurrency)
       : "Fiyat bilgisi yok",
@@ -1116,7 +1138,7 @@ export default function StokDetailPage() {
       [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
       ownerName ||
       "EPH Üyesi",
-    consultantPhone: "Telefon bilgisi",
+    consultantPhone: consultantPhone || "Telefon paylaşılmadı",
     portfolioNo: getPortfolioNo(item),
     score: portfolioScore,
     scoreLabel: portfolioScoreLabel,
@@ -1132,7 +1154,7 @@ export default function StokDetailPage() {
             ? "Yetkili Portföy"
             : "Yetki Kontrol",
       },
-      { icon: "smart", label: "Lina Kartı" },
+      { icon: "smart", label: "Dijital Portföy Kartı" },
       { icon: "car", label: "Portföy Kaydı" },
       { icon: "pool", label: statusLabel(item.status) },
     ],

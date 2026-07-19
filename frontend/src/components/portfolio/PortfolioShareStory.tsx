@@ -33,14 +33,14 @@ export default function PortfolioShareStory({
           </div>
 
           <div className="rounded-full bg-[#1557D6] px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-white">
-            Satılık
+            {data.status || "Portföy"}
           </div>
         </div>
 
         <div>
           <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/14 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-white backdrop-blur">
             <Star className="h-4 w-4" />
-            {data.scoreLabel || "Pekiyi Portföy"} · {data.score || 92}/100
+            {data.scoreLabel || "Puanlanmadı"} · {data.score ?? 0}/100
           </div>
 
           <h1 className="max-w-[360px] text-5xl font-black leading-[0.98] tracking-[-0.06em] text-white">
@@ -72,7 +72,7 @@ export default function PortfolioShareStory({
 
           <div className="mt-5 rounded-[24px] bg-white/14 p-4 text-sm font-bold leading-6 text-white backdrop-blur">
             {data.shortDescription ||
-              "Sosyal donatıları güçlü, yetkili portföy statüsünde, paylaşım için hazır ilan kartı."}
+              "Bu portföy için açıklama paylaşılmadı."}
           </div>
         </div>
 
@@ -80,7 +80,9 @@ export default function PortfolioShareStory({
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-white/14 px-4 py-2 text-xs font-black text-white backdrop-blur">
               <ShieldCheck className="h-4 w-4" />
-              Yetkili Portföy
+              {data.authorization === "Yetkili"
+                ? "Yetkili Portföy"
+                : "Yetki Kontrolü"}
             </div>
 
             <p className="mt-4 text-sm font-black text-white">
@@ -88,14 +90,17 @@ export default function PortfolioShareStory({
             </p>
 
             <p className="text-xs font-bold text-white/72">
-              {data.consultantPhone || "Telefon bilgisi"}
+              {data.consultantPhone || "Telefon paylaşılmadı"}
             </p>
           </div>
 
-          <div className="flex h-[82px] w-[82px] items-center justify-center rounded-[24px] bg-white text-center text-[11px] font-black leading-3 text-[#1557D6]">
-            QR
-            <br />
-            KOD
+          <div className="flex min-h-[82px] w-[112px] flex-col items-center justify-center rounded-[24px] bg-white px-2 text-center text-[#1557D6]">
+            <span className="text-[9px] font-black uppercase tracking-[0.14em]">
+              Portföy No
+            </span>
+            <span className="mt-1 break-all text-[10px] font-black leading-3">
+              {data.portfolioNo || "EPH-PORTFOY"}
+            </span>
           </div>
         </div>
       </div>
