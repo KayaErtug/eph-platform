@@ -26,7 +26,7 @@ const MENU_ITEMS: NavItem[] = [
   { href: "/dashboard", svg: SVG.home, label: "Ana Sayfa" },
   { href: "/stok", svg: SVG.portfolio, label: "Portföy" },
   { href: "/crm", svg: SVG.crm, label: "CRM" },
-  { href: "/network", svg: SVG.forum, label: "Forum" },
+  { href: "/network", svg: SVG.forum, label: "Talep Merkezi" },
   { href: "/lina", svg: SVG.ai, label: "Yapay Zeka" },
 ];
 

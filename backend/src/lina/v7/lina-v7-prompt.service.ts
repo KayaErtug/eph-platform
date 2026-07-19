@@ -193,7 +193,7 @@ export class LinaV7PromptService {
       crm:
         'Kullanıcı CRM alanında. Yalnız kullanıcının erişim hakkı bulunan CRM verileri kullanılabilir.',
       network:
-        'Kullanıcı EPH Network ve forum alanında. Talepler, paylaşımlar ve güvenli iş birliği konuşulabilir.',
+        'Kullanıcı Talep Merkezi alanında. Talepler, paylaşımlar ve güvenli iş birliği konuşulabilir.',
       pool:
         'Kullanıcı havuz alanında. Portföy ve talep eşleşmeleri yalnız backend tarafından verilen verilerle değerlendirilir.',
       notifications:

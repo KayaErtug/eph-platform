@@ -988,7 +988,7 @@ export class LinaMemoryService {
       [LinaModul.GENEL]: "Genel sohbet",
       [LinaModul.PORTFOY]: "Portföy",
       [LinaModul.CRM]: "CRM",
-      [LinaModul.FORUM]: "Forum",
+      [LinaModul.FORUM]: "Talep Merkezi",
       [LinaModul.HAVUZ]: "Havuz",
       [LinaModul.GOREV]: "Görev",
       [LinaModul.RAPORLAMA]: "Raporlama",

@@ -520,7 +520,7 @@ export default function NotificationSettingsPage() {
               icon={<MessageCircle size={18} />}
             />
             <PreferenceRow
-              label="Forum"
+              label="Talep Merkezi"
               active={preferences.forum}
               onClick={() => togglePreference("forum")}
               icon={<Radio size={18} />}

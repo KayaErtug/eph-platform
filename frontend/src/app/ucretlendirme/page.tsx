@@ -7,7 +7,7 @@ const membershipPlans = [
     popular: false,
     features: [
       "10 aktif portföy",
-      "5 forum konusu",
+      "5 talep kaydı",
       "Temel CRM kullanımı",
       "Mesajlaşma",
       "Mobil PWA erişimi",
@@ -22,7 +22,7 @@ const membershipPlans = [
     popular: false,
     features: [
       "20 aktif portföy",
-      "10 forum konusu",
+      "10 talep kaydı",
       "CRM kullanımı",
       "Mesajlaşma",
       "Mobil PWA erişimi",
@@ -37,7 +37,7 @@ const membershipPlans = [
     popular: true,
     features: [
       "50 aktif portföy",
-      "30 forum konusu",
+      "30 talep kaydı",
       "Havuz erişimi",
       "CRM kullanımı",
       "Mesajlaşma",
@@ -52,7 +52,7 @@ const membershipPlans = [
     popular: false,
     features: [
       "100 aktif portföy",
-      "Sınırsız forum",
+      "Sınırsız talep kaydı",
       "Lina AI asistan",
       "250 mesaj",
       "Gelişmiş bildirimler",
@@ -67,7 +67,7 @@ const membershipPlans = [
     popular: false,
     features: [
       "200 aktif portföy",
-      "Sınırsız forum",
+      "Sınırsız talep kaydı",
       "Sınırsız mesaj",
       "Lina AI asistan",
       "Öncelikli eşleşmeler",
@@ -95,9 +95,9 @@ const creditPackages = [
 ];
 
 const creditUses = [
-  ["Forum mesajı", "3 kontör"],
-  ["Forumda ilgileniyorum", "10 kontör"],
-  ["Forumda yardımcı olabilirim", "10 kontör"],
+  ["Talep Merkezi mesajı", "3 kontör"],
+  ["Talep Merkezi’nde ilgileniyorum", "10 kontör"],
+  ["Talep Merkezi’nde yardımcı olabilirim", "10 kontör"],
   ["Portföy öne çıkar", "150 kontör"],
   ["Lina AI ilan metni", "10 kontör"],
   ["Ses kaydından ilan oluştur", "25 kontör"],
@@ -111,12 +111,12 @@ const faqs = [
   {
     question: "EPH aboneliği neyi kapsar?",
     answer:
-      "Abonelik; CRM, portföy yönetimi, forum, mesajlaşma, havuz erişimi ve seçilen pakete göre Lina AI özelliklerini kapsar.",
+      "Abonelik; CRM, portföy yönetimi, Talep Merkezi, mesajlaşma, havuz erişimi ve seçilen pakete göre Lina AI özelliklerini kapsar.",
   },
   {
     question: "Kontörler temel işlemler için mi harcanır?",
     answer:
-      "Hayır. Portföy eklemek, CRM kullanmak, Forum ve Havuz içeriklerini listelemek ve detaylarını görüntülemek ücretsizdir. Mesaj ve iş fırsatı oluşturan aksiyonlar kontör ile çalışır.",
+      "Hayır. Portföy eklemek, CRM kullanmak, Talep Merkezi ve Havuz içeriklerini listelemek ve detaylarını görüntülemek ücretsizdir. Mesaj ve iş fırsatı oluşturan aksiyonlar kontör ile çalışır.",
   },
   {
     question: "Abonelik aylık mı?",
@@ -154,13 +154,13 @@ export default function UcretlendirmePage() {
           </h1>
 
           <p className="mx-auto mt-4 max-w-3xl text-sm font-semibold leading-7 text-[#64748B] md:text-base">
-            EPH; CRM, portföy yönetimi, forum, havuz, mesajlaşma ve Lina AI
+            EPH; CRM, portföy yönetimi, Talep Merkezi, havuz, mesajlaşma ve Lina AI
             araçlarını tek platformda sunar. Temel kullanım aboneliğe dahildir;
             iletişim, iş fırsatı ve üretkenliği artıran işlemler kontör ile kullanılır.
           </p>
 
           <div className="mx-auto mt-5 flex max-w-3xl flex-wrap justify-center gap-2">
-            {["CRM", "Portföy", "Forum", "Havuz", "Lina AI", "Mobil PWA"].map(
+            {["CRM", "Portföy", "Talep Merkezi", "Havuz", "Lina AI", "Mobil PWA"].map(
               (item) => (
                 <span
                   key={item}
@@ -343,7 +343,7 @@ export default function UcretlendirmePage() {
               <tbody>
                 {[
                   ["Aktif Portföy", "10", "20", "50", "100", "200"],
-                  ["Forum Konusu", "5", "10", "30", "Sınırsız", "Sınırsız"],
+                  ["Talep Kaydı", "5", "10", "30", "Sınırsız", "Sınırsız"],
                   ["CRM", "✓", "✓", "✓", "✓", "✓"],
                   ["Havuz", "—", "—", "✓", "✓", "✓"],
                   ["Lina AI", "—", "—", "—", "✓", "✓"],

@@ -197,7 +197,7 @@ export default function MessagesInboxPage() {
                 Görüşmeler
               </h1>
               <p className="mt-1 text-[11px] font-bold text-[#64748B]">
-                Özel iş görüşmeleri ve forum bağlantıları.
+                Özel iş görüşmeleri ve Talep Merkezi bağlantıları.
               </p>
             </div>
 
@@ -232,7 +232,7 @@ export default function MessagesInboxPage() {
               </div>
               <div className="text-[16px] font-black text-[#06194A]">Görüşme yok</div>
               <p className="mt-1 max-w-[280px] text-[12px] font-bold leading-5 text-[#64748B]">
-                Forum veya Havuz üzerinden görüşme başladığında burada görünecek.
+                Talep Merkezi veya Havuz üzerinden görüşme başladığında burada görünecek.
               </p>
             </div>
           ) : (

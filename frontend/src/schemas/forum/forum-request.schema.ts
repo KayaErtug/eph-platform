@@ -571,9 +571,9 @@ export const forumRequestSchema: EPHSchemaDefinition = {
   id: "eph.forum.request",
   version: 1,
   entity: "ForumRequest",
-  title: "Forum Talebi",
+  title: "Talep Merkezi Kaydı",
   description:
-    "Forum talep girişi, filtreleme, detay görüntüleme ve Lina analizi için ortak alan sözlüğü.",
+    "Talep Merkezi kayıt girişi, filtreleme, detay görüntüleme ve Lina analizi için ortak alan sözlüğü.",
   defaultStateByMode: {
     form: createEmptyForumRequestFormState(),
     filter: createEmptyForumRequestFilterState(),
@@ -606,7 +606,7 @@ export const forumRequestSchema: EPHSchemaDefinition = {
             message: "Lütfen talep kategorisini seçin.",
           },
           lina: {
-            meaning: "Forum talebinin ana iş kategorisi",
+            meaning: "Talep Merkezi kaydının ana iş kategorisi",
             analyticsKey: "forum_request_category",
             entityPath: "forum.request.category",
             comparable: true,
@@ -643,7 +643,7 @@ export const forumRequestSchema: EPHSchemaDefinition = {
             },
           },
           lina: {
-            meaning: "Forum kategorisi içindeki yapılandırılmış alt talep türü",
+            meaning: "Talep Merkezi kategorisi içindeki yapılandırılmış alt talep türü",
             analyticsKey: "forum_request_intent",
             entityPath: "forum.request.intent",
             comparable: true,
@@ -706,7 +706,7 @@ export const forumRequestSchema: EPHSchemaDefinition = {
               ),
           },
           lina: {
-            meaning: "Forum talebinin kısa ve kullanıcı tarafından yazılmış başlığı",
+            meaning: "Talep Merkezi kaydının kısa ve kullanıcı tarafından yazılmış başlığı",
             analyticsKey: "forum_request_title",
             entityPath: "forum.request.title",
             searchable: true,
@@ -1063,7 +1063,7 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           options: FORUM_REQUEST_VISIBILITY_OPTIONS,
           defaultValue: "TUM_EPH",
           lina: {
-            meaning: "Forum talebini görebilecek kullanıcı kitlesi",
+            meaning: "Talep Merkezi kaydını görebilecek kullanıcı kitlesi",
             analyticsKey: "request_visibility",
             entityPath: "forum.request.visibility",
             comparable: false,

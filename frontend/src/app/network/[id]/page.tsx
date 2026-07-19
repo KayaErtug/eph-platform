@@ -400,7 +400,7 @@ export default function NetworkPostDetailPage() {
         throw new Error("Paylaşım bağlantısı oluşturulamadı.");
       }
 
-      const message = `Merhaba, "${post.title}" başlıklı Forum talebini sizinle paylaşmak istiyorum: ${url}`;
+      const message = `Merhaba, "${post.title}" başlıklı Talep Merkezi kaydını sizinle paylaşmak istiyorum: ${url}`;
 
       if (navigator.share) {
         await navigator.share({ title: post.title, text: message, url });
@@ -436,7 +436,7 @@ export default function NetworkPostDetailPage() {
     }
 
     if (participantId === user.id) {
-      alert("Kendi Forum paylaşımınız için bu işlemi yapamazsınız.");
+      alert("Kendi Talep Merkezi kaydınız için bu işlemi yapamazsınız.");
       return;
     }
 
@@ -458,7 +458,7 @@ export default function NetworkPostDetailPage() {
     const payload =
       action === "MESSAGE"
         ? {
-            message: `Merhaba, "${post.title}" başlıklı Forum paylaşımınız hakkında görüşmek istiyorum.`,
+            message: `Merhaba, "${post.title}" başlıklı Talep Merkezi kaydınız hakkında görüşmek istiyorum.`,
           }
         : {
             note:
@@ -517,7 +517,7 @@ export default function NetworkPostDetailPage() {
     } catch (error: any) {
       alert(
         error?.response?.data?.message ||
-          "Forum işlemi tamamlanamadı.",
+          "Talep Merkezi işlemi tamamlanamadı.",
       );
     } finally {
       setActionLoading(false);
@@ -550,7 +550,7 @@ export default function NetworkPostDetailPage() {
             onClick={() => router.push("/network")}
             className="mt-4 h-11 rounded-[22px] bg-[#EA580C] px-5 text-[13px] font-black text-white"
           >
-            Foruma Dön
+            Talep Merkezine Dön
           </button>
         </div>
       </main>
@@ -577,7 +577,7 @@ export default function NetworkPostDetailPage() {
 
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-left text-[19px] font-black tracking-[-0.04em] text-[#3A2208]">
-                Forum Talep Detayı
+                Talep Merkezi Detayı
               </h1>
               <p className="truncate text-left text-[10px] font-bold text-[#7C5A36]">
                 {location || "Konum belirtilmedi"}
@@ -781,7 +781,7 @@ export default function NetworkPostDetailPage() {
         <section className="grid grid-cols-1 gap-1.5">
           <div className="rounded-[20px] border border-white bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
             <h3 className="text-center text-[12.5px] font-black text-[#3A2208]">
-              Forum İşlemleri
+              Talep Merkezi İşlemleri
             </h3>
 
             <p className="mt-1 text-center text-[9.5px] font-bold text-[#7C5A36]">
@@ -911,7 +911,7 @@ function ForumActionModal({
 }) {
   const config = {
     MESSAGE: {
-      title: "Forum Mesajı",
+      title: "Talep Merkezi Mesajı",
       cost: 3,
       confirmText: "3 Kontör Harca ve Mesaj Gönder",
     },
@@ -932,7 +932,7 @@ function ForumActionModal({
       <section className="w-[min(94vw,430px)] overflow-hidden rounded-[24px] border-2 border-[#C7D6E8] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
         <div className="relative px-14 pb-3 pt-4 text-center">
           <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-            Forum Kontör İşlemi
+            Talep Merkezi Kontör İşlemi
           </p>
 
           <h2 className="mt-1 text-[19px] font-black leading-tight text-[#1F2937]">

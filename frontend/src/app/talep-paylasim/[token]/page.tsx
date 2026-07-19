@@ -24,7 +24,7 @@ type SharedPost = {
 type SpecItem = { label: string; value: string };
 
 function typeLabel(value?: string | null) {
-  if (!value) return "Forum Talebi";
+  if (!value) return "Talep Merkezi Kaydı";
   return String(value).replaceAll("_", " ");
 }
 
@@ -70,7 +70,7 @@ function getSpecs(post: SharedPost): SpecItem[] {
 
 function getWhatsAppLink(phone: string, title: string) {
   const digits = phone.replace(/\D/g, "");
-  const message = `Merhaba, "${title}" başlıklı Forum talebi hakkında bilgi almak istiyorum.`;
+  const message = `Merhaba, "${title}" başlıklı Talep Merkezi kaydı hakkında bilgi almak istiyorum.`;
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 

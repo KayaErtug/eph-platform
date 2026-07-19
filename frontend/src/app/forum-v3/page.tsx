@@ -74,7 +74,7 @@ export default function ForumV3PreviewPage() {
 
             <div className="min-w-0 text-center">
               <p className="mx-auto inline-flex min-h-[26px] items-center justify-center rounded-full bg-[#EFF6FF] px-3 py-1 text-center text-[11px] font-black text-[#1557D6]">
-                Forum Merkezi
+                Talep Merkezi
               </p>
 
               <h1 className="mt-2 text-center text-[24px] font-black leading-none tracking-[-0.045em] text-[#06194A]">
@@ -90,7 +90,7 @@ export default function ForumV3PreviewPage() {
               type="button"
               onClick={() => router.push("/network")}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-[#1557D6] text-white shadow-[0_14px_28px_rgba(21,87,214,0.24)]"
-              aria-label="Mevcut forum sayfasına git"
+              aria-label="Talep Merkezi sayfasına git"
             >
               <Plus size={21} />
             </button>
@@ -164,7 +164,7 @@ export default function ForumV3PreviewPage() {
             </h2>
 
             <Link href="/network" className="text-center text-[12px] font-black text-[#1557D6]">
-              Forum
+              Talep Merkezi
             </Link>
           </div>
 

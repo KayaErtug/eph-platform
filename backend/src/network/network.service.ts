@@ -444,7 +444,7 @@ export class NetworkService {
 
     if (!userId) {
       throw new BadRequestException(
-        "Kullanıcı bilgisi olmadan forum talebi oluşturulamaz.",
+        "Kullanıcı bilgisi olmadan Talep Merkezi kaydı oluşturulamaz.",
       );
     }
 
@@ -454,7 +454,7 @@ export class NetworkService {
     });
 
     if (!permissionUser) {
-      throw new BadRequestException("Forum talebi için kullanıcı bulunamadı.");
+      throw new BadRequestException("Talep Merkezi kaydı için kullanıcı bulunamadı.");
     }
 
     const category = normalizeForumCategory(dto.type);
@@ -1606,7 +1606,7 @@ export class NetworkService {
     const primaryArea = criteria.areas[0] ?? null;
 
     return this.prisma.$transaction(async (tx) => {
-      // Madde 33: aylik forum talebi limiti asilinca her yeni talep 20 kontor
+      // Madde 33: aylık Talep Merkezi kayıt limiti aşılınca her yeni talep 20 kontör
       const aktifPaket = await tx.kullaniciUyelikPaketi.findFirst({
         where: { kullaniciId: actionUserId, durum: UyelikDurumu.AKTIF },
         orderBy: { baslangicTarihi: "desc" },
@@ -1687,7 +1687,7 @@ export class NetworkService {
           userId: actionUserId,
           amount: 20,
           islemTuru: KontorIslemTuru.FORUM_TALEP_OLUSTURMA,
-          aciklama: `Aylik forum talebi limiti (${aylikLimit}) asildigi icin talep olusturma bedeli: 20 kontor.`,
+          aciklama: `Aylık Talep Merkezi kayıt limiti (${aylikLimit}) aşıldığı için talep oluşturma bedeli: 20 kontör.`,
           postId: post.id,
         });
       }
@@ -1701,7 +1701,7 @@ export class NetworkService {
 
     if (!userId) {
       throw new ForbiddenException(
-        "Forum işlemi için kullanıcı kimliği doğrulanamadı.",
+        "Talep Merkezi işlemi için kullanıcı kimliği doğrulanamadı.",
       );
     }
 
@@ -1749,7 +1749,7 @@ export class NetworkService {
 
     if (!post) {
       throw new NotFoundException(
-        "Aktif Forum paylaşımı bulunamadı.",
+        "Aktif Talep Merkezi kaydı bulunamadı.",
       );
     }
 
@@ -1759,7 +1759,7 @@ export class NetworkService {
 
     if (post.userId === actorId) {
       throw new BadRequestException(
-        "Kendi Forum paylaşımınız için bu işlemi yapamazsınız.",
+        "Kendi Talep Merkezi kaydınız için bu işlemi yapamazsınız.",
       );
     }
 
@@ -1872,7 +1872,7 @@ export class NetworkService {
         userId: context.actorId,
         amount: 3,
         islemTuru: KontorIslemTuru.FORUM_MESAJ,
-        aciklama: `${context.post.title} Forum paylaşımı için mesaj başlatıldı.`,
+        aciklama: `${context.post.title} Talep Merkezi kaydı için mesaj başlatıldı.`,
         postId: context.post.id,
       });
 
@@ -1921,7 +1921,7 @@ export class NetworkService {
               data: {
                 id: randomUUID(),
                 postId: context.post.id,
-                title: `Forum Mesajı - ${context.post.title}`,
+                title: `Talep Merkezi Mesajı - ${context.post.title}`,
                 updatedAt: new Date(),
                 ConversationParticipant: {
                   create: [
@@ -1943,7 +1943,7 @@ export class NetworkService {
 
       const message =
         this.cleanForumActionText(body?.message) ||
-        `Merhaba, "${context.post.title}" başlıklı Forum paylaşımınız hakkında görüşmek istiyorum.`;
+        `Merhaba, "${context.post.title}" başlıklı Talep Merkezi kaydınız hakkında görüşmek istiyorum.`;
 
       await tx.message.create({
         data: {
@@ -1967,14 +1967,14 @@ export class NetworkService {
         data: {
           userId: context.post.userId,
           postId: context.post.id,
-          title: "Forum mesajı başlatıldı",
+          title: "Talep Merkezi mesajı başlatıldı",
           message: `${context.actorName}, "${context.post.title}" paylaşımınız için mesaj gönderdi.`,
         },
       });
 
       return {
         ok: true,
-        message: "Forum mesajı başlatıldı. 3 kontör harcandı.",
+        message: "Talep Merkezi mesajı başlatıldı. 3 kontör harcandı.",
         cost: 3,
         spent: 3,
         previousBalance:
@@ -2006,7 +2006,7 @@ export class NetworkService {
         amount: 10,
         islemTuru:
           KontorIslemTuru.FORUM_ILGILENIYORUM,
-        aciklama: `${context.post.title} Forum paylaşımı için ilgileniyorum bildirimi gönderildi.`,
+        aciklama: `${context.post.title} Talep Merkezi kaydı için ilgileniyorum bildirimi gönderildi.`,
         postId: context.post.id,
       });
 
@@ -2017,7 +2017,7 @@ export class NetworkService {
         data: {
           userId: context.post.userId,
           postId: context.post.id,
-          title: "Forum paylaşımınızla ilgilenen var",
+          title: "Talep Merkezi kaydınızla ilgilenen var",
           message: `${context.actorName}, "${context.post.title}" paylaşımınızla ilgileniyor.${noteText}`,
         },
       });
@@ -2055,7 +2055,7 @@ export class NetworkService {
         amount: 10,
         islemTuru:
           KontorIslemTuru.FORUM_YARDIMCI_OLABILIRIM,
-        aciklama: `${context.post.title} Forum paylaşımı için yardımcı olabilirim bildirimi gönderildi.`,
+        aciklama: `${context.post.title} Talep Merkezi kaydı için yardımcı olabilirim bildirimi gönderildi.`,
         postId: context.post.id,
       });
 
@@ -2066,7 +2066,7 @@ export class NetworkService {
         data: {
           userId: context.post.userId,
           postId: context.post.id,
-          title: "Forum paylaşımınıza yardım teklifi",
+          title: "Talep Merkezi kaydınıza yardım teklifi",
           message: `${context.actorName}, "${context.post.title}" paylaşımınız için yardımcı olabileceğini bildirdi.${noteText}`,
         },
       });

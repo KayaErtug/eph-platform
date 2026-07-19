@@ -48,7 +48,7 @@ function getTitle(pathname: string) {
   if (pathname.startsWith("/crm")) return "CRM";
   if (pathname.startsWith("/portfoy")) return "PORTFÖY";
   if (pathname.startsWith("/forum") || pathname.startsWith("/network")) {
-    return "FORUM";
+    return "TALEP MERKEZİ";
   }
   if (pathname.startsWith("/havuz")) return "HAVUZ";
   if (pathname.startsWith("/messages")) return "MESAJLAR";
@@ -485,7 +485,7 @@ export function EPHMobileShell({
                 />
                 <MenuRow
                   icon={<MessageSquare size={17} />}
-                  label="Forum"
+                  label="Talep Merkezi"
                   onClick={() => go("/network")}
                 />
                 <MenuRow
@@ -697,7 +697,7 @@ function EPHMobileBottomNav({ pathname }: { pathname: string }) {
           pathname.startsWith("/forum")
         }
         icon={<MessageSquare size={25} strokeWidth={2.35} />}
-        label="Forum"
+        label="Talep Merkezi"
       />
       <BottomItem
         href="/havuz"

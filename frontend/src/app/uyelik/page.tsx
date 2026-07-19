@@ -23,13 +23,13 @@ const membershipPlans = [
     badge: "Başlangıç",
     price: "0 ₺",
     credit: "500 hediye kontör",
-    desc: "EPH Platformu deneme döneminde CRM, Portföy, Forum ve Havuz akışlarını test etmek için idealdir.",
+    desc: "EPH Platformu deneme döneminde CRM, Portföy, Talep Merkezi ve Havuz akışlarını test etmek için idealdir.",
     icon: Gift,
     features: [
       "500 hediye kontör",
       "CRM kullanımı",
       "Portföy merkezi",
-      "Forum ve Havuz erişimi",
+      "Talep Merkezi ve Havuz erişimi",
       "Temel kalite göstergeleri",
     ],
   },
@@ -68,7 +68,7 @@ const membershipPlans = [
 const revenueModules = [
   {
     title: "Kontör Ekonomisi",
-    text: "Havuz ve Forum içeriklerini listelemek ve görüntülemek ücretsizdir. Mesaj, ilgileniyorum, müşterim var ve yardımcı olabilirim aksiyonları kontör ile çalışır.",
+    text: "Havuz ve Talep Merkezi içeriklerini listelemek ve görüntülemek ücretsizdir. Mesaj, ilgileniyorum, müşterim var ve yardımcı olabilirim aksiyonları kontör ile çalışır.",
     icon: WalletCards,
   },
   {
@@ -87,9 +87,9 @@ const creditActions = [
   ["Havuz mesajı", "3 kontör"],
   ["Havuzda ilgileniyorum", "10 kontör"],
   ["Havuzda müşterim var", "20 kontör"],
-  ["Forum mesajı", "3 kontör"],
-  ["Forumda ilgileniyorum", "10 kontör"],
-  ["Forumda yardımcı olabilirim", "10 kontör"],
+  ["Talep Merkezi mesajı", "3 kontör"],
+  ["Talep Merkezi’nde ilgileniyorum", "10 kontör"],
+  ["Talep Merkezi’nde yardımcı olabilirim", "10 kontör"],
   ["Listeleme ve detay", "Ücretsiz"],
 ];
 

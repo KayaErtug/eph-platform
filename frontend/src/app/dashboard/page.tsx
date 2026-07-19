@@ -532,7 +532,7 @@ export default function DashboardPage() {
         />
 
         <DashboardSection
-          title="Forum"
+          title="Talep Merkezi"
           icon={<MessageCircle size={15} />}
           items={forumItems}
           tone="forum"
