@@ -1421,6 +1421,11 @@ export default function HavuzPage() {
                   index={index}
                   unit={unit}
                   match={match}
+                  isOwnPortfolio={Boolean(
+                    user?.id &&
+                      (unit.project?.ownerId === user.id ||
+                        unit.project?.owner?.id === user.id),
+                  )}
                   selected={selectedMapUnitId === unit.id}
                   busyAction={busyAction}
                   onDetail={() => setDetailSelection({ unit, match })}
@@ -2245,10 +2250,201 @@ function PremiumHighlightCard({
   );
 }
 
+type PoolCardVisualTheme = {
+  frameGradient: string;
+  frameShadow: string;
+  typeColor: string;
+  typeSoft: string;
+  typeBorder: string;
+};
+
+type PoolCardStatusTone = {
+  label: string;
+  borderColor: string;
+  backgroundColor: string;
+  color: string;
+};
+
+function normalizePoolCardValue(value?: string | null) {
+  return String(value || "")
+    .toLocaleUpperCase("tr-TR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/İ/g, "I")
+    .trim();
+}
+
+function getPoolCardStatusTone(status?: string | null): PoolCardStatusTone {
+  const normalized = normalizePoolCardValue(status);
+
+  const labels: Record<string, string> = {
+    SATILIK: "Satılık",
+    KIRALIK: "Kiralık",
+    GUNLUK_KIRALIK: "Günlük Kiralık",
+    DEVREN_KIRALIK: "Devren Kiralık",
+    DEVREN_SATILIK: "Devren Satılık",
+    ON_SATIS: "Ön Satış",
+    YAKINDA_SATISTA: "Yakında Satışta",
+    HEMEN_TESLIM: "Hemen Teslim",
+    SATILDI: "Satıldı",
+    KIRALANDI: "Kiralandı",
+  };
+
+  const label =
+    labels[normalized] ||
+    normalized
+      .split("_")
+      .filter(Boolean)
+      .map(
+        (part) =>
+          part.charAt(0).toLocaleUpperCase("tr-TR") +
+          part.slice(1).toLocaleLowerCase("tr-TR"),
+      )
+      .join(" ") ||
+    "Portföy";
+
+  if (
+    ["KIRALIK", "GUNLUK_KIRALIK", "DEVREN_KIRALIK", "KIRALANDI"].includes(
+      normalized,
+    )
+  ) {
+    return {
+      label,
+      borderColor: "#B8C2D1",
+      backgroundColor: "#F8FAFC",
+      color: "#475569",
+    };
+  }
+
+  if (
+    [
+      "SATILIK",
+      "DEVREN_SATILIK",
+      "ON_SATIS",
+      "YAKINDA_SATISTA",
+      "HEMEN_TESLIM",
+      "SATILDI",
+    ].includes(normalized)
+  ) {
+    return {
+      label,
+      borderColor: "#E7C766",
+      backgroundColor: "#FFF8DB",
+      color: "#A16207",
+    };
+  }
+
+  return {
+    label,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EFF6FF",
+    color: "#1D4ED8",
+  };
+}
+
+function getPoolCardVisualTheme(unit: Unit): PoolCardVisualTheme {
+  const status = normalizePoolCardValue(unit.status);
+  const type = normalizePoolCardValue(unit.type);
+  const source = normalizePoolCardValue(
+    [unit.type, unit.project?.name, unit.description]
+      .filter(Boolean)
+      .join(" "),
+  );
+
+  const rentalStatuses = [
+    "KIRALIK",
+    "GUNLUK_KIRALIK",
+    "DEVREN_KIRALIK",
+    "KIRALANDI",
+  ];
+
+  const saleStatuses = [
+    "SATILIK",
+    "DEVREN_SATILIK",
+    "ON_SATIS",
+    "YAKINDA_SATISTA",
+    "HEMEN_TESLIM",
+    "SATILDI",
+  ];
+
+  let frameGradient =
+    "linear-gradient(135deg,#1D4ED8 0%,#BFDBFE 22%,#2563EB 48%,#EFF6FF 70%,#1E40AF 100%)";
+  let frameShadow = "0 14px 30px rgba(37,99,235,0.17)";
+
+  if (rentalStatuses.includes(status)) {
+    frameGradient =
+      "linear-gradient(135deg,#64748B 0%,#F8FAFC 18%,#A8B3C5 42%,#FFFFFF 62%,#7C8798 100%)";
+    frameShadow = "0 14px 30px rgba(100,116,139,0.22)";
+  } else if (saleStatuses.includes(status)) {
+    frameGradient =
+      "linear-gradient(135deg,#7A5A10 0%,#F9E7A4 18%,#B88922 42%,#FFF5C7 62%,#8A6617 100%)";
+    frameShadow = "0 14px 32px rgba(184,137,34,0.24)";
+  }
+
+  let typeColor = "#6D28D9";
+  let typeSoft = "#F5F3FF";
+  let typeBorder = "#DDD6FE";
+
+  if (type === "ARSA" || source.includes("ARSA")) {
+    typeColor = "#B45309";
+    typeSoft = "#FFF7ED";
+    typeBorder = "#FED7AA";
+  } else if (
+    ["TARLA", "BAG", "BAHCE", "ZEYTINLIK"].some((item) =>
+      source.includes(item),
+    )
+  ) {
+    typeColor = "#4D7C0F";
+    typeSoft = "#F7FEE7";
+    typeBorder = "#D9F99D";
+  } else if (
+    ["VILLA", "MUSTAKIL", "YALI", "KONAK"].some((item) =>
+      source.includes(item),
+    )
+  ) {
+    typeColor = "#047857";
+    typeSoft = "#ECFDF5";
+    typeBorder = "#A7F3D0";
+  } else if (
+    ["DUKKAN", "MAGAZA", "OFIS", "PLAZA", "SHOWROOM", "ISYERI"].some(
+      (item) => source.includes(item),
+    )
+  ) {
+    typeColor = "#0369A1";
+    typeSoft = "#F0F9FF";
+    typeBorder = "#BAE6FD";
+  } else if (
+    ["FABRIKA", "DEPO", "ATOLYE", "SANAYI", "ANTREPO"].some((item) =>
+      source.includes(item),
+    )
+  ) {
+    typeColor = "#475569";
+    typeSoft = "#F1F5F9";
+    typeBorder = "#CBD5E1";
+  } else if (
+    ["OTEL", "PANSIYON", "MOTEL", "TURISTIK"].some((item) =>
+      source.includes(item),
+    )
+  ) {
+    typeColor = "#BE123C";
+    typeSoft = "#FFF1F2";
+    typeBorder = "#FECDD3";
+  }
+
+  return {
+    frameGradient,
+    frameShadow,
+    typeColor,
+    typeSoft,
+    typeBorder,
+  };
+}
+
 function PoolUnitCard({
   index,
   unit,
   match,
+  isOwnPortfolio,
   selected,
   busyAction,
   onDetail,
@@ -2258,6 +2454,7 @@ function PoolUnitCard({
   index: number;
   unit: Unit;
   match: { score: number; customer: Customer | null; budgetDiff: number };
+  isOwnPortfolio: boolean;
   selected: boolean;
   busyAction: string | null;
   onDetail: () => void;
@@ -2265,242 +2462,209 @@ function PoolUnitCard({
   onAction: (type: PoolAction) => void;
 }) {
   const image = getCover(unit);
-  const features = getHighlightFeatures(unit);
-  const specs = getPrimarySpecs(unit);
   const imageCount = Array.isArray(unit.images) ? unit.images.length : 0;
   const typeChip = getTypeChip(unit);
-
-  const isLand = isLandUnit(unit);
-
-  const highlight = features[0] || "Havuz Detayı";
-  const busy = Boolean(busyAction);
   const location = getLocation(unit);
-  const metadata = decodePortfolioMetadataState(unit.features);
+  const specs = getPrimarySpecs(unit).slice(0, 3);
+  const features = getHighlightFeatures(unit);
+  const highlight = features[0] || "EPH Havuz Portföyü";
   const availableCreditAmount = getAvailableCreditAmount(unit);
-
-  const quickSpecs = isLand
-    ? getFeatureLabels(unit.features)
-        .slice(0, 4)
-        .map((label) => ({ icon: "✓", label }))
-    : [
-        { icon: "▦", label: unit.roomCount || "Oda belirtilmedi" },
-        {
-          icon: "□",
-          label: unit.area
-            ? `${Number(unit.area).toLocaleString("tr-TR")} m²`
-            : "Alan belirtilmedi",
-        },
-        ...getFeatureLabels(unit.features)
-          .slice(0, 2)
-          .map((label) => ({ icon: "✓", label })),
-      ];
-
-  const detailSpecs: { label: string; value: string }[] = isLand
-    ? [
-        metadata.zoningType
-          ? { label: "İmar Durumu", value: metadata.zoningType }
-          : null,
-        unit.adaNo || unit.parselNo
-          ? {
-              label: "Ada / Parsel",
-              value: [unit.adaNo, unit.parselNo].filter(Boolean).join(" / "),
-            }
-          : null,
-        Array.isArray(unit.facades) && unit.facades.length > 0
-          ? { label: "Cephe", value: unit.facades.join(", ") }
-          : null,
-      ].filter((item): item is { label: string; value: string } => Boolean(item))
-    : [
-        metadata.buildingAge
-          ? { label: "Bina Yaşı", value: metadata.buildingAge }
-          : null,
-        unit.floorLabel || (unit.floor !== null && unit.floor !== undefined)
-          ? { label: "Kat", value: unit.floorLabel || String(unit.floor) }
-          : null,
-        unit.totalFloors
-          ? { label: "Toplam Kat", value: String(unit.totalFloors) }
-          : null,
-        unit.netArea
-          ? { label: "Net Alan", value: `${Number(unit.netArea).toLocaleString("tr-TR")} m²` }
-          : null,
-        unit.conceptLabel
-          ? { label: "Konsept", value: unit.conceptLabel }
-          : null,
-      ]
-        .filter((item): item is { label: string; value: string } => Boolean(item))
-        .slice(0, 4);
-
-  detailSpecs.push({
-    label: "Tapu",
-    value:
-      unit.tapuVerified || unit.isVerified ? "Doğrulandı" : "Kontrol Bekliyor",
-  });
-
-  if (availableCreditAmount !== null) {
-    detailSpecs.push({
-      label: "Kullanılabilir Kredi",
-      value: compactMoney(availableCreditAmount, unit.priceCurrency),
-    });
-  }
+  const visualTheme = getPoolCardVisualTheme(unit);
+  const statusTone = getPoolCardStatusTone(unit.status);
+  const verified = isVerified(unit);
+  const busy = Boolean(busyAction);
+  const messageBusy = busyAction === `MESSAGE_${unit.id}`;
 
   return (
     <article
       id={`pool-card-${unit.id}`}
       data-card-index={index}
       data-unit-id={unit.id}
-      className={`scroll-mt-24 w-full max-w-full overflow-hidden rounded-[20px] border-2 border-[#C7D6E8] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.07)] transition-all duration-500 ${
-        selected
-          ? "border-[#00AFA5] ring-4 ring-[#9EEAE5] shadow-[0_18px_42px_rgba(0,175,165,0.24)]"
-          : ""
+      className={`relative scroll-mt-24 w-full max-w-full overflow-hidden rounded-[22px] border-[3px] border-transparent bg-white transition-all duration-300 ${
+        selected ? "ring-4 ring-[#BFDBFE]" : ""
       }`}
+      style={{
+        background: `linear-gradient(#FFFFFF,#FFFFFF) padding-box, ${visualTheme.frameGradient} border-box`,
+        boxShadow: `${visualTheme.frameShadow}, inset 6px 0 0 ${visualTheme.typeColor}`,
+        fontFamily:
+          '"Segoe UI Variable", "Segoe UI", Inter, ui-sans-serif, system-ui, sans-serif',
+      }}
     >
-      <div
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
         onClick={onDetail}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") onDetail();
-        }}
-        className="grid h-[316px] cursor-pointer grid-cols-[45%_55%] gap-1.5 overflow-hidden p-1.5 active:scale-[0.995]"
+        className="block w-full text-center active:bg-[#F8FAFC]"
+        aria-label={`${unit.project?.name || "EPH Portföy"} detayını aç`}
       >
-        <div className="grid h-full min-w-0 grid-rows-[1fr_68px] overflow-hidden rounded-[16px] border border-[#E2EAF5] bg-[#EEF3F8]">
-          <div className="relative min-h-0 overflow-hidden bg-[#EAF1F8]">
-            <PremiumPropertyImage
-              src={image}
-              alt={unit.project?.name || "Portföy"}
-              className="h-full w-full"
-              fallback={<Building2 size={34} />}
-              fallbackClassName="text-[#2563EB]"
-            />
+        <div
+          className="relative h-[178px] w-full overflow-hidden bg-[#EEF3F8]"
+          style={{ borderBottom: `2px solid ${visualTheme.typeBorder}` }}
+        >
+          <PremiumPropertyImage
+            src={image}
+            alt={unit.project?.name || "Portföy"}
+            className="h-full w-full"
+            fallback={<Building2 size={42} />}
+            fallbackClassName="text-[#2563EB]"
+          />
 
-            <div
-              className={`absolute left-2 top-2 z-10 max-w-[calc(100%-16px)] truncate rounded-full px-2.5 py-1 text-[8px] font-black text-white shadow-sm ${
-                isVerified(unit) ? "bg-emerald-600" : "bg-amber-500"
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.10)_0%,transparent_48%,rgba(15,23,42,0.52)_100%)]" />
+
+          <div className="absolute left-2.5 right-2.5 top-2.5 flex items-start justify-between gap-2">
+            <span
+              className={`max-w-[48%] truncate rounded-full border border-white/80 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] backdrop-blur-md ${
+                verified ? "bg-emerald-600/92" : "bg-amber-500/92"
               }`}
             >
-              {isVerified(unit) ? "EPH Onaylı" : "Kontrol Bekliyor"}
-            </div>
+              {verified ? "EPH Onaylı" : "Kontrol Bekliyor"}
+            </span>
 
-            <div className="absolute right-2 top-2 z-10 max-w-[calc(100%-16px)] truncate rounded-full bg-slate-950/82 px-2.5 py-1 text-[8px] font-black text-white shadow-sm">
+            <span className="max-w-[48%] truncate rounded-full border border-white/80 bg-slate-950/65 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] backdrop-blur-md">
+              {imageCount} Fotoğraf
+            </span>
+          </div>
+
+          <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-end justify-between gap-2">
+            <span
+              className="rounded-full border-2 px-3 py-1 text-[11px] font-extrabold shadow-md"
+              style={{
+                borderColor: statusTone.borderColor,
+                backgroundColor: statusTone.backgroundColor,
+                color: statusTone.color,
+              }}
+            >
+              {statusTone.label}
+            </span>
+
+            <span className="max-w-[58%] truncate rounded-full border border-white/80 bg-slate-950/65 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-md backdrop-blur-md">
               {getPortfolioSourceBadgeLabel(unit)}
-            </div>
-          </div>
-
-          <div className="grid min-h-0 grid-cols-2 gap-1 border-t border-[#D7E3F2] bg-white p-1.5">
-            <div className="flex min-w-0 items-center justify-center rounded-[9px] bg-slate-950 px-1 text-center text-[8px] font-black leading-none text-white">
-              <span className="max-w-full truncate">▣ {imageCount} Fotoğraf</span>
-            </div>
-            <div className="flex min-w-0 items-center justify-center rounded-[9px] bg-blue-50 px-1 text-center text-[8px] font-black leading-none text-blue-700">
-              <span className="max-w-full truncate">
-                ⌖ {unit.project?.latitude && unit.project?.longitude ? "Konumlu" : "Konumsuz"}
-              </span>
-            </div>
-            <div className="flex min-w-0 items-center justify-center rounded-[9px] bg-emerald-50 px-1 text-center text-[8px] font-black leading-none text-emerald-700">
-              <span className="max-w-full truncate">
-                ✓ {unit.yetkiVerified || unit.isVerified ? "Yetkili" : "Kontrol"}
-              </span>
-            </div>
-            <div className="flex min-w-0 items-center justify-center rounded-[9px] bg-violet-50 px-1 text-center text-[8px] font-black leading-none text-violet-700">
-              <span className="max-w-full truncate">◆ Havuzda</span>
-            </div>
+            </span>
           </div>
         </div>
 
-        <div className="grid h-full min-w-0 grid-rows-[98px_28px_62px_76px_36px] overflow-hidden rounded-[16px] border-2 border-[#C7D6E8] bg-white text-center">
-          <div className="flex min-h-0 min-w-0 flex-col items-center justify-center overflow-hidden px-2.5 py-1.5">
-            <p className="max-w-full truncate text-[9px] font-black uppercase leading-none tracking-[0.11em] text-[#2563EB]">
+        <div className="px-3.5 pb-3.5 pt-3">
+          <div className="flex flex-wrap items-center justify-center gap-1.5">
+            <span
+              className="rounded-full border-2 px-3 py-1 text-[10.5px] font-extrabold uppercase tracking-[0.08em]"
+              style={{
+                backgroundColor: visualTheme.typeSoft,
+                borderColor: visualTheme.typeBorder,
+                color: visualTheme.typeColor,
+              }}
+            >
               {typeChip}
-            </p>
+            </span>
 
-            <h3 className="mt-1 max-w-full line-clamp-2 break-words text-[14px] font-black leading-[1.05] tracking-[-0.035em] text-[#0F172A] [overflow-wrap:anywhere]">
-              {unit.project?.name || "EPH Portföy"}
-            </h3>
+            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10.5px] font-extrabold text-blue-700">
+              Havuzda
+            </span>
 
-            <p className="mt-1 flex max-w-full min-w-0 items-center justify-center gap-1 text-[8.5px] font-bold leading-[1.1] text-[#64748B]">
-              <MapPin size={10} className="shrink-0" />
-              <span className="min-w-0 line-clamp-2 break-words [overflow-wrap:anywhere]">
-                {location}
+            {match.score > 0 && (
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10.5px] font-extrabold text-emerald-700">
+                Eşleşme %{Math.round(match.score)}
               </span>
-            </p>
-
-            <p className="mt-1.5 max-w-full truncate text-[20px] font-black leading-none tracking-[-0.05em] text-[#0F172A]">
-              {compactMoney(unit.price, unit.priceCurrency)}
-            </p>
+            )}
           </div>
 
-          <div className="flex min-h-0 min-w-0 items-center justify-center gap-1 overflow-hidden px-1.5">
-            {specs.slice(0, 3).map((spec) => (
-              <span
-                key={spec}
-                className="min-w-0 max-w-[32%] truncate rounded-full bg-[#F8FAFC] px-1.5 py-1 text-[8px] font-black leading-none text-[#334155]"
-              >
-                {spec}
+          <h3 className="mx-auto mt-2 max-w-[360px] line-clamp-2 break-words text-center text-[17px] font-extrabold leading-[1.18] tracking-[-0.025em] text-[#111827] [overflow-wrap:anywhere]">
+            {unit.project?.name || "EPH Portföy"}
+          </h3>
+
+          <p className="mt-2 flex min-w-0 items-start justify-center gap-1.5 text-center text-[12px] font-semibold leading-4 text-[#64748B]">
+            <MapPin size={15} className="mt-0.5 shrink-0" />
+            <span className="min-w-0 line-clamp-2 break-words [overflow-wrap:anywhere]">
+              {location}
+            </span>
+          </p>
+
+          <p className="mt-2.5 truncate text-center text-[22px] font-extrabold leading-none tracking-[-0.04em] text-[#111827]">
+            {compactMoney(unit.price, unit.priceCurrency)}
+          </p>
+
+          {specs.length > 0 && (
+            <div className="mt-3 grid grid-cols-3 gap-1.5">
+              {specs.map((spec) => (
+                <span
+                  key={spec}
+                  className="flex min-h-[38px] min-w-0 items-center justify-center rounded-[11px] border-2 px-1.5 text-center text-[10px] font-extrabold leading-[1.15] [overflow-wrap:anywhere]"
+                  style={{
+                    backgroundColor: visualTheme.typeSoft,
+                    borderColor: visualTheme.typeBorder,
+                    color: visualTheme.typeColor,
+                  }}
+                >
+                  {spec}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {availableCreditAmount !== null && (
+            <div className="mt-2.5 flex min-h-[38px] items-center justify-center gap-2 rounded-[12px] border-2 border-emerald-200 bg-emerald-50 px-3 text-center">
+              <WalletCards size={16} className="shrink-0 text-emerald-700" />
+              <span className="text-[10.5px] font-extrabold text-emerald-700">
+                Kullanılabilir Kredi
               </span>
-            ))}
-          </div>
+              <span className="text-[12px] font-black text-emerald-900">
+                {compactMoney(availableCreditAmount, unit.priceCurrency)}
+              </span>
+            </div>
+          )}
 
-          <div className="grid min-h-0 grid-cols-2 gap-1 overflow-hidden px-1.5 py-1">
-            {quickSpecs.map((item) => (
-              <div
-                key={`${item.icon}-${item.label}`}
-                className="flex min-h-0 min-w-0 items-center justify-center gap-1 overflow-hidden rounded-[9px] bg-[#F8FAFC] px-1"
-              >
-                <span className="shrink-0 text-[10px] font-black leading-none text-[#2563EB]">
-                  {item.icon}
-                </span>
-                <span className="min-w-0 line-clamp-2 break-words text-[8px] font-black leading-[1.05] text-[#334155] [overflow-wrap:anywhere]">
-                  {item.label}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid min-h-0 grid-cols-2 gap-1 overflow-hidden px-1.5 py-1">
-            {detailSpecs.map((item) => (
-              <div
-                key={item.label}
-                className="flex min-h-0 min-w-0 flex-col items-center justify-center overflow-hidden rounded-[8px] bg-[#FBFDFF] px-1 py-0.5"
-              >
-                <span className="max-w-full truncate text-[7px] font-black uppercase leading-none tracking-[0.04em] text-[#64748B]">
-                  {item.label}
-                </span>
-                <span className="mt-0.5 max-w-full line-clamp-2 break-words text-[8px] font-black leading-[1.05] text-[#1F2937] [overflow-wrap:anywhere]">
-                  {item.value}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid min-h-0 grid-cols-2 items-center gap-1 overflow-hidden border-t border-[#E2EAF5] bg-[#F8FAFC] px-1.5 py-1">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onAction("INTEREST");
-              }}
-              disabled={busy}
-              className="flex h-[25px] min-w-0 -translate-y-[1px] items-center justify-center overflow-hidden rounded-[8px] bg-white px-1 text-[8px] font-black leading-none text-[#1D4ED8] shadow-[0_3px_8px_rgba(15,23,42,0.05)] disabled:opacity-60"
-            >
-              <span className="max-w-full truncate">☆ İlgilen 10K</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onDetail();
-              }}
-              className="flex h-[25px] min-w-0 -translate-y-[1px] items-center justify-center overflow-hidden rounded-[8px] bg-white px-1 text-[8px] font-black leading-none text-[#2563EB] shadow-[0_3px_8px_rgba(15,23,42,0.05)]"
-            >
-              <span className="max-w-full truncate">✨ {highlight}</span>
-            </button>
+          <div
+            className="mt-2.5 flex min-h-[36px] items-center justify-center rounded-[12px] border px-3 text-center text-[11px] font-extrabold"
+            style={{
+              backgroundColor: visualTheme.typeSoft,
+              borderColor: visualTheme.typeBorder,
+              color: visualTheme.typeColor,
+            }}
+          >
+            ✦ {limitText(highlight, 48)}
           </div>
         </div>
+      </button>
+
+      <div className="border-t border-[#E2EAF5] bg-[#F8FAFC] p-2.5">
+        {isOwnPortfolio ? (
+          <div className="flex min-h-[44px] items-center justify-center rounded-[13px] border-2 border-[#C7D6E8] bg-white px-3 text-center text-[11px] font-extrabold leading-4 text-[#64748B]">
+            Bu portföy size ait
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              onClick={onDetail}
+              className="flex min-h-[42px] items-center justify-center gap-1 rounded-[12px] bg-white px-1 text-[10.5px] font-extrabold text-[#2563EB] shadow-[0_4px_10px_rgba(15,23,42,0.05)] active:scale-[0.98]"
+            >
+              <Eye size={14} />
+              Detay
+            </button>
+
+            <button
+              type="button"
+              onClick={onMessage}
+              disabled={busy}
+              className="flex min-h-[42px] items-center justify-center gap-1 rounded-[12px] bg-white px-1 text-[10.5px] font-extrabold text-[#475569] shadow-[0_4px_10px_rgba(15,23,42,0.05)] disabled:opacity-60"
+            >
+              <MessageCircle size={14} className="text-[#2563EB]" />
+              {messageBusy ? "Açılıyor" : "İletişim 3K"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onAction("INTEREST")}
+              disabled={busy}
+              className="flex min-h-[42px] items-center justify-center gap-1 rounded-[12px] bg-[#2563EB] px-1 text-[10.5px] font-extrabold text-white shadow-[0_6px_14px_rgba(37,99,235,0.20)] disabled:opacity-60"
+            >
+              <Target size={14} />
+              İlgilen 10K
+            </button>
+          </div>
+        )}
       </div>
     </article>
   );
 }
-
 
 function PoolDetailModal({
   unit,
