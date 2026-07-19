@@ -664,8 +664,77 @@ function normalizeCustomerInterestAreas(value: unknown): CustomerInterestAreaDra
 
 function buildInterestedAreaSummary(areas: unknown) {
   return normalizeCustomerInterestAreas(areas)
-    .map((area) => buildInterestedArea(area.city, area.district, area.neighborhood))
+    .map((area) =>
+      buildInterestedArea(
+        area.city,
+        area.district,
+        area.neighborhood,
+      ),
+    )
     .join(" | ");
+}
+
+function getCustomerInterestAreaLabels(
+  customer: Customer,
+) {
+  const relationalAreas =
+    normalizeCustomerInterestAreas(
+      customer.interests,
+    )
+      .map((area) =>
+        buildInterestedArea(
+          area.city,
+          area.district,
+          area.neighborhood,
+        ),
+      )
+      .filter(Boolean);
+
+  if (relationalAreas.length > 0) {
+    return Array.from(
+      new Set(relationalAreas),
+    );
+  }
+
+  const summaryAreas = String(
+    customer.interestedArea || "",
+  )
+    .split("|")
+    .map((area) => area.trim())
+    .filter(Boolean);
+
+  if (summaryAreas.length > 0) {
+    return Array.from(
+      new Set(summaryAreas),
+    );
+  }
+
+  const fallbackCity = String(
+    customer.city || "",
+  ).trim();
+
+  return fallbackCity
+    ? [fallbackCity]
+    : [];
+}
+
+function getCustomerInterestAreaCompactLabel(
+  customer: Customer,
+) {
+  const areas =
+    getCustomerInterestAreaLabels(customer);
+
+  if (areas.length === 0) {
+    return "Bölge yok";
+  }
+
+  if (areas.length === 1) {
+    return areas[0];
+  }
+
+  return `${areas[0]} +${
+    areas.length - 1
+  } bölge`;
 }
 
 function shortMoney(value: number) {
@@ -4406,7 +4475,9 @@ function CustomerCard({ customer, onClick }: { customer: Customer; onClick: () =
         <span className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
           <span className="min-w-0 truncate text-[10.5px] font-extrabold text-white">{customer.firstName} {customer.lastName}</span>
           {roles.slice(0, 2).map((role) => <RolePill key={role} role={role} />)}
-          <span className="hidden min-w-0 flex-1 truncate text-[8px] font-medium text-[#8EA6BF] min-[390px]:inline">{customer.city ? `• ${customer.city}` : ""} {customer.budget ? `• ${money(customer.budget)}` : ""}</span>
+          <span className="hidden min-w-0 flex-1 truncate text-[8px] font-medium text-[#8EA6BF] min-[390px]:inline">• {getCustomerInterestAreaCompactLabel(
+            customer,
+          )} {customer.budget ? `• ${money(customer.budget)}` : ""}</span>
         </span>
         <ChevronRight className={`h-4 w-4 text-[#A8C1D9] transition-transform ${expanded ? "rotate-90" : ""}`} />
       </button>
@@ -4458,7 +4529,11 @@ function CustomerGroupRow({ customers, onOpen }: { customers: Customer[]; onOpen
           {groupRoles.slice(0, 2).map((role) => <RolePill key={role} role={role} />)}
           {groupRoles.length > 2 && <span className="shrink-0 text-[7.5px] font-extrabold text-[#71C2FF]">+{groupRoles.length - 2}</span>}
           <span className="hidden min-w-0 flex-1 truncate text-right text-[8.5px] font-medium text-[#9CB1C8] min-[390px]:inline">
-            {isGroup ? `${customers.length} CRM kaydı` : primaryCustomer.city || "Konum yok"}
+            {isGroup
+              ? `${customers.length} CRM kaydı`
+              : getCustomerInterestAreaCompactLabel(
+                  primaryCustomer,
+                )}
             {totalBudget > 0 ? ` • ${money(totalBudget)}` : ""}
           </span>
         </span>
@@ -4497,11 +4572,22 @@ function CustomerGroupRow({ customers, onOpen }: { customers: Customer[]; onOpen
                       {roles.slice(0, 2).map((role) => <RolePill key={role} role={role} />)}
                     </span>
                     <span className="mt-1 block truncate text-[7.5px] font-semibold text-[#8EA6BF]">
-                      {latestActivity ? `Son görüşme: ${formatShortDate(latestActivity.createdAt)}` : customer.city || "Ek bilgi yok"}
+                      {latestActivity
+                        ? `Son görüşme: ${formatShortDate(
+                            latestActivity.createdAt,
+                          )}`
+                        : getCustomerInterestAreaCompactLabel(
+                            customer,
+                          )}
                     </span>
                   </span>
                   <span className="max-w-[105px] truncate text-right text-[8px] font-semibold text-[#A9C4DE]">
-                    {customer.city || ""}{customer.budget ? ` • ${money(customer.budget)}` : ""}
+                    {getCustomerInterestAreaCompactLabel(
+                      customer,
+                    )}
+                    {customer.budget
+                      ? ` • ${money(customer.budget)}`
+                      : ""}
                   </span>
                   <ChevronRight size={14} className="text-[#A8C1D9]" />
                 </button>
@@ -5230,7 +5316,14 @@ function CustomerDetailModal({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <h2 className="break-words break-words text-[26px] font-black leading-tight tracking-tight text-[#06194A]">{customer.firstName} {customer.lastName}</h2>
-              <p className="mt-1 break-words break-words text-sm font-bold leading-5 text-slate-500">{[customer.phone, customer.city].filter(Boolean).join(" · ")}</p>
+              <p className="mt-1 break-words break-words text-sm font-bold leading-5 text-slate-500">{[
+                customer.phone,
+                getCustomerInterestAreaCompactLabel(
+                  customer,
+                ),
+              ]
+                .filter(Boolean)
+                .join(" · ")}</p>
             </div>
 
             <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><X size={20} /></button>
@@ -5315,7 +5408,13 @@ function GeneralTab({ customer }: { customer: Customer }) {
           { label: "Şehir", value: customer.city || "—" },
           { label: "Minimum Bütçe", value: money(budgetBounds.min) },
           { label: "Maksimum Bütçe", value: money(budgetBounds.max) },
-          { label: "İlgilendiği Bölge", value: customer.interestedArea || "—" },
+          {
+            label: "İlgilendiği Bölgeler",
+            value:
+              getCustomerInterestAreaLabels(
+                customer,
+              ).join(" | ") || "—",
+          },
           { label: "Mülk Tipleri", value: propertyTypeSummary },
           { label: "Lead Kaynağı", value: customer.source || "—" },
           { label: "Meslek / Ünvan", value: customer.profession || "—" },

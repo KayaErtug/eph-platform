@@ -128,6 +128,77 @@ function normalizeForumAreas(
   );
 }
 
+function formatForumArea(
+  area: ForumAreaEntry,
+) {
+  return [
+    area.city,
+    area.district,
+    area.neighborhood,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+}
+
+function getPostAreaLabels(
+  post: Pick<
+    NetworkPost,
+    | "areas"
+    | "city"
+    | "district"
+    | "neighborhood"
+  >,
+) {
+  const normalizedAreas =
+    normalizeForumAreas(post.areas);
+
+  const areaLabels = normalizedAreas
+    .map(formatForumArea)
+    .filter(Boolean);
+
+  if (areaLabels.length > 0) {
+    return Array.from(
+      new Set(areaLabels),
+    );
+  }
+
+  const legacyLocation = [
+    post.city,
+    post.district,
+    post.neighborhood,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+
+  return legacyLocation
+    ? [legacyLocation]
+    : [];
+}
+
+function getPostAreaCompactLabel(
+  post: Pick<
+    NetworkPost,
+    | "areas"
+    | "city"
+    | "district"
+    | "neighborhood"
+  >,
+) {
+  const areas = getPostAreaLabels(post);
+
+  if (areas.length === 0) {
+    return "Konum belirtilmedi";
+  }
+
+  if (areas.length === 1) {
+    return areas[0];
+  }
+
+  return `${areas[0]} +${
+    areas.length - 1
+  } bölge`;
+}
+
 type TopicForm = {
   title: string;
   category: ForumCategory | "";
@@ -1816,9 +1887,8 @@ function RequestCard({
         ? "GÜMÜŞ"
         : "";
   const urgency = String(post.urgency || "Normal");
-  const location = [post.city, post.district, post.neighborhood]
-    .filter(Boolean)
-    .join(" / ");
+  const location =
+    getPostAreaCompactLabel(post);
   const budget = formatPostBudget(post);
   const remaining = remainingTime(post.expiresAt);
   const remainingMatch = remaining.match(/\d+/);

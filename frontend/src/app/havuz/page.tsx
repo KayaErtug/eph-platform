@@ -98,6 +98,21 @@ type Customer = {
   interestedType?: string | null;
   budget?: number | null;
   notes?: string | null;
+  interests?: Array<{
+    id?: string;
+    title?: string | null;
+    city?: string | null;
+    district?: string | null;
+    neighborhood?: string | null;
+    propertyTypes?: string[] | null;
+    statuses?: string[] | null;
+    minBudget?: number | null;
+    maxBudget?: number | null;
+    roomCounts?: string[] | null;
+    features?: string[] | null;
+    notes?: string | null;
+    isActive?: boolean;
+  }> | null;
 };
 
 type PoolAction = "INTEREST" | "LEAD";
@@ -624,6 +639,88 @@ function getTrustBadges(unit: Unit, matchScore: number) {
   return badges.slice(0, 3);
 }
 
+function getCustomerMatchAreas(
+  customer: Customer,
+) {
+  const relationalAreas =
+    Array.isArray(customer.interests)
+      ? customer.interests
+          .filter(
+            (interest) =>
+              interest.isActive !== false,
+          )
+          .map((interest) => ({
+            city: String(
+              interest.city || "",
+            )
+              .toLocaleLowerCase("tr-TR")
+              .trim(),
+            district: String(
+              interest.district || "",
+            )
+              .toLocaleLowerCase("tr-TR")
+              .trim(),
+            neighborhood: String(
+              interest.neighborhood || "",
+            )
+              .toLocaleLowerCase("tr-TR")
+              .trim(),
+          }))
+          .filter(
+            (area) =>
+              area.city ||
+              area.district ||
+              area.neighborhood,
+          )
+      : [];
+
+  if (relationalAreas.length > 0) {
+    return relationalAreas;
+  }
+
+  const legacyAreas = String(
+    customer.interestedArea || "",
+  )
+    .split("|")
+    .map((value) =>
+      value
+        .toLocaleLowerCase("tr-TR")
+        .trim(),
+    )
+    .filter(Boolean)
+    .map((value) => {
+      const parts = value
+        .split("/")
+        .map((part) => part.trim());
+
+      return {
+        city: parts[0] || "",
+        district: parts[1] || "",
+        neighborhood: parts[2] || "",
+      };
+    });
+
+  if (legacyAreas.length > 0) {
+    return legacyAreas;
+  }
+
+  const fallbackCity = String(
+    customer.city || "",
+  )
+    .toLocaleLowerCase("tr-TR")
+    .trim();
+
+  return fallbackCity
+    ? [
+        {
+          city: fallbackCity,
+          district: "",
+          neighborhood: "",
+        },
+      ]
+    : [];
+}
+
 function calculateMatch(
   unit: Unit,
   customers: Customer[],
@@ -644,6 +741,8 @@ function calculateMatch(
     unit.project?.name,
     unit.project?.city,
     unit.project?.district,
+    unit.project?.address,
+    unit.project?.mapAddress,
     unit.type,
     unit.roomCount,
     unit.description,
@@ -660,13 +759,8 @@ function calculateMatch(
     let score = 0;
     let customerBudgetDiff = 0;
 
-    const customerCity = String(
-      customer.city || "",
-    ).toLocaleLowerCase("tr-TR");
-
-    const interestedArea = String(
-      customer.interestedArea || "",
-    ).toLocaleLowerCase("tr-TR");
+    const customerAreas =
+      getCustomerMatchAreas(customer);
 
     const interestedType = String(
       customer.interestedType || "",
@@ -676,21 +770,56 @@ function calculateMatch(
       customer.notes || "",
     ).toLocaleLowerCase("tr-TR");
 
-    if (
-      customerCity &&
-      unitCity &&
-      customerCity === unitCity
-    ) {
-      score += 30;
-    }
+    const areaScore =
+      customerAreas.reduce(
+        (highestScore, area) => {
+          let currentScore = 0;
 
-    if (
-      interestedArea &&
-      (unitDistrict.includes(interestedArea) ||
-        unitText.includes(interestedArea))
-    ) {
-      score += 30;
-    }
+          const cityMatches =
+            !area.city ||
+            Boolean(
+              unitCity &&
+                area.city === unitCity,
+            );
+
+          if (
+            area.city &&
+            unitCity &&
+            area.city === unitCity
+          ) {
+            currentScore += 30;
+          }
+
+          if (
+            cityMatches &&
+            area.district &&
+            (unitDistrict === area.district ||
+              unitText.includes(
+                area.district,
+              ))
+          ) {
+            currentScore += 30;
+          }
+
+          if (
+            cityMatches &&
+            area.neighborhood &&
+            unitText.includes(
+              area.neighborhood,
+            )
+          ) {
+            currentScore += 15;
+          }
+
+          return Math.max(
+            highestScore,
+            currentScore,
+          );
+        },
+        0,
+      );
+
+    score += areaScore;
 
     if (
       interestedType &&

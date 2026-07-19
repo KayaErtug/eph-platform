@@ -59,6 +59,11 @@ type NetworkPost = {
   city?: string | null;
   district?: string | null;
   neighborhood?: string | null;
+  areas?: Array<{
+    city?: string | null;
+    district?: string | null;
+    neighborhood?: string | null;
+  }> | null;
   budget?: number | null;
   visibility?: string | null;
   tags?: string[] | null;
@@ -80,6 +85,71 @@ const CATEGORY_IMAGES: Record<string, string> = {
   Duyuru: "/talep-merkezi/duyuru.jpg",
   Diğer: "/talep-merkezi/diger.jpg",
 };
+
+function normalizePostAreas(
+  post?: NetworkPost | null,
+) {
+  const normalizedAreas = Array.isArray(
+    post?.areas,
+  )
+    ? post.areas
+        .map((area) => ({
+          city: String(
+            area?.city || "",
+          ).trim(),
+          district: String(
+            area?.district || "",
+          ).trim(),
+          neighborhood: String(
+            area?.neighborhood || "",
+          ).trim(),
+        }))
+        .filter(
+          (area) =>
+            area.city ||
+            area.district ||
+            area.neighborhood,
+        )
+    : [];
+
+  if (normalizedAreas.length > 0) {
+    return normalizedAreas;
+  }
+
+  const legacyArea = {
+    city: String(
+      post?.city || "",
+    ).trim(),
+    district: String(
+      post?.district || "",
+    ).trim(),
+    neighborhood: String(
+      post?.neighborhood || "",
+    ).trim(),
+  };
+
+  return legacyArea.city ||
+    legacyArea.district ||
+    legacyArea.neighborhood
+    ? [legacyArea]
+    : [];
+}
+
+function formatPostArea(
+  area: {
+    city?: string | null;
+    district?: string | null;
+    neighborhood?: string | null;
+  },
+) {
+  return [
+    area.city,
+    area.district,
+    area.neighborhood,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+}
 
 function normalizeText(value?: string | null) {
   return String(value || "")
@@ -335,13 +405,28 @@ export default function NetworkPostDetailPage() {
   const owner = useMemo(() => getPostUser(post), [post]);
   const category = useMemo(() => categoryLabel(post?.type), [post?.type]);
   const image = useMemo(() => getCategoryImage(post?.type), [post?.type]);
-  const location = useMemo(
-    () =>
-      [post?.city, post?.district, post?.neighborhood]
-        .filter(Boolean)
-        .join(" / "),
+  const postAreas = useMemo(
+    () => normalizePostAreas(post),
     [post],
   );
+
+  const location = useMemo(() => {
+    const areaLabels = postAreas
+      .map(formatPostArea)
+      .filter(Boolean);
+
+    if (areaLabels.length === 0) {
+      return "";
+    }
+
+    if (areaLabels.length === 1) {
+      return areaLabels[0];
+    }
+
+    return `${areaLabels[0]} +${
+      areaLabels.length - 1
+    } bölge`;
+  }, [postAreas]);
   const criteria = useMemo(() => (post ? criteriaFromPost(post) : []), [post]);
 
   useEffect(() => {
@@ -708,6 +793,45 @@ export default function NetworkPostDetailPage() {
             </div>
           </div>
         </section>
+
+        {postAreas.length > 0 && (
+          <section className="rounded-[20px] border border-[#FED7AA] bg-[#FFF9F0] p-3 shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
+            <div className="flex items-center gap-2">
+              <MapPin
+                size={15}
+                className="shrink-0 text-[#F97316]"
+              />
+
+              <h3 className="text-[11px] font-black uppercase tracking-wide text-[#7C5A36]">
+                Seçili Bölgeler
+              </h3>
+
+              <span className="rounded-full border border-[#FED7AA] bg-white px-2 py-0.5 text-[9px] font-black text-[#EA580C]">
+                {postAreas.length}
+              </span>
+            </div>
+
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {postAreas.map(
+                (area, index) => {
+                  const areaLabel =
+                    formatPostArea(area);
+
+                  return (
+                    <span
+                      key={`${areaLabel}-${index}`}
+                      className="inline-flex max-w-full rounded-full border border-[#FED7AA] bg-white px-2.5 py-1 text-[10px] font-bold leading-4 text-[#3A2208]"
+                    >
+                      <span className="break-words">
+                        {areaLabel}
+                      </span>
+                    </span>
+                  );
+                },
+              )}
+            </div>
+          </section>
+        )}
 
         <section className="grid grid-cols-4 gap-1.5">
           <InfoCard icon={<Tag size={14} />} label="Tür" value={category} />
