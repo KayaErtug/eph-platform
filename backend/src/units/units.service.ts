@@ -15,6 +15,7 @@ import {
   Role,
   UnitStatus,
   UnitType,
+  UyelikDurumu,
 } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
@@ -57,6 +58,25 @@ type PoolActionPayload = {
   message?: string;
   matchScore?: number;
   note?: string;
+};
+
+type PoolMembershipAccessCode =
+  | 'ACTIVE'
+  | 'SUPER_ADMIN'
+  | 'NO_MEMBERSHIP'
+  | 'NOT_STARTED'
+  | 'EXPIRED'
+  | 'PASSIVE'
+  | 'CANCELLED'
+  | 'PACKAGE_INACTIVE';
+
+type PoolMembershipAccess = {
+  allowed: boolean;
+  code: PoolMembershipAccessCode;
+  message: string;
+  packageCode: string | null;
+  packageName: string | null;
+  expiresAt: Date | null;
 };
 
 const unitInclude = {
@@ -268,6 +288,166 @@ export class UnitsService {
 
   private isOwner(user: CurrentUserPayload, ownerId: string) {
     return Boolean(user?.id && ownerId && user.id === ownerId);
+  }
+
+  private async getPoolMembershipAccess(
+    user: CurrentUserPayload,
+  ): Promise<PoolMembershipAccess> {
+    if (this.isSuperAdmin(user)) {
+      return {
+        allowed: true,
+        code: 'SUPER_ADMIN',
+        message: 'Yazılım Ekibi Havuz işlem erişimi aktif.',
+        packageCode: 'SYSTEM',
+        packageName: 'Yazılım Ekibi',
+        expiresAt: null,
+      };
+    }
+
+    const now = new Date();
+
+    const [activeMembership, latestMembership] = await Promise.all([
+      this.prisma.kullaniciUyelikPaketi.findFirst({
+        where: {
+          kullaniciId: user.id,
+          durum: UyelikDurumu.AKTIF,
+          baslangicTarihi: {
+            lte: now,
+          },
+          OR: [
+            {
+              bitisTarihi: null,
+            },
+            {
+              bitisTarihi: {
+                gte: now,
+              },
+            },
+          ],
+        },
+        orderBy: {
+          baslangicTarihi: 'desc',
+        },
+      }),
+      this.prisma.kullaniciUyelikPaketi.findFirst({
+        where: {
+          kullaniciId: user.id,
+        },
+        orderBy: {
+          baslangicTarihi: 'desc',
+        },
+      }),
+    ]);
+
+    if (!activeMembership) {
+      if (!latestMembership) {
+        return {
+          allowed: false,
+          code: 'NO_MEMBERSHIP',
+          message:
+            'Havuz işlemleri için aktif üyelik gereklidir. Üyelik Merkezi üzerinden paket talebi oluşturabilirsiniz.',
+          packageCode: null,
+          packageName: null,
+          expiresAt: null,
+        };
+      }
+
+      if (
+        latestMembership.durum === UyelikDurumu.AKTIF &&
+        latestMembership.baslangicTarihi.getTime() > now.getTime()
+      ) {
+        return {
+          allowed: false,
+          code: 'NOT_STARTED',
+          message:
+            'Üyeliğiniz henüz başlamadığı için Havuz işlemleri kullanılamıyor.',
+          packageCode: null,
+          packageName: null,
+          expiresAt: latestMembership.bitisTarihi,
+        };
+      }
+
+      if (
+        latestMembership.durum === UyelikDurumu.SURESI_DOLDU ||
+        (latestMembership.durum === UyelikDurumu.AKTIF &&
+          latestMembership.bitisTarihi !== null &&
+          latestMembership.bitisTarihi.getTime() < now.getTime())
+      ) {
+        return {
+          allowed: false,
+          code: 'EXPIRED',
+          message:
+            'Üyelik süreniz dolduğu için Havuz işlemleri kilitlidir. Havuzu görüntülemeye devam edebilirsiniz.',
+          packageCode: null,
+          packageName: null,
+          expiresAt: latestMembership.bitisTarihi,
+        };
+      }
+
+      if (latestMembership.durum === UyelikDurumu.IPTAL) {
+        return {
+          allowed: false,
+          code: 'CANCELLED',
+          message:
+            'Üyeliğiniz iptal edildiği için Havuz işlemleri kullanılamıyor.',
+          packageCode: null,
+          packageName: null,
+          expiresAt: latestMembership.bitisTarihi,
+        };
+      }
+
+      return {
+        allowed: false,
+        code: 'PASSIVE',
+        message:
+          'Üyeliğiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.',
+        packageCode: null,
+        packageName: null,
+        expiresAt: latestMembership.bitisTarihi,
+      };
+    }
+
+    const membershipPackage = await this.prisma.uyelikPaketi.findUnique({
+      where: {
+        id: activeMembership.paketId,
+      },
+      select: {
+        paketKodu: true,
+        paketAdi: true,
+        aktifMi: true,
+      },
+    });
+
+    if (!membershipPackage || !membershipPackage.aktifMi) {
+      return {
+        allowed: false,
+        code: 'PACKAGE_INACTIVE',
+        message:
+          'Üyelik paketiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.',
+        packageCode: membershipPackage?.paketKodu || null,
+        packageName: membershipPackage?.paketAdi || null,
+        expiresAt: activeMembership.bitisTarihi,
+      };
+    }
+
+    return {
+      allowed: true,
+      code: 'ACTIVE',
+      message: 'Havuz işlem erişiminiz aktif.',
+      packageCode: membershipPackage.paketKodu,
+      packageName: membershipPackage.paketAdi,
+      expiresAt: activeMembership.bitisTarihi,
+    };
+  }
+
+  private async ensurePoolActionMembership(user: CurrentUserPayload) {
+    const access = await this.getPoolMembershipAccess(user);
+
+    if (!access.allowed) {
+      throw new ForbiddenException(access.message);
+    }
+
+    return access;
   }
 
   private ensureCanViewUnit(user: CurrentUserPayload, ownerId: string) {
@@ -522,7 +702,10 @@ export class UnitsService {
   }
 
   async getPoolWallet(user: CurrentUserPayload) {
-    const wallet = await this.getOrCreateKontorWallet(user.id);
+    const [wallet, membershipAccess] = await Promise.all([
+      this.getOrCreateKontorWallet(user.id),
+      this.getPoolMembershipAccess(user),
+    ]);
 
     return {
       ok: true,
@@ -531,6 +714,7 @@ export class UnitsService {
       toplamHarcama: wallet.toplamHarcama,
       toplamHediye: wallet.toplamHediye,
       aktifMi: wallet.aktifMi,
+      membershipAccess,
     };
   }
 
@@ -1035,6 +1219,28 @@ export class UnitsService {
     };
   }
 
+  private redactPoolUnitForViewer(user: CurrentUserPayload, unit: any) {
+    const redactedUnit = this.redactDoorAccessInfo(user, unit);
+    const project = redactedUnit.project;
+
+    if (!project) {
+      return redactedUnit;
+    }
+
+    const { ownerId, owner, ...safeProject } = project;
+
+    return {
+      ...redactedUnit,
+      project: {
+        ...safeProject,
+        ownerRole: owner?.role || null,
+        isOwnPortfolio: Boolean(
+          ownerId && this.isOwner(user, ownerId),
+        ),
+      },
+    };
+  }
+
   private splitFullName(fullName?: string | null) {
     const cleanName = this.cleanText(fullName);
 
@@ -1468,10 +1674,12 @@ export class UnitsService {
       orderBy: { poolPublishedAt: 'desc' },
     });
 
-    return units.map((unit) => this.redactDoorAccessInfo(user, unit));
+    return units.map((unit) => this.redactPoolUnitForViewer(user, unit));
   }
 
   async poolMessage(id: string, user: CurrentUserPayload, body?: PoolActionPayload) {
+    await this.ensurePoolActionMembership(user);
+
     const unit = await this.getPoolUnitWithProjectOrFail(id);
 
     if (this.isOwner(user, unit.project.ownerId)) {
@@ -1612,6 +1820,8 @@ export class UnitsService {
   }
 
   async poolInterest(id: string, user: CurrentUserPayload, body?: PoolActionPayload) {
+    await this.ensurePoolActionMembership(user);
+
     const unit = await this.getPoolUnitWithProjectOrFail(id);
 
     if (this.isOwner(user, unit.project.ownerId)) {
@@ -1650,6 +1860,8 @@ export class UnitsService {
   }
 
   async poolMatchingCustomer(id: string, user: CurrentUserPayload, body?: PoolActionPayload) {
+    await this.ensurePoolActionMembership(user);
+
     const unit = await this.getPoolUnitWithProjectOrFail(id);
 
     if (this.isOwner(user, unit.project.ownerId)) {
@@ -1688,6 +1900,8 @@ export class UnitsService {
   }
 
   async createPoolShareLink(id: string, user: CurrentUserPayload) {
+    await this.ensurePoolActionMembership(user);
+
     const unit = await this.getPoolUnitWithProjectOrFail(id);
 
     const shareLink = await this.prisma.poolShareLink.create({

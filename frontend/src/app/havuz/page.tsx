@@ -84,14 +84,8 @@ type Unit = {
     longitude?: number | null;
     mapAddress?: string | null;
     placeId?: string | null;
-    ownerId?: string | null;
-    owner?: {
-      id?: string | null;
-      firstName?: string | null;
-      lastName?: string | null;
-      role?: string | null;
-      memberCode?: string | null;
-    } | null;
+    ownerRole?: string | null;
+    isOwnPortfolio?: boolean;
   };
 };
 
@@ -119,10 +113,28 @@ type DetailSelection = {
   match: { score: number; customer: Customer | null; budgetDiff: number };
 };
 
+type PoolMembershipAccess = {
+  allowed: boolean;
+  code:
+    | "ACTIVE"
+    | "SUPER_ADMIN"
+    | "NO_MEMBERSHIP"
+    | "NOT_STARTED"
+    | "EXPIRED"
+    | "PASSIVE"
+    | "CANCELLED"
+    | "PACKAGE_INACTIVE";
+  message: string;
+  packageCode?: string | null;
+  packageName?: string | null;
+  expiresAt?: string | null;
+};
+
 type PoolWallet = {
   balance?: number;
   bakiye?: number;
   aktifMi?: boolean;
+  membershipAccess?: PoolMembershipAccess | null;
 };
 
 type SuccessToast = {
@@ -311,14 +323,14 @@ function isConstructionCompanyRole(role?: string | null) {
 }
 
 function getPortfolioSourceLabel(unit: Unit) {
-  const role = unit.project?.owner?.role;
+  const role = unit.project?.ownerRole;
   if (isConstructionCompanyRole(role)) return "İnşaat Firması Portföyü";
   if (isBuilderRole(role)) return "Müteahhit Portföyü";
   return "Emlakçı Yetkili Portföyü";
 }
 
 function getPortfolioSourceBadgeLabel(unit: Unit) {
-  const role = unit.project?.owner?.role;
+  const role = unit.project?.ownerRole;
   if (isConstructionCompanyRole(role)) return "İnşaat Firması";
   if (isBuilderRole(role)) return "Müteahhit";
   return "Emlakçı Yetkili";
@@ -702,6 +714,8 @@ export default function HavuzPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [membershipAccess, setMembershipAccess] =
+    useState<PoolMembershipAccess | null>(null);
   const [successToast, setSuccessToast] = useState<SuccessToast | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("LIST");
   const [selectedMapUnitId, setSelectedMapUnitId] = useState("");
@@ -713,6 +727,10 @@ export default function HavuzPage() {
   const [nearbyError, setNearbyError] = useState("");
 
   const builder = isBuilderRole(user?.role);
+  const canUsePoolActions = membershipAccess?.allowed === true;
+  const poolActionLockMessage =
+    membershipAccess?.message ||
+    "Havuz işlem erişiminiz doğrulanamadı. Üyelik durumunuzu kontrol ediniz.";
 
   useEffect(() => {
     fetchData();
@@ -759,7 +777,14 @@ export default function HavuzPage() {
       if (walletRes.status === "fulfilled") {
         const wallet = walletRes.value.data as PoolWallet;
         const balance = Number(wallet?.balance ?? wallet?.bakiye ?? 0);
+        const access = wallet?.membershipAccess;
+
         setWalletBalance(Number.isFinite(balance) ? balance : 0);
+        setMembershipAccess(
+          access && typeof access.allowed === "boolean" ? access : null,
+        );
+      } else {
+        setMembershipAccess(null);
       }
     } finally {
       setLoading(false);
@@ -1004,42 +1029,30 @@ export default function HavuzPage() {
   const startPoolMessage = async (unit: Unit, score: number) => {
     if (busyAction) return;
 
+    if (!canUsePoolActions) {
+      setErrorMessage(poolActionLockMessage);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     setErrorMessage("");
     setBusyAction(`MESSAGE_${unit.id}`);
 
     try {
       const message = `Merhaba, ${getEphId(unit.id)} numaralı Havuz portföyünün sahibiyle iletişime geçmek istiyorum.`;
-      let conversationId = "";
 
-      try {
-        const response = await api.post(`/units/pool/${unit.id}/message`, {
-          message,
-          matchScore: score,
-        });
-        conversationId = getConversationId(response.data);
-        showKontorSuccess({
-          title: "İletişim Başlatıldı",
-          data: response.data,
-          fallbackSpent: 3,
-        });
-      } catch (poolError) {
-        const participantId = unit.project?.owner?.id || unit.project?.ownerId;
+      const response = await api.post(`/units/pool/${unit.id}/message`, {
+        message,
+        matchScore: score,
+      });
 
-        if (!participantId) throw poolError;
+      const conversationId = getConversationId(response.data);
 
-        const conversationResponse = await api.post("/conversations/start", {
-          participantId,
-          title: `${getEphId(unit.id)} Havuz Görüşmesi`,
-        });
-
-        conversationId = getConversationId(conversationResponse.data);
-
-        if (conversationId) {
-          await api.post(`/conversations/${conversationId}/messages`, {
-            body: message,
-          });
-        }
-      }
+      showKontorSuccess({
+        title: "İletişim Başlatıldı",
+        data: response.data,
+        fallbackSpent: 3,
+      });
 
       window.setTimeout(() => {
         router.push(
@@ -1055,6 +1068,13 @@ export default function HavuzPage() {
 
   const confirmPoolAction = async (action: SelectedAction) => {
     if (busyAction) return;
+
+    if (!canUsePoolActions) {
+      setSelectedAction(null);
+      setErrorMessage(poolActionLockMessage);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
 
     const endpoint = action.type === "LEAD" ? "matching-customer" : "interest";
     const busyKey = `${action.type}_${action.unit.id}`;
@@ -1184,6 +1204,41 @@ export default function HavuzPage() {
               İş fırsatı merkezi
             </span>
           </div>
+
+          <section
+            className={`mt-2 rounded-[16px] border px-3 py-2.5 text-center ${
+              canUsePoolActions
+                ? "border-emerald-200 bg-emerald-50"
+                : "border-amber-200 bg-amber-50"
+            }`}
+          >
+            <div
+              className={`flex items-center justify-center gap-1.5 text-[10.5px] font-black ${
+                canUsePoolActions ? "text-emerald-800" : "text-amber-800"
+              }`}
+            >
+              <BadgeCheck size={15} />
+              <span>
+                {canUsePoolActions
+                  ? `${membershipAccess?.packageName || "Aktif üyelik"} · Havuz işlemleri açık`
+                  : "Havuz işlemleri kilitli"}
+              </span>
+            </div>
+
+            {!canUsePoolActions && (
+              <>
+                <p className="mt-1 text-[9.5px] font-bold leading-4 text-amber-800">
+                  {poolActionLockMessage}
+                </p>
+                <Link
+                  href="/uyelik"
+                  className="mt-1.5 inline-flex min-h-[30px] items-center justify-center rounded-full border border-amber-300 bg-white px-3 text-[9.5px] font-black text-amber-800"
+                >
+                  Üyelik Merkezi
+                </Link>
+              </>
+            )}
+          </section>
 
           <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#D7E9E7] bg-white text-center">
             <PoolMetric label="Havuz" value={eligibleUnits.length} tone="teal" />
@@ -1387,6 +1442,7 @@ export default function HavuzPage() {
             onSelectUnit={setSelectedMapUnitId}
             onNavigateToCard={focusPoolCard}
             busyAction={busyAction}
+            canUsePoolActions={canUsePoolActions}
             onDetail={(unit, match) => setDetailSelection({ unit, match })}
             onMessage={(unit, match) => startPoolMessage(unit, match.score)}
             onAction={(type, unit, match) =>
@@ -1421,13 +1477,10 @@ export default function HavuzPage() {
                   index={index}
                   unit={unit}
                   match={match}
-                  isOwnPortfolio={Boolean(
-                    user?.id &&
-                      (unit.project?.ownerId === user.id ||
-                        unit.project?.owner?.id === user.id),
-                  )}
+                  isOwnPortfolio={Boolean(unit.project?.isOwnPortfolio)}
                   selected={selectedMapUnitId === unit.id}
                   busyAction={busyAction}
+                  canUsePoolActions={canUsePoolActions}
                   onDetail={() => setDetailSelection({ unit, match })}
                   onMessage={() => startPoolMessage(unit, match.score)}
                   onAction={(type) =>
@@ -1471,10 +1524,10 @@ export default function HavuzPage() {
           match={detailSelection.match}
           busyAction={busyAction}
           isOwnPortfolio={Boolean(
-            user?.id &&
-              (detailSelection.unit.project?.ownerId === user.id ||
-                detailSelection.unit.project?.owner?.id === user.id),
+            detailSelection.unit.project?.isOwnPortfolio,
           )}
+          canUsePoolActions={canUsePoolActions}
+          actionLockMessage={poolActionLockMessage}
           onClose={closeDetailSelection}
           onMessage={() =>
             startPoolMessage(detailSelection.unit, detailSelection.match.score)
@@ -1537,6 +1590,7 @@ function PoolMapSection({
   nearbyRadiusKm,
   selectedUnitId,
   busyAction,
+  canUsePoolActions,
   onSelectUnit,
   onNavigateToCard,
   onDetail,
@@ -1548,6 +1602,7 @@ function PoolMapSection({
   nearbyRadiusKm: number | null;
   selectedUnitId: string;
   busyAction: string | null;
+  canUsePoolActions: boolean;
   onSelectUnit: (unitId: string) => void;
   onNavigateToCard: (unitId: string) => void;
   onDetail: (
@@ -1575,6 +1630,10 @@ function PoolMapSection({
   const selectedItem =
     items.find((item) => item.unit.id === selectedUnitId) || items[0] || null;
   const exactCount = items.length;
+  const selectedActionsDisabled =
+    Boolean(busyAction) ||
+    !canUsePoolActions ||
+    Boolean(selectedItem?.unit.project?.isOwnPortfolio);
 
   useEffect(() => {
     let alive = true;
@@ -1885,7 +1944,7 @@ function PoolMapSection({
               <button
                 type="button"
                 onClick={() => onMessage(selectedItem.unit, selectedItem.match)}
-                disabled={Boolean(busyAction)}
+                disabled={selectedActionsDisabled}
                 className="flex min-h-[36px] items-center justify-center gap-1 rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[11px] font-black text-[#1F2937] disabled:opacity-60"
               >
                 <MessageCircle size={13} className="text-[#2563EB]" /> İletişime Geç 3K
@@ -1895,7 +1954,7 @@ function PoolMapSection({
                 onClick={() =>
                   onAction("INTEREST", selectedItem.unit, selectedItem.match)
                 }
-                disabled={Boolean(busyAction)}
+                disabled={selectedActionsDisabled}
                 className="min-h-[36px] rounded-[14px] border-2 border-[#2563EB] bg-[#EFF6FF] text-[11px] font-black text-[#1D4ED8] disabled:opacity-60"
               >
                 İlgilen 10K
@@ -1905,7 +1964,7 @@ function PoolMapSection({
                 onClick={() =>
                   onAction("LEAD", selectedItem.unit, selectedItem.match)
                 }
-                disabled={Boolean(busyAction)}
+                disabled={selectedActionsDisabled}
                 className="min-h-[36px] rounded-[14px] border-2 border-[#2563EB] bg-[#2563EB] text-[11px] font-black text-white disabled:opacity-60"
               >
                 Müşterim Var 20K
@@ -2447,6 +2506,7 @@ function PoolUnitCard({
   isOwnPortfolio,
   selected,
   busyAction,
+  canUsePoolActions,
   onDetail,
   onMessage,
   onAction,
@@ -2457,6 +2517,7 @@ function PoolUnitCard({
   isOwnPortfolio: boolean;
   selected: boolean;
   busyAction: string | null;
+  canUsePoolActions: boolean;
   onDetail: () => void;
   onMessage: () => void;
   onAction: (type: PoolAction) => void;
@@ -2643,7 +2704,7 @@ function PoolUnitCard({
             <button
               type="button"
               onClick={onMessage}
-              disabled={busy}
+              disabled={busy || !canUsePoolActions}
               className="flex min-h-[42px] items-center justify-center gap-1 rounded-[12px] bg-white px-1 text-[10.5px] font-extrabold text-[#475569] shadow-[0_4px_10px_rgba(15,23,42,0.05)] disabled:opacity-60"
             >
               <MessageCircle size={14} className="text-[#2563EB]" />
@@ -2653,7 +2714,7 @@ function PoolUnitCard({
             <button
               type="button"
               onClick={() => onAction("INTEREST")}
-              disabled={busy}
+              disabled={busy || !canUsePoolActions}
               className="flex min-h-[42px] items-center justify-center gap-1 rounded-[12px] bg-[#2563EB] px-1 text-[10.5px] font-extrabold text-white shadow-[0_6px_14px_rgba(37,99,235,0.20)] disabled:opacity-60"
             >
               <Target size={14} />
@@ -2671,6 +2732,8 @@ function PoolDetailModal({
   match,
   busyAction,
   isOwnPortfolio,
+  canUsePoolActions,
+  actionLockMessage,
   onClose,
   onMessage,
   onAction,
@@ -2679,6 +2742,8 @@ function PoolDetailModal({
   match: { score: number; customer: Customer | null; budgetDiff: number };
   busyAction: string | null;
   isOwnPortfolio: boolean;
+  canUsePoolActions: boolean;
+  actionLockMessage: string;
   onClose: () => void;
   onMessage: () => void;
   onAction: (type: PoolAction) => void;
@@ -2708,6 +2773,11 @@ function PoolDetailModal({
 
   const handleShare = async () => {
     if (shareBusy) return;
+
+    if (!canUsePoolActions) {
+      alert(actionLockMessage);
+      return;
+    }
 
     setShareBusy(true);
 
@@ -2980,6 +3050,20 @@ function PoolDetailModal({
         </div>
 
         <div className="shrink-0 border-t-2 border-[#C7D6E8] bg-white/95 p-2.5 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-12px_28px_rgba(15,23,42,0.08)]">
+          {!isOwnPortfolio && !canUsePoolActions && (
+            <div className="mb-2 rounded-[14px] border-2 border-amber-200 bg-amber-50 px-3 py-2 text-center">
+              <p className="text-[10.5px] font-black leading-4 text-amber-800">
+                {actionLockMessage}
+              </p>
+              <Link
+                href="/uyelik"
+                className="mt-1 inline-flex min-h-[30px] items-center justify-center rounded-full border border-amber-300 bg-white px-3 text-[9.5px] font-black text-amber-800"
+              >
+                Üyelik Merkezi
+              </Link>
+            </div>
+          )}
+
           {isOwnPortfolio ? (
             <div className="flex min-h-[48px] items-center justify-center rounded-[15px] border-2 border-[#C7D6E8] bg-[#F8FAFC] px-3 text-center text-[11px] font-black leading-4 text-[#64748B]">
               Bu portföy size ait. İletişim aksiyonları diğer kullanıcılar için gösterilir.
@@ -2989,7 +3073,7 @@ function PoolDetailModal({
               <button
                 type="button"
                 onClick={onMessage}
-                disabled={Boolean(busyAction)}
+                disabled={Boolean(busyAction) || !canUsePoolActions}
                 className="flex min-h-[42px] items-center justify-center gap-1 rounded-[15px] border-2 border-[#C7D6E8] bg-white text-[12px] font-black text-[#1F2937] disabled:opacity-60"
               >
                 <MessageCircle size={14} className="text-[#2563EB]" />
@@ -2999,7 +3083,7 @@ function PoolDetailModal({
               <button
                 type="button"
                 onClick={() => onAction("INTEREST")}
-                disabled={Boolean(busyAction)}
+                disabled={Boolean(busyAction) || !canUsePoolActions}
                 className="min-h-[42px] rounded-[15px] border-2 border-[#2563EB] bg-[#EFF6FF] text-[12px] font-black text-[#1D4ED8] disabled:opacity-60"
               >
                 İlgilen 10K
@@ -3008,7 +3092,7 @@ function PoolDetailModal({
               <button
                 type="button"
                 onClick={() => onAction("LEAD")}
-                disabled={Boolean(busyAction)}
+                disabled={Boolean(busyAction) || !canUsePoolActions}
                 className="col-span-2 flex min-h-[44px] items-center justify-center gap-1 rounded-[15px] border-2 border-[#2563EB] bg-[#2563EB] text-[12px] font-black text-white disabled:opacity-60"
               >
                 <Users size={14} />
@@ -3020,11 +3104,15 @@ function PoolDetailModal({
           <button
             type="button"
             onClick={handleShare}
-            disabled={shareBusy}
+            disabled={shareBusy || !canUsePoolActions}
             className="mt-2 flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-[15px] border-2 border-[#16A34A] bg-[#F0FDF4] text-[12px] font-black text-[#15803D] disabled:opacity-60"
           >
             <Share2 size={14} />
-            {shareBusy ? "Bağlantı Oluşturuluyor..." : "Müşterime Paylaş"}
+            {shareBusy
+              ? "Bağlantı Oluşturuluyor..."
+              : canUsePoolActions
+                ? "Müşterime Paylaş"
+                : "Üyelik Gerekli"}
           </button>
         </div>
       </section>
