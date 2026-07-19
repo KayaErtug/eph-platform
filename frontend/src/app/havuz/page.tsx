@@ -2895,24 +2895,72 @@ function PoolDetailModal({
             </p>
           </section>
 
-          {availableCreditAmount !== null && (
-            <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white text-center shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
-              <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
-                <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-                  Kullanılabilir Kredi Tutarı
+          <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
+            <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
+                Havuz Bilgi Merkezi
+              </p>
+              <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
+                {availableCreditAmount !== null
+                  ? "Konum, kredi ve güvenli iletişim özeti"
+                  : "Konum ve güvenli iletişim özeti"}
+              </p>
+            </div>
+
+            <div
+              className={`grid gap-1.5 p-2.5 ${
+                availableCreditAmount !== null
+                  ? "grid-cols-3"
+                  : "grid-cols-2"
+              }`}
+            >
+              <div className="flex min-h-[78px] min-w-0 flex-col items-center justify-center rounded-[15px] border-2 border-blue-100 bg-blue-50 px-2 py-2 text-center">
+                <MapPin size={18} className="shrink-0 text-[#2563EB]" />
+                <p className="mt-1 text-[9px] font-black uppercase tracking-[0.06em] text-[#64748B]">
+                  Konum
                 </p>
-                <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
-                  Portföy sahibi tarafından belirtilen tutar
+                <p className="mt-1 line-clamp-2 min-w-0 text-[10.5px] font-black leading-[1.2] text-[#1F2937] [overflow-wrap:anywhere]">
+                  {getLocation(unit)}
                 </p>
               </div>
 
-              <div className="px-3 py-3 text-center">
-                <p className="text-[20px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">
-                  {compactMoney(availableCreditAmount, unit.priceCurrency)}
+              {availableCreditAmount !== null && (
+                <div className="flex min-h-[78px] min-w-0 flex-col items-center justify-center rounded-[15px] border-2 border-emerald-100 bg-emerald-50 px-2 py-2 text-center">
+                  <WalletCards
+                    size={18}
+                    className="shrink-0 text-emerald-700"
+                  />
+                  <p className="mt-1 text-[9px] font-black uppercase tracking-[0.06em] text-[#64748B]">
+                    Kullanılabilir Kredi
+                  </p>
+                  <p className="mt-1 line-clamp-2 min-w-0 text-[10.5px] font-black leading-[1.2] text-emerald-900 [overflow-wrap:anywhere]">
+                    {compactMoney(
+                      availableCreditAmount,
+                      unit.priceCurrency,
+                    )}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex min-h-[78px] min-w-0 flex-col items-center justify-center rounded-[15px] border-2 border-violet-100 bg-violet-50 px-2 py-2 text-center">
+                <MessageCircle
+                  size={18}
+                  className="shrink-0 text-violet-700"
+                />
+                <p className="mt-1 text-[9px] font-black uppercase tracking-[0.06em] text-[#64748B]">
+                  Güvenli İletişim
+                </p>
+                <p className="mt-1 line-clamp-2 min-w-0 text-[10.5px] font-black leading-[1.2] text-violet-900 [overflow-wrap:anywhere]">
+                  EPH üzerinden
                 </p>
               </div>
-            </section>
-          )}
+            </div>
+
+            <p className="border-t border-[#E2EAF5] bg-[#FBFDFF] px-3 py-2 text-center text-[10px] font-bold leading-4 text-[#64748B]">
+              Portföy sahibinin telefon, e-posta ve özel kullanıcı bilgileri
+              paylaşılmaz.
+            </p>
+          </section>
 
           <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
             <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
@@ -2929,10 +2977,6 @@ function PoolDetailModal({
               ))}
             </div>
           </section>
-
-
-
-
         </div>
 
         <div className="shrink-0 border-t-2 border-[#C7D6E8] bg-white/95 p-2.5 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-12px_28px_rgba(15,23,42,0.08)]">
