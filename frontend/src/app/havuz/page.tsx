@@ -63,6 +63,7 @@ type Unit = {
   adaNo?: string | null;
   parselNo?: string | null;
   price?: number | null;
+  availableCreditAmount?: number | null;
   priceCurrency?: string | null;
   description?: string | null;
   isVerified?: boolean;
@@ -2162,8 +2163,6 @@ function getTypeChip(unit: Unit) {
   return label.length > 16 ? "PORTFÖY" : label || "PORTFÖY";
 }
 
-const MAX_CREDIT_LTV_RATE = 0.8;
-
 function isLandUnit(unit: Unit) {
   const chip = getTypeChip(unit);
   const text = [unit.type, unit.status, unit.description, unit.project?.name]
@@ -2179,13 +2178,14 @@ function isLandUnit(unit: Unit) {
   );
 }
 
-function getEstimatedCreditAmount(unit: Unit): number | null {
-  if (isLandUnit(unit)) return null;
+function getAvailableCreditAmount(unit: Unit): number | null {
+  const amount = Number(unit.availableCreditAmount || 0);
 
-  const price = Number(unit.price || 0);
-  if (!price) return null;
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
 
-  return Math.round(price * MAX_CREDIT_LTV_RATE);
+  return amount;
 }
 
 function CompactFeaturePill({ text }: { text: string }) {
@@ -2276,6 +2276,7 @@ function PoolUnitCard({
   const busy = Boolean(busyAction);
   const location = getLocation(unit);
   const metadata = decodePortfolioMetadataState(unit.features);
+  const availableCreditAmount = getAvailableCreditAmount(unit);
 
   const quickSpecs = isLand
     ? getFeatureLabels(unit.features)
@@ -2335,8 +2336,11 @@ function PoolUnitCard({
       unit.tapuVerified || unit.isVerified ? "Doğrulandı" : "Kontrol Bekliyor",
   });
 
-  if (getEstimatedCreditAmount(unit)) {
-    detailSpecs.push({ label: "Kredi", value: "~%80" });
+  if (availableCreditAmount !== null) {
+    detailSpecs.push({
+      label: "Kullanılabilir Kredi",
+      value: compactMoney(availableCreditAmount, unit.priceCurrency),
+    });
   }
 
   return (
@@ -2525,7 +2529,7 @@ function PoolDetailModal({
   const [galleryIndex, setGalleryIndex] = useState(0);
   const image = galleryImages[galleryIndex] || galleryImages[0] || "";
   const specs = getPremiumSpecs(unit);
-  const estimatedCreditAmount = getEstimatedCreditAmount(unit);
+  const availableCreditAmount = getAvailableCreditAmount(unit);
   const portfolioHighlights = getPremiumPortfolioHighlights(unit);
   const imageCount =
     galleryImages.length ||
@@ -2727,29 +2731,20 @@ function PoolDetailModal({
             </p>
           </section>
 
-          {estimatedCreditAmount !== null && (
+          {availableCreditAmount !== null && (
             <section className="mt-3 overflow-hidden rounded-[22px] border-2 border-[#C7D6E8] bg-white text-center shadow-[0_10px_22px_rgba(15,23,42,0.045)]">
               <div className="border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-3 py-2.5 text-center">
                 <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-                  Tahmini Kredi Kullanımı
+                  Kullanılabilir Kredi Tutarı
                 </p>
                 <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
-                  İlan fiyatı üzerinden kaba bir üst sınır tahmini
+                  Portföy sahibi tarafından belirtilen tutar
                 </p>
               </div>
+
               <div className="px-3 py-3 text-center">
                 <p className="text-[20px] font-black leading-none tracking-[-0.04em] text-[#0F172A]">
-                  ~{compactMoney(estimatedCreditAmount, unit.priceCurrency)}
-                </p>
-                <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
-                  Ekspertiz değerinin en fazla %80'i (banka uygulaması)
-                </p>
-                <p className="mx-auto mt-2.5 max-w-[370px] text-center text-[10.5px] font-bold leading-5 text-[#94A3B8] break-words [overflow-wrap:anywhere]">
-                  Bu tutar yalnızca ilan fiyatı üzerinden yapılan kaba bir
-                  tahmindir. Gerçek kredi tutarı bankanın ekspertiz
-                  değerine, güncel faiz oranlarına ve başvuru sahibinin
-                  kredibilitesine göre değişir. Kesin tutar için
-                  bankanızla görüşün.
+                  {compactMoney(availableCreditAmount, unit.priceCurrency)}
                 </p>
               </div>
             </section>
