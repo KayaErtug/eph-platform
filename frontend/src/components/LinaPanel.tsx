@@ -981,7 +981,7 @@ export default function LinaPanel({
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-28">
+        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-5">
           <section className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-[#EEF5FF] via-white to-[#EFF6FF] p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
             <div className="relative z-10 max-w-[56%] py-5">
               <h2 className="text-2xl font-black leading-tight tracking-tight">
@@ -1305,7 +1305,7 @@ export default function LinaPanel({
           </section>
         </main>
 
-        <footer className="absolute bottom-0 left-0 right-0 mx-auto max-w-[460px] bg-gradient-to-t from-[#F7FBFF] via-[#F7FBFF] to-transparent px-4 pb-4 pt-8">
+        <footer className="relative z-20 mx-auto w-full max-w-[460px] shrink-0 bg-gradient-to-t from-[#F7FBFF] via-[#F7FBFF] to-transparent px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
           {voiceError && (
             <div className="mb-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-center text-xs font-black text-red-600">
               {voiceError}
