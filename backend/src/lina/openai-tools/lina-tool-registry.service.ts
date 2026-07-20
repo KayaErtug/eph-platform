@@ -102,11 +102,10 @@ export class LinaToolRegistryService {
     return this.listDefinitions(context).map(
       (definition) => ({
         type: "function" as const,
-        function: {
-          name: definition.name,
-          description: definition.description,
-          parameters: definition.inputSchema,
-        },
+        name: definition.name,
+        description: definition.description,
+        parameters: definition.inputSchema,
+        strict: true as const,
       }),
     );
   }
@@ -152,6 +151,43 @@ export class LinaToolRegistryService {
     ) {
       throw new Error(
         `LINA_TOOL_INVALID_SCHEMA:${definition.name}`,
+      );
+    }
+
+    if (
+      definition.inputSchema.additionalProperties !== false
+    ) {
+      throw new Error(
+        `LINA_TOOL_STRICT_ADDITIONAL_PROPERTIES:${definition.name}`,
+      );
+    }
+
+    const propertyNames = Object.keys(
+      definition.inputSchema.properties,
+    );
+
+    const requiredNames = new Set(
+      definition.inputSchema.required || [],
+    );
+
+    const missingRequired = propertyNames.filter(
+      (propertyName) =>
+        !requiredNames.has(propertyName),
+    );
+
+    const unknownRequired = Array.from(
+      requiredNames,
+    ).filter(
+      (propertyName) =>
+        !propertyNames.includes(propertyName),
+    );
+
+    if (
+      missingRequired.length > 0 ||
+      unknownRequired.length > 0
+    ) {
+      throw new Error(
+        `LINA_TOOL_STRICT_REQUIRED_FIELDS:${definition.name}`,
       );
     }
   }

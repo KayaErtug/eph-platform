@@ -63,11 +63,10 @@ export type LinaRegisteredTool = {
 
 export type LinaOpenAiFunctionTool = {
   type: "function";
-  function: {
-    name: string;
-    description: string;
-    parameters: LinaToolJsonSchema;
-  };
+  name: string;
+  description: string;
+  parameters: LinaToolJsonSchema;
+  strict: true;
 };
 
 export type LinaToolPolicyDecision = {
@@ -96,4 +95,11 @@ export type LinaToolExecutionResult = {
   data?: unknown;
   riskLevel?: LinaToolRiskLevel;
   requiresConfirmation?: boolean;
+};
+
+export type LinaPendingApproval = {
+  toolName: string;
+  input: Record<string, unknown>;
+  riskLevel: LinaToolRiskLevel;
+  message: string;
 };

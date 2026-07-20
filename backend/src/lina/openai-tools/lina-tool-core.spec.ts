@@ -54,7 +54,7 @@ describe("Lina OpenAI tool core", () => {
     );
   });
 
-  it("registers unique tools and exports OpenAI function schemas", () => {
+  it("registers unique strict tools and exports Responses API schemas", () => {
     registry.register(
       createDefinition(),
       async () => ({
@@ -70,21 +70,20 @@ describe("Lina OpenAI tool core", () => {
     ).toEqual([
       {
         type: "function",
-        function: {
-          name: "search_crm_customers",
-          description:
-            "Kullanıcının erişebildiği CRM müşterilerini arar.",
-          parameters: {
-            type: "object",
-            properties: {
-              query: {
-                type: "string",
-              },
+        name: "search_crm_customers",
+        description:
+          "Kullanıcının erişebildiği CRM müşterilerini arar.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
             },
-            required: ["query"],
-            additionalProperties: false,
           },
+          required: ["query"],
+          additionalProperties: false,
         },
+        strict: true,
       },
     ]);
 
@@ -98,6 +97,56 @@ describe("Lina OpenAI tool core", () => {
       ),
     ).toThrow(
       "LINA_TOOL_DUPLICATE_NAME:search_crm_customers",
+    );
+  });
+
+  it("rejects tool schemas that are not strict", () => {
+    expect(() =>
+      registry.register(
+        createDefinition({
+          name: "invalid_optional_schema",
+          inputSchema: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+              },
+            },
+            required: [],
+            additionalProperties: false,
+          },
+        }),
+        async () => ({
+          success: true,
+          message: "Tamam.",
+        }),
+      ),
+    ).toThrow(
+      "LINA_TOOL_STRICT_REQUIRED_FIELDS:invalid_optional_schema",
+    );
+
+    expect(() =>
+      registry.register(
+        createDefinition({
+          name: "invalid_open_schema",
+          inputSchema: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+              },
+            },
+            required: ["query"],
+            additionalProperties: true,
+          },
+        }),
+        async () => ({
+          success: true,
+          message: "Tamam.",
+        }),
+      ),
+    ).toThrow(
+      "LINA_TOOL_STRICT_ADDITIONAL_PROPERTIES:invalid_open_schema",
     );
   });
 
@@ -196,8 +245,7 @@ describe("Lina OpenAI tool core", () => {
       {
         name: "create_crm_customer",
         input: {
-          firstName: "Ahmet",
-          lastName: "Yılmaz",
+          query: "Ahmet Yılmaz",
         },
       },
       emlakciContext,
@@ -215,8 +263,7 @@ describe("Lina OpenAI tool core", () => {
       {
         name: "create_crm_customer",
         input: {
-          firstName: "Ahmet",
-          lastName: "Yılmaz",
+          query: "Ahmet Yılmaz",
         },
         confirmed: true,
       },
