@@ -1023,9 +1023,36 @@ function StokPageInner() {
     }
   };
 
-  const handleRemoveFromPool = async (unit: MapUnit) => {
+  const handleDirectPublish = async (unit: MapUnit) => {
     const confirmed = window.confirm(
-      "İlan havuzdan kaldırılacak ve Taslak durumuna dönecek.\n\nFiyat, açıklama, fotoğraf ve belgeleri güncelleyebilirsiniz.\n\nTekrar yayınlanması için yeniden admin onayı gerekecek.",
+      "Bu portföy doğrudan EPH Havuzunda yayınlanacak. Devam etmek istiyor musunuz?",
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setPoolActionUnitId(unit.id);
+      await api.post(`/units/${unit.id}/submit-approval`);
+      await fetchData();
+      window.alert("Portföy başarıyla EPH Havuzunda yayınlandı.");
+    } catch (error: any) {
+      window.alert(
+        error?.response?.data?.message ||
+          "Portföy havuzda yayınlanamadı. Lütfen üyelik ve portföy durumunu kontrol ediniz.",
+      );
+    } finally {
+      setPoolActionUnitId("");
+    }
+  };
+
+  const handleRemoveFromPool = async (unit: MapUnit) => {
+    const isDirectPublishRole =
+      user?.role === "MUTEAHHIT" || user?.role === "INSAAT_FIRMASI";
+    const republishMessage = isDirectPublishRole
+      ? "Güncelleme tamamlandıktan sonra Doğrudan Havuza Gönder düğmesini kullanabilirsiniz."
+      : "Tekrar yayınlanması için yeniden EPH onayı gerekecek.";
+    const confirmed = window.confirm(
+      `İlan havuzdan kaldırılacak ve Taslak durumuna dönecek.\n\nFiyat, açıklama, fotoğraf ve belgeleri güncelleyebilirsiniz.\n\n${republishMessage}`,
     );
 
     if (!confirmed) return;
@@ -1036,7 +1063,7 @@ function StokPageInner() {
       await fetchData();
       router.push(`/portfoy?edit=${unit.id}`);
     } catch (error: any) {
-      alert(
+      window.alert(
         error?.response?.data?.message || "İlan havuzdan geri çekilemedi.",
       );
     } finally {
@@ -1347,10 +1374,12 @@ function StokPageInner() {
                 deleting={deletingUnitId === unit.id}
                 poolBusy={poolActionUnitId === unit.id}
                 currentUserId={String(user?.id || "")}
+                currentUserRole={String(user?.role || "")}
                 onOpen={() => router.push(`/portfoy/${unit.id}`)}
                 onUpdate={() => openEditModal(unit)}
                 onShare={() => handlePortfolioShare(unit)}
                 onDelete={() => handleDeleteUnit(unit)}
+                onDirectPublish={() => handleDirectPublish(unit)}
                 onRemoveFromPool={() => handleRemoveFromPool(unit)}
                 onWhatsappLocation={() => handleWhatsappLocation(unit)}
               />
@@ -1651,10 +1680,12 @@ function CompactPortfolioCard({
   deleting,
   poolBusy,
   currentUserId,
+  currentUserRole,
   onOpen,
   onUpdate,
   onShare,
   onDelete,
+  onDirectPublish,
   onRemoveFromPool,
   onWhatsappLocation,
 }: {
@@ -1664,10 +1695,12 @@ function CompactPortfolioCard({
   deleting: boolean;
   poolBusy: boolean;
   currentUserId: string;
+  currentUserRole: string;
   onOpen: () => void;
   onUpdate: () => void;
   onShare: () => void;
   onDelete: () => void;
+  onDirectPublish: () => void;
   onRemoveFromPool: () => void;
   onWhatsappLocation: () => void;
 }) {
@@ -1692,6 +1725,9 @@ function CompactPortfolioCard({
   const isPoolVisible = Boolean(
     (unit as any).isPoolVisible || approvalStatus === "HAVUZDA",
   );
+  const isDirectPublishRole =
+    currentUserRole === "MUTEAHHIT" ||
+    currentUserRole === "INSAAT_FIRMASI";
   const possibleOwnerIds = [
     (unit as any)?.userId,
     (unit as any)?.ownerId,
@@ -1704,10 +1740,33 @@ function CompactPortfolioCard({
     .filter(Boolean)
     .map((value) => String(value));
   const isPortfolioOwner = possibleOwnerIds.includes(currentUserId);
+  const canDirectPublish =
+    isPortfolioOwner && isDirectPublishRole && !isPoolVisible;
   const canRemoveFromPool =
     isPortfolioOwner &&
     (approvalStatus === "HAVUZDA" || isPoolVisible);
   const isVerified = isUnitVerified(unit);
+  const approvalBadgeLabel = isPoolVisible
+    ? "Havuzda"
+    : isDirectPublishRole
+      ? "Havuza Hazır"
+      : isVerified
+        ? "EPH Onaylı"
+        : "Onay Bekliyor";
+  const approvalBadgeClass = isPoolVisible
+    ? "bg-emerald-600/90"
+    : isDirectPublishRole
+      ? "bg-sky-600/90"
+      : isVerified
+        ? "bg-emerald-600/90"
+        : "bg-amber-500/90";
+  const verificationLabel = isPoolVisible
+    ? "Havuzda"
+    : isDirectPublishRole
+      ? "Doğrudan Yayın"
+      : isVerified
+        ? "Yetkili"
+        : "Kontrol";
   const text = [unit.type, unit.description, unit.project?.name]
     .join(" ")
     .toLocaleLowerCase("tr-TR");
@@ -1901,11 +1960,9 @@ function CompactPortfolioCard({
 
           <div className="absolute left-2.5 right-2.5 top-2.5 flex items-start justify-between gap-2">
             <span
-              className={`rounded-full border border-white/80 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] backdrop-blur-md ${
-                isVerified ? "bg-emerald-600/90" : "bg-amber-500/90"
-              }`}
+              className={`rounded-full border border-white/80 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] backdrop-blur-md ${approvalBadgeClass}`}
             >
-              {isVerified ? "EPH Onaylı" : "Onay Bekliyor"}
+              {approvalBadgeLabel}
             </span>
 
             <span className="rounded-full border border-white/80 bg-slate-950/60 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] backdrop-blur-md">
@@ -1988,12 +2045,16 @@ function CompactPortfolioCard({
 
             <span
               className={`shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-extrabold ${
-                isVerified
+                isPoolVisible
                   ? "bg-emerald-50 text-emerald-700"
-                  : "bg-amber-50 text-amber-700"
+                  : isDirectPublishRole
+                    ? "bg-sky-50 text-sky-700"
+                    : isVerified
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700"
               }`}
             >
-              {isVerified ? "Yetkili" : "Kontrol"}
+              {verificationLabel}
             </span>
           </div>
 
@@ -2062,6 +2123,24 @@ function CompactPortfolioCard({
           Menü
         </button>
       </div>
+
+      {canDirectPublish && (
+        <div className="border-t border-emerald-100 bg-emerald-50 p-2">
+          <button
+            type="button"
+            onClick={onDirectPublish}
+            disabled={poolBusy}
+            className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[13px] bg-emerald-600 px-3 text-center text-[12px] font-extrabold leading-4 text-white shadow-[0_10px_24px_rgba(5,150,105,0.22)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {poolBusy ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Send size={16} />
+            )}
+            Doğrudan Havuza Gönder
+          </button>
+        </div>
+      )}
 
       {menuOpen && (
         <div className="grid grid-cols-3 gap-2 border-t border-[#EDE9FE] bg-white p-2.5">
@@ -2151,16 +2230,21 @@ function CompactPortfolioCard({
             </p>
           )}
 
-          <div
-            className="mt-2 flex min-h-[38px] items-center justify-center rounded-[12px] border px-3 text-center text-[11px] font-extrabold"
+          <button
+            type="button"
+            onClick={onOpen}
+            className="mt-2 flex min-h-[42px] w-full items-center justify-center gap-2 rounded-[12px] border px-3 text-center text-[11px] font-extrabold active:scale-[0.98]"
             style={{
               backgroundColor: visualTheme.typeSoft,
               borderColor: visualTheme.typeBorder,
               color: visualTheme.typeColor,
             }}
+            aria-label={`${unit.project?.name || "Portföy"} detayını aç`}
           >
-            ✦ {highlight}
-          </div>
+            <Eye size={15} />
+            Portföy Detayını Aç
+            {highlight !== "Portföy Detayı" ? ` · ${highlight}` : ""}
+          </button>
 
           {canRemoveFromPool && (
             <div className="mt-2.5">

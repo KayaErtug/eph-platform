@@ -111,13 +111,13 @@ const FEATURE_LABELS: Record<string, string> = {
   GIYINME_ODASI: "Giyinme Odası",
   ANKASTRE_MUTFAK: "Ankastre Mutfak",
   AKILLI_EV: "Akıllı Ev Sistemi",
-  SOMINE: " ?ömine",
+  SOMINE: "Şömine",
   KLIMA: "Klima",
   ISI_YALITIMI: "Isı Yalıtımı",
   SES_YALITIMI: "Ses Yalıtımı",
   DENIZ_MANZARASI: "Deniz Manzarası",
   DOGA_MANZARASI: "Doğa Manzarası",
-  SEHIR_MANZARASI: " ?ehir Manzarası",
+  SEHIR_MANZARASI: "Şehir Manzarası",
   YUKLEME_RAMPASI: "Yükleme Rampası",
   TIR_GIRISI: "TIR Girişi",
   VINC_SISTEMI: "Vinç Sistemi",
@@ -138,7 +138,20 @@ const FEATURE_LABELS: Record<string, string> = {
 
 function getFeatureLabels(features?: string[] | null) {
   if (!Array.isArray(features)) return [];
-  return features.map((feature) => FEATURE_LABELS[feature] || feature).filter(Boolean);
+
+  return Array.from(
+    new Set(
+      features
+        .map((feature) => String(feature || "").trim())
+        .filter(
+          (feature) =>
+            Boolean(feature) &&
+            !feature.toLocaleUpperCase("tr-TR").startsWith("__EPH_META"),
+        )
+        .map((feature) => FEATURE_LABELS[feature] || feature)
+        .filter(Boolean),
+    ),
+  );
 }
 
 function unitHasFeature(unit: DetailUnit, codes: string[]) {
@@ -234,9 +247,9 @@ function normalizeDetailType(value?: string) {
   return String(value || "")
     .toLocaleUpperCase("tr-TR")
     .replaceAll("İ", "I")
-    .replaceAll(" ?", "G")
+    .replaceAll("Ğ", "G")
     .replaceAll("Ü", "U")
-    .replaceAll(" ?", "S")
+    .replaceAll("Ş", "S")
     .replaceAll("Ö", "O")
     .replaceAll("Ç", "C");
 }
@@ -378,7 +391,14 @@ function getAuthorityDisplayValue(
   verified: boolean,
   documents: PortfolioAuthorityDocument[],
 ) {
+  const ownerRole = String(unit.project?.owner?.role || "").toUpperCase();
+
+  if (isDirectPoolPublisherRole(ownerRole)) {
+    return "Kurumsal Doğrudan Yayın Yetkisi";
+  }
+
   if (!verified && !documents.length) return "";
+
   const authorityKind = getAuthorityKind(unit, documents);
   return isDisplayableDetailValue(authorityKind) ? authorityKind : "";
 }
@@ -628,6 +648,12 @@ function canViewDoorAccessInfo(
 function canReviewDetailUnit(user?: { role?: string | null } | null) {
   const role = String(user?.role || "").toUpperCase();
   return ["MODERATOR", "ADMIN", "SUPER_ADMIN"].includes(role);
+}
+
+function isDirectPoolPublisherRole(role?: string | null) {
+  return ["MUTEAHHIT", "INSAAT_FIRMASI"].includes(
+    String(role || "").toUpperCase(),
+  );
 }
 
 function isApprovalFinal(status?: string) {
@@ -1103,17 +1129,29 @@ export default function StokDetailPage() {
   const handleSubmitApproval = async () => {
     if (!unit) return;
 
-    setApprovalActionLoading("INCELEMEYE_GONDERILDI");
+    const ownerRole = String(
+      unit.project?.owner?.role || user?.role || "",
+    ).toUpperCase();
+    const isDirectPoolPublisher =
+      isDirectPoolPublisherRole(ownerRole);
+
+    setApprovalActionLoading("SUBMIT");
     setActionError("");
 
     try {
       await api.post(`/units/${unit.id}/submit-approval`);
-      await fetchPortfolioDocuments(unit.id);
+
+      if (!isDirectPoolPublisher) {
+        await fetchPortfolioDocuments(unit.id);
+      }
+
       await fetchUnit();
     } catch (err: any) {
       setActionError(
         err?.response?.data?.message ||
-          "Portföy incelemeye gönderilemedi. Lütfen belge durumunu kontrol ediniz.",
+          (isDirectPoolPublisher
+            ? "Portföy doğrudan havuzda yayınlanamadı. Üyelik ve portföy durumunu kontrol ediniz."
+            : "Portföy incelemeye gönderilemedi. Tapu ve Yetki Belgesi durumunu kontrol ediniz."),
       );
     } finally {
       setApprovalActionLoading("");
@@ -1219,8 +1257,17 @@ export default function StokDetailPage() {
   const handleWithdrawFromPool = async () => {
     if (!unit || !isDetailUnitOwner(unit, user)) return;
 
+    const ownerRole = String(
+      unit.project?.owner?.role || user?.role || "",
+    ).toUpperCase();
+    const isDirectPoolPublisher =
+      isDirectPoolPublisherRole(ownerRole);
+    const republishMessage = isDirectPoolPublisher
+      ? "Değişikliklerden sonra portföyü yeniden doğrudan havuzda yayınlayabilirsiniz."
+      : "Değişikliklerden sonra Tapu ve Yetki Belgesi ile yeniden EPH incelemesine göndermeniz gerekir.";
+
     const confirmed = window.confirm(
-      "İlan havuzdan kaldırılacak ve Taslak durumuna dönecek.\n\nFiyat, açıklama, fotoğraf ve belgeleri güncelleyebilirsiniz.\n\nTekrar yayınlanması için yeniden admin onayı gerekecek.",
+      `İlan havuzdan kaldırılacak ve Taslak durumuna dönecek.\n\nFiyat, açıklama ve fotoğrafları güncelleyebilirsiniz.\n\n${republishMessage}`,
     );
 
     if (!confirmed) return;
@@ -1343,6 +1390,11 @@ export default function StokDetailPage() {
   const approvalStatus = String(
     unit.approvalStatus || "TASLAK",
   ).toUpperCase();
+  const portfolioOwnerRole = String(
+    unit.project?.owner?.role || user?.role || "",
+  ).toUpperCase();
+  const isDirectPoolPublisher =
+    isDirectPoolPublisherRole(portfolioOwnerRole);
   const canWithdrawFromPool =
     isPortfolioOwner &&
     (approvalStatus === "HAVUZDA" || Boolean(unit.isPoolVisible));
@@ -1372,20 +1424,26 @@ export default function StokDetailPage() {
         onChange={handleGalleryUpload}
       />
 
-      <input
-        ref={yetkiDocumentInputRef}
-        type="file"
-        accept={DOCUMENT_ACCEPT}
-        className="hidden"
-        onChange={(event) => handleDocumentUpload(event, "YETKI_BELGESI")}
-      />
-      <input
-        ref={tapuDocumentInputRef}
-        type="file"
-        accept={DOCUMENT_ACCEPT}
-        className="hidden"
-        onChange={(event) => handleDocumentUpload(event, "TAPU")}
-      />
+      {!isDirectPoolPublisher && (
+        <>
+          <input
+            ref={yetkiDocumentInputRef}
+            type="file"
+            accept={DOCUMENT_ACCEPT}
+            className="hidden"
+            onChange={(event) =>
+              handleDocumentUpload(event, "YETKI_BELGESI")
+            }
+          />
+          <input
+            ref={tapuDocumentInputRef}
+            type="file"
+            accept={DOCUMENT_ACCEPT}
+            className="hidden"
+            onChange={(event) => handleDocumentUpload(event, "TAPU")}
+          />
+        </>
+      )}
 
       <section className="mx-auto w-full max-w-[430px] px-3 py-3">
         <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-1">
@@ -1620,8 +1678,9 @@ export default function StokDetailPage() {
             </div>
 
             <p className="mx-auto mt-1.5 max-w-[350px] text-[11px] font-bold leading-5 text-[#64748B]">
-              İlan havuzdan kaldırılarak Taslak durumuna döner. Yaptığınız
-              değişikliklerden sonra yeniden admin onayına göndermeniz gerekir.
+              {isDirectPoolPublisher
+                ? "İlan havuzdan kaldırılarak Taslak durumuna döner. Güncellemeden sonra belge ve yönetici onayı olmadan yeniden doğrudan yayınlanabilir."
+                : "İlan havuzdan kaldırılarak Taslak durumuna döner. Güncellemeden sonra Tapu ve Yetki Belgesi ile yeniden EPH incelemesine gönderilir."}
             </p>
 
             <button
@@ -1880,6 +1939,7 @@ export default function StokDetailPage() {
           <PortfolioDocumentsCenter
             unit={unit}
             documents={portfolioDocuments}
+            ownerRole={portfolioOwnerRole}
             canEditPortfolio={canEditPortfolio}
             canReviewPortfolio={canReviewPortfolio}
             documentUploadLoading={documentUploadLoading}
@@ -2197,6 +2257,7 @@ function PortfolioDetailInfoCenter({
 function PortfolioDocumentsCenter({
   unit,
   documents,
+  ownerRole,
   canEditPortfolio,
   canReviewPortfolio,
   documentUploadLoading,
@@ -2210,6 +2271,7 @@ function PortfolioDocumentsCenter({
 }: {
   unit: DetailUnit;
   documents: PortfolioAuthorityDocument[];
+  ownerRole: string;
   canEditPortfolio: boolean;
   canReviewPortfolio: boolean;
   documentUploadLoading: string;
@@ -2221,15 +2283,62 @@ function PortfolioDocumentsCenter({
   onSubmitApproval: () => void;
   onCreateAuthorityLetter: () => void;
 }) {
-  const yetkiDocument = findPortfolioDocument(documents, "YETKI_BELGESI");
-  const tapuDocument = findPortfolioDocument(documents, "TAPU");
-  const hasAnyDocument = Boolean(yetkiDocument || tapuDocument);
   const approvalStatus = String(unit.approvalStatus || "TASLAK").toUpperCase();
-  const isSubmittedForApproval = ["INCELEMEYE_GONDERILDI", "INCELEMEDE"].includes(approvalStatus);
+  const isSubmittedForApproval = ["INCELEMEYE_GONDERILDI", "INCELEMEDE"].includes(
+    approvalStatus,
+  );
   const isApprovedForPool = approvalStatus === "ONAYLANDI";
   const isInPool = approvalStatus === "HAVUZDA";
+  const isDirectPoolPublisher =
+    isDirectPoolPublisherRole(ownerRole);
+  const isSubmitBusy = approvalActionLoading === "SUBMIT";
+
+  if (isDirectPoolPublisher) {
+    const directSubmitDisabled =
+      Boolean(approvalActionLoading) ||
+      isSubmittedForApproval ||
+      isApprovedForPool ||
+      isInPool;
+
+    return (
+      <section className="mt-3 rounded-[22px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-blue-50 p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
+        <div className="flex items-center justify-center gap-2 text-emerald-700">
+          <ShieldCheck size={18} />
+          <h2 className="text-center text-[16px] font-black text-[#06194A]">
+            Havuza Doğrudan Yayınlama
+          </h2>
+        </div>
+
+        <p className="mx-auto mt-1 max-w-[340px] text-center text-[11px] font-bold leading-5 text-[#64748B]">
+          Müteahhit ve İnşaat Firması portföyleri belge yüklemeden ve yönetici
+          onayı beklemeden doğrudan Havuzda yayınlanır.
+        </p>
+
+        <div className="mt-3 rounded-[16px] border border-emerald-100 bg-white px-3 py-2 text-[10px] font-black leading-4 text-emerald-700">
+          Portföy bilgilerinin ve fotoğrafların doğru olduğundan emin olun.
+          Yayınlanan ilan tüm Havuz kullanıcılarına görünür.
+        </div>
+
+        {canEditPortfolio && (
+          <button
+            type="button"
+            onClick={onSubmitApproval}
+            disabled={directSubmitDisabled}
+            className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[16px] bg-emerald-600 px-3 text-[12px] font-black text-white shadow-[0_12px_24px_rgba(5,150,105,0.20)] disabled:bg-slate-200 disabled:text-slate-500"
+          >
+            <Send size={16} />
+            {isSubmitBusy ? "Havuzda Yayınlanıyor..." : "Doğrudan Havuza Gönder"}
+          </button>
+        )}
+      </section>
+    );
+  }
+
+  const yetkiDocument = findPortfolioDocument(documents, "YETKI_BELGESI");
+  const tapuDocument = findPortfolioDocument(documents, "TAPU");
+  const hasRequiredDocuments = Boolean(yetkiDocument && tapuDocument);
   const submitDisabled =
-    !hasAnyDocument ||
+    !hasRequiredDocuments ||
     Boolean(approvalActionLoading) ||
     isSubmittedForApproval ||
     isApprovedForPool ||
@@ -2251,7 +2360,7 @@ function PortfolioDocumentsCenter({
             ? "Portföy onaylandı ve otomatik olarak havuzda yayınlandı."
             : isInPool
               ? "Portföy havuzda yayında."
-              : "Yetki belgesi veya tapu yüklenince portföy incelemeye gönderilebilir."}
+              : "Tapu ve Yetki Belgesi birlikte yüklendiğinde portföy EPH incelemesine gönderilebilir."}
       </p>
 
       {canEditPortfolio && (
@@ -2268,7 +2377,7 @@ function PortfolioDocumentsCenter({
       <div className="mt-3 grid gap-2">
         <PortfolioDocumentRow
           label={DOCUMENT_LABELS.YETKI_BELGESI}
-          description="Yetkili portföy için zorunlu evrak"
+          description="Emlakçı portföyü için zorunlu evrak"
           document={yetkiDocument}
           canEditPortfolio={canEditPortfolio}
           uploadLoading={documentUploadLoading === "YETKI_BELGESI"}
@@ -2279,7 +2388,7 @@ function PortfolioDocumentsCenter({
 
         <PortfolioDocumentRow
           label={DOCUMENT_LABELS.TAPU}
-          description="Tapu veya mülkiyet doğrulama evrakı"
+          description="Emlakçı portföyü için zorunlu tapu evrakı"
           document={tapuDocument}
           canEditPortfolio={canEditPortfolio}
           uploadLoading={documentUploadLoading === "TAPU"}
@@ -2297,9 +2406,9 @@ function PortfolioDocumentsCenter({
           className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[16px] bg-[#06194A] px-3 text-[12px] font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
         >
           <Send size={16} />
-          {approvalActionLoading === "INCELEMEYE_GONDERILDI"
-            ? "Gönderiliyor..."
-            : "İncelemeye Gönder"}
+          {isSubmitBusy
+            ? "İncelemeye Gönderiliyor..."
+            : "EPH İncelemesine Gönder"}
         </button>
       )}
 
@@ -2600,10 +2709,18 @@ function InfoBox({
   label: string;
   value: string;
 }) {
+  const compactValue = value.length > 22;
+
   return (
     <div className="flex min-h-[86px] w-[calc(25%_-_5px)] min-w-[72px] flex-col items-center justify-center rounded-[18px] border border-[#D9E5F3] bg-[#F8FBFF] px-1.5 py-2 text-center text-[#06194A] shadow-[0_8px_18px_rgba(15,23,42,0.055)]">
       <div className="text-[#1557D6]">{icon}</div>
-      <p className="mt-1 break-words text-[16px] font-black leading-tight tracking-[-0.04em]">
+      <p
+        className={`mt-1 break-words font-black tracking-[-0.04em] ${
+          compactValue
+            ? "text-[11px] leading-[1.18]"
+            : "text-[16px] leading-tight"
+        }`}
+      >
         {value}
       </p>
       <p className="mt-0.5 text-[8px] font-black uppercase leading-3 tracking-[0.08em] text-[#64748B]">

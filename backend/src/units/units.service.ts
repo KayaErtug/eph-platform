@@ -283,6 +283,19 @@ export class UnitsService {
     return user?.role === Role.MODERATOR || user?.role === 'MODERATOR';
   }
 
+  private isDirectPoolPublisherRole(role?: Role | string | null) {
+    const normalizedRole = String(role || '').toUpperCase();
+
+    return (
+      normalizedRole === Role.MUTEAHHIT ||
+      normalizedRole === Role.INSAAT_FIRMASI
+    );
+  }
+
+  private isRealEstateAgentRole(role?: Role | string | null) {
+    return String(role || '').toUpperCase() === Role.EMLAKCI;
+  }
+
   private isApprovalManager(user?: CurrentUserPayload) {
     return this.isSuperAdmin(user) || this.isAdmin(user) || this.isModerator(user);
   }
@@ -630,7 +643,17 @@ export class UnitsService {
   private async getUnitWithProjectOrFail(id: string) {
     const unit = await this.prisma.unit.findUnique({
       where: { id },
-      include: { project: true },
+      include: {
+        project: {
+          include: {
+            owner: {
+              select: {
+                role: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!unit) {
@@ -838,6 +861,30 @@ export class UnitsService {
     yetkiVerified: boolean;
   }) {
     return Boolean(unit.tapuVerified || unit.yetkiVerified);
+  }
+
+  private hasRequiredAgentApprovalDocuments(unit: {
+    tapuVerified: boolean;
+    yetkiVerified: boolean;
+  }) {
+    return Boolean(unit.tapuVerified && unit.yetkiVerified);
+  }
+
+  private getMissingAgentApprovalDocuments(unit: {
+    tapuVerified: boolean;
+    yetkiVerified: boolean;
+  }) {
+    const missingDocuments: string[] = [];
+
+    if (!unit.tapuVerified) {
+      missingDocuments.push('Tapu');
+    }
+
+    if (!unit.yetkiVerified) {
+      missingDocuments.push('Yetki Belgesi');
+    }
+
+    return missingDocuments;
   }
 
   private hasPortfolioPhoto(unit: {
@@ -2226,18 +2273,50 @@ export class UnitsService {
     this.ensureCanManageUnit(user, unit.project.ownerId);
     this.ensurePortfolioContentEditable(user, unit);
     this.ensureProjectVisibleForPortfolioActions(unit.project);
+    await this.ensurePoolActionMembership(user);
 
-    if (!this.hasApprovalDocument(unit)) {
+    const ownerRole = unit.project.owner?.role || user.role;
+
+    if (this.isDirectPoolPublisherRole(ownerRole)) {
+      const publishedAt = new Date();
+      const ownerRoleLabel =
+        String(ownerRole).toUpperCase() === Role.MUTEAHHIT
+          ? 'Müteahhit'
+          : 'İnşaat Firması';
+
       return this.prisma.unit.update({
         where: { id },
         data: {
-          approvalStatus: PortfolioApprovalStatus.BELGE_BEKLENIYOR,
-          isPoolVisible: false,
+          approvalStatus: PortfolioApprovalStatus.HAVUZDA,
+          submittedForApprovalAt: null,
+          approvedAt: publishedAt,
+          rejectedAt: null,
           approvalNote:
-            'Havuza gönderebilmek için yetki belgesi, tapu veya ilgili doğrulama evrakı gereklidir.',
+            `${ownerRoleLabel} portföyü belge ve yönetici onayı gerektirmeden doğrudan havuzda yayınlandı.`,
+          isVerified: true,
+          verifiedAt: publishedAt,
+          isPoolVisible: true,
+          poolPublishedAt: publishedAt,
+          poolRemovedAt: null,
         },
         include: unitInclude,
       });
+    }
+
+    if (!this.isRealEstateAgentRole(ownerRole)) {
+      throw new BadRequestException(
+        'Bu kullanıcı rolü için portföy yayınlama akışı tanımlı değildir.',
+      );
+    }
+
+    if (!this.hasRequiredAgentApprovalDocuments(unit)) {
+      const missingDocuments = this.getMissingAgentApprovalDocuments(unit);
+
+      throw new BadRequestException(
+        `Portföyü incelemeye göndermek için ${missingDocuments.join(
+          ' ve ',
+        )} yüklenmelidir.`,
+      );
     }
 
     return this.prisma.unit.update({
@@ -2301,9 +2380,14 @@ export class UnitsService {
 
     const unit = await this.getUnitWithProjectOrFail(id);
 
-    if (!this.hasApprovalDocument(unit)) {
+    const ownerRole = unit.project.owner?.role;
+
+    if (
+      this.isRealEstateAgentRole(ownerRole) &&
+      !this.hasRequiredAgentApprovalDocuments(unit)
+    ) {
       throw new BadRequestException(
-        'Bu portföyde onay için yeterli doğrulama evrakı bulunmuyor.',
+        'Emlakçı portföyü onaylanmadan önce Tapu ve Yetki Belgesi birlikte yüklenmelidir.',
       );
     }
 
@@ -2393,6 +2477,10 @@ export class UnitsService {
       throw new BadRequestException('Bu portföy zaten havuzda değil.');
     }
 
+    const ownerRole = unit.project.owner?.role || user.role;
+    const isDirectPoolPublisher =
+      this.isDirectPoolPublisherRole(ownerRole);
+
     return this.prisma.unit.update({
       where: { id },
       data: {
@@ -2402,8 +2490,9 @@ export class UnitsService {
         isVerified: false,
         verifiedAt: null,
         poolRemovedAt: new Date(),
-        approvalNote:
-          'Portföy havuzdan kaldırıldı. Yeniden yayın için bilgileri kontrol edip admin incelemesine gönderin.',
+        approvalNote: isDirectPoolPublisher
+          ? 'Portföy havuzdan kaldırıldı. Bilgileri güncelledikten sonra yeniden doğrudan havuzda yayınlayabilirsiniz.'
+          : 'Portföy havuzdan kaldırıldı. Bilgileri güncelledikten sonra Tapu ve Yetki Belgesi ile yeniden incelemeye gönderin.',
       },
       include: unitInclude,
     });
