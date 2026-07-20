@@ -25,6 +25,16 @@ type EffectivePersona =
   | "OFFICE_MEMBER"
   | "TEAM_MEMBER";
 
+type MembershipAccessCode =
+  | "SYSTEM"
+  | "ACTIVE"
+  | "NO_MEMBERSHIP"
+  | "NOT_STARTED"
+  | "EXPIRED"
+  | "CANCELLED"
+  | "PASSIVE"
+  | "PACKAGE_INACTIVE";
+
 @Injectable()
 export class LinaUserContextService {
   constructor(
@@ -131,8 +141,48 @@ export class LinaUserContextService {
       );
     }
 
-    const membership =
-      await this.prisma.kullaniciUyelikPaketi.findFirst({
+    const now = new Date();
+
+    const [
+      activeMembership,
+      latestMembership,
+    ] = await Promise.all([
+      this.prisma.kullaniciUyelikPaketi.findFirst({
+        where: {
+          kullaniciId: user.id,
+          durum: UyelikDurumu.AKTIF,
+          baslangicTarihi: {
+            lte: now,
+          },
+          OR: [
+            {
+              bitisTarihi: null,
+            },
+            {
+              bitisTarihi: {
+                gte: now,
+              },
+            },
+          ],
+        },
+        orderBy: [
+          {
+            baslangicTarihi: "desc",
+          },
+          {
+            olusturulmaTarihi: "desc",
+          },
+        ],
+        select: {
+          paketId: true,
+          durum: true,
+          baslangicTarihi: true,
+          bitisTarihi: true,
+          pilotPaketMi: true,
+          testPaketiMi: true,
+        },
+      }),
+      this.prisma.kullaniciUyelikPaketi.findFirst({
         where: {
           kullaniciId: user.id,
         },
@@ -152,46 +202,69 @@ export class LinaUserContextService {
           pilotPaketMi: true,
           testPaketiMi: true,
         },
-      });
+      }),
+    ]);
 
-    const packageInfo = membership
-      ? await this.prisma.uyelikPaketi.findUnique({
-          where: {
-            id: membership.paketId,
-          },
-          select: {
-            paketKodu: true,
-            paketAdi: true,
-            aktifMi: true,
-            aktifPortfoyLimiti: true,
-            verilenKontor: true,
-          },
-        })
-      : null;
+    const effectiveMembership =
+      activeMembership ||
+      latestMembership;
 
-    const now = new Date();
+    const packageInfo =
+      effectiveMembership
+        ? await this.prisma.uyelikPaketi.findUnique({
+            where: {
+              id: effectiveMembership.paketId,
+            },
+            select: {
+              paketKodu: true,
+              paketAdi: true,
+              aktifMi: true,
+              aktifPortfoyLimiti: true,
+              verilenKontor: true,
+            },
+          })
+        : null;
 
-    const membershipStarted =
-      Boolean(membership) &&
-      membership!.baslangicTarihi.getTime() <=
-        now.getTime();
+    const authoritativeRole =
+      user.role as Role;
 
-    const membershipNotExpired =
-      Boolean(membership) &&
-      (
-        membership!.bitisTarihi === null ||
-        membership!.bitisTarihi.getTime() >
-          now.getTime()
+    const isSuperAdmin =
+      authoritativeRole ===
+      Role.SUPER_ADMIN;
+
+    const membershipActive =
+      isSuperAdmin ||
+      Boolean(
+        activeMembership &&
+          packageInfo?.aktifMi === true,
       );
 
-    const membershipActive = Boolean(
-      membership &&
-        membership.durum ===
-          UyelikDurumu.AKTIF &&
-        membershipStarted &&
-        membershipNotExpired &&
-        packageInfo?.aktifMi === true,
-    );
+    const packageCode =
+      isSuperAdmin
+        ? "SYSTEM"
+        : membershipActive &&
+            packageInfo?.paketKodu
+          ? String(
+              packageInfo.paketKodu,
+            )
+          : null;
+
+    const packageDisplayName =
+      isSuperAdmin
+        ? "Yazılım Ekibi"
+        : packageInfo?.paketAdi ||
+          null;
+
+    const membershipAccessCode =
+      this.resolveMembershipAccessCode({
+        isSuperAdmin,
+        activeMembership:
+          Boolean(activeMembership),
+        latestMembership,
+        packageActive:
+          packageInfo?.aktifMi === true,
+        now,
+      });
 
     const effectivePersonas:
       EffectivePersona[] = [];
@@ -233,9 +306,6 @@ export class LinaUserContextService {
       .trim()
       .toUpperCase();
 
-    const authoritativeRole =
-      user.role as Role;
-
     const displayName =
       `${user.firstName || ""} ${
         user.lastName || ""
@@ -250,8 +320,7 @@ export class LinaUserContextService {
         user.officeId
           ? user.officeId
           : null,
-      packageName:
-        packageInfo?.paketAdi || null,
+      packageName: packageCode,
       membershipActive,
       metadata: {
         email: user.email,
@@ -260,24 +329,59 @@ export class LinaUserContextService {
         isApproved: user.isApproved,
         city: user.city,
         district: user.district,
-        packageCode:
-          packageInfo?.paketKodu
-            ? String(
-                packageInfo.paketKodu,
-              )
-            : null,
+
+        packageCode,
+        packageDisplayName,
+        packageActive:
+          packageInfo?.aktifMi ??
+          null,
+        activePortfolioLimit:
+          packageInfo
+            ?.aktifPortfoyLimiti ??
+          null,
+        packageCredits:
+          packageInfo
+            ?.verilenKontor ??
+          null,
+
+        membershipAccessCode,
         membershipStatus:
-          membership?.durum || null,
+          activeMembership?.durum ||
+          latestMembership?.durum ||
+          null,
         membershipStartsAt:
-          membership?.baslangicTarihi.toISOString() ||
+          effectiveMembership
+            ?.baslangicTarihi
+            .toISOString() ||
           null,
         membershipEndsAt:
-          membership?.bitisTarihi?.toISOString() ||
+          effectiveMembership
+            ?.bitisTarihi
+            ?.toISOString() ||
           null,
         pilotPackage:
-          membership?.pilotPaketMi || false,
+          effectiveMembership
+            ?.pilotPaketMi ||
+          false,
         testPackage:
-          membership?.testPaketiMi || false,
+          effectiveMembership
+            ?.testPaketiMi ||
+          false,
+
+        latestMembershipStatus:
+          latestMembership?.durum ||
+          null,
+        latestMembershipStartsAt:
+          latestMembership
+            ?.baslangicTarihi
+            .toISOString() ||
+          null,
+        latestMembershipEndsAt:
+          latestMembership
+            ?.bitisTarihi
+            ?.toISOString() ||
+          null,
+
         office:
           user.office?.isActive
             ? user.office
@@ -295,9 +399,11 @@ export class LinaUserContextService {
             .map((item) => ({
               teamId: item.teamId,
               joinedAt:
-                item.joinedAt.toISOString(),
+                item.joinedAt
+                  .toISOString(),
               team: item.team,
             })),
+
         effectivePersonas,
         claimedRole:
           claimedRole || null,
@@ -309,5 +415,78 @@ export class LinaUserContextService {
         ),
       },
     };
+  }
+
+  private resolveMembershipAccessCode(
+    input: {
+      isSuperAdmin: boolean;
+      activeMembership: boolean;
+      latestMembership:
+        | {
+            durum: UyelikDurumu;
+            baslangicTarihi: Date;
+            bitisTarihi: Date | null;
+          }
+        | null;
+      packageActive: boolean;
+      now: Date;
+    },
+  ): MembershipAccessCode {
+    if (input.isSuperAdmin) {
+      return "SYSTEM";
+    }
+
+    if (
+      input.activeMembership &&
+      input.packageActive
+    ) {
+      return "ACTIVE";
+    }
+
+    if (
+      input.activeMembership &&
+      !input.packageActive
+    ) {
+      return "PACKAGE_INACTIVE";
+    }
+
+    const latest =
+      input.latestMembership;
+
+    if (!latest) {
+      return "NO_MEMBERSHIP";
+    }
+
+    if (
+      latest.durum ===
+        UyelikDurumu.AKTIF &&
+      latest.baslangicTarihi.getTime() >
+        input.now.getTime()
+    ) {
+      return "NOT_STARTED";
+    }
+
+    if (
+      latest.durum ===
+        UyelikDurumu.SURESI_DOLDU ||
+      (
+        latest.durum ===
+          UyelikDurumu.AKTIF &&
+        latest.bitisTarihi !== null &&
+        latest.bitisTarihi.getTime() <
+          input.now.getTime()
+      )
+    ) {
+      return "EXPIRED";
+    }
+
+    if (
+      latest.durum ===
+      UyelikDurumu.IPTAL
+    ) {
+      return "CANCELLED";
+    }
+
+    return "PASSIVE";
   }
 }
