@@ -21,6 +21,9 @@ import { LinaPortfolioSessionService } from "./portfolio/lina-portfolio-session.
 import { LinaPortfolioEngineService } from "./portfolio/lina-portfolio-engine.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
+import { LinaOpenAiLiveGatewayService } from "./openai-tools/lina-openai-live-gateway.service";
+import { LinaConversationMessage } from "./openai-tools/lina-openai-response.types";
+import { LinaToolSourceModule } from "./openai-tools/lina-tool.types";
 
 type LinaApiUser = LinaAccessUser & {
   email?: string;
@@ -52,6 +55,7 @@ type LinaVoiceResponse = {
 
 type LinaProviderAnswer = {
   content: string;
+  provider: "openai" | "local";
   inputTokens: number;
   outputTokens: number;
 };
@@ -67,6 +71,7 @@ export class LinaService {
     private readonly linaPortfolioSessionService: LinaPortfolioSessionService,
     private readonly linaPortfolioEngineService: LinaPortfolioEngineService,
     private readonly linaV7PromptService: LinaV7PromptService,
+    private readonly linaOpenAiLiveGatewayService: LinaOpenAiLiveGatewayService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -143,7 +148,6 @@ export class LinaService {
       this.extractPortfolioExactReply(portfolioRuntimeContext);
 
     try {
-      const provider = this.getAiProvider();
       const providerAnswer = await this.askOpenAi(
         safeUserMessage,
         sourceModule,
@@ -152,6 +156,7 @@ export class LinaService {
         chatPreparation?.history || [],
         chatPreparation?.memorySnapshot,
       );
+      const provider = providerAnswer.provider;
       const rawAnswer = providerAnswer.content;
 
       const outputFilter = this.linaKvkkService.filterText(rawAnswer);
@@ -453,22 +458,6 @@ export class LinaService {
     history: LinaHistoryMessage[] = [],
     memorySnapshot?: LinaPromptMemorySnapshot,
   ): Promise<LinaProviderAnswer> {
-    const apiKey =
-      this.configService.get<string>("OPENAI_API_KEY") ||
-      process.env.OPENAI_API_KEY;
-
-    if (!apiKey) {
-      return {
-        content: this.localFallbackAnswer(message),
-        inputTokens: 0,
-        outputTokens: 0,
-      };
-    }
-
-    const model =
-      this.configService.get<string>("OPENAI_MODEL") ||
-      process.env.OPENAI_MODEL ||
-      "gpt-4.1-mini";
     const systemPrompt = await this.buildSystemPrompt(
       sourceModule,
       user,
@@ -476,59 +465,72 @@ export class LinaService {
       memorySnapshot,
     );
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.18,
-        max_tokens: 900,
-        presence_penalty: -0.1,
-        frequency_penalty: 0.25,
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-          ...history,
-          {
-            role: "user",
-            content: message,
-          },
-        ],
-      }),
-    });
+    const normalizedHistory: LinaConversationMessage[] = history
+      .filter((item) =>
+        Boolean(item?.content?.trim()),
+      )
+      .map(
+        (item): LinaConversationMessage => ({
+          role:
+            item.role === "assistant"
+              ? "assistant"
+              : "user",
+          content: item.content.trim(),
+        }),
+      )
+      .slice(-20);
 
-    if (!response.ok) {
-      const detail = await response.text();
-      throw new Error(`OPENAI_ERROR_${response.status}: ${detail}`);
-    }
+    const gatewayResult =
+      await this.linaOpenAiLiveGatewayService.run({
+        message,
+        instructions: systemPrompt,
+        identity: {
+          id: user?.id,
+          role: user?.role,
+          email: user?.email,
+        },
+        sourceModule:
+          this.normalizeToolSourceModule(
+            sourceModule,
+          ),
+        history: normalizedHistory,
+      });
 
-    const data = (await response.json()) as {
-      choices?: Array<{
-        message?: {
-          content?: string;
-        };
-      }>;
-      usage?: {
-        prompt_tokens?: number;
-        completion_tokens?: number;
-      };
-    };
+    if (
+      gatewayResult.status ===
+      "approval_required"
+    ) {
+      const toolName =
+        gatewayResult.pendingApproval
+          ?.toolName || "unknown";
 
-    const content = data?.choices?.[0]?.message?.content?.trim();
+      this.linaAuditService.log({
+        userId: user?.id,
+        role: user?.role,
+        module: sourceModule,
+        action:
+          "lina_tool_approval_required",
+        result: "blocked",
+        riskLevel: 2,
+        reason: toolName,
+      });
 
-    if (!content) {
-      throw new Error("OPENAI_EMPTY_RESPONSE");
+      throw new Error(
+        `LINA_TOOL_APPROVAL_REQUIRED:${toolName}`,
+      );
     }
 
     return {
-      content,
-      inputTokens: data.usage?.prompt_tokens || 0,
-      outputTokens: data.usage?.completion_tokens || 0,
+      content: gatewayResult.content,
+      provider:
+        gatewayResult.provider ===
+        "local"
+          ? "local"
+          : "openai",
+      inputTokens:
+        gatewayResult.inputTokens,
+      outputTokens:
+        gatewayResult.outputTokens,
     };
   }
 
@@ -1555,6 +1557,31 @@ export class LinaService {
     }
 
     return "general";
+  }
+
+  private normalizeToolSourceModule(
+    sourceModule: LinaModuleName,
+  ): LinaToolSourceModule {
+    if (sourceModule === "audit") {
+      return "admin";
+    }
+
+    const allowed:
+      LinaToolSourceModule[] = [
+      "dashboard",
+      "crm",
+      "network",
+      "pool",
+      "notifications",
+      "general",
+      "admin",
+    ];
+
+    return allowed.includes(
+      sourceModule as LinaToolSourceModule,
+    )
+      ? sourceModule as LinaToolSourceModule
+      : "general";
   }
 
   private isForeignLanguageRequest(message: string): boolean {
