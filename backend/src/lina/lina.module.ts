@@ -27,6 +27,7 @@ import { LinaOpenAiClientService } from "./openai-tools/lina-openai-client.servi
 import { LinaOpenAiOrchestratorService } from "./openai-tools/lina-openai-orchestrator.service";
 import { LinaReadToolProviderService } from "./openai-tools/lina-read-tool-provider.service";
 import { LinaToolExecutorService } from "./openai-tools/lina-tool-executor.service";
+import { LinaToolInputValidatorService } from "./openai-tools/lina-tool-input-validator.service";
 import { LinaToolPolicyService } from "./openai-tools/lina-tool-policy.service";
 import { LinaToolRegistryService } from "./openai-tools/lina-tool-registry.service";
 import { LinaPortfolioApprovalValidationService } from "./portfolio/lina-portfolio-approval-validation.service";
@@ -71,6 +72,7 @@ import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
 
     LinaToolPolicyService,
     LinaToolRegistryService,
+    LinaToolInputValidatorService,
     LinaToolExecutorService,
     LinaOpenAiClientService,
     LinaOpenAiOrchestratorService,

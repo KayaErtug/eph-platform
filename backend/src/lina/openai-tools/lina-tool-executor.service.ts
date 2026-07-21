@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 
+import { LinaToolInputValidatorService } from "./lina-tool-input-validator.service";
 import { LinaToolPolicyService } from "./lina-tool-policy.service";
 import { LinaToolRegistryService } from "./lina-tool-registry.service";
 import {
@@ -13,6 +14,7 @@ export class LinaToolExecutorService {
   constructor(
     private readonly registryService: LinaToolRegistryService,
     private readonly policyService: LinaToolPolicyService,
+    private readonly inputValidatorService: LinaToolInputValidatorService = new LinaToolInputValidatorService(),
   ) {}
 
   async execute(
@@ -33,6 +35,7 @@ export class LinaToolExecutorService {
     }
 
     const { definition, handler } = registeredTool;
+
     const policyDecision =
       this.policyService.evaluate(
         definition,
@@ -48,6 +51,27 @@ export class LinaToolExecutorService {
           policyDecision.reason ||
           "Lina aracı için yetki verilmedi.",
         riskLevel: definition.riskLevel,
+      };
+    }
+
+    const validationResult =
+      this.inputValidatorService.validate(
+        definition.inputSchema,
+        call.input,
+      );
+
+    if (!validationResult.valid) {
+      return {
+        status: "error",
+        success: false,
+        toolName: definition.name,
+        message:
+          "Lina aracı için gönderilen parametreler geçersiz.",
+        data: {
+          issues: validationResult.issues,
+        },
+        riskLevel: definition.riskLevel,
+        requiresConfirmation: false,
       };
     }
 
