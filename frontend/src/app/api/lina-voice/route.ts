@@ -1,136 +1,304 @@
-import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DEFAULT_LINA_VOICE_ID = "LYfSi2g3Frvxg50fRl91";
-const DEFAULT_LINA_MODEL_ID = "eleven_multilingual_v2";
-const LINA_VOICE_SEED = 20260628;
+const OPENAI_SPEECH_ENDPOINT =
+  "https://api.openai.com/v1/audio/speech";
 
-function readEnvValue(key: string) {
-  const fromProcess = process.env[key];
+const DEFAULT_LINA_TTS_MODEL =
+  "gpt-4o-mini-tts";
 
-  if (fromProcess && fromProcess.trim().length > 0) {
-    return fromProcess.trim();
-  }
+const DEFAULT_LINA_TTS_VOICE =
+  "marin";
 
+const MAX_SPEECH_INPUT_LENGTH = 4096;
+
+function readEnvFileValue(
+  filePath: string,
+  key: string,
+): string {
   try {
-    const envPath = path.join(process.cwd(), ".env.local");
-    const envFile = fs.readFileSync(envPath, "utf8");
+    if (!fs.existsSync(filePath)) {
+      return "";
+    }
+
+    const envFile = fs.readFileSync(
+      filePath,
+      "utf8",
+    );
 
     const line = envFile
-      .split("\n")
+      .split(/\r?\n/)
       .map((item) => item.trim())
-      .find((item) => item.startsWith(`${key}=`));
+      .find(
+        (item) =>
+          item.startsWith(`${key}=`) ||
+          item.startsWith(
+            `export ${key}=`,
+          ),
+      );
 
     if (!line) {
       return "";
     }
 
-    return line.replace(`${key}=`, "").trim().replace(/^["']|["']$/g, "");
+    return line
+      .replace(/^export\s+/, "")
+      .replace(`${key}=`, "")
+      .trim()
+      .replace(/^["']|["']$/g, "");
   } catch {
     return "";
   }
 }
 
-function normalizeVoiceText(text: string) {
-  return String(text || "")
-    .replace(/\bEPH\b/g, "Emlak Portföy Havuzu")
-    .replace(/\beph\b/g, "Emlak Portföy Havuzu")
-    .replace(/\bTRY\b/g, "Türk Lirası")
-    .replace(/\bTL\b/g, "Türk Lirası")
-    .replace(/₺/g, " Türk Lirası ")
-    .replace(/\b0\s*km\b/gi, "sıfır kilometre")
-    .replace(/\b0km\b/gi, "sıfır kilometre")
-    .replace(/\b(\d+)\s*[,.]\s*5\s*\+\s*(\d+)\b/g, "$1 buçuk artı $2")
-    .replace(/\b(\d+)\s*\+\s*(\d+)\b/g, "$1 artı $2")
-    .replace(/\n/g, ". ")
-    .replace(/\. \. /g, ". ")
-    .replace(/\. /g, ". ")
-    .replace(/, /g, ", ")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+function readEnvValue(key: string): string {
+  const fromProcess =
+    process.env[key]?.trim();
+
+  if (fromProcess) {
+    return fromProcess;
+  }
+
+  const possibleEnvFiles = [
+    path.join(
+      process.cwd(),
+      ".env.local",
+    ),
+    path.join(
+      process.cwd(),
+      ".env",
+    ),
+    path.join(
+      process.cwd(),
+      "..",
+      "backend",
+      ".env",
+    ),
+  ];
+
+  for (const filePath of possibleEnvFiles) {
+    const value = readEnvFileValue(
+      filePath,
+      key,
+    );
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
 }
 
-export async function POST(req: NextRequest) {
+function normalizeVoiceText(
+  text: string,
+): string {
+  return String(text || "")
+    .replace(
+      /\bEPH\b/g,
+      "Emlak Portföy Havuzu",
+    )
+    .replace(
+      /\beph\b/g,
+      "Emlak Portföy Havuzu",
+    )
+    .replace(
+      /\bTRY\b/g,
+      "Türk Lirası",
+    )
+    .replace(
+      /\bTL\b/g,
+      "Türk Lirası",
+    )
+    .replace(
+      /₺/g,
+      " Türk Lirası ",
+    )
+    .replace(
+      /\bUSD\b/g,
+      "Amerikan Doları",
+    )
+    .replace(
+      /\bEUR\b/g,
+      "Euro",
+    )
+    .replace(
+      /\bKAKS\b/g,
+      "kaks",
+    )
+    .replace(
+      /\bTAKS\b/g,
+      "taks",
+    )
+    .replace(
+      /\bBrüt\b/g,
+      "bürüt",
+    )
+    .replace(
+      /\bbrüt\b/g,
+      "bürüt",
+    )
+    .replace(
+      /\b0\s*km\b/gi,
+      "sıfır kilometre",
+    )
+    .replace(
+      /\b0km\b/gi,
+      "sıfır kilometre",
+    )
+    .replace(
+      /\b(\d+)\s*[,.]\s*5\s*\+\s*(\d+)\b/g,
+      "$1 buçuk artı $2",
+    )
+    .replace(
+      /\b(\d+)\s*\+\s*(\d+)\b/g,
+      "$1 artı $2",
+    )
+    .replace(
+      /\bAda\s*\/\s*Parsel\b/gi,
+      "ada parsel",
+    )
+    .replace(
+      /\b(\d+)\s*(m²|m2)\b/gi,
+      "$1 metrekare",
+    )
+    .replace(/\n+/g, ". ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(
+      0,
+      MAX_SPEECH_INPUT_LENGTH,
+    );
+}
+
+export async function POST(
+  request: NextRequest,
+) {
   try {
-    const { text } = await req.json();
+    const body =
+      (await request.json()) as {
+        text?: unknown;
+      };
 
-    const cleanText =
-      typeof text === "string" && text.trim().length > 0
-        ? normalizeVoiceText(text.trim())
-        : "Merhaba, ben Lina. Size nasıl yardımcı olabilirim?";
+    const requestedText =
+      typeof body?.text === "string"
+        ? body.text.trim()
+        : "";
 
-    const apiKey = readEnvValue("ELEVENLABS_API_KEY");
-    const voiceId =
-      readEnvValue("ELEVENLABS_VOICE_ID") || DEFAULT_LINA_VOICE_ID;
-    const modelId =
-      readEnvValue("ELEVENLABS_MODEL_ID") || DEFAULT_LINA_MODEL_ID;
+    const cleanText = normalizeVoiceText(
+      requestedText ||
+        "Merhaba, ben Lina. Size nasıl yardımcı olabilirim?",
+    );
+
+    const apiKey =
+      readEnvValue("OPENAI_API_KEY");
+
+    const model =
+      readEnvValue(
+        "LINA_OPENAI_TTS_MODEL",
+      ) || DEFAULT_LINA_TTS_MODEL;
+
+    const voice =
+      readEnvValue(
+        "LINA_OPENAI_TTS_VOICE",
+      ) || DEFAULT_LINA_TTS_VOICE;
 
     if (!apiKey) {
       return NextResponse.json(
         {
-          error: "ELEVENLABS_API_KEY eksik.",
+          error:
+            "OPENAI_API_KEY yapılandırılmamış.",
         },
-        { status: 500 },
+        {
+          status: 500,
+        },
       );
     }
 
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+      OPENAI_SPEECH_ENDPOINT,
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "xi-api-key": apiKey,
+          Authorization:
+            `Bearer ${apiKey}`,
+          "Content-Type":
+            "application/json",
         },
         body: JSON.stringify({
-          text: cleanText,
-          model_id: modelId,
-          language_code: "tr",
-          seed: LINA_VOICE_SEED,
-          voice_settings: {
-            stability: 0.72,
-            similarity_boost: 0.82,
-            style: 0,
-            use_speaker_boost: true,
-            speed: 0.92,
-          },
+          model,
+          voice,
+          input: cleanText,
+          instructions:
+            "Doğal ve akıcı Türkçe konuş. Sesin sıcak, güven veren, profesyonel ve sakin olsun. Gayrimenkul terimlerini doğru telaffuz et. Çok hızlı konuşma. Cümle sonlarında doğal ve kısa duraklamalar yap. Abartılı duygu, reklam tonu veya robotik ton kullanma.",
+          response_format: "mp3",
+          speed: 0.96,
         }),
+        cache: "no-store",
       },
     );
 
     if (!response.ok) {
-      const detail = await response.text();
+      const detail =
+        await response.text();
+
+      console.error(
+        "[LINA_OPENAI_TTS_ERROR]",
+        response.status,
+        detail.slice(0, 1000),
+      );
 
       return NextResponse.json(
         {
-          error: "Lina sesi üretilemedi.",
-          detail,
+          error:
+            "Lina OpenAI sesi üretilemedi.",
+          statusCode:
+            response.status,
         },
-        { status: 500 },
+        {
+          status: 502,
+        },
       );
     }
 
-    const audioBuffer = await response.arrayBuffer();
+    const audioBuffer =
+      await response.arrayBuffer();
 
     return new Response(audioBuffer, {
       status: 200,
       headers: {
-        "Content-Type": "audio/mpeg",
-        "Cache-Control": "no-store",
-        "X-Lina-Voice-Id": voiceId,
-        "X-Lina-Voice-Seed": String(LINA_VOICE_SEED),
+        "Content-Type":
+          "audio/mpeg",
+        "Cache-Control":
+          "no-store, no-cache, must-revalidate",
+        "X-Lina-Voice-Provider":
+          "openai",
+        "X-Lina-Voice-Model":
+          model,
+        "X-Lina-Voice-Name":
+          voice,
       },
     });
-  } catch {
+  } catch (error) {
+    console.error(
+      "[LINA_OPENAI_TTS_ROUTE_ERROR]",
+      error instanceof Error
+        ? error.message
+        : "UNKNOWN_ERROR",
+    );
+
     return NextResponse.json(
       {
-        error: "Lina ses servisi çalışırken hata oluştu.",
+        error:
+          "Lina ses servisi çalışırken hata oluştu.",
       },
-      { status: 500 },
+      {
+        status: 500,
+      },
     );
   }
 }
