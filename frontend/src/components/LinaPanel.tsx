@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import {
   ArrowLeft,
+  AudioLines,
   BarChart3,
-  Bell,
   Bot,
   Brain,
   Building2,
@@ -14,19 +15,22 @@ import {
   Loader2,
   Mic,
   RefreshCcw,
-  Send,
+  SendHorizontal,
+  ShieldCheck,
   Sparkles,
+  Square,
   Star,
   Target,
   Trash2,
   UserRound,
   Users,
   Volume2,
+  VolumeX,
   WandSparkles,
+  X,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 
-// Lina CRM Confirmation And Fixed Voice V1
 type LinaActionData = {
   customerId?: string;
   interestId?: string;
@@ -84,54 +88,63 @@ type LinaEndOfDayResponse = {
   error?: string;
 };
 
-const QUICK_COMMANDS = [
+type QuickCommand = {
+  title: string;
+  desc: string;
+  text: string;
+  icon: ReactNode;
+  color: string;
+  bg: string;
+};
+
+const QUICK_COMMANDS: QuickCommand[] = [
   {
     title: "Portföy Oluştur",
-    desc: "Yeni portföy ekle",
+    desc: "Adım adım yeni kayıt",
     text: "Lina, yeni bir emlak portföyü oluşturmak istiyorum. Bana adım adım sorular sor.",
-    icon: <Building2 size={22} />,
+    icon: <Building2 size={20} />,
     color: "#1557D6",
-    bg: "#EFF6FF",
+    bg: "#EAF2FF",
   },
   {
-    title: "İlan Açıklaması Yaz",
-    desc: "Profesyonel ilan yaz",
+    title: "İlan Metni",
+    desc: "Profesyonel açıklama",
     text: "Lina, elimdeki portföy için profesyonel ve etkileyici bir ilan açıklaması yazmama yardım et.",
-    icon: <WandSparkles size={22} />,
+    icon: <WandSparkles size={20} />,
     color: "#7C3AED",
-    bg: "#FAF5FF",
+    bg: "#F3EFFF",
   },
   {
     title: "Müşteri Analizi",
-    desc: "Müşteri değerlendir",
+    desc: "Talebi değerlendir",
     text: "Lina, bir müşterinin talebini analiz edip bana nasıl dönüş yapmam gerektiğini söyle.",
-    icon: <Users size={22} />,
+    icon: <Users size={20} />,
     color: "#0F766E",
-    bg: "#ECFDF5",
+    bg: "#E8FBF6",
   },
   {
-    title: "CRM Analizi",
-    desc: "Verileri analiz et",
+    title: "CRM Öncelikleri",
+    desc: "Bugünkü işleri sırala",
     text: "Lina, CRM kayıtlarımı yorumlayıp bugün hangi müşterilere öncelik vermem gerektiğini söyle.",
-    icon: <BarChart3 size={22} />,
-    color: "#EA580C",
-    bg: "#FFF7ED",
+    icon: <BarChart3 size={20} />,
+    color: "#C2410C",
+    bg: "#FFF3E8",
   },
   {
     title: "Fiyat Yorumu",
-    desc: "Fiyat değerlendirmesi",
+    desc: "Değer analizi başlat",
     text: "Lina, bir portföy için fiyat değerlendirmesi yapmama yardımcı ol.",
-    icon: <Target size={22} />,
-    color: "#F43F5E",
-    bg: "#FFF1F2",
+    icon: <Target size={20} />,
+    color: "#BE123C",
+    bg: "#FFF0F4",
   },
   {
-    title: "Lina Fırsatları",
-    desc: "Yeni fırsatları gör",
+    title: "Fırsatları Bul",
+    desc: "Eşleşmeleri özetle",
     text: "Lina, benim için yeni fırsatları, eşleşen talepleri ve takip etmem gereken işleri özetle.",
-    icon: <Star size={22} />,
-    color: "#F59E0B",
-    bg: "#FFFBEB",
+    icon: <Star size={20} />,
+    color: "#A16207",
+    bg: "#FFF9E8",
   },
 ];
 
@@ -228,10 +241,10 @@ export default function LinaPanel({
   onClose = () => {},
 }: LinaPanelProps) {
   const { user, hasHydrated } = useAuthStore();
-
   const userName = getSafeUserName(user);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const didMountMessagesRef = useRef(false);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -253,18 +266,35 @@ export default function LinaPanel({
       text: createWelcomeMessage(userName),
     },
   ]);
-
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [activeVoiceText, setActiveVoiceText] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [voiceError, setVoiceError] = useState("");
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const [endOfDayReview, setEndOfDayReview] =
     useState<LinaEndOfDayReview | null>(null);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [memorySaving, setMemorySaving] = useState(false);
   const [memoryMessage, setMemoryMessage] = useState("");
+
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+
+    if (hour < 12) return "Günaydın";
+    if (hour < 18) return "İyi günler";
+    return "İyi akşamlar";
+  }, []);
+
+  const latestLinaText = useMemo(() => {
+    return [...messages]
+      .reverse()
+      .find((messageItem) => messageItem.role === "lina")?.text;
+  }, [messages]);
+
+  const conversationCount = Math.max(messages.length - 1, 0);
 
   useEffect(() => {
     if (!hasHydrated || !user) {
@@ -295,13 +325,45 @@ export default function LinaPanel({
     });
   }, [hasHydrated, user, userName]);
 
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
+  useEffect(() => {
+    const textarea = textareaRef.current;
 
-    if (hour < 12) return "Günaydın";
-    if (hour < 18) return "İyi günler";
-    return "İyi akşamlar";
-  }, []);
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = "48px";
+    textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, 48), 112)}px`;
+  }, [input]);
+
+  useEffect(() => {
+    if (!open || typeof window === "undefined") {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const viewport = window.visualViewport;
+
+    const updateViewportHeight = () => {
+      setViewportHeight(
+        Math.round(viewport?.height || window.innerHeight),
+      );
+    };
+
+    document.body.style.overflow = "hidden";
+    updateViewportHeight();
+
+    viewport?.addEventListener("resize", updateViewportHeight);
+    viewport?.addEventListener("scroll", updateViewportHeight);
+    window.addEventListener("resize", updateViewportHeight);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      viewport?.removeEventListener("resize", updateViewportHeight);
+      viewport?.removeEventListener("scroll", updateViewportHeight);
+      window.removeEventListener("resize", updateViewportHeight);
+    };
+  }, [open]);
 
   const fetchEndOfDayReview = async () => {
     const token = getAuthToken(user);
@@ -499,6 +561,8 @@ export default function LinaPanel({
   };
 
   const stopCurrentAudio = () => {
+    voiceRequestIdRef.current += 1;
+
     if (audioSourceRef.current) {
       try {
         audioSourceRef.current.stop();
@@ -511,6 +575,7 @@ export default function LinaPanel({
     }
 
     setSpeaking(false);
+    setActiveVoiceText(null);
   };
 
   const clearRecordingMonitor = () => {
@@ -543,13 +608,17 @@ export default function LinaPanel({
   };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
 
     void fetchEndOfDayReview();
   }, [open, user]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
 
     if (!didMountMessagesRef.current) {
       didMountMessagesRef.current = true;
@@ -557,9 +626,12 @@ export default function LinaPanel({
     }
 
     window.setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-  }, [messages, loading, open]);
+      messagesEndRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+      });
+    }, 80);
+  }, [messages, loading, open, recording, transcribing]);
 
   useEffect(() => {
     return () => {
@@ -573,7 +645,9 @@ export default function LinaPanel({
     };
   }, []);
 
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
 
   const callLinaBackend = async (
     text: string,
@@ -581,12 +655,11 @@ export default function LinaPanel({
   ): Promise<LinaChatResponse> => {
     const token = getAuthToken(user);
     const endpoints = getLinaChatEndpoints();
-
     let lastError = "";
 
     for (const endpoint of endpoints) {
       try {
-        const res = await fetch(endpoint, {
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -602,7 +675,7 @@ export default function LinaPanel({
           }),
         });
 
-        const raw = await res.text();
+        const raw = await response.text();
         let data: LinaChatResponse = {};
 
         try {
@@ -611,8 +684,11 @@ export default function LinaPanel({
           data = { message: raw };
         }
 
-        if (!res.ok) {
-          lastError = data?.message || data?.error || `HTTP ${res.status}`;
+        if (!response.ok) {
+          lastError =
+            data?.message ||
+            data?.error ||
+            `HTTP ${response.status}`;
           continue;
         }
 
@@ -638,6 +714,12 @@ export default function LinaPanel({
   };
 
   const speakWithOpenAi = async (text: string) => {
+    const cleanText = text.trim();
+
+    if (!cleanText) {
+      return;
+    }
+
     try {
       setVoiceError("");
 
@@ -649,27 +731,30 @@ export default function LinaPanel({
       }
 
       stopCurrentAudio();
+
       const requestId = voiceRequestIdRef.current + 1;
       voiceRequestIdRef.current = requestId;
       setSpeaking(true);
+      setActiveVoiceText(cleanText);
 
-      const res = await fetch("/lina-voice", {
+      const response = await fetch("/lina-voice", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text: cleanText }),
       });
 
-      if (!res.ok) {
+      if (!response.ok) {
         if (voiceRequestIdRef.current === requestId) {
           setSpeaking(false);
+          setActiveVoiceText(null);
           setVoiceError("Lina sesi şu anda üretilemedi.");
         }
         return;
       }
 
-      const audioData = await res.arrayBuffer();
+      const audioData = await response.arrayBuffer();
 
       if (voiceRequestIdRef.current !== requestId) {
         return;
@@ -697,29 +782,50 @@ export default function LinaPanel({
 
         if (voiceRequestIdRef.current === requestId) {
           setSpeaking(false);
+          setActiveVoiceText(null);
         }
       };
 
       source.start(0);
     } catch {
       setSpeaking(false);
+      setActiveVoiceText(null);
       setVoiceError(
-        "Lina'nın sesi otomatik başlatılamadı. Dinle butonuna dokunun.",
+        "Lina'nın sesi otomatik başlatılamadı. Dinle düğmesine dokunun.",
       );
     }
+  };
+
+  const toggleMessageVoice = (text: string) => {
+    if (speaking && activeVoiceText === text) {
+      stopCurrentAudio();
+      return;
+    }
+
+    void speakWithOpenAi(text);
   };
 
   const sendMessage = async (textFromVoice?: string) => {
     const text = (textFromVoice || input).trim();
 
-    if (!text || loading) return;
+    if (!text || loading || recording || transcribing) {
+      return;
+    }
 
+    stopCurrentAudio();
     await unlockAudioPlayback();
 
-    const newMessages: Message[] = [...messages, { role: "user", text }];
+    const newMessages: Message[] = [
+      ...messages,
+      {
+        role: "user",
+        text,
+      },
+    ];
 
     setMessages(newMessages);
     setInput("");
+    setVoiceError("");
     setLoading(true);
 
     try {
@@ -729,8 +835,8 @@ export default function LinaPanel({
         response.reply ||
         "Lina işlemi tamamladı ancak sonuç mesajı oluşturamadı.";
 
-      setMessages((prev) => [
-        ...prev,
+      setMessages((currentMessages) => [
+        ...currentMessages,
         {
           role: "lina",
           text: reply,
@@ -747,7 +853,13 @@ export default function LinaPanel({
       const fallback =
         "Şu anda Lina'nın ana beyniyle bağlantı kurulamadı. Demo cevap üretmeyeceğim. Lütfen bağlantı ayarlarını kontrol ettikten sonra tekrar deneyin.";
 
-      setMessages((prev) => [...prev, { role: "lina", text: fallback }]);
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        {
+          role: "lina",
+          text: fallback,
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -760,9 +872,13 @@ export default function LinaPanel({
 
     try {
       setVoiceError("");
+      stopCurrentAudio();
       await unlockAudioPlayback();
 
-      if (!navigator.mediaDevices?.getUserMedia) {
+      if (
+        !navigator.mediaDevices?.getUserMedia ||
+        typeof MediaRecorder === "undefined"
+      ) {
         setVoiceError("Bu cihaz ses kaydını desteklemiyor.");
         return;
       }
@@ -775,7 +891,9 @@ export default function LinaPanel({
         },
       });
 
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      const mimeType = MediaRecorder.isTypeSupported(
+        "audio/webm;codecs=opus",
+      )
         ? "audio/webm;codecs=opus"
         : MediaRecorder.isTypeSupported("audio/mp4")
           ? "audio/mp4"
@@ -811,11 +929,14 @@ export default function LinaPanel({
         }
 
         if (!chunks.length || !voiceDetectedRef.current) {
-          setVoiceError("Ses algılanamadı. Mikrofona dokunup tekrar konuşun.");
+          setVoiceError(
+            "Ses algılanamadı. Mikrofona dokunup tekrar konuşun.",
+          );
           return;
         }
 
-        const blobType = recorder.mimeType || mimeType || "audio/webm";
+        const blobType =
+          recorder.mimeType || mimeType || "audio/webm";
         const extension = blobType.includes("mp4") ? "m4a" : "webm";
         const audioBlob = new Blob(chunks, { type: blobType });
         const formData = new FormData();
@@ -825,18 +946,31 @@ export default function LinaPanel({
         try {
           setTranscribing(true);
 
-          const res = await fetch("/api/whisper", {
+          const response = await fetch("/api/whisper", {
             method: "POST",
             body: formData,
           });
 
-          const data = await res.json();
+          const data = (await response.json()) as {
+            text?: string;
+            error?: string;
+          };
+
+          if (!response.ok) {
+            throw new Error(
+              data?.error || "Ses metne dönüştürülemedi.",
+            );
+          }
+
           const voiceText = data?.text?.trim();
 
           if (voiceText) {
+            setTranscribing(false);
             await sendMessage(voiceText);
           } else {
-            setVoiceError("Ses anlaşılamadı. Lütfen tekrar deneyin.");
+            setVoiceError(
+              "Ses anlaşılamadı. Lütfen tekrar deneyin.",
+            );
           }
         } catch {
           setVoiceError("Ses metne dönüştürülemedi.");
@@ -861,13 +995,17 @@ export default function LinaPanel({
         analyserRef.current = analyser;
 
         const monitorVoice = () => {
-          if (!mediaRef.current || mediaRef.current.state === "inactive") {
+          if (
+            !mediaRef.current ||
+            mediaRef.current.state === "inactive"
+          ) {
             return;
           }
 
           analyser.getByteTimeDomainData(samples);
 
           let total = 0;
+
           for (const sample of samples) {
             const normalized = (sample - 128) / 128;
             total += normalized * normalized;
@@ -881,7 +1019,8 @@ export default function LinaPanel({
             lastVoiceAtRef.current = now;
           }
 
-          const recordingDuration = now - recordingStartedAtRef.current;
+          const recordingDuration =
+            now - recordingStartedAtRef.current;
           const silenceDuration = now - lastVoiceAtRef.current;
 
           if (
@@ -893,15 +1032,20 @@ export default function LinaPanel({
             return;
           }
 
-          if (!voiceDetectedRef.current && recordingDuration > 7000) {
+          if (
+            !voiceDetectedRef.current &&
+            recordingDuration > 7000
+          ) {
             stopRecording();
             return;
           }
 
-          recordingFrameRef.current = window.requestAnimationFrame(monitorVoice);
+          recordingFrameRef.current =
+            window.requestAnimationFrame(monitorVoice);
         };
 
-        recordingFrameRef.current = window.requestAnimationFrame(monitorVoice);
+        recordingFrameRef.current =
+          window.requestAnimationFrame(monitorVoice);
       }
 
       recordingTimeoutRef.current = window.setTimeout(() => {
@@ -909,7 +1053,9 @@ export default function LinaPanel({
       }, 45000);
     } catch {
       setRecording(false);
-      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recordingStreamRef.current
+        ?.getTracks()
+        .forEach((track) => track.stop());
       recordingStreamRef.current = null;
       clearRecordingMonitor();
       setVoiceError("Mikrofon izni alınamadı.");
@@ -935,135 +1081,157 @@ export default function LinaPanel({
         text: createWelcomeMessage(userName),
       },
     ]);
-
     setInput("");
     setVoiceError("");
+    setMemoryMessage("");
+  };
+
+  const focusComposer = () => {
+    window.setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+      });
+    }, 220);
   };
 
   return (
-    <div className="fixed inset-0 z-[140] bg-[#F7FBFF] text-[#06194A]">
-      <div className="mx-auto flex h-[100svh] max-w-[460px] flex-col overflow-hidden bg-[#F7FBFF]">
-        <header className="shrink-0 bg-[#F7FBFF]/95 px-5 pb-3 pt-4 backdrop-blur-xl">
-          <div className="flex items-center justify-between">
+    <div
+      className="lina-professional-shell fixed inset-x-0 top-0 z-[140] flex justify-center overflow-hidden bg-[#EAF1FB] text-[#0B1F45]"
+      style={{
+        height: viewportHeight ? `${viewportHeight}px` : "100dvh",
+        paddingLeft: "env(safe-area-inset-left, 0px)",
+        paddingRight: "env(safe-area-inset-right, 0px)",
+      }}
+    >
+      <div className="relative flex h-full w-full max-w-[760px] flex-col overflow-hidden bg-[#F7FAFE] shadow-[0_0_80px_rgba(15,23,42,0.16)]">
+        <header className="relative z-30 shrink-0 border-b border-[#DCE7F4] bg-white/95 px-3 pb-2.5 pt-[calc(10px+env(safe-area-inset-top,0px))] backdrop-blur-xl">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#06194A] shadow-[0_8px_22px_rgba(15,23,42,0.08)]"
-              aria-label="Geri dön"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#DCE7F4] bg-white text-[#0B1F45] shadow-[0_6px_18px_rgba(15,23,42,0.07)] transition active:scale-95"
+              aria-label="Lina ekranını kapat"
+              title="Geri"
             >
-              <ArrowLeft size={21} />
+              <ArrowLeft size={20} />
             </button>
 
-            <div className="text-center">
-              <h1 className="text-2xl font-black tracking-tight">
-                Lina Asistan
-              </h1>
-              <p className="text-xs font-bold text-[#475569]">
-                EPH operasyon zekası
-              </p>
+            <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl px-1">
+              <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border border-[#CFE0F6] bg-[#EAF2FF]">
+                {imageOk ? (
+                  <img
+                    src="/Lina.jpg"
+                    alt="Lina"
+                    onError={() => setImageOk(false)}
+                    className="h-full w-full object-cover"
+                    style={{ width: "100%", height: "100%" }}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[#1557D6]">
+                    <Bot size={22} />
+                  </div>
+                )}
+
+                <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#10B981]" />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <h1 className="lina-title truncate !text-left text-base font-black tracking-[-0.02em] text-[#0B1F45]">
+                  Lina Asistan
+                </h1>
+                <p className="lina-copy mt-0.5 flex items-center gap-1.5 !text-left text-[11px] font-bold text-[#61708A]">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#10B981]" />
+                  Çevrimiçi · Gerçek EPH verisi
+                </p>
+              </div>
             </div>
 
             <button
               type="button"
-              onClick={
-                speaking
-                  ? stopCurrentAudio
-                  : () =>
-                      speakWithOpenAi(
-                        messages[messages.length - 1]?.text || "",
-                      )
-              }
-              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#1557D6] shadow-[0_8px_22px_rgba(15,23,42,0.08)]"
-              aria-label="Lina sesi"
+              onClick={resetConversation}
+              disabled={loading || transcribing}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#DCE7F4] bg-white text-[#52627A] shadow-[0_6px_18px_rgba(15,23,42,0.06)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+              aria-label="Yeni sohbet başlat"
+              title="Yeni sohbet"
             >
-              <Volume2 size={21} />
+              <RefreshCcw size={18} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (speaking) {
+                  stopCurrentAudio();
+                  return;
+                }
+
+                if (latestLinaText) {
+                  void speakWithOpenAi(latestLinaText);
+                }
+              }}
+              disabled={!latestLinaText}
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-[0_6px_18px_rgba(15,23,42,0.06)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 ${
+                speaking
+                  ? "border-[#BFD4F4] bg-[#1557D6] text-white"
+                  : "border-[#DCE7F4] bg-white text-[#1557D6]"
+              }`}
+              aria-label={
+                speaking ? "Lina sesini durdur" : "Son Lina yanıtını dinle"
+              }
+              title={
+                speaking ? "Sesi durdur" : "Son yanıtı dinle"
+              }
+            >
+              {speaking ? <VolumeX size={19} /> : <Volume2 size={19} />}
             </button>
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-5">
-          <section className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-[#EEF5FF] via-white to-[#EFF6FF] p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
-            <div className="relative z-10 max-w-[56%] py-5">
-              <h2 className="text-2xl font-black leading-tight tracking-tight">
-                {greeting} {userName}! 👋
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-5 pt-3 [-webkit-overflow-scrolling:touch]">
+          <section className="overflow-hidden rounded-[22px] border border-[#D6E4F5] bg-gradient-to-br from-white via-[#F7FAFF] to-[#EAF2FF] p-3.5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#1557D6] text-white shadow-[0_8px_20px_rgba(21,87,214,0.22)]">
+                <Sparkles size={19} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="lina-copy !text-left text-sm font-black text-[#0B1F45]">
+                  {greeting} {userName}
+                </p>
+                <p className="lina-copy mt-1 !text-left text-xs font-semibold leading-5 text-[#5E6D84]">
+                  Portföy, CRM ve müşteri süreçlerinde yazabilir veya
+                  konuşabilirsiniz. Veri yoksa sayı üretmeden açıkça söylerim.
+                </p>
+              </div>
+
+              <div className="shrink-0 rounded-full border border-[#CFE0F6] bg-white px-2.5 py-1 text-[10px] font-black text-[#1557D6]">
+                {conversationCount} mesaj
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-3">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <h2 className="lina-section-title !text-left text-xs font-black uppercase tracking-[0.12em] text-[#61708A]">
+                Hızlı Başlangıç
               </h2>
-
-              <p className="mt-4 text-base font-semibold leading-7 text-[#27364F]">
-                Gerçek veri varsa analiz ederim. Veri yoksa sayı uydurmadan,
-                test edilebilir alanlara yönlendiririm.
-              </p>
+              <span className="text-[10px] font-bold text-[#8A98AC]">
+                Kaydırarak seçin
+              </span>
             </div>
 
-            <div className="absolute bottom-0 right-0 top-0 flex w-[48%] items-end justify-center">
-              {imageOk ? (
-                <img
-                  src="/Lina.jpg"
-                  alt="Lina Asistan"
-                  onError={() => setImageOk(false)}
-                  className="h-full max-h-[238px] w-auto object-contain object-bottom"
-                />
-              ) : (
-                <div className="mb-6 flex h-28 w-28 items-center justify-center rounded-full bg-[#EFF6FF] text-[#1557D6]">
-                  <UserRound size={52} />
-                </div>
-              )}
-            </div>
-
-            <div className="absolute right-7 top-11 text-[#DBEAFE]">
-              <Sparkles size={34} />
-            </div>
-          </section>
-
-          <section className="mt-4 grid grid-cols-4 overflow-hidden rounded-[26px] bg-white shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
-            <Metric
-              icon={<CheckCircle2 size={23} />}
-              value="—"
-              label="Görev"
-              sub="Gerçek veri"
-              color="#1557D6"
-              bg="#EFF6FF"
-            />
-            <Metric
-              icon={<Bell size={23} />}
-              value="—"
-              label="Mesaj"
-              sub="Gerçek veri"
-              color="#7C3AED"
-              bg="#FAF5FF"
-            />
-            <Metric
-              icon={<Target size={23} />}
-              value="—"
-              label="Talep"
-              sub="Gerçek veri"
-              color="#EA580C"
-              bg="#FFF7ED"
-            />
-            <Metric
-              icon={<Star size={23} />}
-              value="—"
-              label="Fırsat"
-              sub="Gerçek veri"
-              color="#0F766E"
-              bg="#ECFDF5"
-            />
-          </section>
-
-          <section className="mt-5">
-            <h3 className="px-1 text-center text-xl font-black tracking-tight">
-              Hızlı İşlemler
-            </h3>
-
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="-mx-3 flex gap-2.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {QUICK_COMMANDS.map((command) => (
                 <button
                   key={command.title}
                   type="button"
-                  onClick={() => sendMessage(command.text)}
-                  className="flex min-h-[76px] items-center gap-3 rounded-[24px] bg-white px-4 text-left shadow-[0_12px_34px_rgba(15,23,42,0.06)] transition active:scale-[0.99]"
+                  onClick={() => void sendMessage(command.text)}
+                  disabled={loading || recording || transcribing}
+                  className="flex min-h-[72px] w-[176px] shrink-0 !justify-start gap-3 rounded-[20px] border border-[#DCE7F4] bg-white p-3 text-left shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
                     style={{
                       color: command.color,
                       backgroundColor: command.bg,
@@ -1073,355 +1241,488 @@ export default function LinaPanel({
                   </span>
 
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-black">
+                    <span className="lina-copy block truncate !text-left text-xs font-black text-[#0B1F45]">
                       {command.title}
                     </span>
-                    <span className="mt-1 block truncate text-xs font-semibold text-[#64748B]">
+                    <span className="lina-copy mt-1 block !text-left text-[10px] font-semibold leading-4 text-[#748198]">
                       {command.desc}
                     </span>
                   </span>
-
-                  <ChevronRight size={18} className="shrink-0 text-[#94A3B8]" />
                 </button>
               ))}
             </div>
           </section>
 
           {(endOfDayReview || memoryLoading || memoryMessage) && (
-            <section className="mt-5">
-              <div className="rounded-[28px] border border-[#D8E6FB] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EEF5FF] p-4 shadow-[0_14px_38px_rgba(15,23,42,0.07)]">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EAF2FF] text-[#1557D6]">
-                    <Brain size={23} />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-base font-black">
-                      Gün Sonu Hafıza Onayı
-                    </h3>
-
-                    {memoryLoading && !endOfDayReview ? (
-                      <div className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-[#64748B]">
-                        <Loader2 size={16} className="animate-spin" />
-                        Günlük özet hazırlanıyor...
-                      </div>
-                    ) : endOfDayReview ? (
-                      <>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-black text-[#475569] shadow-sm">
-                            <Clock3 size={13} />
-                            {endOfDayReview.conversationCount} konuşma
-                          </span>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-black text-[#475569] shadow-sm">
-                            {endOfDayReview.sessionCount} oturum
-                          </span>
-                        </div>
-
-                        <p className="mt-3 text-sm font-semibold leading-6 text-[#334155]">
-                          {endOfDayReview.summary}
-                        </p>
-                      </>
-                    ) : null}
-                  </div>
+            <section className="mt-3 rounded-[22px] border border-[#D7E5F6] bg-white p-3.5 shadow-[0_10px_26px_rgba(15,23,42,0.05)]">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#EAF2FF] text-[#1557D6]">
+                  <Brain size={19} />
                 </div>
 
-                {endOfDayReview && (
-                  <div className="mt-4 grid gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        saveEndOfDayChoice("OTUZ_GUN_KAYDET")
-                      }
-                      disabled={memorySaving}
-                      className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1557D6] px-4 text-sm font-black text-white shadow-[0_10px_24px_rgba(21,87,214,0.22)] disabled:opacity-60"
-                    >
-                      {memorySaving ? (
-                        <Loader2 size={17} className="animate-spin" />
-                      ) : (
-                        <Clock3 size={17} />
-                      )}
-                      30 Gün Hafızaya Kaydet
-                    </button>
+                <div className="min-w-0 flex-1">
+                  <h2 className="lina-section-title !text-left text-sm font-black text-[#0B1F45]">
+                    Gün Sonu Hafıza Onayı
+                  </h2>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        saveEndOfDayChoice("KALICI_KAYDET")
-                      }
-                      disabled={memorySaving}
-                      className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#F4C95D] bg-[#FFFBEB] px-4 text-sm font-black text-[#9A6700] disabled:opacity-60"
-                    >
-                      <Star size={17} />
-                      Kalıcı Hafızaya Ekle
-                    </button>
+                  {memoryLoading && !endOfDayReview ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs font-bold text-[#6B7890]">
+                      <Loader2 size={15} className="animate-spin" />
+                      Özet hazırlanıyor…
+                    </div>
+                  ) : endOfDayReview ? (
+                    <>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#F3F7FC] px-2.5 py-1 text-[10px] font-black text-[#52627A]">
+                          <Clock3 size={12} />
+                          {endOfDayReview.conversationCount} konuşma
+                        </span>
+                        <span className="rounded-full bg-[#F3F7FC] px-2.5 py-1 text-[10px] font-black text-[#52627A]">
+                          {endOfDayReview.sessionCount} oturum
+                        </span>
+                      </div>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        saveEndOfDayChoice("BUGUNU_SIL")
-                      }
-                      disabled={memorySaving}
-                      className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#FECACA] bg-[#FFF7F7] px-4 text-sm font-black text-[#C24141] disabled:opacity-60"
-                    >
-                      <Trash2 size={17} />
-                      Bugünkü Konuşmaları Sil
-                    </button>
-                  </div>
-                )}
-
-                {memoryMessage && (
-                  <p className="mt-3 rounded-2xl bg-white px-4 py-3 text-center text-xs font-black text-[#1557D6] shadow-sm">
-                    {memoryMessage}
-                  </p>
-                )}
+                      <p className="lina-copy mt-2 !text-left text-xs font-semibold leading-5 text-[#52627A]">
+                        {endOfDayReview.summary}
+                      </p>
+                    </>
+                  ) : null}
+                </div>
               </div>
+
+              {endOfDayReview && (
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void saveEndOfDayChoice("OTUZ_GUN_KAYDET")
+                    }
+                    disabled={memorySaving}
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#1557D6] px-3 text-xs font-black text-white shadow-[0_8px_20px_rgba(21,87,214,0.18)] disabled:opacity-50"
+                  >
+                    {memorySaving ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <Clock3 size={15} />
+                    )}
+                    30 Gün Kaydet
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void saveEndOfDayChoice("KALICI_KAYDET")
+                    }
+                    disabled={memorySaving}
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-[#F1D889] bg-[#FFF9E8] px-3 text-xs font-black text-[#8A6500] disabled:opacity-50"
+                  >
+                    <Star size={15} />
+                    Kalıcı Kaydet
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void saveEndOfDayChoice("BUGUNU_SIL")
+                    }
+                    disabled={memorySaving}
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-[#F3CBCB] bg-[#FFF4F4] px-3 text-xs font-black text-[#B42318] disabled:opacity-50"
+                  >
+                    <Trash2 size={15} />
+                    Bugünü Sil
+                  </button>
+                </div>
+              )}
+
+              {memoryMessage && (
+                <p className="mt-3 rounded-2xl bg-[#EEF5FF] px-3 py-2.5 text-xs font-black text-[#1557D6]">
+                  {memoryMessage}
+                </p>
+              )}
             </section>
           )}
 
-          <section className="mt-6">
-            <h3 className="px-1 text-center text-xl font-black tracking-tight">
-              Lina ile Sohbet
-            </h3>
+          <section className="mt-4">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <h2 className="lina-section-title !text-left text-xs font-black uppercase tracking-[0.12em] text-[#61708A]">
+                Sohbet
+              </h2>
 
-            <div className="mt-3 flex flex-col gap-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#DCE7F4] bg-white px-2.5 py-1 text-[10px] font-black text-[#61708A]">
+                <ShieldCheck size={12} className="text-[#10B981]" />
+                Güvenli oturum
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-3">
               {messages.map((messageItem, index) => {
                 const isLina = messageItem.role === "lina";
+                const isActiveVoice =
+                  speaking && activeVoiceText === messageItem.text;
 
                 return (
-                  <div
+                  <article
                     key={`${messageItem.role}-${index}`}
-                    className={`flex ${isLina ? "justify-start" : "justify-end"}`}
+                    className={`flex ${
+                      isLina ? "justify-start" : "justify-end"
+                    }`}
                   >
                     <div
-                      className={`flex max-w-[92%] gap-3 rounded-[26px] px-4 py-4 shadow-[0_12px_34px_rgba(15,23,42,0.06)] ${
+                      className={`max-w-[92%] rounded-[22px] border px-3.5 py-3 shadow-[0_8px_22px_rgba(15,23,42,0.05)] sm:max-w-[82%] ${
                         isLina
-                          ? "bg-white text-[#06194A]"
-                          : "bg-[#1557D6] text-white"
+                          ? "border-[#DCE7F4] bg-white text-[#0B1F45]"
+                          : "border-[#1557D6] bg-[#1557D6] text-white"
                       }`}
                     >
+                      <div className="flex items-center gap-2">
+                        {isLina ? (
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#EAF2FF] text-[#1557D6]">
+                            {imageOk ? (
+                              <img
+                                src="/Lina.jpg"
+                                alt=""
+                                className="h-full w-full object-cover"
+                                style={{ width: "100%", height: "100%" }}
+                              />
+                            ) : (
+                              <Bot size={15} />
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
+                            <UserRound size={15} />
+                          </div>
+                        )}
+
+                        <span
+                          className={`lina-copy !text-left text-[10px] font-black uppercase tracking-[0.1em] ${
+                            isLina ? "text-[#61708A]" : "text-white/75"
+                          }`}
+                        >
+                          {isLina ? "Lina" : "Siz"}
+                        </span>
+                      </div>
+
+                      <p className="lina-copy mt-2 whitespace-pre-wrap !text-left text-sm font-semibold leading-6">
+                        {messageItem.text}
+                      </p>
+
                       {isLina && (
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#EFF6FF] text-[#1557D6]">
-                          {imageOk ? (
-                            <img
-                              src="/Lina.jpg"
-                              alt="Lina"
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <Bot size={28} />
-                          )}
-                        </div>
-                      )}
-
-                      <div className="min-w-0">
-                        <p className="text-left text-sm font-semibold leading-6">
-                          {messageItem.text}
-                        </p>
-
-                        {isLina && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                speakWithOpenAi(messageItem.text)
-                              }
-                              className="mt-3 inline-flex items-center justify-center gap-2 rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] px-4 py-2 text-xs font-black text-[#1557D6]"
-                            >
+                        <div className="mt-2.5 border-t border-[#EDF2F8] pt-2.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              toggleMessageVoice(messageItem.text)
+                            }
+                            className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border px-3 text-[11px] font-black transition active:scale-95 ${
+                              isActiveVoice
+                                ? "border-[#BFD4F4] bg-[#1557D6] text-white"
+                                : "border-[#DCE7F4] bg-[#F7FAFE] text-[#1557D6]"
+                            }`}
+                          >
+                            {isActiveVoice ? (
+                              <VolumeX size={14} />
+                            ) : (
                               <Volume2 size={14} />
-                              {speaking ? "Çalıyor" : "Dinle"}
-                            </button>
+                            )}
+                            {isActiveVoice ? "Durdur" : "Dinle"}
+                          </button>
 
-                            {messageItem.requiresConfirmation &&
-                              index === messages.length - 1 && (
-                                <div className="mt-3 grid grid-cols-2 gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      sendMessage("Kaydı Onayla")
-                                    }
-                                    disabled={loading}
-                                    className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#059669] px-3 text-xs font-black text-white shadow-[0_8px_20px_rgba(5,150,105,0.20)] disabled:opacity-50"
-                                  >
-                                    <CheckCircle2 size={16} />
-                                    {messageItem.data?.confirmLabel ||
-                                      "Kaydı Onayla"}
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      sendMessage("İptal Et")
-                                    }
-                                    disabled={loading}
-                                    className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-[#F2B8B5] bg-[#FFF5F5] px-3 text-xs font-black text-[#B42318] disabled:opacity-50"
-                                  >
-                                    {messageItem.data?.cancelLabel ||
-                                      "İptal Et"}
-                                  </button>
-                                </div>
-                              )}
-
-                            {!messageItem.requiresConfirmation &&
-                              Boolean(messageItem.data?.customerId) &&
-                              (
-                                messageItem.action ===
-                                  "crm_customer_create" ||
-                                messageItem.action ===
-                                  "crm_customer_create_with_interest"
-                              ) && (
+                          {messageItem.requiresConfirmation &&
+                            index === messages.length - 1 && (
+                              <div className="mt-2.5 grid grid-cols-2 gap-2">
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    window.location.assign(
-                                      messageItem.data?.crmUrl ||
-                                        "/crm",
-                                    )
+                                    void sendMessage("Kaydı Onayla")
                                   }
-                                  className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border-2 border-[#BFD5EC] bg-[#EEF5FF] px-4 text-xs font-black text-[#1557D6]"
+                                  disabled={loading}
+                                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#059669] px-3 text-xs font-black text-white shadow-[0_7px_18px_rgba(5,150,105,0.18)] disabled:opacity-50"
                                 >
-                                  CRM’de Görüntüle
-                                  <ChevronRight size={16} />
+                                  <CheckCircle2 size={15} />
+                                  {messageItem.data?.confirmLabel ||
+                                    "Kaydı Onayla"}
                                 </button>
-                              )}
-                          </>
-                        )}
-                      </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void sendMessage("İptal Et")
+                                  }
+                                  disabled={loading}
+                                  className="flex min-h-11 items-center justify-center rounded-xl border border-[#F0BDB8] bg-[#FFF3F2] px-3 text-xs font-black text-[#B42318] disabled:opacity-50"
+                                >
+                                  {messageItem.data?.cancelLabel ||
+                                    "İptal Et"}
+                                </button>
+                              </div>
+                            )}
+
+                          {!messageItem.requiresConfirmation &&
+                            Boolean(messageItem.data?.customerId) &&
+                            (
+                              messageItem.action ===
+                                "crm_customer_create" ||
+                              messageItem.action ===
+                                "crm_customer_create_with_interest"
+                            ) && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  window.location.assign(
+                                    messageItem.data?.crmUrl || "/crm",
+                                  )
+                                }
+                                className="mt-2.5 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#BFD4F4] bg-[#EEF5FF] px-3 text-xs font-black text-[#1557D6]"
+                              >
+                                CRM’de Görüntüle
+                                <ChevronRight size={15} />
+                              </button>
+                            )}
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  </article>
                 );
               })}
 
               {loading && (
                 <div className="flex justify-start">
-                  <div className="inline-flex items-center gap-2 rounded-3xl bg-white px-5 py-4 text-sm font-black text-[#64748B] shadow-sm">
-                    <Loader2 size={18} className="animate-spin" />
-                    Lina düşünüyor...
+                  <div className="inline-flex items-center gap-3 rounded-[20px] border border-[#DCE7F4] bg-white px-4 py-3 text-xs font-black text-[#61708A] shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
+                    <div className="flex items-end gap-1">
+                      {[0, 1, 2, 3].map((item) => (
+                        <span
+                          key={item}
+                          className="block w-1 rounded-full bg-[#1557D6]"
+                          style={{
+                            height: `${8 + item * 3}px`,
+                            animation: `wave 0.8s ease-in-out ${item * 0.12}s infinite`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    Lina yanıt hazırlıyor…
                   </div>
                 </div>
               )}
 
-              <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} className="h-px" />
             </div>
           </section>
         </main>
 
-        <footer className="relative z-20 mx-auto w-full max-w-[460px] shrink-0 bg-gradient-to-t from-[#F7FBFF] via-[#F7FBFF] to-transparent px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+        <footer
+          className="relative z-30 shrink-0 border-t border-[#DCE7F4] bg-white/96 px-3 pt-2.5 backdrop-blur-xl"
+          style={{
+            paddingBottom:
+              "max(10px, env(safe-area-inset-bottom, 0px))",
+          }}
+        >
           {voiceError && (
-            <div className="mb-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-center text-xs font-black text-red-600">
-              {voiceError}
+            <div className="mb-2 flex items-center gap-2 rounded-2xl border border-[#F3CBCB] bg-[#FFF4F4] px-3 py-2.5 text-[#B42318]">
+              <span className="lina-copy min-w-0 flex-1 !text-left text-xs font-black">
+                {voiceError}
+              </span>
+              <button
+                type="button"
+                onClick={() => setVoiceError("")}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#B42318]"
+                aria-label="Ses uyarısını kapat"
+              >
+                <X size={15} />
+              </button>
             </div>
           )}
 
-          <div className="rounded-[28px] bg-white p-2 shadow-[0_18px_45px_rgba(15,23,42,0.10)]">
-            {(recording || transcribing) && (
-              <div className="mb-2 flex min-h-11 items-center justify-center gap-3 rounded-[22px] bg-[#F5F0FF] px-4 text-sm font-black text-[#6D28D9]">
+          {(recording || transcribing) && (
+            <div
+              className={`mb-2 rounded-2xl border px-3 py-2.5 ${
+                recording
+                  ? "border-[#F1C1C7] bg-[#FFF2F4]"
+                  : "border-[#CFE0F6] bg-[#EEF5FF]"
+              }`}
+            >
+              <div className="flex items-center gap-3">
                 {recording ? (
-                  <>
-                    <span className="relative flex h-3 w-3">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#8B5CF6] opacity-50" />
-                      <span className="relative inline-flex h-3 w-3 rounded-full bg-[#7C3AED]" />
-                    </span>
-                    Dinliyorum… Bitirince otomatik göndereceğim.
-                  </>
+                  <div className="flex h-9 items-end gap-1">
+                    {[0, 1, 2, 3, 4].map((item) => (
+                      <span
+                        key={item}
+                        className="block w-1 rounded-full bg-[#E11D48]"
+                        style={{
+                          height: `${9 + (item % 3) * 5}px`,
+                          animation: `wave 0.72s ease-in-out ${item * 0.1}s infinite`,
+                        }}
+                      />
+                    ))}
+                  </div>
                 ) : (
-                  <>
-                    <Loader2 size={17} className="animate-spin" />
-                    Sesiniz yazıya çevriliyor…
-                  </>
+                  <Loader2
+                    size={19}
+                    className="shrink-0 animate-spin text-[#1557D6]"
+                  />
+                )}
+
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={`lina-copy !text-left text-xs font-black ${
+                      recording ? "text-[#BE123C]" : "text-[#1557D6]"
+                    }`}
+                  >
+                    {recording
+                      ? "Sizi dinliyorum"
+                      : "Sesiniz yazıya çevriliyor"}
+                  </p>
+                  <p className="lina-copy mt-0.5 !text-left text-[10px] font-semibold text-[#728098]">
+                    {recording
+                      ? "Konuşmanız bittiğinde otomatik olarak gönderilir."
+                      : "Lütfen birkaç saniye bekleyin."}
+                  </p>
+                </div>
+
+                {recording && (
+                  <button
+                    type="button"
+                    onClick={() => stopRecording()}
+                    className="flex h-10 items-center justify-center gap-2 rounded-xl bg-[#E11D48] px-3 text-xs font-black text-white"
+                  >
+                    <Square size={13} fill="currentColor" />
+                    Bitir
+                  </button>
                 )}
               </div>
-            )}
-
-            <div className="flex items-center gap-2">
-              <textarea
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    sendMessage();
-                  }
-                }}
-                disabled={recording || transcribing}
-                placeholder={
-                  recording
-                    ? "Sizi dinliyorum…"
-                    : transcribing
-                      ? "Ses işleniyor…"
-                      : "Lina’ya yaz veya mikrofona dokunup konuş…"
-                }
-                className="max-h-24 min-h-12 flex-1 resize-none rounded-[22px] bg-[#F8FAFC] px-4 py-3 text-sm font-semibold text-[#06194A] outline-none placeholder:text-[#94A3B8] disabled:opacity-70"
-              />
-
-              <button
-                type="button"
-                onClick={toggleRecording}
-                disabled={loading || transcribing}
-                className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-[0_10px_24px_rgba(124,58,237,0.18)] transition active:scale-95 disabled:opacity-50 ${
-                  recording
-                    ? "bg-[#7C3AED] text-white ring-4 ring-[#EDE9FE]"
-                    : "bg-[#F5F0FF] text-[#7C3AED]"
-                }`}
-                aria-label={recording ? "Konuşmayı bitir" : "Sesli konuş"}
-              >
-                <Mic size={22} className={recording ? "animate-pulse" : ""} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => sendMessage()}
-                disabled={loading || recording || transcribing || !input.trim()}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#1557D6] text-white shadow-[0_10px_24px_rgba(21,87,214,0.24)] transition disabled:opacity-50"
-                aria-label="Gönder"
-              >
-                <Send size={21} />
-              </button>
             </div>
+          )}
 
-            <div className="mt-2 flex justify-center">
-              <button
-                type="button"
-                onClick={resetConversation}
-                disabled={loading}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#F8FAFC] px-4 py-2 text-xs font-black text-[#64748B] transition disabled:opacity-60"
-              >
-                <RefreshCcw size={14} />
-                Sohbeti Sıfırla
-              </button>
+          <div className="rounded-[22px] border border-[#C9D9ED] bg-[#F8FBFF] p-2 shadow-[0_10px_28px_rgba(15,23,42,0.08)] transition focus-within:border-[#8CB3EA] focus-within:ring-4 focus-within:ring-[#1557D6]/[0.08]">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onFocus={focusComposer}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void sendMessage();
+                }
+              }}
+              disabled={recording || transcribing}
+              rows={1}
+              maxLength={4000}
+              placeholder={
+                recording
+                  ? "Sizi dinliyorum…"
+                  : transcribing
+                    ? "Sesiniz işleniyor…"
+                    : "Lina’ya mesajınızı yazın…"
+              }
+              className="lina-professional-input block min-h-12 max-h-28 w-full resize-none overflow-y-auto border-0 bg-transparent px-2.5 py-2.5 text-base font-semibold leading-6 text-[#0B1F45] outline-none placeholder:text-[#98A5B7] disabled:cursor-not-allowed disabled:opacity-55"
+            />
+
+            <div className="mt-1 flex items-center justify-between gap-2 border-t border-[#E2EBF5] pt-2">
+              <div className="flex min-w-0 items-center gap-1.5 px-1">
+                <AudioLines size={14} className="shrink-0 text-[#7C8BA0]" />
+                <span className="truncate text-[10px] font-bold text-[#7C8BA0]">
+                  Yazın veya sesli anlatın
+                </span>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={toggleRecording}
+                  disabled={loading || transcribing}
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-[0_7px_18px_rgba(15,23,42,0.06)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 ${
+                    recording
+                      ? "border-[#E11D48] bg-[#E11D48] text-white"
+                      : "border-[#D3E0F0] bg-white text-[#1557D6]"
+                  }`}
+                  aria-label={
+                    recording ? "Ses kaydını bitir" : "Sesli mesaj başlat"
+                  }
+                  title={
+                    recording ? "Kaydı bitir" : "Sesli mesaj"
+                  }
+                >
+                  {recording ? (
+                    <Square size={16} fill="currentColor" />
+                  ) : (
+                    <Mic size={20} />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void sendMessage()}
+                  disabled={
+                    loading ||
+                    recording ||
+                    transcribing ||
+                    !input.trim()
+                  }
+                  className="flex h-11 min-w-11 items-center justify-center gap-2 rounded-2xl bg-[#1557D6] px-3 text-white shadow-[0_9px_22px_rgba(21,87,214,0.24)] transition active:scale-95 disabled:cursor-not-allowed disabled:bg-[#B8C7DB] disabled:shadow-none"
+                  aria-label="Mesajı gönder"
+                  title="Gönder"
+                >
+                  {loading ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <SendHorizontal size={19} />
+                  )}
+                  <span className="hidden text-xs font-black sm:inline">
+                    Gönder
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </footer>
       </div>
-    </div>
-  );
-}
 
-function Metric({
-  icon,
-  value,
-  label,
-  sub,
-  color,
-  bg,
-}: {
-  icon: React.ReactNode;
-  value: string;
-  label: string;
-  sub: string;
-  color: string;
-  bg: string;
-}) {
-  return (
-    <div className="border-r border-[#E2E8F0] px-2 py-4 text-center last:border-r-0">
-      <div
-        className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl"
-        style={{ color, backgroundColor: bg }}
-      >
-        {icon}
-      </div>
-      <div className="mt-3 text-3xl font-black leading-none">{value}</div>
-      <div className="mt-1 text-sm font-black">{label}</div>
-      <div className="mt-1 text-xs font-semibold text-[#64748B]">{sub}</div>
+      <style jsx global>{`
+        .lina-professional-shell .lina-professional-input {
+          text-align: left !important;
+        }
+
+        .lina-professional-shell .lina-copy,
+        .lina-professional-shell .lina-title,
+        .lina-professional-shell .lina-section-title {
+          text-align: left !important;
+          word-break: normal !important;
+          overflow-wrap: break-word !important;
+        }
+
+        .lina-professional-shell .lina-title {
+          font-size: 16px !important;
+          line-height: 1.15 !important;
+        }
+
+        .lina-professional-shell .lina-section-title {
+          font-size: 12px !important;
+          line-height: 1.2 !important;
+        }
+
+        .lina-professional-shell button {
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        @media (max-width: 380px) {
+          .lina-professional-shell .lina-title {
+            font-size: 15px !important;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .lina-professional-shell *,
+          .lina-professional-shell *::before,
+          .lina-professional-shell *::after {
+            scroll-behavior: auto !important;
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
