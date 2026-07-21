@@ -637,7 +637,7 @@ export default function LinaPanel({
     throw new Error(lastError || "Lina bağlantısı kurulamadı.");
   };
 
-  const speakWithElevenLabs = async (text: string) => {
+  const speakWithOpenAi = async (text: string) => {
     try {
       setVoiceError("");
 
@@ -741,7 +741,7 @@ export default function LinaPanel({
         },
       ]);
 
-      await speakWithElevenLabs(reply);
+      await speakWithOpenAi(reply);
       await fetchEndOfDayReview();
     } catch {
       const fallback =
@@ -969,7 +969,7 @@ export default function LinaPanel({
                 speaking
                   ? stopCurrentAudio
                   : () =>
-                      speakWithElevenLabs(
+                      speakWithOpenAi(
                         messages[messages.length - 1]?.text || "",
                       )
               }
@@ -1223,7 +1223,7 @@ export default function LinaPanel({
                             <button
                               type="button"
                               onClick={() =>
-                                speakWithElevenLabs(messageItem.text)
+                                speakWithOpenAi(messageItem.text)
                               }
                               className="mt-3 inline-flex items-center justify-center gap-2 rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] px-4 py-2 text-xs font-black text-[#1557D6]"
                             >

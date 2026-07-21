@@ -46,7 +46,7 @@ type LinaChatResponse = {
 type LinaVoiceResponse = {
   success: boolean;
   message: string;
-  provider: "elevenlabs" | "local";
+  provider: "openai" | "local";
   audioBase64?: string;
   mimeType?: string;
   kvkkFiltered: boolean;
@@ -402,7 +402,7 @@ export class LinaService {
     });
 
     try {
-      const audio = await this.askElevenLabs(filtered.safeText);
+      const audio = await this.askOpenAiSpeech(filtered.safeText);
 
       this.linaAuditService.log({
         userId: user?.id,
@@ -418,7 +418,7 @@ export class LinaService {
       return {
         success: true,
         message: filtered.safeText,
-        provider: "elevenlabs",
+        provider: "openai",
         audioBase64: audio.toString("base64"),
         mimeType: "audio/mpeg",
         kvkkFiltered: filtered.filtered,
@@ -534,61 +534,79 @@ export class LinaService {
     };
   }
 
-  private async askElevenLabs(text: string): Promise<Buffer> {
+  private async askOpenAiSpeech(
+    text: string,
+  ): Promise<Buffer> {
     const apiKey =
-      this.configService.get<string>("ELEVENLABS_API_KEY") ||
-      process.env.ELEVENLABS_API_KEY;
-    // Lina Fixed Voice V2
-    const voiceId =
-      this.configService.get<string>("LINA_FIXED_VOICE_ID") ||
-      process.env.LINA_FIXED_VOICE_ID ||
-      this.configService.get<string>("ELEVENLABS_VOICE_ID") ||
-      process.env.ELEVENLABS_VOICE_ID;
-    const modelId = "eleven_multilingual_v2";
-    const voiceSeed = 20260628;
+      this.configService.get<string>(
+        "OPENAI_API_KEY",
+      ) ||
+      process.env.OPENAI_API_KEY;
 
-    if (!apiKey || !voiceId) {
-      throw new Error("ELEVENLABS_CONFIG_MISSING");
+    const model =
+      this.configService.get<string>(
+        "LINA_OPENAI_TTS_MODEL",
+      ) ||
+      process.env.LINA_OPENAI_TTS_MODEL ||
+      "gpt-4o-mini-tts";
+
+    const voice =
+      this.configService.get<string>(
+        "LINA_OPENAI_TTS_VOICE",
+      ) ||
+      process.env.LINA_OPENAI_TTS_VOICE ||
+      "marin";
+
+    if (!apiKey) {
+      throw new Error(
+        "OPENAI_TTS_CONFIG_MISSING",
+      );
     }
 
-    const voiceText = this.normalizeVoiceTextForRealEstate(text);
+    const voiceText =
+      this.normalizeVoiceTextForRealEstate(
+        text,
+      );
 
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+      "https://api.openai.com/v1/audio/speech",
       {
         method: "POST",
         headers: {
-          "xi-api-key": apiKey,
-          "Content-Type": "application/json",
-          Accept: "audio/mpeg",
+          Authorization:
+            `Bearer ${apiKey}`,
+          "Content-Type":
+            "application/json",
         },
         body: JSON.stringify({
-          text: voiceText,
-          model_id: modelId,
-          language_code: "tr",
-          seed: voiceSeed,
-          voice_settings: {
-            stability: 0.88,
-            similarity_boost: 0.95,
-            style: 0,
-            use_speaker_boost: true,
-            speed: 1.03,
-          },
+          model,
+          voice,
+          input: voiceText,
+          instructions:
+            "Doğal ve akıcı Türkçe konuş. Sesin sıcak, güven veren, profesyonel ve sakin olsun. Gayrimenkul terimlerini doğru telaffuz et. Çok hızlı konuşma. Cümle sonlarında doğal ve kısa duraklamalar yap. Abartılı duygu, reklam tonu veya robotik ton kullanma.",
+          response_format: "mp3",
+          speed: 0.96,
         }),
       },
     );
 
     if (!response.ok) {
-      const detail = await response.text();
+      const detail =
+        await response.text();
+
       console.error(
-        "[LINA_FIXED_VOICE_V2_BACKEND_ERROR]",
+        "[LINA_OPENAI_TTS_BACKEND_ERROR]",
         response.status,
-        detail,
+        detail.slice(0, 1000),
       );
-      throw new Error(`ELEVENLABS_ERROR_${response.status}: ${detail}`);
+
+      throw new Error(
+        `OPENAI_TTS_ERROR_${response.status}: ${detail}`,
+      );
     }
 
-    const arrayBuffer = await response.arrayBuffer();
+    const arrayBuffer =
+      await response.arrayBuffer();
 
     return Buffer.from(arrayBuffer);
   }

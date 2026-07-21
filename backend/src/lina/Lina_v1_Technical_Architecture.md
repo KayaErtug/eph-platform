@@ -24,7 +24,7 @@ Lina v1’in amacı:
 
 \* KVKK filtresi uygulamak
 
-\* OpenAI, Claude ve ElevenLabs servislerini kontrollü şekilde kullanmak
+\* OpenAI, Claude ve OpenAI TTS servislerini kontrollü şekilde kullanmak
 
 \* EPH Platform içinde profesyonel, güvenli ve denetlenebilir yapay zekâ deneyimi sunmaktır.
 
@@ -46,7 +46,7 @@ Lina v1 için temel kararlar:
 
 2\. Yazılı ve sesli yanıt verebilir.
 
-3\. Sesli yanıt için ElevenLabs kullanılabilir.
+3\. Sesli yanıt için OpenAI TTS kullanılabilir.
 
 4\. Metin üretimi için OpenAI veya Claude kullanılabilir.
 
@@ -230,7 +230,7 @@ Görevleri:
 
 
 
-ElevenLabs ses üretiminden sorumludur.
+OpenAI TTS ses üretiminden sorumludur.
 
 
 
@@ -244,7 +244,7 @@ Görevleri:
 
 \* KVKK filtresinden geçmiş metni alır.
 
-\* ElevenLabs API ile ses üretir.
+\* OpenAI TTS API ile ses üretir.
 
 \* Ses dosyasını güvenli şekilde döner.
 
@@ -454,7 +454,7 @@ Amaç:
 
 
 
-Güvenli metinden ElevenLabs ile Türkçe sesli yanıt üretir.
+Güvenli metinden OpenAI TTS ile Türkçe sesli yanıt üretir.
 
 
 
@@ -882,11 +882,11 @@ Varsayılan model seçimi sistem ayarından yönetilebilir.
 
 
 
-\## 8. ElevenLabs Kullanım Mantığı
+\## 8. OpenAI TTS Kullanım Mantığı
 
 
 
-ElevenLabs yalnızca güvenli ve KVKK filtresinden geçmiş metinler için kullanılmalıdır.
+OpenAI TTS yalnızca güvenli ve KVKK filtresinden geçmiş metinler için kullanılmalıdır.
 
 
 
@@ -904,7 +904,7 @@ Ses üretim sırası:
 
 5\. Metin uzunluğu kontrol edilir.
 
-6\. ElevenLabs API’ye gönderilir.
+6\. OpenAI TTS API’ye gönderilir.
 
 7\. Ses dosyası üretilir.
 
@@ -1090,7 +1090,7 @@ Lina yazılı yanıt akışı:
 
 5\. Metin kısa sesli formata dönüştürülür.
 
-6\. ElevenLabs ile ses üretilir.
+6\. OpenAI TTS ile ses üretilir.
 
 7\. Ses yanıtı kullanıcıya döner.
 
