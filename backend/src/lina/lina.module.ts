@@ -24,6 +24,7 @@ import { LinaPropertyValidationService } from "./lina-property-validation.servic
 import { LinaService } from "./lina.service";
 import { LinaVoiceService } from "./lina-voice.service";
 import { LinaOpenAiClientService } from "./openai-tools/lina-openai-client.service";
+import { LinaOpenAiLiveGatewayService } from "./openai-tools/lina-openai-live-gateway.service";
 import { LinaOpenAiOrchestratorService } from "./openai-tools/lina-openai-orchestrator.service";
 import { LinaOpenAiRuntimeService } from "./openai-tools/lina-openai-runtime.service";
 import { LinaReadToolProviderService } from "./openai-tools/lina-read-tool-provider.service";
@@ -78,6 +79,7 @@ import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
     LinaOpenAiClientService,
     LinaOpenAiOrchestratorService,
     LinaOpenAiRuntimeService,
+    LinaOpenAiLiveGatewayService,
     LinaReadToolProviderService,
   ],
   exports: [
