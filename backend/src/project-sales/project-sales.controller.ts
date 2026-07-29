@@ -406,7 +406,7 @@ export class ProjectSalesController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     if (!file) {
-      throw new BadRequestException('Excel dosyasÄ± yÃ¼klenmedi.');
+      throw new BadRequestException('Excel dosyası yüklenmedi.');
     }
 
     return this.projectSalesImportService.previewExcel(user.id, file);
@@ -426,7 +426,7 @@ export class ProjectSalesController {
     @Body('confirmation') confirmation?: string,
   ) {
     if (!file) {
-      throw new BadRequestException('Excel dosyasÄ± yÃ¼klenmedi.');
+      throw new BadRequestException('Excel dosyası yüklenmedi.');
     }
 
     return this.projectSalesImportService.commitExcel({
@@ -501,7 +501,7 @@ export class ProjectSalesController {
         callback(
           isZip
             ? null
-            : new BadRequestException('YalnÄ±zca .zip dosyasÄ± yÃ¼klenebilir.'),
+            : new BadRequestException('Yalnızca .zip dosyası yüklenebilir.'),
           isZip,
         );
       },
@@ -514,7 +514,7 @@ export class ProjectSalesController {
     @Body('replaceExisting') replaceExisting?: string,
   ) {
     if (!file) {
-      throw new BadRequestException('ZIP dosyasÄ± yÃ¼klenmedi.');
+      throw new BadRequestException('ZIP dosyası yüklenmedi.');
     }
 
     return this.projectMediaZipService.previewZip({
@@ -541,7 +541,7 @@ export class ProjectSalesController {
         callback(
           isZip
             ? null
-            : new BadRequestException('YalnÄ±zca .zip dosyasÄ± yÃ¼klenebilir.'),
+            : new BadRequestException('Yalnızca .zip dosyası yüklenebilir.'),
           isZip,
         );
       },
@@ -554,7 +554,7 @@ export class ProjectSalesController {
     @Body('replaceExisting') replaceExisting?: string,
   ) {
     if (!file) {
-      throw new BadRequestException('ZIP dosyasÄ± yÃ¼klenmedi.');
+      throw new BadRequestException('ZIP dosyası yüklenmedi.');
     }
 
     return this.projectMediaZipService.uploadZip({
