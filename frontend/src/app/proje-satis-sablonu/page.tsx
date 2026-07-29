@@ -92,6 +92,7 @@ import { DeleteProjectModal, NoticeModal } from "./components/ProjectSalesModals
 import { Field, InfoBand, Metric, SectionTitle } from "./components/ProjectSalesPrimitives";
 import { ProjectMediaCenterView } from "./components/ProjectMediaCenterView";
 import { ProjectInventoryNumberingPanel } from "./components/ProjectInventoryNumberingPanel";
+import { ProjectLocationMap } from "./components/ProjectLocationMap";
 import { ProjectSalesLaunchFlowView } from "./components/ProjectSalesLaunchFlowView";
 import { ProjectSalesStockView } from "./components/ProjectSalesStockView";
 import {
@@ -4062,7 +4063,16 @@ function ProjectFormView({
         <SectionTitle
           icon={<MapPin size={20} />}
           title="Harita Konumu"
-          subtitle="Bir proje için tek harita pini kullanılır."
+          subtitle="Haritada gezinerek proje yerini seçebilir veya mevcut konumunu kullanabilirsin."
+        />
+
+        <ProjectLocationMap
+          latitude={form.latitude}
+          longitude={form.longitude}
+          onLocationChange={(latitude, longitude) => {
+            onChange("latitude", latitude.toFixed(7));
+            onChange("longitude", longitude.toFixed(7));
+          }}
         />
 
         <div

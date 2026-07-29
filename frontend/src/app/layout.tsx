@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
+import "leaflet/dist/leaflet.css";
 import { VisitTracker } from "../components/VisitTracker";
 import { ThemeProvider } from "../components/ThemeProvider";
 import { PWARegister } from "../components/PWARegister";
