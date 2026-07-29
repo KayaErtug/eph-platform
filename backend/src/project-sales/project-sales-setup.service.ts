@@ -36,6 +36,7 @@ type ProjectDraftBody = {
   declaredIndependentUnitCount?: unknown;
   declaredSalesInventoryCount?: unknown;
   plannedUnitTypes?: unknown;
+  plannedOtherUnitTypeName?: unknown;
   geometryType?: unknown;
   wizardStep?: unknown;
   setupStatus?: unknown;
@@ -100,6 +101,15 @@ export class ProjectSalesSetupService {
       body.defaultDeliveryDate,
     );
 
+    const plannedUnitTypes = this.parseUnitTypes(
+      body.plannedUnitTypes,
+    );
+    const plannedOtherUnitTypeName =
+      this.parsePlannedOtherUnitTypeName(
+        plannedUnitTypes,
+        body.plannedOtherUnitTypeName,
+      );
+
     const geometryType = this.optionalEnum(
       ProjectGeometryType,
       body.geometryType,
@@ -133,7 +143,8 @@ export class ProjectSalesSetupService {
         placeId: this.optionalText(body.placeId),
         declaredIndependentUnitCount,
         declaredSalesInventoryCount,
-        plannedUnitTypes: this.parseUnitTypes(body.plannedUnitTypes),
+        plannedUnitTypes,
+        plannedOtherUnitTypeName,
         geometryType,
         needsSoftwareTeamReview: COMPLEX_GEOMETRIES.has(geometryType),
         wizardStep: ProjectWizardStep.PROJE_BILGILERI,
@@ -409,8 +420,28 @@ export class ProjectSalesSetupService {
       data.declaredSalesInventoryCount = declaredSalesInventoryCount;
     }
 
-    if (this.hasOwn(body, 'plannedUnitTypes')) {
-      data.plannedUnitTypes = this.parseUnitTypes(body.plannedUnitTypes);
+    if (
+      this.hasOwn(body, 'plannedUnitTypes') ||
+      this.hasOwn(body, 'plannedOtherUnitTypeName')
+    ) {
+      const plannedUnitTypes = this.hasOwn(body, 'plannedUnitTypes')
+        ? this.parseUnitTypes(body.plannedUnitTypes)
+        : project.plannedUnitTypes;
+
+      const plannedOtherUnitTypeName =
+        this.parsePlannedOtherUnitTypeName(
+          plannedUnitTypes,
+          this.hasOwn(body, 'plannedOtherUnitTypeName')
+            ? body.plannedOtherUnitTypeName
+            : project.plannedOtherUnitTypeName,
+        );
+
+      if (this.hasOwn(body, 'plannedUnitTypes')) {
+        data.plannedUnitTypes = plannedUnitTypes;
+      }
+
+      data.plannedOtherUnitTypeName =
+        plannedOtherUnitTypeName;
     }
 
     if (this.hasOwn(body, 'geometryType')) {
@@ -517,6 +548,7 @@ export class ProjectSalesSetupService {
       declaredIndependentUnitCount: true,
       declaredSalesInventoryCount: true,
       plannedUnitTypes: true,
+      plannedOtherUnitTypeName: true,
       geometryType: true,
       wizardStep: true,
       setupStatus: true,
@@ -676,6 +708,28 @@ export class ProjectSalesSetupService {
     }
 
     return result as UnitType[];
+  }
+
+  private parsePlannedOtherUnitTypeName(
+    plannedUnitTypes: UnitType[],
+    value: unknown,
+  ) {
+    if (!plannedUnitTypes.includes(UnitType.DIGER)) {
+      return null;
+    }
+
+    const name = this.requiredText(
+      value,
+      'Diğer bağımsız bölüm türünün adı zorunludur.',
+    );
+
+    if (name.length < 2 || name.length > 80) {
+      throw new BadRequestException(
+        'Diğer bağımsız bölüm türünün adı 2 ile 80 karakter arasında olmalıdır.',
+      );
+    }
+
+    return name;
   }
 
   private optionalCoordinate(

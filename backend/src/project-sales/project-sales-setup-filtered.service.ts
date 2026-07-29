@@ -46,6 +46,7 @@ export class ProjectSalesSetupFilteredService extends ProjectSalesSetupService {
       declaredIndependentUnitCount: true,
       declaredSalesInventoryCount: true,
       plannedUnitTypes: true,
+      plannedOtherUnitTypeName: true,
       geometryType: true,
       wizardStep: true,
       setupStatus: true,

@@ -336,6 +336,7 @@ model Project {
   declaredIndependentUnitCount Int?
   declaredSalesInventoryCount  Int?
   plannedUnitTypes             UnitType[]                   @default([])
+  plannedOtherUnitTypeName     String?
   geometryType                 ProjectGeometryType          @default(DIKDORTGEN)
   wizardStep                   ProjectWizardStep            @default(PROJE_BILGILERI)
   setupStatus                  ProjectSetupStatus           @default(TASLAK)
@@ -3250,6 +3251,7 @@ enum UnitType {
   PANSIYON
   KAMP_YERI
   TATIL_KOYU
+  DIGER
 }
 
 enum NominationStatus {

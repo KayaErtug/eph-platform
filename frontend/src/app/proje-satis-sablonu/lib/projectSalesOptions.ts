@@ -56,6 +56,7 @@ export const UNIT_TYPE_OPTIONS = [
   { value: "MUAYENEHANE", label: "Muayenehane" },
   { value: "KLINIK", label: "Klinik" },
   { value: "OTEL_ODASI", label: "Otel Odası" },
+  { value: "DIGER", label: "Diğer" },
 ];
 
 export const COMMERCIAL_PURPOSE_OPTIONS = [

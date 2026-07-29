@@ -31,6 +31,7 @@ export type ProjectSummary = {
   declaredIndependentUnitCount: number | null;
   declaredSalesInventoryCount: number | null;
   plannedUnitTypes: string[];
+  plannedOtherUnitTypeName: string | null;
   geometryType: string;
   setupStatus: string;
   wizardStep: string;
@@ -59,6 +60,7 @@ export type ProjectForm = {
   declaredSalesInventoryCount: string;
   geometryType: string;
   plannedUnitTypes: string[];
+  plannedOtherUnitTypeName: string;
 };
 
 export type PageMode =

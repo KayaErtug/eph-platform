@@ -623,6 +623,13 @@ export class ProjectSalesInventoryService {
         const isSalesInventory = SALES_PURPOSES.has(commercialPurpose);
         const roomCount = this.optionalText(rawGroup.roomCount);
         const conceptLabel = this.optionalText(rawGroup.conceptLabel);
+
+        if (type === UnitType.DIGER && !conceptLabel) {
+          throw new BadRequestException(
+            `${block.code} ${floor.label} için diğer bağımsız bölüm türünün adı zorunludur.`,
+          );
+        }
+
         const netArea = this.optionalPositiveNumber(
           rawGroup.netArea,
           `${block.code} ${floor.label} net alanı`,

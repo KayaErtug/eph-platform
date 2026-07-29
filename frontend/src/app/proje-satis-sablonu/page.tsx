@@ -267,7 +267,10 @@ function buildFloors(block: BlockForm) {
 }
 
 
-function createUnitGroup(defaultType = "DAIRE"): UnitGroupForm {
+function createUnitGroup(
+  defaultType = "DAIRE",
+  defaultConceptLabel = "",
+): UnitGroupForm {
   return {
     key: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     type: defaultType,
@@ -277,7 +280,8 @@ function createUnitGroup(defaultType = "DAIRE"): UnitGroupForm {
     grossArea: "",
     commercialPurpose: "SATISA_SUNULACAK",
     facades: [],
-    conceptLabel: "",
+    conceptLabel:
+      defaultType === "DIGER" ? defaultConceptLabel : "",
   };
 }
 
@@ -359,6 +363,8 @@ function floorNumberingFromUnits(
 
 function floorPlansFromSetup(setup: ProjectSetupResponse): FloorPlanForm[] {
   const defaultType = setup.plannedUnitTypes?.[0] || "DAIRE";
+  const defaultOtherUnitTypeName =
+    setup.plannedOtherUnitTypeName || "";
   const units = Array.isArray(setup.units) ? setup.units : [];
 
   return setup.blocks.flatMap((block) =>
@@ -416,7 +422,12 @@ function floorPlansFromSetup(setup: ProjectSetupResponse): FloorPlanForm[] {
                 : [],
               conceptLabel: sample.conceptLabel || "",
             }))
-          : [createUnitGroup(defaultType)];
+          : [
+              createUnitGroup(
+                defaultType,
+                defaultOtherUnitTypeName,
+              ),
+            ];
       const numbering = floorNumberingFromUnits(
         floorUnits,
         floor.level,
@@ -537,6 +548,7 @@ function emptyForm(): ProjectForm {
     declaredSalesInventoryCount: "",
     geometryType: "DIKDORTGEN",
     plannedUnitTypes: ["DAIRE"],
+    plannedOtherUnitTypeName: "",
   };
 }
 
@@ -575,6 +587,8 @@ function formFromProject(project: ProjectSummary): ProjectForm {
       project.plannedUnitTypes?.length > 0
         ? project.plannedUnitTypes
         : ["DAIRE"],
+    plannedOtherUnitTypeName:
+      project.plannedOtherUnitTypeName || "",
   };
 }
 
@@ -1614,9 +1628,27 @@ export default function ProjectSalesCenterPage() {
         floorPlan.key === floorKey
           ? {
               ...floorPlan,
-              unitGroups: floorPlan.unitGroups.map((group) =>
-                group.key === groupKey ? { ...group, [field]: value } : group,
-              ),
+              unitGroups: floorPlan.unitGroups.map((group) => {
+                if (group.key !== groupKey) {
+                  return group;
+                }
+
+                if (field === "type") {
+                  const nextType = String(value);
+
+                  return {
+                    ...group,
+                    type: nextType,
+                    conceptLabel:
+                      nextType === "DIGER" &&
+                      !group.conceptLabel.trim()
+                        ? inventoryProject?.plannedOtherUnitTypeName || ""
+                        : group.conceptLabel,
+                  };
+                }
+
+                return { ...group, [field]: value };
+              }),
             }
           : floorPlan,
       ),
@@ -1674,6 +1706,7 @@ export default function ProjectSalesCenterPage() {
                 ...floorPlan.unitGroups,
                 createUnitGroup(
                   inventoryProject?.plannedUnitTypes?.[0] || "DAIRE",
+                  inventoryProject?.plannedOtherUnitTypeName || "",
                 ),
               ],
             }
@@ -2172,6 +2205,8 @@ export default function ProjectSalesCenterPage() {
       form.declaredSalesInventoryCount,
     ),
     plannedUnitTypes: form.plannedUnitTypes,
+    plannedOtherUnitTypeName:
+      form.plannedOtherUnitTypeName.trim() || null,
     geometryType: form.geometryType,
   });
 
@@ -2209,6 +2244,24 @@ export default function ProjectSalesCenterPage() {
           title: "Teslim Tarihi Eksik",
           message:
             "Devam eden projelerde tahmini teslim tarihi zorunludur.",
+        });
+        return;
+      }
+    }
+
+    if (form.plannedUnitTypes.includes("DIGER")) {
+      const otherUnitTypeName =
+        form.plannedOtherUnitTypeName.trim();
+
+      if (
+        otherUnitTypeName.length < 2 ||
+        otherUnitTypeName.length > 80
+      ) {
+        setNotice({
+          tone: "warning",
+          title: "Diğer Türün Adı Eksik",
+          message:
+            "Diğer seçeneği için bağımsız bölüm türünün adını 2 ile 80 karakter arasında yazın.",
         });
         return;
       }
@@ -4205,6 +4258,45 @@ function ProjectFormView({
               onToggle={onToggleUnitType}
             />
           </Field>
+
+          {form.plannedUnitTypes.includes("DIGER") && (
+            <div
+              style={{
+                width: "100%",
+                maxWidth: 560,
+                margin: "10px auto 0",
+              }}
+            >
+              <Field label="Diğer bağımsız bölüm türünün adı *">
+                <input
+                  value={form.plannedOtherUnitTypeName}
+                  onChange={(event) =>
+                    onChange(
+                      "plannedOtherUnitTypeName",
+                      event.target.value,
+                    )
+                  }
+                  maxLength={80}
+                  placeholder="Ör. Öğrenci apartı"
+                  style={inputStyle}
+                />
+              </Field>
+
+              <p
+                style={{
+                  margin: "6px 0 0",
+                  color: "#64748B",
+                  fontSize: 9,
+                  lineHeight: 1.45,
+                  textAlign: "center",
+                  fontWeight: 750,
+                }}
+              >
+                Listede bulunmayan bağımsız bölüm türünü kendi
+                adıyla yazabilirsiniz.
+              </p>
+            </div>
+          )}
         </div>
 
         <InfoBand tone="info">
@@ -5531,7 +5623,13 @@ function ProjectInventoryView({
                         />
                       </Field>
 
-                      <Field label="Konsept etiketi">
+                      <Field
+                        label={
+                          group.type === "DIGER"
+                            ? "Diğer türün adı *"
+                            : "Konsept etiketi"
+                        }
+                      >
                         <input
                           value={group.conceptLabel}
                           onChange={(event) =>
@@ -5543,7 +5641,13 @@ function ProjectInventoryView({
                             )
                           }
                           disabled={inventoryLocked}
-                          placeholder="Ör. Bahçe katı"
+                          placeholder={
+                            group.type === "DIGER"
+                              ? project?.plannedOtherUnitTypeName ||
+                                "Ör. Öğrenci apartı"
+                              : "Ör. Bahçe katı"
+                          }
+                          maxLength={80}
                           style={inputStyle}
                         />
                       </Field>
