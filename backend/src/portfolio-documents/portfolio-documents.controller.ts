@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   UploadedFile,
   UseGuards,
@@ -36,6 +37,18 @@ export class PortfolioDocumentsController {
     });
   }
 
+  @Post(':portfolioId/submit-review')
+  submitPortfolioForReview(
+    @CurrentUser() user: any,
+    @Param('portfolioId') portfolioId: string,
+  ) {
+    return this.portfolioDocumentsService.submitPortfolioForReview({
+      userId: user.id,
+      userRole: user.role,
+      portfolioId,
+    });
+  }
+
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -55,6 +68,48 @@ export class PortfolioDocumentsController {
       portfolioId,
       authorityType,
       file,
+    });
+  }
+
+  @Patch(':documentId/approve')
+  approvePortfolioDocument(
+    @CurrentUser() user: any,
+    @Param('documentId') documentId: string,
+    @Body('note') note?: string,
+  ) {
+    return this.portfolioDocumentsService.approvePortfolioDocument({
+      userId: user.id,
+      userRole: user.role,
+      documentId,
+      note,
+    });
+  }
+
+  @Patch(':documentId/reject')
+  rejectPortfolioDocument(
+    @CurrentUser() user: any,
+    @Param('documentId') documentId: string,
+    @Body('note') note?: string,
+  ) {
+    return this.portfolioDocumentsService.rejectPortfolioDocument({
+      userId: user.id,
+      userRole: user.role,
+      documentId,
+      note,
+    });
+  }
+
+  @Patch(':documentId/request-reupload')
+  requestPortfolioDocumentReupload(
+    @CurrentUser() user: any,
+    @Param('documentId') documentId: string,
+    @Body('note') note?: string,
+  ) {
+    return this.portfolioDocumentsService.requestPortfolioDocumentReupload({
+      userId: user.id,
+      userRole: user.role,
+      documentId,
+      note,
     });
   }
 

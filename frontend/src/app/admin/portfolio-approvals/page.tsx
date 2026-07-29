@@ -81,6 +81,14 @@ type ApprovalUnit = {
     isCover?: boolean;
     sortOrder?: number;
   }[];
+  authorityDocuments?: {
+    id: string;
+    authorityType: string;
+    approved: boolean;
+    approvedById?: string | null;
+    approvedAt?: string | null;
+    rejectReason?: string | null;
+  }[];
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -119,6 +127,38 @@ function isWaitingApprovalStatus(status: string) {
     "INCELEMEDE",
     "EKSIK_BILGI_BEKLENIYOR",
   ].includes(status);
+}
+
+function getRequiredDocumentApprovalState(item: ApprovalUnit) {
+  const documents = Array.isArray(item.authorityDocuments)
+    ? item.authorityDocuments
+    : [];
+
+  const tapuDocuments = documents.filter(
+    (document) => document.authorityType === "TAPU",
+  );
+  const yetkiDocuments = documents.filter(
+    (document) => document.authorityType === "YETKI_BELGESI",
+  );
+
+  const tapuDocument =
+    tapuDocuments.find((document) => document.approved) || tapuDocuments[0];
+  const yetkiDocument =
+    yetkiDocuments.find((document) => document.approved) || yetkiDocuments[0];
+  const hasApprovedTapu = tapuDocuments.some(
+    (document) => document.approved,
+  );
+  const hasApprovedYetki = yetkiDocuments.some(
+    (document) => document.approved,
+  );
+
+  return {
+    tapuDocument,
+    yetkiDocument,
+    hasApprovedTapu,
+    hasApprovedYetki,
+    allRequiredApproved: hasApprovedTapu && hasApprovedYetki,
+  };
 }
 
 function matchesApprovalFilter(item: ApprovalUnit, filter: string) {
@@ -316,26 +356,22 @@ export default function PortfolioApprovalsPage() {
       }
 
       if (action === "approve") {
+        const targetItem = items.find((item) => item.id === id);
+        const documentState = targetItem
+          ? getRequiredDocumentApprovalState(targetItem)
+          : null;
+
+        if (!documentState?.allRequiredApproved) {
+          throw new Error(
+            "Portföyü onaylayıp yayınlamak için Tapu ve Yetki Belgesinin ikisi de ayrı ayrı onaylanmalıdır.",
+          );
+        }
+
         await api.post(`/units/${id}/approve`, {
-          note: "Portföy admin onay merkezinden onaylandı ve havuzda yayınlandı.",
+          note:
+            "Tapu ve Yetki Belgesi onayları doğrulandı. Portföy admin onay merkezinden onaylandı ve havuzda yayınlandı.",
         });
-        setItems((current) =>
-          current.map((item) =>
-            item.id === id
-              ? {
-                  ...item,
-                  approvalStatus: "HAVUZDA",
-                  isVerified: true,
-                  yetkiVerified: true,
-                  isPoolVisible: true,
-                  approvedAt: new Date().toISOString(),
-                  poolPublishedAt: new Date().toISOString(),
-                  approvalNote:
-                    "Portföy admin onay merkezinden onaylandı ve havuzda yayınlandı.",
-                }
-              : item,
-          ),
-        );
+
         setSuccess(
           "Portföy onaylandı ve otomatik olarak havuzda yayınlandı.",
         );
@@ -350,7 +386,11 @@ export default function PortfolioApprovalsPage() {
 
       await fetchItems();
     } catch (err: any) {
-      setError(err?.response?.data?.message || "İşlem tamamlanamadı.");
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "İşlem tamamlanamadı.",
+      );
     } finally {
       setActionLoading("");
     }
@@ -358,7 +398,7 @@ export default function PortfolioApprovalsPage() {
 
   if (!hasHydrated || loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F8FAFC] text-[#172033]">
+      <main className="flex min-h-[100dvh] items-center justify-center overflow-y-auto bg-[#F8FAFC] text-[#172033]">
         <div className="text-center">
           <Loader2 className="mx-auto animate-spin text-[#1557D6]" size={30} />
           <p className="mt-3 text-[12px] font-black uppercase tracking-[0.18em] text-slate-400">
@@ -370,7 +410,7 @@ export default function PortfolioApprovalsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC] text-[#172033]">
+    <main className="min-h-[100dvh] overflow-y-auto bg-[#F8FAFC] pb-[calc(88px+env(safe-area-inset-bottom))] text-[#172033]">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-3 py-2.5 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
@@ -532,7 +572,7 @@ export default function PortfolioApprovalsPage() {
         </div>
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur-xl lg:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-2 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))] backdrop-blur-xl lg:hidden">
         <div className="grid grid-cols-5 gap-1">
           <MobileNav href="/admin" icon={<Home size={21} />} label="Panel" />
           <MobileNav href="/admin/portfolio-approvals" icon={<CheckCircle2 size={21} />} label="Onay" active />
@@ -598,7 +638,13 @@ function PortfolioCard({
   const isPool = currentStatus === "HAVUZDA";
   const isFinalApproved = currentStatus === "ONAYLANDI";
   const isRejected = currentStatus === "REDDEDILDI";
-  const isWaitingAction = isWaitingApprovalStatus(currentStatus);
+  const isReviewable = [
+    "INCELEMEYE_GONDERILDI",
+    "INCELEMEDE",
+  ].includes(currentStatus);
+  const documentState = getRequiredDocumentApprovalState(item);
+  const canApproveAndPublish =
+    isReviewable && documentState.allRequiredApproved;
 
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-2.5 shadow-sm">
@@ -623,14 +669,19 @@ function PortfolioCard({
                 {item.project?.name || unitKind(item)}
               </h2>
               <p className="mt-1 truncate text-[11px] font-bold text-slate-500">
-                {unitKind(item)} • {item.project?.district || "İlçe yok"} / {item.project?.city || "Şehir yok"}
+                {unitKind(item)} • {item.project?.district || "İlçe yok"} /{" "}
+                {item.project?.city || "Şehir yok"}
               </p>
               <p className="mt-1 truncate text-[12px] font-black text-[#1557D6]">
                 {money(item.price, item.priceCurrency)}
               </p>
             </div>
 
-            <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black ${statusClass(item.approvalStatus)}`}>
+            <span
+              className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black ${statusClass(
+                item.approvalStatus,
+              )}`}
+            >
               {STATUS_LABELS[currentStatus] || "Durum Yok"}
             </span>
           </div>
@@ -638,22 +689,52 @@ function PortfolioCard({
       </div>
 
       <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
-        <InfoCard icon={<UsersRound size={15} />} label="Sahip" value={ownerName(item)} />
-        <InfoCard icon={<CalendarDays size={15} />} label="Gönderim" value={dateText(item.submittedForApprovalAt || item.updatedAt)} />
-        <InfoCard icon={<FolderOpen size={15} />} label="Tür" value={unitKind(item)} />
-        <InfoCard icon={<span className="text-[13px] font-black">₺</span>} label="Fiyat" value={money(item.price, item.priceCurrency)} />
+        <InfoCard
+          icon={<UsersRound size={15} />}
+          label="Sahip"
+          value={ownerName(item)}
+        />
+        <InfoCard
+          icon={<CalendarDays size={15} />}
+          label="Gönderim"
+          value={dateText(item.submittedForApprovalAt || item.updatedAt)}
+        />
+        <InfoCard
+          icon={<FolderOpen size={15} />}
+          label="Tür"
+          value={unitKind(item)}
+        />
+        <InfoCard
+          icon={<span className="text-[13px] font-black">₺</span>}
+          label="Fiyat"
+          value={money(item.price, item.priceCurrency)}
+        />
       </div>
 
       <div className="mt-2 grid grid-cols-4 gap-1.5">
-        <DocumentStatus label="Yetki" active={Boolean(item.yetkiVerified || item.isVerified)} />
-        <DocumentStatus label="Tapu" active={Boolean(item.tapuVerified)} />
-        <DocumentStatus label="Foto" active={Boolean(item.photoVerified)} />
+        <DocumentStatus
+          label="Yetki"
+          active={documentState.hasApprovedYetki}
+        />
+        <DocumentStatus
+          label="Tapu"
+          active={documentState.hasApprovedTapu}
+        />
+        <DocumentStatus
+          label="Foto"
+          active={Boolean(item.photoVerified)}
+        />
         <DocumentStatus label="Havuz" active={isPool} />
       </div>
 
-      {isFinalApproved ? (
+      {isReviewable && !documentState.allRequiredApproved ? (
+        <p className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 p-2.5 text-center text-[10px] font-black leading-4 text-amber-800">
+          Onayla ve Yayınla kilitli · Tapu ve Yetki Belgesinin ikisi de
+          ayrı ayrı onaylanmalıdır.
+        </p>
+      ) : isFinalApproved ? (
         <p className="mt-2 rounded-2xl bg-emerald-50 p-2.5 text-center text-[11px] font-black leading-4 text-emerald-800">
-          ✅ Portföy onaylandı. Artık yalnızca Onaylandı veya Havuz filtrelerinde takip edilir.
+          ✅ Portföy onaylandı.
         </p>
       ) : item.approvalNote ? (
         <p className="mt-2 line-clamp-2 rounded-2xl bg-amber-50 p-2.5 text-center text-[11px] font-bold leading-4 text-amber-800">
@@ -661,48 +742,42 @@ function PortfolioCard({
         </p>
       ) : null}
 
-      <div className="mt-2 grid grid-cols-3 gap-1.5 md:grid-cols-5">
+      <div className="mt-2 grid grid-cols-2 gap-1.5 md:grid-cols-5">
         <ActionButton
           label="İncele"
           icon={<Eye size={15} />}
           loading={actionLoading === `${item.id}-review`}
-          disabled={!isWaitingAction}
+          disabled={!isReviewable || currentStatus === "INCELEMEDE"}
           onClick={() => onAction(item.id, "review")}
           className="bg-blue-50 text-blue-700"
         />
         <ActionButton
-          label="Eksik"
+          label="Eksik Bilgi"
           icon={<FileWarning size={15} />}
           loading={actionLoading === `${item.id}-missing`}
-          disabled={!isWaitingAction}
+          disabled={!isReviewable}
           onClick={() => onAction(item.id, "missing")}
           className="bg-amber-50 text-amber-700"
         />
         <ActionButton
-          label={
-            isPool
-              ? "Yayınlandı"
-              : isFinalApproved
-                ? "Onaylandı"
-                : "Onayla ve Yayınla"
-          }
+          label={isPool ? "Yayınlandı" : "Onayla ve Yayınla"}
           icon={<CheckCircle2 size={15} />}
           loading={actionLoading === `${item.id}-approve`}
-          disabled={!isWaitingAction || isFinalApproved}
+          disabled={!canApproveAndPublish || isPool || isFinalApproved}
           onClick={() => onAction(item.id, "approve")}
-          className="bg-emerald-50 text-emerald-700"
+          className="col-span-2 bg-emerald-600 text-white md:col-span-1"
         />
         <ActionButton
-          label={isRejected ? "Reddedildi" : "Red"}
+          label={isRejected ? "Reddedildi" : "Portföyü Reddet"}
           icon={<XCircle size={15} />}
           loading={actionLoading === `${item.id}-reject`}
-          disabled={!isWaitingAction || isRejected}
+          disabled={!isReviewable || isRejected}
           onClick={() => onAction(item.id, "reject")}
           className="bg-rose-50 text-rose-700"
         />
         <Link
-          href={`/stok/${item.id}`}
-          className="flex min-h-[40px] items-center justify-center gap-1 rounded-2xl border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-700"
+          href={`/portfoy/${item.id}`}
+          className="col-span-2 flex min-h-[40px] items-center justify-center gap-1 rounded-2xl border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-700 md:col-span-1"
         >
           <FileText size={15} />
           Detay

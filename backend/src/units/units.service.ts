@@ -11,6 +11,7 @@ import {
   KontorHareketTuru,
   KontorIslemTuru,
   PortfolioApprovalStatus,
+  PortfolioAuthorityType,
   Prisma,
   ProjectSetupStatus,
   Role,
@@ -464,9 +465,33 @@ export class UnitsService {
     return access;
   }
 
-  private ensureCanViewUnit(user: CurrentUserPayload, ownerId: string) {
+  private ensureCanViewUnit(
+    user: CurrentUserPayload,
+    ownerId: string,
+    approvalStatus?: PortfolioApprovalStatus | string | null,
+  ) {
     if (this.isSuperAdmin(user)) return;
     if (this.isOwner(user, ownerId)) return;
+
+    const normalizedStatus = String(approvalStatus || '').toUpperCase();
+    const managerVisibleStatuses = new Set<PortfolioApprovalStatus>([
+      PortfolioApprovalStatus.BELGE_BEKLENIYOR,
+      PortfolioApprovalStatus.INCELEMEYE_GONDERILDI,
+      PortfolioApprovalStatus.INCELEMEDE,
+      PortfolioApprovalStatus.EKSIK_BILGI_BEKLENIYOR,
+      PortfolioApprovalStatus.ONAYLANDI,
+      PortfolioApprovalStatus.HAVUZDA,
+      PortfolioApprovalStatus.REDDEDILDI,
+    ]);
+
+    if (
+      this.isApprovalManager(user) &&
+      managerVisibleStatuses.has(
+        normalizedStatus as PortfolioApprovalStatus,
+      )
+    ) {
+      return;
+    }
 
     throw new ForbiddenException('Bu portföyü görüntüleme yetkiniz yok.');
   }
@@ -484,6 +509,79 @@ export class UnitsService {
         'Bu işlem sadece Moderatör, Admin veya Yazılım Ekibi tarafından yapılabilir.',
       );
     }
+  }
+
+  private async getRequiredAgentDocumentApprovalState(
+    tx: Prisma.TransactionClient,
+    unitId: string,
+  ) {
+    const documents = await tx.portfolioAuthorityDocument.findMany({
+      where: {
+        unitId,
+        authorityType: {
+          in: [
+            PortfolioAuthorityType.TAPU,
+            PortfolioAuthorityType.YETKI_BELGESI,
+          ],
+        },
+      },
+      select: {
+        id: true,
+        authorityType: true,
+        approved: true,
+        approvedById: true,
+        approvedAt: true,
+        rejectReason: true,
+      },
+    });
+
+    const tapuDocuments = documents.filter(
+      (item) => item.authorityType === PortfolioAuthorityType.TAPU,
+    );
+    const yetkiDocuments = documents.filter(
+      (item) =>
+        item.authorityType === PortfolioAuthorityType.YETKI_BELGESI,
+    );
+
+    const tapuDocument =
+      tapuDocuments.find((item) => item.approved) || tapuDocuments[0];
+    const yetkiDocument =
+      yetkiDocuments.find((item) => item.approved) || yetkiDocuments[0];
+    const hasApprovedTapu = tapuDocuments.some((item) => item.approved);
+    const hasApprovedYetki = yetkiDocuments.some((item) => item.approved);
+
+    return {
+      documents,
+      tapuDocument,
+      yetkiDocument,
+      hasApprovedTapu,
+      hasApprovedYetki,
+      allRequiredApproved: hasApprovedTapu && hasApprovedYetki,
+    };
+  }
+
+  private async createPortfolioApprovalAuditLog(
+    tx: Prisma.TransactionClient,
+    input: {
+      actorId: string;
+      targetUserId: string;
+      action: string;
+      unitId: string;
+      description: string;
+      metadata?: Prisma.InputJsonValue;
+    },
+  ) {
+    await tx.adminActionLog.create({
+      data: {
+        actorId: input.actorId,
+        targetUserId: input.targetUserId,
+        action: input.action,
+        entityType: 'UNIT',
+        entityId: input.unitId,
+        description: input.description,
+        metadata: input.metadata,
+      },
+    });
   }
 
   private isPortfolioContentLocked(
@@ -1589,7 +1687,11 @@ export class UnitsService {
       throw new NotFoundException('Portföy bulunamadı.');
     }
 
-    this.ensureCanViewUnit(user, unit.project.ownerId);
+    this.ensureCanViewUnit(
+      user,
+      unit.project.ownerId,
+      unit.approvalStatus,
+    );
 
     if (!this.isProjectVisibleInPortfolio(unit.project)) {
       throw new NotFoundException('Portföy bulunamadı.');
@@ -2379,15 +2481,17 @@ export class UnitsService {
     this.ensureApprovalManager(user);
 
     const unit = await this.getUnitWithProjectOrFail(id);
-
     const ownerRole = unit.project.owner?.role;
 
-    if (
-      this.isRealEstateAgentRole(ownerRole) &&
-      !this.hasRequiredAgentApprovalDocuments(unit)
-    ) {
+    if (this.isDirectPoolPublisherRole(ownerRole)) {
       throw new BadRequestException(
-        'Emlakçı portföyü onaylanmadan önce Tapu ve Yetki Belgesi birlikte yüklenmelidir.',
+        'Müteahhit ve İnşaat Firması portföyleri yönetici onayı olmadan doğrudan havuz yayın akışını kullanır.',
+      );
+    }
+
+    if (!this.isRealEstateAgentRole(ownerRole)) {
+      throw new BadRequestException(
+        'Bu kullanıcı rolü için belge tabanlı portföy onay akışı tanımlı değildir.',
       );
     }
 
@@ -2398,26 +2502,86 @@ export class UnitsService {
 
     if (!approvableStatuses.has(unit.approvalStatus)) {
       throw new BadRequestException(
-        'Yalnızca kullanıcı tarafından incelemeye gönderilmiş portföyler onaylanabilir.',
+        'Yalnızca kullanıcı tarafından incelemeye gönderilmiş portföyler onaylanıp yayınlanabilir.',
       );
     }
 
-    return this.prisma.unit.update({
-      where: { id },
-      data: {
-        approvalStatus: PortfolioApprovalStatus.HAVUZDA,
-        approvedAt: new Date(),
-        rejectedAt: null,
-        approvalNote:
-          body?.note ||
-          'Portföy onaylandı ve otomatik olarak havuzda yayınlandı.',
-        isVerified: true,
-        verifiedAt: new Date(),
-        isPoolVisible: true,
-        poolPublishedAt: new Date(),
-        poolRemovedAt: null,
-      },
-      include: unitInclude,
+    const now = new Date();
+    const approvalNote =
+      String(body?.note || '').trim().slice(0, 1000) ||
+      'Tapu ve Yetki Belgesi ayrı ayrı onaylandı. Portföy onaylandı ve otomatik olarak havuzda yayınlandı.';
+
+    return this.prisma.$transaction(async (tx) => {
+      const documentState =
+        await this.getRequiredAgentDocumentApprovalState(tx, id);
+
+      if (!documentState.allRequiredApproved) {
+        const blockedDocuments: string[] = [];
+
+        if (!documentState.tapuDocument) {
+          blockedDocuments.push('Tapu yüklenmemiş');
+        } else if (!documentState.hasApprovedTapu) {
+          blockedDocuments.push('Tapu onaylanmamış');
+        }
+
+        if (!documentState.yetkiDocument) {
+          blockedDocuments.push('Yetki Belgesi yüklenmemiş');
+        } else if (!documentState.hasApprovedYetki) {
+          blockedDocuments.push('Yetki Belgesi onaylanmamış');
+        }
+
+        throw new BadRequestException(
+          `Portföyü onaylayıp yayınlamak için Tapu ve Yetki Belgesinin ikisi de ayrı ayrı onaylanmalıdır. ${blockedDocuments.join(
+            ' · ',
+          )}`,
+        );
+      }
+
+      const updatedUnit = await tx.unit.update({
+        where: { id },
+        data: {
+          approvalStatus: PortfolioApprovalStatus.HAVUZDA,
+          approvedAt: now,
+          rejectedAt: null,
+          approvalNote,
+          tapuVerified: true,
+          yetkiVerified: true,
+          isVerified: true,
+          verifiedAt: now,
+          isPoolVisible: true,
+          poolPublishedAt: now,
+          poolRemovedAt: null,
+        },
+        include: unitInclude,
+      });
+
+      await this.createPortfolioApprovalAuditLog(tx, {
+        actorId: user.id,
+        targetUserId: unit.project.ownerId,
+        action: 'PORTFOLIO_APPROVED_AND_PUBLISHED',
+        unitId: id,
+        description:
+          'Tapu ve Yetki Belgesi onayları doğrulandı; portföy onaylanarak havuzda yayınlandı.',
+        metadata: {
+          approvalStatusBefore: unit.approvalStatus,
+          approvalStatusAfter: PortfolioApprovalStatus.HAVUZDA,
+          approvalNote,
+          tapuDocumentId: documentState.tapuDocument?.id || '',
+          tapuApprovedById:
+            documentState.tapuDocument?.approvedById || '',
+          tapuApprovedAt:
+            documentState.tapuDocument?.approvedAt?.toISOString() || '',
+          yetkiDocumentId: documentState.yetkiDocument?.id || '',
+          yetkiApprovedById:
+            documentState.yetkiDocument?.approvedById || '',
+          yetkiApprovedAt:
+            documentState.yetkiDocument?.approvedAt?.toISOString() || '',
+          publishedAt: now.toISOString(),
+          directPoolPublisher: false,
+        } as Prisma.InputJsonValue,
+      });
+
+      return updatedUnit;
     });
   }
 
@@ -2443,8 +2607,15 @@ export class UnitsService {
     const unit = await this.getUnitWithProjectOrFail(id);
 
     this.ensureApprovalManager(user);
-
     this.ensureProjectVisibleForPortfolioActions(unit.project);
+
+    const ownerRole = unit.project.owner?.role;
+
+    if (this.isDirectPoolPublisherRole(ownerRole)) {
+      throw new BadRequestException(
+        'Müteahhit ve İnşaat Firması portföyleri doğrudan havuz yayın akışını kullanır.',
+      );
+    }
 
     if (unit.approvalStatus !== PortfolioApprovalStatus.ONAYLANDI) {
       throw new BadRequestException(
@@ -2452,15 +2623,45 @@ export class UnitsService {
       );
     }
 
-    return this.prisma.unit.update({
-      where: { id },
-      data: {
-        approvalStatus: PortfolioApprovalStatus.HAVUZDA,
-        isPoolVisible: true,
-        poolPublishedAt: new Date(),
-        poolRemovedAt: null,
-      },
-      include: unitInclude,
+    const now = new Date();
+
+    return this.prisma.$transaction(async (tx) => {
+      if (this.isRealEstateAgentRole(ownerRole)) {
+        const documentState =
+          await this.getRequiredAgentDocumentApprovalState(tx, id);
+
+        if (!documentState.allRequiredApproved) {
+          throw new BadRequestException(
+            'Portföy havuza gönderilmeden önce Tapu ve Yetki Belgesinin ikisi de ayrı ayrı onaylanmalıdır.',
+          );
+        }
+      }
+
+      const updatedUnit = await tx.unit.update({
+        where: { id },
+        data: {
+          approvalStatus: PortfolioApprovalStatus.HAVUZDA,
+          isPoolVisible: true,
+          poolPublishedAt: now,
+          poolRemovedAt: null,
+        },
+        include: unitInclude,
+      });
+
+      await this.createPortfolioApprovalAuditLog(tx, {
+        actorId: user.id,
+        targetUserId: unit.project.ownerId,
+        action: 'PORTFOLIO_PUBLISHED_TO_POOL',
+        unitId: id,
+        description: 'Onaylanmış portföy havuzda yayınlandı.',
+        metadata: {
+          approvalStatusBefore: unit.approvalStatus,
+          approvalStatusAfter: PortfolioApprovalStatus.HAVUZDA,
+          publishedAt: now.toISOString(),
+        } as Prisma.InputJsonValue,
+      });
+
+      return updatedUnit;
     });
   }
 

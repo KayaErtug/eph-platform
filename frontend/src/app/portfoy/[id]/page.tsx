@@ -19,6 +19,7 @@ import {
   ChevronRight,
   CheckCircle2,
   CircleUserRound,
+  Loader2,
   Copy,
   Edit3,
   ExternalLink,
@@ -33,6 +34,7 @@ import {
   MapPin,
   Maximize2,
   MessageCircle,
+  RotateCcw,
   Ruler,
   Star,
   Truck,
@@ -45,6 +47,7 @@ import {
   Trash2,
   Upload,
   X,
+  XCircle,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -63,6 +66,7 @@ import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
 import EphAuthorityLetterModal from "@/components/authority-letters/EphAuthorityLetterModal";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
 import LinaDocumentPrecheckPanel from "@/components/lina/LinaDocumentPrecheckPanel";
+import { decodePortfolioMetadataState } from "@/components/stok/portfolioFeatureMetadata";
 
 type DetailUnit = Unit & {
   createdAt?: string;
@@ -90,6 +94,23 @@ const DOCUMENT_LABELS: Record<PortfolioAuthorityType, string> = {
 };
 
 const DOCUMENT_ACCEPT = "application/pdf,image/jpeg,image/png,image/webp";
+const DOCUMENT_REJECT_PREFIX = "[BELGE_REDDEDILDI]";
+const DOCUMENT_REUPLOAD_PREFIX = "[YENIDEN_BELGE_ISTENDI]";
+
+type DocumentReviewAction = "APPROVE" | "REJECT" | "REQUEST_REUPLOAD";
+
+type DocumentReviewDialogState = {
+  document: PortfolioAuthorityDocument;
+  label: string;
+  action: DocumentReviewAction;
+};
+
+type DocumentReviewState =
+  | "MISSING"
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "REUPLOAD_REQUESTED";
 
 
 const FEATURE_LABELS: Record<string, string> = {
@@ -111,13 +132,13 @@ const FEATURE_LABELS: Record<string, string> = {
   GIYINME_ODASI: "Giyinme Odası",
   ANKASTRE_MUTFAK: "Ankastre Mutfak",
   AKILLI_EV: "Akıllı Ev Sistemi",
-  SOMINE: "Şömine",
+  SOMINE: " ?ömine",
   KLIMA: "Klima",
   ISI_YALITIMI: "Isı Yalıtımı",
   SES_YALITIMI: "Ses Yalıtımı",
   DENIZ_MANZARASI: "Deniz Manzarası",
   DOGA_MANZARASI: "Doğa Manzarası",
-  SEHIR_MANZARASI: "Şehir Manzarası",
+  SEHIR_MANZARASI: " ?ehir Manzarası",
   YUKLEME_RAMPASI: "Yükleme Rampası",
   TIR_GIRISI: "TIR Girişi",
   VINC_SISTEMI: "Vinç Sistemi",
@@ -139,19 +160,10 @@ const FEATURE_LABELS: Record<string, string> = {
 function getFeatureLabels(features?: string[] | null) {
   if (!Array.isArray(features)) return [];
 
-  return Array.from(
-    new Set(
-      features
-        .map((feature) => String(feature || "").trim())
-        .filter(
-          (feature) =>
-            Boolean(feature) &&
-            !feature.toLocaleUpperCase("tr-TR").startsWith("__EPH_META"),
-        )
-        .map((feature) => FEATURE_LABELS[feature] || feature)
-        .filter(Boolean),
-    ),
-  );
+  return features
+    .filter((feature) => !String(feature || "").startsWith("__EPH_META__:"))
+    .map((feature) => FEATURE_LABELS[feature] || feature)
+    .filter(Boolean);
 }
 
 function unitHasFeature(unit: DetailUnit, codes: string[]) {
@@ -247,9 +259,9 @@ function normalizeDetailType(value?: string) {
   return String(value || "")
     .toLocaleUpperCase("tr-TR")
     .replaceAll("İ", "I")
-    .replaceAll("Ğ", "G")
+    .replaceAll(" ?", "G")
     .replaceAll("Ü", "U")
-    .replaceAll("Ş", "S")
+    .replaceAll(" ?", "S")
     .replaceAll("Ö", "O")
     .replaceAll("Ç", "C");
 }
@@ -307,12 +319,33 @@ function isCommercialDetailType(type?: string) {
 
 function getDetailValue(unit: DetailUnit, keys: string[], fallback = "—") {
   const source = unit as any;
+  const storedFeatures = Array.isArray(source?.features)
+    ? (source.features as string[])
+    : [];
+  const metadata = decodePortfolioMetadataState(storedFeatures) as Record<
+    string,
+    unknown
+  >;
 
   for (const key of keys) {
-    const value = source?.[key];
+    const directValue = source?.[key];
 
-    if (value !== undefined && value !== null && String(value).trim() !== "") {
-      return String(value);
+    if (
+      directValue !== undefined &&
+      directValue !== null &&
+      String(directValue).trim() !== ""
+    ) {
+      return String(directValue);
+    }
+
+    const metadataValue = metadata?.[key];
+
+    if (
+      metadataValue !== undefined &&
+      metadataValue !== null &&
+      String(metadataValue).trim() !== ""
+    ) {
+      return String(metadataValue);
     }
   }
 
@@ -391,14 +424,7 @@ function getAuthorityDisplayValue(
   verified: boolean,
   documents: PortfolioAuthorityDocument[],
 ) {
-  const ownerRole = String(unit.project?.owner?.role || "").toUpperCase();
-
-  if (isDirectPoolPublisherRole(ownerRole)) {
-    return "Kurumsal Doğrudan Yayın Yetkisi";
-  }
-
   if (!verified && !documents.length) return "";
-
   const authorityKind = getAuthorityKind(unit, documents);
   return isDisplayableDetailValue(authorityKind) ? authorityKind : "";
 }
@@ -527,7 +553,7 @@ function calculatePortfolioScore(unit?: DetailUnit | null) {
   if (unit.tapuVerified) score += 7;
   if (unit.photoVerified || imageCount > 0) score += 7;
   if (unit.yetkiVerified || unit.isVerified) score += 10;
-  return Math.min(score, 100);
+  return Math.min(score || 70, 100);
 }
 
 function getPortfolioScoreLabel(score: number) {
@@ -554,6 +580,36 @@ function findPortfolioDocument(
   return documents.find((document) => document.authorityType === authorityType);
 }
 
+function getRequiredDocumentApprovalState(
+  documents: PortfolioAuthorityDocument[],
+) {
+  const tapuDocuments = documents.filter(
+    (document) => document.authorityType === "TAPU",
+  );
+  const yetkiDocuments = documents.filter(
+    (document) => document.authorityType === "YETKI_BELGESI",
+  );
+
+  const tapuDocument =
+    tapuDocuments.find((document) => document.approved) || tapuDocuments[0];
+  const yetkiDocument =
+    yetkiDocuments.find((document) => document.approved) || yetkiDocuments[0];
+  const hasApprovedTapu = tapuDocuments.some(
+    (document) => document.approved,
+  );
+  const hasApprovedYetki = yetkiDocuments.some(
+    (document) => document.approved,
+  );
+
+  return {
+    tapuDocument,
+    yetkiDocument,
+    hasApprovedTapu,
+    hasApprovedYetki,
+    allRequiredApproved: hasApprovedTapu && hasApprovedYetki,
+  };
+}
+
 function formatFileSize(size?: number | null) {
   const numeric = Number(size || 0);
   if (!numeric) return "Boyut yok";
@@ -561,28 +617,34 @@ function formatFileSize(size?: number | null) {
   return `${(numeric / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function getDocumentReviewState(
+  document?: PortfolioAuthorityDocument,
+): DocumentReviewState {
+  if (!document?.fileUrl) return "MISSING";
+  if (document.approved) return "APPROVED";
 
+  const reason = String(document.rejectReason || "").trim();
 
-function isDetailUnitOwner(
-  unit?: DetailUnit | null,
-  user?: { id?: string | null } | null,
-) {
-  if (!unit || !user?.id) return false;
+  if (reason.startsWith(DOCUMENT_REJECT_PREFIX)) return "REJECTED";
+  if (reason.startsWith(DOCUMENT_REUPLOAD_PREFIX)) {
+    return "REUPLOAD_REQUESTED";
+  }
+  if (reason) return "REUPLOAD_REQUESTED";
 
-  const possibleOwnerIds = [
-    (unit as any)?.userId,
-    (unit as any)?.ownerId,
-    (unit as any)?.createdById,
-    (unit as any)?.project?.userId,
-    (unit as any)?.project?.ownerId,
-    (unit as any)?.project?.createdById,
-    (unit as any)?.project?.owner?.id,
-  ]
-    .filter(Boolean)
-    .map((value) => String(value));
-
-  return possibleOwnerIds.includes(String(user.id));
+  return "PENDING";
 }
+
+function getDocumentReviewNote(document?: PortfolioAuthorityDocument) {
+  const reason = String(document?.rejectReason || "").trim();
+
+  if (!reason) return "";
+
+  return reason
+    .replace(DOCUMENT_REJECT_PREFIX, "")
+    .replace(DOCUMENT_REUPLOAD_PREFIX, "")
+    .trim();
+}
+
 
 function canEditDetailUnit(
   unit?: DetailUnit | null,
@@ -694,14 +756,12 @@ export default function StokDetailPage() {
   const [linkShareBusy, setLinkShareBusy] = useState(false);
   const [authorityLetterOpen, setAuthorityLetterOpen] = useState(false);
   const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
-  const [consultantPhone, setConsultantPhone] = useState("");
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [doorAccessVisible, setDoorAccessVisible] = useState(false);
   const [managementOpen, setManagementOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [poolWithdrawLoading, setPoolWithdrawLoading] = useState(false);
   const [actionError, setActionError] = useState("");
   const [imageUploadLoading, setImageUploadLoading] = useState("");
   const [imageActionLoading, setImageActionLoading] = useState("");
@@ -711,6 +771,11 @@ export default function StokDetailPage() {
   >([]);
   const [documentUploadLoading, setDocumentUploadLoading] = useState("");
   const [documentDeleteLoading, setDocumentDeleteLoading] = useState("");
+  const [documentReviewLoading, setDocumentReviewLoading] = useState("");
+  const [documentReviewDialog, setDocumentReviewDialog] =
+    useState<DocumentReviewDialogState | null>(null);
+  const [documentReviewNote, setDocumentReviewNote] = useState("");
+  const [documentReviewError, setDocumentReviewError] = useState("");
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const yetkiDocumentInputRef = useRef<HTMLInputElement | null>(null);
   const tapuDocumentInputRef = useRef<HTMLInputElement | null>(null);
@@ -721,28 +786,14 @@ export default function StokDetailPage() {
   }, [unitId]);
 
   useEffect(() => {
-    let active = true;
-
-    api
-      .get("/profile")
-      .then((response) => {
-        if (!active) return;
-        setConsultantPhone(
-          String(response.data?.phone || "").trim(),
-        );
-      })
-      .catch(() => {
-        if (active) setConsultantPhone("");
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
     if (typeof document === "undefined") return;
-    if (galleryOpen || shareOpen || deleteOpen || authorityLetterOpen) {
+    if (
+      galleryOpen ||
+      shareOpen ||
+      deleteOpen ||
+      authorityLetterOpen ||
+      documentReviewDialog
+    ) {
       const previousOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => {
@@ -750,7 +801,13 @@ export default function StokDetailPage() {
       };
     }
     document.body.style.overflow = "";
-  }, [galleryOpen, shareOpen, deleteOpen, authorityLetterOpen]);
+  }, [
+    galleryOpen,
+    shareOpen,
+    deleteOpen,
+    authorityLetterOpen,
+    documentReviewDialog,
+  ]);
 
   const fetchUnit = async () => {
     try {
@@ -811,13 +868,6 @@ export default function StokDetailPage() {
     if (activePhoto > galleryImages.length - 1)
       setActivePhoto(galleryImages.length - 1);
   }, [galleryImages.length, activePhoto]);
-
-  const calculatedSquareMeterPrice = useMemo(() => {
-    const price = Number(unit?.price || 0);
-    const area = Number(unit?.area || 0);
-    if (!price || !area) return "—";
-    return `${Math.round(price / area).toLocaleString("tr-TR")} ₺/m²`;
-  }, [unit]);
 
   const locationText =
     [unit?.project?.district, unit?.project?.city]
@@ -1126,22 +1176,85 @@ export default function StokDetailPage() {
     }
   };
 
+  const openDocumentReviewDialog = (
+    document: PortfolioAuthorityDocument,
+    label: string,
+    action: DocumentReviewAction,
+  ) => {
+    setDocumentReviewDialog({ document, label, action });
+    setDocumentReviewNote("");
+    setDocumentReviewError("");
+  };
+
+  const closeDocumentReviewDialog = () => {
+    if (documentReviewLoading) return;
+    setDocumentReviewDialog(null);
+    setDocumentReviewNote("");
+    setDocumentReviewError("");
+  };
+
+  const handleDocumentReviewSubmit = async () => {
+    if (!unit || !documentReviewDialog) return;
+
+    const note = documentReviewNote.trim();
+    const requiresNote = documentReviewDialog.action !== "APPROVE";
+
+    if (requiresNote && note.length < 3) {
+      setDocumentReviewError(
+        "Red veya yeniden belge isteme işleminde en az 3 karakterlik açıklama yazılmalıdır.",
+      );
+      return;
+    }
+
+    const endpointMap: Record<DocumentReviewAction, string> = {
+      APPROVE: "approve",
+      REJECT: "reject",
+      REQUEST_REUPLOAD: "request-reupload",
+    };
+
+    const loadingKey = `${documentReviewDialog.document.id}-${documentReviewDialog.action}`;
+
+    setDocumentReviewLoading(loadingKey);
+    setDocumentReviewError("");
+    setActionError("");
+
+    try {
+      await api.patch(
+        `/portfolio-documents/${documentReviewDialog.document.id}/${endpointMap[documentReviewDialog.action]}`,
+        { note },
+      );
+
+      await fetchPortfolioDocuments(unit.id);
+      await fetchUnit();
+      setDocumentReviewDialog(null);
+      setDocumentReviewNote("");
+    } catch (err: any) {
+      setDocumentReviewError(
+        err?.response?.data?.message || "Belge inceleme işlemi tamamlanamadı.",
+      );
+    } finally {
+      setDocumentReviewLoading("");
+    }
+  };
+
   const handleSubmitApproval = async () => {
     if (!unit) return;
 
     const ownerRole = String(
       unit.project?.owner?.role || user?.role || "",
     ).toUpperCase();
-    const isDirectPoolPublisher =
-      isDirectPoolPublisherRole(ownerRole);
+    const isDirectPoolPublisher = isDirectPoolPublisherRole(ownerRole);
 
-    setApprovalActionLoading("SUBMIT");
+    setApprovalActionLoading(
+      isDirectPoolPublisher ? "DIRECT_POOL" : "INCELEMEYE_GONDERILDI",
+    );
     setActionError("");
 
     try {
-      await api.post(`/units/${unit.id}/submit-approval`);
-
-      if (!isDirectPoolPublisher) {
+      if (isDirectPoolPublisher) {
+        await api.post(`/units/${unit.id}/submit-approval`);
+      } else {
+        await api.post(`/portfolio-documents/${unit.id}/submit-review`);
         await fetchPortfolioDocuments(unit.id);
       }
 
@@ -1162,7 +1275,6 @@ export default function StokDetailPage() {
     id: item.id,
     title: item.project?.name || "EPH Portföy",
     location: locationText,
-    status: statusLabel(item.status),
     price: item.price
       ? formatMoney(item.price, item.priceCurrency)
       : "Fiyat bilgisi yok",
@@ -1176,7 +1288,7 @@ export default function StokDetailPage() {
       [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
       ownerName ||
       "EPH Üyesi",
-    consultantPhone: consultantPhone || "Telefon paylaşılmadı",
+    consultantPhone: "Telefon bilgisi",
     portfolioNo: getPortfolioNo(item),
     score: portfolioScore,
     scoreLabel: portfolioScoreLabel,
@@ -1192,7 +1304,7 @@ export default function StokDetailPage() {
             ? "Yetkili Portföy"
             : "Yetki Kontrol",
       },
-      { icon: "smart", label: "Dijital Portföy Kartı" },
+      { icon: "smart", label: "Lina Kartı" },
       { icon: "car", label: "Portföy Kaydı" },
       { icon: "pool", label: statusLabel(item.status) },
     ],
@@ -1254,40 +1366,6 @@ export default function StokDetailPage() {
     }
   };
 
-  const handleWithdrawFromPool = async () => {
-    if (!unit || !isDetailUnitOwner(unit, user)) return;
-
-    const ownerRole = String(
-      unit.project?.owner?.role || user?.role || "",
-    ).toUpperCase();
-    const isDirectPoolPublisher =
-      isDirectPoolPublisherRole(ownerRole);
-    const republishMessage = isDirectPoolPublisher
-      ? "Değişikliklerden sonra portföyü yeniden doğrudan havuzda yayınlayabilirsiniz."
-      : "Değişikliklerden sonra Tapu ve Yetki Belgesi ile yeniden EPH incelemesine göndermeniz gerekir.";
-
-    const confirmed = window.confirm(
-      `İlan havuzdan kaldırılacak ve Taslak durumuna dönecek.\n\nFiyat, açıklama ve fotoğrafları güncelleyebilirsiniz.\n\n${republishMessage}`,
-    );
-
-    if (!confirmed) return;
-
-    setActionError("");
-
-    try {
-      setPoolWithdrawLoading(true);
-      await api.post(`/units/${unit.id}/remove-from-pool`);
-      router.push(`/portfoy?edit=${unit.id}`);
-    } catch (err: any) {
-      setActionError(
-        err?.response?.data?.message ||
-          "İlan havuzdan geri çekilemedi.",
-      );
-    } finally {
-      setPoolWithdrawLoading(false);
-    }
-  };
-
   const handleApprovalAction = async (
     nextStatus:
       | "INCELEMEDE"
@@ -1296,6 +1374,18 @@ export default function StokDetailPage() {
       | "REDDEDILDI",
   ) => {
     if (!unit) return;
+
+    if (nextStatus === "ONAYLANDI") {
+      const requiredDocuments =
+        getRequiredDocumentApprovalState(portfolioDocuments);
+
+      if (!requiredDocuments.allRequiredApproved) {
+        setActionError(
+          "Portföyü onaylayıp yayınlamak için Tapu ve Yetki Belgesinin ikisi de ayrı ayrı onaylanmalıdır.",
+        );
+        return;
+      }
+    }
 
     const endpointMap: Record<typeof nextStatus, string> = {
       INCELEMEDE: "mark-reviewing",
@@ -1308,7 +1398,8 @@ export default function StokDetailPage() {
       INCELEMEDE: "Portföy incelemeye alındı.",
       EKSIK_BILGI_BEKLENIYOR:
         "EPH inceleme ekibi bu portföy için ek bilgi veya belge bekliyor.",
-      ONAYLANDI: "Portföy onaylandı ve otomatik olarak havuzda yayınlandı.",
+      ONAYLANDI:
+        "Tapu ve Yetki Belgesi onayları doğrulandı. Portföy onaylandı ve havuzda yayınlandı.",
       REDDEDILDI: "Portföy doğrulama sürecinde reddedildi.",
     };
 
@@ -1324,7 +1415,7 @@ export default function StokDetailPage() {
     } catch (err: any) {
       setActionError(
         err?.response?.data?.message ||
-          "Onay işlemi tamamlanamadı. Lütfen yetki ve portföy durumunu kontrol ediniz.",
+          "Onay işlemi tamamlanamadı. Lütfen belge onaylarını ve portföy durumunu kontrol ediniz.",
       );
     } finally {
       setApprovalActionLoading("");
@@ -1386,18 +1477,11 @@ export default function StokDetailPage() {
   const style = statusStyle(unit.status);
   const canEditPortfolio = canEditDetailUnit(unit, user);
   const canReviewPortfolio = canReviewDetailUnit(user);
-  const isPortfolioOwner = isDetailUnitOwner(unit, user);
-  const approvalStatus = String(
-    unit.approvalStatus || "TASLAK",
-  ).toUpperCase();
   const portfolioOwnerRole = String(
     unit.project?.owner?.role || user?.role || "",
   ).toUpperCase();
   const isDirectPoolPublisher =
     isDirectPoolPublisherRole(portfolioOwnerRole);
-  const canWithdrawFromPool =
-    isPortfolioOwner &&
-    (approvalStatus === "HAVUZDA" || Boolean(unit.isPoolVisible));
   const canSeeDoorAccessInfo = canViewDoorAccessInfo(unit, user);
   const availableCreditAmount = Number((unit as any)?.availableCreditAmount || 0);
   const doorAccessInfo = String((unit as any)?.doorAccessInfo || "").trim();
@@ -1412,6 +1496,7 @@ export default function StokDetailPage() {
     ? safeDescription
     : shortDescription;
   const encodedShareText = encodeURIComponent(makeShareText(unit));
+  const encodedShareUrl = encodeURIComponent(shareUrl);
 
   return (
     <main className="min-h-[100dvh] overflow-y-auto bg-[#F7FBFF] pb-[calc(112px+env(safe-area-inset-bottom))] text-[#27364F]">
@@ -1424,26 +1509,20 @@ export default function StokDetailPage() {
         onChange={handleGalleryUpload}
       />
 
-      {!isDirectPoolPublisher && (
-        <>
-          <input
-            ref={yetkiDocumentInputRef}
-            type="file"
-            accept={DOCUMENT_ACCEPT}
-            className="hidden"
-            onChange={(event) =>
-              handleDocumentUpload(event, "YETKI_BELGESI")
-            }
-          />
-          <input
-            ref={tapuDocumentInputRef}
-            type="file"
-            accept={DOCUMENT_ACCEPT}
-            className="hidden"
-            onChange={(event) => handleDocumentUpload(event, "TAPU")}
-          />
-        </>
-      )}
+      <input
+        ref={yetkiDocumentInputRef}
+        type="file"
+        accept={DOCUMENT_ACCEPT}
+        className="hidden"
+        onChange={(event) => handleDocumentUpload(event, "YETKI_BELGESI")}
+      />
+      <input
+        ref={tapuDocumentInputRef}
+        type="file"
+        accept={DOCUMENT_ACCEPT}
+        className="hidden"
+        onChange={(event) => handleDocumentUpload(event, "TAPU")}
+      />
 
       <section className="mx-auto w-full max-w-[430px] px-3 py-3">
         <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-1">
@@ -1619,7 +1698,6 @@ export default function StokDetailPage() {
 
         <PortfolioDetailInfoCenter
           unit={unit}
-          calculatedSquareMeterPrice={calculatedSquareMeterPrice}
           canSeeDoorAccessInfo={canSeeDoorAccessInfo}
           doorAccessInfo={doorAccessInfo}
           availableCreditAmount={availableCreditAmount}
@@ -1668,42 +1746,10 @@ export default function StokDetailPage() {
           </div>
         </section>
 
-        {canWithdrawFromPool && (
-          <section className="mt-2 rounded-[22px] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-blue-50 p-3 text-center shadow-[0_12px_28px_rgba(217,119,6,0.12)]">
-            <div className="flex items-center justify-center gap-2">
-              <Edit3 size={18} className="shrink-0 text-amber-700" />
-              <h2 className="text-[15px] font-black text-[#06194A]">
-                İlanınızı Güncellemek mi İstiyorsunuz?
-              </h2>
-            </div>
-
-            <p className="mx-auto mt-1.5 max-w-[350px] text-[11px] font-bold leading-5 text-[#64748B]">
-              {isDirectPoolPublisher
-                ? "İlan havuzdan kaldırılarak Taslak durumuna döner. Güncellemeden sonra belge ve yönetici onayı olmadan yeniden doğrudan yayınlanabilir."
-                : "İlan havuzdan kaldırılarak Taslak durumuna döner. Güncellemeden sonra Tapu ve Yetki Belgesi ile yeniden EPH incelemesine gönderilir."}
-            </p>
-
-            <button
-              type="button"
-              onClick={handleWithdrawFromPool}
-              disabled={poolWithdrawLoading}
-              className="mt-3 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[16px] bg-amber-600 px-3 text-[12px] font-black leading-4 text-white shadow-[0_12px_24px_rgba(217,119,6,0.20)] disabled:opacity-60"
-            >
-              {poolWithdrawLoading ? (
-                "İlan Geri Çekiliyor..."
-              ) : (
-                <>
-                  <Edit3 size={16} />
-                  İlanı Geri Çek ve Güncelle
-                </>
-              )}
-            </button>
-          </section>
-        )}
-
         {canReviewPortfolio && (
           <PortfolioApprovalCenter
             unit={unit}
+            documents={portfolioDocuments}
             galleryImageCount={galleryImages.length}
             canReviewPortfolio={canReviewPortfolio}
             approvalActionLoading={approvalActionLoading}
@@ -1715,11 +1761,16 @@ export default function StokDetailPage() {
 
         <section className="mt-2 rounded-[22px] border border-[#DDE7F3] bg-white p-3 text-center shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
           <PremiumSectionHeading icon={<Share2 size={18} />} title="Paylaş" compact />
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-4 gap-2">
             <ShareLink
               href={`https://wa.me/?text=${encodedShareText}`}
               label="WhatsApp"
               icon={<MessageCircle size={17} />}
+            />
+            <ShareLink
+              href={`https://t.me/share/url?url=${encodedShareUrl}&text=${encodedShareText}`}
+              label="Telegram"
+              icon={<Send size={17} />}
             />
             <button
               onClick={handleCopyLink}
@@ -1935,23 +1986,57 @@ export default function StokDetailPage() {
           </section>
         )}
 
-        {canEditPortfolio && (
-          <PortfolioDocumentsCenter
-            unit={unit}
-            documents={portfolioDocuments}
-            ownerRole={portfolioOwnerRole}
-            canEditPortfolio={canEditPortfolio}
-            canReviewPortfolio={canReviewPortfolio}
-            documentUploadLoading={documentUploadLoading}
-            documentDeleteLoading={documentDeleteLoading}
-            approvalActionLoading={approvalActionLoading}
-            onUploadYetki={() => yetkiDocumentInputRef.current?.click()}
-            onUploadTapu={() => tapuDocumentInputRef.current?.click()}
-            onDeleteDocument={handleDeleteDocument}
-            onSubmitApproval={handleSubmitApproval}
-            onCreateAuthorityLetter={() => setAuthorityLetterOpen(true)}
-          />
+        {canEditPortfolio && isDirectPoolPublisher && (
+          <section className="mt-3 rounded-[22px] border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-emerald-50 p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-[16px] bg-[#1557D6] text-white shadow-[0_10px_22px_rgba(21,87,214,0.22)]">
+              <Send size={18} />
+            </div>
+            <h2 className="mt-2 text-[16px] font-black text-[#06194A]">
+              Kurumsal Doğrudan Yayın
+            </h2>
+            <p className="mx-auto mt-1 max-w-[350px] text-[11px] font-bold leading-5 text-[#64748B]">
+              Müteahhit ve İnşaat Firması portföyleri belge ve yönetici onayı beklemeden doğrudan havuzda yayınlanır.
+            </p>
+            <button
+              type="button"
+              onClick={handleSubmitApproval}
+              disabled={Boolean(approvalActionLoading)}
+              className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[16px] bg-[#1557D6] px-3 text-[12px] font-black text-white shadow-[0_12px_24px_rgba(21,87,214,0.20)] disabled:opacity-60"
+            >
+              {approvalActionLoading === "DIRECT_POOL" ? (
+                <Loader2 className="animate-spin" size={16} />
+              ) : (
+                <Send size={16} />
+              )}
+              {approvalActionLoading === "DIRECT_POOL"
+                ? "Havuzda Yayınlanıyor..."
+                : "Doğrudan Havuza Yayınla"}
+            </button>
+          </section>
         )}
+
+        {!isDirectPoolPublisher &&
+          (canEditPortfolio || canReviewPortfolio) && (
+            <PortfolioDocumentsCenter
+              unit={unit}
+              documents={portfolioDocuments}
+              canEditPortfolio={canEditPortfolio}
+              canReviewPortfolio={canReviewPortfolio}
+              canSubmitReviewAsSoftwareTeam={
+                String(user?.role || "").toUpperCase() === "SUPER_ADMIN"
+              }
+              documentUploadLoading={documentUploadLoading}
+              documentDeleteLoading={documentDeleteLoading}
+              documentReviewLoading={documentReviewLoading}
+              approvalActionLoading={approvalActionLoading}
+              onUploadYetki={() => yetkiDocumentInputRef.current?.click()}
+              onUploadTapu={() => tapuDocumentInputRef.current?.click()}
+              onDeleteDocument={handleDeleteDocument}
+              onReviewDocument={openDocumentReviewDialog}
+              onSubmitApproval={handleSubmitApproval}
+              onCreateAuthorityLetter={() => setAuthorityLetterOpen(true)}
+            />
+          )}
 
         {canEditPortfolio && (
           <section className="mt-2 rounded-[20px] border border-rose-100 bg-white p-2 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
@@ -1975,7 +2060,6 @@ export default function StokDetailPage() {
             </div>
           </section>
         )}
-
       </section>
 
       {galleryOpen && galleryImages.length > 0 && (
@@ -2093,6 +2177,18 @@ export default function StokDetailPage() {
         </div>
       )}
 
+      {documentReviewDialog && (
+        <DocumentReviewModal
+          dialog={documentReviewDialog}
+          note={documentReviewNote}
+          error={documentReviewError}
+          loading={Boolean(documentReviewLoading)}
+          onNoteChange={setDocumentReviewNote}
+          onClose={closeDocumentReviewDialog}
+          onSubmit={handleDocumentReviewSubmit}
+        />
+      )}
+
       <PortfolioShareModal
         open={shareOpen}
         onClose={() => setShareOpen(false)}
@@ -2125,15 +2221,160 @@ export default function StokDetailPage() {
 
 
 
+function DocumentReviewModal({
+  dialog,
+  note,
+  error,
+  loading,
+  onNoteChange,
+  onClose,
+  onSubmit,
+}: {
+  dialog: DocumentReviewDialogState;
+  note: string;
+  error: string;
+  loading: boolean;
+  onNoteChange: (value: string) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  const config: Record<
+    DocumentReviewAction,
+    {
+      title: string;
+      description: string;
+      buttonLabel: string;
+      buttonClass: string;
+      noteRequired: boolean;
+    }
+  > = {
+    APPROVE: {
+      title: `${dialog.label} Onayı`,
+      description:
+        "Belgeyi okunabilirlik, kişi/taşınmaz bilgileri ve geçerlilik açısından kontrol ettiğinizi doğrulayın.",
+      buttonLabel: "Belgeyi Onayla",
+      buttonClass: "bg-emerald-600 text-white",
+      noteRequired: false,
+    },
+    REJECT: {
+      title: `${dialog.label} Reddi`,
+      description:
+        "Belge uygun değilse açık ve kullanıcı tarafından anlaşılabilir bir red gerekçesi yazın.",
+      buttonLabel: "Belgeyi Reddet",
+      buttonClass: "bg-rose-600 text-white",
+      noteRequired: true,
+    },
+    REQUEST_REUPLOAD: {
+      title: "Yeniden Belge İste",
+      description:
+        "Eksik, okunmayan veya yanlış belge için kullanıcıdan yeni dosya isteme nedenini yazın.",
+      buttonLabel: "Yeniden Yükleme İste",
+      buttonClass: "bg-orange-600 text-white",
+      noteRequired: true,
+    },
+  };
+
+  const current = config[dialog.action];
+
+  return (
+    <div className="fixed inset-0 z-[10020] flex items-end justify-center bg-[#06194A]/72 px-3 pt-3 backdrop-blur-md sm:items-center sm:p-4">
+      <section
+        className="max-h-[calc(100dvh-16px)] w-full max-w-lg overflow-y-auto rounded-t-[28px] border border-[#DDE7F3] bg-white px-4 pt-4 shadow-[0_30px_90px_rgba(15,23,42,0.28)] sm:max-h-[calc(100dvh-32px)] sm:rounded-[30px] sm:p-5"
+        style={{
+          paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+        }}
+      >
+        <div className="mx-auto h-1.5 w-14 rounded-full bg-slate-200 sm:hidden" />
+
+        <div className="mt-3 flex items-start justify-between gap-3 sm:mt-0">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1557D6]">
+              Belge Kararı
+            </p>
+            <h2 className="mt-1 break-words text-[20px] font-black leading-6 text-[#06194A]">
+              {current.title}
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 disabled:opacity-50"
+            aria-label="Belge karar penceresini kapat"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="mt-3 rounded-[18px] border border-[#DDE7F3] bg-[#F8FAFC] px-3 py-3 text-center">
+          <p className="break-words text-[12px] font-black text-[#06194A]">
+            {dialog.document.fileName || dialog.label}
+          </p>
+          <p className="mt-1 text-[10px] font-bold leading-4 text-[#64748B]">
+            {current.description}
+          </p>
+        </div>
+
+        <label className="mt-3 block">
+          <span className="block text-center text-[11px] font-black text-[#27364F]">
+            İnceleme Notu {current.noteRequired ? "· Zorunlu" : "· İsteğe Bağlı"}
+          </span>
+          <textarea
+            value={note}
+            onChange={(event) => onNoteChange(event.target.value)}
+            maxLength={1000}
+            rows={5}
+            placeholder={
+              current.noteRequired
+                ? "Kullanıcının neyi düzeltmesi gerektiğini açıkça yazın..."
+                : "İsterseniz onay notu ekleyin..."
+            }
+            className="mt-2 min-h-[120px] w-full resize-none rounded-[18px] border border-[#C7D6E8] bg-[#EEF3F8] px-3 py-3 text-[13px] font-semibold leading-5 text-[#27364F] outline-none focus:border-[#2563EB] focus:ring-4 focus:ring-blue-100"
+          />
+          <span className="mt-1 block text-right text-[9px] font-bold text-slate-400">
+            {note.length}/1000
+          </span>
+        </label>
+
+        {error && (
+          <div className="mt-2 rounded-[16px] border border-rose-100 bg-rose-50 px-3 py-2 text-center text-[11px] font-black leading-4 text-rose-700">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="min-h-[48px] rounded-[16px] border border-[#DDE7F3] bg-white px-3 text-[12px] font-black text-[#475569] disabled:opacity-50"
+          >
+            Vazgeç
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={loading}
+            className={`flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] px-3 text-[12px] font-black shadow-sm disabled:opacity-60 ${current.buttonClass}`}
+          >
+            {loading && <Loader2 className="animate-spin" size={16} />}
+            {loading ? "İşleniyor..." : current.buttonLabel}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+
 function PortfolioDetailInfoCenter({
   unit,
-  calculatedSquareMeterPrice,
   canSeeDoorAccessInfo,
   doorAccessInfo,
   availableCreditAmount,
 }: {
   unit: DetailUnit;
-  calculatedSquareMeterPrice: string;
   canSeeDoorAccessInfo: boolean;
   doorAccessInfo: string;
   availableCreditAmount: number;
@@ -2158,12 +2399,11 @@ function PortfolioDetailInfoCenter({
     { label: "Portföy Tipi", value: typeLabel(unit.type) },
     { label: "Durum", value: statusLabel(unit.status) },
     { label: "Fiyat", value: formatMoney(unit.price, unit.priceCurrency) },
-    { label: "m² Fiyatı", value: calculatedSquareMeterPrice },
+    { label: "Bina Yaşı", value: buildingAge },
     { label: "Brüt Alan", value: formatAreaValue(unit.area) },
     { label: "Net Alan", value: netArea },
     { label: "Oda", value: unit.roomCount || "" },
     { label: "Kat", value: formatFloorInfo(unit) },
-    { label: "Bina Yaşı", value: buildingAge },
     { label: "Isınma", value: heating },
     { label: "Otopark", value: parking },
     { label: "Kayıt Tarihi", value: formatDate(unit.createdAt) },
@@ -2257,86 +2497,56 @@ function PortfolioDetailInfoCenter({
 function PortfolioDocumentsCenter({
   unit,
   documents,
-  ownerRole,
   canEditPortfolio,
   canReviewPortfolio,
+  canSubmitReviewAsSoftwareTeam,
   documentUploadLoading,
   documentDeleteLoading,
+  documentReviewLoading,
   approvalActionLoading,
   onUploadYetki,
   onUploadTapu,
   onDeleteDocument,
+  onReviewDocument,
   onSubmitApproval,
   onCreateAuthorityLetter,
 }: {
   unit: DetailUnit;
   documents: PortfolioAuthorityDocument[];
-  ownerRole: string;
   canEditPortfolio: boolean;
   canReviewPortfolio: boolean;
+  canSubmitReviewAsSoftwareTeam: boolean;
   documentUploadLoading: string;
   documentDeleteLoading: string;
+  documentReviewLoading: string;
   approvalActionLoading: string;
   onUploadYetki: () => void;
   onUploadTapu: () => void;
   onDeleteDocument: (documentId?: string) => void;
+  onReviewDocument: (
+    document: PortfolioAuthorityDocument,
+    label: string,
+    action: DocumentReviewAction,
+  ) => void;
   onSubmitApproval: () => void;
   onCreateAuthorityLetter: () => void;
 }) {
-  const approvalStatus = String(unit.approvalStatus || "TASLAK").toUpperCase();
-  const isSubmittedForApproval = ["INCELEMEYE_GONDERILDI", "INCELEMEDE"].includes(
-    approvalStatus,
-  );
-  const isApprovedForPool = approvalStatus === "ONAYLANDI";
-  const isInPool = approvalStatus === "HAVUZDA";
-  const isDirectPoolPublisher =
-    isDirectPoolPublisherRole(ownerRole);
-  const isSubmitBusy = approvalActionLoading === "SUBMIT";
-
-  if (isDirectPoolPublisher) {
-    const directSubmitDisabled =
-      Boolean(approvalActionLoading) ||
-      isSubmittedForApproval ||
-      isApprovedForPool ||
-      isInPool;
-
-    return (
-      <section className="mt-3 rounded-[22px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-blue-50 p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.045)]">
-        <div className="flex items-center justify-center gap-2 text-emerald-700">
-          <ShieldCheck size={18} />
-          <h2 className="text-center text-[16px] font-black text-[#06194A]">
-            Havuza Doğrudan Yayınlama
-          </h2>
-        </div>
-
-        <p className="mx-auto mt-1 max-w-[340px] text-center text-[11px] font-bold leading-5 text-[#64748B]">
-          Müteahhit ve İnşaat Firması portföyleri belge yüklemeden ve yönetici
-          onayı beklemeden doğrudan Havuzda yayınlanır.
-        </p>
-
-        <div className="mt-3 rounded-[16px] border border-emerald-100 bg-white px-3 py-2 text-[10px] font-black leading-4 text-emerald-700">
-          Portföy bilgilerinin ve fotoğrafların doğru olduğundan emin olun.
-          Yayınlanan ilan tüm Havuz kullanıcılarına görünür.
-        </div>
-
-        {canEditPortfolio && (
-          <button
-            type="button"
-            onClick={onSubmitApproval}
-            disabled={directSubmitDisabled}
-            className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[16px] bg-emerald-600 px-3 text-[12px] font-black text-white shadow-[0_12px_24px_rgba(5,150,105,0.20)] disabled:bg-slate-200 disabled:text-slate-500"
-          >
-            <Send size={16} />
-            {isSubmitBusy ? "Havuzda Yayınlanıyor..." : "Doğrudan Havuza Gönder"}
-          </button>
-        )}
-      </section>
-    );
-  }
-
   const yetkiDocument = findPortfolioDocument(documents, "YETKI_BELGESI");
   const tapuDocument = findPortfolioDocument(documents, "TAPU");
   const hasRequiredDocuments = Boolean(yetkiDocument && tapuDocument);
+  const approvalStatus = String(unit.approvalStatus || "TASLAK").toUpperCase();
+  const isSubmittedForApproval = [
+    "INCELEMEYE_GONDERILDI",
+    "INCELEMEDE",
+  ].includes(approvalStatus);
+  const isApprovedForPool = approvalStatus === "ONAYLANDI";
+  const isInPool = approvalStatus === "HAVUZDA";
+  const isReviewerMode = canReviewPortfolio;
+  const canSoftwareTeamSubmitReview =
+    canSubmitReviewAsSoftwareTeam &&
+    !isSubmittedForApproval &&
+    !isApprovedForPool &&
+    !isInPool;
   const submitDisabled =
     !hasRequiredDocuments ||
     Boolean(approvalActionLoading) ||
@@ -2349,21 +2559,31 @@ function PortfolioDocumentsCenter({
       <div className="flex items-center justify-center gap-2 text-[#1557D6]">
         <FileText size={17} />
         <h2 className="text-center text-[16px] font-black text-[#06194A]">
-          Belge Yükleme Merkezi
+          {isReviewerMode ? "Belge İnceleme Merkezi" : "Belge Yükleme Merkezi"}
         </h2>
       </div>
 
-      <p className="mx-auto mt-1 max-w-[320px] text-center text-[11px] font-bold leading-5 text-[#64748B]">
-        {isSubmittedForApproval
-          ? "Portföy incelemeye gönderildi. Admin onayı bekleniyor."
-          : isApprovedForPool
-            ? "Portföy onaylandı ve otomatik olarak havuzda yayınlandı."
-            : isInPool
-              ? "Portföy havuzda yayında."
-              : "Tapu ve Yetki Belgesi birlikte yüklendiğinde portföy EPH incelemesine gönderilebilir."}
+      <p className="mx-auto mt-1 max-w-[360px] text-center text-[11px] font-bold leading-5 text-[#64748B]">
+        {isReviewerMode
+          ? isSubmittedForApproval
+            ? "Tapu ve Yetki Belgesini ayrı ayrı inceleyin; onaylayın, reddedin veya yeniden yükleme isteyin."
+            : "Belge kararları yalnız portföy incelemeye gönderildiğinde verilebilir."
+          : isSubmittedForApproval
+            ? "Portföy incelemeye gönderildi. Yönetici belge incelemesi bekleniyor."
+            : isApprovedForPool
+              ? "Portföy onaylandı ve yayın işlemi için hazır."
+              : isInPool
+                ? "Portföy havuzda yayında."
+                : "İncelemeye göndermek için Tapu ve Yetki Belgesi birlikte yüklenmelidir."}
       </p>
 
-      {canEditPortfolio && (
+      {isReviewerMode && (
+        <div className="mt-3 rounded-[16px] border border-blue-100 bg-blue-50 px-3 py-2 text-center text-[10px] font-black leading-4 text-blue-800">
+          YÖNETİCİ İNCELEME MODU · Admin ve Moderatör belgeyi değiştiremez veya silemez.
+        </div>
+      )}
+
+      {canEditPortfolio && !isReviewerMode && (
         <button
           type="button"
           onClick={onCreateAuthorityLetter}
@@ -2377,28 +2597,36 @@ function PortfolioDocumentsCenter({
       <div className="mt-3 grid gap-2">
         <PortfolioDocumentRow
           label={DOCUMENT_LABELS.YETKI_BELGESI}
-          description="Emlakçı portföyü için zorunlu evrak"
+          description="Emlakçı portföyü için zorunlu yetkilendirme evrakı"
           document={yetkiDocument}
           canEditPortfolio={canEditPortfolio}
+          canReviewPortfolio={canReviewPortfolio}
+          reviewEnabled={isSubmittedForApproval}
+          reviewLoading={documentReviewLoading}
           uploadLoading={documentUploadLoading === "YETKI_BELGESI"}
           deleteLoading={documentDeleteLoading === yetkiDocument?.id}
           onUpload={onUploadYetki}
           onDelete={() => onDeleteDocument(yetkiDocument?.id)}
+          onReview={onReviewDocument}
         />
 
         <PortfolioDocumentRow
           label={DOCUMENT_LABELS.TAPU}
-          description="Emlakçı portföyü için zorunlu tapu evrakı"
+          description="Emlakçı portföyü için zorunlu mülkiyet evrakı"
           document={tapuDocument}
           canEditPortfolio={canEditPortfolio}
+          canReviewPortfolio={canReviewPortfolio}
+          reviewEnabled={isSubmittedForApproval}
+          reviewLoading={documentReviewLoading}
           uploadLoading={documentUploadLoading === "TAPU"}
           deleteLoading={documentDeleteLoading === tapuDocument?.id}
           onUpload={onUploadTapu}
           onDelete={() => onDeleteDocument(tapuDocument?.id)}
+          onReview={onReviewDocument}
         />
       </div>
 
-      {canEditPortfolio && (
+      {canEditPortfolio && !isReviewerMode && (
         <button
           type="button"
           onClick={onSubmitApproval}
@@ -2406,15 +2634,37 @@ function PortfolioDocumentsCenter({
           className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[16px] bg-[#06194A] px-3 text-[12px] font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
         >
           <Send size={16} />
-          {isSubmitBusy
-            ? "İncelemeye Gönderiliyor..."
-            : "EPH İncelemesine Gönder"}
+          {approvalActionLoading === "SUBMIT" ||
+          approvalActionLoading === "INCELEMEYE_GONDERILDI"
+            ? "Gönderiliyor..."
+            : "İncelemeye Gönder"}
         </button>
       )}
 
-      {canReviewPortfolio && (
-        <div className="mt-3 rounded-[16px] bg-[#F7FBFF] px-3 py-2 text-center text-[11px] font-bold leading-5 text-[#64748B]">
-          Yönetici görünümü aktif. Belgeleri görüntüleyebilir, onay kararını Onay Merkezi üzerinden verebilirsiniz.
+      {isReviewerMode && canSoftwareTeamSubmitReview && (
+        <button
+          type="button"
+          onClick={onSubmitApproval}
+          disabled={submitDisabled}
+          className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[16px] bg-[#06194A] px-3 text-[12px] font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
+        >
+          <Send size={16} />
+          {approvalActionLoading === "SUBMIT" ||
+          approvalActionLoading === "INCELEMEYE_GONDERILDI"
+            ? "Gönderiliyor..."
+            : "Yazılım Ekibi Olarak İncelemeye Gönder"}
+        </button>
+      )}
+
+      {isReviewerMode && canSoftwareTeamSubmitReview && !hasRequiredDocuments && (
+        <div className="mt-2 rounded-[14px] bg-amber-50 px-3 py-2 text-center text-[10px] font-black leading-4 text-amber-800">
+          Yazılım Ekibi inceleme akışını başlatmadan önce Tapu ve Yetki Belgesinin ikisi de yüklenmiş olmalıdır.
+        </div>
+      )}
+
+      {canEditPortfolio && !isReviewerMode && !hasRequiredDocuments && (
+        <div className="mt-2 rounded-[14px] bg-amber-50 px-3 py-2 text-center text-[10px] font-black leading-4 text-amber-800">
+          İnceleme için Tapu ve Yetki Belgesinin ikisi de yüklenmelidir.
         </div>
       )}
     </section>
@@ -2426,21 +2676,64 @@ function PortfolioDocumentRow({
   description,
   document,
   canEditPortfolio,
+  canReviewPortfolio,
+  reviewEnabled,
+  reviewLoading,
   uploadLoading,
   deleteLoading,
   onUpload,
   onDelete,
+  onReview,
 }: {
   label: string;
   description: string;
   document?: PortfolioAuthorityDocument;
   canEditPortfolio: boolean;
+  canReviewPortfolio: boolean;
+  reviewEnabled: boolean;
+  reviewLoading: string;
   uploadLoading: boolean;
   deleteLoading: boolean;
   onUpload: () => void;
   onDelete: () => void;
+  onReview: (
+    document: PortfolioAuthorityDocument,
+    label: string,
+    action: DocumentReviewAction,
+  ) => void;
 }) {
   const hasDocument = Boolean(document?.fileUrl);
+  const mimeType = String(document?.mimeType || "").toLowerCase();
+  const fileName = String(document?.fileName || "").toLowerCase();
+  const isPdf = mimeType === "application/pdf" || fileName.endsWith(".pdf");
+  const isImage =
+    mimeType.startsWith("image/") || /\.(jpg|jpeg|png|webp)$/i.test(fileName);
+  const reviewState = getDocumentReviewState(document);
+  const reviewNote = getDocumentReviewNote(document);
+  const documentStatus =
+    reviewState === "MISSING"
+      ? "Bekliyor"
+      : reviewState === "APPROVED"
+        ? "Onaylandı"
+        : reviewState === "REJECTED"
+          ? "Reddedildi"
+          : reviewState === "REUPLOAD_REQUESTED"
+            ? "Yeniden Belge İstendi"
+            : "İnceleme Bekliyor";
+  const statusClass =
+    reviewState === "MISSING"
+      ? "bg-amber-50 text-amber-700"
+      : reviewState === "APPROVED"
+        ? "bg-emerald-50 text-emerald-700"
+        : reviewState === "REJECTED"
+          ? "bg-rose-100 text-rose-800"
+          : reviewState === "REUPLOAD_REQUESTED"
+            ? "bg-orange-50 text-orange-700"
+            : "bg-blue-50 text-blue-700";
+  const showReviewerPreview = canReviewPortfolio && hasDocument;
+  const activeReviewLoading = Boolean(
+    document?.id && reviewLoading.startsWith(`${document.id}-`),
+  );
 
   return (
     <div className="rounded-[18px] border border-[#E8F0FA] bg-[#FBFDFF] p-3">
@@ -2453,30 +2746,71 @@ function PortfolioDocumentRow({
         </div>
 
         <span
-          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black ${
-            hasDocument
-              ? "bg-emerald-50 text-emerald-700"
-              : "bg-amber-50 text-amber-700"
-          }`}
+          className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black ${statusClass}`}
         >
-          {hasDocument ? "Yüklü" : "Bekliyor"}
+          {documentStatus}
         </span>
       </div>
 
       {hasDocument && (
-        <div className="mt-2 rounded-[14px] bg-white px-3 py-2 text-center">
+        <div className="mt-2 rounded-[14px] border border-[#E8F0FA] bg-white px-3 py-2 text-center">
           <p className="break-words text-[11px] font-black leading-4 text-[#06194A]">
-            {label}
+            {document?.fileName || label}
           </p>
           <p className="mt-0.5 text-[10px] font-bold text-[#64748B]">
             {formatFileSize(document?.sizeBytes)}
           </p>
         </div>
       )}
+
+      {reviewNote && (
+        <div
+          className={`mt-2 rounded-[14px] border px-3 py-2 text-center text-[10px] font-bold leading-4 ${
+            reviewState === "REJECTED"
+              ? "border-rose-100 bg-rose-50 text-rose-700"
+              : "border-orange-100 bg-orange-50 text-orange-700"
+          }`}
+        >
+          İnceleme notu: {reviewNote}
+        </div>
+      )}
+
       {hasDocument && <LinaDocumentPrecheckPanel document={document} />}
 
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        {canEditPortfolio && (
+      {showReviewerPreview && (
+        <div className="mt-2 overflow-hidden rounded-[16px] border border-[#DDE7F3] bg-white">
+          <div className="border-b border-[#E8F0FA] bg-[#F8FAFC] px-3 py-2 text-center text-[10px] font-black text-[#475569]">
+            SALT OKUNUR BELGE ÖNİZLEMESİ
+          </div>
+
+          {isImage ? (
+            <div className="flex max-h-[360px] min-h-[220px] items-center justify-center overflow-auto bg-[#EEF3F8] p-2">
+              <img
+                src={document?.fileUrl}
+                alt={`${label} önizlemesi`}
+                className="max-h-[340px] w-full rounded-[12px] object-contain"
+              />
+            </div>
+          ) : isPdf ? (
+            <iframe
+              title={`${label} PDF önizlemesi`}
+              src={`${document?.fileUrl}#toolbar=0&navpanes=0`}
+              className="h-[360px] w-full border-0 bg-white"
+            />
+          ) : (
+            <div className="flex min-h-[120px] items-center justify-center px-4 py-6 text-center text-[11px] font-bold leading-5 text-[#64748B]">
+              Bu dosya türü tarayıcı içinde önizlenemiyor. Belgeyi yeni sekmede açın.
+            </div>
+          )}
+        </div>
+      )}
+
+      <div
+        className={`mt-2 grid gap-2 ${
+          canEditPortfolio && !canReviewPortfolio ? "grid-cols-3" : "grid-cols-1"
+        }`}
+      >
+        {canEditPortfolio && !canReviewPortfolio && (
           <button
             type="button"
             onClick={onUpload}
@@ -2493,14 +2827,14 @@ function PortfolioDocumentRow({
             href={document?.fileUrl}
             target="_blank"
             rel="noreferrer"
-            className={`${canEditPortfolio ? "" : "col-span-2"} flex min-h-[38px] items-center justify-center gap-1 rounded-[14px] border border-[#DDE7F3] bg-white px-2 text-[10px] font-black text-[#1557D6]`}
+            className="flex min-h-[38px] items-center justify-center gap-1 rounded-[14px] border border-[#DDE7F3] bg-white px-2 text-center text-[10px] font-black text-[#1557D6]"
           >
             <ExternalLink size={14} />
-            Gör
+            Belgeyi Yeni Sekmede Aç
           </a>
         )}
 
-        {canEditPortfolio && hasDocument && (
+        {canEditPortfolio && !canReviewPortfolio && hasDocument && (
           <button
             type="button"
             onClick={onDelete}
@@ -2513,25 +2847,74 @@ function PortfolioDocumentRow({
         )}
 
         {!hasDocument && !canEditPortfolio && (
-          <div className="col-span-3 flex min-h-[38px] items-center justify-center rounded-[14px] bg-white px-2 text-[10px] font-black text-[#64748B]">
-            Belge bekleniyor
+          <div className="flex min-h-[38px] items-center justify-center rounded-[14px] bg-white px-2 text-[10px] font-black text-[#64748B]">
+            Belge yüklenmemiş
           </div>
         )}
       </div>
+
+      {canReviewPortfolio && hasDocument && document && (
+        <div className="mt-2 grid grid-cols-3 gap-1.5">
+          <button
+            type="button"
+            onClick={() => onReview(document, label, "APPROVE")}
+            disabled={
+              !reviewEnabled ||
+              activeReviewLoading ||
+              reviewState === "APPROVED"
+            }
+            className="flex min-h-[40px] items-center justify-center gap-1 rounded-[14px] bg-emerald-50 px-1.5 text-[10px] font-black text-emerald-700 disabled:opacity-45"
+          >
+            {activeReviewLoading ? (
+              <Loader2 className="animate-spin" size={14} />
+            ) : (
+              <CheckCircle2 size={14} />
+            )}
+            Onayla
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onReview(document, label, "REJECT")}
+            disabled={!reviewEnabled || activeReviewLoading}
+            className="flex min-h-[40px] items-center justify-center gap-1 rounded-[14px] bg-rose-50 px-1.5 text-[10px] font-black text-rose-700 disabled:opacity-45"
+          >
+            <XCircle size={14} />
+            Reddet
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onReview(document, label, "REQUEST_REUPLOAD")}
+            disabled={!reviewEnabled || activeReviewLoading}
+            className="flex min-h-[40px] items-center justify-center gap-1 rounded-[14px] bg-orange-50 px-1 text-[9px] font-black text-orange-700 disabled:opacity-45"
+          >
+            <RotateCcw size={13} />
+            Yeniden İste
+          </button>
+        </div>
+      )}
+
+      {canReviewPortfolio && hasDocument && !reviewEnabled && (
+        <div className="mt-2 rounded-[14px] bg-slate-100 px-3 py-2 text-center text-[9px] font-black leading-4 text-slate-500">
+          Karar butonları, portföy incelemeye gönderildiğinde aktif olur.
+        </div>
+      )}
     </div>
   );
 }
 
 
-
 function PortfolioApprovalCenter({
   unit,
+  documents,
   galleryImageCount,
   canReviewPortfolio,
   approvalActionLoading,
   onApprovalAction,
 }: {
   unit: DetailUnit;
+  documents: PortfolioAuthorityDocument[];
   galleryImageCount: number;
   canReviewPortfolio: boolean;
   approvalActionLoading: string;
@@ -2543,10 +2926,22 @@ function PortfolioApprovalCenter({
       | "REDDEDILDI",
   ) => void;
 }) {
-  const approvalStatus = String(unit.approvalStatus || "TASLAK");
-  const poolVisible = Boolean(unit.isPoolVisible || approvalStatus === "HAVUZDA");
+  const approvalStatus = String(
+    unit.approvalStatus || "TASLAK",
+  ).toUpperCase();
+  const poolVisible = Boolean(
+    unit.isPoolVisible || approvalStatus === "HAVUZDA",
+  );
   const score = calculatePortfolioScore(unit);
   const scoreLabel = getPortfolioScoreLabel(score);
+  const requiredDocuments = getRequiredDocumentApprovalState(documents);
+  const isReviewable = [
+    "INCELEMEYE_GONDERILDI",
+    "INCELEMEDE",
+  ].includes(approvalStatus);
+  const canApproveAndPublish =
+    isReviewable && requiredDocuments.allRequiredApproved;
+  const isPublished = poolVisible || approvalStatus === "HAVUZDA";
 
   const statusConfig: Record<
     string,
@@ -2592,11 +2987,11 @@ function PortfolioApprovalCenter({
   const summaryItems = [
     {
       label: "Yetki",
-      active: Boolean(unit.yetkiVerified || unit.isVerified),
+      active: requiredDocuments.hasApprovedYetki,
     },
     {
       label: "Tapu",
-      active: Boolean(unit.tapuVerified),
+      active: requiredDocuments.hasApprovedTapu,
     },
     {
       label: "Fotoğraf",
@@ -2612,7 +3007,7 @@ function PortfolioApprovalCenter({
     statusConfig[approvalStatus] || statusConfig["TASLAK"];
 
   const buttonBase =
-    "min-h-[38px] rounded-[14px] px-2 text-[10px] font-black disabled:opacity-60";
+    "min-h-[42px] rounded-[14px] px-2 text-[10px] font-black disabled:cursor-not-allowed disabled:opacity-45";
 
   return (
     <section className="mt-3 rounded-[22px] border border-[#C7D6E8] bg-white p-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.055)]">
@@ -2642,7 +3037,7 @@ function PortfolioApprovalCenter({
           >
             <p className="text-[9px] font-black">{item.label}</p>
             <p className="mt-0.5 text-[10px] font-black">
-              {item.active ? "Var" : "Yok"}
+              {item.active ? "Onaylı" : "Bekliyor"}
             </p>
           </div>
         ))}
@@ -2654,12 +3049,25 @@ function PortfolioApprovalCenter({
         </div>
       )}
 
+      {canReviewPortfolio &&
+        isReviewable &&
+        !requiredDocuments.allRequiredApproved && (
+          <div className="mt-2 rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-black leading-4 text-amber-800">
+            Onayla ve Yayınla kilitli · Tapu ve Yetki Belgesinin ikisi de
+            ayrı ayrı onaylanmalıdır.
+          </div>
+        )}
+
       {canReviewPortfolio && (
-        <div className="mt-3 grid grid-cols-4 gap-1.5">
+        <div className="mt-3 grid grid-cols-2 gap-1.5">
           <button
             type="button"
             onClick={() => onApprovalAction("INCELEMEDE")}
-            disabled={Boolean(approvalActionLoading)}
+            disabled={
+              Boolean(approvalActionLoading) ||
+              !isReviewable ||
+              approvalStatus === "INCELEMEDE"
+            }
             className={`${buttonBase} bg-[#EFF6FF] text-[#1557D6]`}
           >
             {approvalActionLoading === "INCELEMEDE" ? "..." : "İncele"}
@@ -2667,32 +3075,41 @@ function PortfolioApprovalCenter({
 
           <button
             type="button"
-            onClick={() => onApprovalAction("EKSIK_BILGI_BEKLENIYOR")}
-            disabled={Boolean(approvalActionLoading)}
+            onClick={() =>
+              onApprovalAction("EKSIK_BILGI_BEKLENIYOR")
+            }
+            disabled={Boolean(approvalActionLoading) || !isReviewable}
             className={`${buttonBase} bg-amber-50 text-amber-700`}
           >
             {approvalActionLoading === "EKSIK_BILGI_BEKLENIYOR"
               ? "..."
-              : "Eksik"}
+              : "Eksik Bilgi İste"}
           </button>
 
           <button
             type="button"
             onClick={() => onApprovalAction("ONAYLANDI")}
-            disabled={Boolean(approvalActionLoading)}
-            className={`${buttonBase} bg-emerald-50 text-emerald-700`}
+            disabled={
+              Boolean(approvalActionLoading) ||
+              !canApproveAndPublish ||
+              isPublished
+            }
+            className={`${buttonBase} bg-emerald-600 text-white`}
           >
-            {approvalActionLoading === "ONAYLANDI" ? "..." : "Onay"}
+            {approvalActionLoading === "ONAYLANDI"
+              ? "Yayınlanıyor..."
+              : isPublished
+                ? "Yayınlandı"
+                : "Onayla ve Yayınla"}
           </button>
-
 
           <button
             type="button"
             onClick={() => onApprovalAction("REDDEDILDI")}
-            disabled={Boolean(approvalActionLoading)}
+            disabled={Boolean(approvalActionLoading) || !isReviewable}
             className={`${buttonBase} bg-rose-50 text-rose-700`}
           >
-            {approvalActionLoading === "REDDEDILDI" ? "..." : "Red"}
+            {approvalActionLoading === "REDDEDILDI" ? "..." : "Portföyü Reddet"}
           </button>
         </div>
       )}
@@ -2709,18 +3126,10 @@ function InfoBox({
   label: string;
   value: string;
 }) {
-  const compactValue = value.length > 22;
-
   return (
     <div className="flex min-h-[86px] w-[calc(25%_-_5px)] min-w-[72px] flex-col items-center justify-center rounded-[18px] border border-[#D9E5F3] bg-[#F8FBFF] px-1.5 py-2 text-center text-[#06194A] shadow-[0_8px_18px_rgba(15,23,42,0.055)]">
       <div className="text-[#1557D6]">{icon}</div>
-      <p
-        className={`mt-1 break-words font-black tracking-[-0.04em] ${
-          compactValue
-            ? "text-[11px] leading-[1.18]"
-            : "text-[16px] leading-tight"
-        }`}
-      >
+      <p className="mt-1 break-words text-[16px] font-black leading-tight tracking-[-0.04em]">
         {value}
       </p>
       <p className="mt-0.5 text-[8px] font-black uppercase leading-3 tracking-[0.08em] text-[#64748B]">
