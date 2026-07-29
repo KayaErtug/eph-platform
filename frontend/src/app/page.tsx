@@ -22,8 +22,8 @@ import {
   X,
 } from "lucide-react";
 
-const whatsappNumber = "+90 535 794 46 94";
-const whatsappUrl = "https://wa.me/905357944694";
+const whatsappNumber = "+90 507 779 48 75";
+const whatsappUrl = "https://wa.me/905077794875";
 
 const portfolioCards = Array.from({ length: 19 }, (_, index) => {
   const number = String(index + 1).padStart(2, "0");
@@ -49,9 +49,9 @@ const marqueeCards = Array.from({ length: 17 }, (_, index) => {
 });
 
 const stats = [
-  { icon: Building2, value: "25.000+", label: "Aktif Portföy" },
-  { icon: UsersRound, value: "10.000+", label: "Kayıtlı Üye" },
-  { icon: PieChart, value: "1.500+", label: "Günlük Talep" },
+  { icon: Building2, value: "25.000+", label: "Hedef Portföy" },
+  { icon: UsersRound, value: "10.000+", label: "Hedef Üye" },
+  { icon: PieChart, value: "1.500+", label: "Hedef Günlük Talep" },
   { icon: ShieldCheck, value: "7/24", label: "Canlı Destek" },
 ];
 
@@ -64,9 +64,9 @@ const heroTrustSignals = [
 ];
 
 const heroProofPoints = [
-  { value: "25.000+", label: "paylaşıma hazır portföy" },
-  { value: "10.000+", label: "doğrulanmış üye" },
-  { value: "1.500+", label: "günlük talep hareketi" },
+  { value: "25.000+", label: "hedef aktif portföy" },
+  { value: "10.000+", label: "hedef profesyonel üye" },
+  { value: "1.500+", label: "hedef günlük talep hareketi" },
 ];
 
 function useScrollReveal() {
@@ -314,8 +314,8 @@ function Hero() {
       </div>
 
       <div className="relative z-10 mx-auto grid min-h-[920px] max-w-[1380px] items-center gap-12 px-5 pb-16 pt-28 md:px-10 lg:min-h-[810px] lg:grid-cols-[0.9fr_1.1fr] lg:gap-16 lg:pb-10 lg:pt-24">
-        <div className="mx-auto max-w-[650px] text-center lg:mx-0 lg:text-left" data-reveal>
-          <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-white/[0.07] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#BFDBFE] backdrop-blur-xl lg:mx-0">
+        <div className="mx-auto max-w-[650px] text-center" data-reveal>
+          <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-white/[0.07] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#BFDBFE] backdrop-blur-xl">
             <ShieldCheck size={15} /> Admin onaylı kapalı devre profesyonel ağ
           </div>
 
@@ -332,7 +332,7 @@ function Hero() {
             CRM, portföy havuzu, pazar analizi ve Lina AI tek merkezde.
           </p>
 
-          <div className="mt-9 grid gap-3 sm:flex sm:flex-wrap sm:justify-center lg:justify-start">
+          <div className="mt-9 grid gap-3 sm:flex sm:flex-wrap sm:justify-center">
             <Link href="/kayit" className="shine-button relative inline-flex h-[56px] items-center justify-center gap-3 overflow-hidden rounded-[12px] bg-[#2563EB] px-8 text-[15px] font-semibold text-white shadow-[0_18px_48px_rgba(37,99,235,.38)] transition hover:-translate-y-1 hover:bg-[#1D4ED8]">
               Üyelik Başvurusu Yap <ArrowRight size={18} />
             </Link>
@@ -344,7 +344,7 @@ function Hero() {
             </a>
           </div>
 
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-[13px] text-white/66 lg:justify-start">
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-[13px] text-white/66">
             {heroTrustSignals.map((item) => (
               <span key={item} className="inline-flex items-center gap-2">
                 <Check size={15} className="text-emerald-400" />
@@ -396,7 +396,7 @@ function PortfolioSlider() {
     <section id="ozellikler" data-reveal className="relative overflow-hidden border-b border-white/10 bg-[#0B1730] px-5 py-16 md:px-10">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_22%,rgba(37,99,235,.18),transparent_30%)]" />
       <div className="relative mx-auto grid max-w-[1380px] items-center gap-10 lg:grid-cols-[310px_1fr]">
-        <div className="text-center lg:text-left">
+        <div className="text-center">
           <div className="mb-4 text-[12px] font-semibold uppercase tracking-[0.22em] text-[#60A5FA]">✣ Yapay Zekâ</div>
           <h2 className="text-[34px] font-light leading-[1.12] tracking-[-0.04em] text-white md:text-[44px]">
             EPH Size
@@ -459,7 +459,7 @@ function CustomerSection() {
           </div>
         </div>
 
-        <div className="text-center lg:text-left">
+        <div className="text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-white/[0.06] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#BFDBFE]">
             <MapPin size={15} /> EPH Harita Keşfi
           </div>
@@ -570,7 +570,7 @@ function AnalyticsSection() {
       <div className="mx-auto grid max-w-[1180px] items-center gap-14 lg:grid-cols-[380px_1fr]">
         <div>
           <div className="mb-4 text-[12px] font-semibold uppercase tracking-[0.22em] text-[#60A5FA]">⌘ Pazar Analizi</div>
-          <h2 className="text-left text-[32px] font-light leading-[1.14] tracking-[-0.04em] text-white md:text-[42px]">
+          <h2 className="text-center text-[32px] font-light leading-[1.14] tracking-[-0.04em] text-white md:text-[42px]">
             Pazar Analizi ile
             <span className="block">Doğru Karar Verin.</span>
           </h2>
@@ -717,9 +717,43 @@ function HelpDrawer() {
         </div>
 
         <div className="mt-5 grid gap-3">
-          <input className="h-11 rounded-[10px] border border-white/12 bg-white/[0.06] px-4 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-[#60A5FA]" placeholder="Ad Soyad" />
-          <input className="h-11 rounded-[10px] border border-white/12 bg-white/[0.06] px-4 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-[#60A5FA]" placeholder="Telefon" />
-          <input className="h-11 rounded-[10px] border border-white/12 bg-white/[0.06] px-4 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-[#60A5FA]" placeholder="E-posta" />
+          <label className="grid gap-1.5">
+            <span className="text-[12px] font-semibold text-white/78">Ad Soyad</span>
+            <input
+              type="text"
+              name="fullName"
+              autoComplete="name"
+              className="h-11 rounded-[10px] border border-white/12 bg-white/[0.06] px-4 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-[#60A5FA]"
+              placeholder="Adınızı ve soyadınızı yazın"
+            />
+          </label>
+
+          <label className="grid gap-1.5">
+            <span className="text-[12px] font-semibold text-white/78">Telefon Numarası</span>
+            <input
+              type="tel"
+              name="phone"
+              inputMode="tel"
+              autoComplete="tel"
+              className="h-11 rounded-[10px] border border-white/12 bg-white/[0.06] px-4 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-[#60A5FA]"
+              placeholder="05xx xxx xx xx"
+            />
+          </label>
+
+          <label className="grid gap-1.5">
+            <span className="text-[12px] font-semibold text-white/78">E-posta Adresi</span>
+            <input
+              type="email"
+              name="email"
+              autoComplete="email"
+              className="h-11 rounded-[10px] border border-white/12 bg-white/[0.06] px-4 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-[#60A5FA]"
+              placeholder="ornek@email.com"
+            />
+          </label>
+
+          <div className="mt-1 text-[12px] font-semibold text-white/78">
+            Ofisiniz var mı?
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-white/12 text-[12px] text-white/72">
@@ -731,8 +765,8 @@ function HelpDrawer() {
           </div>
 
           <button type="button" className="h-11 rounded-[10px] bg-[#2563EB] text-[13px] font-semibold text-white">Gönder</button>
-          <a href={whatsappUrl} target="_blank" rel="noreferrer" className="flex h-11 items-center justify-center gap-2 rounded-[10px] border border-white/12 text-[13px] font-medium text-white/76">
-            <Phone size={16} /> {whatsappNumber}
+          <a href="tel:+905077794875" className="flex h-11 items-center justify-center gap-2 rounded-[10px] border border-white/12 text-[13px] font-medium text-white/76">
+            <Phone size={16} /> +90 507 779 48 75
           </a>
         </div>
       </aside>
@@ -808,9 +842,9 @@ export default function LandingPage() {
             <div className="text-center md:text-right">
               <div className="text-[15px] font-bold text-[#0F1E35]">Bize Ulaşın</div>
               <div className="mt-4 grid gap-3 text-[14px] font-semibold text-[#1F3B64]">
-                <a href="tel:+905357944694" className="inline-flex items-center justify-center gap-2 md:justify-end">
+                <a href="tel:+905077794875" className="inline-flex items-center justify-center gap-2 md:justify-end">
                   <Phone size={16} className="text-[#2563EB]" />
-                  +90 535 794 46 94
+                  +90 507 779 48 75
                 </a>
                 <a href="mailto:info@emlakportfoyhavuzu.com" className="inline-flex items-center justify-center gap-2 break-all md:justify-end">
                   <span className="text-[#2563EB]">@</span>
@@ -887,7 +921,7 @@ export default function LandingPage() {
           <div className="mt-2 text-[12px] font-semibold text-[#51657F]">Sayfa Başına Dön</div>
 
           <div className="mx-auto mt-6 max-w-[720px] border-t border-[#E6EEF8] pt-5 text-center text-[12px] font-medium text-[#6A7E96]">
-            © 2024 EPH — Emlak Portföy Havuzu. Tüm hakları saklıdır.
+            © 2026 EPH — Emlak Portföy Havuzu. Tüm hakları saklıdır.
           </div>
         </div>
       </section>

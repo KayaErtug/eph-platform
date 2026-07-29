@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import { VisitTracker } from "../components/VisitTracker";
 import { ThemeProvider } from "../components/ThemeProvider";
@@ -6,6 +7,7 @@ import { PWARegister } from "../components/PWARegister";
 import { EPHMobileShell } from "../components/EPHMobileShell";
 
 const ORGANIZATION_MODULE_ENABLED = false;
+const GOOGLE_ANALYTICS_ID = "G-RD345JKGLV";
 
 export const metadata: Metadata = {
   title: "EPH Platform — Emlak Portföy Havuzu",
@@ -38,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           `}</style>
         )}
       </head>
+
       <body>
         <ThemeProvider>
           <VisitTracker />
@@ -45,6 +48,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <EPHMobileShell>{children}</EPHMobileShell>
         </ThemeProvider>
       </body>
+
+      <GoogleAnalytics gaId={GOOGLE_ANALYTICS_ID} />
     </html>
   );
 }

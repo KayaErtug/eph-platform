@@ -10,3 +10,7 @@ build/
 backend/public/profile-images/
 
 *.bak
+backend/.env.backup-*
+backend/backend@*
+backend/public/
+frontend/*.before-*
