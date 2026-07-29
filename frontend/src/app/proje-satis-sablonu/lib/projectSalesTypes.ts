@@ -17,6 +17,8 @@ export type ProjectSummary = {
   code: string | null;
   description: string | null;
   lifecycleStage: string | null;
+  completionPercent: number | null;
+  defaultDeliveryDate: string | null;
   city: string;
   district: string;
   neighborhood: string | null;
@@ -42,6 +44,8 @@ export type ProjectForm = {
   code: string;
   description: string;
   lifecycleStage: string;
+  completionPercent: string;
+  defaultDeliveryDate: string;
   city: string;
   district: string;
   neighborhood: string;

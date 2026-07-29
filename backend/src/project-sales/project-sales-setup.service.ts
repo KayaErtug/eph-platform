@@ -21,6 +21,8 @@ type ProjectDraftBody = {
   code?: unknown;
   description?: unknown;
   lifecycleStage?: unknown;
+  completionPercent?: unknown;
+  defaultDeliveryDate?: unknown;
   city?: unknown;
   district?: unknown;
   neighborhood?: unknown;
@@ -92,6 +94,11 @@ export class ProjectSalesSetupService {
       body.lifecycleStage,
       'Proje aşaması zorunludur.',
     );
+    const lifecycleDetails = this.parseLifecycleDetails(
+      lifecycleStage,
+      body.completionPercent,
+      body.defaultDeliveryDate,
+    );
 
     const geometryType = this.optionalEnum(
       ProjectGeometryType,
@@ -107,6 +114,8 @@ export class ProjectSalesSetupService {
         code,
         description: this.optionalText(body.description),
         lifecycleStage,
+        completionPercent: lifecycleDetails.completionPercent,
+        defaultDeliveryDate: lifecycleDetails.defaultDeliveryDate,
         city,
         district,
         neighborhood,
@@ -290,12 +299,34 @@ export class ProjectSalesSetupService {
       data.description = this.optionalText(body.description);
     }
 
+    let lifecycleStage = project.lifecycleStage;
+
     if (this.hasOwn(body, 'lifecycleStage')) {
-      data.lifecycleStage = this.requiredEnum(
+      lifecycleStage = this.requiredEnum(
         ProjectLifecycleStage,
         body.lifecycleStage,
         'Geçersiz proje aşaması.',
       );
+      data.lifecycleStage = lifecycleStage;
+    }
+
+    if (
+      this.hasOwn(body, 'lifecycleStage') ||
+      this.hasOwn(body, 'completionPercent') ||
+      this.hasOwn(body, 'defaultDeliveryDate')
+    ) {
+      const lifecycleDetails = this.parseLifecycleDetails(
+        lifecycleStage,
+        this.hasOwn(body, 'completionPercent')
+          ? body.completionPercent
+          : project.completionPercent,
+        this.hasOwn(body, 'defaultDeliveryDate')
+          ? body.defaultDeliveryDate
+          : project.defaultDeliveryDate,
+      );
+
+      data.completionPercent = lifecycleDetails.completionPercent;
+      data.defaultDeliveryDate = lifecycleDetails.defaultDeliveryDate;
     }
 
     if (this.hasOwn(body, 'city')) {
@@ -677,6 +708,88 @@ export class ProjectSalesSetupService {
       throw new BadRequestException(
         `${label} sÄ±fÄ±r veya sÄ±fÄ±rdan bÃ¼yÃ¼k tam sayÄ± olmalÄ±dÄ±r.`,
       );
+    }
+
+    return parsed;
+  }
+
+  private parseLifecycleDetails(
+    lifecycleStage: ProjectLifecycleStage | null,
+    completionPercent: unknown,
+    defaultDeliveryDate: unknown,
+  ) {
+    if (!lifecycleStage) {
+      throw new BadRequestException('Proje aşaması zorunludur.');
+    }
+
+    const deliveryDate = this.optionalDate(
+      defaultDeliveryDate,
+      'Tahmini teslim tarihi',
+    );
+
+    if (lifecycleStage === ProjectLifecycleStage.READY) {
+      return {
+        completionPercent: 100,
+        defaultDeliveryDate: deliveryDate,
+      };
+    }
+
+    if (lifecycleStage === ProjectLifecycleStage.PLANNED) {
+      return {
+        completionPercent: 0,
+        defaultDeliveryDate: deliveryDate,
+      };
+    }
+
+    const parsedCompletion = this.optionalNonNegativeInteger(
+      completionPercent,
+      'Proje tamamlanma oranı',
+    );
+
+    if (
+      parsedCompletion === null ||
+      parsedCompletion <= 0 ||
+      parsedCompletion >= 100
+    ) {
+      throw new BadRequestException(
+        'Devam eden projelerde tamamlanma oranı 1 ile 99 arasında olmalıdır.',
+      );
+    }
+
+    if (!deliveryDate) {
+      throw new BadRequestException(
+        'Devam eden projelerde tahmini teslim tarihi zorunludur.',
+      );
+    }
+
+    return {
+      completionPercent: parsedCompletion,
+      defaultDeliveryDate: deliveryDate,
+    };
+  }
+
+  private optionalDate(value: unknown, label: string) {
+    if (value === undefined || value === null || value === '') {
+      return null;
+    }
+
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) {
+        throw new BadRequestException(`${label} geçersiz.`);
+      }
+
+      return value;
+    }
+
+    const text = String(value).trim();
+    const parsed = new Date(
+      /^\d{4}-\d{2}-\d{2}$/.test(text)
+        ? `${text}T00:00:00.000Z`
+        : text,
+    );
+
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`${label} geçersiz.`);
     }
 
     return parsed;

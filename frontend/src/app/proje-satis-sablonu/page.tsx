@@ -521,6 +521,8 @@ function emptyForm(): ProjectForm {
     code: "",
     description: "",
     lifecycleStage: "",
+    completionPercent: "",
+    defaultDeliveryDate: "",
     city: "",
     district: "",
     neighborhood: "",
@@ -543,6 +545,13 @@ function formFromProject(project: ProjectSummary): ProjectForm {
     code: project.code || "",
     description: project.description || "",
     lifecycleStage: project.lifecycleStage || "",
+    completionPercent:
+      project.completionPercent === null
+        ? ""
+        : String(project.completionPercent),
+    defaultDeliveryDate: project.defaultDeliveryDate
+      ? project.defaultDeliveryDate.slice(0, 10)
+      : "",
     city: project.city || "",
     district: project.district || "",
     neighborhood: project.neighborhood || "",
@@ -2144,6 +2153,8 @@ export default function ProjectSalesCenterPage() {
     code: form.code.trim() || undefined,
     description: form.description.trim() || null,
     lifecycleStage: form.lifecycleStage,
+    completionPercent: integerOrNull(form.completionPercent),
+    defaultDeliveryDate: form.defaultDeliveryDate || null,
     city: form.city.trim(),
     district: form.district.trim(),
     neighborhood: form.neighborhood.trim(),
@@ -2172,6 +2183,34 @@ export default function ProjectSalesCenterPage() {
           "Projeyi kaydetmeden önce Hazır, Devam Eden veya Planlanan seçeneklerinden birini seçin.",
       });
       return;
+    }
+
+    if (form.lifecycleStage === "UNDER_CONSTRUCTION") {
+      const completionPercent = integerOrNull(form.completionPercent);
+
+      if (
+        completionPercent === null ||
+        completionPercent <= 0 ||
+        completionPercent >= 100
+      ) {
+        setNotice({
+          tone: "warning",
+          title: "Tamamlanma Oranı Geçersiz",
+          message:
+            "Devam eden projelerde tamamlanma oranı 1 ile 99 arasında olmalıdır.",
+        });
+        return;
+      }
+
+      if (!form.defaultDeliveryDate) {
+        setNotice({
+          tone: "warning",
+          title: "Teslim Tarihi Eksik",
+          message:
+            "Devam eden projelerde tahmini teslim tarihi zorunludur.",
+        });
+        return;
+      }
     }
 
     setBusyAction("save");
@@ -3615,7 +3654,20 @@ function ProjectFormView({
                   key={option.value}
                   type="button"
                   aria-pressed={selected}
-                  onClick={() => onChange("lifecycleStage", option.value)}
+                  onClick={() => {
+                    onChange("lifecycleStage", option.value);
+
+                    if (option.value === "READY") {
+                      onChange("completionPercent", "100");
+                    } else if (option.value === "PLANNED") {
+                      onChange("completionPercent", "0");
+                    } else if (
+                      form.completionPercent === "0" ||
+                      form.completionPercent === "100"
+                    ) {
+                      onChange("completionPercent", "");
+                    }
+                  }}
                   style={{
                     minHeight: 108,
                     border: selected
@@ -3657,6 +3709,93 @@ function ProjectFormView({
               );
             })}
           </div>
+
+          {form.lifecycleStage && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
+                gap: 10,
+                marginTop: 12,
+                padding: 12,
+                border: "1.5px solid #BFDBFE",
+                borderRadius: 16,
+                background: "#F8FBFF",
+              }}
+            >
+              <Field
+                label={
+                  form.lifecycleStage === "UNDER_CONSTRUCTION"
+                    ? "Tamamlanma oranı (%) *"
+                    : "Tamamlanma oranı (%)"
+                }
+              >
+                <input
+                  inputMode="numeric"
+                  min={0}
+                  max={100}
+                  disabled={form.lifecycleStage !== "UNDER_CONSTRUCTION"}
+                  value={form.completionPercent}
+                  onChange={(event) =>
+                    onChange(
+                      "completionPercent",
+                      event.target.value.replace(/\D/g, "").slice(0, 3),
+                    )
+                  }
+                  placeholder={
+                    form.lifecycleStage === "UNDER_CONSTRUCTION"
+                      ? "Ör. 45"
+                      : undefined
+                  }
+                  style={{
+                    ...inputStyle,
+                    opacity:
+                      form.lifecycleStage === "UNDER_CONSTRUCTION" ? 1 : 0.75,
+                  }}
+                />
+              </Field>
+
+              <Field
+                label={
+                  form.lifecycleStage === "UNDER_CONSTRUCTION"
+                    ? "Tahmini teslim tarihi *"
+                    : form.lifecycleStage === "PLANNED"
+                      ? "Hedef teslim tarihi"
+                      : "Teslim tarihi"
+                }
+              >
+                <input
+                  type="date"
+                  value={form.defaultDeliveryDate}
+                  onChange={(event) =>
+                    onChange("defaultDeliveryDate", event.target.value)
+                  }
+                  style={inputStyle}
+                />
+              </Field>
+
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  borderRadius: 12,
+                  padding: "9px 10px",
+                  textAlign: "center",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  lineHeight: 1.45,
+                  color: "#1E3A8A",
+                  background: "#EFF6FF",
+                }}
+              >
+                {form.lifecycleStage === "READY"
+                  ? "Hazır projeler sistemde otomatik olarak %100 tamamlanmış kabul edilir."
+                  : form.lifecycleStage === "PLANNED"
+                    ? "Planlanan projeler başlangıç öncesi olduğu için otomatik olarak %0 kabul edilir."
+                    : "İnşaat ilerledikçe tamamlanma oranını ve tahmini teslim tarihini güncelleyin."}
+              </div>
+            </div>
+          )}
         </div>
 
         <div
