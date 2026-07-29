@@ -136,6 +136,34 @@ import {
 } from "./lib/projectSalesNumbering";
 
 
+const PROJECT_LIFECYCLE_OPTIONS = [
+  {
+    value: "READY",
+    title: "Hazır Proje",
+    description:
+      "Yapımı tamamlandı; bağımsız bölümler hemen satışa veya teslime hazır.",
+  },
+  {
+    value: "UNDER_CONSTRUCTION",
+    title: "Devam Eden Proje",
+    description:
+      "İnşaat sürüyor; ön satış, ilerleme ve teslim tarihi yönetilecek.",
+  },
+  {
+    value: "PLANNED",
+    title: "Planlanan Proje",
+    description:
+      "Henüz başlamadı; ön talep, yatırımcı ve müşteri ilgisi toplanacak.",
+  },
+] as const;
+
+function projectLifecycleLabel(value: string | null | undefined) {
+  return (
+    PROJECT_LIFECYCLE_OPTIONS.find((option) => option.value === value)?.title ||
+    "Aşama Seçilmedi"
+  );
+}
+
 function facadeCountForGeometry(geometryType: string) {
   const counts: Record<string, number> = {
     TEK_CEPHELI_STANDART: 1,
@@ -492,6 +520,7 @@ function emptyForm(): ProjectForm {
     name: "",
     code: "",
     description: "",
+    lifecycleStage: "",
     city: "",
     district: "",
     neighborhood: "",
@@ -513,6 +542,7 @@ function formFromProject(project: ProjectSummary): ProjectForm {
     name: project.name || "",
     code: project.code || "",
     description: project.description || "",
+    lifecycleStage: project.lifecycleStage || "",
     city: project.city || "",
     district: project.district || "",
     neighborhood: project.neighborhood || "",
@@ -2113,6 +2143,7 @@ export default function ProjectSalesCenterPage() {
     name: form.name.trim(),
     code: form.code.trim() || undefined,
     description: form.description.trim() || null,
+    lifecycleStage: form.lifecycleStage,
     city: form.city.trim(),
     district: form.district.trim(),
     neighborhood: form.neighborhood.trim(),
@@ -2133,6 +2164,16 @@ export default function ProjectSalesCenterPage() {
   });
 
   const saveProject = async (destination: ProjectSaveDestination) => {
+    if (!form.lifecycleStage) {
+      setNotice({
+        tone: "warning",
+        title: "Proje Aşaması Seçilmedi",
+        message:
+          "Projeyi kaydetmeden önce Hazır, Devam Eden veya Planlanan seçeneklerinden birini seçin.",
+      });
+      return;
+    }
+
     setBusyAction("save");
 
     try {
@@ -3031,6 +3072,25 @@ function ProjectList({
                         .filter(Boolean)
                         .join(" / ")}
                     </p>
+
+                    <div style={{ marginTop: 6 }}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: 999,
+                          border: "1px solid #BFDBFE",
+                          background: "#EFF6FF",
+                          color: "#1D4ED8",
+                          padding: "4px 8px",
+                          fontSize: 9,
+                          fontWeight: 950,
+                        }}
+                      >
+                        {projectLifecycleLabel(project.lifecycleStage)}
+                      </span>
+                    </div>
                   </div>
 
                   <span
@@ -3529,6 +3589,74 @@ function ProjectFormView({
               style={inputStyle}
             />
           </Field>
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <SectionTitle
+            icon={<Building2 size={20} />}
+            title="Projenin Aşaması"
+            subtitle="Bu seçim projenin satış, lansman ve müşteri toplama akışını belirler."
+          />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(min(100%, 190px), 1fr))",
+              gap: 9,
+              marginTop: 10,
+            }}
+          >
+            {PROJECT_LIFECYCLE_OPTIONS.map((option) => {
+              const selected = form.lifecycleStage === option.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => onChange("lifecycleStage", option.value)}
+                  style={{
+                    minHeight: 108,
+                    border: selected
+                      ? "2px solid #2563EB"
+                      : "1.5px solid #C7D6E8",
+                    borderRadius: 16,
+                    background: selected ? "#EFF6FF" : "#FFFFFF",
+                    color: "#1F2937",
+                    padding: 12,
+                    textAlign: "center",
+                    cursor: "pointer",
+                    boxShadow: selected
+                      ? "0 10px 24px rgba(37, 99, 235, 0.14)"
+                      : "none",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 950,
+                      color: selected ? "#1D4ED8" : "#1F2937",
+                    }}
+                  >
+                    {option.title}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      lineHeight: 1.45,
+                      color: "#64748B",
+                    }}
+                  >
+                    {option.description}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div

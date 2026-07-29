@@ -32,6 +32,7 @@ export class ProjectSalesSetupFilteredService extends ProjectSalesSetupService {
       name: true,
       code: true,
       description: true,
+      lifecycleStage: true,
       city: true,
       district: true,
       neighborhood: true,

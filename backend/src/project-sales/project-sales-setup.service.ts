@@ -7,6 +7,7 @@
 import {
   Prisma,
   ProjectGeometryType,
+  ProjectLifecycleStage,
   ProjectSetupStatus,
   ProjectWizardStep,
   Role,
@@ -19,6 +20,7 @@ type ProjectDraftBody = {
   name?: unknown;
   code?: unknown;
   description?: unknown;
+  lifecycleStage?: unknown;
   city?: unknown;
   district?: unknown;
   neighborhood?: unknown;
@@ -85,6 +87,12 @@ export class ProjectSalesSetupService {
       declaredSalesInventoryCount,
     );
 
+    const lifecycleStage = this.requiredEnum(
+      ProjectLifecycleStage,
+      body.lifecycleStage,
+      'Proje aşaması zorunludur.',
+    );
+
     const geometryType = this.optionalEnum(
       ProjectGeometryType,
       body.geometryType,
@@ -98,6 +106,7 @@ export class ProjectSalesSetupService {
         name,
         code,
         description: this.optionalText(body.description),
+        lifecycleStage,
         city,
         district,
         neighborhood,
@@ -281,6 +290,14 @@ export class ProjectSalesSetupService {
       data.description = this.optionalText(body.description);
     }
 
+    if (this.hasOwn(body, 'lifecycleStage')) {
+      data.lifecycleStage = this.requiredEnum(
+        ProjectLifecycleStage,
+        body.lifecycleStage,
+        'Geçersiz proje aşaması.',
+      );
+    }
+
     if (this.hasOwn(body, 'city')) {
       data.city = this.requiredText(body.city, 'Ä°l zorunludur.');
     }
@@ -455,6 +472,7 @@ export class ProjectSalesSetupService {
       name: true,
       code: true,
       description: true,
+      lifecycleStage: true,
       city: true,
       district: true,
       neighborhood: true,

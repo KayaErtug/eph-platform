@@ -16,6 +16,7 @@ export type ProjectSummary = {
   name: string;
   code: string | null;
   description: string | null;
+  lifecycleStage: string | null;
   city: string;
   district: string;
   neighborhood: string | null;
@@ -40,6 +41,7 @@ export type ProjectForm = {
   name: string;
   code: string;
   description: string;
+  lifecycleStage: string;
   city: string;
   district: string;
   neighborhood: string;
