@@ -1,58 +1,33 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ActivityType,
   CustomerInterestPriority,
   CustomerPurchaseIntent,
   CustomerRole,
+  KontorHareketTuru,
+  Prisma,
   Role,
   UnitStatus,
 } from '@prisma/client';
-import { randomUUID } from 'crypto';
 
 import { CrmService } from '../crm/crm.service';
 import { NetworkService } from '../network/network.service';
 import { PrismaService } from '../prisma/prisma.service';
-
-type CoordinationDirection = 'CRM_TO_REQUEST' | 'REQUEST_TO_CRM';
-type CoordinationStatus = 'PENDING' | 'COMPLETE' | 'FAILED';
+import {
+  CoordinationLinkRepository,
+  CoordinationLinkRow,
+} from './coordination-link.repository';
+import { PublishCrmInterestDto } from './dto/publish-crm-interest.dto';
 
 type CoordinationUser = {
   id?: string;
   role?: Role | string;
 };
-
-type PublishInterestBody = {
-  title?: string;
-  description?: string;
-  urgency?: string;
-  expiresInDays?: number;
-  acknowledgedWarningCodes?: string[];
-};
-
-type CoordinationLinkRow = {
-  id: string;
-  ownerId: string;
-  direction: CoordinationDirection;
-  sourceEntityType: string;
-  sourceEntityId: string;
-  targetEntityType: string | null;
-  targetEntityId: string | null;
-  networkPostId: string | null;
-  customerId: string | null;
-  customerInterestId: string | null;
-  unitId: string | null;
-  status: CoordinationStatus;
-  metadata: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-const LINK_STALE_MS = 5 * 60 * 1000;
 
 @Injectable()
 export class CoordinationService {
@@ -60,16 +35,17 @@ export class CoordinationService {
     private readonly prisma: PrismaService,
     private readonly crmService: CrmService,
     private readonly networkService: NetworkService,
+    private readonly linkRepository: CoordinationLinkRepository,
   ) {}
 
   async publishCrmInterestToRequestCenter(
     interestId: string,
     rawUser: CoordinationUser,
-    body: PublishInterestBody = {},
+    body: PublishCrmInterestDto = {},
   ) {
     const user = await this.resolveUser(rawUser);
     const interest = await this.findInterestForUser(interestId, user);
-    const reservation = await this.reserveLink({
+    const reservation = await this.linkRepository.reserve({
       ownerId: user.id,
       direction: 'CRM_TO_REQUEST',
       sourceEntityType: 'CUSTOMER_INTEREST',
@@ -77,39 +53,62 @@ export class CoordinationService {
     });
 
     if (!reservation.acquired) {
-      const post = reservation.link.networkPostId
-        ? await this.prisma.networkPost.findUnique({
-            where: { id: reservation.link.networkPostId },
-          })
-        : null;
-
-      return {
-        created: false,
-        link: reservation.link,
-        networkPost: post,
-        message: 'Bu CRM talebi daha önce Talep Merkezi ile bağlandı.',
-      };
+      return this.getExistingRequestPublication(reservation.link);
     }
 
     let createdPostId: string | null = null;
 
     try {
-      const postInput = this.buildNetworkPostInput(interest, body);
-      const post = await this.networkService.create(postInput as any, user.id);
+      const post = await this.networkService.create(
+        this.buildNetworkPostInput(interest, body) as any,
+        user.id,
+      );
       createdPostId = post.id;
 
-      const link = await this.completeLink(reservation.link.id, {
-        targetEntityType: 'NETWORK_POST',
-        targetEntityId: post.id,
-        networkPostId: post.id,
-        customerId: interest.customerId,
-        customerInterestId: interest.id,
-        metadata: {
-          sourceModule: 'CRM',
-          targetModule: 'REQUEST_CENTER',
-          privacyMode: 'NO_CUSTOMER_PERSONAL_DATA',
+      const link = await this.linkRepository.complete(
+        reservation.link.id,
+        {
+          targetEntityType: 'NETWORK_POST',
+          targetEntityId: post.id,
+          networkPostId: post.id,
+          customerId: interest.customerId,
+          customerInterestId: interest.id,
+          metadata: {
+            sourceModule: 'CRM',
+            targetModule: 'REQUEST_CENTER',
+            privacyMode: 'NO_CUSTOMER_PERSONAL_DATA',
+            criteriaVersion: 1,
+          },
         },
-      });
+      );
+
+      await Promise.allSettled([
+        this.crmService.addActivity(
+          interest.customerId,
+          user.id,
+          user.role,
+          {
+            type: ActivityType.DIGER,
+            note:
+              `CRM talebi Talep Merkezi’nde yayınlandı. ` +
+              `Talep kaydı: ${post.id}`,
+          },
+        ),
+        this.writeAudit({
+          actorId: user.id,
+          targetUserId: interest.customer.ownerId,
+          action: 'CRM_INTEREST_PUBLISHED_TO_REQUEST_CENTER',
+          entityId: interest.id,
+          description:
+            'CRM talep profili kişisel bilgiler paylaşılmadan Talep Merkezi’nde yayınlandı.',
+          metadata: {
+            linkId: link.id,
+            customerId: interest.customerId,
+            customerInterestId: interest.id,
+            networkPostId: post.id,
+          },
+        }),
+      ]);
 
       return {
         created: true,
@@ -118,11 +117,32 @@ export class CoordinationService {
         message: 'CRM talebi Talep Merkezi’nde yayınlandı.',
       };
     } catch (error) {
-      await this.failLink(reservation.link.id, error);
+      await this.linkRepository
+        .fail(reservation.link.id, error)
+        .catch(() => undefined);
 
       if (createdPostId) {
-        await this.networkService.remove(createdPostId, user.id).catch(() => undefined);
+        await this.compensateNetworkPostCreation(
+          createdPostId,
+          user.id,
+        ).catch(() => undefined);
       }
+
+      await this.writeAudit({
+        actorId: user.id,
+        targetUserId: interest.customer.ownerId,
+        action: 'CRM_INTEREST_PUBLICATION_FAILED',
+        entityId: interest.id,
+        description:
+          'CRM talebinin Talep Merkezi’nde yayınlanması tamamlanamadı.',
+        metadata: {
+          linkId: reservation.link.id,
+          customerId: interest.customerId,
+          customerInterestId: interest.id,
+          createdPostId,
+          error: this.getErrorMessage(error),
+        },
+      }).catch(() => undefined);
 
       throw error;
     }
@@ -133,168 +153,173 @@ export class CoordinationService {
     rawUser: CoordinationUser,
   ) {
     const user = await this.resolveUser(rawUser);
-    const reservation = await this.reserveLink({
+    const post = await this.findActiveRequestPost(postId);
+    const reservation = await this.linkRepository.reserve({
       ownerId: user.id,
       direction: 'REQUEST_TO_CRM',
       sourceEntityType: 'NETWORK_POST',
-      sourceEntityId: postId,
+      sourceEntityId: post.id,
     });
 
     if (!reservation.acquired) {
-      const customer = reservation.link.customerId
-        ? await this.prisma.customer.findUnique({
-            where: { id: reservation.link.customerId },
-            include: {
-              interests: {
-                orderBy: { createdAt: 'asc' },
-              },
-            },
-          })
-        : null;
-
-      return {
-        created: false,
-        link: reservation.link,
-        customer,
-        message: 'Bu Talep Merkezi kaydı daha önce CRM fırsatına dönüştürüldü.',
-      };
+      return this.getExistingCrmOpportunity(reservation.link);
     }
 
     let createdCustomerId: string | null = null;
 
     try {
-      const post = await this.prisma.networkPost.findFirst({
-        where: {
-          id: postId,
-          isActive: true,
-          expiresAt: { gt: new Date() },
-        },
-        include: {
-          User: {
-            select: {
-              firstName: true,
-              lastName: true,
-              role: true,
-            },
-          },
-        },
-      });
-
-      if (!post) {
-        throw new NotFoundException('Aktif Talep Merkezi kaydı bulunamadı.');
-      }
-
       const areas = this.normalizePostAreas(post.areas, {
         city: post.city,
         district: post.district,
         neighborhood: post.neighborhood,
       });
       const statuses = this.getStatusesFromPost(post.tags);
-      const primaryArea = areas[0] || null;
-      const publicFirstName = this.cleanName(post.User.firstName) || 'Talep';
-      const publicLastName = this.cleanName(post.User.lastName) || 'Merkezi';
-
-      const createdCustomer = await this.crmService.createCustomer(user.id, {
-        firstName: publicFirstName,
-        lastName: publicLastName,
-        roles: this.getCustomerRoles(post.User.role, post.type),
-        source: 'TALEP_MERKEZI',
-        notes:
-          `Talep Merkezi fırsatı: ${post.title}. ` +
-          'İletişim Talep Merkezi üzerinden yürütülmelidir.',
-        interestedArea: areas.map((area) => this.formatArea(area)).join(' | '),
-        interestTitle: post.title,
-        interestNotes: post.description,
-        interestAreas: areas,
-        propertyTypes: post.propertyTypes,
-        interestStatuses: statuses,
-        minBudget: post.minBudget ?? post.budget,
-        maxBudget: post.maxBudget ?? post.budget,
-        priceCurrency: post.priceCurrency,
-        minArea: post.minArea,
-        maxArea: post.maxArea,
-        roomCounts: post.roomCounts,
-        features: post.features,
-        purchaseIntent: this.getPurchaseIntent(statuses),
-        priority: this.getPriority(post.urgency),
-      });
+      const createdCustomer = await this.crmService.createCustomer(
+        user.id,
+        {
+          firstName:
+            this.cleanName(post.User.firstName) || 'Talep',
+          lastName:
+            this.cleanName(post.User.lastName) || 'Merkezi',
+          roles: this.getCustomerRoles(
+            post.User.role,
+            post.type,
+          ),
+          source: 'TALEP_MERKEZI',
+          notes:
+            `Talep Merkezi fırsatı: ${post.title}. ` +
+            'İletişim Talep Merkezi üzerinden yürütülmelidir.',
+          interestedArea: areas
+            .map((area) => this.formatArea(area))
+            .join(' | '),
+          interestTitle: post.title,
+          interestNotes: post.description,
+          interestAreas: areas,
+          propertyTypes: post.propertyTypes,
+          interestStatuses: statuses,
+          minBudget: post.minBudget ?? post.budget,
+          maxBudget: post.maxBudget ?? post.budget,
+          priceCurrency: post.priceCurrency,
+          minArea: post.minArea,
+          maxArea: post.maxArea,
+          roomCounts: post.roomCounts,
+          features: post.features,
+          purchaseIntent: this.getPurchaseIntent(statuses),
+          priority: this.getPriority(post.urgency),
+        },
+      );
 
       if (!createdCustomer) {
-        throw new BadRequestException('CRM fırsatı oluşturulamadı.');
+        throw new BadRequestException(
+          'CRM fırsatı oluşturulamadı.',
+        );
       }
 
       createdCustomerId = createdCustomer.id;
+      const customer = await this.ensureCustomerInterestLocations(
+        createdCustomer.id,
+        areas,
+      );
+      const primaryInterestId =
+        customer.interests[0]?.id || null;
 
-      let customer = await this.prisma.customer.findUnique({
-        where: { id: createdCustomer.id },
-        include: {
-          interests: {
-            orderBy: { createdAt: 'asc' },
+      const link = await this.linkRepository.complete(
+        reservation.link.id,
+        {
+          targetEntityType: 'CUSTOMER',
+          targetEntityId: customer.id,
+          networkPostId: post.id,
+          customerId: customer.id,
+          customerInterestId: primaryInterestId,
+          metadata: {
+            sourceModule: 'REQUEST_CENTER',
+            targetModule: 'CRM',
+            privacyMode: 'PUBLIC_EPH_IDENTITY_ONLY',
+            customerInterestIds: customer.interests.map(
+              (item) => item.id,
+            ),
           },
         },
-      });
+      );
 
-      if (!customer) {
-        throw new BadRequestException('Oluşturulan CRM fırsatı okunamadı.');
-      }
+      const tomorrow = new Date(
+        Date.now() + 24 * 60 * 60 * 1000,
+      ).toISOString();
 
-      if (primaryArea && customer.interests.length === 1) {
-        const primaryInterest = customer.interests[0];
-
-        if (!primaryInterest.city && primaryArea.city) {
-          await this.prisma.customerInterest.update({
-            where: { id: primaryInterest.id },
-            data: {
-              city: primaryArea.city,
-              district: primaryArea.district || null,
-              neighborhood: primaryArea.neighborhood || null,
-            },
-          });
-
-          customer = await this.prisma.customer.findUnique({
-            where: { id: createdCustomer.id },
-            include: {
-              interests: {
-                orderBy: { createdAt: 'asc' },
-              },
-            },
-          });
-        }
-      }
-
-      if (!customer) {
-        throw new BadRequestException('CRM fırsatı güncellenemedi.');
-      }
-
-      const primaryInterestId = customer.interests[0]?.id || null;
-      const link = await this.completeLink(reservation.link.id, {
-        targetEntityType: 'CUSTOMER',
-        targetEntityId: customer.id,
-        networkPostId: post.id,
-        customerId: customer.id,
-        customerInterestId: primaryInterestId,
-        metadata: {
-          sourceModule: 'REQUEST_CENTER',
-          targetModule: 'CRM',
-          privacyMode: 'PUBLIC_EPH_IDENTITY_ONLY',
-          customerInterestIds: customer.interests.map((item) => item.id),
-        },
-      });
+      await Promise.allSettled([
+        this.crmService.addActivity(
+          customer.id,
+          user.id,
+          user.role,
+          {
+            type: ActivityType.DIGER,
+            note:
+              `Talep Merkezi kaydından CRM fırsatı oluşturuldu. ` +
+              `Kaynak talep: ${post.id}`,
+          },
+        ),
+        this.crmService.addTask(
+          customer.id,
+          user.id,
+          user.role,
+          {
+            title:
+              'Talep sahibiyle Talep Merkezi üzerinden iletişime geç',
+            dueDate: tomorrow,
+          },
+        ),
+        this.writeAudit({
+          actorId: user.id,
+          targetUserId: post.userId,
+          action: 'REQUEST_CENTER_POST_CONVERTED_TO_CRM',
+          entityId: post.id,
+          description:
+            'Talep Merkezi kaydı, iletişim bilgileri kopyalanmadan özel CRM fırsatına dönüştürüldü.',
+          metadata: {
+            linkId: link.id,
+            networkPostId: post.id,
+            customerId: customer.id,
+            customerInterestId: primaryInterestId,
+          },
+        }),
+      ]);
 
       return {
         created: true,
         link,
         customer,
-        message: 'Talep Merkezi kaydı özel CRM fırsatına dönüştürüldü.',
+        message:
+          'Talep Merkezi kaydı özel CRM fırsatına dönüştürüldü.',
       };
     } catch (error) {
-      await this.failLink(reservation.link.id, error);
+      await this.linkRepository
+        .fail(reservation.link.id, error)
+        .catch(() => undefined);
 
       if (createdCustomerId) {
         await this.crmService
-          .deleteCustomer(createdCustomerId, user.id, user.role)
+          .deleteCustomer(
+            createdCustomerId,
+            user.id,
+            user.role,
+          )
           .catch(() => undefined);
       }
+
+      await this.writeAudit({
+        actorId: user.id,
+        targetUserId: post.userId,
+        action: 'REQUEST_CENTER_TO_CRM_FAILED',
+        entityId: post.id,
+        description:
+          'Talep Merkezi kaydının CRM fırsatına dönüştürülmesi tamamlanamadı.',
+        metadata: {
+          linkId: reservation.link.id,
+          networkPostId: post.id,
+          createdCustomerId,
+          error: this.getErrorMessage(error),
+        },
+      }).catch(() => undefined);
 
       throw error;
     }
@@ -307,7 +332,7 @@ export class CoordinationService {
     const user = await this.resolveUser(rawUser);
     await this.findInterestForUser(interestId, user);
 
-    return this.getLink(
+    return this.linkRepository.find(
       user.id,
       'CRM_TO_REQUEST',
       'CUSTOMER_INTEREST',
@@ -315,10 +340,14 @@ export class CoordinationService {
     );
   }
 
-  async getRequestCrmStatus(postId: string, rawUser: CoordinationUser) {
+  async getRequestCrmStatus(
+    postId: string,
+    rawUser: CoordinationUser,
+  ) {
     const user = await this.resolveUser(rawUser);
+    await this.findActiveRequestPost(postId);
 
-    return this.getLink(
+    return this.linkRepository.find(
       user.id,
       'REQUEST_TO_CRM',
       'NETWORK_POST',
@@ -326,15 +355,62 @@ export class CoordinationService {
     );
   }
 
+  private async getExistingRequestPublication(
+    link: CoordinationLinkRow,
+  ) {
+    const post = link.networkPostId
+      ? await this.prisma.networkPost.findUnique({
+          where: { id: link.networkPostId },
+        })
+      : null;
+
+    return {
+      created: false,
+      link,
+      networkPost: post,
+      message:
+        'Bu CRM talebi daha önce Talep Merkezi ile bağlandı.',
+    };
+  }
+
+  private async getExistingCrmOpportunity(
+    link: CoordinationLinkRow,
+  ) {
+    const customer = link.customerId
+      ? await this.prisma.customer.findUnique({
+          where: { id: link.customerId },
+          include: {
+            interests: {
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        })
+      : null;
+
+    return {
+      created: false,
+      link,
+      customer,
+      message:
+        'Bu Talep Merkezi kaydı daha önce CRM fırsatına dönüştürüldü.',
+    };
+  }
+
   private async resolveUser(rawUser: CoordinationUser) {
     const id = String(rawUser?.id || '').trim();
 
     if (!id) {
-      throw new ForbiddenException('Koordinasyon işlemi için giriş yapmalısınız.');
+      throw new ForbiddenException(
+        'Koordinasyon işlemi için giriş yapmalısınız.',
+      );
     }
 
-    const suppliedRole = String(rawUser?.role || '').trim().toUpperCase();
-    const role = Object.values(Role).find((item) => item === suppliedRole);
+    const suppliedRole = String(rawUser?.role || '')
+      .trim()
+      .toUpperCase();
+    const role = Object.values(Role).find(
+      (item) => item === suppliedRole,
+    );
 
     if (role) {
       return { id, role };
@@ -356,32 +432,68 @@ export class CoordinationService {
     interestId: string,
     user: { id: string; role: Role },
   ) {
-    const interest = await this.prisma.customerInterest.findUnique({
-      where: { id: interestId },
-      include: { customer: true },
-    });
+    const interest =
+      await this.prisma.customerInterest.findUnique({
+        where: { id: interestId },
+        include: { customer: true },
+      });
 
     if (!interest) {
-      throw new NotFoundException('CRM talep profili bulunamadı.');
+      throw new NotFoundException(
+        'CRM talep profili bulunamadı.',
+      );
     }
 
     if (
       user.role !== Role.SUPER_ADMIN &&
       interest.customer.ownerId !== user.id
     ) {
-      throw new ForbiddenException('Bu CRM talep profiline erişim yetkiniz yok.');
+      throw new ForbiddenException(
+        'Bu CRM talep profiline erişim yetkiniz yok.',
+      );
     }
 
     if (!interest.isActive) {
-      throw new BadRequestException('Pasif CRM talebi yayınlanamaz.');
+      throw new BadRequestException(
+        'Pasif CRM talebi yayınlanamaz.',
+      );
     }
 
     return interest;
   }
 
+  private async findActiveRequestPost(postId: string) {
+    const post = await this.prisma.networkPost.findFirst({
+      where: {
+        id: postId,
+        isActive: true,
+        expiresAt: { gt: new Date() },
+      },
+      include: {
+        User: {
+          select: {
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException(
+        'Aktif Talep Merkezi kaydı bulunamadı.',
+      );
+    }
+
+    return post;
+  }
+
   private buildNetworkPostInput(
-    interest: Awaited<ReturnType<CoordinationService['findInterestForUser']>>,
-    body: PublishInterestBody,
+    interest: Awaited<
+      ReturnType<CoordinationService['findInterestForUser']>
+    >,
+    body: PublishCrmInterestDto,
   ) {
     const location = this.formatArea({
       city: interest.city,
@@ -395,16 +507,21 @@ export class CoordinationService {
       );
     }
 
-    const requestType = this.getRequestType(interest.statuses);
+    const requestType = this.getRequestType(
+      interest.statuses,
+    );
     const propertyText = interest.propertyTypes.length
-      ? interest.propertyTypes.map((item) => this.humanize(item)).join(', ')
+      ? interest.propertyTypes
+          .map((item) => this.humanize(item))
+          .join(', ')
       : 'gayrimenkul';
     const budgetText = this.formatBudget(
       interest.minBudget,
       interest.maxBudget,
       interest.priceCurrency,
     );
-    const generatedTitle = `${location} ${propertyText} arayışı`;
+    const generatedTitle =
+      `${location} ${propertyText} arayışı`;
     const generatedDescription = [
       `${location} bölgesinde ${propertyText} aranıyor.`,
       budgetText ? `Bütçe: ${budgetText}.` : '',
@@ -422,8 +539,14 @@ export class CoordinationService {
 
     return {
       type: 'PORTFOY_ARIYORUM',
-      title: this.trimText(body.title || interest.title || generatedTitle, 50),
-      description: this.trimText(body.description || generatedDescription, 200),
+      title: this.trimText(
+        body.title || interest.title || generatedTitle,
+        50,
+      ),
+      description: this.trimText(
+        body.description || generatedDescription,
+        200,
+      ),
       areas: [
         {
           city: interest.city,
@@ -439,16 +562,195 @@ export class CoordinationService {
       roomCounts: interest.roomCounts,
       features: interest.features,
       priceCurrency: interest.priceCurrency,
-      urgency: body.urgency || this.priorityToUrgency(interest.priority),
+      urgency:
+        body.urgency ||
+        this.priorityToUrgency(interest.priority),
       visibility: 'TUM_EPH',
-      tags: [`Talep Türü:${requestType}`, 'CRM Talep Profili'],
+      tags: [
+        `Talep Türü:${requestType}`,
+        'CRM Talep Profili',
+      ],
       expiresAt: new Date(
-        Date.now() + expiresInDays * 24 * 60 * 60 * 1000,
+        Date.now() +
+          expiresInDays * 24 * 60 * 60 * 1000,
       ).toISOString(),
-      acknowledgedWarningCodes: Array.isArray(body.acknowledgedWarningCodes)
+      acknowledgedWarningCodes: Array.isArray(
+        body.acknowledgedWarningCodes,
+      )
         ? body.acknowledgedWarningCodes
         : [],
     };
+  }
+
+  private async ensureCustomerInterestLocations(
+    customerId: string,
+    areas: Array<{
+      city: string;
+      district: string;
+      neighborhood: string;
+    }>,
+  ) {
+    let customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      include: {
+        interests: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    if (!customer) {
+      throw new BadRequestException(
+        'Oluşturulan CRM fırsatı okunamadı.',
+      );
+    }
+
+    const primaryArea = areas[0];
+    const primaryInterest = customer.interests[0];
+
+    if (
+      primaryArea &&
+      primaryInterest &&
+      !primaryInterest.city
+    ) {
+      await this.prisma.customerInterest.update({
+        where: { id: primaryInterest.id },
+        data: {
+          city: primaryArea.city || null,
+          district: primaryArea.district || null,
+          neighborhood:
+            primaryArea.neighborhood || null,
+        },
+      });
+
+      customer = await this.prisma.customer.findUnique({
+        where: { id: customerId },
+        include: {
+          interests: {
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+      });
+    }
+
+    if (!customer) {
+      throw new BadRequestException(
+        'CRM fırsatı güncellenemedi.',
+      );
+    }
+
+    return customer;
+  }
+
+  private async compensateNetworkPostCreation(
+    postId: string,
+    userId: string,
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      const post = await tx.networkPost.findUnique({
+        where: { id: postId },
+        select: { id: true, userId: true },
+      });
+
+      if (!post || post.userId !== userId) {
+        return;
+      }
+
+      const movements = await tx.kontorHareketi.findMany({
+        where: {
+          kullaniciId: userId,
+          hareketTuru: KontorHareketTuru.HARCAMA,
+          ilgiliKayitTuru: 'NETWORK_POST',
+          ilgiliKayitId: postId,
+        },
+        orderBy: { olusturulmaTarihi: 'asc' },
+      });
+
+      for (const movement of movements) {
+        const marker =
+          `[KOORDINASYON_IADE:${movement.id}]`;
+        const existingRefund =
+          await tx.kontorHareketi.findFirst({
+            where: {
+              kullaniciId: userId,
+              hareketTuru: KontorHareketTuru.IADE,
+              aciklama: { contains: marker },
+            },
+          });
+
+        if (existingRefund) {
+          continue;
+        }
+
+        const wallet = await tx.kontorCuzdani.findUnique({
+          where: { kullaniciId: userId },
+        });
+
+        if (!wallet) {
+          continue;
+        }
+
+        const nextBalance =
+          wallet.bakiye + movement.miktar;
+
+        await tx.kontorCuzdani.update({
+          where: { kullaniciId: userId },
+          data: {
+            bakiye: nextBalance,
+            toplamHarcama: Math.max(
+              0,
+              wallet.toplamHarcama - movement.miktar,
+            ),
+          },
+        });
+
+        await tx.kontorHareketi.create({
+          data: {
+            kullaniciId: userId,
+            hareketTuru: KontorHareketTuru.IADE,
+            islemTuru: movement.islemTuru,
+            miktar: movement.miktar,
+            oncekiBakiye: wallet.bakiye,
+            sonrakiBakiye: nextBalance,
+            aciklama:
+              `Başarısız koordinasyon işlemi için kontör iadesi. ${marker}`,
+            ilgiliKayitTuru: 'NETWORK_POST',
+            ilgiliKayitId: postId,
+            olusturanId: userId,
+          },
+        });
+      }
+
+      await tx.networkPost.update({
+        where: { id: postId },
+        data: {
+          isActive: false,
+          updatedAt: new Date(),
+        },
+      });
+    });
+  }
+
+  private async writeAudit(input: {
+    actorId: string;
+    targetUserId?: string | null;
+    action: string;
+    entityId: string;
+    description: string;
+    metadata: Record<string, unknown>;
+  }) {
+    return this.prisma.adminActionLog.create({
+      data: {
+        actorId: input.actorId,
+        targetUserId: input.targetUserId || null,
+        action: input.action,
+        entityType: 'EPH_COORDINATION',
+        entityId: input.entityId,
+        description: input.description,
+        metadata:
+          input.metadata as Prisma.InputJsonValue,
+      },
+    });
   }
 
   private getRequestType(statuses: UnitStatus[]) {
@@ -459,9 +761,11 @@ export class CoordinationService {
       : 'PORTFOY_SATILIK';
   }
 
-  private getStatusesFromPost(tags: string[]): UnitStatus[] {
+  private getStatusesFromPost(tags: string[]) {
     const requestType = tags
-      .find((tag) => String(tag).startsWith('Talep Türü:'))
+      .find((tag) =>
+        String(tag).startsWith('Talep Türü:'),
+      )
       ?.replace(/^Talep Türü:\s*/i, '')
       .toUpperCase();
 
@@ -479,26 +783,47 @@ export class CoordinationService {
   }
 
   private getPriority(urgency?: string | null) {
-    const normalized = String(urgency || '').toLocaleLowerCase('tr-TR');
+    const normalized = String(urgency || '')
+      .toLocaleLowerCase('tr-TR');
 
-    if (normalized.includes('acil')) return CustomerInterestPriority.ACIL;
-    if (normalized.includes('yüksek')) return CustomerInterestPriority.YUKSEK;
-    if (normalized.includes('dusuk') || normalized.includes('düşük')) {
+    if (normalized.includes('acil')) {
+      return CustomerInterestPriority.ACIL;
+    }
+    if (normalized.includes('yüksek')) {
+      return CustomerInterestPriority.YUKSEK;
+    }
+    if (
+      normalized.includes('dusuk') ||
+      normalized.includes('düşük')
+    ) {
       return CustomerInterestPriority.DUSUK;
     }
 
     return CustomerInterestPriority.NORMAL;
   }
 
-  private priorityToUrgency(priority: CustomerInterestPriority) {
-    if (priority === CustomerInterestPriority.ACIL) return 'Acil';
-    if (priority === CustomerInterestPriority.YUKSEK) return 'Yüksek';
-    if (priority === CustomerInterestPriority.DUSUK) return 'Düşük';
+  private priorityToUrgency(
+    priority: CustomerInterestPriority,
+  ) {
+    if (priority === CustomerInterestPriority.ACIL) {
+      return 'Acil';
+    }
+    if (priority === CustomerInterestPriority.YUKSEK) {
+      return 'Yüksek';
+    }
+    if (priority === CustomerInterestPriority.DUSUK) {
+      return 'Düşük';
+    }
     return 'Normal';
   }
 
-  private getCustomerRoles(userRole: Role, postType: string): CustomerRole[] {
-    if (userRole === Role.MUTEAHHIT) return [CustomerRole.MUTEAHHIT];
+  private getCustomerRoles(
+    userRole: Role,
+    postType: string,
+  ): CustomerRole[] {
+    if (userRole === Role.MUTEAHHIT) {
+      return [CustomerRole.MUTEAHHIT];
+    }
     if (userRole === Role.INSAAT_FIRMASI) {
       return [CustomerRole.INSAAT_FIRMASI];
     }
@@ -520,7 +845,11 @@ export class CoordinationService {
     const areas = Array.isArray(value)
       ? value
           .map((item) => {
-            if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            if (
+              !item ||
+              typeof item !== 'object' ||
+              Array.isArray(item)
+            ) {
               return null;
             }
 
@@ -528,28 +857,45 @@ export class CoordinationService {
 
             return {
               city: String(record.city || '').trim(),
-              district: String(record.district || '').trim(),
-              neighborhood: String(record.neighborhood || '').trim(),
+              district: String(
+                record.district || '',
+              ).trim(),
+              neighborhood: String(
+                record.neighborhood || '',
+              ).trim(),
             };
           })
           .filter(
-            (item): item is {
+            (
+              item,
+            ): item is {
               city: string;
               district: string;
               neighborhood: string;
-            } => Boolean(item?.city || item?.district || item?.neighborhood),
+            } =>
+              Boolean(
+                item?.city ||
+                  item?.district ||
+                  item?.neighborhood,
+              ),
           )
       : [];
 
-    if (areas.length > 0) return areas;
+    if (areas.length > 0) {
+      return areas;
+    }
 
     const fallbackArea = {
       city: String(fallback.city || '').trim(),
       district: String(fallback.district || '').trim(),
-      neighborhood: String(fallback.neighborhood || '').trim(),
+      neighborhood: String(
+        fallback.neighborhood || '',
+      ).trim(),
     };
 
-    return fallbackArea.city || fallbackArea.district || fallbackArea.neighborhood
+    return fallbackArea.city ||
+      fallbackArea.district ||
+      fallbackArea.neighborhood
       ? [fallbackArea]
       : [];
   }
@@ -578,8 +924,12 @@ export class CoordinationService {
     if (minBudget != null && maxBudget != null) {
       return `${format(minBudget)} - ${format(maxBudget)} ${currency}`;
     }
-    if (minBudget != null) return `${format(minBudget)} ${currency} ve üzeri`;
-    if (maxBudget != null) return `${format(maxBudget)} ${currency} ve altı`;
+    if (minBudget != null) {
+      return `${format(minBudget)} ${currency} ve üzeri`;
+    }
+    if (maxBudget != null) {
+      return `${format(maxBudget)} ${currency} ve altı`;
+    }
     return '';
   }
 
@@ -587,7 +937,9 @@ export class CoordinationService {
     return String(value || '')
       .toLocaleLowerCase('tr-TR')
       .replaceAll('_', ' ')
-      .replace(/(^|\s)\S/g, (letter) => letter.toLocaleUpperCase('tr-TR'));
+      .replace(/(^|\s)\S/g, (letter) =>
+        letter.toLocaleUpperCase('tr-TR'),
+      );
   }
 
   private cleanName(value?: string | null) {
@@ -595,163 +947,14 @@ export class CoordinationService {
   }
 
   private trimText(value: string, maxLength: number) {
-    return String(value || '').trim().slice(0, maxLength);
+    return String(value || '')
+      .trim()
+      .slice(0, maxLength);
   }
 
-  private async reserveLink(input: {
-    ownerId: string;
-    direction: CoordinationDirection;
-    sourceEntityType: string;
-    sourceEntityId: string;
-  }): Promise<{ link: CoordinationLinkRow; acquired: boolean }> {
-    const inserted = await this.prisma.$queryRaw<CoordinationLinkRow[]>`
-      INSERT INTO "EphCoordinationLink" (
-        "id",
-        "ownerId",
-        "direction",
-        "sourceEntityType",
-        "sourceEntityId",
-        "status",
-        "createdAt",
-        "updatedAt"
-      )
-      VALUES (
-        ${randomUUID()},
-        ${input.ownerId},
-        ${input.direction},
-        ${input.sourceEntityType},
-        ${input.sourceEntityId},
-        'PENDING',
-        NOW(),
-        NOW()
-      )
-      ON CONFLICT (
-        "ownerId",
-        "direction",
-        "sourceEntityType",
-        "sourceEntityId"
-      ) DO NOTHING
-      RETURNING *
-    `;
-
-    if (inserted[0]) {
-      return { link: inserted[0], acquired: true };
-    }
-
-    const existing = await this.getLink(
-      input.ownerId,
-      input.direction,
-      input.sourceEntityType,
-      input.sourceEntityId,
-    );
-
-    if (!existing) {
-      throw new ConflictException('Koordinasyon bağlantısı oluşturulamadı.');
-    }
-
-    if (existing.status === 'COMPLETE') {
-      return { link: existing, acquired: false };
-    }
-
-    const isFreshPending =
-      existing.status === 'PENDING' &&
-      Date.now() - new Date(existing.updatedAt).getTime() < LINK_STALE_MS;
-
-    if (isFreshPending) {
-      throw new ConflictException('Bu koordinasyon işlemi halen devam ediyor.');
-    }
-
-    const reset = await this.prisma.$queryRaw<CoordinationLinkRow[]>`
-      UPDATE "EphCoordinationLink"
-      SET
-        "status" = 'PENDING',
-        "targetEntityType" = NULL,
-        "targetEntityId" = NULL,
-        "networkPostId" = NULL,
-        "customerId" = NULL,
-        "customerInterestId" = NULL,
-        "unitId" = NULL,
-        "metadata" = NULL,
-        "updatedAt" = NOW()
-      WHERE "id" = ${existing.id}
-      RETURNING *
-    `;
-
-    if (!reset[0]) {
-      throw new ConflictException('Koordinasyon bağlantısı yeniden başlatılamadı.');
-    }
-
-    return { link: reset[0], acquired: true };
-  }
-
-  private async completeLink(
-    linkId: string,
-    input: {
-      targetEntityType: string;
-      targetEntityId: string;
-      networkPostId?: string | null;
-      customerId?: string | null;
-      customerInterestId?: string | null;
-      unitId?: string | null;
-      metadata: Record<string, unknown>;
-    },
-  ) {
-    const metadata = JSON.stringify(input.metadata);
-    const rows = await this.prisma.$queryRaw<CoordinationLinkRow[]>`
-      UPDATE "EphCoordinationLink"
-      SET
-        "targetEntityType" = ${input.targetEntityType},
-        "targetEntityId" = ${input.targetEntityId},
-        "networkPostId" = ${input.networkPostId || null},
-        "customerId" = ${input.customerId || null},
-        "customerInterestId" = ${input.customerInterestId || null},
-        "unitId" = ${input.unitId || null},
-        "status" = 'COMPLETE',
-        "metadata" = ${metadata}::jsonb,
-        "updatedAt" = NOW()
-      WHERE "id" = ${linkId}
-      RETURNING *
-    `;
-
-    if (!rows[0]) {
-      throw new ConflictException('Koordinasyon bağlantısı tamamlanamadı.');
-    }
-
-    return rows[0];
-  }
-
-  private async failLink(linkId: string, error: unknown) {
-    const message =
-      error instanceof Error ? error.message : 'Bilinmeyen koordinasyon hatası';
-    const metadata = JSON.stringify({ error: message.slice(0, 500) });
-
-    await this.prisma.$executeRaw`
-      UPDATE "EphCoordinationLink"
-      SET
-        "status" = 'FAILED',
-        "metadata" = ${metadata}::jsonb,
-        "updatedAt" = NOW()
-      WHERE "id" = ${linkId}
-    `;
-  }
-
-  private async getLink(
-    ownerId: string,
-    direction: CoordinationDirection,
-    sourceEntityType: string,
-    sourceEntityId: string,
-  ) {
-    const rows = await this.prisma.$queryRaw<CoordinationLinkRow[]>`
-      SELECT *
-      FROM "EphCoordinationLink"
-      WHERE
-        "ownerId" = ${ownerId}
-        AND "direction" = ${direction}
-        AND "sourceEntityType" = ${sourceEntityType}
-        AND "sourceEntityId" = ${sourceEntityId}
-      LIMIT 1
-    `;
-
-    return rows[0] || null;
+  private getErrorMessage(error: unknown) {
+    return error instanceof Error
+      ? error.message.slice(0, 500)
+      : 'Bilinmeyen koordinasyon hatası';
   }
 }
