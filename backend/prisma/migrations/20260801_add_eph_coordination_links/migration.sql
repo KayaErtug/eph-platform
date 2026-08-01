@@ -57,3 +57,9 @@ CREATE INDEX "EphCoordinationLink_unitId_idx"
 
 CREATE INDEX "EphCoordinationLink_status_idx"
   ON "EphCoordinationLink"("status");
+
+COMMENT ON TABLE "EphCoordinationLink" IS
+  'CRM, Talep Merkezi, Portföy ve Havuz kayıtlarını kopyalamadan birbirine bağlayan EPH koordinasyon tablosu.';
+
+COMMENT ON COLUMN "EphCoordinationLink"."metadata" IS
+  'Kişisel veri içermeyen teknik koordinasyon özeti.';
