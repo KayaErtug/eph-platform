@@ -10,6 +10,7 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CoordinationService } from './coordination.service';
+import { PublishCrmInterestDto } from './dto/publish-crm-interest.dto';
 
 @Controller('coordination')
 @UseGuards(JwtAuthGuard)
@@ -22,14 +23,7 @@ export class CoordinationController {
   publishCrmInterestToRequestCenter(
     @Param('interestId') interestId: string,
     @CurrentUser() user: any,
-    @Body()
-    body?: {
-      title?: string;
-      description?: string;
-      urgency?: string;
-      expiresInDays?: number;
-      acknowledgedWarningCodes?: string[];
-    },
+    @Body() body: PublishCrmInterestDto,
   ) {
     return this.coordinationService.publishCrmInterestToRequestCenter(
       interestId,
