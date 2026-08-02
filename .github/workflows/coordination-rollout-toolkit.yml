@@ -1,0 +1,23 @@
+name: Coordination Rollout Toolkit
+
+on:
+  pull_request:
+    paths:
+      - "tools/coordination-rollout/**"
+      - ".github/workflows/coordination-rollout-toolkit.yml"
+  workflow_dispatch:
+
+jobs:
+  toolkit-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run rollout toolkit unit tests
+        working-directory: tools/coordination-rollout
+        run: npm test
+      - name: Validate shell scripts
+        run: bash -n tools/coordination-rollout/scripts/*.sh
