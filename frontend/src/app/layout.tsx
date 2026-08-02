@@ -6,6 +6,7 @@ import { VisitTracker } from "../components/VisitTracker";
 import { ThemeProvider } from "../components/ThemeProvider";
 import { PWARegister } from "../components/PWARegister";
 import { EPHMobileShell } from "../components/EPHMobileShell";
+import EPHCoordinationDock from "../components/coordination/EPHCoordinationDock";
 
 const ORGANIZATION_MODULE_ENABLED = false;
 const GOOGLE_ANALYTICS_ID = "G-RD345JKGLV";
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <VisitTracker />
           <PWARegister />
           <EPHMobileShell>{children}</EPHMobileShell>
+          <EPHCoordinationDock />
         </ThemeProvider>
       </body>
 
