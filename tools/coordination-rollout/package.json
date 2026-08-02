@@ -1,0 +1,21 @@
+{
+  "name": "eph-coordination-rollout",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Additive rollout, acceptance, security, load and monitoring toolkit for EPH coordination flows.",
+  "scripts": {
+    "preflight": "node src/preflight.mjs",
+    "smoke": "node src/smoke.mjs",
+    "security": "node src/security.mjs",
+    "load": "node src/load.mjs",
+    "monitor": "node src/monitor.mjs",
+    "watch:recalculate": "node src/recalculation-watch.mjs",
+    "history": "node src/history-snapshot.mjs",
+    "approve": "node src/approval-cli.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
