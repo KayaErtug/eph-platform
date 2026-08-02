@@ -1,0 +1,33 @@
+{
+  "crmToPool": {
+    "customer": "Ayşe Test",
+    "interest": "Denizli / Merkezefendi, satılık 3+1, 5–6 milyon TL",
+    "expected": [
+      "Havuz taraması tamamlanır",
+      "Eşleşmeler yüzde ve gerekçeleriyle döner",
+      "Seçilen portföy CRM müşterisine bağlanır",
+      "CRM aktivitesi ve isteğe bağlı görev oluşur"
+    ]
+  },
+  "crmToRequestCenter": {
+    "expected": [
+      "Müşteri adı, telefon ve e-posta yayınlanmaz",
+      "İkinci çalıştırma kopya talep üretmez",
+      "Başarısız işlemde kontör telafisi çalışır"
+    ]
+  },
+  "requestCenterToCrm": {
+    "expected": [
+      "Talep kaydı özel CRM fırsatına dönüşür",
+      "Telefon ve e-posta kopyalanmaz",
+      "Takip görevi oluşturulur"
+    ]
+  },
+  "staleMatch": {
+    "expected": [
+      "CRM talebi veya bağlı portföy değişince uyarı oluşur",
+      "Yeniden hesaplama sonrası güncel skor gösterilir",
+      "Aynı uyarı gereksiz tekrar üretmez"
+    ]
+  }
+}
