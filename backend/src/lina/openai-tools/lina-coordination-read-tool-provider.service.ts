@@ -267,7 +267,7 @@ export class LinaCoordinationReadToolProviderService
             description: 'Döndürülecek en fazla eşleşme sayısı.',
           },
         },
-        required: ['interestId'],
+        required: ['interestId', 'limit'],
         additionalProperties: false,
       },
     };
