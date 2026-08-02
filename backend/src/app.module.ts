@@ -37,6 +37,7 @@ import { ProjectSalesModule } from './project-sales/project-sales.module';
 import { ProjectSalesTemplatesModule } from './project-sales-templates/project-sales-templates.module';
 import { ProjectSceneModule } from './project-scene/project-scene.module';
 import { MapsModule } from './maps/maps.module';
+import { CoordinationModule } from './coordination/coordination.module';
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { MapsModule } from './maps/maps.module';
     OfficeOwnerCrmModule,
     KontorModule,
     EphAuthorityLettersModule,
+    CoordinationModule,
 
     DashboardModule,
 
