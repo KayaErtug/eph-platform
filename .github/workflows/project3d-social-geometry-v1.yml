@@ -34,7 +34,9 @@ jobs:
             backend/package-lock.json
 
       - name: Apply social geometry package
-        run: python3 .github/scripts/apply_project3d_social_geometry_v1.py
+        run: |
+          python3 .github/scripts/add_project_space_gate_enum.py
+          python3 .github/scripts/apply_project3d_social_geometry_v1.py
 
       - name: Build frontend
         working-directory: frontend
@@ -50,6 +52,7 @@ jobs:
 
       - name: Remove temporary rollout files
         run: |
+          rm -f .github/scripts/add_project_space_gate_enum.py
           rm -f .github/scripts/apply_project3d_social_geometry_v1.py
           rm -f .github/workflows/project3d-social-geometry-v1.yml
 
