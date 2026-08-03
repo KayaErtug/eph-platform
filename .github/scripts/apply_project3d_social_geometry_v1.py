@@ -16,44 +16,47 @@ def patch_renderer() -> None:
     path = ROOT / "frontend/src/app/proje-satis-sablonu/3d/[projectId]/PremiumProjectScene.tsx"
     text = path.read_text(encoding="utf-8")
 
-    text = replace_once(
-        text,
-        'import type { PointerEvent as ReactPointerEvent } from "react";\n\nimport LandscapeLayer from "./LandscapeLayer";',
-        'import type { PointerEvent as ReactPointerEvent } from "react";\n\nimport AmenityGeometry from "./AmenityGeometry";\nimport LandscapeLayer from "./LandscapeLayer";',
-        "renderer amenity import",
-    )
+    if 'import AmenityGeometry from "./AmenityGeometry";' not in text:
+        text = replace_once(
+            text,
+            'import type { PointerEvent as ReactPointerEvent } from "react";\n\nimport LandscapeLayer from "./LandscapeLayer";',
+            'import type { PointerEvent as ReactPointerEvent } from "react";\n\nimport AmenityGeometry from "./AmenityGeometry";\nimport LandscapeLayer from "./LandscapeLayer";',
+            "renderer amenity import",
+        )
 
-    text = replace_once(
-        text,
-        '  if (geometry.includes("L")) {',
-        '  if (["L", "L_PLAN", "L_TIPI", "L_SHAPE"].includes(geometry)) {',
-        "renderer exact L geometry",
-    )
-    text = replace_once(
-        text,
-        '  if (geometry.includes("U")) {',
-        '  if (["U", "U_PLAN", "U_TIPI", "U_SHAPE"].includes(geometry)) {',
-        "renderer exact U geometry",
-    )
-    text = replace_once(
-        text,
-        '  if (geometry.includes("T")) {',
-        '  if (["T", "T_PLAN", "T_TIPI", "T_SHAPE"].includes(geometry)) {',
-        "renderer exact T geometry",
-    )
-    text = replace_once(
-        text,
-        '  if (geometry.includes("KARE")) {',
-        '  if (geometry === "KARE" || geometry === "KARE_PLAN") {',
-        "renderer exact square geometry",
-    )
+    replacements = [
+        (
+            '  if (geometry.includes("L")) {',
+            '  if (["L", "L_PLAN", "L_TIPI", "L_SHAPE"].includes(geometry)) {',
+            "renderer exact L geometry",
+        ),
+        (
+            '  if (geometry.includes("U")) {',
+            '  if (["U", "U_PLAN", "U_TIPI", "U_SHAPE"].includes(geometry)) {',
+            "renderer exact U geometry",
+        ),
+        (
+            '  if (geometry.includes("T")) {',
+            '  if (["T", "T_PLAN", "T_TIPI", "T_SHAPE"].includes(geometry)) {',
+            "renderer exact T geometry",
+        ),
+        (
+            '  if (geometry.includes("KARE")) {',
+            '  if (geometry === "KARE" || geometry === "KARE_PLAN") {',
+            "renderer exact square geometry",
+        ),
+    ]
+    for old, new, label in replacements:
+        if old in text:
+            text = replace_once(text, old, new, label)
 
-    text = replace_once(
-        text,
-        '''    const selected = selectedId === element.id;
+    if '<AmenityGeometry' not in text:
+        text = replace_once(
+            text,
+            '''    const selected = selectedId === element.id;
     const isBlock = element.type === "BLOCK";
     const localFootprint = geometryFootprint(element);''',
-        '''    const selected = selectedId === element.id;
+            '''    const selected = selectedId === element.id;
     const isBlock = element.type === "BLOCK";
 
     if (!isBlock) {
@@ -75,8 +78,8 @@ def patch_renderer() -> None:
     }
 
     const localFootprint = geometryFootprint(element);''',
-        "renderer amenity branch",
-    )
+            "renderer amenity branch",
+        )
 
     path.write_text(text, encoding="utf-8")
 
@@ -84,17 +87,18 @@ def patch_renderer() -> None:
 def patch_types() -> None:
     path = ROOT / "frontend/src/app/proje-satis-sablonu/3d/[projectId]/projectSceneTypes.ts"
     text = path.read_text(encoding="utf-8")
-    text = replace_once(
-        text,
-        '''  sourceId: string;
+    if "projectName?: string;" not in text:
+        text = replace_once(
+            text,
+            '''  sourceId: string;
   name: string;
   code?: string;''',
-        '''  sourceId: string;
+            '''  sourceId: string;
   name: string;
   projectName?: string;
   code?: string;''',
-        "types project name",
-    )
+            "types project name",
+        )
     path.write_text(text, encoding="utf-8")
 
 
@@ -102,21 +106,24 @@ def patch_client() -> None:
     path = ROOT / "frontend/src/app/proje-satis-sablonu/3d/[projectId]/Project3DStudioClient.tsx"
     text = path.read_text(encoding="utf-8")
 
-    text = replace_once(
-        text,
-        "  schemaVersion: 3,",
-        "  schemaVersion: 4,",
-        "client schema version",
-    )
-    text = replace_once(
-        text,
-        "    schemaVersion: Number(source.schemaVersion) || 1,",
-        "    schemaVersion: Math.max(4, Number(source.schemaVersion) || 1),",
-        "client normalized schema version",
-    )
+    if "  schemaVersion: 3," in text:
+        text = replace_once(
+            text,
+            "  schemaVersion: 3,",
+            "  schemaVersion: 4,",
+            "client schema version",
+        )
+    if "    schemaVersion: Number(source.schemaVersion) || 1," in text:
+        text = replace_once(
+            text,
+            "    schemaVersion: Number(source.schemaVersion) || 1,",
+            "    schemaVersion: Math.max(4, Number(source.schemaVersion) || 1),",
+            "client normalized schema version",
+        )
 
-    marker = '''function apiErrorMessage(error: unknown) {'''
-    helper = '''function isSiteGate(element: ProjectSceneElement) {
+    if "function ensureMandatorySiteGate(" not in text:
+        marker = '''function apiErrorMessage(error: unknown) {'''
+        helper = '''function isSiteGate(element: ProjectSceneElement) {
   const type = String(element.spaceType || "").toUpperCase();
   return (
     type === "GIRIS_KAPISI_KEMERI" ||
@@ -179,14 +186,15 @@ function ensureMandatorySiteGate(
 }
 
 '''
-    text = replace_once(text, marker, helper + marker, "client gate helper")
+        text = replace_once(text, marker, helper + marker, "client gate helper")
 
-    text = replace_once(
-        text,
-        '''    setResponse(next);
+    if "ensureMandatorySiteGate(\n        normalizeSceneData" not in text:
+        text = replace_once(
+            text,
+            '''    setResponse(next);
     setSceneData(normalizeSceneData(next.scene?.sceneData));
     setSelectedId(null);''',
-        '''    setResponse(next);
+            '''    setResponse(next);
     setSceneData(
       ensureMandatorySiteGate(
         normalizeSceneData(next.scene?.sceneData),
@@ -194,8 +202,8 @@ function ensureMandatorySiteGate(
       ),
     );
     setSelectedId(null);''',
-        "client inject mandatory gate",
-    )
+            "client inject mandatory gate",
+        )
 
     path.write_text(text, encoding="utf-8")
 
@@ -206,26 +214,28 @@ def patch_backend() -> None:
 
     text = text.replace("schemaVersion: 3,", "schemaVersion: 4,")
 
-    text = replace_once(
-        text,
-        '''        name: space.name,
+    if "space.spaceType === 'GIRIS_KAPISI_KEMERI'" not in text:
+        text = replace_once(
+            text,
+            '''        name: space.name,
         spaceType: space.spaceType,
         grossArea: space.grossArea,''',
-        '''        name: space.name,
+            '''        name: space.name,
         projectName:
           space.spaceType === 'GIRIS_KAPISI_KEMERI'
             ? project.name
             : undefined,
         spaceType: space.spaceType,
         grossArea: space.grossArea,''',
-        "backend explicit gate project name",
-    )
+            "backend explicit gate project name",
+        )
 
-    text = replace_once(
-        text,
-        '''    return {
+    if "const hasExplicitGate = amenityElements.some(" not in text:
+        text = replace_once(
+            text,
+            '''    return {
       schemaVersion: 4,''',
-        '''    const hasExplicitGate = amenityElements.some(
+            '''    const hasExplicitGate = amenityElements.some(
       (element) => element.spaceType === 'GIRIS_KAPISI_KEMERI',
     );
     const gateElements = hasExplicitGate
@@ -254,15 +264,16 @@ def patch_backend() -> None:
 
     return {
       schemaVersion: 4,''',
-        "backend mandatory gate",
-    )
+            "backend mandatory gate",
+        )
 
-    text = replace_once(
-        text,
-        "      elements: [...blockElements, ...amenityElements],",
-        "      elements: [...blockElements, ...amenityElements, ...gateElements],",
-        "backend gate elements",
-    )
+    if "...gateElements" not in text:
+        text = replace_once(
+            text,
+            "      elements: [...blockElements, ...amenityElements],",
+            "      elements: [...blockElements, ...amenityElements, ...gateElements],",
+            "backend gate elements",
+        )
 
     path.write_text(text, encoding="utf-8")
 
@@ -271,28 +282,29 @@ def patch_options() -> None:
     path = ROOT / "frontend/src/app/proje-satis-sablonu/lib/projectSalesOptions.ts"
     text = path.read_text(encoding="utf-8-sig")
 
-    text = replace_once(
-        text,
-        '''  { value: "SUS_HAVUZU", label: "Süs Havuzu" },
+    if 'value: "GIRIS_KAPISI_KEMERI"' not in text:
+        text = replace_once(
+            text,
+            '''  { value: "SUS_HAVUZU", label: "Süs Havuzu" },
   { value: "DIGER", label: "Diğer" },''',
-        '''  { value: "SUS_HAVUZU", label: "Süs Havuzu" },
+            '''  { value: "SUS_HAVUZU", label: "Süs Havuzu" },
   {
     value: "GIRIS_KAPISI_KEMERI",
     label: "Giriş Kapısı Kemeri / Proje İsimliği",
   },
   { value: "DIGER", label: "Diğer" },''',
-        "options gate entry",
-    )
+            "options gate entry",
+        )
 
-    text = replace_once(
-        text,
-        '''  "SUS_HAVUZU",
+        text = replace_once(
+            text,
+            '''  "SUS_HAVUZU",
   "COCUK_OYUN_ALANI",''',
-        '''  "SUS_HAVUZU",
+            '''  "SUS_HAVUZU",
   "GIRIS_KAPISI_KEMERI",
   "COCUK_OYUN_ALANI",''',
-        "options open gate",
-    )
+            "options open gate",
+        )
 
     path.write_text(text, encoding="utf-8")
 
