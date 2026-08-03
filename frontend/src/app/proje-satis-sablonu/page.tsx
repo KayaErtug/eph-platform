@@ -4382,6 +4382,20 @@ function ProjectStructureView({
 }) {
   const previewing = busyAction === "structure-preview";
   const applying = busyAction === "structure-apply";
+  const [expandedBlockKey, setExpandedBlockKey] = useState<string | null>(
+    blocks[0]?.key ?? null,
+  );
+
+  useEffect(() => {
+    setExpandedBlockKey((current) => {
+      if (current && blocks.some((block) => block.key === current)) {
+        return current;
+      }
+
+      return blocks[0]?.key ?? null;
+    });
+  }, [blocks]);
+
   const totalFloorCount = blocks.reduce(
     (total, block) => total + buildFloors(block).length,
     0,
@@ -4442,15 +4456,49 @@ function ProjectStructureView({
             block.geometryType,
           );
           const floors = buildFloors(block);
+          const expanded = expandedBlockKey === block.key;
+          const accordionContentId = `project-block-${block.key}-content`;
 
           return (
-            <section key={block.key} style={{ ...cardStyle, padding: 13 }}>
+            <section
+              key={block.key}
+              style={{
+                ...cardStyle,
+                padding: 0,
+                overflow: "hidden",
+                borderColor: expanded ? "#93C5FD" : "#C7D6E8",
+                boxShadow: expanded
+                  ? "0 12px 30px rgba(37, 99, 235, 0.12)"
+                  : cardStyle.boxShadow,
+              }}
+            >
               <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={expanded}
+                aria-controls={accordionContentId}
+                onClick={() =>
+                  setExpandedBlockKey((current) =>
+                    current === block.key ? null : block.key,
+                  )
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setExpandedBlockKey((current) =>
+                      current === block.key ? null : block.key,
+                    );
+                  }
+                }}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "42px minmax(0, 1fr) 42px",
+                  gridTemplateColumns: "42px minmax(0, 1fr) 42px 42px",
                   alignItems: "center",
                   gap: 9,
+                  padding: 13,
+                  background: expanded ? "#F8FBFF" : "#FFFFFF",
+                  cursor: "pointer",
+                  outline: "none",
                 }}
               >
                 <div
@@ -4494,7 +4542,10 @@ function ProjectStructureView({
 
                 <button
                   type="button"
-                  onClick={() => onRemoveBlock(block.key)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemoveBlock(block.key);
+                  }}
                   disabled={blocks.length === 1 || Boolean(busyAction)}
                   aria-label="Bloğu kaldır"
                   style={{
@@ -4511,8 +4562,39 @@ function ProjectStructureView({
                 >
                   <Trash2 size={17} />
                 </button>
+
+                <div
+                  aria-hidden="true"
+                  style={{
+                    width: 42,
+                    height: 42,
+                    border: "1.5px solid #BFDBFE",
+                    borderRadius: 13,
+                    display: "grid",
+                    placeItems: "center",
+                    background: "#EFF6FF",
+                    color: "#1557D6",
+                  }}
+                >
+                  <ChevronDown
+                    size={19}
+                    style={{
+                      transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: "transform 180ms ease",
+                    }}
+                  />
+                </div>
               </div>
 
+              {expanded && (
+                <div
+                  id={accordionContentId}
+                  style={{
+                    padding: "0 13px 13px",
+                    borderTop: "1px solid #DBEAFE",
+                    background: "#FFFFFF",
+                  }}
+                >
               <div
                 style={{
                   display: "grid",
@@ -4712,6 +4794,8 @@ function ProjectStructureView({
                   </span>
                 )}
               </div>
+                </div>
+              )}
             </section>
           );
         })}
