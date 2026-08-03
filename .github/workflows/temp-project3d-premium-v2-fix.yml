@@ -1,0 +1,47 @@
+name: Temporary Project3D Premium V2 Type Fix
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  fix:
+    if: github.event.issue.title == '[EPH] Fix Project3D Premium V2 types'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/project3d-premium-geometry-v2
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply type fix
+        run: node tools/project3d-premium-v2/fix-types.mjs
+
+      - name: Commit fix and remove helper
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/src/app/proje-satis-sablonu/3d/[projectId]/PremiumProjectScene.tsx
+          git rm tools/project3d-premium-v2/fix-types.mjs
+          git commit -m "fix: type Project3D premium palettes safely"
+          git push origin HEAD:feature/project3d-premium-geometry-v2
+
+      - name: Close trigger issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+              state_reason: 'completed'
+            });
