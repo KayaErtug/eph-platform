@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Clock3,
   Copy,
@@ -126,7 +127,7 @@ export default function CustomerPresentationSheet({
     };
   }, [open]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const createLink = async () => {
     if (busy) return;
@@ -229,15 +230,22 @@ export default function CustomerPresentationSheet({
     );
   };
 
-  return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/55 px-2 pt-8">
-      <section className="flex max-h-[92dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[28px] border-2 border-b-0 border-[#C7D6E8] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.30)]">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[10050] flex items-end justify-center bg-slate-950/60 px-2 pt-8"
+      onClick={onClose}
+      role="presentation"
+    >
+      <section
+        className="relative flex max-h-[92dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[28px] border-2 border-b-0 border-[#C7D6E8] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.30)]"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="shrink-0 border-b-2 border-[#E2EAF5] bg-[#F8FAFC] px-4 pb-3 pt-2 text-center">
           <div className="mx-auto mb-2 h-1.5 w-11 rounded-full bg-[#CBD5E1]" />
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-4 mt-1 flex h-10 w-10 items-center justify-center rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[#2563EB]"
+            className="absolute right-4 top-3 flex h-10 w-10 items-center justify-center rounded-[14px] border-2 border-[#C7D6E8] bg-white text-[#2563EB]"
             aria-label="Kapat"
           >
             <X size={18} />
@@ -374,6 +382,7 @@ export default function CustomerPresentationSheet({
           )}
         </div>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
