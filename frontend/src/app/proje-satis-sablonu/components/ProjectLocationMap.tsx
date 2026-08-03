@@ -17,12 +17,18 @@ type SetPointOptions = {
   center?: boolean;
 };
 
-const DEFAULT_CENTER: [number, number] = [39.0, 35.0];
-const DEFAULT_ZOOM = 6;
+const DEFAULT_CENTER: [number, number] = [39.9334, 32.8597];
+const DEFAULT_ZOOM = 11;
 const SELECTED_ZOOM = 16;
 
 function parseCoordinate(value: string) {
-  const parsed = Number(String(value || "").trim().replace(",", "."));
+  const normalized = String(value ?? "").trim().replace(",", ".");
+
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
