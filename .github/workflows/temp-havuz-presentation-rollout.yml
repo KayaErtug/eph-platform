@@ -1,0 +1,58 @@
+name: Temporary Havuz Presentation Rollout
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  rollout:
+    if: github.event.issue.title == '[EPH] Havuz Presentation V2 Rollout'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/havuz-musteri-sunumu-v2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply targeted source updates
+        run: node tools/havuz-presentation-v2/apply.mjs
+      - name: Backend build
+        working-directory: backend
+        run: |
+          npm ci
+          npm run build
+      - name: Frontend build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Commit validated updates
+        run: |
+          git config user.name "EPH Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add backend frontend
+          if git diff --cached --quiet; then
+            echo "No source changes produced."
+          else
+            git commit -m "feat: complete havuz customer presentation v2"
+            git push origin HEAD:feature/havuz-musteri-sunumu-v2
+          fi
+      - name: Report success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: gh issue comment "$ISSUE_NUMBER" --body "ROLLOUT_SUCCESS"
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: gh issue comment "$ISSUE_NUMBER" --body "ROLLOUT_FAILED: Check the Temporary Havuz Presentation Rollout workflow logs."
