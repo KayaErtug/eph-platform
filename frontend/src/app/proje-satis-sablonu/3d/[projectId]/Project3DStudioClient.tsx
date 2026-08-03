@@ -60,7 +60,7 @@ type Notice = {
 } | null;
 
 const defaultSceneData: ProjectSceneData = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   plot: {
     width: 70,
     depth: 60,
@@ -89,7 +89,7 @@ function normalizeSceneData(value: unknown): ProjectSceneData {
   const source = value as Partial<ProjectSceneData>;
 
   return {
-    schemaVersion: Number(source.schemaVersion) || 1,
+    schemaVersion: Math.max(4, Number(source.schemaVersion) || 1),
     skipped: Boolean(source.skipped),
     plot: {
       width: Number(source.plot?.width) || defaultSceneData.plot.width,
@@ -109,6 +109,68 @@ function normalizeSceneData(value: unknown): ProjectSceneData {
     },
     landscape: normalizeLandscapeSettings(source.landscape),
     elements: Array.isArray(source.elements) ? source.elements : [],
+  };
+}
+
+function isSiteGate(element: ProjectSceneElement) {
+  const type = String(element.spaceType || "").toUpperCase();
+  return (
+    type === "GIRIS_KAPISI_KEMERI" ||
+    type === "SITE_GATE_ARCH" ||
+    element.id === "system-site-gate"
+  );
+}
+
+function ensureMandatorySiteGate(
+  sceneData: ProjectSceneData,
+  projectName: string,
+): ProjectSceneData {
+  const existingIndex = sceneData.elements.findIndex(isSiteGate);
+
+  if (existingIndex >= 0) {
+    return {
+      ...sceneData,
+      schemaVersion: Math.max(4, sceneData.schemaVersion),
+      elements: sceneData.elements.map((element, index) =>
+        index === existingIndex
+          ? {
+              ...element,
+              projectName,
+              spaceType: "GIRIS_KAPISI_KEMERI",
+              size: {
+                width: Math.max(16, Number(element.size?.width) || 20),
+                depth: Math.max(5, Number(element.size?.depth) || 7),
+                height: Math.max(4.2, Number(element.size?.height) || 5.2),
+              },
+            }
+          : element,
+      ),
+    };
+  }
+
+  return {
+    ...sceneData,
+    schemaVersion: Math.max(4, sceneData.schemaVersion),
+    elements: [
+      ...sceneData.elements,
+      {
+        id: "system-site-gate",
+        type: "AMENITY",
+        sourceId: "system-site-gate",
+        name: "Giriş Kapısı Kemeri",
+        projectName,
+        spaceType: "GIRIS_KAPISI_KEMERI",
+        grossArea: 90,
+        position: [0, 0.1, Math.max(0, sceneData.plot.depth / 2 - 5.5)],
+        rotationY: 0,
+        size: {
+          width: 20,
+          depth: 7,
+          height: 5.2,
+        },
+        stylePreset: "SITE_GATE_PREMIUM",
+      },
+    ],
   };
 }
 
@@ -162,7 +224,12 @@ export default function Project3DStudioClient({
 
   const applyResponse = useCallback((next: ProjectSceneResponse) => {
     setResponse(next);
-    setSceneData(normalizeSceneData(next.scene?.sceneData));
+    setSceneData(
+      ensureMandatorySiteGate(
+        normalizeSceneData(next.scene?.sceneData),
+        next.project.name,
+      ),
+    );
     setSelectedId(null);
     setDirty(false);
   }, []);
