@@ -145,8 +145,17 @@ export class ProjectSceneService {
         status: ProjectSceneStatus.ATLANDI,
         completedAt: new Date(),
         sceneData: {
-          schemaVersion: 1,
+          schemaVersion: 3,
           skipped: true,
+          landscape: {
+            preset: 'URBAN_MODERN',
+            density: 3,
+            showTrees: true,
+            showPaths: true,
+            showLighting: true,
+            showBenches: true,
+            showShrubs: true,
+          },
           elements: [],
         },
       },
@@ -282,6 +291,16 @@ export class ProjectSceneService {
           height: floorCount * 3.05 + 1.2,
         },
         stylePreset: 'MODERN_LIGHT',
+        facadeStyle: {
+          preset: 'MODERN_LIGHT',
+          primaryColor: '#2563eb',
+          secondaryColor: '#60a5fa',
+          accentColor: '#ffffff',
+          glassColor: '#dbeafe',
+          roofColor: '#f8fafc',
+          balconyStyle: 'GLASS',
+          verticalFins: false,
+        },
         floors: block.floors.map((floor) => ({
           id: floor.id,
           level: floor.level,
@@ -325,7 +344,7 @@ export class ProjectSceneService {
     });
 
     return {
-      schemaVersion: 2,
+      schemaVersion: 3,
       plot: {
         width: plotWidth,
         depth: plotDepth,
@@ -341,6 +360,15 @@ export class ProjectSceneService {
         showGrid: true,
         showLabels: true,
         quality: 'AUTO',
+      },
+      landscape: {
+        preset: 'URBAN_MODERN',
+        density: 3,
+        showTrees: true,
+        showPaths: true,
+        showLighting: true,
+        showBenches: true,
+        showShrubs: true,
       },
       elements: [...blockElements, ...amenityElements],
     } as Prisma.InputJsonObject;
