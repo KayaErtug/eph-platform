@@ -29,6 +29,9 @@ import {
 
 import api from "@/lib/api";
 
+import PremiumProjectScene, {
+  type SceneViewMode,
+} from "./PremiumProjectScene";
 import type {
   ProjectSceneData,
   ProjectSceneElement,
@@ -129,27 +132,6 @@ function statusLabel(status?: string) {
   return status ? labels[status] || status : "Oluşturulmadı";
 }
 
-function amenityPalette(spaceType?: string) {
-  if (spaceType?.includes("HAVUZ")) {
-    return { top: "#7dd3fc", left: "#38bdf8", right: "#0284c7" };
-  }
-
-  if (
-    spaceType?.includes("BAHCE") ||
-    spaceType?.includes("PEYZAJ") ||
-    spaceType?.includes("PARK") ||
-    spaceType?.includes("DINLENME")
-  ) {
-    return { top: "#86efac", left: "#4ade80", right: "#16a34a" };
-  }
-
-  if (spaceType?.includes("OTOPARK")) {
-    return { top: "#cbd5e1", left: "#94a3b8", right: "#64748b" };
-  }
-
-  return { top: "#fde68a", left: "#fbbf24", right: "#d97706" };
-}
-
 export default function Project3DStudioClient({
   projectId,
 }: {
@@ -164,6 +146,7 @@ export default function Project3DStudioClient({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const [sceneViewMode, setSceneViewMode] = useState<SceneViewMode>("SITE");
 
   const endpoint = `/project-sales/projects/${encodeURIComponent(projectId)}/scene`;
 
@@ -436,151 +419,6 @@ export default function Project3DStudioClient({
     setDirty(true);
   };
 
-  const renderElement = (element: ProjectSceneElement) => {
-    const angle = (element.rotationY * Math.PI) / 180;
-    const rotatePoint = (localX: number, localZ: number) => ({
-      x:
-        element.position[0] +
-        localX * Math.cos(angle) -
-        localZ * Math.sin(angle),
-      z:
-        element.position[2] +
-        localX * Math.sin(angle) +
-        localZ * Math.cos(angle),
-    });
-    const halfWidth = element.size.width / 2;
-    const halfDepth = element.size.depth / 2;
-    const worldCorners = [
-      rotatePoint(-halfWidth, -halfDepth),
-      rotatePoint(halfWidth, -halfDepth),
-      rotatePoint(halfWidth, halfDepth),
-      rotatePoint(-halfWidth, halfDepth),
-    ];
-    const ground = worldCorners.map((point) => toIso(point.x, point.z));
-    const visualHeight =
-      element.type === "BLOCK"
-        ? clamp(element.size.height * sceneMetrics.heightScale, 28, 190)
-        : 5;
-    const top = ground.map((point) => ({
-      x: point.x,
-      y: point.y - visualHeight,
-    }));
-    const selected = selectedId === element.id;
-    const palette =
-      element.type === "BLOCK"
-        ? selected
-          ? { top: "#dbeafe", left: "#60a5fa", right: "#2563eb" }
-          : { top: "#eff6ff", left: "#93c5fd", right: "#3b82f6" }
-        : amenityPalette(element.spaceType);
-    const points = (items: Array<{ x: number; y: number }>) =>
-      items.map((item) => `${item.x},${item.y}`).join(" ");
-    const labelPoint = {
-      x: (top[0].x + top[1].x + top[2].x + top[3].x) / 4,
-      y: Math.min(top[0].y, top[1].y, top[2].y, top[3].y) - 10,
-    };
-
-    return (
-      <g
-        key={element.id}
-        role="button"
-        aria-label={element.name}
-        tabIndex={0}
-        onPointerDown={(event) => handlePointerDown(event, element)}
-        onPointerMove={handlePointerMove}
-        onPointerUp={finishDrag}
-        onPointerCancel={finishDrag}
-        style={{ cursor: dragState?.elementId === element.id ? "grabbing" : "grab" }}
-      >
-        <polygon
-          points={points([ground[3], ground[2], top[2], top[3]])}
-          fill={palette.left}
-          stroke={selected ? "#1d4ed8" : "#ffffff"}
-          strokeWidth={selected ? 3 : 1.4}
-        />
-        <polygon
-          points={points([ground[1], ground[2], top[2], top[1]])}
-          fill={palette.right}
-          stroke={selected ? "#1d4ed8" : "#ffffff"}
-          strokeWidth={selected ? 3 : 1.4}
-        />
-        <polygon
-          points={points(top)}
-          fill={palette.top}
-          stroke={selected ? "#1d4ed8" : "#ffffff"}
-          strokeWidth={selected ? 3 : 1.4}
-        />
-
-        {element.type === "BLOCK" &&
-          Array.from({ length: Math.min(element.floorCount || 1, 20) }).map(
-            (_, floorIndex) => {
-              const ratio = (floorIndex + 1) / Math.max(1, element.floorCount || 1);
-              const first = {
-                x: ground[3].x + (top[3].x - ground[3].x) * ratio,
-                y: ground[3].y + (top[3].y - ground[3].y) * ratio,
-              };
-              const second = {
-                x: ground[2].x + (top[2].x - ground[2].x) * ratio,
-                y: ground[2].y + (top[2].y - ground[2].y) * ratio,
-              };
-
-              return (
-                <line
-                  key={`${element.id}-floor-${floorIndex}`}
-                  x1={first.x}
-                  y1={first.y}
-                  x2={second.x}
-                  y2={second.y}
-                  stroke="rgba(255,255,255,0.62)"
-                  strokeWidth="1"
-                />
-              );
-            },
-          )}
-
-        {sceneData.settings.showLabels && (
-          <g pointerEvents="none">
-            <rect
-              x={labelPoint.x - 52}
-              y={labelPoint.y - 17}
-              width="104"
-              height="23"
-              rx="11.5"
-              fill="rgba(15,23,42,0.88)"
-            />
-            <text
-              x={labelPoint.x}
-              y={labelPoint.y - 1}
-              textAnchor="middle"
-              fill="#ffffff"
-              fontSize="12"
-              fontWeight="700"
-            >
-              {element.name.length > 18
-                ? `${element.name.slice(0, 17)}…`
-                : element.name}
-            </text>
-          </g>
-        )}
-      </g>
-    );
-  };
-
-  const halfPlotWidth = sceneData.plot.width / 2;
-  const halfPlotDepth = sceneData.plot.depth / 2;
-  const plotPoints = [
-    toIso(-halfPlotWidth, -halfPlotDepth),
-    toIso(halfPlotWidth, -halfPlotDepth),
-    toIso(halfPlotWidth, halfPlotDepth),
-    toIso(-halfPlotWidth, halfPlotDepth),
-  ];
-  const pointString = (items: Array<{ x: number; y: number }>) =>
-    items.map((item) => `${item.x},${item.y}`).join(" ");
-  const sortedElements = [...sceneData.elements].sort(
-    (first, second) =>
-      first.position[0] + first.position[2] -
-      (second.position[0] + second.position[2]),
-  );
-
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F8FF] p-6">
@@ -757,91 +595,46 @@ export default function Project3DStudioClient({
                   Bloğu tutup sürükleyerek konumlandır.
                 </p>
               </div>
-              <div className="text-right text-xs font-bold text-slate-500">
-                {sceneData.plot.width} × {sceneData.plot.depth} m
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <div className="inline-flex rounded-xl border border-[#C7D6E8] bg-[#F8FAFC] p-1">
+                  {[
+                    { value: "SITE" as const, label: "Vaziyet" },
+                    { value: "FOCUS" as const, label: "Blok Odak" },
+                    { value: "PRESENTATION" as const, label: "Sunum" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setSceneViewMode(option.value)}
+                      className={`h-8 rounded-lg px-2.5 text-[10px] font-black transition ${
+                        sceneViewMode === option.value
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-slate-600 hover:bg-white"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="text-right text-xs font-bold text-slate-500">
+                  {sceneData.plot.width} × {sceneData.plot.depth} m
+                </div>
               </div>
             </div>
 
-            <div className="relative min-h-[480px] overflow-hidden bg-gradient-to-b from-[#eaf3ff] to-[#dbeafe] md:min-h-[670px]">
-              <svg
-                viewBox="0 0 1000 700"
-                className="absolute inset-0 h-full w-full select-none"
-                style={{ touchAction: "none" }}
-                onPointerDown={() => setSelectedId(null)}
-                aria-label="İzometrik proje sahnesi"
-              >
-                <defs>
-                  <filter id="scene-shadow" x="-20%" y="-20%" width="140%" height="150%">
-                    <feDropShadow dx="0" dy="10" stdDeviation="9" floodOpacity="0.18" />
-                  </filter>
-                  <linearGradient id="plot-gradient" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor="#f8fafc" />
-                    <stop offset="100%" stopColor="#e2e8f0" />
-                  </linearGradient>
-                </defs>
-
-                <ellipse
-                  cx="500"
-                  cy="548"
-                  rx="355"
-                  ry="92"
-                  fill="rgba(15,23,42,0.12)"
-                  filter="url(#scene-shadow)"
-                />
-                <polygon
-                  points={pointString(plotPoints)}
-                  fill="url(#plot-gradient)"
-                  stroke="#94a3b8"
-                  strokeWidth="2"
-                />
-
-                {sceneData.settings.showGrid && (
-                  <g stroke="#cbd5e1" strokeWidth="1" opacity="0.8">
-                    {Array.from({ length: Math.floor(sceneData.plot.width / 10) + 1 }).map(
-                      (_, index) => {
-                        const worldX = -halfPlotWidth + index * 10;
-                        const start = toIso(worldX, -halfPlotDepth);
-                        const end = toIso(worldX, halfPlotDepth);
-                        return (
-                          <line
-                            key={`grid-x-${worldX}`}
-                            x1={start.x}
-                            y1={start.y}
-                            x2={end.x}
-                            y2={end.y}
-                          />
-                        );
-                      },
-                    )}
-                    {Array.from({ length: Math.floor(sceneData.plot.depth / 10) + 1 }).map(
-                      (_, index) => {
-                        const worldZ = -halfPlotDepth + index * 10;
-                        const start = toIso(-halfPlotWidth, worldZ);
-                        const end = toIso(halfPlotWidth, worldZ);
-                        return (
-                          <line
-                            key={`grid-z-${worldZ}`}
-                            x1={start.x}
-                            y1={start.y}
-                            x2={end.x}
-                            y2={end.y}
-                          />
-                        );
-                      },
-                    )}
-                  </g>
-                )}
-
-                <g filter="url(#scene-shadow)">{sortedElements.map(renderElement)}</g>
-
-                <g pointerEvents="none">
-                  <circle cx="90" cy="92" r="29" fill="rgba(15,23,42,0.86)" />
-                  <path d="M90 73 L98 99 L90 94 L82 99 Z" fill="#ffffff" />
-                  <text x="90" y="130" textAnchor="middle" fill="#334155" fontSize="13" fontWeight="800">
-                    KUZEY
-                  </text>
-                </g>
-              </svg>
+            <div className="relative min-h-[480px] overflow-hidden bg-[#dbeafe] md:min-h-[670px]">
+              <PremiumProjectScene
+                sceneData={sceneData}
+                selectedId={selectedId}
+                dragElementId={dragState?.elementId || null}
+                viewMode={sceneViewMode}
+                sceneMetrics={sceneMetrics}
+                toIso={toIso}
+                onClearSelection={() => setSelectedId(null)}
+                onElementPointerDown={handlePointerDown}
+                onElementPointerMove={handlePointerMove}
+                onElementPointerUp={finishDrag}
+              />
 
               <div className="pointer-events-none absolute bottom-3 left-3 rounded-xl border border-white/70 bg-white/90 px-3 py-2 text-[11px] font-bold text-slate-600 shadow-sm backdrop-blur">
                 {sceneData.elements.filter((item) => item.type === "BLOCK").length} blok •{" "}
