@@ -175,35 +175,5 @@ replace_once(
 "accordion content close",
 )
 
-replace_once(
-'''  const addBlock = () => {
-    setBlocks((current) => {
-      const usedCodes = new Set(''',
-'''  const addBlock = () => {
-    setBlocks((current) => {
-      const usedCodes = new Set(''',
-"add block anchor",
-)
-
-# New blocks should become visible immediately. Update the existing return block.
-replace_once(
-'''      return [
-        ...current,
-        createBlockForm(
-          nextIndex,
-          structureProject?.geometryType || "DIKDORTGEN",
-        ),
-      ];''',
-'''      const nextBlock = createBlockForm(
-        nextIndex,
-        structureProject?.geometryType || "DIKDORTGEN",
-      );
-
-      window.setTimeout(() => setExpandedBlockKey(nextBlock.key), 0);
-
-      return [...current, nextBlock];''',
-"expand new block",
-)
-
 path.write_text(text, encoding="utf-8")
 print("Project Blocks Accordion V1 applied")
