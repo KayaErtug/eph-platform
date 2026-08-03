@@ -248,10 +248,10 @@ export class ProjectSceneService {
     const blockCount = project.blocks.length;
     const columns = Math.max(1, Math.ceil(Math.sqrt(blockCount)));
     const rows = Math.max(1, Math.ceil(blockCount / columns));
-    const spacingX = 28;
-    const spacingZ = 24;
-    const plotWidth = Math.max(60, columns * spacingX + 20);
-    const plotDepth = Math.max(60, rows * spacingZ + 20);
+    const spacingX = 34;
+    const spacingZ = 30;
+    const plotWidth = Math.max(68, columns * spacingX + 26);
+    const plotDepth = Math.max(64, rows * spacingZ + 26);
 
     const blockElements = project.blocks.map((block, index) => {
       const column = index % columns;
@@ -259,6 +259,11 @@ export class ProjectSceneService {
       const x = column * spacingX - ((columns - 1) * spacingX) / 2;
       const z = row * spacingZ - ((rows - 1) * spacingZ) / 2;
       const floorCount = Math.max(1, block.floors.length);
+      const geometryType = String(block.geometryType || 'DIKDORTGEN');
+      const isSquare = geometryType.includes('KARE');
+      const isLShape = geometryType.includes('L');
+      const blockWidth = isSquare ? 16 : isLShape ? 22 : 20;
+      const blockDepth = isSquare ? 16 : isLShape ? 18 : 13;
 
       return {
         id: `block-${block.id}`,
@@ -272,9 +277,9 @@ export class ProjectSceneService {
         position: [x, 0, z],
         rotationY: 0,
         size: {
-          width: 18,
-          depth: 12,
-          height: floorCount * 3.2,
+          width: blockWidth,
+          depth: blockDepth,
+          height: floorCount * 3.05 + 1.2,
         },
         stylePreset: 'MODERN_LIGHT',
         floors: block.floors.map((floor) => ({
@@ -292,6 +297,9 @@ export class ProjectSceneService {
         project.spaces.length === 1
           ? 0
           : (Math.PI * 2 * index) / project.spaces.length;
+      const areaBase = Math.sqrt(Math.max(36, Number(space.grossArea || 72)));
+      const amenityWidth = Math.min(18, Math.max(8, areaBase * 1.35));
+      const amenityDepth = Math.min(14, Math.max(6, areaBase * 0.9));
 
       return {
         id: `space-${space.id}`,
@@ -309,15 +317,15 @@ export class ProjectSceneService {
         ],
         rotationY: 0,
         size: {
-          width: 10,
-          depth: 8,
-          height: 0.4,
+          width: amenityWidth,
+          depth: amenityDepth,
+          height: 0.65,
         },
       };
     });
 
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       plot: {
         width: plotWidth,
         depth: plotDepth,
@@ -325,7 +333,7 @@ export class ProjectSceneService {
       },
       camera: {
         mode: 'ORTHOGRAPHIC',
-        position: [40, 34, 40],
+        position: [46, 38, 46],
         target: [0, 0, 0],
         zoom: 1,
       },
