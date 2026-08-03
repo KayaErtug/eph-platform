@@ -38,6 +38,7 @@ import { ProjectSalesTemplatesModule } from './project-sales-templates/project-s
 import { ProjectSceneModule } from './project-scene/project-scene.module';
 import { MapsModule } from './maps/maps.module';
 import { CoordinationModule } from './coordination/coordination.module';
+import { PoolExperienceModule } from './pool-experience/pool-experience.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { CoordinationModule } from './coordination/coordination.module';
     ProjectSalesTemplatesModule,
     ProjectSceneModule,
     MapsModule,
+    PoolExperienceModule,
 
     NominationsModule,
     ApplicationsModule,
