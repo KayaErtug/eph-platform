@@ -5,7 +5,8 @@ export type FacadePresetId =
   | "WARM_STONE"
   | "GLASS_TEAL"
   | "TERRACOTTA"
-  | "GRAPHITE";
+  | "GRAPHITE"
+  | "PURE_WHITE";
 
 export type BalconyStyle = "GLASS" | "SOLID" | "FRAME";
 
