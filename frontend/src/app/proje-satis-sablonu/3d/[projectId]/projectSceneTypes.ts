@@ -1,5 +1,41 @@
 export type SceneVector3 = [number, number, number];
 
+export type FacadePresetId =
+  | "MODERN_LIGHT"
+  | "WARM_STONE"
+  | "GLASS_TEAL"
+  | "TERRACOTTA"
+  | "GRAPHITE";
+
+export type BalconyStyle = "GLASS" | "SOLID" | "FRAME";
+
+export type ProjectFacadeStyle = {
+  preset: FacadePresetId | string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  glassColor?: string;
+  roofColor?: string;
+  balconyStyle?: BalconyStyle | string;
+  verticalFins?: boolean;
+};
+
+export type LandscapePresetId =
+  | "URBAN_MODERN"
+  | "NATURAL_GREEN"
+  | "MEDITERRANEAN"
+  | "FAMILY_GARDEN";
+
+export type ProjectLandscapeSettings = {
+  preset: LandscapePresetId | string;
+  density: number;
+  showTrees: boolean;
+  showPaths: boolean;
+  showLighting: boolean;
+  showBenches: boolean;
+  showShrubs: boolean;
+};
+
 export type ProjectSceneElement = {
   id: string;
   type: "BLOCK" | "AMENITY" | string;
@@ -21,6 +57,7 @@ export type ProjectSceneElement = {
     height: number;
   };
   stylePreset?: string;
+  facadeStyle?: ProjectFacadeStyle;
   floors?: Array<{
     id: string;
     level: number;
@@ -48,6 +85,7 @@ export type ProjectSceneData = {
     showLabels: boolean;
     quality: string;
   };
+  landscape: ProjectLandscapeSettings;
   elements: ProjectSceneElement[];
 };
 
