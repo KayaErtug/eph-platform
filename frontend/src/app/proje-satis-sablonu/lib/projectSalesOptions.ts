@@ -1,4 +1,4 @@
-﻿export const FACADE_GEOMETRY_OPTIONS = [
+export const FACADE_GEOMETRY_OPTIONS = [
   { value: "TEK_CEPHELI_STANDART", label: "Tek cepheli proje" },
   { value: "CIFT_CEPHELI_STANDART", label: "Çift cepheli proje" },
   { value: "UC_CEPHELI_STANDART", label: "Üç cepheli proje" },
@@ -120,6 +120,10 @@ export const PROJECT_SPACE_TYPE_OPTIONS = [
   { value: "PEYZAJ_ALANI", label: "Peyzaj Alanı" },
   { value: "DINLENME_ALANI", label: "Dinlenme Alanı" },
   { value: "SUS_HAVUZU", label: "Süs Havuzu" },
+  {
+    value: "GIRIS_KAPISI_KEMERI",
+    label: "Giriş Kapısı Kemeri / Proje İsimliği",
+  },
   { value: "DIGER", label: "Diğer" },
 ];
 
@@ -171,6 +175,7 @@ export const OPEN_AMENITY_SPACE_TYPES = new Set([
   "PEYZAJ_ALANI",
   "DINLENME_ALANI",
   "SUS_HAVUZU",
+  "GIRIS_KAPISI_KEMERI",
   "COCUK_OYUN_ALANI",
 ]);
 

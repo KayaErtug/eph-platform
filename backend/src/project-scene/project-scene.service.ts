@@ -145,7 +145,7 @@ export class ProjectSceneService {
         status: ProjectSceneStatus.ATLANDI,
         completedAt: new Date(),
         sceneData: {
-          schemaVersion: 3,
+          schemaVersion: 4,
           skipped: true,
           landscape: {
             preset: 'URBAN_MODERN',
@@ -325,6 +325,10 @@ export class ProjectSceneService {
         type: 'AMENITY',
         sourceId: space.id,
         name: space.name,
+        projectName:
+          space.spaceType === 'GIRIS_KAPISI_KEMERI'
+            ? project.name
+            : undefined,
         spaceType: space.spaceType,
         grossArea: space.grossArea,
         blockId: space.blockId,
@@ -343,8 +347,35 @@ export class ProjectSceneService {
       };
     });
 
+    const hasExplicitGate = amenityElements.some(
+      (element) => element.spaceType === 'GIRIS_KAPISI_KEMERI',
+    );
+    const gateElements = hasExplicitGate
+      ? []
+      : [
+          {
+            id: 'system-site-gate',
+            type: 'AMENITY',
+            sourceId: 'system-site-gate',
+            name: 'Giriş Kapısı Kemeri',
+            projectName: project.name,
+            spaceType: 'GIRIS_KAPISI_KEMERI',
+            grossArea: 90,
+            blockId: null,
+            floorId: null,
+            position: [0, 0.1, Math.max(0, plotDepth / 2 - 5.5)],
+            rotationY: 0,
+            size: {
+              width: 20,
+              depth: 7,
+              height: 5.2,
+            },
+            stylePreset: 'SITE_GATE_PREMIUM',
+          },
+        ];
+
     return {
-      schemaVersion: 3,
+      schemaVersion: 4,
       plot: {
         width: plotWidth,
         depth: plotDepth,
@@ -370,7 +401,7 @@ export class ProjectSceneService {
         showBenches: true,
         showShrubs: true,
       },
-      elements: [...blockElements, ...amenityElements],
+      elements: [...blockElements, ...amenityElements, ...gateElements],
     } as Prisma.InputJsonObject;
   }
 

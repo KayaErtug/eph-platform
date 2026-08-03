@@ -2,6 +2,7 @@
 
 import type { PointerEvent as ReactPointerEvent } from "react";
 
+import AmenityGeometry from "./AmenityGeometry";
 import LandscapeLayer from "./LandscapeLayer";
 import type { ProjectSceneData, ProjectSceneElement } from "./projectSceneTypes";
 import { resolveFacadePalette } from "./sceneStylePresets";
@@ -80,7 +81,7 @@ function geometryFootprint(element: ProjectSceneElement): WorldPoint[] {
   const halfDepth = Math.max(2, element.size.depth / 2);
   const geometry = String(element.geometryType || "DIKDORTGEN").toUpperCase();
 
-  if (geometry.includes("L")) {
+  if (["L", "L_PLAN", "L_TIPI", "L_SHAPE"].includes(geometry)) {
     return [
       { x: -halfWidth, z: -halfDepth },
       { x: halfWidth, z: -halfDepth },
@@ -91,7 +92,7 @@ function geometryFootprint(element: ProjectSceneElement): WorldPoint[] {
     ];
   }
 
-  if (geometry.includes("U")) {
+  if (["U", "U_PLAN", "U_TIPI", "U_SHAPE"].includes(geometry)) {
     return [
       { x: -halfWidth, z: -halfDepth },
       { x: halfWidth, z: -halfDepth },
@@ -104,7 +105,7 @@ function geometryFootprint(element: ProjectSceneElement): WorldPoint[] {
     ];
   }
 
-  if (geometry.includes("T")) {
+  if (["T", "T_PLAN", "T_TIPI", "T_SHAPE"].includes(geometry)) {
     return [
       { x: -halfWidth, z: -halfDepth },
       { x: halfWidth, z: -halfDepth },
@@ -117,7 +118,7 @@ function geometryFootprint(element: ProjectSceneElement): WorldPoint[] {
     ];
   }
 
-  if (geometry.includes("KARE")) {
+  if (geometry === "KARE" || geometry === "KARE_PLAN") {
     const half = Math.min(halfWidth, halfDepth);
     return [
       { x: -half, z: -half },
@@ -340,6 +341,25 @@ export default function PremiumProjectScene({
   const renderElement = (element: ProjectSceneElement) => {
     const selected = selectedId === element.id;
     const isBlock = element.type === "BLOCK";
+
+    if (!isBlock) {
+      return (
+        <AmenityGeometry
+          key={element.id}
+          element={element}
+          selected={selected}
+          dragElementId={dragElementId}
+          viewMode={viewMode}
+          sceneMetrics={sceneMetrics}
+          toIso={toIso}
+          showLabels={sceneData.settings.showLabels}
+          onElementPointerDown={onElementPointerDown}
+          onElementPointerMove={onElementPointerMove}
+          onElementPointerUp={onElementPointerUp}
+        />
+      );
+    }
+
     const localFootprint = geometryFootprint(element);
     const worldFootprint = transformFootprint(element, localFootprint);
     const ground = worldFootprint.map((point) => toIso(point.x, point.z));

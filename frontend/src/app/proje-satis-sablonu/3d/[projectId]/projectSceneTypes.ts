@@ -41,6 +41,7 @@ export type ProjectSceneElement = {
   type: "BLOCK" | "AMENITY" | string;
   sourceId: string;
   name: string;
+  projectName?: string;
   code?: string;
   geometryType?: string;
   facadeViewCount?: number;
