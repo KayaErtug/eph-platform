@@ -16,8 +16,7 @@ function replaceOne(content, search, replacement, label) {
   return content.replace(search, replacement);
 }
 
-function replaceRegex(content, pattern, replacement, label, marker) {
-  if (marker && content.includes(marker)) return content;
+function replaceRegex(content, pattern, replacement, label) {
   if (!pattern.test(content)) {
     throw new Error(`Regex patch target not found: ${label}`);
   }
@@ -41,13 +40,14 @@ content = replaceOne(
   "portfolio customer presentation state",
 );
 
-content = replaceRegex(
-  content,
-  /\n  const handleShareLink = async \(\) => \{[\s\S]*?\n  \};\n\n  const handleCopyLink/,
-  '\n  const handleCopyLink',
-  "remove legacy portfolio link creator",
-  "const [customerPresentationOpen, setCustomerPresentationOpen]",
-);
+if (content.includes("const handleShareLink = async")) {
+  content = replaceRegex(
+    content,
+    /\n  const handleShareLink = async \(\) => \{[\s\S]*?\n  \};\n\n  const handleCopyLink/,
+    '\n  const handleCopyLink',
+    "remove legacy portfolio link creator",
+  );
+}
 
 content = replaceOne(
   content,
