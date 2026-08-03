@@ -9,6 +9,20 @@ export type SceneViewMode = "SITE" | "FOCUS" | "PRESENTATION";
 type Point = { x: number; y: number };
 type WorldPoint = { x: number; z: number };
 
+type ScenePalette = {
+  top?: string;
+  side?: string;
+  edge?: string;
+  accent?: string;
+  roof?: string;
+  roofInset?: string;
+  facadeFront?: string;
+  facadeSide?: string;
+  facadeBack?: string;
+  frame?: string;
+  glass?: string;
+};
+
 type SceneMetrics = {
   centerX: number;
   centerY: number;
@@ -133,7 +147,7 @@ function transformFootprint(
   }));
 }
 
-function amenityPalette(spaceType?: string) {
+function amenityPalette(spaceType?: string): ScenePalette {
   const type = String(spaceType || "").toUpperCase();
 
   if (type.includes("HAVUZ")) {
@@ -185,7 +199,10 @@ function amenityPalette(spaceType?: string) {
   };
 }
 
-function blockPalette(selected: boolean, presentation: boolean) {
+function blockPalette(
+  selected: boolean,
+  presentation: boolean,
+): ScenePalette {
   if (selected) {
     return {
       roof: "#eff6ff",
