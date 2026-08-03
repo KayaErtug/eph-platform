@@ -40,6 +40,8 @@ import HavuzFilterCenter, {
   type HavuzFilterState,
 } from "@/components/havuz/HavuzFilterCenter";
 import PremiumPropertyImage from "@/components/media/PremiumPropertyImage";
+import CustomerPresentationSheet from "@/components/presentation/CustomerPresentationSheet";
+import { getPropertyPresentationCards } from "@/components/presentation/propertyPresentation";
 import {
   decodePortfolioMetadataState,
   getFeatureLabels,
@@ -74,6 +76,12 @@ type Unit = {
   yetkiVerified?: boolean;
   createdAt?: string;
   images?: Array<{ url?: string; supabaseUrl?: string; isCover?: boolean }>;
+  poolMatch?: {
+    score: number;
+    customerId?: string | null;
+    budgetDiff?: number;
+    reasons?: string[];
+  };
   project?: {
     id?: string | null;
     name?: string | null;
@@ -729,6 +737,17 @@ function calculateMatch(
   customer: Customer | null;
   budgetDiff: number;
 } {
+  if (unit.poolMatch) {
+    const customer =
+      customers.find((item) => item.id === unit.poolMatch?.customerId) || null;
+
+    return {
+      score: Number(unit.poolMatch.score || 0),
+      customer,
+      budgetDiff: Number(unit.poolMatch.budgetDiff || 0),
+    };
+  }
+
   const unitCity = String(
     unit.project?.city || "",
   ).toLocaleLowerCase("tr-TR");
@@ -898,6 +917,7 @@ export default function HavuzPage() {
   );
   const [detailSelection, setDetailSelection] =
     useState<DetailSelection | null>(null);
+  const [presentationUnit, setPresentationUnit] = useState<Unit | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
@@ -943,7 +963,7 @@ export default function HavuzPage() {
   const fetchData = async () => {
     try {
       const [unitsRes, customersRes, walletRes] = await Promise.allSettled([
-        api.get("/units/pool"),
+        api.get("/pool-experience/units"),
         api.get("/crm/customers"),
         api.get("/units/pool/wallet"),
       ]);
@@ -1741,6 +1761,7 @@ export default function HavuzPage() {
           )}
           canUsePoolActions={canUsePoolActions}
           actionLockMessage={poolActionLockMessage}
+          onPresentation={() => setPresentationUnit(detailSelection.unit)}
           onClose={closeDetailSelection}
           onMessage={() =>
             startPoolMessage(detailSelection.unit, detailSelection.match.score)
@@ -1754,6 +1775,14 @@ export default function HavuzPage() {
           }
         />
       )}
+
+      <CustomerPresentationSheet
+        open={Boolean(presentationUnit)}
+        unitId={presentationUnit?.id || ""}
+        ephId={presentationUnit ? getEphId(presentationUnit.id) : ""}
+        source="POOL"
+        onClose={() => setPresentationUnit(null)}
+      />
 
       {selectedAction && (
         <PoolActionModal
@@ -2947,6 +2976,7 @@ function PoolDetailModal({
   isOwnPortfolio,
   canUsePoolActions,
   actionLockMessage,
+  onPresentation,
   onClose,
   onMessage,
   onAction,
@@ -2957,6 +2987,7 @@ function PoolDetailModal({
   isOwnPortfolio: boolean;
   canUsePoolActions: boolean;
   actionLockMessage: string;
+  onPresentation: () => void;
   onClose: () => void;
   onMessage: () => void;
   onAction: (type: PoolAction) => void;
@@ -2972,83 +3003,16 @@ function PoolDetailModal({
   const image = galleryImages[galleryIndex] || galleryImages[0] || "";
   const specs = getPremiumSpecs(unit);
   const availableCreditAmount = getAvailableCreditAmount(unit);
-  const portfolioHighlights = getPremiumPortfolioHighlights(unit);
+  const portfolioHighlights = getPropertyPresentationCards(unit).map((item) => ({
+    icon: item.icon,
+    title: item.label,
+    text: item.value,
+  }));
   const imageCount =
     galleryImages.length ||
     (Array.isArray(unit.images) ? unit.images.length : 0) ||
     0;
   const messageBusy = busyAction === `MESSAGE_${unit.id}`;
-  const [shareBusy, setShareBusy] = useState(false);
-
-  useEffect(() => {
-    setGalleryIndex(0);
-  }, [unit.id]);
-
-  const handleShare = async () => {
-    if (shareBusy) return;
-
-    if (!canUsePoolActions) {
-      alert(actionLockMessage);
-      return;
-    }
-
-    const shareTarget =
-      window.open("", "_blank");
-
-    if (shareTarget) {
-      shareTarget.opener = null;
-    }
-
-    setShareBusy(true);
-
-    try {
-      const response = await api.post(
-        `/units/pool/${unit.id}/share`,
-      );
-
-      const url = String(
-        response.data?.url || "",
-      ).trim();
-
-      if (!url) {
-        throw new Error(
-          "Paylaşım bağlantısı oluşturulamadı.",
-        );
-      }
-
-      const message =
-        `Merhaba, ${getEphId(unit.id)} numaralı ` +
-        `Havuz portföyünü sizinle paylaşmak ` +
-        `istiyorum: ${url}`;
-
-      const whatsappUrl =
-        `https://wa.me/?text=${encodeURIComponent(message)}`;
-
-      if (
-        shareTarget &&
-        !shareTarget.closed
-      ) {
-        shareTarget.location.href =
-          whatsappUrl;
-      } else {
-        window.location.assign(
-          whatsappUrl,
-        );
-      }
-    } catch (error) {
-      if (
-        shareTarget &&
-        !shareTarget.closed
-      ) {
-        shareTarget.close();
-      }
-
-      alert(getErrorMessage(error));
-    } finally {
-      setShareBusy(false);
-    }
-  };
-
   const goPrevImage = () => {
     if (galleryImages.length <= 1) return;
     setGalleryIndex((current) =>
@@ -3223,28 +3187,18 @@ function PoolDetailModal({
               </p>
               <p className="mt-1 text-[11px] font-bold leading-4 text-[#64748B]">
                 {availableCreditAmount !== null
-                  ? "Konum, kredi ve güvenli iletişim özeti"
-                  : "Konum ve güvenli iletişim özeti"}
+                  ? "Kredi ve güvenli iletişim özeti"
+                  : "Güvenli iletişim özeti"}
               </p>
             </div>
 
             <div
               className={`grid gap-1.5 p-2.5 ${
                 availableCreditAmount !== null
-                  ? "grid-cols-3"
-                  : "grid-cols-2"
+                  ? "grid-cols-2"
+                  : "grid-cols-1"
               }`}
             >
-              <div className="flex min-h-[78px] min-w-0 flex-col items-center justify-center rounded-[15px] border-2 border-blue-100 bg-blue-50 px-2 py-2 text-center">
-                <MapPin size={18} className="shrink-0 text-[#2563EB]" />
-                <p className="mt-1 text-[9px] font-black uppercase tracking-[0.06em] text-[#64748B]">
-                  Konum
-                </p>
-                <p className="mt-1 line-clamp-2 min-w-0 text-[10.5px] font-black leading-[1.2] text-[#1F2937] [overflow-wrap:anywhere]">
-                  {getLocation(unit)}
-                </p>
-              </div>
-
               {availableCreditAmount !== null && (
                 <div className="flex min-h-[78px] min-w-0 flex-col items-center justify-center rounded-[15px] border-2 border-emerald-100 bg-emerald-50 px-2 py-2 text-center">
                   <WalletCards
@@ -3296,6 +3250,20 @@ function PoolDetailModal({
               {portfolioHighlights.map((item) => (
                 <PremiumHighlightCard key={item.title} item={item} dense />
               ))}
+              <button
+                type="button"
+                onClick={onPresentation}
+                className="rounded-[16px] text-center active:scale-[0.98]"
+              >
+                <PremiumHighlightCard
+                  item={{
+                    icon: "🔗",
+                    title: "Müşteri Sunumu",
+                    text: "Sunumu aç, link kopyala veya paylaş",
+                  }}
+                  dense
+                />
+              </button>
             </div>
           </section>
         </div>
@@ -3354,16 +3322,12 @@ function PoolDetailModal({
 
           <button
             type="button"
-            onClick={handleShare}
-            disabled={shareBusy || !canUsePoolActions}
+            onClick={onPresentation}
+            disabled={!canUsePoolActions}
             className="mt-2 flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-[15px] border-2 border-[#16A34A] bg-[#F0FDF4] text-[12px] font-black text-[#15803D] disabled:opacity-60"
           >
             <Share2 size={14} />
-            {shareBusy
-              ? "Bağlantı Oluşturuluyor..."
-              : canUsePoolActions
-                ? "Müşterime Paylaş"
-                : "Üyelik Gerekli"}
+            {canUsePoolActions ? "Müşteri Sunumu" : "Üyelik Gerekli"}
           </button>
         </div>
       </section>

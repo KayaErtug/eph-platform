@@ -63,6 +63,7 @@ import type {
   Unit,
 } from "@/components/stok/stokTypes";
 import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
+import CustomerPresentationSheet from "@/components/presentation/CustomerPresentationSheet";
 import EphAuthorityLetterModal from "@/components/authority-letters/EphAuthorityLetterModal";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
 import LinaDocumentPrecheckPanel from "@/components/lina/LinaDocumentPrecheckPanel";
@@ -753,7 +754,7 @@ export default function StokDetailPage() {
   const [activePhoto, setActivePhoto] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [linkShareBusy, setLinkShareBusy] = useState(false);
+  const [customerPresentationOpen, setCustomerPresentationOpen] = useState(false);
   const [authorityLetterOpen, setAuthorityLetterOpen] = useState(false);
   const [shareData, setShareData] = useState<PortfolioShareData | null>(null);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -1316,22 +1317,6 @@ export default function StokDetailPage() {
     setShareOpen(true);
   };
 
-  const handleShareLink = async () => {
-    if (!unit || linkShareBusy) return;
-    setLinkShareBusy(true);
-    try {
-      const response = await api.post(`/units/portfolio/${unit.id}/share`);
-      const url = String(response.data?.url || "").trim();
-      if (!url) throw new Error("Paylaşım bağlantısı oluşturulamadı.");
-      const message = `Merhaba, "${unitTitle(unit)}" portföyünü sizinle paylaşmak istiyorum: ${url}`;
-      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
-    } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || "Paylaşım bağlantısı oluşturulamadı.");
-    } finally {
-      setLinkShareBusy(false);
-    }
-  };
-
   const handleCopyLink = async () => {
     if (!unit) return;
     try {
@@ -1789,12 +1774,11 @@ export default function StokDetailPage() {
           </div>
           <button
             type="button"
-            onClick={handleShareLink}
-            disabled={linkShareBusy}
+            onClick={() => setCustomerPresentationOpen(true)}
             className="mt-2 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[16px] bg-[#7C3AED] px-3 text-[12px] font-black text-white shadow-[0_12px_24px_rgba(124,58,237,0.22)] disabled:opacity-60"
           >
             <Share2 size={15} />
-            {linkShareBusy ? "Bağlantı Oluşturuluyor..." : "Müşterime Paylaş"}
+            Müşteri Sunumu
           </button>
         </section>
 
@@ -2188,6 +2172,14 @@ export default function StokDetailPage() {
           onSubmit={handleDocumentReviewSubmit}
         />
       )}
+
+      <CustomerPresentationSheet
+        open={customerPresentationOpen}
+        unitId={unit.id}
+        ephId={getPortfolioNo(unit)}
+        source="PORTFOLIO"
+        onClose={() => setCustomerPresentationOpen(false)}
+      />
 
       <PortfolioShareModal
         open={shareOpen}
