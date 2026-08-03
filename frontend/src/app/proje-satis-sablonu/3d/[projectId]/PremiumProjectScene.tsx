@@ -2,7 +2,9 @@
 
 import type { PointerEvent as ReactPointerEvent } from "react";
 
+import LandscapeLayer from "./LandscapeLayer";
 import type { ProjectSceneData, ProjectSceneElement } from "./projectSceneTypes";
+import { resolveFacadePalette } from "./sceneStylePresets";
 
 export type SceneViewMode = "SITE" | "FOCUS" | "PRESENTATION";
 
@@ -200,42 +202,11 @@ function amenityPalette(spaceType?: string): ScenePalette {
 }
 
 function blockPalette(
+  element: ProjectSceneElement,
   selected: boolean,
   presentation: boolean,
 ): ScenePalette {
-  if (selected) {
-    return {
-      roof: "#eff6ff",
-      roofInset: "#bfdbfe",
-      facadeFront: "#2563eb",
-      facadeSide: "#60a5fa",
-      facadeBack: "#93c5fd",
-      frame: "#1d4ed8",
-      glass: "#dbeafe",
-    };
-  }
-
-  if (presentation) {
-    return {
-      roof: "#f8fafc",
-      roofInset: "#e2e8f0",
-      facadeFront: "#1e40af",
-      facadeSide: "#3b82f6",
-      facadeBack: "#60a5fa",
-      frame: "#ffffff",
-      glass: "#dbeafe",
-    };
-  }
-
-  return {
-    roof: "#f8fafc",
-    roofInset: "#dbeafe",
-    facadeFront: "#2563eb",
-    facadeSide: "#60a5fa",
-    facadeBack: "#93c5fd",
-    frame: "#ffffff",
-    glass: "#e0f2fe",
-  };
+  return resolveFacadePalette(element, { selected, presentation });
 }
 
 function renderAmenityMarkings(
@@ -382,7 +353,7 @@ export default function PremiumProjectScene({
     const clipId = `scene-shape-${element.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
     const labelPoint = centerOf(roofTop);
     const palette = isBlock
-      ? blockPalette(selected, viewMode === "PRESENTATION")
+      ? blockPalette(element, selected, viewMode === "PRESENTATION")
       : amenityPalette(element.spaceType);
     const dimmed = Boolean(focusedBlockId && element.id !== focusedBlockId);
     const elementOpacity = dimmed ? (isBlock ? 0.24 : 0.12) : 1;
@@ -403,6 +374,8 @@ export default function PremiumProjectScene({
       .map((face) => face.index);
     const floorCount = Math.max(1, element.floorCount || 1);
     const visibleFloorCount = Math.min(floorCount, 24);
+    const balconyStyle = element.facadeStyle?.balconyStyle || "GLASS";
+    const verticalFins = element.facadeStyle?.verticalFins ?? false;
     const showLabel =
       sceneData.settings.showLabels &&
       (selected || (isBlock && viewMode === "SITE"));
@@ -488,8 +461,20 @@ export default function PremiumProjectScene({
                         y1={first.y}
                         x2={second.x}
                         y2={second.y}
-                        stroke={balconyFloor ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.55)"}
-                        strokeWidth={balconyFloor ? 2.2 : 1}
+                        stroke={
+                          balconyFloor
+                            ? palette.frame || palette.accent
+                            : "rgba(255,255,255,0.55)"
+                        }
+                        strokeWidth={
+                          balconyFloor
+                            ? balconyStyle === "FRAME"
+                              ? 3.2
+                              : balconyStyle === "SOLID"
+                                ? 2.7
+                                : 2.2
+                            : 1
+                        }
                       />
                     );
                   })}
@@ -512,9 +497,9 @@ export default function PremiumProjectScene({
                         y1={bottom.y}
                         x2={upper.x}
                         y2={upper.y}
-                        stroke={palette.glass}
-                        strokeWidth="1.15"
-                        opacity={isFront ? 0.72 : 0.45}
+                        stroke={verticalFins ? palette.accent : palette.glass}
+                        strokeWidth={verticalFins ? 2.15 : 1.15}
+                        opacity={verticalFins ? (isFront ? 0.9 : 0.58) : isFront ? 0.72 : 0.45}
                       />
                     );
                   })}
@@ -650,6 +635,8 @@ export default function PremiumProjectScene({
         strokeLinejoin="round"
         opacity="0.8"
       />
+
+      <LandscapeLayer sceneData={sceneData} viewMode={viewMode} toIso={toIso} />
 
       {sceneData.settings.showGrid && viewMode !== "PRESENTATION" && (
         <g stroke="#cbd5e1" strokeWidth="1" opacity="0.62">

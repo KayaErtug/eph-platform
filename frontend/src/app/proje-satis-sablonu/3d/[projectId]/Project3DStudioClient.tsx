@@ -29,10 +29,18 @@ import {
 
 import api from "@/lib/api";
 
+import FacadeLandscapeControls from "./FacadeLandscapeControls";
 import PremiumProjectScene, {
   type SceneViewMode,
 } from "./PremiumProjectScene";
+import {
+  defaultLandscapeSettings,
+  facadeStyleForPreset,
+  normalizeLandscapeSettings,
+} from "./sceneStylePresets";
 import type {
+  FacadePresetId,
+  ProjectLandscapeSettings,
   ProjectSceneData,
   ProjectSceneElement,
   ProjectSceneResponse,
@@ -52,7 +60,7 @@ type Notice = {
 } | null;
 
 const defaultSceneData: ProjectSceneData = {
-  schemaVersion: 1,
+  schemaVersion: 3,
   plot: {
     width: 70,
     depth: 60,
@@ -69,6 +77,7 @@ const defaultSceneData: ProjectSceneData = {
     showLabels: true,
     quality: "AUTO",
   },
+  landscape: defaultLandscapeSettings,
   elements: [],
 };
 
@@ -98,6 +107,7 @@ function normalizeSceneData(value: unknown): ProjectSceneData {
       showLabels: source.settings?.showLabels ?? true,
       quality: source.settings?.quality || "AUTO",
     },
+    landscape: normalizeLandscapeSettings(source.landscape),
     elements: Array.isArray(source.elements) ? source.elements : [],
   };
 }
@@ -418,6 +428,46 @@ export default function Project3DStudioClient({
     }));
     setDirty(true);
   };
+
+  const applyFacadePreset = useCallback(
+    (presetId: FacadePresetId) => {
+      if (!selectedElement || selectedElement.type !== "BLOCK") return;
+
+      updateElement(selectedElement.id, (element) => ({
+        ...element,
+        stylePreset: presetId,
+        facadeStyle: facadeStyleForPreset(presetId),
+      }));
+    },
+    [selectedElement, updateElement],
+  );
+
+  const applyFacadeToAllBlocks = useCallback((presetId: FacadePresetId) => {
+    const facadeStyle = facadeStyleForPreset(presetId);
+    setSceneData((current) => ({
+      ...current,
+      schemaVersion: Math.max(3, current.schemaVersion),
+      elements: current.elements.map((element) =>
+        element.type === "BLOCK"
+          ? {
+              ...element,
+              stylePreset: presetId,
+              facadeStyle: { ...facadeStyle },
+            }
+          : element,
+      ),
+    }));
+    setDirty(true);
+  }, []);
+
+  const updateLandscape = useCallback((next: ProjectLandscapeSettings) => {
+    setSceneData((current) => ({
+      ...current,
+      schemaVersion: Math.max(3, current.schemaVersion),
+      landscape: normalizeLandscapeSettings(next),
+    }));
+    setDirty(true);
+  }, []);
 
   if (loading) {
     return (
@@ -742,6 +792,14 @@ export default function Project3DStudioClient({
                 </div>
               )}
             </section>
+
+            <FacadeLandscapeControls
+              selectedElement={selectedElement}
+              sceneData={sceneData}
+              onApplyFacadePreset={applyFacadePreset}
+              onApplyFacadeToAllBlocks={applyFacadeToAllBlocks}
+              onUpdateLandscape={updateLandscape}
+            />
 
             <section className="rounded-2xl border border-[#C7D6E8] bg-white p-4 shadow-sm">
               <h2 className="mb-3 text-sm font-black text-slate-900">Proje Özeti</h2>
