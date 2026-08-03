@@ -41,6 +41,7 @@ import HavuzFilterCenter, {
 } from "@/components/havuz/HavuzFilterCenter";
 import PremiumPropertyImage from "@/components/media/PremiumPropertyImage";
 import CustomerPresentationSheet from "@/components/presentation/CustomerPresentationSheet";
+import PoolProjectCenter from "@/components/havuz/PoolProjectCenter";
 import { getPropertyPresentationCards } from "@/components/presentation/propertyPresentation";
 import {
   decodePortfolioMetadataState,
@@ -918,6 +919,7 @@ export default function HavuzPage() {
   const [detailSelection, setDetailSelection] =
     useState<DetailSelection | null>(null);
   const [presentationUnit, setPresentationUnit] = useState<Unit | null>(null);
+  const [projectCount, setProjectCount] = useState(0);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
@@ -1474,7 +1476,7 @@ export default function HavuzPage() {
           </section>
 
           <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#D7E9E7] bg-white text-center">
-            <PoolMetric label="Havuz" value={eligibleUnits.length} tone="teal" />
+            <PoolMetric label="Havuz" value={eligibleUnits.length + projectCount} tone="teal" />
             <PoolMetric label="Güçlü Eşleşme" value={strongMatchCount} tone="blue" />
             <PoolMetric label="EPH Onaylı" value={verifiedPoolCount} tone="green" />
             <PoolMetric label="Haritada" value={poolMapItems.length} tone="orange" />
@@ -1690,6 +1692,14 @@ export default function HavuzPage() {
           </section>
         )}
 
+        <PoolProjectCenter
+          search={search}
+          viewMode={viewMode}
+          canUsePoolActions={canUsePoolActions}
+          actionLockMessage={poolActionLockMessage}
+          onCountChange={setProjectCount}
+        />
+
         <section className="space-y-3">
           {displayedUnits.length > 0 ? (
             displayedUnits.map(({ unit, match, distanceKm }, index) => (
@@ -1722,7 +1732,7 @@ export default function HavuzPage() {
                 />
               </div>
             ))
-          ) : (
+          ) : projectCount === 0 ? (
             <section className="rounded-[24px] border-2 border-dashed border-[#C7D6E8] bg-white p-6 text-center">
               <Building2 className="mx-auto text-[#2563EB]" size={26} />
               <h2 className="mt-3 text-[17px] font-black text-[#1F2937]">
@@ -1738,7 +1748,7 @@ export default function HavuzPage() {
                 Portföy Merkezi
               </Link>
             </section>
-          )}
+          ) : null}
         </section>
       </div>
 

@@ -320,10 +320,7 @@ export class PoolExperienceService {
           approvalStatus: PortfolioApprovalStatus.HAVUZDA,
           project: {
             isActive: true,
-            OR: [
-              { code: null },
-              { setupStatus: 'TAMAMLANDI' },
-            ],
+            code: null,
           },
         },
         include: {

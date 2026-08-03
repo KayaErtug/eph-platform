@@ -39,6 +39,7 @@ import { ProjectSceneModule } from './project-scene/project-scene.module';
 import { MapsModule } from './maps/maps.module';
 import { CoordinationModule } from './coordination/coordination.module';
 import { PoolExperienceModule } from './pool-experience/pool-experience.module';
+import { PoolProjectsModule } from './pool-projects/pool-projects.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { PoolExperienceModule } from './pool-experience/pool-experience.module';
     ProjectSceneModule,
     MapsModule,
     PoolExperienceModule,
+    PoolProjectsModule,
 
     NominationsModule,
     ApplicationsModule,
