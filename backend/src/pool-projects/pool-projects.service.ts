@@ -78,7 +78,7 @@ export class PoolProjectsService {
     ]);
 
     return projects
-      .map((project) => this.serializeProject(project, customers, false))
+      .map((project) => this.serializeProject(project, customers, false, false, user.id))
       .sort((first, second) => {
         const firstDate = new Date(first.publishedAt || first.updatedAt).getTime();
         const secondDate = new Date(second.publishedAt || second.updatedAt).getTime();
@@ -92,7 +92,7 @@ export class PoolProjectsService {
       this.findCustomers(user.id),
     ]);
 
-    return this.serializeProject(project, customers, true);
+    return this.serializeProject(project, customers, true, false, user.id);
   }
 
   async listPresentations(projectId: string, user: CurrentUser) {
@@ -248,7 +248,7 @@ export class PoolProjectsService {
       `,
     ]);
 
-    const serialized = this.serializeProject(project, [], true, true);
+    const serialized = this.serializeProject(project, [], true, true, null);
 
     return {
       link: {
@@ -474,6 +474,7 @@ export class PoolProjectsService {
     customers: any[],
     includeUnits: boolean,
     publicMode = false,
+    currentUserId: string | null = null,
   ) {
     const units = Array.isArray(project.units) ? project.units : [];
     const pricedUnits = units.filter((unit: any) => Number(unit.price || 0) > 0);
@@ -627,7 +628,7 @@ export class PoolProjectsService {
       completionPercent: project.completionPercent,
       deliveryDate: project.defaultDeliveryDate,
       ownerRole: project.owner?.role,
-      isOwnPortfolio: project.owner?.id === customers?.[0]?.ownerId,
+      isOwnPortfolio: project.owner?.id === currentUserId,
       blockCount: project.blocks.length,
       blocks: project.blocks.map((block: any) => ({
         id: block.id,
