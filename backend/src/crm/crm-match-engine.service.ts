@@ -265,7 +265,7 @@ export class CrmMatchEngineService extends CrmService {
           area: candidate.unit.area,
           coverImage: candidate.unit.images?.[0]?.url || null,
           matchScore,
-          matchLevel: this.getMatchLevel(matchScore),
+          matchLevel: this.getV3MatchLevel(matchScore),
           matchReasons: [
             ...candidate.priceReasons,
             locationScore.reason,
@@ -572,18 +572,18 @@ export class CrmMatchEngineService extends CrmService {
     const intent = interest.purchaseIntent as CustomerPurchaseIntent;
 
     if (intent === CustomerPurchaseIntent.KIRALAMA) {
-      return [
+      return new Set<UnitStatus>([
         UnitStatus.KIRALIK,
         UnitStatus.GUNLUK_KIRALIK,
         UnitStatus.DEVREN_KIRALIK,
-      ].includes(unitStatus);
+      ]).has(unitStatus);
     }
 
     if (
       intent === CustomerPurchaseIntent.SATIN_ALMA ||
       intent === CustomerPurchaseIntent.YATIRIM
     ) {
-      return [
+      return new Set<UnitStatus>([
         UnitStatus.SATILIK,
         UnitStatus.DEVREN_SATILIK,
         UnitStatus.ON_SATIS,
@@ -591,7 +591,7 @@ export class CrmMatchEngineService extends CrmService {
         UnitStatus.INSAAT_HALINDE,
         UnitStatus.TESLIME_HAZIR,
         UnitStatus.HEMEN_TESLIM,
-      ].includes(unitStatus);
+      ]).has(unitStatus);
     }
 
     if (intent === CustomerPurchaseIntent.KAT_KARSILIGI) {
@@ -672,7 +672,7 @@ export class CrmMatchEngineService extends CrmService {
     return true;
   }
 
-  private getMatchLevel(score: number) {
+  private getV3MatchLevel(score: number) {
     if (score >= 90) return 'Mükemmel';
     if (score >= 75) return 'Çok Güçlü';
     if (score >= 60) return 'Güçlü';
