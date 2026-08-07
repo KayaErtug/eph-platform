@@ -40,18 +40,6 @@ type MatchCandidate = {
   };
 };
 
-type DistanceSnapshot = {
-  decisionReady: boolean;
-  radiusDistanceKm: number | null;
-  drivingDistanceKm: number | null;
-  durationMinutes: number | null;
-  straightLineDistanceKm: number | null;
-  detourFactor: number | null;
-  roadNetworkBarrierSignal: boolean;
-  errorCode: string | null;
-  message: string | null;
-};
-
 @Injectable()
 export class CrmMatchEngineService extends CrmService {
   private readonly locationRadiusKm = 5;
@@ -167,9 +155,7 @@ export class CrmMatchEngineService extends CrmService {
     }
 
     const poolUnits = await this.matchPrisma.unit.findMany({
-      where: {
-        isPoolVisible: true,
-      },
+      where: { isPoolVisible: true },
       include: {
         project: true,
         images: {
@@ -177,14 +163,16 @@ export class CrmMatchEngineService extends CrmService {
           take: 1,
         },
       },
-      orderBy: {
-        poolPublishedAt: 'desc',
-      },
+      orderBy: { poolPublishedAt: 'desc' },
     });
 
     const candidates = poolUnits
-      .filter((unit) => this.passesCityFilter(interest.city, unit.project?.city))
-      .filter((unit) => this.passesPropertyTypeFilter(interest.propertyTypes, unit.type))
+      .filter((unit) =>
+        this.passesCityFilter(interest.city, unit.project?.city),
+      )
+      .filter((unit) =>
+        this.passesPropertyTypeFilter(interest.propertyTypes, unit.type),
+      )
       .filter((unit) => this.passesStatusFilter(interest, unit.status))
       .map((unit): MatchCandidate | null => {
         const propertyGroup = this.getPropertyGroup(unit.type);
@@ -254,12 +242,16 @@ export class CrmMatchEngineService extends CrmService {
           interest,
           candidate.propertyGroup,
         );
-        const rawScore =
-          candidate.priceScore + locationScore.score + secondary.score;
-        const matchScore = Math.max(0, Math.min(100, Math.round(rawScore)));
-        const distance = this.buildDistanceSnapshot(
-          distanceResult,
-          straightLineDistanceKm,
+        const matchScore = Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(
+              candidate.priceScore +
+                locationScore.score +
+                secondary.score,
+            ),
+          ),
         );
 
         return {
@@ -279,10 +271,36 @@ export class CrmMatchEngineService extends CrmService {
             locationScore.reason,
             ...secondary.reasons,
           ],
+          distance: {
+            decisionReady: true,
+            drivingDistanceKm:
+              typeof distanceResult?.driving?.distanceKm === 'number'
+                ? Number(distanceResult.driving.distanceKm)
+                : null,
+            durationMinutes:
+              typeof distanceResult?.driving?.durationMinutes === 'number'
+                ? Number(distanceResult.driving.durationMinutes)
+                : null,
+            staticDurationMinutes:
+              typeof distanceResult?.driving?.staticDurationMinutes === 'number'
+                ? Number(distanceResult.driving.staticDurationMinutes)
+                : null,
+            straightLineDistanceKm,
+            detourFactor:
+              typeof distanceResult?.comparison?.detourFactor === 'number'
+                ? Number(distanceResult.comparison.detourFactor)
+                : null,
+            roadNetworkBarrierSignal:
+              distanceResult?.comparison?.roadNetworkBarrierSignal === true,
+            errorCode: distanceResult?.driving?.errorCode || null,
+            message: distanceResult?.driving?.message || null,
+          },
           matchPolicy: {
             version: 'CRM_MATCH_V3',
             propertyGroup: candidate.propertyGroup,
-            priceTolerancePercent: Math.round(candidate.priceTolerance * 100),
+            priceTolerancePercent: Math.round(
+              candidate.priceTolerance * 100,
+            ),
             locationRadiusKm: this.locationRadiusKm,
             locationMetric: 'STRAIGHT_LINE_RADIUS',
             cityHardFilter: true,
@@ -291,7 +309,6 @@ export class CrmMatchEngineService extends CrmService {
             statusHardFilter: true,
           },
           priceMatch: candidate.priceDetails,
-          distance,
         };
       },
     );
@@ -305,10 +322,10 @@ export class CrmMatchEngineService extends CrmService {
           return right.matchScore - left.matchScore;
         }
 
-        const leftDistance = left.distance.radiusDistanceKm ?? Number.MAX_VALUE;
-        const rightDistance = right.distance.radiusDistanceKm ?? Number.MAX_VALUE;
-
-        return leftDistance - rightDistance;
+        return (
+          (left.distance.straightLineDistanceKm ?? Number.MAX_VALUE) -
+          (right.distance.straightLineDistanceKm ?? Number.MAX_VALUE)
+        );
       });
   }
 
@@ -322,10 +339,7 @@ export class CrmMatchEngineService extends CrmService {
   }
 
   private getPriceTolerance(group: PropertyGroup) {
-    if (group === 'LAND' || group === 'INDUSTRIAL') {
-      return 0.4;
-    }
-
+    if (group === 'LAND' || group === 'INDUSTRIAL') return 0.4;
     if (
       group === 'COMMERCIAL' ||
       group === 'TOURISM' ||
@@ -333,7 +347,6 @@ export class CrmMatchEngineService extends CrmService {
     ) {
       return 0.35;
     }
-
     return 0.3;
   }
 
@@ -389,7 +402,6 @@ export class CrmMatchEngineService extends CrmService {
 
     if (withinDeclaredBudget) {
       const minBudgetMatched = minBudget === null || unitPrice >= minBudget;
-
       return {
         eligible: true,
         score: minBudgetMatched ? 50 : 46,
@@ -413,18 +425,17 @@ export class CrmMatchEngineService extends CrmService {
     const maximumAskRatio =
       (1 + input.tolerance) / Math.max(0.01, 1 - input.tolerance);
     const currentAskRatio = unitPrice / maxBudget;
-    const negotiationProgress = Math.max(
+    const progress = Math.max(
       0,
       Math.min(
         1,
         (currentAskRatio - 1) / Math.max(0.01, maximumAskRatio - 1),
       ),
     );
-    const score = Math.round(45 - negotiationProgress * 20);
 
     return {
       eligible: true,
-      score,
+      score: Math.round(45 - progress * 20),
       reasons: [
         `%${tolerancePercent} pazarlık bandında fiyat kesişimi var`,
       ],
@@ -442,22 +453,33 @@ export class CrmMatchEngineService extends CrmService {
 
   private getLocationScore(distanceKm: number) {
     if (distanceKm <= 0.5) {
-      return { score: 30, reason: `Hedef mahalle merkezine ${this.formatKm(distanceKm)} km` };
+      return {
+        score: 30,
+        reason: `Hedef mahalle merkezine ${this.formatKm(distanceKm)} km`,
+      };
     }
-
     if (distanceKm <= 1) {
-      return { score: 28, reason: `Hedef mahalleye çok yakın (${this.formatKm(distanceKm)} km)` };
+      return {
+        score: 28,
+        reason: `Hedef mahalleye çok yakın (${this.formatKm(distanceKm)} km)`,
+      };
     }
-
     if (distanceKm <= 2.5) {
-      return { score: 25, reason: `Hedef mahalleye yakın (${this.formatKm(distanceKm)} km)` };
+      return {
+        score: 25,
+        reason: `Hedef mahalleye yakın (${this.formatKm(distanceKm)} km)`,
+      };
     }
-
     if (distanceKm <= 4) {
-      return { score: 22, reason: `Hedef mahalle çevresinde (${this.formatKm(distanceKm)} km)` };
+      return {
+        score: 22,
+        reason: `Hedef mahalle çevresinde (${this.formatKm(distanceKm)} km)`,
+      };
     }
-
-    return { score: 18, reason: `5 km eşleşme alanında (${this.formatKm(distanceKm)} km)` };
+    return {
+      score: 18,
+      reason: `5 km eşleşme alanında (${this.formatKm(distanceKm)} km)`,
+    };
   }
 
   private calculateSecondaryScore(
@@ -500,15 +522,16 @@ export class CrmMatchEngineService extends CrmService {
       const available = new Set(
         unit.features.map((feature: string) => this.normalizeText(feature)),
       );
-      const matchedCount = [...requested].filter((feature) =>
+      const matched = [...requested].filter((feature) =>
         available.has(feature),
       ).length;
 
-      if (matchedCount > 0) {
-        const ratio = matchedCount / requested.size;
-        const featureScore = Math.max(1, Math.round(weights.features * ratio));
-        score += featureScore;
-        reasons.push(`${matchedCount}/${requested.size} özellik uyumlu`);
+      if (matched > 0) {
+        score += Math.max(
+          1,
+          Math.round(weights.features * (matched / requested.size)),
+        );
+        reasons.push(`${matched}/${requested.size} özellik uyumlu`);
       }
     }
 
@@ -516,44 +539,29 @@ export class CrmMatchEngineService extends CrmService {
   }
 
   private getSecondaryWeights(group: PropertyGroup) {
-    if (group === 'LAND') {
-      return { area: 12, room: 0, features: 8 };
-    }
-
-    if (group === 'INDUSTRIAL') {
-      return { area: 8, room: 0, features: 12 };
-    }
-
-    if (group === 'COMMERCIAL') {
-      return { area: 10, room: 0, features: 10 };
-    }
-
+    if (group === 'LAND') return { area: 12, room: 0, features: 8 };
+    if (group === 'INDUSTRIAL') return { area: 8, room: 0, features: 12 };
+    if (group === 'COMMERCIAL') return { area: 10, room: 0, features: 10 };
     if (group === 'TOURISM' || group === 'PROJECT') {
       return { area: 8, room: 2, features: 10 };
     }
-
     return { area: 10, room: 5, features: 5 };
   }
 
   private passesCityFilter(interestCity: unknown, projectCity: unknown) {
     const requested = this.normalizeText(interestCity);
-
-    if (!requested) {
-      return true;
-    }
-
-    return requested === this.normalizeText(projectCity);
+    return !requested || requested === this.normalizeText(projectCity);
   }
 
   private passesPropertyTypeFilter(
     propertyTypes: UnitType[],
     unitType: UnitType,
   ) {
-    if (!Array.isArray(propertyTypes) || propertyTypes.length === 0) {
-      return true;
-    }
-
-    return propertyTypes.includes(unitType);
+    return (
+      !Array.isArray(propertyTypes) ||
+      propertyTypes.length === 0 ||
+      propertyTypes.includes(unitType)
+    );
   }
 
   private passesStatusFilter(interest: any, unitStatus: UnitStatus) {
@@ -602,13 +610,11 @@ export class CrmMatchEngineService extends CrmService {
     }
 
     const district = String(interest.district || '').trim();
-    const address = [neighborhood, district, city, 'Türkiye']
-      .filter(Boolean)
-      .join(', ');
-
     return {
       label: interest.title?.trim() || 'CRM hedef mahallesi',
-      address,
+      address: [neighborhood, district, city, 'Türkiye']
+        .filter(Boolean)
+        .join(', '),
       city,
       district: district || undefined,
       neighborhood,
@@ -651,33 +657,6 @@ export class CrmMatchEngineService extends CrmService {
     };
   }
 
-  private buildDistanceSnapshot(
-    distanceResult: any,
-    straightLineDistanceKm: number,
-  ): DistanceSnapshot {
-    return {
-      decisionReady: true,
-      radiusDistanceKm: straightLineDistanceKm,
-      drivingDistanceKm:
-        typeof distanceResult?.driving?.distanceKm === 'number'
-          ? Number(distanceResult.driving.distanceKm)
-          : null,
-      durationMinutes:
-        typeof distanceResult?.driving?.durationMinutes === 'number'
-          ? Number(distanceResult.driving.durationMinutes)
-          : null,
-      straightLineDistanceKm,
-      detourFactor:
-        typeof distanceResult?.comparison?.detourFactor === 'number'
-          ? Number(distanceResult.comparison.detourFactor)
-          : null,
-      roadNetworkBarrierSignal:
-        distanceResult?.comparison?.roadNetworkBarrierSignal === true,
-      errorCode: distanceResult?.driving?.errorCode || null,
-      message: distanceResult?.driving?.message || null,
-    };
-  }
-
   private isWithinOptionalRange(
     value: unknown,
     minValue: unknown,
@@ -687,18 +666,9 @@ export class CrmMatchEngineService extends CrmService {
     const min = this.toPositiveNumber(minValue);
     const max = this.toPositiveNumber(maxValue);
 
-    if (numberValue === null || (min === null && max === null)) {
-      return false;
-    }
-
-    if (min !== null && numberValue < min) {
-      return false;
-    }
-
-    if (max !== null && numberValue > max) {
-      return false;
-    }
-
+    if (numberValue === null || (min === null && max === null)) return false;
+    if (min !== null && numberValue < min) return false;
+    if (max !== null && numberValue > max) return false;
     return true;
   }
 
@@ -719,12 +689,9 @@ export class CrmMatchEngineService extends CrmService {
 
   private toPositiveNumber(value: unknown): number | null {
     const numberValue = Number(value);
-
-    if (!Number.isFinite(numberValue) || numberValue <= 0) {
-      return null;
-    }
-
-    return numberValue;
+    return Number.isFinite(numberValue) && numberValue > 0
+      ? numberValue
+      : null;
   }
 
   private formatKm(value: number) {
@@ -746,25 +713,21 @@ export class CrmMatchEngineService extends CrmService {
     concurrency: number,
     mapper: (item: T, index: number) => Promise<R>,
   ): Promise<R[]> {
-    if (items.length === 0) {
-      return [];
-    }
+    if (items.length === 0) return [];
 
     const results = new Array<R>(items.length);
     let cursor = 0;
-    const workerCount = Math.max(1, Math.min(concurrency, items.length));
-    const workers = Array.from({ length: workerCount }, async () => {
-      while (true) {
-        const index = cursor;
-        cursor += 1;
-
-        if (index >= items.length) {
-          return;
+    const workers = Array.from(
+      { length: Math.max(1, Math.min(concurrency, items.length)) },
+      async () => {
+        while (true) {
+          const index = cursor;
+          cursor += 1;
+          if (index >= items.length) return;
+          results[index] = await mapper(items[index], index);
         }
-
-        results[index] = await mapper(items[index], index);
-      }
-    });
+      },
+    );
 
     await Promise.all(workers);
     return results;
