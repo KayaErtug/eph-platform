@@ -1,15 +1,21 @@
-import { Module } from "@nestjs/common";
+import { Module } from '@nestjs/common';
 
-import { PrismaModule } from "../prisma/prisma.module";
-import { LinaDistanceModule } from "../lina/geo/lina-distance.module";
-import { PropertyCriteriaModule } from "../property-criteria/property-criteria.module";
-import { CrmController } from "./crm.controller";
-import { CrmService } from "./crm.service";
+import { LinaDistanceModule } from '../lina/geo/lina-distance.module';
+import { PrismaModule } from '../prisma/prisma.module';
+import { PropertyCriteriaModule } from '../property-criteria/property-criteria.module';
+import { CrmController } from './crm.controller';
+import { CrmMatchEngineService } from './crm-match-engine.service';
+import { CrmService } from './crm.service';
 
 @Module({
   imports: [PrismaModule, LinaDistanceModule, PropertyCriteriaModule],
   controllers: [CrmController],
-  providers: [CrmService],
+  providers: [
+    {
+      provide: CrmService,
+      useClass: CrmMatchEngineService,
+    },
+  ],
   exports: [CrmService],
 })
 export class CrmModule {}
