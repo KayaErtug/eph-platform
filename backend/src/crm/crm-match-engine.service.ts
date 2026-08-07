@@ -147,7 +147,7 @@ export class CrmMatchEngineService extends CrmService {
       );
     }
 
-    const origin = this.buildInterestDistancePoint(interest);
+    const origin = this.buildV3InterestDistancePoint(interest);
 
     if (!origin || !interest.city || !interest.neighborhood) {
       await this.touchInterest(interest.id);
@@ -199,11 +199,11 @@ export class CrmMatchEngineService extends CrmService {
       })
       .filter((candidate): candidate is MatchCandidate => Boolean(candidate));
 
-    const evaluated = await this.mapWithConcurrency(
+    const evaluated = await this.mapV3WithConcurrency(
       candidates,
       4,
       async (candidate) => {
-        const destination = this.buildUnitDistancePoint(candidate.unit);
+        const destination = this.buildV3UnitDistancePoint(candidate.unit);
 
         if (!destination) {
           return null;
@@ -601,7 +601,7 @@ export class CrmMatchEngineService extends CrmService {
     return true;
   }
 
-  private buildInterestDistancePoint(interest: any) {
+  private buildV3InterestDistancePoint(interest: any) {
     const neighborhood = String(interest.neighborhood || '').trim();
     const city = String(interest.city || '').trim();
 
@@ -621,7 +621,7 @@ export class CrmMatchEngineService extends CrmService {
     };
   }
 
-  private buildUnitDistancePoint(unit: any) {
+  private buildV3UnitDistancePoint(unit: any) {
     const project = unit.project;
 
     if (!project) {
@@ -708,7 +708,7 @@ export class CrmMatchEngineService extends CrmService {
     });
   }
 
-  private async mapWithConcurrency<T, R>(
+  private async mapV3WithConcurrency<T, R>(
     items: T[],
     concurrency: number,
     mapper: (item: T, index: number) => Promise<R>,
