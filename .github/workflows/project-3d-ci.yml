@@ -28,6 +28,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test -- --runInBand coordination
+      - run: npm test -- --runInBand crm-match-engine.service.spec.ts
 
   frontend-build:
     runs-on: ubuntu-latest
