@@ -167,6 +167,52 @@ describe('CrmMatchEngineService', () => {
     expect(result[0].priceMatch.sellerNegotiationFloor).toBe(6_000_000);
   });
 
+  it.each([
+    [UnitType.DUKKAN_MAGAZA, 'COMMERCIAL', 35],
+    [UnitType.FABRIKA_URETIM_TESISI, 'INDUSTRIAL', 40],
+    [UnitType.OTEL, 'TOURISM', 35],
+    [UnitType.KONUT_PROJESI, 'PROJECT', 35],
+  ])(
+    '%s tipinde %s grubu için %i fiyat toleransını uygular',
+    async (unitType, expectedGroup, expectedTolerance) => {
+      const interest = buildInterest({
+        propertyTypes: [unitType],
+      });
+      const unit = buildUnit({
+        type: unitType,
+        price: 10_000_000,
+        roomCount: null,
+      });
+      const { service } = createService({ interest, units: [unit] });
+
+      const result = await service.getCustomerInterestMatches(
+        interestId,
+        userId,
+        Role.EMLAKCI,
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].matchPolicy.propertyGroup).toBe(expectedGroup);
+      expect(result[0].matchPolicy.priceTolerancePercent).toBe(
+        expectedTolerance,
+      );
+    },
+  );
+
+  it('tam 5 km mesafedeki portföyü eşleşmeye dahil eder', async () => {
+    const { service } = createService({ distanceKm: 5 });
+
+    const result = await service.getCustomerInterestMatches(
+      interestId,
+      userId,
+      Role.EMLAKCI,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].distance.straightLineDistanceKm).toBe(5);
+    expect(result[0].matchPolicy.locationRadiusKm).toBe(5);
+  });
+
   it('hedef mahalle merkezinden 5 km üzerindeki portföyü eşleşme dışı bırakır', async () => {
     const { service } = createService({ distanceKm: 5.01 });
 
@@ -177,6 +223,31 @@ describe('CrmMatchEngineService', () => {
     );
 
     expect(result).toEqual([]);
+  });
+
+  it('ilçe farklı olsa bile aynı ilde ve 5 km içindeyse portföyü eşleştirir', async () => {
+    const unit = buildUnit({
+      project: {
+        ...buildUnit().project,
+        district: 'Kepez',
+        address: 'Sınır Mahallesi',
+        mapAddress: 'Sınır Mahallesi, Kepez, Antalya, Türkiye',
+      },
+    });
+    const { service } = createService({
+      units: [unit],
+      distanceKm: 2,
+    });
+
+    const result = await service.getCustomerInterestMatches(
+      interestId,
+      userId,
+      Role.EMLAKCI,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].district).toBe('Kepez');
+    expect(result[0].matchPolicy.districtHardFilter).toBe(false);
   });
 
   it('il kesin filtresini uygular', async () => {
@@ -204,6 +275,21 @@ describe('CrmMatchEngineService', () => {
   it('mülk tipini kesin filtre olarak uygular', async () => {
     const { service, distanceService } = createService({
       units: [buildUnit({ type: UnitType.VILLA })],
+    });
+
+    const result = await service.getCustomerInterestMatches(
+      interestId,
+      userId,
+      Role.EMLAKCI,
+    );
+
+    expect(result).toEqual([]);
+    expect(distanceService.calculate).not.toHaveBeenCalled();
+  });
+
+  it('işlem türünü kesin filtre olarak uygular', async () => {
+    const { service, distanceService } = createService({
+      units: [buildUnit({ status: UnitStatus.KIRALIK })],
     });
 
     const result = await service.getCustomerInterestMatches(
