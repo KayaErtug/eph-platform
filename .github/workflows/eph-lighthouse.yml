@@ -1,0 +1,85 @@
+name: EPH Lighthouse Baseline
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/eph-lighthouse.yml
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    name: EPH Lighthouse Public Baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v6
+
+      - name: Node.js 22 kur
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Lighthouse 13.4.1 ile giris sayfasini denetle
+        run: |
+          npx --yes lighthouse@13.4.1 https://emlakportfoyhavuzu.com/giris \
+            --quiet \
+            --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
+            --output=json \
+            --output-path=./lighthouse-login.json
+
+      - name: Lighthouse skorlarini degerlendir
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('./lighthouse-login.json', 'utf8'));
+          const categories = report.categories || {};
+
+          const scores = {
+            performance: Math.round((categories.performance?.score || 0) * 100),
+            accessibility: Math.round((categories.accessibility?.score || 0) * 100),
+            bestPractices: Math.round((categories['best-practices']?.score || 0) * 100),
+            seo: Math.round((categories.seo?.score || 0) * 100),
+          };
+
+          console.log('EPH Lighthouse skorları:', scores);
+
+          const summary = [
+            '# EPH Lighthouse — /giris',
+            '',
+            `- Performans: **${scores.performance}**`,
+            `- Erişilebilirlik: **${scores.accessibility}**`,
+            `- En iyi uygulamalar: **${scores.bestPractices}**`,
+            `- SEO: **${scores.seo}**`,
+            '',
+            'Koruma eşikleri: Performans 35, Erişilebilirlik 80, En iyi uygulamalar 75, SEO 70.',
+          ].join('\n');
+
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + '\n');
+
+          const failures = [];
+          if (scores.performance < 35) failures.push(`Performans ${scores.performance} < 35`);
+          if (scores.accessibility < 80) failures.push(`Erişilebilirlik ${scores.accessibility} < 80`);
+          if (scores.bestPractices < 75) failures.push(`En iyi uygulamalar ${scores.bestPractices} < 75`);
+          if (scores.seo < 70) failures.push(`SEO ${scores.seo} < 70`);
+
+          if (failures.length > 0) {
+            console.error('Lighthouse kabul eşiği başarısız:', failures.join(' | '));
+            process.exit(1);
+          }
+          NODE
+
+      - name: Lighthouse raporunu yukle
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: eph-lighthouse-login-report
+          path: lighthouse-login.json
+          if-no-files-found: error
+          retention-days: 7
