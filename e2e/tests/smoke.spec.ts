@@ -12,18 +12,36 @@ const TECHNICAL_ERROR_PATTERNS = [
   /chunkloaderror/i,
 ];
 
+const PUBLIC_ROUTES = [
+  '/giris',
+  '/kayit',
+  '/sifremi-unuttum',
+  '/kvkk',
+  '/kullanici-sozlesmesi',
+  '/gizlilik-politikasi',
+  '/cerez-politikasi',
+];
+
 const PROTECTED_ROUTES = [
   '/dashboard',
   '/portfoy',
   '/havuz',
-  '/network',
+  '/profil',
   '/crm',
-  '/lina-firsatlari',
+  '/network',
   '/messages',
   '/kontor',
   '/uyelik',
-  '/proje-satis-sablonu',
+  '/lina',
+  '/lina-firsatlari',
+  '/notification-settings',
   '/admin',
+  '/market',
+  '/stok',
+  '/uretkenlik',
+  '/forum-v3',
+  '/help-center',
+  '/proje-satis-sablonu',
 ];
 
 async function expectNoTechnicalErrorText(page: Page, context: string) {
@@ -73,7 +91,14 @@ async function openHydratedLogin(page: Page) {
 }
 
 test.describe('EPH P0 Smoke', () => {
-  test('Giriş sayfası sağlıklı açılıyor', async ({ page }) => {
+  for (const path of PUBLIC_ROUTES) {
+    test(`Halka açık sayfa sağlıklı açılıyor: ${path}`, async ({ page }) => {
+      await expectHealthyPage(page, path);
+      await expect(page).toHaveURL(new RegExp(`${path.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}(?:\\?|$)`));
+    });
+  }
+
+  test('Giriş ekranının temel kontrolleri görünür', async ({ page }) => {
     await expectHealthyPage(page, '/giris');
     await expect(
       page.getByRole('heading', { name: 'Hesabınıza giriş yapın' }),
@@ -83,10 +108,7 @@ test.describe('EPH P0 Smoke', () => {
     ).toBeVisible();
     await expect(page.locator('#password')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Giriş Yap' })).toBeVisible();
-  });
-
-  test('Kayıt sayfası sağlıklı açılıyor', async ({ page }) => {
-    await expectHealthyPage(page, '/kayit');
+    await expect(page.getByRole('link', { name: 'Şifremi unuttum' })).toBeVisible();
   });
 
   test('Giriş formu kısa şifreyi kullanıcıya bildiriyor', async ({ page }) => {
@@ -133,15 +155,24 @@ test.describe('EPH P0 Smoke', () => {
     await expectNoTechnicalErrorText(page, 'geçersiz giriş');
   });
 
-  test('Kayıt bağlantısı doğru sayfaya gidiyor', async ({ page }) => {
+  test('Girişten kayıt sayfasına geçiş çalışıyor', async ({ page }) => {
     await page.goto('/giris', { waitUntil: 'domcontentloaded' });
     await page.getByRole('link', { name: 'Kayıt talebi oluşturun' }).click();
     await expect(page).toHaveURL(/\/kayit(?:\?|$)/);
     await expect(page.locator('body')).toBeVisible();
   });
 
+  test('Girişten şifre yenileme sayfasına geçiş çalışıyor', async ({ page }) => {
+    await page.goto('/giris', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('link', { name: 'Şifremi unuttum' }).click();
+    await expect(page).toHaveURL(/\/sifremi-unuttum(?:\?|$)/);
+    await expect(
+      page.getByRole('heading', { name: 'Şifrenizi yenileyin' }),
+    ).toBeVisible();
+  });
+
   for (const path of PROTECTED_ROUTES) {
-    test(`Oturumsuz kullanıcı ${path} yerine girişe yönleniyor`, async ({ page }) => {
+    test(`Oturumsuz kullanıcı korumalı route'a giremiyor: ${path}`, async ({ page }) => {
       const response = await page.goto(path, {
         waitUntil: 'domcontentloaded',
       });
@@ -178,5 +209,20 @@ test.describe('EPH P0 Smoke', () => {
     ).toBeLessThanOrEqual(layout.innerWidth + 1);
 
     await expectNoTechnicalErrorText(page, 'iPhone giriş görünümü');
+  });
+
+  test('iPhone boyutunda şifre yenileme ekranında yatay taşma yok', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/sifremi-unuttum', { waitUntil: 'domcontentloaded' });
+
+    const layout = await page.evaluate(() => ({
+      innerWidth: window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+    }));
+
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.innerWidth + 1);
+    expect(layout.bodyScrollWidth).toBeLessThanOrEqual(layout.innerWidth + 1);
+    await expectNoTechnicalErrorText(page, 'iPhone şifre yenileme görünümü');
   });
 });
