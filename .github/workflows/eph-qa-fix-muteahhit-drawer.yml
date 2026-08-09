@@ -1,0 +1,133 @@
+name: EPH QA Fix Muteahhit Drawer
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/eph-qa-fix-muteahhit-drawer.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix-muteahhit-drawer:
+    name: EPH Muteahhit Drawer Locator Duzeltmesi
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Muteahhit menu locatorlarini drawer icine sabitle
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('e2e/tests/muteahhit-auth.spec.ts')
+          text = path.read_text(encoding='utf-8')
+
+          old = '''async function inspectRoleMenu(page: Page) {
+  await page.getByRole('button', { name: 'Menü' }).click();
+  const closeButton = page.getByRole('button', { name: 'Menüyü kapat' });
+  await expect(closeButton).toBeVisible({ timeout: 5000 });
+
+  await expect(page.getByText('Müteahhit', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('Proje Satış Merkezi', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('Duyurular', { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText('Referans Kodları', { exact: true }),
+  ).toHaveCount(0);
+
+  for (const label of [
+    'Anasayfa',
+    'Portföy',
+    'CRM',
+    'Talep Merkezi',
+    'Havuz',
+    'Mesajlar',
+    'Lina Asistan',
+    'Lina Fırsatları',
+    'Proje Satış Merkezi',
+  ]) {
+    await expect.soft(
+      page.getByText(label, { exact: true }).first(),
+      `Müteahhit menüsünde ${label} görünmüyor`,
+    ).toBeVisible();
+  }
+
+  await closeButton.click();
+}
+'''
+
+          new = '''async function inspectRoleMenu(page: Page) {
+  await page.getByRole('button', { name: 'Menü' }).click();
+  const closeButton = page.getByRole('button', { name: 'Menüyü kapat' });
+  await expect(closeButton).toBeVisible({ timeout: 5000 });
+
+  const drawer = page.locator('.eph-mobile-menu-drawer');
+  await expect(drawer).toBeVisible();
+
+  await expect(drawer.getByText('Müteahhit', { exact: true })).toBeVisible();
+  await expect(
+    drawer.getByText('Proje Satış Merkezi', { exact: true }),
+  ).toBeVisible();
+  await expect(drawer.getByText('Duyurular', { exact: true })).toHaveCount(0);
+  await expect(
+    drawer.getByText('Referans Kodları', { exact: true }),
+  ).toHaveCount(0);
+
+  for (const label of [
+    'Anasayfa',
+    'Portföy',
+    'CRM',
+    'Talep Merkezi',
+    'Havuz',
+    'Mesajlar',
+    'Lina Asistan',
+    'Lina Fırsatları',
+    'Proje Satış Merkezi',
+  ]) {
+    await expect.soft(
+      drawer.getByText(label, { exact: true }).first(),
+      `Müteahhit menüsünde ${label} görünmüyor`,
+    ).toBeVisible();
+  }
+
+  await closeButton.click();
+}
+'''
+
+          if new in text:
+              print('OK: Drawer locator düzeltmesi zaten mevcut.')
+          else:
+              if text.count(old) != 1:
+                  raise SystemExit(
+                      f'HATA: inspectRoleMenu hedefi beklenen sayıda bulunamadı: {text.count(old)}'
+                  )
+              text = text.replace(old, new, 1)
+              path.write_text(text, encoding='utf-8')
+              print('OK: Müteahhit menu locatorlari drawer icine sabitlendi.')
+          PY
+
+      - name: Degisikligi kontrol et
+        run: |
+          git diff --check
+          git diff -- e2e/tests/muteahhit-auth.spec.ts
+
+      - name: Duzeltmeyi main dalina kaydet
+        run: |
+          if git diff --quiet -- e2e/tests/muteahhit-auth.spec.ts; then
+            echo "Düzeltme zaten mevcut."
+            exit 0
+          fi
+
+          git config user.name "EPH QA Automation"
+          git config user.email "149750282+KayaErtug@users.noreply.github.com"
+          git add e2e/tests/muteahhit-auth.spec.ts
+          git commit -m "test: scope muteahhit menu assertions to drawer"
+          git push origin HEAD:main
