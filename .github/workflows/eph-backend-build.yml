@@ -1,0 +1,59 @@
+name: EPH Backend Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/eph-backend-build.yml
+      - backend/src/**
+      - backend/prisma/**
+      - backend/package.json
+      - backend/package-lock.json
+      - backend/tsconfig.json
+      - backend/tsconfig.build.json
+
+permissions:
+  contents: read
+
+jobs:
+  backend-build:
+    name: EPH NestJS Prisma Build Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/eph
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/eph
+      NODE_ENV: test
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v6
+
+      - name: Node.js 22 kur
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Backend bagimliliklarini kur
+        run: npm ci --no-audit --no-fund
+
+      - name: Prisma Client uret
+        run: npx prisma generate
+
+      - name: NestJS production build
+        run: npm run build
+
+      - name: Koordinasyon testleri
+        run: npm test -- --runInBand coordination
+
+      - name: CRM eslesme motoru testleri
+        run: npm test -- --runInBand crm-match-engine.service.spec.ts
