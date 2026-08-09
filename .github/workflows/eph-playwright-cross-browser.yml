@@ -1,0 +1,58 @@
+name: EPH Playwright Cross Browser
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/eph-playwright-cross-browser.yml
+      - e2e/playwright.cross-browser.config.ts
+      - e2e/tests/cross-browser.spec.ts
+      - e2e/package.json
+
+permissions:
+  contents: read
+
+jobs:
+  cross-browser:
+    name: EPH Firefox WebKit iPhone Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: e2e
+
+    env:
+      EPH_BASE_URL: https://emlakportfoyhavuzu.com
+      CI: 'true'
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v6
+
+      - name: Node.js 22 kur
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Test bagimliliklarini kur
+        run: npm install --no-audit --no-fund
+
+      - name: Chromium Firefox WebKit ve sistem bagimliliklarini kur
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Capraz tarayici testlerini calistir
+        run: npx playwright test --config=playwright.cross-browser.config.ts --trace=off
+
+      - name: Playwright raporunu yukle
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: eph-playwright-cross-browser-report
+          path: |
+            e2e/playwright-report-cross-browser/
+            e2e/test-results-cross-browser/
+          if-no-files-found: ignore
+          retention-days: 2
