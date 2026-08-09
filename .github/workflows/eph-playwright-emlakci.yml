@@ -1,0 +1,59 @@
+name: EPH Playwright Emlakci
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  emlakci:
+    name: EPH Emlakci Live Journey
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    defaults:
+      run:
+        working-directory: e2e
+
+    env:
+      EPH_BASE_URL: https://emlakportfoyhavuzu.com
+      EPH_TEST_EMLAKCI_EMAIL: ${{ secrets.EPH_TEST_EMLAKCI_EMAIL }}
+      EPH_TEST_EMLAKCI_PASSWORD: ${{ secrets.EPH_TEST_EMLAKCI_PASSWORD }}
+      CI: 'true'
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v6
+
+      - name: Emlakci test secret kontrolu
+        run: |
+          if [ -z "$EPH_TEST_EMLAKCI_EMAIL" ] || [ -z "$EPH_TEST_EMLAKCI_PASSWORD" ]; then
+            echo "::error::EPH_TEST_EMLAKCI_EMAIL ve EPH_TEST_EMLAKCI_PASSWORD GitHub Actions Secrets olarak tanimlanmalidir."
+            exit 2
+          fi
+
+      - name: Node.js 22 kur
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Test bagimliliklarini kur
+        run: npm install --no-audit --no-fund
+
+      - name: Chromium ve sistem bagimliliklarini kur
+        run: npx playwright install --with-deps chromium
+
+      - name: Emlakci canli yolculuk testlerini calistir
+        run: npm run test:emlakci
+
+      - name: Playwright raporunu yukle
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: eph-playwright-emlakci-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
