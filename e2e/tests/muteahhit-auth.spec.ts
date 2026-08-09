@@ -219,6 +219,62 @@ async function expectNoTechnicalText(page: Page, path: string) {
   }
 }
 
+async function inspectRoleMenu(page: Page) {
+  const menuButton = page.getByRole('button', { name: 'Menü' });
+  await expect(menuButton).toBeVisible();
+  await menuButton.click();
+
+  const closeButton = page.getByRole('button', { name: 'Menüyü kapat' });
+  const menuOpened = await closeButton
+    .isVisible({ timeout: 2500 })
+    .catch(() => false);
+
+  expect.soft(
+    menuOpened,
+    'Müteahhit Dashboard hamburger menüsü drawer açmadı.',
+  ).toBeTruthy();
+
+  if (!menuOpened) {
+    return;
+  }
+
+  await expect.soft(
+    page.getByText('Müteahhit', { exact: true }),
+    'Açılan menüde Müteahhit rol etiketi görünmüyor.',
+  ).toBeVisible();
+  await expect.soft(
+    page.getByText('Proje Satış Merkezi', { exact: true }),
+    'Müteahhit menüsünde Proje Satış Merkezi görünmüyor.',
+  ).toBeVisible();
+  await expect.soft(
+    page.getByText('Duyurular', { exact: true }),
+    'Müteahhit menüsünde Admin Duyurular bağlantısı görünmemeli.',
+  ).toHaveCount(0);
+  await expect.soft(
+    page.getByText('Referans Kodları', { exact: true }),
+    'Müteahhit menüsünde Admin Referans Kodları bağlantısı görünmemeli.',
+  ).toHaveCount(0);
+
+  for (const label of [
+    'Anasayfa',
+    'Portföy',
+    'CRM',
+    'Talep Merkezi',
+    'Havuz',
+    'Mesajlar',
+    'Lina Asistan',
+    'Lina Fırsatları',
+    'Proje Satış Merkezi',
+  ]) {
+    await expect.soft(
+      page.getByText(label, { exact: true }).first(),
+      `Müteahhit menüsünde ${label} görünmüyor`,
+    ).toBeVisible();
+  }
+
+  await closeButton.click();
+}
+
 test.describe('EPH Müteahhit Canlı Oturum', () => {
   test.skip(
     !email || !password,
@@ -243,34 +299,7 @@ test.describe('EPH Müteahhit Canlı Oturum', () => {
       }
     });
 
-    await page.getByRole('button', { name: 'Menü' }).click();
-    await expect(page.getByText('Müteahhit', { exact: true })).toBeVisible();
-    await expect(
-      page.getByText('Proje Satış Merkezi', { exact: true }),
-    ).toBeVisible();
-    await expect(page.getByText('Duyurular', { exact: true })).toHaveCount(0);
-    await expect(
-      page.getByText('Referans Kodları', { exact: true }),
-    ).toHaveCount(0);
-
-    for (const label of [
-      'Anasayfa',
-      'Portföy',
-      'CRM',
-      'Talep Merkezi',
-      'Havuz',
-      'Mesajlar',
-      'Lina Asistan',
-      'Lina Fırsatları',
-      'Proje Satış Merkezi',
-    ]) {
-      await expect.soft(
-        page.getByText(label, { exact: true }).first(),
-        `Müteahhit menüsünde ${label} görünmüyor`,
-      ).toBeVisible();
-    }
-
-    await page.getByRole('button', { name: 'Menüyü kapat' }).click();
+    await inspectRoleMenu(page);
 
     for (const path of CORE_ROUTES) {
       try {
@@ -295,13 +324,15 @@ test.describe('EPH Müteahhit Canlı Oturum', () => {
       timeout: 20_000,
     });
     await page.waitForTimeout(900);
-    await expect(
+    await expect.soft(
       page.getByRole('heading', { name: 'EPH PROJE SATIŞ MERKEZİ' }),
+      'Müteahhit Proje Satış Merkezi başlığını göremiyor.',
     ).toBeVisible();
-    await expect(
+    await expect.soft(
       page.getByRole('button', { name: /Yeni Proje Oluştur/i }),
+      'Müteahhit Yeni Proje Oluştur butonunu göremiyor.',
     ).toBeVisible();
-    await expect(
+    await expect.soft(
       page.getByText('Bu Modüle Erişim Yetkiniz Yok', { exact: true }),
     ).toHaveCount(0);
 
@@ -340,12 +371,27 @@ test.describe('EPH Müteahhit Canlı Oturum', () => {
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await visitWithRetry(page, '/dashboard');
-    await page.getByRole('button', { name: 'Menü' }).click();
-    await page.getByText('Çıkış Yap', { exact: true }).click();
-    await expect(page).toHaveURL(/\/giris(?:\?|$)/);
 
-    await page.goto('/proje-satis-sablonu', { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL(/\/giris(?:\?|$)/);
+    const menuButton = page.getByRole('button', { name: 'Menü' });
+    await menuButton.click();
+    const logoutButton = page.getByText('Çıkış Yap', { exact: true });
+    const logoutVisible = await logoutButton
+      .isVisible({ timeout: 2500 })
+      .catch(() => false);
+
+    if (logoutVisible) {
+      await logoutButton.click();
+      await expect(page).toHaveURL(/\/giris(?:\?|$)/);
+      await page.goto('/proje-satis-sablonu', {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(page).toHaveURL(/\/giris(?:\?|$)/);
+    } else {
+      expect.soft(
+        false,
+        'Müteahhit hamburger menüsü çıkış kontrolünde de açılmadı.',
+      ).toBeTruthy();
+    }
 
     await context.close();
   });
