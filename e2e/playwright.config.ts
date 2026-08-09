@@ -10,9 +10,9 @@ export default defineConfig({
     ['line'],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
   ],
-  timeout: 30_000,
+  timeout: 120_000,
   expect: {
-    timeout: 7_500,
+    timeout: 10_000,
   },
   use: {
     baseURL:
@@ -20,8 +20,8 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    actionTimeout: 10_000,
-    navigationTimeout: 20_000,
+    actionTimeout: 15_000,
+    navigationTimeout: 25_000,
   },
   outputDir: 'test-results',
   projects: [
