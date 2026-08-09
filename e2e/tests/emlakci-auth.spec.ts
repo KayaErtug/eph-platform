@@ -188,10 +188,12 @@ async function createAuthenticatedEmlakciContext(
     waitUntil: 'domcontentloaded',
     timeout: 20_000,
   });
-  await page.waitForTimeout(900);
+  await page.waitForLoadState('load');
+  await page.waitForTimeout(1200);
 
   await expect(page).toHaveURL(/\/dashboard(?:\?|$)/);
   await expect(page.locator('body')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Menü' })).toBeVisible();
 
   return { context, page, token, user };
 }
@@ -284,10 +286,16 @@ test.describe('EPH Emlakçı Canlı Oturum', () => {
       }
     });
 
-    await page.getByRole('button', { name: 'Menü' }).click();
-    await expect(page.getByText('Emlakçı', { exact: true })).toBeVisible();
+    const menuButton = page.getByRole('button', { name: 'Menü' });
+    await expect(menuButton).toBeVisible();
+    await menuButton.click();
+
+    const drawer = page.locator('.eph-mobile-menu-drawer');
+    await expect(drawer).toBeVisible();
+
+    await expect(drawer.getByText('Emlakçı', { exact: true })).toBeVisible();
     await expect(
-      page.getByText('Proje Satış Merkezi', { exact: true }),
+      drawer.getByText('Proje Satış Merkezi', { exact: true }),
     ).toHaveCount(0);
 
     for (const label of [
@@ -301,7 +309,7 @@ test.describe('EPH Emlakçı Canlı Oturum', () => {
       'Lina Fırsatları',
     ]) {
       await expect.soft(
-        page.getByText(label, { exact: true }).first(),
+        drawer.getByText(label, { exact: true }).first(),
         `Emlakçı menüsünde ${label} görünmüyor`,
       ).toBeVisible();
     }
@@ -362,8 +370,15 @@ test.describe('EPH Emlakçı Canlı Oturum', () => {
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await visitWithRetry(page, '/dashboard');
-    await page.getByRole('button', { name: 'Menü' }).click();
-    await page.getByText('Çıkış Yap', { exact: true }).click();
+    await page.waitForLoadState('load');
+
+    const logoutMenuButton = page.getByRole('button', { name: 'Menü' });
+    await expect(logoutMenuButton).toBeVisible();
+    await logoutMenuButton.click();
+
+    const logoutDrawer = page.locator('.eph-mobile-menu-drawer');
+    await expect(logoutDrawer).toBeVisible();
+    await logoutDrawer.getByText('Çıkış Yap', { exact: true }).click();
     await expect(page).toHaveURL(/\/giris(?:\?|$)/);
 
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
