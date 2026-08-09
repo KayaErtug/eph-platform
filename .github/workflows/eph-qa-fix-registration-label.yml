@@ -1,0 +1,84 @@
+name: EPH QA Fix Registration Labels
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/eph-qa-fix-registration-label.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix-registration-labels:
+    name: EPH Kayit Erisilebilirlik Duzeltmesi
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Kayit secim alanlarini erisilebilir adla iliskilendir
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('frontend/src/app/kayit/page.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          membership_old = '''                        <select
+                          value={selectedRegistrationType || ""}'''
+          membership_new = '''                        <select
+                          aria-label="Üyelik Türü"
+                          value={selectedRegistrationType || ""}'''
+
+          city_old = '''                    <select
+                      {...register("city")}'''
+          city_new = '''                    <select
+                      aria-label="Şehir"
+                      {...register("city")}'''
+
+          if membership_new not in text:
+              if text.count(membership_old) != 1:
+                  raise SystemExit(
+                      f'HATA: Üyelik Türü select hedefi beklenen sayıda bulunamadı: {text.count(membership_old)}'
+                  )
+              text = text.replace(membership_old, membership_new, 1)
+
+          if city_new not in text:
+              if text.count(city_old) != 1:
+                  raise SystemExit(
+                      f'HATA: Şehir select hedefi beklenen sayıda bulunamadı: {text.count(city_old)}'
+                  )
+              text = text.replace(city_old, city_new, 1)
+
+          path.write_text(text, encoding='utf-8')
+
+          if 'aria-label="Üyelik Türü"' not in text:
+              raise SystemExit('HATA: Üyelik Türü aria-label doğrulanamadı.')
+          if 'aria-label="Şehir"' not in text:
+              raise SystemExit('HATA: Şehir aria-label doğrulanamadı.')
+
+          print('OK: Üyelik Türü ve Şehir seçimleri erişilebilir ad aldı.')
+          PY
+
+      - name: Degisikligi kontrol et
+        run: |
+          git diff --check
+          git diff -- frontend/src/app/kayit/page.tsx
+
+      - name: Duzeltmeyi main dalina kaydet
+        run: |
+          if git diff --quiet -- frontend/src/app/kayit/page.tsx; then
+            echo "Düzeltme zaten mevcut."
+            exit 0
+          fi
+
+          git config user.name "EPH QA Automation"
+          git config user.email "149750282+KayaErtug@users.noreply.github.com"
+          git add frontend/src/app/kayit/page.tsx
+          git commit -m "fix: label registration select fields for accessibility"
+          git push origin HEAD:main
