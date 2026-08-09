@@ -206,13 +206,16 @@ async function inspectRoleMenu(page: Page) {
   const closeButton = page.getByRole('button', { name: 'Menüyü kapat' });
   await expect(closeButton).toBeVisible({ timeout: 5000 });
 
-  await expect(page.getByText('Müteahhit', { exact: true })).toBeVisible();
+  const drawer = page.locator('.eph-mobile-menu-drawer');
+  await expect(drawer).toBeVisible();
+
+  await expect(drawer.getByText('Müteahhit', { exact: true })).toBeVisible();
   await expect(
-    page.getByText('Proje Satış Merkezi', { exact: true }),
+    drawer.getByText('Proje Satış Merkezi', { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText('Duyurular', { exact: true })).toHaveCount(0);
+  await expect(drawer.getByText('Duyurular', { exact: true })).toHaveCount(0);
   await expect(
-    page.getByText('Referans Kodları', { exact: true }),
+    drawer.getByText('Referans Kodları', { exact: true }),
   ).toHaveCount(0);
 
   for (const label of [
@@ -227,7 +230,7 @@ async function inspectRoleMenu(page: Page) {
     'Proje Satış Merkezi',
   ]) {
     await expect.soft(
-      page.getByText(label, { exact: true }).first(),
+      drawer.getByText(label, { exact: true }).first(),
       `Müteahhit menüsünde ${label} görünmüyor`,
     ).toBeVisible();
   }
