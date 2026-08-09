@@ -1,11 +1,12 @@
 import {
   expect,
   test,
-  type APIRequestContext,
   type Browser,
   type BrowserContext,
   type Page,
 } from '@playwright/test';
+
+import { loginWithStandaloneRequest } from './helpers/live-auth';
 
 const email = process.env.EPH_TEST_EMLAKCI_EMAIL?.trim() || '';
 const password = process.env.EPH_TEST_EMLAKCI_PASSWORD || '';
@@ -90,12 +91,6 @@ type AuthUser = {
   nominationQuota?: number;
 };
 
-type AuthPayload = {
-  token?: string;
-  user?: AuthUser;
-  message?: string;
-};
-
 type AuthenticatedContext = {
   context: BrowserContext;
   page: Page;
@@ -103,27 +98,25 @@ type AuthenticatedContext = {
   user: AuthUser;
 };
 
-async function authenticateEmlakci(
-  request: APIRequestContext,
-): Promise<{ token: string; user: AuthUser }> {
-  const response = await request.post(`${baseURL}/api/auth/login`, {
-    data: {
-      email,
-      password,
-    },
-    timeout: 20_000,
+async function authenticateEmlakci(): Promise<{
+  token: string;
+  user: AuthUser;
+}> {
+  const result = await loginWithStandaloneRequest<AuthUser>({
+    baseURL,
+    email,
+    password,
+    accountLabel: 'EPH Emlakçı test hesabı',
+    attempts: 2,
+    timeoutMs: 30_000,
+    retryDelayMs: 1_500,
   });
 
-  let payload: AuthPayload = {};
-  try {
-    payload = (await response.json()) as AuthPayload;
-  } catch {
-    payload = {};
-  }
+  const payload = result.payload;
 
-  if (!response.ok()) {
+  if (!result.ok) {
     throw new Error(
-      `EPH Emlakçı test hesabı doğrulanamadı (HTTP ${response.status()}): ${
+      `EPH Emlakçı test hesabı doğrulanamadı (HTTP ${result.status}): ${
         payload.message || 'Giriş reddedildi.'
       }`,
     );
@@ -152,8 +145,8 @@ async function authenticateEmlakci(
 async function createAuthenticatedEmlakciContext(
   browser: Browser,
 ): Promise<AuthenticatedContext> {
+  const { token, user } = await authenticateEmlakci();
   const context = await browser.newContext();
-  const { token, user } = await authenticateEmlakci(context.request);
 
   await context.addCookies([
     {
