@@ -8,6 +8,7 @@ on:
     paths:
       - .github/workflows/eph-playwright-emlakci.yml
       - e2e/tests/emlakci-auth.spec.ts
+      - e2e/tests/emlakci-3d-access.spec.ts
       - e2e/package.json
       - e2e/playwright.config.ts
 
@@ -52,8 +53,8 @@ jobs:
       - name: Chromium ve sistem bagimliliklarini kur
         run: npx playwright install --with-deps chromium
 
-      - name: Emlakci canli yolculuk testlerini calistir
-        run: npx playwright test tests/emlakci-auth.spec.ts --trace=off
+      - name: Emlakci canli yolculuk ve 3D yetki testlerini calistir
+        run: npx playwright test tests/emlakci-auth.spec.ts tests/emlakci-3d-access.spec.ts --trace=off
 
       - name: Playwright raporunu yukle
         if: always()
