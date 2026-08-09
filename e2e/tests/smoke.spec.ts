@@ -66,7 +66,9 @@ async function expectHealthyPage(page: Page, path: string) {
 }
 
 async function openHydratedLogin(page: Page) {
-  await page.goto('/giris', { waitUntil: 'networkidle' });
+  await page.goto('/giris', { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('load');
+  await page.waitForTimeout(1200);
   await expect(page.getByRole('button', { name: 'Giriş Yap' })).toBeEnabled();
 }
 
