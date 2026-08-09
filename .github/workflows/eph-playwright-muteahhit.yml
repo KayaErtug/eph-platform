@@ -2,6 +2,14 @@ name: EPH Playwright Muteahhit
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/eph-playwright-muteahhit.yml
+      - e2e/tests/muteahhit-auth.spec.ts
+      - e2e/playwright.config.ts
+      - e2e/package.json
 
 permissions:
   contents: read
