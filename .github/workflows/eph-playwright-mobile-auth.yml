@@ -1,0 +1,69 @@
+name: EPH Playwright Mobile Auth
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/eph-playwright-mobile-auth.yml
+      - e2e/playwright.mobile-auth.config.ts
+      - e2e/tests/mobile-auth.spec.ts
+      - e2e/package.json
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-auth:
+    name: EPH iPhone Android Auth Roles
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: e2e
+
+    env:
+      EPH_BASE_URL: https://emlakportfoyhavuzu.com
+      EPH_TEST_EMLAKCI_EMAIL: umaykutay@gmail.com
+      EPH_TEST_EMLAKCI_PASSWORD: ${{ secrets.EPH_TEST_EMLAKCI_PASSWORD }}
+      EPH_TEST_MUTEAHHIT_EMAIL: jingchensh36@gmail.com
+      EPH_TEST_MUTEAHHIT_PASSWORD: ${{ secrets.EPH_TEST_MUTEAHHIT_PASSWORD }}
+      CI: 'true'
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v6
+
+      - name: Test secret kontrolu
+        run: |
+          if [ -z "$EPH_TEST_EMLAKCI_PASSWORD" ] || [ -z "$EPH_TEST_MUTEAHHIT_PASSWORD" ]; then
+            echo "::error::Emlakci veya Muteahhit test secret bilgisi eksik."
+            exit 2
+          fi
+
+      - name: Node.js 22 kur
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Test bagimliliklarini kur
+        run: npm install --no-audit --no-fund
+
+      - name: Chromium WebKit ve sistem bagimliliklarini kur
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: iPhone Android oturumlu rol testlerini calistir
+        run: npx playwright test --config=playwright.mobile-auth.config.ts --trace=off
+
+      - name: Playwright raporunu yukle
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: eph-playwright-mobile-auth-report
+          path: |
+            e2e/playwright-report-mobile-auth/
+            e2e/test-results-mobile-auth/
+          if-no-files-found: ignore
+          retention-days: 1
