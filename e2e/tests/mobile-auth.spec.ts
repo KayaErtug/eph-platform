@@ -146,6 +146,21 @@ async function expectHealthyPage(page: Page, path: string) {
   await expectNoHorizontalOverflow(page, path);
 }
 
+async function openHydratedMenu(page: Page) {
+  await page.goto('/dashboard', {
+    waitUntil: 'domcontentloaded',
+    timeout: 30_000,
+  });
+  await page.waitForLoadState('load');
+  await page.waitForTimeout(1200);
+
+  const menuButton = page.getByRole('button', { name: 'Menü' });
+  await expect(menuButton).toBeVisible();
+  await menuButton.click();
+
+  await expect(page.locator('.eph-mobile-menu-drawer')).toBeVisible();
+}
+
 test.describe('EPH Mobil Oturumlu Roller', () => {
   test('Emlakçı iPhone ve Android ana mobil yolculuğu', async ({ context }) => {
     test.skip(
@@ -166,8 +181,7 @@ test.describe('EPH Mobil Oturumlu Roller', () => {
       await expectHealthyPage(page, path);
     }
 
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Menü' }).click();
+    await openHydratedMenu(page);
 
     await expect(page.getByText('Emlakçı', { exact: true })).toBeVisible();
     await expect(page.getByText('Proje Satış Merkezi', { exact: true })).toHaveCount(0);
@@ -194,8 +208,7 @@ test.describe('EPH Mobil Oturumlu Roller', () => {
 
     await expectHealthyPage(page, '/proje-satis-sablonu');
 
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Menü' }).click();
+    await openHydratedMenu(page);
 
     await expect(page.getByText('Müteahhit', { exact: true })).toBeVisible();
     await expect(page.getByText('Proje Satış Merkezi', { exact: true })).toBeVisible();
