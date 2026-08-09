@@ -158,7 +158,9 @@ async function openHydratedMenu(page: Page) {
   await expect(menuButton).toBeVisible();
   await menuButton.click();
 
-  await expect(page.locator('.eph-mobile-menu-drawer')).toBeVisible();
+  const drawer = page.locator('.eph-mobile-menu-drawer');
+  await expect(drawer).toBeVisible();
+  return drawer;
 }
 
 test.describe('EPH Mobil Oturumlu Roller', () => {
@@ -181,10 +183,10 @@ test.describe('EPH Mobil Oturumlu Roller', () => {
       await expectHealthyPage(page, path);
     }
 
-    await openHydratedMenu(page);
+    const drawer = await openHydratedMenu(page);
 
-    await expect(page.getByText('Emlakçı', { exact: true })).toBeVisible();
-    await expect(page.getByText('Proje Satış Merkezi', { exact: true })).toHaveCount(0);
+    await expect(drawer.getByText('Emlakçı', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('Proje Satış Merkezi', { exact: true })).toHaveCount(0);
   });
 
   test('Müteahhit iPhone ve Android Proje Satış yolculuğu', async ({ context }) => {
@@ -208,9 +210,11 @@ test.describe('EPH Mobil Oturumlu Roller', () => {
 
     await expectHealthyPage(page, '/proje-satis-sablonu');
 
-    await openHydratedMenu(page);
+    const drawer = await openHydratedMenu(page);
 
-    await expect(page.getByText('Müteahhit', { exact: true })).toBeVisible();
-    await expect(page.getByText('Proje Satış Merkezi', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('Müteahhit', { exact: true })).toBeVisible();
+    await expect(
+      drawer.getByText('Proje Satış Merkezi', { exact: true }),
+    ).toBeVisible();
   });
 });
