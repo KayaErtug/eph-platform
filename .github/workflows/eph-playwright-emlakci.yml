@@ -2,6 +2,11 @@ name: EPH Playwright Emlakci
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/eph-playwright-emlakci.yml
 
 permissions:
   contents: read
