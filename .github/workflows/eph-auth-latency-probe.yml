@@ -1,0 +1,65 @@
+name: EPH Auth Latency Probe
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/eph-auth-latency-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  auth-latency-probe:
+    name: EPH Canli Giris Gecikme Olcumu
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      EPH_BASE_URL: https://emlakportfoyhavuzu.com
+      EPH_TEST_EMLAKCI_EMAIL: umaykutay@gmail.com
+      EPH_TEST_EMLAKCI_PASSWORD: ${{ secrets.EPH_TEST_EMLAKCI_PASSWORD }}
+      EPH_TEST_MUTEAHHIT_EMAIL: jingchensh36@gmail.com
+      EPH_TEST_MUTEAHHIT_PASSWORD: ${{ secrets.EPH_TEST_MUTEAHHIT_PASSWORD }}
+
+    steps:
+      - name: Secret kontrolu
+        run: |
+          if [ -z "$EPH_TEST_EMLAKCI_PASSWORD" ] || [ -z "$EPH_TEST_MUTEAHHIT_PASSWORD" ]; then
+            echo "::error::EPH test sifre secretlari tanimli olmali."
+            exit 2
+          fi
+
+      - name: Giris endpoint surelerini olc
+        shell: bash
+        run: |
+          set -u
+
+          probe() {
+            local label="$1"
+            local email="$2"
+            local password="$3"
+            local payload
+
+            payload=$(python3 -c 'import json,sys; print(json.dumps({"email": sys.argv[1], "password": sys.argv[2]}))' "$email" "$password")
+
+            echo "===== $label ====="
+            curl \
+              --silent \
+              --show-error \
+              --output /dev/null \
+              --max-time 60 \
+              --connect-timeout 10 \
+              --header 'Content-Type: application/json' \
+              --data "$payload" \
+              --write-out 'http=%{http_code} total=%{time_total}s connect=%{time_connect}s start=%{time_starttransfer}s\n' \
+              "$EPH_BASE_URL/api/auth/login" || true
+          }
+
+          probe "KAYITSIZ HESAP" "qa-probe-does-not-exist@example.invalid" "Invalid-QA-Probe-2026"
+          sleep 3
+          probe "EMLAKCI TEST HESABI" "$EPH_TEST_EMLAKCI_EMAIL" "$EPH_TEST_EMLAKCI_PASSWORD"
+          sleep 3
+          probe "MUTEAHHIT TEST HESABI" "$EPH_TEST_MUTEAHHIT_EMAIL" "$EPH_TEST_MUTEAHHIT_PASSWORD"
