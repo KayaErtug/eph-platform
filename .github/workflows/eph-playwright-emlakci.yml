@@ -50,7 +50,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Emlakci canli yolculuk testlerini calistir
-        run: npm run test:emlakci
+        run: npx playwright test tests/emlakci-auth.spec.ts --trace=off
 
       - name: Playwright raporunu yukle
         if: always()
@@ -61,4 +61,4 @@ jobs:
             e2e/playwright-report/
             e2e/test-results/
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 1
