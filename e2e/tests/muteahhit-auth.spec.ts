@@ -1,4 +1,11 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from '@playwright/test';
 
 const email = process.env.EPH_TEST_MUTEAHHIT_EMAIL?.trim() || '';
 const password = process.env.EPH_TEST_MUTEAHHIT_PASSWORD || '';
@@ -32,6 +39,18 @@ const MOBILE_ROUTES = [
   '/proje-satis-sablonu',
 ];
 
+const HEALTHY_API_ROUTES = [
+  '/api/crm/customers',
+  '/api/crm/pipeline',
+  '/api/pool-projects',
+  '/api/coordination/lina-opportunities',
+  '/api/kontor/cuzdan',
+  '/api/kontor/hareketler',
+  '/api/kontor/ozet',
+  '/api/kontor/paket',
+  '/api/project-sales/projects',
+];
+
 const TECHNICAL_ERROR_PATTERNS = [
   /application error/i,
   /internal server error/i,
@@ -42,21 +61,30 @@ const TECHNICAL_ERROR_PATTERNS = [
   /chunkloaderror/i,
 ];
 
+type AuthUser = {
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  role?: string;
+  capabilities?: string[];
+  isApproved?: boolean;
+  referralCode?: string | null;
+  nominationPoints?: number;
+  nominationQuota?: number;
+};
+
 type AuthPayload = {
   token?: string;
-  user?: {
-    id?: string;
-    firstName?: string;
-    lastName?: string;
-    email?: string;
-    role?: string;
-    capabilities?: string[];
-    isApproved?: boolean;
-    referralCode?: string | null;
-    nominationPoints?: number;
-    nominationQuota?: number;
-  };
+  user?: AuthUser;
   message?: string;
+};
+
+type AuthenticatedContext = {
+  context: BrowserContext;
+  page: Page;
+  token: string;
+  user: AuthUser;
 };
 
 function isMuteahhitRole(role?: string) {
@@ -64,12 +92,10 @@ function isMuteahhitRole(role?: string) {
   return ['MUTEAHHIT', 'MÜTEAHHİT', 'MÜTAHHİT'].includes(normalized);
 }
 
-async function createAuthenticatedMuteahhitContext(
-  browser: Browser,
-): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext();
-
-  const response = await context.request.post(`${baseURL}/api/auth/login`, {
+async function authenticateMuteahhit(
+  request: APIRequestContext,
+): Promise<{ token: string; user: AuthUser }> {
+  const response = await request.post(`${baseURL}/api/auth/login`, {
     data: {
       email,
       password,
@@ -96,14 +122,27 @@ async function createAuthenticatedMuteahhitContext(
   const user = payload.user;
 
   if (!token || !user?.id) {
-    throw new Error('EPH Müteahhit test hesabı için token veya kullanıcı bilgisi alınamadı.');
+    throw new Error(
+      'EPH Müteahhit test hesabı için token veya kullanıcı bilgisi alınamadı.',
+    );
   }
 
   if (!isMuteahhitRole(user.role)) {
     throw new Error(
-      `EPH test hesabının rolü MUTEAHHIT değil: ${String(user.role || 'BILINMIYOR')}`,
+      `EPH test hesabının rolü MUTEAHHIT değil: ${String(
+        user.role || 'BILINMIYOR',
+      )}`,
     );
   }
+
+  return { token, user };
+}
+
+async function createAuthenticatedMuteahhitContext(
+  browser: Browser,
+): Promise<AuthenticatedContext> {
+  const context = await browser.newContext();
+  const { token, user } = await authenticateMuteahhit(context.request);
 
   await context.addCookies([
     {
@@ -143,7 +182,7 @@ async function createAuthenticatedMuteahhitContext(
   await expect(page).toHaveURL(/\/dashboard(?:\?|$)/);
   await expect(page.locator('body')).toBeVisible();
 
-  return { context, page };
+  return { context, page, token, user };
 }
 
 async function visitWithRetry(page: Page, path: string) {
@@ -181,16 +220,38 @@ async function expectNoTechnicalText(page: Page, path: string) {
 }
 
 test.describe('EPH Müteahhit Canlı Oturum', () => {
-  test.skip(!email || !password, 'EPH Müteahhit test hesabı GitHub Secrets içinde tanımlı değil.');
+  test.skip(
+    !email || !password,
+    'EPH Müteahhit test hesabı GitHub Secrets içinde tanımlı değil.',
+  );
 
-  test('Müteahhit ana kullanıcı yolculuğu, Proje Satış Merkezi ve mobil görünüm', async ({ browser }) => {
+  test('Müteahhit ana kullanıcı yolculuğu, Proje Satış Merkezi ve mobil görünüm', async ({
+    browser,
+  }) => {
     const { context, page } = await createAuthenticatedMuteahhitContext(browser);
+    const pageErrors: string[] = [];
+    const serverErrors: string[] = [];
+
+    page.on('pageerror', (error) => {
+      pageErrors.push(`${page.url()} :: ${error.message}`);
+    });
+
+    page.on('response', (response) => {
+      const url = response.url();
+      if (url.startsWith(`${baseURL}/api/`) && response.status() >= 500) {
+        serverErrors.push(`${response.status()} ${url}`);
+      }
+    });
 
     await page.getByRole('button', { name: 'Menü' }).click();
     await expect(page.getByText('Müteahhit', { exact: true })).toBeVisible();
-    await expect(page.getByText('Proje Satış Merkezi', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('Proje Satış Merkezi', { exact: true }),
+    ).toBeVisible();
     await expect(page.getByText('Duyurular', { exact: true })).toHaveCount(0);
-    await expect(page.getByText('Referans Kodları', { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByText('Referans Kodları', { exact: true }),
+    ).toHaveCount(0);
 
     for (const label of [
       'Anasayfa',
@@ -229,6 +290,21 @@ test.describe('EPH Müteahhit Canlı Oturum', () => {
       }
     }
 
+    await page.goto('/proje-satis-sablonu', {
+      waitUntil: 'domcontentloaded',
+      timeout: 20_000,
+    });
+    await page.waitForTimeout(900);
+    await expect(
+      page.getByRole('heading', { name: 'EPH PROJE SATIŞ MERKEZİ' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Yeni Proje Oluştur/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Bu Modüle Erişim Yetkiniz Yok', { exact: true }),
+    ).toHaveCount(0);
+
     await page.setViewportSize({ width: 414, height: 736 });
 
     for (const path of MOBILE_ROUTES) {
@@ -253,6 +329,15 @@ test.describe('EPH Müteahhit Canlı Oturum', () => {
       }
     }
 
+    expect.soft(
+      serverErrors,
+      `Canlı API 5xx hataları: ${serverErrors.join(' | ')}`,
+    ).toEqual([]);
+    expect.soft(
+      pageErrors,
+      `Tarayıcı runtime hataları: ${pageErrors.join(' | ')}`,
+    ).toEqual([]);
+
     await page.setViewportSize({ width: 1280, height: 900 });
     await visitWithRetry(page, '/dashboard');
     await page.getByRole('button', { name: 'Menü' }).click();
@@ -261,6 +346,66 @@ test.describe('EPH Müteahhit Canlı Oturum', () => {
 
     await page.goto('/proje-satis-sablonu', { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(/\/giris(?:\?|$)/);
+
+    await context.close();
+  });
+
+  test('Müteahhit temel API ve Proje Satış yetkileri sağlıklı', async ({
+    browser,
+  }) => {
+    const { context, token, user } =
+      await createAuthenticatedMuteahhitContext(browser);
+    const authHeaders = {
+      Authorization: `Bearer ${token}`,
+    };
+
+    for (const path of HEALTHY_API_ROUTES) {
+      const response = await context.request.get(`${baseURL}${path}`, {
+        headers: authHeaders,
+        timeout: 20_000,
+      });
+
+      expect.soft(
+        response.status(),
+        `${path} beklenmeyen HTTP ${response.status()} döndürdü`,
+      ).toBeLessThan(500);
+      expect.soft(
+        response.status(),
+        `${path} Müteahhit hesabını yetkisiz saydı`,
+      ).not.toBe(401);
+      expect.soft(
+        response.status(),
+        `${path} Müteahhit hesabını rol nedeniyle engelledi`,
+      ).not.toBe(403);
+    }
+
+    const conversationsResponse = await context.request.get(
+      `${baseURL}/api/conversations?userId=${encodeURIComponent(
+        String(user.id || ''),
+      )}`,
+      {
+        headers: authHeaders,
+        timeout: 20_000,
+      },
+    );
+    expect.soft(conversationsResponse.status()).toBeLessThan(500);
+    expect.soft(conversationsResponse.status()).not.toBe(401);
+    expect.soft(conversationsResponse.status()).not.toBe(403);
+
+    const projectResponse = await context.request.get(
+      `${baseURL}/api/project-sales/projects`,
+      {
+        headers: authHeaders,
+        timeout: 20_000,
+      },
+    );
+    expect(projectResponse.status()).toBe(200);
+
+    const projects = await projectResponse.json();
+    expect(
+      Array.isArray(projects),
+      'Proje Satış Merkezi proje listesi dizi dönmeli.',
+    ).toBeTruthy();
 
     await context.close();
   });
