@@ -164,7 +164,16 @@ test.describe('EPH Gerçek Proje Sunum Linki Pozitif Kabul', () => {
     expect(new URL(page.url()).pathname).not.toBe('/giris');
 
     await page.waitForLoadState('load');
-    await page.waitForTimeout(1200);
+
+    await expect(
+      page.getByText('Proje sunumu hazırlanıyor', { exact: true }),
+    ).toHaveCount(0, { timeout: 20_000 });
+
+    if (project?.name) {
+      await expect(
+        page.getByText(String(project.name), { exact: false }).first(),
+      ).toBeVisible({ timeout: 15_000 });
+    }
 
     const bodyText = await page.locator('body').innerText();
     expect(bodyText.trim().length).toBeGreaterThan(50);
