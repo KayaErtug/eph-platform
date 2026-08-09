@@ -18,7 +18,7 @@ jobs:
 
     env:
       EPH_BASE_URL: https://emlakportfoyhavuzu.com
-      EPH_TEST_EMLAKCI_EMAIL: ${{ secrets.EPH_TEST_EMLAKCI_EMAIL }}
+      EPH_TEST_EMLAKCI_EMAIL: umaykutay@gmail.com
       EPH_TEST_EMLAKCI_PASSWORD: ${{ secrets.EPH_TEST_EMLAKCI_PASSWORD }}
       CI: 'true'
 
@@ -28,8 +28,8 @@ jobs:
 
       - name: Emlakci test secret kontrolu
         run: |
-          if [ -z "$EPH_TEST_EMLAKCI_EMAIL" ] || [ -z "$EPH_TEST_EMLAKCI_PASSWORD" ]; then
-            echo "::error::EPH_TEST_EMLAKCI_EMAIL ve EPH_TEST_EMLAKCI_PASSWORD GitHub Actions Secrets olarak tanimlanmalidir."
+          if [ -z "$EPH_TEST_EMLAKCI_PASSWORD" ]; then
+            echo "::error::EPH_TEST_EMLAKCI_PASSWORD GitHub Actions Secret olarak tanimlanmalidir."
             exit 2
           fi
 
