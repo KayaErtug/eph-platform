@@ -74,6 +74,7 @@ function shouldShowShell(pathname: string) {
   if (pathname.startsWith("/paylasim")) return false;
   if (pathname.startsWith("/talep-paylasim")) return false;
   if (pathname.startsWith("/portfoy-paylasim")) return false;
+  if (pathname.startsWith("/proje-sunum")) return false;
 
   return true;
 }
