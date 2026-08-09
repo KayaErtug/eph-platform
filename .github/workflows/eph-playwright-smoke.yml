@@ -13,6 +13,15 @@ on:
       - e2e/tests/smoke.spec.ts
       - e2e/package.json
       - e2e/playwright.config.ts
+      - frontend/src/components/EPHMobileShell.tsx
+      - frontend/src/proxy.ts
+      - frontend/src/app/giris/**
+      - frontend/src/app/kayit/**
+      - frontend/src/app/sifremi-unuttum/**
+      - frontend/src/app/proje-sunum/**
+      - frontend/src/app/portfoy-paylasim/**
+      - frontend/src/app/paylasim/**
+      - frontend/src/app/talep-paylasim/**
 
 permissions:
   contents: read
