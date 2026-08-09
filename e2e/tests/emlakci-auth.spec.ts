@@ -176,8 +176,21 @@ async function expectNoTechnicalText(page: Page, path: string) {
 test.describe('EPH Emlakçı Canlı Oturum', () => {
   test.skip(!email || !password, 'EPH Emlakçı test hesabı GitHub Secrets içinde tanımlı değil.');
 
-  test('Emlakçı ana kullanıcı yolculuğu, rol menüsü ve mobil görünüm', async ({ browser }) => {
+  test('Emlakçı ana kullanıcı yolculuğu, rol menüsü, API sağlığı ve mobil görünüm', async ({ browser }) => {
     const { context, page } = await createAuthenticatedEmlakciContext(browser);
+    const pageErrors: string[] = [];
+    const serverErrors: string[] = [];
+
+    page.on('pageerror', (error) => {
+      pageErrors.push(`${page.url()} :: ${error.message}`);
+    });
+
+    page.on('response', (response) => {
+      const url = response.url();
+      if (url.startsWith(`${baseURL}/api/`) && response.status() >= 500) {
+        serverErrors.push(`${response.status()} ${url}`);
+      }
+    });
 
     await page.getByRole('button', { name: 'Menü' }).click();
     await expect(page.getByText('Emlakçı', { exact: true })).toBeVisible();
@@ -242,6 +255,16 @@ test.describe('EPH Emlakçı Canlı Oturum', () => {
         expect.soft(false, `${path} mobil test açılamadı: ${String(error)}`).toBeTruthy();
       }
     }
+
+    expect.soft(
+      serverErrors,
+      `Canlı API 5xx hataları: ${serverErrors.join(' | ')}`,
+    ).toEqual([]);
+
+    expect.soft(
+      pageErrors,
+      `Tarayıcı runtime hataları: ${pageErrors.join(' | ')}`,
+    ).toEqual([]);
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await visitWithRetry(page, '/dashboard');
