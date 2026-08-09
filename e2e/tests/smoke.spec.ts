@@ -22,6 +22,25 @@ const PUBLIC_ROUTES = [
   '/cerez-politikasi',
 ];
 
+const PUBLIC_TOKEN_ROUTES = [
+  {
+    path: '/proje-sunum/playwright-gecersiz-token',
+    expectedText: /Sunum bağlantısı geçerli değil/i,
+  },
+  {
+    path: '/portfoy-paylasim/playwright-gecersiz-token',
+    expectedText: /Sunum Açılmadı/i,
+  },
+  {
+    path: '/paylasim/playwright-gecersiz-token',
+    expectedText: /Sunum Açılmadı/i,
+  },
+  {
+    path: '/talep-paylasim/playwright-gecersiz-token',
+    expectedText: /geçersiz|aktif değil|bulunamadı/i,
+  },
+];
+
 const PROTECTED_ROUTES = [
   '/dashboard',
   '/portfoy',
@@ -94,7 +113,31 @@ test.describe('EPH P0 Smoke', () => {
   for (const path of PUBLIC_ROUTES) {
     test(`Halka açık sayfa sağlıklı açılıyor: ${path}`, async ({ page }) => {
       await expectHealthyPage(page, path);
-      await expect(page).toHaveURL(new RegExp(`${path.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}(?:\\?|$)`));
+      await expect(page).toHaveURL(
+        new RegExp(
+          `${path.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}(?:\\?|$)`,
+        ),
+      );
+    });
+  }
+
+  for (const { path, expectedText } of PUBLIC_TOKEN_ROUTES) {
+    test(`Halka açık token route giriş istemiyor: ${path}`, async ({ page }) => {
+      const response = await page.goto(path, {
+        waitUntil: 'domcontentloaded',
+      });
+
+      expect(response, `${path} için document response alınamadı`).not.toBeNull();
+      expect(response?.status() ?? 599).toBeLessThan(500);
+
+      await page.waitForTimeout(1400);
+
+      expect(
+        new URL(page.url()).pathname,
+        `${path} halka açık olmasına rağmen giriş ekranına yönlendirildi`,
+      ).not.toBe('/giris');
+      await expect(page.locator('body')).toContainText(expectedText);
+      await expectNoTechnicalErrorText(page, path);
     });
   }
 
