@@ -1,0 +1,109 @@
+name: EPH QA Fix Emlakci Drawer
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/eph-qa-fix-emlakci-drawer.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix-emlakci-drawer:
+    name: EPH Emlakci Drawer Locator Duzeltmesi
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Emlakci menu hydration ve drawer locatorlarini duzelt
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('e2e/tests/emlakci-auth.spec.ts')
+          text = path.read_text(encoding='utf-8')
+
+          load_old = '''  await page.goto('/dashboard', {
+    waitUntil: 'domcontentloaded',
+    timeout: 20_000,
+  });
+  await page.waitForTimeout(900);
+'''
+          load_new = '''  await page.goto('/dashboard', {
+    waitUntil: 'domcontentloaded',
+    timeout: 20_000,
+  });
+  await page.waitForLoadState('load');
+  await page.waitForTimeout(1200);
+'''
+
+          if load_new not in text:
+              if text.count(load_old) != 1:
+                  raise SystemExit(f'HATA: Dashboard hydration hedefi bulunamadi: {text.count(load_old)}')
+              text = text.replace(load_old, load_new, 1)
+
+          menu_old = "    await page.getByRole('button', { name: 'Menü' }).click();\n"
+          menu_new = (
+              "    const menuButton = page.getByRole('button', { name: 'Menü' });\n"
+              "    await expect(menuButton).toBeVisible();\n"
+              "    await menuButton.click();\n\n"
+              "    const drawer = page.locator('.eph-mobile-menu-drawer');\n"
+              "    await expect(drawer).toBeVisible();\n"
+          )
+
+          if "const drawer = page.locator('.eph-mobile-menu-drawer');" not in text:
+              if text.count(menu_old) < 1:
+                  raise SystemExit('HATA: Emlakci menu acma hedefi bulunamadi.')
+              text = text.replace(menu_old, menu_new, 1)
+
+          replacements = [
+              ("page.getByText('Emlakçı', { exact: true })", "drawer.getByText('Emlakçı', { exact: true })"),
+              ("page.getByText('Proje Satış Merkezi', { exact: true })", "drawer.getByText('Proje Satış Merkezi', { exact: true })"),
+              ("page.getByText(label, { exact: true }).first()", "drawer.getByText(label, { exact: true }).first()"),
+          ]
+
+          for old, new in replacements:
+              if new not in text:
+                  if old not in text:
+                      raise SystemExit(f'HATA: Emlakci locator hedefi bulunamadi: {old}')
+                  text = text.replace(old, new, 1)
+
+          required = [
+              "await page.waitForLoadState('load');",
+              "const drawer = page.locator('.eph-mobile-menu-drawer');",
+              "drawer.getByText('Emlakçı', { exact: true })",
+              "drawer.getByText('Proje Satış Merkezi', { exact: true })",
+              "drawer.getByText(label, { exact: true }).first()",
+          ]
+
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit('HATA: Emlakci drawer duzeltmesi eksik: ' + ' | '.join(missing))
+
+          path.write_text(text, encoding='utf-8')
+          print('OK: Emlakci hydration ve drawer locatorlari duzeltildi.')
+          PY
+
+      - name: Degisikligi kontrol et
+        run: |
+          git diff --check
+          git diff -- e2e/tests/emlakci-auth.spec.ts
+
+      - name: Duzeltmeyi main dalina kaydet
+        run: |
+          if git diff --quiet -- e2e/tests/emlakci-auth.spec.ts; then
+            echo "Düzeltme zaten mevcut."
+            exit 0
+          fi
+
+          git config user.name "EPH QA Automation"
+          git config user.email "149750282+KayaErtug@users.noreply.github.com"
+          git add e2e/tests/emlakci-auth.spec.ts
+          git commit -m "test: stabilize emlakci hydrated drawer assertions"
+          git push origin HEAD:main
