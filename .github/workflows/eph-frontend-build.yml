@@ -1,5 +1,6 @@
 name: EPH Frontend Build
 
+# Kalıcı production build kapısı: frontend QA düzeltmelerini main üzerinde doğrular.
 on:
   workflow_dispatch:
   push:
