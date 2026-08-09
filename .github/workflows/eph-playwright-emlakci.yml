@@ -7,6 +7,9 @@ on:
       - main
     paths:
       - .github/workflows/eph-playwright-emlakci.yml
+      - e2e/tests/emlakci-auth.spec.ts
+      - e2e/package.json
+      - e2e/playwright.config.ts
 
 permissions:
   contents: read
