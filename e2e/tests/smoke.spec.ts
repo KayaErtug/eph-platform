@@ -171,24 +171,38 @@ test.describe('EPH P0 Smoke', () => {
     ).toBeVisible();
   });
 
-  test('Şifre yenileme geçersiz e-postayı API çağrısı yapmadan reddediyor', async ({ page }) => {
-    let forgotPasswordRequestCount = 0;
-    page.on('request', (request) => {
-      if (/\/auth\/forgot-password(?:\?|$)/.test(request.url())) {
-        forgotPasswordRequestCount += 1;
-      }
+  test('Şifre yenileme kod isteme akışı API yazması yapmadan çalışıyor', async ({ page }) => {
+    await page.route(/\/auth\/forgot-password(?:\?|$)/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'E-posta adresiniz kayıtlıysa kod gönderilmiştir.',
+          resendAfterSeconds: 60,
+        }),
+      });
     });
 
     await page.goto('/sifremi-unuttum', { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('load');
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(1200);
 
-    const emailInput = page.locator('input[type="email"]');
-    await emailInput.fill('gecersiz-email');
-    await page.getByRole('button', { name: 'Doğrulama Kodu Gönder' }).click();
+    await page.locator('input[type="email"]').fill('playwright-reset@example.com');
 
-    await expect(page.getByText('Geçerli bir e-posta adresi girin.')).toBeVisible();
-    expect(forgotPasswordRequestCount).toBe(0);
+    const request = page.waitForRequest((candidate) =>
+      /\/auth\/forgot-password(?:\?|$)/.test(candidate.url()),
+    );
+
+    await page.locator('form button[type="submit"]').first().click();
+    await request;
+
+    await expect(
+      page.getByRole('heading', { name: 'Doğrulama kodunu girin' }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('E-posta adresiniz kayıtlıysa kod gönderilmiştir.'),
+    ).toBeVisible();
+    await expectNoTechnicalErrorText(page, 'şifre yenileme kod isteme');
   });
 
   for (const path of PROTECTED_ROUTES) {
