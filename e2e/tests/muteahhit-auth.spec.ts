@@ -80,9 +80,8 @@ type AuthPayload = {
   message?: string;
 };
 
-type AuthenticatedContext = {
+type ApiAuthenticatedContext = {
   context: BrowserContext;
-  page: Page;
   token: string;
   user: AuthUser;
 };
@@ -96,10 +95,7 @@ async function authenticateMuteahhit(
   request: APIRequestContext,
 ): Promise<{ token: string; user: AuthUser }> {
   const response = await request.post(`${baseURL}/api/auth/login`, {
-    data: {
-      email,
-      password,
-    },
+    data: { email, password },
     timeout: 20_000,
   });
 
@@ -138,51 +134,39 @@ async function authenticateMuteahhit(
   return { token, user };
 }
 
-async function createAuthenticatedMuteahhitContext(
+async function createApiAuthenticatedContext(
   browser: Browser,
-): Promise<AuthenticatedContext> {
+): Promise<ApiAuthenticatedContext> {
   const context = await browser.newContext();
   const { token, user } = await authenticateMuteahhit(context.request);
+  return { context, token, user };
+}
 
-  await context.addCookies([
-    {
-      name: 'eph_token',
-      value: token,
-      url: baseURL,
-      sameSite: 'Lax',
-    },
-  ]);
-
-  await context.addInitScript(
-    ({ storedUser, storedToken }) => {
-      window.localStorage.setItem(
-        'auth-storage',
-        JSON.stringify({
-          state: {
-            user: storedUser,
-            token: storedToken,
-          },
-          version: 0,
-        }),
-      );
-    },
-    {
-      storedUser: user,
-      storedToken: token,
-    },
-  );
-
+async function createUiAuthenticatedContext(
+  browser: Browser,
+): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto('/dashboard', {
+
+  await page.goto('/giris', {
     waitUntil: 'domcontentloaded',
     timeout: 20_000,
   });
-  await page.waitForTimeout(900);
+  await page.waitForLoadState('load');
+  await page.waitForTimeout(800);
 
-  await expect(page).toHaveURL(/\/dashboard(?:\?|$)/);
+  await page
+    .getByRole('textbox', { name: 'E-posta adresi' })
+    .fill(email);
+  await page.locator('#password').fill(password);
+  await page.getByRole('button', { name: 'Giriş Yap' }).click();
+
+  await page.waitForURL(/\/dashboard(?:\?|$)/, { timeout: 20_000 });
+  await page.waitForTimeout(1200);
   await expect(page.locator('body')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Menü' })).toBeVisible();
 
-  return { context, page, token, user };
+  return { context, page };
 }
 
 async function visitWithRetry(page: Page, path: string) {
@@ -198,9 +182,7 @@ async function visitWithRetry(page: Page, path: string) {
       return response;
     } catch (error) {
       lastError = error;
-      if (attempt === 1) {
-        await page.waitForTimeout(800);
-      }
+      if (attempt === 1) await page.waitForTimeout(800);
     }
   }
 
@@ -220,39 +202,17 @@ async function expectNoTechnicalText(page: Page, path: string) {
 }
 
 async function inspectRoleMenu(page: Page) {
-  const menuButton = page.getByRole('button', { name: 'Menü' });
-  await expect(menuButton).toBeVisible();
-  await menuButton.click();
-
+  await page.getByRole('button', { name: 'Menü' }).click();
   const closeButton = page.getByRole('button', { name: 'Menüyü kapat' });
-  const menuOpened = await closeButton
-    .isVisible({ timeout: 2500 })
-    .catch(() => false);
+  await expect(closeButton).toBeVisible({ timeout: 5000 });
 
-  expect.soft(
-    menuOpened,
-    'Müteahhit Dashboard hamburger menüsü drawer açmadı.',
-  ).toBeTruthy();
-
-  if (!menuOpened) {
-    return;
-  }
-
-  await expect.soft(
-    page.getByText('Müteahhit', { exact: true }),
-    'Açılan menüde Müteahhit rol etiketi görünmüyor.',
-  ).toBeVisible();
-  await expect.soft(
+  await expect(page.getByText('Müteahhit', { exact: true })).toBeVisible();
+  await expect(
     page.getByText('Proje Satış Merkezi', { exact: true }),
-    'Müteahhit menüsünde Proje Satış Merkezi görünmüyor.',
   ).toBeVisible();
-  await expect.soft(
-    page.getByText('Duyurular', { exact: true }),
-    'Müteahhit menüsünde Admin Duyurular bağlantısı görünmemeli.',
-  ).toHaveCount(0);
-  await expect.soft(
+  await expect(page.getByText('Duyurular', { exact: true })).toHaveCount(0);
+  await expect(
     page.getByText('Referans Kodları', { exact: true }),
-    'Müteahhit menüsünde Admin Referans Kodları bağlantısı görünmemeli.',
   ).toHaveCount(0);
 
   for (const label of [
@@ -281,10 +241,10 @@ test.describe('EPH Müteahhit Canlı Oturum', () => {
     'EPH Müteahhit test hesabı GitHub Secrets içinde tanımlı değil.',
   );
 
-  test('Müteahhit ana kullanıcı yolculuğu, Proje Satış Merkezi ve mobil görünüm', async ({
+  test('Müteahhit gerçek giriş, ana kullanıcı yolculuğu ve mobil görünüm', async ({
     browser,
   }) => {
-    const { context, page } = await createAuthenticatedMuteahhitContext(browser);
+    const { context, page } = await createUiAuthenticatedContext(browser);
     const pageErrors: string[] = [];
     const serverErrors: string[] = [];
 
@@ -324,6 +284,7 @@ test.describe('EPH Müteahhit Canlı Oturum', () => {
       timeout: 20_000,
     });
     await page.waitForTimeout(900);
+
     await expect.soft(
       page.getByRole('heading', { name: 'EPH PROJE SATIŞ MERKEZİ' }),
       'Müteahhit Proje Satış Merkezi başlığını göremiyor.',
@@ -371,27 +332,14 @@ test.describe('EPH Müteahhit Canlı Oturum', () => {
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await visitWithRetry(page, '/dashboard');
+    await page.getByRole('button', { name: 'Menü' }).click();
+    await page.getByText('Çıkış Yap', { exact: true }).click();
+    await expect(page).toHaveURL(/\/giris(?:\?|$)/);
 
-    const menuButton = page.getByRole('button', { name: 'Menü' });
-    await menuButton.click();
-    const logoutButton = page.getByText('Çıkış Yap', { exact: true });
-    const logoutVisible = await logoutButton
-      .isVisible({ timeout: 2500 })
-      .catch(() => false);
-
-    if (logoutVisible) {
-      await logoutButton.click();
-      await expect(page).toHaveURL(/\/giris(?:\?|$)/);
-      await page.goto('/proje-satis-sablonu', {
-        waitUntil: 'domcontentloaded',
-      });
-      await expect(page).toHaveURL(/\/giris(?:\?|$)/);
-    } else {
-      expect.soft(
-        false,
-        'Müteahhit hamburger menüsü çıkış kontrolünde de açılmadı.',
-      ).toBeTruthy();
-    }
+    await page.goto('/proje-satis-sablonu', {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(page).toHaveURL(/\/giris(?:\?|$)/);
 
     await context.close();
   });
@@ -399,11 +347,8 @@ test.describe('EPH Müteahhit Canlı Oturum', () => {
   test('Müteahhit temel API ve Proje Satış yetkileri sağlıklı', async ({
     browser,
   }) => {
-    const { context, token, user } =
-      await createAuthenticatedMuteahhitContext(browser);
-    const authHeaders = {
-      Authorization: `Bearer ${token}`,
-    };
+    const { context, token, user } = await createApiAuthenticatedContext(browser);
+    const authHeaders = { Authorization: `Bearer ${token}` };
 
     for (const path of HEALTHY_API_ROUTES) {
       const response = await context.request.get(`${baseURL}${path}`, {
