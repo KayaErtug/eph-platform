@@ -1,0 +1,58 @@
+name: EPH Playwright PWA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/eph-playwright-pwa.yml
+      - e2e/tests/pwa-production.spec.ts
+      - e2e/package.json
+      - e2e/playwright.config.ts
+
+permissions:
+  contents: read
+
+jobs:
+  pwa:
+    name: EPH Production PWA Acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: e2e
+
+    env:
+      EPH_BASE_URL: https://emlakportfoyhavuzu.com
+      CI: 'true'
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v6
+
+      - name: Node.js 22 kur
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Test bagimliliklarini kur
+        run: npm install --no-audit --no-fund
+
+      - name: Chromium ve sistem bagimliliklarini kur
+        run: npx playwright install --with-deps chromium
+
+      - name: PWA uretim kabul testlerini calistir
+        run: npx playwright test tests/pwa-production.spec.ts --trace=off
+
+      - name: Playwright raporunu yukle
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: eph-playwright-pwa-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          if-no-files-found: ignore
+          retention-days: 2
