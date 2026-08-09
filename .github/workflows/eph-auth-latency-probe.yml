@@ -15,7 +15,7 @@ jobs:
   auth-latency-probe:
     name: EPH Canli Giris Gecikme Olcumu
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 7
 
     env:
       EPH_BASE_URL: https://emlakportfoyhavuzu.com
@@ -32,7 +32,19 @@ jobs:
             exit 2
           fi
 
-      - name: Giris endpoint surelerini olc
+      - name: Kodu al
+        uses: actions/checkout@v6
+
+      - name: Node.js 22 kur
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Playwright test paketini kur
+        working-directory: e2e
+        run: npm install --no-audit --no-fund
+
+      - name: Curl ile giris endpoint surelerini olc
         shell: bash
         run: |
           set -u
@@ -45,7 +57,7 @@ jobs:
 
             payload=$(python3 -c 'import json,sys; print(json.dumps({"email": sys.argv[1], "password": sys.argv[2]}))' "$email" "$password")
 
-            echo "===== $label ====="
+            echo "===== CURL $label ====="
             curl \
               --silent \
               --show-error \
@@ -59,7 +71,99 @@ jobs:
           }
 
           probe "KAYITSIZ HESAP" "qa-probe-does-not-exist@example.invalid" "Invalid-QA-Probe-2026"
-          sleep 3
+          sleep 2
           probe "EMLAKCI TEST HESABI" "$EPH_TEST_EMLAKCI_EMAIL" "$EPH_TEST_EMLAKCI_PASSWORD"
-          sleep 3
+          sleep 2
           probe "MUTEAHHIT TEST HESABI" "$EPH_TEST_MUTEAHHIT_EMAIL" "$EPH_TEST_MUTEAHHIT_PASSWORD"
+
+      - name: Node fetch ve Playwright request karsilastir
+        working-directory: e2e
+        run: |
+          node <<'NODE'
+          const { request } = require('@playwright/test');
+
+          const baseURL = process.env.EPH_BASE_URL;
+          const cases = [
+            {
+              label: 'EMLAKCI',
+              email: process.env.EPH_TEST_EMLAKCI_EMAIL,
+              password: process.env.EPH_TEST_EMLAKCI_PASSWORD,
+            },
+            {
+              label: 'MUTEAHHIT',
+              email: process.env.EPH_TEST_MUTEAHHIT_EMAIL,
+              password: process.env.EPH_TEST_MUTEAHHIT_PASSWORD,
+            },
+          ];
+
+          async function nativeProbe(item) {
+            const started = Date.now();
+            try {
+              const response = await fetch(`${baseURL}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: item.email,
+                  password: item.password,
+                }),
+                signal: AbortSignal.timeout(60000),
+              });
+              console.log(
+                `NODE_FETCH ${item.label} http=${response.status} total=${(
+                  (Date.now() - started) /
+                  1000
+                ).toFixed(3)}s`,
+              );
+              await response.arrayBuffer();
+            } catch (error) {
+              console.log(
+                `NODE_FETCH ${item.label} ERROR total=${(
+                  (Date.now() - started) /
+                  1000
+                ).toFixed(3)}s ${error?.name || 'Error'}`,
+              );
+            }
+          }
+
+          async function playwrightProbe(item) {
+            const api = await request.newContext();
+            const started = Date.now();
+            try {
+              const response = await api.post(`${baseURL}/api/auth/login`, {
+                data: {
+                  email: item.email,
+                  password: item.password,
+                },
+                timeout: 60000,
+              });
+              console.log(
+                `PLAYWRIGHT_REQUEST ${item.label} http=${response.status()} total=${(
+                  (Date.now() - started) /
+                  1000
+                ).toFixed(3)}s`,
+              );
+              await response.body();
+            } catch (error) {
+              console.log(
+                `PLAYWRIGHT_REQUEST ${item.label} ERROR total=${(
+                  (Date.now() - started) /
+                  1000
+                ).toFixed(3)}s ${error?.name || 'Error'}`,
+              );
+            } finally {
+              await api.dispose();
+            }
+          }
+
+          (async () => {
+            for (const item of cases) {
+              await nativeProbe(item);
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+              await playwrightProbe(item);
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+            }
+          })().catch((error) => {
+            console.error(error?.message || String(error));
+            process.exitCode = 1;
+          });
+          NODE
