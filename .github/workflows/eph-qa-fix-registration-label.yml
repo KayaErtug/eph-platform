@@ -27,41 +27,49 @@ jobs:
           from pathlib import Path
 
           path = Path('frontend/src/app/kayit/page.tsx')
-          text = path.read_text(encoding='utf-8')
+          lines = path.read_text(encoding='utf-8').splitlines(keepends=True)
 
-          membership_old = '''                        <select
-                          value={selectedRegistrationType || ""}'''
-          membership_new = '''                        <select
-                          aria-label="Üyelik Türü"
-                          value={selectedRegistrationType || ""}'''
+          membership_found = 0
+          city_found = 0
+          output = []
 
-          city_old = '''                    <select
-                      {...register("city")}'''
-          city_new = '''                    <select
-                      aria-label="Şehir"
-                      {...register("city")}'''
+          for index, line in enumerate(lines):
+              output.append(line)
 
-          if membership_new not in text:
-              if text.count(membership_old) != 1:
-                  raise SystemExit(
-                      f'HATA: Üyelik Türü select hedefi beklenen sayıda bulunamadı: {text.count(membership_old)}'
-                  )
-              text = text.replace(membership_old, membership_new, 1)
+              if line.strip() != '<select':
+                  continue
 
-          if city_new not in text:
-              if text.count(city_old) != 1:
-                  raise SystemExit(
-                      f'HATA: Şehir select hedefi beklenen sayıda bulunamadı: {text.count(city_old)}'
-                  )
-              text = text.replace(city_old, city_new, 1)
+              next_line = lines[index + 1].strip() if index + 1 < len(lines) else ''
+              indent = line[: len(line) - len(line.lstrip())] + '  '
 
-          path.write_text(text, encoding='utf-8')
+              if next_line == 'value={selectedRegistrationType || ""}':
+                  membership_found += 1
+                  if index + 1 < len(lines) and 'aria-label="Üyelik Türü"' not in lines[index + 1]:
+                      output.append(f'{indent}aria-label="Üyelik Türü"\n')
 
-          if 'aria-label="Üyelik Türü"' not in text:
+              if next_line == '{...register("city")}':
+                  city_found += 1
+                  if index + 1 < len(lines) and 'aria-label="Şehir"' not in lines[index + 1]:
+                      output.append(f'{indent}aria-label="Şehir"\n')
+
+          if membership_found != 1:
+              raise SystemExit(
+                  f'HATA: Üyelik Türü select hedefi beklenen sayıda bulunamadı: {membership_found}'
+              )
+
+          if city_found != 1:
+              raise SystemExit(
+                  f'HATA: Şehir select hedefi beklenen sayıda bulunamadı: {city_found}'
+              )
+
+          text = ''.join(output)
+
+          if text.count('aria-label="Üyelik Türü"') != 1:
               raise SystemExit('HATA: Üyelik Türü aria-label doğrulanamadı.')
-          if 'aria-label="Şehir"' not in text:
+          if text.count('aria-label="Şehir"') != 1:
               raise SystemExit('HATA: Şehir aria-label doğrulanamadı.')
 
+          path.write_text(text, encoding='utf-8')
           print('OK: Üyelik Türü ve Şehir seçimleri erişilebilir ad aldı.')
           PY
 
