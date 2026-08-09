@@ -1,9 +1,10 @@
 import {
   expect,
   test,
-  type APIRequestContext,
   type Browser,
 } from '@playwright/test';
+
+import { loginWithStandaloneRequest } from './helpers/live-auth';
 
 const email = process.env.EPH_TEST_EMLAKCI_EMAIL?.trim() || '';
 const password = process.env.EPH_TEST_EMLAKCI_PASSWORD || '';
@@ -17,28 +18,22 @@ type AuthUser = {
   role?: string;
 };
 
-type AuthPayload = {
-  token?: string;
-  user?: AuthUser;
-  message?: string;
-};
-
-async function authenticateEmlakci(request: APIRequestContext) {
-  const response = await request.post(`${baseURL}/api/auth/login`, {
-    data: { email, password },
-    timeout: 20_000,
+async function authenticateEmlakci() {
+  const result = await loginWithStandaloneRequest<AuthUser>({
+    baseURL,
+    email,
+    password,
+    accountLabel: 'EPH Emlakçı 3D regresyon hesabı',
+    attempts: 2,
+    timeoutMs: 30_000,
+    retryDelayMs: 1_500,
   });
 
-  let payload: AuthPayload = {};
-  try {
-    payload = (await response.json()) as AuthPayload;
-  } catch {
-    payload = {};
-  }
+  const payload = result.payload;
 
-  if (!response.ok()) {
+  if (!result.ok) {
     throw new Error(
-      `EPH Emlakçı test hesabı doğrulanamadı (HTTP ${response.status()}): ${
+      `EPH Emlakçı test hesabı doğrulanamadı (HTTP ${result.status}): ${
         payload.message || 'Giriş reddedildi.'
       }`,
     );
@@ -63,8 +58,8 @@ async function authenticateEmlakci(request: APIRequestContext) {
 }
 
 async function createAuthenticatedPage(browser: Browser) {
+  const { token, user } = await authenticateEmlakci();
   const context = await browser.newContext();
-  const { token, user } = await authenticateEmlakci(context.request);
 
   await context.addCookies([
     {
