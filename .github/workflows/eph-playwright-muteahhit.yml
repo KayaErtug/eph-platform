@@ -1,0 +1,59 @@
+name: EPH Playwright Muteahhit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  muteahhit:
+    name: EPH Muteahhit Live Journey
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    defaults:
+      run:
+        working-directory: e2e
+
+    env:
+      EPH_BASE_URL: https://emlakportfoyhavuzu.com
+      EPH_TEST_MUTEAHHIT_EMAIL: jingchensh36@gmail.com
+      EPH_TEST_MUTEAHHIT_PASSWORD: ${{ secrets.EPH_TEST_MUTEAHHIT_PASSWORD }}
+      CI: 'true'
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v6
+
+      - name: Muteahhit test secret kontrolu
+        run: |
+          if [ -z "$EPH_TEST_MUTEAHHIT_PASSWORD" ]; then
+            echo "::error::EPH_TEST_MUTEAHHIT_PASSWORD GitHub Actions Secret olarak tanimlanmalidir."
+            exit 2
+          fi
+
+      - name: Node.js 22 kur
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Test bagimliliklarini kur
+        run: npm install --no-audit --no-fund
+
+      - name: Chromium ve sistem bagimliliklarini kur
+        run: npx playwright install --with-deps chromium
+
+      - name: Muteahhit canli yolculuk testlerini calistir
+        run: npx playwright test tests/muteahhit-auth.spec.ts --trace=off
+
+      - name: Playwright raporunu yukle
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: eph-playwright-muteahhit-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          if-no-files-found: ignore
+          retention-days: 1
