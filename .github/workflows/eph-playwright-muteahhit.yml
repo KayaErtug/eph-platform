@@ -9,6 +9,7 @@ on:
       - .github/workflows/eph-playwright-muteahhit.yml
       - e2e/tests/muteahhit-auth.spec.ts
       - e2e/tests/muteahhit-3d-live.spec.ts
+      - e2e/tests/project-presentation-positive.spec.ts
       - e2e/playwright.config.ts
       - e2e/package.json
 
@@ -53,8 +54,8 @@ jobs:
       - name: Chromium ve sistem bagimliliklarini kur
         run: npx playwright install --with-deps chromium
 
-      - name: Muteahhit canli yolculuk ve 3D salt okunur testlerini calistir
-        run: npx playwright test tests/muteahhit-auth.spec.ts tests/muteahhit-3d-live.spec.ts --trace=off
+      - name: Muteahhit canli yolculuk 3D ve sunum linki testlerini calistir
+        run: npx playwright test tests/muteahhit-auth.spec.ts tests/muteahhit-3d-live.spec.ts tests/project-presentation-positive.spec.ts --trace=off
 
       - name: Playwright raporunu yukle
         if: always()
