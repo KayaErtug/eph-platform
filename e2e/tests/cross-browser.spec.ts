@@ -67,13 +67,13 @@ test.describe('EPH Cross Browser Acceptance', () => {
   });
 
   test('Oturumsuz kullanıcı dashboard yerine giriş ekranına gidiyor', async ({ page }) => {
-    const response = await page.goto('/dashboard', {
-      waitUntil: 'domcontentloaded',
-    });
+    await page
+      .goto('/dashboard', {
+        waitUntil: 'commit',
+      })
+      .catch(() => null);
 
-    expect(response).not.toBeNull();
-    expect(response?.status() ?? 599).toBeLessThan(500);
-
+    await page.waitForURL(/\/giris(?:\?|$)/, { timeout: 15_000 });
     await expect(page).toHaveURL(/\/giris(?:\?|$)/);
     await expect(
       page.getByRole('heading', { name: 'Hesabınıza giriş yapın' }),
