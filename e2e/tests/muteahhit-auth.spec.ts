@@ -1,11 +1,12 @@
 import {
   expect,
   test,
-  type APIRequestContext,
   type Browser,
   type BrowserContext,
   type Page,
 } from '@playwright/test';
+
+import { loginWithStandaloneRequest } from './helpers/live-auth';
 
 const email = process.env.EPH_TEST_MUTEAHHIT_EMAIL?.trim() || '';
 const password = process.env.EPH_TEST_MUTEAHHIT_PASSWORD || '';
@@ -74,12 +75,6 @@ type AuthUser = {
   nominationQuota?: number;
 };
 
-type AuthPayload = {
-  token?: string;
-  user?: AuthUser;
-  message?: string;
-};
-
 type ApiAuthenticatedContext = {
   context: BrowserContext;
   token: string;
@@ -91,24 +86,25 @@ function isMuteahhitRole(role?: string) {
   return ['MUTEAHHIT', 'MÜTEAHHİT', 'MÜTAHHİT'].includes(normalized);
 }
 
-async function authenticateMuteahhit(
-  request: APIRequestContext,
-): Promise<{ token: string; user: AuthUser }> {
-  const response = await request.post(`${baseURL}/api/auth/login`, {
-    data: { email, password },
-    timeout: 20_000,
+async function authenticateMuteahhit(): Promise<{
+  token: string;
+  user: AuthUser;
+}> {
+  const result = await loginWithStandaloneRequest<AuthUser>({
+    baseURL,
+    email,
+    password,
+    accountLabel: 'EPH Müteahhit test hesabı',
+    attempts: 2,
+    timeoutMs: 30_000,
+    retryDelayMs: 1_500,
   });
 
-  let payload: AuthPayload = {};
-  try {
-    payload = (await response.json()) as AuthPayload;
-  } catch {
-    payload = {};
-  }
+  const payload = result.payload;
 
-  if (!response.ok()) {
+  if (!result.ok) {
     throw new Error(
-      `EPH Müteahhit test hesabı doğrulanamadı (HTTP ${response.status()}): ${
+      `EPH Müteahhit test hesabı doğrulanamadı (HTTP ${result.status}): ${
         payload.message || 'Giriş reddedildi.'
       }`,
     );
@@ -137,8 +133,8 @@ async function authenticateMuteahhit(
 async function createApiAuthenticatedContext(
   browser: Browser,
 ): Promise<ApiAuthenticatedContext> {
+  const { token, user } = await authenticateMuteahhit();
   const context = await browser.newContext();
-  const { token, user } = await authenticateMuteahhit(context.request);
   return { context, token, user };
 }
 
@@ -335,8 +331,15 @@ test.describe('EPH Müteahhit Canlı Oturum', () => {
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await visitWithRetry(page, '/dashboard');
-    await page.getByRole('button', { name: 'Menü' }).click();
-    await page.getByText('Çıkış Yap', { exact: true }).click();
+    await page.waitForLoadState('load');
+
+    const logoutMenuButton = page.getByRole('button', { name: 'Menü' });
+    await expect(logoutMenuButton).toBeVisible();
+    await logoutMenuButton.click();
+
+    const logoutDrawer = page.locator('.eph-mobile-menu-drawer');
+    await expect(logoutDrawer).toBeVisible();
+    await logoutDrawer.getByText('Çıkış Yap', { exact: true }).click();
     await expect(page).toHaveURL(/\/giris(?:\?|$)/);
 
     await page.goto('/proje-satis-sablonu', {

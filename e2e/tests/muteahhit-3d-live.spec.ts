@@ -1,9 +1,10 @@
 import {
   expect,
   test,
-  type APIRequestContext,
   type Browser,
 } from '@playwright/test';
+
+import { loginWithStandaloneRequest } from './helpers/live-auth';
 
 const email = process.env.EPH_TEST_MUTEAHHIT_EMAIL?.trim() || '';
 const password = process.env.EPH_TEST_MUTEAHHIT_PASSWORD || '';
@@ -16,12 +17,6 @@ type AuthUser = {
   role?: string;
 };
 
-type AuthPayload = {
-  token?: string;
-  user?: AuthUser;
-  message?: string;
-};
-
 type ProjectRow = {
   id?: string;
 };
@@ -31,22 +26,22 @@ function isMuteahhitRole(role?: string) {
   return ['MUTEAHHIT', 'MÜTEAHHİT', 'MÜTAHHİT'].includes(normalized);
 }
 
-async function authenticateMuteahhit(request: APIRequestContext) {
-  const response = await request.post(`${baseURL}/api/auth/login`, {
-    data: { email, password },
-    timeout: 20_000,
+async function authenticateMuteahhit() {
+  const result = await loginWithStandaloneRequest<AuthUser>({
+    baseURL,
+    email,
+    password,
+    accountLabel: 'EPH Müteahhit 3D test hesabı',
+    attempts: 2,
+    timeoutMs: 30_000,
+    retryDelayMs: 1_500,
   });
 
-  let payload: AuthPayload = {};
-  try {
-    payload = (await response.json()) as AuthPayload;
-  } catch {
-    payload = {};
-  }
+  const payload = result.payload;
 
-  if (!response.ok()) {
+  if (!result.ok) {
     throw new Error(
-      `EPH Müteahhit test hesabı doğrulanamadı (HTTP ${response.status()}): ${
+      `EPH Müteahhit test hesabı doğrulanamadı (HTTP ${result.status}): ${
         payload.message || 'Giriş reddedildi.'
       }`,
     );
@@ -63,8 +58,8 @@ async function authenticateMuteahhit(request: APIRequestContext) {
 }
 
 async function createAuthenticatedPage(browser: Browser) {
+  const { token, user } = await authenticateMuteahhit();
   const context = await browser.newContext();
-  const { token, user } = await authenticateMuteahhit(context.request);
 
   await context.addCookies([
     {
