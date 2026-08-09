@@ -65,6 +65,11 @@ async function expectHealthyPage(page: Page, path: string) {
   ).toEqual([]);
 }
 
+async function openHydratedLogin(page: Page) {
+  await page.goto('/giris', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('button', { name: 'Giriş Yap' })).toBeEnabled();
+}
+
 test.describe('EPH P0 Smoke', () => {
   test('Giriş sayfası sağlıklı açılıyor', async ({ page }) => {
     await expectHealthyPage(page, '/giris');
@@ -82,22 +87,23 @@ test.describe('EPH P0 Smoke', () => {
     await expectHealthyPage(page, '/kayit');
   });
 
-  test('Giriş formu hatalı alanları kullanıcıya bildiriyor', async ({ page }) => {
-    await page.goto('/giris', { waitUntil: 'domcontentloaded' });
+  test('Giriş formu kısa şifreyi kullanıcıya bildiriyor', async ({ page }) => {
+    await openHydratedLogin(page);
     await page
       .getByRole('textbox', { name: 'E-posta adresi' })
-      .fill('gecersiz-email');
+      .fill('playwright-validation@example.com');
     await page.locator('#password').fill('123');
     await page.getByRole('button', { name: 'Giriş Yap' }).click();
 
-    await expect(page.locator('.login-error').first()).toBeVisible();
-    expect(await page.locator('.login-error').count()).toBeGreaterThanOrEqual(2);
+    await expect(page.locator('.login-error')).toContainText(
+      'Şifre en az 6 karakter olmalıdır',
+    );
     await expect(page).toHaveURL(/\/giris(?:\?|$)/);
     await expectNoTechnicalErrorText(page, 'hatalı giriş formu');
   });
 
   test('Geçersiz giriş kullanıcı dostu hata gösteriyor', async ({ page }) => {
-    await page.route('**/auth/login', async (route) => {
+    await page.route(/\/auth\/login(?:\?|$)/, async (route) => {
       await route.fulfill({
         status: 401,
         contentType: 'application/json',
@@ -105,12 +111,18 @@ test.describe('EPH P0 Smoke', () => {
       });
     });
 
-    await page.goto('/giris', { waitUntil: 'domcontentloaded' });
+    await openHydratedLogin(page);
     await page
       .getByRole('textbox', { name: 'E-posta adresi' })
       .fill('playwright-test@example.com');
     await page.locator('#password').fill('YanlisSifre123!');
+
+    const loginRequest = page.waitForRequest((request) =>
+      /\/auth\/login(?:\?|$)/.test(request.url()),
+    );
+
     await page.getByRole('button', { name: 'Giriş Yap' }).click();
+    await loginRequest;
 
     await expect(page.locator('.login-server-error')).toContainText(
       'E-posta veya şifre hatalı.',
