@@ -644,6 +644,7 @@ function KayitForm() {
                       <>
                         <input type="hidden" {...register("role")} />
                         <select
+                          aria-label="Üyelik Türü"
                           value={selectedRegistrationType || ""}
                           onChange={(event) =>
                             onRegistrationTypeChange(
@@ -698,6 +699,7 @@ function KayitForm() {
 
                   <FormRow icon={<MapPin size={18} />} label="Şehir">
                     <select
+                      aria-label="Şehir"
                       {...register("city")}
                       className="input"
                       defaultValue=""
