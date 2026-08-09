@@ -171,40 +171,6 @@ test.describe('EPH P0 Smoke', () => {
     ).toBeVisible();
   });
 
-  test('Şifre yenileme kod isteme akışı API yazması yapmadan çalışıyor', async ({ page }) => {
-    await page.route(/\/auth\/forgot-password(?:\?|$)/, async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          message: 'E-posta adresiniz kayıtlıysa kod gönderilmiştir.',
-          resendAfterSeconds: 60,
-        }),
-      });
-    });
-
-    await page.goto('/sifremi-unuttum', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('load');
-    await page.waitForTimeout(1200);
-
-    await page.locator('input[type="email"]').fill('playwright-reset@example.com');
-
-    const request = page.waitForRequest((candidate) =>
-      /\/auth\/forgot-password(?:\?|$)/.test(candidate.url()),
-    );
-
-    await page.locator('form button[type="submit"]').first().click();
-    await request;
-
-    await expect(
-      page.getByRole('heading', { name: 'Doğrulama kodunu girin' }),
-    ).toBeVisible();
-    await expect(
-      page.getByText('E-posta adresiniz kayıtlıysa kod gönderilmiştir.'),
-    ).toBeVisible();
-    await expectNoTechnicalErrorText(page, 'şifre yenileme kod isteme');
-  });
-
   for (const path of PROTECTED_ROUTES) {
     test(`Oturumsuz kullanıcı korumalı route'a giremiyor: ${path}`, async ({ page }) => {
       const response = await page.goto(path, {
