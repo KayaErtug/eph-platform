@@ -71,8 +71,10 @@ test.describe('EPH P0 Smoke', () => {
     await expect(
       page.getByRole('heading', { name: 'Hesabınıza giriş yapın' }),
     ).toBeVisible();
-    await expect(page.getByLabel('E-posta adresi')).toBeVisible();
-    await expect(page.getByLabel('Şifre')).toBeVisible();
+    await expect(
+      page.getByRole('textbox', { name: 'E-posta adresi' }),
+    ).toBeVisible();
+    await expect(page.locator('#password')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Giriş Yap' })).toBeVisible();
   });
 
@@ -80,14 +82,18 @@ test.describe('EPH P0 Smoke', () => {
     await expectHealthyPage(page, '/kayit');
   });
 
-  test('Giriş formu boş gönderimde doğrulama yapıyor', async ({ page }) => {
+  test('Giriş formu hatalı alanları kullanıcıya bildiriyor', async ({ page }) => {
     await page.goto('/giris', { waitUntil: 'domcontentloaded' });
+    await page
+      .getByRole('textbox', { name: 'E-posta adresi' })
+      .fill('gecersiz-email');
+    await page.locator('#password').fill('123');
     await page.getByRole('button', { name: 'Giriş Yap' }).click();
 
     await expect(page.locator('.login-error').first()).toBeVisible();
-    expect(await page.locator('.login-error').count()).toBeGreaterThanOrEqual(1);
+    expect(await page.locator('.login-error').count()).toBeGreaterThanOrEqual(2);
     await expect(page).toHaveURL(/\/giris(?:\?|$)/);
-    await expectNoTechnicalErrorText(page, 'boş giriş formu');
+    await expectNoTechnicalErrorText(page, 'hatalı giriş formu');
   });
 
   test('Geçersiz giriş kullanıcı dostu hata gösteriyor', async ({ page }) => {
@@ -100,8 +106,10 @@ test.describe('EPH P0 Smoke', () => {
     });
 
     await page.goto('/giris', { waitUntil: 'domcontentloaded' });
-    await page.getByLabel('E-posta adresi').fill('playwright-test@example.com');
-    await page.getByLabel('Şifre').fill('YanlisSifre123!');
+    await page
+      .getByRole('textbox', { name: 'E-posta adresi' })
+      .fill('playwright-test@example.com');
+    await page.locator('#password').fill('YanlisSifre123!');
     await page.getByRole('button', { name: 'Giriş Yap' }).click();
 
     await expect(page.locator('.login-server-error')).toContainText(
