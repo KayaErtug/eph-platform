@@ -8,7 +8,39 @@ const TECHNICAL_ERROR_PATTERNS = [
   /referenceerror/i,
   /typeerror:/i,
   /undefined is not/i,
+  /unexpected token/i,
+  /chunkloaderror/i,
 ];
+
+const PROTECTED_ROUTES = [
+  '/dashboard',
+  '/portfoy',
+  '/havuz',
+  '/network',
+  '/crm',
+  '/lina-firsatlari',
+  '/messages',
+  '/kontor',
+  '/uyelik',
+  '/proje-satis-sablonu',
+  '/admin',
+];
+
+async function expectNoTechnicalErrorText(page: Page, context: string) {
+  const bodyText = await page.locator('body').innerText();
+
+  expect(
+    bodyText.trim().length,
+    `${context} boş sayfa döndürdü`,
+  ).toBeGreaterThan(0);
+
+  for (const pattern of TECHNICAL_ERROR_PATTERNS) {
+    expect(
+      bodyText,
+      `${context} kullanıcıya teknik hata metni gösteriyor: ${pattern}`,
+    ).not.toMatch(pattern);
+  }
+}
 
 async function expectHealthyPage(page: Page, path: string) {
   const pageErrors: string[] = [];
@@ -25,16 +57,7 @@ async function expectHealthyPage(page: Page, path: string) {
   ).toBeLessThan(500);
 
   await expect(page.locator('body')).toBeVisible();
-
-  const bodyText = await page.locator('body').innerText();
-  expect(bodyText.trim().length, `${path} boş sayfa döndürdü`).toBeGreaterThan(0);
-
-  for (const pattern of TECHNICAL_ERROR_PATTERNS) {
-    expect(
-      bodyText,
-      `${path} kullanıcıya teknik hata metni gösteriyor: ${pattern}`,
-    ).not.toMatch(pattern);
-  }
+  await expectNoTechnicalErrorText(page, path);
 
   expect(
     pageErrors,
@@ -45,29 +68,93 @@ async function expectHealthyPage(page: Page, path: string) {
 test.describe('EPH P0 Smoke', () => {
   test('Giriş sayfası sağlıklı açılıyor', async ({ page }) => {
     await expectHealthyPage(page, '/giris');
+    await expect(
+      page.getByRole('heading', { name: 'Hesabınıza giriş yapın' }),
+    ).toBeVisible();
+    await expect(page.getByLabel('E-posta adresi')).toBeVisible();
+    await expect(page.getByLabel('Şifre')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Giriş Yap' })).toBeVisible();
   });
 
   test('Kayıt sayfası sağlıklı açılıyor', async ({ page }) => {
     await expectHealthyPage(page, '/kayit');
   });
 
-  test('Oturumsuz kullanıcı Dashboard yerine girişe yönleniyor', async ({ page }) => {
-    const response = await page.goto('/dashboard', {
-      waitUntil: 'domcontentloaded',
-    });
+  test('Giriş formu boş gönderimde doğrulama yapıyor', async ({ page }) => {
+    await page.goto('/giris', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Giriş Yap' }).click();
 
-    expect(response).not.toBeNull();
-    expect(response?.status() ?? 599).toBeLessThan(500);
+    await expect(page.locator('.login-error').first()).toBeVisible();
+    expect(await page.locator('.login-error').count()).toBeGreaterThanOrEqual(1);
     await expect(page).toHaveURL(/\/giris(?:\?|$)/);
+    await expectNoTechnicalErrorText(page, 'boş giriş formu');
   });
 
-  test('Oturumsuz kullanıcı Havuz yerine girişe yönleniyor', async ({ page }) => {
-    const response = await page.goto('/havuz', {
-      waitUntil: 'domcontentloaded',
+  test('Geçersiz giriş kullanıcı dostu hata gösteriyor', async ({ page }) => {
+    await page.route('**/auth/login', async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'E-posta veya şifre hatalı.' }),
+      });
     });
 
-    expect(response).not.toBeNull();
-    expect(response?.status() ?? 599).toBeLessThan(500);
+    await page.goto('/giris', { waitUntil: 'domcontentloaded' });
+    await page.getByLabel('E-posta adresi').fill('playwright-test@example.com');
+    await page.getByLabel('Şifre').fill('YanlisSifre123!');
+    await page.getByRole('button', { name: 'Giriş Yap' }).click();
+
+    await expect(page.locator('.login-server-error')).toContainText(
+      'E-posta veya şifre hatalı.',
+    );
     await expect(page).toHaveURL(/\/giris(?:\?|$)/);
+    await expectNoTechnicalErrorText(page, 'geçersiz giriş');
+  });
+
+  test('Kayıt bağlantısı doğru sayfaya gidiyor', async ({ page }) => {
+    await page.goto('/giris', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('link', { name: 'Kayıt talebi oluşturun' }).click();
+    await expect(page).toHaveURL(/\/kayit(?:\?|$)/);
+    await expect(page.locator('body')).toBeVisible();
+  });
+
+  for (const path of PROTECTED_ROUTES) {
+    test(`Oturumsuz kullanıcı ${path} yerine girişe yönleniyor`, async ({ page }) => {
+      const response = await page.goto(path, {
+        waitUntil: 'domcontentloaded',
+      });
+
+      expect(response, `${path} için response alınamadı`).not.toBeNull();
+      expect(response?.status() ?? 599).toBeLessThan(500);
+      await expect(page).toHaveURL(/\/giris(?:\?|$)/);
+      await expect(
+        page.getByRole('heading', { name: 'Hesabınıza giriş yapın' }),
+      ).toBeVisible();
+      await expectNoTechnicalErrorText(page, `${path} yetkisiz erişim`);
+    });
+  }
+
+  test('iPhone boyutunda giriş ekranında yatay taşma yok', async ({ page }) => {
+    await page.setViewportSize({ width: 414, height: 736 });
+    await page.goto('/giris', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByRole('button', { name: 'Giriş Yap' })).toBeVisible();
+
+    const layout = await page.evaluate(() => ({
+      innerWidth: window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+    }));
+
+    expect(
+      layout.scrollWidth,
+      `Mobil document taşması: ${JSON.stringify(layout)}`,
+    ).toBeLessThanOrEqual(layout.innerWidth + 1);
+    expect(
+      layout.bodyScrollWidth,
+      `Mobil body taşması: ${JSON.stringify(layout)}`,
+    ).toBeLessThanOrEqual(layout.innerWidth + 1);
+
+    await expectNoTechnicalErrorText(page, 'iPhone giriş görünümü');
   });
 });
