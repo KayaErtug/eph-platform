@@ -1,4 +1,11 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from '@playwright/test';
 
 const email = process.env.EPH_TEST_EMLAKCI_EMAIL?.trim() || '';
 const password = process.env.EPH_TEST_EMLAKCI_PASSWORD || '';
@@ -30,6 +37,17 @@ const MOBILE_ROUTES = [
   '/havuz',
 ];
 
+const HEALTHY_API_ROUTES = [
+  '/api/crm/customers',
+  '/api/crm/pipeline',
+  '/api/pool-projects',
+  '/api/coordination/lina-opportunities',
+  '/api/kontor/cuzdan',
+  '/api/kontor/hareketler',
+  '/api/kontor/ozet',
+  '/api/kontor/paket',
+];
+
 const TECHNICAL_ERROR_PATTERNS = [
   /application error/i,
   /internal server error/i,
@@ -40,29 +58,55 @@ const TECHNICAL_ERROR_PATTERNS = [
   /chunkloaderror/i,
 ];
 
+const POOL_FORBIDDEN_OWNER_KEYS = new Set([
+  'ownername',
+  'ownerfirstname',
+  'ownerlastname',
+  'ownerphone',
+  'owneremail',
+  'ownertckimlikno',
+  'ownertckn',
+  'tapusahibi',
+  'tapuowner',
+  'tapuownername',
+  'tapuownertc',
+  'tapuownertckimlikno',
+  'taxnumber',
+  'vkn',
+  'yetkibelgesi',
+  'authorizationdocument',
+]);
+
+type AuthUser = {
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  role?: string;
+  capabilities?: string[];
+  isApproved?: boolean;
+  referralCode?: string | null;
+  nominationPoints?: number;
+  nominationQuota?: number;
+};
+
 type AuthPayload = {
   token?: string;
-  user?: {
-    id?: string;
-    firstName?: string;
-    lastName?: string;
-    email?: string;
-    role?: string;
-    capabilities?: string[];
-    isApproved?: boolean;
-    referralCode?: string | null;
-    nominationPoints?: number;
-    nominationQuota?: number;
-  };
+  user?: AuthUser;
   message?: string;
 };
 
-async function createAuthenticatedEmlakciContext(
-  browser: Browser,
-): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext();
+type AuthenticatedContext = {
+  context: BrowserContext;
+  page: Page;
+  token: string;
+  user: AuthUser;
+};
 
-  const response = await context.request.post(`${baseURL}/api/auth/login`, {
+async function authenticateEmlakci(
+  request: APIRequestContext,
+): Promise<{ token: string; user: AuthUser }> {
+  const response = await request.post(`${baseURL}/api/auth/login`, {
     data: {
       email,
       password,
@@ -89,14 +133,27 @@ async function createAuthenticatedEmlakciContext(
   const user = payload.user;
 
   if (!token || !user?.id) {
-    throw new Error('EPH Emlakçı test hesabı için token veya kullanıcı bilgisi alınamadı.');
+    throw new Error(
+      'EPH Emlakçı test hesabı için token veya kullanıcı bilgisi alınamadı.',
+    );
   }
 
   if (user.role !== 'EMLAKCI') {
     throw new Error(
-      `EPH test hesabının rolü EMLAKCI değil: ${String(user.role || 'BILINMIYOR')}`,
+      `EPH test hesabının rolü EMLAKCI değil: ${String(
+        user.role || 'BILINMIYOR',
+      )}`,
     );
   }
+
+  return { token, user };
+}
+
+async function createAuthenticatedEmlakciContext(
+  browser: Browser,
+): Promise<AuthenticatedContext> {
+  const context = await browser.newContext();
+  const { token, user } = await authenticateEmlakci(context.request);
 
   await context.addCookies([
     {
@@ -136,7 +193,7 @@ async function createAuthenticatedEmlakciContext(
   await expect(page).toHaveURL(/\/dashboard(?:\?|$)/);
   await expect(page.locator('body')).toBeVisible();
 
-  return { context, page };
+  return { context, page, token, user };
 }
 
 async function visitWithRetry(page: Page, path: string) {
@@ -173,10 +230,45 @@ async function expectNoTechnicalText(page: Page, path: string) {
   }
 }
 
-test.describe('EPH Emlakçı Canlı Oturum', () => {
-  test.skip(!email || !password, 'EPH Emlakçı test hesabı GitHub Secrets içinde tanımlı değil.');
+function collectForbiddenKeys(
+  value: unknown,
+  path = '$',
+  findings: string[] = [],
+): string[] {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      collectForbiddenKeys(item, `${path}[${index}]`, findings);
+    });
+    return findings;
+  }
 
-  test('Emlakçı ana kullanıcı yolculuğu, rol menüsü, API sağlığı ve mobil görünüm', async ({ browser }) => {
+  if (!value || typeof value !== 'object') {
+    return findings;
+  }
+
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    const normalizedKey = key.toLocaleLowerCase('tr-TR').replaceAll('_', '');
+    const childPath = `${path}.${key}`;
+
+    if (POOL_FORBIDDEN_OWNER_KEYS.has(normalizedKey)) {
+      findings.push(childPath);
+    }
+
+    collectForbiddenKeys(child, childPath, findings);
+  }
+
+  return findings;
+}
+
+test.describe('EPH Emlakçı Canlı Oturum', () => {
+  test.skip(
+    !email || !password,
+    'EPH Emlakçı test hesabı GitHub Secrets içinde tanımlı değil.',
+  );
+
+  test('Emlakçı ana kullanıcı yolculuğu, rol menüsü, API sağlığı ve mobil görünüm', async ({
+    browser,
+  }) => {
     const { context, page } = await createAuthenticatedEmlakciContext(browser);
     const pageErrors: string[] = [];
     const serverErrors: string[] = [];
@@ -194,7 +286,9 @@ test.describe('EPH Emlakçı Canlı Oturum', () => {
 
     await page.getByRole('button', { name: 'Menü' }).click();
     await expect(page.getByText('Emlakçı', { exact: true })).toBeVisible();
-    await expect(page.getByText('Proje Satış Merkezi', { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByText('Proje Satış Merkezi', { exact: true }),
+    ).toHaveCount(0);
 
     for (const label of [
       'Anasayfa',
@@ -274,6 +368,98 @@ test.describe('EPH Emlakçı Canlı Oturum', () => {
 
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(/\/giris(?:\?|$)/);
+
+    await context.close();
+  });
+
+  test('Emlakçı API sağlık, Havuz mahremiyeti ve Proje Satış yetki sınırı', async ({
+    browser,
+  }) => {
+    const { context, page, token, user } =
+      await createAuthenticatedEmlakciContext(browser);
+    const authHeaders = {
+      Authorization: `Bearer ${token}`,
+    };
+
+    for (const path of HEALTHY_API_ROUTES) {
+      const response = await context.request.get(`${baseURL}${path}`, {
+        headers: authHeaders,
+        timeout: 20_000,
+      });
+
+      expect.soft(
+        response.status(),
+        `${path} beklenmeyen HTTP ${response.status()} döndürdü`,
+      ).toBeLessThan(500);
+      expect.soft(
+        response.status(),
+        `${path} Emlakçı hesabını yetkisiz saydı`,
+      ).not.toBe(401);
+      expect.soft(
+        response.status(),
+        `${path} Emlakçı hesabını rol nedeniyle engelledi`,
+      ).not.toBe(403);
+    }
+
+    const conversationsResponse = await context.request.get(
+      `${baseURL}/api/conversations?userId=${encodeURIComponent(
+        String(user.id || ''),
+      )}`,
+      {
+        headers: authHeaders,
+        timeout: 20_000,
+      },
+    );
+    expect.soft(conversationsResponse.status()).toBeLessThan(500);
+    expect.soft(conversationsResponse.status()).not.toBe(401);
+    expect.soft(conversationsResponse.status()).not.toBe(403);
+
+    const poolResponse = await context.request.get(
+      `${baseURL}/api/pool-projects`,
+      {
+        headers: authHeaders,
+        timeout: 20_000,
+      },
+    );
+    expect(poolResponse.status()).toBe(200);
+
+    const poolPayload = await poolResponse.json();
+    const privacyFindings = collectForbiddenKeys(poolPayload);
+    expect.soft(
+      privacyFindings,
+      `Havuz API'sinde portföy/proje sahibine ait yasak alanlar bulundu: ${privacyFindings.join(
+        ', ',
+      )}`,
+    ).toEqual([]);
+
+    const projectSalesApiResponse = await context.request.get(
+      `${baseURL}/api/project-sales/projects`,
+      {
+        headers: authHeaders,
+        timeout: 20_000,
+      },
+    );
+    expect(
+      projectSalesApiResponse.status(),
+      'Emlakçı backend seviyesinde Proje Satış Merkezi API erişimi almamalı.',
+    ).toBe(403);
+
+    await page.goto('/proje-satis-sablonu', {
+      waitUntil: 'domcontentloaded',
+      timeout: 20_000,
+    });
+    await page.waitForTimeout(700);
+
+    await expect(
+      page.getByText('Bu Modüle Erişim Yetkiniz Yok', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Yeni Proje Oluştur', { exact: true }),
+    ).toHaveCount(0);
+    await expectNoTechnicalText(
+      page,
+      '/proje-satis-sablonu Emlakçı yetki reddi',
+    );
 
     await context.close();
   });
