@@ -6,6 +6,7 @@
     "test": "playwright test",
     "test:smoke": "playwright test tests/smoke.spec.ts",
     "test:emlakci": "playwright test tests/emlakci-auth.spec.ts",
+    "test:muteahhit": "playwright test tests/muteahhit-auth.spec.ts",
     "report": "playwright show-report"
   },
   "devDependencies": {
