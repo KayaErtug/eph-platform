@@ -20,6 +20,7 @@ import {
   Mic,
   Phone,
   PhoneCall,
+  Pencil,
   Plus,
   Search,
   Sparkles,
@@ -68,6 +69,24 @@ interface Customer {
   interests?: CustomerInterest[];
   properties?: CustomerProperty[];
   owner?: { firstName: string; lastName: string; role: string };
+}
+
+interface CustomerUpdatePayload {
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  email: string | null;
+  city: string | null;
+  profession: string | null;
+  company: string | null;
+  budget: number | null;
+  interestedArea: string | null;
+  interestedType: string | null;
+  source: string | null;
+  status: string;
+  roles: string[];
+  tags: string[];
+  notes: string | null;
 }
 
 interface Activity {
@@ -1408,6 +1427,14 @@ export default function CrmPage() {
     await fetchAll();
   };
 
+  const handleUpdateCustomer = async (payload: CustomerUpdatePayload) => {
+    if (!selectedCustomer) return;
+
+    await api.patch(`/crm/customers/${selectedCustomer.id}`, payload);
+    await refreshSelectedCustomer(selectedCustomer.id);
+    await fetchAll();
+  };
+
   const handleAddActivity = async () => {
     if (!selectedCustomer || !activityForm.note) return;
     setActivityLoading(true);
@@ -2244,6 +2271,7 @@ export default function CrmPage() {
             customer={selectedCustomer}
             onClose={() => setSelectedCustomer(null)}
             onStatusChange={handleStatusChange}
+            onUpdateCustomer={handleUpdateCustomer}
             onUpdateRoles={handleUpdateRoles}
             activityForm={activityForm}
             setActivityForm={setActivityForm}
@@ -2664,6 +2692,7 @@ export default function CrmPage() {
           customer={selectedCustomer}
           onClose={() => setSelectedCustomer(null)}
           onStatusChange={handleStatusChange}
+          onUpdateCustomer={handleUpdateCustomer}
           onUpdateRoles={handleUpdateRoles}
           activityForm={activityForm}
           setActivityForm={setActivityForm}
@@ -5247,6 +5276,7 @@ function CustomerDetailModal({
   customer,
   onClose,
   onStatusChange,
+  onUpdateCustomer,
   onUpdateRoles,
   activityForm,
   setActivityForm,
@@ -5273,6 +5303,7 @@ function CustomerDetailModal({
   customer: Customer;
   onClose: () => void;
   onStatusChange: (customerId: string, status: string) => void;
+  onUpdateCustomer: (payload: CustomerUpdatePayload) => Promise<void>;
   onUpdateRoles: (roles: string[]) => void;
   activityForm: { type: string; note: string };
   setActivityForm: React.Dispatch<React.SetStateAction<{ type: string; note: string }>>;
@@ -5358,7 +5389,7 @@ function CustomerDetailModal({
         </div>
 
         <div className="eph-crm-modal-body space-y-6 p-5">
-          {activeTab === "genel" && <GeneralTab customer={customer} />}
+          {activeTab === "genel" && <GeneralTab customer={customer} onUpdateCustomer={onUpdateCustomer} />}
           {activeTab === "roller" && <RolesTab customer={customer} onUpdateRoles={onUpdateRoles} />}
           {activeTab === "ilgiler" && (
             <InterestsTab
@@ -5386,7 +5417,30 @@ function CustomerDetailModal({
   );
 }
 
-function GeneralTab({ customer }: { customer: Customer }) {
+function GeneralTab({
+  customer,
+  onUpdateCustomer,
+}: {
+  customer: Customer;
+  onUpdateCustomer: (payload: CustomerUpdatePayload) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    fullName: `${customer.firstName} ${customer.lastName}`.trim(),
+    phone: customer.phone || "",
+    email: customer.email || "",
+    city: customer.city || "",
+    profession: customer.profession || "",
+    company: customer.company || "",
+    budget: customer.budget ? String(customer.budget) : "",
+    interestedArea: customer.interestedArea || "",
+    interestedType: customer.interestedType || "",
+    source: customer.source || "",
+    roles: customer.roles || [],
+    tags: customer.tags || [],
+    notes: customer.notes || "",
+  });
   const budgetBounds = getCustomerBudgetBounds(customer);
   const propertyTypeLabels = Array.from(
     new Set(
@@ -5399,8 +5453,111 @@ function GeneralTab({ customer }: { customer: Customer }) {
     customer.interestedType ||
     "—";
 
+  useEffect(() => {
+    setForm({
+      fullName: `${customer.firstName} ${customer.lastName}`.trim(),
+      phone: customer.phone || "",
+      email: customer.email || "",
+      city: customer.city || "",
+      profession: customer.profession || "",
+      company: customer.company || "",
+      budget: customer.budget ? String(customer.budget) : "",
+      interestedArea: customer.interestedArea || "",
+      interestedType: customer.interestedType || "",
+      source: customer.source || "",
+      roles: customer.roles || [],
+      tags: customer.tags || [],
+      notes: customer.notes || "",
+    });
+  }, [customer]);
+
+  const setField = (key: keyof typeof form, value: string) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const handleSave = async () => {
+    const { firstName, lastName } = splitCustomerFullName(form.fullName);
+
+    if (!firstName || !lastName) {
+      alert("Ad ve soyadı birlikte yazın.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await onUpdateCustomer({
+        firstName,
+        lastName,
+        phone: onlyDigits(form.phone).slice(0, 11) || null,
+        email: form.email.trim() || null,
+        city: form.city.trim() || null,
+        profession: form.profession.trim() || null,
+        company: form.company.trim() || null,
+        budget: form.budget ? Number(onlyDigits(form.budget)) : null,
+        interestedArea: form.interestedArea.trim() || null,
+        interestedType: form.interestedType.trim() || null,
+        source: form.source || null,
+        status: customer.status,
+        roles: form.roles,
+        tags: form.tags,
+        notes: form.notes.trim() || null,
+      });
+      setEditing(false);
+    } catch (error: any) {
+      alert(error?.response?.data?.message || "CRM kaydı güncellenemedi.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Ad Soyad *"><input className="premium-input" value={form.fullName} onChange={(event) => setField("fullName", event.target.value)} /></Field>
+          <Field label="Telefon"><input className="premium-input" inputMode="numeric" value={formatTurkishPhoneInput(form.phone)} onChange={(event) => setField("phone", onlyDigits(event.target.value).slice(0, 11))} /></Field>
+          <Field label="E-posta"><input className="premium-input" type="email" value={form.email} onChange={(event) => setField("email", event.target.value)} /></Field>
+          <Field label="Şehir"><input className="premium-input" value={form.city} onChange={(event) => setField("city", event.target.value)} /></Field>
+          <Field label="Meslek / Ünvan"><input className="premium-input" value={form.profession} onChange={(event) => setField("profession", event.target.value)} /></Field>
+          <Field label="Firma / Ofis"><input className="premium-input" value={form.company} onChange={(event) => setField("company", event.target.value)} /></Field>
+          <Field label="Genel Bütçe"><input className="premium-input" inputMode="numeric" value={formatBudgetInput(form.budget)} onChange={(event) => setField("budget", onlyDigits(event.target.value))} /></Field>
+          <Field label="İlgilendiği Bölge"><input className="premium-input" value={form.interestedArea} onChange={(event) => setField("interestedArea", event.target.value)} /></Field>
+          <Field label="İlgilendiği Mülk Tipi"><input className="premium-input" value={form.interestedType} onChange={(event) => setField("interestedType", event.target.value)} /></Field>
+          <Field label="Potansiyel Müşteri Kaynağı">
+            <select className="premium-input" value={form.source} onChange={(event) => setField("source", event.target.value)}>
+              <option value="">Kaynak seç</option>
+              {LEAD_SOURCE_OPTIONS.map((source) => <option key={source} value={source}>{source}</option>)}
+            </select>
+          </Field>
+        </div>
+
+        <FormSection title="Müşteri Rolleri">
+          <MultiOptionGrid options={CUSTOMER_ROLES} value={form.roles} onChange={(roles) => setForm((current) => ({ ...current, roles }))} />
+        </FormSection>
+
+        <FormSection title="Etiketler">
+          <MultiOptionGrid options={TAGS.map((tag) => ({ key: tag, label: tag }))} value={form.tags} onChange={(tags) => setForm((current) => ({ ...current, tags }))} />
+        </FormSection>
+
+        <Field label="Müşteri Notu"><textarea className="premium-input min-h-[120px] resize-none py-3" value={form.notes} onChange={(event) => setField("notes", event.target.value)} /></Field>
+
+        <div className="grid grid-cols-2 gap-3">
+          <button type="button" onClick={handleSave} disabled={saving} className="flex min-h-12 items-center justify-center rounded-2xl bg-[#2563EB] px-4 text-sm font-black text-white disabled:opacity-50">
+            {saving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
+          </button>
+          <button type="button" onClick={() => setEditing(false)} disabled={saving} className="min-h-12 rounded-2xl border-2 border-[#C7D6E8] bg-white px-4 text-sm font-black text-[#64748B]">İptal</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
+      <button type="button" onClick={() => setEditing(true)} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#2563EB] px-4 text-sm font-black text-white shadow-[0_10px_22px_rgba(37,99,235,0.20)]">
+        <Pencil size={17} /> CRM Kaydını Güncelle
+      </button>
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {[
           { label: "Telefon", value: customer.phone ? formatTurkishPhoneInput(customer.phone) : "—" },
@@ -6153,5 +6310,3 @@ function TeamLeaderModeSwitch({
     </section>
   );
 }
-
-
