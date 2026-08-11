@@ -17,7 +17,6 @@ import {
   MapPin,
   MessageCircle,
   Share2,
-  Sparkles,
   Tag,
   UserRound,
   X,
@@ -974,15 +973,6 @@ export default function NetworkPostDetailPage() {
         />
       )}
 
-      <button
-        type="button"
-        onClick={() => router.push("/lina")}
-        className="fixed right-4 z-30 flex h-[60px] w-[60px] flex-col items-center justify-center rounded-full bg-gradient-to-br from-[#7C3AED] to-[#4F46E5] text-white shadow-[0_14px_28px_rgba(79,70,229,0.30)]"
-        style={{ bottom: "calc(76px + env(safe-area-inset-bottom, 0px))" }}
-      >
-        <Sparkles size={20} fill="white" />
-        <span className="mt-0.5 text-[10px] font-black">Lina</span>
-      </button>
     </main>
   );
 }

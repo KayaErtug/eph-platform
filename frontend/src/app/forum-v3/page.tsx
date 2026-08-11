@@ -9,7 +9,6 @@ import {
   MessageCircle,
   Plus,
   Search,
-  Sparkles,
   Star,
   TrendingUp,
   UsersRound,
@@ -178,9 +177,8 @@ export default function ForumV3PreviewPage() {
             Bildirimler
           </h2>
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <ActionButton icon={<Bell size={17} />} label="Bildirim" href="/notification-settings" />
-            <ActionButton icon={<Sparkles size={17} />} label="Lina" href="/lina" />
             <ActionButton icon={<MessageCircle size={17} />} label="Mesaj" href="/messages" />
           </div>
         </section>

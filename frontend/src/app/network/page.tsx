@@ -1635,16 +1635,6 @@ export default function NetworkPage() {
         </section>
       </div>
 
-      <button
-        type="button"
-        onClick={() => router.push("/lina")}
-        className="fixed right-4 z-30 flex h-[76px] w-[76px] flex-col items-center justify-center rounded-full bg-gradient-to-br from-[#7C3AED] to-[#4F46E5] text-white shadow-[0_18px_38px_rgba(79,70,229,0.34)]"
-        style={{ bottom: "calc(84px + env(safe-area-inset-bottom, 0px))" }}
-      >
-        <Sparkles size={25} fill="white" />
-        <span className="mt-1 text-[13px] font-black">Lina</span>
-      </button>
-
       <ForumAdvancedFilter
         open={advancedFilterOpen}
         posts={posts}
@@ -2377,4 +2367,3 @@ function TopicModal({
     />
   );
 }
-
