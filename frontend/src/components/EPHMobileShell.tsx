@@ -197,7 +197,6 @@ export function EPHMobileShell({
   const { user, logout, hasHydrated } = useAuthStore();
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showLinaFab, setShowLinaFab] = useState(true);
   const [unreadMessages, setUnreadMessages] = useState(0);
 
   const showShell = shouldShowShell(pathname);
@@ -244,21 +243,6 @@ export function EPHMobileShell({
       window.visualViewport?.removeEventListener("scroll", setViewportVars);
     };
   }, []);
-
-  useEffect(() => {
-    if (pathname.startsWith("/lina")) {
-      setShowLinaFab(false);
-      return;
-    }
-
-    setShowLinaFab(true);
-
-    const timer = window.setTimeout(() => {
-      setShowLinaFab(false);
-    }, 5000);
-
-    return () => window.clearTimeout(timer);
-  }, [pathname]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -601,18 +585,6 @@ export function EPHMobileShell({
       >
         {children}
       </main>
-
-      {!pathname.startsWith("/lina") && showLinaFab && (
-        <button
-          type="button"
-          className="eph-mobile-lina-fab"
-          onClick={openLina}
-          aria-label="Lina"
-        >
-          <span className="eph-mobile-lina-star">✦</span>
-          <span>Lina</span>
-        </button>
-      )}
 
       {showBottomNav && <EPHMobileBottomNav pathname={pathname} />}
     </div>

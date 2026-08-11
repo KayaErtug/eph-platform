@@ -118,6 +118,7 @@ export default function EPHCoordinationDock() {
   const routeKind = getRouteKind(pathname || "");
 
   const [open, setOpen] = useState(false);
+  const [showTriggerLabel, setShowTriggerLabel] = useState(true);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
@@ -274,6 +275,17 @@ export default function EPHCoordinationDock() {
     const timer = window.setInterval(refreshAlerts, 60_000);
     return () => window.clearInterval(timer);
   }, [refreshAlerts, routeKind, user?.id]);
+
+  useEffect(() => {
+    if (!routeKind || open) return;
+
+    setShowTriggerLabel(true);
+    const timer = window.setTimeout(() => {
+      setShowTriggerLabel(false);
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [alerts.length, open, pathname, routeKind]);
 
   useEffect(() => {
     if (!open) return;
@@ -670,19 +682,37 @@ export default function EPHCoordinationDock() {
           </div>
         </section>
       ) : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="relative flex h-14 items-center gap-2 rounded-full border border-[#78B9F1] bg-gradient-to-r from-[#08284A] to-[#0C4D82] px-4 text-sm font-black text-white shadow-[0_14px_36px_rgba(5,35,68,0.42)]"
-        >
-          <Sparkles size={19} className="text-[#8DD3FF]" />
-          Lina Eşleştirme
-          {alerts.length > 0 && (
-            <span className="absolute -right-1 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-amber-400 px-1 text-[11px] font-black text-[#3A2208]">
-              {alerts.length}
-            </span>
+        <div className="flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className={`relative flex items-center justify-center gap-2 rounded-full border border-[#78B9F1] bg-gradient-to-r from-[#08284A] to-[#0C4D82] text-sm font-black text-white shadow-[0_12px_28px_rgba(5,35,68,0.34)] transition-all ${
+              showTriggerLabel ? "h-12 px-4" : "h-11 w-11 px-0"
+            }`}
+            aria-label="Lina Eşleştirme panelini aç"
+            title="Lina Eşleştirme"
+          >
+            <Sparkles size={18} className="shrink-0 text-[#8DD3FF]" />
+            {showTriggerLabel && <span>Lina Eşleştirme</span>}
+            {alerts.length > 0 && (
+              <span className="absolute -right-1 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-amber-400 px-1 text-[11px] font-black text-[#3A2208]">
+                {alerts.length}
+              </span>
+            )}
+          </button>
+
+          {showTriggerLabel && (
+            <button
+              type="button"
+              onClick={() => setShowTriggerLabel(false)}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-[#C7D6E8] bg-white text-[#52657A] shadow-[0_8px_20px_rgba(15,23,42,0.16)]"
+              aria-label="Lina Eşleştirme bildirimini küçült"
+              title="Küçült"
+            >
+              <X size={16} />
+            </button>
           )}
-        </button>
+        </div>
       )}
     </div>
   );
