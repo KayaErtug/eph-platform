@@ -349,9 +349,17 @@ export class LinaController {
     const allowedModules: LinaActionSourceModule[] = [
       "dashboard",
       "crm",
-      "network",
+      "portfolio",
       "pool",
+      "requests",
+      "forum",
+      "network",
+      "project_sales",
+      "kontor",
+      "membership",
+      "messages",
       "notifications",
+      "admin",
       "general",
     ];
 
