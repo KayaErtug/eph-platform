@@ -10,8 +10,11 @@ import {
   Req,
   ServiceUnavailableException,
   UnauthorizedException,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { Request } from "express";
 
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -25,6 +28,7 @@ import { LinaDistanceRequestDto } from "./geo/lina-distance.dto";
 import { LinaDistanceService } from "./geo/lina-distance.service";
 import { LinaMemoryService } from "./lina-memory.service";
 import { LinaService } from "./lina.service";
+import { LinaTranscriptionService } from "./lina-transcription.service";
 
 type LinaRequestUser = {
   id?: string;
@@ -49,6 +53,7 @@ export class LinaController {
     private readonly linaCrmOwnerActionService: LinaCrmOwnerActionService,
     private readonly linaActionEngineService: LinaActionEngineService,
     private readonly linaDistanceService: LinaDistanceService,
+    private readonly linaTranscriptionService: LinaTranscriptionService,
   ) {}
 
   // Lina Temporary Passive Mode V1
@@ -147,6 +152,27 @@ export class LinaController {
     }
 
     return this.linaService.createTextReply(body, user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("transcribe")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      limits: {
+        fileSize: 10 * 1024 * 1024,
+      },
+    }),
+  )
+  async transcribe(
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    if (this.linaTemporarilyDisabled) {
+      throw new ServiceUnavailableException(
+        this.linaTemporarilyDisabledMessage,
+      );
+    }
+
+    return this.linaTranscriptionService.transcribe(file);
   }
 
   @UseGuards(JwtAuthGuard)
