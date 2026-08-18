@@ -20,6 +20,7 @@ import { Request } from "express";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { LinaActionEngineService } from "./actions/lina-action-engine.service";
 import { LinaCrmOwnerActionService } from "./actions/lina-crm-owner-action.service";
+import { LinaNaturalCommandService } from "./actions/lina-natural-command.service";
 import { LinaActionSourceModule } from "./actions/lina-action.types";
 import { LinaChatDto } from "./dto/lina-chat.dto";
 import { LinaPreferencesDto } from "./dto/lina-preferences.dto";
@@ -52,6 +53,7 @@ export class LinaController {
     private readonly linaMemoryService: LinaMemoryService,
     private readonly linaCrmOwnerActionService: LinaCrmOwnerActionService,
     private readonly linaActionEngineService: LinaActionEngineService,
+    private readonly linaNaturalCommandService: LinaNaturalCommandService,
     private readonly linaDistanceService: LinaDistanceService,
     private readonly linaTranscriptionService: LinaTranscriptionService,
   ) {}
@@ -129,8 +131,12 @@ export class LinaController {
       };
     }
 
-    const actionResult = await this.linaActionEngineService.tryExecute(
+    const normalizedMessage = this.linaNaturalCommandService.normalize(
       body?.message,
+    );
+
+    const actionResult = await this.linaActionEngineService.tryExecute(
+      normalizedMessage,
       user,
       sourceModule,
       body?.history,
