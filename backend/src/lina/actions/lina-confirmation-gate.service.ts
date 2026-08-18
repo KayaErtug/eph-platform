@@ -99,8 +99,6 @@ export class LinaConfirmationGateService {
 
     if (this.isConfirmationWord(message)) {
       if (!pending) {
-        // Lina Action Engine içinde zaten var olan özel onay akışlarının
-        // (ör. CRM kayıt taslağı) çalışmasına izin ver.
         return { handled: false };
       }
 
@@ -159,8 +157,6 @@ export class LinaConfirmationGateService {
     }
 
     if (pending) {
-      // Kullanıcı bekleyen taslak varken yeni bir komut verirse eski taslak
-      // geçersiz olur. Yeni komut kendi başına yeniden değerlendirilir.
       this.pendingPlans.delete(userId);
     }
 
@@ -301,9 +297,17 @@ export class LinaConfirmationGateService {
     const labels: Record<LinaActionSourceModule, string> = {
       dashboard: "Ana Panel",
       crm: "CRM",
-      network: "Network",
+      portfolio: "Portföy",
       pool: "Havuz",
+      requests: "Talep Merkezi",
+      forum: "Forum",
+      network: "Network",
+      project_sales: "Proje Satış Merkezi",
+      kontor: "Kontör",
+      membership: "Üyelik",
+      messages: "Mesajlar",
       notifications: "Bildirimler",
+      admin: "Yönetim",
       general: "EPH Platform",
     };
 
