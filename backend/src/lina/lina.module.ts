@@ -6,6 +6,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { PropertyValidationModule } from "../property-validation/property-validation.module";
 
 import { LinaActionEngineService } from "./actions/lina-action-engine.service";
+import { LinaConfirmationGateService } from "./actions/lina-confirmation-gate.service";
 import { LinaCrmOwnerActionService } from "./actions/lina-crm-owner-action.service";
 import { LinaNaturalCommandService } from "./actions/lina-natural-command.service";
 import { EphLocationCatalogService } from "./catalog/eph-location-catalog.service";
@@ -53,6 +54,7 @@ import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
 
     LinaService,
     LinaActionEngineService,
+    LinaConfirmationGateService,
     LinaCrmOwnerActionService,
     LinaNaturalCommandService,
     LinaAccessService,
@@ -91,6 +93,7 @@ import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
   exports: [
     LinaService,
     LinaActionEngineService,
+    LinaConfirmationGateService,
     LinaCrmOwnerActionService,
     LinaNaturalCommandService,
     LinaAccessService,
