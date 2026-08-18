@@ -3,9 +3,17 @@ import { Role } from "@prisma/client";
 export type LinaActionSourceModule =
   | "dashboard"
   | "crm"
-  | "network"
+  | "portfolio"
   | "pool"
+  | "requests"
+  | "forum"
+  | "network"
+  | "project_sales"
+  | "kontor"
+  | "membership"
+  | "messages"
   | "notifications"
+  | "admin"
   | "general";
 
 export type LinaActionUser = {
