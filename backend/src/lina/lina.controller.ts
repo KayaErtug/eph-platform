@@ -19,6 +19,7 @@ import { Request } from "express";
 
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { LinaActionEngineService } from "./actions/lina-action-engine.service";
+import { LinaConfirmationGateService } from "./actions/lina-confirmation-gate.service";
 import { LinaCrmOwnerActionService } from "./actions/lina-crm-owner-action.service";
 import { LinaNaturalCommandService } from "./actions/lina-natural-command.service";
 import { LinaActionSourceModule } from "./actions/lina-action.types";
@@ -53,6 +54,7 @@ export class LinaController {
     private readonly linaMemoryService: LinaMemoryService,
     private readonly linaCrmOwnerActionService: LinaCrmOwnerActionService,
     private readonly linaActionEngineService: LinaActionEngineService,
+    private readonly linaConfirmationGateService: LinaConfirmationGateService,
     private readonly linaNaturalCommandService: LinaNaturalCommandService,
     private readonly linaDistanceService: LinaDistanceService,
     private readonly linaTranscriptionService: LinaTranscriptionService,
@@ -106,10 +108,44 @@ export class LinaController {
 
     const user = this.extractUser(request);
     const sourceModule = this.normalizeSourceModule(body?.sourceModule);
+    const normalizedMessage = this.linaNaturalCommandService.normalize(
+      body?.message,
+    );
+
+    let executionMessage = normalizedMessage;
+    let confirmedGateExecution = false;
+
+    if (user.id && user.role) {
+      const gateResult = this.linaConfirmationGateService.evaluate(
+        normalizedMessage,
+        user.id,
+        sourceModule,
+      );
+
+      if (gateResult.handled && !gateResult.executeMessage) {
+        return {
+          success: gateResult.success ?? true,
+          message:
+            gateResult.message ||
+            "İşlem taslağı hazırlandı ve kullanıcı onayı bekleniyor.",
+          provider: "local" as const,
+          kvkkFiltered: false,
+          detectedTypes: [],
+          action: "confirmation_required",
+          requiresConfirmation: gateResult.requiresConfirmation ?? true,
+          data: gateResult.data,
+        };
+      }
+
+      if (gateResult.executeMessage) {
+        executionMessage = gateResult.executeMessage;
+        confirmedGateExecution = true;
+      }
+    }
 
     const ownerActionResult =
       await this.linaCrmOwnerActionService.tryExecute(
-        body?.message,
+        executionMessage,
         user,
         sourceModule,
         body?.history,
@@ -131,12 +167,8 @@ export class LinaController {
       };
     }
 
-    const normalizedMessage = this.linaNaturalCommandService.normalize(
-      body?.message,
-    );
-
     const actionResult = await this.linaActionEngineService.tryExecute(
-      normalizedMessage,
+      executionMessage,
       user,
       sourceModule,
       body?.history,
@@ -157,7 +189,14 @@ export class LinaController {
       };
     }
 
-    return this.linaService.createTextReply(body, user);
+    const fallbackBody = confirmedGateExecution
+      ? {
+          ...body,
+          message: executionMessage,
+        }
+      : body;
+
+    return this.linaService.createTextReply(fallbackBody, user);
   }
 
   @UseGuards(JwtAuthGuard)
