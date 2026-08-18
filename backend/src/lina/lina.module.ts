@@ -7,6 +7,7 @@ import { PropertyValidationModule } from "../property-validation/property-valida
 
 import { LinaActionEngineService } from "./actions/lina-action-engine.service";
 import { LinaCrmOwnerActionService } from "./actions/lina-crm-owner-action.service";
+import { LinaNaturalCommandService } from "./actions/lina-natural-command.service";
 import { EphLocationCatalogService } from "./catalog/eph-location-catalog.service";
 import { EphSchemaCatalogService } from "./catalog/eph-schema-catalog.service";
 import { LinaUserContextService } from "./catalog/lina-user-context.service";
@@ -53,6 +54,7 @@ import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
     LinaService,
     LinaActionEngineService,
     LinaCrmOwnerActionService,
+    LinaNaturalCommandService,
     LinaAccessService,
     LinaKvkkService,
     LinaAuditService,
@@ -90,6 +92,7 @@ import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
     LinaService,
     LinaActionEngineService,
     LinaCrmOwnerActionService,
+    LinaNaturalCommandService,
     LinaAccessService,
     LinaKvkkService,
     LinaAuditService,
