@@ -22,6 +22,7 @@ import { LinaMemoryService } from "./lina-memory.service";
 import { LinaNotificationService } from "./lina-notification.service";
 import { LinaPropertyValidationService } from "./lina-property-validation.service";
 import { LinaService } from "./lina.service";
+import { LinaTranscriptionService } from "./lina-transcription.service";
 import { LinaVoiceService } from "./lina-voice.service";
 import { LinaCoordinationReadToolProviderService } from "./openai-tools/lina-coordination-read-tool-provider.service";
 import { LinaOpenAiClientService } from "./openai-tools/lina-openai-client.service";
@@ -58,6 +59,7 @@ import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
     LinaMemoryService,
     LinaNotificationService,
     LinaPropertyValidationService,
+    LinaTranscriptionService,
     LinaVoiceService,
 
     LinaPortfolioApprovalValidationService,
@@ -94,6 +96,7 @@ import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
     LinaMemoryService,
     LinaNotificationService,
     LinaPropertyValidationService,
+    LinaTranscriptionService,
     LinaVoiceService,
     LinaPortfolioApprovalValidationService,
     LinaPortfolioSessionService,
