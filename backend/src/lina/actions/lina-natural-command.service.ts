@@ -233,7 +233,9 @@ export class LinaNaturalCommandService {
     const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
     const yyyy = String(date.getUTCFullYear());
 
-    return `${dd}.${mm}.${yyyy}`;
+    // Slash kullanımı önemli: action engine noktalı tarihi "20.08" gibi
+    // bir saat ifadesi sanmamalı. 20/08/2026 açık tarih olarak ayrıştırılır.
+    return `${dd}/${mm}/${yyyy}`;
   }
 
   private normalizeText(value: string): string {
