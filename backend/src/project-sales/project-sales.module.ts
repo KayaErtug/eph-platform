@@ -16,6 +16,8 @@ import { ProjectSalesPricingController } from './project-sales-pricing.controlle
 import { ProjectSalesPricingService } from './project-sales-pricing.service';
 import { ProjectSalesRequestOpportunityController } from './project-sales-request-opportunity.controller';
 import { ProjectSalesRequestOpportunityService } from './project-sales-request-opportunity.service';
+import { ProjectSalesReservationController } from './project-sales-reservation.controller';
+import { ProjectSalesReservationService } from './project-sales-reservation.service';
 import { ProjectSalesSetupFilteredService } from './project-sales-setup-filtered.service';
 import { ProjectSalesSetupService } from './project-sales-setup.service';
 import { ProjectSalesSpacesService } from './project-sales-spaces.service';
@@ -31,6 +33,7 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesCrmOpportunityController,
     ProjectSalesRequestOpportunityController,
     ProjectSalesDemandHeatmapController,
+    ProjectSalesReservationController,
   ],
   providers: [
     ProjectSalesService,
@@ -45,6 +48,7 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesCrmOpportunityService,
     ProjectSalesRequestOpportunityService,
     ProjectSalesDemandHeatmapService,
+    ProjectSalesReservationService,
     {
       provide: ProjectSalesSetupService,
       useClass: ProjectSalesSetupFilteredService,
@@ -66,6 +70,7 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesCrmOpportunityService,
     ProjectSalesRequestOpportunityService,
     ProjectSalesDemandHeatmapService,
+    ProjectSalesReservationService,
     ProjectSalesSetupService,
     ProjectSalesSpacesService,
     ProjectSalesStockService,
