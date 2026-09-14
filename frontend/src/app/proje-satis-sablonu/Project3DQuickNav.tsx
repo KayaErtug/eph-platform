@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Flame, Radar } from "lucide-react";
+import { Box, Flame, Radar, Sparkles } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
 export default function Project3DQuickNav() {
@@ -10,11 +10,26 @@ export default function Project3DQuickNav() {
   const on3D = pathname.startsWith("/proje-satis-sablonu/3d");
   const onRadar = pathname.startsWith("/proje-satis-sablonu/firsat-radari");
   const onHeatmap = pathname.startsWith("/proje-satis-sablonu/talep-isi-haritasi");
+  const onTools = pathname.startsWith("/proje-satis-sablonu/muteahhit-araclari");
 
   if (on3D) return null;
 
   return (
     <div className="fixed bottom-[calc(84px+env(safe-area-inset-bottom))] right-4 z-[70] flex flex-col items-end gap-2 md:bottom-6 md:right-6">
+      {!onTools ? (
+        <button
+          type="button"
+          onClick={() => router.push("/proje-satis-sablonu/muteahhit-araclari")}
+          className="inline-flex h-12 items-center gap-2 rounded-2xl border border-violet-200 bg-white px-4 text-xs font-black text-violet-700 shadow-[0_12px_32px_rgba(124,58,237,0.14)] active:scale-95"
+          aria-label="Müteahhit araçlarını aç"
+        >
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-violet-50">
+            <Sparkles size={16} />
+          </span>
+          Müteahhit Araçları
+        </button>
+      ) : null}
+
       {!onHeatmap ? (
         <button
           type="button"

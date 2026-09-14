@@ -1,14 +1,19 @@
 import { Module } from '@nestjs/common';
+import { LinaModule } from '../lina/lina.module';
 import { ProjectMediaZipService } from './project-media-zip.service';
 import { ProjectSalesAgentChannelController } from './project-sales-agent-channel.controller';
 import { ProjectSalesAgentChannelService } from './project-sales-agent-channel.service';
 import { ProjectSalesCompletionService } from './project-sales-completion.service';
+import { ProjectSalesContractorAssistantController } from './project-sales-contractor-assistant.controller';
+import { ProjectSalesContractorAssistantService } from './project-sales-contractor-assistant.service';
 import { ProjectSalesController } from './project-sales.controller';
 import { ProjectSalesCrmOpportunityController } from './project-sales-crm-opportunity.controller';
 import { ProjectSalesCrmOpportunityService } from './project-sales-crm-opportunity.service';
 import { ProjectSalesDashboardService } from './project-sales-dashboard.service';
 import { ProjectSalesDemandHeatmapController } from './project-sales-demand-heatmap.controller';
 import { ProjectSalesDemandHeatmapService } from './project-sales-demand-heatmap.service';
+import { ProjectSalesFeasibilityController } from './project-sales-feasibility.controller';
+import { ProjectSalesFeasibilityService } from './project-sales-feasibility.service';
 import { ProjectSalesImportService } from './project-sales-import.service';
 import { ProjectSalesInventoryService } from './project-sales-inventory.service';
 import { ProjectSalesLaunchService } from './project-sales-launch.service';
@@ -30,6 +35,7 @@ import { ProjectSalesStructureService } from './project-sales-structure.service'
 import { ProjectSalesService } from './project-sales.service';
 
 @Module({
+  imports: [LinaModule],
   controllers: [
     ProjectSalesController,
     ProjectSalesPresentationShareController,
@@ -40,6 +46,8 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesReservationController,
     ProjectSalesOfferController,
     ProjectSalesAgentChannelController,
+    ProjectSalesFeasibilityController,
+    ProjectSalesContractorAssistantController,
   ],
   providers: [
     ProjectSalesService,
@@ -57,6 +65,8 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesReservationService,
     ProjectSalesOfferService,
     ProjectSalesAgentChannelService,
+    ProjectSalesFeasibilityService,
+    ProjectSalesContractorAssistantService,
     {
       provide: ProjectSalesSetupService,
       useClass: ProjectSalesSetupFilteredService,
@@ -81,6 +91,8 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesReservationService,
     ProjectSalesOfferService,
     ProjectSalesAgentChannelService,
+    ProjectSalesFeasibilityService,
+    ProjectSalesContractorAssistantService,
     ProjectSalesSetupService,
     ProjectSalesSpacesService,
     ProjectSalesStockService,
