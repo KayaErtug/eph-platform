@@ -57,3 +57,6 @@ jobs:
 
       - name: CRM eslesme motoru testleri
         run: npm test -- --runInBand crm-match-engine.service.spec.ts
+
+      - name: Proje satis toplu fiyat testleri
+        run: npm test -- --runInBand project-sales-pricing.service.spec.ts
