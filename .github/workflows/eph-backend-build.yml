@@ -66,3 +66,6 @@ jobs:
 
       - name: Proje satis Talep Merkezi firsat radari testleri
         run: npm test -- --runInBand project-sales-request-opportunity.service.spec.ts
+
+      - name: Proje satis Talep Isi Haritasi testleri
+        run: npm test -- --runInBand project-sales-demand-heatmap.service.spec.ts
