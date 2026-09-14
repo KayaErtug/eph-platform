@@ -35,6 +35,7 @@ jobs:
       - run: npm test -- --runInBand project-sales-demand-heatmap.service.spec.ts
       - run: npm test -- --runInBand project-sales-reservation.service.spec.ts
       - run: npm test -- --runInBand project-sales-offer.service.spec.ts
+      - run: npm test -- --runInBand project-sales-agent-channel.service.spec.ts
 
   frontend-build:
     runs-on: ubuntu-latest
