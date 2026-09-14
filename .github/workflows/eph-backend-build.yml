@@ -75,3 +75,12 @@ jobs:
 
       - name: Proje satis Teklif Odeme Plani testleri
         run: npm test -- --runInBand project-sales-offer.service.spec.ts
+
+      - name: EPH Emlakci Satis Kanali testleri
+        run: npm test -- --runInBand project-sales-agent-channel.service.spec.ts
+
+      - name: Arsa Proje Fizibilite testleri
+        run: npm test -- --runInBand project-sales-feasibility.service.spec.ts
+
+      - name: Lina Muteahhit Asistani testleri
+        run: npm test -- --runInBand project-sales-contractor-assistant.service.spec.ts
