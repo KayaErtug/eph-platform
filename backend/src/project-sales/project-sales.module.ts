@@ -8,6 +8,8 @@ import { ProjectSalesInventoryService } from './project-sales-inventory.service'
 import { ProjectSalesLaunchService } from './project-sales-launch.service';
 import { ProjectSalesMediaSetupService } from './project-sales-media-setup.service';
 import { ProjectSalesPresentationShareController } from './project-sales-presentation-share.controller';
+import { ProjectSalesPricingController } from './project-sales-pricing.controller';
+import { ProjectSalesPricingService } from './project-sales-pricing.service';
 import { ProjectSalesSetupFilteredService } from './project-sales-setup-filtered.service';
 import { ProjectSalesSetupService } from './project-sales-setup.service';
 import { ProjectSalesSpacesService } from './project-sales-spaces.service';
@@ -16,7 +18,11 @@ import { ProjectSalesStructureService } from './project-sales-structure.service'
 import { ProjectSalesService } from './project-sales.service';
 
 @Module({
-  controllers: [ProjectSalesController, ProjectSalesPresentationShareController],
+  controllers: [
+    ProjectSalesController,
+    ProjectSalesPresentationShareController,
+    ProjectSalesPricingController,
+  ],
   providers: [
     ProjectSalesService,
     ProjectSalesCompletionService,
@@ -26,6 +32,7 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesMediaSetupService,
     ProjectMediaZipService,
     ProjectSalesDashboardService,
+    ProjectSalesPricingService,
     {
       provide: ProjectSalesSetupService,
       useClass: ProjectSalesSetupFilteredService,
@@ -43,6 +50,7 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesMediaSetupService,
     ProjectMediaZipService,
     ProjectSalesDashboardService,
+    ProjectSalesPricingService,
     ProjectSalesSetupService,
     ProjectSalesSpacesService,
     ProjectSalesStockService,
