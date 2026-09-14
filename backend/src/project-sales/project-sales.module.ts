@@ -12,6 +12,8 @@ import { ProjectSalesMediaSetupService } from './project-sales-media-setup.servi
 import { ProjectSalesPresentationShareController } from './project-sales-presentation-share.controller';
 import { ProjectSalesPricingController } from './project-sales-pricing.controller';
 import { ProjectSalesPricingService } from './project-sales-pricing.service';
+import { ProjectSalesRequestOpportunityController } from './project-sales-request-opportunity.controller';
+import { ProjectSalesRequestOpportunityService } from './project-sales-request-opportunity.service';
 import { ProjectSalesSetupFilteredService } from './project-sales-setup-filtered.service';
 import { ProjectSalesSetupService } from './project-sales-setup.service';
 import { ProjectSalesSpacesService } from './project-sales-spaces.service';
@@ -25,6 +27,7 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesPresentationShareController,
     ProjectSalesPricingController,
     ProjectSalesCrmOpportunityController,
+    ProjectSalesRequestOpportunityController,
   ],
   providers: [
     ProjectSalesService,
@@ -37,6 +40,7 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesDashboardService,
     ProjectSalesPricingService,
     ProjectSalesCrmOpportunityService,
+    ProjectSalesRequestOpportunityService,
     {
       provide: ProjectSalesSetupService,
       useClass: ProjectSalesSetupFilteredService,
@@ -56,6 +60,7 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesDashboardService,
     ProjectSalesPricingService,
     ProjectSalesCrmOpportunityService,
+    ProjectSalesRequestOpportunityService,
     ProjectSalesSetupService,
     ProjectSalesSpacesService,
     ProjectSalesStockService,
