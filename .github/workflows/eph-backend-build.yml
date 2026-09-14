@@ -60,3 +60,6 @@ jobs:
 
       - name: Proje satis toplu fiyat testleri
         run: npm test -- --runInBand project-sales-pricing.service.spec.ts
+
+      - name: Proje satis CRM firsat radari testleri
+        run: npm test -- --runInBand project-sales-crm-opportunity.service.spec.ts
