@@ -265,7 +265,7 @@ export default function AgentSalesChannelPage() {
                     <div className="grid grid-cols-3 gap-2 text-center text-xs">
                       <div className="rounded-xl bg-[#F4F8FF] p-2"><div className="text-slate-400">Oda</div><div className="mt-1 font-black">{item.roomCount || "—"}</div></div>
                       <div className="rounded-xl bg-[#F4F8FF] p-2"><div className="text-slate-400">Net / Alan</div><div className="mt-1 font-black">{displayArea ? `${displayArea} m²` : "—"}</div></div>
-                      <div className="rounded-xl bg-[#F4F8FF] p-2"><div className="text-slate-400">Kat</div><div className="mt-1 truncate font-black">{item.floorLabel || item.floor ?? "—"}</div></div>
+                      <div className="rounded-xl bg-[#F4F8FF] p-2"><div className="text-slate-400">Kat</div><div className="mt-1 truncate font-black">{item.floorLabel || (item.floor ?? "—")}</div></div>
                     </div>
 
                     <div className="mt-4 flex gap-2">
