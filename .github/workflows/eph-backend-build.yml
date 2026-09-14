@@ -63,3 +63,6 @@ jobs:
 
       - name: Proje satis CRM firsat radari testleri
         run: npm test -- --runInBand project-sales-crm-opportunity.service.spec.ts
+
+      - name: Proje satis Talep Merkezi firsat radari testleri
+        run: npm test -- --runInBand project-sales-request-opportunity.service.spec.ts
