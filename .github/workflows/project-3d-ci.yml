@@ -36,6 +36,8 @@ jobs:
       - run: npm test -- --runInBand project-sales-reservation.service.spec.ts
       - run: npm test -- --runInBand project-sales-offer.service.spec.ts
       - run: npm test -- --runInBand project-sales-agent-channel.service.spec.ts
+      - run: npm test -- --runInBand project-sales-feasibility.service.spec.ts
+      - run: npm test -- --runInBand project-sales-contractor-assistant.service.spec.ts
 
   frontend-build:
     runs-on: ubuntu-latest
