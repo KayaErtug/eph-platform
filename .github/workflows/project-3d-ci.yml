@@ -33,6 +33,7 @@ jobs:
       - run: npm test -- --runInBand project-sales-crm-opportunity.service.spec.ts
       - run: npm test -- --runInBand project-sales-request-opportunity.service.spec.ts
       - run: npm test -- --runInBand project-sales-demand-heatmap.service.spec.ts
+      - run: npm test -- --runInBand project-sales-reservation.service.spec.ts
 
   frontend-build:
     runs-on: ubuntu-latest
