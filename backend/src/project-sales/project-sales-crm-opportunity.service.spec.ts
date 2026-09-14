@@ -91,7 +91,7 @@ describe('ProjectSalesCrmOpportunityService', () => {
       phone: '05550000000',
       email: 'ayse@example.com',
       company: null,
-      status: CustomerStatus.AKTIF,
+      status: CustomerStatus.ILK_GORUSME,
     },
     ...overrides,
   });
