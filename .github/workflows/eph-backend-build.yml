@@ -69,3 +69,6 @@ jobs:
 
       - name: Proje satis Talep Isi Haritasi testleri
         run: npm test -- --runInBand project-sales-demand-heatmap.service.spec.ts
+
+      - name: Proje satis Rezervasyon Opsiyon testleri
+        run: npm test -- --runInBand project-sales-reservation.service.spec.ts
