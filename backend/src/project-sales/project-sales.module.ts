@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ProjectMediaZipService } from './project-media-zip.service';
 import { ProjectSalesCompletionService } from './project-sales-completion.service';
 import { ProjectSalesController } from './project-sales.controller';
+import { ProjectSalesCrmOpportunityController } from './project-sales-crm-opportunity.controller';
+import { ProjectSalesCrmOpportunityService } from './project-sales-crm-opportunity.service';
 import { ProjectSalesDashboardService } from './project-sales-dashboard.service';
 import { ProjectSalesImportService } from './project-sales-import.service';
 import { ProjectSalesInventoryService } from './project-sales-inventory.service';
@@ -22,6 +24,7 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesController,
     ProjectSalesPresentationShareController,
     ProjectSalesPricingController,
+    ProjectSalesCrmOpportunityController,
   ],
   providers: [
     ProjectSalesService,
@@ -33,6 +36,7 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectMediaZipService,
     ProjectSalesDashboardService,
     ProjectSalesPricingService,
+    ProjectSalesCrmOpportunityService,
     {
       provide: ProjectSalesSetupService,
       useClass: ProjectSalesSetupFilteredService,
@@ -51,6 +55,7 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectMediaZipService,
     ProjectSalesDashboardService,
     ProjectSalesPricingService,
+    ProjectSalesCrmOpportunityService,
     ProjectSalesSetupService,
     ProjectSalesSpacesService,
     ProjectSalesStockService,
