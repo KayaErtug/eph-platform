@@ -6,6 +6,11 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ProjectSalesCrmOpportunityService } from './project-sales-crm-opportunity.service';
 
+type AuthenticatedUser = {
+  id: string;
+  role: Role;
+};
+
 @Controller('project-sales/projects/:projectId/crm-opportunities')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
@@ -16,7 +21,7 @@ export class ProjectSalesCrmOpportunityController {
 
   @Get()
   getProjectOpportunities(
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('projectId') projectId: string,
     @Query('limit') limit?: string,
   ) {
