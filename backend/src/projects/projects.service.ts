@@ -10,6 +10,7 @@ type ProjectLocationData = {
   description?: string;
   city?: string;
   district?: string;
+  neighborhood?: string | null;
   address?: string;
   latitude?: number | string | null;
   longitude?: number | string | null;
@@ -33,31 +34,50 @@ function toNullableFloat(value: number | string | null | undefined) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function cleanOptionalText(value: string | null | undefined) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+
+  const normalized = String(value).trim();
+  return normalized || null;
+}
+
 function cleanOptionalLocationData(data: ProjectLocationData) {
-  return {
-    description: data.description,
-    city: data.city,
-    district: data.district,
-    address: data.address,
-    latitude: toNullableFloat(data.latitude),
-    longitude: toNullableFloat(data.longitude),
-    mapAddress: data.mapAddress ? String(data.mapAddress).trim() : null,
-    placeId: data.placeId ? String(data.placeId).trim() : null,
-    isActive: data.isActive,
-  };
+  const cleaned: Record<string, unknown> = {};
+
+  if (data.name !== undefined) cleaned.name = String(data.name).trim();
+  if (data.description !== undefined) cleaned.description = data.description;
+  if (data.city !== undefined) cleaned.city = String(data.city).trim();
+  if (data.district !== undefined) cleaned.district = String(data.district).trim();
+  if (data.neighborhood !== undefined) {
+    cleaned.neighborhood = cleanOptionalText(data.neighborhood);
+  }
+  if (data.address !== undefined) cleaned.address = String(data.address).trim();
+  if (data.latitude !== undefined) cleaned.latitude = toNullableFloat(data.latitude);
+  if (data.longitude !== undefined) cleaned.longitude = toNullableFloat(data.longitude);
+  if (data.mapAddress !== undefined) {
+    cleaned.mapAddress = cleanOptionalText(data.mapAddress);
+  }
+  if (data.placeId !== undefined) {
+    cleaned.placeId = cleanOptionalText(data.placeId);
+  }
+  if (data.isActive !== undefined) cleaned.isActive = data.isActive;
+
+  return cleaned;
 }
 
 function cleanCreateLocationData(data: CreateProjectData) {
   return {
-    name: data.name,
+    name: String(data.name).trim(),
     description: data.description,
-    city: data.city,
-    district: data.district,
-    address: data.address,
+    city: String(data.city).trim(),
+    district: String(data.district).trim(),
+    neighborhood: cleanOptionalText(data.neighborhood),
+    address: String(data.address).trim(),
     latitude: toNullableFloat(data.latitude),
     longitude: toNullableFloat(data.longitude),
-    mapAddress: data.mapAddress ? String(data.mapAddress).trim() : null,
-    placeId: data.placeId ? String(data.placeId).trim() : null,
+    mapAddress: cleanOptionalText(data.mapAddress),
+    placeId: cleanOptionalText(data.placeId),
     isActive: data.isActive,
   };
 }
@@ -79,9 +99,7 @@ export class ProjectsService {
     ]);
 
     const hasLockedPortfolio = units.some((unit) =>
-      lockedStatuses.has(
-        String(unit.approvalStatus || '').toUpperCase(),
-      ),
+      lockedStatuses.has(String(unit.approvalStatus || '').toUpperCase()),
     );
 
     if (hasLockedPortfolio) {
@@ -142,13 +160,25 @@ export class ProjectsService {
     });
   }
 
-  async findAll(filters?: { city?: string; district?: string; isActive?: boolean }) {
+  async findAll(filters?: {
+    city?: string;
+    district?: string;
+    neighborhood?: string;
+    isActive?: boolean;
+  }) {
     return this.prisma.project.findMany({
       where: {
         ...this.getPortfolioVisibleProjectWhere(),
         isActive: filters?.isActive ?? true,
-        city: filters?.city ? { contains: filters.city, mode: 'insensitive' } : undefined,
-        district: filters?.district ? { contains: filters.district, mode: 'insensitive' } : undefined,
+        city: filters?.city
+          ? { contains: filters.city, mode: 'insensitive' }
+          : undefined,
+        district: filters?.district
+          ? { contains: filters.district, mode: 'insensitive' }
+          : undefined,
+        neighborhood: filters?.neighborhood
+          ? { contains: filters.neighborhood, mode: 'insensitive' }
+          : undefined,
       },
       include: {
         owner: {
