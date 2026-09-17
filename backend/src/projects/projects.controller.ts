@@ -11,6 +11,7 @@ type ProjectLocationBody = {
   description?: string;
   city: string;
   district: string;
+  neighborhood?: string | null;
   address: string;
   latitude?: number | string | null;
   longitude?: number | string | null;
@@ -34,8 +35,9 @@ export class ProjectsController {
   findAll(
     @Query('city') city?: string,
     @Query('district') district?: string,
+    @Query('neighborhood') neighborhood?: string,
   ) {
-    return this.projectsService.findAll({ city, district });
+    return this.projectsService.findAll({ city, district, neighborhood });
   }
 
   @Get('my')
@@ -53,7 +55,11 @@ export class ProjectsController {
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
-  update(@Param('id') id: string, @CurrentUser() user: any, @Body() body: Partial<ProjectLocationBody> & { isActive?: boolean }) {
+  update(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: Partial<ProjectLocationBody> & { isActive?: boolean },
+  ) {
     return this.projectsService.update(id, user.id, body);
   }
 

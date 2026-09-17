@@ -10,6 +10,7 @@ import { ProfileModule } from './profile/profile.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { ProjectsModule } from './projects/projects.module';
 import { UnitsModule } from './units/units.module';
+import { PropertyCardProfileModule } from './property-card/property-card-profile.module';
 import { NominationsModule } from './nominations/nominations.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { LeadsModule } from './leads/leads.module';
@@ -56,6 +57,7 @@ import { PoolProjectsModule } from './pool-projects/pool-projects.module';
 
     ProjectsModule,
     UnitsModule,
+    PropertyCardProfileModule,
     ProjectSalesModule,
     ProjectSalesTemplatesModule,
     ProjectSceneModule,
