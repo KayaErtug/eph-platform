@@ -1,0 +1,1322 @@
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  LinaDurum,
+  LinaGorevOnceligi,
+  LinaModul,
+  Role,
+  UnitStatus,
+} from '@prisma/client';
+
+import { CrmService } from '../crm/crm.service';
+import { EphMatchEngineService } from '../matching/eph-match-engine.service';
+import { PrismaService } from '../prisma/prisma.service';
+
+type CoordinationUser = {
+  id?: string;
+  role?: Role | string;
+};
+
+type RequestArea = {
+  city: string;
+  district: string;
+  neighborhood: string;
+};
+
+const CRM_MATCH_NOTIFICATION = 'CRM_INTEREST_POOL_MATCH';
+const REQUEST_MATCH_NOTIFICATION = 'NETWORK_POST_PORTFOLIO_MATCH';
+
+@Injectable()
+export class CoordinationRecalculationService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly crmService: CrmService,
+    private readonly ephMatchEngine: EphMatchEngineService,
+  ) {}
+
+  async getAlerts(rawUser: CoordinationUser) {
+    const user = await this.resolveUser(rawUser);
+
+    const [interests, linkedProperties, ownPosts, requestNotifications] =
+      await Promise.all([
+        this.prisma.customerInterest.findMany({
+          where: {
+            isActive: true,
+            customer: { ownerId: user.id },
+          },
+          select: {
+            id: true,
+            title: true,
+            updatedAt: true,
+            lastMatchedAt: true,
+            customer: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
+        }),
+        this.prisma.customerProperty.findMany({
+          where: {
+            customer: { ownerId: user.id },
+            unit: { isPoolVisible: true },
+          },
+          select: {
+            id: true,
+            updatedAt: true,
+            customer: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+            unit: {
+              select: {
+                id: true,
+                updatedAt: true,
+                number: true,
+                project: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
+        }),
+        this.prisma.networkPost.findMany({
+          where: {
+            userId: user.id,
+            isActive: true,
+            expiresAt: { gt: new Date() },
+          },
+          select: {
+            id: true,
+            title: true,
+            updatedAt: true,
+          },
+          orderBy: { updatedAt: 'desc' },
+        }),
+        this.prisma.linaBildirim.findMany({
+          where: {
+            kullaniciId: user.id,
+            ilgiliKayitTuru: REQUEST_MATCH_NOTIFICATION,
+          },
+          select: {
+            ilgiliKayitId: true,
+            olusturulmaTarihi: true,
+          },
+          orderBy: { olusturulmaTarihi: 'desc' },
+        }),
+      ]);
+
+    const alerts: Array<{
+      type: string;
+      entityId: string;
+      title: string;
+      message: string;
+      updatedAt: string;
+      action: string;
+    }> = [];
+
+    interests.forEach((interest) => {
+      const stale =
+        !interest.lastMatchedAt ||
+        interest.updatedAt.getTime() > interest.lastMatchedAt.getTime();
+
+      if (!stale) return;
+
+      const customerName = `${interest.customer.firstName} ${interest.customer.lastName}`.trim();
+      alerts.push({
+        type: 'CRM_INTEREST_STALE',
+        entityId: interest.id,
+        title: interest.title || `${customerName} talebi`,
+        message:
+          'CRM talebi son Havuz taramasından sonra değişti. Lina yeniden eşleştirme öneriyor.',
+        updatedAt: interest.updatedAt.toISOString(),
+        action: 'RECALCULATE_CRM_INTEREST',
+      });
+    });
+
+    linkedProperties.forEach((relation) => {
+      if (relation.unit.updatedAt.getTime() <= relation.updatedAt.getTime()) {
+        return;
+      }
+
+      const customerName = `${relation.customer.firstName} ${relation.customer.lastName}`.trim();
+      const portfolioName =
+        relation.unit.project?.name || relation.unit.number || 'Havuz portföyü';
+
+      alerts.push({
+        type: 'POOL_UNIT_STALE',
+        entityId: relation.unit.id,
+        title: portfolioName,
+        message: `${customerName} ile bağlı portföy güncellendi. Eşleşme puanı yeniden hesaplanmalı.`,
+        updatedAt: relation.unit.updatedAt.toISOString(),
+        action: 'RECALCULATE_POOL_LINK',
+      });
+    });
+
+    const lastRequestScanByPost = new Map<string, Date>();
+    requestNotifications.forEach((notification) => {
+      const postId = String(notification.ilgiliKayitId || '').trim();
+      if (!postId || lastRequestScanByPost.has(postId)) return;
+      lastRequestScanByPost.set(postId, notification.olusturulmaTarihi);
+    });
+
+    ownPosts.forEach((post) => {
+      const lastScan = lastRequestScanByPost.get(post.id);
+      if (lastScan && post.updatedAt.getTime() <= lastScan.getTime()) return;
+
+      alerts.push({
+        type: 'REQUEST_POST_STALE',
+        entityId: post.id,
+        title: post.title,
+        message:
+          'Talep Merkezi kaydı değişti veya henüz taranmadı. Lina kendi portföylerinizle yeniden karşılaştırma öneriyor.',
+        updatedAt: post.updatedAt.toISOString(),
+        action: 'RECALCULATE_REQUEST_PORTFOLIOS',
+      });
+    });
+
+    alerts.sort(
+      (left, right) =>
+        new Date(right.updatedAt).getTime() -
+        new Date(left.updatedAt).getTime(),
+    );
+
+    return {
+      count: alerts.length,
+      alerts,
+    };
+  }
+
+  async recalculateCrmInterest(
+    interestId: string,
+    rawUser: CoordinationUser,
+  ) {
+    const user = await this.resolveUser(rawUser);
+    const interest = await this.prisma.customerInterest.findUnique({
+      where: { id: interestId },
+      include: {
+        customer: {
+          select: {
+            ownerId: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    if (!interest) {
+      throw new NotFoundException('CRM talep profili bulunamadı.');
+    }
+
+    if (
+      user.role !== Role.SUPER_ADMIN &&
+      interest.customer.ownerId !== user.id
+    ) {
+      throw new ForbiddenException('Bu CRM talebini tarama yetkiniz yok.');
+    }
+
+    const wasStale =
+      !interest.lastMatchedAt ||
+      interest.updatedAt.getTime() > interest.lastMatchedAt.getTime();
+    const matches = await this.crmService.getCustomerInterestMatches(
+      interest.id,
+      user.id,
+      user.role,
+    );
+    const topMatch = matches[0] || null;
+
+    if (wasStale) {
+      const customerName = `${interest.customer.firstName} ${interest.customer.lastName}`.trim();
+      const message = topMatch
+        ? `${customerName} için en güçlü Havuz eşleşmesi %${topMatch.matchScore}: ${topMatch.projectName || 'Portföy'}.`
+        : `${customerName} için güncel Havuz taramasında uygun portföy bulunamadı.`;
+
+      await this.createLinaNotification({
+        userId: user.id,
+        module: LinaModul.CRM,
+        title: 'CRM–Havuz eşleşmesi yenilendi',
+        message,
+        relatedType: CRM_MATCH_NOTIFICATION,
+        relatedId: interest.id,
+        targetUrl: '/crm',
+        priority:
+          topMatch && topMatch.matchScore >= 80
+            ? LinaGorevOnceligi.YUKSEK
+            : LinaGorevOnceligi.NORMAL,
+      });
+    }
+
+    return {
+      recalculatedAt: new Date().toISOString(),
+      wasStale,
+      warning: topMatch
+        ? `Lina ${matches.length} Havuz eşleşmesi buldu. En güçlü eşleşme %${topMatch.matchScore}.`
+        : 'Lina güncel kriterlerle uygun Havuz portföyü bulamadı.',
+      matches,
+    };
+  }
+
+  async recalculateRequestPortfolioMatches(
+    postId: string,
+    rawUser: CoordinationUser,
+  ) {
+    const user = await this.resolveUser(rawUser);
+    const post = await this.prisma.networkPost.findFirst({
+      where: {
+        id: postId,
+        isActive: true,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Aktif Talep Merkezi kaydı bulunamadı.');
+    }
+
+    const units = await this.prisma.unit.findMany({
+      where: {
+        project: { ownerId: user.id },
+        isSalesInventory: true,
+        isOffMarket: false,
+      },
+      include: {
+        project: true,
+        images: {
+          where: { isCover: true },
+          take: 1,
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    const areas = this.normalizeAreas(post.areas, {
+      city: post.city,
+      district: post.district,
+      neighborhood: post.neighborhood,
+    });
+    const statuses = this.getStatusesFromPost(post.tags);
+
+    const baseDemand = {
+      id: post.id,
+      title: post.title,
+      city: post.city,
+      district: post.district,
+      neighborhood: post.neighborhood,
+      propertyTypes: post.propertyTypes,
+      statuses,
+      minBudget: post.minBudget,
+      maxBudget: post.maxBudget ?? post.budget,
+      budget: post.budget,
+      minArea: post.minArea,
+      maxArea: post.maxArea,
+      roomCounts: post.roomCounts,
+      features: post.features,
+    };
+
+    const demands =
+      areas.length > 0
+        ? areas.map((area) => ({
+            ...baseDemand,
+            city: area.city || post.city,
+            district: area.district || post.district,
+            neighborhood: area.neighborhood || post.neighborhood,
+          }))
+        : [baseDemand];
+
+    const unitById = new Map(
+      units.map((unit) => [String(unit.id), unit]),
+    );
+
+    const bestByUnit = new Map<string, any>();
+
+    for (const demand of demands) {
+      const areaMatches =
+        await this.ephMatchEngine.matchDemandToUnits(
+          demand,
+          units,
+          {
+            source: 'TALEP_MERKEZI',
+            useDistance: true,
+          },
+        );
+
+      for (const match of areaMatches) {
+        const current = bestByUnit.get(match.unitId);
+
+        if (!current || match.matchScore > current.matchScore) {
+          const sourceUnit = unitById.get(match.unitId);
+
+          bestByUnit.set(match.unitId, {
+            ...match,
+            updatedAt:
+              sourceUnit?.updatedAt?.toISOString?.() || null,
+          });
+        }
+      }
+    }
+
+    const matches = Array.from(bestByUnit.values()).sort(
+      (left, right) => right.matchScore - left.matchScore,
+    );
+
+    const latestPortfolioUpdate = units.reduce<Date | null>((latest, unit) => {
+      if (!latest || unit.updatedAt.getTime() > latest.getTime()) {
+        return unit.updatedAt;
+      }
+      return latest;
+    }, null);
+    const lastNotification = await this.prisma.linaBildirim.findFirst({
+      where: {
+        kullaniciId: user.id,
+        ilgiliKayitTuru: REQUEST_MATCH_NOTIFICATION,
+        ilgiliKayitId: post.id,
+      },
+      orderBy: { olusturulmaTarihi: 'desc' },
+      select: { olusturulmaTarihi: true },
+    });
+    const changedAt = [post.updatedAt, latestPortfolioUpdate]
+      .filter((value): value is Date => Boolean(value))
+      .sort((a, b) => b.getTime() - a.getTime())[0];
+    const wasStale =
+      !lastNotification ||
+      (changedAt &&
+        changedAt.getTime() > lastNotification.olusturulmaTarihi.getTime());
+    const topMatch = matches[0] || null;
+
+    if (wasStale) {
+      await this.createLinaNotification({
+        userId: user.id,
+        module: LinaModul.FORUM,
+        title: 'Talep–Portföy eşleşmesi yenilendi',
+        message: topMatch
+          ? `${post.title} için kendi portföylerinizde %${topMatch.matchScore} eşleşen ${topMatch.projectName || 'bir portföy'} bulundu.`
+          : `${post.title} için kendi portföylerinizde güncel eşleşme bulunamadı.`,
+        relatedType: REQUEST_MATCH_NOTIFICATION,
+        relatedId: post.id,
+        targetUrl: '/network',
+        priority:
+          topMatch && topMatch.matchScore >= 80
+            ? LinaGorevOnceligi.YUKSEK
+            : LinaGorevOnceligi.NORMAL,
+      });
+    }
+
+    return {
+      recalculatedAt: new Date().toISOString(),
+      wasStale,
+      warning: topMatch
+        ? `Lina ${matches.length} portföy eşleşmesi buldu. En güçlü eşleşme %${topMatch.matchScore}.`
+        : 'Lina kendi portföylerinizde uygun eşleşme bulamadı.',
+      matches,
+    };
+  }
+
+  async recalculateRequestPoolMatches(
+    postId: string,
+    rawUser: CoordinationUser,
+  ) {
+    await this.resolveUser(rawUser);
+
+    const post = await this.prisma.networkPost.findFirst({
+      where: {
+        id: postId,
+        isActive: true,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException(
+        'Aktif Talep Merkezi kaydı bulunamadı.',
+      );
+    }
+
+    const units = await this.prisma.unit.findMany({
+      where: {
+        isPoolVisible: true,
+        isOffMarket: false,
+        project: {
+          isActive: true,
+        },
+      },
+      include: {
+        project: true,
+        images: {
+          where: { isCover: true },
+          take: 1,
+        },
+      },
+      orderBy: {
+        poolPublishedAt: 'desc',
+      },
+    });
+
+    const areas = this.normalizeAreas(post.areas, {
+      city: post.city,
+      district: post.district,
+      neighborhood: post.neighborhood,
+    });
+
+    const statuses = this.getStatusesFromPost(post.tags);
+
+    const baseDemand = {
+      id: post.id,
+      title: post.title,
+      city: post.city,
+      district: post.district,
+      neighborhood: post.neighborhood,
+      propertyTypes: post.propertyTypes,
+      statuses,
+      minBudget: post.minBudget,
+      maxBudget: post.maxBudget ?? post.budget,
+      budget: post.budget,
+      minArea: post.minArea,
+      maxArea: post.maxArea,
+      roomCounts: post.roomCounts,
+      features: post.features,
+    };
+
+    const demands =
+      areas.length > 0
+        ? areas.map((area) => ({
+            ...baseDemand,
+            city: area.city || post.city,
+            district: area.district || post.district,
+            neighborhood:
+              area.neighborhood || post.neighborhood,
+          }))
+        : [baseDemand];
+
+    const bestByUnit = new Map<string, any>();
+
+    for (const demand of demands) {
+      const areaMatches =
+        await this.ephMatchEngine.matchDemandToUnits(
+          demand,
+          units,
+          {
+            source: 'TALEP_MERKEZI',
+            useDistance: true,
+          },
+        );
+
+      for (const match of areaMatches) {
+        const current = bestByUnit.get(match.unitId);
+
+        if (
+          !current ||
+          match.matchScore > current.matchScore
+        ) {
+          bestByUnit.set(match.unitId, match);
+        }
+      }
+    }
+
+    const matches = Array.from(
+      bestByUnit.values(),
+    ).sort(
+      (left, right) =>
+        right.matchScore - left.matchScore,
+    );
+
+    const topMatch = matches[0] || null;
+
+    return {
+      recalculatedAt: new Date().toISOString(),
+      warning: topMatch
+        ? `Havuzda ${matches.length} eşleşme bulundu. En güçlü eşleşme %${topMatch.matchScore}.`
+        : 'Havuzda bu talebe uygun portföy bulunamadı.',
+      matches,
+    };
+  }
+
+  async getLinaOpportunities(
+    rawUser: CoordinationUser,
+  ) {
+    const user = await this.resolveUser(rawUser);
+    const now = new Date();
+
+    const [
+      ownUnits,
+      externalPoolUnits,
+      customers,
+      ownPosts,
+      externalPosts,
+    ] = await Promise.all([
+      this.prisma.unit.findMany({
+        where: {
+          project: {
+            ownerId: user.id,
+          },
+          isSalesInventory: true,
+          isOffMarket: false,
+        },
+        include: {
+          project: true,
+          images: {
+            where: { isCover: true },
+            take: 1,
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 200,
+      }),
+
+      this.prisma.unit.findMany({
+        where: {
+          isPoolVisible: true,
+          isOffMarket: false,
+          project: {
+            isActive: true,
+            ownerId: {
+              not: user.id,
+            },
+          },
+        },
+        include: {
+          project: true,
+          images: {
+            where: { isCover: true },
+            take: 1,
+          },
+        },
+        orderBy: {
+          poolPublishedAt: 'desc',
+        },
+        take: 200,
+      }),
+
+      this.prisma.customer.findMany({
+        where: {
+          ownerId: user.id,
+        },
+        include: {
+          interests: {
+            where: {
+              isActive: true,
+            },
+          },
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        take: 100,
+      }),
+
+      this.prisma.networkPost.findMany({
+        where: {
+          userId: user.id,
+          isActive: true,
+          expiresAt: {
+            gt: now,
+          },
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        take: 100,
+      }),
+
+      this.prisma.networkPost.findMany({
+        where: {
+          userId: {
+            not: user.id,
+          },
+          isActive: true,
+          expiresAt: {
+            gt: now,
+          },
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        take: 100,
+      }),
+    ]);
+
+    const counterpartyIds = Array.from(
+      new Set(
+        [
+          ...externalPoolUnits.map(
+            (unit) => unit.project?.ownerId,
+          ),
+          ...externalPosts.map(
+            (post) => post.userId,
+          ),
+        ].filter(Boolean),
+      ),
+    ) as string[];
+
+    const counterparties =
+      counterpartyIds.length > 0
+        ? await this.prisma.user.findMany({
+            where: {
+              id: {
+                in: counterpartyIds,
+              },
+            },
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          })
+        : [];
+
+    const counterpartyMap = new Map(
+      counterparties.map((item) => [
+        item.id,
+        [item.firstName, item.lastName]
+          .filter(Boolean)
+          .join(' ')
+          .trim() || 'EPH Üyesi',
+      ]),
+    );
+
+    const allUnits = [
+      ...ownUnits,
+      ...externalPoolUnits,
+    ];
+
+    const unitMap = new Map(
+      allUnits.map((unit) => [
+        String(unit.id),
+        unit,
+      ]),
+    );
+
+    const opportunities: any[] = [];
+
+    const buildPostDemands = (post: any) => {
+      const areas = this.normalizeAreas(
+        post.areas,
+        {
+          city: post.city,
+          district: post.district,
+          neighborhood: post.neighborhood,
+        },
+      );
+
+      const statuses =
+        this.getStatusesFromPost(post.tags);
+
+      const baseDemand = {
+        id: post.id,
+        title: post.title,
+        city: post.city,
+        district: post.district,
+        neighborhood: post.neighborhood,
+        propertyTypes: post.propertyTypes,
+        statuses,
+        minBudget: post.minBudget,
+        maxBudget:
+          post.maxBudget ?? post.budget,
+        budget: post.budget,
+        minArea: post.minArea,
+        maxArea: post.maxArea,
+        roomCounts: post.roomCounts,
+        features: post.features,
+      };
+
+      return areas.length > 0
+        ? areas.map((area) => ({
+            ...baseDemand,
+            city: area.city || post.city,
+            district:
+              area.district || post.district,
+            neighborhood:
+              area.neighborhood ||
+              post.neighborhood,
+          }))
+        : [baseDemand];
+    };
+
+    const matchPostToUnits = async (
+      post: any,
+      units: any[],
+    ) => {
+      const bestByUnit =
+        new Map<string, any>();
+
+      for (const demand of buildPostDemands(post)) {
+        const results =
+          await this.ephMatchEngine.matchDemandToUnits(
+            demand,
+            units,
+            {
+              source: 'TALEP_MERKEZI',
+              useDistance: true,
+            },
+          );
+
+        for (const result of results) {
+          const current =
+            bestByUnit.get(result.unitId);
+
+          if (
+            !current ||
+            result.matchScore >
+              current.matchScore
+          ) {
+            bestByUnit.set(
+              result.unitId,
+              result,
+            );
+          }
+        }
+      }
+
+      return Array.from(
+        bestByUnit.values(),
+      );
+    };
+
+    const makeAsset = (
+      match: any,
+      unit: any,
+    ) => {
+      const isMine =
+        unit?.project?.ownerId === user.id;
+
+      const ownerId =
+        unit?.project?.ownerId || null;
+
+      return {
+        unitId: match.unitId,
+        projectId:
+          unit?.project?.id || null,
+        projectName:
+          match.projectName || null,
+        city: match.city || null,
+        district: match.district || null,
+        neighborhood:
+          match.neighborhood || null,
+        type: match.type || null,
+        status: match.status || null,
+        price: match.price ?? null,
+        roomCount:
+          match.roomCount || null,
+        area: match.area ?? null,
+        coverImage:
+          match.coverImage || null,
+        isMine,
+        isPoolVisible:
+          unit?.isPoolVisible === true,
+        ownerId,
+        ownerName: isMine
+          ? 'Sizin portföyünüz'
+          : ownerId
+            ? counterpartyMap.get(ownerId) ||
+              'EPH Üyesi'
+            : 'EPH Üyesi',
+      };
+    };
+
+    const pushOpportunity = (
+      value: any,
+    ) => {
+      if (
+        !value ||
+        Number(value.matchScore || 0) < 40
+      ) {
+        return;
+      }
+
+      opportunities.push(value);
+    };
+
+    // ======================================================
+    // A) BENİM CRM TALEPLERİM -> BENİM PORTFÖYÜM + HAVUZ
+    // ======================================================
+
+    for (const customer of customers) {
+      const customerName = [
+        customer.firstName,
+        customer.lastName,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .trim() || 'CRM müşterisi';
+
+      for (const interest of customer.interests) {
+        const matches =
+          await this.ephMatchEngine.matchDemandToUnits(
+            interest,
+            allUnits,
+            {
+              source: 'CRM',
+              useDistance: true,
+            },
+          );
+
+        for (const match of matches) {
+          const unit =
+            unitMap.get(match.unitId);
+
+          if (!unit) continue;
+
+          const asset =
+            makeAsset(match, unit);
+
+          pushOpportunity({
+            id:
+              `CRM:${interest.id}:${match.unitId}`,
+            category:
+              'MUSTERILERIM_ICIN',
+            origin:
+              'CRM',
+            counterpart:
+              asset.isMine
+                ? 'KENDI_PORTFOYUM'
+                : 'HAVUZ',
+            matchScore:
+              match.matchScore,
+            matchLevel:
+              match.matchLevel,
+            matchReasons:
+              match.matchReasons,
+            distance:
+              match.distance,
+            priceMatch:
+              match.priceMatch,
+            matchPolicy:
+              match.matchPolicy,
+            customer: {
+              id: customer.id,
+              name: customerName,
+              interestId:
+                interest.id,
+              title:
+                interest.title ||
+                'Gayrimenkul talebi',
+            },
+            request: null,
+            asset,
+          });
+        }
+      }
+    }
+
+    // ======================================================
+    // B) BENİM TALEP MERKEZİ KAYITLARIM -> PORTFÖY + HAVUZ
+    // ======================================================
+
+    for (const post of ownPosts) {
+      const matches =
+        await matchPostToUnits(
+          post,
+          allUnits,
+        );
+
+      for (const match of matches) {
+        const unit =
+          unitMap.get(match.unitId);
+
+        if (!unit) continue;
+
+        const asset =
+          makeAsset(match, unit);
+
+        pushOpportunity({
+          id:
+            `MY_REQUEST:${post.id}:${match.unitId}`,
+          category:
+            'TALEP_MERKEZIM',
+          origin:
+            'TALEP_MERKEZI',
+          counterpart:
+            asset.isMine
+              ? 'KENDI_PORTFOYUM'
+              : 'HAVUZ',
+          matchScore:
+            match.matchScore,
+          matchLevel:
+            match.matchLevel,
+          matchReasons:
+            match.matchReasons,
+          distance:
+            match.distance,
+          priceMatch:
+            match.priceMatch,
+          matchPolicy:
+            match.matchPolicy,
+          customer: null,
+          request: {
+            id: post.id,
+            title: post.title,
+            ownerId: user.id,
+            ownerName:
+              'Sizin Talep Merkezi kaydınız',
+            isMine: true,
+          },
+          asset,
+        });
+      }
+    }
+
+    // ======================================================
+    // C) DİĞER KULLANICILARIN TALEPLERİ -> BENİM PORTFÖYLERİM
+    // ======================================================
+
+    for (const post of externalPosts) {
+      const matches =
+        await matchPostToUnits(
+          post,
+          ownUnits,
+        );
+
+      for (const match of matches) {
+        const unit =
+          unitMap.get(match.unitId);
+
+        if (!unit) continue;
+
+        pushOpportunity({
+          id:
+            `PORTFOLIO:${match.unitId}:${post.id}`,
+          category:
+            'PORTFOYLERIM_ICIN',
+          origin:
+            'PORTFOY',
+          counterpart:
+            'TALEP_MERKEZI',
+          matchScore:
+            match.matchScore,
+          matchLevel:
+            match.matchLevel,
+          matchReasons:
+            match.matchReasons,
+          distance:
+            match.distance,
+          priceMatch:
+            match.priceMatch,
+          matchPolicy:
+            match.matchPolicy,
+          customer: null,
+          request: {
+            id: post.id,
+            title: post.title,
+            ownerId:
+              post.userId || null,
+            ownerName:
+              post.userId
+                ? counterpartyMap.get(
+                    post.userId,
+                  ) || 'EPH Üyesi'
+                : 'EPH Üyesi',
+            isMine: false,
+          },
+          asset:
+            makeAsset(match, unit),
+        });
+      }
+    }
+
+    const deduplicated = new Map<
+      string,
+      any
+    >();
+
+    const getOpportunityScope = (
+      item: any,
+    ) => {
+      if (
+        item.category ===
+        'MUSTERILERIM_ICIN'
+      ) {
+        return [
+          'CRM',
+          item.customer?.interestId ||
+            item.customer?.id ||
+            'UNKNOWN',
+          item.counterpart ||
+            'UNKNOWN',
+        ].join(':');
+      }
+
+      if (
+        item.category ===
+        'TALEP_MERKEZIM'
+      ) {
+        return [
+          'MY_REQUEST',
+          item.request?.id ||
+            'UNKNOWN',
+          item.counterpart ||
+            'UNKNOWN',
+        ].join(':');
+      }
+
+      return [
+        'PORTFOLIO_REQUEST',
+        item.request?.id ||
+          'UNKNOWN',
+      ].join(':');
+    };
+
+    const priceDistanceFromBudget = (
+      item: any,
+    ) => {
+      const budget =
+        Number(
+          item.priceMatch
+            ?.declaredMaxBudget,
+        );
+
+      const price =
+        Number(
+          item.asset?.price,
+        );
+
+      if (
+        !Number.isFinite(budget) ||
+        !Number.isFinite(price)
+      ) {
+        return Number.POSITIVE_INFINITY;
+      }
+
+      return Math.abs(
+        price - budget,
+      );
+    };
+
+    for (const item of opportunities) {
+      const projectKey =
+        item.asset?.projectId ||
+        item.asset?.unitId ||
+        item.id;
+
+      const dedupeKey = [
+        getOpportunityScope(item),
+        'PROJECT',
+        projectKey,
+      ].join(':');
+
+      const current =
+        deduplicated.get(
+          dedupeKey,
+        );
+
+      if (!current) {
+        deduplicated.set(
+          dedupeKey,
+          {
+            ...item,
+            matchedUnitCount: 1,
+          },
+        );
+
+        continue;
+      }
+
+      const matchedUnitCount =
+        Number(
+          current.matchedUnitCount ||
+            1,
+        ) + 1;
+
+      const candidateIsBetter =
+        item.matchScore >
+          current.matchScore ||
+        (
+          item.matchScore ===
+            current.matchScore &&
+          priceDistanceFromBudget(
+            item,
+          ) <
+            priceDistanceFromBudget(
+              current,
+            )
+        );
+
+      if (candidateIsBetter) {
+        deduplicated.set(
+          dedupeKey,
+          {
+            ...item,
+            matchedUnitCount,
+          },
+        );
+      } else {
+        current.matchedUnitCount =
+          matchedUnitCount;
+      }
+    }
+
+    const sorted = Array.from(
+      deduplicated.values(),
+    )
+      .sort(
+        (left, right) =>
+          right.matchScore -
+          left.matchScore,
+      )
+      .slice(0, 100);
+
+    const strongCount =
+      sorted.filter(
+        (item) =>
+          item.matchScore >= 75,
+      ).length;
+
+    const suitableCount =
+      sorted.filter(
+        (item) =>
+          item.matchScore >= 40 &&
+          item.matchScore < 75,
+      ).length;
+
+    return {
+      generatedAt:
+        new Date().toISOString(),
+      policyVersion:
+        'EPH_MATCH_V1',
+      user: {
+        id: user.id,
+      },
+      summary: {
+        total: sorted.length,
+        strong: strongCount,
+        suitable: suitableCount,
+        customersFor:
+          sorted.filter(
+            (item) =>
+              item.category ===
+              'MUSTERILERIM_ICIN',
+          ).length,
+        portfoliosFor:
+          sorted.filter(
+            (item) =>
+              item.category ===
+              'PORTFOYLERIM_ICIN',
+          ).length,
+        requestsFor:
+          sorted.filter(
+            (item) =>
+              item.category ===
+              'TALEP_MERKEZIM',
+          ).length,
+      },
+      opportunities: sorted,
+    };
+  }
+
+  private async resolveUser(rawUser: CoordinationUser) {
+    const id = String(rawUser?.id || '').trim();
+    if (!id) {
+      throw new ForbiddenException('Koordinasyon işlemi için giriş yapmalısınız.');
+    }
+
+    const suppliedRole = String(rawUser?.role || '').trim().toUpperCase();
+    const role = Object.values(Role).find((item) => item === suppliedRole);
+    if (role) return { id, role };
+
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { role: true },
+    });
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
+
+    return { id, role: user.role };
+  }
+
+  private normalizeAreas(
+    value: unknown,
+    fallback: {
+      city?: string | null;
+      district?: string | null;
+      neighborhood?: string | null;
+    },
+  ): RequestArea[] {
+    const areas = Array.isArray(value)
+      ? value
+          .map((item) => {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) {
+              return null;
+            }
+            const record = item as Record<string, unknown>;
+            return {
+              city: this.normalizeText(record.city),
+              district: this.normalizeText(record.district),
+              neighborhood: this.normalizeText(record.neighborhood),
+            };
+          })
+          .filter((item): item is RequestArea => Boolean(item))
+          .filter((item) => item.city || item.district || item.neighborhood)
+      : [];
+
+    if (areas.length > 0) return areas;
+
+    const fallbackArea = {
+      city: this.normalizeText(fallback.city),
+      district: this.normalizeText(fallback.district),
+      neighborhood: this.normalizeText(fallback.neighborhood),
+    };
+
+    return fallbackArea.city || fallbackArea.district || fallbackArea.neighborhood
+      ? [fallbackArea]
+      : [];
+  }
+
+  private getStatusesFromPost(tags: string[]): UnitStatus[] {
+    const requestType = tags
+      .find((tag) => String(tag).startsWith('Talep Türü:'))
+      ?.replace(/^Talep Türü:\s*/i, '')
+      .toUpperCase();
+
+    return requestType?.includes('KIRALIK')
+      ? [UnitStatus.KIRALIK]
+      : [UnitStatus.SATILIK];
+  }
+
+  private normalizeText(value: unknown) {
+    return String(value || '')
+      .trim()
+      .toLocaleLowerCase('tr-TR')
+      .replace(/\s+/g, ' ');
+  }
+
+  private async createLinaNotification(input: {
+    userId: string;
+    module: LinaModul;
+    title: string;
+    message: string;
+    relatedType: string;
+    relatedId: string;
+    targetUrl: string;
+    priority: LinaGorevOnceligi;
+  }) {
+    return this.prisma.linaBildirim.create({
+      data: {
+        kullaniciId: input.userId,
+        modul: input.module,
+        baslik: input.title,
+        mesaj: input.message,
+        bildirimTuru: 'ESLESME_YENILENDI',
+        oncelik: input.priority,
+        hedefUrl: input.targetUrl,
+        ilgiliKayitTuru: input.relatedType,
+        ilgiliKayitId: input.relatedId,
+        sesliMi: false,
+        epostaMi: false,
+        okunduMu: false,
+        gonderildiMi: true,
+        gonderimTarihi: new Date(),
+        durum: LinaDurum.TAMAMLANDI,
+      },
+    });
+  }
+}

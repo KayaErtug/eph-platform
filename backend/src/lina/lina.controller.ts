@@ -10,21 +10,34 @@ import {
   Req,
   ServiceUnavailableException,
   UnauthorizedException,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { Request } from "express";
 
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { LinaActionEngineService } from "./actions/lina-action-engine.service";
+import { LinaConfirmationGateService } from "./actions/lina-confirmation-gate.service";
 import { LinaCrmOwnerActionService } from "./actions/lina-crm-owner-action.service";
+import { LinaNaturalCommandService } from "./actions/lina-natural-command.service";
 import { LinaActionSourceModule } from "./actions/lina-action.types";
+import {
+  LINA_ACTION_SOURCE_MODULES,
+  normalizeLinaSourceModule,
+} from "./lina-source-module";
 import { LinaChatDto } from "./dto/lina-chat.dto";
+import { LinaNetworkRequestDraftDto } from "./dto/lina-network-request-draft.dto";
 import { LinaPreferencesDto } from "./dto/lina-preferences.dto";
 import { LinaVoiceDto } from "./dto/lina-voice.dto";
 import { LinaDistanceRequestDto } from "./geo/lina-distance.dto";
 import { LinaDistanceService } from "./geo/lina-distance.service";
 import { LinaMemoryService } from "./lina-memory.service";
+import { LinaNetworkRequestDraftService } from "./lina-network-request-draft.service";
+import { LinaScopeService } from "./lina-scope.service";
 import { LinaService } from "./lina.service";
+import { LinaTranscriptionService } from "./lina-transcription.service";
 
 type LinaRequestUser = {
   id?: string;
@@ -45,14 +58,19 @@ type LinaEndOfDayDecisionBody = {
 export class LinaController {
   constructor(
     private readonly linaService: LinaService,
+    private readonly linaScopeService: LinaScopeService,
     private readonly linaMemoryService: LinaMemoryService,
+    private readonly linaNetworkRequestDraftService: LinaNetworkRequestDraftService,
     private readonly linaCrmOwnerActionService: LinaCrmOwnerActionService,
     private readonly linaActionEngineService: LinaActionEngineService,
+    private readonly linaConfirmationGateService: LinaConfirmationGateService,
+    private readonly linaNaturalCommandService: LinaNaturalCommandService,
     private readonly linaDistanceService: LinaDistanceService,
+    private readonly linaTranscriptionService: LinaTranscriptionService,
   ) {}
 
   // Lina Temporary Passive Mode V1
-  private readonly linaTemporarilyDisabled = true;
+  private readonly linaTemporarilyDisabled = false;
   private readonly linaTemporarilyDisabledMessage =
     "Lina geçici olarak pasif durumdadır. Platformdaki diğer geliştirmeler tamamlandıktan sonra yeniden devreye alınacaktır.";
 
@@ -79,6 +97,14 @@ export class LinaController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post("network/request-draft")
+  async createNetworkRequestDraft(@Body() body: LinaNetworkRequestDraftDto) {
+    const scope = await this.linaScopeService.classifyRequestDraft(String(body?.message || ""));
+    if (scope === "OUT_OF_SCOPE") return this.linaScopeService.blockedReply();
+    return this.linaNetworkRequestDraftService.create(body?.message);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post("chat")
   async chat(
     @Body() body: LinaChatDto,
@@ -98,11 +124,52 @@ export class LinaController {
     }
 
     const user = this.extractUser(request);
+    const scope = await this.linaScopeService.classify(body);
+    if (scope === "OUT_OF_SCOPE") return this.linaScopeService.blockedReply();
     const sourceModule = this.normalizeSourceModule(body?.sourceModule);
+    const normalizedMessage = this.linaNaturalCommandService.normalize(
+      body?.message,
+    );
+
+    let executionMessage = normalizedMessage;
+    let confirmedGateExecution = false;
+
+    if (user.id && user.role) {
+      const gateResult = this.linaConfirmationGateService.evaluate(
+        normalizedMessage,
+        user.id,
+        sourceModule,
+      );
+
+      if (gateResult.handled && !gateResult.executeMessage) {
+        return {
+          success: gateResult.success ?? true,
+          message:
+            gateResult.message ||
+            "İşlem taslağı hazırlandı ve kullanıcı onayı bekleniyor.",
+          provider: "local" as const,
+          kvkkFiltered: false,
+          detectedTypes: [],
+          action: "confirmation_required",
+          requiresConfirmation: gateResult.requiresConfirmation ?? true,
+          data: gateResult.data,
+        };
+      }
+
+      if (gateResult.executeMessage) {
+        executionMessage = gateResult.executeMessage;
+        confirmedGateExecution = true;
+      }
+    }
+
+    if (executionMessage !== String(body?.message || "").trim()) {
+      const executionScope = await this.linaScopeService.classify({ ...body, message: executionMessage });
+      if (executionScope === "OUT_OF_SCOPE") return this.linaScopeService.blockedReply();
+    }
 
     const ownerActionResult =
       await this.linaCrmOwnerActionService.tryExecute(
-        body?.message,
+        executionMessage,
         user,
         sourceModule,
         body?.history,
@@ -125,7 +192,7 @@ export class LinaController {
     }
 
     const actionResult = await this.linaActionEngineService.tryExecute(
-      body?.message,
+      executionMessage,
       user,
       sourceModule,
       body?.history,
@@ -146,7 +213,35 @@ export class LinaController {
       };
     }
 
-    return this.linaService.createTextReply(body, user);
+    const fallbackBody = confirmedGateExecution
+      ? {
+          ...body,
+          message: executionMessage,
+        }
+      : body;
+
+    return this.linaService.createTextReply(fallbackBody, user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("transcribe")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      limits: {
+        fileSize: 10 * 1024 * 1024,
+      },
+    }),
+  )
+  async transcribe(
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    if (this.linaTemporarilyDisabled) {
+      throw new ServiceUnavailableException(
+        this.linaTemporarilyDisabledMessage,
+      );
+    }
+
+    return this.linaTranscriptionService.transcribe(file);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -275,18 +370,10 @@ export class LinaController {
   private normalizeSourceModule(
     sourceModule?: string,
   ): LinaActionSourceModule {
-    const allowedModules: LinaActionSourceModule[] = [
-      "dashboard",
-      "crm",
-      "network",
-      "pool",
-      "notifications",
-      "general",
-    ];
-
-    return allowedModules.includes(sourceModule as LinaActionSourceModule)
-      ? (sourceModule as LinaActionSourceModule)
-      : "general";
+    return normalizeLinaSourceModule(
+      sourceModule,
+      LINA_ACTION_SOURCE_MODULES,
+    );
   }
 
   private readHeader(

@@ -1,4 +1,4 @@
-﻿import {
+import {
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -7,18 +7,26 @@
 import {
   Prisma,
   ProjectGeometryType,
+  ProjectLifecycleStage,
   ProjectSetupStatus,
   ProjectWizardStep,
   Role,
   UnitType,
 } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { validateProjectDates } from './planningInput';
 import { PrismaService } from '../prisma/prisma.service';
 
 type ProjectDraftBody = {
   name?: unknown;
   code?: unknown;
   description?: unknown;
+  lifecycleStage?: unknown;
+  completionPercent?: unknown;
+  defaultDeliveryDate?: unknown;
+  plannedStartDate?: unknown;
+  permitNumber?: unknown;
+  permitAuthority?: unknown;
   city?: unknown;
   district?: unknown;
   neighborhood?: unknown;
@@ -32,6 +40,7 @@ type ProjectDraftBody = {
   declaredIndependentUnitCount?: unknown;
   declaredSalesInventoryCount?: unknown;
   plannedUnitTypes?: unknown;
+  plannedOtherUnitTypeName?: unknown;
   geometryType?: unknown;
   wizardStep?: unknown;
   setupStatus?: unknown;
@@ -60,24 +69,21 @@ export class ProjectSalesSetupService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createProjectDraft(userId: string, body: ProjectDraftBody) {
-    const name = this.requiredText(body.name, 'Proje adÄ± zorunludur.');
-    const city = this.requiredText(body.city, 'Ä°l zorunludur.');
-    const district = this.requiredText(body.district, 'Ä°lÃ§e zorunludur.');
-    const neighborhood = this.requiredText(
-      body.neighborhood,
-      'Mahalle zorunludur.',
-    );
-    const address = this.requiredText(body.address, 'AÃ§Ä±k adres zorunludur.');
+    const name = this.requiredText(body.name, 'Proje adı zorunludur.');
+    const city = this.optionalText(body.city) ?? '';
+    const district = this.optionalText(body.district) ?? '';
+    const neighborhood = this.optionalText(body.neighborhood) ?? null;
+    const address = this.optionalText(body.address) ?? '';
     const code = body.code
       ? this.normalizeProjectCode(body.code)
       : await this.generateUniqueProjectCode(userId, name);
     const declaredIndependentUnitCount = this.optionalNonNegativeInteger(
       body.declaredIndependentUnitCount,
-      'Toplam baÄŸÄ±msÄ±z bÃ¶lÃ¼m sayÄ±sÄ±',
+      'Toplam bağımsız bölüm sayısı',
     );
     const declaredSalesInventoryCount = this.optionalNonNegativeInteger(
       body.declaredSalesInventoryCount,
-      'SatÄ±ÅŸ veya kiralama stoku sayÄ±sÄ±',
+      'Satış veya kiralama stoku sayısı',
     );
 
     this.validateDeclaredCounts(
@@ -85,25 +91,49 @@ export class ProjectSalesSetupService {
       declaredSalesInventoryCount,
     );
 
+    const lifecycleStage = this.requiredEnum(
+      ProjectLifecycleStage,
+      body.lifecycleStage,
+      'Proje aşaması zorunludur.',
+    );
+    const lifecycleDetails = this.parseLifecycleDetails(
+      lifecycleStage,
+      body.completionPercent,
+      body.defaultDeliveryDate,
+    );
+
+    const plannedUnitTypes = Array.isArray(body.plannedUnitTypes) && body.plannedUnitTypes.length
+      ? this.parseUnitTypes(body.plannedUnitTypes)
+      : [];
+    const plannedOtherUnitTypeName = plannedUnitTypes.includes(UnitType.DIGER)
+      ? this.parsePlannedOtherUnitTypeName(
+          plannedUnitTypes,
+          body.plannedOtherUnitTypeName,
+        )
+      : null;
+
     const geometryType = this.optionalEnum(
       ProjectGeometryType,
       body.geometryType,
-      'GeÃ§ersiz proje geometrisi.',
+      'Geçersiz proje geometrisi.',
     ) ?? ProjectGeometryType.DIKDORTGEN;
 
     await this.ensureProjectCodeAvailable(userId, code);
 
-    return this.prisma.project.create({
+    const create = (client: PrismaService | Prisma.TransactionClient) => client.project.create({
       data: {
         name,
         code,
         description: this.optionalText(body.description),
+        lifecycleStage,
+        completionPercent: lifecycleDetails.completionPercent,
+        defaultDeliveryDate: lifecycleDetails.defaultDeliveryDate,
         city,
         district,
         neighborhood,
         address,
-        adaNo: this.optionalText(body.adaNo),
-        parselNo: this.optionalText(body.parselNo),
+        adaNo: this.cadastralNumber(body.adaNo, 6, 'Ada'),
+        parselNo: this.cadastralNumber(body.parselNo, 4, 'Parsel'),
         latitude: this.optionalCoordinate(body.latitude, 'Enlem', -90, 90),
         longitude: this.optionalCoordinate(
           body.longitude,
@@ -115,7 +145,8 @@ export class ProjectSalesSetupService {
         placeId: this.optionalText(body.placeId),
         declaredIndependentUnitCount,
         declaredSalesInventoryCount,
-        plannedUnitTypes: this.parseUnitTypes(body.plannedUnitTypes),
+        plannedUnitTypes,
+        plannedOtherUnitTypeName,
         geometryType,
         needsSoftwareTeamReview: COMPLEX_GEOMETRIES.has(geometryType),
         wizardStep: ProjectWizardStep.PROJE_BILGILERI,
@@ -128,10 +159,17 @@ export class ProjectSalesSetupService {
       },
       select: this.projectListSelect(),
     });
+    if (!this.hasPlanning(body)) return { ...await create(this.prisma), plannedStartDate: null, permitNumber: null, permitAuthority: null };
+    const start = this.parsePlanningStart(body.plannedStartDate, lifecycleStage, lifecycleDetails.defaultDeliveryDate);
+    return this.prisma.$transaction(async tx => {
+      const created = await create(tx);
+      const planning = await this.savePlanningStart(tx, created.id, start, body);
+      return { ...created, ...planning };
+    });
   }
 
   async listProjectDrafts(userId: string, userRole: Role) {
-    return this.prisma.project.findMany({
+    const projects = await this.prisma.project.findMany({
       where:
         userRole === Role.SUPER_ADMIN
           ? {}
@@ -141,6 +179,7 @@ export class ProjectSalesSetupService {
       select: this.projectListSelect(),
       orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
     });
+    return this.attachPlanning(projects);
   }
 
   async getProjectSetup(projectId: string, userId: string, userRole: Role) {
@@ -196,6 +235,7 @@ export class ProjectSalesSetupService {
             grossArea: true,
             facades: true,
             conceptLabel: true,
+            description: true,
             legalStatus: true,
             commercialPurpose: true,
             isSalesInventory: true,
@@ -239,12 +279,13 @@ export class ProjectSalesSetupService {
     });
 
     if (!project) {
-      throw new NotFoundException('Proje bulunamadÄ±.');
+      throw new NotFoundException('Proje bulunamadı.');
     }
 
     this.ensureProjectAccess(project.ownerId, userId, userRole);
 
-    return project;
+    const row = await this.prisma.systemSetting.findUnique({ where: { key: this.planningKey(projectId) } });
+    return { ...project, ...this.readPlanning(row?.valueJson) };
   }
 
   async updateProjectDraft(
@@ -260,7 +301,7 @@ export class ProjectSalesSetupService {
     });
 
     if (!project) {
-      throw new NotFoundException('Proje bulunamadÄ±.');
+      throw new NotFoundException('Proje bulunamadı.');
     }
 
     this.ensureProjectAccess(project.ownerId, userId, userRole);
@@ -268,7 +309,7 @@ export class ProjectSalesSetupService {
     const data: Prisma.ProjectUpdateInput = {};
 
     if (this.hasOwn(body, 'name')) {
-      data.name = this.requiredText(body.name, 'Proje adÄ± zorunludur.');
+      data.name = this.requiredText(body.name, 'Proje adı zorunludur.');
     }
 
     if (this.hasOwn(body, 'code')) {
@@ -281,31 +322,58 @@ export class ProjectSalesSetupService {
       data.description = this.optionalText(body.description);
     }
 
+    let lifecycleStage = project.lifecycleStage;
+
+    if (this.hasOwn(body, 'lifecycleStage')) {
+      lifecycleStage = this.requiredEnum(
+        ProjectLifecycleStage,
+        body.lifecycleStage,
+        'Geçersiz proje aşaması.',
+      );
+      data.lifecycleStage = lifecycleStage;
+    }
+
+    if (
+      this.hasOwn(body, 'lifecycleStage') ||
+      this.hasOwn(body, 'completionPercent') ||
+      this.hasOwn(body, 'defaultDeliveryDate')
+    ) {
+      const lifecycleDetails = this.parseLifecycleDetails(
+        lifecycleStage,
+        this.hasOwn(body, 'completionPercent')
+          ? body.completionPercent
+          : project.completionPercent,
+        this.hasOwn(body, 'defaultDeliveryDate')
+          ? body.defaultDeliveryDate
+          : project.defaultDeliveryDate,
+      );
+
+      data.completionPercent = lifecycleDetails.completionPercent;
+      data.defaultDeliveryDate = lifecycleDetails.defaultDeliveryDate;
+    }
+
     if (this.hasOwn(body, 'city')) {
-      data.city = this.requiredText(body.city, 'Ä°l zorunludur.');
+      data.city = this.optionalText(body.city) ?? '';
     }
 
     if (this.hasOwn(body, 'district')) {
-      data.district = this.requiredText(body.district, 'Ä°lÃ§e zorunludur.');
+      data.district = this.optionalText(body.district) ?? '';
     }
 
     if (this.hasOwn(body, 'neighborhood')) {
-      data.neighborhood = this.requiredText(
-        body.neighborhood,
-        'Mahalle zorunludur.',
-      );
+      data.neighborhood = this.optionalText(body.neighborhood) ?? null;
     }
 
     if (this.hasOwn(body, 'address')) {
-      data.address = this.requiredText(body.address, 'AÃ§Ä±k adres zorunludur.');
+      data.address = this.optionalText(body.address) ?? '';
     }
 
     if (this.hasOwn(body, 'adaNo')) {
-      data.adaNo = this.optionalText(body.adaNo);
+      data.adaNo = this.cadastralNumber(body.adaNo, 6, 'Ada');
     }
 
     if (this.hasOwn(body, 'parselNo')) {
-      data.parselNo = this.optionalText(body.parselNo);
+      data.parselNo = this.cadastralNumber(body.parselNo, 4, 'Parsel');
     }
 
     if (this.hasOwn(body, 'latitude')) {
@@ -335,7 +403,7 @@ export class ProjectSalesSetupService {
     )
       ? this.optionalNonNegativeInteger(
           body.declaredIndependentUnitCount,
-          'Toplam baÄŸÄ±msÄ±z bÃ¶lÃ¼m sayÄ±sÄ±',
+          'Toplam bağımsız bölüm sayısı',
         )
       : project.declaredIndependentUnitCount;
     const declaredSalesInventoryCount = this.hasOwn(
@@ -344,7 +412,7 @@ export class ProjectSalesSetupService {
     )
       ? this.optionalNonNegativeInteger(
           body.declaredSalesInventoryCount,
-          'SatÄ±ÅŸ veya kiralama stoku sayÄ±sÄ±',
+          'Satış veya kiralama stoku sayısı',
         )
       : project.declaredSalesInventoryCount;
 
@@ -361,15 +429,35 @@ export class ProjectSalesSetupService {
       data.declaredSalesInventoryCount = declaredSalesInventoryCount;
     }
 
-    if (this.hasOwn(body, 'plannedUnitTypes')) {
-      data.plannedUnitTypes = this.parseUnitTypes(body.plannedUnitTypes);
+    if (
+      this.hasOwn(body, 'plannedUnitTypes') ||
+      this.hasOwn(body, 'plannedOtherUnitTypeName')
+    ) {
+      const plannedUnitTypes = this.hasOwn(body, 'plannedUnitTypes')
+        ? this.parseUnitTypes(body.plannedUnitTypes)
+        : project.plannedUnitTypes;
+
+      const plannedOtherUnitTypeName =
+        this.parsePlannedOtherUnitTypeName(
+          plannedUnitTypes,
+          this.hasOwn(body, 'plannedOtherUnitTypeName')
+            ? body.plannedOtherUnitTypeName
+            : project.plannedOtherUnitTypeName,
+        );
+
+      if (this.hasOwn(body, 'plannedUnitTypes')) {
+        data.plannedUnitTypes = plannedUnitTypes;
+      }
+
+      data.plannedOtherUnitTypeName =
+        plannedOtherUnitTypeName;
     }
 
     if (this.hasOwn(body, 'geometryType')) {
       const geometryType = this.requiredEnum(
         ProjectGeometryType,
         body.geometryType,
-        'GeÃ§ersiz proje geometrisi.',
+        'Geçersiz proje geometrisi.',
       );
 
       data.geometryType = geometryType;
@@ -380,7 +468,7 @@ export class ProjectSalesSetupService {
       data.wizardStep = this.requiredEnum(
         ProjectWizardStep,
         body.wizardStep,
-        'GeÃ§ersiz proje sihirbazÄ± adÄ±mÄ±.',
+        'Geçersiz proje sihirbazı adımı.',
       );
     }
 
@@ -388,28 +476,35 @@ export class ProjectSalesSetupService {
       const setupStatus = this.requiredEnum(
         ProjectSetupStatus,
         body.setupStatus,
-        'GeÃ§ersiz proje kurulum durumu.',
+        'Geçersiz proje kurulum durumu.',
       );
 
       if (!USER_EDITABLE_SETUP_STATUSES.has(setupStatus)) {
         throw new BadRequestException(
-          'Bu proje kurulum durumu doÄŸrudan deÄŸiÅŸtirilemez.',
+          'Bu proje kurulum durumu doğrudan değiştirilemez.',
         );
       }
 
       data.setupStatus = setupStatus;
     }
 
-    if (Object.keys(data).length === 0) {
-      throw new BadRequestException('GÃ¼ncellenecek proje bilgisi bulunamadÄ±.');
+    if (Object.keys(data).length === 0 && !this.hasPlanning(body)) {
+      throw new BadRequestException('Güncellenecek proje bilgisi bulunamadı.');
     }
 
-    return this.prisma.project.update({
-      where: {
-        id: projectId,
-      },
-      data,
-      select: this.projectListSelect(),
+    const update = (client: PrismaService | Prisma.TransactionClient) => client.project.update({
+      where: { id: projectId }, data, select: this.projectListSelect(),
+    });
+    if (!this.hasPlanning(body) && !this.hasOwn(body, 'lifecycleStage') && !this.hasOwn(body, 'defaultDeliveryDate')) return (await this.attachPlanning([await update(this.prisma)]))[0];
+    const row = await this.prisma.systemSetting.findUnique({ where: { key: this.planningKey(projectId) } });
+    const previous = this.readPlanningStart(row?.valueJson);
+    const incoming = this.hasOwn(body, 'plannedStartDate') ? body.plannedStartDate : previous;
+    const delivery = this.hasOwn(body, 'defaultDeliveryDate') ? this.optionalDate(body.defaultDeliveryDate, 'Tahmini teslim tarihi') : project.defaultDeliveryDate;
+    const start = this.parsePlanningStart(incoming, lifecycleStage, delivery, this.hasOwn(body, 'plannedStartDate') || Boolean(previous));
+    return this.prisma.$transaction(async tx => {
+      const updated = await update(tx);
+      const planning = await this.savePlanningStart(tx, projectId, start, body);
+      return { ...updated, ...planning };
     });
   }
 
@@ -430,7 +525,7 @@ export class ProjectSalesSetupService {
     });
 
     if (!project) {
-      throw new NotFoundException('Proje bulunamadÄ±.');
+      throw new NotFoundException('Proje bulunamadı.');
     }
 
     this.ensureProjectAccess(project.ownerId, userId, userRole);
@@ -445,7 +540,7 @@ export class ProjectSalesSetupService {
       success: true,
       projectId: project.id,
       projectName: project.name,
-      message: 'Proje ve projeye baÄŸlÄ± tÃ¼m kayÄ±tlar silindi.',
+      message: 'Proje ve projeye bağlı tüm kayıtlar silindi.',
     };
   }
 
@@ -455,6 +550,7 @@ export class ProjectSalesSetupService {
       name: true,
       code: true,
       description: true,
+      lifecycleStage: true,
       city: true,
       district: true,
       neighborhood: true,
@@ -468,6 +564,7 @@ export class ProjectSalesSetupService {
       declaredIndependentUnitCount: true,
       declaredSalesInventoryCount: true,
       plannedUnitTypes: true,
+      plannedOtherUnitTypeName: true,
       geometryType: true,
       wizardStep: true,
       setupStatus: true,
@@ -497,7 +594,7 @@ export class ProjectSalesSetupService {
       return;
     }
 
-    throw new ForbiddenException('Bu projeye eriÅŸim yetkiniz yok.');
+    throw new ForbiddenException('Bu projeye erişim yetkiniz yok.');
   }
 
   private async ensureProjectCodeAvailable(
@@ -522,7 +619,7 @@ export class ProjectSalesSetupService {
 
     if (existing) {
       throw new BadRequestException(
-        'Bu proje kodu daha Ã¶nce kullanÄ±lmÄ±ÅŸ. FarklÄ± bir proje kodu girin.',
+        'Bu proje kodu daha önce kullanılmış. Farklı bir proje kodu girin.',
       );
     }
   }
@@ -548,26 +645,26 @@ export class ProjectSalesSetupService {
       }
     }
 
-    throw new BadRequestException('Proje kodu Ã¼retilemedi. Tekrar deneyin.');
+    throw new BadRequestException('Proje kodu üretilemedi. Tekrar deneyin.');
   }
 
   private normalizeProjectCode(value: unknown) {
     const normalized = this.requiredText(
       value,
-      'Proje kodu boÅŸ bÄ±rakÄ±lamaz.',
+      'Proje kodu boş bırakılamaz.',
     )
       .toLocaleUpperCase('tr-TR')
-      .replace(/Ã‡/g, 'C')
-      .replace(/Ä/g, 'G')
-      .replace(/Ä°/g, 'I')
-      .replace(/Ã–/g, 'O')
-      .replace(/Å/g, 'S')
-      .replace(/Ãœ/g, 'U')
+      .replace(/Ç/g, 'C')
+      .replace(/Ğ/g, 'G')
+      .replace(/İ/g, 'I')
+      .replace(/Ö/g, 'O')
+      .replace(/Ş/g, 'S')
+      .replace(/Ü/g, 'U')
       .replace(/[^A-Z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
 
     if (!normalized) {
-      throw new BadRequestException('GeÃ§erli bir proje kodu girin.');
+      throw new BadRequestException('Geçerli bir proje kodu girin.');
     }
 
     return normalized.slice(0, 40);
@@ -583,7 +680,7 @@ export class ProjectSalesSetupService {
       salesInventoryCount > independentUnitCount
     ) {
       throw new BadRequestException(
-        'SatÄ±ÅŸ veya kiralama stoku sayÄ±sÄ± toplam baÄŸÄ±msÄ±z bÃ¶lÃ¼m sayÄ±sÄ±ndan bÃ¼yÃ¼k olamaz.',
+        'Satış veya kiralama stoku sayısı toplam bağımsız bölüm sayısından büyük olamaz.',
       );
     }
   }
@@ -591,7 +688,7 @@ export class ProjectSalesSetupService {
   private parseUnitTypes(value: unknown): UnitType[] {
     if (!Array.isArray(value)) {
       throw new BadRequestException(
-        'Planlanan baÄŸÄ±msÄ±z bÃ¶lÃ¼m tipleri liste biÃ§iminde olmalÄ±dÄ±r.',
+        'Planlanan bağımsız bölüm tipleri liste biçiminde olmalıdır.',
       );
     }
 
@@ -599,7 +696,7 @@ export class ProjectSalesSetupService {
     const result = Array.from(
       new Set(
         value.map((item) =>
-          this.requiredText(item, 'BaÄŸÄ±msÄ±z bÃ¶lÃ¼m tipi boÅŸ olamaz.')
+          this.requiredText(item, 'Bağımsız bölüm tipi boş olamaz.')
             .trim()
             .toUpperCase(),
         ),
@@ -608,25 +705,47 @@ export class ProjectSalesSetupService {
 
     if (result.length === 0) {
       throw new BadRequestException(
-        'En az bir planlanan baÄŸÄ±msÄ±z bÃ¶lÃ¼m tipi seÃ§ilmelidir.',
+        'En az bir planlanan bağımsız bölüm tipi seçilmelidir.',
       );
     }
 
     if (result.length > 30) {
       throw new BadRequestException(
-        'En fazla 30 planlanan baÄŸÄ±msÄ±z bÃ¶lÃ¼m tipi seÃ§ilebilir.',
+        'En fazla 30 planlanan bağımsız bölüm tipi seçilebilir.',
       );
     }
 
     for (const item of result) {
       if (!allowed.has(item as UnitType)) {
         throw new BadRequestException(
-          `GeÃ§ersiz baÄŸÄ±msÄ±z bÃ¶lÃ¼m tipi: ${item}`,
+          `Geçersiz bağımsız bölüm tipi: ${item}`,
         );
       }
     }
 
     return result as UnitType[];
+  }
+
+  private parsePlannedOtherUnitTypeName(
+    plannedUnitTypes: UnitType[],
+    value: unknown,
+  ) {
+    if (!plannedUnitTypes.includes(UnitType.DIGER)) {
+      return null;
+    }
+
+    const name = this.requiredText(
+      value,
+      'Diğer bağımsız bölüm türünün adı zorunludur.',
+    );
+
+    if (name.length < 2 || name.length > 80) {
+      throw new BadRequestException(
+        'Diğer bağımsız bölüm türünün adı 2 ile 80 karakter arasında olmalıdır.',
+      );
+    }
+
+    return name;
   }
 
   private optionalCoordinate(
@@ -642,7 +761,7 @@ export class ProjectSalesSetupService {
     const parsed = Number(value);
 
     if (!Number.isFinite(parsed) || parsed < minimum || parsed > maximum) {
-      throw new BadRequestException(`${label} deÄŸeri geÃ§ersiz.`);
+      throw new BadRequestException(`${label} değeri geçersiz.`);
     }
 
     return parsed;
@@ -657,8 +776,133 @@ export class ProjectSalesSetupService {
 
     if (!Number.isInteger(parsed) || parsed < 0) {
       throw new BadRequestException(
-        `${label} sÄ±fÄ±r veya sÄ±fÄ±rdan bÃ¼yÃ¼k tam sayÄ± olmalÄ±dÄ±r.`,
+        `${label} sıfır veya sıfırdan büyük tam sayı olmalıdır.`,
       );
+    }
+
+    return parsed;
+  }
+
+  protected async attachPlanning<T extends { id: string }>(projects: T[]) {
+    const rows = await this.prisma.systemSetting.findMany({ where: { key: { in: projects.map(project => this.planningKey(project.id)) } } });
+    return projects.map(project => {
+      const row = rows.find(item => item.key === this.planningKey(project.id));
+      return { ...project, ...this.readPlanning(row?.valueJson) };
+    });
+  }
+
+  private planningKey(projectId: string) { return `EPH_PROJECT_PLANNING_${projectId}`; }
+
+  private readPlanningStart(value: Prisma.JsonValue | undefined): string | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return typeof value.plannedStartDate === 'string' ? value.plannedStartDate : null;
+  }
+
+  private parsePlanningStart(value: unknown, stage: ProjectLifecycleStage | null, delivery: Date | null, required = true) {
+    if (stage !== ProjectLifecycleStage.PLANNED) return null;
+    const start = this.optionalDate(value, 'Proje başlangıç tarihi');
+    const normalized = start?.toISOString().slice(0, 7);
+    const error = validateProjectDates(stage, delivery?.toISOString() || '', normalized || '', new Date(), required);
+    if (error && (required || start)) throw new BadRequestException(error);
+    return normalized ? `${normalized}-01` : null;
+  }
+
+  private hasPlanning(body: ProjectDraftBody) {
+    return ['plannedStartDate','permitNumber','permitAuthority'].some(key=>this.hasOwn(body,key));
+  }
+
+  private readPlanning(value: Prisma.JsonValue | undefined) {
+    const object = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    return { plannedStartDate: this.readPlanningStart(value), permitNumber: typeof object.permitNumber === 'string' ? object.permitNumber : null, permitAuthority: typeof object.permitAuthority === 'string' ? object.permitAuthority : null };
+  }
+
+  private async savePlanningStart(tx: Prisma.TransactionClient, projectId: string, start: string | null, body: ProjectDraftBody) {
+    const key = this.planningKey(projectId);
+    const row = await tx.systemSetting.findUnique({ where: { key } });
+    const previous = this.readPlanning(row?.valueJson);
+    const text = (value:unknown,label:string,max:number) => { if(value==null||value==='')return null;if(typeof value!=='string'||value.trim().length>max)throw new BadRequestException(`${label} en fazla ${max} karakter olabilir.`);return value.trim()||null; };
+    const valueJson = { plannedStartDate: start, permitNumber: this.hasOwn(body,'permitNumber')?text(body.permitNumber,'Ruhsat numarası',80):previous.permitNumber, permitAuthority: this.hasOwn(body,'permitAuthority')?text(body.permitAuthority,'Ruhsatı veren idare',120):previous.permitAuthority };
+    await tx.systemSetting.upsert({ where: { key }, create: { key, valueJson }, update: { valueJson } });
+    return valueJson;
+  }
+
+  private parseLifecycleDetails(
+    lifecycleStage: ProjectLifecycleStage | null,
+    completionPercent: unknown,
+    defaultDeliveryDate: unknown,
+  ) {
+    if (!lifecycleStage) {
+      throw new BadRequestException('Proje aşaması zorunludur.');
+    }
+
+    if (lifecycleStage === ProjectLifecycleStage.READY) return { completionPercent: 100, defaultDeliveryDate: null };
+
+    const deliveryDate = this.optionalDate(
+      defaultDeliveryDate,
+      'Tahmini teslim tarihi',
+    );
+
+    if (deliveryDate) {
+      const error = validateProjectDates(lifecycleStage, deliveryDate.toISOString(), '', new Date(), false);
+      if (error) throw new BadRequestException(error);
+    }
+
+    if (lifecycleStage === ProjectLifecycleStage.PLANNED) {
+      return {
+        completionPercent: 0,
+        defaultDeliveryDate: deliveryDate,
+      };
+    }
+
+    const parsedCompletion = this.optionalNonNegativeInteger(
+      completionPercent,
+      'Proje tamamlanma oranı',
+    );
+
+    if (
+      parsedCompletion === null ||
+      parsedCompletion <= 0 ||
+      parsedCompletion >= 100
+    ) {
+      throw new BadRequestException(
+        'Devam eden projelerde tamamlanma oranı 1 ile 99 arasında olmalıdır.',
+      );
+    }
+
+    if (!deliveryDate) {
+      throw new BadRequestException(
+        'Devam eden projelerde tahmini teslim tarihi zorunludur.',
+      );
+    }
+
+    return {
+      completionPercent: parsedCompletion,
+      defaultDeliveryDate: deliveryDate,
+    };
+  }
+
+  private optionalDate(value: unknown, label: string) {
+    if (value === undefined || value === null || value === '') {
+      return null;
+    }
+
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) {
+        throw new BadRequestException(`${label} geçersiz.`);
+      }
+
+      return value;
+    }
+
+    const text = String(value).trim();
+    const parsed = new Date(
+      /^\d{4}-\d{2}-\d{2}$/.test(text)
+        ? `${text}T00:00:00.000Z`
+        : text,
+    );
+
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`${label} geçersiz.`);
     }
 
     return parsed;
@@ -706,6 +950,14 @@ export class ProjectSalesSetupService {
       throw new BadRequestException(message);
     }
 
+    return text;
+  }
+
+  private cadastralNumber(value: unknown, maxLength: number, label: string) {
+    const text = this.optionalText(value);
+    if (text && !new RegExp(`^\\d{1,${maxLength}}$`).test(text)) {
+      throw new BadRequestException(`${label} numarası en fazla ${maxLength} rakam olmalıdır.`);
+    }
     return text;
   }
 

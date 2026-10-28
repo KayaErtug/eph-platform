@@ -39,8 +39,8 @@ export class KontorController {
   }
 
   @Get('hareketler')
-  getHareketler(@CurrentUser() user: any) {
-    return this.kontorService.getHareketler(user.id);
+  getHareketler(@CurrentUser() user: any, @Req() request: Request) {
+    return this.kontorService.getHareketler(user.id, this.extractActor(user, request));
   }
 
   @Get('ozet')

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
@@ -14,7 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { Response } from 'express';
-import { DocumentType } from '@prisma/client';
+import { DocumentType, Role } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -81,14 +82,36 @@ export class ProfileController {
     @CurrentUser() user: any,
     @Body()
     body: {
+      companyName?: string;
       firstName?: string;
       lastName?: string;
       phone?: string;
       city?: string;
       district?: string;
+      taxNumber?: string;
+      taxOffice?: string;
     },
   ) {
     return this.profileService.updateProfile(user.id, body);
+  }
+
+  @Post('onboarding')
+  @UseGuards(JwtAuthGuard)
+  completeInitialProfile(
+    @CurrentUser() user: any,
+    @Body()
+    body: {
+      companyName?: string;
+      firstName?: string;
+      lastName?: string;
+      city?: string;
+      district?: string;
+      role?: Role;
+      registrationType?: string;
+      password?: string;
+    },
+  ) {
+    return this.profileService.completeInitialProfile(user.id, body);
   }
 
   @Post('avatar')
@@ -135,5 +158,17 @@ export class ProfileController {
     @Body('type') type: DocumentType,
   ) {
     return this.profileService.uploadDocument(user.id, type, file);
+  }
+
+  @Delete('account')
+  @UseGuards(JwtAuthGuard)
+  deleteAccount(
+    @CurrentUser() user: any,
+    @Body('confirmation') confirmation?: string,
+  ) {
+    return this.profileService.requestAccountDeletion(
+      user.id,
+      confirmation,
+    );
   }
 }

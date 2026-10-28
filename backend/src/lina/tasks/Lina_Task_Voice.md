@@ -666,11 +666,11 @@ Okunmayacak bilgiler:
 
 
 
-\## 11. ElevenLabs Entegrasyon Mantığı
+\## 11. OpenAI TTS Entegrasyon Mantığı
 
 
 
-Lina sesli yanıt üretirken ElevenLabs kullanılabilir.
+Lina sesli yanıt üretirken OpenAI TTS kullanılabilir.
 
 
 
@@ -686,15 +686,15 @@ Temel akış:
 
 4\. Hassas bilgiler maskeleme veya çıkarma işleminden geçer.
 
-5\. Güvenli metin ElevenLabs API’ye gönderilir.
+5\. Güvenli metin OpenAI TTS API’ye gönderilir.
 
-6\. ElevenLabs ses dosyası üretir.
+6\. OpenAI TTS ses dosyası üretir.
 
 7\. Ses dosyası kullanıcıya oynatılır veya bildirimle ilişkilendirilir.
 
 
 
-ElevenLabs için önerilen yapı:
+OpenAI TTS için önerilen yapı:
 
 
 
@@ -1302,7 +1302,7 @@ Lina sesli sisteminde şu yapı önerilir:
 
 6\. Yetki kontrolü yapılır.
 
-7\. Uygunsa ElevenLabs ile ses üretilir.
+7\. Uygunsa OpenAI TTS ile ses üretilir.
 
 8\. Ses dosyası kullanıcıya oynatılır.
 

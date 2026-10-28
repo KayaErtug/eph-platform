@@ -1,0 +1,892 @@
+import { Injectable } from '@nestjs/common';
+import { UnitType } from '@prisma/client';
+
+import { LinaDistanceService } from '../lina/geo/lina-distance.service';
+
+export type EphMatchSource =
+  | 'CRM'
+  | 'TALEP_MERKEZI'
+  | 'PORTFOY'
+  | 'HAVUZ'
+  | 'PROJE_STOK';
+
+export type EphMatchDemand = {
+  id?: string | null;
+  title?: string | null;
+  city?: string | null;
+  district?: string | null;
+  neighborhood?: string | null;
+  propertyTypes?: Array<string | UnitType> | null;
+  statuses?: string[] | null;
+  purchaseIntent?: string | null;
+  minBudget?: number | null;
+  maxBudget?: number | null;
+  budget?: number | null;
+  minArea?: number | null;
+  maxArea?: number | null;
+  roomCounts?: string[] | null;
+  features?: string[] | null;
+};
+
+export type EphMatchOptions = {
+  source?: EphMatchSource;
+  useDistance?: boolean;
+};
+
+export type EphMatchResult = {
+  unitId: string;
+  projectName: string | null;
+  city: string | null;
+  district: string | null;
+  neighborhood: string | null;
+  type: string;
+  status: string;
+  price: number;
+  roomCount: string | null;
+  area: number | null;
+  coverImage: string | null;
+  matchScore: number;
+  matchLevel: 'GUCLU' | 'UYGUN' | 'ZAYIF';
+  matchReasons: string[];
+  distance: {
+    decisionReady: boolean;
+    drivingDistanceKm: number | null;
+    durationMinutes: number | null;
+    straightLineDistanceKm: number | null;
+  } | null;
+  matchPolicy: {
+    version: 'EPH_MATCH_V1';
+    source: EphMatchSource;
+    propertyGroup: PropertyGroup;
+    priceTolerancePercent: number;
+    locationRadiusKm: number;
+    cityHardFilter: true;
+    districtHardFilter: false;
+    propertyTypeHardFilter: true;
+    statusHardFilter: true;
+  };
+  priceMatch: PriceMatchDetails;
+};
+
+type PropertyGroup =
+  | 'RESIDENTIAL'
+  | 'LAND'
+  | 'COMMERCIAL'
+  | 'INDUSTRIAL'
+  | 'TOURISM'
+  | 'PROJECT';
+
+type PriceMatchDetails = {
+  declaredMaxBudget: number | null;
+  buyerNegotiationCeiling: number | null;
+  sellerAskingPrice: number;
+  sellerNegotiationFloor: number;
+  overlapAmount: number | null;
+  tolerancePercent: number;
+  withinDeclaredBudget: boolean;
+};
+
+type PriceMatch = {
+  eligible: boolean;
+  score: number;
+  reasons: string[];
+  details: PriceMatchDetails;
+};
+
+@Injectable()
+export class EphMatchEngineService {
+  private readonly locationRadiusKm = 5;
+
+  private readonly landTypes = new Set<string>([
+    'ARSA',
+    'KONUT_ARSASI',
+    'VILLA_ARSASI',
+    'TICARI_ARSA',
+    'SANAYI_ARSASI',
+    'TURIZM_IMARLI_ARSA',
+    'TARLA',
+    'BAHCE',
+    'BAG',
+    'ZEYTINLIK',
+    'MEYVE_BAHCESI',
+    'SERA',
+    'BESI_CIFTLIGI',
+    'ORMAN_ARAZISI',
+    'ADA',
+  ]);
+
+  private readonly commercialTypes = new Set<string>([
+    'DUKKAN_MAGAZA',
+    'OFIS_BURO',
+    'TICARI_ISLETME',
+    'HOME_OFFICE',
+    'PLAZA_KATI',
+    'SHOWROOM',
+    'IS_HANI_KATI',
+    'IS_MERKEZI',
+    'PAYLASIMLI_OFIS',
+    'KOMPLE_BINA',
+  ]);
+
+  private readonly industrialTypes = new Set<string>([
+    'FABRIKA_URETIM_TESISI',
+    'ATOLYE',
+    'DEPO_ANTREPO',
+    'LOJISTIK_MERKEZI',
+    'FABRIKA_ATOLYE',
+    'URETIM_TESISI',
+    'AKARYAKIT_ISTASYONU',
+  ]);
+
+  private readonly tourismTypes = new Set<string>([
+    'OTEL_PANSIYON',
+    'APART_OTEL',
+    'OTEL',
+    'BUTIK_OTEL',
+    'MOTEL',
+    'PANSIYON',
+    'KAMP_YERI',
+    'TATIL_KOYU',
+    'RESTORAN',
+    'KAFE',
+    'DUGUN_SALONU',
+    'SPOR_TESISI',
+    'OKUL_EGITIM_TESISI',
+    'HASTANE_SAGLIK_TESISI',
+    'TURISTIK_TESIS',
+  ]);
+
+  private readonly projectTypes = new Set<string>([
+    'KONUT_PROJESI',
+    'VILLA_PROJESI',
+    'REZIDANS_PROJESI',
+    'KARMA_PROJE',
+    'AVM_PROJESI',
+    'TICARI_PROJE',
+  ]);
+
+  constructor(private readonly distanceService: LinaDistanceService) {}
+
+  async matchDemandToUnits(
+    demand: EphMatchDemand,
+    units: any[],
+    options: EphMatchOptions = {},
+  ): Promise<EphMatchResult[]> {
+    const results = await this.mapWithConcurrency(
+      units,
+      4,
+      (unit) => this.matchDemandToUnit(demand, unit, options),
+    );
+
+    return results
+      .filter((result): result is EphMatchResult => Boolean(result))
+      .sort((left, right) => {
+        if (right.matchScore !== left.matchScore) {
+          return right.matchScore - left.matchScore;
+        }
+
+        return (
+          (left.distance?.straightLineDistanceKm ?? Number.MAX_VALUE) -
+          (right.distance?.straightLineDistanceKm ?? Number.MAX_VALUE)
+        );
+      });
+  }
+
+  async matchDemandToUnit(
+    demand: EphMatchDemand,
+    unit: any,
+    options: EphMatchOptions = {},
+  ): Promise<EphMatchResult | null> {
+    const project = unit?.project;
+
+    if (!unit || !project) {
+      return null;
+    }
+
+    if (!this.passesCityFilter(demand.city, project.city)) {
+      return null;
+    }
+
+    if (!this.passesPropertyTypeFilter(demand.propertyTypes, unit.type)) {
+      return null;
+    }
+
+    if (!this.passesStatusFilter(demand, unit.status)) {
+      return null;
+    }
+
+    const propertyGroup = this.getPropertyGroup(unit.type);
+    const priceTolerance = this.getPriceTolerance(propertyGroup);
+
+    const priceMatch = this.calculatePriceMatch({
+      unitPrice: Number(unit.price || 0),
+      minBudget: demand.minBudget,
+      maxBudget: demand.maxBudget ?? demand.budget,
+      tolerance: priceTolerance,
+    });
+
+    if (!priceMatch.eligible) {
+      return null;
+    }
+
+    const location = await this.calculateLocation(
+      demand,
+      unit,
+      options.useDistance !== false,
+    );
+
+    if (!location.eligible) {
+      return null;
+    }
+
+    const secondary = this.calculateSecondaryScore(
+      unit,
+      demand,
+      propertyGroup,
+    );
+
+    const matchScore = Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(priceMatch.score + location.score + secondary.score),
+      ),
+    );
+
+    return {
+      unitId: String(unit.id),
+      projectName: project.name || null,
+      city: project.city || null,
+      district: project.district || null,
+      neighborhood:
+        project.neighborhood ||
+        project.mapAddress ||
+        project.address ||
+        null,
+      type: String(unit.type || ''),
+      status: String(unit.status || ''),
+      price: Number(unit.price || 0),
+      roomCount: unit.roomCount || null,
+      area:
+        this.toPositiveNumber(unit.area) ??
+        this.toPositiveNumber(unit.grossArea) ??
+        this.toPositiveNumber(unit.netArea),
+      coverImage:
+        unit.images?.[0]?.url ||
+        unit.images?.[0]?.supabaseUrl ||
+        unit.mediaPackage?.assets?.[0]?.url ||
+        unit.mediaPackage?.assets?.[0]?.supabaseUrl ||
+        null,
+      matchScore,
+      matchLevel: this.getMatchLevel(matchScore),
+      matchReasons: [
+        ...priceMatch.reasons,
+        location.reason,
+        ...secondary.reasons,
+      ].filter(Boolean),
+      distance: location.distance,
+      matchPolicy: {
+        version: 'EPH_MATCH_V1',
+        source: options.source || 'CRM',
+        propertyGroup,
+        priceTolerancePercent: Math.round(priceTolerance * 100),
+        locationRadiusKm: this.locationRadiusKm,
+        cityHardFilter: true,
+        districtHardFilter: false,
+        propertyTypeHardFilter: true,
+        statusHardFilter: true,
+      },
+      priceMatch: priceMatch.details,
+    };
+  }
+
+  async findBestCustomerMatchForUnit(
+    unit: any,
+    customers: any[],
+    options: EphMatchOptions = {},
+  ) {
+    let best:
+      | (EphMatchResult & {
+          customerId: string;
+          interestId: string | null;
+        })
+      | null = null;
+
+    for (const customer of customers || []) {
+      const interests =
+        Array.isArray(customer.interests) && customer.interests.length > 0
+          ? customer.interests.filter(
+              (interest: any) => interest.isActive !== false,
+            )
+          : [
+              {
+                city: customer.city,
+                district: customer.interestedArea,
+                propertyTypes: customer.interestedType
+                  ? [customer.interestedType]
+                  : [],
+                maxBudget: customer.budget,
+              },
+            ];
+
+      for (const interest of interests) {
+        const result = await this.matchDemandToUnit(interest, unit, {
+          ...options,
+          source: options.source || 'CRM',
+        });
+
+        if (!result) continue;
+
+        if (!best || result.matchScore > best.matchScore) {
+          best = {
+            ...result,
+            customerId: String(customer.id),
+            interestId: interest?.id ? String(interest.id) : null,
+          };
+        }
+      }
+    }
+
+    return best;
+  }
+
+  private async calculateLocation(
+    demand: EphMatchDemand,
+    unit: any,
+    useDistance: boolean,
+  ) {
+    const city = this.normalizeText(demand.city);
+    const district = this.normalizeText(demand.district);
+    const neighborhood = this.normalizeText(demand.neighborhood);
+
+    const project = unit.project || {};
+    const unitDistrict = this.normalizeText(project.district);
+    const unitNeighborhood = this.normalizeText(
+      project.neighborhood || project.mapAddress || project.address,
+    );
+
+    if (useDistance && neighborhood && city) {
+      const origin = {
+        label: demand.title?.trim() || 'EPH hedef bölgesi',
+        address: [demand.neighborhood, demand.district, demand.city, 'Türkiye']
+          .filter(Boolean)
+          .join(', '),
+        city: demand.city || undefined,
+        district: demand.district || undefined,
+        neighborhood: demand.neighborhood || undefined,
+      };
+
+      const destination = this.buildUnitDistancePoint(unit);
+
+      if (destination) {
+        try {
+          const distanceResult: any = await this.distanceService.calculate({
+            origin,
+            destination,
+            routingPreference: 'TRAFFIC_AWARE',
+            avoidFerries: true,
+            avoidTolls: false,
+            avoidHighways: false,
+          });
+
+          const straightLineDistanceKm =
+            typeof distanceResult?.straightLine?.distanceKm === 'number'
+              ? Number(distanceResult.straightLine.distanceKm)
+              : null;
+
+          if (
+            straightLineDistanceKm !== null &&
+            straightLineDistanceKm > this.locationRadiusKm
+          ) {
+            return {
+              eligible: false,
+              score: 0,
+              reason: '',
+              distance: null,
+            };
+          }
+
+          if (straightLineDistanceKm !== null) {
+            const score = this.getDistanceLocationScore(straightLineDistanceKm);
+
+            return {
+              eligible: true,
+              score: score.score,
+              reason: score.reason,
+              distance: {
+                decisionReady: true,
+                drivingDistanceKm:
+                  typeof distanceResult?.driving?.distanceKm === 'number'
+                    ? Number(distanceResult.driving.distanceKm)
+                    : null,
+                durationMinutes:
+                  typeof distanceResult?.driving?.durationMinutes === 'number'
+                    ? Number(distanceResult.driving.durationMinutes)
+                    : null,
+                straightLineDistanceKm,
+              },
+            };
+          }
+        } catch {
+          // Coğrafi servis kullanılamazsa hiyerarşik konum eşleşmesine düş.
+        }
+      }
+    }
+
+    if (
+      neighborhood &&
+      unitNeighborhood &&
+      unitNeighborhood.includes(neighborhood)
+    ) {
+      return {
+        eligible: true,
+        score: 30,
+        reason: 'Mahalle eşleşiyor',
+        distance: null,
+      };
+    }
+
+    if (district && district === unitDistrict) {
+      return {
+        eligible: true,
+        score: 25,
+        reason: 'İlçe eşleşiyor',
+        distance: null,
+      };
+    }
+
+    if (city) {
+      return {
+        eligible: true,
+        score: 15,
+        reason: district
+          ? 'Aynı ilde alternatif bölge'
+          : 'İl eşleşiyor',
+        distance: null,
+      };
+    }
+
+    return {
+      eligible: true,
+      score: 0,
+      reason: 'Konum kriteri belirtilmedi',
+      distance: null,
+    };
+  }
+
+  private buildUnitDistancePoint(unit: any) {
+    const project = unit?.project;
+
+    if (!project) {
+      return null;
+    }
+
+    const latitude = Number(project.latitude);
+    const longitude = Number(project.longitude);
+    const hasCoordinates =
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      latitude !== 0 &&
+      longitude !== 0;
+
+    const address =
+      String(project.mapAddress || '').trim() ||
+      [
+        project.neighborhood,
+        project.address,
+        project.district,
+        project.city,
+        'Türkiye',
+      ]
+        .filter(Boolean)
+        .join(', ');
+
+    if (!hasCoordinates && !String(project.placeId || '').trim() && !address) {
+      return null;
+    }
+
+    return {
+      label: project.name?.trim() || `Portföy ${String(unit.id).slice(0, 8)}`,
+      latitude: hasCoordinates ? latitude : undefined,
+      longitude: hasCoordinates ? longitude : undefined,
+      placeId: String(project.placeId || '').trim() || undefined,
+      address: address || undefined,
+      city: project.city || undefined,
+      district: project.district || undefined,
+      neighborhood: project.neighborhood || undefined,
+    };
+  }
+
+  private calculatePriceMatch(input: {
+    unitPrice: number;
+    minBudget?: number | null;
+    maxBudget?: number | null;
+    tolerance: number;
+  }): PriceMatch {
+    const unitPrice = Math.max(0, Number(input.unitPrice || 0));
+    const minBudget = this.toPositiveNumber(input.minBudget);
+    const maxBudget = this.toPositiveNumber(input.maxBudget);
+    const tolerancePercent = Math.round(input.tolerance * 100);
+    const sellerNegotiationFloor = unitPrice * (1 - input.tolerance);
+
+    if (maxBudget === null) {
+      return {
+        eligible: true,
+        score: 25,
+        reasons: ['Maksimum bütçe belirtilmedi'],
+        details: {
+          declaredMaxBudget: null,
+          buyerNegotiationCeiling: null,
+          sellerAskingPrice: unitPrice,
+          sellerNegotiationFloor,
+          overlapAmount: null,
+          tolerancePercent,
+          withinDeclaredBudget: false,
+        },
+      };
+    }
+
+    const buyerNegotiationCeiling = maxBudget * (1 + input.tolerance);
+    const withinDeclaredBudget = unitPrice <= maxBudget;
+    const overlapAmount = buyerNegotiationCeiling - sellerNegotiationFloor;
+
+    if (!withinDeclaredBudget && overlapAmount < 0) {
+      return {
+        eligible: false,
+        score: 0,
+        reasons: [],
+        details: {
+          declaredMaxBudget: maxBudget,
+          buyerNegotiationCeiling,
+          sellerAskingPrice: unitPrice,
+          sellerNegotiationFloor,
+          overlapAmount,
+          tolerancePercent,
+          withinDeclaredBudget,
+        },
+      };
+    }
+
+    if (withinDeclaredBudget) {
+      const minimumFits =
+        minBudget === null || unitPrice >= minBudget;
+
+      return {
+        eligible: true,
+        score: minimumFits ? 50 : 46,
+        reasons: [
+          minimumFits
+            ? 'Fiyat beyan edilen bütçe içinde'
+            : 'Fiyat maksimum bütçenin altında',
+        ],
+        details: {
+          declaredMaxBudget: maxBudget,
+          buyerNegotiationCeiling,
+          sellerAskingPrice: unitPrice,
+          sellerNegotiationFloor,
+          overlapAmount,
+          tolerancePercent,
+          withinDeclaredBudget,
+        },
+      };
+    }
+
+    const maximumAskRatio =
+      (1 + input.tolerance) / Math.max(0.01, 1 - input.tolerance);
+    const currentAskRatio = unitPrice / maxBudget;
+    const progress = Math.max(
+      0,
+      Math.min(
+        1,
+        (currentAskRatio - 1) / Math.max(0.01, maximumAskRatio - 1),
+      ),
+    );
+
+    return {
+      eligible: true,
+      score: Math.round(45 - progress * 20),
+      reasons: [
+        `%${tolerancePercent} pazarlık bandında fiyat kesişimi var`,
+      ],
+      details: {
+        declaredMaxBudget: maxBudget,
+        buyerNegotiationCeiling,
+        sellerAskingPrice: unitPrice,
+        sellerNegotiationFloor,
+        overlapAmount,
+        tolerancePercent,
+        withinDeclaredBudget,
+      },
+    };
+  }
+
+  private calculateSecondaryScore(
+    unit: any,
+    demand: EphMatchDemand,
+    group: PropertyGroup,
+  ) {
+    const weights = this.getSecondaryWeights(group);
+    let score = 0;
+    const reasons: string[] = [];
+
+    const unitArea =
+      this.toPositiveNumber(unit.area) ??
+      this.toPositiveNumber(unit.grossArea) ??
+      this.toPositiveNumber(unit.netArea);
+
+    if (
+      weights.area > 0 &&
+      this.rangeRequested(demand.minArea, demand.maxArea) &&
+      this.isWithinOptionalRange(unitArea, demand.minArea, demand.maxArea)
+    ) {
+      score += weights.area;
+      reasons.push('m² hedefi uyumlu');
+    }
+
+    if (
+      weights.room > 0 &&
+      Array.isArray(demand.roomCounts) &&
+      demand.roomCounts.length > 0 &&
+      unit.roomCount &&
+      demand.roomCounts.map(String).includes(String(unit.roomCount))
+    ) {
+      score += weights.room;
+      reasons.push('Oda sayısı uyumlu');
+    }
+
+    if (
+      weights.features > 0 &&
+      Array.isArray(demand.features) &&
+      demand.features.length > 0 &&
+      Array.isArray(unit.features)
+    ) {
+      const requested = new Set(
+        demand.features.map((feature) => this.normalizeText(feature)),
+      );
+      const available = new Set(
+        unit.features.map((feature: string) => this.normalizeText(feature)),
+      );
+
+      const matched = [...requested].filter((feature) =>
+        available.has(feature),
+      ).length;
+
+      if (matched > 0) {
+        score += Math.max(
+          1,
+          Math.round(weights.features * (matched / requested.size)),
+        );
+        reasons.push(`${matched}/${requested.size} özellik uyumlu`);
+      }
+    }
+
+    return { score, reasons };
+  }
+
+  private passesCityFilter(requestedCity: unknown, projectCity: unknown) {
+    const requested = this.normalizeText(requestedCity);
+    return !requested || requested === this.normalizeText(projectCity);
+  }
+
+  private passesPropertyTypeFilter(
+    propertyTypes: EphMatchDemand['propertyTypes'],
+    unitType: unknown,
+  ) {
+    if (!Array.isArray(propertyTypes) || propertyTypes.length === 0) {
+      return true;
+    }
+
+    const requested = propertyTypes.map((value) =>
+      String(value).toUpperCase(),
+    );
+
+    return requested.includes(String(unitType || '').toUpperCase());
+  }
+
+  private passesStatusFilter(demand: EphMatchDemand, unitStatus: unknown) {
+    const status = String(unitStatus || '').toUpperCase();
+
+    if (Array.isArray(demand.statuses) && demand.statuses.length > 0) {
+      return demand.statuses
+        .map((value) => String(value).toUpperCase())
+        .includes(status);
+    }
+
+    const intent = String(demand.purchaseIntent || '').toUpperCase();
+
+    if (intent === 'KIRALAMA') {
+      return new Set([
+        'KIRALIK',
+        'GUNLUK_KIRALIK',
+        'DEVREN_KIRALIK',
+      ]).has(status);
+    }
+
+    if (intent === 'SATIN_ALMA' || intent === 'YATIRIM') {
+      return new Set([
+        'SATILIK',
+        'DEVREN_SATILIK',
+        'ON_SATIS',
+        'YAKINDA_SATISTA',
+        'INSAAT_HALINDE',
+        'TESLIME_HAZIR',
+        'HEMEN_TESLIM',
+      ]).has(status);
+    }
+
+    if (intent === 'KAT_KARSILIGI') {
+      return status === 'KAT_KARSILIGI';
+    }
+
+    return true;
+  }
+
+  private getPropertyGroup(type: unknown): PropertyGroup {
+    const value = String(type || '').toUpperCase();
+
+    if (this.landTypes.has(value)) return 'LAND';
+    if (this.industrialTypes.has(value)) return 'INDUSTRIAL';
+    if (this.commercialTypes.has(value)) return 'COMMERCIAL';
+    if (this.tourismTypes.has(value)) return 'TOURISM';
+    if (this.projectTypes.has(value)) return 'PROJECT';
+
+    return 'RESIDENTIAL';
+  }
+
+  private getPriceTolerance(group: PropertyGroup) {
+    if (group === 'LAND' || group === 'INDUSTRIAL') return 0.4;
+
+    if (
+      group === 'COMMERCIAL' ||
+      group === 'TOURISM' ||
+      group === 'PROJECT'
+    ) {
+      return 0.35;
+    }
+
+    return 0.3;
+  }
+
+  private getSecondaryWeights(group: PropertyGroup) {
+    if (group === 'LAND') return { area: 12, room: 0, features: 8 };
+    if (group === 'INDUSTRIAL') return { area: 8, room: 0, features: 12 };
+    if (group === 'COMMERCIAL') return { area: 10, room: 0, features: 10 };
+
+    if (group === 'TOURISM' || group === 'PROJECT') {
+      return { area: 8, room: 2, features: 10 };
+    }
+
+    return { area: 10, room: 5, features: 5 };
+  }
+
+  private getDistanceLocationScore(distanceKm: number) {
+    if (distanceKm <= 0.5) {
+      return {
+        score: 30,
+        reason: `Hedef bölge merkezine ${this.formatKm(distanceKm)} km`,
+      };
+    }
+
+    if (distanceKm <= 1) {
+      return {
+        score: 28,
+        reason: `Hedef bölgeye çok yakın (${this.formatKm(distanceKm)} km)`,
+      };
+    }
+
+    if (distanceKm <= 2.5) {
+      return {
+        score: 25,
+        reason: `Hedef bölgeye yakın (${this.formatKm(distanceKm)} km)`,
+      };
+    }
+
+    if (distanceKm <= 4) {
+      return {
+        score: 22,
+        reason: `Hedef bölge çevresinde (${this.formatKm(distanceKm)} km)`,
+      };
+    }
+
+    return {
+      score: 18,
+      reason: `5 km eşleşme alanında (${this.formatKm(distanceKm)} km)`,
+    };
+  }
+
+  private getMatchLevel(score: number): 'GUCLU' | 'UYGUN' | 'ZAYIF' {
+    if (score >= 75) return 'GUCLU';
+    if (score >= 40) return 'UYGUN';
+    return 'ZAYIF';
+  }
+
+  private rangeRequested(min: unknown, max: unknown) {
+    return this.toPositiveNumber(min) !== null ||
+      this.toPositiveNumber(max) !== null;
+  }
+
+  private isWithinOptionalRange(
+    value: unknown,
+    min: unknown,
+    max: unknown,
+  ) {
+    const numeric = this.toPositiveNumber(value);
+    const minimum = this.toPositiveNumber(min);
+    const maximum = this.toPositiveNumber(max);
+
+    if (numeric === null) return false;
+    if (minimum !== null && numeric < minimum) return false;
+    if (maximum !== null && numeric > maximum) return false;
+
+    return true;
+  }
+
+  private toPositiveNumber(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+
+    const numeric = Number(value);
+
+    return Number.isFinite(numeric) && numeric > 0
+      ? numeric
+      : null;
+  }
+
+  private normalizeText(value: unknown) {
+    return String(value || '')
+      .trim()
+      .toLocaleLowerCase('tr-TR');
+  }
+
+  private formatKm(value: number) {
+    return value < 1
+      ? value.toFixed(2)
+      : value.toFixed(1);
+  }
+
+  private async mapWithConcurrency<T, R>(
+    items: T[],
+    concurrency: number,
+    worker: (item: T) => Promise<R>,
+  ): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+
+    const runners = Array.from(
+      { length: Math.min(concurrency, items.length) },
+      async () => {
+        while (true) {
+          const index = nextIndex++;
+          if (index >= items.length) return;
+
+          results[index] = await worker(items[index]);
+        }
+      },
+    );
+
+    await Promise.all(runners);
+
+    return results;
+  }
+}

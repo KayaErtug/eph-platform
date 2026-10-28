@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { PrismaService } from './prisma/prisma.service';
 import * as nodemailer from 'nodemailer';
 
 export type RegistrationType =
@@ -11,7 +12,7 @@ export type RegistrationType =
 export class MailService {
   private readonly transporter: nodemailer.Transporter;
 
-  constructor() {
+  constructor(@Optional() private readonly prisma?: PrismaService) {
     const smtpPort = Number(process.env.SMTP_PORT || 587);
     const smtpSecure =
       String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
@@ -32,6 +33,14 @@ export class MailService {
         rejectUnauthorized,
       },
     });
+  }
+
+  private async adminEmailQueueConfigured() {
+    if (!this.prisma) return false;
+    try {
+      const rows = await this.prisma.$queryRaw<Array<{ recipient: string }>>`SELECT "recipient" FROM "AdminEmailSetting" WHERE "id" = 'main'`;
+      return rows[0]?.recipient === 'ephplatform@gmail.com';
+    } catch { return false; }
   }
 
   private getRegistrationRequirements(registrationType: RegistrationType) {
@@ -131,6 +140,64 @@ export class MailService {
     });
   }
 
+  async sendProfileOnboardingEmailVerificationCode(data: {
+    email: string;
+    code: string;
+    expiresInMinutes: number;
+  }) {
+    const fromName = process.env.SMTP_FROM_NAME || 'EPH Platform';
+    const fromEmail =
+      process.env.SMTP_FROM_EMAIL ||
+      process.env.SMTP_USER ||
+      'bildirim@emlakportfoyhavuzu.com';
+
+    await this.transporter.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.email,
+      subject: 'EPH Platform E-posta Doğrulama Kodunuz',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#F4F8FF;padding:24px;">
+          <div style="overflow:hidden;border:1px solid #C7D6E8;border-radius:20px;background:#FFFFFF;">
+            <div style="background:#2563EB;padding:24px;text-align:center;">
+              <h1 style="margin:0;color:#FFFFFF;font-size:24px;">E-posta Adresinizi Doğrulayın</h1>
+              <p style="margin:8px 0 0;color:#DBEAFE;font-size:14px;">EPH Platform güvenli üyelik doğrulaması</p>
+            </div>
+
+            <div style="padding:28px;color:#1F2937;">
+              <p style="margin:0 0 14px;font-size:16px;line-height:1.7;">Merhaba,</p>
+
+              <p style="margin:0 0 20px;font-size:15px;line-height:1.7;">
+                Üyelik kaydınıza devam etmek için aşağıdaki 6 haneli doğrulama kodunu kayıt ekranına girin.
+              </p>
+
+              <div style="margin:24px 0;border:2px dashed #2563EB;border-radius:16px;background:#EFF6FF;padding:22px;text-align:center;">
+                <p style="margin:0 0 8px;color:#64748B;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">Doğrulama Kodunuz</p>
+                <p style="margin:0;color:#06194A;font-family:monospace;font-size:34px;font-weight:900;letter-spacing:8px;">${data.code}</p>
+              </div>
+
+              <div style="margin:0 0 18px;border:1px solid #BFDBFE;border-radius:14px;background:#EFF6FF;padding:16px;">
+                <p style="margin:0 0 8px;color:#1E3A8A;font-size:14px;font-weight:800;">Profil kurulumu</p>
+                <p style="margin:0;color:#475569;font-size:13px;line-height:1.7;">
+                  Telefon ve e-posta doğrulamanız tamamlandıktan sonra Profil sayfasına yönlendirileceksiniz.
+                  Mesleğinizi Profil sayfasında seçecek ve seçtiğiniz role uygun mesleki doğrulama bilgilerini burada tamamlayacaksınız.
+                </p>
+              </div>
+
+              <div style="border:1px solid #E2E8F0;border-radius:12px;background:#F8FAFC;padding:16px;">
+                <p style="margin:0;color:#475569;font-size:13px;line-height:1.7;">
+                  Bu kod <strong>${data.expiresInMinutes} dakika</strong> boyunca geçerlidir ve yalnızca bir kez kullanılabilir.
+                </p>
+                <p style="margin:10px 0 0;color:#475569;font-size:13px;line-height:1.7;">
+                  Bu başvuruyu siz yapmadıysanız bu e-postayı dikkate almayın.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `,
+    });
+  }
+
   async sendPasswordResetCode(data: {
     email: string;
     firstName: string;
@@ -216,6 +283,7 @@ export class MailService {
     requestedRole: string;
     referralCode?: string;
   }) {
+    if (await this.adminEmailQueueConfigured()) return;
     const ROLE_LABELS: Record<string, string> = {
       EMLAKCI: 'Emlakçı',
       MUTEAHHIT: 'Müteahhit',
@@ -372,6 +440,7 @@ export class MailService {
     nominatorName: string;
     note?: string;
   }) {
+    if (await this.adminEmailQueueConfigured()) return;
     const ROLE_LABELS: Record<string, string> = {
       EMLAKCI: 'Emlakçı',
       MUTEAHHIT: 'Müteahhit',
@@ -416,6 +485,7 @@ export class MailService {
     city?: string;
     interest?: string;
   }) {
+    if (await this.adminEmailQueueConfigured()) return;
     await this.transporter.sendMail({
       from: '"EPH Platform - Lina" <bildirim@emlakportfoyhavuzu.com>',
       to: 'info@emlakportfoyhavuzu.com',

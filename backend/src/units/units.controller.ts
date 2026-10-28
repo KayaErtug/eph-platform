@@ -16,6 +16,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UnitsService } from './units.service';
+import type { PoolPublicationInput } from './pool-publication.service';
 
 @Controller('units')
 @UseGuards(JwtAuthGuard)
@@ -45,6 +46,28 @@ export class UnitsController {
     });
   }
 
+  @Get('my')
+  findMy(
+    @CurrentUser() user: any,
+    @Query('status') status?: UnitStatus,
+    @Query('type') type?: UnitType,
+    @Query('city') city?: string,
+    @Query('isOffMarket') isOffMarket?: string,
+  ) {
+    return this.unitsService.findAll(user, {
+      status,
+      type,
+      city,
+      isOffMarket:
+        isOffMarket === 'true'
+          ? true
+          : isOffMarket === 'false'
+            ? false
+            : undefined,
+      ownerOnly: true,
+    });
+  }
+
   @Get('quality-summary')
   findQualitySummary(@CurrentUser() user: any) {
     return this.unitsService.getQualitySummary(user);
@@ -65,6 +88,11 @@ export class UnitsController {
     return this.unitsService.findPool(user, { status, type, city });
   }
 
+  @Get('pool/:id/contact-quote')
+  poolContactQuote(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.unitsService.poolContactQuote(id, user);
+  }
+
   @Post('pool/:id/message')
   @UseGuards(RolesGuard)
   @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
@@ -74,6 +102,8 @@ export class UnitsController {
     @Body()
     body: {
       message?: string;
+      expectedCostPk?: number;
+      expectedChargeUserId?: string;
       matchScore?: number;
     },
   ) {
@@ -108,6 +138,31 @@ export class UnitsController {
     },
   ) {
     return this.unitsService.poolMatchingCustomer(id, user, body);
+  }
+
+  @Post('pool/:id/location')
+  @UseGuards(RolesGuard)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  poolLocation(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.unitsService.poolLocation(id, user);
+  }
+
+  @Post('pool/:id/private-info')
+  @UseGuards(RolesGuard)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  poolPrivateInfo(@Param('id') id: string, @CurrentUser() user: any, @Body() body?: { expectedCostPk?: number; expectedChargeUserId?: string }) {
+    return this.unitsService.poolPrivateInfo(id, user, body?.expectedCostPk, body?.expectedChargeUserId);
+  }
+
+  @Post('pool/:id/contact/:channel')
+  @UseGuards(RolesGuard)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  poolContact(
+    @Param('id') id: string,
+    @Param('channel') channel: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.unitsService.poolContact(id, user, channel);
   }
 
   @Post('pool/:id/share')
@@ -162,11 +217,18 @@ export class UnitsController {
     return this.unitsService.verifyUnit(id, body);
   }
 
+  @Get(':id/publication-quote')
+  @UseGuards(RolesGuard)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
+  publicationQuote(@Param('id') id: string, @CurrentUser() user: any, @Query() query: PoolPublicationInput) {
+    return this.unitsService.publicationQuote(id, user, query);
+  }
+
   @Post(':id/submit-approval')
   @UseGuards(RolesGuard)
   @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
-  submitApproval(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.unitsService.submitApproval(id, user);
+  submitApproval(@Param('id') id: string, @CurrentUser() user: any, @Body() body?: PoolPublicationInput) {
+    return this.unitsService.submitApproval(id, user, body);
   }
 
   @Post(':id/mark-reviewing')
@@ -199,14 +261,14 @@ export class UnitsController {
 
   @Post(':id/send-to-pool')
   @UseGuards(RolesGuard)
-  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   sendToPool(@Param('id') id: string, @CurrentUser() user: any) {
     return this.unitsService.sendToPool(id, user);
   }
 
   @Post(':id/remove-from-pool')
   @UseGuards(RolesGuard)
-  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
+  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI)
   removeFromPool(@Param('id') id: string, @CurrentUser() user: any) {
     return this.unitsService.removeFromPool(id, user);
   }

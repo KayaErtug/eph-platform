@@ -12,7 +12,10 @@ import {
 } from "@prisma/client";
 
 import { CrmService } from "../../crm/crm.service";
+import { NetworkService } from "../../network/network.service";
+import { getCardProfileBinding } from "../../property-card/property-card-profile.registry";
 import { LinaAuditService } from "../lina-audit.service";
+import { LinaNetworkRequestDraftService } from "../lina-network-request-draft.service";
 import {
   LinaActionExecutionResult,
   LinaActionHistoryItem,
@@ -111,6 +114,14 @@ type PendingCrmCreation = {
   customer?: PendingDirectCrmCustomer;
 };
 
+type PendingNetworkRequestCreation = {
+  userId: string;
+  createdAt: number;
+  expiresAt: number;
+  sourceModule: LinaActionSourceModule;
+  sourceText: string;
+};
+
 
 const PENDING_ACTION_TTL_MS = 5 * 60 * 1000;
 const PENDING_CRM_CREATION_TTL_MS = 10 * 60 * 1000;
@@ -119,9 +130,13 @@ const PENDING_CRM_CREATION_TTL_MS = 10 * 60 * 1000;
 export class LinaActionEngineService {
   private readonly pendingActions = new Map<string, LinaPendingAction>();
   private readonly pendingCrmCreations = new Map<string, PendingCrmCreation>();
+  private readonly pendingNetworkRequestCreations =
+    new Map<string, PendingNetworkRequestCreation>();
 
   constructor(
     private readonly crmService: CrmService,
+    private readonly networkService: NetworkService,
+    private readonly linaNetworkRequestDraftService: LinaNetworkRequestDraftService,
     private readonly linaAuditService: LinaAuditService,
   ) {}
 
@@ -187,6 +202,26 @@ export class LinaActionEngineService {
           message,
           user,
           sourceModule,
+        );
+      }
+
+      const networkRequestPrepare = this.prepareNetworkRequestCreate(
+        message,
+        user,
+        sourceModule,
+        history,
+      );
+
+      if (networkRequestPrepare) {
+        return networkRequestPrepare;
+      }
+
+      if (this.isConfirmedNetworkRequestCreate(message, history)) {
+        return await this.createNetworkRequestFromHistory(
+          user,
+          sourceModule,
+          history,
+          message,
         );
       }
 
@@ -1204,6 +1239,230 @@ export class LinaActionEngineService {
     return labels[type] || String(type).replaceAll("_", " ");
   }
 
+  private prepareNetworkRequestCreate(
+    message: string,
+    user: LinaResolvedUser,
+    sourceModule: LinaActionSourceModule,
+    history: LinaActionHistoryItem[],
+  ): LinaActionExecutionResult | null {
+    const normalized = this.normalize(message);
+
+    const mentionsRequestCenter =
+      normalized.includes("talep merkezi") ||
+      normalized.includes("talep merkezine");
+
+    const explicitSave = /(kaydet|olustur|ekle)/.test(normalized);
+
+    if (
+      !mentionsRequestCenter ||
+      !explicitSave ||
+      this.isConfirmationWord(message)
+    ) {
+      return null;
+    }
+
+    const sourceText = this.findNetworkRequestSourceText(
+      history,
+      message,
+    );
+
+    if (!sourceText) {
+      return {
+        handled: true,
+        success: false,
+        message:
+          "Talep Merkezi kaydı için önceki talep metnini bulamadım. Talebinizi kriterleriyle birlikte tekrar yazın.",
+      };
+    }
+
+    const now = Date.now();
+
+    this.pendingNetworkRequestCreations.set(user.id, {
+      userId: user.id,
+      createdAt: now,
+      expiresAt: now + PENDING_ACTION_TTL_MS,
+      sourceModule,
+      sourceText,
+    });
+
+    this.audit(
+      user,
+      sourceModule,
+      "network_request_create_prepare",
+      "allowed",
+    );
+
+    return {
+      handled: true,
+      success: true,
+      action: "network_request_create",
+      requiresConfirmation: true,
+      message:
+        "Talep Merkezi kaydı hazır. Kaydetmek için 5 dakika içinde yalnızca “Onayla” deyin. Vazgeçmek için “İptal” deyin.",
+    };
+  }
+
+  private isConfirmedNetworkRequestCreate(
+    message: string,
+    history: LinaActionHistoryItem[],
+  ): boolean {
+    const normalized = this.normalize(message);
+    const mentionsRequestCenter =
+      normalized.includes("talep merkezi") ||
+      normalized.includes("talep merkezine");
+    const explicitSave = /(kaydet|olustur|ekle)/.test(normalized);
+    const explicitConfirmation = this.isConfirmationWord(message);
+
+    if (mentionsRequestCenter && explicitSave && explicitConfirmation) {
+      return true;
+    }
+
+    if (!explicitConfirmation) {
+      return false;
+    }
+
+    const lastAssistantMessage = [...history]
+      .reverse()
+      .find((item) => item.role === "assistant")?.content;
+
+    if (!lastAssistantMessage) {
+      return false;
+    }
+
+    const assistantNormalized = this.normalize(lastAssistantMessage);
+    return (
+      assistantNormalized.includes("talep merkezi") &&
+      /(kaydet|kaydetmek|kaydedil)/.test(assistantNormalized)
+    );
+  }
+
+  private async createNetworkRequestFromHistory(
+    user: LinaResolvedUser,
+    sourceModule: LinaActionSourceModule,
+    history: LinaActionHistoryItem[],
+    currentMessage: string,
+  ): Promise<LinaActionExecutionResult> {
+    const sourceText = this.findNetworkRequestSourceText(
+      history,
+      currentMessage,
+    );
+
+    if (!sourceText) {
+      return {
+        handled: true,
+        success: false,
+        message:
+          "Talep Merkezi kaydı için önceki talep metnini bulamadım. Talebinizi kriterleriyle birlikte tekrar yazın.",
+      };
+    }
+
+    const draftResult = await this.linaNetworkRequestDraftService.create(
+      sourceText,
+    );
+    const draft = draftResult.draft;
+
+    if (
+      !draft.category ||
+      !draft.requestIntent ||
+      !draft.propertyType ||
+      !draft.city
+    ) {
+      return {
+        handled: true,
+        success: false,
+        message:
+          "Talep Merkezi kaydı için kategori, talep türü, gayrimenkul tipi veya şehir eksik. Talebinizi bu bilgilerle tekrar yazın.",
+      };
+    }
+
+    const binding = getCardProfileBinding(draft.propertyType);
+    const profileValues = draft.profileCriteria || {};
+    const cardProfileCriteria =
+      binding && Object.keys(profileValues).length > 0
+        ? {
+            version: "1.3",
+            profile: binding.profileCode,
+            values: profileValues,
+          }
+        : undefined;
+
+    const post = await this.networkService.create(
+      {
+        userId: user.id,
+        type: draft.category,
+        title: draft.title,
+        description: draft.detail,
+        city: draft.city,
+        areas: draft.areas,
+        minArea: draft.minArea,
+        maxBudget: draft.maxBudget,
+        propertyTypes: [draft.propertyType],
+        roomCounts: draft.roomCounts,
+        cardProfileCriteria,
+        priceCurrency: draft.currency,
+        urgency: draft.urgency,
+        tags: [`Talep Türü:${draft.requestIntent}`],
+      },
+      user.id,
+    );
+
+    this.audit(
+      user,
+      sourceModule,
+      "network_request_create",
+      "success",
+    );
+
+    return {
+      handled: true,
+      success: true,
+      message: `Talebiniz Talep Merkezi'ne kaydedildi: ${draft.title}.`,
+      data: post,
+    };
+  }
+
+  private findNetworkRequestSourceText(
+    history: LinaActionHistoryItem[],
+    currentMessage: string,
+  ): string | null {
+    const currentNormalized = this.normalize(currentMessage);
+
+    const candidates = [...history]
+      .reverse()
+      .filter((item) => item.role === "user")
+      .map((item) => String(item.content || "").trim())
+      .filter(Boolean)
+      .filter((item) => this.normalize(item) !== currentNormalized);
+
+    for (const candidate of candidates) {
+      const normalized = this.normalize(candidate);
+
+      if (
+        normalized.includes("talep merkezi") ||
+        normalized.includes("havuz portfoy") ||
+        this.isConfirmationWord(candidate) ||
+        this.isCancellationWord(candidate)
+      ) {
+        continue;
+      }
+
+      const hasPropertySignal =
+        /(daire|villa|rezidans|mustakil|arsa|tarla|dukkan|ofis|fabrika|depo|otel|proje)/.test(
+          normalized,
+        );
+      const hasDemandSignal =
+        /(ariyorum|satilik|kiralik|butce|tl|₺|milyon|bin|\d+\s*\+\s*\d+)/.test(
+          normalized,
+        );
+
+      if (hasPropertySignal && hasDemandSignal) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
   private looksLikePlatformAction(message: string): boolean {
     const normalized = this.normalize(message);
 
@@ -1314,12 +1573,27 @@ export class LinaActionEngineService {
   }
 
   private isCrmCustomerUpdateCommand(message: string): boolean {
+    const raw = String(message || "").trim();
     const normalized = this.normalize(message);
 
+    const hasUpdateField =
+      /(telefon|e[- ]?posta|email|sehir|il|butce|not)/.test(normalized);
+
+    const hasUpdateVerb =
+      /(guncelle|degistir|duzelt)/.test(normalized);
+
+    const hasExplicitCrmContext =
+      /(crm|musteri)/.test(normalized);
+
+    const hasNamedPossessiveTarget =
+      /^.+?['’](?:nın|nin|nun|nün|ın|in|un|ün)\s+(?:telefon(?:u|unu)?|e[- ]?posta(?:sı|si)?|email(?:i)?|şehir(?:i)?|sehir(?:i)?|il(?:i)?|bütçe(?:si)?|butce(?:si)?|not(?:u)?)\b/iu.test(
+        raw,
+      );
+
     return (
-      /(crm|musteri)/.test(normalized) &&
-      /(telefon|e posta|email|sehir|il|butce|not)/.test(normalized) &&
-      /(guncelle|degistir|duzelt)/.test(normalized)
+      hasUpdateField &&
+      hasUpdateVerb &&
+      (hasExplicitCrmContext || hasNamedPossessiveTarget)
     );
   }
 
@@ -1916,6 +2190,57 @@ export class LinaActionEngineService {
     user: LinaResolvedUser,
     sourceModule: LinaActionSourceModule,
   ): Promise<LinaActionExecutionResult> {
+    const pendingNetwork =
+      this.pendingNetworkRequestCreations.get(user.id);
+
+    if (pendingNetwork) {
+      if (pendingNetwork.expiresAt < Date.now()) {
+        this.pendingNetworkRequestCreations.delete(user.id);
+
+        if (
+          this.isConfirmationWord(message) ||
+          this.isCancellationWord(message)
+        ) {
+          return {
+            handled: true,
+            success: false,
+            message:
+              "Bekleyen Talep Merkezi kayıt taslağının onay süresi doldu. Talebi yeniden kaydetmeyi isteyin.",
+          };
+        }
+      } else if (this.isCancellationWord(message)) {
+        this.pendingNetworkRequestCreations.delete(user.id);
+
+        this.audit(
+          user,
+          pendingNetwork.sourceModule || sourceModule,
+          "network_request_create_cancel",
+          "success",
+        );
+
+        return {
+          handled: true,
+          success: true,
+          action: "confirmation_cancelled",
+          message: "Bekleyen Talep Merkezi kayıt taslağı iptal edildi.",
+        };
+      } else if (this.isConfirmationWord(message)) {
+        this.pendingNetworkRequestCreations.delete(user.id);
+
+        return await this.createNetworkRequestFromHistory(
+          user,
+          pendingNetwork.sourceModule || sourceModule,
+          [
+            {
+              role: "user",
+              content: pendingNetwork.sourceText,
+            },
+          ],
+          message,
+        );
+      }
+    }
+
     const pendingCrm = this.pendingCrmCreations.get(user.id);
 
     if (pendingCrm) {
@@ -2216,6 +2541,9 @@ export class LinaActionEngineService {
       .trim();
 
     const patterns: RegExp[] = [
+      /^(.+?)\s+CRM\s+kayd(?:ını|ini|unu|ünü)\s+(?:sil|kaldır|kaldir)\b/iu,
+
+        /^(.+?)['’](?:nın|nin|nun|nün|ın|in|un|ün)\s+(?:telefon(?:u|unu)?|e[- ]?posta(?:sı|si)?|email(?:i)?|şehir(?:i)?|sehir(?:i)?|il(?:i)?|bütçe(?:si)?|butce(?:si)?|not(?:u)?)\b/iu,
       /(?:crm['’]?(?:e|ye|de|den)?\s+)(.+?)(?:\s+(?:adlı|isimli)\s+)?(?:müşteri(?:yi|si)?\s+)?(?:ekle|kaydet|oluştur|olustur|sil|kaldır|kaldir|bul|göster|goster|getir|ara)\b/i,
       /^(.+?)(?:['’](?:ı|i|u|ü|yi|yı|yu|yü|ın|in|un|ün))?\s+(?:adlı|isimli\s+)?(?:müşteri(?:yi|si)?\s+)?crm['’]?(?:e|ye|de|den)?\s+(?:ekle|kaydet|oluştur|olustur|sil|kaldır|kaldir|bul|göster|goster|getir|ara)\b/i,
       /^(.+?)(?:['’](?:ın|in|un|ün|a|e|ya|ye))?\s+(?:için\s+)?(?:görev|gorev|not|aktivite|telefon görüşmesi|telefon gorusmesi|whatsapp görüşmesi|whatsapp gorusmesi|yer gösterimi|yer gosterimi|teklif)\b/i,

@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { Role } from '@prisma/client';
 
@@ -34,7 +34,7 @@ export class TeamLeaderCrmController {
   }
 
   @Get('dashboard')
-  getMyDashboard(@Req() request: TeamLeaderCrmRequest) {
-    return this.teamLeaderCrmService.getMyDashboard(this.extractActor(request));
+  getMyDashboard(@Req() request: TeamLeaderCrmRequest, @Query('teamId') teamId?: string) {
+    return this.teamLeaderCrmService.getMyDashboard(this.extractActor(request), teamId);
   }
 }

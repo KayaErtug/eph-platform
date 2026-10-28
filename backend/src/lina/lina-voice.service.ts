@@ -6,7 +6,7 @@ export type LinaVoiceResult = {
   success: boolean;
   message: string;
   audioUrl?: string;
-  provider?: 'elevenlabs' | 'mock';
+  provider?: 'openai' | 'mock';
   blockedReason?: string;
 };
 

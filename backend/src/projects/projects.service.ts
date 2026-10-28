@@ -1,20 +1,18 @@
+import { PoolProjectsService } from '../pool-projects/pool-projects.service';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   PortfolioApprovalStatus,
   ProjectSetupStatus,
+  Role,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  DeedOwnerViewer,
-  getOfficeAdvisorIds,
-  redactDeedOwnerInfo,
-} from '../units/deed-owner-privacy';
 
 type ProjectLocationData = {
   name?: string;
   description?: string;
   city?: string;
   district?: string;
+  neighborhood?: string | null;
   address?: string;
   latitude?: number | string | null;
   longitude?: number | string | null;
@@ -38,42 +36,57 @@ function toNullableFloat(value: number | string | null | undefined) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function cleanOptionalText(value: string | null | undefined) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+
+  const normalized = String(value).trim();
+  return normalized || null;
+}
+
 function cleanOptionalLocationData(data: ProjectLocationData) {
-  return {
-    name:
-      data.name !== undefined
-        ? String(data.name).trim()
-        : undefined,
-    description: data.description,
-    city: data.city,
-    district: data.district,
-    address: data.address,
-    latitude: toNullableFloat(data.latitude),
-    longitude: toNullableFloat(data.longitude),
-    mapAddress: data.mapAddress ? String(data.mapAddress).trim() : null,
-    placeId: data.placeId ? String(data.placeId).trim() : null,
-    isActive: data.isActive,
-  };
+  const cleaned: Record<string, unknown> = {};
+
+  if (data.name !== undefined) cleaned.name = String(data.name).trim();
+  if (data.description !== undefined) cleaned.description = data.description;
+  if (data.city !== undefined) cleaned.city = String(data.city).trim();
+  if (data.district !== undefined) cleaned.district = String(data.district).trim();
+  if (data.neighborhood !== undefined) {
+    cleaned.neighborhood = cleanOptionalText(data.neighborhood);
+  }
+  if (data.address !== undefined) cleaned.address = String(data.address).trim();
+  if (data.latitude !== undefined) cleaned.latitude = toNullableFloat(data.latitude);
+  if (data.longitude !== undefined) cleaned.longitude = toNullableFloat(data.longitude);
+  if (data.mapAddress !== undefined) {
+    cleaned.mapAddress = cleanOptionalText(data.mapAddress);
+  }
+  if (data.placeId !== undefined) {
+    cleaned.placeId = cleanOptionalText(data.placeId);
+  }
+  if (data.isActive !== undefined) cleaned.isActive = data.isActive;
+
+  return cleaned;
 }
 
 function cleanCreateLocationData(data: CreateProjectData) {
   return {
-    name: data.name,
+    name: String(data.name).trim(),
     description: data.description,
-    city: data.city,
-    district: data.district,
-    address: data.address,
+    city: String(data.city).trim(),
+    district: String(data.district).trim(),
+    neighborhood: cleanOptionalText(data.neighborhood),
+    address: String(data.address).trim(),
     latitude: toNullableFloat(data.latitude),
     longitude: toNullableFloat(data.longitude),
-    mapAddress: data.mapAddress ? String(data.mapAddress).trim() : null,
-    placeId: data.placeId ? String(data.placeId).trim() : null,
+    mapAddress: cleanOptionalText(data.mapAddress),
+    placeId: cleanOptionalText(data.placeId),
     isActive: data.isActive,
   };
 }
 
 @Injectable()
 export class ProjectsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private readonly poolProjects: PoolProjectsService) {}
 
   private ensureProjectContentEditable(
     units: Array<{
@@ -151,31 +164,17 @@ export class ProjectsService {
     });
   }
 
-  // Tapu sahibi bilgisi ve kapı girişi ilan sahibi danışmana, ofis sahibine ve süper admine döner.
-  private async redactProjectUnits<
-    T extends { ownerId: string; units: object[] },
-  >(projects: T[], viewer: DeedOwnerViewer): Promise<T[]> {
-    const officeAdvisorIds = await getOfficeAdvisorIds(this.prisma, viewer.id);
-
-    return projects.map((project) => ({
-      ...project,
-      units: project.units.map((unit) =>
-        redactDeedOwnerInfo(unit, project.ownerId, viewer, officeAdvisorIds),
-      ),
-    }));
-  }
-
-  async findAll(
-    filters: {
-      city?: string;
-      district?: string;
-      isActive?: boolean;
-    } | undefined,
-    viewer: DeedOwnerViewer,
-  ) {
-    const projects = await this.prisma.project.findMany({
+  async findAll(filters?: {
+    city?: string;
+    district?: string;
+    neighborhood?: string;
+    isActive?: boolean;
+  }, user?: { id: string; role?: string }) {
+    if (!user?.id) throw new ForbiddenException('Oturum bulunamadı.');
+    const owned = await this.prisma.project.findMany({
       where: {
         ...this.getPortfolioVisibleProjectWhere(),
+        ...(user.role === Role.SUPER_ADMIN ? {} : { ownerId: user.id }),
         isActive: filters?.isActive ?? true,
         city: filters?.city
           ? {
@@ -186,6 +185,12 @@ export class ProjectsService {
         district: filters?.district
           ? {
               contains: filters.district,
+              mode: 'insensitive',
+            }
+          : undefined,
+        neighborhood: filters?.neighborhood
+          ? {
+              contains: filters.neighborhood,
               mode: 'insensitive',
             }
           : undefined,
@@ -210,11 +215,18 @@ export class ProjectsService {
         createdAt: 'desc',
       },
     });
-
-    return this.redactProjectUnits(projects, viewer);
+    if (user.role === Role.SUPER_ADMIN) return owned;
+    const publicProjects = await this.poolProjects.listProjects(user);
+    const ownedIds = new Set(owned.map(project => project.id));
+    return [...owned, ...publicProjects.filter(project => !ownedIds.has(project.id) &&
+      (!filters?.city || project.city?.toLocaleLowerCase('tr-TR').includes(filters.city.toLocaleLowerCase('tr-TR'))) &&
+      (!filters?.district || project.district?.toLocaleLowerCase('tr-TR').includes(filters.district.toLocaleLowerCase('tr-TR'))) &&
+      (!filters?.neighborhood || project.neighborhood?.toLocaleLowerCase('tr-TR').includes(filters.neighborhood.toLocaleLowerCase('tr-TR')))
+    )];
   }
 
-  async findOne(id: string, viewer: DeedOwnerViewer) {
+  async findOne(id: string, user?: { id: string; role?: string }) {
+    if (!user?.id) throw new ForbiddenException('Oturum bulunamadı.');
     const project = await this.prisma.project.findFirst({
       where: {
         id,
@@ -246,13 +258,15 @@ export class ProjectsService {
       throw new NotFoundException('Proje bulunamadi.');
     }
 
-    return (await this.redactProjectUnits([project], viewer))[0];
+    if (project.ownerId === user.id || user.role === Role.SUPER_ADMIN) return project;
+    return this.poolProjects.getProjectDetail(id, user);
   }
 
   async update(
     id: string,
     userId: string,
     data: ProjectLocationData,
+    userRole?: Role | string,
   ) {
     const project = await this.prisma.project.findUnique({
       where: {
@@ -271,13 +285,13 @@ export class ProjectsService {
       throw new NotFoundException('Proje bulunamadi.');
     }
 
-    if (project.ownerId !== userId) {
+    if (project.ownerId !== userId && userRole !== Role.SUPER_ADMIN) {
       throw new ForbiddenException(
         'Bu projeyi duzenleme yetkiniz yok.',
       );
     }
 
-    this.ensureProjectContentEditable(project.units);
+    if (userRole !== Role.SUPER_ADMIN) this.ensureProjectContentEditable(project.units);
 
     return this.prisma.project.update({
       where: {
@@ -298,7 +312,7 @@ export class ProjectsService {
     });
   }
 
-  async remove(id: string, userId: string) {
+  async remove(id: string, userId: string, userRole?: Role | string) {
     const project = await this.prisma.project.findUnique({
       where: {
         id,
@@ -316,13 +330,13 @@ export class ProjectsService {
       throw new NotFoundException('Proje bulunamadi.');
     }
 
-    if (project.ownerId !== userId) {
+    if (project.ownerId !== userId && userRole !== Role.SUPER_ADMIN) {
       throw new ForbiddenException(
         'Bu projeyi silme yetkiniz yok.',
       );
     }
 
-    this.ensureProjectContentEditable(project.units);
+    if (userRole !== Role.SUPER_ADMIN) this.ensureProjectContentEditable(project.units);
 
     return this.prisma.project.delete({
       where: {
@@ -331,11 +345,11 @@ export class ProjectsService {
     });
   }
 
-  async myProjects(ownerId: string) {
+  async myProjects(ownerId: string, userRole?: Role | string) {
     return this.prisma.project.findMany({
       where: {
         ...this.getPortfolioVisibleProjectWhere(),
-        ownerId,
+        ...(userRole === Role.SUPER_ADMIN ? {} : { ownerId }),
       },
       include: {
         units: true,

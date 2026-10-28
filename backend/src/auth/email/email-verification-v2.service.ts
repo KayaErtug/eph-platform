@@ -35,7 +35,7 @@ export class EmailVerificationV2Service {
 
   async send(
     pendingRegistrationId: string,
-    registrationType: MailRegistrationType,
+    registrationType: MailRegistrationType | 'PROFILE_ONBOARDING',
   ) {
     const pending = await this.prisma.pendingRegistration.findUnique({
       where: { id: pendingRegistrationId },
@@ -64,13 +64,21 @@ export class EmailVerificationV2Service {
       },
     });
 
-    await this.mailService.sendEmailVerificationCode({
-      email: pending.email,
-      firstName: pending.firstName,
-      code,
-      expiresInMinutes,
-      registrationType,
-    });
+    if (registrationType === 'PROFILE_ONBOARDING') {
+      await this.mailService.sendProfileOnboardingEmailVerificationCode({
+        email: pending.email,
+        code,
+        expiresInMinutes,
+      });
+    } else {
+      await this.mailService.sendEmailVerificationCode({
+        email: pending.email,
+        firstName: pending.firstName,
+        code,
+        expiresInMinutes,
+        registrationType,
+      });
+    }
 
     return { success: true, expiresInMinutes };
   }

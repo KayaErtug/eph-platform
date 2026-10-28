@@ -1,3 +1,4 @@
+import { NativePushService } from './native-push.service';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as webPush from 'web-push';
@@ -18,7 +19,7 @@ type PushPayload = {
 
 @Injectable()
 export class PushService {
-  constructor(private readonly prisma: PrismaService) {
+  constructor(private readonly prisma: PrismaService, private readonly nativePush: NativePushService) {
     const publicKey = process.env.VAPID_PUBLIC_KEY;
     const privateKey = process.env.VAPID_PRIVATE_KEY;
     const subject = process.env.VAPID_SUBJECT || 'mailto:mustafaertugkaya@gmail.com';
@@ -84,14 +85,15 @@ export class PushService {
   }
 
   async sendToUser(userId: string, payload: PushPayload) {
+    const native = await this.nativePush.sendToUser(userId, payload);
     const subscriptions = await this.prisma.pushSubscription.findMany({
       where: { userId },
     });
 
     if (subscriptions.length === 0) {
       return {
-        ok: false,
-        message: 'Bu kullanıcı için kayıtlı bildirim aboneliği yok.',
+        ...native,
+        message: native.ok ? 'Bildirim gönderim servisine iletildi.' : 'Aktif bildirim aboneliği bulunamadı.',
       };
     }
 
@@ -127,9 +129,9 @@ export class PushService {
     );
 
     return {
-      ok: successCount > 0,
-      successCount,
-      failCount,
+      ok: successCount + native.successCount > 0,
+      successCount: successCount + native.successCount,
+      failCount: failCount + native.failCount,
     };
   }
 }

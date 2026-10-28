@@ -39,17 +39,6 @@ const APPROVED_REVIEW_STATUSES: ProjectDesignReviewStatus[] = [
   ProjectDesignReviewStatus.TAMAMLANDI,
 ];
 
-const COMPLEX_GEOMETRIES = new Set<ProjectGeometryType>([
-  ProjectGeometryType.BESGEN,
-  ProjectGeometryType.ALTIGEN,
-  ProjectGeometryType.YILDIZ,
-  ProjectGeometryType.DAIRESEL,
-  ProjectGeometryType.KIRIK_CEPHELI,
-  ProjectGeometryType.COK_KANATLI,
-  ProjectGeometryType.BAGLANTILI_KULELER,
-  ProjectGeometryType.OZEL_KARMASIK,
-]);
-
 @Injectable()
 export class ProjectSalesCompletionService {
   constructor(private readonly prisma: PrismaService) {}
@@ -540,25 +529,7 @@ export class ProjectSalesCompletionService {
       });
     }
 
-    if (
-      project.declaredIndependentUnitCount === null
-    ) {
-      issues.push({
-        code: 'DECLARED_UNIT_COUNT_REQUIRED',
-        message:
-          'Beyan edilen toplam bağımsız bölüm sayısı girilmelidir.',
-      });
-    }
-
-    if (
-      project.declaredSalesInventoryCount === null
-    ) {
-      issues.push({
-        code: 'DECLARED_SALES_COUNT_REQUIRED',
-        message:
-          'Beyan edilen satış veya kiralama stoku sayısı girilmelidir.',
-      });
-    }
+    // Declared counts optional in 8-step flow
 
     if (
       project.declaredIndependentUnitCount !== null &&
@@ -638,33 +609,6 @@ export class ProjectSalesCompletionService {
         code: 'INCOMPLETE_UNIT_STRUCTURE',
         message:
           `${incompleteUnitCount} bağımsız bölümün blok, kat veya numara bilgisi eksik.`,
-      });
-    }
-
-    const latestReview = project.designReviewRequests[0];
-    const complexGeometry =
-      COMPLEX_GEOMETRIES.has(project.geometryType);
-
-    if (
-      (project.needsSoftwareTeamReview || complexGeometry) &&
-      !latestReview
-    ) {
-      issues.push({
-        code: 'SOFTWARE_TEAM_REVIEW_REQUIRED',
-        message:
-          'Bu proje için Yazılım Ekibi inceleme talebi oluşturulmalıdır.',
-      });
-    }
-
-    if (
-      (project.needsSoftwareTeamReview || complexGeometry) &&
-      latestReview &&
-      !APPROVED_REVIEW_STATUSES.includes(latestReview.status)
-    ) {
-      issues.push({
-        code: 'SOFTWARE_TEAM_REVIEW_NOT_APPROVED',
-        message:
-          'Yazılım Ekibi incelemesi onaylanmadan proje kurulumu tamamlanamaz.',
       });
     }
 

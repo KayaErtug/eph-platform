@@ -1,3 +1,4 @@
+import { resolveOfficeWallet } from '../office/office-wallet.rules';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -883,16 +884,25 @@ export class EphAuthorityLettersService {
     aciklama: string;
     ilgiliKayitId: string;
   }) {
-    let wallet = await input.tx.kontorCuzdani.findUnique({
+    const chargeUserId = (await resolveOfficeWallet(input.tx, input.userId, {}, true)).chargeUserId;
+    await input.tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtext(${`wallet:${chargeUserId}`})
+        )
+      `;
+
+    await input.tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${chargeUserId} FOR UPDATE`;
+
+      let wallet = await input.tx.kontorCuzdani.findUnique({
       where: {
-        kullaniciId: input.userId,
+        kullaniciId: chargeUserId,
       },
     });
 
     if (!wallet) {
       wallet = await input.tx.kontorCuzdani.create({
         data: {
-          kullaniciId: input.userId,
+          kullaniciId: chargeUserId,
           bakiye: 0,
           toplamYukleme: 0,
           toplamHarcama: 0,
@@ -916,10 +926,12 @@ export class EphAuthorityLettersService {
 
     const updatedWallet = await input.tx.kontorCuzdani.update({
       where: {
-        kullaniciId: input.userId,
+        kullaniciId: chargeUserId,
       },
       data: {
-        bakiye: nextBalance,
+        bakiye: {
+            decrement: input.amount,
+          },
         toplamHarcama: {
           increment: input.amount,
         },
@@ -928,7 +940,7 @@ export class EphAuthorityLettersService {
 
     const movement = await input.tx.kontorHareketi.create({
       data: {
-        kullaniciId: input.userId,
+        kullaniciId: chargeUserId,
         hareketTuru: KontorHareketTuru.HARCAMA,
         islemTuru: KontorIslemTuru.DIGER,
         miktar: input.amount,

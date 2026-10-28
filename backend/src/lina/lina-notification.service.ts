@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { LinaNotificationSourceModule } from './lina-source-module';
 
 export type LinaNotificationPriority = 0 | 1 | 2 | 3 | 4;
 

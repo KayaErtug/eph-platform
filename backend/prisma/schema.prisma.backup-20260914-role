@@ -1,0 +1,3638 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                          String                       @id @default(uuid())
+  email                       String?                      @unique
+  phone                       String                       @unique
+  passwordHash                String?
+  firstName                   String
+  lastName                    String
+  role                        Role                         @default(ADAY)
+  isVerified                  Boolean                      @default(false)
+  emailVerifiedAt             DateTime?
+  emailVerificationCodeHash   String?
+  emailVerificationExpiresAt  DateTime?
+  emailVerificationAttempts   Int                          @default(0)
+  emailVerificationLastSentAt DateTime?
+  passwordResetCodeHash       String?
+  passwordResetExpiresAt      DateTime?
+  passwordResetAttempts       Int                          @default(0)
+  passwordResetLastSentAt     DateTime?
+  passwordResetVersion        Int                          @default(0)
+  isApproved                  Boolean                      @default(false)
+  profileCompleted            Boolean                      @default(false)
+  profileCompletedAt          DateTime?
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  nominationPoints            Int                          @default(0)
+  nominationQuota             Int                          @default(10)
+  referralCode                String?                      @unique
+  adminVisible                Boolean                      @default(true)
+  profileImageUrl             String?
+  memberCode                  String?                      @unique
+  memberSince                 DateTime?
+  riskLevel                   RiskLevel                    @default(DUSUK)
+  trustScore                  Int                          @default(70)
+  city                        String?
+  cityPlateCode               String?
+  district                    String?
+  hesapTuru                   KullaniciHesapTuru           @default(GERCEK)
+  pilotKullaniciMi            Boolean                      @default(false)
+  officeId                    String?
+  activities                  Activity[]
+  adminActionLogs             AdminActionLog[]             @relation("AdminActionActor")
+  adminActionTargets          AdminActionLog[]             @relation("AdminActionTarget")
+  applications                Application[]
+  reviewedApplications        Application[]                @relation("ApplicationReviewer")
+  auditLogs                   AuditLog[]                   @relation("AuditActor")
+  activitiesAudited           AuditLog[]                   @relation("AuditTargetUser")
+  ConversationParticipant     ConversationParticipant[]
+  customers                   Customer[]
+  documents                   Document[]
+  linaPortfolioSessions       LinaPortfolioSession[]
+  linaPreference              LinaPreference?
+  linaOturumlari              LinaOturum[]
+  linaGunSonuOnaylari         LinaGunSonuOnayi[]
+  Message                     Message[]
+  NetworkNotification         NetworkNotification[]
+  NetworkPost                 NetworkPost[]
+  NetworkPostFollower         NetworkPostFollower[]
+  NetworkPostUpdateLog        NetworkPostUpdateLog[]
+  NetworkPostView             NetworkPostView[]
+  nominations                 Nomination[]
+  ownedOffices                Office[]                     @relation("OfficeOwner")
+  announcementsCreated        PlatformAnnouncement[]       @relation("AnnouncementCreator")
+  portfolioAuthorityApprovals PortfolioAuthorityDocument[] @relation("PortfolioAuthorityApprover")
+  projects                    Project[]
+  projectInventoryBatches     ProjectInventoryBatch[]      @relation("ProjectInventoryBatchCreator")
+  projectDesignReviewRequests ProjectDesignReviewRequest[] @relation("ProjectDesignReviewRequester")
+  projectDesignReviews        ProjectDesignReviewRequest[] @relation("ProjectDesignReviewReviewer")
+  salesUnits                  Unit[]                       @relation("UnitSalesRepresentative")
+  pushSubscriptions           PushSubscription[]
+  reportsCreated              Report[]                     @relation("ReportReporter")
+  reportsResolved             Report[]                     @relation("ReportResolver")
+  superAdminProfile           SUPER_ADMIN?
+  systemMessagesSent          SystemMessage[]              @relation("SystemMessageSender")
+  systemMessagesInbox         SystemMessage[]              @relation("SystemMessageTargetUser")
+  tasks                       Task[]
+  ledTeams                    Team[]                       @relation("TeamLeader")
+  teamMemberships             TeamMember[]
+  office                      Office?                      @relation("OfficeUsers", fields: [officeId], references: [id])
+  capabilitiesCreated         UserCapability[]             @relation("CapabilityCreator")
+  capabilities                UserCapability[]             @relation("UserCapabilities")
+  restrictionsCreated         UserRestriction[]            @relation("RestrictionCreator")
+  restrictions                UserRestriction[]            @relation("RestrictedUser")
+  visits                      UserVisit[]
+  hediyeKontorHavuzlari       HediyeKontorHavuzu[]         @relation("GiftPoolCreator")
+  hediyeKontorGonderimleri    HediyeKontorDagitimi[]       @relation("GiftCreditSender")
+  hediyeKontorAlimlari        HediyeKontorDagitimi[]       @relation("GiftCreditRecipient")
+
+  @@index([officeId])
+}
+
+model SUPER_ADMIN {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  title       String   @default("Süper Admin")
+  isActive    Boolean  @default(true)
+  permissions String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Office {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  ownerUserId String?
+  city        String?
+  district    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  owner       User?    @relation("OfficeOwner", fields: [ownerUserId], references: [id])
+  teams       Team[]
+  users       User[]   @relation("OfficeUsers")
+
+  @@index([ownerUserId])
+  @@index([city, district])
+  @@index([isActive])
+}
+
+model Team {
+  id        String       @id @default(uuid())
+  officeId  String
+  name      String
+  leaderId  String?
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  leader    User?        @relation("TeamLeader", fields: [leaderId], references: [id])
+  office    Office       @relation(fields: [officeId], references: [id], onDelete: Cascade)
+  members   TeamMember[]
+
+  @@unique([officeId, name])
+  @@index([officeId])
+  @@index([leaderId])
+  @@index([isActive])
+}
+
+model TeamMember {
+  id        String    @id @default(uuid())
+  teamId    String
+  userId    String
+  joinedAt  DateTime  @default(now())
+  leftAt    DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@index([isActive])
+}
+
+model PendingRegistration {
+  id                  String  @id @default(dbgenerated("(gen_random_uuid())::text"))
+  firstName           String
+  lastName            String
+  email               String? @unique
+  phone               String  @unique
+  passwordHash        String?
+  city                String?
+  role                Role    @default(ADAY)
+  registrationType    String?
+  inviteCode          String?
+  referralCandidateId String?
+
+  status PendingRegistrationStatus @default(PHONE_VERIFICATION_PENDING)
+
+  phoneVerified               Boolean   @default(false)
+  phoneVerifiedAt             DateTime?
+  phoneVerificationCodeHash   String?
+  phoneVerificationExpiresAt  DateTime?
+  phoneVerificationAttempts   Int       @default(0)
+  phoneVerificationLastSentAt DateTime?
+
+  emailVerified               Boolean   @default(false)
+  emailVerifiedAt             DateTime?
+  emailVerificationCodeHash   String?
+  emailVerificationExpiresAt  DateTime?
+  emailVerificationAttempts   Int       @default(0)
+  emailVerificationLastSentAt DateTime?
+
+  ipAddress   String?
+  userAgent   String?
+  expiresAt   DateTime
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([role])
+  @@index([inviteCode])
+  @@index([referralCandidateId])
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
+model PhoneVerificationSecurity {
+  phone                       String  @id
+  activePendingRegistrationId String?
+
+  failedAttempts      Int       @default(0)
+  totalFailedAttempts Int       @default(0)
+  lastAttemptAt       DateTime?
+
+  lockedAt     DateTime?
+  lockedUntil  DateTime?
+  suspiciousAt DateTime?
+
+  lastSmsSentAt    DateTime?
+  nextSmsAllowedAt DateTime?
+
+  lastIpAddress String?
+  lastUserAgent String?
+
+  firebaseVerificationIdHash String?
+  firebaseSessionStartedAt   DateTime?
+  firebaseSessionExpiresAt   DateTime?
+  firebaseSessionConsumedAt  DateTime?
+  firebaseUid                String?
+
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([activePendingRegistrationId])
+  @@index([lockedUntil])
+  @@index([nextSmsAllowedAt])
+  @@index([suspiciousAt])
+  @@index([lastIpAddress, updatedAt])
+}
+
+model UserCapability {
+  id          String     @id @default(uuid())
+  userId      String
+  capability  Capability
+  createdById String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  createdBy   User?      @relation("CapabilityCreator", fields: [createdById], references: [id])
+  user        User       @relation("UserCapabilities", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, capability])
+  @@index([userId])
+  @@index([capability])
+  @@index([createdById])
+}
+
+model Invitation {
+  id                   String            @id @default(uuid())
+  code                 String            @unique
+  role                 Role
+  status               InvitationStatus  @default(PENDING)
+  maxUses              Int               @default(1)
+  usedCount            Int               @default(0)
+  expiresAt            DateTime
+  createdAt            DateTime          @default(now())
+  adayAdSoyad          String?
+  adayEposta           String?
+  adayTelefon          String?
+  davetKoduTuru        DavetKoduTuru     @default(REFERANSLI_BASVURU)
+  epostaGonderildiMi   Boolean           @default(false)
+  epostaGonderimTarihi DateTime?
+  epostaHataMesaji     String?
+  iptalEdenKullaniciId String?
+  iptalSebebi          String?
+  iptalTarihi          DateTime?
+  olusturanKullaniciId String?
+  olusturanRol         Role?
+  onayYetkiSeviyesi    OnayYetkiSeviyesi @default(MODERATOR_ADMIN_SUPER_ADMIN)
+  pilotDavetiMi        Boolean           @default(false)
+  updatedAt            DateTime          @updatedAt
+
+  @@index([role])
+  @@index([status])
+  @@index([davetKoduTuru])
+  @@index([adayEposta])
+  @@index([pilotDavetiMi])
+  @@index([olusturanKullaniciId])
+  @@index([olusturanRol])
+  @@index([expiresAt])
+}
+
+model ReferralCandidate {
+  id           String    @id @default(uuid())
+  referralCode String    @unique
+  firstName    String
+  lastName     String
+  email           String?  @unique
+  phone        String    @unique
+  role         Role
+  isActive     Boolean   @default(true)
+  usedAt       DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Document {
+  id        String         @id @default(uuid())
+  userId    String
+  type      DocumentType
+  status    DocumentStatus @default(PENDING)
+  fileUrl   String
+  fileName  String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id                           String                       @id @default(uuid())
+  name                         String
+  code                         String?
+  description                  String?
+  lifecycleStage               ProjectLifecycleStage?
+  city                         String
+  district                     String
+  neighborhood                 String?
+  address                      String
+  adaNo                        String?
+  parselNo                     String?
+  ownerId                      String
+  completionPercent            Int?
+  defaultDeliveryDate          DateTime?
+  declaredIndependentUnitCount Int?
+  declaredSalesInventoryCount  Int?
+  plannedUnitTypes             UnitType[]                   @default([])
+  plannedOtherUnitTypeName     String?
+  geometryType                 ProjectGeometryType          @default(DIKDORTGEN)
+  wizardStep                   ProjectWizardStep            @default(PROJE_BILGILERI)
+  setupStatus                  ProjectSetupStatus           @default(TASLAK)
+  needsSoftwareTeamReview      Boolean                      @default(false)
+  isActive                     Boolean                      @default(true)
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime                     @updatedAt
+  latitude                     Float?
+  longitude                    Float?
+  mapAddress                   String?
+  placeId                      String?
+  owner                        User                         @relation(fields: [ownerId], references: [id])
+  units                        Unit[]
+  blocks                       ProjectBlock[]
+  spaces                       ProjectSpace[]
+  designReviewRequests         ProjectDesignReviewRequest[]
+  inventoryBatches             ProjectInventoryBatch[]
+  mediaPackages                ProjectMediaPackage[]
+
+  @@unique([ownerId, code])
+  @@index([ownerId])
+  @@index([lifecycleStage])
+  @@index([latitude, longitude])
+  @@index([city, district, neighborhood])
+  @@index([geometryType])
+  @@index([wizardStep])
+  @@index([setupStatus])
+  @@index([needsSoftwareTeamReview])
+  @@index([isActive])
+}
+
+model ProjectBlock {
+  id              String                 @id @default(uuid())
+  projectId       String
+  sourceBatchId   String?
+  code            String
+  normalizedCode  String
+  name            String?
+  geometryType    ProjectGeometryType    @default(DIKDORTGEN)
+  facadeViewCount Int                    @default(1)
+  sortOrder       Int                    @default(0)
+  isActive        Boolean                @default(true)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  project         Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceBatch     ProjectInventoryBatch? @relation("ProjectBlockSourceBatch", fields: [sourceBatchId], references: [id], onDelete: SetNull)
+  floors          ProjectFloor[]
+  units           Unit[]
+  spaces          ProjectSpace[]
+
+  @@unique([projectId, normalizedCode])
+  @@index([projectId, sortOrder])
+  @@index([sourceBatchId])
+  @@index([geometryType])
+  @@index([isActive])
+}
+
+model ProjectFloor {
+  id            String                 @id @default(uuid())
+  blockId       String
+  sourceBatchId String?
+  level         Int
+  label         String
+  floorType     ProjectFloorType       @default(NORMAL)
+  sortOrder     Int                    @default(0)
+  isActive      Boolean                @default(true)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  block         ProjectBlock           @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  sourceBatch   ProjectInventoryBatch? @relation("ProjectFloorSourceBatch", fields: [sourceBatchId], references: [id], onDelete: SetNull)
+  units         Unit[]
+  spaces        ProjectSpace[]
+
+  @@unique([blockId, level])
+  @@index([blockId, sortOrder])
+  @@index([sourceBatchId])
+  @@index([floorType])
+  @@index([isActive])
+}
+
+model ProjectSpace {
+  id                String                   @id @default(uuid())
+  projectId         String
+  blockId           String?
+  floorId           String?
+  code              String
+  name              String
+  spaceType         ProjectSpaceType
+  customTypeName    String?
+  legalStatus       ProjectLegalStatus
+  commercialPurpose ProjectCommercialPurpose
+  grossArea         Float?
+  description       String?
+  isCustomerVisible Boolean                  @default(true)
+  sortOrder         Int                      @default(0)
+  isActive          Boolean                  @default(true)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  project           Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  block             ProjectBlock?            @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  floor             ProjectFloor?            @relation(fields: [floorId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, code])
+  @@index([projectId])
+  @@index([blockId])
+  @@index([floorId])
+  @@index([spaceType])
+  @@index([legalStatus])
+  @@index([commercialPurpose])
+  @@index([isCustomerVisible])
+  @@index([isActive])
+}
+
+model ProjectDesignReviewRequest {
+  id               String                    @id @default(uuid())
+  projectId        String
+  requestedById    String
+  reviewedById     String?
+  status           ProjectDesignReviewStatus @default(BEKLIYOR)
+  geometryNotes    String?
+  userMessage      String?
+  softwareTeamNote String?
+  attachments      Json?
+  requestedAt      DateTime                  @default(now())
+  reviewedAt       DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  project          Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy      User                      @relation("ProjectDesignReviewRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy       User?                     @relation("ProjectDesignReviewReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([requestedById])
+  @@index([reviewedById])
+  @@index([status])
+  @@index([requestedAt])
+}
+
+model ProjectMediaPackage {
+  id        String                  @id @default(uuid())
+  projectId String
+  code      String
+  name      String
+  type      ProjectMediaPackageType
+  unitType  UnitType?
+  roomCount String?
+  isDefault Boolean                 @default(false)
+  isActive  Boolean                 @default(true)
+  sortOrder Int                     @default(0)
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  project   Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assets    ProjectMediaAsset[]
+  units     Unit[]
+
+  @@unique([projectId, code])
+  @@index([projectId, type])
+  @@index([projectId, unitType, roomCount])
+  @@index([projectId, isDefault])
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+model ProjectMediaAsset {
+  id           String              @id @default(uuid())
+  packageId    String
+  url          String
+  supabaseUrl  String?
+  path         String
+  bucket       String              @default("portfolio-images")
+  originalName String?
+  mimetype     String?
+  size         Int?
+  isCover      Boolean             @default(false)
+  sortOrder    Int                 @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  package      ProjectMediaPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId])
+  @@index([packageId, isCover])
+  @@index([packageId, sortOrder])
+}
+
+model ProjectInventoryBatch {
+  id                String                      @id @default(uuid())
+  projectId         String
+  createdById       String
+  originalBatchId   String?
+  type              ProjectInventoryBatchType
+  status            ProjectInventoryBatchStatus @default(UPLOADED)
+  idempotencyKey    String
+  inputHash         String?
+  sourceFileName    String?
+  sourceFileUrl     String?
+  sourceText        String?
+  templateVersion   String?
+  totalRows         Int                         @default(0)
+  processedRows     Int                         @default(0)
+  validRows         Int                         @default(0)
+  invalidRows       Int                         @default(0)
+  createdCount      Int                         @default(0)
+  updatedCount      Int                         @default(0)
+  skippedCount      Int                         @default(0)
+  failedCount       Int                         @default(0)
+  progressPercent   Int                         @default(0)
+  validationSummary Json?
+  errorSummary      Json?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  cancelRequestedAt DateTime?
+  cancelledAt       DateTime?
+  rolledBackAt      DateTime?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  project           Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy         User                        @relation("ProjectInventoryBatchCreator", fields: [createdById], references: [id])
+  originalBatch     ProjectInventoryBatch?      @relation("ProjectInventoryBatchRollback", fields: [originalBatchId], references: [id], onDelete: SetNull)
+  rollbackBatches   ProjectInventoryBatch[]     @relation("ProjectInventoryBatchRollback")
+  items             ProjectInventoryBatchItem[]
+  createdBlocks     ProjectBlock[]              @relation("ProjectBlockSourceBatch")
+  createdFloors     ProjectFloor[]              @relation("ProjectFloorSourceBatch")
+  createdUnits      Unit[]                      @relation("UnitSourceBatch")
+
+  @@unique([projectId, idempotencyKey])
+  @@index([projectId, status])
+  @@index([projectId, type])
+  @@index([createdById])
+  @@index([originalBatchId])
+  @@index([inputHash])
+  @@index([createdAt])
+}
+
+model ProjectInventoryBatchItem {
+  id             String                          @id @default(uuid())
+  batchId        String
+  unitId         String?
+  sequence       Int
+  sourceRow      Int?
+  naturalKey     String?
+  action         ProjectInventoryBatchItemAction @default(CREATE)
+  status         ProjectInventoryBatchItemStatus @default(PENDING)
+  rawData        Json?
+  normalizedData Json?
+  errors         Json?
+  warnings       Json?
+  beforeData     Json?
+  afterData      Json?
+  afterHash      String?
+  createdAt      DateTime                        @default(now())
+  updatedAt      DateTime                        @updatedAt
+  batch          ProjectInventoryBatch           @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  unit           Unit?                           @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  @@unique([batchId, sequence])
+  @@index([batchId, status])
+  @@index([batchId, action])
+  @@index([unitId])
+  @@index([naturalKey])
+}
+
+model Unit {
+  id                     String                       @id @default(uuid())
+  projectId              String
+  blockId                String?
+  floorId                String?
+  sourceBatchId          String?
+  salesRepresentativeId  String?
+  mediaPackageId         String?
+  inventoryCode          String?
+  externalRef            String?
+  inventorySortOrder     Int                          @default(0)
+  type                   UnitType                     @default(DAIRE)
+  legalStatus            ProjectLegalStatus           @default(TAPUDA_BAGIMSIZ_BOLUM)
+  commercialPurpose      ProjectCommercialPurpose     @default(SATISA_SUNULACAK)
+  isSalesInventory       Boolean                      @default(true)
+  floor                  Int?
+  number                 String?
+  roomCount              String?
+  conceptLabel           String?
+  area                   Float?
+  netArea                Float?
+  grossArea              Float?
+  facades                String[]                     @default([])
+  deliveryDate           DateTime?
+  price                  Float
+  status                 UnitStatus                   @default(SATILIK)
+  description            String?
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
+  isOffMarket            Boolean                      @default(false)
+  isVerified             Boolean                      @default(false)
+  photoVerified          Boolean                      @default(false)
+  tapuVerified           Boolean                      @default(false)
+  verifiedAt             DateTime?
+  yetkiVerified          Boolean                      @default(false)
+  floorLabel             String?
+  priceCurrency          String?                      @default("TRY")
+  totalFloors            Int?
+  approvalNote           String?
+  approvalStatus         PortfolioApprovalStatus      @default(TASLAK)
+  approvedAt             DateTime?
+  isPoolVisible          Boolean                      @default(false)
+  poolPublishedAt        DateTime?
+  poolRemovedAt          DateTime?
+  rejectedAt             DateTime?
+  submittedForApprovalAt DateTime?
+  deedOwnerEmail         String?
+  deedOwnerFullName      String?
+  deedOwnerPhone         String?
+  features               String[]                     @default([])
+  availableCreditAmount  Float?
+  doorAccessInfo         String?
+  allowPhoneCall         Boolean                      @default(false)
+  contactPhone           String?
+  allowWhatsapp          Boolean                      @default(false)
+  whatsappPhone          String?
+  adaNo                  String?
+  parselNo               String?
+  customerProperties     CustomerProperty[]
+  authorityLetters       EPHAuthorityLetter[]
+  authorityDocuments     PortfolioAuthorityDocument[]
+  project                Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  block                  ProjectBlock?                @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  projectFloor           ProjectFloor?                @relation(fields: [floorId], references: [id], onDelete: SetNull)
+  sourceBatch            ProjectInventoryBatch?       @relation("UnitSourceBatch", fields: [sourceBatchId], references: [id], onDelete: SetNull)
+  salesRepresentative    User?                        @relation("UnitSalesRepresentative", fields: [salesRepresentativeId], references: [id], onDelete: SetNull)
+  mediaPackage           ProjectMediaPackage?         @relation(fields: [mediaPackageId], references: [id], onDelete: SetNull)
+  batchItems             ProjectInventoryBatchItem[]
+  images                 UnitImage[]
+
+  @@unique([projectId, inventoryCode])
+  @@unique([projectId, externalRef])
+  @@unique([projectId, blockId, floorId, number])
+  @@index([projectId, blockId, floorId])
+  @@index([projectId, status])
+  @@index([projectId, isSalesInventory])
+  @@index([legalStatus])
+  @@index([commercialPurpose])
+  @@index([blockId])
+  @@index([floorId])
+  @@index([sourceBatchId])
+  @@index([salesRepresentativeId])
+  @@index([mediaPackageId])
+  @@index([deliveryDate])
+  @@index([approvalStatus])
+  @@index([isPoolVisible])
+  @@index([availableCreditAmount])
+}
+
+model UnitImage {
+  id           String   @id @default(uuid())
+  unitId       String
+  url          String
+  supabaseUrl  String?
+  path         String
+  bucket       String   @default("portfolio-images")
+  originalName String?
+  mimetype     String?
+  size         Int?
+  isCover      Boolean  @default(false)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  unit         Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@index([isCover])
+  @@index([sortOrder])
+}
+
+model PortfolioAuthorityDocument {
+  id              String                 @id @default(uuid())
+  unitId          String
+  authorityType   PortfolioAuthorityType
+  fileUrl         String
+  fileName        String?
+  mimeType        String?
+  sizeBytes       Int?
+  approved        Boolean                @default(false)
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectReason    String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  documentSide    String?
+  analyzedAt      DateTime?
+  confidenceScore Int?
+  documentType    String?
+  linaSummary     String?
+  ocrQualityScore Int?
+  qrDetected      Boolean?
+  riskLevel       String?
+  approvedBy      User?                  @relation("PortfolioAuthorityApprover", fields: [approvedById], references: [id])
+  unit            Unit                   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@index([authorityType])
+  @@index([approved])
+  @@index([approvedById])
+  @@index([documentSide])
+  @@index([createdAt])
+}
+
+model Report {
+  id             String       @id @default(uuid())
+  reporterId     String
+  targetUserId   String?
+  entityType     String
+  entityId       String?
+  reason         String
+  description    String?
+  status         ReportStatus @default(ACIK)
+  resolvedById   String?
+  resolvedAt     DateTime?
+  resolutionNote String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  reporter       User         @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedBy     User?        @relation("ReportResolver", fields: [resolvedById], references: [id])
+
+  @@index([reporterId])
+  @@index([targetUserId])
+  @@index([status])
+}
+
+model UserRestriction {
+  id          String          @id @default(uuid())
+  userId      String
+  createdById String
+  type        RestrictionType
+  reason      String
+  isActive    Boolean         @default(true)
+  startsAt    DateTime        @default(now())
+  endsAt      DateTime?
+  liftedAt    DateTime?
+  liftedNote  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  createdBy   User            @relation("RestrictionCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  user        User            @relation("RestrictedUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
+}
+
+model AdminActionLog {
+  id           String   @id @default(uuid())
+  actorId      String?
+  targetUserId String?
+  action       String
+  entityType   String
+  entityId     String?
+  description  String?
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  actor        User?    @relation("AdminActionActor", fields: [actorId], references: [id])
+  targetUser   User?    @relation("AdminActionTarget", fields: [targetUserId], references: [id])
+
+  @@index([actorId])
+  @@index([targetUserId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model TuranQuote {
+  id          String   @id @default(uuid())
+  text        String
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@index([createdAt])
+}
+
+model PlatformAnnouncement {
+  id          String               @id @default(uuid())
+  createdById String
+  title       String
+  content     String
+  audience    AnnouncementAudience @default(TUM_UYELER)
+  isActive    Boolean              @default(true)
+  startsAt    DateTime             @default(now())
+  endsAt      DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  createdBy   User                 @relation("AnnouncementCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([isActive])
+  @@index([audience])
+}
+
+model SystemMessage {
+  id                   String                  @id @default(uuid())
+  senderId             String
+  visibleSenderName    String                  @default("EPH Admin")
+  targetType           SystemMessageTargetType
+  targetUserId         String?
+  targetRole           Role?
+  category             SystemMessageCategory
+  customCategory       String?
+  title                String
+  body                 String
+  isRead               Boolean                 @default(false)
+  readAt               DateTime?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  recipientCount       Int                     @default(0)
+  targetCities         String[]
+  targetCityPlateCodes String[]
+  targetRoles          String[]
+  sender               User                    @relation("SystemMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  targetUser           User?                   @relation("SystemMessageTargetUser", fields: [targetUserId], references: [id])
+
+  @@index([senderId])
+  @@index([targetUserId])
+  @@index([targetRole])
+  @@index([targetType])
+  @@index([category])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model Nomination {
+  id             String           @id @default(uuid())
+  nominatorId    String
+  candidateName  String
+  candidateEmail String
+  candidatePhone String
+  candidateRole  Role
+  note           String?
+  status         NominationStatus @default(PENDING)
+  adminNote      String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  nominator      User             @relation(fields: [nominatorId], references: [id], onDelete: Cascade)
+}
+
+model Application {
+  id                    String            @id @default(uuid())
+  applicantName         String
+  applicantEmail        String
+  applicantPhone        String
+  requestedRole         Role
+  message               String?
+  referralCode          String?
+  referrerId            String?
+  status                ApplicationStatus @default(PENDING)
+  adminNote             String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  city                  String?
+  ipAddress             String?
+  isRisky               Boolean           @default(false)
+  isVip                 Boolean           @default(false)
+  kvkkAccepted          Boolean           @default(false)
+  legalAcceptedAt       DateTime?
+  platformAccepted      Boolean           @default(false)
+  privacyAccepted       Boolean           @default(false)
+  profession            String?
+  reviewedAt            DateTime?
+  reviewedById          String?
+  riskNote              String?
+  userAgent             String?
+  userAgreementAccepted Boolean           @default(false)
+  basvuruTuru           BasvuruTuru       @default(REFERANSSIZ)
+  district              String?
+  epostaGonderildiMi    Boolean           @default(false)
+  epostaGonderimTarihi  DateTime?
+  epostaHataMesaji      String?
+  invitationId          String?
+  moderatorNote         String?
+  onayYetkiSeviyesi     OnayYetkiSeviyesi @default(ADMIN_SUPER_ADMIN)
+  onaylayanRol          Role?
+  pilotBasvuruMu        Boolean           @default(false)
+  referansDogrulandiMi  Boolean           @default(false)
+  referansOlusturanId   String?
+  referansliMi          Boolean           @default(false)
+  rejectReason          String?
+  rejectedAt            DateTime?
+  rejectedById          String?
+  referrer              User?             @relation(fields: [referrerId], references: [id])
+  reviewedBy            User?             @relation("ApplicationReviewer", fields: [reviewedById], references: [id])
+
+  @@index([applicantEmail])
+  @@index([requestedRole])
+  @@index([basvuruTuru])
+  @@index([pilotBasvuruMu])
+  @@index([referralCode])
+  @@index([invitationId])
+  @@index([referansliMi])
+  @@index([referansOlusturanId])
+  @@index([status])
+  @@index([onayYetkiSeviyesi])
+  @@index([reviewedById])
+  @@index([createdAt])
+}
+
+model Lead {
+  id           String   @id @default(uuid())
+  fullName     String?
+  phone        String?
+  email        String?
+  profession   String?
+  city         String?
+  interest     String?
+  conversation String?
+  source       String   @default("LINA")
+  createdAt    DateTime @default(now())
+}
+
+model Customer {
+  id              String             @id @default(uuid())
+  ownerId         String
+  firstName       String
+  lastName        String
+  phone           String?
+  email           String?
+  city            String?
+  profession      String?
+  company         String?
+  budget          Float?
+  interestedArea  String?
+  interestedType  String?
+  source          String?
+  status          CustomerStatus     @default(YENI_LEAD)
+  tags            String[]           @default([])
+  notes           String?
+  lastContactedAt DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  roles           CustomerRole[]     @default([])
+  activities      Activity[]
+  owner           User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  interests       CustomerInterest[]
+  properties      CustomerProperty[]
+  tasks           Task[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([city])
+  @@index([updatedAt])
+}
+
+model CustomerProperty {
+  id           String                   @id @default(uuid())
+  customerId   String
+  unitId       String
+  relationType CustomerPropertyRelation
+  notes        String?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  customer     Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  unit         Unit                     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, unitId, relationType])
+  @@index([customerId])
+  @@index([unitId])
+  @@index([relationType])
+  @@index([createdAt])
+}
+
+model CustomerInterest {
+  id             String                   @id @default(uuid())
+  customerId     String
+  title          String?
+  city           String?
+  district       String?
+  neighborhood   String?
+  propertyTypes  UnitType[]               @default([])
+  statuses       UnitStatus[]             @default([])
+  minBudget      Float?
+  maxBudget      Float?
+  priceCurrency  String                   @default("TRY")
+  minArea        Float?
+  maxArea        Float?
+  roomCounts     String[]                 @default([])
+  features       String[]                 @default([])
+  purchaseIntent CustomerPurchaseIntent   @default(BELIRSIZ)
+  priority       CustomerInterestPriority @default(NORMAL)
+  notes          String?
+  isActive       Boolean                  @default(true)
+  lastMatchedAt  DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  customer       Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([city, district, neighborhood])
+  @@index([isActive])
+  @@index([priority])
+  @@index([purchaseIntent])
+  @@index([createdAt])
+}
+
+model Activity {
+  id         String       @id @default(uuid())
+  customerId String
+  userId     String
+  type       ActivityType
+  note       String
+  createdAt  DateTime     @default(now())
+  customer   Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id         String     @id @default(uuid())
+  customerId String
+  userId     String
+  title      String
+  dueDate    DateTime?
+  status     TaskStatus @default(BEKLIYOR)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserVisit {
+  id        String   @id @default(uuid())
+  userId    String?
+  page      String
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Conversation {
+  id                      String                    @id
+  postId                  String?
+  title                   String
+  status                  ConversationStatus        @default(ACTIVE)
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
+  NetworkPost             NetworkPost?              @relation(fields: [postId], references: [id])
+  ConversationParticipant ConversationParticipant[]
+  Message                 Message[]
+}
+
+model ConversationParticipant {
+  id             String       @id
+  conversationId String
+  userId         String
+  createdAt      DateTime     @default(now())
+  lastReadAt     DateTime?
+  Conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  User           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String       @id
+  conversationId String
+  senderId       String
+  body           String
+  createdAt      DateTime     @default(now())
+  Conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  User           User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model NetworkPost {
+  id             String                 @id
+  userId         String
+  type           String
+  title          String
+  description    String
+  city           String?
+  district       String?
+  neighborhood   String?
+  budget         Float?
+  minArea        Float?
+  maxArea        Float?
+  minRoom        Int?
+  maxRoom        Int?
+  minBudget      Float?
+  maxBudget      Float?
+  areas          Json?
+  propertyTypes  UnitType[]             @default([])
+  roomCounts     String[]               @default([])
+  features       String[]               @default([])
+  priceCurrency  String                 @default("TRY")
+  allowPhoneCall Boolean                @default(false)
+  contactPhone   String?
+  allowWhatsapp  Boolean                @default(false)
+  whatsappPhone  String?
+  urgency        String?
+  visibility     NetworkVisibility      @default(TUM_EPH)
+  tags           String[]
+  expiresAt      DateTime
+  isActive       Boolean                @default(true)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime
+  Conversation   Conversation[]
+  User           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  followers      NetworkPostFollower[]
+  updateLogs     NetworkPostUpdateLog[]
+  views          NetworkPostView[]
+}
+
+model NetworkPostUpdateLog {
+  id        String      @id @default(uuid())
+  postId    String
+  userId    String
+  summary   String
+  changes   Json
+  createdAt DateTime    @default(now())
+  post      NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NetworkPostFollower {
+  id        String      @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime    @default(now())
+  post      NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+}
+
+model NetworkPostView {
+  id        String      @id @default(uuid())
+  postId    String
+  userId    String?
+  createdAt DateTime    @default(now())
+  post      NetworkPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User?       @relation(fields: [userId], references: [id])
+
+  @@index([postId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model NetworkNotification {
+  id        String   @id @default(uuid())
+  userId    String
+  postId    String?
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LinaPreference {
+  id                           String   @id @default(uuid())
+  userId                       String   @unique
+  voiceEnabled                 Boolean  @default(false)
+  dashboardVoiceSummaryEnabled Boolean  @default(false)
+  crmVoiceReminderEnabled      Boolean  @default(false)
+  networkVoiceSummaryEnabled   Boolean  @default(false)
+  poolVoiceSummaryEnabled      Boolean  @default(false)
+  quietHoursEnabled            Boolean  @default(true)
+  quietHoursStart              String   @default("22:00")
+  quietHoursEnd                String   @default("08:00")
+  urgentVoiceEnabled           Boolean  @default(false)
+  summaryStyle                 String   @default("normal")
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+  user                         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model LinaPortfolioSession {
+  id                 String    @id @default(uuid())
+  userId             String
+  mode               String    @default("PORTFOLIO_CREATE")
+  sessionType        String    @default("PORTFOLIO_DRAFT")
+  title              String?
+  propertyType       String?
+  transactionType    String?
+  step               String    @default("TRANSACTION_TYPE")
+  city               String?
+  district           String?
+  neighborhood       String?
+  roomCount          String?
+  squareMeter        Float?
+  floor              String?
+  buildingFloorCount Int?
+  price              Float?
+  currency           String    @default("TRY")
+  status             String    @default("DRAFT")
+  confirmationStatus String    @default("WAITING")
+  stateJson          Json?
+  lastActivityAt     DateTime  @default(now())
+  expiresAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([lastActivityAt])
+}
+
+model AuditLog {
+  id           String      @id @default(uuid())
+  actorId      String?
+  targetUserId String?
+  action       AuditAction
+  entityType   String
+  entityId     String?
+  description  String?
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime    @default(now())
+  actor        User?       @relation("AuditActor", fields: [actorId], references: [id])
+  targetUser   User?       @relation("AuditTargetUser", fields: [targetUserId], references: [id])
+}
+
+model UyelikPaketi {
+  id                        String          @id @default(uuid())
+  paketKodu                 UyelikPaketKodu @unique
+  paketAdi                  String
+  aciklama                  String?
+  aktifPortfoyLimiti        Int
+  aylikForumKonusuLimiti    Int?
+  aylikMesajBaslatmaLimiti  Int?
+  gunlukMesajBaslatmaLimiti Int?
+  gunlukForumIlgiLimiti     Int?
+  gunlukHavuzMesajLimiti    Int?
+  verilenKontor             Int             @default(0)
+  fiyat                     Decimal?
+  paraBirimi                String          @default("TRY")
+  aktifMi                   Boolean         @default(true)
+  olusturulmaTarihi         DateTime        @default(now())
+  guncellenmeTarihi         DateTime        @updatedAt
+
+  @@index([paketKodu])
+  @@index([aktifMi])
+}
+
+model KullaniciUyelikPaketi {
+  id                String       @id @default(uuid())
+  kullaniciId       String
+  paketId           String
+  durum             UyelikDurumu @default(AKTIF)
+  baslangicTarihi   DateTime     @default(now())
+  bitisTarihi       DateTime?
+  pilotPaketMi      Boolean      @default(false)
+  testPaketiMi      Boolean      @default(false)
+  notlar            String?
+  olusturulmaTarihi DateTime     @default(now())
+  guncellenmeTarihi DateTime     @updatedAt
+
+  @@index([kullaniciId])
+  @@index([paketId])
+  @@index([durum])
+  @@index([baslangicTarihi])
+  @@index([bitisTarihi])
+}
+
+model HediyeKontorHavuzu {
+  id            String                 @id @default(uuid())
+  kod           String                 @unique @default("GLOBAL")
+  bakiye        Int                    @default(50000)
+  toplamYukleme Int                    @default(50000)
+  toplamDagitim Int                    @default(0)
+  aktifMi       Boolean                @default(true)
+  createdById   String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  createdBy     User?                  @relation("GiftPoolCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  dagitimlar    HediyeKontorDagitimi[]
+
+  @@index([aktifMi])
+  @@index([createdById])
+}
+
+model HediyeKontorDagitimi {
+  id            String             @id @default(uuid())
+  havuzId       String
+  gonderenId    String?
+  aliciId       String?
+  miktar        Int
+  gonderenRol   Role
+  adminKaynakli Boolean            @default(false)
+  aciklama      String?
+  createdAt     DateTime           @default(now())
+  havuz         HediyeKontorHavuzu @relation(fields: [havuzId], references: [id], onDelete: Cascade)
+  gonderen      User?              @relation("GiftCreditSender", fields: [gonderenId], references: [id], onDelete: SetNull)
+  alici         User?              @relation("GiftCreditRecipient", fields: [aliciId], references: [id], onDelete: SetNull)
+
+  @@index([havuzId])
+  @@index([gonderenId])
+  @@index([aliciId])
+  @@index([adminKaynakli])
+  @@index([createdAt])
+}
+
+model KontorCuzdani {
+  id                String   @id @default(uuid())
+  kullaniciId       String   @unique
+  bakiye            Int      @default(0)
+  toplamYukleme     Int      @default(0)
+  toplamHarcama     Int      @default(0)
+  toplamHediye      Int      @default(0)
+  aktifMi           Boolean  @default(true)
+  olusturulmaTarihi DateTime @default(now())
+  guncellenmeTarihi DateTime @updatedAt
+
+  @@index([kullaniciId])
+  @@index([aktifMi])
+}
+
+model KontorHareketi {
+  id                String            @id @default(uuid())
+  kullaniciId       String
+  hareketTuru       KontorHareketTuru
+  islemTuru         KontorIslemTuru
+  miktar            Int
+  oncekiBakiye      Int
+  sonrakiBakiye     Int
+  aciklama          String?
+  ilgiliKayitTuru   String?
+  ilgiliKayitId     String?
+  olusturanId       String?
+  olusturulmaTarihi DateTime          @default(now())
+
+  @@index([kullaniciId])
+  @@index([hareketTuru])
+  @@index([islemTuru])
+  @@index([ilgiliKayitTuru])
+  @@index([ilgiliKayitId])
+  @@index([olusturulmaTarihi])
+}
+
+model PoolShareLink {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  unitId     String
+  sharedById String
+  viewCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([unitId])
+  @@index([sharedById])
+}
+
+model NetworkPostShareLink {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  postId     String
+  sharedById String
+  viewCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([postId])
+  @@index([sharedById])
+}
+
+model KotaKullanimi {
+  id                String     @id @default(uuid())
+  kullaniciId       String
+  kotaKodu          String
+  donem             KotaDonemi
+  limit             Int
+  kullanilan        Int        @default(0)
+  donemBaslangic    DateTime
+  donemBitis        DateTime
+  olusturulmaTarihi DateTime   @default(now())
+  guncellenmeTarihi DateTime   @updatedAt
+
+  @@unique([kullaniciId, kotaKodu, donem, donemBaslangic])
+  @@index([kullaniciId])
+  @@index([kotaKodu])
+  @@index([donem])
+  @@index([donemBaslangic])
+  @@index([donemBitis])
+}
+
+model MesajlasmaLimiti {
+  id                           String          @id @default(uuid())
+  paketKodu                    UyelikPaketKodu @unique
+  gunlukYeniGorusmeLimiti      Int
+  aylikYeniGorusmeLimiti       Int
+  mevcutKonusmaCevapSinirsizMi Boolean         @default(true)
+  gunlukForumIlgiLimiti        Int
+  gunlukHavuzMesajLimiti       Int
+  ekBesGorusmeKontoru          Int             @default(50)
+  ekOnBesGorusmeKontoru        Int             @default(125)
+  ekElliGorusmeKontoru         Int             @default(350)
+  aktifMi                      Boolean         @default(true)
+  olusturulmaTarihi            DateTime        @default(now())
+  guncellenmeTarihi            DateTime        @updatedAt
+
+  @@index([aktifMi])
+}
+
+model AdminDuyuru {
+  id                  String           @id @default(uuid())
+  olusturanId         String?
+  mesajTuru           AdminMesajTuru
+  baslik              String
+  icerik              String
+  hedefRol            String?
+  hedefIl             String?
+  hedefPaket          UyelikPaketKodu?
+  hedefKullaniciId    String?
+  yayindaMi           Boolean          @default(false)
+  gonderildiMi        Boolean          @default(false)
+  yayinTarihi         DateTime?
+  sonGecerlilikTarihi DateTime?
+  olusturulmaTarihi   DateTime         @default(now())
+  guncellenmeTarihi   DateTime         @updatedAt
+
+  @@index([olusturanId])
+  @@index([mesajTuru])
+  @@index([hedefRol])
+  @@index([hedefIl])
+  @@index([hedefPaket])
+  @@index([hedefKullaniciId])
+  @@index([yayindaMi])
+  @@index([gonderildiMi])
+}
+
+model DestekTalebi {
+  id                String            @id @default(uuid())
+  kullaniciId       String
+  baslik            String
+  aciklama          String
+  kategori          String?
+  durum             DestekTalepDurumu @default(ACIK)
+  oncelik           LinaGorevOnceligi @default(NORMAL)
+  sonYanitTarihi    DateTime?
+  kapanmaTarihi     DateTime?
+  olusturulmaTarihi DateTime          @default(now())
+  guncellenmeTarihi DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([kategori])
+  @@index([durum])
+  @@index([oncelik])
+}
+
+model LinaOturum {
+  id                String        @id @default(uuid())
+  kullaniciId       String
+  rolSnapshot       String?
+  kanal             LinaKanal     @default(YAZILI)
+  kaynakModul       LinaModul     @default(GENEL)
+  durum             LinaDurum     @default(ISLENIYOR)
+  oturumOzeti       String?
+  mesajSayisi       Int           @default(0)
+  inputTokenSayisi  Int           @default(0)
+  outputTokenSayisi Int           @default(0)
+  harcananKontor    Int           @default(0)
+  sonAktiviteTarihi DateTime      @default(now())
+  kapanmaTarihi     DateTime?
+  gecerlilikTarihi  DateTime?
+  silinmeTarihi     DateTime?
+  olusturulmaTarihi DateTime      @default(now())
+  guncellenmeTarihi DateTime      @updatedAt
+  kullanici         User          @relation(fields: [kullaniciId], references: [id], onDelete: Cascade)
+  konusmalar        LinaKonusma[]
+  hafizalar         LinaHafiza[]
+
+  @@index([kullaniciId])
+  @@index([kullaniciId, durum])
+  @@index([kaynakModul])
+  @@index([durum])
+  @@index([sonAktiviteTarihi])
+  @@index([gecerlilikTarihi])
+  @@index([silinmeTarihi])
+}
+
+model LinaGunSonuOnayi {
+  id                String             @id @default(uuid())
+  kullaniciId       String
+  tarih             DateTime           @db.Date
+  gunlukOzet        String
+  oturumIdleri      String[]           @default([])
+  oturumSayisi      Int                @default(0)
+  konusmaSayisi     Int                @default(0)
+  secim             LinaGunSonuSecimi?
+  durum             LinaDurum          @default(BEKLIYOR)
+  onayTarihi        DateTime?
+  olusturulmaTarihi DateTime           @default(now())
+  guncellenmeTarihi DateTime           @updatedAt
+  kullanici         User               @relation(fields: [kullaniciId], references: [id], onDelete: Cascade)
+  hafizalar         LinaHafiza[]
+
+  @@unique([kullaniciId, tarih])
+  @@index([kullaniciId])
+  @@index([tarih])
+  @@index([secim])
+  @@index([durum])
+}
+
+model LinaKonusma {
+  id                String             @id @default(uuid())
+  kullaniciId       String?
+  oturumId          String?
+  siraNo            Int?
+  rol               String?
+  kanal             LinaKanal          @default(YAZILI)
+  modul             LinaModul          @default(GENEL)
+  niyet             LinaNiyet          @default(BELIRSIZ)
+  kullaniciMesaji   String
+  linaCevabi        String?
+  ozet              String?
+  inputTokenSayisi  Int                @default(0)
+  outputTokenSayisi Int                @default(0)
+  harcananKontor    Int                @default(0)
+  belirsizlikVarMi  Boolean            @default(false)
+  yetkiUygunMu      Boolean            @default(true)
+  riskSeviyesi      LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi    LinaFirsatSeviyesi @default(YOK)
+  durum             LinaDurum          @default(TAMAMLANDI)
+  silinmeTarihi     DateTime?
+  olusturulmaTarihi DateTime           @default(now())
+  guncellenmeTarihi DateTime           @updatedAt
+  oturum            LinaOturum?        @relation(fields: [oturumId], references: [id], onDelete: SetNull)
+
+  @@unique([oturumId, siraNo])
+  @@index([kullaniciId])
+  @@index([kullaniciId, olusturulmaTarihi])
+  @@index([oturumId])
+  @@index([oturumId, olusturulmaTarihi])
+  @@index([rol])
+  @@index([modul])
+  @@index([niyet])
+  @@index([silinmeTarihi])
+  @@index([olusturulmaTarihi])
+}
+
+model LinaBaglam {
+  id                String    @id @default(uuid())
+  kullaniciId       String?
+  konusmaId         String?
+  modul             LinaModul @default(GENEL)
+  rol               String?
+  baglamBasligi     String?
+  baglamIcerigi     Json
+  aktifMi           Boolean   @default(true)
+  gecerlilikTarihi  DateTime?
+  olusturulmaTarihi DateTime  @default(now())
+  guncellenmeTarihi DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([modul])
+  @@index([aktifMi])
+}
+
+model LinaHafiza {
+  id                  String            @id @default(uuid())
+  kullaniciId         String?
+  konusmaId           String?
+  oturumId            String?
+  gunSonuOnayId       String?
+  katman              LinaHafizaKatmani
+  onem                LinaHafizaOnemi   @default(ORTA)
+  baslik              String
+  icerik              String
+  veri                Json?
+  kaliciMi            Boolean           @default(false)
+  kullaniciOnayliMi   Boolean           @default(false)
+  aktifMi             Boolean           @default(true)
+  kaynakModul         LinaModul         @default(GENEL)
+  onayTarihi          DateTime?
+  gecerlilikTarihi    DateTime?
+  sonKullanilmaTarihi DateTime?
+  kullanimSayisi      Int               @default(0)
+  silinmeTarihi       DateTime?
+  olusturulmaTarihi   DateTime          @default(now())
+  guncellenmeTarihi   DateTime          @updatedAt
+  oturum              LinaOturum?       @relation(fields: [oturumId], references: [id], onDelete: SetNull)
+  gunSonuOnayi        LinaGunSonuOnayi? @relation(fields: [gunSonuOnayId], references: [id], onDelete: SetNull)
+
+  @@index([kullaniciId])
+  @@index([kullaniciId, aktifMi])
+  @@index([konusmaId])
+  @@index([oturumId])
+  @@index([gunSonuOnayId])
+  @@index([katman])
+  @@index([onem])
+  @@index([aktifMi])
+  @@index([kaliciMi])
+  @@index([kullaniciOnayliMi])
+  @@index([gecerlilikTarihi])
+  @@index([silinmeTarihi])
+}
+
+model LinaTercih {
+  id                  String   @id @default(uuid())
+  kullaniciId         String   @unique
+  sesliYanitAktifMi   Boolean  @default(false)
+  proaktifBildirimMi  Boolean  @default(true)
+  sessizSaatAktifMi   Boolean  @default(true)
+  sessizSaatBaslangic String   @default("22:00")
+  sessizSaatBitis     String   @default("08:00")
+  yanitUzunlugu       String   @default("NORMAL")
+  hitapTercihi        String?
+  bolgeselDilAktifMi  Boolean  @default(true)
+  olusturulmaTarihi   DateTime @default(now())
+  guncellenmeTarihi   DateTime @updatedAt
+
+  @@index([kullaniciId])
+}
+
+model LinaKarar {
+  id                String             @id @default(uuid())
+  kullaniciId       String?
+  konusmaId         String?
+  modul             LinaModul          @default(GENEL)
+  niyet             LinaNiyet          @default(BELIRSIZ)
+  kararSeviyesi     LinaKararSeviyesi  @default(BILGILENDIRME)
+  riskSeviyesi      LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi    LinaFirsatSeviyesi @default(YOK)
+  kararBasligi      String
+  kararOzeti        String
+  gerekce           String?
+  veriOzeti         Json?
+  uygulanabilirMi   Boolean            @default(true)
+  otomatikMi        Boolean            @default(false)
+  durum             LinaDurum          @default(TAMAMLANDI)
+  olusturulmaTarihi DateTime           @default(now())
+  guncellenmeTarihi DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([modul])
+  @@index([kararSeviyesi])
+  @@index([riskSeviyesi])
+  @@index([firsatSeviyesi])
+  @@index([olusturulmaTarihi])
+}
+
+model LinaOneri {
+  id                  String             @id @default(uuid())
+  kullaniciId         String?
+  konusmaId           String?
+  kararId             String?
+  modul               LinaModul          @default(GENEL)
+  oneriDurumu         LinaOneriDurumu    @default(BEKLIYOR)
+  baslik              String
+  aciklama            String
+  gerekce             String?
+  oncelik             LinaGorevOnceligi  @default(NORMAL)
+  riskSeviyesi        LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi      LinaFirsatSeviyesi @default(YOK)
+  hedefUrl            String?
+  aksiyonTipi         String?
+  aksiyonVerisi       Json?
+  gosterilmeTarihi    DateTime?
+  cevaplanmaTarihi    DateTime?
+  sonGecerlilikTarihi DateTime?
+  olusturulmaTarihi   DateTime           @default(now())
+  guncellenmeTarihi   DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([kararId])
+  @@index([modul])
+  @@index([oneriDurumu])
+  @@index([oncelik])
+  @@index([olusturulmaTarihi])
+}
+
+model LinaGorev {
+  id                      String            @id @default(uuid())
+  kullaniciId             String?
+  konusmaId               String?
+  kararId                 String?
+  modul                   LinaModul         @default(GENEL)
+  baslik                  String
+  aciklama                String?
+  oncelik                 LinaGorevOnceligi @default(NORMAL)
+  durum                   LinaGorevDurumu   @default(BEKLIYOR)
+  hedefUrl                String?
+  gorevVerisi             Json?
+  baslangicTarihi         DateTime?
+  bitisTarihi             DateTime?
+  hatirlatmaTarihi        DateTime?
+  tamamlanmaTarihi        DateTime?
+  otomatikOlustuMu        Boolean           @default(false)
+  kullaniciOnayiGerekliMi Boolean           @default(true)
+  olusturulmaTarihi       DateTime          @default(now())
+  guncellenmeTarihi       DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([kararId])
+  @@index([modul])
+  @@index([oncelik])
+  @@index([durum])
+  @@index([hatirlatmaTarihi])
+}
+
+model LinaDenetim {
+  id                String           @id @default(uuid())
+  kullaniciId       String?
+  konusmaId         String?
+  kararId           String?
+  gorevId           String?
+  denetimTuru       LinaDenetimTuru
+  modul             LinaModul        @default(GENEL)
+  baslik            String
+  aciklama          String?
+  oncekiDeger       Json?
+  sonrakiDeger      Json?
+  ekVeri            Json?
+  riskSeviyesi      LinaRiskSeviyesi @default(YOK)
+  cozulduMu         Boolean          @default(false)
+  cozumAciklamasi   String?
+  cozumTarihi       DateTime?
+  olusturulmaTarihi DateTime         @default(now())
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([kararId])
+  @@index([gorevId])
+  @@index([denetimTuru])
+  @@index([modul])
+  @@index([riskSeviyesi])
+  @@index([cozulduMu])
+}
+
+model LinaBilgiKutuphanesi {
+  id                        String        @id @default(uuid())
+  bilgiTuru                 LinaBilgiTuru
+  modul                     LinaModul     @default(GENEL)
+  rol                       String?
+  baslik                    String
+  ozet                      String?
+  icerik                    String
+  etiketler                 String[]
+  surum                     String        @default("1.0.0")
+  aktifMi                   Boolean       @default(true)
+  onayliMi                  Boolean       @default(false)
+  kaynakDosya               String?
+  kaynakBaslik              String?
+  gecerlilikBaslangicTarihi DateTime?
+  gecerlilikBitisTarihi     DateTime?
+  olusturanKullaniciId      String?
+  onaylayanKullaniciId      String?
+  olusturulmaTarihi         DateTime      @default(now())
+  guncellenmeTarihi         DateTime      @updatedAt
+
+  @@index([bilgiTuru])
+  @@index([modul])
+  @@index([rol])
+  @@index([aktifMi])
+  @@index([onayliMi])
+}
+
+model LinaBolgeselTerim {
+  id                   String          @id @default(uuid())
+  il                   String?
+  ilce                 String?
+  mahalle              String?
+  terim                String
+  standartKarsilik     String
+  aciklama             String?
+  ornekKullanim        String?
+  kaynak               String?
+  guvenSeviyesi        LinaTerimGuveni @default(ORTA)
+  aktifMi              Boolean         @default(true)
+  onayliMi             Boolean         @default(false)
+  kullanimSayisi       Int             @default(0)
+  olusturanKullaniciId String?
+  onaylayanKullaniciId String?
+  olusturulmaTarihi    DateTime        @default(now())
+  guncellenmeTarihi    DateTime        @updatedAt
+
+  @@index([il])
+  @@index([ilce])
+  @@index([mahalle])
+  @@index([terim])
+  @@index([standartKarsilik])
+  @@index([guvenSeviyesi])
+  @@index([aktifMi])
+  @@index([onayliMi])
+}
+
+model LinaCrmMusteri {
+  id                String   @id @default(uuid())
+  kullaniciId       String
+  adSoyad           String
+  telefon           String?
+  email             String?
+  musteriTipi       String?
+  kaynak            String?
+  il                String?
+  ilce              String?
+  mahalle           String?
+  notlar            String?
+  etiketler         String[]
+  aktifMi           Boolean  @default(true)
+  olusturulmaTarihi DateTime @default(now())
+  guncellenmeTarihi DateTime @updatedAt
+
+  @@index([kullaniciId])
+  @@index([adSoyad])
+  @@index([telefon])
+  @@index([il])
+  @@index([ilce])
+  @@index([mahalle])
+  @@index([aktifMi])
+}
+
+model LinaCrmTalep {
+  id                String            @id @default(uuid())
+  kullaniciId       String
+  musteriId         String?
+  talepBasligi      String
+  talepAciklamasi   String?
+  talepTuru         String
+  kategori          String?
+  altKategori       String?
+  il                String?
+  ilce              String?
+  mahalle           String?
+  minFiyat          Decimal?
+  maxFiyat          Decimal?
+  paraBirimi        String            @default("TRY")
+  minMetrekare      Int?
+  maxMetrekare      Int?
+  odaSayisi         String?
+  binaYasi          String?
+  katBilgisi        String?
+  aciliyetSeviyesi  LinaGorevOnceligi @default(NORMAL)
+  durum             LinaDurum         @default(BEKLIYOR)
+  linaOzet          String?
+  linaPuan          Int?
+  aktifMi           Boolean           @default(true)
+  olusturulmaTarihi DateTime          @default(now())
+  guncellenmeTarihi DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([musteriId])
+  @@index([talepTuru])
+  @@index([kategori])
+  @@index([il])
+  @@index([ilce])
+  @@index([mahalle])
+  @@index([durum])
+  @@index([aktifMi])
+}
+
+model LinaCrmGorusme {
+  id                 String    @id @default(uuid())
+  kullaniciId        String
+  musteriId          String?
+  talepId            String?
+  gorusmeTuru        String
+  baslik             String
+  notlar             String?
+  sonuc              String?
+  duyguDurumu        String?
+  satinAlmaNiyeti    String?
+  linaOzet           String?
+  linaSonrakiAdim    String?
+  gorusmeTarihi      DateTime  @default(now())
+  sonrakiTakipTarihi DateTime?
+  olusturulmaTarihi  DateTime  @default(now())
+  guncellenmeTarihi  DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([musteriId])
+  @@index([talepId])
+  @@index([gorusmeTarihi])
+  @@index([sonrakiTakipTarihi])
+}
+
+model LinaCrmTakip {
+  id                String            @id @default(uuid())
+  kullaniciId       String
+  musteriId         String?
+  talepId           String?
+  baslik            String
+  aciklama          String?
+  takipTarihi       DateTime
+  tamamlanmaTarihi  DateTime?
+  oncelik           LinaGorevOnceligi @default(NORMAL)
+  durum             LinaGorevDurumu   @default(BEKLIYOR)
+  linaHatirlatsinMi Boolean           @default(true)
+  otomatikOlustuMu  Boolean           @default(false)
+  olusturulmaTarihi DateTime          @default(now())
+  guncellenmeTarihi DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([musteriId])
+  @@index([talepId])
+  @@index([takipTarihi])
+  @@index([durum])
+}
+
+model LinaPortfoyAnaliz {
+  id                 String             @id @default(uuid())
+  kullaniciId        String
+  portfoyId          String
+  kalitePuani        Int                @default(0)
+  eksikBilgiPuani    Int                @default(0)
+  pazarlamaPuani     Int                @default(0)
+  eslesmePuani       Int                @default(0)
+  baslikAnalizi      String?
+  aciklamaAnalizi    String?
+  fiyatAnalizi       String?
+  konumAnalizi       String?
+  gorselAnalizi      String?
+  eksikAlanlar       String[]
+  onerilenAksiyonlar Json?
+  riskSeviyesi       LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi     LinaFirsatSeviyesi @default(YOK)
+  sonAnalizTarihi    DateTime           @default(now())
+  olusturulmaTarihi  DateTime           @default(now())
+  guncellenmeTarihi  DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([portfoyId])
+  @@index([kalitePuani])
+  @@index([riskSeviyesi])
+  @@index([firsatSeviyesi])
+}
+
+model LinaPortfoyOneri {
+  id                String            @id @default(uuid())
+  kullaniciId       String
+  portfoyId         String
+  analizId          String?
+  baslik            String
+  aciklama          String
+  gerekce           String?
+  oneriTuru         String
+  oncelik           LinaGorevOnceligi @default(NORMAL)
+  durum             LinaOneriDurumu   @default(BEKLIYOR)
+  uygulanacakAlan   String?
+  eskiDeger         Json?
+  onerilenDeger     Json?
+  olusturulmaTarihi DateTime          @default(now())
+  guncellenmeTarihi DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([portfoyId])
+  @@index([analizId])
+  @@index([oneriTuru])
+  @@index([durum])
+}
+
+model LinaPortfoyPaylasim {
+  id                 String    @id @default(uuid())
+  kullaniciId        String
+  portfoyId          String
+  kanal              String
+  paylasimBasligi    String?
+  paylasimMetni      String?
+  hedefUrl           String?
+  gorselUrl          String?
+  paylasimDurumu     LinaDurum @default(BEKLIYOR)
+  tiklanmaSayisi     Int       @default(0)
+  goruntulenmeSayisi Int       @default(0)
+  paylasimTarihi     DateTime?
+  olusturulmaTarihi  DateTime  @default(now())
+  guncellenmeTarihi  DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([portfoyId])
+  @@index([kanal])
+  @@index([paylasimDurumu])
+}
+
+model LinaPortfoyEslesme {
+  id                String             @id @default(uuid())
+  kullaniciId       String
+  portfoyId         String
+  hedefKullaniciId  String?
+  hedefTalepId      String?
+  eslesmePuani      Int                @default(0)
+  eslesmeGerekcesi  String?
+  eksikNoktalar     String[]
+  riskSeviyesi      LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi    LinaFirsatSeviyesi @default(ORTA)
+  durum             LinaDurum          @default(BEKLIYOR)
+  olusturulmaTarihi DateTime           @default(now())
+  guncellenmeTarihi DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([portfoyId])
+  @@index([hedefKullaniciId])
+  @@index([hedefTalepId])
+  @@index([eslesmePuani])
+  @@index([durum])
+}
+
+model LinaForumAnaliz {
+  id                 String             @id @default(uuid())
+  kullaniciId        String
+  forumGonderiId     String
+  niyet              LinaNiyet          @default(BELIRSIZ)
+  modul              LinaModul          @default(FORUM)
+  talepTuru          String?
+  kategori           String?
+  altKategori        String?
+  il                 String?
+  ilce               String?
+  mahalle            String?
+  butceMin           Decimal?
+  butceMax           Decimal?
+  paraBirimi         String             @default("TRY")
+  aciliyetSeviyesi   LinaGorevOnceligi  @default(NORMAL)
+  guvenPuani         Int                @default(0)
+  eslesmePotansiyeli Int                @default(0)
+  linaOzeti          String?
+  eksikBilgiler      String[]
+  onerilenAksiyonlar Json?
+  riskSeviyesi       LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi     LinaFirsatSeviyesi @default(ORTA)
+  sonAnalizTarihi    DateTime           @default(now())
+  olusturulmaTarihi  DateTime           @default(now())
+  guncellenmeTarihi  DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([forumGonderiId])
+  @@index([niyet])
+  @@index([talepTuru])
+  @@index([kategori])
+  @@index([il])
+  @@index([ilce])
+  @@index([mahalle])
+}
+
+model LinaForumEslesme {
+  id                      String    @id @default(uuid())
+  kullaniciId             String
+  analizId                String
+  forumGonderiId          String
+  hedefKullaniciId        String?
+  portfoyId               String?
+  crmTalepId              String?
+  havuzKaydiId            String?
+  eslesmePuani            Int       @default(0)
+  eslesmeGerekcesi        String?
+  eksikNoktalar           String[]
+  kullaniciyaGosterildiMi Boolean   @default(false)
+  gorusmeBaslatildiMi     Boolean   @default(false)
+  durum                   LinaDurum @default(BEKLIYOR)
+  olusturulmaTarihi       DateTime  @default(now())
+  guncellenmeTarihi       DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([analizId])
+  @@index([forumGonderiId])
+  @@index([hedefKullaniciId])
+  @@index([portfoyId])
+  @@index([crmTalepId])
+  @@index([havuzKaydiId])
+  @@index([eslesmePuani])
+  @@index([durum])
+}
+
+model LinaForumOneri {
+  id                String            @id @default(uuid())
+  kullaniciId       String
+  forumGonderiId    String
+  analizId          String?
+  baslik            String
+  aciklama          String
+  gerekce           String?
+  oneriTuru         String
+  oncelik           LinaGorevOnceligi @default(NORMAL)
+  durum             LinaOneriDurumu   @default(BEKLIYOR)
+  uygulanacakAlan   String?
+  eskiDeger         Json?
+  onerilenDeger     Json?
+  olusturulmaTarihi DateTime          @default(now())
+  guncellenmeTarihi DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([forumGonderiId])
+  @@index([analizId])
+  @@index([oneriTuru])
+  @@index([durum])
+}
+
+model LinaForumFirsat {
+  id                      String             @id @default(uuid())
+  kullaniciId             String?
+  forumGonderiId          String
+  firsatBasligi           String
+  firsatOzeti             String
+  firsatGerekcesi         String?
+  ilgiliModul             LinaModul          @default(FORUM)
+  firsatSeviyesi          LinaFirsatSeviyesi @default(ORTA)
+  riskSeviyesi            LinaRiskSeviyesi   @default(YOK)
+  hedefUrl                String?
+  aksiyonVerisi           Json?
+  kullaniciyaGosterildiMi Boolean            @default(false)
+  durum                   LinaDurum          @default(BEKLIYOR)
+  olusturulmaTarihi       DateTime           @default(now())
+  guncellenmeTarihi       DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([forumGonderiId])
+  @@index([firsatSeviyesi])
+  @@index([riskSeviyesi])
+  @@index([durum])
+}
+
+model LinaHavuzKaydi {
+  id                String    @id @default(uuid())
+  kullaniciId       String
+  portfoyId         String
+  havuzDurumu       LinaDurum @default(BEKLIYOR)
+  yetkiliMi         Boolean   @default(false)
+  paylasimaUygunMu  Boolean   @default(false)
+  gizlilikUygunMu   Boolean   @default(true)
+  il                String?
+  ilce              String?
+  mahalle           String?
+  kategori          String?
+  altKategori       String?
+  fiyat             Decimal?
+  paraBirimi        String    @default("TRY")
+  linaOzeti         String?
+  guvenPuani        Int       @default(0)
+  kalitePuani       Int       @default(0)
+  aktifMi           Boolean   @default(true)
+  olusturulmaTarihi DateTime  @default(now())
+  guncellenmeTarihi DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([portfoyId])
+  @@index([havuzDurumu])
+  @@index([yetkiliMi])
+  @@index([paylasimaUygunMu])
+  @@index([il])
+  @@index([ilce])
+  @@index([mahalle])
+  @@index([aktifMi])
+}
+
+model LinaHavuzAnaliz {
+  id                 String             @id @default(uuid())
+  kullaniciId        String
+  havuzKaydiId       String
+  portfoyId          String
+  guvenPuani         Int                @default(0)
+  kalitePuani        Int                @default(0)
+  eslesmePuani       Int                @default(0)
+  yetkiAnalizi       String?
+  fiyatAnalizi       String?
+  konumAnalizi       String?
+  gizlilikAnalizi    String?
+  eksikBilgiler      String[]
+  riskSeviyesi       LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi     LinaFirsatSeviyesi @default(ORTA)
+  linaOzeti          String?
+  onerilenAksiyonlar Json?
+  sonAnalizTarihi    DateTime           @default(now())
+  olusturulmaTarihi  DateTime           @default(now())
+  guncellenmeTarihi  DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([havuzKaydiId])
+  @@index([portfoyId])
+  @@index([guvenPuani])
+  @@index([kalitePuani])
+}
+
+model LinaHavuzEslesme {
+  id                      String             @id @default(uuid())
+  kullaniciId             String
+  havuzKaydiId            String
+  portfoyId               String
+  hedefKullaniciId        String?
+  crmTalepId              String?
+  forumGonderiId          String?
+  eslesmePuani            Int                @default(0)
+  eslesmeGerekcesi        String?
+  eksikNoktalar           String[]
+  kullaniciyaGosterildiMi Boolean            @default(false)
+  gorusmeBaslatildiMi     Boolean            @default(false)
+  riskSeviyesi            LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi          LinaFirsatSeviyesi @default(ORTA)
+  durum                   LinaDurum          @default(BEKLIYOR)
+  olusturulmaTarihi       DateTime           @default(now())
+  guncellenmeTarihi       DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([havuzKaydiId])
+  @@index([portfoyId])
+  @@index([hedefKullaniciId])
+  @@index([crmTalepId])
+  @@index([forumGonderiId])
+  @@index([eslesmePuani])
+  @@index([durum])
+}
+
+model LinaHavuzOneri {
+  id                String            @id @default(uuid())
+  kullaniciId       String
+  havuzKaydiId      String
+  portfoyId         String
+  baslik            String
+  aciklama          String
+  gerekce           String?
+  oneriTuru         String
+  oncelik           LinaGorevOnceligi @default(NORMAL)
+  durum             LinaOneriDurumu   @default(BEKLIYOR)
+  uygulanacakAlan   String?
+  eskiDeger         Json?
+  onerilenDeger     Json?
+  olusturulmaTarihi DateTime          @default(now())
+  guncellenmeTarihi DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([havuzKaydiId])
+  @@index([portfoyId])
+  @@index([oneriTuru])
+  @@index([durum])
+}
+
+model LinaProaktifTaramaKurali {
+  id                   String    @id @default(uuid())
+  kuralAdi             String
+  aciklama             String?
+  modul                LinaModul
+  rol                  String?
+  aktifMi              Boolean   @default(true)
+  calismaSikligi       String    @default("GUNLUK")
+  sonCalismaTarihi     DateTime?
+  sonrakiCalismaTarihi DateTime?
+  kuralVerisi          Json?
+  esikDegerler         Json?
+  olusturulmaTarihi    DateTime  @default(now())
+  guncellenmeTarihi    DateTime  @updatedAt
+
+  @@index([modul])
+  @@index([rol])
+  @@index([aktifMi])
+  @@index([sonrakiCalismaTarihi])
+}
+
+model LinaProaktifTaramaSonucu {
+  id                      String             @id @default(uuid())
+  kuralId                 String?
+  kullaniciId             String?
+  modul                   LinaModul
+  taramaBasligi           String
+  taramaOzeti             String?
+  bulunanVeri             Json?
+  riskSeviyesi            LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi          LinaFirsatSeviyesi @default(YOK)
+  aksiyonGerekliMi        Boolean            @default(false)
+  kullaniciyaGosterildiMi Boolean            @default(false)
+  durum                   LinaDurum          @default(BEKLIYOR)
+  olusturulmaTarihi       DateTime           @default(now())
+  guncellenmeTarihi       DateTime           @updatedAt
+
+  @@index([kuralId])
+  @@index([kullaniciId])
+  @@index([modul])
+  @@index([riskSeviyesi])
+  @@index([firsatSeviyesi])
+  @@index([durum])
+}
+
+model LinaProaktifOneri {
+  id                String            @id @default(uuid())
+  sonucId           String
+  kullaniciId       String?
+  modul             LinaModul
+  baslik            String
+  aciklama          String
+  gerekce           String?
+  oncelik           LinaGorevOnceligi @default(NORMAL)
+  durum             LinaOneriDurumu   @default(BEKLIYOR)
+  hedefUrl          String?
+  aksiyonTipi       String?
+  aksiyonVerisi     Json?
+  olusturulmaTarihi DateTime          @default(now())
+  guncellenmeTarihi DateTime          @updatedAt
+
+  @@index([sonucId])
+  @@index([kullaniciId])
+  @@index([modul])
+  @@index([oncelik])
+  @@index([durum])
+}
+
+model LinaProaktifUyari {
+  id                String           @id @default(uuid())
+  kullaniciId       String?
+  modul             LinaModul
+  baslik            String
+  aciklama          String?
+  riskSeviyesi      LinaRiskSeviyesi @default(ORTA)
+  ilgiliKayitTuru   String?
+  ilgiliKayitId     String?
+  cozulduMu         Boolean          @default(false)
+  cozumAciklamasi   String?
+  cozumTarihi       DateTime?
+  olusturulmaTarihi DateTime         @default(now())
+  guncellenmeTarihi DateTime         @updatedAt
+
+  @@index([kullaniciId])
+  @@index([modul])
+  @@index([riskSeviyesi])
+  @@index([cozulduMu])
+}
+
+model LinaRapor {
+  id                String             @id @default(uuid())
+  kullaniciId       String?
+  raporBasligi      String
+  raporOzeti        String?
+  raporIcerigi      String?
+  modul             LinaModul          @default(RAPORLAMA)
+  rol               String?
+  donemBaslangic    DateTime?
+  donemBitis        DateTime?
+  veriKaynaklari    String[]
+  raporVerisi       Json?
+  riskSeviyesi      LinaRiskSeviyesi   @default(YOK)
+  firsatSeviyesi    LinaFirsatSeviyesi @default(YOK)
+  durum             LinaDurum          @default(TAMAMLANDI)
+  olusturulmaTarihi DateTime           @default(now())
+  guncellenmeTarihi DateTime           @updatedAt
+
+  @@index([kullaniciId])
+  @@index([modul])
+  @@index([rol])
+  @@index([donemBaslangic])
+  @@index([donemBitis])
+  @@index([durum])
+}
+
+model LinaRaporBolumu {
+  id                String   @id @default(uuid())
+  raporId           String
+  sira              Int      @default(0)
+  baslik            String
+  ozet              String?
+  icerik            String?
+  veri              Json?
+  grafikVerisi      Json?
+  olusturulmaTarihi DateTime @default(now())
+  guncellenmeTarihi DateTime @updatedAt
+
+  @@index([raporId])
+  @@index([sira])
+}
+
+model LinaRaporAksiyonu {
+  id                String            @id @default(uuid())
+  raporId           String
+  kullaniciId       String?
+  baslik            String
+  aciklama          String?
+  gerekce           String?
+  ilgiliModul       LinaModul
+  oncelik           LinaGorevOnceligi @default(NORMAL)
+  durum             LinaOneriDurumu   @default(BEKLIYOR)
+  hedefUrl          String?
+  aksiyonVerisi     Json?
+  olusturulmaTarihi DateTime          @default(now())
+  guncellenmeTarihi DateTime          @updatedAt
+
+  @@index([raporId])
+  @@index([kullaniciId])
+  @@index([ilgiliModul])
+  @@index([oncelik])
+  @@index([durum])
+}
+
+model LinaSesTercihi {
+  id                   String   @id @default(uuid())
+  kullaniciId          String   @unique
+  sesliYanitAktifMi    Boolean  @default(false)
+  sesliBildirimAktifMi Boolean  @default(false)
+  mikrofonAktifMi      Boolean  @default(false)
+  sesSaglayici         String   @default("ELEVENLABS")
+  sesKimligi           String?
+  sesAdi               String   @default("EPH Classic")
+  hiz                  Float    @default(1.0)
+  ton                  String?
+  duygu                String?
+  sessizSaatAktifMi    Boolean  @default(true)
+  sessizSaatBaslangic  String   @default("22:00")
+  sessizSaatBitis      String   @default("08:00")
+  olusturulmaTarihi    DateTime @default(now())
+  guncellenmeTarihi    DateTime @updatedAt
+
+  @@index([kullaniciId])
+}
+
+model LinaSesKaydi {
+  id                String    @id @default(uuid())
+  kullaniciId       String?
+  konusmaId         String?
+  kanal             LinaKanal @default(SESLI)
+  modul             LinaModul @default(GENEL)
+  sesTuru           String
+  metin             String?
+  sesDosyaUrl       String?
+  sureSaniye        Int?
+  dosyaBoyutu       Int?
+  mimeTuru          String?
+  sesSaglayici      String?
+  sesKimligi        String?
+  basariliMi        Boolean   @default(true)
+  hataMesaji        String?
+  olusturulmaTarihi DateTime  @default(now())
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([kanal])
+  @@index([modul])
+  @@index([sesTuru])
+  @@index([basariliMi])
+}
+
+model LinaSesCozumleme {
+  id                String   @id @default(uuid())
+  kullaniciId       String?
+  sesKaydiId        String?
+  kaynakDil         String   @default("tr")
+  cozumlenenMetin   String?
+  guvenPuani        Float?
+  basariliMi        Boolean  @default(true)
+  hataMesaji        String?
+  olusturulmaTarihi DateTime @default(now())
+
+  @@index([kullaniciId])
+  @@index([sesKaydiId])
+  @@index([basariliMi])
+}
+
+model LinaBildirim {
+  id                String            @id @default(uuid())
+  kullaniciId       String
+  modul             LinaModul         @default(GENEL)
+  baslik            String
+  mesaj             String
+  bildirimTuru      String
+  oncelik           LinaGorevOnceligi @default(NORMAL)
+  hedefUrl          String?
+  ilgiliKayitTuru   String?
+  ilgiliKayitId     String?
+  sesliMi           Boolean           @default(false)
+  epostaMi          Boolean           @default(false)
+  okunduMu          Boolean           @default(false)
+  gonderildiMi      Boolean           @default(false)
+  planlananTarih    DateTime?
+  gonderimTarihi    DateTime?
+  okunmaTarihi      DateTime?
+  durum             LinaDurum         @default(BEKLIYOR)
+  olusturulmaTarihi DateTime          @default(now())
+  guncellenmeTarihi DateTime          @updatedAt
+
+  @@index([kullaniciId])
+  @@index([modul])
+  @@index([bildirimTuru])
+  @@index([oncelik])
+  @@index([okunduMu])
+  @@index([gonderildiMi])
+  @@index([planlananTarih])
+  @@index([durum])
+}
+
+model LinaBildirimTercihi {
+  id                     String   @id @default(uuid())
+  kullaniciId            String   @unique
+  genelBildirimAktifMi   Boolean  @default(true)
+  proaktifBildirimMi     Boolean  @default(true)
+  sesliBildirimMi        Boolean  @default(false)
+  epostaBildirimMi       Boolean  @default(true)
+  crmBildirimMi          Boolean  @default(true)
+  portfoyBildirimMi      Boolean  @default(true)
+  forumBildirimMi        Boolean  @default(true)
+  havuzBildirimMi        Boolean  @default(true)
+  gorevBildirimMi        Boolean  @default(true)
+  raporBildirimMi        Boolean  @default(true)
+  sessizSaatAktifMi      Boolean  @default(true)
+  sessizSaatBaslangic    String   @default("22:00")
+  sessizSaatBitis        String   @default("08:00")
+  acilBildirimHerZamanMi Boolean  @default(true)
+  olusturulmaTarihi      DateTime @default(now())
+  guncellenmeTarihi      DateTime @updatedAt
+
+  @@index([kullaniciId])
+}
+
+model LinaBildirimGonderimKaydi {
+  id                String    @id @default(uuid())
+  bildirimId        String
+  kullaniciId       String
+  kanal             LinaKanal @default(SISTEM)
+  basariliMi        Boolean   @default(false)
+  hataMesaji        String?
+  denemeSayisi      Int       @default(0)
+  saglayici         String?
+  saglayiciCevabi   Json?
+  olusturulmaTarihi DateTime  @default(now())
+
+  @@index([bildirimId])
+  @@index([kullaniciId])
+  @@index([kanal])
+  @@index([basariliMi])
+}
+
+model LinaEpostaSablonu {
+  id                String           @id @default(uuid())
+  sablonKodu        String           @unique
+  hesap             LinaEpostaHesabi
+  baslik            String
+  konu              String
+  icerik            String
+  aktifMi           Boolean          @default(true)
+  olusturulmaTarihi DateTime         @default(now())
+  guncellenmeTarihi DateTime         @updatedAt
+
+  @@index([hesap])
+  @@index([aktifMi])
+}
+
+model LinaEpostaGonderimKaydi {
+  id                String           @id @default(uuid())
+  bildirimId        String?
+  kullaniciId       String?
+  hesap             LinaEpostaHesabi
+  aliciEposta       String
+  konu              String
+  icerik            String
+  sablonKodu        String?
+  ilgiliKayitTuru   String?
+  ilgiliKayitId     String?
+  durum             LinaEpostaDurumu @default(BEKLIYOR)
+  hataMesaji        String?
+  denemeSayisi      Int              @default(0)
+  gonderimTarihi    DateTime?
+  olusturulmaTarihi DateTime         @default(now())
+  guncellenmeTarihi DateTime         @updatedAt
+
+  @@index([bildirimId])
+  @@index([kullaniciId])
+  @@index([hesap])
+  @@index([aliciEposta])
+  @@index([sablonKodu])
+  @@index([durum])
+  @@index([olusturulmaTarihi])
+}
+
+model LinaYetkiKurali {
+  id                String    @id @default(uuid())
+  rol               String
+  modul             LinaModul
+  islemKodu         String
+  izinliMi          Boolean   @default(false)
+  onayGerekliMi     Boolean   @default(false)
+  aciklama          String?
+  aktifMi           Boolean   @default(true)
+  olusturulmaTarihi DateTime  @default(now())
+  guncellenmeTarihi DateTime  @updatedAt
+
+  @@unique([rol, modul, islemKodu])
+  @@index([rol])
+  @@index([modul])
+  @@index([aktifMi])
+}
+
+model LinaYetkiKontrolKaydi {
+  id                String    @id @default(uuid())
+  kullaniciId       String?
+  rol               String?
+  modul             LinaModul
+  islemKodu         String
+  izinVerildiMi     Boolean   @default(false)
+  onayGerekliMi     Boolean   @default(false)
+  gerekce           String?
+  istekVerisi       Json?
+  olusturulmaTarihi DateTime  @default(now())
+
+  @@index([kullaniciId])
+  @@index([rol])
+  @@index([modul])
+  @@index([islemKodu])
+  @@index([izinVerildiMi])
+  @@index([onayGerekliMi])
+}
+
+model LinaOnayKaydi {
+  id                   String    @id @default(uuid())
+  isteyenKullaniciId   String?
+  onaylayanKullaniciId String?
+  modul                LinaModul
+  islemKodu            String
+  baslik               String
+  aciklama             String?
+  istekVerisi          Json?
+  sonucVerisi          Json?
+  durum                LinaDurum @default(BEKLIYOR)
+  onayTarihi           DateTime?
+  retTarihi            DateTime?
+  retGerekcesi         String?
+  sonGecerlilikTarihi  DateTime?
+  olusturulmaTarihi    DateTime  @default(now())
+  guncellenmeTarihi    DateTime  @updatedAt
+
+  @@index([isteyenKullaniciId])
+  @@index([onaylayanKullaniciId])
+  @@index([modul])
+  @@index([islemKodu])
+  @@index([durum])
+  @@index([sonGecerlilikTarihi])
+}
+
+model LinaRetKaydi {
+  id                 String    @id @default(uuid())
+  kullaniciId        String?
+  konusmaId          String?
+  modul              LinaModul
+  niyet              LinaNiyet @default(BELIRSIZ)
+  retSebebi          String
+  retAciklamasi      String?
+  guvenlikRiskiVarMi Boolean   @default(false)
+  yetkiIhlaliVarMi   Boolean   @default(false)
+  belirsizlikVarMi   Boolean   @default(false)
+  istekVerisi        Json?
+  olusturulmaTarihi  DateTime  @default(now())
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([modul])
+  @@index([niyet])
+  @@index([guvenlikRiskiVarMi])
+  @@index([yetkiIhlaliVarMi])
+}
+
+model LinaGeriBildirim {
+  id                String    @id @default(uuid())
+  kullaniciId       String?
+  konusmaId         String?
+  modul             LinaModul @default(GENEL)
+  puan              Int?
+  begenildiMi       Boolean?
+  geriBildirimMetni String?
+  sorunTuru         String?
+  beklenti          String?
+  olusturulmaTarihi DateTime  @default(now())
+
+  @@index([kullaniciId])
+  @@index([konusmaId])
+  @@index([modul])
+  @@index([puan])
+}
+
+model LinaYanitDegerlendirme {
+  id                String   @id @default(uuid())
+  konusmaId         String
+  dogrulukPuani     Int      @default(0)
+  faydaPuani        Int      @default(0)
+  tonPuani          Int      @default(0)
+  baglamPuani       Int      @default(0)
+  hataVarMi         Boolean  @default(false)
+  hataAciklamasi    String?
+  iyilestirmeNotu   String?
+  olusturulmaTarihi DateTime @default(now())
+
+  @@index([konusmaId])
+  @@index([dogrulukPuani])
+  @@index([faydaPuani])
+  @@index([tonPuani])
+  @@index([baglamPuani])
+  @@index([hataVarMi])
+}
+
+model LinaKalibrasyon {
+  id                String    @id @default(uuid())
+  kullaniciId       String?
+  rol               String?
+  modul             LinaModul @default(GENEL)
+  ayarBasligi       String
+  ayarAciklamasi    String?
+  ayarVerisi        Json
+  aktifMi           Boolean   @default(true)
+  baslangicTarihi   DateTime  @default(now())
+  bitisTarihi       DateTime?
+  olusturulmaTarihi DateTime  @default(now())
+  guncellenmeTarihi DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([rol])
+  @@index([modul])
+  @@index([aktifMi])
+}
+
+model LinaOneriBasariKaydi {
+  id                String    @id @default(uuid())
+  kullaniciId       String?
+  oneriId           String?
+  modul             LinaModul @default(GENEL)
+  uygulandiMi       Boolean   @default(false)
+  sonucBasariliMi   Boolean?
+  sonucAciklamasi   String?
+  kullaniciMemnunMu Boolean?
+  etkiPuani         Int?
+  olusturulmaTarihi DateTime  @default(now())
+  guncellenmeTarihi DateTime  @updatedAt
+
+  @@index([kullaniciId])
+  @@index([oneriId])
+  @@index([modul])
+  @@index([uygulandiMi])
+  @@index([sonucBasariliMi])
+  @@index([etkiPuani])
+}
+
+model EPHAuthorityLetter {
+  id                 String   @id @default(cuid())
+  unitId             String
+  authorityNo        String   @unique
+  ownerName          String
+  ownerPhone         String?
+  ownerEmail         String?
+  authorityType      String
+  authorityStartDate DateTime
+  authorityEndDate   DateTime
+  status             String   @default("TASLAK")
+  pdfUrl             String?
+  createdById        String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  unit               Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@index([status])
+}
+
+enum PendingRegistrationStatus {
+  PHONE_VERIFICATION_PENDING
+  EMAIL_VERIFICATION_PENDING
+  READY_TO_CREATE_USER
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+enum Role {
+  ADAY
+  EMLAKCI
+  MUTEAHHIT
+  INSAAT_FIRMASI
+  ADMIN
+  SUPER_ADMIN
+  MODERATOR
+}
+
+enum Capability {
+  TEAM_LEADER
+  OFFICE_OWNER
+}
+
+enum RiskLevel {
+  DUSUK
+  ORTA
+  YUKSEK
+  KRITIK
+}
+
+enum ReportStatus {
+  ACIK
+  INCELENIYOR
+  COZULDU
+  REDDEDILDI
+}
+
+enum RestrictionType {
+  GIRIS_ENGELI
+  PAYLASIM_ENGELI
+  MESAJ_ENGELI
+  ILAN_ENGELI
+  GECICI_ASKI
+  KALICI_ASKI
+}
+
+enum AnnouncementAudience {
+  TUM_UYELER
+  EMLAKCILAR
+  MUTEAHHITLER
+  INSAAT_FIRMALARI
+  ADMINLER
+}
+
+enum SystemMessageTargetType {
+  TEK_KULLANICI
+  TUM_KULLANICILAR
+  EMLAKCILAR
+  MUTEAHHITLER
+  INSAAT_FIRMALARI
+  ADMINLER
+  SUPER_ADMINLER
+  OZEL_GRUP
+  COKLU_KULLANICI
+  SEHIRLER
+  SEHIRLER_VE_ROLLER
+}
+
+enum SystemMessageCategory {
+  BILGILENDIRME
+  SIKAYET_YANITI
+  ONERI_YANITI
+  UYARI
+  DUYURU
+  HESAP_ISLEMI
+  ILAN_ISLEMI
+  UYELIK_PAKET_ISLEMI
+  EVRAK_DOGRULAMA_ISLEMI
+  NETWORK_ISLEMI
+  GUVENLIK_BILDIRIMI
+  BAKIM_TEKNIK_BILGILENDIRME
+  ODEME_FATURA_BILGILENDIRMESI
+  KURAL_IHLALI_BILDIRIMI
+  DESTEK_YANITI
+  DIGER
+}
+
+enum InvitationStatus {
+  PENDING
+  USED
+  EXPIRED
+  REVOKED
+}
+
+enum BasvuruTuru {
+  REFERANSSIZ
+  REFERANSLI
+  PILOT
+}
+
+enum OnayYetkiSeviyesi {
+  MODERATOR_ADMIN_SUPER_ADMIN
+  ADMIN_SUPER_ADMIN
+  SUPER_ADMIN
+}
+
+enum DavetKoduTuru {
+  REFERANSLI_BASVURU
+  PILOT_DAVETI
+  YONETICI_DAVETI
+}
+
+enum DocumentType {
+  VERGI_LEVHASI
+  YETKI_BELGESI
+  TICARET_SICIL
+  KIMLIK
+  DIGER
+  MYK_BELGESI
+  IMZA_SIRKULERI
+  FAALIYET_BELGESI
+  IS_BITIRME_BELGESI
+  YAMBIS_BELGESI
+  REFERANS_PROJE
+  TAPU
+  KAT_KARSILIGI_SOZLESMESI
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PortfolioApprovalStatus {
+  TASLAK
+  BELGE_BEKLENIYOR
+  INCELEMEYE_GONDERILDI
+  INCELEMEDE
+  EKSIK_BILGI_BEKLENIYOR
+  ONAYLANDI
+  HAVUZDA
+  REDDEDILDI
+}
+
+enum PortfolioAuthorityType {
+  YETKI_BELGESI
+  TAPU
+  KAT_KARSILIGI_SOZLESMESI
+  DIGER_DOGRULAMA_EVRAKI
+  TAPU_SAHIBI_KIMLIK
+}
+
+enum ProjectLifecycleStage {
+  READY
+  UNDER_CONSTRUCTION
+  PLANNED
+}
+
+enum ProjectGeometryType {
+  TEK_CEPHELI_STANDART
+  CIFT_CEPHELI_STANDART
+  UC_CEPHELI_STANDART
+  DORT_CEPHELI_STANDART
+  DIKDORTGEN
+  KARE
+  L_PLAN
+  U_PLAN
+  BIRDEN_FAZLA_STANDART_BLOK
+  BESGEN
+  ALTIGEN
+  YILDIZ
+  DAIRESEL
+  KIRIK_CEPHELI
+  COK_KANATLI
+  BAGLANTILI_KULELER
+  OZEL_KARMASIK
+}
+
+enum ProjectWizardStep {
+  PROJE_BILGILERI
+  PROJE_YAPISI
+  MEKAN_ENVANTERI
+  GEOMETRI
+  BLOKLAR
+  KATLAR
+  KAT_DAGILIMI
+  NUMARALANDIRMA
+  KONTROL
+  TAMAMLANDI
+}
+
+enum ProjectSetupStatus {
+  TASLAK
+  YAPI_OLUSTURULUYOR
+  BILGI_GIRISI_EKSIK
+  KONTROLE_HAZIR
+  TAMAMLANDI
+  ARSIVLENDI
+}
+
+enum ProjectLegalStatus {
+  TAPUDA_BAGIMSIZ_BOLUM
+  ORTAK_KULLANIM_ALANI
+  BAGIMSIZ_BOLUM_EKLENTISI
+  TEKNIK_HIZMET_ALANI
+  ACIK_ALAN_SOSYAL_DONATI
+}
+
+enum ProjectCommercialPurpose {
+  SATISA_SUNULACAK
+  KIRAYA_VERILECEK
+  SATIS_VEYA_KIRALAMA_STOGU
+  ARSA_SAHIBINE_AYRILMIS
+  FIRMA_KULLANIMINA_AYRILMIS
+  SITE_ISLETMESINE_AYRILMIS
+  ORTAK_KULLANIMA_AYRILMIS
+  TEKNIK_KULLANIM
+  SATIS_DISI
+}
+
+enum ProjectSpaceType {
+  KAPALI_HAVUZ
+  ACIK_HAVUZ
+  SAUNA
+  SPA
+  HAMAM
+  BUHAR_ODASI
+  SPOR_SALONU
+  KRES
+  COCUK_OYUN_ALANI
+  SINEMA_SALONU
+  HOBI_ODASI
+  TOPLANTI_SALONU
+  KUTUPHANE
+  ORTAK_TERAS
+  LOBI
+  RESEPSIYON
+  SITE_YONETIM_OFISI
+  ORTAK_BAHCE
+  SITE_MARKETI
+  KAFETERYA
+  DINLENME_SALONU
+  MISAFIR_SALONU
+  ELEKTRIK_ODASI
+  MEKANIK_ODA
+  JENERATOR_ODASI
+  SU_DEPOSU
+  SIGINAK
+  GUVENLIK_ODASI
+  PERSONEL_ODASI
+  COP_ODASI
+  TEKNIK_DEPO
+  KAPALI_OTOPARK
+  ACIK_OTOPARK
+  SERVIS_ALANI
+  YURUYUS_PARKURU
+  BASKETBOL_SAHASI
+  TENIS_KORTU
+  COCUK_PARKI
+  PEYZAJ_ALANI
+  DINLENME_ALANI
+  SUS_HAVUZU
+  GIRIS_KAPISI_KEMERI
+  DIGER
+}
+
+enum ProjectDesignReviewStatus {
+  BEKLIYOR
+  INCELEMEDE
+  EK_BILGI_BEKLENIYOR
+  ONAYLANDI
+  REDDEDILDI
+  TAMAMLANDI
+}
+
+enum ProjectMediaPackageType {
+  PROJECT_GENERAL
+  UNIT_STANDARD
+  COMMERCIAL_STANDARD
+  OTHER
+}
+
+enum ProjectFloorType {
+  BODRUM
+  ZEMIN
+  NORMAL
+  ASMA
+  TERAS
+  CATI
+  DIGER
+}
+
+enum ProjectInventoryBatchType {
+  EXCEL_IMPORT
+  CSV_IMPORT
+  RULE_GENERATION
+  NATURAL_LANGUAGE_GENERATION
+  BULK_PRICE_UPDATE
+  BULK_STATUS_UPDATE
+  BULK_FEATURE_UPDATE
+  BULK_DELIVERY_UPDATE
+  ROLLBACK
+}
+
+enum ProjectInventoryBatchStatus {
+  UPLOADED
+  VALIDATING
+  PREVIEW_READY
+  QUEUED
+  PROCESSING
+  COMPLETED
+  PARTIAL
+  FAILED
+  CANCELLED
+  ROLLED_BACK
+}
+
+enum ProjectInventoryBatchItemAction {
+  CREATE
+  UPDATE
+  SKIP
+  DELETE
+  NO_CHANGE
+  ROLLBACK
+}
+
+enum ProjectInventoryBatchItemStatus {
+  PENDING
+  VALID
+  INVALID
+  PROCESSING
+  CREATED
+  UPDATED
+  SKIPPED
+  FAILED
+  ROLLED_BACK
+}
+
+enum UnitStatus {
+  SATILIK
+  REZERVE
+  OPSIYONLU
+  SATILDI
+  PASIF
+  KIRALIK
+  GUNLUK_KIRALIK
+  DEVREN_SATILIK
+  DEVREN_KIRALIK
+  INSAAT_PROJESI
+  KAT_KARSILIGI
+  KIRALANDII
+  ON_SATIS
+  PROJE_ASAMASI
+  YAKINDA_SATISTA
+  INSAAT_HALINDE
+  TESLIME_HAZIR
+  HEMEN_TESLIM
+  HASILAT_PAYLASIMLI
+}
+
+enum UnitType {
+  DAIRE
+  STUDYO
+  VILLA
+  REZIDANS
+  MUSTAK_EV
+  KOSK_YALI
+  CIFTLIK_EVI
+  PREFABRIK_EV
+  DUKKAN_MAGAZA
+  MARKET
+  OFIS_BURO
+  PLAZA_KATI
+  DEPO_ANTREPO
+  FABRIKA_ATOLYE
+  OTEL_PANSIYON
+  DUGUN_SALONU
+  ARSA
+  TARLA
+  BAHCE
+  ZEYTINLIK
+  ADA
+  DEVRE_MULK
+  TURISTIK_TESIS
+  VILLA_TERAS
+  VILLA_GARDEN
+  DUBLEKS_VILLA
+  TRIPLEKS_VILLA
+  KOY_EVI
+  TAS_EV
+  AHSAP_EV
+  CELIK_KONSTRUKSIYON
+  TINY_HOUSE
+  BUNGALOV
+  DAG_EVI
+  YAYLA_EVI
+  GOL_EVI
+  BAG_EVI
+  HOBI_BAHCESI_EVI
+  MAGARA_EV
+  YALI
+  YALI_DAIRESI
+  KONAK
+  PENTHOUSE
+  LOFT
+  TERAS_LOFT
+  DUBLEKS
+  TRIPLEKS
+  LOFT_DUBLEKS
+  MARINA_RESIDENCE
+  GOLF_RESIDENCE
+  SAHIL_RESIDENCE
+  DAG_RESIDENCE
+  SKY_RESIDENCE
+  OZEL_HAVUZLU_VILLA
+  OZEL_ISKELELI_VILLA
+  AKILLI_VILLA
+  ULTRA_LUKS_VILLA
+  HOME_OFFICE
+  MUAYENEHANE
+  KLINIK
+  SHOWROOM
+  IS_HANI_KATI
+  IS_MERKEZI
+  PAYLASIMLI_OFIS
+  LOJISTIK_MERKEZI
+  URETIM_TESISI
+  AKARYAKIT_ISTASYONU
+  APART_OTEL
+  OTEL_ODASI
+  RESTORAN
+  KAFE
+  SPOR_TESISI
+  OKUL_EGITIM_TESISI
+  HASTANE_SAGLIK_TESISI
+  KOMPLE_BINA
+  KONUT_ARSASI
+  VILLA_ARSASI
+  TICARI_ARSA
+  SANAYI_ARSASI
+  TURIZM_IMARLI_ARSA
+  BAG
+  MEYVE_BAHCESI
+  SERA
+  BESI_CIFTLIGI
+  ORMAN_ARAZISI
+  KONUT_PROJESI
+  VILLA_PROJESI
+  REZIDANS_PROJESI
+  KARMA_PROJE
+  AVM_PROJESI
+  TICARI_PROJE
+  YAZLIK
+  FABRIKA_URETIM_TESISI
+  ATOLYE
+  TICARI_ISLETME
+  OTEL
+  BUTIK_OTEL
+  MOTEL
+  PANSIYON
+  KAMP_YERI
+  TATIL_KOYU
+  DIGER
+}
+
+enum NominationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  INVITED
+  REGISTERED
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  INVITED
+  REGISTERED
+  GORUSME_PLANLANDI
+  EVRAK_BEKLENIYOR
+}
+
+enum CustomerStatus {
+  YENI_LEAD
+  ILK_GORUSME
+  PORTFOLYO_GONDERILDI
+  YER_GOSTERIMI
+  TEKLIF_SURECI
+  PAZARLIK
+  KAPANDI
+  KAYBEDILDI
+}
+
+enum CustomerRole {
+  ALICI
+  SATICI
+  KIRACI
+  MAL_SAHIBI
+  YATIRIMCI
+  MUTEAHHIT
+  INSAAT_FIRMASI
+  ARSA_SAHIBI
+}
+
+enum CustomerPurchaseIntent {
+  BELIRSIZ
+  SATIN_ALMA
+  KIRALAMA
+  YATIRIM
+  ARSA_GELISTIRME
+  KAT_KARSILIGI
+}
+
+enum CustomerInterestPriority {
+  DUSUK
+  NORMAL
+  YUKSEK
+  ACIL
+}
+
+enum CustomerPropertyRelation {
+  TAPU_SAHIBI
+  SATICI
+  ALICI_ADAYI
+  KIRACI
+  KIRAYA_VEREN
+  MUTEAHHIT
+  INSAAT_FIRMASI
+  YATIRIMCI
+  ORTAK_MALIK
+  VEKIL
+  MIRASCI
+  ARSA_SAHIBI
+  KAT_KARSILIGI_ARSA_SAHIBI
+}
+
+enum ActivityType {
+  TELEFON
+  WHATSAPP
+  EMAIL
+  YER_GOSTERIMI
+  TEKLIF
+  NOT
+  DIGER
+}
+
+enum TaskStatus {
+  BEKLIYOR
+  TAMAMLANDI
+  IPTAL
+}
+
+enum ConversationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum NetworkVisibility {
+  TUM_EPH
+  SADECE_EMLAKCILAR
+  SADECE_MUTEAHHITLER
+  SADECE_BAGLANTILARIM
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  VIEW_USER
+  VIEW_APPLICATION
+  APPROVE_APPLICATION
+  REJECT_APPLICATION
+  UPDATE_APPLICATION_STATUS
+  UPDATE_APPLICATION_NOTE
+  UPDATE_USER_ROLE
+  UPDATE_USER_PACKAGE
+  SUSPEND_USER
+  VIEW_AUDIT_LOG
+  VIEW_SENSITIVE_DATA_ATTEMPT
+  SYSTEM_SECURITY_ACTION
+  TECHNICAL_SUPPORT_ACCESS
+  HEDIYE_KONTOR_HAVUZU_OLUSTUR
+  HEDIYE_KONTOR_HAVUZU_YUKLE
+  HEDIYE_KONTOR_GONDER
+  TRIAL_UZAT
+}
+
+enum KullaniciHesapTuru {
+  GERCEK
+  PILOT
+  TEST
+  SISTEM
+}
+
+enum UyelikPaketKodu {
+  SILVER
+  GOLD
+  PREMIUM
+  PLATINIUM
+  KURUMSAL
+  DENEME
+  STARTER
+}
+
+enum UyelikDurumu {
+  AKTIF
+  PASIF
+  SURESI_DOLDU
+  IPTAL
+}
+
+enum KontorHareketTuru {
+  YUKLEME
+  HARCAMA
+  IADE
+  HEDIYE
+  DUZELTME
+}
+
+enum KontorIslemTuru {
+  FORUM_ACIL_ETIKETI
+  FORUM_SABITLEME
+  FORUM_VITRIN
+  PORTFOY_ONE_CIKARMA
+  LINA_ILAN_ACIKLAMASI
+  LINA_ILAN_DUZENLEME
+  LINA_SESTEN_ILAN
+  SOSYAL_MEDYA_METNI
+  INSTAGRAM_GONDERISI
+  INSTAGRAM_REELS
+  WHATSAPP_PORTFOY_KARTI
+  PDF_PORTFOY_DOSYASI
+  TOPLU_ISLEM
+  TOPLU_EPOSTA
+  EK_GORUSME_HAKKI
+  DIGER
+  HAVUZ_MESAJ
+  HAVUZ_ILGILENIYORUM
+  HAVUZ_ESLESEN_MUSTERIM_VAR
+  HAVUZ_KONUM
+  HAVUZ_TELEFON
+  HAVUZ_WHATSAPP
+  FORUM_MESAJ
+  FORUM_ILGILENIYORUM
+  FORUM_YARDIMCI_OLABILIRIM
+  FORUM_TALEP_OLUSTURMA
+  FORUM_TELEFON
+  FORUM_WHATSAPP
+}
+
+enum KotaDonemi {
+  GUNLUK
+  AYLIK
+  YILLIK
+}
+
+enum AdminMesajTuru {
+  TEKNIK_BILGILENDIRME
+  KAMPANYA
+  KONTOR_BAKIYE
+  PROFIL_EVRAK
+  PAKET_UYELIK
+  KURAL_GUVENLIK
+  GENEL_DUYURU
+  KISIYE_OZEL_MESAJ
+}
+
+enum DestekTalepDurumu {
+  ACIK
+  ISLENIYOR
+  YANITLANDI
+  KAPANDI
+}
+
+enum LinaGunSonuSecimi {
+  OTUZ_GUN_KAYDET
+  KALICI_KAYDET
+  BUGUNU_SIL
+}
+
+enum LinaKanal {
+  YAZILI
+  SESLI
+  SISTEM
+  PROAKTIF
+  EPOSTA
+}
+
+enum LinaModul {
+  GENEL
+  PORTFOY
+  CRM
+  FORUM
+  HAVUZ
+  GOREV
+  RAPORLAMA
+  PROAKTIF_TARAMA
+  BILGI_KUTUPHANESI
+  DENETIM
+  SES
+  BILDIRIM
+  EPOSTA
+  YETKI
+  KALIBRASYON
+}
+
+enum LinaNiyet {
+  BILGI_ALMA
+  ISLEM_YAPMA
+  PORTFOY_EKLEME
+  PORTFOY_GUNCELLEME
+  MUSTERI_TAKIBI
+  TALEP_OLUSTURMA
+  ESLESME_ARAMA
+  GOREV_OLUSTURMA
+  RAPOR_ISTEME
+  SIKAYET
+  ONERI
+  BELIRSIZ
+}
+
+enum LinaDurum {
+  BEKLIYOR
+  ISLENIYOR
+  TAMAMLANDI
+  REDDEDILDI
+  HATA
+  IPTAL
+}
+
+enum LinaKararSeviyesi {
+  BILGILENDIRME
+  ONERI
+  UYARI
+  AKSIYON
+  KRITIK
+}
+
+enum LinaRiskSeviyesi {
+  YOK
+  DUSUK
+  ORTA
+  YUKSEK
+  KRITIK
+}
+
+enum LinaFirsatSeviyesi {
+  YOK
+  DUSUK
+  ORTA
+  YUKSEK
+  COK_YUKSEK
+}
+
+enum LinaHafizaKatmani {
+  OTURUM
+  ISLEM
+  KULLANICI
+  ROL
+  KURUMSAL
+  BOLGESEL_TERIM
+  SISTEM
+  DENETIM
+}
+
+enum LinaHafizaOnemi {
+  DUSUK
+  ORTA
+  YUKSEK
+  KALICI
+}
+
+enum LinaDenetimTuru {
+  BILGI
+  UYARI
+  HATA
+  YETKI_IHLALI
+  CELISKI
+  RED
+  GUVENLIK
+}
+
+enum LinaOneriDurumu {
+  BEKLIYOR
+  GOSTERILDI
+  ONAYLANDI
+  REDDEDILDI
+  UYGULANDI
+  SURESI_DOLDU
+}
+
+enum LinaGorevOnceligi {
+  DUSUK
+  NORMAL
+  YUKSEK
+  ACIL
+}
+
+enum LinaGorevDurumu {
+  BEKLIYOR
+  DEVAM_EDIYOR
+  TAMAMLANDI
+  IPTAL_EDILDI
+  GECIKTI
+}
+
+enum LinaBilgiTuru {
+  ANAYASA
+  KURAL
+  SSS
+  EGITIM
+  TERIM
+  PROSEDUR
+  SENARYO
+}
+
+enum LinaTerimGuveni {
+  DUSUK
+  ORTA
+  YUKSEK
+  ONAYLI
+}
+
+enum LinaEpostaHesabi {
+  BILDIRIM
+  DESTEK
+  INFO
+}
+
+enum LinaEpostaDurumu {
+  BEKLIYOR
+  GONDERILDI
+  HATA
+  IPTAL
+}

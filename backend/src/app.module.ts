@@ -1,4 +1,8 @@
 import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { AdminEmailModule } from './admin-email/admin-email.module';
+import { ContentSafetyModule } from './content-safety/content-safety.module';
 import { ConfigModule } from '@nestjs/config';
 
 import { PrismaModule } from './prisma/prisma.module';
@@ -10,6 +14,7 @@ import { ProfileModule } from './profile/profile.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { ProjectsModule } from './projects/projects.module';
 import { UnitsModule } from './units/units.module';
+import { PropertyCardProfileModule } from './property-card/property-card-profile.module';
 import { NominationsModule } from './nominations/nominations.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { LeadsModule } from './leads/leads.module';
@@ -29,18 +34,29 @@ import { KatilimTalepleriModule } from './katilim-talepleri/katilim-talepleri.mo
 import { OrganizationModule } from './organization/organization.module';
 import { TeamLeaderCrmModule } from './team-leader-crm/team-leader-crm.module';
 import { OfficeOwnerCrmModule } from './office-owner-crm/office-owner-crm.module';
+import { OfficeModule } from './office/office.module';
 import { KontorModule } from './kontor/kontor.module';
+import { MembershipModule } from './membership/membership.module';
 import { EphAuthorityLettersModule } from './eph-authority-letters/eph-authority-letters.module';
 import { LinaModule } from './lina/lina.module';
 import { TuranModule } from './turan/turan.module';
 import { ProjectSalesModule } from './project-sales/project-sales.module';
 import { ProjectSalesTemplatesModule } from './project-sales-templates/project-sales-templates.module';
+import { ProjectSceneModule } from './project-scene/project-scene.module';
+import { ProjectRenderModule } from './project-render/project-render.module';
+import { MapsModule } from './maps/maps.module';
+import { CoordinationModule } from './coordination/coordination.module';
+import { PoolExperienceModule } from './pool-experience/pool-experience.module';
+import { PoolAudienceModule } from './pool-audience/pool-audience.module';
+import { PoolProjectsModule } from './pool-projects/pool-projects.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
 
     PrismaModule,
+    ContentSafetyModule,
+    AdminEmailModule,
     SupabaseModule,
 
     InvitationsModule,
@@ -51,8 +67,15 @@ import { ProjectSalesTemplatesModule } from './project-sales-templates/project-s
 
     ProjectsModule,
     UnitsModule,
+    PropertyCardProfileModule,
     ProjectSalesModule,
     ProjectSalesTemplatesModule,
+    ProjectSceneModule,
+    ProjectRenderModule,
+    MapsModule,
+    PoolExperienceModule,
+    PoolAudienceModule,
+    PoolProjectsModule,
 
     NominationsModule,
     ApplicationsModule,
@@ -73,8 +96,11 @@ import { ProjectSalesTemplatesModule } from './project-sales-templates/project-s
     OrganizationModule,
     TeamLeaderCrmModule,
     OfficeOwnerCrmModule,
+    OfficeModule,
     KontorModule,
+    MembershipModule,
     EphAuthorityLettersModule,
+    CoordinationModule,
 
     DashboardModule,
 
@@ -83,5 +109,7 @@ import { ProjectSalesTemplatesModule } from './project-sales-templates/project-s
     LinaModule,
     TuranModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

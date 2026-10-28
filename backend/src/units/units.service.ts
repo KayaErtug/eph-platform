@@ -1,7 +1,13 @@
+import { actorPaidWhere, resolveOfficeWallet } from '../office/office-wallet.rules';
+import { TextSafetyService } from '../text-safety/text-safety.service';
+import { TextSafetyField } from '../text-safety/text-safety.types';
+import { assertNoBlockedInteraction } from '../content-safety/block-policy';
+import { redactPoolDeedOwnerText, serializePoolPrivateInfo } from './pool-privacy';
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Inject,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -11,15 +17,22 @@ import {
   KontorHareketTuru,
   KontorIslemTuru,
   PortfolioApprovalStatus,
+  PortfolioAuthorityType,
+  Prisma,
   ProjectSetupStatus,
   Role,
   UnitStatus,
   UnitType,
+  UyelikDurumu,
 } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
-import { getOfficeAdvisorIds, redactDeedOwnerInfo } from './deed-owner-privacy';
+import { getOfficeAdvisorIds } from './deed-owner-privacy';
+import { AdminService } from '../admin/admin.service';
+import { PoolAudienceService } from '../pool-audience/pool-audience.service';
+import { PoolPublicationService, type PoolPublicationInput, type PublicationUnit } from './pool-publication.service';
+import { countsAgainstActivePortfolioLimit } from './portfolio-policy';
 
 const PLATFORM_URL =
   process.env.FRONTEND_URL ||
@@ -51,13 +64,38 @@ type CreateUnitPayload = {
   deedOwnerEmail?: string;
   availableCreditAmount?: number | string | null;
   doorAccessInfo?: string | null;
+  allowPhoneCall?: boolean;
+  contactPhone?: string | null;
+  allowWhatsapp?: boolean;
+  whatsappPhone?: string | null;
   features?: string[];
 };
 
 type PoolActionPayload = {
+  expectedCostPk?: number;
+  expectedChargeUserId?: string;
   message?: string;
   matchScore?: number;
   note?: string;
+};
+
+type PoolMembershipAccessCode =
+  | 'ACTIVE'
+  | 'SUPER_ADMIN'
+  | 'NO_MEMBERSHIP'
+  | 'NOT_STARTED'
+  | 'EXPIRED'
+  | 'PASSIVE'
+  | 'CANCELLED'
+  | 'PACKAGE_INACTIVE';
+
+type PoolMembershipAccess = {
+  allowed: boolean;
+  code: PoolMembershipAccessCode;
+  message: string;
+  packageCode: string | null;
+  packageName: string | null;
+  expiresAt: Date | null;
 };
 
 const unitInclude = {
@@ -67,6 +105,7 @@ const unitInclude = {
       name: true,
       city: true,
       district: true,
+      neighborhood: true,
       address: true,
       latitude: true,
       longitude: true,
@@ -80,10 +119,12 @@ const unitInclude = {
           lastName: true,
           role: true,
           memberCode: true,
+          companyName: true, office: { select: { id: true, name: true, ownerUserId: true, owner: { select: { id: true, firstName: true, lastName: true, phone: true } } } },
         },
       },
     },
   },
+  mediaPackage: { select: { assets: { orderBy: [{ isCover: 'desc' as const }, { sortOrder: 'asc' as const }], select: { id: true, url: true, supabaseUrl: true, isCover: true, sortOrder: true } } } },
   images: {
     orderBy: [
       { isCover: 'desc' as const },
@@ -132,6 +173,72 @@ const PORTFOLIO_METADATA_KEYS = new Set([
   'campType',
   'resortType',
   'periodType',
+
+  'netArea',
+  'heatingType',
+  'parkingType',
+  'facade',
+  'gardenStatus',
+  'landArea',
+  'viewType',
+  'zoningKaks',
+  'cadastralRoadStatus',
+  'electricityStatus',
+  'waterStatus',
+  'cornerParcelStatus',
+  'unitCount',
+  'elevatorStatus',
+  'tirEntranceStatus',
+  'loadingRampStatus',
+  'industrialElectricityStatus',
+  'pumpCount',
+  'tankCapacity',
+  'fuelTypes',
+  'licenseStatus',
+  'roadFrontage',
+  'marketArea',
+  'tourismCategory',
+  'deliveryDate',
+  'zoningTaks',
+  'floorPermit',
+  'infrastructureStatus',
+  'industrialZoning',
+  'electricityPower',
+  'naturalGasStatus',
+  'roadWidth',
+  'osbDistance',
+  'titleDeedType',
+  'agricultureType',
+  'villageDistance',
+  'altitude',
+  'cropType',
+  'vineyardArea',
+  'irrigationStatus',
+  'roadStatus',
+  'warehouseStatus',
+  'fencingStatus',
+  'treeCount',
+  'oliveTreeCount',
+  'averageTreeAge',
+  'yieldStatus',
+  'harvestInfo',
+  'streetFrontageStatus',
+  'usageStatus',
+  'ceilingHeight',
+  'officeArea',
+  'fireSystemStatus',
+  'shelvingSystemStatus',
+  'loadingArea',
+  'securityStatus',
+  'operatingStatus',
+  'occupancyRate',
+  'locationType',
+  'distanceInfo',
+  'unitsForSale',
+  'presaleStatus',
+  'balconyStatus',
+  'balconyCount',
+  'barterAccepted',
 ]);
 
 type RequiredPortfolioRule = {
@@ -245,10 +352,37 @@ const PORTFOLIO_FIELD_LABELS: Record<string, string> = {
   stationType: 'İstasyon Tipi',
   zoningType: 'İmar Durumu',
   periodType: 'Dönem Tipi',
+  netArea: 'Net Alan',
+  grossArea: 'Brüt Alan',
+  gardenArea: 'Bahçe Alanı',
+  landArea: 'Arsa Alanı',
+  unitCount: 'Bağımsız Bölüm Sayısı',
+  bathroomCount: 'Banyo Sayısı',
+  heatingType: 'Isınma Türü',
+  parkingType: 'Otopark',
+  front: 'Cephe',
+  view: 'Manzara',
+  elevator: 'Asansör',
+  usageStatus: 'Kullanım Durumu',
+  serviceType: 'Hizmet Tipi',
+  seasonUsage: 'Kullanım Şekli',
+  restorationStatus: 'Restorasyon Durumu',
+  infrastructure: 'Altyapı Özeti',
+  road: 'Yol Durumu',
+  commercialValue: 'Ticari Değer',
 };
 
 @Injectable()
 export class UnitsService {
+  @Inject(AdminService)
+  private readonly adminService!: AdminService;
+
+  @Inject(PoolAudienceService)
+  private readonly poolAudienceService!: PoolAudienceService;
+
+  @Inject(PoolPublicationService)
+  private readonly poolPublicationService!: PoolPublicationService;
+
   constructor(private prisma: PrismaService) {}
 
   private isSuperAdmin(user?: CurrentUserPayload) {
@@ -263,6 +397,19 @@ export class UnitsService {
     return user?.role === Role.MODERATOR || user?.role === 'MODERATOR';
   }
 
+  private isDirectPoolPublisherRole(role?: Role | string | null) {
+    const normalizedRole = String(role || '').toUpperCase();
+
+    return (
+      normalizedRole === Role.MUTEAHHIT ||
+      normalizedRole === Role.INSAAT_FIRMASI
+    );
+  }
+
+  private isRealEstateAgentRole(role?: Role | string | null) {
+    return String(role || '').toUpperCase() === Role.EMLAKCI;
+  }
+
   private isApprovalManager(user?: CurrentUserPayload) {
     return this.isSuperAdmin(user) || this.isAdmin(user) || this.isModerator(user);
   }
@@ -271,12 +418,193 @@ export class UnitsService {
     return Boolean(user?.id && ownerId && user.id === ownerId);
   }
 
-  private async ensureCanViewUnit(user: CurrentUserPayload, ownerId: string) {
+  private async getPoolMembershipAccess(
+    user: CurrentUserPayload,
+  ): Promise<PoolMembershipAccess> {
+    if (this.isSuperAdmin(user)) {
+      return {
+        allowed: true,
+        code: 'SUPER_ADMIN',
+        message: 'Yazılım Ekibi Havuz işlem erişimi aktif.',
+        packageCode: 'SYSTEM',
+        packageName: 'Yazılım Ekibi',
+        expiresAt: null,
+      };
+    }
+
+    const now = new Date();
+
+    const [activeMembership, latestMembership] = await Promise.all([
+      this.prisma.kullaniciUyelikPaketi.findFirst({
+        where: {
+          kullaniciId: user.id,
+          durum: UyelikDurumu.AKTIF,
+          baslangicTarihi: {
+            lte: now,
+          },
+          OR: [
+            {
+              bitisTarihi: null,
+            },
+            {
+              bitisTarihi: {
+                gte: now,
+              },
+            },
+          ],
+        },
+        orderBy: {
+          baslangicTarihi: 'desc',
+        },
+      }),
+      this.prisma.kullaniciUyelikPaketi.findFirst({
+        where: {
+          kullaniciId: user.id,
+        },
+        orderBy: {
+          baslangicTarihi: 'desc',
+        },
+      }),
+    ]);
+
+    if (!activeMembership) {
+      if (!latestMembership) {
+        return {
+          allowed: false,
+          code: 'NO_MEMBERSHIP',
+          message:
+            'Havuz işlemleri için aktif üyelik gereklidir. Üyelik Merkezi üzerinden paket talebi oluşturabilirsiniz.',
+          packageCode: null,
+          packageName: null,
+          expiresAt: null,
+        };
+      }
+
+      if (
+        latestMembership.durum === UyelikDurumu.AKTIF &&
+        latestMembership.baslangicTarihi.getTime() > now.getTime()
+      ) {
+        return {
+          allowed: false,
+          code: 'NOT_STARTED',
+          message:
+            'Üyeliğiniz henüz başlamadığı için Havuz işlemleri kullanılamıyor.',
+          packageCode: null,
+          packageName: null,
+          expiresAt: latestMembership.bitisTarihi,
+        };
+      }
+
+      if (
+        latestMembership.durum === UyelikDurumu.SURESI_DOLDU ||
+        (latestMembership.durum === UyelikDurumu.AKTIF &&
+          latestMembership.bitisTarihi !== null &&
+          latestMembership.bitisTarihi.getTime() < now.getTime())
+      ) {
+        return {
+          allowed: false,
+          code: 'EXPIRED',
+          message:
+            'Üyelik süreniz dolduğu için Havuz işlemleri kilitlidir. Havuzu görüntülemeye devam edebilirsiniz.',
+          packageCode: null,
+          packageName: null,
+          expiresAt: latestMembership.bitisTarihi,
+        };
+      }
+
+      if (latestMembership.durum === UyelikDurumu.IPTAL) {
+        return {
+          allowed: false,
+          code: 'CANCELLED',
+          message:
+            'Üyeliğiniz iptal edildiği için Havuz işlemleri kullanılamıyor.',
+          packageCode: null,
+          packageName: null,
+          expiresAt: latestMembership.bitisTarihi,
+        };
+      }
+
+      return {
+        allowed: false,
+        code: 'PASSIVE',
+        message:
+          'Üyeliğiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.',
+        packageCode: null,
+        packageName: null,
+        expiresAt: latestMembership.bitisTarihi,
+      };
+    }
+
+    const membershipPackage = await this.prisma.uyelikPaketi.findUnique({
+      where: {
+        id: activeMembership.paketId,
+      },
+      select: {
+        paketKodu: true,
+        paketAdi: true,
+        aktifMi: true,
+      },
+    });
+
+    if (!membershipPackage || !membershipPackage.aktifMi) {
+      return {
+        allowed: false,
+        code: 'PACKAGE_INACTIVE',
+        message:
+          'Üyelik paketiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.',
+        packageCode: membershipPackage?.paketKodu || null,
+        packageName: membershipPackage?.paketAdi || null,
+        expiresAt: activeMembership.bitisTarihi,
+      };
+    }
+
+    return {
+      allowed: true,
+      code: 'ACTIVE',
+      message: 'Havuz işlem erişiminiz aktif.',
+      packageCode: membershipPackage.paketKodu,
+      packageName: membershipPackage.paketAdi,
+      expiresAt: activeMembership.bitisTarihi,
+    };
+  }
+
+  private async ensurePoolActionMembership(user: CurrentUserPayload) {
+    const access = await this.getPoolMembershipAccess(user);
+
+    if (!access.allowed) {
+      throw new ForbiddenException(access.message);
+    }
+
+    return access;
+  }
+
+  private ensureCanViewUnit(
+    user: CurrentUserPayload,
+    ownerId: string,
+    approvalStatus?: PortfolioApprovalStatus | string | null,
+  ) {
     if (this.isSuperAdmin(user)) return;
     if (this.isOwner(user, ownerId)) return;
 
-    const officeAdvisorIds = await getOfficeAdvisorIds(this.prisma, user?.id);
-    if (officeAdvisorIds.has(ownerId)) return;
+    const normalizedStatus = String(approvalStatus || '').toUpperCase();
+    const managerVisibleStatuses = new Set<PortfolioApprovalStatus>([
+      PortfolioApprovalStatus.BELGE_BEKLENIYOR,
+      PortfolioApprovalStatus.INCELEMEYE_GONDERILDI,
+      PortfolioApprovalStatus.INCELEMEDE,
+      PortfolioApprovalStatus.EKSIK_BILGI_BEKLENIYOR,
+      PortfolioApprovalStatus.ONAYLANDI,
+      PortfolioApprovalStatus.HAVUZDA,
+      PortfolioApprovalStatus.REDDEDILDI,
+    ]);
+
+    if (
+      this.isApprovalManager(user) &&
+      managerVisibleStatuses.has(
+        normalizedStatus as PortfolioApprovalStatus,
+      )
+    ) {
+      return;
+    }
 
     throw new ForbiddenException('Bu portföyü görüntüleme yetkiniz yok.');
   }
@@ -292,6 +620,111 @@ export class UnitsService {
     if (!this.isApprovalManager(user)) {
       throw new ForbiddenException(
         'Bu işlem sadece Moderatör, Admin veya Yazılım Ekibi tarafından yapılabilir.',
+      );
+    }
+  }
+
+  private async getRequiredAgentDocumentApprovalState(
+    tx: Prisma.TransactionClient,
+    unitId: string,
+  ) {
+    const documents = await tx.portfolioAuthorityDocument.findMany({
+      where: {
+        unitId,
+        authorityType: {
+          in: [
+            PortfolioAuthorityType.TAPU,
+            PortfolioAuthorityType.YETKI_BELGESI,
+          ],
+        },
+      },
+      select: {
+        id: true,
+        authorityType: true,
+        approved: true,
+        approvedById: true,
+        approvedAt: true,
+        rejectReason: true,
+      },
+    });
+
+    const tapuDocuments = documents.filter(
+      (item) => item.authorityType === PortfolioAuthorityType.TAPU,
+    );
+    const yetkiDocuments = documents.filter(
+      (item) =>
+        item.authorityType === PortfolioAuthorityType.YETKI_BELGESI,
+    );
+
+    const tapuDocument =
+      tapuDocuments.find((item) => item.approved) || tapuDocuments[0];
+    const yetkiDocument =
+      yetkiDocuments.find((item) => item.approved) || yetkiDocuments[0];
+    const hasApprovedTapu = tapuDocuments.some((item) => item.approved);
+    const hasApprovedYetki = yetkiDocuments.some((item) => item.approved);
+
+    return {
+      documents,
+      tapuDocument,
+      yetkiDocument,
+      hasApprovedTapu,
+      hasApprovedYetki,
+      allRequiredApproved: hasApprovedTapu && hasApprovedYetki,
+    };
+  }
+
+  private async createPortfolioApprovalAuditLog(
+    tx: Prisma.TransactionClient,
+    input: {
+      actorId: string;
+      targetUserId: string;
+      action: string;
+      unitId: string;
+      description: string;
+      metadata?: Prisma.InputJsonValue;
+    },
+  ) {
+    await tx.adminActionLog.create({
+      data: {
+        actorId: input.actorId,
+        targetUserId: input.targetUserId,
+        action: input.action,
+        entityType: 'UNIT',
+        entityId: input.unitId,
+        description: input.description,
+        metadata: input.metadata,
+      },
+    });
+  }
+
+  private isPortfolioContentLocked(
+    approvalStatus?: PortfolioApprovalStatus | string | null,
+  ) {
+    const normalizedStatus = String(approvalStatus || '').toUpperCase();
+
+    const lockedStatuses = new Set<PortfolioApprovalStatus>([
+      PortfolioApprovalStatus.INCELEMEYE_GONDERILDI,
+      PortfolioApprovalStatus.INCELEMEDE,
+      PortfolioApprovalStatus.ONAYLANDI,
+      PortfolioApprovalStatus.HAVUZDA,
+    ]);
+
+    return lockedStatuses.has(
+      normalizedStatus as PortfolioApprovalStatus,
+    );
+  }
+
+  private ensurePortfolioContentEditable(
+    user: CurrentUserPayload,
+    unit: {
+      approvalStatus?: PortfolioApprovalStatus | string | null;
+    },
+  ) {
+    if (this.isSuperAdmin(user)) return;
+
+    if (this.isPortfolioContentLocked(unit.approvalStatus)) {
+      throw new ForbiddenException(
+        'Portföy incelemeye gönderildikten sonra bilgileri değiştirilemez. Düzeltme gerekiyorsa portföyün Eksik Bilgi durumuna alınması gerekir.',
       );
     }
   }
@@ -421,7 +854,17 @@ export class UnitsService {
   private async getUnitWithProjectOrFail(id: string) {
     const unit = await this.prisma.unit.findUnique({
       where: { id },
-      include: { project: true },
+      include: {
+        project: {
+          include: {
+            owner: {
+              select: {
+                role: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!unit) {
@@ -443,6 +886,7 @@ export class UnitsService {
                 firstName: true,
                 lastName: true,
                 role: true,
+                companyName: true, office: { select: { id: true, name: true, ownerUserId: true, owner: { select: { id: true, firstName: true, lastName: true, phone: true } } } },
               },
             },
           },
@@ -458,7 +902,7 @@ export class UnitsService {
       throw new BadRequestException('Bu portfÃ¶y ÅŸu anda Havuz iÃ§inde aktif deÄŸil.');
     }
 
-    if (!unit.isPoolVisible || unit.approvalStatus !== PortfolioApprovalStatus.HAVUZDA) {
+    if (!unit.project.isActive || !countsAgainstActivePortfolioLimit(unit.status) || !unit.isPoolVisible || unit.approvalStatus !== PortfolioApprovalStatus.HAVUZDA) {
       throw new BadRequestException('Bu portföy şu anda Havuz içinde aktif değil.');
     }
 
@@ -471,6 +915,7 @@ export class UnitsService {
   }
 
   private async getOrCreateKontorWallet(userId: string) {
+    userId = (await resolveOfficeWallet(this.prisma, userId)).chargeUserId;
     let wallet = await this.prisma.kontorCuzdani.findUnique({
       where: {
         kullaniciId: userId,
@@ -494,7 +939,10 @@ export class UnitsService {
   }
 
   async getPoolWallet(user: CurrentUserPayload) {
-    const wallet = await this.getOrCreateKontorWallet(user.id);
+    const [wallet, membershipAccess] = await Promise.all([
+      this.getOrCreateKontorWallet(user.id),
+      this.getPoolMembershipAccess(user),
+    ]);
 
     return {
       ok: true,
@@ -503,90 +951,121 @@ export class UnitsService {
       toplamHarcama: wallet.toplamHarcama,
       toplamHediye: wallet.toplamHediye,
       aktifMi: wallet.aktifMi,
+      membershipAccess,
     };
   }
 
-  private async spendKontor(input: {
-    userId: string;
-    amount: number;
-    islemTuru: KontorIslemTuru;
-    aciklama: string;
-    ilgiliKayitTuru: string;
-    ilgiliKayitId: string;
-  }) {
-    return this.prisma.$transaction(async (tx) => {
-      let wallet = await tx.kontorCuzdani.findUnique({
-        where: {
-          kullaniciId: input.userId,
-        },
-      });
-
-      if (!wallet) {
-        wallet = await tx.kontorCuzdani.create({
-          data: {
-            kullaniciId: input.userId,
-            bakiye: 0,
-            toplamYukleme: 0,
-            toplamHarcama: 0,
-            toplamHediye: 0,
-            aktifMi: true,
-          },
-        });
-      }
-
-      if (!wallet.aktifMi) {
-        throw new BadRequestException('Kontör cüzdanınız aktif değil.');
-      }
-
-      if (wallet.bakiye < input.amount) {
-        throw new BadRequestException(
-          `Bu işlem için ${input.amount} kontör gerekir. Mevcut bakiyeniz ${wallet.bakiye} kontör.`,
-        );
-      }
-
-      const nextBalance = wallet.bakiye - input.amount;
-
-      const updatedWallet = await tx.kontorCuzdani.update({
-        where: {
-          kullaniciId: input.userId,
-        },
-        data: {
-          bakiye: nextBalance,
-          toplamHarcama: {
-            increment: input.amount,
-          },
-        },
-      });
-
-      const movement = await tx.kontorHareketi.create({
-        data: {
-          kullaniciId: input.userId,
-          hareketTuru: KontorHareketTuru.HARCAMA,
-          islemTuru: input.islemTuru,
-          miktar: input.amount,
-          oncekiBakiye: wallet.bakiye,
-          sonrakiBakiye: nextBalance,
-          aciklama: input.aciklama,
-          ilgiliKayitTuru: input.ilgiliKayitTuru,
-          ilgiliKayitId: input.ilgiliKayitId,
-          olusturanId: input.userId,
-        },
-      });
-
-      return {
-        wallet: updatedWallet,
-        movement,
-      };
-    });
+  private async lockPoolKontorWallet(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ) {
+    userId = (await resolveOfficeWallet(tx, userId, {}, true)).chargeUserId;
+    await tx.$executeRaw`
+      SELECT pg_advisory_xact_lock(
+        hashtext(${`wallet:${userId}`})
+      )
+    `;
+    await tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${userId} FOR UPDATE`;
   }
 
-  private async createPoolNotification(input: {
-    ownerId: string;
-    title: string;
-    message: string;
-    unitId: string;
-  }) {
-    return this.prisma.networkNotification.create({
+  private async spendKontor(
+    tx: Prisma.TransactionClient,
+    input: {
+      userId: string;
+      amount: number;
+      islemTuru: KontorIslemTuru;
+      aciklama: string;
+      ilgiliKayitTuru: string;
+      ilgiliKayitId: string;
+    },
+    options?: {
+      walletLocked?: boolean;
+    },
+  ) {
+    const actorId = input.userId;
+    const chargeUserId = (await resolveOfficeWallet(tx, actorId, {}, true)).chargeUserId;
+    if (!options?.walletLocked) {
+      await this.lockPoolKontorWallet(tx, input.userId);
+    }
+
+    let wallet = await tx.kontorCuzdani.findUnique({
+      where: {
+        kullaniciId: chargeUserId,
+      },
+    });
+
+    if (!wallet) {
+      wallet = await tx.kontorCuzdani.create({
+        data: {
+          kullaniciId: chargeUserId,
+          bakiye: 0,
+          toplamYukleme: 0,
+          toplamHarcama: 0,
+          toplamHediye: 0,
+          aktifMi: true,
+        },
+      });
+    }
+
+    if (!wallet.aktifMi) {
+      throw new BadRequestException(
+        'Kontör cüzdanınız aktif değil.',
+      );
+    }
+
+    if (wallet.bakiye < input.amount) {
+      throw new BadRequestException(
+        `Bu işlem için ${input.amount} kontör gerekir. Mevcut bakiyeniz ${wallet.bakiye} kontör.`,
+      );
+    }
+
+    const nextBalance = wallet.bakiye - input.amount;
+
+    const updatedWallet = await tx.kontorCuzdani.update({
+      where: {
+        kullaniciId: chargeUserId,
+      },
+      data: {
+        bakiye: {
+            decrement: input.amount,
+          },
+        toplamHarcama: {
+          increment: input.amount,
+        },
+      },
+    });
+
+    const movement = await tx.kontorHareketi.create({
+      data: {
+        kullaniciId: chargeUserId,
+        hareketTuru: KontorHareketTuru.HARCAMA,
+        islemTuru: input.islemTuru,
+        miktar: input.amount,
+        oncekiBakiye: wallet.bakiye,
+        sonrakiBakiye: nextBalance,
+        aciklama: input.aciklama,
+        ilgiliKayitTuru: input.ilgiliKayitTuru,
+        ilgiliKayitId: input.ilgiliKayitId,
+        olusturanId: actorId,
+      },
+    });
+
+    return {
+      wallet: updatedWallet,
+      movement,
+    };
+  }
+
+  private async createPoolNotification(
+    tx: Prisma.TransactionClient,
+    input: {
+      ownerId: string;
+      title: string;
+      message: string;
+      unitId: string;
+    },
+  ) {
+    return tx.networkNotification.create({
       data: {
         userId: input.ownerId,
         postId: null,
@@ -601,6 +1080,30 @@ export class UnitsService {
     yetkiVerified: boolean;
   }) {
     return Boolean(unit.tapuVerified || unit.yetkiVerified);
+  }
+
+  private hasRequiredAgentApprovalDocuments(unit: {
+    tapuVerified: boolean;
+    yetkiVerified: boolean;
+  }) {
+    return Boolean(unit.tapuVerified && unit.yetkiVerified);
+  }
+
+  private getMissingAgentApprovalDocuments(unit: {
+    tapuVerified: boolean;
+    yetkiVerified: boolean;
+  }) {
+    const missingDocuments: string[] = [];
+
+    if (!unit.tapuVerified) {
+      missingDocuments.push('Tapu');
+    }
+
+    if (!unit.yetkiVerified) {
+      missingDocuments.push('Yetki Belgesi');
+    }
+
+    return missingDocuments;
   }
 
   private hasPortfolioPhoto(unit: {
@@ -733,6 +1236,7 @@ export class UnitsService {
     ).trim();
 
     if (!PORTFOLIO_METADATA_KEYS.has(key) || !metadataValue) return null;
+    if (key === 'barterAccepted' && !['true', 'false'].includes(metadataValue)) return null;
 
     return {
       key,
@@ -799,8 +1303,47 @@ export class UnitsService {
               )}:${encodeURIComponent(metadata.value)}`;
             }
 
-            const normalized = String(item || '').trim().toUpperCase();
-            return allowed.has(normalized) ? normalized : '';
+            const rawFeature = String(item || '').trim();
+            const normalized = rawFeature.toUpperCase();
+
+            if (allowed.has(normalized)) return normalized;
+
+            const publicFeatureGroups = new Map<string, string>([
+              ['INTERIOR', 'interior'],
+              ['EXTERIOR', 'exterior'],
+              ['LOCATION', 'location'],
+              ['TRANSPORT', 'transport'],
+              ['FRONT', 'front'],
+              ['VIEW', 'view'],
+              ['ACCESSIBILITY', 'accessibility'],
+              ['ZONING', 'zoning'],
+              ['LANDINFRASTRUCTURE', 'landInfrastructure'],
+              ['COMMERCIAL', 'commercial'],
+              ['TOURISM', 'tourism'],
+              ['LUXURY', 'luxury'],
+            ]);
+            const separatorIndex = rawFeature.indexOf(':');
+
+            if (separatorIndex < 1) return '';
+
+            const rawGroup = rawFeature
+              .slice(0, separatorIndex)
+              .trim()
+              .replace(/[^a-zA-Z]/g, '')
+              .toUpperCase();
+            const group = publicFeatureGroups.get(rawGroup);
+
+            if (!group) return '';
+
+            const label = rawFeature
+              .slice(separatorIndex + 1)
+              .replace(/[-]/g, ' ')
+              .replace(/[<>]/g, '')
+              .replace(/s+/g, ' ')
+              .trim()
+              .slice(0, 120);
+
+            return label ? [group, label].join(':') : '';
           })
           .filter(Boolean),
       ),
@@ -886,6 +1429,37 @@ export class UnitsService {
   private normalizePhone(value?: string | null) {
     const text = String(value || '').trim();
     return text || undefined;
+  }
+
+  private normalizeContactSettings(input: {
+    allowPhoneCall?: boolean;
+    contactPhone?: string | null;
+    allowWhatsapp?: boolean;
+    whatsappPhone?: string | null;
+  }) {
+    const allowPhoneCall = Boolean(input.allowPhoneCall);
+    const allowWhatsapp = Boolean(input.allowWhatsapp);
+    const contactPhone = this.normalizePhone(input.contactPhone);
+    const whatsappPhone = this.normalizePhone(input.whatsappPhone);
+
+    if (allowPhoneCall && !contactPhone) {
+      throw new BadRequestException(
+        'Telefonla aranma izni için aranacak telefon numarası zorunludur.',
+      );
+    }
+
+    if (allowWhatsapp && !whatsappPhone) {
+      throw new BadRequestException(
+        'WhatsApp iletişim izni için WhatsApp numarası zorunludur.',
+      );
+    }
+
+    return {
+      allowPhoneCall,
+      contactPhone: allowPhoneCall ? contactPhone || null : null,
+      allowWhatsapp,
+      whatsappPhone: allowWhatsapp ? whatsappPhone || null : null,
+    };
   }
 
   private normalizeOptionalNumber(value?: number | string | null) {
@@ -983,15 +1557,319 @@ export class UnitsService {
     return { adaNo, parselNo };
   }
 
-  // Tapu sahibi bilgisi ve kapı girişi: ilan sahibi danışman, bağlı olduğu ofisin sahibi ve süper admin görür.
-  private async redactDoorAccessInfoList<
-    T extends { project?: { ownerId?: string | null } | null },
-  >(user: CurrentUserPayload, units: T[]): Promise<T[]> {
-    const officeAdvisorIds = await getOfficeAdvisorIds(this.prisma, user?.id);
+  private canSeeDoorAccessInfo(user: CurrentUserPayload, ownerId?: string | null, officeAdvisorIds?: Set<string>) {
+    return this.isSuperAdmin(user) || Boolean(ownerId && (this.isOwner(user, ownerId) || officeAdvisorIds?.has(ownerId)));
+  }
 
-    return units.map((unit) =>
-      redactDeedOwnerInfo(unit, unit.project?.ownerId, { id: user?.id, role: user?.role }, officeAdvisorIds),
+  private redactDoorAccessInfo<
+    T extends {
+      doorAccessInfo?: string | null;
+      deedOwnerFullName?: string | null;
+      deedOwnerPhone?: string | null;
+      deedOwnerEmail?: string | null;
+      project?: { ownerId?: string | null } | null;
+    },
+  >(user: CurrentUserPayload, unit: T, officeAdvisorIds?: Set<string>): T {
+    if (this.canSeeDoorAccessInfo(user, unit.project?.ownerId, officeAdvisorIds)) return unit;
+
+    return {
+      ...unit,
+      doorAccessInfo: null,
+      deedOwnerFullName: null,
+      deedOwnerPhone: null,
+      deedOwnerEmail: null,
+    };
+  }
+
+  private hasPoolLocation(project?: {
+    latitude?: number | null;
+    longitude?: number | null;
+    mapAddress?: string | null;
+    address?: string | null;
+    placeId?: string | null;
+  } | null) {
+    if (!project) return false;
+
+    const latitude = Number(project.latitude || 0);
+    const longitude = Number(project.longitude || 0);
+    const hasCoordinates =
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      Boolean(latitude && longitude);
+
+    return Boolean(
+      hasCoordinates ||
+        String(project.mapAddress || '').trim() ||
+        String(project.address || '').trim() ||
+        String(project.placeId || '').trim(),
     );
+  }
+
+  private getApproximatePoolCoordinates(
+    unitId: string,
+    latitudeInput?: number | null,
+    longitudeInput?: number | null,
+  ) {
+    const latitude = Number(latitudeInput || 0);
+    const longitude = Number(longitudeInput || 0);
+
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude) ||
+      !latitude ||
+      !longitude
+    ) {
+      return {
+        latitude: null,
+        longitude: null,
+      };
+    }
+
+    let hash = 0;
+    const source = String(unitId || 'EPH');
+
+    for (let index = 0; index < source.length; index += 1) {
+      hash = (hash * 31 + source.charCodeAt(index)) % 104729;
+    }
+
+    const latitudeOffset = ((hash % 7) - 3) * 0.00055;
+    const longitudeOffset =
+      ((Math.floor(hash / 7) % 7) - 3) * 0.00065;
+
+    return {
+      latitude: Number(
+        (Math.round(latitude * 100) / 100 + latitudeOffset).toFixed(6),
+      ),
+      longitude: Number(
+        (Math.round(longitude * 100) / 100 + longitudeOffset).toFixed(6),
+      ),
+    };
+  }
+
+  private async getPoolLocationAccessUnitIds(
+    user: CurrentUserPayload,
+    unitIds: string[],
+    action: KontorIslemTuru = KontorIslemTuru.HAVUZ_KONUM,
+  ) {
+    if (!unitIds.length) return new Set<string>();
+
+    if (this.isSuperAdmin(user)) {
+      return new Set(unitIds);
+    }
+
+    const rows = await this.prisma.kontorHareketi.findMany({
+      where: {
+        ...actorPaidWhere(user.id),
+        hareketTuru: KontorHareketTuru.HARCAMA,
+        islemTuru: action,
+        ilgiliKayitTuru: 'UNIT',
+        ilgiliKayitId: {
+          in: unitIds,
+        },
+      },
+      select: {
+        ilgiliKayitId: true,
+      },
+    });
+
+    return new Set(
+      rows
+        .map((row) => row.ilgiliKayitId)
+        .filter((value): value is string => Boolean(value)),
+    );
+  }
+
+  private async getPoolPrivateInfoAccessUnitIds(
+    user: CurrentUserPayload,
+    unitIds: string[],
+  ) {
+    if (!unitIds.length) return new Set<string>();
+
+    if (this.isSuperAdmin(user)) {
+      return new Set(unitIds);
+    }
+
+    const rows = await this.prisma.kontorHareketi.findMany({
+      where: {
+        ...actorPaidWhere(user.id),
+        hareketTuru: KontorHareketTuru.HARCAMA,
+        islemTuru: {
+          in: [
+            KontorIslemTuru.HAVUZ_OZEL_BILGI,
+            KontorIslemTuru.HAVUZ_KONUM,
+            KontorIslemTuru.HAVUZ_TELEFON,
+            KontorIslemTuru.HAVUZ_WHATSAPP,
+          ],
+        },
+        ilgiliKayitTuru: 'UNIT',
+        ilgiliKayitId: {
+          in: unitIds,
+        },
+      },
+      select: {
+        ilgiliKayitId: true,
+      },
+    });
+
+    return new Set(
+      rows
+        .map((row) => row.ilgiliKayitId)
+        .filter((value): value is string => Boolean(value)),
+    );
+  }
+
+  private redactPoolUnitForViewer(
+    user: CurrentUserPayload,
+    unit: any,
+    privateInfoUnlocked = false,
+  ) {
+    const redactedUnit = this.redactDoorAccessInfo(user, unit);
+    const {
+      contactPhone,
+      whatsappPhone,
+      authorityDocuments,
+      mediaPackage,
+      ...safeUnit
+    } = redactedUnit;
+
+    const seenImages = new Set<string>();
+    safeUnit.images = [...(safeUnit.images || []), ...(mediaPackage?.assets || [])].filter(image => { const url = image.supabaseUrl || image.url; if (!url || seenImages.has(url)) return false; seenImages.add(url); return true; });
+
+    const phoneCallAllowed = Boolean(
+      safeUnit.allowPhoneCall && String(contactPhone || '').trim(),
+    );
+
+    const whatsappAllowed = Boolean(
+      safeUnit.allowWhatsapp && String(whatsappPhone || '').trim(),
+    );
+
+    const project = safeUnit.project;
+
+    if (!project) {
+      return {
+        ...safeUnit,
+        ...serializePoolPrivateInfo(unit, privateInfoUnlocked),
+        phoneCallAllowed,
+        whatsappAllowed,
+      };
+    }
+
+    const { ownerId, owner, ...safeProject } = project;
+
+    const isOwnPortfolio = Boolean(
+      ownerId && this.isOwner(user, ownerId),
+    );
+
+    const canSeePrivateInfo =
+      this.isSuperAdmin(user) ||
+      isOwnPortfolio ||
+      privateInfoUnlocked;
+
+    const hasLocation = this.hasPoolLocation(project);
+
+    const approximate = this.getApproximatePoolCoordinates(
+      unit.id,
+      project.latitude,
+      project.longitude,
+    );
+
+    return {
+      ...safeUnit,
+      ...serializePoolPrivateInfo(unit, canSeePrivateInfo),
+
+      authorityDocuments:
+        this.isSuperAdmin(user) || isOwnPortfolio
+          ? authorityDocuments
+          : [],
+
+      phoneCallAllowed,
+      whatsappAllowed,
+
+      project: {
+        ...safeProject,
+        name: redactPoolDeedOwnerText(unit, safeProject.name),
+
+        address: canSeePrivateInfo
+          ? safeProject.address
+          : null,
+
+        latitude: canSeePrivateInfo
+          ? safeProject.latitude
+          : approximate.latitude,
+
+        longitude: canSeePrivateInfo
+          ? safeProject.longitude
+          : approximate.longitude,
+
+        mapAddress: canSeePrivateInfo
+          ? safeProject.mapAddress
+          : null,
+
+        placeId: canSeePrivateInfo
+          ? safeProject.placeId
+          : null,
+
+        ownerRole: owner?.role || null,
+        isOwnPortfolio,
+        hasLocation,
+
+        locationUnlocked: canSeePrivateInfo,
+
+        locationPrecision: hasLocation
+          ? canSeePrivateInfo
+            ? 'EXACT'
+            : 'APPROXIMATE'
+          : 'NONE',
+      },
+    };
+  }
+
+  private buildPoolDirectionsUrl(project: {
+    latitude?: number | null;
+    longitude?: number | null;
+    mapAddress?: string | null;
+    address?: string | null;
+    placeId?: string | null;
+  }) {
+    const latitude = Number(project.latitude || 0);
+    const longitude = Number(project.longitude || 0);
+    const hasCoordinates =
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      Boolean(latitude && longitude);
+
+    const destination = hasCoordinates
+      ? `${latitude},${longitude}`
+      : String(project.mapAddress || project.address || '').trim();
+
+    if (!destination) {
+      throw new BadRequestException(
+        'Bu gayrimenkul için kullanılabilir konum bilgisi bulunmuyor.',
+      );
+    }
+
+    const destinationPlaceId = String(project.placeId || '').trim();
+    const placeIdQuery = destinationPlaceId
+      ? `&destination_place_id=${encodeURIComponent(destinationPlaceId)}`
+      : '';
+
+    return (
+      'https://www.google.com/maps/dir/?api=1' +
+      `&destination=${encodeURIComponent(destination)}` +
+      placeIdQuery
+    );
+  }
+
+  private serializePoolLocation(unit: any) {
+    return {
+      ...serializePoolPrivateInfo(unit, true),
+      latitude: unit.project.latitude ?? null,
+      longitude: unit.project.longitude ?? null,
+      address: unit.project.address ?? null,
+      mapAddress: unit.project.mapAddress ?? null,
+      placeId: unit.project.placeId ?? null,
+      directionsUrl: this.buildPoolDirectionsUrl(unit.project),
+    };
   }
 
   private splitFullName(fullName?: string | null) {
@@ -1202,6 +2080,7 @@ export class UnitsService {
       adaNo: data.adaNo,
       parselNo: data.parselNo,
     });
+    const contactSettings = this.normalizeContactSettings(data);
 
     const createdUnit = await this.prisma.unit.create({
       data: {
@@ -1223,6 +2102,7 @@ export class UnitsService {
         deedOwnerEmail: this.cleanText(data.deedOwnerEmail),
         availableCreditAmount: this.normalizeOptionalNumber(data.availableCreditAmount),
         doorAccessInfo: this.cleanText(data.doorAccessInfo),
+        ...contactSettings,
         features: normalizedFeatures,
         projectId,
         approvalStatus: PortfolioApprovalStatus.TASLAK,
@@ -1249,6 +2129,7 @@ export class UnitsService {
         project: {
           select: {
             ...unitInclude.project.select,
+            isActive: true,
             code: true,
             declaredIndependentUnitCount: true,
             declaredSalesInventoryCount: true,
@@ -1270,13 +2151,23 @@ export class UnitsService {
       throw new NotFoundException('Portföy bulunamadı.');
     }
 
-    await this.ensureCanViewUnit(user, unit.project.ownerId);
+    if (unit.project.ownerId !== user.id && !this.isSuperAdmin(user) && !this.isAdmin(user) && !this.isModerator(user) &&
+        (unit.project.isActive === false || !countsAgainstActivePortfolioLimit(unit.status) || !unit.isPoolVisible)) {
+      throw new NotFoundException('Bu ilan pasiftir veya erişiminiz bulunmuyor. Detayları görüntülenemez.');
+    }
+
+    await assertNoBlockedInteraction(this.prisma, user.id, [unit.project.ownerId]);
+    this.ensureCanViewUnit(
+      user,
+      unit.project.ownerId,
+      unit.approvalStatus,
+    );
 
     if (!this.isProjectVisibleInPortfolio(unit.project)) {
       throw new NotFoundException('Portföy bulunamadı.');
     }
 
-    return (await this.redactDoorAccessInfoList(user, [unit]))[0];
+    return this.redactDoorAccessInfo(user, unit, await getOfficeAdvisorIds(this.prisma, user?.id));
   }
 
   async findPortfolioApprovals(
@@ -1317,7 +2208,8 @@ export class UnitsService {
       ],
     });
 
-    return this.redactDoorAccessInfoList(user, units);
+    const officeAdvisorIds = await getOfficeAdvisorIds(this.prisma, user?.id);
+    return units.map((unit) => this.redactDoorAccessInfo(user, unit, officeAdvisorIds));
   }
 
   async findByProject(
@@ -1349,7 +2241,7 @@ export class UnitsService {
       throw new NotFoundException('Proje bulunamadı.');
     }
 
-    await this.ensureCanViewUnit(user, project.ownerId);
+    this.ensureCanViewUnit(user, project.ownerId);
 
     if (!this.isProjectVisibleInPortfolio(project)) {
       throw new NotFoundException('Proje bulunamadı.');
@@ -1365,7 +2257,8 @@ export class UnitsService {
       orderBy: [{ floor: 'asc' }, { number: 'asc' }],
     });
 
-    return this.redactDoorAccessInfoList(user, units);
+    const officeAdvisorIds = await getOfficeAdvisorIds(this.prisma, user?.id);
+    return units.map((unit) => this.redactDoorAccessInfo(user, unit, officeAdvisorIds));
   }
 
   async findAll(
@@ -1375,6 +2268,7 @@ export class UnitsService {
       type?: UnitType;
       city?: string;
       isOffMarket?: boolean;
+      ownerOnly?: boolean;
     },
   ) {
     const units = await this.prisma.unit.findMany({
@@ -1384,9 +2278,11 @@ export class UnitsService {
         type: filters?.type,
         isOffMarket: filters?.isOffMarket,
         project: {
-          ...(this.isSuperAdmin(user) || this.isAdmin(user) || this.isModerator(user)
-            ? {}
-            : { ownerId: user.id }),
+          ...(filters?.ownerOnly
+            ? { ownerId: user.id }
+            : this.isSuperAdmin(user) || this.isAdmin(user) || this.isModerator(user)
+              ? {}
+              : { ownerId: user.id }),
           ...this.getPortfolioVisibleProjectWhere(),
           isActive: true,
           city: filters?.city
@@ -1398,7 +2294,8 @@ export class UnitsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return this.redactDoorAccessInfoList(user, units);
+    const officeAdvisorIds = await getOfficeAdvisorIds(this.prisma, user?.id);
+    return units.map((unit) => this.redactDoorAccessInfo(user, unit, officeAdvisorIds));
   }
 
   async findPool(
@@ -1412,8 +2309,8 @@ export class UnitsService {
     const units = await this.prisma.unit.findMany({
       where: {
         isPoolVisible: true,
+        status: { notIn: [UnitStatus.PASIF, UnitStatus.SATILDI, UnitStatus.KIRALANDII], ...(filters?.status ? { equals: filters.status } : {}) },
         approvalStatus: PortfolioApprovalStatus.HAVUZDA,
-        status: filters?.status,
         type: filters?.type,
         project: {
           ...this.getPoolVisibleProjectWhere(),
@@ -1427,14 +2324,450 @@ export class UnitsService {
       orderBy: { poolPublishedAt: 'desc' },
     });
 
-    return this.redactDoorAccessInfoList(user, units);
+    const visibleUnits =
+      await this.poolAudienceService.filterVisibleUnits(user, units);
+
+    const unitIds = visibleUnits.map((unit) => unit.id);
+
+    const [privateInfoUnitIds, configuredPrivateInfoCost] =
+      await Promise.all([
+        this.getPoolPrivateInfoAccessUnitIds(user, unitIds),
+        this.adminService.getNumericSystemSetting(
+          'POOL_PRIVATE_INFO_COST',
+          25,
+        ),
+      ]);
+
+    const privateInfoCost = Number.isFinite(configuredPrivateInfoCost)
+      ? Math.max(0, Math.trunc(configuredPrivateInfoCost))
+      : 25;
+
+    return visibleUnits.map((unit) => ({
+      ...this.redactPoolUnitForViewer(
+        user,
+        unit,
+        privateInfoUnitIds.has(unit.id),
+      ),
+      privateInfoCost,
+    }));
   }
 
-  async poolMessage(id: string, user: CurrentUserPayload, body?: PoolActionPayload) {
+  async poolContactQuote(id: string, user: CurrentUserPayload) {
     const unit = await this.getPoolUnitWithProjectOrFail(id);
+    await this.poolAudienceService.assertCanViewUnit(id, user);
+    const payer = await resolveOfficeWallet(this.prisma, user.id);
+    const [unlocked, configuredCost, wallet, recentCharge] = await Promise.all([
+      this.getPoolPrivateInfoAccessUnitIds(user, [id]),
+      this.adminService.getNumericSystemSetting('POOL_PRIVATE_INFO_COST', 25),
+      this.prisma.kontorCuzdani.findUnique({ where: { kullaniciId: payer.chargeUserId } }),
+      this.prisma.kontorHareketi.findFirst({ where: { ...actorPaidWhere(user.id), hareketTuru: KontorHareketTuru.HARCAMA, islemTuru: KontorIslemTuru.HAVUZ_MESAJ, ilgiliKayitTuru: 'UNIT', ilgiliKayitId: id, olusturulmaTarihi: { gte: new Date(Date.now() - 86400000) } }, select: { id: true } }),
+    ]);
+    const alreadyUnlocked = unlocked.has(id) || this.isOwner(user, unit.project.ownerId) || this.isSuperAdmin(user);
+    return { actorId: user.id, chargeUserId: payer.chargeUserId, walletSource: payer.walletSource, walletOfficeId: payer.walletOfficeId, walletLabel: payer.label, balance: wallet?.bakiye ?? 0, privateCostPk: alreadyUnlocked ? 0 : Math.max(0, Math.trunc(Number.isFinite(configuredCost) ? configuredCost : 25)), messageCostPk: recentCharge ? 0 : 3,
+      alreadyUnlocked, phoneAvailable: Boolean(unit.allowPhoneCall && unit.contactPhone), whatsappAvailable: Boolean(unit.allowWhatsapp && unit.whatsappPhone),
+      unit: alreadyUnlocked ? this.redactPoolUnitForViewer(user, unit, true) : null };
+  }
+
+  async poolPrivateInfo(
+    id: string,
+    user: CurrentUserPayload,
+    expectedCostPk?: number,
+    expectedChargeUserId?: string,
+  ) {
+    const unit = await this.getPoolUnitWithProjectOrFail(id);
+    await this.poolAudienceService.assertCanViewUnit(id, user);
+
+    const configuredCost =
+      await this.adminService.getNumericSystemSetting(
+        'POOL_PRIVATE_INFO_COST',
+        25,
+      );
+
+    const cost = Number.isFinite(configuredCost)
+      ? Math.max(0, Math.trunc(configuredCost))
+      : 25;
+
+    const isOwnPortfolio = this.isOwner(
+      user,
+      unit.project.ownerId,
+    );
+
+    if (isOwnPortfolio || this.isSuperAdmin(user)) {
+      const wallet = await this.getOrCreateKontorWallet(user.id);
+
+      return {
+        ok: true,
+        message: isOwnPortfolio
+          ? 'Kendi portföyünüzün özel bilgileri ücretsiz açıldı.'
+          : 'Yazılım Ekibi özel bilgi erişimi ücretsiz açıldı.',
+        cost: 0,
+        spent: 0,
+        previousBalance: wallet.bakiye,
+        remainingBalance: wallet.bakiye,
+        balance: wallet.bakiye,
+        alreadyUnlocked: true,
+        privateInfoUnlocked: true,
+        unit: this.redactPoolUnitForViewer(
+          user,
+          unit,
+          true,
+        ),
+      };
+    }
+
+    await this.ensurePoolActionMembership(user);
+
+    const ephId = this.getEphId(unit.id);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await this.lockPoolKontorWallet(tx, user.id);
+      if (expectedChargeUserId && (await resolveOfficeWallet(tx, user.id)).chargeUserId !== expectedChargeUserId) throw new BadRequestException('Ofis harcama hesabı değişti. Ücreti yeniden kontrol edin.');
+
+      const existingAccess =
+        await tx.kontorHareketi.findFirst({
+          where: {
+            ...actorPaidWhere(user.id),
+            hareketTuru: KontorHareketTuru.HARCAMA,
+            islemTuru: {
+              in: [
+                KontorIslemTuru.HAVUZ_OZEL_BILGI,
+                KontorIslemTuru.HAVUZ_KONUM,
+                KontorIslemTuru.HAVUZ_TELEFON,
+                KontorIslemTuru.HAVUZ_WHATSAPP,
+              ],
+            },
+            ilgiliKayitTuru: 'UNIT',
+            ilgiliKayitId: unit.id,
+          },
+          orderBy: {
+            olusturulmaTarihi: 'desc',
+          },
+        });
+
+      if (existingAccess) {
+        const wallet = await tx.kontorCuzdani.findUnique({
+          where: {
+            kullaniciId: (await resolveOfficeWallet(tx, user.id)).chargeUserId,
+          },
+        });
+
+        return {
+          spent: 0,
+          previousBalance: wallet?.bakiye ?? 0,
+          remainingBalance: wallet?.bakiye ?? 0,
+          alreadyUnlocked: true,
+        };
+      }
+
+      if (expectedCostPk !== undefined && expectedCostPk !== cost) throw new BadRequestException('İletişim ücreti değişti. Güncel ücreti kontrol ederek yeniden onaylayın.');
+      const charged = await this.spendKontor(
+        tx,
+        {
+          userId: user.id,
+          amount: cost,
+          islemTuru: KontorIslemTuru.HAVUZ_OZEL_BILGI,
+          aciklama:
+            `${ephId} için Havuz özel bilgileri açıldı.`,
+          ilgiliKayitTuru: 'UNIT',
+          ilgiliKayitId: unit.id,
+        },
+        {
+          walletLocked: true,
+        },
+      );
+
+      return {
+        spent: cost,
+        previousBalance: charged.movement.oncekiBakiye,
+        remainingBalance: charged.wallet.bakiye,
+        alreadyUnlocked: false,
+      };
+    });
+
+    return {
+      ok: true,
+
+      message: result.alreadyUnlocked
+        ? 'Bu portföyün özel bilgileri daha önce açılmıştı; tekrar PK düşülmedi.'
+        : `Özel bilgiler açıldı. ${result.spent} PK harcandı.`,
+
+      cost,
+      spent: result.spent,
+      previousBalance: result.previousBalance,
+      remainingBalance: result.remainingBalance,
+      balance: result.remainingBalance,
+      alreadyUnlocked: result.alreadyUnlocked,
+      privateInfoUnlocked: true,
+
+      unit: this.redactPoolUnitForViewer(
+        user,
+        unit,
+        true,
+      ),
+    };
+  }
+
+  async poolLocation(id: string, user: CurrentUserPayload) {
+    const unit = await this.getPoolUnitWithProjectOrFail(id);
+    await this.poolAudienceService.assertCanViewUnit(id, user);
+
+    if (!this.hasPoolLocation(unit.project)) {
+      throw new BadRequestException(
+        'Bu gayrimenkul için konum bilgisi eklenmemiş.',
+      );
+    }
+
+    const isOwnPortfolio = this.isOwner(
+      user,
+      unit.project.ownerId,
+    );
+
+    if (isOwnPortfolio || this.isSuperAdmin(user)) {
+      const wallet = await this.getOrCreateKontorWallet(user.id);
+
+      return {
+        ok: true,
+        message: isOwnPortfolio
+          ? 'Kendi portföyünüzün konumu ücretsiz açıldı.'
+          : 'Yazılım Ekibi konum erişimi ücretsiz açıldı.',
+        cost: 0,
+        spent: 0,
+        previousBalance: wallet.bakiye,
+        remainingBalance: wallet.bakiye,
+        balance: wallet.bakiye,
+        alreadyUnlocked: true,
+        isOwnPortfolio,
+        locationUnlocked: true,
+        locationPrecision: 'EXACT',
+        location: this.serializePoolLocation(unit),
+      };
+    }
+
+    await this.ensurePoolActionMembership(user);
+
+    const ephId = this.getEphId(unit.id);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await this.lockPoolKontorWallet(tx, user.id);
+
+      const existingAccess = await tx.kontorHareketi.findFirst({
+        where: {
+          ...actorPaidWhere(user.id),
+          hareketTuru: KontorHareketTuru.HARCAMA,
+          islemTuru: {
+            in: [
+              KontorIslemTuru.HAVUZ_OZEL_BILGI,
+              KontorIslemTuru.HAVUZ_KONUM,
+              KontorIslemTuru.HAVUZ_TELEFON,
+              KontorIslemTuru.HAVUZ_WHATSAPP,
+            ],
+          },
+          ilgiliKayitTuru: 'UNIT',
+          ilgiliKayitId: unit.id,
+        },
+        orderBy: {
+          olusturulmaTarihi: 'desc',
+        },
+      });
+
+      if (existingAccess) {
+        const wallet = await tx.kontorCuzdani.findUnique({
+          where: {
+            kullaniciId: (await resolveOfficeWallet(tx, user.id)).chargeUserId,
+          },
+        });
+
+        return {
+          spent: 0,
+          previousBalance: wallet?.bakiye ?? 0,
+          remainingBalance: wallet?.bakiye ?? 0,
+          alreadyUnlocked: true,
+        };
+      }
+
+      const charged = await this.spendKontor(
+        tx,
+        {
+          userId: user.id,
+          amount: 10,
+          islemTuru: KontorIslemTuru.HAVUZ_KONUM,
+          aciklama: `${ephId} için gayrimenkul konumu açıldı.`,
+          ilgiliKayitTuru: 'UNIT',
+          ilgiliKayitId: unit.id,
+        },
+        {
+          walletLocked: true,
+        },
+      );
+
+      return {
+        spent: 10,
+        previousBalance: charged.movement.oncekiBakiye,
+        remainingBalance: charged.wallet.bakiye,
+        alreadyUnlocked: false,
+      };
+    });
+
+    return {
+      ok: true,
+      message: result.alreadyUnlocked
+        ? 'Bu gayrimenkulün konumu daha önce açılmıştı; tekrar kontör düşülmedi.'
+        : 'Gayrimenkul konumu açıldı. 10 kontör harcandı.',
+      cost: 10,
+      spent: result.spent,
+      previousBalance: result.previousBalance,
+      remainingBalance: result.remainingBalance,
+      balance: result.remainingBalance,
+      alreadyUnlocked: result.alreadyUnlocked,
+      isOwnPortfolio: false,
+      locationUnlocked: true,
+      locationPrecision: 'EXACT',
+      location: this.serializePoolLocation(unit),
+    };
+  }
+
+  async poolContact(
+    id: string,
+    user: CurrentUserPayload,
+    channelInput: string,
+  ) {
+    const channel = String(channelInput || '').trim().toUpperCase();
+
+    if (!['CALL', 'WHATSAPP'].includes(channel)) {
+      throw new BadRequestException('Geçersiz iletişim kanalı.');
+    }
+
+    const unit = await this.getPoolUnitWithProjectOrFail(id);
+    await this.poolAudienceService.assertCanViewUnit(id, user);
+
+    const isCall = channel === 'CALL';
+    const allowed = isCall ? unit.allowPhoneCall : unit.allowWhatsapp;
+    const officeOwner = (unit.project?.owner?.office as any)?.owner;
+    const phone = String(
+      (officeOwner?.phone || (isCall ? unit.contactPhone : unit.whatsappPhone)) || '',
+    ).trim();
+
+    if (!allowed || !phone) {
+      throw new BadRequestException(
+        isCall
+          ? 'İlan sahibi telefonla aranma izni vermemiştir.'
+          : 'İlan sahibi WhatsApp iletişim izni vermemiştir.',
+      );
+    }
+
+    const isOwnPortfolio = this.isOwner(user, unit.project.ownerId);
+    const islemTuru = isCall
+      ? KontorIslemTuru.HAVUZ_TELEFON
+      : KontorIslemTuru.HAVUZ_WHATSAPP;
+    let spent = 0;
+    const isPrivilegedViewer =
+      isOwnPortfolio || this.isSuperAdmin(user);
+    let alreadyUnlocked = isPrivilegedViewer;
+    let wallet = await this.getOrCreateKontorWallet(user.id);
+    let previousBalance = wallet.bakiye;
+    let remainingBalance = wallet.bakiye;
+
+    if (!alreadyUnlocked) {
+      await this.ensurePoolActionMembership(user);
+      const ephId = this.getEphId(unit.id);
+
+      const result = await this.prisma.$transaction(async (tx) => {
+        await this.lockPoolKontorWallet(tx, user.id);
+
+        const existingAccess = await tx.kontorHareketi.findFirst({
+          where: {
+            ...actorPaidWhere(user.id),
+            hareketTuru: KontorHareketTuru.HARCAMA,
+            islemTuru: {
+              in: [
+                KontorIslemTuru.HAVUZ_OZEL_BILGI,
+                KontorIslemTuru.HAVUZ_KONUM,
+                KontorIslemTuru.HAVUZ_TELEFON,
+                KontorIslemTuru.HAVUZ_WHATSAPP,
+              ],
+            },
+            ilgiliKayitTuru: 'UNIT',
+            ilgiliKayitId: unit.id,
+          },
+        });
+
+        if (existingAccess) {
+          const currentWallet = await tx.kontorCuzdani.findUnique({
+            where: { kullaniciId: (await resolveOfficeWallet(tx, user.id)).chargeUserId },
+          });
+
+          return {
+            spent: 0,
+            alreadyUnlocked: true,
+            previousBalance: currentWallet?.bakiye ?? 0,
+            remainingBalance: currentWallet?.bakiye ?? 0,
+          };
+        }
+
+        const charged = await this.spendKontor(
+          tx,
+          {
+            userId: user.id,
+            amount: 10,
+            islemTuru,
+            aciklama: `${ephId} için ${
+              isCall ? 'telefonla arama' : 'WhatsApp'
+            } iletişim bilgisi açıldı.`,
+            ilgiliKayitTuru: 'UNIT',
+            ilgiliKayitId: unit.id,
+          },
+          { walletLocked: true },
+        );
+
+        return {
+          spent: 10,
+          alreadyUnlocked: false,
+          previousBalance: charged.movement.oncekiBakiye,
+          remainingBalance: charged.wallet.bakiye,
+        };
+      });
+
+      spent = result.spent;
+      alreadyUnlocked = result.alreadyUnlocked;
+      previousBalance = result.previousBalance;
+      remainingBalance = result.remainingBalance;
+    }
+
+    const whatsappDigits = phone.replace(/\D/g, '').replace(/^0/, '90');
+
+    return {
+      ok: true,
+      channel,
+      cost: 10,
+      spent,
+      alreadyUnlocked,
+      previousBalance,
+      remainingBalance,
+      balance: remainingBalance,
+      phone,
+      url: isCall ? `tel:${phone}` : `https://wa.me/${whatsappDigits}`,
+      message: isPrivilegedViewer
+        ? 'Kendi/yetkili iletişim bilginiz gösterildi; kontör harcanmadı.'
+        : alreadyUnlocked
+        ? 'Bu iletişim bilgisi daha önce açılmıştı; tekrar kontör düşülmedi.'
+        : `${isCall ? 'Telefon' : 'WhatsApp'} iletişim bilgisi açıldı. 10 kontör harcandı.`,
+    };
+  }
+
+  async poolMessage(
+    id: string,
+    user: CurrentUserPayload,
+    body?: PoolActionPayload,
+  ) {
+    await this.ensurePoolActionMembership(user);
+
+    const unit = await this.getPoolUnitWithProjectOrFail(id);
+    await this.poolAudienceService.assertCanViewUnit(id, user);
 
     if (this.isOwner(user, unit.project.ownerId)) {
-      throw new BadRequestException('Kendi portföyünüz için Havuz mesajı başlatamazsınız.');
+      throw new BadRequestException(
+        'Kendi portföyünüz için Havuz mesajı başlatamazsınız.',
+      );
     }
 
     const ephId = this.getEphId(unit.id);
@@ -1442,49 +2775,76 @@ export class UnitsService {
     const firstMessage =
       this.cleanText(body?.message) ||
       `Merhaba, ${ephId} numaralı Havuz portföyü hakkında bilgi almak istiyorum.`;
+    if (firstMessage.length > 10000) throw new BadRequestException('Mesaj en fazla 10.000 karakter olabilir.');
+    const safety = new TextSafetyService().validate(firstMessage, { field: TextSafetyField.MESSAGE });
+    if (!safety.valid) throw new BadRequestException({ code: 'UNSAFE_MESSAGE', message: safety.errors[0]?.message || 'Mesaj içeriğini düzenleyin.' });
 
-    const dedupWindowStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const recentCharge = await this.prisma.kontorHareketi.findFirst({
-      where: {
-        kullaniciId: user.id,
-        hareketTuru: KontorHareketTuru.HARCAMA,
-        islemTuru: KontorIslemTuru.HAVUZ_MESAJ,
-        ilgiliKayitTuru: 'UNIT',
-        ilgiliKayitId: unit.id,
-        olusturulmaTarihi: { gte: dedupWindowStart },
-      },
-      orderBy: { olusturulmaTarihi: 'desc' },
-    });
+    const result = await this.prisma.$transaction(async (tx) => {
+      await this.lockPoolKontorWallet(tx, user.id);
+      if (body?.expectedChargeUserId && (await resolveOfficeWallet(tx, user.id)).chargeUserId !== body.expectedChargeUserId) throw new BadRequestException('Ofis harcama hesabı değişti. Ücreti yeniden kontrol edin.');
 
-    let cost = 3;
-    let spent = 0;
-    let previousBalance: number;
-    let remainingBalance: number;
-    let responseMessage: string;
+      const dedupWindowStart = new Date(
+        Date.now() - 24 * 60 * 60 * 1000,
+      );
 
-    if (recentCharge) {
-      const wallet = await this.prisma.kontorCuzdani.findUnique({
-        where: { kullaniciId: user.id },
+      const recentCharge = await tx.kontorHareketi.findFirst({
+        where: {
+          ...actorPaidWhere(user.id),
+          hareketTuru: KontorHareketTuru.HARCAMA,
+          islemTuru: KontorIslemTuru.HAVUZ_MESAJ,
+          ilgiliKayitTuru: 'UNIT',
+          ilgiliKayitId: unit.id,
+          olusturulmaTarihi: {
+            gte: dedupWindowStart,
+          },
+        },
+        orderBy: {
+          olusturulmaTarihi: 'desc',
+        },
       });
-      previousBalance = wallet?.bakiye ?? 0;
-      remainingBalance = wallet?.bakiye ?? 0;
-      responseMessage = 'Bu Havuz ilanı için 24 saat içinde zaten kontör harcadınız, tekrar düşülmedi.';
-    } else {
-      const kontorResult = await this.spendKontor({
-        userId: user.id,
-        amount: 3,
-        islemTuru: KontorIslemTuru.HAVUZ_MESAJ,
-        aciklama: `${ephId} için Havuz mesajı başlatıldı.`,
-        ilgiliKayitTuru: 'UNIT',
-        ilgiliKayitId: unit.id,
-      });
-      spent = 3;
-      previousBalance = kontorResult.movement.oncekiBakiye;
-      remainingBalance = kontorResult.wallet.bakiye;
-      responseMessage = 'Mesaj başlatıldı. 3 kontör harcandı.';
-    }
 
-    const conversation = await this.prisma.$transaction(async (tx) => {
+      let spent = 0;
+      let previousBalance: number;
+      let remainingBalance: number;
+      let responseMessage: string;
+
+      if (recentCharge) {
+        const wallet = await tx.kontorCuzdani.findUnique({
+          where: {
+            kullaniciId: (await resolveOfficeWallet(tx, user.id)).chargeUserId,
+          },
+        });
+
+        previousBalance = wallet?.bakiye ?? 0;
+        remainingBalance = wallet?.bakiye ?? 0;
+        responseMessage =
+          'Bu Havuz ilanı için 24 saat içinde zaten kontör harcadınız, tekrar düşülmedi.';
+      } else {
+        if (body?.expectedCostPk !== undefined && body.expectedCostPk !== 3) throw new BadRequestException('Mesaj ücreti değişti. Güncel ücreti kontrol ederek yeniden onaylayın.');
+        const kontorResult = await this.spendKontor(
+          tx,
+          {
+            userId: user.id,
+            amount: 3,
+            islemTuru: KontorIslemTuru.HAVUZ_MESAJ,
+            aciklama: `${ephId} için Havuz mesajı başlatıldı.`,
+            ilgiliKayitTuru: 'UNIT',
+            ilgiliKayitId: unit.id,
+          },
+          {
+            walletLocked: true,
+          },
+        );
+
+        spent = 3;
+        previousBalance =
+          kontorResult.movement.oncekiBakiye;
+        remainingBalance =
+          kontorResult.wallet.bakiye;
+        responseMessage =
+          'Mesaj başlatıldı. 3 kontör harcandı.';
+      }
+
       const existing = await tx.conversation.findFirst({
         where: {
           postId: null,
@@ -1492,7 +2852,10 @@ export class UnitsService {
           ConversationParticipant: {
             every: {
               userId: {
-                in: [user.id, unit.project.ownerId],
+                in: [
+                  user.id,
+                  ((unit.project?.owner?.office as any)?.ownerUserId as string | undefined) || unit.project.ownerId,
+                ],
               },
             },
           },
@@ -1503,7 +2866,8 @@ export class UnitsService {
       });
 
       const activeConversation =
-        existing && existing.ConversationParticipant.length === 2
+        existing &&
+        existing.ConversationParticipant.length === 2
           ? existing
           : await tx.conversation.create({
               data: {
@@ -1547,107 +2911,176 @@ export class UnitsService {
         },
       });
 
-      return activeConversation;
-    });
+      await this.createPoolNotification(tx, {
+        ownerId: unit.project.ownerId,
+        unitId: unit.id,
+        title: 'Havuz mesajı başlatıldı',
+        message:
+          `${ephId} numaralı portföyünüz için ` +
+          'yeni bir Havuz mesajı var.',
+      });
 
-    await this.createPoolNotification({
-      ownerId: unit.project.ownerId,
-      unitId: unit.id,
-      title: 'Havuz mesajı başlatıldı',
-      message: `${ephId} numaralı portföyünüz için yeni bir Havuz mesajı var.`,
+      return {
+        spent,
+        previousBalance,
+        remainingBalance,
+        responseMessage,
+        conversationId: activeConversation.id,
+      };
     });
 
     return {
       ok: true,
-      message: responseMessage,
-      cost,
-      spent,
-      previousBalance,
-      remainingBalance,
-      balance: remainingBalance,
-      conversationId: conversation.id,
-      url: `/messages/${conversation.id}`,
+      message: result.responseMessage,
+      cost: 3,
+      spent: result.spent,
+      previousBalance: result.previousBalance,
+      remainingBalance: result.remainingBalance,
+      balance: result.remainingBalance,
+      conversationId: result.conversationId,
+      url: `/messages/${result.conversationId}`,
     };
   }
 
-  async poolInterest(id: string, user: CurrentUserPayload, body?: PoolActionPayload) {
+  async poolInterest(
+    id: string,
+    user: CurrentUserPayload,
+    body?: PoolActionPayload,
+  ) {
+    await this.ensurePoolActionMembership(user);
+
     const unit = await this.getPoolUnitWithProjectOrFail(id);
+    await this.poolAudienceService.assertCanViewUnit(id, user);
 
     if (this.isOwner(user, unit.project.ownerId)) {
-      throw new BadRequestException('Kendi portföyünüz için ilgileniyorum bildirimi gönderemezsiniz.');
+      throw new BadRequestException(
+        'Kendi portföyünüz için ilgileniyorum bildirimi gönderemezsiniz.',
+      );
     }
 
     const ephId = this.getEphId(unit.id);
-    const scoreText = Number(body?.matchScore || 0) > 0 ? ` Uyum: %${Number(body?.matchScore)}.` : '';
-    const noteText = this.cleanText(body?.note) ? ` Not: ${this.cleanText(body?.note)}.` : '';
+    const scoreText =
+      Number(body?.matchScore || 0) > 0
+        ? ` Uyum: %${Number(body?.matchScore)}.`
+        : '';
 
-    const kontorResult = await this.spendKontor({
-      userId: user.id,
-      amount: 10,
-      islemTuru: KontorIslemTuru.HAVUZ_ILGILENIYORUM,
-      aciklama: `${ephId} için ilgileniyorum bildirimi gönderildi.`,
-      ilgiliKayitTuru: 'UNIT',
-      ilgiliKayitId: unit.id,
-    });
+    const cleanNote = this.cleanText(body?.note);
+    const noteText = cleanNote
+      ? ` Not: ${cleanNote}.`
+      : '';
 
-    await this.createPoolNotification({
-      ownerId: unit.project.ownerId,
-      unitId: unit.id,
-      title: 'Portföyünüzle ilgilenen var',
-      message: `${ephId} numaralı Havuz portföyünüz için ilgileniyorum bildirimi alındı.${scoreText}${noteText}`,
-    });
+    const kontorResult =
+      await this.prisma.$transaction(async (tx) => {
+        const charged = await this.spendKontor(tx, {
+          userId: user.id,
+          amount: 10,
+          islemTuru:
+            KontorIslemTuru.HAVUZ_ILGILENIYORUM,
+          aciklama:
+            `${ephId} için ilgileniyorum bildirimi gönderildi.`,
+          ilgiliKayitTuru: 'UNIT',
+          ilgiliKayitId: unit.id,
+        });
+
+        await this.createPoolNotification(tx, {
+          ownerId: unit.project.ownerId,
+          unitId: unit.id,
+          title: 'Portföyünüzle ilgilenen var',
+          message:
+            `${ephId} numaralı Havuz portföyünüz için ` +
+            `ilgileniyorum bildirimi alındı.${scoreText}${noteText}`,
+        });
+
+        return charged;
+      });
 
     return {
       ok: true,
-      message: 'İlgileniyorum bildirimi gönderildi. 10 kontör harcandı.',
+      message:
+        'İlgileniyorum bildirimi gönderildi. 10 kontör harcandı.',
       cost: 10,
       spent: 10,
-      previousBalance: kontorResult.movement.oncekiBakiye,
-      remainingBalance: kontorResult.wallet.bakiye,
-      balance: kontorResult.wallet.bakiye,
+      previousBalance:
+        kontorResult.movement.oncekiBakiye,
+      remainingBalance:
+        kontorResult.wallet.bakiye,
+      balance:
+        kontorResult.wallet.bakiye,
     };
   }
 
-  async poolMatchingCustomer(id: string, user: CurrentUserPayload, body?: PoolActionPayload) {
+  async poolMatchingCustomer(
+    id: string,
+    user: CurrentUserPayload,
+    body?: PoolActionPayload,
+  ) {
+    await this.ensurePoolActionMembership(user);
+
     const unit = await this.getPoolUnitWithProjectOrFail(id);
+    await this.poolAudienceService.assertCanViewUnit(id, user);
 
     if (this.isOwner(user, unit.project.ownerId)) {
-      throw new BadRequestException('Kendi portföyünüz için eşleşen müşterim var bildirimi gönderemezsiniz.');
+      throw new BadRequestException(
+        'Kendi portföyünüz için eşleşen müşterim var bildirimi gönderemezsiniz.',
+      );
     }
 
     const ephId = this.getEphId(unit.id);
-    const scoreText = Number(body?.matchScore || 0) > 0 ? ` Uyum: %${Number(body?.matchScore)}.` : '';
-    const noteText = this.cleanText(body?.note) ? ` Not: ${this.cleanText(body?.note)}.` : '';
+    const scoreText =
+      Number(body?.matchScore || 0) > 0
+        ? ` Uyum: %${Number(body?.matchScore)}.`
+        : '';
 
-    const kontorResult = await this.spendKontor({
-      userId: user.id,
-      amount: 20,
-      islemTuru: KontorIslemTuru.HAVUZ_ESLESEN_MUSTERIM_VAR,
-      aciklama: `${ephId} için eşleşen müşterim var bildirimi gönderildi.`,
-      ilgiliKayitTuru: 'UNIT',
-      ilgiliKayitId: unit.id,
-    });
+    const cleanNote = this.cleanText(body?.note);
+    const noteText = cleanNote
+      ? ` Not: ${cleanNote}.`
+      : '';
 
-    await this.createPoolNotification({
-      ownerId: unit.project.ownerId,
-      unitId: unit.id,
-      title: 'Eşleşen müşteri bildirimi',
-      message: `${ephId} numaralı Havuz portföyünüz için eşleşen müşterim var bildirimi alındı.${scoreText}${noteText}`,
-    });
+    const kontorResult =
+      await this.prisma.$transaction(async (tx) => {
+        const charged = await this.spendKontor(tx, {
+          userId: user.id,
+          amount: 20,
+          islemTuru:
+            KontorIslemTuru.HAVUZ_ESLESEN_MUSTERIM_VAR,
+          aciklama:
+            `${ephId} için eşleşen müşterim var bildirimi gönderildi.`,
+          ilgiliKayitTuru: 'UNIT',
+          ilgiliKayitId: unit.id,
+        });
+
+        await this.createPoolNotification(tx, {
+          ownerId: unit.project.ownerId,
+          unitId: unit.id,
+          title: 'Eşleşen müşteri bildirimi',
+          message:
+            `${ephId} numaralı Havuz portföyünüz için ` +
+            `eşleşen müşterim var bildirimi alındı.${scoreText}${noteText}`,
+        });
+
+        return charged;
+      });
 
     return {
       ok: true,
-      message: 'Eşleşen müşterim var bildirimi gönderildi. 20 kontör harcandı.',
+      message:
+        'Eşleşen müşterim var bildirimi gönderildi. 20 kontör harcandı.',
       cost: 20,
       spent: 20,
-      previousBalance: kontorResult.movement.oncekiBakiye,
-      remainingBalance: kontorResult.wallet.bakiye,
-      balance: kontorResult.wallet.bakiye,
+      previousBalance:
+        kontorResult.movement.oncekiBakiye,
+      remainingBalance:
+        kontorResult.wallet.bakiye,
+      balance:
+        kontorResult.wallet.bakiye,
     };
   }
 
   async createPoolShareLink(id: string, user: CurrentUserPayload) {
+    await this.ensurePoolActionMembership(user);
+
     const unit = await this.getPoolUnitWithProjectOrFail(id);
+    await this.poolAudienceService.assertCanViewUnit(id, user);
 
     const shareLink = await this.prisma.poolShareLink.create({
       data: {
@@ -1679,6 +3112,7 @@ export class UnitsService {
         project: {
           select: {
             ...unitInclude.project.select,
+            isActive: true,
             code: true,
             declaredIndependentUnitCount: true,
             declaredSalesInventoryCount: true,
@@ -1691,6 +3125,8 @@ export class UnitsService {
 
     if (
       !unit ||
+      unit.project.isActive === false ||
+      !countsAgainstActivePortfolioLimit(unit.status) ||
       !unit.isPoolVisible ||
       unit.approvalStatus !== PortfolioApprovalStatus.HAVUZDA ||
       !this.isProjectVisibleInPool(unit.project)
@@ -1782,6 +3218,7 @@ export class UnitsService {
         project: {
           select: {
             ...unitInclude.project.select,
+            isActive: true,
             code: true,
             declaredIndependentUnitCount: true,
             declaredSalesInventoryCount: true,
@@ -1792,8 +3229,8 @@ export class UnitsService {
       },
     });
 
-    if (!unit) {
-      throw new NotFoundException('Bu portföy artık mevcut değil.');
+    if (!unit || unit.project.isActive === false || !countsAgainstActivePortfolioLimit(unit.status)) {
+      throw new NotFoundException('Bu ilan pasiftir. Detayları görüntülenemez.');
     }
 
     if (!this.isProjectVisibleInPortfolio(unit.project)) {
@@ -1848,36 +3285,28 @@ export class UnitsService {
     };
   }
 
-  async submitApproval(id: string, user: CurrentUserPayload) {
-    const unit = await this.getUnitWithProjectOrFail(id);
-
+  private async ensurePoolPublicationAccess(unit: PublicationUnit, user: CurrentUserPayload, verifyMembership = true) {
     this.ensureCanManageUnit(user, unit.project.ownerId);
     this.ensureProjectVisibleForPortfolioActions(unit.project);
-
-    if (!this.hasApprovalDocument(unit)) {
-      return this.prisma.unit.update({
-        where: { id },
-        data: {
-          approvalStatus: PortfolioApprovalStatus.BELGE_BEKLENIYOR,
-          isPoolVisible: false,
-          approvalNote:
-            'Havuza gönderebilmek için yetki belgesi, tapu veya ilgili doğrulama evrakı gereklidir.',
-        },
-        include: unitInclude,
-      });
+    if (verifyMembership) await this.ensurePoolActionMembership(user);
+    if (!this.isSuperAdmin(user) && !this.isDirectPoolPublisherRole(unit.project.owner?.role || user.role) && !this.isRealEstateAgentRole(unit.project.owner?.role || user.role)) {
+      throw new BadRequestException('Bu kullanıcı rolü için portföy yayınlama akışı tanımlı değildir.');
     }
+    if (unit.project.isActive === false || !countsAgainstActivePortfolioLimit(unit.status)) {
+      throw new BadRequestException('Pasif, satılmış veya kiralanmış portföy Havuzda yayınlanamaz.');
+    }
+  }
 
-    return this.prisma.unit.update({
-      where: { id },
-      data: {
-        approvalStatus: PortfolioApprovalStatus.INCELEMEYE_GONDERILDI,
-        submittedForApprovalAt: new Date(),
-        rejectedAt: null,
-        approvalNote: null,
-        isPoolVisible: false,
-      },
-      include: unitInclude,
-    });
+  async publicationQuote(id: string, user: CurrentUserPayload, selection: PoolPublicationInput = {}) {
+    const unit = await this.getUnitWithProjectOrFail(id);
+    await this.ensurePoolPublicationAccess(unit, user);
+    return this.poolPublicationService.quote(unit, user.id, selection);
+  }
+
+  async submitApproval(id: string, user: CurrentUserPayload, body?: PoolPublicationInput) {
+    const unit = await this.getUnitWithProjectOrFail(id);
+    await this.ensurePoolPublicationAccess(unit, user);
+    return this.poolPublicationService.publish(unit, user, body, unitInclude, current => this.ensurePoolPublicationAccess(current, user, false));
   }
 
   async markReviewing(
@@ -1923,34 +3352,96 @@ export class UnitsService {
     });
   }
 
-  async approve(id: string, user: CurrentUserPayload, body?: { note?: string }) {
+  async approve(
+    id: string,
+    user: CurrentUserPayload,
+    body?: { note?: string },
+  ) {
     this.ensureApprovalManager(user);
+    if (this.isAdmin(user) || this.isSuperAdmin(user)) {
+      const permission = await this.adminService.resolveOperationalPermission(user, 'PORTFOLIO_APPROVE');
+      if (!permission.enabled) {
+        throw new ForbiddenException('Portföy onaylama yetkiniz bulunmuyor.');
+      }
+    }
 
     const unit = await this.getUnitWithProjectOrFail(id);
+    const ownerRole = unit.project.owner?.role;
 
-    if (!this.hasApprovalDocument(unit)) {
+    if (this.isDirectPoolPublisherRole(ownerRole)) {
       throw new BadRequestException(
-        'Bu portföyde onay için yeterli doğrulama evrakı bulunmuyor.',
+        'Müteahhit ve İnşaat Firması portföyleri yönetici onayı olmadan doğrudan havuz yayın akışını kullanır.',
       );
     }
 
-    return this.prisma.unit.update({
-      where: { id },
-      data: {
-        approvalStatus: PortfolioApprovalStatus.ONAYLANDI,
-        approvedAt: new Date(),
-        rejectedAt: null,
-        approvalNote: body?.note || null,
-        isVerified: true,
-        verifiedAt: new Date(),
-        isPoolVisible: false,
-      },
-      include: unitInclude,
+    if (!this.isRealEstateAgentRole(ownerRole)) {
+      throw new BadRequestException(
+        'Bu kullanıcı rolü için portföy onay akışı tanımlı değildir.',
+      );
+    }
+
+    const approvableStatuses = new Set<PortfolioApprovalStatus>([
+      PortfolioApprovalStatus.INCELEMEYE_GONDERILDI,
+      PortfolioApprovalStatus.INCELEMEDE,
+    ]);
+
+    if (!approvableStatuses.has(unit.approvalStatus)) {
+      throw new BadRequestException(
+        'Yalnızca incelemeye gönderilmiş portföyler onaylanıp yayınlanabilir.',
+      );
+    }
+
+    const now = new Date();
+    const approvalNote =
+      String(body?.note || '').trim().slice(0, 1000) ||
+      'Portföy yönetici tarafından incelendi, onaylandı ve havuzda yayınlandı.';
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedUnit = await tx.unit.update({
+        where: { id },
+        data: {
+          approvalStatus: PortfolioApprovalStatus.HAVUZDA,
+          approvedAt: now,
+          rejectedAt: null,
+          approvalNote,
+          isVerified: true,
+          verifiedAt: now,
+          isPoolVisible: true,
+          poolPublishedAt: now,
+          poolRemovedAt: null,
+        },
+        include: unitInclude,
+      });
+
+      await this.createPortfolioApprovalAuditLog(tx, {
+        actorId: user.id,
+        targetUserId: unit.project.ownerId,
+        action: 'PORTFOLIO_APPROVED_AND_PUBLISHED',
+        unitId: id,
+        description:
+          'Portföy yönetici tarafından incelenerek onaylandı ve havuzda yayınlandı.',
+        metadata: {
+          approvalStatusBefore: unit.approvalStatus,
+          approvalStatusAfter: PortfolioApprovalStatus.HAVUZDA,
+          approvalNote,
+          publishedAt: now.toISOString(),
+          directPoolPublisher: false,
+          portfolioDocumentRequirement: false,
+        } as Prisma.InputJsonValue,
+      });
+
+      return updatedUnit;
     });
   }
 
   async reject(id: string, user: CurrentUserPayload, body?: { note?: string }) {
     this.ensureApprovalManager(user);
+    if (this.isAdmin(user) || this.isSuperAdmin(user)) {
+      const permission = await this.adminService.resolveOperationalPermission(user, 'PORTFOLIO_REJECT');
+      if (!permission.enabled) {
+        throw new ForbiddenException('Portföy reddetme yetkiniz bulunmuyor.');
+      }
+    }
 
     await this.getUnitWithProjectOrFail(id);
 
@@ -1970,11 +3461,16 @@ export class UnitsService {
   async sendToPool(id: string, user: CurrentUserPayload) {
     const unit = await this.getUnitWithProjectOrFail(id);
 
-    if (!this.isApprovalManager(user)) {
-      this.ensureCanManageUnit(user, unit.project.ownerId);
-    }
-
+    this.ensureApprovalManager(user);
     this.ensureProjectVisibleForPortfolioActions(unit.project);
+
+    const ownerRole = unit.project.owner?.role;
+
+    if (this.isDirectPoolPublisherRole(ownerRole)) {
+      throw new BadRequestException(
+        'Müteahhit ve İnşaat Firması portföyleri doğrudan havuz yayın akışını kullanır.',
+      );
+    }
 
     if (unit.approvalStatus !== PortfolioApprovalStatus.ONAYLANDI) {
       throw new BadRequestException(
@@ -1982,23 +3478,55 @@ export class UnitsService {
       );
     }
 
-    return this.prisma.unit.update({
-      where: { id },
-      data: {
-        approvalStatus: PortfolioApprovalStatus.HAVUZDA,
-        isPoolVisible: true,
-        poolPublishedAt: new Date(),
-        poolRemovedAt: null,
-      },
-      include: unitInclude,
+    const now = new Date();
+
+    return this.prisma.$transaction(async (tx) => {
+      if (this.isRealEstateAgentRole(ownerRole)) {
+        const documentState =
+          await this.getRequiredAgentDocumentApprovalState(tx, id);
+
+        if (!documentState.allRequiredApproved) {
+          throw new BadRequestException(
+            'Portföy havuza gönderilmeden önce Tapu ve Yetki Belgesinin ikisi de ayrı ayrı onaylanmalıdır.',
+          );
+        }
+      }
+
+      const updatedUnit = await tx.unit.update({
+        where: { id },
+        data: {
+          approvalStatus: PortfolioApprovalStatus.HAVUZDA,
+          isPoolVisible: true,
+          poolPublishedAt: now,
+          poolRemovedAt: null,
+        },
+        include: unitInclude,
+      });
+
+      await this.createPortfolioApprovalAuditLog(tx, {
+        actorId: user.id,
+        targetUserId: unit.project.ownerId,
+        action: 'PORTFOLIO_PUBLISHED_TO_POOL',
+        unitId: id,
+        description: 'Onaylanmış portföy havuzda yayınlandı.',
+        metadata: {
+          approvalStatusBefore: unit.approvalStatus,
+          approvalStatusAfter: PortfolioApprovalStatus.HAVUZDA,
+          publishedAt: now.toISOString(),
+        } as Prisma.InputJsonValue,
+      });
+
+      return updatedUnit;
     });
   }
 
   async removeFromPool(id: string, user: CurrentUserPayload) {
     const unit = await this.getUnitWithProjectOrFail(id);
 
-    if (!this.isApprovalManager(user)) {
-      this.ensureCanManageUnit(user, unit.project.ownerId);
+    if (!this.isOwner(user, unit.project.ownerId)) {
+      throw new ForbiddenException(
+        'Bu ilanı yalnızca portföy sahibi geri çekebilir.',
+      );
     }
 
     if (!unit.isPoolVisible) {
@@ -2008,9 +3536,14 @@ export class UnitsService {
     return this.prisma.unit.update({
       where: { id },
       data: {
-        approvalStatus: PortfolioApprovalStatus.ONAYLANDI,
+        approvalStatus: PortfolioApprovalStatus.TASLAK,
         isPoolVisible: false,
+        approvedAt: null,
+        isVerified: false,
+        verifiedAt: null,
         poolRemovedAt: new Date(),
+        approvalNote:
+          'Portföy havuzdan kaldırıldı. Bilgileri güncelledikten sonra yeniden havuza gönderebilirsiniz.',
       },
       include: unitInclude,
     });
@@ -2020,6 +3553,7 @@ export class UnitsService {
     const unit = await this.getUnitWithProjectOrFail(id);
 
     this.ensureCanManageUnit(user, unit.project.ownerId);
+    this.ensurePortfolioContentEditable(user, unit);
     this.ensureProjectVisibleForPortfolioActions(unit.project);
 
     return this.prisma.unit.update({
@@ -2033,6 +3567,7 @@ export class UnitsService {
     const unit = await this.getUnitWithProjectOrFail(id);
 
     this.ensureCanManageUnit(user, unit.project.ownerId);
+    this.ensurePortfolioContentEditable(user, unit);
 
     const protectedFields = [
       'approvalStatus',
@@ -2053,7 +3588,15 @@ export class UnitsService {
       }
     }
 
-    const { availableCreditAmount, doorAccessInfo, ...safeData } = data;
+    const {
+      availableCreditAmount,
+      doorAccessInfo,
+      allowPhoneCall,
+      contactPhone,
+      allowWhatsapp,
+      whatsappPhone,
+      ...safeData
+    } = data;
     const nextType = 'type' in data ? data.type : unit.type;
     const nextAdaNo = 'adaNo' in data ? data.adaNo : (unit as any).adaNo;
     const nextParselNo = 'parselNo' in data ? data.parselNo : (unit as any).parselNo;
@@ -2075,6 +3618,16 @@ export class UnitsService {
       type: nextType,
       adaNo: nextAdaNo,
       parselNo: nextParselNo,
+    });
+    const contactSettings = this.normalizeContactSettings({
+      allowPhoneCall:
+        'allowPhoneCall' in data ? allowPhoneCall : unit.allowPhoneCall,
+      contactPhone:
+        'contactPhone' in data ? contactPhone : unit.contactPhone,
+      allowWhatsapp:
+        'allowWhatsapp' in data ? allowWhatsapp : unit.allowWhatsapp,
+      whatsappPhone:
+        'whatsappPhone' in data ? whatsappPhone : unit.whatsappPhone,
     });
 
     const updatedUnit = await this.prisma.unit.update({
@@ -2103,6 +3656,7 @@ export class UnitsService {
           'doorAccessInfo' in data
             ? this.cleanText(doorAccessInfo)
             : undefined,
+        ...contactSettings,
         features:
           'features' in data
             ? nextFeatures
@@ -2219,7 +3773,63 @@ export class UnitsService {
   async remove(id: string, user: CurrentUserPayload) {
     const unit = await this.getUnitWithProjectOrFail(id);
 
-    this.ensureCanManageUnit(user, unit.project.ownerId);
+    const isSuper = this.isSuperAdmin(user);
+    if (!isSuper) {
+      const [userRecord, ownedOffice] = await Promise.all([
+        this.prisma.user.findUnique({
+          where: { id: user.id },
+          select: {
+            id: true,
+            officeId: true,
+            office: {
+              select: {
+                id: true,
+                ownerUserId: true,
+                isActive: true,
+              },
+            },
+          },
+        }),
+        this.prisma.office.findFirst({
+          where: { ownerUserId: user.id, isActive: true },
+          select: { id: true },
+        }),
+      ]);
+
+      const isOfficeOwner = Boolean(
+        ownedOffice ||
+        (userRecord?.office?.isActive && userRecord?.office?.ownerUserId === user.id)
+      );
+
+      const isDanisman = Boolean(
+        userRecord?.officeId &&
+        userRecord?.office?.isActive &&
+        !isOfficeOwner,
+      );
+
+      if (isDanisman) {
+        throw new ForbiddenException(
+          'Portföy silme yetkisi yalnızca ofis sahibine aittir. Danışmanlar portföyü yalnızca aktif/pasif yapabilir.',
+        );
+      }
+
+      const isDirectOwner = this.isOwner(user, unit.project.ownerId);
+      let isOfficeOwnerOfProject = false;
+      const effectiveOfficeId = ownedOffice?.id || userRecord?.office?.id;
+      if (isOfficeOwner && effectiveOfficeId) {
+        const projectOwner = await this.prisma.user.findUnique({
+          where: { id: unit.project.ownerId },
+          select: { officeId: true },
+        });
+        isOfficeOwnerOfProject = projectOwner?.officeId === effectiveOfficeId;
+      }
+
+      if (!isDirectOwner && !isOfficeOwnerOfProject) {
+        throw new ForbiddenException('Bu portföy için işlem yetkiniz yok.');
+      }
+    }
+
+    this.ensurePortfolioContentEditable(user, unit);
 
     return this.prisma.unit.delete({
       where: { id },

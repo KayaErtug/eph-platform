@@ -1,11 +1,13 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { LinaDistanceService } from '../lina/geo/lina-distance.service';
+import { DeedOwnerViewer, getOfficeAdvisorIds, redactDeedOwnerInfo } from '../units/deed-owner-privacy';
+import { PropertyCriteriaService } from '../property-criteria/property-criteria.service';
 import {
-  DeedOwnerViewer,
-  getOfficeAdvisorIds,
-  redactDeedOwnerInfo,
-} from '../units/deed-owner-privacy';
+  CARD_PROFILE_CODES,
+  CARD_PROFILES,
+  getCardProfileBinding,
+} from '../property-card/property-card-profile.registry';
 import {
   ActivityType,
   CustomerInterestPriority,
@@ -19,12 +21,32 @@ import {
   UnitStatus,
   UnitType,
 } from '@prisma/client';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class CrmService {
+  private readonly matchLogger = new Logger(CrmService.name);
+  private interestMatchHandler?: (interestId: string) => Promise<void>;
+
+  registerInterestMatchHandler(handler: (interestId: string) => Promise<void>) {
+    this.interestMatchHandler = handler;
+  }
+
+  private async refreshInterestMatches(interest: { id: string; isActive: boolean }) {
+    if (!interest.isActive) return;
+    try {
+      if (!this.interestMatchHandler) throw new Error('Matching handler unavailable');
+      await this.interestMatchHandler(interest.id);
+    } catch {
+      this.matchLogger.warn('CRM ihtiyacı kaydedildi; otomatik eşleştirme tamamlanamadı. Yeniden tarama gerekli.');
+    }
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly linaDistanceService: LinaDistanceService,
+    private readonly propertyCriteriaService: PropertyCriteriaService,
   ) {}
 
   private canAccessCustomer(customerOwnerId: string, userId: string, userRole: Role) {
@@ -51,42 +73,6 @@ export class CrmService {
     return value
       .map((item) => String(item ?? '').trim())
       .filter(Boolean);
-  }
-
-  private normalizeCustomerInterestAreas(value: unknown) {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    const seen = new Set<string>();
-
-    return value
-      .map((item) => ({
-        city: String(item?.city ?? '').trim(),
-        district: String(item?.district ?? '').trim(),
-        neighborhood: String(item?.neighborhood ?? '').trim(),
-      }))
-      .filter((item) => item.city && item.district)
-      .filter((item) => {
-        const key = [item.city, item.district, item.neighborhood]
-          .map((part) => part.toLocaleLowerCase('tr-TR'))
-          .join('|');
-
-        if (seen.has(key)) {
-          return false;
-        }
-
-        seen.add(key);
-        return true;
-      });
-  }
-
-  private buildCustomerInterestAreaSummary(
-    areas: Array<{ city: string; district: string; neighborhood: string }>,
-  ) {
-    return areas
-      .map((area) => [area.city, area.district, area.neighborhood].filter(Boolean).join(' / '))
-      .join(' | ');
   }
 
   private normalizeEnumArray<T extends string>(value: unknown, allowedValues: readonly T[]): T[] | undefined {
@@ -123,25 +109,132 @@ export class CrmService {
     return numberValue;
   }
 
+  private normalizeCardProfileCriteria(
+    value: unknown,
+    propertyTypes: readonly string[] | undefined,
+  ): Prisma.InputJsonValue | typeof Prisma.DbNull | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null) {
+      return Prisma.DbNull;
+    }
+
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new BadRequestException('Kart kriterleri geçersiz.');
+    }
+
+    const record = value as Record<string, unknown>;
+    const rawDemandGroupId = record.demandGroupId;
+    const demandGroupId = rawDemandGroupId === undefined || rawDemandGroupId === null
+      ? undefined
+      : String(rawDemandGroupId).trim();
+    if (demandGroupId && !/^[A-Za-z0-9_-]{8,128}$/.test(demandGroupId)) {
+      throw new BadRequestException('Talep grubu kimliği geçersiz.');
+    }
+    const profileCode = String(record.profile ?? record.cardProfile ?? '')
+      .trim()
+      .toUpperCase();
+    const allowedProfileCodes = new Set<string>(CARD_PROFILE_CODES);
+
+    if (!allowedProfileCodes.has(profileCode)) {
+      throw new BadRequestException(`Geçersiz CardProfile: ${profileCode || 'boş'}`);
+    }
+
+    const canonicalProfileCode =
+      profileCode as (typeof CARD_PROFILE_CODES)[number];
+
+    for (const propertyType of propertyTypes || []) {
+      const binding = getCardProfileBinding(propertyType as UnitType);
+
+      if (!binding || binding.profileCode !== canonicalProfileCode) {
+        throw new BadRequestException(
+          'Kart kriterleri seçilen gayrimenkul tipleriyle uyumlu değil.',
+        );
+      }
+    }
+
+    const rawValues = record.values;
+
+    if (
+      rawValues !== undefined &&
+      (!rawValues || typeof rawValues !== 'object' || Array.isArray(rawValues))
+    ) {
+      throw new BadRequestException('CardProfile values alanı geçersiz.');
+    }
+
+    const valuesRecord = (rawValues || {}) as Record<string, unknown>;
+    const values: Record<string, string[]> = {};
+    const rawPriorities = record.priorities;
+    if (
+      rawPriorities !== undefined &&
+      (!rawPriorities || typeof rawPriorities !== 'object' || Array.isArray(rawPriorities))
+    ) {
+      throw new BadRequestException('CardProfile priorities alanı geçersiz.');
+    }
+    const prioritiesRecord = (rawPriorities || {}) as Record<string, unknown>;
+    const priorities: Record<string, 'MUST' | 'PREFERENCE' | 'ANY'> = {};
+
+    for (const slot of CARD_PROFILES[canonicalProfileCode].slots) {
+      const sourceKeys = Array.from(
+        new Set([slot.key, ...slot.sourceKeys]),
+      );
+
+      for (const sourceKey of sourceKeys) {
+        if (!(sourceKey in valuesRecord)) continue;
+
+        const raw = valuesRecord[sourceKey];
+        const normalized = (Array.isArray(raw) ? raw : [raw])
+          .map((item) => String(item ?? '').trim())
+          .filter(Boolean);
+        const unique = Array.from(new Set(normalized));
+
+        if (unique.length > 0) {
+          values[slot.key] = unique;
+          break;
+        }
+      }
+
+      for (const sourceKey of sourceKeys) {
+        if (!(sourceKey in prioritiesRecord)) continue;
+        const priority = String(prioritiesRecord[sourceKey] ?? '').trim().toUpperCase();
+        if (!['MUST', 'PREFERENCE', 'ANY'].includes(priority)) {
+          throw new BadRequestException(`Geçersiz kriter önceliği: ${sourceKey}`);
+        }
+        priorities[slot.key] = priority as 'MUST' | 'PREFERENCE' | 'ANY';
+        break;
+      }
+    }
+
+    return {
+      version: '1.3',
+      profile: canonicalProfileCode,
+      values,
+      ...(rawPriorities === undefined ? {} : { priorities }),
+      ...(demandGroupId ? { demandGroupId } : {}),
+    } as Prisma.InputJsonValue;
+  }
+
   private cleanCustomerData(data: any): Prisma.CustomerUncheckedCreateInput | Prisma.CustomerUncheckedUpdateInput {
     const allowedCustomerRoles = Object.values(CustomerRole);
 
     const cleaned: any = {
       firstName: data.firstName,
       lastName: data.lastName,
-      phone: data.phone ?? null,
-      email: data.email ?? null,
-      city: data.city ?? null,
-      profession: data.profession ?? null,
-      company: data.company ?? null,
+      phone: data.phone === undefined ? undefined : data.phone || null,
+      email: data.email === undefined ? undefined : data.email || null,
+      city: data.city === undefined ? undefined : data.city || null,
+      profession: data.profession === undefined ? undefined : data.profession || null,
+      company: data.company === undefined ? undefined : data.company || null,
       budget: this.normalizeOptionalNumber(data.budget),
-      interestedArea: data.interestedArea ?? null,
-      interestedType: data.interestedType ?? null,
-      source: data.source ?? null,
+      interestedArea: data.interestedArea === undefined ? undefined : data.interestedArea || null,
+      interestedType: data.interestedType === undefined ? undefined : data.interestedType || null,
+      source: data.source === undefined ? undefined : data.source || null,
       status: data.status,
       roles: this.normalizeEnumArray(data.roles, allowedCustomerRoles),
       tags: this.normalizeStringArray(data.tags),
-      notes: data.notes ?? null,
+      notes: data.notes === undefined ? undefined : data.notes || null,
       lastContactedAt: data.lastContactedAt ? new Date(data.lastContactedAt) : undefined,
     };
 
@@ -162,13 +255,17 @@ export class CrmService {
 
     const purchaseIntent = String(data.purchaseIntent ?? CustomerPurchaseIntent.BELIRSIZ);
     const priority = String(data.priority ?? CustomerInterestPriority.NORMAL);
+    const propertyTypes = this.normalizeEnumArray(
+      data.propertyTypes,
+      allowedUnitTypes as string[],
+    );
 
     const cleaned: any = {
       title: data.title ?? null,
       city: data.city ?? null,
       district: data.district ?? null,
       neighborhood: data.neighborhood ?? null,
-      propertyTypes: this.normalizeEnumArray(data.propertyTypes, allowedUnitTypes as string[]),
+      propertyTypes,
       statuses: this.normalizeEnumArray(data.statuses, allowedUnitStatuses as string[]),
       minBudget: this.normalizeOptionalNumber(data.minBudget),
       maxBudget: this.normalizeOptionalNumber(data.maxBudget),
@@ -177,6 +274,10 @@ export class CrmService {
       maxArea: this.normalizeOptionalNumber(data.maxArea),
       roomCounts: this.normalizeStringArray(data.roomCounts),
       features: this.normalizeStringArray(data.features),
+      cardProfileCriteria: this.normalizeCardProfileCriteria(
+        data.cardProfileCriteria,
+        propertyTypes,
+      ),
       purchaseIntent: allowedIntents.includes(purchaseIntent as CustomerPurchaseIntent)
         ? purchaseIntent
         : CustomerPurchaseIntent.BELIRSIZ,
@@ -286,31 +387,131 @@ export class CrmService {
     }));
   }
 
+  private async ensureActiveCrmCapacity(userId: string, tx?: Prisma.TransactionClient) {
+    const client = tx || this.prisma;
+
+    // 1. Ofis kontrolü: Kullanıcı bir ofise bağlıysa (üye veya sahip), tüm danışmanların toplamını say
+    const user = await client.user.findUnique({
+      where: { id: userId },
+      select: { id: true, officeId: true },
+    });
+
+    let officeId = user?.officeId;
+    if (!officeId) {
+      const owned = await client.office.findFirst({
+        where: { ownerUserId: userId, isActive: true },
+        select: { id: true },
+      });
+      if (owned) officeId = owned.id;
+    }
+
+    if (officeId) {
+      const office = await client.office.findUnique({
+        where: { id: officeId },
+        include: { users: { select: { id: true } } },
+      });
+
+      if (office) {
+        const memberIds = Array.from(
+          new Set([
+            ...(office.ownerUserId ? [office.ownerUserId] : []),
+            ...office.users.map((u) => u.id),
+          ]),
+        );
+
+        const subSetting = await client.systemSetting.findUnique({
+          where: { key: `OFFICE_SUBSCRIPTION_${office.id}` },
+        });
+        const sub: any = subSetting?.valueJson;
+        const config = await client.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' } });
+        const current: any = Array.isArray(config?.valueJson) ? config.valueJson.find((p: any) => p.code === sub?.packageCode) : undefined;
+        const limit = Number(current?.crmCapacity ?? sub?.crmCapacity ?? 1500);
+        const packageName = String(sub?.packageName || 'Ofis');
+
+        const totalOfficeCustomers = await client.customer.count({
+          where: { ownerId: { in: memberIds } },
+        });
+
+        if (limit >= 0 && totalOfficeCustomers >= limit) {
+          throw new BadRequestException(
+            `${packageName} paketinizde ofisinizin toplam aktif CRM kapasitesi ${limit}. ` +
+              `Ofisteki tüm danışmanların mevcut toplam müşteri sayısı: ${totalOfficeCustomers}. ` +
+              'Yeni müşteri eklemek için ofis paketinizi yükseltebilirsiniz.',
+          );
+        }
+        return;
+      }
+    }
+
+    // 2. Bireysel danışman kontrolü
+    const activeSub = await client.kullaniciUyelikPaketi.findFirst({
+      where: {
+        kullaniciId: userId,
+        durum: 'AKTIF',
+      },
+      orderBy: { olusturulmaTarihi: 'desc' },
+    });
+
+    if (activeSub && activeSub.paketId) {
+      const pkg = await client.uyelikPaketi.findUnique({
+        where: { id: activeSub.paketId },
+      });
+      if (pkg) {
+        const limit = pkg.aktifCrmLimiti ?? 100;
+        const currentCount = await client.customer.count({
+          where: { ownerId: userId },
+        });
+        if (limit >= 0 && currentCount >= limit) {
+          throw new BadRequestException(
+            `${pkg.paketAdi} paketinizde aktif CRM kapasiteniz ${limit}. ` +
+              `Mevcut müşteri sayınız ${currentCount}. ` +
+              'Yeni müşteri eklemek için paketinizi yükseltebilirsiniz.',
+          );
+        }
+      }
+    }
+  }
+
   // CRM Madde 19 Form Detail Sync V3
   async createCustomer(userId: string, data: any) {
-    const interestAreas = this.normalizeCustomerInterestAreas(data?.interestAreas);
+    await this.ensureActiveCrmCapacity(userId);
+    const normalizedCriteria = this.propertyCriteriaService.normalize({
+      recordKind: 'DEMAND',
+      source: 'CRM',
+      areas: data?.interestAreas,
+      propertyTypes: data?.propertyTypes,
+      statuses: data?.interestStatuses,
+      minBudget: data?.minBudget,
+      maxBudget: data?.maxBudget,
+      minArea: data?.minArea,
+      maxArea: data?.maxArea,
+      roomCounts: data?.roomCounts,
+      features: data?.features,
+      priceCurrency: data?.priceCurrency,
+      isActive: true,
+    });
+
+    const interestAreas = normalizedCriteria.areas.filter(
+      (area) => area.city && area.district,
+    );
+
     const interestedArea =
       interestAreas.length > 0
-        ? this.buildCustomerInterestAreaSummary(interestAreas)
+        ? this.propertyCriteriaService.buildAreaSummary(interestAreas)
         : data?.interestedArea;
 
-    const minBudget = this.normalizeOptionalNumber(data?.minBudget);
-    const maxBudget = this.normalizeOptionalNumber(data?.maxBudget);
-    const minArea = this.normalizeOptionalNumber(data?.minArea);
-    const maxArea = this.normalizeOptionalNumber(data?.maxArea);
-
-    const propertyTypes =
-      this.normalizeEnumArray<UnitType>(
-        data?.propertyTypes,
-        Object.values(UnitType),
-      ) ?? [];
-    const statuses =
-      this.normalizeEnumArray<UnitStatus>(
-        data?.interestStatuses,
-        Object.values(UnitStatus),
-      ) ?? [];
-    const roomCounts = this.normalizeStringArray(data?.roomCounts) ?? [];
-    const features = this.normalizeStringArray(data?.features) ?? [];
+    const minBudget = normalizedCriteria.budget.min;
+    const maxBudget = normalizedCriteria.budget.max;
+    const minArea = normalizedCriteria.grossArea.min;
+    const maxArea = normalizedCriteria.grossArea.max;
+    const propertyTypes = normalizedCriteria.propertyTypes;
+    const statuses = normalizedCriteria.statuses;
+    const roomCounts = normalizedCriteria.roomCounts;
+    const features = normalizedCriteria.features;
+    const cardProfileCriteria = this.normalizeCardProfileCriteria(
+      data?.cardProfileCriteria,
+      propertyTypes,
+    );
 
     const requestedIntent = String(
       data?.purchaseIntent ?? CustomerPurchaseIntent.BELIRSIZ,
@@ -343,6 +544,8 @@ export class CrmService {
         statuses.length > 0 ||
         roomCounts.length > 0 ||
         features.length > 0 ||
+        (cardProfileCriteria !== undefined &&
+          cardProfileCriteria !== Prisma.DbNull) ||
         interestTitle ||
         interestNotes ||
         purchaseIntent !== CustomerPurchaseIntent.BELIRSIZ ||
@@ -388,11 +591,12 @@ export class CrmService {
               statuses,
               minBudget: minBudget ?? null,
               maxBudget: maxBudget ?? null,
-              priceCurrency: 'TRY',
+              priceCurrency: normalizedCriteria.priceCurrency,
               minArea: minArea ?? null,
               maxArea: maxArea ?? null,
               roomCounts,
               features,
+              cardProfileCriteria,
               purchaseIntent,
               priority,
               notes: interestNotes || null,
@@ -456,6 +660,133 @@ export class CrmService {
       ...customer,
       properties: this.redactPropertyUnits({ id: userId, role: userRole }, officeAdvisorIds, customer.properties),
     };
+  }
+
+  async uploadCustomerPhoto(
+    customerId: string,
+    userId: string,
+    userRole: Role,
+    file: Express.Multer.File,
+  ) {
+    await this.findCustomerForAccess(
+      customerId,
+      userId,
+      userRole,
+    );
+
+    if (!file) {
+      throw new BadRequestException(
+        'Müşteri profil fotoğrafı seçilmedi.',
+      );
+    }
+
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+    ];
+
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Sadece JPG, PNG veya WEBP yüklenebilir.',
+      );
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException(
+        'Müşteri profil fotoğrafı 5MB den büyük olamaz.',
+      );
+    }
+
+    const safeExt =
+      file.mimetype === 'image/png'
+        ? 'png'
+        : file.mimetype === 'image/webp'
+          ? 'webp'
+          : 'jpg';
+
+    const uploadDir = path.resolve(
+      process.cwd(),
+      'private',
+      'crm-customer-images',
+    );
+
+    await fs.promises.mkdir(uploadDir, {
+      recursive: true,
+    });
+
+    for (const extension of ['jpg', 'png', 'webp']) {
+      const existingPath = path.join(
+        uploadDir,
+        `${customerId}.${extension}`,
+      );
+
+      try {
+        await fs.promises.unlink(existingPath);
+      } catch (error: any) {
+        if (error?.code !== 'ENOENT') {
+          throw error;
+        }
+      }
+    }
+
+    const filePath = path.join(
+      uploadDir,
+      `${customerId}.${safeExt}`,
+    );
+
+    await fs.promises.writeFile(
+      filePath,
+      file.buffer,
+    );
+
+    const photoUrl =
+      `/api/crm/customers/${customerId}/photo-file`;
+
+    return this.prisma.customer.update({
+      where: { id: customerId },
+      data: { photoUrl },
+    });
+  }
+
+  async getCustomerPhotoFile(
+    customerId: string,
+    userId: string,
+    userRole: Role,
+  ) {
+    const customer =
+      await this.findCustomerForAccess(
+        customerId,
+        userId,
+        userRole,
+      );
+
+    if (!customer.photoUrl) {
+      throw new NotFoundException(
+        'Müşteri profil fotoğrafı bulunamadı.',
+      );
+    }
+
+    const uploadDir = path.resolve(
+      process.cwd(),
+      'private',
+      'crm-customer-images',
+    );
+
+    for (const extension of ['jpg', 'png', 'webp']) {
+      const candidate = path.join(
+        uploadDir,
+        `${customerId}.${extension}`,
+      );
+
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    throw new NotFoundException(
+      'Müşteri profil fotoğrafı bulunamadı.',
+    );
   }
 
   async updateCustomer(id: string, userId: string, userRole: Role, data: any) {
@@ -545,21 +876,36 @@ export class CrmService {
   async addCustomerInterest(customerId: string, userId: string, userRole: Role, data: any) {
     await this.findCustomerForAccess(customerId, userId, userRole);
 
-    return this.prisma.customerInterest.create({
+    const interest = await this.prisma.customerInterest.create({
       data: {
         ...this.cleanInterestData(data),
         customerId,
       } as Prisma.CustomerInterestUncheckedCreateInput,
     });
+    await this.refreshInterestMatches(interest);
+    return interest;
   }
 
   async updateCustomerInterest(interestId: string, userId: string, userRole: Role, data: any) {
-    await this.findInterestForAccess(interestId, userId, userRole);
+    const existing = await this.findInterestForAccess(
+      interestId,
+      userId,
+      userRole,
+    );
+    const normalizedData = {
+      ...data,
+      propertyTypes:
+        data.propertyTypes ?? existing.propertyTypes,
+    };
 
-    return this.prisma.customerInterest.update({
+    const interest = await this.prisma.customerInterest.update({
       where: { id: interestId },
-      data: this.cleanInterestData(data) as Prisma.CustomerInterestUncheckedUpdateInput,
+      data: this.cleanInterestData(
+        normalizedData,
+      ) as Prisma.CustomerInterestUncheckedUpdateInput,
     });
+    await this.refreshInterestMatches(interest);
+    return interest;
   }
 
   async deleteCustomerInterest(interestId: string, userId: string, userRole: Role) {
@@ -940,14 +1286,22 @@ export class CrmService {
         reasons.push('Portföy durumu uyumlu');
       }
 
-      if (
-        interest.minBudget &&
-        interest.maxBudget &&
-        unit.price >= interest.minBudget &&
-        unit.price <= interest.maxBudget
-      ) {
-        score += 10;
-        reasons.push('Bütçe aralığında');
+      const minimumBudgetOk =
+        !interest.minBudget ||
+        unit.price >= interest.minBudget;
+
+      const withinMaximumBudget =
+        !interest.maxBudget ||
+        unit.price <= interest.maxBudget;
+
+      if (interest.maxBudget) {
+        if (unit.price <= interest.maxBudget) {
+          score += 10;
+          reasons.push('Bütçeye uygun');
+        }
+      } else if (interest.minBudget && unit.price >= interest.minBudget) {
+        score += 5;
+        reasons.push('Bütçeye uygun');
       }
 
       if (
@@ -1003,9 +1357,60 @@ export class CrmService {
       };
     });
 
+    const eligibleResults = preliminaryResults.filter((result) => {
+      const unit = result.unit;
+
+      // İl, talebin kesin coğrafi sınırıdır.
+      if (interest.city && !result.sameCity) {
+        return false;
+      }
+
+      // Seçili mülk tipi kesin eşleşme kriteridir.
+      if (
+        Array.isArray(interest.propertyTypes) &&
+        interest.propertyTypes.length > 0 &&
+        !interest.propertyTypes.includes(unit.type)
+      ) {
+        return false;
+      }
+
+      // Satılık / kiralık gibi durum tercihi varsa kesin uygulanır.
+      if (
+        Array.isArray(interest.statuses) &&
+        interest.statuses.length > 0 &&
+        !interest.statuses.includes(unit.status)
+      ) {
+        return false;
+      }
+
+      // Maksimum bütçede %30 tolerans uygulanır.
+      // Bu sınırın üzerindeki portföyler eşleşmeye girmez.
+      const maximumBudgetWithTolerance =
+        interest.maxBudget
+          ? interest.maxBudget * 1.3
+          : null;
+
+      if (
+        maximumBudgetWithTolerance &&
+        unit.price > maximumBudgetWithTolerance
+      ) {
+        return false;
+      }
+
+      // Eski kayıtlardaki minimum bütçe desteği korunur.
+      if (
+        interest.minBudget &&
+        unit.price < interest.minBudget
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
     const origin = this.buildInterestDistancePoint(interest);
     const distanceCandidates = origin
-      ? preliminaryResults
+      ? eligibleResults
           .filter((result) => {
             const destination = this.buildUnitDistancePoint(result.unit);
 
@@ -1109,7 +1514,7 @@ export class CrmService {
       },
     });
 
-    return preliminaryResults
+    return eligibleResults
       .map((result) => {
         const unit = result.unit;
         const matchScore = Math.min(result.score, 100);

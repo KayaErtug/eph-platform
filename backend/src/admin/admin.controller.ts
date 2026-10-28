@@ -15,7 +15,7 @@ import { AdminService } from "./admin.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
-import { Capability, Role } from "@prisma/client";
+import { Capability, Prisma, Role } from "@prisma/client";
 
 type AdminRequestUser = {
   id?: string;
@@ -48,8 +48,8 @@ export class AdminController {
   }
 
   @Get("stats")
-  getStats() {
-    return this.adminService.getStats();
+  getStats(@Req() request: AdminRequest) {
+    return this.adminService.getStats(this.extractActor(request));
   }
 
   @Get("dashboard-summary")
@@ -176,18 +176,21 @@ export class AdminController {
   }
 
   @Get("documents")
-  getDocuments(@Query("filter") filter?: "pending" | "approved" | "rejected" | "all") {
-    return this.adminService.getDocuments(filter || "pending");
+  getDocuments(
+    @Req() request: AdminRequest,
+    @Query("filter") filter?: "pending" | "approved" | "rejected" | "all",
+  ) {
+    return this.adminService.getDocuments(filter || "pending", this.extractActor(request));
   }
 
   @Patch("documents/:id/approve")
-  approveDocument(@Param("id") id: string) {
-    return this.adminService.approveDocument(id);
+  approveDocument(@Param("id") id: string, @Req() request: AdminRequest) {
+    return this.adminService.approveDocument(id, this.extractActor(request));
   }
 
   @Patch("documents/:id/reject")
-  rejectDocument(@Param("id") id: string) {
-    return this.adminService.rejectDocument(id);
+  rejectDocument(@Param("id") id: string, @Req() request: AdminRequest) {
+    return this.adminService.rejectDocument(id, this.extractActor(request));
   }
 
   @Get("nominations")
@@ -254,8 +257,40 @@ export class AdminController {
     return this.adminService.updateApplicationNote(id, body.adminNote || "");
   }
 
-  @Patch("users/:id/trial-extend")
+  @Get("users/:id/membership-packages")
   @Roles(Role.SUPER_ADMIN)
+  getUserMembershipPackages(
+    @Param("id") id: string,
+    @Req() request: AdminRequest,
+  ) {
+    return this.adminService.getUserMembershipPackages(
+      id,
+      this.extractActor(request),
+    );
+  }
+
+  @Patch("users/:id/membership")
+  @Roles(Role.SUPER_ADMIN)
+  updateUserMembership(
+    @Param("id") id: string,
+    @Body()
+    body: {
+      paketKodu: string;
+      gunSayisi?: number;
+      aySayisi?: number;
+      gerekce?: string;
+    },
+    @Req() request: AdminRequest,
+  ) {
+    return this.adminService.updateUserMembership(
+      id,
+      body,
+      this.extractActor(request),
+    );
+  }
+
+  @Patch("users/:id/trial-extend")
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   extendUserTrial(
     @Param("id") id: string,
     @Body()
@@ -272,5 +307,81 @@ export class AdminController {
     );
   }
 
+
+
+  @Get("system-settings")
+  @Roles(Role.SUPER_ADMIN)
+  getSystemSettings(@Req() request: AdminRequest) {
+    return this.adminService.getSystemSettings(this.extractActor(request));
+  }
+
+  @Patch("system-settings/:key")
+  @Roles(Role.SUPER_ADMIN)
+  updateSystemSetting(
+    @Param("key") key: string,
+    @Body() body: { value: number; description?: string },
+    @Req() request: AdminRequest,
+  ) {
+    return this.adminService.updateSystemSetting(key, body, this.extractActor(request));
+  }
+
+  @Get("permission-center/definitions")
+  @Roles(Role.SUPER_ADMIN)
+  getPermissionDefinitions(
+    @Req() request: AdminRequest,
+  ) {
+    return this.adminService.getPermissionDefinitions(
+      this.extractActor(request),
+    );
+  }
+
+  @Get("permission-center/users/:id")
+  @Roles(Role.SUPER_ADMIN)
+  getUserPermissionProfile(
+    @Param("id") id: string,
+    @Req() request: AdminRequest,
+  ) {
+    return this.adminService.getUserPermissionProfile(
+      id,
+      this.extractActor(request),
+    );
+  }
+
+  @Patch("permission-center/users/:id/permissions/:permissionKey")
+  @Roles(Role.SUPER_ADMIN)
+  updateUserPermissionOverride(
+    @Param("id") id: string,
+    @Param("permissionKey") permissionKey: string,
+    @Body()
+    body: {
+      enabled?: boolean | null;
+      numericLimit?: number | null;
+      validFrom?: string | null;
+      validUntil?: string | null;
+      metadata?: Prisma.InputJsonObject | null;
+    },
+    @Req() request: AdminRequest,
+  ) {
+    return this.adminService.updateUserPermissionOverride(
+      id,
+      permissionKey,
+      body,
+      this.extractActor(request),
+    );
+  }
+
+  @Delete("permission-center/users/:id/permissions/:permissionKey")
+  @Roles(Role.SUPER_ADMIN)
+  deleteUserPermissionOverride(
+    @Param("id") id: string,
+    @Param("permissionKey") permissionKey: string,
+    @Req() request: AdminRequest,
+  ) {
+    return this.adminService.deleteUserPermissionOverride(
+      id,
+      permissionKey,
+      this.extractActor(request),
+    );
+  }
 
 }

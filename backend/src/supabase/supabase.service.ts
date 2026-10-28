@@ -132,6 +132,97 @@ export class SupabaseService {
     return data.publicUrl;
   }
 
+
+  resolveStoragePath(bucket: string, storedValue: string) {
+    const raw = String(storedValue || '').trim();
+
+    if (!raw) {
+      throw new Error('Storage dosya yolu boş olamaz.');
+    }
+
+    if (!/^https?:\/\//i.test(raw)) {
+      return raw.replace(/^\/+/, '');
+    }
+
+    let url: URL;
+
+    try {
+      url = new URL(raw);
+    } catch {
+      throw new Error('Geçersiz Storage URL değeri.');
+    }
+
+    const encodedBucket = encodeURIComponent(bucket);
+
+    const markers = [
+      `/storage/v1/object/public/${encodedBucket}/`,
+      `/storage/v1/object/sign/${encodedBucket}/`,
+      `/storage/v1/object/authenticated/${encodedBucket}/`,
+    ];
+
+    for (const markerValue of markers) {
+      const index = url.pathname.indexOf(markerValue);
+
+      if (index >= 0) {
+        const encodedPath = url.pathname.slice(
+          index + markerValue.length,
+        );
+
+        const decodedPath = decodeURIComponent(encodedPath)
+          .replace(/^\/+/, '')
+          .trim();
+
+        if (!decodedPath) {
+          break;
+        }
+
+        return decodedPath;
+      }
+    }
+
+    throw new Error(
+      `Storage URL "${bucket}" bucket yolu ile eşleşmiyor.`,
+    );
+  }
+
+  async createSignedUrl(
+    bucket: string,
+    storedValue: string,
+    expiresInSeconds = 300,
+  ) {
+    const path = this.resolveStoragePath(
+      bucket,
+      storedValue,
+    );
+
+    const safeExpiresIn = Math.max(
+      30,
+      Math.min(
+        3600,
+        Math.floor(Number(expiresInSeconds) || 300),
+      ),
+    );
+
+    const { data, error } = await this.supabase.storage
+      .from(bucket)
+      .createSignedUrl(
+        path,
+        safeExpiresIn,
+      );
+
+    if (error || !data?.signedUrl) {
+      throw new Error(
+        this.storageErrorMessage(
+          error || 'Signed URL üretilemedi',
+          bucket,
+          path,
+        ),
+      );
+    }
+
+    return data.signedUrl;
+  }
+
   getImageDomainUrl(path: string) {
     const baseUrl =
       process.env.IMAGE_PUBLIC_BASE_URL ||

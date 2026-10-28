@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { LinaAccessSourceModule } from './lina-source-module';
 
 export type LinaRole =
   | 'EMLAKCI'
@@ -8,15 +9,7 @@ export type LinaRole =
   | 'ADMIN'
   | 'SUPERADMIN';
 
-export type LinaModuleName =
-  | 'dashboard'
-  | 'crm'
-  | 'network'
-  | 'pool'
-  | 'notifications'
-  | 'admin'
-  | 'audit'
-  | 'general';
+export type LinaModuleName = LinaAccessSourceModule;
 
 export type LinaAccessUser = {
   id?: string;

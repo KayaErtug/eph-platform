@@ -66,14 +66,17 @@ export class TeamLeaderCrmService {
     return Math.max(0, Math.min(100, Math.round(memberScore + authorizedScore + poolScore + activityScore)));
   }
 
-  async getMyDashboard(actor?: TeamLeaderCrmActor) {
+  async getMyDashboard(actor?: TeamLeaderCrmActor, teamId?: string) {
     const actorId = await this.ensureCanViewTeamLeaderDashboard(actor);
 
+    const isSuperAdmin = actor?.role === Role.SUPER_ADMIN;
+    if (teamId && !isSuperAdmin) throw new ForbiddenException('Başka takım seçimi yalnız Yazılım Ekibi için açıktır.');
     const team = await this.prisma.team.findFirst({
       where: {
-        leaderId: actorId,
+        ...(isSuperAdmin ? (teamId ? { id: teamId } : {}) : { leaderId: actorId }),
         isActive: true,
       },
+      orderBy: { createdAt: 'asc' },
       include: {
         office: { select: { id: true, name: true, city: true, district: true } },
         leader: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
@@ -100,7 +103,7 @@ export class TeamLeaderCrmService {
     });
 
     if (!team) {
-      throw new NotFoundException('Aktif liderlik yaptığınız takım bulunamadı.');
+      throw new NotFoundException(isSuperAdmin ? 'Aktif takım bulunamadı.' : 'Aktif liderlik yaptığınız takım bulunamadı.');
     }
 
     const memberUserIds = team.members.map((member) => member.userId);

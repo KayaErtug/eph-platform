@@ -47,6 +47,7 @@ export class InvitationsService {
     MODERATOR: 'MOD',
     ADMIN: 'ADM',
     SUPER_ADMIN: 'SUP',
+    ADAY: 'ADA',
   };
 
   private guvenlikKoduUret(length = 7): string {

@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { Role } from '@prisma/client';
 
@@ -31,7 +31,7 @@ export class OfficeOwnerCrmController {
   }
 
   @Get('dashboard')
-  getDashboard(@Req() request: OfficeOwnerCrmRequest) {
-    return this.officeOwnerCrmService.getDashboard(this.extractActor(request));
+  getDashboard(@Req() request: OfficeOwnerCrmRequest, @Query('officeId') officeId?: string) {
+    return this.officeOwnerCrmService.getDashboard(this.extractActor(request), officeId);
   }
 }

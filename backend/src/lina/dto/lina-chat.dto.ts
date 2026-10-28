@@ -10,6 +10,8 @@ import {
   MinLength,
   ValidateNested,
 } from "class-validator";
+import { LINA_CHAT_SOURCE_MODULES } from "../lina-source-module";
+import type { LinaChatSourceModule } from "../lina-source-module";
 
 export class LinaChatHistoryItemDto {
   @IsIn(["user", "assistant"])
@@ -26,14 +28,8 @@ export class LinaChatDto {
   message!: string;
 
   @IsOptional()
-  @IsIn(["dashboard", "crm", "network", "pool", "notifications", "general"])
-  sourceModule?:
-    | "dashboard"
-    | "crm"
-    | "network"
-    | "pool"
-    | "notifications"
-    | "general";
+  @IsIn([...LINA_CHAT_SOURCE_MODULES])
+  sourceModule?: LinaChatSourceModule;
 
   @IsOptional()
   @IsBoolean()

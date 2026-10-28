@@ -1,3 +1,4 @@
+import { resolveOfficeWallet } from '../office/office-wallet.rules';
 import {
   BadRequestException,
   ForbiddenException,
@@ -8,10 +9,12 @@ import {
   AuditAction,
   KontorHareketTuru,
   KontorIslemTuru,
+  Prisma,
   Role,
   UyelikDurumu,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AdminService } from '../admin/admin.service';
 
 type KontorKategoriKodu =
   | 'HAVUZ_MESAJ'
@@ -32,7 +35,10 @@ type GiftActor = {
 
 @Injectable()
 export class KontorService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly adminService: AdminService,
+  ) {}
 
   private readonly adminGiftOptions = [100, 250, 500];
   private readonly adminDailyLimit = 5000;
@@ -115,9 +121,19 @@ export class KontorService {
     if (
       islemTuru === KontorIslemTuru.FORUM_ACIL_ETIKETI ||
       islemTuru === KontorIslemTuru.FORUM_SABITLEME ||
-      islemTuru === KontorIslemTuru.FORUM_VITRIN
+      islemTuru === KontorIslemTuru.FORUM_VITRIN ||
+      islemTuru === KontorIslemTuru.FORUM_TELEFON ||
+      islemTuru === KontorIslemTuru.FORUM_WHATSAPP ||
+      islemTuru === KontorIslemTuru.FORUM_OZEL_BILGI
     ) {
       return 'FORUM_ISLEMLERI';
+    }
+
+    if (
+      islemTuru === KontorIslemTuru.HAVUZ_TELEFON ||
+      islemTuru === KontorIslemTuru.HAVUZ_WHATSAPP
+    ) {
+      return 'HAVUZ_MESAJ';
     }
 
     if (
@@ -137,6 +153,303 @@ export class KontorService {
     }
 
     return 'DIGER';
+  }
+
+  async harcamayiYap(input: {
+    userId: string;
+    actorId?: string;
+    amount: number;
+    islemTuru: KontorIslemTuru;
+    aciklama?: string;
+    ilgiliKayitTuru?: string;
+    ilgiliKayitId?: string;
+    idempotencyKey?: string;
+    transaction?: Prisma.TransactionClient;
+    walletSource?: string;
+    walletOfficeId?: string;
+  }) {
+    const userId = String(input?.userId || '').trim();
+    const actorId = String(input?.actorId || userId).trim();
+    const amount = Number(input?.amount);
+    const idempotencyKey = String(input?.idempotencyKey || '').trim();
+    const relatedRecordType = String(input?.ilgiliKayitTuru || '').trim();
+
+    if (!userId) {
+      throw new BadRequestException(
+        'Kontör harcaması için kullanıcı zorunludur.',
+      );
+    }
+
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      throw new BadRequestException(
+        'Kontör harcama miktarı pozitif tam sayı olmalıdır.',
+      );
+    }
+
+    const spend = async (tx: Prisma.TransactionClient) => {
+      const context = await resolveOfficeWallet(tx, actorId, { walletSource: input.walletSource, walletOfficeId: input.walletOfficeId }, true);
+      if (input.actorId && userId !== actorId && context.chargeUserId !== userId) throw new BadRequestException('Ofis PK hesabı değişti. İşlemi yeniden onaylayın.');
+      const chargeUserId = context.chargeUserId;
+      if (idempotencyKey) {
+        await tx.$executeRaw`
+          SELECT pg_advisory_xact_lock(
+            hashtext(${`kontor-spend:${userId}:${idempotencyKey}`})
+          )
+        `;
+
+        const existingMovement = await tx.kontorHareketi.findFirst({
+          where: {
+            OR: [{ kullaniciId: chargeUserId }, { olusturanId: actorId }, { kullaniciId: actorId, olusturanId: null }],
+            hareketTuru: 'HARCAMA',
+            islemTuru: input.islemTuru,
+            ilgiliKayitId: idempotencyKey,
+            ...(relatedRecordType
+              ? { ilgiliKayitTuru: relatedRecordType }
+              : {}),
+          },
+          orderBy: {
+            olusturulmaTarihi: 'desc',
+          },
+        });
+
+        if (existingMovement) {
+          if (input.actorId && (existingMovement.olusturanId || userId) !== actorId) throw new ForbiddenException('İşlem anahtarı başka kullanıcıya aittir.');
+          const currentWallet = existingMovement.kullaniciId === chargeUserId ? await tx.kontorCuzdani.findUnique({
+            where: { kullaniciId: chargeUserId },
+          }) : null;
+
+          return {
+            spent: existingMovement.miktar,
+            previousBalance: existingMovement.oncekiBakiye,
+            remainingBalance:
+              currentWallet?.bakiye ?? existingMovement.sonrakiBakiye,
+            wallet: currentWallet,
+            movement: existingMovement,
+            alreadyProcessed: true,
+          };
+        }
+      }
+
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtext(${`wallet:${chargeUserId}`})
+        )
+      `;
+
+      await tx.kontorCuzdani.upsert({
+        where: { kullaniciId: chargeUserId },
+        update: {},
+        create: {
+          kullaniciId: chargeUserId,
+          bakiye: 0,
+          toplamYukleme: 0,
+          toplamHarcama: 0,
+          toplamHediye: 0,
+          aktifMi: true,
+        },
+      });
+
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "KontorCuzdani"
+        WHERE "kullaniciId" = ${chargeUserId}
+        FOR UPDATE
+      `;
+
+      const wallet = await tx.kontorCuzdani.findUnique({
+        where: { kullaniciId: chargeUserId },
+      });
+
+      if (!wallet) {
+        throw new BadRequestException(
+          'Kullanıcı kontör cüzdanı bulunamadı.',
+        );
+      }
+
+      if (!wallet.aktifMi) {
+        throw new ForbiddenException(
+          'Kontör cüzdanınız aktif değildir.',
+        );
+      }
+
+      if (wallet.bakiye < amount) {
+        throw new BadRequestException(
+          `Bu işlem için ${amount} kontör gerekir. Mevcut bakiyeniz ${wallet.bakiye} kontör.`,
+        );
+      }
+
+      const updatedWallet = await tx.kontorCuzdani.update({
+        where: { kullaniciId: chargeUserId },
+        data: {
+          bakiye: { decrement: amount },
+          toplamHarcama: { increment: amount },
+        },
+      });
+
+      const movement = await tx.kontorHareketi.create({
+        data: {
+          kullaniciId: chargeUserId,
+          hareketTuru: 'HARCAMA',
+          islemTuru: input.islemTuru,
+          miktar: amount,
+          oncekiBakiye: wallet.bakiye,
+          sonrakiBakiye: updatedWallet.bakiye,
+          aciklama: this.cleanDescription(input.aciklama),
+          ilgiliKayitTuru:
+            relatedRecordType || null,
+          ilgiliKayitId:
+            idempotencyKey ||
+            String(input.ilgiliKayitId || '').trim() ||
+            null,
+          olusturanId: actorId,
+        },
+      });
+
+      return {
+        spent: amount,
+        previousBalance: wallet.bakiye,
+        remainingBalance: updatedWallet.bakiye,
+        wallet: updatedWallet,
+        movement,
+        alreadyProcessed: false,
+      };
+    };
+    return input.transaction ? spend(input.transaction) : this.prisma.$transaction(spend);
+  }
+
+  async harcamayiIadeEt(input: {
+    userId: string;
+    originalMovementId: string;
+    aciklama?: string;
+  }) {
+    const userId = String(input?.userId || '').trim();
+    const originalMovementId = String(
+      input?.originalMovementId || '',
+    ).trim();
+
+    if (!userId || !originalMovementId) {
+      throw new BadRequestException(
+        'Kontör iadesi için kullanıcı ve harcama hareketi zorunludur.',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtext(
+            ${`kontor-refund:${userId}:${originalMovementId}`}
+          )
+        )
+      `;
+
+      const existingRefund =
+        await tx.kontorHareketi.findFirst({
+          where: {
+            kullaniciId: userId,
+            hareketTuru: KontorHareketTuru.IADE,
+            ilgiliKayitTuru: 'KONTOR_HARCAMA_IADE',
+            ilgiliKayitId: originalMovementId,
+          },
+          orderBy: {
+            olusturulmaTarihi: 'desc',
+          },
+        });
+
+      if (existingRefund) {
+        const currentWallet =
+          await tx.kontorCuzdani.findUnique({
+            where: { kullaniciId: userId },
+          });
+
+        return {
+          refunded: existingRefund.miktar,
+          remainingBalance:
+            currentWallet?.bakiye ??
+            existingRefund.sonrakiBakiye,
+          wallet: currentWallet,
+          movement: existingRefund,
+          alreadyProcessed: true,
+        };
+      }
+
+      const originalMovement =
+        await tx.kontorHareketi.findFirst({
+          where: {
+            id: originalMovementId,
+            kullaniciId: userId,
+            hareketTuru: KontorHareketTuru.HARCAMA,
+          },
+        });
+
+      if (!originalMovement) {
+        throw new NotFoundException(
+          'İade edilecek kontör harcaması bulunamadı.',
+        );
+      }
+
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtext(${`wallet:${userId}`})
+        )
+      `;
+
+      const wallet =
+        await tx.kontorCuzdani.findUnique({
+          where: { kullaniciId: userId },
+        });
+
+      if (!wallet) {
+        throw new BadRequestException(
+          'Kullanıcı kontör cüzdanı bulunamadı.',
+        );
+      }
+
+      const nextBalance =
+        wallet.bakiye + originalMovement.miktar;
+
+      const updatedWallet =
+        await tx.kontorCuzdani.update({
+          where: {
+            kullaniciId: userId,
+          },
+          data: {
+            bakiye: {
+              increment: originalMovement.miktar,
+            },
+            toplamHarcama: Math.max(
+              0,
+              wallet.toplamHarcama -
+                originalMovement.miktar,
+            ),
+          },
+        });
+
+      const refundMovement =
+        await tx.kontorHareketi.create({
+          data: {
+            kullaniciId: userId,
+            hareketTuru: KontorHareketTuru.IADE,
+            islemTuru: originalMovement.islemTuru,
+            miktar: originalMovement.miktar,
+            oncekiBakiye: wallet.bakiye,
+            sonrakiBakiye: nextBalance,
+            aciklama:
+              this.cleanDescription(input.aciklama) ||
+              'Başarısız işlem için kontör iadesi.',
+            ilgiliKayitTuru: 'KONTOR_HARCAMA_IADE',
+            ilgiliKayitId: originalMovementId,
+            olusturanId: originalMovement.olusturanId || userId,
+          },
+        });
+
+      return {
+        refunded: originalMovement.miktar,
+        remainingBalance: updatedWallet.bakiye,
+        wallet: updatedWallet,
+        movement: refundMovement,
+        alreadyProcessed: false,
+      };
+    });
   }
 
   async getCuzdan(userId: string) {
@@ -161,7 +474,14 @@ export class KontorService {
     };
   }
 
-  async getHareketler(userId: string) {
+  async getHareketler(userId: string, actor: GiftActor) {
+    if (actor?.role === Role.ADMIN || actor?.role === Role.SUPER_ADMIN) {
+      const permission = await this.adminService.resolveOperationalPermission(actor, 'CREDIT_HISTORY_VIEW');
+      if (!permission.enabled) {
+        throw new ForbiddenException('Kontör geçmişi görüntüleme yetkiniz bulunmuyor.');
+      }
+    }
+
     const hareketler =
       await this.prisma.kontorHareketi.findMany({
         where: { kullaniciId: userId },
@@ -321,7 +641,8 @@ export class KontorService {
             durum: aktifPaket.durum,
             aktifPortfoyLimiti:
               paket.aktifPortfoyLimiti,
-            verilenKontor: paket.verilenKontor,
+            aylikPaketPk: paket.aylikPaketPk,
+            verilenKontor: paket.aylikPaketPk,
             fiyat: paket.fiyat,
             paraBirimi: paket.paraBirimi,
             baslangicTarihi:
@@ -504,6 +825,10 @@ export class KontorService {
     },
   ) {
     const actor = this.normalizeGiftActor(actorInput);
+    const permission = await this.adminService.resolveOperationalPermission(actor, 'GIFT_PK');
+    if (!permission.enabled) {
+      throw new ForbiddenException('Hediye PK gönderme yetkiniz bulunmuyor.');
+    }
     const aliciId = String(body?.aliciId || '').trim();
     const miktar = Number(body?.miktar);
 
@@ -564,7 +889,7 @@ export class KontorService {
 
       await tx.$executeRaw`
         SELECT pg_advisory_xact_lock(
-          hashtext(${`gift-recipient:${aliciId}`})
+          hashtext(${`wallet:${aliciId}`})
         )
       `;
 

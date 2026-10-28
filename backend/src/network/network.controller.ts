@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Query,
   Patch,
   Post,
   UseGuards,
@@ -18,8 +19,18 @@ export class NetworkController {
   constructor(private readonly networkService: NetworkService) {}
 
   @Get('posts')
-  findAll() {
-    return this.networkService.findAll();
+  findAll(@CurrentUser() user: any) {
+    return this.networkService.findAll(user.id || user.sub);
+  }
+
+  @Get('posts/lookup')
+  lookupListing(@Query('number') number: string, @CurrentUser() user: any) {
+    return this.networkService.lookupListing(number, user.id || user.sub);
+  }
+
+  @Get('demand-density')
+  getDemandDensity(@CurrentUser() user: any) {
+    return this.networkService.getDemandDensity(user.id || user.sub);
   }
 
   @Get('posts/followed')
@@ -28,8 +39,8 @@ export class NetworkController {
   }
 
   @Get('posts/featured')
-  getFeaturedPosts() {
-    return this.networkService.getFeaturedPosts();
+  getFeaturedPosts(@CurrentUser() user: any) {
+    return this.networkService.getFeaturedPosts(user.id || user.sub);
   }
 
   @Get('notifications')
@@ -43,13 +54,13 @@ export class NetworkController {
   }
 
   @Get('posts/:id/stats')
-  getPostStats(@Param('id') id: string) {
-    return this.networkService.getPostStats(id);
+  getPostStats(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.networkService.getPostStats(id, user.id || user.sub);
   }
 
   @Get('posts/:id/update-logs')
-  getUpdateLogs(@Param('id') id: string) {
-    return this.networkService.getUpdateLogs(id);
+  getUpdateLogs(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.networkService.getUpdateLogs(id, user.id || user.sub);
   }
 
   @Post('posts/:id/view')
@@ -63,8 +74,8 @@ export class NetworkController {
   }
 
   @Get('posts/:id/followers')
-  getPostFollowers(@Param('id') id: string) {
-    return this.networkService.getPostFollowers(id);
+  getPostFollowers(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.networkService.getPostFollowers(id, user.id || user.sub);
   }
 
   @Post('posts/:id/follow')
@@ -78,8 +89,8 @@ export class NetworkController {
   }
 
   @Get('posts/:id')
-  findOne(@Param('id') id: string) {
-    return this.networkService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.networkService.findOne(id, user.id || user.sub);
   }
 
   @Post('posts/:id/share')
@@ -106,13 +117,41 @@ export class NetworkController {
     return this.networkService.create(body, user.id);
   }
 
+  @Get('posts/:id/contact-quote')
+  getContactQuote(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query() query?: { walletSource?: string; walletOfficeId?: string },
+  ) {
+    return this.networkService.getContactQuote(id, user, query);
+  }
+
+  @Post('posts/:id/private-info')
+  privateInfo(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body?: { walletSource?: string; walletOfficeId?: string },
+  ) {
+    return this.networkService.postPrivateInfo(id, user, body);
+  }
+
   @Post('posts/:id/message')
   messagePost(
     @Param('id') id: string,
     @CurrentUser() user: any,
-    @Body() body?: { message?: string },
+    @Body() body?: { message?: string; walletSource?: string; walletOfficeId?: string },
   ) {
     return this.networkService.messagePost(id, user, body);
+  }
+
+  @Post('posts/:id/contact/:channel')
+  contactPost(
+    @Param('id') id: string,
+    @Param('channel') channel: string,
+    @CurrentUser() user: any,
+    @Body() body?: { walletSource?: string; walletOfficeId?: string },
+  ) {
+    return this.networkService.postContact(id, user, channel, body);
   }
 
   @Post('posts/:id/interest')

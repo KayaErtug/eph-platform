@@ -1,4 +1,4 @@
-﻿import {
+import {
   BadRequestException,
   Body,
   Controller,
@@ -34,6 +34,7 @@ import { ProjectSalesSpacesService } from './project-sales-spaces.service';
 import { ProjectSalesStockService } from './project-sales-stock.service';
 import { ProjectSalesStructureService } from './project-sales-structure.service';
 import { ProjectSalesService } from './project-sales.service';
+import { resolveSharedProjectLocation } from './shared-project-location';
 
 const MEDIA_ZIP_MAX_FILE_SIZE = 200 * 1024 * 1024;
 
@@ -68,6 +69,11 @@ export class ProjectSalesController {
     private readonly projectSalesStockService: ProjectSalesStockService,
     private readonly projectSalesStructureService: ProjectSalesStructureService,
   ) {}
+
+  @Post('location/resolve-shared')
+  resolveSharedLocation(@Body() body: { url?: unknown }) {
+    return resolveSharedProjectLocation(body.url);
+  }
 
   @Post('projects')
   createProjectDraft(
@@ -338,7 +344,7 @@ export class ProjectSalesController {
 
   @Get('dashboard')
   getDashboard(@CurrentUser() user: any) {
-    return this.projectSalesDashboardService.getDashboard(user.id);
+    return this.projectSalesDashboardService.getDashboard(user.id, user.role);
   }
 
   @Get('projects/:projectId/launch')
@@ -377,15 +383,22 @@ export class ProjectSalesController {
     );
   }
 
+  @Post('projects/:projectId/launch/withdraw-from-pool')
+  withdrawProjectFromPool(@CurrentUser() user: any, @Param('projectId') projectId: string) {
+    return this.projectSalesLaunchService.withdrawFromPool(projectId, user.id, user.role);
+  }
+
   @Post('projects/:projectId/launch/publish-to-pool')
   publishProjectToPool(
     @CurrentUser() user: any,
     @Param('projectId') projectId: string,
+    @Body() body?: { poolAudience?: { mode?: 'PUBLIC' | 'TARGETED'; roles?: string[]; groupIds?: string[] } },
   ) {
     return this.projectSalesLaunchService.publishToPool(
       projectId,
       user.id,
       user.role,
+      body?.poolAudience,
     );
   }
 
@@ -406,7 +419,7 @@ export class ProjectSalesController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     if (!file) {
-      throw new BadRequestException('Excel dosyasÄ± yÃ¼klenmedi.');
+      throw new BadRequestException('Excel dosyası yüklenmedi.');
     }
 
     return this.projectSalesImportService.previewExcel(user.id, file);
@@ -426,7 +439,7 @@ export class ProjectSalesController {
     @Body('confirmation') confirmation?: string,
   ) {
     if (!file) {
-      throw new BadRequestException('Excel dosyasÄ± yÃ¼klenmedi.');
+      throw new BadRequestException('Excel dosyası yüklenmedi.');
     }
 
     return this.projectSalesImportService.commitExcel({
@@ -501,7 +514,7 @@ export class ProjectSalesController {
         callback(
           isZip
             ? null
-            : new BadRequestException('YalnÄ±zca .zip dosyasÄ± yÃ¼klenebilir.'),
+            : new BadRequestException('Yalnızca .zip dosyası yüklenebilir.'),
           isZip,
         );
       },
@@ -514,7 +527,7 @@ export class ProjectSalesController {
     @Body('replaceExisting') replaceExisting?: string,
   ) {
     if (!file) {
-      throw new BadRequestException('ZIP dosyasÄ± yÃ¼klenmedi.');
+      throw new BadRequestException('ZIP dosyası yüklenmedi.');
     }
 
     return this.projectMediaZipService.previewZip({
@@ -541,7 +554,7 @@ export class ProjectSalesController {
         callback(
           isZip
             ? null
-            : new BadRequestException('YalnÄ±zca .zip dosyasÄ± yÃ¼klenebilir.'),
+            : new BadRequestException('Yalnızca .zip dosyası yüklenebilir.'),
           isZip,
         );
       },
@@ -554,7 +567,7 @@ export class ProjectSalesController {
     @Body('replaceExisting') replaceExisting?: string,
   ) {
     if (!file) {
-      throw new BadRequestException('ZIP dosyasÄ± yÃ¼klenmedi.');
+      throw new BadRequestException('ZIP dosyası yüklenmedi.');
     }
 
     return this.projectMediaZipService.uploadZip({

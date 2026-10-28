@@ -46,13 +46,7 @@ export enum RegistrationType {
 }
 
 export class RegisterDto {
-  @IsString()
-  firstName: string;
-
-  @IsString()
-  lastName: string;
-
-  @IsEmail()
+  @IsEmail({}, { message: 'Geçerli bir e-posta adresi giriniz' })
   email: string;
 
   @Transform(({ value }) => normalizePhoneForSystem(value))
@@ -62,17 +56,27 @@ export class RegisterDto {
   })
   phone: string;
 
-  @Transform(({ value }) => String(value || '').trim())
+  // Aşağıdaki alanlar yalnız eski mobil sürüm ile geçiş uyumluluğu içindir.
+  @IsOptional()
+  @IsString()
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+
+  @IsOptional()
   @IsString()
   @MinLength(2, {
-    message: 'Şehir seçimi zorunludur',
+    message: 'Şehir seçimi en az 2 karakter olmalıdır',
   })
-  city: string;
+  city?: string;
 
+  @IsOptional()
   @IsEnum(Role, {
     message: 'Geçerli bir meslek seçiniz',
   })
-  role: Role;
+  role?: Role;
 
   @IsOptional()
   @IsEnum(RegistrationType, {
@@ -80,11 +84,26 @@ export class RegisterDto {
   })
   registrationType?: RegistrationType;
 
+  @IsOptional()
   @IsString()
-  @MinLength(6)
-  password: string;
+  @MinLength(6, {
+    message: 'Şifre en az 6 karakter olmalıdır',
+  })
+  password?: string;
 
   @IsOptional()
   @IsString()
   inviteCode?: string;
+
+  @IsOptional()
+  @IsString()
+  taxNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  taxOffice?: string;
+
+  @IsOptional()
+  @IsString()
+  professionalDocumentNumber?: string;
 }

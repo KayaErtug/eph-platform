@@ -1,0 +1,2 @@
+ALTER TABLE "NetworkPost"
+ADD COLUMN "landSharePercent" DOUBLE PRECISION;

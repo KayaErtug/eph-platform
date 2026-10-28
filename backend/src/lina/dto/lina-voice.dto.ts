@@ -1,4 +1,6 @@
 import { IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
+import { LINA_CHAT_SOURCE_MODULES } from '../lina-source-module';
+import type { LinaChatSourceModule } from '../lina-source-module';
 
 export class LinaVoiceDto {
   @IsString()
@@ -6,8 +8,8 @@ export class LinaVoiceDto {
   text!: string;
 
   @IsOptional()
-  @IsIn(['dashboard', 'crm', 'network', 'pool', 'notifications', 'general'])
-  sourceModule?: 'dashboard' | 'crm' | 'network' | 'pool' | 'notifications' | 'general';
+  @IsIn([...LINA_CHAT_SOURCE_MODULES])
+  sourceModule?: LinaChatSourceModule;
 
   @IsOptional()
   @IsInt()

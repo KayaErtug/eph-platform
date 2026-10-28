@@ -8,16 +8,19 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 
 type CreatePendingRegistrationInput = {
-  firstName: string;
-  lastName: string;
+  firstName?: string | null;
+  lastName?: string | null;
   email: string;
   phone: string;
-  passwordHash: string;
-  city: string;
-  role: Role;
+  passwordHash?: string | null;
+  city?: string | null;
+  role?: Role | null;
   registrationType?: string | null;
   inviteCode?: string | null;
   referralCandidateId?: string | null;
+  taxNumber?: string | null;
+  taxOffice?: string | null;
+  professionalDocumentNumber?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
 };
@@ -45,16 +48,19 @@ export class PendingRegistrationService {
 
     return this.prisma.pendingRegistration.create({
       data: {
-        firstName: input.firstName,
-        lastName: input.lastName,
+        firstName: String(input.firstName || '').trim(),
+        lastName: String(input.lastName || '').trim(),
         email: input.email,
         phone: input.phone,
-        passwordHash: input.passwordHash,
-        city: input.city,
-        role: input.role,
+        passwordHash: input.passwordHash || null,
+        city: input.city || null,
+        role: input.role || Role.ADAY,
         registrationType: input.registrationType || null,
         inviteCode: input.inviteCode || null,
         referralCandidateId: input.referralCandidateId || null,
+        taxNumber: input.taxNumber || null,
+        taxOffice: input.taxOffice || null,
+        professionalDocumentNumber: input.professionalDocumentNumber || null,
         ipAddress: input.ipAddress || null,
         userAgent: input.userAgent || null,
         expiresAt,

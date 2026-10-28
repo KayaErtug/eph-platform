@@ -72,8 +72,9 @@ export class OrganizationController {
     @Body()
     body: {
       name?: string;
-      city?: string;
-      district?: string;
+      city?: string | null;
+      district?: string | null;
+      neighborhood?: string | null;
       ownerUserId?: string | null;
     },
     @Req() request: OrganizationRequest,
@@ -92,6 +93,7 @@ export class OrganizationController {
       name?: string;
       city?: string | null;
       district?: string | null;
+      neighborhood?: string | null;
       ownerUserId?: string | null;
       isActive?: boolean;
     },

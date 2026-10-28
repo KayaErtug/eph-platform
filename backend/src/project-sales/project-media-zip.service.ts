@@ -110,9 +110,9 @@ const ZIP_MAX_UNCOMPRESSED_SIZE = 400 * 1024 * 1024;
 const ZIP_MAX_IMAGE_COUNT = 200;
 const ZIP_MAX_PACKAGE_COUNT = 50;
 const ZIP_MAX_COMPRESSION_RATIO = 100;
-const GENERAL_MIN_IMAGE_COUNT = 8;
+const GENERAL_MIN_IMAGE_COUNT = 4;
 const GENERAL_MAX_IMAGE_COUNT = 10;
-const PACKAGE_RECOMMENDED_IMAGE_COUNT = 5;
+const PACKAGE_MIN_IMAGE_COUNT = 4;
 const PACKAGE_MAX_IMAGE_COUNT = 10;
 
 const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
@@ -162,7 +162,7 @@ export class ProjectMediaZipService {
           max: GENERAL_MAX_IMAGE_COUNT,
         },
         recommendedStandardImageCount:
-          PACKAGE_RECOMMENDED_IMAGE_COUNT,
+          PACKAGE_MIN_IMAGE_COUNT,
         maxStandardImageCount: PACKAGE_MAX_IMAGE_COUNT,
       },
       folders: definitions.map((item) => ({
@@ -1002,11 +1002,23 @@ export class ProjectMediaZipService {
             level: 'ERROR',
             code: 'INVALID_GENERAL_IMAGE_COUNT',
             message:
-              `Proje genel paketinde ${GENERAL_MIN_IMAGE_COUNT}-${GENERAL_MAX_IMAGE_COUNT} görsel olmalıdır.`,
+              `Proje genel paketinde en az ${GENERAL_MIN_IMAGE_COUNT}, en fazla ${GENERAL_MAX_IMAGE_COUNT} görsel olmalıdır.`,
             path: mediaPackage.sourceFolder,
             value: mediaPackage.fileCount,
           });
         }
+      } else if (
+        mediaPackage.fileCount <
+        PACKAGE_MIN_IMAGE_COUNT
+      ) {
+        issues.push({
+          level: 'ERROR',
+          code: 'PACKAGE_IMAGE_COUNT_TOO_LOW',
+          message:
+            `Her oda planı kategorisinde en az ${PACKAGE_MIN_IMAGE_COUNT} görsel olmalıdır.`,
+          path: mediaPackage.sourceFolder,
+          value: mediaPackage.fileCount,
+        });
       } else if (
         mediaPackage.fileCount >
         PACKAGE_MAX_IMAGE_COUNT
@@ -1015,19 +1027,7 @@ export class ProjectMediaZipService {
           level: 'ERROR',
           code: 'PACKAGE_IMAGE_COUNT_TOO_HIGH',
           message:
-            `Standart fotoğraf paketinde en fazla ${PACKAGE_MAX_IMAGE_COUNT} görsel olabilir.`,
-          path: mediaPackage.sourceFolder,
-          value: mediaPackage.fileCount,
-        });
-      } else if (
-        mediaPackage.fileCount <
-        PACKAGE_RECOMMENDED_IMAGE_COUNT
-      ) {
-        issues.push({
-          level: 'WARNING',
-          code: 'PACKAGE_IMAGE_COUNT_LOW',
-          message:
-            `Standart paket için ${PACKAGE_RECOMMENDED_IMAGE_COUNT} görsel önerilir.`,
+            `Her oda planı kategorisinde en fazla ${PACKAGE_MAX_IMAGE_COUNT} görsel olabilir.`,
           path: mediaPackage.sourceFolder,
           value: mediaPackage.fileCount,
         });

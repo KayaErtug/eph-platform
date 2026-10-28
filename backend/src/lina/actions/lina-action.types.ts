@@ -1,12 +1,8 @@
 import { Role } from "@prisma/client";
+import type { LinaActionSourceModule as CanonicalLinaActionSourceModule } from "../lina-source-module";
 
 export type LinaActionSourceModule =
-  | "dashboard"
-  | "crm"
-  | "network"
-  | "pool"
-  | "notifications"
-  | "general";
+  CanonicalLinaActionSourceModule;
 
 export type LinaActionUser = {
   id?: string;
@@ -36,6 +32,7 @@ export type LinaActionName =
   | "crm_activity_create"
   | "crm_task_create"
   | "crm_task_update"
+  | "network_request_create"
   | "confirmation_cancelled";
 
 export type LinaActionExecutionResult = {

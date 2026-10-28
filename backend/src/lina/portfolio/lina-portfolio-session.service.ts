@@ -68,6 +68,19 @@ export type LinaPortfolioDraftInput = Partial<
   }
 >;
 
+export type LinaPortfolioValidationStatus =
+  | 'BLOCKED'
+  | 'WARNING_CONFIRMATION_REQUIRED'
+  | 'APPROVED';
+
+export type LinaPortfolioValidationState = {
+  version: string;
+  status: LinaPortfolioValidationStatus;
+  messages: string[];
+  requiredWarningCodes: string[];
+  acknowledgedWarningCodes: string[];
+};
+
 export type LinaPortfolioSessionState = {
   flowVersion?: string;
   userMessages?: string[];
@@ -80,6 +93,7 @@ export type LinaPortfolioSessionState = {
   updatedBy?: string;
   createdProjectId?: string;
   createdUnitId?: string;
+  validation?: LinaPortfolioValidationState;
 };
 
 export type LinaPortfolioSessionContext = LinaPortfolioDraft & {
@@ -253,6 +267,10 @@ export class LinaPortfolioSessionService {
   ): Promise<LinaPortfolioSessionContext> {
     const session = await this.getOrCreateActiveSession(userId);
     const state = this.normalizeState(session.state);
+    const {
+      validation: _discardedValidation,
+      ...stateWithoutValidation
+    } = state;
     const currentDraft = this.getDraft(session, state);
     const cleanedFields = this.cleanFields(fields);
     const mergedDraft: LinaPortfolioDraft = {
@@ -279,7 +297,7 @@ export class LinaPortfolioSessionService {
           : session.confirmationStatus,
         lastActivityAt: new Date(),
         stateJson: this.toJson({
-          ...state,
+          ...stateWithoutValidation,
           flowVersion: this.flowVersion,
           extractedFields: mergedDraft,
           missingFields,
@@ -291,11 +309,52 @@ export class LinaPortfolioSessionService {
     return this.toContext(updatedSession);
   }
 
-  async markApproved(
+  async saveValidationState(
     userId: string,
+    validation: LinaPortfolioValidationState,
   ): Promise<LinaPortfolioSessionContext> {
     const session = await this.getOrCreateActiveSession(userId);
     const state = this.normalizeState(session.state);
+
+    const updatedSession = await this.prisma.linaPortfolioSession.update({
+      where: { id: session.id },
+      data: {
+        step:
+          validation.status === 'WARNING_CONFIRMATION_REQUIRED'
+            ? 'CONFIRMATION'
+            : 'SUMMARY',
+        status: 'READY_FOR_CONFIRMATION',
+        confirmationStatus: 'WAITING',
+        lastActivityAt: new Date(),
+        stateJson: this.toJson({
+          ...state,
+          flowVersion: this.flowVersion,
+          validation,
+          updatedBy: 'property-validation',
+        }),
+      },
+    });
+
+    return this.toContext(updatedSession);
+  }
+
+  async markApproved(
+    userId: string,
+    acknowledgedWarningCodes: readonly string[] = [],
+  ): Promise<LinaPortfolioSessionContext> {
+    const session = await this.getOrCreateActiveSession(userId);
+    const state = this.normalizeState(session.state);
+
+    const approvedValidation = state.validation
+      ? {
+          ...state.validation,
+          status: 'APPROVED' as const,
+          requiredWarningCodes: [],
+          acknowledgedWarningCodes: [
+            ...new Set(acknowledgedWarningCodes),
+          ],
+        }
+      : null;
 
     const updatedSession = await this.prisma.linaPortfolioSession.update({
       where: { id: session.id },
@@ -306,6 +365,9 @@ export class LinaPortfolioSessionService {
         lastActivityAt: new Date(),
         stateJson: this.toJson({
           ...state,
+          ...(approvedValidation
+            ? { validation: approvedValidation }
+            : {}),
           flowVersion: this.flowVersion,
           updatedBy: 'confirmation',
         }),
@@ -320,6 +382,10 @@ export class LinaPortfolioSessionService {
   ): Promise<LinaPortfolioSessionContext> {
     const session = await this.getOrCreateActiveSession(userId);
     const state = this.normalizeState(session.state);
+    const {
+      validation: _discardedValidation,
+      ...stateWithoutValidation
+    } = state;
 
     const updatedSession = await this.prisma.linaPortfolioSession.update({
       where: { id: session.id },
@@ -329,7 +395,7 @@ export class LinaPortfolioSessionService {
         step: 'SUMMARY',
         lastActivityAt: new Date(),
         stateJson: this.toJson({
-          ...state,
+          ...stateWithoutValidation,
           flowVersion: this.flowVersion,
           updatedBy: 'confirmation',
         }),
@@ -426,7 +492,10 @@ export class LinaPortfolioSessionService {
       session.status === 'CREATED'
         ? 'CREATED'
         : session.status === 'READY_FOR_CONFIRMATION'
-          ? 'SUMMARY'
+          ? state.validation?.status ===
+            'WARNING_CONFIRMATION_REQUIRED'
+            ? 'CONFIRMATION'
+            : 'SUMMARY'
           : this.getNextStep(missingFields);
 
     return {

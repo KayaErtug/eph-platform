@@ -1,4 +1,19 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { Response } from 'express';
 import { CrmService } from './crm.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -34,6 +49,42 @@ export class CrmController {
   @Get('customers/:id')
   getCustomer(@Param('id') id: string, @CurrentUser() user: any) {
     return this.crmService.getCustomer(id, user.id, user.role);
+  }
+
+  @Post('customers/:id/photo')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  uploadCustomerPhoto(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.crmService.uploadCustomerPhoto(
+      id,
+      user.id,
+      user.role,
+      file,
+    );
+  }
+
+  @Get('customers/:id/photo-file')
+  async getCustomerPhotoFile(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Res() res: Response,
+  ) {
+    const filePath =
+      await this.crmService.getCustomerPhotoFile(
+        id,
+        user.id,
+        user.role,
+      );
+
+    return res.sendFile(filePath);
   }
 
   @Patch('customers/:id')

@@ -1,0 +1,5 @@
+ALTER TYPE "UnitType"
+ADD VALUE IF NOT EXISTS 'DIGER';
+
+ALTER TABLE "Project"
+ADD COLUMN "plannedOtherUnitTypeName" TEXT;

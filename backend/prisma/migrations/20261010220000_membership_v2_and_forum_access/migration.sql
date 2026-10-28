@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "KontorIslemTuru" ADD VALUE IF NOT EXISTS 'FORUM_OZEL_BILGI';
+
+-- AlterTable
+ALTER TABLE "UyelikPaketi" ADD COLUMN IF NOT EXISTS "aktifCrmLimiti" INTEGER DEFAULT 100;

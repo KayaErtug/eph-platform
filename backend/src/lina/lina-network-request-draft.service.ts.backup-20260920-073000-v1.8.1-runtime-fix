@@ -1,0 +1,149 @@
+import { BadGatewayException, BadRequestException, Injectable } from "@nestjs/common";
+import { UnitType } from "@prisma/client";
+
+import { EphLocationCatalogService } from "./catalog/eph-location-catalog.service";
+import { LinaOpenAiClientService } from "./openai-tools/lina-openai-client.service";
+import { LinaOpenAiResponse } from "./openai-tools/lina-openai-response.types";
+
+const CATEGORIES = [
+  "PORTFOY_ARIYORUM", "KAT_KARSILIGI_ARSA_ARIYORUM", "BOLGESEL_SATIS_OFISI_ARIYORUM",
+  "IS_ORTAGI_ARIYORUM", "YATIRIMCI_ARIYORUM", "SEKTOREL_IHTIYACLAR", "DUYURU_KAMPANYA", "DIGER",
+] as const;
+const REQUEST_INTENTS = [
+  "PORTFOY_SATILIK", "PORTFOY_KIRALIK", "ARSA_KONUT_PROJESI", "ARSA_TICARI_PROJE",
+  "ARSA_KARMA_PROJE", "ARSA_KENTSEL_DONUSUM", "SATIS_OFISI_PROJE",
+  "SATIS_OFISI_BOLGESEL_PARTNER", "SATIS_OFISI_TEK_YETKILI", "SATIS_OFISI_BAYILIK_TEMSILCILIK",
+  "IS_ORTAGI_PORTFOY", "IS_ORTAGI_PROJE", "IS_ORTAGI_COZUM", "IS_ORTAGI_YUKLENICI_TASERON",
+  "YATIRIMCI_ARSA", "YATIRIMCI_PROJE", "YATIRIMCI_FINANSMAN", "YATIRIMCI_KURUMSAL",
+  "HIZMET_EKSPERTIZ", "HIZMET_TAPU_HUKUK", "HIZMET_FOTOGRAF_DRONE",
+  "HIZMET_MIMARLIK_MUHENDISLIK", "HIZMET_REKLAM_PAZARLAMA", "HIZMET_DIGER",
+  "DUYURU_GENEL", "DUYURU_ETKINLIK_EGITIM", "DUYURU_PLATFORM", "DUYURU_BOLGESEL",
+  "KAMPANYA_LANSMAN", "KAMPANYA_SATIS", "KAMPANYA_FIYAT_GUNCELLEME",
+  "KAMPANYA_ETKINLIK_TANITIM", "DIGER_GENEL_TALEP", "DIGER_BILGI_DESTEK", "DIGER_LISTE_DISI",
+] as const;
+const CURRENCIES = ["TRY", "USD", "EUR", "GBP"] as const;
+const URGENCIES = ["Normal", "Acil", "Müşteri Hazır", "Sıcak Talep"] as const;
+
+type JsonRecord = Record<string, unknown>;
+
+@Injectable()
+export class LinaNetworkRequestDraftService {
+  constructor(
+    private readonly openAiClient: LinaOpenAiClientService,
+    private readonly locationCatalog: EphLocationCatalogService,
+  ) {}
+
+  async create(message?: string) {
+    const text = String(message || "").replace(/\s+/g, " ").trim();
+    if (text.length < 8 || text.length > 1500) {
+      throw new BadRequestException("Talebinizi 8-1500 karakter arasında yazın.");
+    }
+
+    const response = await this.openAiClient.createResponse({
+      instructions: [
+        "Sen EPH Talep Merkezi için yalnız form taslağı çıkaran Lina'sın.",
+        "Kayıt, yayın, güncelleme veya başka bir işlem yapma. Yalnız geçerli JSON nesnesi döndür.",
+        `category: ${CATEGORIES.join(",")}`,
+        `requestIntent: ${REQUEST_INTENTS.join(",")}`,
+        `propertyType: ${Object.values(UnitType).join(",")}`,
+        `currency: ${CURRENCIES.join(",")}; urgency: ${URGENCIES.join(",")}`,
+        "Alanlar: category,requestIntent,propertyType,roomCounts,profileCriteria,minArea,city,areas,maxBudget,currency,urgency,confidence,warnings.",
+        "Bilinmeyen tekil alanı null, diziyi [], profileCriteria'yı {} yap. areas dizisi {city,district,neighborhood} nesnelerinden oluşsun.",
+        "Sayılar yalnız sayı olsun. Metinden olmayan bilgi uydurma. confidence 0-1 arasında olsun.",
+      ].join("\n"),
+      input: [{ role: "user", content: text }],
+      tools: [],
+      toolChoice: "none",
+      maxOutputTokens: 700,
+    });
+
+    const raw = this.parseJson(this.extractText(response));
+    const roomCounts = [
+      ...(Array.isArray(raw.roomCounts) ? raw.roomCounts.map(String) : []),
+      ...(text.match(/\b\d+\s*\+\s*\d+\b/g) || []).map((item) => item.replace(/\s/g, "")),
+    ].filter((item) => /^\d+\+\d+$/.test(item));
+    const warnings = Array.isArray(raw.warnings)
+      ? raw.warnings.map(String).map((item) => item.trim()).filter(Boolean).slice(0, 5)
+      : [];
+    const resolvedLocation = await this.locationCatalog.resolveLocationFromMessage(text).catch(() => null);
+    const city = resolvedLocation?.success ? resolvedLocation.province || "" : this.cleanString(raw.city);
+    const areas = resolvedLocation?.success && resolvedLocation.district
+      ? [{ city, district: resolvedLocation.district, neighborhood: resolvedLocation.neighborhood || resolvedLocation.village || "" }]
+      : this.cleanAreas(raw.areas, city);
+    if (resolvedLocation && !resolvedLocation.success && this.cleanString(raw.city)) {
+      warnings.push("Konum EPH kataloğunda kesin doğrulanamadı; yayınlamadan önce kontrol edin.");
+    }
+
+    return {
+      success: true,
+      draft: {
+        category: this.pick(raw.category, CATEGORIES),
+        requestIntent: this.pick(raw.requestIntent, REQUEST_INTENTS),
+        propertyType: this.pick(raw.propertyType, Object.values(UnitType)),
+        roomCounts: [...new Set(roomCounts)].slice(0, 8),
+        profileCriteria: this.cleanProfileCriteria(raw.profileCriteria),
+        minArea: this.positiveNumber(raw.minArea),
+        city,
+        areas,
+        maxBudget: this.positiveNumber(raw.maxBudget),
+        currency: this.pick(raw.currency, CURRENCIES) || "TRY",
+        urgency: this.pick(raw.urgency, URGENCIES) || "Normal",
+      },
+      confidence: Math.max(0, Math.min(1, Number(raw.confidence) || 0)),
+      warnings: [...new Set(warnings)].slice(0, 6),
+      requiresApproval: true,
+    };
+  }
+
+  private extractText(response: LinaOpenAiResponse): string {
+    if (response.output_text?.trim()) return response.output_text.trim();
+    return (response.output || []).flatMap((item) => item.type === "message" && Array.isArray(item.content)
+      ? item.content.map((content) => content.type === "output_text" && typeof content.text === "string" ? content.text : "")
+      : []).filter(Boolean).join("\n").trim();
+  }
+
+  private parseJson(value: string): JsonRecord {
+    try {
+      const cleaned = value.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+      const parsed = JSON.parse(cleaned);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error();
+      return parsed as JsonRecord;
+    } catch {
+      throw new BadGatewayException("Lina talep taslağını oluşturamadı. Lütfen tekrar deneyin.");
+    }
+  }
+
+  private pick<T extends string>(value: unknown, allowed: readonly T[]): T | null {
+    const clean = this.cleanString(value);
+    return allowed.includes(clean as T) ? clean as T : null;
+  }
+
+  private cleanString(value: unknown): string {
+    return typeof value === "string" ? value.trim() : "";
+  }
+
+  private positiveNumber(value: unknown): number | null {
+    const number = Number(value);
+    return Number.isFinite(number) && number > 0 ? Math.round(number) : null;
+  }
+
+  private cleanAreas(value: unknown, fallbackCity: string) {
+    if (!Array.isArray(value)) return [];
+    return value.map((item) => {
+      const area = item && typeof item === "object" ? item as JsonRecord : {};
+      return {
+        city: this.cleanString(area.city) || fallbackCity,
+        district: this.cleanString(area.district),
+        neighborhood: this.cleanString(area.neighborhood),
+      };
+    }).filter((item) => item.city && (item.district || item.neighborhood)).slice(0, 10);
+  }
+
+  private cleanProfileCriteria(value: unknown): Record<string, string[]> {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value as JsonRecord).map(([key, raw]) => [
+      key,
+      (Array.isArray(raw) ? raw : [raw]).map(String).map((item) => item.trim()).filter(Boolean).slice(0, 8),
+    ]).filter(([, values]) => (values as string[]).length > 0));
+  }
+}

@@ -12,6 +12,7 @@ import {
 } from '@prisma/client';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { PoolAudienceService, type AudienceInput } from '../pool-audience/pool-audience.service';
 
 const PLATFORM_URL =
   process.env.FRONTEND_URL ||
@@ -47,7 +48,7 @@ const CLOSED_STATUSES = new Set<UnitStatus>([
 
 @Injectable()
 export class ProjectSalesLaunchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audience: PoolAudienceService) {}
 
   async getLaunchCenter(projectId: string, userId: string, userRole: Role) {
     const project = await this.getAuthorizedProject(projectId, userId, userRole);
@@ -95,6 +96,8 @@ export class ProjectSalesLaunchService {
   async getPresentationByToken(token: string) {
     const projectId = this.verifyPresentationToken(token);
     const project = await this.getProject(projectId);
+    project.units = await this.audience.filterPublicUnits(project.units);
+    if (!project.units.length) throw new NotFoundException('Bu proje genel sunuma açık değil.');
     const stats = this.getProjectStats(project);
     const publishReadiness = this.buildPublishReadiness(project, stats);
 
@@ -134,25 +137,25 @@ export class ProjectSalesLaunchService {
     };
   }
 
-  async publishToPool(projectId: string, userId: string, userRole: Role) {
+  async publishToPool(projectId: string, userId: string, userRole: Role, poolAudience?: AudienceInput) {
     const project = await this.getAuthorizedProject(projectId, userId, userRole);
     const stats = this.getProjectStats(project);
     const publishReadiness = this.buildPublishReadiness(project, stats);
 
     if (!publishReadiness.ready) {
       throw new BadRequestException(
-        'Proje havuza yayınlanmadan önce eksikler tamamlanmalıdır.',
+        { message: 'Proje havuza yayınlanmadan önce eksikler tamamlanmalıdır.', issues: publishReadiness.issues },
       );
     }
 
     const publishedAt = new Date();
-    const result = await this.prisma.unit.updateMany({
+    const result = await this.prisma.$transaction(async tx => {
+      if (poolAudience) await this.audience.setProjectAudience(projectId, { id: userId, role: userRole }, poolAudience, tx);
+      return tx.unit.updateMany({
       where: {
         projectId: project.id,
         isSalesInventory: true,
-        status: {
-          not: UnitStatus.PASIF,
-        },
+        status: { in: [...AVAILABLE_STATUSES] },
       },
       data: {
         approvalStatus: PortfolioApprovalStatus.HAVUZDA,
@@ -161,6 +164,8 @@ export class ProjectSalesLaunchService {
         poolPublishedAt: publishedAt,
         poolRemovedAt: null,
       },
+    });
+
     });
 
     const nextProject = await this.getProject(project.id);
@@ -173,6 +178,16 @@ export class ProjectSalesLaunchService {
       project: this.serializeProject(nextProject),
       publishReadiness: this.buildPublishReadiness(nextProject, nextStats),
     };
+  }
+
+  async withdrawFromPool(projectId: string, userId: string, userRole: Role) {
+    const project = await this.getAuthorizedProject(projectId, userId, userRole);
+    const removedAt = new Date();
+    const result = await this.prisma.unit.updateMany({
+      where: { projectId: project.id, isSalesInventory: true, isPoolVisible: true },
+      data: { isPoolVisible: false, isOffMarket: false, poolRemovedAt: removedAt, approvalStatus: PortfolioApprovalStatus.ONAYLANDI },
+    });
+    return { success: true, withdrawnUnitCount: result.count, removedAt: removedAt.toISOString() };
   }
 
   private async getAuthorizedProject(
@@ -236,6 +251,19 @@ export class ProjectSalesLaunchService {
                 code: true,
                 name: true,
                 sortOrder: true,
+              },
+            },
+            images: {
+              orderBy: [
+                { isCover: 'desc' },
+                { sortOrder: 'asc' },
+                { createdAt: 'asc' },
+              ],
+              select: {
+                id: true,
+                url: true,
+                supabaseUrl: true,
+                isCover: true,
               },
             },
             mediaPackage: {
@@ -316,7 +344,7 @@ export class ProjectSalesLaunchService {
     const pricedUnits = units.filter((unit) => Number(unit.price || 0) > 0);
     const imageCount = project.mediaPackages.reduce(
       (total, mediaPackage) => total + mediaPackage._count.assets,
-      0,
+      units.reduce((total,unit)=>total+(unit.images?.length||0),0),
     );
     const totalListValue = units.reduce(
       (total, unit) => total + Number(unit.price || 0),
@@ -428,6 +456,18 @@ export class ProjectSalesLaunchService {
     const coverPackage =
       project.mediaPackages.find((item) => item._count.assets > 0) || null;
     const coverAsset = coverPackage?.assets[0] || null;
+    const firstUnitWithImage = project.units.find(
+      (u: any) =>
+        (u.images && u.images.length > 0) ||
+        (u.mediaPackage?.assets && u.mediaPackage.assets.length > 0),
+    );
+    const fallbackCoverUrl =
+      (firstUnitWithImage as any)?.images?.[0]?.supabaseUrl ||
+      (firstUnitWithImage as any)?.images?.[0]?.url ||
+      (firstUnitWithImage as any)?.mediaPackage?.assets?.[0]?.supabaseUrl ||
+      (firstUnitWithImage as any)?.mediaPackage?.assets?.[0]?.url ||
+      null;
+
     const highlightedUnits = project.units
       .filter((unit) => AVAILABLE_STATUSES.has(unit.status))
       .slice(0, 8)
@@ -444,6 +484,8 @@ export class ProjectSalesLaunchService {
         priceCurrency: unit.priceCurrency,
         status: unit.status,
         coverUrl:
+          (unit as any).images?.[0]?.supabaseUrl ||
+          (unit as any).images?.[0]?.url ||
           unit.mediaPackage?.assets[0]?.supabaseUrl ||
           unit.mediaPackage?.assets[0]?.url ||
           null,
@@ -454,7 +496,7 @@ export class ProjectSalesLaunchService {
       subtitle: [project.city, project.district, project.neighborhood]
         .filter(Boolean)
         .join(' / '),
-      coverUrl: coverAsset?.supabaseUrl || coverAsset?.url || null,
+      coverUrl: coverAsset?.supabaseUrl || coverAsset?.url || fallbackCoverUrl,
       metrics: {
         totalUnits: stats.totalUnits,
         availableUnits: stats.availableUnits,
@@ -496,7 +538,7 @@ export class ProjectSalesLaunchService {
       {
         key: 'media_uploaded',
         label: 'Görsel paketleri yüklendi',
-        passed: stats.imageCount > 0,
+        passed: stats.totalUnits > 0 && project.units.every(unit => unit.images?.length || unit.mediaPackage?.assets?.length),
         detail: `${stats.imageCount} görsel`,
       },
       {
@@ -510,6 +552,16 @@ export class ProjectSalesLaunchService {
     return {
       ready: checks.every((check) => check.passed),
       checks,
+      issues: [
+        ...checks.filter(check => !check.passed).map(check => ({ code: check.key, message: check.label + ('detail' in check && check.detail ? ': ' + check.detail : '') })),
+        ...project.units.flatMap(unit => {
+          const label = [unit.block?.code, unit.floorLabel || unit.floor, unit.number || unit.id].filter(value => value !== null && value !== undefined && value !== '').join(' / ');
+          return [
+            ...(Number(unit.price || 0) <= 0 ? [{ code: 'price_' + unit.id, message: label + ': fiyat girilmedi.' }] : []),
+            ...(!unit.images?.length && !unit.mediaPackage?.assets?.length ? [{ code: 'media_' + unit.id, message: label + ': bölüm fotoğrafı veya bağlı görsel paketi eksik.' }] : []),
+          ];
+        }),
+      ],
       nextAction: checks.every((check) => check.passed)
         ? 'HAVUZ_YAYININA_HAZIR'
         : 'EKSIKLERI_TAMAMLA',

@@ -4,13 +4,24 @@ import {
   BadRequestException,
   ForbiddenException,
 } from "@nestjs/common";
+import { companyName, requiresCompanyName } from '../profile/company-name';
 import { PrismaService } from "../prisma/prisma.service";
 import { MailService } from "../mail.service";
+import { MembershipService } from "../membership/membership.service";
+import { SupabaseService } from "../supabase/supabase.service";
 import {
   AuditAction,
+  Prisma,
   Capability,
+  DocumentType,
+  ProfessionalVerificationStatus,
   Role,
   UyelikDurumu,
+  UyelikPaketKodu,
+  UyelikPaketSegmenti,
+  PortfolioCreditLotTuru,
+  KontorHareketTuru,
+  KontorIslemTuru,
 } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 
@@ -29,7 +40,28 @@ export class AdminService {
   constructor(
     private prisma: PrismaService,
     private mail: MailService,
+    private supabase: SupabaseService,
+    private membershipService: MembershipService,
   ) {}
+
+  private async createProfessionalDocumentSignedUrl(
+    storedValue: string,
+  ) {
+    try {
+      return await this.supabase.createSignedUrl(
+        "documents",
+        storedValue,
+        300,
+      );
+    } catch (error) {
+      console.error(
+        "Admin mesleki belge signed URL üretilemedi:",
+        error instanceof Error ? error.message : error,
+      );
+
+      return null;
+    }
+  }
 
   private generateInviteCode(): string {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -114,6 +146,7 @@ export class AdminService {
     MODERATOR: "MOD",
     ADMIN: "ADM",
     SUPER_ADMIN: "SUP",
+    ADAY: "ADA",
   };
 
   private guvenlikKoduUret(length = 7): string {
@@ -239,6 +272,139 @@ export class AdminService {
     if (!this.isSoftwareTeam(actor)) {
       throw new ForbiddenException("Bu işlem sadece Yazılım Ekibi tarafından yapılabilir.");
     }
+  }
+
+  private requireAdminOrSoftwareTeam(actor?: AdminActor) {
+    if (!this.isAdmin(actor) && !this.isSoftwareTeam(actor)) {
+      throw new ForbiddenException(
+        "Bu işlem sadece Admin veya Yazılım Ekibi tarafından yapılabilir.",
+      );
+    }
+  }
+
+  async getNumericSystemSetting(
+    key: string,
+    fallback: number,
+  ): Promise<number> {
+    const setting = await this.prisma.systemSetting.findUnique({
+      where: { key },
+      select: { valueJson: true },
+    });
+
+    if (!setting) {
+      return fallback;
+    }
+
+    const raw = setting.valueJson as unknown;
+
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      return raw;
+    }
+
+    if (
+      typeof raw === "object" &&
+      raw !== null &&
+      "value" in raw
+    ) {
+      const value = Number(
+        (raw as Record<string, unknown>)["value"],
+      );
+
+      if (Number.isFinite(value)) {
+        return value;
+      }
+    }
+
+    const parsed = Number(raw);
+
+    return Number.isFinite(parsed)
+      ? parsed
+      : fallback;
+  }
+
+  async resolveOperationalPermission(
+    actor: AdminActor | undefined,
+    permissionKey: string,
+  ) {
+    const actorId = this.getActorId(actor);
+    const actorRole = this.getActorRole(actor) as Role;
+
+    if (actorRole === Role.SUPER_ADMIN) {
+      return {
+        enabled: true,
+        numericLimit: null as number | null,
+        metadata: null as Record<string, unknown> | null,
+        source: "SUPER_ADMIN" as const,
+      };
+    }
+
+    const permission =
+      await this.prisma.permissionDefinition.findUnique({
+        where: { key: permissionKey },
+      });
+
+    if (!permission || !permission.active) {
+      throw new ForbiddenException(
+        "Bu işlem için aktif yetki tanımı bulunamadı.",
+      );
+    }
+
+    if (permission.superAdminOnly) {
+      throw new ForbiddenException(
+        "Bu işlem yalnız Süper Admin tarafından yapılabilir.",
+      );
+    }
+
+    const rolePolicy =
+      await this.prisma.rolePermissionPolicy.findUnique({
+        where: {
+          role_permissionId: {
+            role: actorRole,
+            permissionId: permission.id,
+          },
+        },
+      });
+
+    const baseEnabled =
+      rolePolicy?.enabled ?? permission.defaultEnabled;
+    const baseNumericLimit =
+      rolePolicy?.numericLimit ?? permission.defaultNumericLimit ?? null;
+    const baseMetadata =
+      (rolePolicy?.metadata as Record<string, unknown> | null) ??
+      (permission.metadata as Record<string, unknown> | null) ??
+      null;
+
+    const now = new Date();
+    const override =
+      await this.prisma.userPermissionOverride.findUnique({
+        where: {
+          userId_permissionId: {
+            userId: actorId,
+            permissionId: permission.id,
+          },
+        },
+      });
+
+    if (
+      override &&
+      (!override.validFrom || override.validFrom <= now) &&
+      (!override.validUntil || override.validUntil >= now)
+    ) {
+      return {
+        enabled: override.enabled ?? baseEnabled,
+        numericLimit: override.numericLimit ?? baseNumericLimit,
+        metadata:
+          (override.metadata as Record<string, unknown> | null) ?? baseMetadata,
+        source: "USER_OVERRIDE" as const,
+      };
+    }
+
+    return {
+      enabled: baseEnabled,
+      numericLimit: baseNumericLimit,
+      metadata: baseMetadata,
+      source: rolePolicy ? "ROLE_POLICY" as const : "PERMISSION_DEFAULT" as const,
+    };
   }
 
 
@@ -583,7 +749,12 @@ export class AdminService {
     }
   }
 
-  async getStats() {
+  async getStats(actor?: AdminActor) {
+    const permission = await this.resolveOperationalPermission(actor, "REPORT_VIEW");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Rapor görüntüleme yetkiniz bulunmuyor.");
+    }
+
     const totalUsers = await this.prisma.user.count();
     const pendingUsers = await this.prisma.user.count({
       where: {
@@ -621,8 +792,12 @@ export class AdminService {
   }
 
   async getDashboardSummary(actor?: AdminActor) {
-    const role = String(actor?.role || "").toUpperCase();
-    const canViewAudit = role === Role.SUPER_ADMIN;
+    const reportPermission = await this.resolveOperationalPermission(actor, "REPORT_VIEW");
+    if (!reportPermission.enabled) {
+      throw new ForbiddenException("Rapor görüntüleme yetkiniz bulunmuyor.");
+    }
+    const auditPermission = await this.resolveOperationalPermission(actor, "AUDIT_VIEW");
+    const canViewAudit = auditPermission.enabled;
 
     const now = new Date();
     const startOfToday = new Date(now);
@@ -757,6 +932,11 @@ export class AdminService {
   }
 
   async getTrafficSummary(actor?: AdminActor) {
+    const permission = await this.resolveOperationalPermission(actor, "REPORT_VIEW");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Rapor görüntüleme yetkiniz bulunmuyor.");
+    }
+
     const now = new Date();
 
     const startOfToday = new Date(now);
@@ -932,6 +1112,10 @@ export class AdminService {
         cityPlateCode: true,
         isApproved: true,
         isVerified: true,
+        emailVerifiedAt: true,
+        professionalVerificationStatus: true,
+        profileCompleted: true,
+        profileCompletedAt: true,
         nominationPoints: true,
         nominationQuota: true,
         referralCode: true,
@@ -1022,6 +1206,27 @@ export class AdminService {
     });
 
     const userIds = users.map((user) => user.id);
+    const userPhones = users
+      .map((user) => user.phone)
+      .filter((phone): phone is string => Boolean(phone));
+
+    const phoneVerificationRows = userPhones.length
+      ? await this.prisma.phoneVerificationSecurity.findMany({
+          where: {
+            phone: {
+              in: userPhones,
+            },
+          },
+          select: {
+            phone: true,
+            verifiedAt: true,
+          },
+        })
+      : [];
+
+    const phoneVerificationMap = new Map(
+      phoneVerificationRows.map((item) => [item.phone, item]),
+    );
 
     const uyelikler = userIds.length
       ? await this.prisma.kullaniciUyelikPaketi.findMany({
@@ -1089,6 +1294,8 @@ export class AdminService {
 
       return {
         ...maskedUser,
+        phoneVerifiedAt:
+          phoneVerificationMap.get(user.phone)?.verifiedAt || null,
         aktifUyelik: aktifUyelik
           ? {
               id: aktifUyelik.id,
@@ -1120,7 +1327,10 @@ export class AdminService {
     capabilities: Array<Capability | string>,
     actor?: AdminActor,
   ) {
-    this.requireSoftwareTeam(actor);
+    const permission = await this.resolveOperationalPermission(actor, "CAPABILITY_MANAGE");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Kullanıcı ek yetkilerini yönetme yetkiniz bulunmuyor.");
+    }
 
     const actorId = this.getActorId(actor);
     const normalizedCapabilities = this.normalizeCapabilities(capabilities);
@@ -1147,6 +1357,15 @@ export class AdminService {
       throw new BadRequestException("Yazılım Ekibi hesabına organizasyon ek yetkisi atanamaz.");
     }
 
+    if (
+      normalizedCapabilities.includes(Capability.OFFICE_OWNER) &&
+      user.role !== Role.EMLAKCI
+    ) {
+      throw new BadRequestException(
+        "OFFICE_OWNER ek yetkisi yalnız Emlakçı rolüne atanabilir.",
+      );
+    }
+
     const currentCapabilities = user.capabilities.map((item) => item.capability);
     const capabilitiesToAdd = normalizedCapabilities.filter(
       (capability) => !currentCapabilities.includes(capability),
@@ -1154,6 +1373,13 @@ export class AdminService {
     const capabilitiesToRemove = currentCapabilities.filter(
       (capability) => !normalizedCapabilities.includes(capability),
     );
+
+    const officeOwnerChanged =
+      user.role === Role.EMLAKCI &&
+      (
+        capabilitiesToAdd.includes(Capability.OFFICE_OWNER) ||
+        capabilitiesToRemove.includes(Capability.OFFICE_OWNER)
+      );
 
     await this.prisma.$transaction([
       ...(capabilitiesToRemove.length
@@ -1184,6 +1410,23 @@ export class AdminService {
           },
         }),
       ),
+      ...(officeOwnerChanged
+        ? [
+            this.prisma.document.updateMany({
+              where: { userId: id },
+              data: { status: "PENDING" },
+            }),
+            this.prisma.user.update({
+              where: { id },
+              data: {
+                professionalVerificationStatus:
+                  ProfessionalVerificationStatus.REVIEW_REQUIRED,
+                profileCompleted: false,
+                profileCompletedAt: null,
+              },
+            }),
+          ]
+        : []),
     ]);
 
     const updated = await this.prisma.user.findUnique({
@@ -1238,6 +1481,11 @@ export class AdminService {
   }
 
   async approveUser(id: string, actor?: AdminActor) {
+    const permission = await this.resolveOperationalPermission(actor, "USER_APPROVE");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Kullanıcı onaylama yetkiniz bulunmuyor.");
+    }
+
     const user = await this.prisma.user.findUnique({ where: { id } });
 
     if (!user) {
@@ -1289,6 +1537,10 @@ export class AdminService {
   }
 
   async rejectUser(id: string, actor?: AdminActor) {
+    const permission = await this.resolveOperationalPermission(actor, "USER_DELETE");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Kullanıcı silme yetkiniz bulunmuyor.");
+    }
     this.requireSoftwareTeam(actor);
 
     const user = await this.prisma.user.findUnique({ where: { id } });
@@ -1326,6 +1578,11 @@ export class AdminService {
       duration?: SuspendDuration | string;
     },
   ) {
+    const permission = await this.resolveOperationalPermission(actor, "USER_SUSPEND");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Kullanıcı askıya alma yetkiniz bulunmuyor.");
+    }
+
     const actorId = this.getActorId(actor);
     const reason = this.ensureReason(body?.reason);
 
@@ -1447,37 +1704,103 @@ export class AdminService {
   }
 
   async changeUserRole(id: string, role: Role | string, actor?: AdminActor) {
-    this.requireSoftwareTeam(actor);
+    const permission = await this.resolveOperationalPermission(actor, "ROLE_CHANGE");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Kullanıcı rolünü değiştirme yetkiniz bulunmuyor.");
+    }
 
-    const normalizedRole = String(role || "").trim().toUpperCase() as Role;
+    const normalizedRole =
+      String(role || "").trim().toUpperCase() as Role;
 
     if (!Object.values(Role).includes(normalizedRole)) {
       throw new BadRequestException("Geçersiz rol.");
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id } });
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
 
     if (!user) {
       throw new NotFoundException("Kullanıcı bulunamadı.");
     }
 
     if (user.id === this.getActorId(actor)) {
-      throw new BadRequestException("Kendi rolünüzü değiştiremezsiniz.");
+      throw new BadRequestException(
+        "Kendi rolünüzü değiştiremezsiniz.",
+      );
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: { role: normalizedRole },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        profileImageUrl: true,
-        role: true,
-        isApproved: true,
+    if (
+      normalizedRole === Role.SUPER_ADMIN ||
+      user.role === Role.SUPER_ADMIN
+    ) {
+      const superAdminPermission = await this.resolveOperationalPermission(actor, "SUPER_ADMIN_MANAGE");
+      if (!superAdminPermission.enabled) {
+        throw new ForbiddenException("Yazılım Ekibi hesabını yönetme yetkiniz bulunmuyor.");
+      }
+    }
+
+    const roleChanged =
+      user.role !== normalizedRole;
+
+    const professionalRole =
+      normalizedRole === Role.EMLAKCI ||
+      normalizedRole === Role.MUTEAHHIT ||
+      normalizedRole === Role.INSAAT_FIRMASI;
+
+    const updated = await this.prisma.$transaction(
+      async (tx) => {
+        if (
+          roleChanged &&
+          normalizedRole !== Role.EMLAKCI
+        ) {
+          await tx.userCapability.deleteMany({
+            where: {
+              userId: id,
+              capability: Capability.OFFICE_OWNER,
+            },
+          });
+        }
+
+        if (roleChanged && professionalRole) {
+          await tx.document.updateMany({
+            where: { userId: id },
+            data: { status: "PENDING" },
+          });
+        }
+
+        return tx.user.update({
+          where: { id },
+          data: {
+            role: normalizedRole,
+            ...(roleChanged
+              ? {
+                  professionalVerificationStatus:
+                    professionalRole
+                      ? ProfessionalVerificationStatus.REVIEW_REQUIRED
+                      : null,
+                  ...(professionalRole
+                    ? {
+                        profileCompleted: false,
+                        profileCompletedAt: null,
+                      }
+                    : {}),
+                }
+              : {}),
+          },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            profileImageUrl: true,
+            role: true,
+            isApproved: true,
+            professionalVerificationStatus: true,
+          },
+        });
       },
-    });
+    );
 
     await this.logAdminAction({
       actor,
@@ -1489,6 +1812,8 @@ export class AdminService {
       metadata: {
         oldRole: user.role,
         newRole: normalizedRole,
+        professionalVerificationReset:
+          roleChanged && professionalRole,
       },
     });
 
@@ -1506,6 +1831,8 @@ export class AdminService {
     },
     actor?: AdminActor,
   ) {
+    this.requireSoftwareTeam(actor);
+
     const normalizedRole = String(data.role || "").trim().toUpperCase() as Role;
 
     if (!Object.values(Role).includes(normalizedRole)) {
@@ -1518,6 +1845,13 @@ export class AdminService {
       normalizedRole === Role.SUPER_ADMIN
     ) {
       this.requireSoftwareTeam(actor);
+    }
+
+    if (normalizedRole === Role.SUPER_ADMIN) {
+      const superAdminPermission = await this.resolveOperationalPermission(actor, "SUPER_ADMIN_MANAGE");
+      if (!superAdminPermission.enabled) {
+        throw new ForbiddenException("Yazılım Ekibi hesabını oluşturma yetkiniz bulunmuyor.");
+      }
     }
 
     const existing = await this.prisma.user.findUnique({
@@ -1541,6 +1875,12 @@ export class AdminService {
         role: normalizedRole,
         isApproved: true,
         isVerified: true,
+        professionalVerificationStatus:
+          normalizedRole === Role.EMLAKCI ||
+          normalizedRole === Role.MUTEAHHIT ||
+          normalizedRole === Role.INSAAT_FIRMASI
+            ? ProfessionalVerificationStatus.PENDING
+            : null,
         referralCode,
       },
       select: {
@@ -1969,7 +2309,135 @@ export class AdminService {
     });
   }
 
-  async getDocuments(filter?: "pending" | "approved" | "rejected" | "all") {
+  private requiredProfessionalDocumentTypes(
+    role: Role,
+    capabilities: Capability[],
+  ): DocumentType[] {
+    if (role === Role.EMLAKCI) {
+      return capabilities.includes(Capability.OFFICE_OWNER)
+        ? [DocumentType.YETKI_BELGESI]
+        : [DocumentType.MYK_BELGESI];
+    }
+
+    if (
+      role === Role.MUTEAHHIT ||
+      role === Role.INSAAT_FIRMASI
+    ) {
+      return [
+        DocumentType.YAMBIS_BELGESI,
+        DocumentType.VERGI_LEVHASI,
+      ];
+    }
+
+    return [];
+  }
+
+  private async syncProfessionalVerificationStatus(
+    userId: string,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        role: true,
+        companyName: true,
+        professionalVerificationStatus: true,
+        capabilities: {
+          select: {
+            capability: true,
+          },
+        },
+        documents: {
+          select: {
+            type: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException("Kullanıcı bulunamadı.");
+    }
+
+    if (user.professionalVerificationStatus === null) {
+      return null;
+    }
+
+    const requiredTypes =
+      this.requiredProfessionalDocumentTypes(
+        user.role,
+        user.capabilities.map(
+          (item) => item.capability,
+        ),
+      );
+
+    if (!requiredTypes.length) {
+      return user.professionalVerificationStatus;
+    }
+
+    const states = requiredTypes.map((requiredType) => {
+      const matching = user.documents.filter(
+        (document) => document.type === requiredType,
+      );
+
+      const approved = matching.some(
+        (document) => document.status === "APPROVED",
+      );
+
+      const rejected =
+        !approved &&
+        matching.some(
+          (document) => document.status === "REJECTED",
+        );
+
+      return {
+        requiredType,
+        approved,
+        rejected,
+      };
+    });
+
+    let nextStatus: ProfessionalVerificationStatus =
+      ProfessionalVerificationStatus.PENDING;
+
+    const hasEmployer = !requiresCompanyName(user.role) || (typeof user.companyName === 'string' && user.companyName.trim().length >= 2);
+    if (hasEmployer && states.every((state) => state.approved)) {
+      nextStatus =
+        ProfessionalVerificationStatus.VERIFIED;
+    } else if (
+      states.some((state) => state.rejected)
+    ) {
+      nextStatus =
+        ProfessionalVerificationStatus.REJECTED;
+    }
+
+    const verified =
+      nextStatus ===
+      ProfessionalVerificationStatus.VERIFIED;
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        professionalVerificationStatus: nextStatus,
+        profileCompleted: verified,
+        profileCompletedAt: verified
+          ? new Date()
+          : null,
+      },
+    });
+
+    return nextStatus;
+  }
+
+  async getDocuments(
+    filter?: "pending" | "approved" | "rejected" | "all",
+    actor?: AdminActor,
+  ) {
+    const permission = await this.resolveOperationalPermission(actor, "DOCUMENT_VIEW");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Belge görüntüleme yetkiniz bulunmuyor.");
+    }
+
     const where =
       filter === "pending"
         ? { status: "PENDING" as const }
@@ -1979,48 +2447,117 @@ export class AdminService {
             ? { status: "REJECTED" as const }
             : {};
 
-    return this.prisma.document.findMany({
+    const documents = await this.prisma.document.findMany({
       where,
       include: {
         user: {
           select: {
             id: true,
+            companyName: true,
             firstName: true,
             lastName: true,
             email: true,
             profileImageUrl: true,
             role: true,
+            professionalVerificationStatus: true,
           },
         },
       },
       orderBy: { createdAt: "desc" },
     });
+
+    return Promise.all(
+      documents.map(async (document) => ({
+        ...document,
+        fileUrl:
+          await this.createProfessionalDocumentSignedUrl(
+            document.fileUrl,
+          ),
+      })),
+    );
   }
 
-  async approveDocument(id: string) {
-    const doc = await this.prisma.document.findUnique({ where: { id } });
+  async approveDocument(id: string, actor?: AdminActor) {
+    const permission = await this.resolveOperationalPermission(actor, "DOCUMENT_APPROVE");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Belge onaylama yetkiniz bulunmuyor.");
+    }
+
+    const doc = await this.prisma.document.findUnique({
+      where: { id },
+    });
 
     if (!doc) {
       throw new NotFoundException("Belge bulunamadı.");
     }
 
-    return this.prisma.document.update({
+    const owner = await this.prisma.user.findUnique({
+      where: { id: doc.userId }, select: { role: true, companyName: true },
+    });
+    if (!owner) throw new NotFoundException('Kullanıcı bulunamadı.');
+    if (requiresCompanyName(owner.role)) companyName(owner.companyName);
+
+    const updated = await this.prisma.document.update({
       where: { id },
       data: { status: "APPROVED" },
     });
+
+    const professionalVerificationStatus =
+      await this.syncProfessionalVerificationStatus(
+        updated.userId,
+      );
+
+    const trialMembership =
+      professionalVerificationStatus ===
+      ProfessionalVerificationStatus.VERIFIED
+        ? await this.membershipService.startTrialMembership(
+            updated.userId,
+          )
+        : null;
+
+    return {
+      ...updated,
+      fileUrl:
+        await this.createProfessionalDocumentSignedUrl(
+          updated.fileUrl,
+        ),
+      professionalVerificationStatus,
+      trialMembership,
+    };
   }
 
-  async rejectDocument(id: string) {
-    const doc = await this.prisma.document.findUnique({ where: { id } });
+  async rejectDocument(id: string, actor?: AdminActor) {
+    const permission = await this.resolveOperationalPermission(actor, "DOCUMENT_REJECT");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Belge reddetme yetkiniz bulunmuyor.");
+    }
+
+    const doc = await this.prisma.document.findUnique({
+      where: { id },
+    });
 
     if (!doc) {
       throw new NotFoundException("Belge bulunamadı.");
     }
 
-    return this.prisma.document.update({
+    const updated = await this.prisma.document.update({
       where: { id },
       data: { status: "REJECTED" },
     });
+
+    const professionalVerificationStatus =
+      await this.syncProfessionalVerificationStatus(
+        updated.userId,
+      );
+
+    return {
+      ...updated,
+      fileUrl:
+        await this.createProfessionalDocumentSignedUrl(
+          updated.fileUrl,
+        ),
+      professionalVerificationStatus,
+    };
   }
 
   async getNominations(status?: string) {
@@ -2333,6 +2870,1091 @@ export class AdminService {
     return updated;
   }
 
+  private resolveMembershipSegment(
+    role: Role | string,
+  ): UyelikPaketSegmenti {
+    if (role === Role.EMLAKCI) {
+      return UyelikPaketSegmenti.EMLAK_PRO;
+    }
+
+    if (
+      role === Role.MUTEAHHIT ||
+      role === Role.INSAAT_FIRMASI
+    ) {
+      return UyelikPaketSegmenti.MUTEAHHIT;
+    }
+
+    throw new BadRequestException(
+      "Bu kullanıcı rolü için üyelik paketi atanamaz.",
+    );
+  }
+
+  async getUserMembershipPackages(
+    userId: string,
+    actor?: AdminActor,
+  ) {
+    const permission = await this.resolveOperationalPermission(actor, "MEMBERSHIP_VIEW");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Üyelik görüntüleme yetkiniz bulunmuyor.");
+    }
+    this.requireSoftwareTeam(actor);
+
+    const normalizedUserId = String(userId || "").trim();
+
+    if (!normalizedUserId) {
+      throw new BadRequestException(
+        "Kullanıcı kimliği zorunludur.",
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: normalizedUserId },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(
+        "Kullanıcı bulunamadı.",
+      );
+    }
+
+    if (user.role === Role.SUPER_ADMIN) {
+      throw new BadRequestException(
+        "Yazılım Ekibi hesabının üyelik paketi değiştirilemez.",
+      );
+    }
+
+    const segment =
+      this.resolveMembershipSegment(user.role);
+
+    const paketler =
+      await this.prisma.uyelikPaketi.findMany({
+        where: {
+          segment,
+          aktifMi: true,
+        },
+        orderBy: {
+          fiyat: "asc",
+        },
+      });
+
+    return {
+      segment,
+      paketler: paketler.map((paket) => ({
+        id: paket.id,
+        paketKodu: paket.paketKodu,
+        paketAdi: paket.paketAdi,
+        fiyat:
+          paket.fiyat === null
+            ? null
+            : Number(paket.fiyat),
+        paraBirimi: paket.paraBirimi,
+        aylikPaketPk: paket.aylikPaketPk,
+        aktifPortfoyLimiti:
+          paket.aktifPortfoyLimiti,
+        aylikTalepLimiti:
+          paket.aylikTalepLimiti,
+        aylikHavuzGonderimLimiti:
+          paket.aylikHavuzGonderimLimiti,
+        aylikMatchLimiti:
+          paket.aylikMatchLimiti,
+        projeLimiti: paket.projeLimiti,
+        projeIlanLimiti:
+          paket.projeIlanLimiti,
+        denemeGunSayisi:
+          paket.denemeGunSayisi,
+      })),
+    };
+  }
+
+  async updateUserMembership(
+    userId: string,
+    body: {
+      paketKodu: string;
+      gunSayisi?: number;
+      aySayisi?: number;
+      gerekce?: string;
+    },
+    actor?: AdminActor,
+  ) {
+    const permission = await this.resolveOperationalPermission(actor, "MEMBERSHIP_CHANGE");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Üyelik değiştirme yetkiniz bulunmuyor.");
+    }
+    this.requireSoftwareTeam(actor);
+
+    const actorId = this.getActorId(actor);
+    const normalizedUserId =
+      String(userId || "").trim();
+
+    const paketKodu =
+      String(body?.paketKodu || "")
+        .trim()
+        .toUpperCase() as UyelikPaketKodu;
+
+    const gerekceMetni =
+      String(body?.gerekce || "").trim();
+
+    const gerekce =
+      gerekceMetni ||
+      "Yazılım Ekibi tarafından üyelik paketi güncellendi.";
+
+    if (!normalizedUserId) {
+      throw new BadRequestException(
+        "Kullanıcı kimliği zorunludur.",
+      );
+    }
+
+    if (
+      !Object.values(UyelikPaketKodu).includes(
+        paketKodu,
+      )
+    ) {
+      throw new BadRequestException(
+        "Geçersiz üyelik paketi.",
+      );
+    }
+
+    if (gerekceMetni.length > 120) {
+      throw new BadRequestException(
+        "Üyelik değişiklik gerekçesi en fazla 120 karakter olabilir.",
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtext(${`admin-membership:${normalizedUserId}`})
+        )
+      `;
+
+      const user = await tx.user.findUnique({
+        where: {
+          id: normalizedUserId,
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          role: true,
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException(
+          "Kullanıcı bulunamadı.",
+        );
+      }
+
+      if (user.role === Role.SUPER_ADMIN) {
+        throw new BadRequestException(
+          "Yazılım Ekibi hesabının üyelik paketi değiştirilemez.",
+        );
+      }
+
+      const segment =
+        this.resolveMembershipSegment(user.role);
+
+      const paket =
+        await tx.uyelikPaketi.findUnique({
+          where: {
+            paketKodu_segment: {
+              paketKodu,
+              segment,
+            },
+          },
+        });
+
+      if (!paket || !paket.aktifMi) {
+        throw new NotFoundException(
+          "Kullanıcının segmentine uygun aktif üyelik paketi bulunamadı.",
+        );
+      }
+
+      const mevcutUyelik =
+        await tx.kullaniciUyelikPaketi.findFirst({
+          where: {
+            kullaniciId: normalizedUserId,
+          },
+          orderBy: {
+            baslangicTarihi: "desc",
+          },
+        });
+
+      const now = new Date();
+      const bitisTarihi = new Date(now);
+
+      if (
+        paketKodu === UyelikPaketKodu.DENEME
+      ) {
+        if (
+          body?.gunSayisi !== undefined &&
+          Number(body.gunSayisi) !== 14
+        ) {
+          throw new BadRequestException(
+            "İlk deneme paketi yalnız 14 gün olabilir.",
+          );
+        }
+
+        const denemePaketleri =
+          await tx.uyelikPaketi.findMany({
+            where: {
+              paketKodu: UyelikPaketKodu.DENEME,
+            },
+            select: {
+              id: true,
+            },
+          });
+
+        const oncekiDeneme =
+          await tx.kullaniciUyelikPaketi.findFirst({
+            where: {
+              kullaniciId: normalizedUserId,
+              paketId: {
+                in: denemePaketleri.map(
+                  (item) => item.id,
+                ),
+              },
+            },
+            select: {
+              id: true,
+            },
+          });
+
+        if (oncekiDeneme) {
+          throw new BadRequestException(
+            "Bu kullanıcı daha önce deneme paketinden yararlanmıştır. İkinci kez deneme paketi atanamaz.",
+          );
+        }
+
+        const ucretliPaketler =
+          await tx.uyelikPaketi.findMany({
+            where: {
+              paketKodu: {
+                in: [
+                  UyelikPaketKodu.BRONZ,
+                  UyelikPaketKodu.GUMUS,
+                  UyelikPaketKodu.ALTIN,
+                ],
+              },
+            },
+            select: {
+              id: true,
+            },
+          });
+
+        const oncekiUcretliUyelik =
+          await tx.kullaniciUyelikPaketi.findFirst({
+            where: {
+              kullaniciId: normalizedUserId,
+              paketId: {
+                in: ucretliPaketler.map(
+                  (item) => item.id,
+                ),
+              },
+            },
+            select: {
+              id: true,
+            },
+          });
+
+        if (oncekiUcretliUyelik) {
+          throw new BadRequestException(
+            "Ücretli paket kullanmış kullanıcıya sonradan deneme paketi atanamaz.",
+          );
+        }
+
+        bitisTarihi.setUTCDate(
+          bitisTarihi.getUTCDate() + 14,
+        );
+      } else {
+        const aySayisi =
+          body?.aySayisi === undefined
+            ? 1
+            : Number(body.aySayisi);
+
+        if (
+          !Number.isInteger(aySayisi) ||
+          aySayisi <= 0 ||
+          aySayisi > 36
+        ) {
+          throw new BadRequestException(
+            "Üyelik süresi 1-36 ay arasında olmalıdır.",
+          );
+        }
+
+        bitisTarihi.setUTCMonth(
+          bitisTarihi.getUTCMonth() + aySayisi,
+        );
+      }
+
+      await tx.kullaniciUyelikPaketi.updateMany({
+        where: {
+          kullaniciId: normalizedUserId,
+          durum: UyelikDurumu.AKTIF,
+        },
+        data: {
+          durum: UyelikDurumu.PASIF,
+        },
+      });
+
+      const yeniUyelik =
+        await tx.kullaniciUyelikPaketi.create({
+          data: {
+            kullaniciId: normalizedUserId,
+            paketId: paket.id,
+            durum: UyelikDurumu.AKTIF,
+            baslangicTarihi: now,
+            bitisTarihi,
+            pilotPaketMi:
+              mevcutUyelik?.pilotPaketMi || false,
+            testPaketiMi:
+              mevcutUyelik?.testPaketiMi || false,
+            notlar: gerekce,
+          },
+        });
+
+      const packagePk =
+        Number(paket.aylikPaketPk || 0);
+
+      let creditLot = null;
+
+      if (packagePk > 0) {
+        creditLot =
+          await tx.portfolioCreditLot.create({
+            data: {
+              kullaniciId: normalizedUserId,
+              lotTuru:
+                PortfolioCreditLotTuru.PAKET,
+              ilkMiktar: packagePk,
+              kalanMiktar: packagePk,
+              sonKullanmaTarihi:
+                yeniUyelik.bitisTarihi,
+              kaynakKayitTuru:
+                "ADMIN_MEMBERSHIP",
+              kaynakKayitId:
+                yeniUyelik.id,
+              uyelikId:
+                yeniUyelik.id,
+              dedupeKey:
+                `admin-membership:${yeniUyelik.id}:package-pk`,
+              aciklama:
+                `${paket.paketAdi} üyelik paketi aylık PK tanımı`,
+              aktifMi: true,
+            },
+          });
+
+        await tx.kontorCuzdani.upsert({
+          where: {
+            kullaniciId:
+              normalizedUserId,
+          },
+          update: {},
+          create: {
+            kullaniciId:
+              normalizedUserId,
+            bakiye: 0,
+            toplamYukleme: 0,
+            toplamHarcama: 0,
+            toplamHediye: 0,
+            aktifMi: true,
+          },
+        });
+
+        await tx.$queryRaw`
+          SELECT "id"
+          FROM "KontorCuzdani"
+          WHERE "kullaniciId" = ${normalizedUserId}
+          FOR UPDATE
+        `;
+
+        const wallet =
+          await tx.kontorCuzdani.findUnique({
+            where: {
+              kullaniciId:
+                normalizedUserId,
+            },
+          });
+
+        if (!wallet) {
+          throw new BadRequestException(
+            "Kullanıcı PK cüzdanı oluşturulamadı.",
+          );
+        }
+
+        const updatedWallet =
+          await tx.kontorCuzdani.update({
+            where: {
+              kullaniciId:
+                normalizedUserId,
+            },
+            data: {
+              bakiye: {
+                increment: packagePk,
+              },
+              toplamYukleme: {
+                increment: packagePk,
+              },
+              aktifMi: true,
+            },
+          });
+
+        await tx.kontorHareketi.create({
+          data: {
+            kullaniciId:
+              normalizedUserId,
+            hareketTuru:
+              KontorHareketTuru.YUKLEME,
+            islemTuru:
+              KontorIslemTuru.DIGER,
+            miktar: packagePk,
+            oncekiBakiye:
+              wallet.bakiye,
+            sonrakiBakiye:
+              updatedWallet.bakiye,
+            aciklama:
+              `${paket.paketAdi} üyelik paketi PK yüklemesi`,
+            ilgiliKayitTuru:
+              "ADMIN_MEMBERSHIP",
+            ilgiliKayitId:
+              yeniUyelik.id,
+            olusturanId:
+              actorId,
+          },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          targetUserId:
+            normalizedUserId,
+          action:
+            AuditAction.UPDATE_USER_PACKAGE,
+          entityType:
+            "KullaniciUyelikPaketi",
+          entityId:
+            yeniUyelik.id,
+          description: gerekce,
+          metadata: {
+            eskiUyelikId:
+              mevcutUyelik?.id || null,
+            eskiPaketId:
+              mevcutUyelik?.paketId || null,
+            yeniUyelikId:
+              yeniUyelik.id,
+            yeniPaketId:
+              paket.id,
+            yeniPaketKodu:
+              paket.paketKodu,
+            yeniPaketAdi:
+              paket.paketAdi,
+            segment:
+              paket.segment,
+            bitisTarihi:
+              bitisTarihi.toISOString(),
+            packagePk,
+            portfolioCreditLotId:
+              creditLot?.id || null,
+          },
+          ipAddress:
+            actor?.ipAddress,
+          userAgent:
+            actor?.userAgent,
+        },
+      });
+
+      const kullaniciAdi =
+        `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+        user.email;
+
+      return {
+        success: true,
+        mesaj:
+          `${kullaniciAdi} kullanıcısının üyelik paketi ${paket.paketAdi} olarak güncellendi.`,
+        segment,
+        uyelik: {
+          id: yeniUyelik.id,
+          paketId: paket.id,
+          paketKodu:
+            paket.paketKodu,
+          paketAdi:
+            paket.paketAdi,
+          durum:
+            yeniUyelik.durum,
+          baslangicTarihi:
+            yeniUyelik.baslangicTarihi,
+          bitisTarihi:
+            yeniUyelik.bitisTarihi,
+          pilotPaketMi:
+            yeniUyelik.pilotPaketMi,
+          testPaketiMi:
+            yeniUyelik.testPaketiMi,
+        },
+        packagePk,
+        portfolioCreditLotId:
+          creditLot?.id || null,
+      };
+    });
+  }
+
+  private systemSettingResponse(setting: {
+    key: string;
+    valueJson: Prisma.JsonValue;
+    description: string | null;
+    updatedAt: Date;
+    updatedById: string | null;
+  }) {
+    const raw = setting.valueJson;
+    const value = typeof raw === "object" && raw !== null && !Array.isArray(raw)
+      ? Number(raw.value)
+      : Number(raw);
+
+    return {
+      key: setting.key,
+      value,
+      description: setting.description,
+      updatedAt: setting.updatedAt,
+      updatedById: setting.updatedById,
+    };
+  }
+
+  async getSystemSettings(actor?: AdminActor) {
+    this.requireSoftwareTeam(actor);
+
+    const settings = await this.prisma.systemSetting.findMany({
+      where: {
+        key: { in: ["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"] },
+      },
+      orderBy: { key: "asc" },
+    });
+
+    return settings.map((setting) => this.systemSettingResponse(setting));
+  }
+
+  async updateSystemSetting(
+    key: string,
+    body: { value: number; description?: string },
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    if (!["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"].includes(key)) {
+      throw new BadRequestException("Desteklenmeyen sistem ayarı.");
+    }
+
+    const minimum =
+      key === "TRIAL_MAX_EXTENSIONS" ||
+      key === "POOL_PRIVATE_INFO_COST" ||
+      key === "MATCH_SCAN_COST_PK" ||
+      key === "MATCH_SCAN_COST_REQUEST_PK" ||
+      key === "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK" ||
+      key === "MATCH_SCAN_COST_POOL_PROPERTY_PK" ||
+      key === "MATCH_SCAN_COST_CRM_PK"
+        ? 0
+        : 1;
+    if (!body || typeof body.value !== "number" || !Number.isSafeInteger(body.value) || body.value < minimum) {
+      throw new BadRequestException(`Değer en az ${minimum} olan bir tam sayı olmalıdır.`);
+    }
+    if (body.description !== undefined && typeof body.description !== "string") {
+      throw new BadRequestException("Açıklama metin olmalıdır.");
+    }
+
+    const actorId = this.getActorId(actor);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`system-setting:${key}`}))::text AS locked`;
+      const existing = await tx.systemSetting.findUnique({ where: { key } });
+      if (!existing) {
+        throw new NotFoundException("Sistem ayarı bulunamadı.");
+      }
+
+      const previousValue = this.systemSettingResponse(existing).value;
+      const raw = existing.valueJson;
+      const valueJson: Prisma.InputJsonValue = typeof raw === "object" && raw !== null && !Array.isArray(raw)
+        ? { ...raw, value: body.value } as Prisma.InputJsonObject
+        : body.value;
+      const updated = await tx.systemSetting.update({
+        where: { key },
+        data: {
+          valueJson,
+          description: body.description,
+          updatedById: actorId,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: AuditAction.UPDATE_SYSTEM_SETTING,
+          entityType: "SystemSetting",
+          entityId: updated.id,
+          description: `Sistem ayarı güncellendi: ${key}`,
+          metadata: { key, previousValue, newValue: body.value },
+          ipAddress: actor?.ipAddress,
+          userAgent: actor?.userAgent,
+        },
+      });
+
+      return this.systemSettingResponse(updated);
+    });
+  }
+
+  async getPermissionDefinitions(
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    return this.prisma.permissionDefinition.findMany({
+      where: {
+        active: true,
+      },
+      orderBy: [
+        { category: "asc" },
+        { key: "asc" },
+      ],
+    });
+  }
+
+  async getUserPermissionProfile(
+    userId: string,
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    const normalizedUserId =
+      String(userId || "").trim();
+
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: normalizedUserId,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(
+        "Kullanıcı bulunamadı.",
+      );
+    }
+
+    const definitions =
+      await this.prisma.permissionDefinition.findMany({
+        where: {
+          active: true,
+        },
+        include: {
+          rolePolicies: {
+            where: {
+              role: user.role,
+            },
+          },
+          overrides: {
+            where: {
+              userId: normalizedUserId,
+            },
+          },
+        },
+        orderBy: [
+          { category: "asc" },
+          { key: "asc" },
+        ],
+      });
+
+    const now = new Date();
+
+    const permissions = definitions.map(
+      (permission) => {
+        const rolePolicy =
+          permission.rolePolicies[0] || null;
+
+        const override =
+          permission.overrides[0] || null;
+
+        const overrideActive =
+          !!override &&
+          (!override.validFrom ||
+            override.validFrom <= now) &&
+          (!override.validUntil ||
+            override.validUntil >= now);
+
+        const enabled =
+          permission.superAdminOnly
+            ? user.role === Role.SUPER_ADMIN
+            : overrideActive &&
+                override?.enabled !== null
+              ? override.enabled
+              : rolePolicy
+                ? rolePolicy.enabled
+                : permission.defaultEnabled;
+
+        const numericLimit =
+          overrideActive &&
+          override?.numericLimit !== null
+            ? override.numericLimit
+            : rolePolicy?.numericLimit ??
+              permission.defaultNumericLimit ??
+              null;
+
+        const metadata =
+          overrideActive && override?.metadata
+            ? override.metadata
+            : rolePolicy?.metadata ??
+              permission.metadata ??
+              null;
+
+        return {
+          id: permission.id,
+          key: permission.key,
+          category: permission.category,
+          label: permission.label,
+          description: permission.description,
+          delegable: permission.delegable,
+          superAdminOnly:
+            permission.superAdminOnly,
+          enabled,
+          numericLimit,
+          metadata,
+          source:
+            permission.superAdminOnly &&
+            user.role === Role.SUPER_ADMIN
+              ? "SUPER_ADMIN"
+              : overrideActive
+                ? "USER_OVERRIDE"
+                : rolePolicy
+                  ? "ROLE_POLICY"
+                  : "PERMISSION_DEFAULT",
+          rolePolicy: rolePolicy
+            ? {
+                enabled:
+                  rolePolicy.enabled,
+                numericLimit:
+                  rolePolicy.numericLimit,
+                metadata:
+                  rolePolicy.metadata,
+              }
+            : null,
+          override: override
+            ? {
+                id: override.id,
+                enabled:
+                  override.enabled,
+                numericLimit:
+                  override.numericLimit,
+                validFrom:
+                  override.validFrom,
+                validUntil:
+                  override.validUntil,
+                metadata:
+                  override.metadata,
+                active:
+                  overrideActive,
+              }
+            : null,
+        };
+      },
+    );
+
+    return {
+      user,
+      permissions,
+    };
+  }
+
+  async updateUserPermissionOverride(
+    userId: string,
+    permissionKey: string,
+    body: {
+      enabled?: boolean | null;
+      numericLimit?: number | null;
+      validFrom?: string | null;
+      validUntil?: string | null;
+      metadata?: Prisma.InputJsonObject | null;
+    },
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    const actorId = this.getActorId(actor);
+
+    const normalizedUserId =
+      String(userId || "").trim();
+
+    const normalizedPermissionKey =
+      String(permissionKey || "")
+        .trim()
+        .toUpperCase();
+
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: normalizedUserId,
+      },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(
+        "Kullanıcı bulunamadı.",
+      );
+    }
+
+    const permission =
+      await this.prisma.permissionDefinition.findUnique({
+        where: {
+          key: normalizedPermissionKey,
+        },
+      });
+
+    if (!permission || !permission.active) {
+      throw new NotFoundException(
+        "Aktif yetki tanımı bulunamadı.",
+      );
+    }
+
+    if (
+      permission.superAdminOnly ||
+      !permission.delegable
+    ) {
+      throw new ForbiddenException(
+        "Bu yetki kullanıcıya devredilemez.",
+      );
+    }
+
+    if (
+      body.numericLimit !== undefined &&
+      body.numericLimit !== null &&
+      (
+        !Number.isInteger(body.numericLimit) ||
+        body.numericLimit < 0
+      )
+    ) {
+      throw new BadRequestException(
+        "Sayısal limit sıfır veya pozitif tam sayı olmalıdır.",
+      );
+    }
+
+    const validFrom =
+      body.validFrom
+        ? new Date(body.validFrom)
+        : null;
+
+    const validUntil =
+      body.validUntil
+        ? new Date(body.validUntil)
+        : null;
+
+    if (
+      validFrom &&
+      Number.isNaN(validFrom.getTime())
+    ) {
+      throw new BadRequestException(
+        "Yetki başlangıç tarihi geçersiz.",
+      );
+    }
+
+    if (
+      validUntil &&
+      Number.isNaN(validUntil.getTime())
+    ) {
+      throw new BadRequestException(
+        "Yetki bitiş tarihi geçersiz.",
+      );
+    }
+
+    if (
+      validFrom &&
+      validUntil &&
+      validUntil < validFrom
+    ) {
+      throw new BadRequestException(
+        "Yetki bitiş tarihi başlangıç tarihinden önce olamaz.",
+      );
+    }
+
+    const updated =
+      await this.prisma.userPermissionOverride.upsert({
+        where: {
+          userId_permissionId: {
+            userId: normalizedUserId,
+            permissionId: permission.id,
+          },
+        },
+        update: {
+          enabled:
+            body.enabled === undefined
+              ? undefined
+              : body.enabled,
+          numericLimit:
+            body.numericLimit === undefined
+              ? undefined
+              : body.numericLimit,
+          validFrom:
+            body.validFrom === undefined
+              ? undefined
+              : validFrom,
+          validUntil:
+            body.validUntil === undefined
+              ? undefined
+              : validUntil,
+          metadata:
+            body.metadata === undefined
+              ? undefined
+              : body.metadata === null
+                ? Prisma.DbNull
+                : body.metadata,
+          updatedById: actorId,
+        },
+        create: {
+          userId: normalizedUserId,
+          permissionId: permission.id,
+          enabled:
+            body.enabled ?? null,
+          numericLimit:
+            body.numericLimit ?? null,
+          validFrom,
+          validUntil,
+          metadata:
+            body.metadata === null
+              ? Prisma.DbNull
+              : body.metadata,
+          updatedById: actorId,
+        },
+      });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        targetUserId:
+          normalizedUserId,
+        action:
+          AuditAction.UPDATE_USER_PERMISSION,
+        entityType:
+          "UserPermissionOverride",
+        entityId:
+          updated.id,
+        description:
+          `Kullanıcı yetkisi güncellendi: ${permission.key}`,
+        metadata: {
+          permissionKey:
+            permission.key,
+          enabled:
+            updated.enabled,
+          numericLimit:
+            updated.numericLimit,
+          validFrom:
+            updated.validFrom?.toISOString() ??
+            null,
+          validUntil:
+            updated.validUntil?.toISOString() ??
+            null,
+          overrideMetadata:
+            updated.metadata ?? null,
+        },
+        ipAddress:
+          actor?.ipAddress,
+        userAgent:
+          actor?.userAgent,
+      },
+    });
+
+    return this.getUserPermissionProfile(
+      normalizedUserId,
+      actor,
+    );
+  }
+
+  async deleteUserPermissionOverride(
+    userId: string,
+    permissionKey: string,
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    const actorId = this.getActorId(actor);
+
+    const normalizedUserId =
+      String(userId || "").trim();
+
+    const normalizedPermissionKey =
+      String(permissionKey || "")
+        .trim()
+        .toUpperCase();
+
+    const permission =
+      await this.prisma.permissionDefinition.findUnique({
+        where: {
+          key: normalizedPermissionKey,
+        },
+      });
+
+    if (!permission) {
+      throw new NotFoundException(
+        "Yetki tanımı bulunamadı.",
+      );
+    }
+
+    const existing =
+      await this.prisma.userPermissionOverride.findUnique({
+        where: {
+          userId_permissionId: {
+            userId: normalizedUserId,
+            permissionId: permission.id,
+          },
+        },
+      });
+
+    if (existing) {
+      await this.prisma.userPermissionOverride.delete({
+        where: {
+          id: existing.id,
+        },
+      });
+
+      await this.prisma.auditLog.create({
+        data: {
+          actorId,
+          targetUserId:
+            normalizedUserId,
+          action:
+            AuditAction.UPDATE_USER_PERMISSION,
+          entityType:
+            "UserPermissionOverride",
+          entityId:
+            existing.id,
+          description:
+            `Kullanıcı özel yetkisi kaldırıldı: ${permission.key}`,
+          metadata: {
+            permissionKey:
+              permission.key,
+            action:
+              "DELETE_OVERRIDE",
+          },
+          ipAddress:
+            actor?.ipAddress,
+          userAgent:
+            actor?.userAgent,
+        },
+      });
+    }
+
+    return this.getUserPermissionProfile(
+      normalizedUserId,
+      actor,
+    );
+  }
+
   async extendUserTrial(
     userId: string,
     body: {
@@ -2341,9 +3963,41 @@ export class AdminService {
     },
     actor?: AdminActor,
   ) {
-    this.requireSoftwareTeam(actor);
+    this.requireAdminOrSoftwareTeam(actor);
 
     const actorId = this.getActorId(actor);
+
+    const trialInitialDays =
+      await this.getNumericSystemSetting("TRIAL_INITIAL_DAYS", 14);
+
+    const trialExtensionDays =
+      await this.getNumericSystemSetting("TRIAL_EXTENSION_DAYS", 14);
+
+    const trialMaxExtensions =
+      await this.getNumericSystemSetting("TRIAL_MAX_EXTENSIONS", 1);
+
+    if (
+      !Number.isInteger(trialInitialDays) ||
+      trialInitialDays <= 0 ||
+      !Number.isInteger(trialExtensionDays) ||
+      trialExtensionDays <= 0 ||
+      !Number.isInteger(trialMaxExtensions) ||
+      trialMaxExtensions < 0
+    ) {
+      throw new BadRequestException(
+        "Deneme politikası sistem ayarları geçersiz.",
+      );
+    }
+
+    const trialExtendPermission =
+      await this.resolveOperationalPermission(actor, "TRIAL_EXTEND");
+
+    if (!trialExtendPermission.enabled) {
+      throw new ForbiddenException(
+        "Deneme süresi uzatma yetkiniz bulunmuyor.",
+      );
+    }
+
     const normalizedUserId = String(userId || "").trim();
     const gunSayisi = Number(body?.gunSayisi);
     const gerekceMetni =
@@ -2356,15 +4010,12 @@ export class AdminService {
       throw new BadRequestException("Kullanıcı kimliği zorunludur.");
     }
 
-    if (!Number.isInteger(gunSayisi) || gunSayisi <= 0) {
+    if (
+      !Number.isInteger(gunSayisi) ||
+      gunSayisi !== trialExtensionDays
+    ) {
       throw new BadRequestException(
-        "Uzatma süresi pozitif tam gün sayısı olmalıdır.",
-      );
-    }
-
-    if (gunSayisi > 30) {
-      throw new BadRequestException(
-        "Deneme süresi tek işlemde en fazla 30 gün uzatılabilir.",
+        `Deneme süresi yalnız ${trialExtensionDays} gün uzatılabilir.`,
       );
     }
 
@@ -2400,6 +4051,53 @@ export class AdminService {
         throw new BadRequestException(
           "Yazılım Ekibi hesabının üyelik süresi değiştirilemez.",
         );
+      }
+
+      if (this.isAdmin(actor)) {
+        const numericLimit = trialExtendPermission.numericLimit;
+        const metadata = trialExtendPermission.metadata || {};
+
+        const limitScope = String(
+          metadata["limitScope"] || "",
+        ).toUpperCase();
+
+        const limitPeriod = String(
+          metadata["limitPeriod"] || "",
+        ).toUpperCase();
+
+        if (
+          numericLimit !== null &&
+          limitScope === "PER_TARGET_USER" &&
+          limitPeriod === "YEAR"
+        ) {
+          const now = new Date();
+
+          const yearStart = new Date(
+            Date.UTC(now.getUTCFullYear(), 0, 1),
+          );
+
+          const nextYearStart = new Date(
+            Date.UTC(now.getUTCFullYear() + 1, 0, 1),
+          );
+
+          const usedCount = await tx.auditLog.count({
+            where: {
+              actorId,
+              targetUserId: normalizedUserId,
+              action: AuditAction.TRIAL_UZAT,
+              createdAt: {
+                gte: yearStart,
+                lt: nextYearStart,
+              },
+            },
+          });
+
+          if (usedCount >= numericLimit) {
+            throw new ForbiddenException(
+              `Bu kullanıcı için yıllık deneme uzatma limitiniz dolmuştur. Yıllık limit: ${numericLimit}.`,
+            );
+          }
+        }
       }
 
       const mevcutUyelik =
@@ -2441,17 +4139,52 @@ export class AdminService {
         );
       }
 
-      const simdi = new Date();
-      const eskiBitisTarihi = mevcutUyelik.bitisTarihi;
-      const uzatmaBaslangici =
-        eskiBitisTarihi && eskiBitisTarihi > simdi
-          ? new Date(eskiBitisTarihi)
-          : new Date(simdi);
+        const toplamUzatmaSayisi =
+          await tx.auditLog.count({
+            where: {
+              targetUserId: normalizedUserId,
+              action: AuditAction.TRIAL_UZAT,
+            },
+          });
 
-      const yeniBitisTarihi = new Date(uzatmaBaslangici);
-      yeniBitisTarihi.setUTCDate(
-        yeniBitisTarihi.getUTCDate() + gunSayisi,
-      );
+        if (toplamUzatmaSayisi >= trialMaxExtensions) {
+          throw new BadRequestException(
+            `Bu kullanıcı için izin verilen azami deneme uzatma sayısına ulaşıldı. Limit: ${trialMaxExtensions}.`,
+          );
+        }
+
+        const eskiBitisTarihi =
+          mevcutUyelik.bitisTarihi;
+
+        const maksimumToplamGun =
+          trialInitialDays +
+          trialExtensionDays * trialMaxExtensions;
+
+        const maksimumBitisTarihi =
+          new Date(mevcutUyelik.baslangicTarihi);
+
+        maksimumBitisTarihi.setUTCDate(
+          maksimumBitisTarihi.getUTCDate() + maksimumToplamGun,
+        );
+
+        const yeniBitisTarihi =
+          new Date(eskiBitisTarihi);
+
+        yeniBitisTarihi.setUTCDate(
+          yeniBitisTarihi.getUTCDate() + trialExtensionDays,
+        );
+
+        if (
+          yeniBitisTarihi >
+          maksimumBitisTarihi
+        ) {
+          throw new BadRequestException(
+            `Deneme süresi toplam ${maksimumToplamGun} günü aşamaz.`,
+          );
+        }
+
+      const uzatmaBaslangici =
+        new Date(eskiBitisTarihi);
 
       const guncelUyelik =
         await tx.kullaniciUyelikPaketi.update({
@@ -2484,6 +4217,25 @@ export class AdminService {
               uzatmaBaslangici.toISOString(),
             yeniBitisTarihi:
               yeniBitisTarihi.toISOString(),
+            trialPolicy: {
+              initialDays: trialInitialDays,
+              extensionDays: trialExtensionDays,
+              maxExtensions: trialMaxExtensions,
+            },
+            actorPermission: {
+              source: trialExtendPermission.source,
+              numericLimit: trialExtendPermission.numericLimit,
+              limitScope:
+                String(
+                  trialExtendPermission.metadata?.["limitScope"] || "",
+                ) || null,
+              limitPeriod:
+                String(
+                  trialExtendPermission.metadata?.["limitPeriod"] || "",
+                ) || null,
+            },
+            previousExtensionCount:
+              toplamUzatmaSayisi,
           },
           ipAddress: actor?.ipAddress,
           userAgent: actor?.userAgent,

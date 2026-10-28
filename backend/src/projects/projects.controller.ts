@@ -11,6 +11,7 @@ type ProjectLocationBody = {
   description?: string;
   city: string;
   district: string;
+  neighborhood?: string | null;
   address: string;
   latitude?: number | string | null;
   longitude?: number | string | null;
@@ -35,33 +36,34 @@ export class ProjectsController {
     @CurrentUser() user: any,
     @Query('city') city?: string,
     @Query('district') district?: string,
+    @Query('neighborhood') neighborhood?: string,
   ) {
-    return this.projectsService.findAll({ city, district }, { id: user.id, role: user.role });
+    return this.projectsService.findAll({ city, district, neighborhood }, user);
   }
 
   @Get('my')
   @UseGuards(RolesGuard)
   @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
   myProjects(@CurrentUser() user: any) {
-    return this.projectsService.myProjects(user.id);
+    return this.projectsService.myProjects(user.id, user.role);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.projectsService.findOne(id, { id: user.id, role: user.role });
+    return this.projectsService.findOne(id, user);
   }
 
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
   update(@Param('id') id: string, @CurrentUser() user: any, @Body() body: Partial<ProjectLocationBody> & { isActive?: boolean }) {
-    return this.projectsService.update(id, user.id, body);
+    return this.projectsService.update(id, user.id, body, user.role);
   }
 
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
   remove(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.projectsService.remove(id, user.id);
+    return this.projectsService.remove(id, user.id, user.role);
   }
 }

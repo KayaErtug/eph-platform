@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   CustomerRole,
+  Role,
   CustomerStatus,
   PortfolioApprovalStatus,
   UnitStatus,
@@ -54,10 +55,11 @@ type ProjectSummary = {
 export class ProjectSalesDashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getDashboard(userId: string) {
+  async getDashboard(userId: string, userRole?: Role | string) {
+    const ownerScope = userRole === Role.SUPER_ADMIN ? {} : { ownerId: userId };
     const [projects, unitGroups, customerGroups] = await Promise.all([
       this.prisma.project.findMany({
-        where: { ownerId: userId },
+        where: ownerScope,
         select: {
           id: true,
           code: true,
@@ -74,7 +76,7 @@ export class ProjectSalesDashboardService {
         by: ['projectId', 'status', 'isPoolVisible', 'approvalStatus'],
         where: {
           project: {
-            ownerId: userId,
+            ...ownerScope,
           },
         },
         _count: {
@@ -87,7 +89,7 @@ export class ProjectSalesDashboardService {
       this.prisma.customer.groupBy({
         by: ['status'],
         where: {
-          ownerId: userId,
+          ...ownerScope,
           roles: {
             has: CustomerRole.ALICI,
           },

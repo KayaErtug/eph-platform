@@ -1,21 +1,21 @@
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import {
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
-import { Capability, Role } from '@prisma/client';
+  Capability,
+  ProfessionalVerificationStatus,
+  Role,
+} from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
-import {
-  RegistrationType,
-  RegisterDto,
-} from '../dto/register.dto';
+import { RegistrationType, RegisterDto } from '../dto/register.dto';
 import { EmailVerificationV2Service } from '../email/email-verification-v2.service';
-import { PhoneOtpService } from '../otp/phone-otp.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UsersService } from '../../users/users.service';
 import { PendingRegistrationService } from './pending-registration.service';
+import { SupabaseService } from '../../supabase/supabase.service';
 
 type MailRegistrationType =
+  | 'PROFILE_ONBOARDING'
   | 'EMLAK_DANISMANI'
   | 'EMLAK_OFISI'
   | 'MUTEAHHIT'
@@ -27,18 +27,25 @@ export class RegistrationV2Service {
     private readonly usersService: UsersService,
     private readonly prisma: PrismaService,
     private readonly pendingService: PendingRegistrationService,
-    private readonly phoneOtpService: PhoneOtpService,
     private readonly emailVerificationService: EmailVerificationV2Service,
+    private readonly supabase: SupabaseService,
+    private readonly jwtService: JwtService,
   ) {}
 
   private normalizeEmail(email: string) {
-    return String(email || '').trim().toLowerCase();
+    return String(email || '')
+      .trim()
+      .toLowerCase();
   }
 
   private resolveMailRegistrationType(
     role: Role,
     registrationType?: string | null,
   ): MailRegistrationType {
+    if (role === Role.ADAY) {
+      return 'PROFILE_ONBOARDING';
+    }
+
     if (role === Role.MUTEAHHIT) {
       return 'MUTEAHHIT';
     }
@@ -59,9 +66,7 @@ export class RegistrationV2Service {
     let code = 'EPH-';
 
     for (let index = 0; index < 8; index += 1) {
-      code += chars.charAt(
-        Math.floor(Math.random() * chars.length),
-      );
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
 
     return code;
@@ -86,25 +91,72 @@ export class RegistrationV2Service {
     const email = this.normalizeEmail(dto.email);
     const phone = String(dto.phone || '').trim();
 
-    const [existingEmail, existingPhone] =
-      await Promise.all([
-        this.usersService.findByEmail(email),
-        this.prisma.user.findUnique({
-          where: { phone },
-          select: { id: true },
-        }),
-      ]);
+    const [existingEmail, existingPhone] = await Promise.all([
+      this.usersService.findByEmail(email),
+      this.prisma.user.findUnique({
+        where: { phone },
+        select: { id: true },
+      }),
+    ]);
 
     if (existingEmail) {
-      throw new BadRequestException(
-        'Bu e-posta zaten kayıtlı.',
-      );
+      throw new BadRequestException('Bu e-posta zaten kayıtlı.');
     }
 
     if (existingPhone) {
-      throw new BadRequestException(
-        'Bu telefon numarası zaten kayıtlı.',
-      );
+      throw new BadRequestException('Bu telefon numarası zaten kayıtlı.');
+    }
+
+    /*
+     * Gecis uyumlulugu:
+     * - password varsa eski mobil kayit akisi
+     * - password yoksa yeni B modeli (e-posta + telefon)
+     */
+    const isLegacyFlow = Boolean(String(dto.password || '').trim());
+
+    if (!isLegacyFlow) {
+      const pending = await this.pendingService.createOrReplace({
+        firstName: '',
+        lastName: '',
+        email,
+        phone,
+        passwordHash: null,
+        city: null,
+        role: Role.ADAY,
+        registrationType: null,
+        inviteCode: null,
+        referralCandidateId: null,
+        taxNumber: null,
+        taxOffice: null,
+        professionalDocumentNumber: null,
+      });
+
+      return {
+        success: true,
+        flow: 'PROFILE_ONBOARDING',
+        pendingRegistrationId: pending.id,
+        requiresPhoneVerification: true,
+        firebasePhoneVerificationRequired: true,
+        phone: pending.phone,
+        message:
+          'E-posta ve telefon bilgileriniz kaydedildi. Telefon doğrulamasına devam ediniz.',
+      };
+    }
+
+    const firstName = String(dto.firstName || '').trim();
+    const lastName = String(dto.lastName || '').trim();
+    const city = String(dto.city || '').trim();
+
+    if (!firstName) {
+      throw new BadRequestException('Ad alanı zorunludur.');
+    }
+
+    if (!lastName) {
+      throw new BadRequestException('Soyad alanı zorunludur.');
+    }
+
+    if (city.length < 2) {
+      throw new BadRequestException('Şehir seçimi zorunludur.');
     }
 
     const allowedRoles: Role[] = [
@@ -120,151 +172,126 @@ export class RegistrationV2Service {
     if (dto.inviteCode?.trim()) {
       inviteCode = dto.inviteCode.trim().toUpperCase();
 
-      const referral =
-        await this.prisma.referralCandidate.findFirst({
-          where: {
-            referralCode: inviteCode,
-            isActive: true,
-            usedAt: null,
-          },
-        });
+      const referral = await this.prisma.referralCandidate.findFirst({
+        where: {
+          referralCode: inviteCode,
+          isActive: true,
+          usedAt: null,
+        },
+      });
 
       if (!referral) {
-        throw new BadRequestException(
-          'Referans kodu bulunamadı.',
-        );
+        throw new BadRequestException('Referans kodu bulunamadı.');
       }
 
       role = referral.role;
       referralCandidateId = referral.id;
-    } else if (!allowedRoles.includes(role)) {
-      throw new BadRequestException(
-        'Geçerli bir meslek seçiniz.',
-      );
     }
 
-    const passwordHash = await bcrypt.hash(
-      dto.password,
-      10,
-    );
+    if (!role || !allowedRoles.includes(role)) {
+      throw new BadRequestException('Geçerli bir meslek seçiniz.');
+    }
 
-    const pending =
-      await this.pendingService.createOrReplace({
-        firstName: dto.firstName.trim(),
-        lastName: dto.lastName.trim(),
-        email,
-        phone,
-        passwordHash,
-        city: dto.city.trim(),
-        role,
-        registrationType:
-          dto.registrationType ||
-          RegistrationType.EMLAK_DANISMANI,
-        inviteCode,
-        referralCandidateId,
-      });
+    const taxNumber = String(dto.taxNumber || '').replace(/\D/g, '');
+    const taxOffice = String(dto.taxOffice || '').trim();
+    const professionalDocumentNumber = String(
+      dto.professionalDocumentNumber || '',
+    ).trim();
 
-    await this.phoneOtpService.send(pending.id);
+    if (role === Role.EMLAKCI && !professionalDocumentNumber) {
+      throw new BadRequestException('Yetki belge numarası zorunludur.');
+    }
+
+    if (role === Role.MUTEAHHIT || role === Role.INSAAT_FIRMASI) {
+      if (!/^\d{10}$/.test(taxNumber)) {
+        throw new BadRequestException('Vergi numarası 10 haneli olmalıdır.');
+      }
+
+      if (taxOffice.length < 2) {
+        throw new BadRequestException('Vergi dairesi zorunludur.');
+      }
+    }
+
+    const passwordHash = await bcrypt.hash(String(dto.password), 10);
+
+    const pending = await this.pendingService.createOrReplace({
+      firstName,
+      lastName,
+      email,
+      phone,
+      passwordHash,
+      city,
+      role,
+      registrationType:
+        dto.registrationType || RegistrationType.EMLAK_DANISMANI,
+      inviteCode,
+      referralCandidateId,
+      taxNumber,
+      taxOffice,
+      professionalDocumentNumber,
+    });
 
     return {
       success: true,
+      flow: 'LEGACY',
       pendingRegistrationId: pending.id,
       requiresPhoneVerification: true,
+      firebasePhoneVerificationRequired: true,
       phone: pending.phone,
-      message: 'Telefon doğrulama kodu gönderildi.',
-    };
-  }
-
-  async verifyPhoneOtp(
-    pendingRegistrationId: string,
-    code: string,
-  ) {
-    const pending =
-      await this.pendingService.findById(
-        pendingRegistrationId,
-      );
-
-    if (!pending) {
-      throw new BadRequestException(
-        'Kayıt doğrulama oturumu bulunamadı.',
-      );
-    }
-
-    if (pending.phoneVerified) {
-      return {
-        success: true,
-        alreadyVerified: true,
-        pendingRegistrationId: pending.id,
-        requiresEmailVerification: true,
-        message:
-          'Telefon numaranız zaten doğrulanmış.',
-      };
-    }
-
-    await this.phoneOtpService.verify(
-      pendingRegistrationId,
-      code,
-    );
-
-    const updated =
-      await this.pendingService.markPhoneVerified(
-        pendingRegistrationId,
-      );
-
-    return {
-      success: true,
-      pendingRegistrationId: updated.id,
-      phoneVerified: true,
-      requiresEmailVerification: true,
-      email: updated.email,
       message:
-        'Telefon numaranız doğrulandı. E-posta doğrulamasına devam ediniz.',
+        'Üyelik bilgileriniz kaydedildi. Firebase telefon doğrulamasına devam ediniz.',
     };
   }
 
-  async resendPhoneOtp(
+  async uploadProfessionalDocument(
     pendingRegistrationId: string,
+    file: Express.Multer.File,
   ) {
-    const pending =
-      await this.pendingService.findById(
-        pendingRegistrationId,
-      );
-
-    if (!pending) {
+    if (!String(pendingRegistrationId || '').trim()) {
+      throw new BadRequestException('Kayıt başvurusu kimliği zorunludur.');
+    }
+    const pending = await this.pendingService.findById(pendingRegistrationId);
+    if (!pending || pending.completedAt || pending.expiresAt < new Date()) {
       throw new BadRequestException(
-        'Kayıt doğrulama oturumu bulunamadı.',
+        'Kayıt başvurusu bulunamadı veya süresi doldu.',
       );
     }
-
-    if (pending.phoneVerified) {
-      throw new BadRequestException(
-        'Telefon numarası zaten doğrulanmış.',
-      );
+    if (!file) {
+      throw new BadRequestException('Mesleki belge seçilmelidir.');
     }
-
-    return this.phoneOtpService.send(
-      pendingRegistrationId,
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (!allowed.includes(file.mimetype)) {
+      throw new BadRequestException('Belge PDF, JPG veya PNG olmalıdır.');
+    }
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `pending-registration/${pending.id}/${Date.now()}-${safeName}`;
+    await this.supabase.uploadFile(
+      'documents',
+      storagePath,
+      file.buffer,
+      file.mimetype,
     );
+    const professionalDocumentUrl = storagePath;
+    await this.prisma.pendingRegistration.update({
+      where: { id: pending.id },
+      data: {
+        professionalDocumentUrl,
+        professionalDocumentName: file.originalname,
+        professionalDocumentMime: file.mimetype,
+      },
+    });
+    return { success: true, fileName: file.originalname };
   }
 
-  async sendEmailCode(
-    pendingRegistrationId: string,
-  ) {
-    const pending =
-      await this.pendingService.findById(
-        pendingRegistrationId,
-      );
+  async sendEmailCode(pendingRegistrationId: string) {
+    const pending = await this.pendingService.findById(pendingRegistrationId);
 
     if (!pending) {
-      throw new BadRequestException(
-        'Kayıt doğrulama oturumu bulunamadı.',
-      );
+      throw new BadRequestException('Kayıt doğrulama oturumu bulunamadı.');
     }
 
     if (!pending.phoneVerified) {
-      throw new BadRequestException(
-        'Önce telefon doğrulamasını tamamlayınız.',
-      );
+      throw new BadRequestException('Önce telefon doğrulamasını tamamlayınız.');
     }
 
     if (pending.emailVerified) {
@@ -272,51 +299,37 @@ export class RegistrationV2Service {
         success: true,
         alreadyVerified: true,
         pendingRegistrationId: pending.id,
-        message:
-          'E-posta adresiniz zaten doğrulanmış.',
+        message: 'E-posta adresiniz zaten doğrulanmış.',
       };
     }
 
-    const registrationType =
-      this.resolveMailRegistrationType(
-        pending.role,
-        pending.registrationType,
-      );
+    const registrationType = this.resolveMailRegistrationType(
+      pending.role,
+      pending.registrationType,
+    );
 
-    const result =
-      await this.emailVerificationService.send(
-        pending.id,
-        registrationType,
-      );
+    const result = await this.emailVerificationService.send(
+      pending.id,
+      registrationType,
+    );
 
     return {
       ...result,
       pendingRegistrationId: pending.id,
       email: pending.email,
-      message:
-        'E-posta doğrulama kodu gönderildi.',
+      message: 'E-posta doğrulama kodu gönderildi.',
     };
   }
 
-  async verifyEmailV2(
-    pendingRegistrationId: string,
-    code: string,
-  ) {
-    const pending =
-      await this.pendingService.findById(
-        pendingRegistrationId,
-      );
+  async verifyEmailV2(pendingRegistrationId: string, code: string) {
+    const pending = await this.pendingService.findById(pendingRegistrationId);
 
     if (!pending) {
-      throw new BadRequestException(
-        'Kayıt doğrulama oturumu bulunamadı.',
-      );
+      throw new BadRequestException('Kayıt doğrulama oturumu bulunamadı.');
     }
 
     if (!pending.phoneVerified) {
-      throw new BadRequestException(
-        'Önce telefon doğrulamasını tamamlayınız.',
-      );
+      throw new BadRequestException('Önce telefon doğrulamasını tamamlayınız.');
     }
 
     if (pending.emailVerified) {
@@ -325,20 +338,15 @@ export class RegistrationV2Service {
         alreadyVerified: true,
         pendingRegistrationId: pending.id,
         readyToComplete: true,
-        message:
-          'E-posta adresiniz zaten doğrulanmış.',
+        message: 'E-posta adresiniz zaten doğrulanmış.',
       };
     }
 
-    await this.emailVerificationService.verify(
-      pendingRegistrationId,
-      code,
-    );
+    await this.emailVerificationService.verify(pendingRegistrationId, code);
 
-    const updated =
-      await this.pendingService.markEmailVerified(
-        pendingRegistrationId,
-      );
+    const updated = await this.pendingService.markEmailVerified(
+      pendingRegistrationId,
+    );
 
     return {
       success: true,
@@ -350,18 +358,11 @@ export class RegistrationV2Service {
     };
   }
 
-  async completeRegistration(
-    pendingRegistrationId: string,
-  ) {
-    const pending =
-      await this.pendingService.findById(
-        pendingRegistrationId,
-      );
+  async completeRegistration(pendingRegistrationId: string) {
+    const pending = await this.pendingService.findById(pendingRegistrationId);
 
     if (!pending) {
-      throw new BadRequestException(
-        'Kayıt doğrulama oturumu bulunamadı.',
-      );
+      throw new BadRequestException('Kayıt doğrulama oturumu bulunamadı.');
     }
 
     if (!pending.phoneVerified || !pending.emailVerified) {
@@ -370,49 +371,71 @@ export class RegistrationV2Service {
       );
     }
 
+    const isProfileOnboardingFlow =
+      !pending.passwordHash && pending.role === Role.ADAY;
+
+    if (!isProfileOnboardingFlow && !pending.professionalDocumentUrl) {
+      throw new BadRequestException('Mesleki belge yüklenmelidir.');
+    }
+
     if (pending.completedAt) {
-      const existingUser =
-        await this.prisma.user.findFirst({
-          where: {
-            OR: [
-              { email: pending.email },
-              { phone: pending.phone },
-            ],
-          },
-          select: {
-            id: true,
-            email: true,
-            phone: true,
-            isApproved: true,
-            isVerified: true,
-          },
-        });
+      const existingUser = await this.prisma.user.findFirst({
+        where: {
+          OR: [{ email: pending.email }, { phone: pending.phone }],
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          role: true,
+          isApproved: true,
+          isVerified: true,
+          professionalVerificationStatus: true,
+        },
+      });
 
       if (existingUser) {
+        if (isProfileOnboardingFlow) {
+          const token = this.jwtService.sign({
+            sub: existingUser.id,
+            email: existingUser.email,
+            phone: existingUser.phone,
+            role: existingUser.role,
+          });
+
+          return {
+            success: true,
+            alreadyCompleted: true,
+            flow: 'PROFILE_ONBOARDING',
+            token,
+            profileRoute: '/profile',
+            user: existingUser,
+            message:
+              'Kayıt daha önce tamamlandı. Profil bilgilerinizi tamamlayınız.',
+          };
+        }
+
         return {
           success: true,
           alreadyCompleted: true,
           userId: existingUser.id,
           isApproved: existingUser.isApproved,
           isVerified: existingUser.isVerified,
-          message:
-            'Üyelik kaydınız daha önce tamamlanmış.',
+          message: 'Üyelik kaydınız daha önce tamamlanmış.',
         };
       }
     }
 
-    const duplicateUser =
-      await this.prisma.user.findFirst({
-        where: {
-          OR: [
-            { email: pending.email },
-            { phone: pending.phone },
-          ],
-        },
-        select: {
-          id: true,
-        },
-      });
+    const duplicateUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email: pending.email }, { phone: pending.phone }],
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (duplicateUser) {
       throw new BadRequestException(
@@ -420,8 +443,58 @@ export class RegistrationV2Service {
       );
     }
 
-    const referralCode =
-      await this.generateUniqueReferralCode();
+    const referralCode = await this.generateUniqueReferralCode();
+
+    if (isProfileOnboardingFlow) {
+      const user = await this.prisma.user.create({
+        data: {
+          firstName: '',
+          lastName: '',
+          email: pending.email,
+          phone: pending.phone,
+          passwordHash: null,
+          city: null,
+          role: Role.ADAY,
+          isVerified: true,
+          emailVerifiedAt: pending.emailVerifiedAt || new Date(),
+          isApproved: true,
+          professionalVerificationStatus:
+            ProfessionalVerificationStatus.PENDING,
+          profileCompleted: false,
+          referralCode,
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          role: true,
+          isApproved: true,
+          isVerified: true,
+          professionalVerificationStatus: true,
+        },
+      });
+
+      await this.pendingService.markCompleted(pending.id);
+
+      const token = this.jwtService.sign({
+        sub: user.id,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+      });
+
+      return {
+        success: true,
+        flow: 'PROFILE_ONBOARDING',
+        token,
+        profileRoute: '/profile',
+        user,
+        message:
+          'Telefon ve e-posta doğrulaması tamamlandı. Profil bilgilerinizi tamamlayınız.',
+      };
+    }
 
     const user = await this.prisma.user.create({
       data: {
@@ -433,17 +506,28 @@ export class RegistrationV2Service {
         passwordHash: pending.passwordHash,
         role: pending.role,
         isVerified: true,
-        emailVerifiedAt:
-          pending.emailVerifiedAt || new Date(),
+        emailVerifiedAt: pending.emailVerifiedAt || new Date(),
         isApproved: false,
         referralCode,
+        taxNumber: pending.taxNumber,
+        taxOffice: pending.taxOffice,
+        professionalDocumentNumber: pending.professionalDocumentNumber,
       },
     });
 
-    if (
-      pending.registrationType ===
-      RegistrationType.EMLAK_OFISI
-    ) {
+    await this.prisma.document.create({
+      data: {
+        userId: user.id,
+        type:
+          pending.role === Role.EMLAKCI
+            ? 'YETKI_BELGESI'
+            : 'YAMBIS_BELGESI',
+        fileUrl: pending.professionalDocumentUrl!,
+        fileName: pending.professionalDocumentName || 'mesleki-belge',
+      },
+    });
+
+    if (pending.registrationType === RegistrationType.EMLAK_OFISI) {
       await this.prisma.userCapability.upsert({
         where: {
           userId_capability: {
@@ -474,18 +558,17 @@ export class RegistrationV2Service {
       });
     }
 
-    await this.pendingService.markCompleted(
-      pending.id,
-    );
+    await this.pendingService.markCompleted(pending.id);
 
     return {
       success: true,
+      flow: 'LEGACY',
       userId: user.id,
       isVerified: true,
       isApproved: false,
       membershipStatus: 'BELGE_BEKLIYOR',
       message:
-        'Telefon ve e-posta doğrulaması tamamlandı. Mesleki belgelerinizi yükleyerek üyelik onay sürecine devam ediniz.',
+        'Telefon ve e-posta doğrulaması tamamlandı. Üyelik onay sürecine devam ediniz.',
     };
   }
 }

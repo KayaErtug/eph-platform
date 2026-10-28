@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { Capability, PortfolioApprovalStatus, Role } from "@prisma/client";
 
+import { officeLocationData } from "./office-location";
 import { PrismaService } from "../prisma/prisma.service";
 
 type OrganizationActor = {
@@ -192,20 +193,7 @@ export class OrganizationService {
     officeId: string,
     tx: any = this.prisma,
   ) {
-    await tx.teamMember.updateMany({
-      where: {
-        userId,
-        isActive: true,
-        NOT: {
-          teamId,
-        },
-      },
-      data: {
-        isActive: false,
-        leftAt: new Date(),
-      },
-    });
-
+    // Task 18: Çoklu takım üyeliği. Diğer takım üyelikleri korunur.
     await tx.teamMember.upsert({
       where: {
         teamId_userId: {
@@ -308,7 +296,7 @@ export class OrganizationService {
       this.prisma.office.count({ where: { isActive: true } }),
       this.prisma.team.count(),
       this.prisma.team.count({ where: { isActive: true } }),
-      this.prisma.teamMember.count({ where: { isActive: true } }),
+      this.prisma.teamMember.findMany({ where: { isActive: true }, select: { userId: true }, distinct: ['userId'] }).then((r) => r.length),
     ]);
 
     return {
@@ -560,8 +548,9 @@ export class OrganizationService {
   async createOffice(
     body: {
       name?: string;
-      city?: string;
-      district?: string;
+      city?: string | null;
+      district?: string | null;
+      neighborhood?: string | null;
       ownerUserId?: string | null;
     },
     actor?: OrganizationActor,
@@ -572,6 +561,7 @@ export class OrganizationService {
 
     if (!name) throw new BadRequestException("Ofis adı zorunludur.");
 
+    const location = officeLocationData(body);
     const ownerUserId = body.ownerUserId || null;
     if (ownerUserId) await this.getUserOrThrow(ownerUserId);
 
@@ -582,8 +572,7 @@ export class OrganizationService {
         data: {
           name,
           slug,
-          city: this.cleanText(body.city) || null,
-          district: this.cleanText(body.district) || null,
+          ...location,
           ownerUserId,
           isActive: true,
         },
@@ -612,6 +601,7 @@ export class OrganizationService {
       name?: string;
       city?: string | null;
       district?: string | null;
+      neighborhood?: string | null;
       ownerUserId?: string | null;
       isActive?: boolean;
     },
@@ -622,7 +612,7 @@ export class OrganizationService {
 
     const office = await this.prisma.office.findUnique({
       where: { id },
-      select: { id: true, name: true, ownerUserId: true },
+      select: { id: true, name: true, ownerUserId: true, city: true, district: true, neighborhood: true },
     });
 
     if (!office) throw new NotFoundException("Ofis bulunamadı.");
@@ -631,6 +621,7 @@ export class OrganizationService {
       body.name !== undefined ? this.cleanText(body.name) : office.name;
     if (!nextName) throw new BadRequestException("Ofis adı zorunludur.");
 
+    const location = officeLocationData(body, office);
     const nextOwnerUserId =
       body.ownerUserId === undefined
         ? office.ownerUserId
@@ -649,12 +640,7 @@ export class OrganizationService {
         data: {
           name: nextName,
           ...(nextSlug ? { slug: nextSlug } : {}),
-          ...(body.city !== undefined
-            ? { city: this.cleanText(body.city) || null }
-            : {}),
-          ...(body.district !== undefined
-            ? { district: this.cleanText(body.district) || null }
-            : {}),
+          ...location,
           ...(body.isActive !== undefined
             ? { isActive: Boolean(body.isActive) }
             : {}),
@@ -898,6 +884,26 @@ export class OrganizationService {
     };
   }
 
+    async getMaxTeamsForOffice(officeId: string): Promise<number> {
+    const subscription = await this.prisma.systemSetting.findUnique({
+      where: { key: `OFFICE_SUBSCRIPTION_${officeId}` },
+    });
+    const sub = subscription?.valueJson as any;
+    const packagesSetting = await this.prisma.systemSetting.findUnique({
+      where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' },
+    });
+    const packages = Array.isArray(packagesSetting?.valueJson) ? (packagesSetting.valueJson as any[]) : [];
+    const currentPkg = packages.find((p) => p.code === sub?.packageCode);
+    const agentCapacity = Number(currentPkg?.agents ?? sub?.agents ?? 3);
+
+    // Task 17: 15 kişilik pakette en fazla 3 takım.
+    if (agentCapacity >= 25) return 5;
+    if (agentCapacity >= 15) return 3;
+    if (agentCapacity >= 7) return 2;
+    if (agentCapacity >= 1) return 1;
+    return 0;
+  }
+
   async createTeam(
     body: { officeId?: string; name?: string; leaderId?: string | null },
     actor?: OrganizationActor,
@@ -919,6 +925,16 @@ export class OrganizationService {
       throw new NotFoundException("Aktif ofis bulunamadı.");
 
     if (leaderId) await this.getUserOrThrow(leaderId);
+
+    const activeTeamsCount = await this.prisma.team.count({
+      where: { officeId, isActive: true },
+    });
+    const maxTeams = await this.getMaxTeamsForOffice(officeId);
+    if (activeTeamsCount >= maxTeams) {
+      throw new BadRequestException(
+        `Mevcut ofis paketinizde en fazla ${maxTeams} takım oluşturabilirsiniz.`,
+      );
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const team = await tx.team.create({

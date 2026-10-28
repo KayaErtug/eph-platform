@@ -8,6 +8,8 @@ import { Role, UnitStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 type SalesStockUpdateBody = {
+  number?: unknown;
+  facades?: unknown;
   price?: unknown;
   priceCurrency?: unknown;
   status?: unknown;
@@ -20,6 +22,8 @@ type SalesStockBulkUpdateBody = {
 type PreparedSalesStockUpdate = {
   unitId: string;
   data: {
+    number?: string;
+    facades?: string[];
     price?: number;
     priceCurrency?: string;
     status?: UnitStatus;
@@ -373,6 +377,22 @@ export class ProjectSalesStockService {
 
       data.status = status;
       data.isOffMarket = status === UnitStatus.PASIF;
+    }
+
+    if (body.number !== undefined) {
+      const numStr = String(body.number || '').trim();
+      if (!numStr) {
+        throw new BadRequestException('Bağımsız bölüm kapı/daire numarası boş bırakılamaz.');
+      }
+      if (numStr.length > 50) {
+        throw new BadRequestException('Kapı/daire numarası en fazla 50 karakter olabilir.');
+      }
+      data.number = numStr;
+    }
+
+    if (body.facades !== undefined) {
+      if (!Array.isArray(body.facades) || body.facades.length > 16 || body.facades.some(value => typeof value !== 'string' || !value.trim() || value.length > 80)) throw new BadRequestException('En fazla 16 cephe adı, her biri 1–80 karakter olmalıdır.');
+      data.facades = [...new Set(body.facades.map(value => String(value).trim()))];
     }
 
     if (Object.keys(data).length === 0) {

@@ -8,10 +8,11 @@ import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { EmailVerificationV2Service } from './email/email-verification-v2.service';
+import { FirebasePhoneRegistrationService } from './firebase/firebase-phone-registration.service';
+import { FirebasePhoneVerificationService } from './firebase/firebase-phone-verification.service';
+import { PhoneVerificationSecurityService } from './firebase/phone-verification-security.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
-import { NetgsmService } from './otp/netgsm.service';
-import { PhoneOtpService } from './otp/phone-otp.service';
 import { PendingRegistrationService } from './registration/pending-registration.service';
 import { RegistrationV2Service } from './registration/registration-v2.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -22,9 +23,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     InvitationsModule,
     PassportModule,
     JwtModule.register({
-      secret:
-        process.env.JWT_SECRET ||
-        'sm-super-secret-jwt-key-degistirin',
+      secret: process.env.JWT_SECRET || 'sm-super-secret-jwt-key-degistirin',
       signOptions: { expiresIn: '7d' },
     }),
   ],
@@ -32,9 +31,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     AuthService,
     RegistrationV2Service,
     PendingRegistrationService,
-    PhoneOtpService,
-    NetgsmService,
+
+    FirebasePhoneVerificationService,
+    PhoneVerificationSecurityService,
+    FirebasePhoneRegistrationService,
+
     EmailVerificationV2Service,
+
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
@@ -46,6 +49,9 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     RolesGuard,
     JwtModule,
     RegistrationV2Service,
+    FirebasePhoneVerificationService,
+    PhoneVerificationSecurityService,
+    FirebasePhoneRegistrationService,
   ],
 })
 export class AuthModule {}

@@ -44,6 +44,19 @@ export class MessagesController {
     return this.messagesService.getMessages(id, user.id, user.role);
   }
 
+  @Post('team')
+  startTeamConversation(
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: {
+      officeId: string;
+      teamId: string;
+      title?: string;
+    },
+  ) {
+    return this.messagesService.startTeamConversation(user.id, body.officeId, body.teamId, body.title);
+  }
+
   @Post(':id/messages')
   sendMessage(
     @Param('id') id: string,
@@ -52,6 +65,7 @@ export class MessagesController {
     body: {
       senderId?: string;
       body: string;
+      clientMessageId?: string;
     },
   ) {
     return this.messagesService.sendMessage(id, body, user.id, user.role);

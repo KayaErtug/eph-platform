@@ -1,18 +1,47 @@
+import { consumeMembershipQuota } from '../membership/membership-quota.rules';
+import { resolveOfficeWallet } from '../office/office-wallet.rules';
+import { TextSafetyField } from '../text-safety/text-safety.types';
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Inject,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import {
   KontorHareketTuru,
   KontorIslemTuru,
   Prisma,
-  UyelikDurumu,
+  Role,
 } from "@prisma/client";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
+import { visibleAuthor, blockedPeerIds } from "../content-safety/block-policy";
+import {
+  generateRequestListingNumber,
+  isValidRequestListingNumber,
+  listingNumber,
+  parseListingNumberOrId,
+} from '../common/listing-number';
 import { PrismaService } from "../prisma/prisma.service";
+import { AdminService } from "../admin/admin.service";
+import { PropertyCriteriaService } from "../property-criteria/property-criteria.service";
+import { PropertyDemandAdapter } from "../property-demand/property-demand.adapter";
+import { PropertyValidationService } from "../property-validation/property-validation.service";
+import { PropertyValidationContext } from "../property-validation/property-validation.types";
+import { TextSafetyService } from "../text-safety/text-safety.service";
 import { PushService } from "../push/push.service";
+import { NETWORK_CONTACT_OWNER_SELECT, networkProfessionalContact, networkContactPhone, networkOwnerLabel, networkPaidAccessWhere } from './network-contact-policy';
+
+type NetworkAccessOptions = {
+  walletSource?: string;
+  walletOfficeId?: string;
+  expectedCostPk?: number;
+  expectedActorId?: string;
+  requestId?: string;
+  aciklama?: string;
+  channel?: 'CALL' | 'WHATSAPP';
+};
 
 const PLATFORM_URL =
   process.env.FRONTEND_URL ||
@@ -35,6 +64,17 @@ type CreateNetworkPostDto = {
   maxRoom?: number | null;
   minBudget?: number | null;
   maxBudget?: number | null;
+  landSharePercent?: number | null;
+  propertyTypes?: string[] | null;
+  roomCounts?: string[] | null;
+  features?: string[] | null;
+  cardProfileCriteria?: unknown;
+  priceCurrency?: string | null;
+  allowPhoneCall?: boolean;
+  contactPhone?: string | null;
+  allowWhatsapp?: boolean;
+  whatsappPhone?: string | null;
+  acknowledgedWarningCodes?: string[] | null;
   areas?: Array<{
     city?: string | null;
     district?: string | null;
@@ -73,6 +113,17 @@ type UpdateNetworkPostDto = {
   maxRoom?: number | null;
   minBudget?: number | null;
   maxBudget?: number | null;
+  landSharePercent?: number | null;
+  propertyTypes?: string[] | null;
+  roomCounts?: string[] | null;
+  features?: string[] | null;
+  cardProfileCriteria?: unknown;
+  priceCurrency?: string | null;
+  allowPhoneCall?: boolean;
+  contactPhone?: string | null;
+  allowWhatsapp?: boolean;
+  whatsappPhone?: string | null;
+  acknowledgedWarningCodes?: string[] | null;
   areas?: Array<{
     city?: string | null;
     district?: string | null;
@@ -99,6 +150,7 @@ function normalizeValue(value: unknown) {
   if (value == null) return "";
   if (Array.isArray(value)) return value.join(",");
   if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
 
@@ -305,10 +357,387 @@ function isForumManagerRole(role?: string | null) {
 
 @Injectable()
 export class NetworkService {
+  private readonly matchLogger = new Logger(NetworkService.name);
+  private requestMatchHandler?: (postId: string, ownerId: string) => Promise<void>;
+
+  registerRequestMatchHandler(handler: (postId: string, ownerId: string) => Promise<void>) {
+    this.requestMatchHandler = handler;
+  }
+
+  private async refreshRequestMatches(post: { id: string; userId: string; type: string; isActive: boolean; expiresAt: Date }) {
+    if (post.type !== "PORTFOY_ARIYORUM" || !post.isActive || post.expiresAt <= new Date()) return;
+    try {
+      if (!this.requestMatchHandler) throw new Error('Matching handler unavailable');
+      await this.requestMatchHandler(post.id, post.userId);
+    } catch {
+      this.matchLogger.warn('Talep kaydedildi; otomatik eşleştirme tamamlanamadı. Yeniden tarama gerekli.');
+    }
+  }
+
+  @Inject(AdminService)
+  private readonly adminService!: AdminService;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly pushService: PushService,
+    private readonly propertyCriteriaService: PropertyCriteriaService,
+    private readonly propertyDemandAdapter: PropertyDemandAdapter,
+    private readonly propertyValidationService: PropertyValidationService,
+    private readonly textSafetyService: TextSafetyService,
   ) {}
+
+  private normalizeContactSettings(input: {
+    allowPhoneCall?: boolean | null;
+    contactPhone?: string | null;
+    allowWhatsapp?: boolean | null;
+    whatsappPhone?: string | null;
+  }) {
+    const allowPhoneCall = Boolean(input.allowPhoneCall);
+    const allowWhatsapp = Boolean(input.allowWhatsapp);
+    const contactPhone = cleanForumText(input.contactPhone) || null;
+    const whatsappPhone = cleanForumText(input.whatsappPhone) || null;
+
+    if (allowPhoneCall && !contactPhone) {
+      throw new BadRequestException(
+        "Telefonla aranma izni için aranacak telefon numarasını girin.",
+      );
+    }
+
+    if (allowWhatsapp && !whatsappPhone) {
+      throw new BadRequestException(
+        "WhatsApp izni için mesaj alınacak telefon numarasını girin.",
+      );
+    }
+
+    return {
+      allowPhoneCall,
+      contactPhone: allowPhoneCall ? contactPhone : null,
+      allowWhatsapp,
+      whatsappPhone: allowWhatsapp ? whatsappPhone : null,
+    };
+  }
+
+  private async networkPostVisibilityFilter(
+    viewerId?: string | null,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<Prisma.NetworkPostWhereInput> {
+    const allowed: Prisma.NetworkPostWhereInput[] = [
+      { visibility: 'TUM_EPH' },
+    ];
+
+    if (!viewerId) return { OR: allowed };
+
+    allowed.push({ userId: viewerId });
+    const viewer = await db.user.findUnique({
+      where: { id: viewerId },
+      select: { role: true },
+    });
+
+    const blockScope: Prisma.NetworkPostWhereInput = { User: visibleAuthor(viewerId) };
+    if (viewer?.role === Role.SUPER_ADMIN) return blockScope;
+
+    if (viewer?.role === Role.EMLAKCI) {
+      allowed.push({ visibility: 'SADECE_EMLAKCILAR' });
+    }
+    if (
+      viewer?.role === Role.MUTEAHHIT ||
+      viewer?.role === Role.INSAAT_FIRMASI
+    ) {
+      allowed.push({ visibility: 'SADECE_MUTEAHHITLER' });
+    }
+
+    return { AND: [{ OR: allowed }, blockScope] };
+  }
+
+  private async assertCanViewNetworkPost(
+    postId: string,
+    viewerId?: string | null,
+    options: { ownerOnly?: boolean } = {},
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    if (!viewerId) {
+      throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
+    }
+    const visibility = await this.networkPostVisibilityFilter(viewerId, db);
+    const manager = options.ownerOnly ? await db.user.findUnique({ where: { id: viewerId }, select: { role: true } }) : null;
+    const ownerScope = options.ownerOnly && manager?.role !== Role.SUPER_ADMIN ? [{ userId: viewerId }] : [];
+    const post = await db.networkPost.findFirst({
+      where: {
+        id: postId,
+        isActive: true,
+        expiresAt: { gt: new Date() },
+        AND: [
+          visibility,
+          ...ownerScope,
+        ],
+      },
+      select: { id: true, userId: true, title: true },
+    });
+    if (!post) {
+      throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
+    }
+    return post;
+  }
+
+  private serializeNetworkPostForViewer<T extends Record<string, any>>(
+    post: T,
+    viewerId?: string | null,
+    privateUnlocked = false,
+    revealPrivateInfo = false,
+  ) {
+    const isOwner = Boolean(viewerId && post.userId === viewerId);
+    const canSeePrivateInfo = isOwner || privateUnlocked;
+    const canRevealPrivateInfo = canSeePrivateInfo && (revealPrivateInfo || isOwner);
+
+    const phoneCallAllowed = Boolean(
+      post.allowPhoneCall && networkContactPhone(post.contactPhone),
+    );
+    const whatsappAllowed = Boolean(
+      post.allowWhatsapp && networkContactPhone(post.whatsappPhone),
+    );
+    const canonicalDemand = this.propertyDemandAdapter.fromNetworkPost(post);
+    const { contactPhone, whatsappPhone, User, user, ...safePost } = post;
+
+    const rawUser = User || user;
+    const professionalContact = networkProfessionalContact(rawUser);
+    const listingOwnerName = professionalContact.name;
+
+    const serializedUser = canRevealPrivateInfo && rawUser
+      ? {
+          id: rawUser.id,
+          firstName: rawUser.role === Role.SUPER_ADMIN ? 'Yazılım Ekibi' : rawUser.firstName,
+          lastName: rawUser.role === Role.SUPER_ADMIN ? null : rawUser.lastName,
+          role: rawUser.role,
+          email: rawUser.role === Role.SUPER_ADMIN ? null : rawUser.email,
+        }
+      : rawUser
+        ? {
+            id: canSeePrivateInfo ? rawUser.id : null,
+            role: rawUser.role,
+          }
+        : null;
+
+    return {
+      ...safePost,
+      userId: canSeePrivateInfo ? post.userId : null,
+      listingOwnerLabel: networkOwnerLabel(rawUser?.role, rawUser?.capabilities),
+      User: serializedUser,
+      user: serializedUser,
+      isOwner,
+      cardProfileCriteria: canonicalDemand.cardProfileCriteria,
+      phoneCallAllowed,
+      whatsappAllowed,
+      contactPhone: canRevealPrivateInfo && phoneCallAllowed ? networkContactPhone(contactPhone) : null,
+      whatsappPhone: canRevealPrivateInfo && whatsappAllowed ? networkContactPhone(whatsappPhone) : null,
+      listingOwnerName: canRevealPrivateInfo ? listingOwnerName : null,
+      listingOwnerEmail: canRevealPrivateInfo ? professionalContact.email : null,
+      listingOwnerPhone: canRevealPrivateInfo ? professionalContact.phone : null,
+      listingOfficeName: canRevealPrivateInfo ? professionalContact.officeName : null,
+      privateInfoUnlocked: canSeePrivateInfo,
+      phoneUnlocked: canSeePrivateInfo,
+      whatsappUnlocked: canSeePrivateInfo,
+      replyAllowed: canSeePrivateInfo,
+    };
+  }
+
+  private normalizeNetworkPostCriteria(
+    dto: Partial<CreateNetworkPostDto | UpdateNetworkPostDto>,
+  ) {
+    const criteria = this.propertyCriteriaService.normalize({
+      recordKind: "DEMAND",
+      source: "REQUEST_CENTER",
+      areas: dto.areas,
+      city: dto.city,
+      district: dto.district,
+      neighborhood: dto.neighborhood,
+      propertyTypes: dto.propertyTypes,
+      minBudget: dto.minBudget,
+      maxBudget: dto.maxBudget,
+      priceCurrency: dto.priceCurrency,
+      minArea: dto.minArea,
+      maxArea: dto.maxArea,
+      roomCounts: dto.roomCounts,
+      features: dto.features,
+      isActive: true,
+    });
+
+    const exactBudget = this.propertyCriteriaService.normalize({
+      recordKind: "DEMAND",
+      source: "REQUEST_CENTER",
+      price: dto.budget,
+      isActive: true,
+    }).budget.min;
+
+    return {
+      criteria,
+      exactBudget,
+    };
+  }
+
+  private normalizeNetworkDemandPersistence(
+    input: Partial<CreateNetworkPostDto | UpdateNetworkPostDto>,
+    propertyTypes: unknown,
+    roomCounts: unknown,
+    features: unknown,
+  ) {
+    const demand = this.propertyDemandAdapter.fromNetworkPost({
+      ...input,
+      propertyTypes,
+      roomCounts,
+      features,
+    });
+
+    return {
+      features: demand.features,
+      cardProfileCriteria: demand.cardProfileCriteria,
+    };
+  }
+
+  private normalizeLandSharePercent(value: number | null | undefined) {
+    if (value === undefined || value === null) return null;
+
+    const numeric = Number(value);
+
+    if (!Number.isFinite(numeric) || numeric <= 0 || numeric > 100) {
+      throw new BadRequestException(
+        "Kat karşılığı oranı 0'dan büyük ve 100'den küçük veya eşit olmalıdır.",
+      );
+    }
+
+    return Math.round(numeric * 100) / 100;
+  }
+
+  private validatePropertyDemandInput(
+    category: string,
+    dto: Partial<CreateNetworkPostDto | UpdateNetworkPostDto>,
+  ) {
+    if (category !== "PORTFOY_ARIYORUM") {
+      return;
+    }
+
+    const propertyTypes = this.propertyCriteriaService.normalize({
+      recordKind: "DEMAND",
+      source: "REQUEST_CENTER",
+      propertyTypes: dto.propertyTypes,
+      isActive: true,
+    }).propertyTypes;
+
+    const result = this.propertyValidationService.validate({
+      context: PropertyValidationContext.DEMAND,
+      recordKind: "DEMAND",
+      source: "REQUEST_CENTER",
+      propertyTypes,
+      acknowledgedWarningCodes: dto.acknowledgedWarningCodes ?? [],
+      values: {
+        minArea: dto.minArea,
+        maxArea: dto.maxArea,
+        minRoom: dto.minRoom,
+        maxRoom: dto.maxRoom,
+        minBudget: dto.minBudget ?? dto.budget,
+        maxBudget: dto.maxBudget ?? dto.budget,
+        roomCounts: dto.roomCounts,
+      },
+    });
+
+    if (!result.valid) {
+      const blockingIssues = result.issues.filter(
+        (issue) => issue.blocking,
+      );
+
+      throw new BadRequestException({
+        code: "PROPERTY_VALIDATION_FAILED",
+        validationVersion: result.version,
+        requiresConfirmation: false,
+        message:
+          blockingIssues[0]?.message ||
+          "Gayrimenkul kriterlerinde geçersiz değerler bulunmaktadır.",
+        issues: blockingIssues,
+      });
+    }
+
+    if (result.requiresConfirmation) {
+      const firstWarning = result.pendingWarnings[0];
+
+      throw new BadRequestException({
+        code: "PROPERTY_VALIDATION_CONFIRMATION_REQUIRED",
+        validationVersion: result.version,
+        requiresConfirmation: true,
+        message:
+          firstWarning?.message ||
+          "Olağan dışı gayrimenkul kriterleri için kullanıcı onayı gereklidir.",
+        linaTitle:
+          firstWarning?.metadata?.linaTitle ||
+          "Lina olağan dışı bir değer fark etti",
+        confirmationText:
+          firstWarning?.metadata?.confirmationText ||
+          "Bu değerin doğru olduğunu onaylıyorum",
+        requiredWarningCodes:
+          result.requiredWarningCodes,
+        acknowledgedWarningCodes:
+          result.acknowledgedWarningCodes,
+        warnings: result.pendingWarnings,
+        issues: result.pendingWarnings,
+      });
+    }
+  }
+
+  preparePropertyDemandPreview(
+    dto: Pick<
+      CreateNetworkPostDto,
+      | "areas"
+      | "propertyTypes"
+      | "roomCounts"
+      | "features"
+      | "cardProfileCriteria"
+      | "priceCurrency"
+      | "maxBudget"
+      | "minArea"
+      | "acknowledgedWarningCodes"
+    >,
+    requestType: string,
+  ) {
+    const normalizedRequestType = normalizeForumRequestType(requestType);
+    const allowedRequestTypes =
+      FORUM_REQUEST_TYPES_BY_CATEGORY.PORTFOY_ARIYORUM;
+
+    if (!allowedRequestTypes.includes(normalizedRequestType)) {
+      throw new BadRequestException(
+        "Talep türü PORTFOY_SATILIK veya PORTFOY_KIRALIK olmalıdır.",
+      );
+    }
+
+    this.validatePropertyDemandInput("PORTFOY_ARIYORUM", dto);
+
+    const { criteria } = this.normalizeNetworkPostCriteria(dto);
+    const canonicalDemand = this.propertyDemandAdapter.fromNetworkPost({
+      ...dto,
+      propertyTypes: criteria.propertyTypes,
+      roomCounts: criteria.roomCounts,
+      features: criteria.features,
+    });
+
+    if (criteria.areas.length === 0) {
+      throw new BadRequestException("En az bir hedef bölge seçilmelidir.");
+    }
+
+    const cities = new Set(
+      criteria.areas.map((area) =>
+        area.city.trim().toLocaleLowerCase("tr-TR"),
+      ),
+    );
+
+    if (cities.size !== 1) {
+      throw new BadRequestException(
+        "Tek talepte yalnız bir İl/Şehir seçilebilir.",
+      );
+    }
+
+    return {
+      criteria,
+      cardProfileCriteria: canonicalDemand.cardProfileCriteria,
+      requestType: normalizedRequestType,
+    };
+  }
 
   private async validateForumPostInput(
     dto: CreateNetworkPostDto | UpdateNetworkPostDto,
@@ -319,7 +748,7 @@ export class NetworkService {
 
     if (!userId) {
       throw new BadRequestException(
-        "Kullanıcı bilgisi olmadan forum talebi oluşturulamaz.",
+        "Kullanıcı bilgisi olmadan Talep Merkezi kaydı oluşturulamaz.",
       );
     }
 
@@ -329,7 +758,7 @@ export class NetworkService {
     });
 
     if (!permissionUser) {
-      throw new BadRequestException("Forum talebi için kullanıcı bulunamadı.");
+      throw new BadRequestException("Talep Merkezi kaydı için kullanıcı bulunamadı.");
     }
 
     const category = normalizeForumCategory(dto.type);
@@ -390,7 +819,38 @@ export class NetworkService {
       );
     }
 
-    if (requiresForumCity(category) && !cleanForumText(dto.city)) {
+    const titleSafety =
+      this.textSafetyService.validatePublicTitle(title);
+
+    if (!titleSafety.valid) {
+      throw new BadRequestException({
+        code: "TEXT_SAFETY_FAILED",
+        message:
+          titleSafety.errors[0]?.message ||
+          "Talep başlığı güvenlik kontrolünden geçemedi.",
+        issues: titleSafety.errors,
+      });
+    }
+
+    const descriptionSafety =
+      this.textSafetyService.validatePublicDescription(
+        description,
+      );
+
+    if (!descriptionSafety.valid) {
+      throw new BadRequestException({
+        code: "TEXT_SAFETY_FAILED",
+        message:
+          descriptionSafety.errors[0]?.message ||
+          "Talep açıklaması güvenlik kontrolünden geçemedi.",
+        issues: descriptionSafety.errors,
+      });
+    }
+
+    const normalizedLocation =
+      this.normalizeNetworkPostCriteria(dto).criteria.areas;
+
+    if (requiresForumCity(category) && normalizedLocation.length === 0) {
       throw new BadRequestException("Şehir alanı zorunludur.");
     }
 
@@ -432,37 +892,310 @@ export class NetworkService {
     };
   }
 
-  async findAll() {
+  async findAll(viewerId?: string | null) {
     const now = new Date();
+    const visibilityFilter = await this.networkPostVisibilityFilter(viewerId);
 
-    return this.prisma.networkPost.findMany({
+    const [posts, unlockedPostIds] = await Promise.all([
+      this.prisma.networkPost.findMany({
+        where: {
+          AND: [visibilityFilter],
+          isActive: true,
+          expiresAt: {
+            gt: now,
+          },
+        },
+        include: {
+          User: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+              capabilities: { select: { capability: true } },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+      this.getUnlockedPostIdsForViewer(viewerId),
+    ]);
+
+    const isSuper = unlockedPostIds.has("*");
+
+    return posts.slice().sort((a, b) => {
+      const aUrgent = String(a.urgency || "").toUpperCase() === "ACIL" && (!a.expiresAt || a.expiresAt.getTime() > now.getTime()) ? 1 : 0;
+      const bUrgent = String(b.urgency || "").toUpperCase() === "ACIL" && (!b.expiresAt || b.expiresAt.getTime() > now.getTime()) ? 1 : 0;
+      if (aUrgent !== bUrgent) return bUrgent - aUrgent;
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    }).map((post) =>
+      this.serializeNetworkPostForViewer(
+        post,
+        viewerId,
+        isSuper || unlockedPostIds.has(post.id),
+      ),
+    );
+  }
+
+  async getDemandDensity(viewerId: string) {
+    const now = new Date();
+    const visibilityFilter = await this.networkPostVisibilityFilter(viewerId);
+
+    const posts = await this.prisma.networkPost.findMany({
       where: {
+        type: "PORTFOY_ARIYORUM",
+        AND: [visibilityFilter],
         isActive: true,
         expiresAt: {
           gt: now,
         },
       },
-      include: {
-        User: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
+      select: {
+        id: true,
+        city: true,
+        district: true,
+        neighborhood: true,
+        areas: true,
       },
     });
+
+    type NeighborhoodBucket = {
+      neighborhood: string;
+      postIds: Set<string>;
+    };
+
+    type DistrictBucket = {
+      district: string;
+      postIds: Set<string>;
+      neighborhoods: Map<string, NeighborhoodBucket>;
+    };
+
+    type CityBucket = {
+      city: string;
+      postIds: Set<string>;
+      districts: Map<string, DistrictBucket>;
+    };
+
+    const cities = new Map<string, CityBucket>();
+
+    const clean = (value: unknown) =>
+      String(value ?? "").trim();
+
+    const normalizeKey = (value: string) =>
+      value.toLocaleLowerCase("tr-TR");
+
+    const addArea = (
+      postId: string,
+      cityValue: unknown,
+      districtValue: unknown,
+      neighborhoodValue: unknown,
+    ) => {
+      const city = clean(cityValue);
+      const district = clean(districtValue);
+      const neighborhood = clean(neighborhoodValue);
+
+      if (!city) return;
+
+      const cityKey = normalizeKey(city);
+
+      let cityBucket = cities.get(cityKey);
+
+      if (!cityBucket) {
+        cityBucket = {
+          city,
+          postIds: new Set<string>(),
+          districts: new Map<string, DistrictBucket>(),
+        };
+        cities.set(cityKey, cityBucket);
+      }
+
+      cityBucket.postIds.add(postId);
+
+      if (!district) return;
+
+      const districtKey = normalizeKey(district);
+
+      let districtBucket = cityBucket.districts.get(districtKey);
+
+      if (!districtBucket) {
+        districtBucket = {
+          district,
+          postIds: new Set<string>(),
+          neighborhoods: new Map<string, NeighborhoodBucket>(),
+        };
+        cityBucket.districts.set(districtKey, districtBucket);
+      }
+
+      districtBucket.postIds.add(postId);
+
+      if (!neighborhood) return;
+
+      const neighborhoodKey = normalizeKey(neighborhood);
+
+      let neighborhoodBucket =
+        districtBucket.neighborhoods.get(neighborhoodKey);
+
+      if (!neighborhoodBucket) {
+        neighborhoodBucket = {
+          neighborhood,
+          postIds: new Set<string>(),
+        };
+        districtBucket.neighborhoods.set(
+          neighborhoodKey,
+          neighborhoodBucket,
+        );
+      }
+
+      neighborhoodBucket.postIds.add(postId);
+    };
+
+    for (const post of posts) {
+      const rawAreas = Array.isArray(post.areas)
+        ? post.areas
+        : [];
+
+      const seenAreas = new Set<string>();
+      let hasUsableArea = false;
+
+      for (const rawArea of rawAreas) {
+        if (
+          !rawArea ||
+          typeof rawArea !== "object" ||
+          Array.isArray(rawArea)
+        ) {
+          continue;
+        }
+
+        const area = rawArea as Record<string, unknown>;
+
+        const city =
+          clean(area.city) || clean(post.city);
+
+        const district =
+          clean(area.district) || clean(post.district);
+
+        const neighborhood =
+          clean(area.neighborhood);
+
+        if (!city) continue;
+
+        const areaKey = [
+          normalizeKey(city),
+          normalizeKey(district),
+          normalizeKey(neighborhood),
+        ].join("|");
+
+        if (seenAreas.has(areaKey)) continue;
+
+        seenAreas.add(areaKey);
+        hasUsableArea = true;
+
+        addArea(
+          post.id,
+          city,
+          district,
+          neighborhood,
+        );
+      }
+
+      if (!hasUsableArea) {
+        addArea(
+          post.id,
+          post.city,
+          post.district,
+          post.neighborhood,
+        );
+      }
+    }
+
+    const resultCities = Array.from(cities.values())
+      .map((cityBucket) => ({
+        city: cityBucket.city,
+        activeDemandCount: cityBucket.postIds.size,
+        districts: Array.from(cityBucket.districts.values())
+          .map((districtBucket) => ({
+            district: districtBucket.district,
+            activeDemandCount: districtBucket.postIds.size,
+            neighborhoods: Array.from(
+              districtBucket.neighborhoods.values(),
+            )
+              .map((neighborhoodBucket) => ({
+                neighborhood:
+                  neighborhoodBucket.neighborhood,
+                activeDemandCount:
+                  neighborhoodBucket.postIds.size,
+              }))
+              .sort(
+                (a, b) =>
+                  b.activeDemandCount -
+                    a.activeDemandCount ||
+                  a.neighborhood.localeCompare(
+                    b.neighborhood,
+                    "tr",
+                  ),
+              ),
+          }))
+          .sort(
+            (a, b) =>
+              b.activeDemandCount -
+                a.activeDemandCount ||
+              a.district.localeCompare(
+                b.district,
+                "tr",
+              ),
+          ),
+      }))
+      .sort(
+        (a, b) =>
+          b.activeDemandCount -
+            a.activeDemandCount ||
+          a.city.localeCompare(b.city, "tr"),
+      );
+
+    return {
+      totalActiveDemands: posts.length,
+      cities: resultCities,
+    };
   }
 
-  async findOne(id: string) {
+  async lookupListing(number: string, viewerId?: string | null) {
+    const parsed = parseListingNumberOrId(number);
+    if (!viewerId) throw new NotFoundException('İlan bulunamadı.');
+    const visibility = await this.networkPostVisibilityFilter(viewerId);
+    const whereCondition = parsed.type === 'UUID'
+      ? { id: parsed.value, AND: [visibility] }
+      : { listingNumber: parsed.value, AND: [visibility] };
+    const post = await this.prisma.networkPost.findFirst({
+      where: whereCondition,
+      select: { id: true, listingNumber: true, isActive: true, expiresAt: true },
+    });
+    if (!post) throw new NotFoundException('İlan bulunamadı.');
+    return {
+      id: post.id,
+      status: post.isActive && post.expiresAt > new Date() ? 'ACTIVE' : 'PASSIVE',
+      ...(post.listingNumber ? { listingNumber: post.listingNumber } : {}),
+    };
+  }
+
+  async findOne(id: string, viewerId?: string | null) {
+    const visibilityFilter = await this.networkPostVisibilityFilter(viewerId);
+    let targetWhere: Record<string, unknown> = { id };
+    try {
+      const parsed = parseListingNumberOrId(id);
+      if (parsed.type === 'LISTING_NUMBER') {
+        targetWhere = { listingNumber: parsed.value };
+      } else {
+        targetWhere = { id: parsed.value };
+      }
+    } catch {
+      targetWhere = { id };
+    }
     const post = await this.prisma.networkPost.findFirst({
       where: {
-        id,
-        isActive: true,
+        AND: [visibilityFilter],
+        ...targetWhere,
       },
       include: {
         User: {
@@ -470,9 +1203,8 @@ export class NetworkService {
             id: true,
             firstName: true,
             lastName: true,
-            email: true,
-            phone: true,
             role: true,
+            capabilities: { select: { capability: true } },
           },
         },
       },
@@ -482,14 +1214,24 @@ export class NetworkService {
       throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
     }
 
-    return post;
+    if (!post.isActive || post.expiresAt <= new Date()) throw new NotFoundException('Bu ilan pasiftir. Detayları görüntülenemez.');
+
+    const hasAccess = viewerId
+      ? await this.hasPostPrivateAccess(post.id, viewerId, post.userId)
+      : false;
+
+    return this.serializeNetworkPostForViewer(post, viewerId, hasAccess);
   }
 
   async createNetworkPostShareLink(id: string, actionUserId: string) {
+    const actor = await this.prisma.user.findUnique({ where: { id: actionUserId }, select: { role: true } });
     const post = await this.prisma.networkPost.findFirst({
       where: {
         id,
+        ...(actor?.role === Role.SUPER_ADMIN ? {} : { userId: actionUserId }),
+        visibility: 'TUM_EPH',
         isActive: true,
+        expiresAt: { gt: new Date() },
       },
       select: { id: true },
     });
@@ -524,7 +1266,9 @@ export class NetworkService {
     const post = await this.prisma.networkPost.findFirst({
       where: {
         id: shareLink.postId,
+        visibility: 'TUM_EPH',
         isActive: true,
+        expiresAt: { gt: new Date() },
       },
     });
 
@@ -532,10 +1276,7 @@ export class NetworkService {
       throw new NotFoundException("Bu talep artık aktif değil.");
     }
 
-    const sharedBy = await this.prisma.user.findUnique({
-      where: { id: shareLink.sharedById },
-      select: { firstName: true, lastName: true, phone: true },
-    });
+    const sharedBy = await this.prisma.user.findUnique({ where: { id: shareLink.sharedById }, select: { role: true, capabilities: { select: { capability: true } } } });
 
     await this.prisma.networkPostShareLink.update({
       where: { id: shareLink.id },
@@ -556,35 +1297,21 @@ export class NetworkService {
       createdAt: post.createdAt,
       sharedBy: sharedBy
         ? {
-            fullName:
-              this.cleanForumActionText(
-                `${sharedBy.firstName} ${sharedBy.lastName}`,
-              ) || "EPH Yetkilisi",
-            phone: sharedBy.phone || null,
+            fullName: networkOwnerLabel(sharedBy.role, sharedBy.capabilities),
+            phone: null,
           }
         : null,
     };
   }
 
-  async getPostStats(id: string) {
-    const post = await this.prisma.networkPost.findFirst({
-      where: {
-        id,
-        isActive: true,
-      },
-      select: {
-        id: true,
-        title: true,
-      },
-    });
-
-    if (!post) {
-      throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
-    }
+  async getPostStats(id: string, userId: string) {
+    const post = await this.assertCanViewNetworkPost(id, userId, { ownerOnly: true });
+    const viewer = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
 
     const conversations = await this.prisma.conversation.findMany({
       where: {
         postId: id,
+        ...(viewer?.role === Role.SUPER_ADMIN ? {} : { ConversationParticipant: { some: { userId } } }),
       },
       select: {
         id: true,
@@ -598,6 +1325,7 @@ export class NetworkService {
                 firstName: true,
                 lastName: true,
                 role: true,
+                capabilities: { select: { capability: true } },
               },
             },
           },
@@ -617,6 +1345,7 @@ export class NetworkService {
                 firstName: true,
                 lastName: true,
                 role: true,
+                capabilities: { select: { capability: true } },
               },
             },
           },
@@ -704,6 +1433,7 @@ export class NetworkService {
   }
 
   async recordPostView(id: string, userId?: string) {
+    await this.assertCanViewNetworkPost(id, userId);
     const post = await this.prisma.networkPost.findFirst({
       where: {
         id,
@@ -751,7 +1481,8 @@ export class NetworkService {
     };
   }
 
-  async getUpdateLogs(id: string) {
+  async getUpdateLogs(id: string, userId: string) {
+    await this.assertCanViewNetworkPost(id, userId, { ownerOnly: true });
     const logs = await this.prisma.networkPostUpdateLog.findMany({
       where: {
         postId: id,
@@ -790,6 +1521,7 @@ export class NetworkService {
   }
 
   async getFollowStatus(id: string, userId?: string) {
+    await this.assertCanViewNetworkPost(id, userId);
     const post = await this.prisma.networkPost.findFirst({
       where: {
         id,
@@ -835,6 +1567,7 @@ export class NetworkService {
   }
 
   async followPost(id: string, userId: string) {
+    await this.assertCanViewNetworkPost(id, userId);
     if (!userId) {
       return {
         ok: false,
@@ -882,6 +1615,7 @@ export class NetworkService {
   }
 
   async unfollowPost(id: string, userId: string) {
+    await this.assertCanViewNetworkPost(id, userId);
     if (!userId) {
       return {
         ok: false,
@@ -901,11 +1635,13 @@ export class NetworkService {
 
   async getFollowedPosts(userId: string) {
     if (!userId) return [];
+    const visibility = await this.networkPostVisibilityFilter(userId);
 
     const follows = await this.prisma.networkPostFollower.findMany({
       where: {
         userId,
         post: {
+          AND: [visibility],
           isActive: true,
           expiresAt: {
             gt: new Date(),
@@ -921,6 +1657,7 @@ export class NetworkService {
                 firstName: true,
                 lastName: true,
                 role: true,
+                capabilities: { select: { capability: true } },
               },
             },
           },
@@ -931,10 +1668,17 @@ export class NetworkService {
       },
     });
 
+    const unlockedPostIds = await this.getUnlockedPostIdsForViewer(userId);
+    const isSuper = unlockedPostIds.has("*");
+
     return follows.map((follow) => ({
       id: follow.id,
       followedAt: follow.createdAt,
-      post: follow.post,
+      post: this.serializeNetworkPostForViewer(
+        follow.post,
+        userId,
+        isSuper || unlockedPostIds.has(follow.post.id),
+      ),
     }));
   }
 
@@ -1031,12 +1775,14 @@ export class NetworkService {
     changes: NetworkPostChangeItem[],
   ) {
     if (changes.length === 0) return;
+    const blocked = await blockedPeerIds(this.prisma, ownerId);
 
     const followers = await this.prisma.networkPostFollower.findMany({
       where: {
         postId,
         userId: {
           not: ownerId,
+          notIn: blocked,
         },
       },
       select: {
@@ -1074,7 +1820,8 @@ export class NetworkService {
     );
   }
 
-  async getPostFollowers(id: string) {
+  async getPostFollowers(id: string, userId: string) {
+    await this.assertCanViewNetworkPost(id, userId, { ownerOnly: true });
     const post = await this.prisma.networkPost.findFirst({
       where: {
         id,
@@ -1115,57 +1862,70 @@ export class NetworkService {
     }));
   }
 
-  async getFeaturedPosts() {
+  async getFeaturedPosts(viewerId: string) {
     const now = new Date();
+    const visibility = await this.networkPostVisibilityFilter(viewerId);
 
-    const posts = await this.prisma.networkPost.findMany({
-      where: {
-        isActive: true,
-        expiresAt: {
-          gt: now,
-        },
-      },
-      include: {
-        User: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            role: true,
+    const [posts, unlockedPostIds] = await Promise.all([
+      this.prisma.networkPost.findMany({
+        where: {
+          AND: [visibility],
+          isActive: true,
+          expiresAt: {
+            gt: now,
           },
         },
-        _count: {
-          select: {
-            followers: true,
-            Conversation: true,
-            views: true,
+        include: {
+          User: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+              capabilities: { select: { capability: true } },
+            },
+          },
+          _count: {
+            select: {
+              followers: true,
+              Conversation: true,
+              views: true,
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 50,
-    });
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 50,
+      }),
+      this.getUnlockedPostIdsForViewer(viewerId),
+    ]);
+
+    const isSuper = unlockedPostIds.has("*");
 
     return posts
-      .map((post) => ({
-        id: post.id,
-        title: post.title,
-        type: post.type,
-        city: post.city,
-        district: post.district,
-        budget: post.budget,
-        createdAt: post.createdAt,
-        user: post.User,
-        score:
-          post._count.views +
-          post._count.followers * 5 +
-          post._count.Conversation * 8,
-        viewCount: post._count.views,
-        followerCount: post._count.followers,
-        requestCount: post._count.Conversation,
-      }))
+      .map((post) => {
+        const canSee = isSuper || unlockedPostIds.has(post.id) || (viewerId && post.userId === viewerId);
+        const serialized = this.serializeNetworkPostForViewer(post, viewerId, canSee);
+        return {
+          id: post.id,
+          title: post.title,
+          type: post.type,
+          city: post.city,
+          district: post.district,
+          budget: post.budget,
+          createdAt: post.createdAt,
+          user: serialized.user,
+          User: serialized.User,
+          score:
+            post._count.views +
+            post._count.followers * 5 +
+            post._count.Conversation * 8,
+          viewCount: post._count.views,
+          followerCount: post._count.followers,
+          requestCount: post._count.Conversation,
+        };
+      })
       .sort((a, b) => b.score - a.score)
       .slice(0, 6);
   }
@@ -1199,7 +1959,18 @@ export class NetworkService {
     throw new ForbiddenException("Bu paylaşım için işlem yetkiniz yok.");
   }
 
+  private async requireForumModerationPermission(actionUser: { id: string; role: Role }) {
+    if (actionUser.role === Role.ADMIN || actionUser.role === Role.SUPER_ADMIN) {
+      const permission = await this.adminService.resolveOperationalPermission(actionUser, "FORUM_MODERATE");
+      if (!permission.enabled) {
+        throw new ForbiddenException("Forum moderasyon yetkiniz bulunmuyor.");
+      }
+    }
+  }
+
   async update(id: string, dto: UpdateNetworkPostDto, actionUserId: string) {
+    const actionUser = await this.getNetworkActionUser(actionUserId);
+    await this.requireForumModerationPermission(actionUser);
     const existing = await this.prisma.networkPost.findFirst({
       where: {
         id,
@@ -1211,7 +1982,6 @@ export class NetworkService {
       throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
     }
 
-    const actionUser = await this.getNetworkActionUser(actionUserId);
     this.ensureCanManageNetworkPost(existing.userId, actionUser);
 
     const validated = await this.validateForumPostInput(
@@ -1228,27 +1998,115 @@ export class NetworkService {
       actionUser.id,
     );
 
+    this.validatePropertyDemandInput(validated.category, {
+      ...dto,
+      userId: existing.userId,
+      type: dto.type ?? existing.type,
+      title: dto.title ?? existing.title,
+      description: dto.description ?? existing.description,
+      city: dto.city ?? existing.city,
+      district: dto.district ?? existing.district,
+      neighborhood: dto.neighborhood ?? existing.neighborhood,
+      budget: dto.budget ?? existing.budget,
+      minArea: dto.minArea ?? existing.minArea,
+      maxArea: dto.maxArea ?? existing.maxArea,
+      minBudget: dto.minBudget ?? existing.minBudget,
+      maxBudget: dto.maxBudget ?? existing.maxBudget,
+      propertyTypes: dto.propertyTypes ?? existing.propertyTypes,
+      roomCounts: dto.roomCounts ?? existing.roomCounts,
+      features: dto.features ?? existing.features,
+      priceCurrency: dto.priceCurrency ?? existing.priceCurrency,
+      areas:
+        dto.areas ??
+        (Array.isArray(existing.areas)
+          ? (existing.areas as CreateNetworkPostDto["areas"])
+          : null),
+    });
+
+    const { criteria, exactBudget } =
+      this.normalizeNetworkPostCriteria({
+        ...dto,
+        userId: existing.userId,
+        type: dto.type ?? existing.type,
+        title: dto.title ?? existing.title,
+        description: dto.description ?? existing.description,
+        city: dto.city ?? existing.city,
+        district: dto.district ?? existing.district,
+        neighborhood: dto.neighborhood ?? existing.neighborhood,
+        budget: dto.budget ?? existing.budget,
+        minArea: dto.minArea ?? existing.minArea,
+        maxArea: dto.maxArea ?? existing.maxArea,
+        minBudget: dto.minBudget ?? existing.minBudget,
+        maxBudget: dto.maxBudget ?? existing.maxBudget,
+        propertyTypes: dto.propertyTypes ?? existing.propertyTypes,
+        roomCounts: dto.roomCounts ?? existing.roomCounts,
+        features: dto.features ?? existing.features,
+        priceCurrency: dto.priceCurrency ?? existing.priceCurrency,
+        areas:
+          dto.areas ??
+          (Array.isArray(existing.areas)
+            ? (existing.areas as CreateNetworkPostDto["areas"])
+            : null),
+      });
+    const demandPersistence = this.normalizeNetworkDemandPersistence(
+      {
+        ...dto,
+        type: validated.category,
+        cardProfileCriteria:
+          dto.cardProfileCriteria !== undefined
+            ? dto.cardProfileCriteria
+            : dto.features !== undefined || dto.propertyTypes !== undefined
+              ? undefined
+              : existing.cardProfileCriteria,
+      },
+      criteria.propertyTypes,
+      criteria.roomCounts,
+      criteria.features,
+    );
+    const primaryArea = criteria.areas[0] ?? null;
+    const contactSettings = this.normalizeContactSettings({
+      allowPhoneCall:
+        dto.allowPhoneCall ?? existing.allowPhoneCall,
+      contactPhone:
+        dto.contactPhone ?? existing.contactPhone,
+      allowWhatsapp:
+        dto.allowWhatsapp ?? existing.allowWhatsapp,
+      whatsappPhone:
+        dto.whatsappPhone ?? existing.whatsappPhone,
+    });
+
     const nextData = {
       type: validated.category,
       title: dto.title ? validated.title : existing.title,
       description: dto.description
         ? validated.description
         : existing.description,
-      city: dto.areas?.[0]?.city ?? dto.city ?? existing.city,
-      district: dto.areas?.[0]?.district ?? dto.district ?? existing.district,
-      neighborhood:
-        dto.areas?.[0]?.neighborhood ??
-        dto.neighborhood ??
-        existing.neighborhood,
-      budget: dto.budget ?? existing.budget,
-      minArea: dto.minArea ?? existing.minArea,
-      maxArea: dto.maxArea ?? existing.maxArea,
+      city: primaryArea?.city ?? existing.city,
+      district: primaryArea?.district ?? existing.district,
+      neighborhood: primaryArea?.neighborhood ?? existing.neighborhood,
+      budget: exactBudget,
+      minArea: criteria.grossArea.min,
+      maxArea: criteria.grossArea.max,
       minRoom: dto.minRoom ?? existing.minRoom,
       maxRoom: dto.maxRoom ?? existing.maxRoom,
-      minBudget: dto.minBudget ?? existing.minBudget,
-      maxBudget: dto.maxBudget ?? existing.maxBudget,
-      ...(dto.areas
-        ? { areas: dto.areas as unknown as Prisma.InputJsonValue }
+      minBudget: criteria.budget.min,
+      maxBudget: criteria.budget.max,
+      landSharePercent:
+        dto.landSharePercent === undefined
+          ? existing.landSharePercent
+          : this.normalizeLandSharePercent(dto.landSharePercent),
+      propertyTypes: criteria.propertyTypes,
+      roomCounts: criteria.roomCounts,
+      features: demandPersistence.features,
+      cardProfileCriteria: demandPersistence.cardProfileCriteria
+        ? (demandPersistence.cardProfileCriteria as unknown as Prisma.InputJsonValue)
+        : Prisma.DbNull,
+      priceCurrency: criteria.priceCurrency,
+      ...contactSettings,
+      ...(criteria.areas.length > 0
+        ? {
+            areas: criteria.areas as unknown as Prisma.InputJsonValue,
+          }
         : {}),
       urgency: dto.urgency ?? existing.urgency,
       visibility: (dto.visibility as any) ?? existing.visibility,
@@ -1273,6 +2131,13 @@ export class NetworkService {
       { field: "district", label: "İlçe" },
       { field: "neighborhood", label: "Mahalle" },
       { field: "budget", label: "Bütçe" },
+      { field: "propertyTypes", label: "Gayrimenkul tipleri" },
+      { field: "roomCounts", label: "Oda seçenekleri" },
+      { field: "features", label: "Gayrimenkul özellikleri" },
+      { field: "cardProfileCriteria", label: "Kart kriterleri" },
+      { field: "priceCurrency", label: "Para birimi" },
+      { field: "allowPhoneCall", label: "Telefonla aranma izni" },
+      { field: "allowWhatsapp", label: "WhatsApp izni" },
       { field: "urgency", label: "Aciliyet" },
       { field: "visibility", label: "Görünürlük" },
       { field: "tags", label: "Etiketler" },
@@ -1308,10 +2173,13 @@ export class NetworkService {
             firstName: true,
             lastName: true,
             role: true,
+            capabilities: { select: { capability: true } },
           },
         },
       },
     });
+
+    await this.refreshRequestMatches(updatedPost);
 
     if (changes.length > 0) {
       await this.prisma.networkPostUpdateLog.create({
@@ -1338,10 +2206,15 @@ export class NetworkService {
       );
     }
 
-    return updatedPost;
+    return this.serializeNetworkPostForViewer(
+      updatedPost,
+      actionUser.id,
+    );
   }
 
   async remove(id: string, userId: string) {
+    const actionUser = await this.getNetworkActionUser(userId);
+    await this.requireForumModerationPermission(actionUser);
     const existing = await this.prisma.networkPost.findFirst({
       where: {
         id,
@@ -1357,7 +2230,6 @@ export class NetworkService {
       throw new NotFoundException("Pazaryeri paylaşımı bulunamadı.");
     }
 
-    const actionUser = await this.getNetworkActionUser(userId);
     this.ensureCanManageNetworkPost(existing.userId, actionUser);
 
     await this.prisma.networkPost.update({
@@ -1384,90 +2256,142 @@ export class NetworkService {
       "create",
     );
 
-    return this.prisma.$transaction(async (tx) => {
-      // Madde 33: aylik forum talebi limiti asilinca her yeni talep 20 kontor
-      const aktifPaket = await tx.kullaniciUyelikPaketi.findFirst({
-        where: { kullaniciId: actionUserId, durum: UyelikDurumu.AKTIF },
-        orderBy: { baslangicTarihi: "desc" },
-      });
-      const paket = aktifPaket
-        ? await tx.uyelikPaketi.findUnique({
-            where: { id: aktifPaket.paketId },
-          })
-        : null;
-      const aylikLimit = paket?.aylikForumKonusuLimiti ?? null;
+    this.validatePropertyDemandInput(validated.category, dto);
 
-      const now = new Date();
-      const ayBasi = new Date(now.getFullYear(), now.getMonth(), 1);
-      const buAyTalepSayisi =
-        aylikLimit == null
-          ? 0
-          : await tx.networkPost.count({
-              where: {
-                userId: actionUserId,
-                createdAt: { gte: ayBasi },
+    const { criteria, exactBudget } =
+      this.normalizeNetworkPostCriteria(dto);
+    const demandPersistence = this.normalizeNetworkDemandPersistence(
+      { ...dto, type: validated.category },
+      criteria.propertyTypes,
+      criteria.roomCounts,
+      criteria.features,
+    );
+    const primaryArea = criteria.areas[0] ?? null;
+    const contactSettings = this.normalizeContactSettings(dto);
+
+    const MAX_COLLISION_RETRIES = 5;
+    let result: any;
+    for (let attempt = 0; attempt < MAX_COLLISION_RETRIES; attempt++) {
+      const candidateListingNumber = generateRequestListingNumber();
+      try {
+        result = await this.prisma.$transaction(async (tx) => {
+          await consumeMembershipQuota(tx, actionUserId, 'TALEP');
+          const post = await tx.networkPost.create({
+            data: {
+              id: randomUUID(),
+              listingNumber: candidateListingNumber,
+              userId: actionUserId,
+              type: validated.category,
+              title: validated.title,
+              description: validated.description,
+              city: primaryArea?.city || null,
+              district: primaryArea?.district || null,
+              neighborhood: primaryArea?.neighborhood || null,
+              budget: exactBudget,
+              minArea: criteria.grossArea.min,
+              maxArea: criteria.grossArea.max,
+              minRoom: dto.minRoom ?? null,
+              maxRoom: dto.maxRoom ?? null,
+              minBudget: criteria.budget.min,
+              maxBudget: criteria.budget.max,
+              landSharePercent: this.normalizeLandSharePercent(dto.landSharePercent),
+              areas:
+                criteria.areas.length > 0
+                  ? (criteria.areas as unknown as Prisma.InputJsonValue)
+                  : undefined,
+              propertyTypes: criteria.propertyTypes,
+              roomCounts: criteria.roomCounts,
+              features: demandPersistence.features,
+              cardProfileCriteria: demandPersistence.cardProfileCriteria
+                ? (demandPersistence.cardProfileCriteria as unknown as Prisma.InputJsonValue)
+                : undefined,
+              priceCurrency: criteria.priceCurrency,
+              ...contactSettings,
+              urgency: dto.urgency || "Normal",
+              visibility: (dto.visibility as any) || "TUM_EPH",
+              tags: buildForumTags(
+                validated.category,
+                validated.requestType,
+                dto.tags,
+              ),
+              expiresAt: dto.expiresAt
+                ? new Date(dto.expiresAt)
+                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+              isActive: true,
+              updatedAt: new Date(),
+            },
+            include: {
+              User: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  role: true,
+                  capabilities: { select: { capability: true } },
+                },
               },
-            });
-      const limitAsildi =
-        aylikLimit != null && buAyTalepSayisi >= aylikLimit;
+            },
+          });
 
-      const post = await tx.networkPost.create({
-      data: {
-        id: randomUUID(),
-        userId: actionUserId,
-        type: validated.category,
-        title: validated.title,
-        description: validated.description,
-        city: dto.areas?.[0]?.city || dto.city || null,
-        district: dto.areas?.[0]?.district || dto.district || null,
-        neighborhood: dto.areas?.[0]?.neighborhood || dto.neighborhood || null,
-        budget: dto.budget || null,
-        minArea: dto.minArea ?? null,
-        maxArea: dto.maxArea ?? null,
-        minRoom: dto.minRoom ?? null,
-        maxRoom: dto.maxRoom ?? null,
-        minBudget: dto.minBudget ?? null,
-        maxBudget: dto.maxBudget ?? null,
-        areas: dto.areas
-          ? (dto.areas as unknown as Prisma.InputJsonValue)
-          : undefined,
-        urgency: dto.urgency || "Normal",
-        visibility: (dto.visibility as any) || "TUM_EPH",
-        tags: buildForumTags(
-          validated.category,
-          validated.requestType,
-          dto.tags,
-        ),
-        expiresAt: dto.expiresAt
-          ? new Date(dto.expiresAt)
-          : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        isActive: true,
-        updatedAt: new Date(),
-      },
-      include: {
-        User: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
-        },
-      },
-      });
+          const isUrgent = String(dto.urgency || "").toUpperCase() === "ACIL";
+          const kontorAmount = isUrgent ? 35 : 25;
+          const kontorAciklama = isUrgent
+            ? "Talep Merkezi acil talep yayınlama bedeli: 35 PK (25 PK taban + 10 PK aciliyet)."
+            : "Talep Merkezi talep yayınlama bedeli: 25 PK.";
 
-      if (limitAsildi) {
-        await this.spendForumKontor(tx, {
-          userId: actionUserId,
-          amount: 20,
-          islemTuru: KontorIslemTuru.FORUM_TALEP_OLUSTURMA,
-          aciklama: `Aylik forum talebi limiti (${aylikLimit}) asildigi icin talep olusturma bedeli: 20 kontor.`,
-          postId: post.id,
+          const payment = await this.spendForumKontor(tx, {
+            userId: actionUserId,
+            amount: kontorAmount,
+            islemTuru: KontorIslemTuru.FORUM_TALEP_OLUSTURMA,
+            aciklama: kontorAciklama,
+            postId: post.id,
+          });
+
+          return {
+            ...this.serializeNetworkPostForViewer(post, actionUserId),
+            id: post.id as string,
+            userId: post.userId as string,
+            type: post.type as string,
+            isActive: post.isActive as boolean,
+            expiresAt: post.expiresAt as Date,
+            listingNumber: post.listingNumber,
+            publicationReceipt: {
+              ok: true as const,
+              postId: post.id,
+              actorId: actionUserId,
+              operationId: payment.movement.id,
+              spent: payment.movement.miktar,
+              previousBalance: payment.movement.oncekiBakiye,
+              remainingBalance: payment.wallet.bakiye,
+              walletSource: 'PERSONAL' as const,
+              walletOfficeId: null,
+              replayed: false as const,
+            },
+          };
         });
-      }
+        break;
+      } catch (err: any) {
+        const isP2002 =
+          err instanceof Prisma.PrismaClientKnownRequestError || err?.code === 'P2002';
+        const target = (err?.meta as any)?.target;
+        const targetMatchesListingNumber =
+          Array.isArray(target) ? target.includes('listingNumber') : String(target || '').includes('listingNumber');
 
-      return post;
-    });
+        const isListingNumberUniqueError =
+          (isP2002 && targetMatchesListingNumber) ||
+          Boolean(err?.isListingNumberCollision);
+
+        if (isListingNumberUniqueError && attempt < MAX_COLLISION_RETRIES - 1) {
+          continue;
+        }
+        throw err;
+      }
+    }
+    if (!result) {
+      throw new BadRequestException('Talep ilan numarası tahsis edilemedi. Lütfen tekrar deneyin.');
+    }
+    await this.refreshRequestMatches(result);
+    return result;
   }
 
   private getForumActionUserId(user?: CurrentUserPayload): string {
@@ -1475,7 +2399,7 @@ export class NetworkService {
 
     if (!userId) {
       throw new ForbiddenException(
-        "Forum işlemi için kullanıcı kimliği doğrulanamadı.",
+        "Talep Merkezi işlemi için kullanıcı kimliği doğrulanamadı.",
       );
     }
 
@@ -1493,6 +2417,7 @@ export class NetworkService {
   ) {
     const actorId = this.getForumActionUserId(user);
 
+    await this.assertCanViewNetworkPost(postId, actorId, {}, tx);
     const [post, actor] = await Promise.all([
       tx.networkPost.findFirst({
         where: {
@@ -1523,7 +2448,7 @@ export class NetworkService {
 
     if (!post) {
       throw new NotFoundException(
-        "Aktif Forum paylaşımı bulunamadı.",
+        "Aktif Talep Merkezi kaydı bulunamadı.",
       );
     }
 
@@ -1533,7 +2458,7 @@ export class NetworkService {
 
     if (post.userId === actorId) {
       throw new BadRequestException(
-        "Kendi Forum paylaşımınız için bu işlemi yapamazsınız.",
+        "Kendi Talep Merkezi kaydınız için bu işlemi yapamazsınız.",
       );
     }
 
@@ -1552,17 +2477,26 @@ export class NetworkService {
     tx: Prisma.TransactionClient,
     input: {
       userId: string;
+      actorId?: string;
+      walletSource?: string;
+      walletOfficeId?: string;
       amount: number;
       islemTuru: KontorIslemTuru;
       aciklama: string;
       postId: string;
     },
   ) {
+    const actorId = input.actorId || input.userId;
+    const selected = await resolveOfficeWallet(tx, actorId, { walletSource: input.walletSource, walletOfficeId: input.walletOfficeId }, true);
+    if (input.actorId && selected.chargeUserId !== input.userId) throw new BadRequestException('Ofis harcama hesabı değişti; ücreti yeniden kontrol edin.');
+    input = { ...input, userId: selected.chargeUserId, actorId };
     await tx.$executeRaw`
       SELECT pg_advisory_xact_lock(
-        hashtext(${`forum-wallet:${input.userId}`})
+        hashtext(${`wallet:${input.userId}`})
       )
     `;
+
+    await tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${input.userId} FOR UPDATE`;
 
     let wallet = await tx.kontorCuzdani.findUnique({
       where: {
@@ -1602,7 +2536,9 @@ export class NetworkService {
         kullaniciId: input.userId,
       },
       data: {
-        bakiye: nextBalance,
+        bakiye: {
+            decrement: input.amount,
+          },
         toplamHarcama: {
           increment: input.amount,
         },
@@ -1620,7 +2556,7 @@ export class NetworkService {
         aciklama: input.aciklama,
         ilgiliKayitTuru: "NETWORK_POST",
         ilgiliKayitId: input.postId,
-        olusturanId: input.userId,
+        olusturanId: input.actorId || input.userId,
       },
     });
 
@@ -1630,62 +2566,312 @@ export class NetworkService {
     };
   }
 
+  async getRequestAccessCost(tx?: Prisma.TransactionClient | PrismaService): Promise<number> {
+    const setting = await (tx || this.prisma).systemSetting.findUnique({ where: { key: "REQUEST_PRIVATE_INFO_COST" } });
+    if (!setting || setting.valueJson === null || setting.valueJson === undefined) return 25;
+    const value = typeof setting.valueJson === 'number' || typeof setting.valueJson === 'string' ? Number(setting.valueJson) : NaN;
+    if (!Number.isSafeInteger(value) || value <= 0 || value > 2147483647) {
+      throw new BadRequestException('İletişim tarifesi doğrulanamadı.');
+    }
+    return value;
+  }
+
+  async hasPostPrivateAccess(
+    postId: string, viewerId: string, postOwnerId: string,
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<boolean> {
+    if (!viewerId) return false;
+    if (viewerId === postOwnerId) return true;
+    const viewer = await tx.user.findUnique({ where: { id: viewerId }, select: { role: true } });
+    if (viewer?.role === Role.SUPER_ADMIN) return true;
+    return Boolean(await tx.kontorHareketi.findFirst({ where: networkPaidAccessWhere(viewerId, postId), select: { id: true } }));
+  }
+
+  async getUnlockedPostIdsForViewer(viewerId?: string | null): Promise<Set<string>> {
+    if (!viewerId) return new Set();
+    const viewer = await this.prisma.user.findUnique({ where: { id: viewerId }, select: { role: true } });
+    if (viewer?.role === Role.SUPER_ADMIN) return new Set(['*']);
+    const records = await this.prisma.kontorHareketi.findMany({ where: networkPaidAccessWhere(viewerId), select: { ilgiliKayitId: true } });
+    return new Set(records.map(record => record.ilgiliKayitId).filter((id): id is string => Boolean(id)));
+  }
+
+  private assertNetworkActor(actorId: string, options?: NetworkAccessOptions) {
+    if (options?.expectedActorId !== undefined && options.expectedActorId !== actorId) {
+      throw new ForbiddenException('Oturum değişti. İşlemi yeniden açın.');
+    }
+  }
+
+  private async networkWalletContext(
+    actorId: string, options: NetworkAccessOptions = {},
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const value = await resolveOfficeWallet(tx, actorId, options, tx !== this.prisma);
+    return { chargeUserId: value.chargeUserId, walletOfficeId: value.walletOfficeId };
+  }
+
+  async getContactQuote(postId: string, user: CurrentUserPayload, query?: NetworkAccessOptions) {
+    const actorId = this.getForumActionUserId(user);
+    this.assertNetworkActor(actorId, query);
+    await this.assertCanViewNetworkPost(postId, actorId);
+    const post = await this.prisma.networkPost.findFirst({
+      where: { id: postId, isActive: true, expiresAt: { gt: new Date() } },
+      select: { id: true, userId: true, allowPhoneCall: true, contactPhone: true, allowWhatsapp: true, whatsappPhone: true, User: { select: NETWORK_CONTACT_OWNER_SELECT } },
+    });
+    if (!post) throw new NotFoundException('Aktif Talep Merkezi kaydı bulunamadı.');
+    const professionalContact = networkProfessionalContact(post.User);
+    const alreadyUnlocked = await this.hasPostPrivateAccess(postId, actorId, post.userId);
+    const context = await this.networkWalletContext(actorId, query);
+    const wallet = await this.prisma.kontorCuzdani.findUnique({ where: { kullaniciId: context.chargeUserId } });
+    const tariffCostPk = await this.getRequestAccessCost();
+    const costPk = alreadyUnlocked ? 0 : tariffCostPk;
+    return {
+      costPk, tariffCostPk, alreadyUnlocked, balance: wallet?.bakiye ?? 0,
+      eligible: alreadyUnlocked || Boolean(wallet?.aktifMi && wallet.bakiye >= costPk),
+      phoneCallAllowed: Boolean(post.allowPhoneCall && networkContactPhone(post.contactPhone)),
+      whatsappAllowed: Boolean(post.allowWhatsapp && networkContactPhone(post.whatsappPhone)),
+      availableInfo: {
+        name: Boolean(professionalContact.name),
+        phone: Boolean(professionalContact.phone || (post.allowPhoneCall && networkContactPhone(post.contactPhone))),
+        office: Boolean(professionalContact.officeName),
+        email: Boolean(professionalContact.email),
+      },
+    };
+  }
+
+  async unlockPostUnifiedAccess(
+    postId: string,
+    actorId: string,
+    options?: NetworkAccessOptions,
+    clientTx?: Prisma.TransactionClient,
+  ) {
+    const runInTx = async (tx: Prisma.TransactionClient) => {
+      this.assertNetworkActor(actorId, options);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'network-access:' + actorId + ':' + postId}))`;
+      await this.assertCanViewNetworkPost(postId, actorId, {}, tx);
+
+      const post = await tx.networkPost.findFirst({
+        where: {
+          id: postId,
+          isActive: true,
+          expiresAt: { gt: new Date() },
+        },
+        include: {
+          User: {
+            select: NETWORK_CONTACT_OWNER_SELECT,
+          },
+        },
+      });
+
+      if (!post) {
+        throw new NotFoundException("Aktif Talep Merkezi kaydı bulunamadı.");
+      }
+
+      if (options?.channel) {
+        const allowed = options.channel === 'CALL' ? post.allowPhoneCall : post.allowWhatsapp;
+        const phone = networkContactPhone(options.channel === 'CALL' ? post.contactPhone : post.whatsappPhone);
+        if (!allowed || !phone) throw new ForbiddenException('Talep sahibinin bu kanal için geçerli iletişim izni yok.');
+      }
+      const { chargeUserId, walletOfficeId } = await this.networkWalletContext(actorId, options, tx);
+      const isOwner = post.userId === actorId;
+      const alreadyUnlocked = await this.hasPostPrivateAccess(
+        postId,
+        actorId,
+        post.userId,
+        tx,
+      );
+
+      const tariffCost = await this.getRequestAccessCost(tx);
+
+      if (isOwner || alreadyUnlocked) {
+        const wallet = await tx.kontorCuzdani.findUnique({
+          where: { kullaniciId: chargeUserId },
+        });
+        return {
+          post,
+          alreadyUnlocked: true,
+          cost: 0,
+          tariffCostPk: tariffCost,
+          spent: 0,
+          balance: wallet?.bakiye ?? 0,
+          operationId: null,
+          walletOfficeId,
+        };
+      }
+
+      if (!Number.isSafeInteger(options?.expectedCostPk) || options?.expectedCostPk !== tariffCost) {
+        throw new BadRequestException('Güncel iletişim ücretini yeniden onaylayın.');
+      }
+      const cost = tariffCost;
+      const spendResult = await this.spendForumKontor(tx, {
+        userId: chargeUserId,
+        walletSource: options?.walletSource,
+        walletOfficeId: options?.walletOfficeId,
+        actorId,
+        amount: cost,
+        islemTuru: KontorIslemTuru.FORUM_OZEL_BILGI,
+        aciklama:
+          options?.aciklama ||
+          `${post.title} talebi için özel bilgi ve yanıt erişimi açıldı.`,
+        postId: post.id,
+      });
+
+      const actor = await tx.user.findUnique({
+        where: { id: actorId },
+        select: { firstName: true, lastName: true },
+      });
+      const actorName = actor
+        ? `${actor.firstName || ""} ${actor.lastName || ""}`.trim()
+        : "Bir kullanıcı";
+
+      await tx.networkNotification.create({
+        data: {
+          userId: post.userId,
+          postId: post.id,
+          title: "Talebiniz için özel erişim açıldı",
+          message: `${actorName}, "${post.title}" paylaşımınız için özel bilgilerinize erişti.`,
+        },
+      });
+
+      return {
+        post,
+        alreadyUnlocked: false,
+        cost,
+        tariffCostPk: cost,
+        spent: cost,
+        balance: spendResult.wallet.bakiye,
+        operationId: spendResult.movement.id,
+        walletOfficeId,
+      };
+    };
+
+    if (clientTx) {
+      return runInTx(clientTx);
+    }
+    return this.prisma.$transaction(runInTx);
+  }
+
+  async postContact(postId: string, user: CurrentUserPayload, channelInput: string, body?: NetworkAccessOptions) {
+    const actorId = this.getForumActionUserId(user);
+    const channel = String(channelInput || '').trim().toUpperCase();
+    if (channel !== 'CALL' && channel !== 'WHATSAPP') throw new BadRequestException('Geçersiz iletişim kanalı.');
+    return this.prisma.$transaction(async tx => {
+      const unlock = await this.unlockPostUnifiedAccess(postId, actorId, {
+        ...body, channel,
+        aciklama: `${channel === 'CALL' ? 'Telefon' : 'WhatsApp'} iletişimi ve yanıt hakkı açıldı.`,
+      }, tx);
+      const phone = networkContactPhone(channel === 'CALL' ? unlock.post.contactPhone : unlock.post.whatsappPhone);
+      if (!phone) throw new ForbiddenException('Geçerli iletişim numarası bulunamadı.');
+      return {
+        ok: true, channel, phone,
+        url: channel === 'CALL' ? `tel:${phone}` : `https://wa.me/${phone.slice(1)}`,
+        cost: unlock.spent, tariffCostPk: unlock.tariffCostPk, spent: unlock.spent,
+        alreadyUnlocked: unlock.alreadyUnlocked, replayed: unlock.alreadyUnlocked,
+        balance: unlock.balance, remainingBalance: unlock.balance, operationId: unlock.operationId,
+        walletOfficeId: unlock.walletOfficeId, privateInfoUnlocked: true, replyAllowed: true,
+        message: unlock.alreadyUnlocked ? 'Erişim daha önce açılmıştı; yeniden PK harcanmadı.' : `İletişim ve yanıt hakkı açıldı. ${unlock.spent} PK harcandı.`,
+      };
+    });
+  }
+
+  async postPrivateInfo(
+    postId: string,
+    user: CurrentUserPayload,
+    body?: NetworkAccessOptions,
+  ) {
+    const actorId = this.getForumActionUserId(user);
+    return this.prisma.$transaction(async tx => {
+      const unlock = await this.unlockPostUnifiedAccess(postId, actorId, body, tx);
+
+      return {
+        ok: true,
+        cost: unlock.spent,
+        tariffCostPk: unlock.tariffCostPk,
+        spent: unlock.spent,
+        alreadyUnlocked: unlock.alreadyUnlocked,
+        replayed: unlock.alreadyUnlocked,
+        balance: unlock.balance,
+        remainingBalance: unlock.balance,
+        walletOfficeId: unlock.walletOfficeId,
+        operationId: unlock.operationId,
+        privateInfoUnlocked: true,
+        replyAllowed: true,
+        post: this.serializeNetworkPostForViewer(unlock.post, actorId, true, true),
+        message: unlock.alreadyUnlocked
+          ? "Özel bilgiler daha önce açılmıştı; yeniden PK harcanmadı."
+          : `Özel bilgiler ve yanıt hakkı açıldı. ${unlock.spent} PK harcandı.`,
+      };
+    });
+  }
+
   async messagePost(
     postId: string,
     user: CurrentUserPayload,
-    body?: ForumActionPayload,
+    body?: NetworkAccessOptions & { message?: string },
   ) {
+    const text = String(body?.message || '').trim();
+    if (text.length > 10000) throw new BadRequestException('Mesaj en fazla 10.000 karakter olabilir.');
+    if (text) {
+      const safety = this.textSafetyService.validate(text, { field: TextSafetyField.MESSAGE });
+      if (!safety.valid) throw new BadRequestException({ code: 'UNSAFE_MESSAGE', message: safety.errors[0]?.message || 'Mesaj içeriğini düzenleyin.' });
+    }
+    const actorId = this.getForumActionUserId(user);
+    if (body?.requestId !== undefined && (typeof body.requestId !== 'string' || !/^[A-Za-z0-9_-]{8,160}$/.test(body.requestId))) {
+      throw new BadRequestException('Geçersiz yanıt işlem kimliği.');
+    }
+    const messageId = body?.requestId
+      ? 'network-reply-' + createHash('sha256').update(JSON.stringify([actorId, postId, body.requestId])).digest('hex')
+      : randomUUID();
+
     return this.prisma.$transaction(async (tx) => {
-      const context = await this.getForumActionContext(
-        tx,
+      const unlock = await this.unlockPostUnifiedAccess(
         postId,
-        user,
+        actorId,
+        {
+          ...body,
+          aciklama: 'Talep yanıtı gönderildi ve özel bilgi erişimi açıldı.',
+        },
+        tx,
       );
 
-      const kontorResult = await this.spendForumKontor(tx, {
-        userId: context.actorId,
-        amount: 3,
-        islemTuru: KontorIslemTuru.FORUM_MESAJ,
-        aciklama: `${context.post.title} Forum paylaşımı için mesaj başlatıldı.`,
-        postId: context.post.id,
-      });
-
-      const participantIds = [
-        context.actorId,
-        context.post.userId,
-      ].sort();
+      const participantIds = [actorId, unlock.post.userId].sort();
 
       await tx.$executeRaw`
         SELECT pg_advisory_xact_lock(
-          hashtext(${`forum-conversation:${context.post.id}:${participantIds.join(":")}`})
+          hashtext(${'forum-conversation:' + unlock.post.id + ':' + participantIds.join(":")})
         )
       `;
 
-      const existingConversation =
-        await tx.conversation.findFirst({
-          where: {
-            postId: context.post.id,
-            AND: [
-              {
-                ConversationParticipant: {
-                  some: {
-                    userId: context.actorId,
-                  },
-                },
+      const previousMessage = body?.requestId ? await tx.message.findUnique({ where: { id: messageId } }) : null;
+      if (previousMessage) {
+        return {
+          ok: true, cost: 0, spent: 0, tariffCostPk: unlock.tariffCostPk,
+          alreadyUnlocked: true, replayed: true, balance: unlock.balance, remainingBalance: unlock.balance,
+          walletOfficeId: unlock.walletOfficeId, operationId: messageId, conversationId: previousMessage.conversationId,
+          url: `/messages/${previousMessage.conversationId}`, privateInfoUnlocked: true, replyAllowed: true,
+          message: 'Önceki yanıt açıldı; yeniden mesaj gönderilmedi ve PK harcanmadı.',
+        };
+      }
+
+      const existingConversation = await tx.conversation.findFirst({
+        where: {
+          postId: unlock.post.id,
+          AND: [
+            {
+              ConversationParticipant: {
+                some: { userId: actorId },
               },
-              {
-                ConversationParticipant: {
-                  some: {
-                    userId: context.post.userId,
-                  },
-                },
+            },
+            {
+              ConversationParticipant: {
+                some: { userId: unlock.post.userId },
               },
-            ],
-          },
-          include: {
-            ConversationParticipant: true,
-          },
-        });
+            },
+          ],
+        },
+        include: {
+          ConversationParticipant: true,
+        },
+      });
 
       const conversation =
         existingConversation &&
@@ -1694,19 +2880,13 @@ export class NetworkService {
           : await tx.conversation.create({
               data: {
                 id: randomUUID(),
-                postId: context.post.id,
-                title: `Forum Mesajı - ${context.post.title}`,
+                postId: unlock.post.id,
+                title: `Talep Merkezi Mesajı - ${unlock.post.title}`,
                 updatedAt: new Date(),
                 ConversationParticipant: {
                   create: [
-                    {
-                      id: randomUUID(),
-                      userId: context.actorId,
-                    },
-                    {
-                      id: randomUUID(),
-                      userId: context.post.userId,
-                    },
+                    { id: randomUUID(), userId: actorId },
+                    { id: randomUUID(), userId: unlock.post.userId },
                   ],
                 },
               },
@@ -1717,48 +2897,57 @@ export class NetworkService {
 
       const message =
         this.cleanForumActionText(body?.message) ||
-        `Merhaba, "${context.post.title}" başlıklı Forum paylaşımınız hakkında görüşmek istiyorum.`;
+        `Merhaba, "${unlock.post.title}" başlıklı talebiniz hakkında görüşmek istiyorum.`;
 
       await tx.message.create({
         data: {
-          id: randomUUID(),
+          id: messageId,
           conversationId: conversation.id,
-          senderId: context.actorId,
+          senderId: actorId,
           body: message,
         },
       });
 
       await tx.conversation.update({
-        where: {
-          id: conversation.id,
-        },
-        data: {
-          updatedAt: new Date(),
-        },
+        where: { id: conversation.id },
+        data: { updatedAt: new Date() },
       });
+
+      const actor = await tx.user.findUnique({
+        where: { id: actorId },
+        select: { firstName: true, lastName: true },
+      });
+      const actorName = actor
+        ? `${actor.firstName || ""} ${actor.lastName || ""}`.trim()
+        : "Bir kullanıcı";
 
       await tx.networkNotification.create({
         data: {
-          userId: context.post.userId,
-          postId: context.post.id,
-          title: "Forum mesajı başlatıldı",
-          message: `${context.actorName}, "${context.post.title}" paylaşımınız için mesaj gönderdi.`,
+          userId: unlock.post.userId,
+          postId: unlock.post.id,
+          title: "Talebinize yanıt geldi",
+          message: `${actorName}, "${unlock.post.title}" talebinize yanıt verdi.`,
         },
       });
 
       return {
         ok: true,
-        message: "Forum mesajı başlatıldı. 3 kontör harcandı.",
-        cost: 3,
-        spent: 3,
-        previousBalance:
-          kontorResult.movement.oncekiBakiye,
-        remainingBalance:
-          kontorResult.wallet.bakiye,
-        balance:
-          kontorResult.wallet.bakiye,
+        cost: unlock.cost,
+        spent: unlock.spent,
+        tariffCostPk: unlock.tariffCostPk,
+        alreadyUnlocked: unlock.alreadyUnlocked,
+        replayed: unlock.alreadyUnlocked,
+        balance: unlock.balance,
+        remainingBalance: unlock.balance,
+        walletOfficeId: unlock.walletOfficeId,
+        operationId: unlock.operationId || `conv-${conversation.id}`,
         conversationId: conversation.id,
         url: `/messages/${conversation.id}`,
+        privateInfoUnlocked: true,
+        replyAllowed: true,
+        message: unlock.alreadyUnlocked
+          ? "Talebe yanıt verildi. Ek PK harcanmadı."
+          : `Talebe yanıt verildi ve iletişim erişimi açıldı. ${unlock.spent} PK harcandı.`,
       };
     });
   }
@@ -1768,48 +2957,9 @@ export class NetworkService {
     user: CurrentUserPayload,
     body?: ForumActionPayload,
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      const context = await this.getForumActionContext(
-        tx,
-        postId,
-        user,
-      );
-
-      const kontorResult = await this.spendForumKontor(tx, {
-        userId: context.actorId,
-        amount: 10,
-        islemTuru:
-          KontorIslemTuru.FORUM_ILGILENIYORUM,
-        aciklama: `${context.post.title} Forum paylaşımı için ilgileniyorum bildirimi gönderildi.`,
-        postId: context.post.id,
-      });
-
-      const note = this.cleanForumActionText(body?.note);
-      const noteText = note ? ` Not: ${note}` : "";
-
-      await tx.networkNotification.create({
-        data: {
-          userId: context.post.userId,
-          postId: context.post.id,
-          title: "Forum paylaşımınızla ilgilenen var",
-          message: `${context.actorName}, "${context.post.title}" paylaşımınızla ilgileniyor.${noteText}`,
-        },
-      });
-
-      return {
-        ok: true,
-        message:
-          "İlgileniyorum bildirimi gönderildi. 10 kontör harcandı.",
-        cost: 10,
-        spent: 10,
-        previousBalance:
-          kontorResult.movement.oncekiBakiye,
-        remainingBalance:
-          kontorResult.wallet.bakiye,
-        balance:
-          kontorResult.wallet.bakiye,
-      };
-    });
+    throw new BadRequestException(
+      "?lgileniyorum i?lemi g?ncel tarifede kald?r?lm??t?r. L?tfen Talebe Yan?t Ver veya ?leti?im butonunu kullan?n.",
+    );
   }
 
   async helpPost(
@@ -1817,49 +2967,8 @@ export class NetworkService {
     user: CurrentUserPayload,
     body?: ForumActionPayload,
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      const context = await this.getForumActionContext(
-        tx,
-        postId,
-        user,
-      );
-
-      const kontorResult = await this.spendForumKontor(tx, {
-        userId: context.actorId,
-        amount: 10,
-        islemTuru:
-          KontorIslemTuru.FORUM_YARDIMCI_OLABILIRIM,
-        aciklama: `${context.post.title} Forum paylaşımı için yardımcı olabilirim bildirimi gönderildi.`,
-        postId: context.post.id,
-      });
-
-      const note = this.cleanForumActionText(body?.note);
-      const noteText = note ? ` Not: ${note}` : "";
-
-      await tx.networkNotification.create({
-        data: {
-          userId: context.post.userId,
-          postId: context.post.id,
-          title: "Forum paylaşımınıza yardım teklifi",
-          message: `${context.actorName}, "${context.post.title}" paylaşımınız için yardımcı olabileceğini bildirdi.${noteText}`,
-        },
-      });
-
-      return {
-        ok: true,
-        message:
-          "Yardımcı olabilirim bildirimi gönderildi. 10 kontör harcandı.",
-        cost: 10,
-        spent: 10,
-        previousBalance:
-          kontorResult.movement.oncekiBakiye,
-        remainingBalance:
-          kontorResult.wallet.bakiye,
-        balance:
-          kontorResult.wallet.bakiye,
-      };
-    });
+    throw new BadRequestException(
+      "Yard?mc? Olabilirim i?lemi g?ncel tarifede kald?r?lm??t?r. L?tfen Talebe Yan?t Ver veya ?leti?im butonunu kullan?n.",
+    );
   }
-
-
 }

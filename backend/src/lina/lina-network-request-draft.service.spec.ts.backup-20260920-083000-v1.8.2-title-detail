@@ -1,0 +1,86 @@
+import { LinaNetworkRequestDraftService } from "./lina-network-request-draft.service";
+
+describe("LinaNetworkRequestDraftService", () => {
+  it("returns a canonical, approval-only draft", async () => {
+    const openAiClient = {
+      createResponse: jest.fn().mockResolvedValue({
+        output_text: JSON.stringify({
+          category: "PORTFOY_ARIYORUM", requestIntent: "PORTFOY_SATILIK", propertyType: "DAIRE",
+          roomCounts: ["invalid"], minArea: 120, city: "istanbul", maxBudget: 9000000,
+          currency: "TRY", urgency: "Müşteri Hazır", confidence: 0.91, warnings: [],
+        }),
+      }),
+    };
+    const locationCatalog = {
+      resolveLocationFromMessage: jest.fn().mockResolvedValue({
+        success: true, province: "İstanbul", district: "Kadıköy", neighborhood: "Fenerbahçe",
+      }),
+    };
+    const service = new LinaNetworkRequestDraftService(openAiClient as never, locationCatalog as never);
+
+    const result = await service.create("İstanbul Kadıköy'de 3+1 satılık daire arıyorum");
+
+    expect(result.requiresApproval).toBe(true);
+    expect(result.draft).toMatchObject({
+      category: "PORTFOY_ARIYORUM", requestIntent: "PORTFOY_SATILIK", propertyType: "DAIRE",
+      roomCounts: ["3+1"], city: "İstanbul",
+      areas: [{ city: "İstanbul", district: "Kadıköy", neighborhood: "Fenerbahçe" }],
+    });
+  });
+
+  it("rejects an empty request", async () => {
+    const service = new LinaNetworkRequestDraftService({} as never, {} as never);
+    await expect(service.create("kısa")).rejects.toThrow("8-1500");
+  });
+
+  it("maps canonical profile criteria and verifies every requested neighborhood", async () => {
+    const openAiClient = {
+      createResponse: jest.fn().mockResolvedValue({
+        output_text: JSON.stringify({
+          category: "PORTFOY_ARIYORUM", requestIntent: "PORTFOY_SATILIK", propertyType: "DAIRE",
+          roomCounts: [], profileCriteria: { parkingType: ["Var"] }, minArea: 120, city: "Denizli",
+          areas: [
+            { city: "Denizli", district: "Merkezefendi", neighborhood: "Şemikler" },
+            { city: "Denizli", district: "Merkezefendi", neighborhood: "Akkonak" },
+          ],
+          maxBudget: 8000000, currency: "TRY", urgency: "Normal", confidence: 0.95, warnings: [],
+        }),
+      }),
+    };
+    const locationCatalog = {
+      resolveLocationFromMessage: jest.fn().mockImplementation(async (message: string) => {
+        if (message.includes("Şemikler")) return { success: true, province: "Denizli", district: "Merkezefendi", neighborhood: "Şemikler" };
+        if (message.includes("Akkonak")) return { success: true, province: "Denizli", district: "Merkezefendi", neighborhood: "Akkonak" };
+        return { success: false, source: "NONE", message: "Katalog geçici olarak yanıt vermedi." };
+      }),
+    };
+    const service = new LinaNetworkRequestDraftService(openAiClient as never, locationCatalog as never);
+    const message = "Denizli Merkezefendi Şemikler ve Akkonak'ta satılık 3+1 veya 4+1 daire arıyorum. En az 120 m² olsun. Bütçem maksimum 8 milyon TL. Asansör ve otopark olsun.";
+
+    const result = await service.create(message);
+
+    expect(result.draft).toMatchObject({
+      roomCounts: ["3+1", "4+1"], minArea: 120, maxBudget: 8000000, city: "Denizli",
+      areas: [
+        { city: "Denizli", district: "Merkezefendi", neighborhood: "Şemikler" },
+        { city: "Denizli", district: "Merkezefendi", neighborhood: "Akkonak" },
+      ],
+      profileCriteria: { elevatorStatus: ["Var"] },
+    });
+    expect(result.draft.profileCriteria.parkingType).toBeUndefined();
+    expect(result.warnings).toContain("Otopark tipi belirtilmedi; açık veya kapalı otopark seçimini kontrol edin.");
+    expect(result.warnings.some((warning) => warning.includes("Konum"))).toBe(false);
+  });
+
+  it("keeps the warning for an unknown location", async () => {
+    const openAiClient = { createResponse: jest.fn().mockResolvedValue({
+      output_text: JSON.stringify({ city: "Atlantis", areas: [], warnings: [] }),
+    }) };
+    const locationCatalog = { resolveLocationFromMessage: jest.fn().mockResolvedValue({ success: false }) };
+    const service = new LinaNetworkRequestDraftService(openAiClient as never, locationCatalog as never);
+
+    const result = await service.create("Atlantis merkezde satılık bir daire arıyorum");
+
+    expect(result.warnings).toContain("Konum EPH kataloğunda kesin doğrulanamadı; yayınlamadan önce kontrol edin.");
+  });
+});

@@ -1,0 +1,35 @@
+import { LinaNetworkRequestDraftService } from "./lina-network-request-draft.service";
+
+describe("LinaNetworkRequestDraftService", () => {
+  it("returns a canonical, approval-only draft", async () => {
+    const openAiClient = {
+      createResponse: jest.fn().mockResolvedValue({
+        output_text: JSON.stringify({
+          category: "PORTFOY_ARIYORUM", requestIntent: "PORTFOY_SATILIK", propertyType: "DAIRE",
+          roomCounts: ["invalid"], minArea: 120, city: "istanbul", maxBudget: 9000000,
+          currency: "TRY", urgency: "Müşteri Hazır", confidence: 0.91, warnings: [],
+        }),
+      }),
+    };
+    const locationCatalog = {
+      resolveLocationFromMessage: jest.fn().mockResolvedValue({
+        success: true, province: "İstanbul", district: "Kadıköy", neighborhood: "Fenerbahçe",
+      }),
+    };
+    const service = new LinaNetworkRequestDraftService(openAiClient as never, locationCatalog as never);
+
+    const result = await service.create("İstanbul Kadıköy'de 3+1 satılık daire arıyorum");
+
+    expect(result.requiresApproval).toBe(true);
+    expect(result.draft).toMatchObject({
+      category: "PORTFOY_ARIYORUM", requestIntent: "PORTFOY_SATILIK", propertyType: "DAIRE",
+      roomCounts: ["3+1"], city: "İstanbul",
+      areas: [{ city: "İstanbul", district: "Kadıköy", neighborhood: "Fenerbahçe" }],
+    });
+  });
+
+  it("rejects an empty request", async () => {
+    const service = new LinaNetworkRequestDraftService({} as never, {} as never);
+    await expect(service.create("kısa")).rejects.toThrow("8-1500");
+  });
+});

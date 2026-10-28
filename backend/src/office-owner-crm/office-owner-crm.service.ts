@@ -43,10 +43,16 @@ export class OfficeOwnerCrmService {
     return Math.max(0, Math.min(100, advisorScore + teamScore + portfolioScore + authorizedScore + poolScore));
   }
 
-  private async findManagedOffice(actor: OfficeOwnerActor) {
+  private async findManagedOffice(actor: OfficeOwnerActor, officeId?: string) {
     const actorId = this.getActorId(actor);
     const role = this.getActorRole(actor);
 
+    if (officeId) {
+      if (role !== Role.SUPER_ADMIN) throw new ForbiddenException('Başka ofis seçimi yalnız Yazılım Ekibi için açıktır.');
+      const selected = await this.prisma.office.findFirst({ where: { id: officeId, isActive: true }, select: { id: true, name: true, city: true, district: true, ownerUserId: true } });
+      if (!selected) throw new NotFoundException('Aktif ofis bulunamadı.');
+      return selected;
+    }
     const directOffice = await this.prisma.office.findFirst({
       where: {
         ownerUserId: actorId,
@@ -121,8 +127,8 @@ export class OfficeOwnerCrmService {
     throw new NotFoundException('Aktif ofis sahipliği bulunamadı.');
   }
 
-  async getDashboard(actor: OfficeOwnerActor) {
-    const office = await this.findManagedOffice(actor);
+  async getDashboard(actor: OfficeOwnerActor, officeId?: string) {
+    const office = await this.findManagedOffice(actor, officeId);
 
     const [officeUsers, teams] = await Promise.all([
       this.prisma.user.findMany({

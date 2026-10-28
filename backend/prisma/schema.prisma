@@ -1,3 +1,24 @@
+enum ProjectSceneStatus {
+  TASLAK
+  TAMAMLANDI
+  ATLANDI
+}
+
+model ProjectScene {
+  id            String             @id @default(uuid())
+  projectId     String             @unique
+  schemaVersion Int                @default(1)
+  version       Int                @default(1)
+  status        ProjectSceneStatus @default(TASLAK)
+  sceneData     Json
+  thumbnailUrl  String?
+  completedAt   DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([status])
+}
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,91 +30,133 @@ datasource db {
 }
 
 model User {
-  id                          String                       @id @default(uuid())
-  email                       String                       @unique
-  phone                       String                       @unique
-  passwordHash                String
-  firstName                   String
-  lastName                    String
-  role                        Role
-  isVerified                  Boolean                      @default(false)
-  emailVerifiedAt             DateTime?
-  emailVerificationCodeHash   String?
-  emailVerificationExpiresAt  DateTime?
-  emailVerificationAttempts   Int                          @default(0)
-  emailVerificationLastSentAt DateTime?
-  passwordResetCodeHash       String?
-  passwordResetExpiresAt      DateTime?
-  passwordResetAttempts       Int                          @default(0)
-  passwordResetLastSentAt     DateTime?
-  passwordResetVersion        Int                          @default(0)
-  isApproved                  Boolean                      @default(false)
-  createdAt                   DateTime                     @default(now())
-  updatedAt                   DateTime                     @updatedAt
-  nominationPoints            Int                          @default(0)
-  nominationQuota             Int                          @default(10)
-  referralCode                String?                      @unique
-  adminVisible                Boolean                      @default(true)
-  profileImageUrl             String?
-  memberCode                  String?                      @unique
-  memberSince                 DateTime?
-  riskLevel                   RiskLevel                    @default(DUSUK)
-  trustScore                  Int                          @default(70)
-  city                        String?
-  cityPlateCode               String?
-  district                    String?
-  hesapTuru                   KullaniciHesapTuru           @default(GERCEK)
-  pilotKullaniciMi            Boolean                      @default(false)
-  officeId                    String?
-  activities                  Activity[]
-  adminActionLogs             AdminActionLog[]             @relation("AdminActionActor")
-  adminActionTargets          AdminActionLog[]             @relation("AdminActionTarget")
-  applications                Application[]
-  reviewedApplications        Application[]                @relation("ApplicationReviewer")
-  auditLogs                   AuditLog[]                   @relation("AuditActor")
-  activitiesAudited           AuditLog[]                   @relation("AuditTargetUser")
-  ConversationParticipant     ConversationParticipant[]
-  customers                   Customer[]
-  documents                   Document[]
-  linaPortfolioSessions       LinaPortfolioSession[]
-  linaPreference              LinaPreference?
-  linaOturumlari              LinaOturum[]
-  linaGunSonuOnaylari         LinaGunSonuOnayi[]
-  Message                     Message[]
-  NetworkNotification         NetworkNotification[]
-  NetworkPost                 NetworkPost[]
-  NetworkPostFollower         NetworkPostFollower[]
-  NetworkPostUpdateLog        NetworkPostUpdateLog[]
-  NetworkPostView             NetworkPostView[]
-  nominations                 Nomination[]
-  ownedOffices                Office[]                     @relation("OfficeOwner")
-  announcementsCreated        PlatformAnnouncement[]       @relation("AnnouncementCreator")
-  portfolioAuthorityApprovals PortfolioAuthorityDocument[] @relation("PortfolioAuthorityApprover")
-  projects                    Project[]
-  projectInventoryBatches     ProjectInventoryBatch[]      @relation("ProjectInventoryBatchCreator")
-  projectDesignReviewRequests ProjectDesignReviewRequest[] @relation("ProjectDesignReviewRequester")
-  projectDesignReviews        ProjectDesignReviewRequest[] @relation("ProjectDesignReviewReviewer")
-  salesUnits                  Unit[]                       @relation("UnitSalesRepresentative")
-  pushSubscriptions           PushSubscription[]
-  reportsCreated              Report[]                     @relation("ReportReporter")
-  reportsResolved             Report[]                     @relation("ReportResolver")
-  superAdminProfile           SUPER_ADMIN?
-  systemMessagesSent          SystemMessage[]              @relation("SystemMessageSender")
-  systemMessagesInbox         SystemMessage[]              @relation("SystemMessageTargetUser")
-  tasks                       Task[]
-  ledTeams                    Team[]                       @relation("TeamLeader")
-  teamMemberships             TeamMember[]
-  office                      Office?                      @relation("OfficeUsers", fields: [officeId], references: [id])
-  capabilitiesCreated         UserCapability[]             @relation("CapabilityCreator")
-  capabilities                UserCapability[]             @relation("UserCapabilities")
-  restrictionsCreated         UserRestriction[]            @relation("RestrictionCreator")
-  restrictions                UserRestriction[]            @relation("RestrictedUser")
-  visits                      UserVisit[]
-  hediyeKontorHavuzlari       HediyeKontorHavuzu[]         @relation("GiftPoolCreator")
-  hediyeKontorGonderimleri    HediyeKontorDagitimi[]       @relation("GiftCreditSender")
-  hediyeKontorAlimlari        HediyeKontorDagitimi[]       @relation("GiftCreditRecipient")
+  id                             String                          @id @default(uuid())
+  email                          String?                         @unique
+  phone                          String                          @unique
+  passwordHash                   String?
+  firstName                      String
+  lastName                       String
+  role                           Role                            @default(ADAY)
+  isVerified                     Boolean                         @default(false)
+  emailVerifiedAt                DateTime?
+  emailVerificationCodeHash      String?
+  emailVerificationExpiresAt     DateTime?
+  emailVerificationAttempts      Int                             @default(0)
+  emailVerificationLastSentAt    DateTime?
+  passwordResetCodeHash          String?
+  passwordResetExpiresAt         DateTime?
+  passwordResetAttempts          Int                             @default(0)
+  passwordResetLastSentAt        DateTime?
+  passwordResetVersion           Int                             @default(0)
+  isApproved                     Boolean                         @default(false)
+  professionalVerificationStatus ProfessionalVerificationStatus?
+  profileCompleted               Boolean                         @default(false)
+  profileCompletedAt             DateTime?
+  createdAt                      DateTime                        @default(now())
+  updatedAt                      DateTime                        @updatedAt
+  nominationPoints               Int                             @default(0)
+  nominationQuota                Int                             @default(10)
+  referralCode                   String?                         @unique
+  adminVisible                   Boolean                         @default(true)
+  profileImageUrl                String?
+  memberCode                     String?                         @unique
+  memberSince                    DateTime?
+  riskLevel                      RiskLevel                       @default(DUSUK)
+  trustScore                     Int                             @default(70)
+  city                           String?
+  cityPlateCode                  String?
+  district                       String?
+  taxNumber                      String?
+  taxOffice                      String?
+  companyName                    String?
+  professionalDocumentNumber     String?
+  hesapTuru                      KullaniciHesapTuru              @default(GERCEK)
+  pilotKullaniciMi               Boolean                         @default(false)
+  officeId                       String?
+  activities                     Activity[]
+  adminActionLogs                AdminActionLog[]                @relation("AdminActionActor")
+  adminActionTargets             AdminActionLog[]                @relation("AdminActionTarget")
+  applications                   Application[]
+  reviewedApplications           Application[]                   @relation("ApplicationReviewer")
+  auditLogs                      AuditLog[]                      @relation("AuditActor")
+  activitiesAudited              AuditLog[]                      @relation("AuditTargetUser")
+  ConversationParticipant        ConversationParticipant[]
+  customers                      Customer[]
+  documents                      Document[]
+  linaPortfolioSessions          LinaPortfolioSession[]
+  linaPreference                 LinaPreference?
+  linaOturumlari                 LinaOturum[]
+  linaGunSonuOnaylari            LinaGunSonuOnayi[]
+  Message                        Message[]
+  NetworkNotification            NetworkNotification[]
+  NetworkPost                    NetworkPost[]
+  NetworkPostFollower            NetworkPostFollower[]
+  NetworkPostUpdateLog           NetworkPostUpdateLog[]
+  NetworkPostView                NetworkPostView[]
+  nominations                    Nomination[]
+  ownedOffices                   Office[]                        @relation("OfficeOwner")
+  announcementsCreated           PlatformAnnouncement[]          @relation("AnnouncementCreator")
+  portfolioAuthorityApprovals    PortfolioAuthorityDocument[]    @relation("PortfolioAuthorityApprover")
+  projects                       Project[]
+  projectInventoryBatches        ProjectInventoryBatch[]         @relation("ProjectInventoryBatchCreator")
+  projectDesignReviewRequests    ProjectDesignReviewRequest[]    @relation("ProjectDesignReviewRequester")
+  projectDesignReviews           ProjectDesignReviewRequest[]    @relation("ProjectDesignReviewReviewer")
+  salesUnits                     Unit[]                          @relation("UnitSalesRepresentative")
+  pushSubscriptions              PushSubscription[]
+  usersBlocked                   UserBlock[]                     @relation("UserBlockCreator")
+  blockedByUsers                 UserBlock[]                     @relation("UserBlockTarget")
+  reportsCreated                 Report[]                        @relation("ReportReporter")
+  reportsResolved                Report[]                        @relation("ReportResolver")
+  superAdminProfile              SUPER_ADMIN?
+  systemMessagesSent             SystemMessage[]                 @relation("SystemMessageSender")
+  systemMessagesInbox            SystemMessage[]                 @relation("SystemMessageTargetUser")
+  tasks                          Task[]
+  ledTeams                       Team[]                          @relation("TeamLeader")
+  teamMemberships                TeamMember[]
+  office                         Office?                         @relation("OfficeUsers", fields: [officeId], references: [id])
+  capabilitiesCreated            UserCapability[]                @relation("CapabilityCreator")
+  capabilities                   UserCapability[]                @relation("UserCapabilities")
+  permissionOverrides            UserPermissionOverride[]        @relation("PermissionOverrideUser")
+  permissionOverridesChanged     UserPermissionOverride[]        @relation("PermissionOverrideUpdater")
+  systemSettingsChanged          SystemSetting[]                 @relation("SystemSettingUpdater")
+  permissionDefinitionsCreated   PermissionDefinition[]          @relation("PermissionDefinitionCreator")
+  permissionDefinitionsUpdated   PermissionDefinition[]          @relation("PermissionDefinitionUpdater")
+  rolePermissionPoliciesChanged  RolePermissionPolicy[]          @relation("RolePermissionPolicyUpdater")
+  restrictionsCreated            UserRestriction[]               @relation("RestrictionCreator")
+  restrictions                   UserRestriction[]               @relation("RestrictedUser")
+  visits                         UserVisit[]
+  hediyeKontorHavuzlari          HediyeKontorHavuzu[]            @relation("GiftPoolCreator")
+  hediyeKontorGonderimleri       HediyeKontorDagitimi[]          @relation("GiftCreditSender")
+  hediyeKontorAlimlari           HediyeKontorDagitimi[]          @relation("GiftCreditRecipient")
+  accountDeletionRequests        AccountDeletionRequest[]
+  poolAudienceGroupsOwned        PoolAudienceGroup[]             @relation("PoolAudienceGroupOwner")
+  poolAudienceGroupMemberships   PoolAudienceGroupMember[]       @relation("PoolAudienceGroupMemberUser")
+
+  portfolioCreditLots PortfolioCreditLot[]
+  paymentOrders       PaymentOrder[]
+  paymentSettlements  PaymentSettlement[]
 
   @@index([officeId])
+}
+
+model AccountDeletionRequest {
+  id                  String                       @id @default(uuid())
+  userId              String
+  status              AccountDeletionRequestStatus @default(PENDING)
+  requestedAt         DateTime                     @default(now())
+  scheduledDeletionAt DateTime
+  completedAt         DateTime?
+  canceledAt          DateTime?
+  user                User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([scheduledDeletionAt, status])
+}
+
+enum AccountDeletionRequestStatus {
+  PENDING
+  COMPLETED
+  CANCELED
 }
 
 model SUPER_ADMIN {
@@ -108,18 +171,19 @@ model SUPER_ADMIN {
 }
 
 model Office {
-  id          String   @id @default(uuid())
-  name        String
-  slug        String   @unique
-  ownerUserId String?
-  city        String?
-  district    String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  owner       User?    @relation("OfficeOwner", fields: [ownerUserId], references: [id])
-  teams       Team[]
-  users       User[]   @relation("OfficeUsers")
+  id           String   @id @default(uuid())
+  name         String
+  slug         String   @unique
+  ownerUserId  String?
+  city         String?
+  district     String?
+  neighborhood String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  owner        User?    @relation("OfficeOwner", fields: [ownerUserId], references: [id])
+  teams        Team[]
+  users        User[]   @relation("OfficeUsers")
 
   @@index([ownerUserId])
   @@index([city, district])
@@ -163,17 +227,23 @@ model TeamMember {
 }
 
 model PendingRegistration {
-  id                  String  @id @default(uuid())
-  firstName           String
-  lastName            String
-  email               String  @unique
-  phone               String  @unique
-  passwordHash        String
-  city                String
-  role                Role
-  registrationType    String?
-  inviteCode          String?
-  referralCandidateId String?
+  id                         String  @id @default(dbgenerated("(gen_random_uuid())::text"))
+  firstName                  String
+  lastName                   String
+  email                      String? @unique
+  phone                      String  @unique
+  passwordHash               String?
+  city                       String?
+  role                       Role    @default(ADAY)
+  registrationType           String?
+  inviteCode                 String?
+  referralCandidateId        String?
+  taxNumber                  String?
+  taxOffice                  String?
+  professionalDocumentNumber String?
+  professionalDocumentUrl    String?
+  professionalDocumentName   String?
+  professionalDocumentMime   String?
 
   status PendingRegistrationStatus @default(PHONE_VERIFICATION_PENDING)
 
@@ -206,6 +276,41 @@ model PendingRegistration {
   @@index([createdAt])
 }
 
+model PhoneVerificationSecurity {
+  phone                       String  @id
+  activePendingRegistrationId String?
+
+  failedAttempts      Int       @default(0)
+  totalFailedAttempts Int       @default(0)
+  lastAttemptAt       DateTime?
+
+  lockedAt     DateTime?
+  lockedUntil  DateTime?
+  suspiciousAt DateTime?
+
+  lastSmsSentAt    DateTime?
+  nextSmsAllowedAt DateTime?
+
+  lastIpAddress String?
+  lastUserAgent String?
+
+  firebaseVerificationIdHash String?
+  firebaseSessionStartedAt   DateTime?
+  firebaseSessionExpiresAt   DateTime?
+  firebaseSessionConsumedAt  DateTime?
+  firebaseUid                String?
+
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([activePendingRegistrationId])
+  @@index([lockedUntil])
+  @@index([nextSmsAllowedAt])
+  @@index([suspiciousAt])
+  @@index([lastIpAddress, updatedAt])
+}
+
 model UserCapability {
   id          String     @id @default(uuid())
   userId      String
@@ -220,6 +325,94 @@ model UserCapability {
   @@index([userId])
   @@index([capability])
   @@index([createdById])
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  valueJson   Json
+  description String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  updatedBy User? @relation("SystemSettingUpdater", fields: [updatedById], references: [id])
+
+  @@index([key])
+  @@index([updatedById])
+}
+
+model PermissionDefinition {
+  id                  String   @id @default(uuid())
+  key                 String   @unique
+  category            String
+  label               String
+  description         String?
+  defaultEnabled      Boolean  @default(false)
+  defaultNumericLimit Int?
+  delegable           Boolean  @default(true)
+  superAdminOnly      Boolean  @default(false)
+  active              Boolean  @default(true)
+  metadata            Json?
+  createdById         String?
+  updatedById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  createdBy User? @relation("PermissionDefinitionCreator", fields: [createdById], references: [id])
+  updatedBy User? @relation("PermissionDefinitionUpdater", fields: [updatedById], references: [id])
+
+  overrides    UserPermissionOverride[]
+  rolePolicies RolePermissionPolicy[]
+
+  @@index([category])
+  @@index([active])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model RolePermissionPolicy {
+  id           String   @id @default(uuid())
+  role         Role
+  permissionId String
+  enabled      Boolean
+  numericLimit Int?
+  metadata     Json?
+  updatedById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  permission PermissionDefinition @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  updatedBy  User?                @relation("RolePermissionPolicyUpdater", fields: [updatedById], references: [id])
+
+  @@unique([role, permissionId])
+  @@index([role])
+  @@index([permissionId])
+  @@index([updatedById])
+}
+
+model UserPermissionOverride {
+  id           String    @id @default(uuid())
+  userId       String
+  permissionId String
+  enabled      Boolean?
+  numericLimit Int?
+  validFrom    DateTime?
+  validUntil   DateTime?
+  metadata     Json?
+  updatedById  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user       User                 @relation("PermissionOverrideUser", fields: [userId], references: [id], onDelete: Cascade)
+  permission PermissionDefinition @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  updatedBy  User?                @relation("PermissionOverrideUpdater", fields: [updatedById], references: [id])
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@index([permissionId])
+  @@index([updatedById])
+  @@index([validUntil])
 }
 
 model Invitation {
@@ -262,7 +455,7 @@ model ReferralCandidate {
   referralCode String    @unique
   firstName    String
   lastName     String
-  email        String    @unique
+  email        String?   @unique
   phone        String    @unique
   role         Role
   isActive     Boolean   @default(true)
@@ -288,6 +481,7 @@ model Project {
   name                         String
   code                         String?
   description                  String?
+  lifecycleStage               ProjectLifecycleStage?
   city                         String
   district                     String
   neighborhood                 String?
@@ -300,6 +494,7 @@ model Project {
   declaredIndependentUnitCount Int?
   declaredSalesInventoryCount  Int?
   plannedUnitTypes             UnitType[]                   @default([])
+  plannedOtherUnitTypeName     String?
   geometryType                 ProjectGeometryType          @default(DIKDORTGEN)
   wizardStep                   ProjectWizardStep            @default(PROJE_BILGILERI)
   setupStatus                  ProjectSetupStatus           @default(TASLAK)
@@ -321,6 +516,7 @@ model Project {
 
   @@unique([ownerId, code])
   @@index([ownerId])
+  @@index([lifecycleStage])
   @@index([latitude, longitude])
   @@index([city, district, neighborhood])
   @@index([geometryType])
@@ -613,6 +809,10 @@ model Unit {
   features               String[]                     @default([])
   availableCreditAmount  Float?
   doorAccessInfo         String?
+  allowPhoneCall         Boolean                      @default(false)
+  contactPhone           String?
+  allowWhatsapp          Boolean                      @default(false)
+  whatsappPhone          String?
   adaNo                  String?
   parselNo               String?
   customerProperties     CustomerProperty[]
@@ -626,6 +826,7 @@ model Unit {
   mediaPackage           ProjectMediaPackage?         @relation(fields: [mediaPackageId], references: [id], onDelete: SetNull)
   batchItems             ProjectInventoryBatchItem[]
   images                 UnitImage[]
+  poolAudience           PoolAudienceUnit?
 
   @@unique([projectId, inventoryCode])
   @@unique([projectId, externalRef])
@@ -644,6 +845,62 @@ model Unit {
   @@index([approvalStatus])
   @@index([isPoolVisible])
   @@index([availableCreditAmount])
+}
+
+enum PoolAudienceMode {
+  PUBLIC
+  TARGETED
+}
+
+model PoolAudienceGroup {
+  id        String   @id @default(uuid())
+  ownerId   String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner     User                      @relation("PoolAudienceGroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members   PoolAudienceGroupMember[]
+  unitLinks PoolAudienceUnitGroup[]
+
+  @@unique([ownerId, name])
+  @@index([ownerId])
+}
+
+model PoolAudienceGroupMember {
+  groupId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  group PoolAudienceGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User              @relation("PoolAudienceGroupMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
+}
+
+model PoolAudienceUnit {
+  unitId    String           @id
+  mode      PoolAudienceMode @default(PUBLIC)
+  roles     Role[]           @default([])
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  unit   Unit                    @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  groups PoolAudienceUnitGroup[]
+
+  @@index([mode])
+}
+
+model PoolAudienceUnitGroup {
+  unitId  String
+  groupId String
+
+  unitAudience PoolAudienceUnit  @relation(fields: [unitId], references: [unitId], onDelete: Cascade)
+  group        PoolAudienceGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([unitId, groupId])
+  @@index([groupId])
 }
 
 model UnitImage {
@@ -720,6 +977,19 @@ model Report {
   @@index([reporterId])
   @@index([targetUserId])
   @@index([status])
+}
+
+model UserBlock {
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  label     String   @default("EPH kullanıcısı")
+  createdAt DateTime @default(now())
+  blocker   User     @relation("UserBlockCreator", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("UserBlockTarget", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId, blockerId])
 }
 
 model UserRestriction {
@@ -923,6 +1193,7 @@ model Customer {
   city            String?
   profession      String?
   company         String?
+  photoUrl        String?
   budget          Float?
   interestedArea  String?
   interestedType  String?
@@ -965,29 +1236,30 @@ model CustomerProperty {
 }
 
 model CustomerInterest {
-  id             String                   @id @default(uuid())
-  customerId     String
-  title          String?
-  city           String?
-  district       String?
-  neighborhood   String?
-  propertyTypes  UnitType[]               @default([])
-  statuses       UnitStatus[]             @default([])
-  minBudget      Float?
-  maxBudget      Float?
-  priceCurrency  String                   @default("TRY")
-  minArea        Float?
-  maxArea        Float?
-  roomCounts     String[]                 @default([])
-  features       String[]                 @default([])
-  purchaseIntent CustomerPurchaseIntent   @default(BELIRSIZ)
-  priority       CustomerInterestPriority @default(NORMAL)
-  notes          String?
-  isActive       Boolean                  @default(true)
-  lastMatchedAt  DateTime?
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-  customer       Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id                  String                   @id @default(uuid())
+  customerId          String
+  title               String?
+  city                String?
+  district            String?
+  neighborhood        String?
+  propertyTypes       UnitType[]               @default([])
+  statuses            UnitStatus[]             @default([])
+  minBudget           Float?
+  maxBudget           Float?
+  priceCurrency       String                   @default("TRY")
+  minArea             Float?
+  maxArea             Float?
+  roomCounts          String[]                 @default([])
+  features            String[]                 @default([])
+  cardProfileCriteria Json?
+  purchaseIntent      CustomerPurchaseIntent   @default(BELIRSIZ)
+  priority            CustomerInterestPriority @default(NORMAL)
+  notes               String?
+  isActive            Boolean                  @default(true)
+  lastMatchedAt       DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  customer            Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
   @@index([city, district, neighborhood])
@@ -1066,34 +1338,45 @@ model Message {
 }
 
 model NetworkPost {
-  id           String                 @id
-  userId       String
-  type         String
-  title        String
-  description  String
-  city         String?
-  district     String?
-  neighborhood String?
-  budget       Float?
-  minArea      Float?
-  maxArea      Float?
-  minRoom      Int?
-  maxRoom      Int?
-  minBudget    Float?
-  maxBudget    Float?
-  areas        Json?
-  urgency      String?
-  visibility   NetworkVisibility      @default(TUM_EPH)
-  tags         String[]
-  expiresAt    DateTime
-  isActive     Boolean                @default(true)
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime
-  Conversation Conversation[]
-  User         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  followers    NetworkPostFollower[]
-  updateLogs   NetworkPostUpdateLog[]
-  views        NetworkPostView[]
+  id                  String                 @id
+  listingNumber       String                 @unique
+  userId              String
+  type                String
+  title               String
+  description         String
+  city                String?
+  district            String?
+  neighborhood        String?
+  budget              Float?
+  minArea             Float?
+  maxArea             Float?
+  minRoom             Int?
+  maxRoom             Int?
+  minBudget           Float?
+  maxBudget           Float?
+  landSharePercent    Float?
+  areas               Json?
+  propertyTypes       UnitType[]             @default([])
+  roomCounts          String[]               @default([])
+  features            String[]               @default([])
+  cardProfileCriteria Json?
+  priceCurrency       String                 @default("TRY")
+  allowPhoneCall      Boolean                @default(false)
+  contactPhone        String?
+  allowWhatsapp       Boolean                @default(false)
+  whatsappPhone       String?
+  urgency             String?
+  visibility          NetworkVisibility      @default(TUM_EPH)
+  tags                String[]
+  expiresAt           DateTime
+  isActive            Boolean                @default(true)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime
+  Conversation        Conversation[]
+  User                User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  followers           NetworkPostFollower[]
+  updateLogs          NetworkPostUpdateLog[]
+  views               NetworkPostView[]
 }
 
 model NetworkPostUpdateLog {
@@ -1227,24 +1510,43 @@ model AuditLog {
 }
 
 model UyelikPaketi {
-  id                        String          @id @default(uuid())
-  paketKodu                 UyelikPaketKodu @unique
-  paketAdi                  String
-  aciklama                  String?
-  aktifPortfoyLimiti        Int
+  id        String              @id @default(uuid())
+  paketKodu UyelikPaketKodu
+  segment   UyelikPaketSegmenti
+  paketAdi  String
+  aciklama  String?
+
+  aktifPortfoyLimiti       Int
+  aktifCrmLimiti           Int? @default(100)
+  aylikTalepLimiti         Int  @default(0)
+  aylikHavuzGonderimLimiti Int  @default(0)
+  aylikMatchLimiti         Int  @default(0)
+  aylikYeniGorusmeLimiti   Int  @default(0)
+  projeLimiti              Int?
+  projeIlanLimiti          Int?
+  aylikPaketPk             Int  @default(0)
+  denemeGunSayisi          Int?
+
+  fiyat      Decimal?
+  paraBirimi String   @default("TRY")
+  aktifMi    Boolean  @default(true)
+
+  // LEGACY: yeni Membership Core'a geçiş tamamlanınca kaldırılacak.
   aylikForumKonusuLimiti    Int?
   aylikMesajBaslatmaLimiti  Int?
   gunlukMesajBaslatmaLimiti Int?
   gunlukForumIlgiLimiti     Int?
   gunlukHavuzMesajLimiti    Int?
-  verilenKontor             Int             @default(0)
-  fiyat                     Decimal?
-  paraBirimi                String          @default("TRY")
-  aktifMi                   Boolean         @default(true)
-  olusturulmaTarihi         DateTime        @default(now())
-  guncellenmeTarihi         DateTime        @updatedAt
+  verilenKontor             Int  @default(0)
 
+  olusturulmaTarihi DateTime @default(now())
+  guncellenmeTarihi DateTime @updatedAt
+
+  paymentOrders PaymentOrder[]
+
+  @@unique([paketKodu, segment])
   @@index([paketKodu])
+  @@index([segment])
   @@index([aktifMi])
 }
 
@@ -1260,6 +1562,9 @@ model KullaniciUyelikPaketi {
   notlar            String?
   olusturulmaTarihi DateTime     @default(now())
   guncellenmeTarihi DateTime     @updatedAt
+
+  portfolioCreditLots PortfolioCreditLot[]
+  paymentSettlements  PaymentSettlement[]
 
   @@index([kullaniciId])
   @@index([paketId])
@@ -1341,6 +1646,32 @@ model KontorHareketi {
   @@index([ilgiliKayitTuru])
   @@index([ilgiliKayitId])
   @@index([olusturulmaTarihi])
+}
+
+model MatchScanAttempt {
+  id           String                 @id @default(uuid())
+  requestId    String                 @unique
+  userId       String
+  sourceType   MatchScanSourceType    @default(REQUEST)
+  sourceId     String
+  postId       String?
+  status       MatchScanAttemptStatus @default(PROCESSING)
+  cost         Int                    @default(0)
+  movementId   String?
+  resultJson   Json?
+  errorMessage String?
+  startedAt    DateTime               @default(now())
+  completedAt  DateTime?
+  failedAt     DateTime?
+  updatedAt    DateTime               @updatedAt
+
+  @@index([userId])
+  @@index([sourceType])
+  @@index([sourceId])
+  @@index([userId, sourceType, sourceId, startedAt])
+  @@index([postId])
+  @@index([status])
+  @@index([startedAt])
 }
 
 model PoolShareLink {
@@ -2756,7 +3087,16 @@ enum PendingRegistrationStatus {
   CANCELLED
 }
 
+enum ProfessionalVerificationStatus {
+  PENDING
+  ANALYZING
+  VERIFIED
+  REVIEW_REQUIRED
+  REJECTED
+}
+
 enum Role {
+  ADAY
   EMLAKCI
   MUTEAHHIT
   INSAAT_FIRMASI
@@ -2900,6 +3240,12 @@ enum PortfolioAuthorityType {
   TAPU_SAHIBI_KIMLIK
 }
 
+enum ProjectLifecycleStage {
+  READY
+  UNDER_CONSTRUCTION
+  PLANNED
+}
+
 enum ProjectGeometryType {
   TEK_CEPHELI_STANDART
   CIFT_CEPHELI_STANDART
@@ -3004,6 +3350,7 @@ enum ProjectSpaceType {
   PEYZAJ_ALANI
   DINLENME_ALANI
   SUS_HAVUZU
+  GIRIS_KAPISI_KEMERI
   DIGER
 }
 
@@ -3203,6 +3550,7 @@ enum UnitType {
   PANSIYON
   KAMP_YERI
   TATIL_KOYU
+  DIGER
 }
 
 enum NominationStatus {
@@ -3316,6 +3664,8 @@ enum AuditAction {
   UPDATE_APPLICATION_NOTE
   UPDATE_USER_ROLE
   UPDATE_USER_PACKAGE
+  UPDATE_SYSTEM_SETTING
+  UPDATE_USER_PERMISSION
   SUSPEND_USER
   VIEW_AUDIT_LOG
   VIEW_SENSITIVE_DATA_ATTEMPT
@@ -3335,13 +3685,12 @@ enum KullaniciHesapTuru {
 }
 
 enum UyelikPaketKodu {
-  SILVER
-  GOLD
-  PREMIUM
-  PLATINIUM
-  KURUMSAL
   DENEME
-  STARTER
+  BRONZ
+  GUMUS
+  ALTIN
+  PLATINUM
+  UCRETSIZ
 }
 
 enum UyelikDurumu {
@@ -3376,13 +3725,35 @@ enum KontorIslemTuru {
   TOPLU_EPOSTA
   EK_GORUSME_HAKKI
   DIGER
+  HAVUZ_PORTFOY_YAYIN
   HAVUZ_MESAJ
   HAVUZ_ILGILENIYORUM
   HAVUZ_ESLESEN_MUSTERIM_VAR
+  HAVUZ_KONUM
+  HAVUZ_TELEFON
+  HAVUZ_WHATSAPP
+  HAVUZ_OZEL_BILGI
   FORUM_MESAJ
   FORUM_ILGILENIYORUM
   FORUM_YARDIMCI_OLABILIRIM
   FORUM_TALEP_OLUSTURMA
+  FORUM_TELEFON
+  FORUM_WHATSAPP
+  FORUM_OZEL_BILGI
+  ESLESME_TARAMASI
+}
+
+enum MatchScanSourceType {
+  REQUEST
+  PRIVATE_PORTFOLIO
+  POOL_PROPERTY
+  CRM_CUSTOMER
+}
+
+enum MatchScanAttemptStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
 }
 
 enum KotaDonemi {
@@ -3569,4 +3940,309 @@ enum LinaEpostaDurumu {
   GONDERILDI
   HATA
   IPTAL
+}
+
+// ============================================================
+// EPH MEMBERSHIP + PORTFOLIO CREDIT + PAYMENT CORE V1
+// Provider-agnostic: PayTR, iyzico, banka sanal POS ve
+// gelecekteki ödeme kuruluşları adapter katmanından bağlanır.
+// ============================================================
+
+enum UyelikPaketSegmenti {
+  EMLAK_PRO
+  MUTEAHHIT
+}
+
+enum PortfolioCreditLotTuru {
+  PAKET
+  DEVIR
+  SATIN_ALMA
+  HEDIYE
+  REFERANS
+  IADE
+  DUZELTME
+}
+
+enum PaymentOrderPurpose {
+  MEMBERSHIP_PURCHASE
+  MEMBERSHIP_RENEWAL
+  MEMBERSHIP_UPGRADE
+  PK_PURCHASE
+}
+
+enum PaymentOrderStatus {
+  CREATED
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  EXPIRED
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum PaymentAttemptStatus {
+  CREATED
+  REQUIRES_ACTION
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentTransactionType {
+  AUTHORIZATION
+  CAPTURE
+  PAYMENT
+  VOID
+  REFUND
+  CHARGEBACK
+}
+
+enum PaymentTransactionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum PaymentRefundStatus {
+  CREATED
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model PortfolioCreditLot {
+  id                String                 @id @default(uuid())
+  kullaniciId       String
+  lotTuru           PortfolioCreditLotTuru
+  ilkMiktar         Int
+  kalanMiktar       Int
+  sonKullanmaTarihi DateTime?
+  kaynakKayitTuru   String?
+  kaynakKayitId     String?
+  uyelikId          String?
+  paymentOrderId    String?
+  dedupeKey         String?                @unique
+  aciklama          String?
+  aktifMi           Boolean                @default(true)
+  olusturulmaTarihi DateTime               @default(now())
+  guncellenmeTarihi DateTime               @updatedAt
+
+  kullanici    User                   @relation(fields: [kullaniciId], references: [id], onDelete: Restrict)
+  uyelik       KullaniciUyelikPaketi? @relation(fields: [uyelikId], references: [id], onDelete: SetNull)
+  paymentOrder PaymentOrder?          @relation(fields: [paymentOrderId], references: [id], onDelete: SetNull)
+  settlements  PaymentSettlement[]
+
+  @@index([kullaniciId])
+  @@index([lotTuru])
+  @@index([sonKullanmaTarihi])
+  @@index([uyelikId])
+  @@index([paymentOrderId])
+  @@index([aktifMi])
+}
+
+model PaymentProvider {
+  id                String   @id @default(uuid())
+  kod               String   @unique
+  ad                String
+  adapterKodu       String
+  capabilities      Json?
+  aktifMi           Boolean  @default(true)
+  oncelik           Int      @default(100)
+  olusturulmaTarihi DateTime @default(now())
+  guncellenmeTarihi DateTime @updatedAt
+
+  attempts      PaymentAttempt[]
+  transactions  PaymentTransaction[]
+  refunds       PaymentRefund[]
+  webhookEvents PaymentWebhookEvent[]
+
+  @@index([aktifMi])
+  @@index([oncelik])
+}
+
+model PaymentOrder {
+  id                String              @id @default(uuid())
+  siparisNo         String              @unique
+  kullaniciId       String
+  amac              PaymentOrderPurpose
+  durum             PaymentOrderStatus  @default(CREATED)
+  tutar             Decimal
+  paraBirimi        String              @default("TRY")
+  hedefPaketId      String?
+  pkMiktari         Int?
+  fiyatSnapshot     Json?
+  metadata          Json?
+  expiresAt         DateTime?
+  paidAt            DateTime?
+  olusturulmaTarihi DateTime            @default(now())
+  guncellenmeTarihi DateTime            @updatedAt
+
+  kullanici    User                 @relation(fields: [kullaniciId], references: [id], onDelete: Restrict)
+  hedefPaket   UyelikPaketi?        @relation(fields: [hedefPaketId], references: [id], onDelete: SetNull)
+  attempts     PaymentAttempt[]
+  transactions PaymentTransaction[]
+  refunds      PaymentRefund[]
+  creditLots   PortfolioCreditLot[]
+  settlement   PaymentSettlement?
+
+  @@index([kullaniciId])
+  @@index([amac])
+  @@index([durum])
+  @@index([hedefPaketId])
+  @@index([olusturulmaTarihi])
+}
+
+model PaymentAttempt {
+  id                String               @id @default(uuid())
+  orderId           String
+  providerId        String
+  durum             PaymentAttemptStatus @default(CREATED)
+  idempotencyKey    String               @unique
+  providerReference String?
+  checkoutReference String?
+  publicMetadata    Json?
+  failureCode       String?
+  failureMessage    String?
+  olusturulmaTarihi DateTime             @default(now())
+  guncellenmeTarihi DateTime             @updatedAt
+
+  order        PaymentOrder         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  provider     PaymentProvider      @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  transactions PaymentTransaction[]
+
+  @@index([orderId])
+  @@index([providerId])
+  @@index([durum])
+  @@index([providerReference])
+}
+
+model PaymentTransaction {
+  id                    String                   @id @default(uuid())
+  orderId               String
+  attemptId             String?
+  providerId            String?
+  providerTransactionId String?
+  islemTuru             PaymentTransactionType
+  durum                 PaymentTransactionStatus @default(PENDING)
+  tutar                 Decimal
+  paraBirimi            String                   @default("TRY")
+  processedAt           DateTime?
+  metadata              Json?
+  olusturulmaTarihi     DateTime                 @default(now())
+
+  order    PaymentOrder     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  attempt  PaymentAttempt?  @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  provider PaymentProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  refunds  PaymentRefund[]
+
+  @@index([orderId])
+  @@index([attemptId])
+  @@index([providerId])
+  @@index([providerTransactionId])
+  @@index([durum])
+}
+
+model PaymentRefund {
+  id                String              @id @default(uuid())
+  orderId           String
+  transactionId     String?
+  providerId        String?
+  providerRefundId  String?
+  durum             PaymentRefundStatus @default(CREATED)
+  tutar             Decimal
+  paraBirimi        String              @default("TRY")
+  sebep             String?
+  metadata          Json?
+  olusturulmaTarihi DateTime            @default(now())
+  guncellenmeTarihi DateTime            @updatedAt
+
+  order       PaymentOrder        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  transaction PaymentTransaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  provider    PaymentProvider?    @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([transactionId])
+  @@index([providerId])
+  @@index([providerRefundId])
+  @@index([durum])
+}
+
+model PaymentWebhookEvent {
+  id                String    @id @default(uuid())
+  providerId        String
+  providerEventId   String?
+  eventType         String?
+  signatureValid    Boolean   @default(false)
+  payloadHash       String
+  payload           Json?
+  processed         Boolean   @default(false)
+  processedAt       DateTime?
+  errorMessage      String?
+  olusturulmaTarihi DateTime  @default(now())
+
+  provider PaymentProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  @@unique([providerId, payloadHash])
+  @@index([providerId])
+  @@index([providerEventId])
+  @@index([processed])
+}
+
+model PaymentSettlement {
+  id                   String   @id @default(uuid())
+  orderId              String   @unique
+  kullaniciId          String
+  uyelikId             String?
+  portfolioCreditLotId String?
+  settledAt            DateTime @default(now())
+  metadata             Json?
+  olusturulmaTarihi    DateTime @default(now())
+
+  order              PaymentOrder           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  kullanici          User                   @relation(fields: [kullaniciId], references: [id], onDelete: Restrict)
+  uyelik             KullaniciUyelikPaketi? @relation(fields: [uyelikId], references: [id], onDelete: SetNull)
+  portfolioCreditLot PortfolioCreditLot?    @relation(fields: [portfolioCreditLotId], references: [id], onDelete: SetNull)
+
+  @@index([kullaniciId])
+  @@index([uyelikId])
+  @@index([portfolioCreditLotId])
+}
+
+
+model AdminEmailSetting {
+  id        String   @id @default("main")
+  recipient String   @default("ephplatform@gmail.com")
+  enabled   Boolean  @default(false)
+  captureEnabled Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AdminEmailOutbox {
+  id            String    @id @default(uuid())
+  eventKey      String    @unique
+  recipient     String
+  category      String
+  entityType    String
+  entityId      String?
+  title         String
+  summary       String
+  actorLabel    String?
+  status        String    @default("PENDING")
+  attempts      Int       @default(0)
+  availableAt   DateTime  @default(now())
+  leaseToken    String?
+  leaseUntil    DateTime?
+  sentAt        DateTime?
+  lastErrorCode String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, availableAt])
+  @@index([entityType, entityId])
 }
