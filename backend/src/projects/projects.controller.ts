@@ -32,10 +32,11 @@ export class ProjectsController {
 
   @Get()
   findAll(
+    @CurrentUser() user: any,
     @Query('city') city?: string,
     @Query('district') district?: string,
   ) {
-    return this.projectsService.findAll({ city, district });
+    return this.projectsService.findAll({ city, district }, { id: user.id, role: user.role });
   }
 
   @Get('my')
@@ -46,8 +47,8 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.projectsService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.projectsService.findOne(id, { id: user.id, role: user.role });
   }
 
   @Patch(':id')

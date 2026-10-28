@@ -19,6 +19,7 @@ import {
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { getOfficeAdvisorIds, redactDeedOwnerInfo } from './deed-owner-privacy';
 
 const PLATFORM_URL =
   process.env.FRONTEND_URL ||
@@ -270,9 +271,12 @@ export class UnitsService {
     return Boolean(user?.id && ownerId && user.id === ownerId);
   }
 
-  private ensureCanViewUnit(user: CurrentUserPayload, ownerId: string) {
+  private async ensureCanViewUnit(user: CurrentUserPayload, ownerId: string) {
     if (this.isSuperAdmin(user)) return;
     if (this.isOwner(user, ownerId)) return;
+
+    const officeAdvisorIds = await getOfficeAdvisorIds(this.prisma, user?.id);
+    if (officeAdvisorIds.has(ownerId)) return;
 
     throw new ForbiddenException('Bu portföyü görüntüleme yetkiniz yok.');
   }
@@ -979,28 +983,15 @@ export class UnitsService {
     return { adaNo, parselNo };
   }
 
-  private canSeeDoorAccessInfo(user: CurrentUserPayload, ownerId?: string | null) {
-    return this.isSuperAdmin(user) || Boolean(ownerId && this.isOwner(user, ownerId));
-  }
+  // Tapu sahibi bilgisi ve kapı girişi: ilan sahibi danışman, bağlı olduğu ofisin sahibi ve süper admin görür.
+  private async redactDoorAccessInfoList<
+    T extends { project?: { ownerId?: string | null } | null },
+  >(user: CurrentUserPayload, units: T[]): Promise<T[]> {
+    const officeAdvisorIds = await getOfficeAdvisorIds(this.prisma, user?.id);
 
-  private redactDoorAccessInfo<
-    T extends {
-      doorAccessInfo?: string | null;
-      deedOwnerFullName?: string | null;
-      deedOwnerPhone?: string | null;
-      deedOwnerEmail?: string | null;
-      project?: { ownerId?: string | null } | null;
-    },
-  >(user: CurrentUserPayload, unit: T): T {
-    if (this.canSeeDoorAccessInfo(user, unit.project?.ownerId)) return unit;
-
-    return {
-      ...unit,
-      doorAccessInfo: null,
-      deedOwnerFullName: null,
-      deedOwnerPhone: null,
-      deedOwnerEmail: null,
-    };
+    return units.map((unit) =>
+      redactDeedOwnerInfo(unit, unit.project?.ownerId, { id: user?.id, role: user?.role }, officeAdvisorIds),
+    );
   }
 
   private splitFullName(fullName?: string | null) {
@@ -1279,13 +1270,13 @@ export class UnitsService {
       throw new NotFoundException('Portföy bulunamadı.');
     }
 
-    this.ensureCanViewUnit(user, unit.project.ownerId);
+    await this.ensureCanViewUnit(user, unit.project.ownerId);
 
     if (!this.isProjectVisibleInPortfolio(unit.project)) {
       throw new NotFoundException('Portföy bulunamadı.');
     }
 
-    return this.redactDoorAccessInfo(user, unit);
+    return (await this.redactDoorAccessInfoList(user, [unit]))[0];
   }
 
   async findPortfolioApprovals(
@@ -1326,7 +1317,7 @@ export class UnitsService {
       ],
     });
 
-    return units.map((unit) => this.redactDoorAccessInfo(user, unit));
+    return this.redactDoorAccessInfoList(user, units);
   }
 
   async findByProject(
@@ -1358,7 +1349,7 @@ export class UnitsService {
       throw new NotFoundException('Proje bulunamadı.');
     }
 
-    this.ensureCanViewUnit(user, project.ownerId);
+    await this.ensureCanViewUnit(user, project.ownerId);
 
     if (!this.isProjectVisibleInPortfolio(project)) {
       throw new NotFoundException('Proje bulunamadı.');
@@ -1374,7 +1365,7 @@ export class UnitsService {
       orderBy: [{ floor: 'asc' }, { number: 'asc' }],
     });
 
-    return units.map((unit) => this.redactDoorAccessInfo(user, unit));
+    return this.redactDoorAccessInfoList(user, units);
   }
 
   async findAll(
@@ -1407,7 +1398,7 @@ export class UnitsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return units.map((unit) => this.redactDoorAccessInfo(user, unit));
+    return this.redactDoorAccessInfoList(user, units);
   }
 
   async findPool(
@@ -1436,7 +1427,7 @@ export class UnitsService {
       orderBy: { poolPublishedAt: 'desc' },
     });
 
-    return units.map((unit) => this.redactDoorAccessInfo(user, unit));
+    return this.redactDoorAccessInfoList(user, units);
   }
 
   async poolMessage(id: string, user: CurrentUserPayload, body?: PoolActionPayload) {

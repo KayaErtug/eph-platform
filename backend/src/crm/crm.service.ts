@@ -2,6 +2,11 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { PrismaService } from '../prisma/prisma.service';
 import { LinaDistanceService } from '../lina/geo/lina-distance.service';
 import {
+  DeedOwnerViewer,
+  getOfficeAdvisorIds,
+  redactDeedOwnerInfo,
+} from '../units/deed-owner-privacy';
+import {
   ActivityType,
   CustomerInterestPriority,
   CustomerPropertyRelation,
@@ -240,8 +245,27 @@ export class CrmService {
     return property;
   }
 
+  // Müşteriye bağlı portföyde tapu sahibi bilgisi ilan sahibi danışmana, ofis sahibine ve süper admine döner.
+  private redactPropertyUnits<
+    T extends { unit?: { project?: { ownerId?: string | null } | null } | null },
+  >(viewer: DeedOwnerViewer, officeAdvisorIds: Set<string>, properties: T[]): T[] {
+    return properties.map((property) =>
+      property.unit
+        ? {
+            ...property,
+            unit: redactDeedOwnerInfo(
+              property.unit,
+              property.unit.project?.ownerId,
+              viewer,
+              officeAdvisorIds,
+            ),
+          }
+        : property,
+    );
+  }
+
   async getCustomers(userId: string, userRole: Role) {
-    return this.prisma.customer.findMany({
+    const customers = await this.prisma.customer.findMany({
       where: this.getCustomerWhere(userId, userRole),
       include: {
         owner: { select: { firstName: true, lastName: true, role: true } },
@@ -253,6 +277,13 @@ export class CrmService {
       },
       orderBy: { updatedAt: 'desc' },
     });
+
+    const officeAdvisorIds = await getOfficeAdvisorIds(this.prisma, userId);
+
+    return customers.map((customer) => ({
+      ...customer,
+      properties: this.redactPropertyUnits({ id: userId, role: userRole }, officeAdvisorIds, customer.properties),
+    }));
   }
 
   // CRM Madde 19 Form Detail Sync V3
@@ -419,7 +450,12 @@ export class CrmService {
       throw new ForbiddenException('Bu CRM kaydına erişim yetkiniz yok.');
     }
 
-    return customer;
+    const officeAdvisorIds = await getOfficeAdvisorIds(this.prisma, userId);
+
+    return {
+      ...customer,
+      properties: this.redactPropertyUnits({ id: userId, role: userRole }, officeAdvisorIds, customer.properties),
+    };
   }
 
   async updateCustomer(id: string, userId: string, userRole: Role, data: any) {
@@ -538,7 +574,7 @@ export class CrmService {
   async getCustomerProperties(customerId: string, userId: string, userRole: Role) {
     await this.findCustomerForAccess(customerId, userId, userRole);
 
-    return this.prisma.customerProperty.findMany({
+    const properties = await this.prisma.customerProperty.findMany({
       where: { customerId },
       include: {
         unit: {
@@ -550,6 +586,12 @@ export class CrmService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return this.redactPropertyUnits(
+      { id: userId, role: userRole },
+      await getOfficeAdvisorIds(this.prisma, userId),
+      properties,
+    );
   }
 
   async addCustomerProperty(
@@ -579,7 +621,7 @@ export class CrmService {
       throw new ForbiddenException('Bu portföyü CRM kaydına bağlama yetkiniz yok.');
     }
 
-    return this.prisma.customerProperty.upsert({
+    const property = await this.prisma.customerProperty.upsert({
       where: {
         customerId_unitId_relationType: {
           customerId,
@@ -606,6 +648,14 @@ export class CrmService {
         },
       },
     });
+
+    return (
+      this.redactPropertyUnits(
+        { id: userId, role: userRole },
+        await getOfficeAdvisorIds(this.prisma, userId),
+        [property],
+      )
+    )[0];
   }
 
   async deleteCustomerProperty(customerPropertyId: string, userId: string, userRole: Role) {

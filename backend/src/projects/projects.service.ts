@@ -1,6 +1,14 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ProjectSetupStatus } from '@prisma/client';
+import {
+  PortfolioApprovalStatus,
+  ProjectSetupStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  DeedOwnerViewer,
+  getOfficeAdvisorIds,
+  redactDeedOwnerInfo,
+} from '../units/deed-owner-privacy';
 
 type ProjectLocationData = {
   name?: string;
@@ -32,6 +40,10 @@ function toNullableFloat(value: number | string | null | undefined) {
 
 function cleanOptionalLocationData(data: ProjectLocationData) {
   return {
+    name:
+      data.name !== undefined
+        ? String(data.name).trim()
+        : undefined,
     description: data.description,
     city: data.city,
     district: data.district,
@@ -62,6 +74,31 @@ function cleanCreateLocationData(data: CreateProjectData) {
 @Injectable()
 export class ProjectsService {
   constructor(private prisma: PrismaService) {}
+
+  private ensureProjectContentEditable(
+    units: Array<{
+      approvalStatus?: PortfolioApprovalStatus | string | null;
+    }>,
+  ) {
+    const lockedStatuses = new Set<string>([
+      PortfolioApprovalStatus.INCELEMEYE_GONDERILDI,
+      PortfolioApprovalStatus.INCELEMEDE,
+      PortfolioApprovalStatus.ONAYLANDI,
+      PortfolioApprovalStatus.HAVUZDA,
+    ]);
+
+    const hasLockedPortfolio = units.some((unit) =>
+      lockedStatuses.has(
+        String(unit.approvalStatus || '').toUpperCase(),
+      ),
+    );
+
+    if (hasLockedPortfolio) {
+      throw new ForbiddenException(
+        'İncelemeye gönderilmiş veya havuzda yayınlanan portföyün adres ve harita konumu değiştirilemez. Düzeltme için portföyün Eksik Bilgi durumuna alınması gerekir.',
+      );
+    }
+  }
 
   private getPortfolioVisibleProjectWhere() {
     return {
@@ -114,13 +151,44 @@ export class ProjectsService {
     });
   }
 
-  async findAll(filters?: { city?: string; district?: string; isActive?: boolean }) {
-    return this.prisma.project.findMany({
+  // Tapu sahibi bilgisi ve kapı girişi ilan sahibi danışmana, ofis sahibine ve süper admine döner.
+  private async redactProjectUnits<
+    T extends { ownerId: string; units: object[] },
+  >(projects: T[], viewer: DeedOwnerViewer): Promise<T[]> {
+    const officeAdvisorIds = await getOfficeAdvisorIds(this.prisma, viewer.id);
+
+    return projects.map((project) => ({
+      ...project,
+      units: project.units.map((unit) =>
+        redactDeedOwnerInfo(unit, project.ownerId, viewer, officeAdvisorIds),
+      ),
+    }));
+  }
+
+  async findAll(
+    filters: {
+      city?: string;
+      district?: string;
+      isActive?: boolean;
+    } | undefined,
+    viewer: DeedOwnerViewer,
+  ) {
+    const projects = await this.prisma.project.findMany({
       where: {
         ...this.getPortfolioVisibleProjectWhere(),
         isActive: filters?.isActive ?? true,
-        city: filters?.city ? { contains: filters.city, mode: 'insensitive' } : undefined,
-        district: filters?.district ? { contains: filters.district, mode: 'insensitive' } : undefined,
+        city: filters?.city
+          ? {
+              contains: filters.city,
+              mode: 'insensitive',
+            }
+          : undefined,
+        district: filters?.district
+          ? {
+              contains: filters.district,
+              mode: 'insensitive',
+            }
+          : undefined,
       },
       include: {
         owner: {
@@ -142,9 +210,11 @@ export class ProjectsService {
         createdAt: 'desc',
       },
     });
+
+    return this.redactProjectUnits(projects, viewer);
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, viewer: DeedOwnerViewer) {
     const project = await this.prisma.project.findFirst({
       where: {
         id,
@@ -176,13 +246,24 @@ export class ProjectsService {
       throw new NotFoundException('Proje bulunamadi.');
     }
 
-    return project;
+    return (await this.redactProjectUnits([project], viewer))[0];
   }
 
-  async update(id: string, userId: string, data: ProjectLocationData) {
+  async update(
+    id: string,
+    userId: string,
+    data: ProjectLocationData,
+  ) {
     const project = await this.prisma.project.findUnique({
       where: {
         id,
+      },
+      include: {
+        units: {
+          select: {
+            approvalStatus: true,
+          },
+        },
       },
     });
 
@@ -191,8 +272,12 @@ export class ProjectsService {
     }
 
     if (project.ownerId !== userId) {
-      throw new ForbiddenException('Bu projeyi duzenleme yetkiniz yok.');
+      throw new ForbiddenException(
+        'Bu projeyi duzenleme yetkiniz yok.',
+      );
     }
+
+    this.ensureProjectContentEditable(project.units);
 
     return this.prisma.project.update({
       where: {
@@ -218,6 +303,13 @@ export class ProjectsService {
       where: {
         id,
       },
+      include: {
+        units: {
+          select: {
+            approvalStatus: true,
+          },
+        },
+      },
     });
 
     if (!project) {
@@ -225,8 +317,12 @@ export class ProjectsService {
     }
 
     if (project.ownerId !== userId) {
-      throw new ForbiddenException('Bu projeyi silme yetkiniz yok.');
+      throw new ForbiddenException(
+        'Bu projeyi silme yetkiniz yok.',
+      );
     }
+
+    this.ensureProjectContentEditable(project.units);
 
     return this.prisma.project.delete({
       where: {
