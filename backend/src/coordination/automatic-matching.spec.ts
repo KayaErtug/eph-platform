@@ -10,7 +10,7 @@ describe('automatic matching after persistence', () => {
   function network() {
     const post = { id: 'request', userId: 'ali', type: 'PORTFOY_ARIYORUM', title: 'Talep', isActive: true, expiresAt: new Date('2099-01-01'), tags: [], updatedAt: new Date() };
     let committed = false;
-    const tx = { user: { findUnique: jest.fn().mockResolvedValue(null) }, kullaniciUyelikPaketi: { findFirst: jest.fn().mockResolvedValue(null) }, networkPost: { create: jest.fn().mockResolvedValue(post) } };
+    const tx = { user: { findUnique: jest.fn().mockResolvedValue(null) }, kullaniciUyelikPaketi: { findFirst: jest.fn().mockResolvedValue(null) }, systemSetting: { findUnique: jest.fn().mockResolvedValue(null) }, networkPost: { create: jest.fn().mockResolvedValue(post) } };
     const prisma = {
       $transaction: jest.fn(async (callback: any) => { const result = await callback(tx); committed = true; return result; }),
       networkPost: { findFirst: jest.fn().mockResolvedValue(post), update: jest.fn().mockImplementation(async () => { committed = true; return post; }) },

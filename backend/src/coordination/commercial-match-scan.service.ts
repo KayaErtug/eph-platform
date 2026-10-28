@@ -398,7 +398,7 @@ export class CommercialMatchScanService {
     if (count > MAX_CANDIDATES) this.reject('MATCH_SCAN_SOURCE_INVALID', 'Tarama kapsamı çok geniş. Kriterleri daraltın; bu işlem için PK kesilmedi.');
   }
   private async cost(type: CommercialScanType) {
-    const general = await this.adminService.getNumericSystemSetting('MATCH_SCAN_COST_PK', 25);
+    const general = await this.adminService.getNumericSystemSetting('COST_ESLESME_TARAMA', await this.adminService.getNumericSystemSetting('MATCH_SCAN_COST_PK', 25));
     const value = await this.adminService.getNumericSystemSetting(COST_KEYS[type], general);
     if (!Number.isSafeInteger(value) || value <= 0) this.reject('MATCH_SCAN_TARIFF_INVALID', 'Pozitif PK tarama ücreti tanımlanmamış. Yönetimden tarifeyi kontrol edin.');
     return value;

@@ -24,6 +24,7 @@ import {
   parseListingNumberOrId,
 } from '../common/listing-number';
 import { PrismaService } from "../prisma/prisma.service";
+import { readCost } from "../pricing/commercial-costs";
 import { AdminService } from "../admin/admin.service";
 import { PropertyCriteriaService } from "../property-criteria/property-criteria.service";
 import { PropertyDemandAdapter } from "../property-demand/property-demand.adapter";
@@ -2334,10 +2335,12 @@ export class NetworkService {
           });
 
           const isUrgent = String(dto.urgency || "").toUpperCase() === "ACIL";
-          const kontorAmount = isUrgent ? 35 : 25;
+          const baseCost = await readCost(tx, "COST_TALEP_YAYIN");
+          const urgentExtra = isUrgent ? await readCost(tx, "COST_TALEP_ACIL_EK") : 0;
+          const kontorAmount = baseCost + urgentExtra;
           const kontorAciklama = isUrgent
-            ? "Talep Merkezi acil talep yayınlama bedeli: 35 PK (25 PK taban + 10 PK aciliyet)."
-            : "Talep Merkezi talep yayınlama bedeli: 25 PK.";
+            ? `Talep Merkezi acil talep yayınlama bedeli: ${kontorAmount} PK (${baseCost} PK taban + ${urgentExtra} PK aciliyet).`
+            : `Talep Merkezi talep yayınlama bedeli: ${kontorAmount} PK.`;
 
           const payment = await this.spendForumKontor(tx, {
             userId: actionUserId,
@@ -2567,7 +2570,9 @@ export class NetworkService {
   }
 
   async getRequestAccessCost(tx?: Prisma.TransactionClient | PrismaService): Promise<number> {
-    const setting = await (tx || this.prisma).systemSetting.findUnique({ where: { key: "REQUEST_PRIVATE_INFO_COST" } });
+    const db = tx || this.prisma;
+    const setting = (await db.systemSetting.findUnique({ where: { key: "COST_OZEL_BILGI" } }))
+      ?? (await db.systemSetting.findUnique({ where: { key: "REQUEST_PRIVATE_INFO_COST" } }));
     if (!setting || setting.valueJson === null || setting.valueJson === undefined) return 25;
     const value = typeof setting.valueJson === 'number' || typeof setting.valueJson === 'string' ? Number(setting.valueJson) : NaN;
     if (!Number.isSafeInteger(value) || value <= 0 || value > 2147483647) {

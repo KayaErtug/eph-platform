@@ -33,6 +33,7 @@ import { AdminService } from '../admin/admin.service';
 import { PoolAudienceService } from '../pool-audience/pool-audience.service';
 import { PoolPublicationService, type PoolPublicationInput, type PublicationUnit } from './pool-publication.service';
 import { countsAgainstActivePortfolioLimit } from './portfolio-policy';
+import { readCost } from '../pricing/commercial-costs';
 
 const PLATFORM_URL =
   process.env.FRONTEND_URL ||
@@ -2332,10 +2333,7 @@ export class UnitsService {
     const [privateInfoUnitIds, configuredPrivateInfoCost] =
       await Promise.all([
         this.getPoolPrivateInfoAccessUnitIds(user, unitIds),
-        this.adminService.getNumericSystemSetting(
-          'POOL_PRIVATE_INFO_COST',
-          25,
-        ),
+        this.adminService.getNumericSystemSetting('COST_OZEL_BILGI', await this.adminService.getNumericSystemSetting('POOL_PRIVATE_INFO_COST', 25)),
       ]);
 
     const privateInfoCost = Number.isFinite(configuredPrivateInfoCost)
@@ -2358,7 +2356,7 @@ export class UnitsService {
     const payer = await resolveOfficeWallet(this.prisma, user.id);
     const [unlocked, configuredCost, wallet, recentCharge] = await Promise.all([
       this.getPoolPrivateInfoAccessUnitIds(user, [id]),
-      this.adminService.getNumericSystemSetting('POOL_PRIVATE_INFO_COST', 25),
+      this.adminService.getNumericSystemSetting('COST_OZEL_BILGI', await this.adminService.getNumericSystemSetting('POOL_PRIVATE_INFO_COST', 25)),
       this.prisma.kontorCuzdani.findUnique({ where: { kullaniciId: payer.chargeUserId } }),
       this.prisma.kontorHareketi.findFirst({ where: { ...actorPaidWhere(user.id), hareketTuru: KontorHareketTuru.HARCAMA, islemTuru: KontorIslemTuru.HAVUZ_MESAJ, ilgiliKayitTuru: 'UNIT', ilgiliKayitId: id, olusturulmaTarihi: { gte: new Date(Date.now() - 86400000) } }, select: { id: true } }),
     ]);
@@ -2378,10 +2376,7 @@ export class UnitsService {
     await this.poolAudienceService.assertCanViewUnit(id, user);
 
     const configuredCost =
-      await this.adminService.getNumericSystemSetting(
-        'POOL_PRIVATE_INFO_COST',
-        25,
-      );
+      await this.adminService.getNumericSystemSetting('COST_OZEL_BILGI', await this.adminService.getNumericSystemSetting('POOL_PRIVATE_INFO_COST', 25));
 
     const cost = Number.isFinite(configuredCost)
       ? Math.max(0, Math.trunc(configuredCost))
@@ -2508,6 +2503,7 @@ export class UnitsService {
   }
 
   async poolLocation(id: string, user: CurrentUserPayload) {
+    const locationCost = await readCost(this.prisma, 'COST_HAVUZ_KONUM');
     const unit = await this.getPoolUnitWithProjectOrFail(id);
     await this.poolAudienceService.assertCanViewUnit(id, user);
 
@@ -2589,7 +2585,7 @@ export class UnitsService {
         tx,
         {
           userId: user.id,
-          amount: 10,
+          amount: locationCost,
           islemTuru: KontorIslemTuru.HAVUZ_KONUM,
           aciklama: `${ephId} için gayrimenkul konumu açıldı.`,
           ilgiliKayitTuru: 'UNIT',
@@ -2601,7 +2597,7 @@ export class UnitsService {
       );
 
       return {
-        spent: 10,
+        spent: locationCost,
         previousBalance: charged.movement.oncekiBakiye,
         remainingBalance: charged.wallet.bakiye,
         alreadyUnlocked: false,
@@ -2612,8 +2608,8 @@ export class UnitsService {
       ok: true,
       message: result.alreadyUnlocked
         ? 'Bu gayrimenkulün konumu daha önce açılmıştı; tekrar kontör düşülmedi.'
-        : 'Gayrimenkul konumu açıldı. 10 kontör harcandı.',
-      cost: 10,
+        : `Gayrimenkul konumu açıldı. ${locationCost} kontör harcandı.`,
+      cost: locationCost,
       spent: result.spent,
       previousBalance: result.previousBalance,
       remainingBalance: result.remainingBalance,
@@ -2637,6 +2633,10 @@ export class UnitsService {
       throw new BadRequestException('Geçersiz iletişim kanalı.');
     }
 
+    const contactCost = await readCost(
+      this.prisma,
+      channel === 'CALL' ? 'COST_HAVUZ_TELEFON' : 'COST_HAVUZ_WHATSAPP',
+    );
     const unit = await this.getPoolUnitWithProjectOrFail(id);
     await this.poolAudienceService.assertCanViewUnit(id, user);
 
@@ -2708,7 +2708,7 @@ export class UnitsService {
           tx,
           {
             userId: user.id,
-            amount: 10,
+            amount: contactCost,
             islemTuru,
             aciklama: `${ephId} için ${
               isCall ? 'telefonla arama' : 'WhatsApp'
@@ -2720,7 +2720,7 @@ export class UnitsService {
         );
 
         return {
-          spent: 10,
+          spent: contactCost,
           alreadyUnlocked: false,
           previousBalance: charged.movement.oncekiBakiye,
           remainingBalance: charged.wallet.bakiye,
@@ -2738,7 +2738,7 @@ export class UnitsService {
     return {
       ok: true,
       channel,
-      cost: 10,
+      cost: contactCost,
       spent,
       alreadyUnlocked,
       previousBalance,
@@ -2750,7 +2750,7 @@ export class UnitsService {
         ? 'Kendi/yetkili iletişim bilginiz gösterildi; kontör harcanmadı.'
         : alreadyUnlocked
         ? 'Bu iletişim bilgisi daha önce açılmıştı; tekrar kontör düşülmedi.'
-        : `${isCall ? 'Telefon' : 'WhatsApp'} iletişim bilgisi açıldı. 10 kontör harcandı.`,
+        : `${isCall ? 'Telefon' : 'WhatsApp'} iletişim bilgisi açıldı. ${contactCost} kontör harcandı.`,
     };
   }
 

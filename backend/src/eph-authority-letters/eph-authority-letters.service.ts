@@ -19,6 +19,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import * as QRCode from 'qrcode';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { readCost } from '../pricing/commercial-costs';
 
 type CurrentUserPayload = {
   userId: string;
@@ -46,7 +47,6 @@ type AuthorityLetterQuotaResult = {
 };
 
 const AUTHORITY_LETTER_MONTHLY_QUOTA_CODE = 'AUTHORITY_LETTER_MONTHLY';
-const AUTHORITY_LETTER_OVER_LIMIT_COST = 5;
 const PLATFORM_URL =
   process.env.FRONTEND_URL ||
   process.env.NEXT_PUBLIC_APP_URL ||
@@ -133,9 +133,9 @@ export class EphAuthorityLettersService {
         await this.spendKontorInTransaction({
           tx,
           userId: input.userId,
-          amount: AUTHORITY_LETTER_OVER_LIMIT_COST,
+          amount: quotaResult.chargedKontor,
           ilgiliKayitId: letter.id,
-          aciklama: `${letter.authorityNo} numaralı yetki belgesi üretimi için aylık ücretsiz limit aşıldığından ${AUTHORITY_LETTER_OVER_LIMIT_COST} kontör harcandı.`,
+          aciklama: `${letter.authorityNo} numaralı yetki belgesi üretimi için aylık ücretsiz limit aşıldığından ${quotaResult.chargedKontor} kontör harcandı.`,
         });
       }
 
@@ -690,7 +690,7 @@ export class EphAuthorityLettersService {
       limit: monthlyLimit,
       used,
       remaining,
-      overLimitCost: AUTHORITY_LETTER_OVER_LIMIT_COST,
+      overLimitCost: await readCost(input.tx, 'COST_YETKI_MEKTUBU_ASIM'),
       isOverLimit: used >= monthlyLimit,
       package: {
         code: packageInfo.paketKodu,
@@ -744,7 +744,7 @@ export class EphAuthorityLettersService {
       limit: monthlyLimit,
       used,
       remaining,
-      overLimitCost: AUTHORITY_LETTER_OVER_LIMIT_COST,
+      overLimitCost: await readCost(input.tx, 'COST_YETKI_MEKTUBU_ASIM'),
       isOverLimit: used >= monthlyLimit,
       package: {
         code: 'EPH_DEFAULT',
@@ -795,7 +795,7 @@ export class EphAuthorityLettersService {
       usedBefore,
       usedAfter: usedBefore,
       isFree,
-      chargedKontor: isFree ? 0 : AUTHORITY_LETTER_OVER_LIMIT_COST,
+      chargedKontor: isFree ? 0 : await readCost(input.tx, 'COST_YETKI_MEKTUBU_ASIM'),
     };
   }
 
@@ -873,7 +873,7 @@ export class EphAuthorityLettersService {
       usedBefore,
       usedAfter: usedBefore,
       isFree,
-      chargedKontor: isFree ? 0 : AUTHORITY_LETTER_OVER_LIMIT_COST,
+      chargedKontor: isFree ? 0 : await readCost(input.tx, 'COST_YETKI_MEKTUBU_ASIM'),
     };
   }
 

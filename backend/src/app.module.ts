@@ -37,6 +37,7 @@ import { OfficeOwnerCrmModule } from './office-owner-crm/office-owner-crm.module
 import { OfficeModule } from './office/office.module';
 import { KontorModule } from './kontor/kontor.module';
 import { MembershipModule } from './membership/membership.module';
+import { PricingModule } from './pricing/pricing.module';
 import { EphAuthorityLettersModule } from './eph-authority-letters/eph-authority-letters.module';
 import { LinaModule } from './lina/lina.module';
 import { TuranModule } from './turan/turan.module';
@@ -99,6 +100,7 @@ import { PoolProjectsModule } from './pool-projects/pool-projects.module';
     OfficeModule,
     KontorModule,
     MembershipModule,
+    PricingModule,
     EphAuthorityLettersModule,
     CoordinationModule,
 

@@ -337,10 +337,7 @@ export class PoolExperienceService {
                 ilgiliKayitId: true,
               },
             }),
-        this.adminService.getNumericSystemSetting(
-          'POOL_PRIVATE_INFO_COST',
-          25,
-        ),
+        this.adminService.getNumericSystemSetting('COST_OZEL_BILGI', await this.adminService.getNumericSystemSetting('POOL_PRIVATE_INFO_COST', 25)),
       ]);
 
     const privateInfoCost = Number.isFinite(configuredPrivateInfoCost)

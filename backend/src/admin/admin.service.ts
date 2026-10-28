@@ -1,3 +1,4 @@
+import { COST_DEFAULTS, COST_PREFIX } from "../pricing/commercial-costs";
 import {
   Injectable,
   NotFoundException,
@@ -3428,7 +3429,7 @@ export class AdminService {
 
     const settings = await this.prisma.systemSetting.findMany({
       where: {
-        key: { in: ["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"] },
+        OR: [{ key: { in: ["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"] } }, { key: { startsWith: COST_PREFIX } }],
       },
       orderBy: { key: "asc" },
     });
@@ -3443,11 +3444,13 @@ export class AdminService {
   ) {
     this.requireSoftwareTeam(actor);
 
-    if (!["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"].includes(key)) {
+    const isCommercialCost = Object.prototype.hasOwnProperty.call(COST_DEFAULTS, key);
+    if (!isCommercialCost && !["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"].includes(key)) {
       throw new BadRequestException("Desteklenmeyen sistem ayarı.");
     }
 
     const minimum =
+      isCommercialCost ||
       key === "TRIAL_MAX_EXTENSIONS" ||
       key === "POOL_PRIVATE_INFO_COST" ||
       key === "MATCH_SCAN_COST_PK" ||

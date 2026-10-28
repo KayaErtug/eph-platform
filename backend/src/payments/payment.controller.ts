@@ -8,13 +8,12 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { CheckoutDto, MembershipPriceDto, PaymentSettingsDto, RefundRequestDto, MembershipPackageSettingsDto } from './payment.dto';
 import { PaymentService } from './payment.service';
 import { PaymentNoStoreInterceptor } from './payment-no-store.interceptor';
-import { StorePaymentService } from './store.service';
 
 @Controller('payments')
 @UseInterceptors(PaymentNoStoreInterceptor)
 @UseGuards(JwtAuthGuard)
 export class PaymentController {
-  constructor(private readonly payments: PaymentService, private readonly stores: StorePaymentService) {}
+  constructor(private readonly payments: PaymentService) {}
   @Get('catalog') catalog(@CurrentUser() user: { id: string }) { return this.payments.catalog(user.id); }
   @Get('orders') orders(@CurrentUser() user: { id: string }) { return this.payments.orders(user.id); }
   @Get('orders/:id') order(@CurrentUser() user: { id: string }, @Param('id') id: string) { return this.payments.order(user.id, id); }
@@ -22,7 +21,7 @@ export class PaymentController {
     return this.payments.checkout(user.id, dto, key, req.ip || req.socket.remoteAddress || '');
   }
   @Post('orders/:id/refresh') @HttpCode(200)
-  refresh(@CurrentUser() user: { id: string }, @Param('id') id: string) { return this.stores.refresh(user.id, id); }
+  refresh(@CurrentUser() user: { id: string }, @Param('id') id: string) { return this.payments.refresh(user.id, id); }
   @Post('orders/:id/refund-request')
   refund(@CurrentUser() user: { id: string }, @Param('id') id: string, @Body() dto: RefundRequestDto) {
     return this.payments.requestRefund(user.id, id, dto.reason);

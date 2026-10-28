@@ -282,9 +282,9 @@ export class OfficeService {
     if (!['PERSONAL', 'OFFICE'].includes(walletSource) || (walletSource === 'PERSONAL' && walletOfficeId)) throw new BadRequestException('Geçersiz PK kaynağı.');
     let costPk = 25;
     try {
-      const setting = await this.prisma.systemSetting.findUnique({
-        where: { key: "REQUEST_PRIVATE_INFO_COST" },
-      });
+      const setting =
+        (await this.prisma.systemSetting.findUnique({ where: { key: "COST_OZEL_BILGI" } })) ??
+        (await this.prisma.systemSetting.findUnique({ where: { key: "REQUEST_PRIVATE_INFO_COST" } }));
       if (
         setting &&
         setting.valueJson !== null &&

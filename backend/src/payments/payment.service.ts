@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, OnApplicationBootstrap, OnModuleDestroy, ServiceUnavailableException } from '@nestjs/common';
-import { PaymentAttemptStatus, PaymentOrderPurpose, PaymentOrderStatus, PaymentTransactionStatus, PaymentTransactionType, Prisma, UyelikPaketKodu } from '@prisma/client';
+import { AuditAction, PaymentAttemptStatus, PaymentOrderPurpose, PaymentOrderStatus, PaymentTransactionStatus, PaymentTransactionType, Prisma, UyelikPaketKodu } from '@prisma/client';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { MembershipService } from '../membership/membership.service';
@@ -72,10 +72,20 @@ export class PaymentService implements OnApplicationBootstrap, OnModuleDestroy {
         registryNumber: dto.registryNumber, email: dto.email, phone: dto.phone },
       delivery: dto.delivery, refunds: dto.refunds, sales: dto.sales, privacy: dto.privacy,
     };
-    await this.prisma.systemSetting.upsert({
-      where: { key: PAYMENT_SETTINGS_KEY },
-      create: { key: PAYMENT_SETTINGS_KEY, valueJson: { approved: dto.approved, pkProducts: dto.pkProducts.map((p) => ({ ...p })), terms }, updatedById: userId },
-      update: { valueJson: { approved: dto.approved, pkProducts: dto.pkProducts.map((p) => ({ ...p })), terms }, updatedById: userId },
+    await this.prisma.$transaction(async (tx) => {
+      const before = await tx.systemSetting.findUnique({ where: { key: PAYMENT_SETTINGS_KEY } });
+      const previous = jsonObject(before?.valueJson);
+      const next = { approved: dto.approved, pkProducts: dto.pkProducts.map((p) => ({ ...p })), terms };
+      const saved = await tx.systemSetting.upsert({
+        where: { key: PAYMENT_SETTINGS_KEY },
+        create: { key: PAYMENT_SETTINGS_KEY, valueJson: next, updatedById: userId },
+        update: { valueJson: next, updatedById: userId },
+      });
+      await tx.auditLog.create({ data: { actorId: userId, action: AuditAction.UPDATE_SYSTEM_SETTING, entityType: 'SystemSetting', entityId: saved.id,
+        description: `Ödeme ayarları güncellendi: ${PAYMENT_SETTINGS_KEY}`,
+        metadata: JSON.parse(JSON.stringify({ key: PAYMENT_SETTINGS_KEY,
+          previousValue: { approved: previous.approved ?? null, pkProducts: previous.pkProducts ?? [], termsVersion: termsVersion(previous.terms) },
+          newValue: { approved: next.approved, pkProducts: next.pkProducts, termsVersion: termsVersion(terms) } })) } });
     });
     return this.settings();
   }
@@ -93,6 +103,10 @@ export class PaymentService implements OnApplicationBootstrap, OnModuleDestroy {
       await tx.uyelikPaketi.update({ where: { id }, data: { fiyat: new Prisma.Decimal(amountMinor).div(100), paraBirimi: 'TRY', aktifMi: active } });
       await tx.systemSetting.create({ data: { key: `EPH_PAYMENT_PRICE_AUDIT_${randomUUID()}`, updatedById: actor,
         valueJson: { packageId: id, oldPrice: old.fiyat?.toString() || null, oldActive: old.aktifMi, amountMinor, active } } });
+      await tx.auditLog.create({ data: { actorId: actor, action: AuditAction.UPDATE_SYSTEM_SETTING, entityType: 'UyelikPaketi', entityId: id,
+        description: `Üyelik fiyatı güncellendi: ${old.paketKodu}`,
+        metadata: { key: `UyelikPaketi.fiyat:${old.segment}:${old.paketKodu}`, previousValue: { fiyat: old.fiyat?.toString() || null, aktifMi: old.aktifMi },
+          newValue: { fiyat: new Prisma.Decimal(amountMinor).div(100).toString(), aktifMi: active } } } });
       return { saved: true };
     });
   }
@@ -165,6 +179,9 @@ export class PaymentService implements OnApplicationBootstrap, OnModuleDestroy {
       }
       await tx.systemSetting.create({ data: { key: `EPH_MEMBERSHIP_SETTINGS_AUDIT_${randomUUID()}`, updatedById: actor,
         valueJson: JSON.parse(JSON.stringify({ packageId: id, before, after, officeBefore, officeAfter: offices, changedAt: new Date().toISOString() })) } });
+      await tx.auditLog.create({ data: { actorId: actor, action: AuditAction.UPDATE_SYSTEM_SETTING, entityType: 'UyelikPaketi', entityId: id,
+        description: `Üyelik paketi güncellendi: ${before.paketKodu}`,
+        metadata: JSON.parse(JSON.stringify({ key: `UyelikPaketi:${before.segment}:${before.paketKodu}`, previousValue: before, newValue: after })) } });
       return { saved: true, updatedAt: after.guncellenmeTarihi };
     });
   }

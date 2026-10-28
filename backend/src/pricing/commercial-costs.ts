@@ -1,0 +1,40 @@
+import { Prisma } from '@prisma/client';
+
+// Ticari değerler veridir, kod değildir (EPH_KURALLARI §0-B): kaynak SystemSetting.
+// Buradaki değerler yalnızca ayar yoksa kullanılan yedek değerlerdir.
+export const COST_DEFAULTS = {
+  COST_HAVUZ_PORTFOY_YAYIN: 50,
+  COST_PROJE_HAVUZ: 100,
+  COST_OZEL_BILGI: 25,
+  COST_HAVUZ_KONUM: 10,
+  COST_HAVUZ_TELEFON: 10,
+  COST_HAVUZ_WHATSAPP: 10,
+  COST_TALEP_YAYIN: 25,
+  COST_TALEP_ACIL_EK: 10,
+  COST_ESLESME_TARAMA: 25,
+  COST_YETKI_MEKTUBU_ASIM: 5,
+} as const;
+
+export type CostKey = keyof typeof COST_DEFAULTS;
+
+export const COST_PREFIX = 'COST_';
+
+type CostDb = Pick<Prisma.TransactionClient, 'systemSetting'>;
+
+export function parseCostValue(raw: unknown): number | null {
+  const candidate = typeof raw === 'object' && raw !== null && !Array.isArray(raw)
+    ? (raw as { value?: unknown }).value
+    : raw;
+  const value = typeof candidate === 'string' && candidate.trim() !== '' ? Number(candidate) : candidate;
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+// Sıra: COST_* ayarı, varsa eski anahtarlar, yoksa yedek değer.
+export async function readCost(db: CostDb, key: CostKey, legacyKeys: string[] = []): Promise<number> {
+  for (const candidate of [key, ...legacyKeys]) {
+    const row = await db.systemSetting.findUnique({ where: { key: candidate }, select: { valueJson: true } });
+    const value = row ? parseCostValue(row.valueJson) : null;
+    if (value !== null) return value;
+  }
+  return COST_DEFAULTS[key];
+}
