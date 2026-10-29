@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PoolPublicationService, type PoolPublicationInput, type PublicationUnit } from './pool-publication.service';
 
 const actor = { id: 'actor-1', role: 'EMLAKCI' };
-const input = (requestId = 'publish-request-1'): PoolPublicationInput => ({ requestId, expectedActorId: actor.id, expectedCostPk: 50, walletSource: 'PERSONAL' });
+const input = (requestId = 'publish-request-1'): PoolPublicationInput => ({ requestId, expectedActorId: actor.id, expectedCostPk: 25, walletSource: 'PERSONAL' });
 const makeUnit = (id = 'unit-1') => ({ id, isPoolVisible: false, approvalStatus: 'TASLAK', status: 'SATILIK', isOffMarket: false, poolRemovedAt: null as Date | null, project: { ownerId: actor.id, isActive: true, owner: { role: 'EMLAKCI' } } });
 type Unit = ReturnType<typeof makeUnit>;
 type Wallet = { bakiye: number; aktifMi: boolean; toplamHarcama: number };
@@ -78,15 +78,15 @@ function harness() {
 }
 
 describe('Pool publication: quote, atomic charge and durable replay', () => {
-  it('quote is read only and costs 50 PK', async () => {
+  it('quote is read only and costs 25 PK', async () => {
     const h = harness();
     const quote = await h.service.quote(h.state.units['unit-1'] as unknown as PublicationUnit, actor.id, { walletSource: 'PERSONAL' });
-    assert.equal(quote.costPk, 50); assert.equal(quote.eligible, true);
+    assert.equal(quote.costPk, 25); assert.equal(quote.eligible, true);
     assert.equal(h.state.wallets[actor.id].bakiye, 200); assert.equal(h.state.logs.length, 0); assert.equal(h.calls.length, 0);
   });
   it('publishes, charges once and returns a verifiable receipt', async () => {
     const h = harness(); const result = await h.publish();
-    assert.equal(result.isPoolVisible, true); assert.equal(result.billing.spent, 50); assert.equal(result.billing.remainingBalance, 150);
+    assert.equal(result.isPoolVisible, true); assert.equal(result.billing.spent, 25); assert.equal(result.billing.remainingBalance, 175);
     assert.ok('operationId' in result.billing); assert.ok('requestId' in result.billing);
     assert.equal(result.billing.operationId, 'movement-1'); assert.equal(result.billing.requestId, input().requestId);
     assert.equal(h.state.movements.length, 1); assert.equal(h.state.logs.length, 2);
@@ -95,7 +95,7 @@ describe('Pool publication: quote, atomic charge and durable replay', () => {
   it('replays the same request with zero new PK and no writes', async () => {
     const h = harness(); await h.publish(); const result = await h.publish();
     assert.equal(result.billing.spent, 0); assert.equal(result.billing.replayed, true);
-    assert.equal(h.state.movements.length, 1); assert.equal(h.state.wallets[actor.id].bakiye, 150); assert.equal(h.state.logs.length, 2);
+    assert.equal(h.state.movements.length, 1); assert.equal(h.state.wallets[actor.id].bakiye, 175); assert.equal(h.state.logs.length, 2);
   });
   it('a new key for an already published unit does not charge', async () => {
     const h = harness(); await h.publish(); const result = await h.publish(input('new-publish-key'));
@@ -103,7 +103,7 @@ describe('Pool publication: quote, atomic charge and durable replay', () => {
   });
   it('two simultaneous requests for one unit charge only once', async () => {
     const h = harness(); const results = await Promise.all([h.publish(), h.publish(input('concurrent-key-2'))]);
-    assert.equal(results.reduce((total, result) => total + Number(result.billing.spent), 0), 50); assert.equal(h.state.movements.length, 1);
+    assert.equal(results.reduce((total, result) => total + Number(result.billing.spent), 0), 25); assert.equal(h.state.movements.length, 1);
   });
   it('replay after withdrawal cannot publish or charge again', async () => {
     const h = harness(); await h.publish(); h.state.units['unit-1'].isPoolVisible = false; h.state.units['unit-1'].approvalStatus = 'TASLAK';
@@ -111,7 +111,7 @@ describe('Pool publication: quote, atomic charge and durable replay', () => {
   });
   it('a new confirmed publication after withdrawal is a new charge', async () => {
     const h = harness(); await h.publish(); h.state.units['unit-1'].isPoolVisible = false; h.state.units['unit-1'].approvalStatus = 'TASLAK';
-    await h.publish(input('republish-new-key')); assert.equal(h.state.movements.length, 2); assert.equal(h.state.wallets[actor.id].bakiye, 100);
+    await h.publish(input('republish-new-key')); assert.equal(h.state.movements.length, 2); assert.equal(h.state.wallets[actor.id].bakiye, 150);
   });
   for (const failure of ['unit', 'movement', 'receipt', 'audit', 'audience']) {
     it('rolls back all state on ' + failure + ' failure', async () => {
@@ -129,7 +129,7 @@ describe('Pool publication: quote, atomic charge and durable replay', () => {
   });
   it('office PK charges the office owner wallet and records the actor', async () => {
     const h = harness(); h.mode('SHARED'); const result = await h.publish({ ...input(), walletSource: 'OFFICE', walletOfficeId: 'office-1' });
-    assert.equal(h.state.wallets[actor.id].bakiye, 200); assert.equal(h.state.wallets['office-owner'].bakiye, 50);
+    assert.equal(h.state.wallets[actor.id].bakiye, 200); assert.equal(h.state.wallets['office-owner'].bakiye, 75);
     assert.ok('walletOfficeId' in result.billing);
     assert.equal(result.billing.walletOfficeId, 'office-1'); assert.equal(h.state.movements[0].olusturanId, actor.id);
   });
@@ -152,7 +152,7 @@ describe('Pool publication: quote, atomic charge and durable replay', () => {
   it('invalid cost and missing modern request key cannot charge', async () => {
     const h = harness(); await assert.rejects(h.publish({ ...input(), expectedCostPk: 49 })); await assert.rejects(h.publish({ walletSource: 'PERSONAL' })); assert.equal(h.state.movements.length, 0);
   });
-  it('a quote of zero cannot charge 50 if publication state changed', async () => {
+  it('a quote of zero cannot charge 25 if publication state changed', async () => {
     const h = harness(); await assert.rejects(h.publish({ ...input(), expectedCostPk: 0 })); assert.equal(h.state.movements.length, 0);
   });
   it('reusing a key for a different unit is rejected', async () => {
