@@ -279,12 +279,17 @@ export class PoolProjectsService {
   }
 
   async getPublicPresentation(token: string) {
-    const rows = await this.prisma.$queryRaw<ProjectPresentationLinkRow[]>`
+    // Tablo canlıda yoksa (42P01) 500 yerine "bağlantı yok" olarak ele alınır.
+    const rows = await this.prisma
+      .$queryRaw<ProjectPresentationLinkRow[]>`
       SELECT *
       FROM "EphProjectPresentationLink"
       WHERE "token" = ${token}
       LIMIT 1
-    `;
+    `.catch((error: unknown) => {
+      if (String((error as Error)?.message).includes('42P01')) return [];
+      throw error;
+    });
     const link = rows[0];
 
     if (!link || link.revokedAt || new Date(link.expiresAt).getTime() <= Date.now()) {
@@ -365,7 +370,8 @@ export class PoolProjectsService {
   }
 
   async trackWhatsappClick(token: string) {
-    const rows = await this.prisma.$queryRaw<ProjectPresentationLinkRow[]>`
+    const rows = await this.prisma
+      .$queryRaw<ProjectPresentationLinkRow[]>`
       UPDATE "EphProjectPresentationLink"
       SET "whatsappClickCount" = "whatsappClickCount" + 1,
           "updatedAt" = NOW()
@@ -373,7 +379,10 @@ export class PoolProjectsService {
         AND "revokedAt" IS NULL
         AND "expiresAt" > NOW()
       RETURNING *
-    `;
+    `.catch((error: unknown) => {
+      if (String((error as Error)?.message).includes('42P01')) return [];
+      throw error;
+    });
 
     if (!rows[0]) {
       throw new NotFoundException('Sunum bağlantısı geçerli değil.');

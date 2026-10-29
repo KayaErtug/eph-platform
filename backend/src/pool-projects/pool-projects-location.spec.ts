@@ -41,3 +41,29 @@ describe('Token\'lı proje sunumu konum gizleme', () => {
     }
   });
 });
+
+describe('Sunum linki eksik veri dayanıklılığı', () => {
+  it('linki oluşturan kullanıcı bulunamazsa sayfa açılır, yaklaşık konum döner', async () => {
+    const service: any = Object.create(PoolProjectsService.prototype);
+    service.prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([link]),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      user: { findUnique: jest.fn().mockResolvedValue(null) },
+      kontorHareketi: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    service.findProject = jest.fn().mockResolvedValue(project);
+    service.audience = { filterPublicUnits: jest.fn(async (units: unknown[]) => units) };
+    const result = await service.getPublicPresentation('t');
+    expect(result.sharer).toBeNull();
+    expect(result.project).toMatchObject({ address: null, locationApproximate: true });
+  });
+
+  it('tablo yokken (42P01) 500 değil 404 döner', async () => {
+    const service: any = Object.create(PoolProjectsService.prototype);
+    service.prisma = {
+      $queryRaw: jest.fn(() => Promise.reject(new Error('Raw query failed. Code: `42P01`'))),
+    };
+    await expect(service.getPublicPresentation('t')).rejects.toMatchObject({ status: 404 });
+    await expect(service.trackWhatsappClick('t')).rejects.toMatchObject({ status: 404 });
+  });
+});
