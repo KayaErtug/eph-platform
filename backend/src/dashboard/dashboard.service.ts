@@ -20,6 +20,7 @@ export class DashboardService {
       latestCustomers,
       latestActivities,
       pendingTasks,
+      pendingTaskCount,
     ] = await Promise.all([
       this.prisma.unit.count({
         where: {
@@ -78,6 +79,10 @@ export class DashboardService {
           customer: true,
         },
       }),
+
+      this.prisma.task.count({
+        where: ownTaskWhere,
+      }),
     ]);
 
     return {
@@ -86,6 +91,7 @@ export class DashboardService {
         totalCustomers,
         totalVisits,
         totalProjects,
+        pendingTasks: pendingTaskCount,
       },
       latestUnits,
       latestCustomers,
