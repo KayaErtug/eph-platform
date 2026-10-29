@@ -6,7 +6,7 @@
 - Guard: `PermissionGuard` + `@RequirePermission(key)`. Önceden admin uçlarının çoğu yalnız `@Roles(ADMIN)` ile korunuyordu; yetki anahtarı kontrolü yoktu.
 - Eski mobil ekran: tek tek yetkiyi modalda aç/kapa (PATCH ile her biri ayrı çağrı), toplu seçim yok.
 
-## 2. Yetki listesi (36 anahtar, gerçek uçlardan)
+## 2. Yetki listesi (37 anahtar, gerçek uçlardan)
 | Grup | Anahtarlar |
 |---|---|
 | Kullanıcı Yönetimi | USER_VIEW, USER_CREATE, USER_APPROVE, USER_DELETE, USER_SUSPEND, ROLE_CHANGE, CAPABILITY_MANAGE, MEMBER_CODE_MANAGE, SUPER_ADMIN_MANAGE* |
