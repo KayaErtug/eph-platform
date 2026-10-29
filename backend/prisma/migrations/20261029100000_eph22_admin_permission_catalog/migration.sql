@@ -1,5 +1,5 @@
 -- EPH-22: yönetici yetki kataloğu. Yalnızca ekleme yapar; mevcut kayıtlara dokunmaz.
--- Yeni yetkiler varsayılan KAPALI gelir; Süper Admin Yetki Merkezi'nden tek tek verir.
+-- Yeni tanımlar varsayılan KAPALI; mevcut ADMIN erişimi aşağıdaki rol politikasıyla korunur.
 
 INSERT INTO "PermissionDefinition" ("id","key","category","label","description","defaultEnabled","delegable","superAdminOnly","active","createdAt","updatedAt") VALUES
   (gen_random_uuid()::text, 'USER_VIEW', 'Kullanıcı Yönetimi', 'Kullanıcı listesini görme', 'Kullanıcı listesi ve kullanıcı bilgileri', false, true, false, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -45,4 +45,22 @@ INSERT INTO "RolePermissionPolicy" ("id","role","permissionId","enabled","create
 SELECT gen_random_uuid()::text, 'MODERATOR'::"Role", pd."id", true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM "PermissionDefinition" pd
 WHERE pd."key" = 'PORTFOLIO_MODERATE'
+ON CONFLICT ("role","permissionId") DO NOTHING;
+
+-- EPH-22-KONTROL: ADMIN'in EPH-22 öncesi erişebildiği uçları koru.
+-- Mevcut kapalı politikalar, limitler ve kullanıcı override'ları aynen kalır.
+INSERT INTO "RolePermissionPolicy" ("id","role","permissionId","enabled","createdAt","updatedAt")
+SELECT gen_random_uuid()::text, 'ADMIN'::"Role", pd."id", true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+FROM "PermissionDefinition" pd
+WHERE pd."superAdminOnly" = false AND pd."key" IN (
+  'USER_VIEW', 'USER_CREATE', 'USER_APPROVE', 'USER_DELETE', 'USER_SUSPEND',
+  'ROLE_CHANGE', 'CAPABILITY_MANAGE', 'MEMBER_CODE_MANAGE',
+  'DOCUMENT_VIEW', 'DOCUMENT_APPROVE', 'DOCUMENT_REJECT',
+  'APPLICATION_VIEW', 'APPLICATION_REVIEW', 'APPLICATION_DELETE',
+  'NOMINATION_VIEW', 'NOMINATION_MANAGE', 'LEAD_VIEW',
+  'REFERRAL_VIEW', 'REFERRAL_MANAGE', 'INVITATION_VIEW',
+  'PORTFOLIO_MODERATE', 'ANNOUNCEMENT_VIEW', 'ANNOUNCEMENT_MANAGE',
+  'KONTOR_GIFT_POOL_VIEW', 'KONTOR_GIFT_SEND', 'TRIAL_EXTEND',
+  'ORGANIZATION_VIEW', 'ORGANIZATION_MANAGE', 'REPORT_VIEW'
+)
 ON CONFLICT ("role","permissionId") DO NOTHING;
