@@ -7,6 +7,27 @@ type Loan = { monthlyRatePct: number; source: string; updatedAt: string };
 type Cached<T> = { data: T; at: string };
 
 export const MARKET_LOAN_SETTING_KEY = 'MARKET_KONUT_FAIZ_AYLIK';
+export const MARKET_LOAN_SOURCE_KEY = 'MARKET_KONUT_FAIZ_KAYNAK';
+export const MARKET_MANUAL_PREFIX = 'MARKET_MANUAL_';
+export const MARKET_CODES = ['USD', 'EUR', 'GBP', 'GRAM_ALTIN', 'CEYREK_ALTIN', 'BIST100'] as const;
+const LABELS: Record<string, { label: string; unit: string }> = {
+  USD: { label: 'Dolar', unit: '₺' },
+  EUR: { label: 'Euro', unit: '₺' },
+  GBP: { label: 'Sterlin', unit: '₺' },
+  GRAM_ALTIN: { label: 'Gram Altın', unit: '₺' },
+  CEYREK_ALTIN: { label: 'Çeyrek Altın', unit: '₺' },
+  BIST100: { label: 'BIST 100', unit: 'puan' },
+};
+
+// Ayar değeri: düz sayı/metin ya da { value }.
+export function settingValue(raw: unknown): unknown {
+  return raw && typeof raw === 'object' && !Array.isArray(raw) && 'value' in raw ? (raw as { value: unknown }).value : raw;
+}
+const positive = (raw: unknown) => {
+  const v = settingValue(raw);
+  const n = typeof v === 'string' ? (v.trim() === '' ? NaN : Number(v.replace(',', '.'))) : Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
 const FETCH_TIMEOUT_MS = 10_000;
 const TCMB_BASE = 'https://www.tcmb.gov.tr/kurlar';
 const FX = [
@@ -121,22 +142,42 @@ export class MarketTickerService implements OnModuleInit {
   }
 
   private async loan(): Promise<Loan | null> {
-    const row = await this.prisma.systemSetting.findUnique({ where: { key: MARKET_LOAN_SETTING_KEY }, select: { valueJson: true, updatedAt: true } });
-    const raw = row?.valueJson as unknown;
-    const manual = Number(raw && typeof raw === 'object' && 'value' in raw ? (raw as { value: unknown }).value : raw);
-    if (row && raw !== null && raw !== '' && Number.isFinite(manual) && manual > 0) {
-      return { monthlyRatePct: manual, source: 'Yönetici', updatedAt: row.updatedAt.toISOString() };
+    const [row, src] = await Promise.all([
+      this.prisma.systemSetting.findUnique({ where: { key: MARKET_LOAN_SETTING_KEY }, select: { valueJson: true, updatedAt: true } }),
+      this.prisma.systemSetting.findUnique({ where: { key: MARKET_LOAN_SOURCE_KEY }, select: { valueJson: true } }),
+    ]);
+    const manual = row ? positive(row.valueJson) : null;
+    if (row && manual !== null) {
+      const text = settingValue(src?.valueJson);
+      const source = typeof text === 'string' && text.trim() ? text.trim() : 'Yönetici';
+      return { monthlyRatePct: manual, source, updatedAt: row.updatedAt.toISOString() };
     }
     return this.evds ? { monthlyRatePct: this.evds.data, source: 'TCMB EVDS', updatedAt: this.evds.at } : null;
   }
 
+  // MARKET_MANUAL_<KOD> varsa otomatik kaynağın yerine geçer.
+  private async manualItems() {
+    const rows = await this.prisma.systemSetting.findMany({
+      where: { key: { in: MARKET_CODES.map(c => MARKET_MANUAL_PREFIX + c) } },
+      select: { key: true, valueJson: true, updatedAt: true },
+    });
+    const out = new Map<string, { item: TickerItem; at: string }>();
+    for (const r of rows) {
+      const code = r.key.slice(MARKET_MANUAL_PREFIX.length);
+      const value = positive(r.valueJson);
+      if (value === null || !LABELS[code]) continue;
+      out.set(code, { item: { code, ...LABELS[code], value, changePct: null, source: 'Yönetici' }, at: r.updatedAt.toISOString() });
+    }
+    return out;
+  }
+
   async getTicker() {
     if (!this.items.size) await this.refresh();
+    const manual = await this.manualItems();
     const cached = [...this.items.values()];
-    const order = ['USD', 'EUR', 'GBP', 'GRAM_ALTIN', 'CEYREK_ALTIN', 'BIST100'];
-    const items = order.map(code => this.items.get(code)?.data).filter((i): i is TickerItem => Boolean(i));
+    const items = MARKET_CODES.map(code => manual.get(code)?.item ?? this.items.get(code)?.data).filter((i): i is TickerItem => Boolean(i));
     const loan = await this.loan();
-    const times = [...cached.map(c => c.at), ...(loan ? [loan.updatedAt] : [])].sort();
+    const times = [...cached.map(c => c.at), ...[...manual.values()].map(m => m.at), ...(loan ? [loan.updatedAt] : [])].sort();
     return { updatedAt: times.length ? times[times.length - 1] : null, items, loan };
   }
 }

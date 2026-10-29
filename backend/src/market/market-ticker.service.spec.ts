@@ -10,8 +10,13 @@ const body = (text: string) => ({ ok: true, status: 200, text: async () => text 
 const gold = JSON.stringify({ GRA: { Selling: 6400, Change: 1.5 }, CEYREKALTIN: { Selling: 10600, Change: 0.5 } });
 const bist = JSON.stringify({ chart: { result: [{ meta: { regularMarketPrice: 11000, chartPreviousClose: 10000 } }] } });
 
-function service(setting: unknown = null) {
-  const prisma: any = { systemSetting: { findUnique: jest.fn(async () => setting) } };
+function service(setting: unknown = null, extra: Record<string, any> = {}) {
+  const prisma: any = {
+    systemSetting: {
+      findUnique: jest.fn(async ({ where }: any) => (where.key === 'MARKET_KONUT_FAIZ_KAYNAK' ? extra.source ?? null : setting)),
+      findMany: jest.fn(async () => extra.manual ?? []),
+    },
+  };
   return new MarketTickerService(prisma);
 }
 
@@ -77,5 +82,25 @@ describe('Piyasa ticker (EPH-28)', () => {
     process.env.EVDS_KONUT_SERIES = 'TP.X';
     const s = service();
     expect((await s.getTicker()).loan).toMatchObject({ monthlyRatePct: 2.5, source: 'TCMB EVDS' });
+  });
+
+  it('elle değer otomatik kaynağı geçersiz kılar; kredi kaynağı metni kullanılır (EPH-28B)', async () => {
+    global.fetch = jest.fn(async (url: string) => {
+      if (url.endsWith('today.xml')) return body(xml('27.10.2026', '51', '55', '66'));
+      if (url.includes('truncgil')) return body(gold);
+      if (url.includes('yahoo')) return body(bist);
+      throw new Error('kapalı');
+    }) as any;
+    const at = new Date('2026-10-29T08:00:00Z');
+    const s = service({ valueJson: { value: 2.74 }, updatedAt: at }, {
+      source: { valueJson: { value: 'Akbank İlk Evim' } },
+      manual: [{ key: 'MARKET_MANUAL_CEYREK_ALTIN', valueJson: { value: 10425 }, updatedAt: at }],
+    });
+    const t = await s.getTicker();
+    expect(t.items.find(i => i.code === 'CEYREK_ALTIN')).toEqual({ code: 'CEYREK_ALTIN', label: 'Çeyrek Altın', value: 10425, unit: '₺', changePct: null, source: 'Yönetici' });
+    expect(t.items.find(i => i.code === 'GRAM_ALTIN')?.source).toBe('Truncgil');
+    expect(t.loan).toMatchObject({ monthlyRatePct: 2.74, source: 'Akbank İlk Evim', updatedAt: at.toISOString() });
+    const empty = await service({ valueJson: 2.5, updatedAt: at }, { source: { valueJson: { value: '  ' } } }).getTicker();
+    expect(empty.loan?.source).toBe('Yönetici');
   });
 });

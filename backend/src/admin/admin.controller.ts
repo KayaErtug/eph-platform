@@ -353,7 +353,7 @@ export class AdminController {
   @Roles(Role.SUPER_ADMIN)
   updateSystemSetting(
     @Param("key") key: string,
-    @Body() body: { value: number; description?: string },
+    @Body() body: { value: number | string; description?: string },
     @Req() request: AdminRequest,
   ) {
     return this.adminService.updateSystemSetting(key, body, this.extractActor(request));

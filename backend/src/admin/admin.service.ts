@@ -1,4 +1,5 @@
 import { COST_PREFIX, LIMIT_PREFIX, isManagedCommercialKey } from "../pricing/commercial-costs";
+import { MARKET_CODES, MARKET_LOAN_SETTING_KEY, MARKET_LOAN_SOURCE_KEY, MARKET_MANUAL_PREFIX } from "../market/market-ticker.service";
 import {
   Injectable,
   NotFoundException,
@@ -3331,6 +3332,15 @@ export class AdminService {
     });
   }
 
+  // Piyasa şeridi ayarları: kod → açıklama. Sayısal anahtarlar ondalık (> 0), kaynak anahtarı metindir.
+  private marketSettingDefinitions(): Record<string, string> {
+    return {
+      [MARKET_LOAN_SETTING_KEY]: "Konut kredisi aylık faiz oranı (%). Doluysa piyasa şeridinde otomatik kaynağın yerine geçer.",
+      [MARKET_LOAN_SOURCE_KEY]: "Konut kredisi faizinin kaynak adı (ör. Akbank İlk Evim). Boşsa 'Yönetici' yazılır.",
+      ...Object.fromEntries(MARKET_CODES.map((c) => [MARKET_MANUAL_PREFIX + c, `${c} elle değer. Doluysa piyasa şeridinde otomatik kaynağın yerine geçer (kaynak: Yönetici).`])),
+    };
+  }
+
   private systemSettingResponse(setting: {
     key: string;
     valueJson: Prisma.JsonValue;
@@ -3339,9 +3349,8 @@ export class AdminService {
     updatedById: string | null;
   }) {
     const raw = setting.valueJson;
-    const value = typeof raw === "object" && raw !== null && !Array.isArray(raw)
-      ? Number(raw.value)
-      : Number(raw);
+    const inner = typeof raw === "object" && raw !== null && !Array.isArray(raw) ? raw.value : raw;
+    const value: number | string = setting.key === MARKET_LOAN_SOURCE_KEY ? String(inner ?? "") : Number(inner);
 
     return {
       key: setting.key,
@@ -3357,20 +3366,33 @@ export class AdminService {
 
     const settings = await this.prisma.systemSetting.findMany({
       where: {
-        OR: [{ key: { in: ["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"] } }, { key: { startsWith: COST_PREFIX } }, { key: { startsWith: LIMIT_PREFIX } }],
+        OR: [{ key: { in: ["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"] } }, { key: { startsWith: COST_PREFIX } }, { key: { startsWith: LIMIT_PREFIX } }, { key: { startsWith: "MARKET_" } }],
       },
       orderBy: { key: "asc" },
     });
 
-    return settings.map((setting) => this.systemSettingResponse(setting));
+    const list: Array<ReturnType<AdminService["systemSettingResponse"]> | { key: string; value: null; description: string; updatedAt: null; updatedById: null }> =
+      settings.map((setting) => this.systemSettingResponse(setting));
+    // Henüz kaydı olmayan piyasa ayarları da ekranda açıklamalı görünür (değer boş).
+    for (const [key, description] of Object.entries(this.marketSettingDefinitions())) {
+      if (!settings.some((s) => s.key === key)) list.push({ key, value: null, description, updatedAt: null, updatedById: null });
+      else {
+        const row = list.find((r) => r.key === key);
+        if (row && !row.description) row.description = description;
+      }
+    }
+    return list.sort((a, b) => a.key.localeCompare(b.key));
   }
 
   async updateSystemSetting(
     key: string,
-    body: { value: number; description?: string },
+    body: { value: number | string; description?: string },
     actor?: AdminActor,
   ) {
     this.requireSoftwareTeam(actor);
+
+    const marketDescription = this.marketSettingDefinitions()[key];
+    if (marketDescription) return this.updateMarketSetting(key, marketDescription, body, actor);
 
     const isCommercialCost = isManagedCommercialKey(key);
     if (!isCommercialCost && !["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"].includes(key)) {
@@ -3426,6 +3448,64 @@ export class AdminService {
           entityId: updated.id,
           description: `Sistem ayarı güncellendi: ${key}`,
           metadata: { key, previousValue, newValue: body.value },
+          ipAddress: actor?.ipAddress,
+          userAgent: actor?.userAgent,
+        },
+      });
+
+      return this.systemSettingResponse(updated);
+    });
+  }
+
+  // MARKET_* ayarları: kayıt yoksa oluşturulur; değişiklik AuditLog'a kim/ne zaman/eski/yeni ile yazılır.
+  private async updateMarketSetting(
+    key: string,
+    defaultDescription: string,
+    body: { value: number | string; description?: string },
+    actor?: AdminActor,
+  ) {
+    const isText = key === MARKET_LOAN_SOURCE_KEY;
+    let value: number | string;
+    if (isText) {
+      if (typeof body?.value !== "string" || body.value.trim().length > 80) {
+        throw new BadRequestException("Kaynak en fazla 80 karakterlik metin olmalıdır.");
+      }
+      value = body.value.trim();
+    } else {
+      const n = typeof body?.value === "string" ? Number(body.value.replace(",", ".")) : body?.value;
+      if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) {
+        throw new BadRequestException("Değer 0'dan büyük bir sayı olmalıdır.");
+      }
+      value = n;
+    }
+    if (body.description !== undefined && typeof body.description !== "string") {
+      throw new BadRequestException("Açıklama metin olmalıdır.");
+    }
+
+    const actorId = this.getActorId(actor);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`system-setting:${key}`}))::text AS locked`;
+      const existing = await tx.systemSetting.findUnique({ where: { key } });
+      const previousValue = existing ? this.systemSettingResponse(existing).value : null;
+      const raw = existing?.valueJson;
+      const valueJson: Prisma.InputJsonValue = typeof raw === "object" && raw !== null && !Array.isArray(raw)
+        ? { ...raw, value } as Prisma.InputJsonObject
+        : value;
+      const description = body.description ?? existing?.description ?? defaultDescription;
+      const updated = await tx.systemSetting.upsert({
+        where: { key },
+        create: { key, valueJson, description, updatedById: actorId },
+        update: { valueJson, description, updatedById: actorId },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: AuditAction.UPDATE_SYSTEM_SETTING,
+          entityType: "SystemSetting",
+          entityId: updated.id,
+          description: `Sistem ayarı güncellendi: ${key}`,
+          metadata: { key, previousValue, newValue: value },
           ipAddress: actor?.ipAddress,
           userAgent: actor?.userAgent,
         },
