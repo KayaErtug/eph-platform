@@ -4,7 +4,7 @@ import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { MembershipService } from '../membership/membership.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CheckoutDto, PaymentSettingsDto, MembershipPackageSettingsDto } from './payment.dto';
+import { CheckoutDto, PaymentSettingsDto, MembershipPackageSettingsDto, OfficePackageSettingsDto } from './payment.dto';
 import { PAYMENT_GATEWAY, PaymentGateway } from './iyzico.gateway';
 import { DEFAULT_PAYMENT_TERMS, PAYMENT_SETTINGS_KEY, digest, equalMoney, jsonObject, money, termsVersion } from './payment.rules';
 
@@ -152,6 +152,30 @@ export class PaymentService implements OnApplicationBootstrap, OnModuleDestroy {
     });
   }
 
+  async adminOfficePackages() {
+    return this.membership.getOfficePackages();
+  }
+
+  async saveOfficePackage(actor: string, code: string, dto: OfficePackageSettingsDto) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'OFFICE_MEMBERSHIP_PACKAGES'}))`;
+      const row = await tx.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' } });
+      const offices = Array.isArray(row?.valueJson) ? JSON.parse(JSON.stringify(row.valueJson)) as Array<Record<string, unknown>> : [];
+      const office = offices.find((item) => item.code === code);
+      if (!row || !office) throw new NotFoundException('Ofis paketi bulunamadı.');
+      const before = JSON.parse(JSON.stringify(office));
+      Object.assign(office, { name: dto.name, price: dto.price, monthlyPk: dto.monthlyPk, active: dto.active,
+        portfolioCapacity: dto.portfolioCapacity, crmCapacity: dto.crmCapacity,
+        monthlyDemandLimit: dto.monthlyDemandLimit, monthlyPoolLimit: dto.monthlyPoolLimit, trialDays: dto.trialDays,
+        agents: dto.agents, totalUsers: dto.agents + 1 });
+      const saved = await tx.systemSetting.update({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' }, data: { valueJson: offices as Prisma.InputJsonValue, updatedById: actor } });
+      await tx.auditLog.create({ data: { actorId: actor, action: AuditAction.UPDATE_SYSTEM_SETTING, entityType: 'SystemSetting', entityId: saved.id,
+        description: `Ofis paketi güncellendi: ${code}`,
+        metadata: JSON.parse(JSON.stringify({ key: `OFFICE_MEMBERSHIP_PACKAGES:${code}`, previousValue: before, newValue: office })) } });
+      return { saved: true };
+    });
+  }
+
   async saveMembershipPackage(actor: string, id: string, dto: MembershipPackageSettingsDto) {
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "UyelikPaketi" WHERE "id" = ${id} FOR UPDATE`;
@@ -161,24 +185,8 @@ export class PaymentService implements OnApplicationBootstrap, OnModuleDestroy {
       if (['DENEME', 'UCRETSIZ'].includes(before.paketKodu) && !dto.denemeGunSayisi) throw new BadRequestException('Deneme süresi en az 1 gün olmalıdır.');
       const { expectedUpdatedAt, ofisAltKullaniciLimiti, ...data } = dto;
       const after = await tx.uyelikPaketi.update({ where: { id }, data });
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'OFFICE_MEMBERSHIP_PACKAGES'}))`;
-      const row = await tx.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' } });
-      const officeBefore = JSON.parse(JSON.stringify(row?.valueJson ?? null));
-      const offices = Array.isArray(row?.valueJson) ? row.valueJson as Array<Record<string, unknown>> : [];
-      if (before.segment === 'EMLAK_PRO') {
-        const office = offices.find((p) => p.code === before.paketKodu);
-        if (office) {
-          Object.assign(office, { name: 'Ofis '+after.paketAdi, price: Number(after.fiyat), monthlyPk: after.aylikPaketPk, active: after.aktifMi,
-            portfolioCapacity: after.aktifPortfoyLimiti, crmCapacity: after.aktifCrmLimiti,
-            monthlyDemandLimit: after.aylikTalepLimiti, monthlyPoolLimit: after.aylikHavuzGonderimLimiti,
-            trialDays: after.denemeGunSayisi ?? 0,
-            ...(ofisAltKullaniciLimiti !== null && ofisAltKullaniciLimiti !== undefined ? { agents: ofisAltKullaniciLimiti, totalUsers: ofisAltKullaniciLimiti + 1 } : {}),
-          });
-          await tx.systemSetting.update({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' }, data: { valueJson: offices as Prisma.InputJsonValue } });
-        }
-      }
       await tx.systemSetting.create({ data: { key: `EPH_MEMBERSHIP_SETTINGS_AUDIT_${randomUUID()}`, updatedById: actor,
-        valueJson: JSON.parse(JSON.stringify({ packageId: id, before, after, officeBefore, officeAfter: offices, changedAt: new Date().toISOString() })) } });
+        valueJson: JSON.parse(JSON.stringify({ packageId: id, before, after, changedAt: new Date().toISOString() })) } });
       await tx.auditLog.create({ data: { actorId: actor, action: AuditAction.UPDATE_SYSTEM_SETTING, entityType: 'UyelikPaketi', entityId: id,
         description: `Üyelik paketi güncellendi: ${before.paketKodu}`,
         metadata: JSON.parse(JSON.stringify({ key: `UyelikPaketi:${before.segment}:${before.paketKodu}`, previousValue: before, newValue: after })) } });

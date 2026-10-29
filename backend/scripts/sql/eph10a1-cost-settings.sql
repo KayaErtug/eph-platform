@@ -1,6 +1,6 @@
 -- EPH-10A-1: COST_* ticari değer anahtarları. ÇALIŞTIRILMADI; canlıya alınırken birlikte çalıştırılacak.
 -- Davranış değişmez: değerler bugünkü canlı davranışa eşittir. Mevcut ayarlar varsa değeri onlardan alır.
--- Tekrar çalıştırmak güvenlidir (ON CONFLICT DO NOTHING). Geri alma: DELETE FROM "SystemSetting" WHERE "key" LIKE 'COST\_%';
+-- Tekrar çalıştırmak güvenlidir (ON CONFLICT DO NOTHING). Geri alma: DELETE FROM "SystemSetting" WHERE "key" ~ '^(COST|LIMIT)_';
 BEGIN;
 
 WITH legacy AS (
@@ -17,10 +17,15 @@ WITH legacy AS (
   UNION ALL SELECT 'COST_TALEP_ACIL_EK', to_jsonb(10), 'Acil talep ilavesi (PK)'
   UNION ALL SELECT 'COST_ESLESME_TARAMA', COALESCE((SELECT eslesme FROM legacy), to_jsonb(25)), 'Eşleşme taraması (PK)'
   UNION ALL SELECT 'COST_YETKI_MEKTUBU_ASIM', to_jsonb(5), 'Yetki mektubu aylık limit aşımı (PK)'
+  UNION ALL SELECT 'LIMIT_PORTFOY_FOTOGRAF', to_jsonb(15), 'Portföy başına en fazla fotoğraf sayısı'
+  UNION ALL SELECT 'LIMIT_TALEP_SURE_1_GUN', to_jsonb(3), 'Talep geçerlilik süresi seçeneği 1 (gün)'
+  UNION ALL SELECT 'LIMIT_TALEP_SURE_2_GUN', to_jsonb(7), 'Talep geçerlilik süresi seçeneği 2 (gün)'
+  UNION ALL SELECT 'LIMIT_TALEP_SURE_3_GUN', to_jsonb(14), 'Talep geçerlilik süresi seçeneği 3 (gün)'
+  UNION ALL SELECT 'LIMIT_TALEP_SURE_4_GUN', to_jsonb(30), 'Talep geçerlilik süresi seçeneği 4 (gün)'
 )
 INSERT INTO "SystemSetting" ("id", "key", "valueJson", "description", "createdAt", "updatedAt")
 SELECT gen_random_uuid()::text, "key", "value", "description", now(), now() FROM wanted
 ON CONFLICT ("key") DO NOTHING;
 
-SELECT "key", "valueJson" FROM "SystemSetting" WHERE "key" LIKE 'COST\_%' ORDER BY "key";
+SELECT "key", "valueJson" FROM "SystemSetting" WHERE "key" ~ '^(COST|LIMIT)_' ORDER BY "key";
 COMMIT;

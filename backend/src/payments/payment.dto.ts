@@ -17,6 +17,19 @@ export class MembershipPackageSettingsDto {
   @IsDateString() expectedUpdatedAt!: string;
 }
 
+export class OfficePackageSettingsDto {
+  @IsString() @Length(2,80) name!: string;
+  @IsNumber({maxDecimalPlaces:2}) @Min(0) @Max(10000000) price!: number;
+  @IsInt() @Min(0) @Max(10000000) monthlyPk!: number;
+  @IsBoolean() active!: boolean;
+  @IsInt() @Min(0) @Max(10000000) portfolioCapacity!: number;
+  @IsInt() @Min(-1) @Max(10000000) crmCapacity!: number;
+  @IsInt() @Min(0) @Max(10000000) monthlyDemandLimit!: number;
+  @IsInt() @Min(0) @Max(10000000) monthlyPoolLimit!: number;
+  @IsInt() @Min(0) @Max(36500) trialDays!: number;
+  @IsInt() @Min(0) @Max(1000) agents!: number;
+}
+
 export class BillingDto {
   @IsString() @Length(2, 80) firstName!: string;
   @IsString() @Length(2, 80) lastName!: string;

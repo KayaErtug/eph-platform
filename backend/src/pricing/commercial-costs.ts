@@ -16,6 +16,20 @@ export type CostKey = keyof typeof COST_DEFAULTS;
 
 export const COST_PREFIX = 'COST_';
 
+// Ücret olmayan ticari sınırlar: portföy fotoğraf sayısı ve talep geçerlilik süreleri (gün).
+export const LIMIT_DEFAULTS = {
+  LIMIT_PORTFOY_FOTOGRAF: 15,
+  LIMIT_TALEP_SURE_1_GUN: 3,
+  LIMIT_TALEP_SURE_2_GUN: 7,
+  LIMIT_TALEP_SURE_3_GUN: 14,
+  LIMIT_TALEP_SURE_4_GUN: 30,
+} as const;
+
+export const LIMIT_PREFIX = 'LIMIT_';
+
+export const isManagedCommercialKey = (key: string) =>
+  Object.prototype.hasOwnProperty.call(COST_DEFAULTS, key) || Object.prototype.hasOwnProperty.call(LIMIT_DEFAULTS, key);
+
 type CostDb = Pick<Prisma.TransactionClient, 'systemSetting'>;
 
 export function parseCostValue(raw: unknown): number | null {

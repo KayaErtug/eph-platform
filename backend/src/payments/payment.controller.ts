@@ -5,7 +5,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { CheckoutDto, MembershipPriceDto, PaymentSettingsDto, RefundRequestDto, MembershipPackageSettingsDto } from './payment.dto';
+import { CheckoutDto, MembershipPriceDto, PaymentSettingsDto, RefundRequestDto, MembershipPackageSettingsDto, OfficePackageSettingsDto } from './payment.dto';
 import { PaymentService } from './payment.service';
 import { PaymentNoStoreInterceptor } from './payment-no-store.interceptor';
 
@@ -55,6 +55,8 @@ export class PaymentAdminController {
   constructor(private readonly payments: PaymentService) {}
   @Get('membership-packages') membershipPackages() { return this.payments.adminMembershipPackages(); }
   @Put('membership-packages/:id') saveMembershipPackage(@CurrentUser() user: { id: string }, @Param('id') id: string, @Body() dto: MembershipPackageSettingsDto) { return this.payments.saveMembershipPackage(user.id, id, dto); }
+  @Get('office-packages') officePackages() { return this.payments.adminOfficePackages(); }
+  @Put('office-packages/:code') saveOfficePackage(@CurrentUser() user: { id: string }, @Param('code') code: string, @Body() dto: OfficePackageSettingsDto) { return this.payments.saveOfficePackage(user.id, code, dto); }
   @Get('settings') settings() { return this.payments.settings(); }
   @Put('settings') save(@CurrentUser() user: { id: string }, @Body() dto: PaymentSettingsDto) { return this.payments.saveSettings(user.id, dto); }
   @Get('orders') orders() { return this.payments.orders('', true); }
