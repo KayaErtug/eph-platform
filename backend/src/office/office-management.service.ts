@@ -96,7 +96,14 @@ export class OfficeManagementService {
       const applicants = ids.length ? await this.prisma.user.findMany({ where: { id: { in: ids }, officeId: null, role: Role.EMLAKCI }, select: { id: true, firstName: true, lastName: true } }) : [];
       const policy = await this.prisma.systemSetting.findUnique({ where: { key: officePolicyKey(office.id) } });
       const profile = await this.prisma.systemSetting.findUnique({ where: { key: officeProfileKey(office.id) } });
-      return { id: office.id, name: office.name, ownerName: [office.owner?.firstName, office.owner?.lastName].filter(Boolean).join(' '), city: office.city || '', district: office.district || '', neighborhood: office.neighborhood || '', ...officeProfile(profile?.valueJson), isOwner, mode, modeConfigured: Boolean(policy), balance: wallet?.bakiye ?? 0, walletActive: wallet?.aktifMi === true, memberCount: await this.prisma.user.count({ where: { officeId: office.id, role: Role.EMLAKCI, id: { not: office.ownerUserId || '' } } }), members, applicants, ...(await this.dashboardExtras(office, isOwner, policy?.valueJson)) };
+      const extras = await this.dashboardExtras(office, isOwner, policy?.valueJson);
+      const enrichedMembers = members.map(member => ({
+        ...member,
+        canScan: extras.permissions?.scanPermissions[member.id] !== false,
+        canAutoSpend: extras.permissions?.autoSpendPermissions[member.id] !== false,
+        teams: (extras.teams || []).filter(team => team.members.some(m => m.id === member.id)).map(team => ({ id: team.id, name: team.name })),
+      }));
+      return { id: office.id, name: office.name, ownerName: [office.owner?.firstName, office.owner?.lastName].filter(Boolean).join(' '), city: office.city || '', district: office.district || '', neighborhood: office.neighborhood || '', ...officeProfile(profile?.valueJson), isOwner, mode, modeConfigured: Boolean(policy), balance: wallet?.bakiye ?? 0, walletActive: wallet?.aktifMi === true, memberCount: await this.prisma.user.count({ where: { officeId: office.id, role: Role.EMLAKCI, id: { not: office.ownerUserId || '' } } }), members: enrichedMembers, applicants, ...extras };
     }));
     return { actorId: userId, requiresOffice: user.role === Role.EMLAKCI && !data.length,
       canCreate: user.role === Role.EMLAKCI && user.capabilities.some(c => c.capability === Capability.OFFICE_OWNER) && !data.length,
@@ -133,13 +140,15 @@ export class OfficeManagementService {
     const restricted = allowedSharedPoolUserIds.length > 0 || allowedSharedPoolTeamIds.length > 0;
     const allMembers = advisors.map(a => ({
       ...a,
+      firstName: a.firstName || '',
+      lastName: a.lastName || '',
       roleTitle: 'Emlak Danışmanı',
       canScan: scanPermissions[a.id] !== false,
       canAutoSpend: autoSpendPermissions[a.id] !== false,
       hasSharedPoolAccess: !restricted || allowedSharedPoolUserIds.includes(a.id) || teamRows.some(t => allowedSharedPoolTeamIds.includes(t.id) && t.members.some(m => m.userId === a.id)),
       teams: teamRows.filter(t => t.members.some(m => m.userId === a.id)).map(t => ({ id: t.id, name: t.name })),
     }));
-    return { allMembers, teams, maxTeams: await this.maxTeamsFor(this.prisma, office.id), permissions: { scanPermissions, autoSpendPermissions, allowedSharedPoolUserIds, allowedSharedPoolTeamIds } };
+    return { hierarchy, allMembers, teams, maxTeams: await this.maxTeamsFor(this.prisma, office.id), permissions: { scanPermissions, autoSpendPermissions, allowedSharedPoolUserIds, allowedSharedPoolTeamIds } };
   }
 
   async updateProfile(userId: string, officeId: string, raw: unknown) {
