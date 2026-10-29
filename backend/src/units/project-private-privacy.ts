@@ -15,16 +15,44 @@ export function canSeeProjectPrivateInfo(
   return viewer.id === projectOwnerId || viewer.id === officeOwnerId;
 }
 
-export function redactProjectPrivateInfo<T extends object>(project: T, canSee: boolean): T {
-  if (canSee) return project;
+// Yetkisiz görünümde koordinat mahalle düzeyine (2 ondalık) yuvarlanır; yetkilide kesin kalır.
+export function approximateCoordinate(value: unknown) {
+  const number = Number(value);
+  return value == null || !Number.isFinite(number) || number === 0 ? null : Math.round(number * 100) / 100;
+}
 
-  const { authorizedContact, ...rest } = project as T & { authorizedContact?: unknown };
+export function projectLocationFields(
+  source: object,
+  canSee: boolean,
+) {
+  const project = source as { address?: unknown; mapAddress?: unknown; latitude?: unknown; longitude?: unknown };
+  return canSee
+    ? {
+        address: project.address ?? null,
+        mapAddress: project.mapAddress ?? null,
+        latitude: project.latitude ?? null,
+        longitude: project.longitude ?? null,
+        locationApproximate: false,
+      }
+    : {
+        address: null,
+        mapAddress: null,
+        latitude: approximateCoordinate(project.latitude),
+        longitude: approximateCoordinate(project.longitude),
+        locationApproximate: true,
+      };
+}
+
+export function redactProjectPrivateInfo<T extends object>(project: T, canSee: boolean): T {
+  const source = project as T & { authorizedContact?: unknown; placeId?: unknown };
+  const location = projectLocationFields(source, canSee);
+  if (canSee) return { ...project, ...location } as T;
+
+  const { authorizedContact, ...rest } = source;
 
   return {
     ...rest,
-    address: null,
-    mapAddress: null,
-    latitude: null,
-    longitude: null,
+    ...location,
+    ...('placeId' in rest ? { placeId: null } : {}),
   } as unknown as T;
 }

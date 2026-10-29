@@ -1,6 +1,7 @@
 import { listingNumber } from '../common/listing-number';
 import { UnitStatus } from '@prisma/client';
 import { redactPoolDeedOwnerText, serializePoolPrivateInfo } from '../units/pool-privacy';
+import { canSeeProjectPrivateInfo, projectLocationFields } from '../units/project-private-privacy';
 import {
   BadRequestException,
   ForbiddenException,
@@ -88,47 +89,6 @@ export class PoolExperienceService {
         String(project.address || '').trim() ||
         String(project.placeId || '').trim(),
     );
-  }
-
-  private getApproximatePoolCoordinates(
-    unitId: string,
-    latitudeInput?: number | null,
-    longitudeInput?: number | null,
-  ) {
-    const latitude = Number(latitudeInput || 0);
-    const longitude = Number(longitudeInput || 0);
-
-    if (
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude) ||
-      !latitude ||
-      !longitude
-    ) {
-      return {
-        latitude: null,
-        longitude: null,
-      };
-    }
-
-    let hash = 0;
-    const source = String(unitId || 'EPH');
-
-    for (let index = 0; index < source.length; index += 1) {
-      hash = (hash * 31 + source.charCodeAt(index)) % 104729;
-    }
-
-    const latitudeOffset = ((hash % 7) - 3) * 0.00055;
-    const longitudeOffset =
-      ((Math.floor(hash / 7) % 7) - 3) * 0.00065;
-
-    return {
-      latitude: Number(
-        (Math.round(latitude * 100) / 100 + latitudeOffset).toFixed(6),
-      ),
-      longitude: Number(
-        (Math.round(longitude * 100) / 100 + longitudeOffset).toFixed(6),
-      ),
-    };
   }
 
   private normalizeDuration(value: unknown) {
@@ -289,7 +249,7 @@ export class PoolExperienceService {
               mapAddress: true,
               placeId: true,
               ownerId: true,
-              owner: { select: { role: true, firstName: true, lastName: true, companyName: true, office: { select: { name: true } } } },
+              owner: { select: { role: true, firstName: true, lastName: true, companyName: true, office: { select: { name: true, ownerUserId: true } } } },
             },
           },
           images: {
@@ -357,10 +317,11 @@ export class PoolExperienceService {
         this.isSuperAdmin(user) ||
         isOwnPortfolio ||
         privateInfoUnitIds.has(unit.id);
-      const approximate = this.getApproximatePoolCoordinates(
-        unit.id,
-        unit.project.latitude,
-        unit.project.longitude,
+      const canSeeProjectPrivate = canSeeProjectPrivateInfo(
+        user,
+        unit.project.ownerId,
+        unit.project.owner.office?.ownerUserId,
+        privateInfoUnlocked,
       );
 
       return {
@@ -405,21 +366,14 @@ export class PoolExperienceService {
           city: unit.project.city,
           district: unit.project.district,
           neighborhood: unit.project.neighborhood,
-          address: privateInfoUnlocked ? unit.project.address : null,
-          latitude: privateInfoUnlocked
-            ? unit.project.latitude
-            : approximate.latitude,
-          longitude: privateInfoUnlocked
-            ? unit.project.longitude
-            : approximate.longitude,
-          mapAddress: privateInfoUnlocked ? unit.project.mapAddress : null,
-          placeId: privateInfoUnlocked ? unit.project.placeId : null,
+          ...projectLocationFields(unit.project, canSeeProjectPrivate),
+          placeId: canSeeProjectPrivate ? unit.project.placeId : null,
           ownerRole: unit.project.owner.role,
           isOwnPortfolio,
           hasLocation,
-          locationUnlocked: privateInfoUnlocked,
+          locationUnlocked: canSeeProjectPrivate,
           locationPrecision: hasLocation
-            ? privateInfoUnlocked
+            ? canSeeProjectPrivate
               ? 'EXACT'
               : 'APPROXIMATE'
             : 'NONE',
@@ -638,6 +592,27 @@ export class PoolExperienceService {
     return link;
   }
 
+  private async sharerUnlockedUnit(userId: string, unitId: string) {
+    const row = await this.prisma.kontorHareketi.findFirst({
+      where: {
+        kullaniciId: userId,
+        hareketTuru: KontorHareketTuru.HARCAMA,
+        islemTuru: {
+          in: [
+            KontorIslemTuru.HAVUZ_OZEL_BILGI,
+            KontorIslemTuru.HAVUZ_KONUM,
+            KontorIslemTuru.HAVUZ_TELEFON,
+            KontorIslemTuru.HAVUZ_WHATSAPP,
+          ],
+        },
+        ilgiliKayitTuru: 'UNIT',
+        ilgiliKayitId: unitId,
+      },
+      select: { id: true },
+    });
+    return Boolean(row);
+  }
+
   async getCustomerPresentation(token: string) {
     const link = await this.findActivePresentation(token);
 
@@ -654,6 +629,8 @@ export class PoolExperienceService {
               latitude: true,
               longitude: true,
               isActive: true,
+              ownerId: true,
+              owner: { select: { office: { select: { ownerUserId: true } } } },
             },
           },
           images: {
@@ -668,6 +645,8 @@ export class PoolExperienceService {
       this.prisma.user.findUnique({
         where: { id: link.sharedById },
         select: {
+          id: true,
+          role: true,
           firstName: true,
           lastName: true,
           phone: true,
@@ -690,6 +669,17 @@ export class PoolExperienceService {
     ) {
       throw new NotFoundException('Bu portföy artık Havuz içinde aktif değil.');
     }
+
+    // Kesin konum yalnızca linki oluşturan kullanıcı görmeye yetkiliyse sunuma girer; değilse yaklaşık konum.
+    const sharerCanSee = sharedBy
+      ? canSeeProjectPrivateInfo(
+          sharedBy,
+          unit.project.ownerId,
+          unit.project.owner.office?.ownerUserId,
+          await this.sharerUnlockedUnit(sharedBy.id, unit.id),
+        )
+      : false;
+    const location = projectLocationFields(unit.project, sharerCanSee);
 
     await this.prisma.$executeRaw`
       UPDATE "EphPresentationLink"
@@ -729,8 +719,9 @@ export class PoolExperienceService {
         city: unit.project.city,
         district: unit.project.district,
         neighborhood: unit.project.neighborhood,
-        latitude: unit.project.latitude,
-        longitude: unit.project.longitude,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        locationApproximate: location.locationApproximate,
       },
       sharedBy: sharedBy
         ? {

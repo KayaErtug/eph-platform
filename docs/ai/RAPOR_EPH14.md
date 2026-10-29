@@ -35,3 +35,43 @@
 - src/pool-projects/pool-projects.service.ts
 - Test (deploy gerekmez): src/units/project-private-privacy.spec.ts
 - Not: `src/dashboard/dashboard.service.ts` çalışma ağacında başka işten değişik; bu commit'e alınmadı.
+
+---
+
+# EPH-14C — yaklaşık konum, sunum ve pool-experience gizleme
+
+## Karar uygulaması
+1. Yetkisiz kullanıcıya proje/portföy koordinatı **yaklaşık** (2 ondalık, `Math.round(x*100)/100`; eski ±offset'li hash yaklaşımı kaldırıldı) + `locationApproximate: true`; `address`/`mapAddress`/`placeId` null. Yetkilide kesin koordinat + `locationApproximate: false`. Tek yardımcı: `projectLocationFields` (`units/project-private-privacy.ts`); `redactProjectPrivateInfo` da onu kullanır. Koordinat yoksa lat/lng null kalır.
+2. Token'lı proje sunumu (`GET /pool-projects-public/:token`): adres/kesin koordinat yalnızca linki oluşturan (`sharedById`) kullanıcı proje sahibi / ofis sahibi / süper admin / projenin bir birimini İletişime Geç ile açmışsa girer; değilse il/ilçe/mahalle + yaklaşık koordinat. Yetki sunum görüntülenirken linki oluşturanın **güncel** durumuna göre hesaplanır.
+3. `pool-experience.service.ts` `findPoolUnits`: aynı yardımcı, ofis sahibi (`office.ownerUserId`) eklendi. Aynı serviste `getCustomerPresentation` (token'lı birim sunumu) ham koordinat dönüyordu; aynı kuralla (linki oluşturan yetkisizse yaklaşık) düzeltildi — **karar kapsamını bu uca genişlettim, itiraz edersen geri alınır**. Birim sunumuna adres/mapAddress eklenmedi.
+
+## Mobilin kullanacağı alanlar (tam adlar)
+- `locationApproximate: boolean` — `project` nesnesinde: `GET /units/pool` (+ contact-quote), `GET /pool-experience/units`, `GET /pool-projects`, `GET /pool-projects/:projectId`, `GET /pool-projects-public/:token` (`project` ve `presentation` içindeki proje), `GET /customer-presentation/:token` (`project.locationApproximate`), `POST /units/pool/:id/private-info` (`projectInfo.locationApproximate`, her zaman false).
+- `projectInfo` (yalnız `POST /units/pool/:id/private-info`, yalnız proje birimlerinde, aksi halde `null`): `authorizedContact` {fullName, phone, whatsapp, whatsappSameAsPhone, email}, `address`, `mapAddress`, `latitude`, `longitude`, `locationApproximate` (=false).
+- Mevcut, anlamı değişmeyen: `project.locationPrecision` ('EXACT'|'APPROXIMATE'|'NONE'), `project.locationUnlocked`, `project.hasLocation`, `projectAuthorizedContact` (yetkisizde null).
+- Yetkisizde `project.latitude/longitude` artık null değil, 2 ondalıklı; harita yaklaşık pin/daire çizmeli, `locationApproximate === true` iken kesin konum gibi göstermemeli.
+
+## Değişenler (backend/)
+- src/units/project-private-privacy.ts (yardımcılar: approximateCoordinate, projectLocationFields; redact güncellendi)
+- src/units/units.service.ts (yardımcıya geçiş; kullanılmayan `getApproximatePoolCoordinates` silindi)
+- src/pool-projects/pool-projects.service.ts (genel sunumda linki oluşturan yetkisi; `locationApproximate` çıktıya eklendi)
+- src/pool-experience/pool-experience.service.ts (findPoolUnits + getCustomerPresentation; özel `getApproximatePoolCoordinates` silindi, `sharerUnlockedUnit` eklendi)
+- Testler: src/units/project-private-privacy.spec.ts (güncellendi), src/pool-projects/pool-projects-location.spec.ts (yeni), src/pool-experience/pool-experience-location.spec.ts (yeni)
+- Yedekler: *.bak-eph14c (4 servis/yardımcı + spec)
+
+## Doğrulanan
+- `npm run build` → Exit 0
+- `npx jest src/units src/projects src/pool-projects src/pool` → Exit 0 (9 suite, 48 test)
+- Yetkili/yetkisiz testleri: yardımcı + units redact (sahip/ofis sahibi/süper admin/açan), token'lı proje sunumu (4 yetkili + yetkisiz), pool-experience (4 yetkili + yetkisiz).
+
+## Kalan
+- Canlı/deploy yapılmadı; gerçek DB/cihaz kanıtı yok. Mobil ekranlar `locationApproximate`'i henüz okumuyor.
+- `GET /units/:id`, `/units`, `/units/my` özel portföy uçları kapsam dışı (havuz değil).
+
+## Deploy — EPH-13 + EPH-14 + EPH-14C birlikte (backend/, sunucuya kopyalanacak)
+- src/units/units.service.ts
+- src/units/project-private-privacy.ts
+- src/pool-projects/pool-projects.service.ts
+- src/pool-experience/pool-experience.service.ts
+- Deploy gerekmeyen testler: src/units/project-private-privacy.spec.ts, src/pool-projects/pool-projects-location.spec.ts, src/pool-experience/pool-experience-location.spec.ts
+- Not: `src/dashboard/dashboard.service.ts` başka işten değişik; commit'e alınmadı. Deploy/PM2 restart onayın olmadan yapılmadı.

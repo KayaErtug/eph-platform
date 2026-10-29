@@ -29,7 +29,7 @@ import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { getOfficeAdvisorIds } from './deed-owner-privacy';
-import { canSeeProjectPrivateInfo } from './project-private-privacy';
+import { canSeeProjectPrivateInfo, projectLocationFields } from './project-private-privacy';
 import { AdminService } from '../admin/admin.service';
 import { PoolAudienceService } from '../pool-audience/pool-audience.service';
 import { PoolPublicationService, type PoolPublicationInput, type PublicationUnit } from './pool-publication.service';
@@ -1607,47 +1607,6 @@ export class UnitsService {
     );
   }
 
-  private getApproximatePoolCoordinates(
-    unitId: string,
-    latitudeInput?: number | null,
-    longitudeInput?: number | null,
-  ) {
-    const latitude = Number(latitudeInput || 0);
-    const longitude = Number(longitudeInput || 0);
-
-    if (
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude) ||
-      !latitude ||
-      !longitude
-    ) {
-      return {
-        latitude: null,
-        longitude: null,
-      };
-    }
-
-    let hash = 0;
-    const source = String(unitId || 'EPH');
-
-    for (let index = 0; index < source.length; index += 1) {
-      hash = (hash * 31 + source.charCodeAt(index)) % 104729;
-    }
-
-    const latitudeOffset = ((hash % 7) - 3) * 0.00055;
-    const longitudeOffset =
-      ((Math.floor(hash / 7) % 7) - 3) * 0.00065;
-
-    return {
-      latitude: Number(
-        (Math.round(latitude * 100) / 100 + latitudeOffset).toFixed(6),
-      ),
-      longitude: Number(
-        (Math.round(longitude * 100) / 100 + longitudeOffset).toFixed(6),
-      ),
-    };
-  }
-
   private async getPoolLocationAccessUnitIds(
     user: CurrentUserPayload,
     unitIds: string[],
@@ -1820,13 +1779,7 @@ export class UnitsService {
         ...safeProject,
         name: redactPoolDeedOwnerText(unit, safeProject.name),
 
-        address: canSeeProjectPrivate ? safeProject.address : null,
-
-        latitude: canSeeProjectPrivate ? safeProject.latitude : null,
-
-        longitude: canSeeProjectPrivate ? safeProject.longitude : null,
-
-        mapAddress: canSeeProjectPrivate ? safeProject.mapAddress : null,
+        ...projectLocationFields(safeProject, canSeeProjectPrivate),
 
         placeId: canSeeProjectPrivate ? safeProject.placeId : null,
 
@@ -2541,10 +2494,7 @@ export class UnitsService {
 
     return {
       authorizedContact: this.getProjectAuthorizedContact(user, project.authorizedContact, project.owner, true),
-      address: project.address ?? null,
-      mapAddress: project.mapAddress ?? null,
-      latitude: project.latitude ?? null,
-      longitude: project.longitude ?? null,
+      ...projectLocationFields(project, true),
     };
   }
 

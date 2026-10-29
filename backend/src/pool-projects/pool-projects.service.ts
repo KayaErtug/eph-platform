@@ -318,7 +318,11 @@ export class PoolProjectsService {
 
     const publicUnits = await this.audience.filterPublicUnits(project.units);
     if (!publicUnits.length) throw new NotFoundException('Bu proje genel sunuma açık değil.');
-    const serialized = await this.serializeProject({ ...project, units: publicUnits }, [], true, true, null, true);
+    // Adres/konum yalnızca linki oluşturan kullanıcı görmeye yetkiliyse sunuma girer; değilse yaklaşık konum.
+    const sharerCanSee = sharer
+      ? this.canSeeProjectPrivate(sharer, project, await this.unlockedUnitIds(sharer, [project]))
+      : false;
+    const serialized = await this.serializeProject({ ...project, units: publicUnits }, [], true, true, null, sharerCanSee);
 
     return {
       link: {
@@ -722,6 +726,7 @@ export class PoolProjectsService {
         .join(' / '),
       latitude: project.latitude,
       longitude: project.longitude,
+      locationApproximate: project.locationApproximate,
       completionPercent: project.completionPercent,
       deliveryDate: project.defaultDeliveryDate,
       ownerRole: project.owner?.role,
