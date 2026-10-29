@@ -2,7 +2,7 @@ import { actorPaidWhere, resolveOfficeWallet } from '../office/office-wallet.rul
 import { TextSafetyService } from '../text-safety/text-safety.service';
 import { TextSafetyField } from '../text-safety/text-safety.types';
 import { assertNoBlockedInteraction } from '../content-safety/block-policy';
-import { redactPoolDeedOwnerText, serializePoolPrivateInfo } from './pool-privacy';
+import { redactPoolDeedOwnerText, serializePoolOfficeInfo, serializePoolPrivateInfo } from './pool-privacy';
 import {
   BadRequestException,
   ForbiddenException,
@@ -888,7 +888,7 @@ export class UnitsService {
                 firstName: true,
                 lastName: true,
                 role: true,
-                companyName: true, office: { select: { id: true, name: true, ownerUserId: true, owner: { select: { id: true, firstName: true, lastName: true, phone: true } } } },
+                companyName: true, phone: true, office: { select: { id: true, name: true, city: true, district: true, neighborhood: true, ownerUserId: true, owner: { select: { id: true, firstName: true, lastName: true, phone: true } } } },
               },
             },
           },
@@ -1759,6 +1759,7 @@ export class UnitsService {
     return {
       ...safeUnit,
       ...serializePoolPrivateInfo(unit, canSeePrivateInfo),
+      ...(canSeeProjectPrivate ? serializePoolOfficeInfo(unit, true) : {}),
 
       projectAuthorizedContact: this.getProjectAuthorizedContact(
         user,

@@ -5,6 +5,20 @@ export function redactPoolDeedOwnerText(unit: any, value: string | null | undefi
   return privateValues.reduce((result, item) => result.split(item).join('[Özel bilgi]'), value);
 }
 
+// Ofis alanları: şemada Office'te telefon/adres kolonu yok; ilan sahibinin kayıtlı telefonu,
+// ofis sahibinin cep telefonu ve Office city/district/neighborhood'dan oluşan adres kullanılır. Ofis yoksa null.
+export function serializePoolOfficeInfo(unit: any, visible: boolean) {
+  const office = unit.project?.owner?.office;
+  if (!visible || !office) return { officePhone: null, officeOwnerPhone: null, officeAddress: null };
+  const clean = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : null);
+  const address = [office.neighborhood, office.district, office.city].map(clean).filter(Boolean).join(', ');
+  return {
+    officePhone: clean(unit.project?.owner?.phone),
+    officeOwnerPhone: clean(office.owner?.phone),
+    officeAddress: address || null,
+  };
+}
+
 export function serializePoolPrivateInfo(
   unit: any,
   privateUnlocked: boolean,
@@ -85,6 +99,8 @@ export function serializePoolPrivateInfo(
         privateUnlocked && whatsappAllowed
           ? hasOfficeOwner ? officeOwner.phone : (unit.whatsappPhone ?? null)
           : null,
+
+    ...serializePoolOfficeInfo(unit, privateUnlocked),
 
     privateInfoUnlocked: privateUnlocked,
 
