@@ -14,6 +14,7 @@ type TrialDb = Pick<Prisma.TransactionClient, 'systemSetting'>;
 export type TrialPolicy = {
   initialDays: number;
   extensionDays: number;
+  // ADMIN sınırlarıdır; SUPER_ADMIN uzatmalarında uygulanmaz (§0).
   maxExtensions: number;
   maxTotalDays: number;
 };

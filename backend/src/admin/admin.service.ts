@@ -4203,7 +4203,10 @@ export class AdminService {
       initialDays: trialInitialDays,
       extensionDays: trialExtensionDays,
       maxExtensions: trialMaxExtensions,
+      maxTotalDays: maksimumToplamGun,
     } = await readTrialPolicy(this.prisma);
+
+    const enforceTrialLimits = !this.isSoftwareTeam(actor);
 
     const trialExtendPermission =
       await this.resolveOperationalPermission(actor, "TRIAL_EXTEND");
@@ -4269,7 +4272,7 @@ export class AdminService {
         );
       }
 
-      if (this.isAdmin(actor)) {
+      if (enforceTrialLimits && this.isAdmin(actor)) {
         const numericLimit = trialExtendPermission.numericLimit;
         const metadata = trialExtendPermission.metadata || {};
 
@@ -4363,7 +4366,7 @@ export class AdminService {
             },
           });
 
-        if (toplamUzatmaSayisi >= trialMaxExtensions) {
+        if (enforceTrialLimits && toplamUzatmaSayisi >= trialMaxExtensions) {
           throw new BadRequestException(
             `Bu kullanıcı için izin verilen azami deneme uzatma sayısına ulaşıldı. Limit: ${trialMaxExtensions}.`,
           );
@@ -4371,10 +4374,6 @@ export class AdminService {
 
         const eskiBitisTarihi =
           mevcutUyelik.bitisTarihi;
-
-        const maksimumToplamGun =
-          trialInitialDays +
-          trialExtensionDays * trialMaxExtensions;
 
         const maksimumBitisTarihi =
           new Date(mevcutUyelik.baslangicTarihi);
@@ -4391,6 +4390,7 @@ export class AdminService {
         );
 
         if (
+          enforceTrialLimits &&
           yeniBitisTarihi >
           maksimumBitisTarihi
         ) {

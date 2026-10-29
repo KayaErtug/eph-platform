@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AdminService } from './admin.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ForbiddenException } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { AuditAction, Role, UyelikDurumu } from '@prisma/client';
 import { MailService } from '../mail.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { MembershipService } from '../membership/membership.service';
@@ -36,6 +36,112 @@ describe('AdminService', () => {
   it('rejects reports without an active permission definition', async () => {
     await expect(service.getStats({ id: 'admin-id', role: Role.ADMIN })).rejects.toBeInstanceOf(ForbiddenException);
     expect(mail.sendUserApproved).not.toHaveBeenCalled();
+  });
+
+  describe('EPH-34 extendUserTrial', () => {
+    const admin = { id: 'admin-id', role: Role.ADMIN };
+    const superAdmin = { id: 'super-admin-id', role: Role.SUPER_ADMIN };
+    let tx: any;
+    let currentMembership: any;
+    let audits: any[];
+
+    beforeEach(() => {
+      audits = [];
+      currentMembership = {
+        id: 'membership-id', paketId: 'trial-package', durum: UyelikDurumu.AKTIF,
+        baslangicTarihi: new Date('2026-10-01T12:00:00Z'),
+        bitisTarihi: new Date('2026-10-15T12:00:00Z'),
+      };
+      tx = {
+        $executeRaw: jest.fn(),
+        user: { findUnique: jest.fn().mockResolvedValue({ id: 'target', role: Role.EMLAKCI, email: 'target@example.com' }) },
+        kullaniciUyelikPaketi: {
+          findFirst: jest.fn(async () => ({ ...currentMembership })),
+          update: jest.fn(async ({ data }: any) => (currentMembership = { ...currentMembership, ...data })),
+        },
+        uyelikPaketi: { findUnique: jest.fn().mockResolvedValue({ id: 'trial-package', paketKodu: 'DENEME', paketAdi: 'Deneme' }) },
+        auditLog: {
+          count: jest.fn(async ({ where }: any) => audits.filter(a =>
+            a.targetUserId === where.targetUserId && a.action === where.action &&
+            (!where.actorId || a.actorId === where.actorId) &&
+            (!where.createdAt || (a.createdAt >= where.createdAt.gte && a.createdAt < where.createdAt.lt)),
+          ).length),
+          create: jest.fn(async ({ data }: any) => { audits.push({ ...data, createdAt: new Date() }); return data; }),
+        },
+      };
+      (prisma as any).$transaction = jest.fn((fn: any) => fn(tx));
+      (prisma as any).systemSetting = { findUnique: jest.fn().mockResolvedValue(null) };
+      (prisma as any).permissionDefinition.findUnique.mockResolvedValue({
+        id: 'trial-permission', active: true, superAdminOnly: false, defaultEnabled: true,
+        defaultNumericLimit: 1, metadata: { limitScope: 'PER_TARGET_USER', limitPeriod: 'YEAR' },
+      });
+      (prisma as any).rolePermissionPolicy = { findUnique: jest.fn().mockResolvedValue(null) };
+      (prisma as any).userPermissionOverride = { findUnique: jest.fn().mockResolvedValue(null) };
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+      (prisma as any).permissionDefinition.findUnique.mockResolvedValue(null);
+    });
+
+    it('SUPER_ADMIN aynı kullanıcıyı art arda 3 kez uzatır; her biri +14 gün ve audit', async () => {
+      for (let i = 1; i <= 3; i++) {
+        const result = await service.extendUserTrial('target', { gunSayisi: 14, gerekce: `Uzatma ${i}` }, superAdmin);
+        expect(result.uyelik.yeniBitisTarihi).toEqual(new Date(Date.UTC(2026, 9, 15 + i * 14, 12)));
+        expect(audits[i - 1]).toMatchObject({
+          actorId: superAdmin.id, targetUserId: 'target', action: AuditAction.TRIAL_UZAT,
+          description: `Uzatma ${i}`,
+          metadata: { gunSayisi: 14, previousExtensionCount: i - 1 },
+        });
+      }
+      expect(tx.auditLog.create).toHaveBeenCalledTimes(3);
+      expect(tx.kullaniciUyelikPaketi.update).toHaveBeenCalledTimes(3);
+      expect(tx.$executeRaw).toHaveBeenCalledTimes(3);
+    });
+
+    it('SUPER_ADMIN için numericLimit 0 bile uygulanmaz', async () => {
+      jest.spyOn(service, 'resolveOperationalPermission').mockResolvedValue({
+        enabled: true, numericLimit: 0, source: 'SUPER_ADMIN',
+        metadata: { limitScope: 'PER_TARGET_USER', limitPeriod: 'YEAR' },
+      });
+      await expect(service.extendUserTrial('target', { gunSayisi: 14 }, superAdmin)).resolves.toMatchObject({ success: true });
+      expect(tx.auditLog.count).toHaveBeenCalledTimes(1);
+    });
+
+    it('ADMIN ilk kez uzatır, ikinci kez yıllık kişi başı numericLimit sınırına takılır', async () => {
+      await service.extendUserTrial('target', { gunSayisi: 14 }, admin);
+      await expect(service.extendUserTrial('target', { gunSayisi: 14 }, admin)).rejects.toThrow('Yıllık limit: 1');
+      expect(audits).toHaveLength(1);
+      expect(tx.kullaniciUyelikPaketi.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('ADMIN numericLimit dolmadan da toplam uzatma sayısı sınırına takılır', async () => {
+      (prisma as any).rolePermissionPolicy.findUnique.mockResolvedValue({ numericLimit: 10 });
+      await service.extendUserTrial('target', { gunSayisi: 14 }, admin);
+      await expect(service.extendUserTrial('target', { gunSayisi: 14 }, admin)).rejects.toThrow('azami deneme uzatma sayısına');
+      expect(audits).toHaveLength(1);
+    });
+
+    it('ADMIN toplam gün sınırı korunur', async () => {
+      currentMembership.bitisTarihi = new Date('2026-10-16T12:00:00Z');
+      await expect(service.extendUserTrial('target', { gunSayisi: 14 }, admin)).rejects.toThrow('toplam 28 günü aşamaz');
+      expect(tx.kullaniciUyelikPaketi.update).not.toHaveBeenCalled();
+      expect(audits).toHaveLength(0);
+    });
+
+    it('SUPER_ADMIN uzatma günü SystemSetting üzerinden okunur', async () => {
+      (prisma as any).systemSetting.findUnique.mockImplementation(async ({ where }: any) =>
+        where.key === 'TRIAL_EXTENSION_DAYS' ? { valueJson: { value: 7 } } : null);
+      for (let i = 0; i < 3; i++) await service.extendUserTrial('target', { gunSayisi: 7 }, superAdmin);
+      expect(currentMembership.bitisTarihi).toEqual(new Date('2026-11-05T12:00:00Z'));
+      expect(audits).toHaveLength(3);
+    });
+
+    it.each([admin, superAdmin])('sabit uzatma miktarı ve gerekçe sınırı korunur: $role', async actor => {
+      await expect(service.extendUserTrial('target', { gunSayisi: 28 }, actor)).rejects.toThrow('yalnız 14 gün');
+      await expect(service.extendUserTrial('target', { gunSayisi: 14, gerekce: 'x'.repeat(51) }, actor)).rejects.toThrow('en fazla 50 karakter');
+      expect(tx.kullaniciUyelikPaketi.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('setUserPermissionsBulk', () => {
