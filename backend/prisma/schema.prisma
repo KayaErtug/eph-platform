@@ -513,6 +513,7 @@ model Project {
   designReviewRequests         ProjectDesignReviewRequest[]
   inventoryBatches             ProjectInventoryBatch[]
   mediaPackages                ProjectMediaPackage[]
+  authorizedContact            ProjectAuthorizedContact?
 
   @@unique([ownerId, code])
   @@index([ownerId])
@@ -1507,6 +1508,20 @@ model AuditLog {
   createdAt    DateTime    @default(now())
   actor        User?       @relation("AuditActor", fields: [actorId], references: [id])
   targetUser   User?       @relation("AuditTargetUser", fields: [targetUserId], references: [id])
+}
+
+model ProjectAuthorizedContact {
+  id                  String   @id @default(uuid())
+  projectId           String   @unique
+  fullName            String
+  phone               String
+  whatsapp            String?
+  whatsappSameAsPhone Boolean  @default(false)
+  email               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model UyelikPaketi {

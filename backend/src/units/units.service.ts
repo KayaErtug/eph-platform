@@ -880,6 +880,7 @@ export class UnitsService {
       include: {
         project: {
           include: {
+            authorizedContact: true,
             owner: {
               select: {
                 id: true,
@@ -1718,6 +1719,27 @@ export class UnitsService {
     );
   }
 
+  // Proje Yetkilisi: proje sahibi, ofis sahibi ve süper admin her zaman; diğerleri Özel bilgileri açınca görür.
+  private getProjectAuthorizedContact(
+    user: CurrentUserPayload,
+    contact: any,
+    owner: any,
+    privateInfoUnlocked: boolean,
+  ) {
+    if (!contact) return null;
+    const isOfficeOwner = Boolean(
+      user?.id && owner?.office?.ownerUserId && owner.office.ownerUserId === user.id,
+    );
+    if (!privateInfoUnlocked && !isOfficeOwner && !this.isSuperAdmin(user)) return null;
+    return {
+      fullName: contact.fullName,
+      phone: contact.phone,
+      whatsapp: contact.whatsapp,
+      whatsappSameAsPhone: contact.whatsappSameAsPhone,
+      email: contact.email,
+    };
+  }
+
   private redactPoolUnitForViewer(
     user: CurrentUserPayload,
     unit: any,
@@ -1754,7 +1776,7 @@ export class UnitsService {
       };
     }
 
-    const { ownerId, owner, ...safeProject } = project;
+    const { ownerId, owner, authorizedContact, ...safeProject } = project;
 
     const isOwnPortfolio = Boolean(
       ownerId && this.isOwner(user, ownerId),
@@ -1776,6 +1798,13 @@ export class UnitsService {
     return {
       ...safeUnit,
       ...serializePoolPrivateInfo(unit, canSeePrivateInfo),
+
+      projectAuthorizedContact: this.getProjectAuthorizedContact(
+        user,
+        authorizedContact,
+        owner,
+        canSeePrivateInfo,
+      ),
 
       authorityDocuments:
         this.isSuperAdmin(user) || isOwnPortfolio
@@ -2361,6 +2390,7 @@ export class UnitsService {
     const alreadyUnlocked = unlocked.has(id) || this.isOwner(user, unit.project.ownerId) || this.isSuperAdmin(user);
     return { actorId: user.id, chargeUserId: payer.chargeUserId, walletSource: payer.walletSource, walletOfficeId: payer.walletOfficeId, walletLabel: payer.label, balance: wallet?.bakiye ?? 0, privateCostPk: alreadyUnlocked ? 0 : Math.max(0, Math.trunc(Number.isFinite(configuredCost) ? configuredCost : 25)),
       alreadyUnlocked, phoneAvailable: Boolean(unit.allowPhoneCall && unit.contactPhone), whatsappAvailable: Boolean(unit.allowWhatsapp && unit.whatsappPhone),
+      projectAuthorizedContact: this.getProjectAuthorizedContact(user, (unit.project as any).authorizedContact, unit.project.owner, alreadyUnlocked),
       unit: alreadyUnlocked ? this.redactPoolUnitForViewer(user, unit, true) : null };
   }
 

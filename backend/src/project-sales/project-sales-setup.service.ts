@@ -44,6 +44,7 @@ type ProjectDraftBody = {
   geometryType?: unknown;
   wizardStep?: unknown;
   setupStatus?: unknown;
+  authorizedContact?: unknown;
 };
 
 const COMPLEX_GEOMETRIES = new Set<ProjectGeometryType>([
@@ -188,6 +189,7 @@ export class ProjectSalesSetupService {
         id: projectId,
       },
       include: {
+        authorizedContact: true,
         owner: {
           select: {
             id: true,
@@ -305,6 +307,10 @@ export class ProjectSalesSetupService {
     }
 
     this.ensureProjectAccess(project.ownerId, userId, userRole);
+
+    if (this.hasOwn(body, 'authorizedContact')) {
+      await this.saveAuthorizedContact(projectId, body.authorizedContact);
+    }
 
     const data: Prisma.ProjectUpdateInput = {};
 
@@ -505,6 +511,45 @@ export class ProjectSalesSetupService {
       const updated = await update(tx);
       const planning = await this.savePlanningStart(tx, projectId, start, body);
       return { ...updated, ...planning };
+    });
+  }
+
+  private parseContactPhone(value: unknown, label: string, required: boolean) {
+    const text = this.optionalText(value);
+    if (!text) {
+      if (required) throw new BadRequestException(`${label} zorunludur.`);
+      return null;
+    }
+    const compact = text.replace(/[\s()-]/g, '');
+    if (!/^\+?[0-9]{10,15}$/.test(compact)) {
+      throw new BadRequestException(`${label} geçerli bir numara olmalıdır.`);
+    }
+    return compact;
+  }
+
+  // Proje yetkilisi: null gönderilirse kayıt silinir.
+  private async saveAuthorizedContact(projectId: string, value: unknown) {
+    if (value === null) {
+      await this.prisma.projectAuthorizedContact.deleteMany({ where: { projectId } });
+      return;
+    }
+    if (typeof value !== 'object' || Array.isArray(value)) {
+      throw new BadRequestException('Proje yetkilisi bilgisi geçersiz.');
+    }
+    const raw = value as Record<string, unknown>;
+    const fullName = this.requiredText(raw.fullName, 'Proje yetkilisi ad soyad zorunludur.');
+    const phone = this.parseContactPhone(raw.phone, 'Proje yetkilisi telefonu', true) as string;
+    const whatsappSameAsPhone = raw.whatsappSameAsPhone === true;
+    const whatsapp = whatsappSameAsPhone ? phone : this.parseContactPhone(raw.whatsapp, 'Proje yetkilisi WhatsApp numarası', false);
+    const email = this.optionalText(raw.email);
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new BadRequestException('Proje yetkilisi e-posta adresi geçerli değil.');
+    }
+    const data = { fullName, phone, whatsapp, whatsappSameAsPhone, email: email ?? null };
+    await this.prisma.projectAuthorizedContact.upsert({
+      where: { projectId },
+      create: { projectId, ...data },
+      update: data,
     });
   }
 
