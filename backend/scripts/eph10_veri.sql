@@ -1,6 +1,6 @@
 -- EPH-10 VERİ BETİĞİ: onaylı tarifedeki ticari değerleri uygular
 -- ÇALIŞTIRILMADI. Sabah, yedek alındıktan sonra tek transaction olarak çalıştırılacak.
--- Kaynak: EPH_PK_Tarife_Yeni.xlsx + Mustafa abinin kararları (EPH_PK_Tarife_Onayli.xlsx bulunamadı).
+-- Kaynak: D:/Downloads/EPH_PK_Tarife_Onayli.xlsx (28.10.2026).
 
 -- Geri alma: eph10_geri_al.sql
 BEGIN;
@@ -24,8 +24,8 @@ ON CONFLICT ("key") DO UPDATE SET "valueJson" = EXCLUDED."valueJson", "updatedAt
 -- 2) Bireysel paketler
 --    Ücretsiz havuz / talep hakları 0 (her işlem PK ile); 0 = kota yok, işlem yalnızca PK ile ücretlenir.
 UPDATE "UyelikPaketi" SET "aylikTalepLimiti" = 0, "aylikHavuzGonderimLimiti" = 0, "guncellenmeTarihi" = now();
---    Emlak Ücretsiz: portföy 10, aylık PK 0 (deneme günü DEĞİŞTİRİLMEDİ).
-UPDATE "UyelikPaketi" SET "aktifPortfoyLimiti" = 10, "aylikPaketPk" = 0, "guncellenmeTarihi" = now() WHERE "segment" = 'EMLAK_PRO' AND "paketKodu" = 'UCRETSIZ';
+--    Emlak Ücretsiz: portföy 10, aylık PK 0 (deneme yok: denemeGunSayisi 0; kayıt DENEME paketiyle açılır, UCRETSIZ deneme olarak atanmaz).
+UPDATE "UyelikPaketi" SET "aktifPortfoyLimiti" = 10, "aylikPaketPk" = 0, "denemeGunSayisi" = 0, "guncellenmeTarihi" = now() WHERE "segment" = 'EMLAK_PRO' AND "paketKodu" = 'UCRETSIZ';
 --    Müteahhit Deneme portföy 50; Müteahhit Altın aylık PK 2500.
 UPDATE "UyelikPaketi" SET "aktifPortfoyLimiti" = 50, "guncellenmeTarihi" = now() WHERE "segment" = 'MUTEAHHIT' AND "paketKodu" = 'DENEME';
 UPDATE "UyelikPaketi" SET "aylikPaketPk" = 2500, "guncellenmeTarihi" = now() WHERE "segment" = 'MUTEAHHIT' AND "paketKodu" = 'ALTIN';
@@ -37,7 +37,7 @@ UPDATE "SystemSetting" SET "valueJson" = (
   SELECT jsonb_agg(
     CASE
       WHEN e->>'code' = 'UCRETSIZ' THEN e || '{"agents":1,"totalUsers":2,"monthlyPk":100,"trialDays":0,"portfolioCapacity":30,"monthlyPoolLimit":0,"monthlyDemandLimit":0,"notes":"1 yönetici + 1 alt kullanıcı"}'::jsonb
-      WHEN e ? 'monthlyPoolLimit' THEN e || '{"monthlyPoolLimit":0,"monthlyDemandLimit":0}'::jsonb
+      WHEN e->>'code' IN ('DENEME','BRONZ','GUMUS','ALTIN','PLATINUM') THEN e || '{"monthlyPoolLimit":0,"monthlyDemandLimit":0}'::jsonb
       ELSE e
     END ORDER BY ord)
   FROM jsonb_array_elements("valueJson"::jsonb) WITH ORDINALITY AS t(e, ord)
