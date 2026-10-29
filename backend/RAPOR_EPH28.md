@@ -15,3 +15,13 @@
 **Kalan:**
 - Mobil admin ekranı sayısal tam sayı girişi varsayabilir; ondalık/metin alanı için mobil tarafta düzenleme gerekir (bu görevde yapılmadı).
 - SQL canlıda henüz çalıştırılmadı, deploy yapılmadı.
+
+## EPH-28D: elle değeri silme (backend)
+**Değişen:** `src/admin/admin.service.ts`, `src/admin/admin.controller.ts`, `src/admin/admin.service.spec.ts`. Yedekler: `*.bak-eph28d`.
+
+- `PATCH /admin/system-settings/:key`: `MARKET_MANUAL_*` ve `MARKET_KONUT_FAIZ_AYLIK` için `value: null` veya boş/boşluk metin gelirse ayar kaydı SİLİNİR; kalem otomatik kaynağa döner. Yanıt: `{ key, value: null, description, updatedAt: null, updatedById: null }`.
+- AuditLog (`UPDATE_SYSTEM_SETTING`): `metadata = { key, previousValue: <eski>, newValue: null }`. Kayıt zaten yoksa sessizce tamamlanır, audit yazılmaz.
+- `MARKET_KONUT_FAIZ_KAYNAK` (metin) boş gelirse silinmez, eskisi gibi boş metin olarak saklanır. MARKET dışı anahtarların davranışı değişmedi (null → 400).
+
+**Doğrulanan:** `npm run build` → Exit 0. `npx jest src/admin src/market` → 4 suite, 25/25 geçti.
+**Kalan:** Mobil admin ekranında "Temizle" aksiyonu bu görevde yapılmadı (gönderilecek gövde: `{ "value": null }`).

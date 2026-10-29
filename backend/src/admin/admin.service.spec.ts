@@ -87,4 +87,71 @@ describe('AdminService', () => {
       });
     });
   });
+
+  describe('updateSystemSetting MARKET_* silme', () => {
+    const sa = { id: 'a', role: Role.SUPER_ADMIN };
+    const mkTx = (existing: any) => ({
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      systemSetting: {
+        findUnique: jest.fn().mockResolvedValue(existing),
+        delete: jest.fn(),
+        upsert: jest.fn(),
+      },
+      auditLog: { create: jest.fn() },
+    });
+    const row = (key: string, value: unknown) => ({ id: 's1', key, valueJson: { value }, description: 'd', updatedAt: new Date(), updatedById: 'x' });
+
+    beforeEach(() => {
+      jest.spyOn(service as any, 'requireSoftwareTeam').mockReturnValue(undefined);
+    });
+
+    it.each([null, '', '  '])('MARKET_MANUAL_USD value=%p ayarı siler, audit eski -> null', async (v) => {
+      const tx = mkTx(row('MARKET_MANUAL_USD', 41.5));
+      (prisma as any).$transaction = jest.fn((fn: any) => fn(tx));
+      const res: any = await service.updateSystemSetting('MARKET_MANUAL_USD', { value: v as any }, sa);
+      expect(tx.systemSetting.delete).toHaveBeenCalledWith({ where: { key: 'MARKET_MANUAL_USD' } });
+      expect(tx.systemSetting.upsert).not.toHaveBeenCalled();
+      expect(tx.auditLog.create.mock.calls[0][0].data.metadata).toEqual({ key: 'MARKET_MANUAL_USD', previousValue: 41.5, newValue: null });
+      expect(res.value).toBeNull();
+    });
+
+    it('MARKET_KONUT_FAIZ_AYLIK null ile silinir', async () => {
+      const tx = mkTx(row('MARKET_KONUT_FAIZ_AYLIK', 2.74));
+      (prisma as any).$transaction = jest.fn((fn: any) => fn(tx));
+      await service.updateSystemSetting('MARKET_KONUT_FAIZ_AYLIK', { value: null }, sa);
+      expect(tx.systemSetting.delete).toHaveBeenCalled();
+      expect(tx.auditLog.create.mock.calls[0][0].data.metadata).toMatchObject({ previousValue: 2.74, newValue: null });
+    });
+
+    it('kayıt yoksa silme sessizce tamamlanır, audit yazılmaz', async () => {
+      const tx = mkTx(null);
+      (prisma as any).$transaction = jest.fn((fn: any) => fn(tx));
+      const res: any = await service.updateSystemSetting('MARKET_MANUAL_EUR', { value: null }, sa);
+      expect(tx.systemSetting.delete).not.toHaveBeenCalled();
+      expect(tx.auditLog.create).not.toHaveBeenCalled();
+      expect(res.value).toBeNull();
+    });
+
+    it('MARKET_KONUT_FAIZ_KAYNAK boş metin silmez, boş olarak saklar', async () => {
+      const tx = mkTx(row('MARKET_KONUT_FAIZ_KAYNAK', 'Akbank'));
+      tx.systemSetting.upsert.mockResolvedValue(row('MARKET_KONUT_FAIZ_KAYNAK', ''));
+      (prisma as any).$transaction = jest.fn((fn: any) => fn(tx));
+      await service.updateSystemSetting('MARKET_KONUT_FAIZ_KAYNAK', { value: '' }, sa);
+      expect(tx.systemSetting.delete).not.toHaveBeenCalled();
+      expect(tx.systemSetting.upsert).toHaveBeenCalled();
+    });
+
+    it('geçerli sayı hâlâ upsert eder', async () => {
+      const tx = mkTx(null);
+      tx.systemSetting.upsert.mockResolvedValue(row('MARKET_MANUAL_USD', 42));
+      (prisma as any).$transaction = jest.fn((fn: any) => fn(tx));
+      await service.updateSystemSetting('MARKET_MANUAL_USD', { value: 42 }, sa);
+      expect(tx.systemSetting.upsert).toHaveBeenCalled();
+      expect(tx.systemSetting.delete).not.toHaveBeenCalled();
+    });
+
+    it('MARKET dışı anahtar null ile reddedilir', async () => {
+      await expect(service.updateSystemSetting('TRIAL_INITIAL_DAYS', { value: null }, sa)).rejects.toThrow();
+    });
+  });
 });

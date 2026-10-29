@@ -3386,7 +3386,7 @@ export class AdminService {
 
   async updateSystemSetting(
     key: string,
-    body: { value: number | string; description?: string },
+    body: { value: number | string | null; description?: string },
     actor?: AdminActor,
   ) {
     this.requireSoftwareTeam(actor);
@@ -3461,10 +3461,12 @@ export class AdminService {
   private async updateMarketSetting(
     key: string,
     defaultDescription: string,
-    body: { value: number | string; description?: string },
+    body: { value: number | string | null; description?: string },
     actor?: AdminActor,
   ) {
     const isText = key === MARKET_LOAN_SOURCE_KEY;
+    const isBlank = body?.value === null || (typeof body?.value === "string" && body.value.trim() === "");
+    if (!isText && isBlank) return this.clearMarketSetting(key, defaultDescription, actor);
     let value: number | string;
     if (isText) {
       if (typeof body?.value !== "string" || body.value.trim().length > 80) {
@@ -3512,6 +3514,31 @@ export class AdminService {
       });
 
       return this.systemSettingResponse(updated);
+    });
+  }
+
+  // Sayısal MARKET_* ayarı boş/null gelirse kayıt silinir; kalem otomatik kaynağa döner. AuditLog: eski değer → null.
+  private async clearMarketSetting(key: string, description: string, actor?: AdminActor) {
+    const actorId = this.getActorId(actor);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`system-setting:${key}`}))::text AS locked`;
+      const existing = await tx.systemSetting.findUnique({ where: { key } });
+      if (existing) {
+        await tx.systemSetting.delete({ where: { key } });
+        await tx.auditLog.create({
+          data: {
+            actorId,
+            action: AuditAction.UPDATE_SYSTEM_SETTING,
+            entityType: "SystemSetting",
+            entityId: existing.id,
+            description: `Sistem ayarı silindi (otomatik kaynağa dönüldü): ${key}`,
+            metadata: { key, previousValue: this.systemSettingResponse(existing).value, newValue: null },
+            ipAddress: actor?.ipAddress,
+            userAgent: actor?.userAgent,
+          },
+        });
+      }
+      return { key, value: null, description, updatedAt: null, updatedById: null };
     });
   }
 
