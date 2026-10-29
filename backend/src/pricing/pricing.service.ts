@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { COST_DEFAULTS, COST_PREFIX, LIMIT_DEFAULTS, LIMIT_PREFIX, parseCostValue } from './commercial-costs';
+import { COST_DEFAULTS, COST_PREFIX, LIMIT_DEFAULTS, LIMIT_LIST_DEFAULTS, LIMIT_PREFIX, parseCostValue } from './commercial-costs';
+import { readTrialPolicy } from './trial-policy';
 
-const OFFICE_FIELDS = ['code', 'name', 'price', 'monthlyPk', 'active', 'portfolioCapacity', 'crmCapacity', 'monthlyDemandLimit', 'monthlyPoolLimit', 'trialDays', 'agents', 'totalUsers'];
+const OFFICE_FIELDS = ['code', 'name', 'price', 'monthlyPk', 'active', 'portfolioCapacity', 'crmCapacity', 'monthlyDemandLimit', 'monthlyPoolLimit', 'trialDays', 'agents', 'totalUsers', 'maxTeams'];
 
 @Injectable()
 export class PricingService {
@@ -25,7 +26,7 @@ export class PricingService {
 
     const stored = new Map(rows.map((row) => [row.key, parseCostValue(row.valueJson)]));
     const view = (defaults: Record<string, number>, prefix: string) =>
-      [...new Set([...Object.keys(defaults), ...rows.map((row) => row.key).filter((key) => key.startsWith(prefix))])].sort().map((key) => {
+      [...new Set([...Object.keys(defaults), ...rows.map((row) => row.key).filter((key) => key.startsWith(prefix))])].filter((key) => !(key in LIMIT_LIST_DEFAULTS)).sort().map((key) => {
         const value = stored.get(key);
         return { key, value: value ?? defaults[key] ?? null, source: value !== null && value !== undefined ? 'DB' : 'DEFAULT' };
       });
@@ -33,6 +34,7 @@ export class PricingService {
     const limits = view(LIMIT_DEFAULTS, LIMIT_PREFIX);
 
     const officeList = Array.isArray(officeRow?.valueJson) ? officeRow.valueJson as Array<Record<string, unknown>> : [];
+    const officeTrial = officeList.find((item) => item.code === 'DENEME');
     const officePackages = officeList.map((item) => Object.fromEntries(OFFICE_FIELDS.filter((field) => field in item).map((field) => [field, item[field]])));
 
     const payment = paymentRow?.valueJson;
@@ -46,6 +48,9 @@ export class PricingService {
       limits,
       packages: packages.map((item) => ({ ...item, fiyat: item.fiyat === null ? null : Number(item.fiyat) })),
       officePackages,
+      // Mobil metinleri için: ofis denemesi hediye PK/gün (OFFICE_MEMBERSHIP_PACKAGES[DENEME]) ve üyelik deneme politikası.
+      officeTrial: officeTrial ? { monthlyPk: officeTrial.monthlyPk ?? null, trialDays: officeTrial.trialDays ?? null } : null,
+      trialPolicy: await readTrialPolicy(this.prisma),
       pkProducts,
     };
   }

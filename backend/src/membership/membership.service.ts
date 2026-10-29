@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { readTrialPolicy, resolveInitialTrialDays } from "../pricing/trial-policy";
 import {
   KontorHareketTuru,
   KontorIslemTuru,
@@ -253,56 +254,10 @@ export class MembershipService {
         );
       }
 
-      const setting =
-        await tx.systemSetting.findUnique({
-          where: {
-            key: "TRIAL_INITIAL_DAYS",
-          },
-          select: {
-            valueJson: true,
-          },
-        });
-
-      const rawInitialDays =
-        setting?.valueJson as unknown;
-
-      let initialDays = 14;
-
-      if (paket.denemeGunSayisi !== null && paket.denemeGunSayisi !== undefined) {
-        initialDays = paket.denemeGunSayisi;
-      } else if (
-        typeof rawInitialDays === "number" &&
-        Number.isFinite(rawInitialDays)
-      ) {
-        initialDays = rawInitialDays;
-      } else if (
-        typeof rawInitialDays === "object" &&
-        rawInitialDays !== null &&
-        "value" in rawInitialDays
-      ) {
-        const parsed = Number(
-          (rawInitialDays as Record<string, unknown>)["value"],
-        );
-
-        if (Number.isFinite(parsed)) {
-          initialDays = parsed;
-        }
-      } else {
-        const parsed = Number(rawInitialDays);
-
-        if (Number.isFinite(parsed)) {
-          initialDays = parsed;
-        }
-      }
-
-      if (
-        !Number.isInteger(initialDays) ||
-        initialDays <= 0
-      ) {
-        throw new BadRequestException(
-          "TRIAL_INITIAL_DAYS sistem ayarı geçersiz.",
-        );
-      }
+      const initialDays = resolveInitialTrialDays(
+        paket,
+        await readTrialPolicy(tx),
+      );
 
       const now = new Date();
       const endDate = new Date(now);

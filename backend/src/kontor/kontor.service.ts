@@ -15,6 +15,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminService } from '../admin/admin.service';
+import { readLimit, readLimitList } from '../pricing/commercial-costs';
 
 type KontorKategoriKodu =
   | 'HAVUZ_MESAJ'
@@ -40,10 +41,16 @@ export class KontorService {
     private readonly adminService: AdminService,
   ) {}
 
-  private readonly adminGiftOptions = [100, 250, 500];
-  private readonly adminDailyLimit = 5000;
-  private readonly recipientAdminGiftCountLimit = 2;
-  private readonly recipientAdminGiftAmountLimit = 1000;
+  // Admin hediye sınırları SystemSetting'ten okunur (LIMIT_ADMIN_HEDIYE_*, LIMIT_ALICI_ADMIN_HEDIYE_*); yoksa commercial-costs yedeği.
+  private async readGiftLimits() {
+    const [options, daily, recipientCount, recipientAmount] = await Promise.all([
+      readLimitList(this.prisma, 'LIMIT_ADMIN_HEDIYE_PK_SECENEKLERI'),
+      readLimit(this.prisma, 'LIMIT_ADMIN_HEDIYE_GUNLUK_PK'),
+      readLimit(this.prisma, 'LIMIT_ALICI_ADMIN_HEDIYE_ADET'),
+      readLimit(this.prisma, 'LIMIT_ALICI_ADMIN_HEDIYE_TOPLAM_PK'),
+    ]);
+    return { options, daily, recipientCount, recipientAmount };
+  }
 
   private readonly emptyWallet = {
     bakiye: 0,
@@ -659,6 +666,7 @@ export class KontorService {
   async getHediyeHavuzu(actorInput: GiftActor) {
     const actor = this.normalizeGiftActor(actorInput);
     const dayRange = this.getIstanbulDayRange();
+    const giftLimits = await this.readGiftLimits();
 
     const [havuz, bugunGonderilen] =
       await Promise.all([
@@ -700,11 +708,11 @@ export class KontorService {
         rol: actor.role,
         secenekler:
           actor.role === Role.ADMIN
-            ? this.adminGiftOptions
+            ? giftLimits.options
             : null,
         gunlukLimit:
           actor.role === Role.ADMIN
-            ? this.adminDailyLimit
+            ? giftLimits.daily
             : null,
         bugunGonderilen: bugunToplam,
         bugunIslemAdedi:
@@ -713,7 +721,7 @@ export class KontorService {
           actor.role === Role.ADMIN
             ? Math.max(
                 0,
-                this.adminDailyLimit - bugunToplam,
+                giftLimits.daily - bugunToplam,
               )
             : null,
       },
@@ -829,6 +837,7 @@ export class KontorService {
     if (!permission.enabled) {
       throw new ForbiddenException('Hediye PK gönderme yetkiniz bulunmuyor.');
     }
+    const giftLimits = await this.readGiftLimits();
     const aliciId = String(body?.aliciId || '').trim();
     const miktar = Number(body?.miktar);
 
@@ -852,10 +861,10 @@ export class KontorService {
 
     if (
       adminKaynakli &&
-      !this.adminGiftOptions.includes(miktar)
+      !giftLimits.options.includes(miktar)
     ) {
       throw new BadRequestException(
-        'ADMIN yalnızca 100, 250 veya 500 kontör gönderebilir.',
+        `ADMIN yalnızca ${giftLimits.options.join(', ')} kontör gönderebilir.`,
       );
     }
 
@@ -972,28 +981,28 @@ export class KontorService {
 
         if (
           adminGunlukToplam + miktar >
-          this.adminDailyLimit
+          giftLimits.daily
         ) {
           throw new BadRequestException(
-            `Günlük hediye kontör limitiniz ${this.adminDailyLimit} kontördür.`,
+            `Günlük hediye kontör limitiniz ${giftLimits.daily} kontördür.`,
           );
         }
 
         if (
           aliciAdminHediyeAdedi >=
-          this.recipientAdminGiftCountLimit
+          giftLimits.recipientCount
         ) {
           throw new BadRequestException(
-            'Bu kullanıcı ADMIN hesaplarından en fazla 2 kez hediye kontör alabilir.',
+            `Bu kullanıcı ADMIN hesaplarından en fazla ${giftLimits.recipientCount} kez hediye kontör alabilir.`,
           );
         }
 
         if (
           aliciAdminHediyeToplami + miktar >
-          this.recipientAdminGiftAmountLimit
+          giftLimits.recipientAmount
         ) {
           throw new BadRequestException(
-            'Bu kullanıcının ADMIN kaynaklı toplam hediye kontör sınırı 1.000 kontördür.',
+            `Bu kullanıcının ADMIN kaynaklı toplam hediye kontör sınırı ${giftLimits.recipientAmount} kontördür.`,
           );
         }
       }

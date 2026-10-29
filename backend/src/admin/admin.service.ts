@@ -1,4 +1,5 @@
-import { COST_PREFIX, LIMIT_PREFIX, isManagedCommercialKey } from "../pricing/commercial-costs";
+import { COST_PREFIX, LIMIT_DEFAULTS, LIMIT_DESCRIPTIONS, LIMIT_LIST_DEFAULTS, LIMIT_PREFIX, isManagedCommercialKey, parseLimitList } from "../pricing/commercial-costs";
+import { readTrialPolicy, resolveInitialTrialDays } from "../pricing/trial-policy";
 import { MARKET_CODES, MARKET_LOAN_SETTING_KEY, MARKET_LOAN_SOURCE_KEY, MARKET_MANUAL_PREFIX } from "../market/market-ticker.service";
 import {
   Injectable,
@@ -3021,12 +3022,17 @@ export class AdminService {
       if (
         paketKodu === UyelikPaketKodu.DENEME
       ) {
+        const initialTrialDays = resolveInitialTrialDays(
+          paket,
+          await readTrialPolicy(tx),
+        );
+
         if (
           body?.gunSayisi !== undefined &&
-          Number(body.gunSayisi) !== 14
+          Number(body.gunSayisi) !== initialTrialDays
         ) {
           throw new BadRequestException(
-            "İlk deneme paketi yalnız 14 gün olabilir.",
+            `İlk deneme paketi yalnız ${initialTrialDays} gün olabilir.`,
           );
         }
 
@@ -3099,7 +3105,7 @@ export class AdminService {
         }
 
         bitisTarihi.setUTCDate(
-          bitisTarihi.getUTCDate() + 14,
+          bitisTarihi.getUTCDate() + initialTrialDays,
         );
       } else {
         const aySayisi =
@@ -3350,7 +3356,9 @@ export class AdminService {
   }) {
     const raw = setting.valueJson;
     const inner = typeof raw === "object" && raw !== null && !Array.isArray(raw) ? raw.value : raw;
-    const value: number | string = setting.key === MARKET_LOAN_SOURCE_KEY ? String(inner ?? "") : Number(inner);
+    const value: number | string | number[] = Array.isArray(inner)
+      ? inner as number[]
+      : setting.key === MARKET_LOAN_SOURCE_KEY ? String(inner ?? "") : Number(inner);
 
     return {
       key: setting.key,
@@ -3371,7 +3379,7 @@ export class AdminService {
       orderBy: { key: "asc" },
     });
 
-    const list: Array<ReturnType<AdminService["systemSettingResponse"]> | { key: string; value: null; description: string; updatedAt: null; updatedById: null }> =
+    const list: Array<ReturnType<AdminService["systemSettingResponse"]> | { key: string; value: number | number[] | null; description: string; updatedAt: null; updatedById: null }> =
       settings.map((setting) => this.systemSettingResponse(setting));
     // Henüz kaydı olmayan piyasa ayarları da ekranda açıklamalı görünür (değer boş).
     for (const [key, description] of Object.entries(this.marketSettingDefinitions())) {
@@ -3381,18 +3389,46 @@ export class AdminService {
         if (row && !row.description) row.description = description;
       }
     }
+    // Kaydı olmayan açıklamalı limitler yedek (kod) değeriyle listelenir; updatedAt null = henüz kaydedilmedi.
+    const limitDefaults: Record<string, number | readonly number[]> = { ...LIMIT_DEFAULTS, ...LIMIT_LIST_DEFAULTS };
+    for (const [key, description] of Object.entries(LIMIT_DESCRIPTIONS)) {
+      const row = list.find((r) => r.key === key);
+      if (!row) {
+        const fallback = limitDefaults[key];
+        list.push({ key, value: Array.isArray(fallback) ? [...fallback] : fallback as number, description, updatedAt: null, updatedById: null });
+      } else if (!row.description) row.description = description;
+    }
     return list.sort((a, b) => a.key.localeCompare(b.key));
+  }
+
+  // GET /admin/trial-policy: mobilin süre/buton metinlerini sunucudan üretmesi için.
+  async getTrialPolicy() {
+    const policy = await readTrialPolicy(this.prisma);
+    const packages = await this.prisma.uyelikPaketi.findMany({
+      where: { paketKodu: UyelikPaketKodu.DENEME, aktifMi: true },
+      select: { denemeGunSayisi: true },
+    });
+    const days = [...new Set(packages.map((p) => p.denemeGunSayisi).filter((d): d is number => typeof d === "number" && d > 0))];
+    const initialDays = days.length === 1 ? days[0] : policy.initialDays;
+    return {
+      initialDays,
+      extensionDays: policy.extensionDays,
+      maxExtensions: policy.maxExtensions,
+      maxTotalDays: initialDays + policy.extensionDays * policy.maxExtensions,
+    };
   }
 
   async updateSystemSetting(
     key: string,
-    body: { value: number | string | null; description?: string },
+    body: { value: number | string | null | number[]; description?: string },
     actor?: AdminActor,
   ) {
     this.requireSoftwareTeam(actor);
 
     const marketDescription = this.marketSettingDefinitions()[key];
     if (marketDescription) return this.updateMarketSetting(key, marketDescription, body, actor);
+
+    if (Object.prototype.hasOwnProperty.call(LIMIT_LIST_DEFAULTS, key)) return this.updateLimitList(key, body, actor);
 
     const isCommercialCost = isManagedCommercialKey(key);
     if (!isCommercialCost && !["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"].includes(key)) {
@@ -3422,22 +3458,20 @@ export class AdminService {
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`system-setting:${key}`}))::text AS locked`;
       const existing = await tx.systemSetting.findUnique({ where: { key } });
-      if (!existing) {
+      // Yönetilen (varsayılanı olan) anahtar henüz kayıtlı değilse ilk kayıt burada oluşur.
+      if (!existing && !isCommercialCost) {
         throw new NotFoundException("Sistem ayarı bulunamadı.");
       }
 
-      const previousValue = this.systemSettingResponse(existing).value;
-      const raw = existing.valueJson;
+      const previousValue = existing ? this.systemSettingResponse(existing).value : null;
+      const raw = existing?.valueJson;
       const valueJson: Prisma.InputJsonValue = typeof raw === "object" && raw !== null && !Array.isArray(raw)
         ? { ...raw, value: body.value } as Prisma.InputJsonObject
-        : body.value;
-      const updated = await tx.systemSetting.update({
+        : existing ? body.value : { value: body.value };
+      const updated = await tx.systemSetting.upsert({
         where: { key },
-        data: {
-          valueJson,
-          description: body.description,
-          updatedById: actorId,
-        },
+        create: { key, valueJson, description: body.description ?? LIMIT_DESCRIPTIONS[key], updatedById: actorId },
+        update: { valueJson, description: body.description, updatedById: actorId },
       });
 
       await tx.auditLog.create({
@@ -3461,7 +3495,7 @@ export class AdminService {
   private async updateMarketSetting(
     key: string,
     defaultDescription: string,
-    body: { value: number | string | null; description?: string },
+    body: { value: number | string | null | number[]; description?: string },
     actor?: AdminActor,
   ) {
     const isText = key === MARKET_LOAN_SOURCE_KEY;
@@ -3513,6 +3547,47 @@ export class AdminService {
         },
       });
 
+      return this.systemSettingResponse(updated);
+    });
+  }
+
+  // Dizi değerli LIMIT_* ayarı ({ value: number[] }): tekrarsız, pozitif tam sayı listesi.
+  private async updateLimitList(
+    key: string,
+    body: { value: number | string | null | number[]; description?: string },
+    actor?: AdminActor,
+  ) {
+    const value = Array.isArray(body?.value) ? parseLimitList(body.value) : null;
+    if (!value || value.length > 20 || new Set(value).size !== value.length) {
+      throw new BadRequestException("Değer, tekrarsız pozitif tam sayılardan oluşan en fazla 20 elemanlı bir liste olmalıdır.");
+    }
+    if (body.description !== undefined && typeof body.description !== "string") {
+      throw new BadRequestException("Açıklama metin olmalıdır.");
+    }
+    const sorted = [...value].sort((a, b) => a - b);
+    const actorId = this.getActorId(actor);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`system-setting:${key}`}))::text AS locked`;
+      const existing = await tx.systemSetting.findUnique({ where: { key } });
+      const previousValue = existing ? this.systemSettingResponse(existing).value : null;
+      const description = body.description ?? existing?.description ?? LIMIT_DESCRIPTIONS[key];
+      const updated = await tx.systemSetting.upsert({
+        where: { key },
+        create: { key, valueJson: { value: sorted }, description, updatedById: actorId },
+        update: { valueJson: { value: sorted }, description, updatedById: actorId },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: AuditAction.UPDATE_SYSTEM_SETTING,
+          entityType: "SystemSetting",
+          entityId: updated.id,
+          description: `Sistem ayarı güncellendi: ${key}`,
+          metadata: { key, previousValue, newValue: sorted },
+          ipAddress: actor?.ipAddress,
+          userAgent: actor?.userAgent,
+        },
+      });
       return this.systemSettingResponse(updated);
     });
   }
@@ -4124,27 +4199,11 @@ export class AdminService {
 
     const actorId = this.getActorId(actor);
 
-    const trialInitialDays =
-      await this.getNumericSystemSetting("TRIAL_INITIAL_DAYS", 14);
-
-    const trialExtensionDays =
-      await this.getNumericSystemSetting("TRIAL_EXTENSION_DAYS", 14);
-
-    const trialMaxExtensions =
-      await this.getNumericSystemSetting("TRIAL_MAX_EXTENSIONS", 1);
-
-    if (
-      !Number.isInteger(trialInitialDays) ||
-      trialInitialDays <= 0 ||
-      !Number.isInteger(trialExtensionDays) ||
-      trialExtensionDays <= 0 ||
-      !Number.isInteger(trialMaxExtensions) ||
-      trialMaxExtensions < 0
-    ) {
-      throw new BadRequestException(
-        "Deneme politikası sistem ayarları geçersiz.",
-      );
-    }
+    const {
+      initialDays: trialInitialDays,
+      extensionDays: trialExtensionDays,
+      maxExtensions: trialMaxExtensions,
+    } = await readTrialPolicy(this.prisma);
 
     const trialExtendPermission =
       await this.resolveOperationalPermission(actor, "TRIAL_EXTEND");

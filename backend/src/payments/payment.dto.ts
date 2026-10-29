@@ -28,6 +28,7 @@ export class OfficePackageSettingsDto {
   @IsInt() @Min(0) @Max(10000000) monthlyPoolLimit!: number;
   @IsInt() @Min(0) @Max(36500) trialDays!: number;
   @IsInt() @Min(0) @Max(1000) agents!: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000) maxTeams?: number;
 }
 
 export class BillingDto {

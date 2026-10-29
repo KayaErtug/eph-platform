@@ -31,3 +31,22 @@ describe('PK wallet owner and authenticated actor attribution', () => {
     const t = setup(); await t.service.harcamayiYap({ ...input, userId: 'member', actorId: undefined, walletSource: 'PERSONAL', walletOfficeId: undefined }); expect(t.tx.kontorHareketi.create.mock.calls[0][0].data).toMatchObject({ kullaniciId: 'member', olusturanId: 'member' });
   });
 });
+
+describe('admin hediye PK sınırları SystemSetting\'ten okunur', () => {
+  const svc = (rows: Record<string, unknown>) => new KontorService({
+    systemSetting: { findUnique: jest.fn(async ({ where }: any) => (where.key in rows ? { valueJson: rows[where.key] } : null)) },
+  } as any, {} as any) as any;
+
+  it('kayıt yoksa yedek değerler', async () => {
+    expect(await svc({}).readGiftLimits()).toEqual({ options: [100, 250, 500], daily: 5000, recipientCount: 2, recipientAmount: 1000 });
+  });
+
+  it('kayıtlı değerler yedeğin yerine geçer', async () => {
+    expect(await svc({
+      LIMIT_ADMIN_HEDIYE_PK_SECENEKLERI: { value: [50, 150] },
+      LIMIT_ADMIN_HEDIYE_GUNLUK_PK: { value: 900 },
+      LIMIT_ALICI_ADMIN_HEDIYE_ADET: 3,
+      LIMIT_ALICI_ADMIN_HEDIYE_TOPLAM_PK: { value: 400 },
+    }).readGiftLimits()).toEqual({ options: [50, 150], daily: 900, recipientCount: 3, recipientAmount: 400 });
+  });
+});

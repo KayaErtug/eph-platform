@@ -168,6 +168,7 @@ export class PaymentService implements OnApplicationBootstrap, OnModuleDestroy {
         portfolioCapacity: dto.portfolioCapacity, crmCapacity: dto.crmCapacity,
         monthlyDemandLimit: dto.monthlyDemandLimit, monthlyPoolLimit: dto.monthlyPoolLimit, trialDays: dto.trialDays,
         agents: dto.agents, totalUsers: dto.agents + 1 });
+      if (dto.maxTeams !== undefined) office.maxTeams = dto.maxTeams;
       const saved = await tx.systemSetting.update({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' }, data: { valueJson: offices as Prisma.InputJsonValue, updatedById: actor } });
       await tx.auditLog.create({ data: { actorId: actor, action: AuditAction.UPDATE_SYSTEM_SETTING, entityType: 'SystemSetting', entityId: saved.id,
         description: `Ofis paketi güncellendi: ${code}`,

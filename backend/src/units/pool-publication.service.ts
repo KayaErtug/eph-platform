@@ -128,7 +128,7 @@ export class PoolPublicationService {
         remainingBalance = previousBalance - publicationCostPk;
         const debit = await tx.kontorCuzdani.updateMany({ where: { kullaniciId: wallet.chargeUserId, aktifMi: true, bakiye: { gte: publicationCostPk } }, data: { bakiye: { decrement: publicationCostPk }, toplamHarcama: { increment: publicationCostPk } } });
         if (debit.count !== 1) throw new BadRequestException('PK kesintisi doğrulanamadı. Yayınlama geri alındı.');
-        const movement = await tx.kontorHareketi.create({ data: { kullaniciId: wallet.chargeUserId, hareketTuru: KontorHareketTuru.HARCAMA, islemTuru: KontorIslemTuru.HAVUZ_PORTFOY_YAYIN, miktar: publicationCostPk, oncekiBakiye: previousBalance, sonrakiBakiye: remainingBalance, aciklama: 'Portföy EPH Havuzunda yayınlandı. 50 PK harcandı.', ilgiliKayitTuru: 'UNIT', ilgiliKayitId: snapshot.id, olusturanId: user.id } });
+        const movement = await tx.kontorHareketi.create({ data: { kullaniciId: wallet.chargeUserId, hareketTuru: KontorHareketTuru.HARCAMA, islemTuru: KontorIslemTuru.HAVUZ_PORTFOY_YAYIN, miktar: publicationCostPk, oncekiBakiye: previousBalance, sonrakiBakiye: remainingBalance, aciklama: `Portföy EPH Havuzunda yayınlandı. ${publicationCostPk} PK harcandı.`, ilgiliKayitTuru: 'UNIT', ilgiliKayitId: snapshot.id, olusturanId: user.id } });
         spent = publicationCostPk;
         operationId = movement.id;
       }

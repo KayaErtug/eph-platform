@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { Capability, PortfolioApprovalStatus, Role } from "@prisma/client";
+import { readLimit } from "../pricing/commercial-costs";
+import { resolveMaxTeams } from "../office/office-team-quota";
 
 import { officeLocationData } from "./office-location";
 import { PrismaService } from "../prisma/prisma.service";
@@ -896,12 +898,7 @@ export class OrganizationService {
     const currentPkg = packages.find((p) => p.code === sub?.packageCode);
     const agentCapacity = Number(currentPkg?.agents ?? sub?.agents ?? 3);
 
-    // Task 17: 15 kişilik pakette en fazla 3 takım.
-    if (agentCapacity >= 25) return 5;
-    if (agentCapacity >= 15) return 3;
-    if (agentCapacity >= 7) return 2;
-    if (agentCapacity >= 1) return 1;
-    return 0;
+    return resolveMaxTeams(currentPkg, agentCapacity);
   }
 
   async createTeam(
@@ -1043,9 +1040,10 @@ export class OrganizationService {
     if (!team || !team.isActive)
       throw new NotFoundException("Aktif takım bulunamadı.");
 
-    if (team._count.members >= 10) {
+    const maxAdvisors = await readLimit(this.prisma, "LIMIT_TAKIM_DANISMAN");
+    if (team._count.members >= maxAdvisors) {
       throw new BadRequestException(
-        "Bir takımda en fazla 10 aktif danışman olabilir.",
+        `Bir takımda en fazla ${maxAdvisors} aktif danışman olabilir.`,
       );
     }
 

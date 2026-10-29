@@ -25,14 +25,36 @@ export const LIMIT_DEFAULTS = {
   LIMIT_TALEP_SURE_4_GUN: 30,
   LIMIT_YETKI_MEKTUBU_CARPAN: 2,
   LIMIT_YETKI_MEKTUBU_SABIT: 20,
+  LIMIT_ADMIN_HEDIYE_GUNLUK_PK: 5000,
+  LIMIT_ALICI_ADMIN_HEDIYE_ADET: 2,
+  LIMIT_ALICI_ADMIN_HEDIYE_TOPLAM_PK: 1000,
+  LIMIT_TAKIM_DANISMAN: 10,
 } as const;
+
+// Dizi değerli LIMIT_* ayarları ({ value: number[] }); tek sayı olmadıkları için LIMIT_DEFAULTS'a girmez.
+export const LIMIT_LIST_DEFAULTS = {
+  LIMIT_ADMIN_HEDIYE_PK_SECENEKLERI: [100, 250, 500],
+} as const;
+
+export type LimitListKey = keyof typeof LIMIT_LIST_DEFAULTS;
+
+// Süper admin ayar ekranında kaydı olmasa da açıklamalı görünen limitler.
+export const LIMIT_DESCRIPTIONS: Record<string, string> = {
+  LIMIT_ADMIN_HEDIYE_PK_SECENEKLERI: 'ADMIN rolünün tek seferde gönderebileceği hediye PK tutarları (liste, ör. 100, 250, 500).',
+  LIMIT_ADMIN_HEDIYE_GUNLUK_PK: 'Bir ADMIN hesabının günde gönderebileceği toplam hediye PK.',
+  LIMIT_ALICI_ADMIN_HEDIYE_ADET: 'Bir kullanıcının ADMIN hesaplarından alabileceği en fazla hediye PK işlemi sayısı.',
+  LIMIT_ALICI_ADMIN_HEDIYE_TOPLAM_PK: 'Bir kullanıcının ADMIN hesaplarından alabileceği toplam hediye PK.',
+  LIMIT_TAKIM_DANISMAN: 'Bir takımdaki en fazla aktif danışman sayısı.',
+};
 
 export type LimitKey = keyof typeof LIMIT_DEFAULTS;
 
 export const LIMIT_PREFIX = 'LIMIT_';
 
 export const isManagedCommercialKey = (key: string) =>
-  Object.prototype.hasOwnProperty.call(COST_DEFAULTS, key) || Object.prototype.hasOwnProperty.call(LIMIT_DEFAULTS, key);
+  Object.prototype.hasOwnProperty.call(COST_DEFAULTS, key) ||
+  Object.prototype.hasOwnProperty.call(LIMIT_DEFAULTS, key) ||
+  Object.prototype.hasOwnProperty.call(LIMIT_LIST_DEFAULTS, key);
 
 type CostDb = Pick<Prisma.TransactionClient, 'systemSetting'>;
 
@@ -59,4 +81,18 @@ export async function readLimit(db: CostDb, key: LimitKey): Promise<number> {
   const row = await db.systemSetting.findUnique({ where: { key }, select: { valueJson: true } });
   const value = row ? parseCostValue(row.valueJson) : null;
   return value !== null ? value : LIMIT_DEFAULTS[key];
+}
+
+export function parseLimitList(raw: unknown): number[] | null {
+  const candidate = typeof raw === 'object' && raw !== null && !Array.isArray(raw)
+    ? (raw as { value?: unknown }).value
+    : raw;
+  if (!Array.isArray(candidate) || candidate.length === 0) return null;
+  return candidate.every((item) => typeof item === 'number' && Number.isSafeInteger(item) && item > 0) ? candidate as number[] : null;
+}
+
+// Sıra: LIMIT_* liste ayarı, yoksa/geçersizse yedek liste.
+export async function readLimitList(db: CostDb, key: LimitListKey): Promise<number[]> {
+  const row = await db.systemSetting.findUnique({ where: { key }, select: { valueJson: true } });
+  return (row ? parseLimitList(row.valueJson) : null) ?? [...LIMIT_LIST_DEFAULTS[key]];
 }

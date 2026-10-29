@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs';
+import { resolveMaxTeams } from './office-team-quota';
 import * as path from 'path';
 import { officeLogoExtension, officeProfile, officeProfileInput, officeProfileKey } from './office-profile';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
@@ -321,7 +322,7 @@ export class OfficeManagementService {
       const config = await tx.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' } });
       const currentPkg = Array.isArray(config?.valueJson) ? (config.valueJson as any[]).find(p => p.code === sub?.packageCode) : undefined;
       const agentCap = Number(currentPkg?.agents ?? sub?.agents ?? 3);
-      const maxTeams = agentCap >= 25 ? 5 : agentCap >= 15 ? 3 : agentCap >= 7 ? 2 : agentCap >= 1 ? 1 : 0;
+      const maxTeams = resolveMaxTeams(currentPkg, agentCap);
       if (activeTeamsCount >= maxTeams) {
         throw new BadRequestException(`Mevcut ofis paketinizde en fazla ${maxTeams} takım oluşturabilirsiniz.`);
       }

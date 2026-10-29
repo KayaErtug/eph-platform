@@ -349,11 +349,17 @@ export class AdminController {
     return this.adminService.getSystemSettings(this.extractActor(request));
   }
 
+  @Get("trial-policy")
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  getTrialPolicy() {
+    return this.adminService.getTrialPolicy();
+  }
+
   @Patch("system-settings/:key")
   @Roles(Role.SUPER_ADMIN)
   updateSystemSetting(
     @Param("key") key: string,
-    @Body() body: { value: number | string | null; description?: string },
+    @Body() body: { value: number | string | null | number[]; description?: string },
     @Req() request: AdminRequest,
   ) {
     return this.adminService.updateSystemSetting(key, body, this.extractActor(request));
