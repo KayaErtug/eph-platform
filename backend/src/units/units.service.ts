@@ -33,7 +33,6 @@ import { AdminService } from '../admin/admin.service';
 import { PoolAudienceService } from '../pool-audience/pool-audience.service';
 import { PoolPublicationService, type PoolPublicationInput, type PublicationUnit } from './pool-publication.service';
 import { countsAgainstActivePortfolioLimit } from './portfolio-policy';
-import { readCost } from '../pricing/commercial-costs';
 
 const PLATFORM_URL =
   process.env.FRONTEND_URL ||
@@ -2354,14 +2353,13 @@ export class UnitsService {
     const unit = await this.getPoolUnitWithProjectOrFail(id);
     await this.poolAudienceService.assertCanViewUnit(id, user);
     const payer = await resolveOfficeWallet(this.prisma, user.id);
-    const [unlocked, configuredCost, wallet, recentCharge] = await Promise.all([
+    const [unlocked, configuredCost, wallet] = await Promise.all([
       this.getPoolPrivateInfoAccessUnitIds(user, [id]),
       this.adminService.getNumericSystemSetting('COST_OZEL_BILGI', await this.adminService.getNumericSystemSetting('POOL_PRIVATE_INFO_COST', 25)),
       this.prisma.kontorCuzdani.findUnique({ where: { kullaniciId: payer.chargeUserId } }),
-      this.prisma.kontorHareketi.findFirst({ where: { ...actorPaidWhere(user.id), hareketTuru: KontorHareketTuru.HARCAMA, islemTuru: KontorIslemTuru.HAVUZ_MESAJ, ilgiliKayitTuru: 'UNIT', ilgiliKayitId: id, olusturulmaTarihi: { gte: new Date(Date.now() - 86400000) } }, select: { id: true } }),
     ]);
     const alreadyUnlocked = unlocked.has(id) || this.isOwner(user, unit.project.ownerId) || this.isSuperAdmin(user);
-    return { actorId: user.id, chargeUserId: payer.chargeUserId, walletSource: payer.walletSource, walletOfficeId: payer.walletOfficeId, walletLabel: payer.label, balance: wallet?.bakiye ?? 0, privateCostPk: alreadyUnlocked ? 0 : Math.max(0, Math.trunc(Number.isFinite(configuredCost) ? configuredCost : 25)), messageCostPk: recentCharge ? 0 : 3,
+    return { actorId: user.id, chargeUserId: payer.chargeUserId, walletSource: payer.walletSource, walletOfficeId: payer.walletOfficeId, walletLabel: payer.label, balance: wallet?.bakiye ?? 0, privateCostPk: alreadyUnlocked ? 0 : Math.max(0, Math.trunc(Number.isFinite(configuredCost) ? configuredCost : 25)),
       alreadyUnlocked, phoneAvailable: Boolean(unit.allowPhoneCall && unit.contactPhone), whatsappAvailable: Boolean(unit.allowWhatsapp && unit.whatsappPhone),
       unit: alreadyUnlocked ? this.redactPoolUnitForViewer(user, unit, true) : null };
   }
@@ -2407,6 +2405,8 @@ export class UnitsService {
           unit,
           true,
         ),
+        contact: this.poolContactDetails(unit),
+        location: this.hasPoolLocation(unit.project) ? this.serializePoolLocation(unit) : null,
       };
     }
 
@@ -2499,11 +2499,33 @@ export class UnitsService {
         unit,
         true,
       ),
+      contact: this.poolContactDetails(unit),
+      location: this.hasPoolLocation(unit.project) ? this.serializePoolLocation(unit) : null,
     };
   }
 
+  private poolContactDetails(unit: any) {
+    const officeOwner = (unit.project?.owner?.office as any)?.owner;
+    const channel = (allowed: boolean, own: unknown, url: (phone: string) => string) => {
+      const phone = String(officeOwner?.phone || own || '').trim();
+      return allowed && phone ? { phone, url: url(phone) } : null;
+    };
+    return {
+      call: channel(Boolean(unit.allowPhoneCall), unit.contactPhone, (phone) => `tel:${phone}`),
+      whatsapp: channel(Boolean(unit.allowWhatsapp), unit.whatsappPhone, (phone) => `https://wa.me/${phone.replace(/\D/g, '').replace(/^0/, '90')}`),
+    };
+  }
+
+  // Konum ve iletişim "Özel bilgileri aç" ile tek seferde açılır; ayrıca PK kesilmez.
+  private async assertPoolPrivateInfoUnlocked(user: CurrentUserPayload, unitId: string) {
+    await this.ensurePoolActionMembership(user);
+    const unlocked = await this.getPoolPrivateInfoAccessUnitIds(user, [unitId]);
+    if (!unlocked.has(unitId)) {
+      throw new BadRequestException('Önce "Özel bilgileri aç" ile bu portföyün özel bilgilerini açmalısınız.');
+    }
+  }
+
   async poolLocation(id: string, user: CurrentUserPayload) {
-    const locationCost = await readCost(this.prisma, 'COST_HAVUZ_KONUM');
     const unit = await this.getPoolUnitWithProjectOrFail(id);
     await this.poolAudienceService.assertCanViewUnit(id, user);
 
@@ -2518,104 +2540,22 @@ export class UnitsService {
       unit.project.ownerId,
     );
 
-    if (isOwnPortfolio || this.isSuperAdmin(user)) {
-      const wallet = await this.getOrCreateKontorWallet(user.id);
-
-      return {
-        ok: true,
-        message: isOwnPortfolio
-          ? 'Kendi portföyünüzün konumu ücretsiz açıldı.'
-          : 'Yazılım Ekibi konum erişimi ücretsiz açıldı.',
-        cost: 0,
-        spent: 0,
-        previousBalance: wallet.bakiye,
-        remainingBalance: wallet.bakiye,
-        balance: wallet.bakiye,
-        alreadyUnlocked: true,
-        isOwnPortfolio,
-        locationUnlocked: true,
-        locationPrecision: 'EXACT',
-        location: this.serializePoolLocation(unit),
-      };
+    if (!isOwnPortfolio && !this.isSuperAdmin(user)) {
+      await this.assertPoolPrivateInfoUnlocked(user, unit.id);
     }
 
-    await this.ensurePoolActionMembership(user);
-
-    const ephId = this.getEphId(unit.id);
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      await this.lockPoolKontorWallet(tx, user.id);
-
-      const existingAccess = await tx.kontorHareketi.findFirst({
-        where: {
-          ...actorPaidWhere(user.id),
-          hareketTuru: KontorHareketTuru.HARCAMA,
-          islemTuru: {
-            in: [
-              KontorIslemTuru.HAVUZ_OZEL_BILGI,
-              KontorIslemTuru.HAVUZ_KONUM,
-              KontorIslemTuru.HAVUZ_TELEFON,
-              KontorIslemTuru.HAVUZ_WHATSAPP,
-            ],
-          },
-          ilgiliKayitTuru: 'UNIT',
-          ilgiliKayitId: unit.id,
-        },
-        orderBy: {
-          olusturulmaTarihi: 'desc',
-        },
-      });
-
-      if (existingAccess) {
-        const wallet = await tx.kontorCuzdani.findUnique({
-          where: {
-            kullaniciId: (await resolveOfficeWallet(tx, user.id)).chargeUserId,
-          },
-        });
-
-        return {
-          spent: 0,
-          previousBalance: wallet?.bakiye ?? 0,
-          remainingBalance: wallet?.bakiye ?? 0,
-          alreadyUnlocked: true,
-        };
-      }
-
-      const charged = await this.spendKontor(
-        tx,
-        {
-          userId: user.id,
-          amount: locationCost,
-          islemTuru: KontorIslemTuru.HAVUZ_KONUM,
-          aciklama: `${ephId} için gayrimenkul konumu açıldı.`,
-          ilgiliKayitTuru: 'UNIT',
-          ilgiliKayitId: unit.id,
-        },
-        {
-          walletLocked: true,
-        },
-      );
-
-      return {
-        spent: locationCost,
-        previousBalance: charged.movement.oncekiBakiye,
-        remainingBalance: charged.wallet.bakiye,
-        alreadyUnlocked: false,
-      };
-    });
+    const wallet = await this.getOrCreateKontorWallet(user.id);
 
     return {
       ok: true,
-      message: result.alreadyUnlocked
-        ? 'Bu gayrimenkulün konumu daha önce açılmıştı; tekrar kontör düşülmedi.'
-        : `Gayrimenkul konumu açıldı. ${locationCost} kontör harcandı.`,
-      cost: locationCost,
-      spent: result.spent,
-      previousBalance: result.previousBalance,
-      remainingBalance: result.remainingBalance,
-      balance: result.remainingBalance,
-      alreadyUnlocked: result.alreadyUnlocked,
-      isOwnPortfolio: false,
+      message: 'Gayrimenkul konumu gösterildi.',
+      cost: 0,
+      spent: 0,
+      previousBalance: wallet.bakiye,
+      remainingBalance: wallet.bakiye,
+      balance: wallet.bakiye,
+      alreadyUnlocked: true,
+      isOwnPortfolio,
       locationUnlocked: true,
       locationPrecision: 'EXACT',
       location: this.serializePoolLocation(unit),
@@ -2633,10 +2573,6 @@ export class UnitsService {
       throw new BadRequestException('Geçersiz iletişim kanalı.');
     }
 
-    const contactCost = await readCost(
-      this.prisma,
-      channel === 'CALL' ? 'COST_HAVUZ_TELEFON' : 'COST_HAVUZ_WHATSAPP',
-    );
     const unit = await this.getPoolUnitWithProjectOrFail(id);
     await this.poolAudienceService.assertCanViewUnit(id, user);
 
@@ -2655,424 +2591,28 @@ export class UnitsService {
       );
     }
 
-    const isOwnPortfolio = this.isOwner(user, unit.project.ownerId);
-    const islemTuru = isCall
-      ? KontorIslemTuru.HAVUZ_TELEFON
-      : KontorIslemTuru.HAVUZ_WHATSAPP;
-    let spent = 0;
     const isPrivilegedViewer =
-      isOwnPortfolio || this.isSuperAdmin(user);
-    let alreadyUnlocked = isPrivilegedViewer;
-    let wallet = await this.getOrCreateKontorWallet(user.id);
-    let previousBalance = wallet.bakiye;
-    let remainingBalance = wallet.bakiye;
+      this.isOwner(user, unit.project.ownerId) || this.isSuperAdmin(user);
 
-    if (!alreadyUnlocked) {
-      await this.ensurePoolActionMembership(user);
-      const ephId = this.getEphId(unit.id);
-
-      const result = await this.prisma.$transaction(async (tx) => {
-        await this.lockPoolKontorWallet(tx, user.id);
-
-        const existingAccess = await tx.kontorHareketi.findFirst({
-          where: {
-            ...actorPaidWhere(user.id),
-            hareketTuru: KontorHareketTuru.HARCAMA,
-            islemTuru: {
-              in: [
-                KontorIslemTuru.HAVUZ_OZEL_BILGI,
-                KontorIslemTuru.HAVUZ_KONUM,
-                KontorIslemTuru.HAVUZ_TELEFON,
-                KontorIslemTuru.HAVUZ_WHATSAPP,
-              ],
-            },
-            ilgiliKayitTuru: 'UNIT',
-            ilgiliKayitId: unit.id,
-          },
-        });
-
-        if (existingAccess) {
-          const currentWallet = await tx.kontorCuzdani.findUnique({
-            where: { kullaniciId: (await resolveOfficeWallet(tx, user.id)).chargeUserId },
-          });
-
-          return {
-            spent: 0,
-            alreadyUnlocked: true,
-            previousBalance: currentWallet?.bakiye ?? 0,
-            remainingBalance: currentWallet?.bakiye ?? 0,
-          };
-        }
-
-        const charged = await this.spendKontor(
-          tx,
-          {
-            userId: user.id,
-            amount: contactCost,
-            islemTuru,
-            aciklama: `${ephId} için ${
-              isCall ? 'telefonla arama' : 'WhatsApp'
-            } iletişim bilgisi açıldı.`,
-            ilgiliKayitTuru: 'UNIT',
-            ilgiliKayitId: unit.id,
-          },
-          { walletLocked: true },
-        );
-
-        return {
-          spent: contactCost,
-          alreadyUnlocked: false,
-          previousBalance: charged.movement.oncekiBakiye,
-          remainingBalance: charged.wallet.bakiye,
-        };
-      });
-
-      spent = result.spent;
-      alreadyUnlocked = result.alreadyUnlocked;
-      previousBalance = result.previousBalance;
-      remainingBalance = result.remainingBalance;
+    if (!isPrivilegedViewer) {
+      await this.assertPoolPrivateInfoUnlocked(user, unit.id);
     }
 
+    const wallet = await this.getOrCreateKontorWallet(user.id);
     const whatsappDigits = phone.replace(/\D/g, '').replace(/^0/, '90');
 
     return {
       ok: true,
       channel,
-      cost: contactCost,
-      spent,
-      alreadyUnlocked,
-      previousBalance,
-      remainingBalance,
-      balance: remainingBalance,
+      cost: 0,
+      spent: 0,
+      alreadyUnlocked: true,
+      previousBalance: wallet.bakiye,
+      remainingBalance: wallet.bakiye,
+      balance: wallet.bakiye,
       phone,
       url: isCall ? `tel:${phone}` : `https://wa.me/${whatsappDigits}`,
-      message: isPrivilegedViewer
-        ? 'Kendi/yetkili iletişim bilginiz gösterildi; kontör harcanmadı.'
-        : alreadyUnlocked
-        ? 'Bu iletişim bilgisi daha önce açılmıştı; tekrar kontör düşülmedi.'
-        : `${isCall ? 'Telefon' : 'WhatsApp'} iletişim bilgisi açıldı. ${contactCost} kontör harcandı.`,
-    };
-  }
-
-  async poolMessage(
-    id: string,
-    user: CurrentUserPayload,
-    body?: PoolActionPayload,
-  ) {
-    await this.ensurePoolActionMembership(user);
-
-    const unit = await this.getPoolUnitWithProjectOrFail(id);
-    await this.poolAudienceService.assertCanViewUnit(id, user);
-
-    if (this.isOwner(user, unit.project.ownerId)) {
-      throw new BadRequestException(
-        'Kendi portföyünüz için Havuz mesajı başlatamazsınız.',
-      );
-    }
-
-    const ephId = this.getEphId(unit.id);
-    const title = `Havuz Mesajı - ${ephId}`;
-    const firstMessage =
-      this.cleanText(body?.message) ||
-      `Merhaba, ${ephId} numaralı Havuz portföyü hakkında bilgi almak istiyorum.`;
-    if (firstMessage.length > 10000) throw new BadRequestException('Mesaj en fazla 10.000 karakter olabilir.');
-    const safety = new TextSafetyService().validate(firstMessage, { field: TextSafetyField.MESSAGE });
-    if (!safety.valid) throw new BadRequestException({ code: 'UNSAFE_MESSAGE', message: safety.errors[0]?.message || 'Mesaj içeriğini düzenleyin.' });
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      await this.lockPoolKontorWallet(tx, user.id);
-      if (body?.expectedChargeUserId && (await resolveOfficeWallet(tx, user.id)).chargeUserId !== body.expectedChargeUserId) throw new BadRequestException('Ofis harcama hesabı değişti. Ücreti yeniden kontrol edin.');
-
-      const dedupWindowStart = new Date(
-        Date.now() - 24 * 60 * 60 * 1000,
-      );
-
-      const recentCharge = await tx.kontorHareketi.findFirst({
-        where: {
-          ...actorPaidWhere(user.id),
-          hareketTuru: KontorHareketTuru.HARCAMA,
-          islemTuru: KontorIslemTuru.HAVUZ_MESAJ,
-          ilgiliKayitTuru: 'UNIT',
-          ilgiliKayitId: unit.id,
-          olusturulmaTarihi: {
-            gte: dedupWindowStart,
-          },
-        },
-        orderBy: {
-          olusturulmaTarihi: 'desc',
-        },
-      });
-
-      let spent = 0;
-      let previousBalance: number;
-      let remainingBalance: number;
-      let responseMessage: string;
-
-      if (recentCharge) {
-        const wallet = await tx.kontorCuzdani.findUnique({
-          where: {
-            kullaniciId: (await resolveOfficeWallet(tx, user.id)).chargeUserId,
-          },
-        });
-
-        previousBalance = wallet?.bakiye ?? 0;
-        remainingBalance = wallet?.bakiye ?? 0;
-        responseMessage =
-          'Bu Havuz ilanı için 24 saat içinde zaten kontör harcadınız, tekrar düşülmedi.';
-      } else {
-        if (body?.expectedCostPk !== undefined && body.expectedCostPk !== 3) throw new BadRequestException('Mesaj ücreti değişti. Güncel ücreti kontrol ederek yeniden onaylayın.');
-        const kontorResult = await this.spendKontor(
-          tx,
-          {
-            userId: user.id,
-            amount: 3,
-            islemTuru: KontorIslemTuru.HAVUZ_MESAJ,
-            aciklama: `${ephId} için Havuz mesajı başlatıldı.`,
-            ilgiliKayitTuru: 'UNIT',
-            ilgiliKayitId: unit.id,
-          },
-          {
-            walletLocked: true,
-          },
-        );
-
-        spent = 3;
-        previousBalance =
-          kontorResult.movement.oncekiBakiye;
-        remainingBalance =
-          kontorResult.wallet.bakiye;
-        responseMessage =
-          'Mesaj başlatıldı. 3 kontör harcandı.';
-      }
-
-      const existing = await tx.conversation.findFirst({
-        where: {
-          postId: null,
-          title,
-          ConversationParticipant: {
-            every: {
-              userId: {
-                in: [
-                  user.id,
-                  ((unit.project?.owner?.office as any)?.ownerUserId as string | undefined) || unit.project.ownerId,
-                ],
-              },
-            },
-          },
-        },
-        include: {
-          ConversationParticipant: true,
-        },
-      });
-
-      const activeConversation =
-        existing &&
-        existing.ConversationParticipant.length === 2
-          ? existing
-          : await tx.conversation.create({
-              data: {
-                id: randomUUID(),
-                postId: null,
-                title,
-                updatedAt: new Date(),
-                ConversationParticipant: {
-                  create: [
-                    {
-                      id: randomUUID(),
-                      userId: user.id,
-                    },
-                    {
-                      id: randomUUID(),
-                      userId: unit.project.ownerId,
-                    },
-                  ],
-                },
-              },
-              include: {
-                ConversationParticipant: true,
-              },
-            });
-
-      await tx.message.create({
-        data: {
-          id: randomUUID(),
-          conversationId: activeConversation.id,
-          senderId: user.id,
-          body: firstMessage,
-        },
-      });
-
-      await tx.conversation.update({
-        where: {
-          id: activeConversation.id,
-        },
-        data: {
-          updatedAt: new Date(),
-        },
-      });
-
-      await this.createPoolNotification(tx, {
-        ownerId: unit.project.ownerId,
-        unitId: unit.id,
-        title: 'Havuz mesajı başlatıldı',
-        message:
-          `${ephId} numaralı portföyünüz için ` +
-          'yeni bir Havuz mesajı var.',
-      });
-
-      return {
-        spent,
-        previousBalance,
-        remainingBalance,
-        responseMessage,
-        conversationId: activeConversation.id,
-      };
-    });
-
-    return {
-      ok: true,
-      message: result.responseMessage,
-      cost: 3,
-      spent: result.spent,
-      previousBalance: result.previousBalance,
-      remainingBalance: result.remainingBalance,
-      balance: result.remainingBalance,
-      conversationId: result.conversationId,
-      url: `/messages/${result.conversationId}`,
-    };
-  }
-
-  async poolInterest(
-    id: string,
-    user: CurrentUserPayload,
-    body?: PoolActionPayload,
-  ) {
-    await this.ensurePoolActionMembership(user);
-
-    const unit = await this.getPoolUnitWithProjectOrFail(id);
-    await this.poolAudienceService.assertCanViewUnit(id, user);
-
-    if (this.isOwner(user, unit.project.ownerId)) {
-      throw new BadRequestException(
-        'Kendi portföyünüz için ilgileniyorum bildirimi gönderemezsiniz.',
-      );
-    }
-
-    const ephId = this.getEphId(unit.id);
-    const scoreText =
-      Number(body?.matchScore || 0) > 0
-        ? ` Uyum: %${Number(body?.matchScore)}.`
-        : '';
-
-    const cleanNote = this.cleanText(body?.note);
-    const noteText = cleanNote
-      ? ` Not: ${cleanNote}.`
-      : '';
-
-    const kontorResult =
-      await this.prisma.$transaction(async (tx) => {
-        const charged = await this.spendKontor(tx, {
-          userId: user.id,
-          amount: 10,
-          islemTuru:
-            KontorIslemTuru.HAVUZ_ILGILENIYORUM,
-          aciklama:
-            `${ephId} için ilgileniyorum bildirimi gönderildi.`,
-          ilgiliKayitTuru: 'UNIT',
-          ilgiliKayitId: unit.id,
-        });
-
-        await this.createPoolNotification(tx, {
-          ownerId: unit.project.ownerId,
-          unitId: unit.id,
-          title: 'Portföyünüzle ilgilenen var',
-          message:
-            `${ephId} numaralı Havuz portföyünüz için ` +
-            `ilgileniyorum bildirimi alındı.${scoreText}${noteText}`,
-        });
-
-        return charged;
-      });
-
-    return {
-      ok: true,
-      message:
-        'İlgileniyorum bildirimi gönderildi. 10 kontör harcandı.',
-      cost: 10,
-      spent: 10,
-      previousBalance:
-        kontorResult.movement.oncekiBakiye,
-      remainingBalance:
-        kontorResult.wallet.bakiye,
-      balance:
-        kontorResult.wallet.bakiye,
-    };
-  }
-
-  async poolMatchingCustomer(
-    id: string,
-    user: CurrentUserPayload,
-    body?: PoolActionPayload,
-  ) {
-    await this.ensurePoolActionMembership(user);
-
-    const unit = await this.getPoolUnitWithProjectOrFail(id);
-    await this.poolAudienceService.assertCanViewUnit(id, user);
-
-    if (this.isOwner(user, unit.project.ownerId)) {
-      throw new BadRequestException(
-        'Kendi portföyünüz için eşleşen müşterim var bildirimi gönderemezsiniz.',
-      );
-    }
-
-    const ephId = this.getEphId(unit.id);
-    const scoreText =
-      Number(body?.matchScore || 0) > 0
-        ? ` Uyum: %${Number(body?.matchScore)}.`
-        : '';
-
-    const cleanNote = this.cleanText(body?.note);
-    const noteText = cleanNote
-      ? ` Not: ${cleanNote}.`
-      : '';
-
-    const kontorResult =
-      await this.prisma.$transaction(async (tx) => {
-        const charged = await this.spendKontor(tx, {
-          userId: user.id,
-          amount: 20,
-          islemTuru:
-            KontorIslemTuru.HAVUZ_ESLESEN_MUSTERIM_VAR,
-          aciklama:
-            `${ephId} için eşleşen müşterim var bildirimi gönderildi.`,
-          ilgiliKayitTuru: 'UNIT',
-          ilgiliKayitId: unit.id,
-        });
-
-        await this.createPoolNotification(tx, {
-          ownerId: unit.project.ownerId,
-          unitId: unit.id,
-          title: 'Eşleşen müşteri bildirimi',
-          message:
-            `${ephId} numaralı Havuz portföyünüz için ` +
-            `eşleşen müşterim var bildirimi alındı.${scoreText}${noteText}`,
-        });
-
-        return charged;
-      });
-
-    return {
-      ok: true,
-      message:
-        'Eşleşen müşterim var bildirimi gönderildi. 20 kontör harcandı.',
-      cost: 20,
-      spent: 20,
-      previousBalance:
-        kontorResult.movement.oncekiBakiye,
-      remainingBalance:
-        kontorResult.wallet.bakiye,
-      balance:
-        kontorResult.wallet.bakiye,
+      message: 'İletişim bilgisi gösterildi.',
     };
   }
 

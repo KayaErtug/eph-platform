@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  KontorHareketTuru,
+  KontorIslemTuru,
   PortfolioApprovalStatus,
   ProjectSetupStatus,
   Role,
@@ -12,6 +14,8 @@ import {
 } from '@prisma/client';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveOfficeWallet } from '../office/office-wallet.rules';
+import { readCost } from '../pricing/commercial-costs';
 import { PoolAudienceService, type AudienceInput } from '../pool-audience/pool-audience.service';
 
 const PLATFORM_URL =
@@ -137,7 +141,13 @@ export class ProjectSalesLaunchService {
     };
   }
 
-  async publishToPool(projectId: string, userId: string, userRole: Role, poolAudience?: AudienceInput) {
+  async publishToPool(
+    projectId: string,
+    userId: string,
+    userRole: Role,
+    poolAudience?: AudienceInput,
+    payment: { walletSource?: string; walletOfficeId?: string; expectedCostPk?: number } = {},
+  ) {
     const project = await this.getAuthorizedProject(projectId, userId, userRole);
     const stats = this.getProjectStats(project);
     const publishReadiness = this.buildPublishReadiness(project, stats);
@@ -149,7 +159,43 @@ export class ProjectSalesLaunchService {
     }
 
     const publishedAt = new Date();
+    let billing = { costPk: 0, spent: 0, previousBalance: 0, remainingBalance: 0 };
     const result = await this.prisma.$transaction(async tx => {
+      // Tek seferlik proje havuz ücreti: proje havuzda kaldığı sürece ve sonradan eklenen bölümler için tekrar alınmaz.
+      const alreadyInPool = (await tx.unit.count({
+        where: { projectId: project.id, isSalesInventory: true, isPoolVisible: true, approvalStatus: PortfolioApprovalStatus.HAVUZDA },
+      })) > 0;
+      const projectCostPk = alreadyInPool || userRole === Role.SUPER_ADMIN ? 0 : await readCost(tx, 'COST_PROJE_HAVUZ');
+      if (payment.expectedCostPk !== undefined && payment.expectedCostPk !== projectCostPk) {
+        throw new BadRequestException('Güncel proje havuz ücretini kontrol edip tekrar onaylayın.');
+      }
+      if (projectCostPk > 0) {
+        const selected = await resolveOfficeWallet(tx, userId, { walletSource: payment.walletSource, walletOfficeId: payment.walletOfficeId }, true);
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`wallet:${selected.chargeUserId}`}))`;
+        await tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${selected.chargeUserId} FOR UPDATE`;
+        const wallet = await tx.kontorCuzdani.findUnique({ where: { kullaniciId: selected.chargeUserId } });
+        if (!wallet?.aktifMi || wallet.bakiye < projectCostPk) throw new BadRequestException('Krediniz bu işlem için yeterli değil.');
+        const debit = await tx.kontorCuzdani.updateMany({
+          where: { kullaniciId: selected.chargeUserId, aktifMi: true, bakiye: { gte: projectCostPk } },
+          data: { bakiye: { decrement: projectCostPk }, toplamHarcama: { increment: projectCostPk } },
+        });
+        if (debit.count !== 1) throw new BadRequestException('PK kesintisi doğrulanamadı. Yayınlama geri alındı.');
+        await tx.kontorHareketi.create({
+          data: {
+            kullaniciId: selected.chargeUserId,
+            hareketTuru: KontorHareketTuru.HARCAMA,
+            islemTuru: KontorIslemTuru.HAVUZ_PORTFOY_YAYIN,
+            miktar: projectCostPk,
+            oncekiBakiye: wallet.bakiye,
+            sonrakiBakiye: wallet.bakiye - projectCostPk,
+            aciklama: `Proje EPH Havuzuna gönderildi (${project.name}). ${projectCostPk} PK harcandı.`,
+            ilgiliKayitTuru: 'PROJECT',
+            ilgiliKayitId: project.id,
+            olusturanId: userId,
+          },
+        });
+        billing = { costPk: projectCostPk, spent: projectCostPk, previousBalance: wallet.bakiye, remainingBalance: wallet.bakiye - projectCostPk };
+      }
       if (poolAudience) await this.audience.setProjectAudience(projectId, { id: userId, role: userRole }, poolAudience, tx);
       return tx.unit.updateMany({
       where: {
@@ -175,6 +221,7 @@ export class ProjectSalesLaunchService {
       success: true,
       publishedAt: publishedAt.toISOString(),
       publishedUnitCount: result.count,
+      billing,
       project: this.serializeProject(nextProject),
       publishReadiness: this.buildPublishReadiness(nextProject, nextStats),
     };

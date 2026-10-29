@@ -88,7 +88,7 @@ describe('Project release access', () => {
   });
 
   it('does not publish anything when audience validation fails', async () => {
-    const updateMany = jest.fn(); const tx = { unit: { updateMany } };
+    const updateMany = jest.fn(); const tx = { unit: { updateMany, count: jest.fn().mockResolvedValue(1) } };
     const db = { $transaction: jest.fn(fn => fn(tx)) };
     const audience = { setProjectAudience: jest.fn().mockRejectedValue(new BadRequestException('invalid')) };
     const service: any = new ProjectSalesLaunchService(db as any, audience as any);
@@ -96,6 +96,32 @@ describe('Project release access', () => {
     service.getProjectStats = jest.fn().mockReturnValue({});
     service.buildPublishReadiness = jest.fn().mockReturnValue({ ready: true });
     await expect(service.publishToPool('p', 'owner', Role.MUTEAHHIT, { mode: 'TARGETED' })).rejects.toThrow('invalid');
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('project already in the pool is republished without a PK charge', async () => {
+    const updateMany = jest.fn().mockResolvedValue({ count: 3 }); const tx = { unit: { updateMany, count: jest.fn().mockResolvedValue(2) }, kontorHareketi: { create: jest.fn() } };
+    const db = { $transaction: jest.fn(fn => fn(tx)) };
+    const service: any = new ProjectSalesLaunchService(db as any, { setProjectAudience: jest.fn() } as any);
+    service.getAuthorizedProject = jest.fn().mockResolvedValue({ id: 'p', name: 'Proje' });
+    service.getProjectStats = jest.fn().mockReturnValue({});
+    service.buildPublishReadiness = jest.fn().mockReturnValue({ ready: true });
+    service.getProject = jest.fn().mockResolvedValue({ id: 'p' });
+    service.serializeProject = jest.fn().mockReturnValue({});
+    const result = await service.publishToPool('p', 'owner', Role.MUTEAHHIT, undefined, { expectedCostPk: 0 });
+    expect(result.billing.spent).toBe(0);
+    expect(tx.kontorHareketi.create).not.toHaveBeenCalled();
+    expect(updateMany).toHaveBeenCalled();
+  });
+
+  it('rejects a changed project pool tariff before charging', async () => {
+    const updateMany = jest.fn(); const tx = { unit: { updateMany, count: jest.fn().mockResolvedValue(0) }, systemSetting: { findUnique: jest.fn().mockResolvedValue(null) } };
+    const db = { $transaction: jest.fn(fn => fn(tx)) };
+    const service: any = new ProjectSalesLaunchService(db as any, { setProjectAudience: jest.fn() } as any);
+    service.getAuthorizedProject = jest.fn().mockResolvedValue({ id: 'p', name: 'Proje' });
+    service.getProjectStats = jest.fn().mockReturnValue({});
+    service.buildPublishReadiness = jest.fn().mockReturnValue({ ready: true });
+    await expect(service.publishToPool('p', 'owner', Role.MUTEAHHIT, undefined, { expectedCostPk: 50 })).rejects.toThrow('ücretini kontrol');
     expect(updateMany).not.toHaveBeenCalled();
   });
 

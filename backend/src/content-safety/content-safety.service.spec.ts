@@ -122,7 +122,7 @@ describe('Blocking is enforced beyond the mobile UI', () => {
 });
 
 describe('Financial and deletion regressions', () => {
-  it.each(['poolMessage', 'poolInterest', 'poolMatchingCustomer', 'poolLocation', 'poolPrivateInfo'])('blocked author refuses %s before entering a debit transaction', async action => {
+  it.each(['poolLocation', 'poolPrivateInfo'])('blocked author refuses %s before entering a debit transaction', async action => {
     const t = setup();
     t.db.unit.findUnique = jest.fn().mockResolvedValue({ id: 'unit', project: { ownerId: 'owner' }, poolAudience: null });
     t.db.userBlock.findFirst.mockResolvedValue({ id: 'block' });

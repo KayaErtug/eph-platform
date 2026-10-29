@@ -93,53 +93,6 @@ export class UnitsController {
     return this.unitsService.poolContactQuote(id, user);
   }
 
-  @Post('pool/:id/message')
-  @UseGuards(RolesGuard)
-  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
-  poolMessage(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-    @Body()
-    body: {
-      message?: string;
-      expectedCostPk?: number;
-      expectedChargeUserId?: string;
-      matchScore?: number;
-    },
-  ) {
-    return this.unitsService.poolMessage(id, user, body);
-  }
-
-  @Post('pool/:id/interest')
-  @UseGuards(RolesGuard)
-  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
-  poolInterest(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-    @Body()
-    body: {
-      matchScore?: number;
-      note?: string;
-    },
-  ) {
-    return this.unitsService.poolInterest(id, user, body);
-  }
-
-  @Post('pool/:id/matching-customer')
-  @UseGuards(RolesGuard)
-  @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)
-  poolMatchingCustomer(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-    @Body()
-    body: {
-      matchScore?: number;
-      note?: string;
-    },
-  ) {
-    return this.unitsService.poolMatchingCustomer(id, user, body);
-  }
-
   @Post('pool/:id/location')
   @UseGuards(RolesGuard)
   @Roles(Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.SUPER_ADMIN)

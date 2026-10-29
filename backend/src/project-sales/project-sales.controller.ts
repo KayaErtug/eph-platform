@@ -392,13 +392,19 @@ export class ProjectSalesController {
   publishProjectToPool(
     @CurrentUser() user: any,
     @Param('projectId') projectId: string,
-    @Body() body?: { poolAudience?: { mode?: 'PUBLIC' | 'TARGETED'; roles?: string[]; groupIds?: string[] } },
+    @Body() body?: {
+      poolAudience?: { mode?: 'PUBLIC' | 'TARGETED'; roles?: string[]; groupIds?: string[] };
+      walletSource?: string;
+      walletOfficeId?: string;
+      expectedCostPk?: number;
+    },
   ) {
     return this.projectSalesLaunchService.publishToPool(
       projectId,
       user.id,
       user.role,
       body?.poolAudience,
+      { walletSource: body?.walletSource, walletOfficeId: body?.walletOfficeId, expectedCostPk: body?.expectedCostPk },
     );
   }
 

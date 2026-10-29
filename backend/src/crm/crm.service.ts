@@ -436,7 +436,7 @@ export class CrmService {
           throw new BadRequestException(
             `${packageName} paketinizde ofisinizin toplam aktif CRM kapasitesi ${limit}. ` +
               `Ofisteki tüm danışmanların mevcut toplam müşteri sayısı: ${totalOfficeCustomers}. ` +
-              'Yeni müşteri eklemek için ofis paketinizi yükseltebilirsiniz.',
+              'Yeni müşteri eklenemiyor.',
           );
         }
         return;
@@ -465,7 +465,7 @@ export class CrmService {
           throw new BadRequestException(
             `${pkg.paketAdi} paketinizde aktif CRM kapasiteniz ${limit}. ` +
               `Mevcut müşteri sayınız ${currentCount}. ` +
-              'Yeni müşteri eklemek için paketinizi yükseltebilirsiniz.',
+              'Yeni müşteri eklenemiyor.',
           );
         }
       }
