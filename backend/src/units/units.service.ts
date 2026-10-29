@@ -2425,6 +2425,8 @@ export class UnitsService {
           : 'Yazılım Ekibi özel bilgi erişimi ücretsiz açıldı.',
         cost: 0,
         spent: 0,
+        operationId: null,
+        replayed: true,
         previousBalance: wallet.bakiye,
         remainingBalance: wallet.bakiye,
         balance: wallet.bakiye,
@@ -2478,6 +2480,7 @@ export class UnitsService {
 
         return {
           spent: 0,
+          operationId: null as string | null,
           previousBalance: wallet?.bakiye ?? 0,
           remainingBalance: wallet?.bakiye ?? 0,
           alreadyUnlocked: true,
@@ -2503,6 +2506,7 @@ export class UnitsService {
 
       return {
         spent: cost,
+        operationId: charged.movement.id as string | null,
         previousBalance: charged.movement.oncekiBakiye,
         remainingBalance: charged.wallet.bakiye,
         alreadyUnlocked: false,
@@ -2518,6 +2522,8 @@ export class UnitsService {
 
       cost,
       spent: result.spent,
+      operationId: result.operationId,
+      replayed: result.alreadyUnlocked === true,
       previousBalance: result.previousBalance,
       remainingBalance: result.remainingBalance,
       balance: result.remainingBalance,
