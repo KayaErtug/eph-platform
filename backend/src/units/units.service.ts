@@ -29,6 +29,7 @@ import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { getOfficeAdvisorIds } from './deed-owner-privacy';
+import { canSeeProjectPrivateInfo } from './project-private-privacy';
 import { AdminService } from '../admin/admin.service';
 import { PoolAudienceService } from '../pool-audience/pool-audience.service';
 import { PoolPublicationService, type PoolPublicationInput, type PublicationUnit } from './pool-publication.service';
@@ -1789,10 +1790,11 @@ export class UnitsService {
 
     const hasLocation = this.hasPoolLocation(project);
 
-    const approximate = this.getApproximatePoolCoordinates(
-      unit.id,
-      project.latitude,
-      project.longitude,
+    const canSeeProjectPrivate = canSeeProjectPrivateInfo(
+      user,
+      ownerId,
+      owner?.office?.ownerUserId,
+      canSeePrivateInfo,
     );
 
     return {
@@ -1803,7 +1805,7 @@ export class UnitsService {
         user,
         authorizedContact,
         owner,
-        canSeePrivateInfo,
+        canSeeProjectPrivate,
       ),
 
       authorityDocuments:
@@ -1818,34 +1820,24 @@ export class UnitsService {
         ...safeProject,
         name: redactPoolDeedOwnerText(unit, safeProject.name),
 
-        address: canSeePrivateInfo
-          ? safeProject.address
-          : null,
+        address: canSeeProjectPrivate ? safeProject.address : null,
 
-        latitude: canSeePrivateInfo
-          ? safeProject.latitude
-          : approximate.latitude,
+        latitude: canSeeProjectPrivate ? safeProject.latitude : null,
 
-        longitude: canSeePrivateInfo
-          ? safeProject.longitude
-          : approximate.longitude,
+        longitude: canSeeProjectPrivate ? safeProject.longitude : null,
 
-        mapAddress: canSeePrivateInfo
-          ? safeProject.mapAddress
-          : null,
+        mapAddress: canSeeProjectPrivate ? safeProject.mapAddress : null,
 
-        placeId: canSeePrivateInfo
-          ? safeProject.placeId
-          : null,
+        placeId: canSeeProjectPrivate ? safeProject.placeId : null,
 
         ownerRole: owner?.role || null,
         isOwnPortfolio,
         hasLocation,
 
-        locationUnlocked: canSeePrivateInfo,
+        locationUnlocked: canSeeProjectPrivate,
 
         locationPrecision: hasLocation
-          ? canSeePrivateInfo
+          ? canSeeProjectPrivate
             ? 'EXACT'
             : 'APPROXIMATE'
           : 'NONE',
@@ -2438,6 +2430,7 @@ export class UnitsService {
           true,
         ),
         contact: this.poolContactDetails(unit),
+        projectInfo: this.serializePoolProjectInfo(user, unit),
         location: this.hasPoolLocation(unit.project) ? this.serializePoolLocation(unit) : null,
       };
     }
@@ -2536,7 +2529,22 @@ export class UnitsService {
         true,
       ),
       contact: this.poolContactDetails(unit),
+      projectInfo: this.serializePoolProjectInfo(user, unit),
       location: this.hasPoolLocation(unit.project) ? this.serializePoolLocation(unit) : null,
+    };
+  }
+
+  // Proje birimiyse "İletişime Geç" ile açılan proje alanları: yetkili + açık adres + harita konumu.
+  private serializePoolProjectInfo(user: CurrentUserPayload, unit: any) {
+    const project = unit.project;
+    if (!project || !this.isProjectSalesProject(project)) return null;
+
+    return {
+      authorizedContact: this.getProjectAuthorizedContact(user, project.authorizedContact, project.owner, true),
+      address: project.address ?? null,
+      mapAddress: project.mapAddress ?? null,
+      latitude: project.latitude ?? null,
+      longitude: project.longitude ?? null,
     };
   }
 

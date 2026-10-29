@@ -6,6 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  KontorHareketTuru,
+  KontorIslemTuru,
   PortfolioApprovalStatus,
   ProjectSetupStatus,
   Role,
@@ -17,6 +19,8 @@ import { randomUUID } from 'crypto';
 import { EphMatchEngineService } from '../matching/eph-match-engine.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PoolAudienceService } from '../pool-audience/pool-audience.service';
+import { actorPaidWhere } from '../office/office-wallet.rules';
+import { canSeeProjectPrivateInfo, redactProjectPrivateInfo } from '../units/project-private-privacy';
 
 type CurrentUser = {
   id: string;
@@ -85,6 +89,7 @@ export class PoolProjectsService {
     ]);
 
     const visibleProjects = await this.visibleProjects(projects, user);
+    const unlockedUnitIds = await this.unlockedUnitIds(user, visibleProjects);
     const serializedProjects = await Promise.all(
       visibleProjects.map((project) =>
         this.serializeProject(
@@ -93,6 +98,7 @@ export class PoolProjectsService {
           false,
           false,
           user.id,
+          this.canSeeProjectPrivate(user, project, unlockedUnitIds),
         ),
       ),
     );
@@ -118,7 +124,43 @@ export class PoolProjectsService {
 
     const visible = (await this.visibleProjects([project], user))[0];
     if (!visible) throw new NotFoundException('Havuz projesi bulunamadı.');
-    return this.serializeProject(visible, customers, true, false, user.id);
+    const unlockedUnitIds = await this.unlockedUnitIds(user, [visible]);
+    return this.serializeProject(visible, customers, true, false, user.id, this.canSeeProjectPrivate(user, visible, unlockedUnitIds));
+  }
+
+  // Proje adresi/konumu: proje sahibi, ofis sahibi, süper admin ve projenin bir birimini "İletişime Geç" ile açan kullanıcı görür.
+  private async unlockedUnitIds(user: CurrentUser, projects: Array<{ units: Array<{ id: string }> }>) {
+    const unitIds = projects.flatMap((project) => project.units.map((unit) => unit.id));
+    if (!unitIds.length) return new Set<string>();
+
+    const rows = await this.prisma.kontorHareketi.findMany({
+      where: {
+        ...actorPaidWhere(user.id),
+        hareketTuru: KontorHareketTuru.HARCAMA,
+        islemTuru: {
+          in: [
+            KontorIslemTuru.HAVUZ_OZEL_BILGI,
+            KontorIslemTuru.HAVUZ_KONUM,
+            KontorIslemTuru.HAVUZ_TELEFON,
+            KontorIslemTuru.HAVUZ_WHATSAPP,
+          ],
+        },
+        ilgiliKayitTuru: 'UNIT',
+        ilgiliKayitId: { in: unitIds },
+      },
+      select: { ilgiliKayitId: true },
+    });
+
+    return new Set(rows.map((row) => row.ilgiliKayitId).filter((value): value is string => Boolean(value)));
+  }
+
+  private canSeeProjectPrivate(user: CurrentUser, project: any, unlockedUnitIds: Set<string>) {
+    return canSeeProjectPrivateInfo(
+      user,
+      project.ownerId,
+      project.owner?.office?.ownerUserId,
+      project.units.some((unit: any) => unlockedUnitIds.has(unit.id)),
+    );
   }
 
   async listPresentations(projectId: string, user: CurrentUser) {
@@ -276,7 +318,7 @@ export class PoolProjectsService {
 
     const publicUnits = await this.audience.filterPublicUnits(project.units);
     if (!publicUnits.length) throw new NotFoundException('Bu proje genel sunuma açık değil.');
-    const serialized = await this.serializeProject({ ...project, units: publicUnits }, [], true, true, null);
+    const serialized = await this.serializeProject({ ...project, units: publicUnits }, [], true, true, null, true);
 
     return {
       link: {
@@ -388,7 +430,7 @@ export class PoolProjectsService {
   private projectInclude() {
     return {
       owner: {
-        select: { id: true, role: true },
+        select: { id: true, role: true, office: { select: { ownerUserId: true } } },
       },
       blocks: {
         where: { isActive: true },
@@ -507,7 +549,9 @@ export class PoolProjectsService {
     includeUnits: boolean,
     publicMode = false,
     currentUserId: string | null = null,
+    canSeePrivate = false,
   ) {
+    project = redactProjectPrivateInfo(project, canSeePrivate);
     const units = Array.isArray(project.units) ? project.units : [];
     const pricedUnits = units.filter((unit: any) => Number(unit.price || 0) > 0);
     const currency =
