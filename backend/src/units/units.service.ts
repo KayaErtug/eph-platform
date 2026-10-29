@@ -1,4 +1,5 @@
 import { actorPaidWhere, resolveOfficeWallet } from '../office/office-wallet.rules';
+import { officeProfile, officeProfileKey } from '../office/office-profile';
 import { TextSafetyService } from '../text-safety/text-safety.service';
 import { TextSafetyField } from '../text-safety/text-safety.types';
 import { assertNoBlockedInteraction } from '../content-safety/block-policy';
@@ -120,7 +121,7 @@ const unitInclude = {
           lastName: true,
           role: true,
           memberCode: true,
-          companyName: true, office: { select: { id: true, name: true, ownerUserId: true, owner: { select: { id: true, firstName: true, lastName: true, phone: true } } } },
+          companyName: true, office: { select: { id: true, name: true, city: true, district: true, neighborhood: true, ownerUserId: true, owner: { select: { id: true, firstName: true, lastName: true, phone: true } } } },
         },
       },
     },
@@ -908,7 +909,19 @@ export class UnitsService {
       throw new BadRequestException('Bu portföy şu anda Havuz içinde aktif değil.');
     }
 
+    await this.attachOfficeProfilePhones([unit]);
     return unit;
+  }
+
+  // Ofis telefonu Office tablosunda değil, SystemSetting EPH_OFFICE_PROFILE_<officeId> içinde tutulur.
+  private async attachOfficeProfilePhones(units: any[]) {
+    const offices = units.map((unit) => unit.project?.owner?.office).filter((office) => office?.id);
+    if (!offices.length) return;
+    const rows = await this.prisma.systemSetting.findMany({
+      where: { key: { in: [...new Set(offices.map((office) => officeProfileKey(office.id)))] } },
+    });
+    const phones = new Map(rows.map((row) => [row.key, officeProfile(row.valueJson).phone]));
+    for (const office of offices) office.profilePhone = phones.get(officeProfileKey(office.id)) || null;
   }
 
   private getEphId(id: string) {
@@ -2301,6 +2314,8 @@ export class UnitsService {
 
     const visibleUnits =
       await this.poolAudienceService.filterVisibleUnits(user, units);
+
+    await this.attachOfficeProfilePhones(visibleUnits);
 
     const unitIds = visibleUnits.map((unit) => unit.id);
 

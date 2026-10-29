@@ -26,3 +26,11 @@ Alanlar yalnız İletişime Geç ile açan, ilan sahibi, ofis sahibi, süper adm
 
 ## Kalan
 Mobil cihaz doğrulaması yapılmadı.
+
+## Düzeltme: officePhone kaynağı
+- Sorun: officePhone, danışmanın User.phone değerinden besleniyordu; kartta aynı numara iki başlıkla görünüyordu.
+- Kaynak: OfficeIdentityCard `PATCH /office/:id/profile` → `OfficeManagementService.updateProfile` → SystemSetting `EPH_OFFICE_PROFILE_<officeId>.valueJson.phone`.
+- Değişen: `backend/src/units/pool-privacy.ts` (officePhone = office.profilePhone), `units.service.ts` (`attachOfficeProfilePhones` — liste ve getPoolUnitWithProjectOrFail'de toplu okur; unitInclude office'e city/district/neighborhood eklendi), `pool-office-info.spec.ts`.
+- officeOwnerPhone ve officeAddress değişmedi. Profil telefonu yoksa officePhone null.
+- Doğrulanan: `npm run build` Exit 0; `jest src/units` 45/45 geçti.
+- Kalan: `jest src/office` 3 suite / 17 test kırık; değişiklikten ÖNCE de aynı (git stash ile doğrulandı), bu işle ilgisiz (office-management.spec mock'larında `capabilities` eksik).

@@ -3,7 +3,7 @@ import { UnitsService } from './units.service';
 import { serializePoolOfficeInfo } from './pool-privacy';
 
 const officeOwner = { id: 'office-owner', firstName: 'Ofis', lastName: 'Sahibi', phone: '05550000002' };
-const office = { id: 'o1', name: 'Ofis', city: 'Ankara', district: 'Çankaya', neighborhood: 'Kızılay', ownerUserId: 'office-owner', owner: officeOwner };
+const office = { id: 'o1', name: 'Ofis', city: 'Ankara', district: 'Çankaya', neighborhood: 'Kızılay', ownerUserId: 'office-owner', owner: officeOwner, profilePhone: '03120000001' };
 const project = { id: 'p1', ownerId: 'owner', isActive: true, owner: { id: 'owner', role: Role.EMLAKCI, phone: '05550000001', office } };
 const unit = { id: 'u1', project, images: [], allowPhoneCall: false, allowWhatsapp: false };
 
@@ -30,11 +30,19 @@ describe('Havuz ofis bilgileri (EPH-17C)', () => {
       [{ id: 'admin', role: Role.SUPER_ADMIN }, false],
     ] as const) {
       expect(redact({ ...user }, unlocked)).toMatchObject({
-        officePhone: '05550000001',
+        officePhone: '03120000001',
         officeOwnerPhone: '05550000002',
         officeAddress: 'Kızılay, Çankaya, Ankara',
       });
     }
+  });
+
+  it('ofis profil telefonu yoksa officePhone null; danışman telefonu kullanılmaz', () => {
+    const noPhone = { ...unit, project: { ...project, owner: { ...project.owner, office: { ...office, profilePhone: null } } } };
+    const result = serializePoolOfficeInfo(noPhone, true);
+    expect(result.officePhone).toBeNull();
+    expect(result.officeOwnerPhone).toBe('05550000002');
+    expect(JSON.stringify(result)).not.toContain('05550000001');
   });
 
   it('ofis yoksa null', () => {
