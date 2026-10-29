@@ -37,4 +37,54 @@ describe('AdminService', () => {
     await expect(service.getStats({ id: 'admin-id', role: Role.ADMIN })).rejects.toBeInstanceOf(ForbiddenException);
     expect(mail.sendUserApproved).not.toHaveBeenCalled();
   });
+
+  describe('setUserPermissionsBulk', () => {
+    const profile = (role: Role) => ({
+      user: { id: 'u1', role },
+      permissions: [
+        { id: 'p1', key: 'USER_VIEW', enabled: false, superAdminOnly: false, delegable: true },
+        { id: 'p2', key: 'SYSTEM_SETTING_MANAGE', enabled: false, superAdminOnly: true, delegable: false },
+      ],
+    });
+
+    it('rejects non super admin actors', async () => {
+      await expect(
+        service.setUserPermissionsBulk('u1', { permissions: { USER_VIEW: true } }, { id: 'a', role: Role.ADMIN }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('refuses to restrict a super admin target', async () => {
+      jest.spyOn(service, 'getUserPermissionProfile').mockResolvedValue(profile(Role.SUPER_ADMIN) as any);
+      await expect(
+        service.setUserPermissionsBulk('u1', { permissions: { USER_VIEW: false } }, { id: 'a', role: Role.SUPER_ADMIN }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('refuses super-admin-only permissions', async () => {
+      jest.spyOn(service, 'getUserPermissionProfile').mockResolvedValue(profile(Role.ADMIN) as any);
+      await expect(
+        service.setUserPermissionsBulk('u1', { permissions: { SYSTEM_SETTING_MANAGE: true } }, { id: 'a', role: Role.SUPER_ADMIN }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('writes override and audit log with old and new values only for changes', async () => {
+      jest.spyOn(service, 'getUserPermissionProfile').mockResolvedValue(profile(Role.ADMIN) as any);
+      const tx = {
+        userPermissionOverride: { upsert: jest.fn().mockResolvedValue({ id: 'o1' }) },
+        auditLog: { create: jest.fn() },
+      };
+      (prisma as any).$transaction = jest.fn((fn: any) => fn(tx));
+
+      await service.setUserPermissionsBulk('u1', { permissions: { USER_VIEW: true } }, { id: 'a', role: Role.SUPER_ADMIN });
+
+      expect(tx.userPermissionOverride.upsert).toHaveBeenCalledTimes(1);
+      const audit = tx.auditLog.create.mock.calls[0][0].data;
+      expect(audit.actorId).toBe('a');
+      expect(audit.metadata).toMatchObject({
+        permissionKey: 'USER_VIEW',
+        oldValue: { enabled: false },
+        newValue: { enabled: true },
+      });
+    });
+  });
 });

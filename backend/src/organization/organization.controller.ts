@@ -16,6 +16,8 @@ import { OrganizationService } from "./organization.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { PermissionGuard } from "../auth/guards/permission.guard";
+import { RequirePermission } from "../auth/decorators/require-permission.decorator";
 
 type OrganizationRequestUser = {
   id?: string;
@@ -30,7 +32,7 @@ type OrganizationRequest = Request & {
 };
 
 @Controller("organization")
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionGuard)
 @Roles(Role.ADMIN, Role.SUPER_ADMIN)
 export class OrganizationController {
   constructor(private readonly organizationService: OrganizationService) {}
@@ -48,26 +50,31 @@ export class OrganizationController {
   }
 
   @Get("summary")
+  @RequirePermission("ORGANIZATION_VIEW")
   getSummary() {
     return this.organizationService.getSummary();
   }
 
   @Get("users")
+  @RequirePermission("ORGANIZATION_VIEW")
   getOrganizationUsers() {
     return this.organizationService.getOrganizationUsers();
   }
 
   @Get("offices")
+  @RequirePermission("ORGANIZATION_VIEW")
   getOffices() {
     return this.organizationService.getOffices();
   }
 
   @Get("offices/:id/kpi")
+  @RequirePermission("ORGANIZATION_VIEW")
   getOfficeKpi(@Param("id") id: string) {
     return this.organizationService.getOfficeKpi(id);
   }
 
   @Post("offices")
+  @RequirePermission("ORGANIZATION_MANAGE")
   createOffice(
     @Body()
     body: {
@@ -86,6 +93,7 @@ export class OrganizationController {
   }
 
   @Patch("offices/:id")
+  @RequirePermission("ORGANIZATION_MANAGE")
   updateOffice(
     @Param("id") id: string,
     @Body()
@@ -107,16 +115,19 @@ export class OrganizationController {
   }
 
   @Get("teams")
+  @RequirePermission("ORGANIZATION_VIEW")
   getTeams() {
     return this.organizationService.getTeams();
   }
 
   @Get("teams/:id/kpi")
+  @RequirePermission("ORGANIZATION_VIEW")
   getTeamKpi(@Param("id") id: string) {
     return this.organizationService.getTeamKpi(id);
   }
 
   @Post("teams")
+  @RequirePermission("ORGANIZATION_MANAGE")
   createTeam(
     @Body()
     body: {
@@ -133,6 +144,7 @@ export class OrganizationController {
   }
 
   @Patch("teams/:id")
+  @RequirePermission("ORGANIZATION_MANAGE")
   updateTeam(
     @Param("id") id: string,
     @Body()
@@ -150,6 +162,7 @@ export class OrganizationController {
   }
 
   @Patch("teams/:id/leader")
+  @RequirePermission("ORGANIZATION_MANAGE")
   setTeamLeader(
     @Param("id") id: string,
     @Body() body: { leaderId?: string | null },
@@ -163,6 +176,7 @@ export class OrganizationController {
   }
 
   @Post("teams/:id/members")
+  @RequirePermission("ORGANIZATION_MANAGE")
   addTeamMember(
     @Param("id") id: string,
     @Body() body: { userId?: string },
@@ -176,6 +190,7 @@ export class OrganizationController {
   }
 
   @Delete("teams/:id/members/:userId")
+  @RequirePermission("ORGANIZATION_MANAGE")
   removeTeamMember(
     @Param("id") id: string,
     @Param("userId") userId: string,

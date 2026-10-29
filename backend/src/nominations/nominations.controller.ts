@@ -4,6 +4,8 @@ import { CreateNominationDto } from './dto/create-nomination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionGuard } from '../auth/guards/permission.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('nominations')
@@ -22,14 +24,16 @@ export class NominationsController {
   }
 
   @Get()
-  @UseGuards(RolesGuard)
+  @RequirePermission("NOMINATION_VIEW")
+  @UseGuards(RolesGuard, PermissionGuard)
   @Roles(Role.ADMIN)
   findAll(@Query('status') status?: string) {
     return this.nominationsService.findAll(status);
   }
 
   @Patch(':id/status')
-  @UseGuards(RolesGuard)
+  @RequirePermission("NOMINATION_MANAGE")
+  @UseGuards(RolesGuard, PermissionGuard)
   @Roles(Role.ADMIN)
   updateStatus(
     @Param('id') id: string,
@@ -39,7 +43,8 @@ export class NominationsController {
   }
 
   @Patch(':id/note')
-  @UseGuards(RolesGuard)
+  @RequirePermission("NOMINATION_MANAGE")
+  @UseGuards(RolesGuard, PermissionGuard)
   @Roles(Role.ADMIN)
   addNote(@Param('id') id: string, @Body() body: { adminNote: string }) {
     return this.nominationsService.addAdminNote(id, body.adminNote);

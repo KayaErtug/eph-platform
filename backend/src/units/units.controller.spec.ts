@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnitsController } from './units.controller';
 import { UnitsService } from './units.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 describe('UnitsController', () => {
   let controller: UnitsController;
@@ -13,6 +14,7 @@ describe('UnitsController', () => {
           provide: UnitsService,
           useValue: {},
         },
+        { provide: PrismaService, useValue: {} },
       ],
     }).compile();
 

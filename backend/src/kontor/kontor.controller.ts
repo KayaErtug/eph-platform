@@ -11,6 +11,8 @@ import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionGuard } from '../auth/guards/permission.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { KontorService } from './kontor.service';
 
@@ -54,7 +56,8 @@ export class KontorController {
   }
 
   @Get('hediye-havuzu')
-  @UseGuards(RolesGuard)
+  @RequirePermission("KONTOR_GIFT_POOL_VIEW")
+  @UseGuards(RolesGuard, PermissionGuard)
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   getHediyeHavuzu(
     @CurrentUser() user: any,
@@ -84,7 +87,8 @@ export class KontorController {
   }
 
   @Post('hediye-gonder')
-  @UseGuards(RolesGuard)
+  @RequirePermission("KONTOR_GIFT_SEND")
+  @UseGuards(RolesGuard, PermissionGuard)
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   gonderHediyeKontor(
     @CurrentUser() user: any,

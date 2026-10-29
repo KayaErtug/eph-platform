@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Put,
   Delete,
   Param,
   Query,
@@ -15,6 +16,8 @@ import { AdminService } from "./admin.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { PermissionGuard } from "../auth/guards/permission.guard";
+import { RequirePermission } from "../auth/decorators/require-permission.decorator";
 import { Capability, Prisma, Role } from "@prisma/client";
 
 type AdminRequestUser = {
@@ -30,7 +33,7 @@ type AdminRequest = Request & {
 };
 
 @Controller("admin")
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionGuard)
 @Roles(Role.ADMIN, Role.SUPER_ADMIN)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
@@ -48,16 +51,19 @@ export class AdminController {
   }
 
   @Get("stats")
+  @RequirePermission("REPORT_VIEW")
   getStats(@Req() request: AdminRequest) {
     return this.adminService.getStats(this.extractActor(request));
   }
 
   @Get("dashboard-summary")
+  @RequirePermission("REPORT_VIEW")
   getDashboardSummary(@Req() request: AdminRequest) {
     return this.adminService.getDashboardSummary(this.extractActor(request));
   }
 
   @Get("users")
+  @RequirePermission("USER_VIEW")
   getUsers(
     @Query("filter") filter?: "pending" | "approved" | "all",
     @Req() request?: AdminRequest,
@@ -66,21 +72,25 @@ export class AdminController {
   }
 
   @Get("traffic-summary")
+  @RequirePermission("REPORT_VIEW")
   getTrafficSummary(@Req() request: AdminRequest) {
     return this.adminService.getTrafficSummary(this.extractActor(request));
   }
 
   @Patch("users/:id/approve")
+  @RequirePermission("USER_APPROVE")
   approveUser(@Param("id") id: string, @Req() request: AdminRequest) {
     return this.adminService.approveUser(id, this.extractActor(request));
   }
 
   @Delete("users/:id/reject")
+  @RequirePermission("USER_DELETE")
   rejectUser(@Param("id") id: string, @Req() request: AdminRequest) {
     return this.adminService.rejectUser(id, this.extractActor(request));
   }
 
   @Patch("users/:id/suspend")
+  @RequirePermission("USER_SUSPEND")
   suspendUser(
     @Param("id") id: string,
     @Body()
@@ -94,6 +104,7 @@ export class AdminController {
   }
 
   @Patch("users/:id/role")
+  @RequirePermission("ROLE_CHANGE")
   changeUserRole(
     @Param("id") id: string,
     @Body() body: { role: Role | string },
@@ -103,6 +114,7 @@ export class AdminController {
   }
 
   @Post("users")
+  @RequirePermission("USER_CREATE")
   createUser(
     @Body()
     body: {
@@ -119,16 +131,19 @@ export class AdminController {
   }
 
   @Patch("users/member-codes/missing")
+  @RequirePermission("MEMBER_CODE_MANAGE")
   assignMissingMemberCodes(@Req() request: AdminRequest) {
     return this.adminService.assignMissingMemberCodes(this.extractActor(request));
   }
 
   @Patch("users/:id/member-code")
+  @RequirePermission("MEMBER_CODE_MANAGE")
   assignMemberCodeToUser(@Param("id") id: string, @Req() request: AdminRequest) {
     return this.adminService.assignMemberCodeToUser(id, this.extractActor(request));
   }
 
   @Patch("users/:id/capabilities")
+  @RequirePermission("CAPABILITY_MANAGE")
   updateUserCapabilities(
     @Param("id") id: string,
     @Body() body: { capabilities?: Array<Capability | string> },
@@ -142,11 +157,13 @@ export class AdminController {
   }
 
   @Get("referrals")
+  @RequirePermission("REFERRAL_VIEW")
   getReferralCodes(@Req() request: AdminRequest) {
     return this.adminService.getReferralCodes(this.extractActor(request));
   }
 
   @Post("referrals")
+  @RequirePermission("REFERRAL_MANAGE")
   createReferralCandidate(
     @Body()
     body: {
@@ -161,21 +178,25 @@ export class AdminController {
   }
 
   @Patch("referrals/:id/deactivate")
+  @RequirePermission("REFERRAL_MANAGE")
   deactivateReferralCandidate(@Param("id") id: string) {
     return this.adminService.deactivateReferralCandidate(id);
   }
 
   @Delete("referrals/:id")
+  @RequirePermission("REFERRAL_MANAGE")
   deleteReferralCandidate(@Param("id") id: string, @Req() request: AdminRequest) {
     return this.adminService.deleteReferralCandidate(id, this.extractActor(request));
   }
 
   @Get("invitations")
+  @RequirePermission("INVITATION_VIEW")
   getInvitations() {
     return this.adminService.getInvitations();
   }
 
   @Get("documents")
+  @RequirePermission("DOCUMENT_VIEW")
   getDocuments(
     @Req() request: AdminRequest,
     @Query("filter") filter?: "pending" | "approved" | "rejected" | "all",
@@ -184,21 +205,25 @@ export class AdminController {
   }
 
   @Patch("documents/:id/approve")
+  @RequirePermission("DOCUMENT_APPROVE")
   approveDocument(@Param("id") id: string, @Req() request: AdminRequest) {
     return this.adminService.approveDocument(id, this.extractActor(request));
   }
 
   @Patch("documents/:id/reject")
+  @RequirePermission("DOCUMENT_REJECT")
   rejectDocument(@Param("id") id: string, @Req() request: AdminRequest) {
     return this.adminService.rejectDocument(id, this.extractActor(request));
   }
 
   @Get("nominations")
+  @RequirePermission("NOMINATION_VIEW")
   getNominations(@Query("status") status?: string) {
     return this.adminService.getNominations(status);
   }
 
   @Patch("nominations/:id/status")
+  @RequirePermission("NOMINATION_MANAGE")
   updateNominationStatus(
     @Param("id") id: string,
     @Body() body: { status: string; adminNote?: string },
@@ -207,11 +232,13 @@ export class AdminController {
   }
 
   @Get("applications")
+  @RequirePermission("APPLICATION_VIEW")
   getApplications(@Query("status") status?: string) {
     return this.adminService.getApplications(status);
   }
 
   @Patch("applications/:id/status")
+  @RequirePermission("APPLICATION_REVIEW")
   updateApplicationStatus(
     @Param("id") id: string,
     @Body() body: { status: string; adminNote?: string; rejectReason?: string },
@@ -225,21 +252,25 @@ export class AdminController {
   }
 
   @Get("katilim-talepleri")
+  @RequirePermission("APPLICATION_VIEW")
   getKatilimTalepleri(@Query("status") status?: string) {
     return this.adminService.getApplicationDashboard(status);
   }
 
   @Get("katilim-talepleri/:id")
+  @RequirePermission("APPLICATION_VIEW")
   getKatilimTalebi(@Param("id") id: string) {
     return this.adminService.getApplicationDetail(id);
   }
 
   @Patch("katilim-talepleri/:id/onayla")
+  @RequirePermission("APPLICATION_REVIEW")
   approveKatilimTalebi(@Param("id") id: string, @Body() body: { adminNote?: string }) {
     return this.adminService.approveApplication(id, body.adminNote);
   }
 
   @Patch("katilim-talepleri/:id/reddet")
+  @RequirePermission("APPLICATION_REVIEW")
   rejectKatilimTalebi(
     @Param("id") id: string,
     @Body() body: { adminNote?: string; rejectReason?: string },
@@ -248,11 +279,13 @@ export class AdminController {
   }
 
   @Delete("katilim-talepleri/:id")
+  @RequirePermission("APPLICATION_DELETE")
   deleteKatilimTalebi(@Param("id") id: string, @Req() request: AdminRequest) {
     return this.adminService.deleteApplication(id, this.extractActor(request));
   }
 
   @Patch("katilim-talepleri/:id/not")
+  @RequirePermission("APPLICATION_REVIEW")
   updateKatilimTalebiNotu(@Param("id") id: string, @Body() body: { adminNote?: string }) {
     return this.adminService.updateApplicationNote(id, body.adminNote || "");
   }
@@ -290,6 +323,7 @@ export class AdminController {
   }
 
   @Patch("users/:id/trial-extend")
+  @RequirePermission("TRIAL_EXTEND")
   @Roles(Role.ADMIN, Role.SUPER_ADMIN)
   extendUserTrial(
     @Param("id") id: string,
@@ -365,6 +399,20 @@ export class AdminController {
     return this.adminService.updateUserPermissionOverride(
       id,
       permissionKey,
+      body,
+      this.extractActor(request),
+    );
+  }
+
+  @Put("permission-center/users/:id/permissions")
+  @Roles(Role.SUPER_ADMIN)
+  setUserPermissionsBulk(
+    @Param("id") id: string,
+    @Body() body: { permissions?: Record<string, boolean> },
+    @Req() request: AdminRequest,
+  ) {
+    return this.adminService.setUserPermissionsBulk(
+      id,
       body,
       this.extractActor(request),
     );

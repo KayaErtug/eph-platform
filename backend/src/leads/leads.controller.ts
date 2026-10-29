@@ -3,6 +3,8 @@ import { LeadsService } from './leads.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionGuard } from '../auth/guards/permission.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('leads')
@@ -19,7 +21,8 @@ export class LeadsController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @RequirePermission("LEAD_VIEW")
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionGuard)
   @Roles(Role.ADMIN)
   findAll() {
     return this.leadsService.findAll();

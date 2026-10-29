@@ -13,6 +13,8 @@ import { Role, UnitStatus, UnitType } from '@prisma/client';
 
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionGuard } from '../auth/guards/permission.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UnitsService } from './units.service';
@@ -133,7 +135,8 @@ export class UnitsController {
   }
 
   @Get('admin/portfolio-approvals')
-  @UseGuards(RolesGuard)
+  @RequirePermission("PORTFOLIO_MODERATE")
+  @UseGuards(RolesGuard, PermissionGuard)
   @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   findPortfolioApprovals(@CurrentUser() user: any, @Query('status') status?: string) {
     return this.unitsService.findPortfolioApprovals(user, { status });
@@ -185,35 +188,40 @@ export class UnitsController {
   }
 
   @Post(':id/mark-reviewing')
-  @UseGuards(RolesGuard)
+  @RequirePermission("PORTFOLIO_MODERATE")
+  @UseGuards(RolesGuard, PermissionGuard)
   @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   markReviewing(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
     return this.unitsService.markReviewing(id, user, body);
   }
 
   @Post(':id/request-missing-info')
-  @UseGuards(RolesGuard)
+  @RequirePermission("PORTFOLIO_MODERATE")
+  @UseGuards(RolesGuard, PermissionGuard)
   @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   requestMissingInfo(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
     return this.unitsService.requestMissingInfo(id, user, body);
   }
 
   @Post(':id/approve')
-  @UseGuards(RolesGuard)
+  @RequirePermission("PORTFOLIO_MODERATE")
+  @UseGuards(RolesGuard, PermissionGuard)
   @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   approve(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
     return this.unitsService.approve(id, user, body);
   }
 
   @Post(':id/reject')
-  @UseGuards(RolesGuard)
+  @RequirePermission("PORTFOLIO_MODERATE")
+  @UseGuards(RolesGuard, PermissionGuard)
   @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   reject(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any) {
     return this.unitsService.reject(id, user, body);
   }
 
   @Post(':id/send-to-pool')
-  @UseGuards(RolesGuard)
+  @RequirePermission("PORTFOLIO_MODERATE")
+  @UseGuards(RolesGuard, PermissionGuard)
   @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   sendToPool(@Param('id') id: string, @CurrentUser() user: any) {
     return this.unitsService.sendToPool(id, user);

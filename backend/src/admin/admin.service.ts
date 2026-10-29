@@ -25,6 +25,7 @@ import {
   KontorIslemTuru,
 } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
+import { resolvePermission } from "../auth/permission.resolver";
 
 type AdminActor = {
   id?: string;
@@ -327,85 +328,12 @@ export class AdminService {
     actor: AdminActor | undefined,
     permissionKey: string,
   ) {
-    const actorId = this.getActorId(actor);
-    const actorRole = this.getActorRole(actor) as Role;
-
-    if (actorRole === Role.SUPER_ADMIN) {
-      return {
-        enabled: true,
-        numericLimit: null as number | null,
-        metadata: null as Record<string, unknown> | null,
-        source: "SUPER_ADMIN" as const,
-      };
-    }
-
-    const permission =
-      await this.prisma.permissionDefinition.findUnique({
-        where: { key: permissionKey },
-      });
-
-    if (!permission || !permission.active) {
-      throw new ForbiddenException(
-        "Bu işlem için aktif yetki tanımı bulunamadı.",
-      );
-    }
-
-    if (permission.superAdminOnly) {
-      throw new ForbiddenException(
-        "Bu işlem yalnız Süper Admin tarafından yapılabilir.",
-      );
-    }
-
-    const rolePolicy =
-      await this.prisma.rolePermissionPolicy.findUnique({
-        where: {
-          role_permissionId: {
-            role: actorRole,
-            permissionId: permission.id,
-          },
-        },
-      });
-
-    const baseEnabled =
-      rolePolicy?.enabled ?? permission.defaultEnabled;
-    const baseNumericLimit =
-      rolePolicy?.numericLimit ?? permission.defaultNumericLimit ?? null;
-    const baseMetadata =
-      (rolePolicy?.metadata as Record<string, unknown> | null) ??
-      (permission.metadata as Record<string, unknown> | null) ??
-      null;
-
-    const now = new Date();
-    const override =
-      await this.prisma.userPermissionOverride.findUnique({
-        where: {
-          userId_permissionId: {
-            userId: actorId,
-            permissionId: permission.id,
-          },
-        },
-      });
-
-    if (
-      override &&
-      (!override.validFrom || override.validFrom <= now) &&
-      (!override.validUntil || override.validUntil >= now)
-    ) {
-      return {
-        enabled: override.enabled ?? baseEnabled,
-        numericLimit: override.numericLimit ?? baseNumericLimit,
-        metadata:
-          (override.metadata as Record<string, unknown> | null) ?? baseMetadata,
-        source: "USER_OVERRIDE" as const,
-      };
-    }
-
-    return {
-      enabled: baseEnabled,
-      numericLimit: baseNumericLimit,
-      metadata: baseMetadata,
-      source: rolePolicy ? "ROLE_POLICY" as const : "PERMISSION_DEFAULT" as const,
-    };
+    return resolvePermission(
+      this.prisma,
+      this.getActorId(actor),
+      this.getActorRole(actor) as Role,
+      permissionKey,
+    );
   }
 
 
@@ -3714,6 +3642,12 @@ export class AdminService {
       );
     }
 
+    if (user.role === Role.SUPER_ADMIN) {
+      throw new ForbiddenException(
+        "Süper Admin yetkileri kısıtlanamaz.",
+      );
+    }
+
     const permission =
       await this.prisma.permissionDefinition.findUnique({
         where: {
@@ -3726,6 +3660,16 @@ export class AdminService {
         "Aktif yetki tanımı bulunamadı.",
       );
     }
+
+    const previous =
+      await this.prisma.userPermissionOverride.findUnique({
+        where: {
+          userId_permissionId: {
+            userId: normalizedUserId,
+            permissionId: permission.id,
+          },
+        },
+      });
 
     if (
       permission.superAdminOnly ||
@@ -3853,6 +3797,14 @@ export class AdminService {
         metadata: {
           permissionKey:
             permission.key,
+          oldValue: previous
+            ? {
+                enabled: previous.enabled,
+                numericLimit: previous.numericLimit,
+                validFrom: previous.validFrom?.toISOString() ?? null,
+                validUntil: previous.validUntil?.toISOString() ?? null,
+              }
+            : null,
           enabled:
             updated.enabled,
           numericLimit:
@@ -3944,6 +3896,12 @@ export class AdminService {
               permission.key,
             action:
               "DELETE_OVERRIDE",
+            oldValue: {
+              enabled: existing.enabled,
+              numericLimit: existing.numericLimit,
+              validFrom: existing.validFrom?.toISOString() ?? null,
+              validUntil: existing.validUntil?.toISOString() ?? null,
+            },
           },
           ipAddress:
             actor?.ipAddress,
@@ -3957,6 +3915,94 @@ export class AdminService {
       normalizedUserId,
       actor,
     );
+  }
+
+  async setUserPermissionsBulk(
+    userId: string,
+    body: { permissions?: Record<string, boolean> },
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    const actorId = this.getActorId(actor);
+    const normalizedUserId = String(userId || "").trim();
+    const requested = body?.permissions;
+
+    if (
+      !requested ||
+      typeof requested !== "object" ||
+      Object.values(requested).some((value) => typeof value !== "boolean")
+    ) {
+      throw new BadRequestException("Yetki listesi geçersiz.");
+    }
+
+    const before = await this.getUserPermissionProfile(normalizedUserId, actor);
+
+    if (before.user.role === Role.SUPER_ADMIN) {
+      throw new ForbiddenException("Süper Admin yetkileri kısıtlanamaz.");
+    }
+
+    const byKey = new Map(before.permissions.map((item) => [item.key, item]));
+    const changes: Array<{ id: string; key: string; oldEnabled: boolean; newEnabled: boolean }> = [];
+
+    for (const [rawKey, newEnabled] of Object.entries(requested)) {
+      const key = String(rawKey).trim().toUpperCase();
+      const current = byKey.get(key);
+
+      if (!current) {
+        throw new NotFoundException(`Aktif yetki tanımı bulunamadı: ${key}`);
+      }
+
+      if (current.superAdminOnly || !current.delegable) {
+        throw new ForbiddenException(`Bu yetki kullanıcıya devredilemez: ${key}`);
+      }
+
+      if (current.enabled !== newEnabled) {
+        changes.push({ id: current.id, key, oldEnabled: current.enabled, newEnabled });
+      }
+    }
+
+    if (changes.length > 0) {
+      await this.prisma.$transaction(async (tx) => {
+        for (const change of changes) {
+          const override = await tx.userPermissionOverride.upsert({
+            where: {
+              userId_permissionId: {
+                userId: normalizedUserId,
+                permissionId: change.id,
+              },
+            },
+            update: { enabled: change.newEnabled, updatedById: actorId },
+            create: {
+              userId: normalizedUserId,
+              permissionId: change.id,
+              enabled: change.newEnabled,
+              updatedById: actorId,
+            },
+          });
+
+          await tx.auditLog.create({
+            data: {
+              actorId,
+              targetUserId: normalizedUserId,
+              action: AuditAction.UPDATE_USER_PERMISSION,
+              entityType: "UserPermissionOverride",
+              entityId: override.id,
+              description: `Kullanıcı yetkisi güncellendi: ${change.key}`,
+              metadata: {
+                permissionKey: change.key,
+                oldValue: { enabled: change.oldEnabled },
+                newValue: { enabled: change.newEnabled },
+              },
+              ipAddress: actor?.ipAddress,
+              userAgent: actor?.userAgent,
+            },
+          });
+        }
+      });
+    }
+
+    return this.getUserPermissionProfile(normalizedUserId, actor);
   }
 
   async extendUserTrial(

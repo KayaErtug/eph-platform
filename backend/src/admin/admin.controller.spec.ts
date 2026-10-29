@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 const adminService = { getStats: jest.fn<ReturnType<AdminService['getStats']>, Parameters<AdminService['getStats']>>() };
 
@@ -12,6 +13,7 @@ describe('AdminController', () => {
       controllers: [AdminController],
       providers: [
         { provide: AdminService, useValue: adminService },
+        { provide: PrismaService, useValue: {} },
       ],
     }).compile();
 

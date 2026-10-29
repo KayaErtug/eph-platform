@@ -16,6 +16,8 @@ import { AnnouncementAudience, Role } from "@prisma/client";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
+import { PermissionGuard } from "../../auth/guards/permission.guard";
+import { RequirePermission } from "../../auth/decorators/require-permission.decorator";
 import { AdminAnnouncementsService } from "./admin-announcements.service";
 
 type AdminRequestUser = {
@@ -31,7 +33,7 @@ type AdminRequest = Request & {
 };
 
 @Controller("admin/announcements")
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionGuard)
 @Roles(Role.ADMIN, Role.SUPER_ADMIN)
 export class AdminAnnouncementsController {
   constructor(private readonly announcementsService: AdminAnnouncementsService) {}
@@ -49,6 +51,7 @@ export class AdminAnnouncementsController {
   }
 
   @Get()
+  @RequirePermission("ANNOUNCEMENT_VIEW")
   getAnnouncements(
     @Query("status") status?: string,
     @Query("audience") audience?: string,
@@ -57,6 +60,7 @@ export class AdminAnnouncementsController {
   }
 
   @Post()
+  @RequirePermission("ANNOUNCEMENT_MANAGE")
   createAnnouncement(
     @Body()
     body: {
@@ -76,6 +80,7 @@ export class AdminAnnouncementsController {
   }
 
   @Patch(":id")
+  @RequirePermission("ANNOUNCEMENT_MANAGE")
   updateAnnouncement(
     @Param("id") id: string,
     @Body()
@@ -97,6 +102,7 @@ export class AdminAnnouncementsController {
   }
 
   @Delete(":id")
+  @RequirePermission("ANNOUNCEMENT_MANAGE")
   deleteAnnouncement(@Param("id") id: string, @Req() request?: AdminRequest) {
     return this.announcementsService.deleteAnnouncement(
       id,
