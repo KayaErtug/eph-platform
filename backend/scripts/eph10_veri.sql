@@ -18,7 +18,9 @@ INSERT INTO "SystemSetting" ("id","key","valueJson","description","createdAt","u
   (gen_random_uuid()::text, 'LIMIT_TALEP_SURE_1_GUN', to_jsonb(3), 'Talep geçerlilik süresi seçeneği 1 (gün)', now(), now()),
   (gen_random_uuid()::text, 'LIMIT_TALEP_SURE_2_GUN', to_jsonb(7), 'Talep geçerlilik süresi seçeneği 2 (gün)', now(), now()),
   (gen_random_uuid()::text, 'LIMIT_TALEP_SURE_3_GUN', to_jsonb(14), 'Talep geçerlilik süresi seçeneği 3 (gün)', now(), now()),
-  (gen_random_uuid()::text, 'LIMIT_TALEP_SURE_4_GUN', to_jsonb(30), 'Talep geçerlilik süresi seçeneği 4 (gün)', now(), now())
+  (gen_random_uuid()::text, 'LIMIT_TALEP_SURE_4_GUN', to_jsonb(30), 'Talep geçerlilik süresi seçeneği 4 (gün)', now(), now()),
+  (gen_random_uuid()::text, 'LIMIT_YETKI_MEKTUBU_CARPAN', to_jsonb(2), 'Yetki mektubu aylık ücretsiz hak çarpanı (portföy limiti x)', now(), now()),
+  (gen_random_uuid()::text, 'LIMIT_YETKI_MEKTUBU_SABIT', to_jsonb(20), 'Yetki mektubu aylık ücretsiz hak, sabit', now(), now())
 ON CONFLICT ("key") DO UPDATE SET "valueJson" = EXCLUDED."valueJson", "updatedAt" = now();
 
 -- 2) Bireysel paketler

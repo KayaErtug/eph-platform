@@ -19,7 +19,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import * as QRCode from 'qrcode';
 
 import { PrismaService } from '../prisma/prisma.service';
-import { readCost } from '../pricing/commercial-costs';
+import { readCost, readLimit } from '../pricing/commercial-costs';
 
 type CurrentUserPayload = {
   userId: string;
@@ -653,7 +653,7 @@ export class EphAuthorityLettersService {
       );
     }
 
-    const monthlyLimit = activePortfolioLimit * 2;
+    const monthlyLimit = activePortfolioLimit * (await readLimit(input.tx, 'LIMIT_YETKI_MEKTUBU_CARPAN'));
     const monthRange = this.getMonthRange();
 
     const quota = await input.tx.kotaKullanimi.upsert({
@@ -707,7 +707,7 @@ export class EphAuthorityLettersService {
     tx: any;
     userId: string;
   }) {
-    const monthlyLimit = 20;
+    const monthlyLimit = await readLimit(input.tx, 'LIMIT_YETKI_MEKTUBU_SABIT');
     const monthRange = this.getMonthRange();
 
     const quota = await input.tx.kotaKullanimi.upsert({
@@ -760,7 +760,7 @@ export class EphAuthorityLettersService {
     tx: any;
     userId: string;
   }): Promise<AuthorityLetterQuotaResult> {
-    const monthlyLimit = 20;
+    const monthlyLimit = await readLimit(input.tx, 'LIMIT_YETKI_MEKTUBU_SABIT');
     const monthRange = this.getMonthRange();
 
     const quota = await input.tx.kotaKullanimi.upsert({
@@ -838,7 +838,7 @@ export class EphAuthorityLettersService {
       );
     }
 
-    const monthlyLimit = activePortfolioLimit * 2;
+    const monthlyLimit = activePortfolioLimit * (await readLimit(input.tx, 'LIMIT_YETKI_MEKTUBU_CARPAN'));
     const monthRange = this.getMonthRange();
 
     const quota = await input.tx.kotaKullanimi.upsert({

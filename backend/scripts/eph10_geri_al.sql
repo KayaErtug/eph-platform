@@ -21,4 +21,6 @@ UPDATE "SystemSetting" SET "valueJson" = jsonb_set("valueJson"::jsonb, '{pkProdu
 -- COST_* / LIMIT_* anahtarları öncesinde yoktu veya 10A-1 tohumuyla bugünkü değerdeydi: havuz yayın ücreti eski davranışa (50) döner, diğerleri aynı kalır.
 UPDATE "SystemSetting" SET "valueJson" = to_jsonb(50), "updatedAt" = now() WHERE "key" = 'COST_HAVUZ_PORTFOY_YAYIN';
 UPDATE "SystemSetting" SET "valueJson" = to_jsonb(5), "updatedAt" = now() WHERE "key" = 'COST_YETKI_MEKTUBU_ASIM';
+-- Yeni anahtarlar (önceki değer yok): silinince kod yedek değerlerine (2 / 20) döner.
+DELETE FROM "SystemSetting" WHERE "key" IN ('LIMIT_YETKI_MEKTUBU_CARPAN', 'LIMIT_YETKI_MEKTUBU_SABIT');
 COMMIT;

@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 // Ticari değerler veridir, kod değildir (EPH_KURALLARI §0-B): kaynak SystemSetting.
 // Buradaki değerler yalnızca ayar yoksa kullanılan yedek değerlerdir.
 export const COST_DEFAULTS = {
-  COST_HAVUZ_PORTFOY_YAYIN: 50,
+  COST_HAVUZ_PORTFOY_YAYIN: 25,
   COST_PROJE_HAVUZ: 100,
   COST_OZEL_BILGI: 25,
   COST_TALEP_YAYIN: 25,
@@ -23,7 +23,11 @@ export const LIMIT_DEFAULTS = {
   LIMIT_TALEP_SURE_2_GUN: 7,
   LIMIT_TALEP_SURE_3_GUN: 14,
   LIMIT_TALEP_SURE_4_GUN: 30,
+  LIMIT_YETKI_MEKTUBU_CARPAN: 2,
+  LIMIT_YETKI_MEKTUBU_SABIT: 20,
 } as const;
+
+export type LimitKey = keyof typeof LIMIT_DEFAULTS;
 
 export const LIMIT_PREFIX = 'LIMIT_';
 
@@ -48,4 +52,11 @@ export async function readCost(db: CostDb, key: CostKey, legacyKeys: string[] = 
     if (value !== null) return value;
   }
   return COST_DEFAULTS[key];
+}
+
+// Sıra: LIMIT_* ayarı, yoksa yedek değer.
+export async function readLimit(db: CostDb, key: LimitKey): Promise<number> {
+  const row = await db.systemSetting.findUnique({ where: { key }, select: { valueJson: true } });
+  const value = row ? parseCostValue(row.valueJson) : null;
+  return value !== null ? value : LIMIT_DEFAULTS[key];
 }
