@@ -96,11 +96,50 @@ export class OfficeManagementService {
       const applicants = ids.length ? await this.prisma.user.findMany({ where: { id: { in: ids }, officeId: null, role: Role.EMLAKCI }, select: { id: true, firstName: true, lastName: true } }) : [];
       const policy = await this.prisma.systemSetting.findUnique({ where: { key: officePolicyKey(office.id) } });
       const profile = await this.prisma.systemSetting.findUnique({ where: { key: officeProfileKey(office.id) } });
-      return { id: office.id, name: office.name, ownerName: [office.owner?.firstName, office.owner?.lastName].filter(Boolean).join(' '), city: office.city || '', district: office.district || '', neighborhood: office.neighborhood || '', ...officeProfile(profile?.valueJson), isOwner, mode, modeConfigured: Boolean(policy), balance: wallet?.bakiye ?? 0, walletActive: wallet?.aktifMi === true, memberCount: await this.prisma.user.count({ where: { officeId: office.id, role: Role.EMLAKCI, id: { not: office.ownerUserId || '' } } }), members, applicants };
+      return { id: office.id, name: office.name, ownerName: [office.owner?.firstName, office.owner?.lastName].filter(Boolean).join(' '), city: office.city || '', district: office.district || '', neighborhood: office.neighborhood || '', ...officeProfile(profile?.valueJson), isOwner, mode, modeConfigured: Boolean(policy), balance: wallet?.bakiye ?? 0, walletActive: wallet?.aktifMi === true, memberCount: await this.prisma.user.count({ where: { officeId: office.id, role: Role.EMLAKCI, id: { not: office.ownerUserId || '' } } }), members, applicants, ...(await this.dashboardExtras(office, isOwner, policy?.valueJson)) };
     }));
     return { actorId: userId, requiresOffice: user.role === Role.EMLAKCI && !data.length,
       canCreate: user.role === Role.EMLAKCI && user.capabilities.some(c => c.capability === Capability.OFFICE_OWNER) && !data.length,
       offices: data };
+  }
+
+  private async maxTeamsFor(db: OfficeDb, officeId: string) {
+    const subscription = await db.systemSetting.findUnique({ where: { key: `OFFICE_SUBSCRIPTION_${officeId}` } });
+    const sub = subscription?.valueJson as any;
+    const config = await db.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' } });
+    const currentPkg = Array.isArray(config?.valueJson) ? (config.valueJson as any[]).find(p => p.code === sub?.packageCode) : undefined;
+    return resolveMaxTeams(currentPkg, Number(currentPkg?.agents ?? sub?.agents ?? 3));
+  }
+
+  // Mobil OfficeWorkspace sözleşmesi: hierarchy herkese; teams, allMembers, maxTeams, permissions yalnız ofis sahibine.
+  private async dashboardExtras(office: { id: string; name: string; ownerUserId: string | null; owner?: { firstName: string | null; lastName: string | null } | null }, isOwner: boolean, policyValue: unknown) {
+    const fullName = (u?: { firstName?: string | null; lastName?: string | null } | null) => [u?.firstName, u?.lastName].filter(Boolean).join(' ');
+    const advisors = await this.prisma.user.findMany({ where: { officeId: office.id, role: Role.EMLAKCI, id: { not: office.ownerUserId || '' } }, select: { id: true, firstName: true, lastName: true, phone: true, isApproved: true, isVerified: true }, orderBy: { firstName: 'asc' } });
+    const hierarchy = [
+      ...(office.ownerUserId ? [{ officeName: office.name, roleTitle: 'Ofis Sahibi', fullName: fullName(office.owner) || 'Ofis Sahibi', userId: office.ownerUserId }] : []),
+      ...advisors.map(a => ({ officeName: office.name, roleTitle: 'Emlak Danışmanı', fullName: fullName(a), userId: a.id })),
+    ];
+    if (!isOwner) return { hierarchy };
+    const policy = policyValue && typeof policyValue === 'object' && !Array.isArray(policyValue) ? policyValue as Record<string, any> : {};
+    const scanPermissions: Record<string, boolean> = policy.scanPermissions && typeof policy.scanPermissions === 'object' ? policy.scanPermissions : {};
+    const autoSpendPermissions: Record<string, boolean> = policy.autoSpendPermissions && typeof policy.autoSpendPermissions === 'object' ? policy.autoSpendPermissions : {};
+    const allowedSharedPoolUserIds: string[] = Array.isArray(policy.allowedSharedPoolUserIds) ? policy.allowedSharedPoolUserIds : [];
+    const allowedSharedPoolTeamIds: string[] = Array.isArray(policy.allowedSharedPoolTeamIds) ? policy.allowedSharedPoolTeamIds : [];
+    const teamRows = await this.prisma.team.findMany({ where: { officeId: office.id, isActive: true }, include: { leader: { select: { firstName: true, lastName: true } }, members: { where: { isActive: true }, include: { user: { select: { id: true, firstName: true, lastName: true } } } } }, orderBy: { name: 'asc' } });
+    const teams = teamRows.map(t => {
+      const members = t.members.map(m => ({ id: m.user.id, firstName: m.user.firstName || '', lastName: m.user.lastName || '' }));
+      return { id: t.id, name: t.name, leaderId: t.leaderId, leaderName: fullName(t.leader) || null, memberCount: members.length, members };
+    });
+    const restricted = allowedSharedPoolUserIds.length > 0 || allowedSharedPoolTeamIds.length > 0;
+    const allMembers = advisors.map(a => ({
+      ...a,
+      roleTitle: 'Emlak Danışmanı',
+      canScan: scanPermissions[a.id] !== false,
+      canAutoSpend: autoSpendPermissions[a.id] !== false,
+      hasSharedPoolAccess: !restricted || allowedSharedPoolUserIds.includes(a.id) || teamRows.some(t => allowedSharedPoolTeamIds.includes(t.id) && t.members.some(m => m.userId === a.id)),
+      teams: teamRows.filter(t => t.members.some(m => m.userId === a.id)).map(t => ({ id: t.id, name: t.name })),
+    }));
+    return { allMembers, teams, maxTeams: await this.maxTeamsFor(this.prisma, office.id), permissions: { scanPermissions, autoSpendPermissions, allowedSharedPoolUserIds, allowedSharedPoolTeamIds } };
   }
 
   async updateProfile(userId: string, officeId: string, raw: unknown) {
@@ -317,12 +356,7 @@ export class OfficeManagementService {
       await officeLock(tx, `office-policy:${officeId}`);
       await this.owned(tx, userId, officeId);
       const activeTeamsCount = await tx.team.count({ where: { officeId, isActive: true } });
-      const subscription = await tx.systemSetting.findUnique({ where: { key: `OFFICE_SUBSCRIPTION_${officeId}` } });
-      const sub = subscription?.valueJson as any;
-      const config = await tx.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' } });
-      const currentPkg = Array.isArray(config?.valueJson) ? (config.valueJson as any[]).find(p => p.code === sub?.packageCode) : undefined;
-      const agentCap = Number(currentPkg?.agents ?? sub?.agents ?? 3);
-      const maxTeams = resolveMaxTeams(currentPkg, agentCap);
+      const maxTeams = await this.maxTeamsFor(tx, officeId);
       if (activeTeamsCount >= maxTeams) {
         throw new BadRequestException(`Mevcut ofis paketinizde en fazla ${maxTeams} takım oluşturabilirsiniz.`);
       }

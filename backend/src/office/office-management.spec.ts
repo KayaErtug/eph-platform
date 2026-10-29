@@ -11,7 +11,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 function fixture() {
   let state: any = {
-    users: { owner: { id: 'owner', role: 'EMLAKCI', officeId: 'office', isApproved: true, isVerified: true }, member: { id: 'member', role: 'EMLAKCI', officeId: 'office', isApproved: true, isVerified: true }, stranger: { id: 'stranger', role: 'EMLAKCI', officeId: null, isApproved: true, isVerified: true }, contractor: { id: 'contractor', role: 'MUTEAHHIT', officeId: null }, super: { id: 'super', role: 'SUPER_ADMIN', officeId: null } },
+    users: { owner: { id: 'owner', role: 'EMLAKCI', capabilities: [{ capability: 'OFFICE_OWNER' }], officeId: 'office', isApproved: true, isVerified: true }, member: { id: 'member', role: 'EMLAKCI', capabilities: [], officeId: 'office', isApproved: true, isVerified: true }, stranger: { id: 'stranger', role: 'EMLAKCI', capabilities: [], officeId: null, isApproved: true, isVerified: true }, contractor: { id: 'contractor', role: 'MUTEAHHIT', capabilities: [], officeId: null }, super: { id: 'super', role: 'SUPER_ADMIN', capabilities: [], officeId: null } },
     offices: { office: { id: 'office', name: 'EPH Test Ofisi', ownerUserId: 'owner', isActive: true } },
     settings: { EPH_OFFICE_MEMBERSHIP_ENFORCED: true, [officePolicyKey('office')]: { mode: 'ALLOCATED' } },
     wallets: { owner: { kullaniciId: 'owner', bakiye: 100, toplamYukleme: 100, toplamHarcama: 0, toplamHediye: 0, aktifMi: true }, member: { kullaniciId: 'member', bakiye: 5, toplamYukleme: 5, toplamHarcama: 0, toplamHediye: 0, aktifMi: true }, contractor: { kullaniciId: 'contractor', bakiye: 20, aktifMi: true } },

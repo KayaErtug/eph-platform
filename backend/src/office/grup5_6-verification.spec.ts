@@ -172,6 +172,7 @@ describe('GRUP 5 & GRUP 6 Verification (Tasks 9, 10, 19, 20, 22, 25)', () => {
         isActive: true,
       });
 
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'owner-1', role: Role.EMLAKCI, capabilities: [{ capability: 'OFFICE_OWNER' }] });
       // Team has user-1 and user-2
       mockPrisma.teamMember.findMany.mockResolvedValue([
         { userId: 'user-1' },
