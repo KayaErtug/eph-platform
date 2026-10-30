@@ -5,7 +5,7 @@ Tarih: 2026-10-30. Yerel değişiklik + commit; deploy/PM2 restart yapılmadı, 
 ## Değişen
 - `backend/src/pricing/pricing.service.ts` — `tariff()` içinde `limits`: liste değerli `LIMIT_*` anahtarları (`LIMIT_ADMIN_HEDIYE_PK_SECENEKLERI`, `LIMIT_DENEME_GUN_SECENEKLERI` ve DB'de `{ value: number[] }` olarak kayıtlı diğer liste anahtarları) `value: number[]` döner. Kayıt yoksa/geçersizse `LIMIT_LIST_DEFAULTS` yedeği (`source: 'DEFAULT'`). Sayısal anahtarlar aynen kaldı.
 - `backend/src/pricing/pricing.service.spec.ts` — yeni test (2 senaryo).
-- Paket: `D:\Downloads\EPH59_HAZIR\src\pricing\` (iki dosya). Yedek: `pricing.service.ts.bak-eph59`.
+- Paket: `D:\Downloads\EPH59_HAZIR\src\pricing\` (iki dosya) ve EPH-57 (commit b804765b) için CRLF: `srcuthegistration\pending-registration.service.ts`, `srcuthegistrationegistration-v2.service.ts`, `src\profile\profile.service.ts`. Yedek: `pricing.service.ts.bak-eph59`.
 
 ## Doğrulanan
 - `npx jest src/pricing` → 3 suite, 15 test geçti.
