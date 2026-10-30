@@ -97,13 +97,13 @@ describe('Software team message intervention', () => {
   function setup() {
     const conversation = { id: 'conversation', NetworkPost: null, ConversationParticipant: [{ userId: 'a' }, { userId: 'b' }] };
     const db = { userBlock: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) }, conversation: { findUnique: jest.fn().mockResolvedValue(conversation), update: jest.fn().mockResolvedValue({}) }, message: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn(async ({ data }) => ({ id: 'message', body: data.body, createdAt: new Date(), User: { id: data.User.connect.id, role: Role.SUPER_ADMIN, firstName: 'Private', lastName: 'Name' }, Conversation: conversation })) } };
-    const push = { sendToUser: jest.fn().mockResolvedValue({}) };
+    const push = { notify: jest.fn().mockResolvedValue({}) };
     return { db, push, service: new MessagesService(db as any, push as any) };
   }
   it('Super can write as Yazılım Ekibi in a conversation without impersonation', async () => {
     const { service, db, push } = setup(); await service.sendMessage('conversation', { body: 'Destek yanıtı' }, 'super', Role.SUPER_ADMIN);
-    expect(db.message.create.mock.calls[0][0].data.User.connect.id).toBe('super'); expect(push.sendToUser).toHaveBeenCalledTimes(2);
-    for (const call of push.sendToUser.mock.calls) expect(call[1].body).toBe('Yazılım Ekibi size mesaj gönderdi.');
+    expect(db.message.create.mock.calls[0][0].data.User.connect.id).toBe('super'); expect(push.notify).toHaveBeenCalledTimes(2);
+    for (const call of push.notify.mock.calls) expect(call[1].body).toBe('Yazılım Ekibi size mesaj gönderdi.');
   });
   it('blocks normal outsiders and forged senderId even for Super', async () => {
     const { service, db } = setup();

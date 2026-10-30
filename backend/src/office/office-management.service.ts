@@ -4,6 +4,7 @@ import * as path from 'path';
 import { officeLogoExtension, officeProfile, officeProfileInput, officeProfileKey } from './office-profile';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PushService } from '../push/push.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { Capability, KontorHareketTuru, KontorIslemTuru, Prisma, Role } from '@prisma/client';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,7 +20,8 @@ function officeMatchLogsKey(officeId: string) { return `office-match-logs:${offi
 
 @Injectable()
 export class OfficeManagementService {
-  constructor(private readonly prisma: PrismaService, @Optional() private readonly pushService?: PushService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly pushService?: PushService,
+    @Optional() private readonly notifications?: NotificationsService) {}
 
   async rolloutStatus() {
     const users = await this.prisma.user.findMany({ where: { role: Role.EMLAKCI, isApproved: true, isVerified: true, OR: [{ professionalVerificationStatus: null }, { professionalVerificationStatus: 'VERIFIED' }], office: { isNot: { isActive: true } }, ownedOffices: { none: { isActive: true } } }, select: { id: true, firstName: true, lastName: true } });
@@ -91,9 +93,13 @@ export class OfficeManagementService {
       const walletId = isOwner || mode === 'SHARED' ? office.ownerUserId : userId;
       const wallet = walletId ? await this.prisma.kontorCuzdani.findUnique({ where: { kullaniciId: walletId } }) : null;
       const members = isOwner ? await this.prisma.user.findMany({ where: { officeId: office.id, role: Role.EMLAKCI }, select: { id: true, firstName: true, lastName: true, isApproved: true, isVerified: true }, orderBy: { firstName: 'asc' } }) : [];
-      const pending = isOwner ? await this.prisma.systemSetting.findMany({ where: { key: { startsWith: `EPH_OFFICE_JOIN_${office.id}_` }, valueJson: { path: ['status'], equals: 'PENDING' } } }) : [];
+      const pending = isOwner ? (await this.prisma.systemSetting.findMany({ where: { key: { startsWith: `EPH_OFFICE_JOIN_${office.id}_` } } })).filter(r => (r.valueJson as Prisma.JsonObject | null)?.status === 'PENDING') : [];
       const ids = pending.map(r => (r.valueJson as Prisma.JsonObject)?.userId).filter((id): id is string => typeof id === 'string');
-      const applicants = ids.length ? await this.prisma.user.findMany({ where: { id: { in: ids }, officeId: null, role: Role.EMLAKCI }, select: { id: true, firstName: true, lastName: true } }) : [];
+      const capacity = await this.agentCapacity(this.prisma, office.id);
+      const agentCount = await this.prisma.user.count({ where: { officeId: office.id, role: Role.EMLAKCI, id: { not: office.ownerUserId || '' } } });
+      const full = agentCount >= capacity.limit;
+      const applicantRows = ids.length ? await this.prisma.user.findMany({ where: { id: { in: ids }, role: Role.EMLAKCI }, select: { id: true, firstName: true, lastName: true, phone: true, officeId: true } }) : [];
+      const applicants = applicantRows.map(({ officeId: linked, ...a }) => ({ ...a, capacityFull: full, blockedReason: linked ? 'Danışman başka bir ofise bağlı.' : full ? `Kapasite dolu: paketinizde ${capacity.limit} danışman hakkı var.` : null }));
       const policy = await this.prisma.systemSetting.findUnique({ where: { key: officePolicyKey(office.id) } });
       const profile = await this.prisma.systemSetting.findUnique({ where: { key: officeProfileKey(office.id) } });
       const extras = await this.dashboardExtras(office, isOwner, policy?.valueJson);
@@ -103,11 +109,23 @@ export class OfficeManagementService {
         canAutoSpend: extras.permissions?.autoSpendPermissions[member.id] !== false,
         teams: (extras.teams || []).filter(team => team.members.some(m => m.id === member.id)).map(team => ({ id: team.id, name: team.name })),
       }));
-      return { id: office.id, name: office.name, ownerName: [office.owner?.firstName, office.owner?.lastName].filter(Boolean).join(' '), city: office.city || '', district: office.district || '', neighborhood: office.neighborhood || '', ...officeProfile(profile?.valueJson), isOwner, mode, modeConfigured: Boolean(policy), balance: wallet?.bakiye ?? 0, walletActive: wallet?.aktifMi === true, memberCount: await this.prisma.user.count({ where: { officeId: office.id, role: Role.EMLAKCI, id: { not: office.ownerUserId || '' } } }), members: enrichedMembers, applicants, ...extras };
+      return { id: office.id, name: office.name, ownerName: [office.owner?.firstName, office.owner?.lastName].filter(Boolean).join(' '), city: office.city || '', district: office.district || '', neighborhood: office.neighborhood || '', ...officeProfile(profile?.valueJson), isOwner, mode, modeConfigured: Boolean(policy), balance: wallet?.bakiye ?? 0, walletActive: wallet?.aktifMi === true, memberCount: agentCount, agentCapacity: { used: agentCount, total: capacity.limit, packageName: capacity.packageName }, members: enrichedMembers, applicants, ...extras };
     }));
     return { actorId: userId, requiresOffice: user.role === Role.EMLAKCI && !data.length,
       canCreate: user.role === Role.EMLAKCI && user.capabilities.some(c => c.capability === Capability.OFFICE_OWNER) && !data.length,
       offices: data };
+  }
+
+  // Danışman kontenjanı (sahip hariç): paket kaydı > abonelik > varsayılan 5.
+  private async agentCapacity(db: OfficeDb, officeId: string) {
+    const subscription = await db.systemSetting.findUnique({ where: { key: `OFFICE_SUBSCRIPTION_${officeId}` } });
+    const sub = subscription?.valueJson as Prisma.JsonObject | undefined;
+    const config = await db.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' } });
+    const current = Array.isArray(config?.valueJson) ? (config.valueJson as Prisma.JsonObject[]).find(p => p.code === sub?.packageCode) : undefined;
+    const capacity = current?.agents ?? sub?.agents;
+    const limit = typeof capacity === 'number' && Number.isSafeInteger(capacity) && capacity >= 0 ? capacity : 5;
+    const label = [current?.name, current?.title, sub?.packageName, sub?.packageCode].find(v => typeof v === 'string' && v);
+    return { limit, packageName: (label as string | undefined) || 'Paket' };
   }
 
   private async maxTeamsFor(db: OfficeDb, officeId: string) {
@@ -283,6 +301,9 @@ export class OfficeManagementService {
       const key = requestKey(officeId, userId);
       const data = { officeId, userId, status: 'PENDING', requestedAt: new Date().toISOString() };
       await tx.systemSetting.upsert({ where: { key }, create: { key, valueJson: data }, update: { valueJson: data } });
+      await this.notifications?.notify(office.ownerUserId, { type: 'OFFICE_JOIN_REQUEST', priority: 'ACIL',
+        title: 'Yeni ofis başvurusu', body: 'Ofisinize katılım başvurusu geldi.', actionUrl: '/office',
+        eventKey: `office-request:${key}:${data.requestedAt}` }, tx);
       return { ok: true, message: `${office.name} ofis sahibinin onayı bekleniyor.` };
     });
   }
@@ -301,17 +322,16 @@ export class OfficeManagementService {
       if (approve) {
         const applicant = await tx.user.findUnique({ where: { id: applicantId } });
         if (applicant?.role !== Role.EMLAKCI || applicant.officeId || await tx.office.count({ where: { ownerUserId: applicantId, isActive: true } })) throw new BadRequestException('Danışmanın ofis bağlantısı değişmiş.');
-        const subscription = await tx.systemSetting.findUnique({ where: { key: `OFFICE_SUBSCRIPTION_${officeId}` } });
-        const sub = subscription?.valueJson as Prisma.JsonObject | undefined;
-        const config = await tx.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' } });
-        const current = Array.isArray(config?.valueJson) ? (config.valueJson as Prisma.JsonObject[]).find(p => p.code === sub?.packageCode) : undefined;
-        const capacity = current?.agents ?? sub?.agents;
-        const limit = typeof capacity === 'number' && Number.isSafeInteger(capacity) && capacity >= 0 ? capacity : 5;
+        const { limit } = await this.agentCapacity(tx, officeId);
         const count = await tx.user.count({ where: { officeId, role: Role.EMLAKCI, NOT: { id: userId } } });
-        if (count >= limit) throw new BadRequestException('Ofisin danışman kapasitesi dolu.');
+        if (count >= limit) throw new BadRequestException(`Kapasite dolu: paketinizde ${limit} danışman hakkı var.`);
         await tx.user.update({ where: { id: applicantId }, data: { officeId } });
       }
-      await tx.systemSetting.update({ where: { key }, data: { valueJson: { ...value, status: approve ? 'APPROVED' : 'REJECTED', decidedBy: userId, decidedAt: new Date().toISOString() } } });
+      const decidedAt = new Date().toISOString();
+      await tx.systemSetting.update({ where: { key }, data: { valueJson: { ...value, status: approve ? 'APPROVED' : 'REJECTED', decidedBy: userId, decidedAt } } });
+      await this.notifications?.notify(applicantId, { type: 'OFFICE_JOIN_DECIDED', priority: 'ONEMLI',
+        title: 'Ofis başvurunuz sonuçlandı', body: approve ? 'Ofis başvurunuz onaylandı.' : 'Ofis başvurunuz reddedildi.',
+        actionUrl: '/office', eventKey: `office-decision:${key}:${decidedAt}` }, tx);
       await tx.adminActionLog.create({ data: { actorId: userId, targetUserId: applicantId, action: 'OFFICE_JOIN_DECIDED', entityType: 'OFFICE', entityId: officeId, description: approve ? 'Danışman ofise kabul edildi; mesleki doğrulama durumu değiştirilmedi.' : 'Ofis başvurusu reddedildi.' } });
       return { ok: true };
     });
@@ -505,6 +525,23 @@ export class OfficeManagementService {
         create: { key, valueJson: updated },
         update: { valueJson: updated },
       });
+      if (this.notifications) {
+        const members = await tx.user.findMany({ where: { officeId }, select: { id: true } });
+        const teams = await tx.team.findMany({ where: { officeId, isActive: true }, include: { members: { where: { isActive: true } } } });
+        const access = (policy: any, id: string) => {
+          const users: string[] = policy.allowedSharedPoolUserIds || [];
+          const allowedTeams: string[] = policy.allowedSharedPoolTeamIds || [];
+          return !users.length && !allowedTeams.length || users.includes(id) || teams.some(t => allowedTeams.includes(t.id) && t.members.some(m => m.userId === id));
+        };
+        for (const member of members) {
+          const changed = (current.scanPermissions?.[member.id] !== false) !== (updated.scanPermissions[member.id] !== false)
+            || (current.autoSpendPermissions?.[member.id] !== false) !== (updated.autoSpendPermissions[member.id] !== false)
+            || access(current, member.id) !== access(updated, member.id);
+          if (changed) await this.notifications.notify(member.id, { type: 'ROLE_CHANGED', priority: 'ONEMLI',
+            title: 'Ofis yetkileriniz değişti', body: 'Ofis içindeki erişim veya PK kullanım yetkiniz güncellendi.',
+            actionUrl: '/office', eventKey: `office-permission:${officeId}:${updated.updatedAt}:${member.id}` }, tx);
+        }
+      }
       return { ok: true, permissions: updated };
     });
   }

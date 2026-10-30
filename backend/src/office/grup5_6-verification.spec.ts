@@ -11,6 +11,7 @@ describe('GRUP 5 & GRUP 6 Verification (Tasks 9, 10, 19, 20, 22, 25)', () => {
 
   beforeEach(() => {
     mockPush = {
+      notify: jest.fn().mockResolvedValue({}),
       sendToUser: jest.fn().mockResolvedValue(true),
     };
 
@@ -69,8 +70,8 @@ describe('GRUP 5 & GRUP 6 Verification (Tasks 9, 10, 19, 20, 22, 25)', () => {
 
     messagesService = new MessagesService(
       mockPrisma as any,
-      textSafetyService as any,
       mockPush as any,
+      textSafetyService as any,
     );
 
     officeManagementService = new OfficeManagementService(

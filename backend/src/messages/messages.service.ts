@@ -11,14 +11,14 @@ import { Role } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
-import { PushService } from '../push/push.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { networkPaidAccessWhere } from '../network/network-contact-policy';
 
 @Injectable()
 export class MessagesService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly pushService: PushService,
+    private readonly notifications: NotificationsService,
     private readonly textSafetyService: TextSafetyService = new TextSafetyService(),
   ) {}
 
@@ -448,11 +448,12 @@ export class MessagesService {
 
     await Promise.all(
       receiverIds.map((receiverId) =>
-        this.pushService.sendToUser(receiverId, {
+        this.notifications.notify(receiverId, {
+          type: 'NEW_MESSAGE', priority: 'ONEMLI', eventKey: `message:${message.id}:${receiverId}`,
           title: 'Yeni mesajınız var',
           body: message.User.role === Role.SUPER_ADMIN ? 'Yazılım Ekibi size mesaj gönderdi.' : `${message.User.firstName} ${message.User.lastName} size mesaj gönderdi.`,
-          url: `/messages/${conversationId}`,
-        }),
+          actionUrl: `/messages/${conversationId}`,
+        }).catch(() => undefined), // The committed Message is retried by NotificationEventsService.
       ),
     );
 

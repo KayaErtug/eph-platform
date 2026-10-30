@@ -1,5 +1,6 @@
 import { PoolAudienceModule } from '../pool-audience/pool-audience.module';
 import { Module } from '@nestjs/common';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { LinaModule } from '../lina/lina.module';
 import { ProjectMediaZipService } from './project-media-zip.service';
 import { ProjectSalesAgentChannelController } from './project-sales-agent-channel.controller';
@@ -36,7 +37,7 @@ import { ProjectSalesStructureService } from './project-sales-structure.service'
 import { ProjectSalesService } from './project-sales.service';
 
 @Module({
-  imports: [LinaModule, PoolAudienceModule],
+  imports: [LinaModule, PoolAudienceModule, NotificationsModule],
   controllers: [
     ProjectSalesController,
     ProjectSalesPresentationShareController,

@@ -2,6 +2,7 @@ import { NativePushService } from './native-push.service';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as webPush from 'web-push';
+import { notificationCategory, SETTINGS_PREFIX } from '../notifications/notification-settings';
 
 type BrowserPushSubscription = {
   endpoint: string;
@@ -15,6 +16,7 @@ type PushPayload = {
   title: string;
   body: string;
   url?: string;
+  category?: 'messages' | 'forum' | 'pool' | 'announcements' | 'lina';
 };
 
 @Injectable()
@@ -85,6 +87,11 @@ export class PushService {
   }
 
   async sendToUser(userId: string, payload: PushPayload) {
+    const row = await this.prisma.systemSetting.findUnique({ where: { key: SETTINGS_PREFIX + userId } });
+    const settings = row?.valueJson as Record<string, unknown> | undefined;
+    if (settings?.enabled === false || settings?.[payload.category || notificationCategory('', payload.url || '')] === false) {
+      return { ok: false, successCount: 0, failCount: 0, skippedCount: 1 };
+    }
     const native = await this.nativePush.sendToUser(userId, payload);
     const subscriptions = await this.prisma.pushSubscription.findMany({
       where: { userId },

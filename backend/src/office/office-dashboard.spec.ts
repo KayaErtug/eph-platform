@@ -1,6 +1,7 @@
 import { OfficeManagementService } from './office-management.service';
 import { officePolicyKey } from './office-wallet.rules';
 
+const advisorRow = () => ({ id: 'advisor', firstName: 'Test', lastName: 'Danışman', phone: null, isApproved: true, isVerified: true });
 function fixture(actorId = 'owner', maxTeams: number | undefined = 4) {
   const owner = { id: 'owner', firstName: 'Ofis', lastName: 'Sahibi', isApproved: true, isVerified: true };
   const advisor = { id: 'advisor', firstName: 'Test', lastName: 'Danışman', phone: null, isApproved: true, isVerified: true };
@@ -60,6 +61,19 @@ describe('Mobile office dashboard contract', () => {
       return null;
     });
     expect((await f.service.dashboard('owner')).offices[0].maxTeams).toBe(2);
+  });
+
+  it('shows pending applicants even when capacity is full, with a blocked reason', async () => {
+    const f = fixture();
+    f.db.systemSetting.findMany.mockImplementation(async () => [
+      { key: 'EPH_OFFICE_JOIN_office_app', valueJson: { userId: 'app', status: 'PENDING' } },
+      { key: 'EPH_OFFICE_JOIN_office_old', valueJson: { userId: 'old', status: 'APPROVED' } },
+    ]);
+    f.db.user.findMany.mockImplementation(async ({ where }) => where.id?.in ? [{ id: 'app', firstName: 'Ayşe', lastName: 'Yıl', phone: '555', officeId: null }] : [advisorRow()]);
+    f.db.user.count.mockImplementation(async () => 7);
+    const office = (await f.service.dashboard('owner')).offices[0];
+    expect(office.agentCapacity).toEqual({ used: 7, total: 7, packageName: 'test' });
+    expect(office.applicants).toEqual([{ id: 'app', firstName: 'Ayşe', lastName: 'Yıl', phone: '555', capacityFull: true, blockedReason: 'Kapasite dolu: paketinizde 7 danışman hakkı var.' }]);
   });
 
   it('returns hierarchy to an affiliated advisor while preserving owner-only data boundaries', async () => {

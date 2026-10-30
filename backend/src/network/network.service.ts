@@ -1695,12 +1695,14 @@ export class NetworkService {
       this.prisma.networkNotification.count({
         where: {
           userId,
+          OR: [{ type: 'NETWORK' }, { postId: { not: null } }],
           isRead: false,
         },
       }),
       this.prisma.networkNotification.findMany({
         where: {
           userId,
+          OR: [{ type: 'NETWORK' }, { postId: { not: null } }],
         },
         orderBy: {
           createdAt: "desc",
@@ -1726,6 +1728,7 @@ export class NetworkService {
     await this.prisma.networkNotification.updateMany({
       where: {
         userId,
+        OR: [{ type: 'NETWORK' }, { postId: { not: null } }],
         isRead: false,
       },
       data: {
@@ -2733,6 +2736,8 @@ export class NetworkService {
           userId: post.userId,
           postId: post.id,
           title: "Talebiniz için özel erişim açıldı",
+          type: 'CONTACT_UNLOCKED', priority: 'BILGI', actionUrl: `/network/${post.id}`,
+          eventKey: `contact:${spendResult.movement.id}`, pushStatus: 'PENDING',
           message: `${actorName}, "${post.title}" paylaşımınız için özel bilgilerinize erişti.`,
         },
       });

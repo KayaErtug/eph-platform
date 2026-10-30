@@ -1,17 +1,18 @@
 import { Cron } from '@nestjs/schedule';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 type Preferences = Record<'messages' | 'forum' | 'pool' | 'announcements' | 'lina', boolean>;
 type Subscription = { userId: string; token: string; platform: string; sound: boolean; preferences: Preferences };
-type Payload = { title: string; body: string; url?: string };
+type Payload = { title: string; body: string; url?: string; category?: keyof Preferences };
 const PREFIX = 'EPH_NATIVE_PUSH_';
 const RECEIPTS = 'EPH_PUSH_RECEIPT_';
 const DEFAULTS: Preferences = { messages: true, forum: true, pool: true, announcements: true, lina: true };
 
 @Injectable()
 export class NativePushService {
+  private readonly logger = new Logger(NativePushService.name);
   private collecting = false;
   constructor(private readonly prisma: PrismaService) {}
 
@@ -41,6 +42,7 @@ export class NativePushService {
       if (devices.length >= 20 && !devices.some(device => device.key === this.key(token))) throw new BadRequestException('Cihaz bildirim sınırına ulaşıldı. Kullanılmayan cihazların bildirimlerini kapatın.');
       await tx.systemSetting.upsert({ where: { key: this.key(token) }, create: { key: this.key(token), valueJson }, update: { valueJson } });
     });
+    this.logger.log({ event: 'EPH_PUSH', phase: 'subscribe', userId, deviceKey: this.key(token), platform: String(body.platform) });
     return { ok: true };
   }
 
@@ -65,9 +67,10 @@ export class NativePushService {
     }, take: 100 });
     let successCount = 0;
     let failCount = 0;
+    let skippedCount = 0;
     await Promise.all(rows.map(async row => {
       const subscription = row.valueJson as unknown as Subscription;
-      if (!subscription?.token || !bypassPreferences && subscription.preferences?.[this.category(payload.url)] === false) return;
+      if (!subscription?.token || !bypassPreferences && subscription.preferences?.[payload.category || this.category(payload.url)] === false) { skippedCount++; return; }
       try {
         const response = await fetch('https://exp.host/--/api/v2/push/send', {
           method: 'POST',
@@ -75,7 +78,8 @@ export class NativePushService {
           body: JSON.stringify({ to: subscription.token, title: payload.title, body: payload.body, sound: subscription.sound ? 'default' : null, channelId: subscription.sound ? 'eph-default' : 'eph-silent', data: { url: payload.url || '/' } }),
           signal: AbortSignal.timeout(10000),
         });
-        const result = await response.json() as { data?: { status?: string; id?: string; details?: { error?: string } } };
+        const result = await response.json() as { data?: { status?: string; id?: string; details?: { error?: string } }; errors?: Array<{ code?: string }> };
+        this.logger.log({ event: 'EPH_PUSH', phase: 'ticket', userId, deviceKey: row.key, httpStatus: response.status, status: result.data?.status || 'error', ticketId: result.data?.id, code: result.data?.details?.error || result.errors?.[0]?.code });
         if (response.ok && result.data?.status === 'ok') {
           successCount++;
           if (result.data.id) {
@@ -88,9 +92,10 @@ export class NativePushService {
           failCount++;
           if (result.data?.details?.error === 'DeviceNotRegistered') await this.prisma.systemSetting.deleteMany({ where: { key: row.key, valueJson: { path: ['userId'], equals: userId } } });
         }
-      } catch { failCount++; }
+      } catch { failCount++; this.logger.warn({ event: 'EPH_PUSH', phase: 'ticket', userId, deviceKey: row.key, code: 'NETWORK_OR_RESPONSE_ERROR' }); }
     }));
-    return { ok: successCount > 0, successCount, failCount };
+    this.logger.log({ event: 'EPH_PUSH', phase: 'send', userId, deviceCount: rows.length, successCount, failCount, skippedCount });
+    return { ok: successCount > 0, successCount, failCount, skippedCount };
   }
 
   @Cron('*/2 * * * *')
@@ -104,12 +109,13 @@ export class NativePushService {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...(process.env.EXPO_ACCESS_TOKEN ? { Authorization: `Bearer ${process.env.EXPO_ACCESS_TOKEN}` } : {}) },
         body: JSON.stringify({ ids: rows.map(row => row.key.slice(RECEIPTS.length)) }), signal: AbortSignal.timeout(10000),
       });
-      if (!response.ok) return;
+      if (!response.ok) { this.logger.warn({ event: 'EPH_PUSH', phase: 'receipt-fetch', httpStatus: response.status }); return; }
       const result = await response.json() as { data?: Record<string, { status?: string; details?: { error?: string } }> };
       for (const row of rows) {
         const receipt = result.data?.[row.key.slice(RECEIPTS.length)];
         if (!receipt && Date.now() - row.createdAt.getTime() < 86400000) continue;
         const subscription = row.valueJson as unknown as { userId: string; token: string };
+        this.logger.log({ event: 'EPH_PUSH', phase: 'receipt', userId: subscription.userId, ticketId: row.key.slice(RECEIPTS.length), status: receipt?.status || 'expired', code: receipt?.details?.error });
         if (receipt?.details?.error === 'DeviceNotRegistered') await this.prisma.systemSetting.deleteMany({ where: { key: this.key(subscription.token), valueJson: { path: ['userId'], equals: subscription.userId } } });
         if (receipt?.status === 'error') console.warn('EPH bildirim teslim hatası:', receipt.details?.error || 'UNKNOWN');
         await this.prisma.systemSetting.deleteMany({ where: { key: row.key } });

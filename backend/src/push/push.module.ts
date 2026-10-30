@@ -9,6 +9,6 @@ import { PushService } from './push.service';
   imports: [PrismaModule],
   controllers: [PushController, NativePushController],
   providers: [PushService, NativePushService],
-  exports: [PushService],
+  exports: [PushService, NativePushService],
 })
 export class PushModule {}

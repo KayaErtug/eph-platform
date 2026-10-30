@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Optional,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -14,6 +15,7 @@ import {
 } from '@prisma/client';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { resolveOfficeWallet } from '../office/office-wallet.rules';
 import { readCost } from '../pricing/commercial-costs';
 import { PoolAudienceService, type AudienceInput } from '../pool-audience/pool-audience.service';
@@ -52,7 +54,8 @@ const CLOSED_STATUSES = new Set<UnitStatus>([
 
 @Injectable()
 export class ProjectSalesLaunchService {
-  constructor(private readonly prisma: PrismaService, private readonly audience: PoolAudienceService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audience: PoolAudienceService,
+    @Optional() private readonly notifications?: NotificationsService) {}
 
   async getLaunchCenter(projectId: string, userId: string, userRole: Role) {
     const project = await this.getAuthorizedProject(projectId, userId, userRole);
@@ -197,7 +200,7 @@ export class ProjectSalesLaunchService {
         billing = { costPk: projectCostPk, spent: projectCostPk, previousBalance: wallet.bakiye, remainingBalance: wallet.bakiye - projectCostPk };
       }
       if (poolAudience) await this.audience.setProjectAudience(projectId, { id: userId, role: userRole }, poolAudience, tx);
-      return tx.unit.updateMany({
+      const published = await tx.unit.updateMany({
       where: {
         projectId: project.id,
         isSalesInventory: true,
@@ -211,7 +214,12 @@ export class ProjectSalesLaunchService {
         poolRemovedAt: null,
       },
     });
-
+      if (!alreadyInPool && published.count > 0) await this.notifications?.notify(project.ownerId, {
+        type: 'PROJECT_POOL_ACCEPTED', priority: 'ONEMLI', title: 'Projeniz havuza kabul edildi',
+        body: 'Projenizin bağımsız bölümleri EPH Havuzunda yayınlandı.', actionUrl: `/project-sales/${project.id}`,
+        eventKey: `project-pool:${project.id}:${publishedAt.toISOString()}`,
+      }, tx);
+      return published;
     });
 
     const nextProject = await this.getProject(project.id);

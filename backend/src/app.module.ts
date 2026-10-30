@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NotificationsModule } from './notifications/notifications.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AdminEmailModule } from './admin-email/admin-email.module';
@@ -88,6 +89,7 @@ import { PoolProjectsModule } from './pool-projects/pool-projects.module';
 
     VisitsModule,
     PushModule,
+    NotificationsModule,
     MessagesModule,
     NetworkModule,
     SystemMessagesModule,

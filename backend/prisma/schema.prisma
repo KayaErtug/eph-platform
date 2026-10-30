@@ -1336,6 +1336,7 @@ model Message {
   createdAt      DateTime     @default(now())
   Conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   User           User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  @@index([createdAt])
 }
 
 model NetworkPost {
@@ -1423,11 +1424,20 @@ model NetworkNotification {
   message   String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+  type      String   @default("NETWORK")
+  priority  String   @default("BILGI")
+  actionUrl String?
+  eventKey  String?  @unique
+  pushStatus String  @default("NONE")
+  pushAttempts Int   @default(0)
+  pushAttemptedAt DateTime?
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([isRead])
   @@index([createdAt])
+  @@index([userId, isRead, priority])
+  @@index([pushStatus, pushAttemptedAt])
 }
 
 model PushSubscription {
@@ -1508,6 +1518,7 @@ model AuditLog {
   createdAt    DateTime    @default(now())
   actor        User?       @relation("AuditActor", fields: [actorId], references: [id])
   targetUser   User?       @relation("AuditTargetUser", fields: [targetUserId], references: [id])
+  @@index([createdAt])
 }
 
 model ProjectAuthorizedContact {
@@ -1687,6 +1698,7 @@ model MatchScanAttempt {
   @@index([postId])
   @@index([status])
   @@index([startedAt])
+  @@index([status, sourceType, completedAt])
 }
 
 model PoolShareLink {

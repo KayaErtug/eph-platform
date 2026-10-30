@@ -45,6 +45,7 @@ export const LIMIT_DESCRIPTIONS: Record<string, string> = {
   LIMIT_ALICI_ADMIN_HEDIYE_ADET: 'Bir kullanıcının ADMIN hesaplarından alabileceği en fazla hediye PK işlemi sayısı.',
   LIMIT_ALICI_ADMIN_HEDIYE_TOPLAM_PK: 'Bir kullanıcının ADMIN hesaplarından alabileceği toplam hediye PK.',
   LIMIT_TAKIM_DANISMAN: 'Bir takımdaki en fazla aktif danışman sayısı.',
+  LIMIT_PK_DUSUK_UYARI: 'PK bakiyesi bu eşiğin altına düştüğünde bildirim gönderilir. Değer veritabanından yönetilir.',
 };
 
 export type LimitKey = keyof typeof LIMIT_DEFAULTS;
@@ -52,6 +53,7 @@ export type LimitKey = keyof typeof LIMIT_DEFAULTS;
 export const LIMIT_PREFIX = 'LIMIT_';
 
 export const isManagedCommercialKey = (key: string) =>
+  key === 'LIMIT_PK_DUSUK_UYARI' ||
   Object.prototype.hasOwnProperty.call(COST_DEFAULTS, key) ||
   Object.prototype.hasOwnProperty.call(LIMIT_DEFAULTS, key) ||
   Object.prototype.hasOwnProperty.call(LIMIT_LIST_DEFAULTS, key);
