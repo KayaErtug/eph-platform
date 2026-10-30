@@ -4,11 +4,13 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Role } from '@prisma/client';
 
 type EphAuthenticatedRequest = {
   originalUrl?: string;
   url?: string;
   user?: {
+    role?: Role;
     professionalVerificationStatus?: string | null;
     officeMembershipRequired?: boolean;
   };
@@ -25,6 +27,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     const request =
       context.switchToHttp().getRequest<EphAuthenticatedRequest>();
+
+    // §0: kimliği doğrulanmış Süper Admin mesleki/ofis onboarding'ine takılmaz.
+    if (request.user?.role === Role.SUPER_ADMIN) return true;
 
     const status =
       request.user?.professionalVerificationStatus ?? null;

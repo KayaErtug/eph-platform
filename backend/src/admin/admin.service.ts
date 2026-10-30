@@ -3062,7 +3062,9 @@ export class AdminService {
           await readTrialPolicy(tx),
         );
 
+        const isSuperAdmin = this.isSoftwareTeam(actor);
         if (
+          !isSuperAdmin &&
           body?.gunSayisi !== undefined &&
           Number(body.gunSayisi) !== initialTrialDays
         ) {
@@ -3139,9 +3141,24 @@ export class AdminService {
           );
         }
 
-        bitisTarihi.setUTCDate(
-          bitisTarihi.getUTCDate() + initialTrialDays,
-        );
+        // Gün ve ay ayrı sözleşmelerdir; mobilin gunSayisi:1 değeri 1 ay sayılmaz.
+        if (isSuperAdmin && body?.aySayisi !== undefined) {
+          const months = Number(body.aySayisi);
+          if (body.gunSayisi !== undefined || !Number.isSafeInteger(months) || months <= 0) {
+            throw new BadRequestException("Deneme için yalnız pozitif bir ay veya gün süresi gönderilmelidir.");
+          }
+          bitisTarihi.setUTCMonth(bitisTarihi.getUTCMonth() + months);
+        } else {
+          const days = isSuperAdmin && body?.gunSayisi !== undefined
+            ? Number(body.gunSayisi) : initialTrialDays;
+          if (!Number.isSafeInteger(days) || days <= 0) {
+            throw new BadRequestException("Deneme süresi pozitif tam gün olmalıdır.");
+          }
+          bitisTarihi.setUTCDate(bitisTarihi.getUTCDate() + days);
+        }
+        if (!Number.isFinite(bitisTarihi.getTime())) {
+          throw new BadRequestException("Deneme bitiş tarihi geçersiz.");
+        }
       } else {
         const aySayisi =
           body?.aySayisi === undefined

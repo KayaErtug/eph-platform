@@ -196,6 +196,7 @@ export class AdminController {
   }
 
   @Get("documents")
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   @RequirePermission("DOCUMENT_VIEW")
   getDocuments(
     @Req() request: AdminRequest,
@@ -205,12 +206,14 @@ export class AdminController {
   }
 
   @Patch("documents/:id/approve")
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   @RequirePermission("DOCUMENT_APPROVE")
   approveDocument(@Param("id") id: string, @Req() request: AdminRequest) {
     return this.adminService.approveDocument(id, this.extractActor(request));
   }
 
   @Patch("documents/:id/reject")
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.SUPER_ADMIN)
   @RequirePermission("DOCUMENT_REJECT")
   rejectDocument(@Param("id") id: string, @Req() request: AdminRequest) {
     return this.adminService.rejectDocument(id, this.extractActor(request));
