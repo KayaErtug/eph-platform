@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { COST_DEFAULTS, COST_PREFIX, LIMIT_DEFAULTS, LIMIT_LIST_DEFAULTS, LIMIT_PREFIX, parseCostValue } from './commercial-costs';
+import { COST_DEFAULTS, COST_PREFIX, LIMIT_DEFAULTS, LIMIT_LIST_DEFAULTS, LIMIT_PREFIX, parseCostValue, parseLimitList } from './commercial-costs';
 import { readTrialPolicy } from './trial-policy';
 
 const OFFICE_FIELDS = ['code', 'name', 'price', 'monthlyPk', 'active', 'portfolioCapacity', 'crmCapacity', 'monthlyDemandLimit', 'monthlyPoolLimit', 'trialDays', 'agents', 'totalUsers', 'maxTeams'];
@@ -31,7 +31,16 @@ export class PricingService {
         return { key, value: value ?? defaults[key] ?? null, source: value !== null && value !== undefined ? 'DB' : 'DEFAULT' };
       });
     const costs = view(COST_DEFAULTS, COST_PREFIX);
-    const limits = view(LIMIT_DEFAULTS, LIMIT_PREFIX);
+    // Liste değerli LIMIT_* anahtarları dizi olarak döner (kayıt geçersizse/yoksa yedek liste); sayısal anahtarlar değişmez.
+    const lists = new Map<string, number[]>(Object.entries(LIMIT_LIST_DEFAULTS).map(([key, value]) => [key, [...value]]));
+    for (const row of rows) {
+      const list = row.key.startsWith(LIMIT_PREFIX) ? parseLimitList(row.valueJson) : null;
+      if (list) lists.set(row.key, list);
+    }
+    const limits = [
+      ...view(LIMIT_DEFAULTS, LIMIT_PREFIX).filter((item) => !lists.has(item.key)),
+      ...[...lists].map(([key, value]) => ({ key, value, source: rows.some((row) => row.key === key && parseLimitList(row.valueJson)) ? 'DB' : 'DEFAULT' })),
+    ].sort((a, b) => a.key.localeCompare(b.key));
 
     const officeList = Array.isArray(officeRow?.valueJson) ? officeRow.valueJson as Array<Record<string, unknown>> : [];
     const officeTrial = officeList.find((item) => item.code === 'DENEME');
