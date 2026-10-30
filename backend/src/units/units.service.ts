@@ -920,8 +920,12 @@ export class UnitsService {
     const rows = await this.prisma.systemSetting.findMany({
       where: { key: { in: [...new Set(offices.map((office) => officeProfileKey(office.id)))] } },
     });
-    const phones = new Map(rows.map((row) => [row.key, officeProfile(row.valueJson).phone]));
-    for (const office of offices) office.profilePhone = phones.get(officeProfileKey(office.id)) || null;
+    const profiles = new Map(rows.map((row) => [row.key, officeProfile(row.valueJson)]));
+    for (const office of offices) {
+      const profile = profiles.get(officeProfileKey(office.id));
+      office.profilePhone = profile?.phone || null;
+      office.profileAddress = profile?.address || null;
+    }
   }
 
   private getEphId(id: string) {

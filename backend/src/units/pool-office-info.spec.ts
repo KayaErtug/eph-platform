@@ -37,6 +37,11 @@ describe('Havuz ofis bilgileri (EPH-17C)', () => {
     }
   });
 
+  it('ofis profilinde açık adres varsa o kullanılır', () => {
+    const withAddress = { ...unit, project: { ...project, owner: { ...project.owner, office: { ...office, profileAddress: 'Atatürk Cd. No:5 Kat:2, Kızılay' } } } };
+    expect(serializePoolOfficeInfo(withAddress, true).officeAddress).toBe('Atatürk Cd. No:5 Kat:2, Kızılay');
+  });
+
   it('ofis profil telefonu yoksa officePhone null; danışman telefonu kullanılmaz', () => {
     const noPhone = { ...unit, project: { ...project, owner: { ...project.owner, office: { ...office, profilePhone: null } } } };
     const result = serializePoolOfficeInfo(noPhone, true);

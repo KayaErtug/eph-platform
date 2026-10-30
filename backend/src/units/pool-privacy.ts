@@ -6,13 +6,14 @@ export function redactPoolDeedOwnerText(unit: any, value: string | null | undefi
 }
 
 // Ofis alanları: ofis telefonu SystemSetting EPH_OFFICE_PROFILE_<id> içindeki phone (OfficeIdentityCard kaydı);
-// office.profilePhone olarak units.service tarafından eklenir, yoksa null. Ofis sahibinin cep telefonu ve
-// Office city/district/neighborhood'dan oluşan adres ayrıca kullanılır. Ofis yoksa null.
+// office.profilePhone olarak units.service tarafından eklenir, yoksa null. Ofis sahibinin cep telefonu ayrıca kullanılır.
+// Adres: profildeki açık adres (office.profileAddress), yoksa Office city/district/neighborhood. Ofis yoksa null.
 export function serializePoolOfficeInfo(unit: any, visible: boolean) {
   const office = unit.project?.owner?.office;
   if (!visible || !office) return { officePhone: null, officeOwnerPhone: null, officeAddress: null };
   const clean = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : null);
-  const address = [office.neighborhood, office.district, office.city].map(clean).filter(Boolean).join(', ');
+  const address = clean(office.profileAddress)
+    || [office.neighborhood, office.district, office.city].map(clean).filter(Boolean).join(', ');
   return {
     officePhone: clean(office.profilePhone),
     officeOwnerPhone: clean(office.owner?.phone),
