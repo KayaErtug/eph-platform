@@ -39,7 +39,7 @@ describe('Professional employer profile', () => {
   });
   it('onboarding stores employer and does not create an office membership', async () => {
     db.user.findUnique.mockResolvedValue({ role: Role.ADAY, passwordHash: null });
-    const tx = { user: db.user, userCapability: { upsert: jest.fn() } };
+    const tx = { user: db.user, userCapability: { upsert: jest.fn() }, pendingRegistration: { findFirst: jest.fn().mockResolvedValue(null) } };
     db.$transaction = jest.fn(cb => cb(tx));
     await service.completeInitialProfile('user', { firstName: 'Ali', lastName: 'Kaya', city: 'Denizli', role: Role.EMLAKCI, registrationType: 'EMLAK_DANISMANI', password: 'test123', companyName: 'Kaya Emlak' });
     expect(db.user.update.mock.calls[0][0].data).toMatchObject({ companyName: 'Kaya Emlak', profileCompleted: false });

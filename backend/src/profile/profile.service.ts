@@ -434,6 +434,8 @@ export class ProfileService {
       where: { id: userId },
       select: {
         id: true,
+        email: true,
+        phone: true,
         role: true,
         passwordHash: true,
         professionalVerificationStatus: true,
@@ -575,6 +577,39 @@ export class ProfileService {
           profileCompletedAt: null,
         },
       });
+
+      // PROFILE_ONBOARDING'de meslek henüz bilinmediği için kayıt belgesi
+      // PendingRegistration'da bekler. Meslek seçildiğinde gerçek Document'a aktar.
+      const pendingDocument = await tx.pendingRegistration.findFirst({
+        where: {
+          email: user.email,
+          phone: user.phone,
+          phoneVerified: true,
+          emailVerified: true,
+          completedAt: { not: null },
+          professionalDocumentUrl: { not: null },
+        },
+        orderBy: { completedAt: 'desc' },
+      });
+      if (pendingDocument?.professionalDocumentUrl) {
+        const existingDocument = await tx.document.findFirst({
+          where: { userId, fileUrl: pendingDocument.professionalDocumentUrl },
+        });
+        if (!existingDocument) {
+          await tx.document.create({
+            data: {
+              userId,
+              type: selectedRole === Role.EMLAKCI
+                ? resolvedRegistrationType === 'EMLAK_OFISI'
+                  ? DocumentType.YETKI_BELGESI : DocumentType.MYK_BELGESI
+                : DocumentType.YAMBIS_BELGESI,
+              status: 'PENDING',
+              fileUrl: pendingDocument.professionalDocumentUrl,
+              fileName: pendingDocument.professionalDocumentName || 'mesleki-belge',
+            },
+          });
+        }
+      }
 
       if (resolvedRegistrationType === 'EMLAK_OFISI') {
         await tx.userCapability.upsert({

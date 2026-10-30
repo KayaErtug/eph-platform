@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
   Capability,
+  PendingRegistrationStatus,
   ProfessionalVerificationStatus,
   Role,
 } from '@prisma/client';
@@ -359,216 +360,227 @@ export class RegistrationV2Service {
   }
 
   async completeRegistration(pendingRegistrationId: string) {
-    const pending = await this.pendingService.findById(pendingRegistrationId);
+    return this.prisma.$transaction(async (tx) => {
+      // Aynı oturum iki paralel tamamlamada iki kullanıcı/belge oluşturamaz.
+      await tx.$queryRaw`SELECT "id" FROM "PendingRegistration" WHERE "id" = ${pendingRegistrationId} FOR UPDATE`;
+      const pending = await tx.pendingRegistration.findUnique({ where: { id: pendingRegistrationId } });
 
-    if (!pending) {
-      throw new BadRequestException('Kayıt doğrulama oturumu bulunamadı.');
-    }
+      if (!pending) {
+        throw new BadRequestException('Kayıt doğrulama oturumu bulunamadı.');
+      }
 
-    if (!pending.phoneVerified || !pending.emailVerified) {
-      throw new BadRequestException(
-        'Telefon ve e-posta doğrulaması tamamlanmalıdır.',
-      );
-    }
+      if (!pending.phoneVerified || !pending.emailVerified) {
+        throw new BadRequestException(
+          'Telefon ve e-posta doğrulaması tamamlanmalıdır.',
+        );
+      }
 
-    const isProfileOnboardingFlow =
-      !pending.passwordHash && pending.role === Role.ADAY;
+      const isProfileOnboardingFlow =
+        !pending.passwordHash && pending.role === Role.ADAY;
 
-    if (!isProfileOnboardingFlow && !pending.professionalDocumentUrl) {
-      throw new BadRequestException('Mesleki belge yüklenmelidir.');
-    }
+      if (!isProfileOnboardingFlow && !pending.professionalDocumentUrl) {
+        throw new BadRequestException('Mesleki belge yüklenmelidir.');
+      }
 
-    if (pending.completedAt) {
-      const existingUser = await this.prisma.user.findFirst({
+      if (pending.completedAt) {
+        const existingUser = await tx.user.findFirst({
+          where: {
+            OR: [{ email: pending.email }, { phone: pending.phone }],
+          },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            role: true,
+            isApproved: true,
+            isVerified: true,
+            professionalVerificationStatus: true,
+          },
+        });
+
+        if (existingUser) {
+          if (isProfileOnboardingFlow) {
+            const token = this.jwtService.sign({
+              sub: existingUser.id,
+              email: existingUser.email,
+              phone: existingUser.phone,
+              role: existingUser.role,
+            });
+
+            return {
+              success: true,
+              alreadyCompleted: true,
+              flow: 'PROFILE_ONBOARDING',
+              token,
+              profileRoute: '/profile',
+              user: existingUser,
+              message:
+                'Kayıt daha önce tamamlandı. Profil bilgilerinizi tamamlayınız.',
+            };
+          }
+
+          return {
+            success: true,
+            alreadyCompleted: true,
+            userId: existingUser.id,
+            isApproved: existingUser.isApproved,
+            isVerified: existingUser.isVerified,
+            message: 'Üyelik kaydınız daha önce tamamlanmış.',
+          };
+        }
+      }
+
+      const duplicateUser = await tx.user.findFirst({
         where: {
           OR: [{ email: pending.email }, { phone: pending.phone }],
         },
         select: {
           id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          role: true,
-          isApproved: true,
-          isVerified: true,
-          professionalVerificationStatus: true,
         },
       });
 
-      if (existingUser) {
-        if (isProfileOnboardingFlow) {
-          const token = this.jwtService.sign({
-            sub: existingUser.id,
-            email: existingUser.email,
-            phone: existingUser.phone,
-            role: existingUser.role,
-          });
+      if (duplicateUser) {
+        throw new BadRequestException(
+          'Bu e-posta veya telefon numarasıyla daha önce hesap oluşturulmuş.',
+        );
+      }
 
-          return {
-            success: true,
-            alreadyCompleted: true,
-            flow: 'PROFILE_ONBOARDING',
-            token,
-            profileRoute: '/profile',
-            user: existingUser,
-            message:
-              'Kayıt daha önce tamamlandı. Profil bilgilerinizi tamamlayınız.',
-          };
-        }
+      const referralCode = await this.generateUniqueReferralCode();
+
+      if (isProfileOnboardingFlow) {
+        const user = await tx.user.create({
+          data: {
+            firstName: '',
+            lastName: '',
+            email: pending.email,
+            phone: pending.phone,
+            passwordHash: null,
+            city: null,
+            role: Role.ADAY,
+            isVerified: true,
+            emailVerifiedAt: pending.emailVerifiedAt || new Date(),
+            isApproved: true,
+            professionalVerificationStatus:
+              ProfessionalVerificationStatus.PENDING,
+            profileCompleted: false,
+            referralCode,
+          },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            role: true,
+            isApproved: true,
+            isVerified: true,
+            professionalVerificationStatus: true,
+          },
+        });
+
+        await tx.pendingRegistration.update({
+          where: { id: pending.id },
+          data: { status: PendingRegistrationStatus.COMPLETED, completedAt: new Date() },
+        });
+
+        const token = this.jwtService.sign({
+          sub: user.id,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+        });
 
         return {
           success: true,
-          alreadyCompleted: true,
-          userId: existingUser.id,
-          isApproved: existingUser.isApproved,
-          isVerified: existingUser.isVerified,
-          message: 'Üyelik kaydınız daha önce tamamlanmış.',
+          flow: 'PROFILE_ONBOARDING',
+          token,
+          profileRoute: '/profile',
+          user,
+          message:
+            'Telefon ve e-posta doğrulaması tamamlandı. Profil bilgilerinizi tamamlayınız.',
         };
       }
-    }
 
-    const duplicateUser = await this.prisma.user.findFirst({
-      where: {
-        OR: [{ email: pending.email }, { phone: pending.phone }],
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (duplicateUser) {
-      throw new BadRequestException(
-        'Bu e-posta veya telefon numarasıyla daha önce hesap oluşturulmuş.',
-      );
-    }
-
-    const referralCode = await this.generateUniqueReferralCode();
-
-    if (isProfileOnboardingFlow) {
-      const user = await this.prisma.user.create({
+      const user = await tx.user.create({
         data: {
-          firstName: '',
-          lastName: '',
+          firstName: pending.firstName,
+          lastName: pending.lastName,
           email: pending.email,
           phone: pending.phone,
-          passwordHash: null,
-          city: null,
-          role: Role.ADAY,
+          city: pending.city,
+          passwordHash: pending.passwordHash,
+          role: pending.role,
           isVerified: true,
           emailVerifiedAt: pending.emailVerifiedAt || new Date(),
-          isApproved: true,
-          professionalVerificationStatus:
-            ProfessionalVerificationStatus.PENDING,
-          profileCompleted: false,
+          isApproved: false,
           referralCode,
-        },
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          role: true,
-          isApproved: true,
-          isVerified: true,
-          professionalVerificationStatus: true,
+          taxNumber: pending.taxNumber,
+          taxOffice: pending.taxOffice,
+          professionalDocumentNumber: pending.professionalDocumentNumber,
         },
       });
 
-      await this.pendingService.markCompleted(pending.id);
+      await tx.document.create({
+        data: {
+          userId: user.id,
+          type:
+            pending.role === Role.EMLAKCI
+              ? pending.registrationType === RegistrationType.EMLAK_OFISI
+                ? 'YETKI_BELGESI' : 'MYK_BELGESI'
+              : 'YAMBIS_BELGESI',
+          fileUrl: pending.professionalDocumentUrl!,
+          fileName: pending.professionalDocumentName || 'mesleki-belge',
+        },
+      });
 
-      const token = this.jwtService.sign({
-        sub: user.id,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
+      if (pending.registrationType === RegistrationType.EMLAK_OFISI) {
+        await tx.userCapability.upsert({
+          where: {
+            userId_capability: {
+              userId: user.id,
+              capability: Capability.OFFICE_OWNER,
+            },
+          },
+          update: {},
+          create: {
+            userId: user.id,
+            capability: Capability.OFFICE_OWNER,
+            createdById: null,
+          },
+        });
+      }
+
+      if (pending.referralCandidateId) {
+        await tx.referralCandidate.updateMany({
+          where: {
+            id: pending.referralCandidateId,
+            usedAt: null,
+            isActive: true,
+          },
+          data: {
+            usedAt: new Date(),
+            isActive: false,
+          },
+        });
+      }
+
+      await tx.pendingRegistration.update({
+        where: { id: pending.id },
+        data: { status: PendingRegistrationStatus.COMPLETED, completedAt: new Date() },
       });
 
       return {
         success: true,
-        flow: 'PROFILE_ONBOARDING',
-        token,
-        profileRoute: '/profile',
-        user,
-        message:
-          'Telefon ve e-posta doğrulaması tamamlandı. Profil bilgilerinizi tamamlayınız.',
-      };
-    }
-
-    const user = await this.prisma.user.create({
-      data: {
-        firstName: pending.firstName,
-        lastName: pending.lastName,
-        email: pending.email,
-        phone: pending.phone,
-        city: pending.city,
-        passwordHash: pending.passwordHash,
-        role: pending.role,
-        isVerified: true,
-        emailVerifiedAt: pending.emailVerifiedAt || new Date(),
-        isApproved: false,
-        referralCode,
-        taxNumber: pending.taxNumber,
-        taxOffice: pending.taxOffice,
-        professionalDocumentNumber: pending.professionalDocumentNumber,
-      },
-    });
-
-    await this.prisma.document.create({
-      data: {
+        flow: 'LEGACY',
         userId: user.id,
-        type:
-          pending.role === Role.EMLAKCI
-            ? 'YETKI_BELGESI'
-            : 'YAMBIS_BELGESI',
-        fileUrl: pending.professionalDocumentUrl!,
-        fileName: pending.professionalDocumentName || 'mesleki-belge',
-      },
+        isVerified: true,
+        isApproved: false,
+        membershipStatus: 'BELGE_BEKLIYOR',
+        message:
+          'Telefon ve e-posta doğrulaması tamamlandı. Üyelik onay sürecine devam ediniz.',
+      };
     });
-
-    if (pending.registrationType === RegistrationType.EMLAK_OFISI) {
-      await this.prisma.userCapability.upsert({
-        where: {
-          userId_capability: {
-            userId: user.id,
-            capability: Capability.OFFICE_OWNER,
-          },
-        },
-        update: {},
-        create: {
-          userId: user.id,
-          capability: Capability.OFFICE_OWNER,
-          createdById: null,
-        },
-      });
-    }
-
-    if (pending.referralCandidateId) {
-      await this.prisma.referralCandidate.updateMany({
-        where: {
-          id: pending.referralCandidateId,
-          usedAt: null,
-          isActive: true,
-        },
-        data: {
-          usedAt: new Date(),
-          isActive: false,
-        },
-      });
-    }
-
-    await this.pendingService.markCompleted(pending.id);
-
-    return {
-      success: true,
-      flow: 'LEGACY',
-      userId: user.id,
-      isVerified: true,
-      isApproved: false,
-      membershipStatus: 'BELGE_BEKLIYOR',
-      message:
-        'Telefon ve e-posta doğrulaması tamamlandı. Üyelik onay sürecine devam ediniz.',
-    };
   }
 }

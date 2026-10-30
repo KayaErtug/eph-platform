@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   PendingRegistration,
   PendingRegistrationStatus,
@@ -40,32 +40,51 @@ export class PendingRegistrationService {
   ): Promise<PendingRegistration> {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    await this.prisma.pendingRegistration.deleteMany({
-      where: {
-        OR: [{ email: input.email }, { phone: input.phone }],
-      },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const previous = await tx.pendingRegistration.findMany({
+        where: {
+          OR: [{ email: input.email }, { phone: input.phone }],
+        },
+      });
 
-    return this.prisma.pendingRegistration.create({
-      data: {
-        firstName: String(input.firstName || '').trim(),
-        lastName: String(input.lastName || '').trim(),
-        email: input.email,
-        phone: input.phone,
-        passwordHash: input.passwordHash || null,
-        city: input.city || null,
-        role: input.role || Role.ADAY,
-        registrationType: input.registrationType || null,
-        inviteCode: input.inviteCode || null,
-        referralCandidateId: input.referralCandidateId || null,
-        taxNumber: input.taxNumber || null,
-        taxOffice: input.taxOffice || null,
-        professionalDocumentNumber: input.professionalDocumentNumber || null,
-        ipAddress: input.ipAddress || null,
-        userAgent: input.userAgent || null,
-        expiresAt,
-        status: PendingRegistrationStatus.PHONE_VERIFICATION_PENDING,
-      },
+      // Başka telefon/e-posta ile yeniden deneme, belgesi olan eski kaydı silemez; belgesiz kayıtta yeniden deneme serbesttir.
+      if (previous.some(item => item.professionalDocumentUrl && (item.email !== input.email || item.phone !== input.phone))) {
+        throw new BadRequestException('Bu e-posta veya telefon için farklı bir kayıt oturumu mevcut. Mevcut kayda devam ediniz.');
+      }
+      const withDocument = previous.find(item => item.professionalDocumentUrl);
+      if (withDocument && (withDocument.role !== (input.role || Role.ADAY) ||
+          withDocument.registrationType !== (input.registrationType || null))) {
+        throw new BadRequestException('Belge yüklenmiş kaydın meslek türü değiştirilemez. Mevcut kayda devam ediniz.');
+      }
+      await tx.pendingRegistration.deleteMany({
+        where: { OR: [{ email: input.email }, { phone: input.phone }] },
+      });
+
+      return tx.pendingRegistration.create({
+        data: {
+          firstName: String(input.firstName || '').trim(),
+          lastName: String(input.lastName || '').trim(),
+          email: input.email,
+          phone: input.phone,
+          passwordHash: input.passwordHash || null,
+          city: input.city || null,
+          role: input.role || Role.ADAY,
+          registrationType: input.registrationType || null,
+          inviteCode: input.inviteCode || null,
+          referralCandidateId: input.referralCandidateId || null,
+          taxNumber: input.taxNumber || null,
+          taxOffice: input.taxOffice || null,
+          professionalDocumentNumber: input.professionalDocumentNumber || null,
+          // Doğrulamalar yeni oturumda sıfırlanır; yüklenen dosyanın referansı korunur.
+          professionalDocumentUrl: withDocument?.professionalDocumentUrl || null,
+          professionalDocumentName: withDocument?.professionalDocumentName || null,
+          professionalDocumentMime: withDocument?.professionalDocumentMime || null,
+          ipAddress: input.ipAddress || null,
+          userAgent: input.userAgent || null,
+          expiresAt,
+          status: PendingRegistrationStatus.PHONE_VERIFICATION_PENDING,
+        },
+      });
     });
   }
 
