@@ -925,10 +925,17 @@ export class KontorService {
         FOR UPDATE
       `;
 
-      const havuz =
+      // EPH-62: havuz kaydı yoksa süper admin gönderimi engellenmez; şema varsayılanlarıyla (50000) oluşturulur.
+      let havuz =
         await tx.hediyeKontorHavuzu.findUnique({
           where: { kod: 'GLOBAL' },
         });
+
+      if (!havuz && actor.role === Role.SUPER_ADMIN) {
+        havuz = await tx.hediyeKontorHavuzu.create({
+          data: { kod: 'GLOBAL', createdById: actor.id },
+        });
+      }
 
       if (!havuz || !havuz.aktifMi) {
         throw new BadRequestException(
