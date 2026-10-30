@@ -25,6 +25,8 @@ type LinaDocumentAnalysisInput = {
   mimeType?: string;
   buffer?: Buffer;
   authorityType?: PortfolioAuthorityType | string;
+  // SystemSetting DOCUMENT_AI_ANALYSIS_ENABLED; yalnız true ise belge OpenAI'a gönderilir.
+  aiEnabled?: boolean;
   portfolioContext?: {
     ownerName?: string | null;
     ownerPhone?: string | null;
@@ -137,6 +139,11 @@ export class LinaDocumentPrecheckService {
     input: LinaDocumentAnalysisInput,
     fallback: LinaDocumentDeepAnalysis,
   ): Promise<LinaDocumentDeepAnalysis> {
+    if (input.aiEnabled !== true) {
+      console.log('[LINA_OCR_DEBUG] AI_DISABLED_MANUAL_REVIEW');
+      return fallback;
+    }
+
     const apiKey = this.getConfig('OPENAI_API_KEY');
 
     if (!apiKey || !input.buffer?.length || !input.mimeType) {

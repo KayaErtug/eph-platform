@@ -3409,7 +3409,7 @@ export class AdminService {
 
     const settings = await this.prisma.systemSetting.findMany({
       where: {
-        OR: [{ key: { in: ["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"] } }, { key: { startsWith: COST_PREFIX } }, { key: { startsWith: LIMIT_PREFIX } }, { key: { startsWith: "MARKET_" } }],
+        OR: [{ key: { in: ["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK", "DOCUMENT_AI_ANALYSIS_ENABLED"] } }, { key: { startsWith: COST_PREFIX } }, { key: { startsWith: LIMIT_PREFIX } }, { key: { startsWith: "MARKET_" } }],
       },
       orderBy: { key: "asc" },
     });
@@ -3466,13 +3466,14 @@ export class AdminService {
     if (Object.prototype.hasOwnProperty.call(LIMIT_LIST_DEFAULTS, key)) return this.updateLimitList(key, body, actor);
 
     const isCommercialCost = isManagedCommercialKey(key);
-    if (!isCommercialCost && !["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"].includes(key)) {
+    if (!isCommercialCost && !["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK", "DOCUMENT_AI_ANALYSIS_ENABLED"].includes(key)) {
       throw new BadRequestException("Desteklenmeyen sistem ayarı.");
     }
 
     const minimum =
       key.startsWith(LIMIT_PREFIX) ? 1 :
       isCommercialCost ||
+      key === "DOCUMENT_AI_ANALYSIS_ENABLED" ||
       key === "TRIAL_MAX_EXTENSIONS" ||
       key === "POOL_PRIVATE_INFO_COST" ||
       key === "MATCH_SCAN_COST_PK" ||
@@ -3485,6 +3486,9 @@ export class AdminService {
     if (!body || typeof body.value !== "number" || !Number.isSafeInteger(body.value) || body.value < minimum) {
       throw new BadRequestException(`Değer en az ${minimum} olan bir tam sayı olmalıdır.`);
     }
+    if (key === "DOCUMENT_AI_ANALYSIS_ENABLED" && body.value > 1) {
+      throw new BadRequestException("Değer 0 (kapalı) veya 1 (açık) olmalıdır.");
+    }
     if (body.description !== undefined && typeof body.description !== "string") {
       throw new BadRequestException("Açıklama metin olmalıdır.");
     }
@@ -3494,7 +3498,7 @@ export class AdminService {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`system-setting:${key}`}))::text AS locked`;
       const existing = await tx.systemSetting.findUnique({ where: { key } });
       // Yönetilen (varsayılanı olan) anahtar henüz kayıtlı değilse ilk kayıt burada oluşur.
-      if (!existing && !isCommercialCost) {
+      if (!existing && !isCommercialCost && key !== "DOCUMENT_AI_ANALYSIS_ENABLED") {
         throw new NotFoundException("Sistem ayarı bulunamadı.");
       }
 
@@ -3505,7 +3509,7 @@ export class AdminService {
         : existing ? body.value : { value: body.value };
       const updated = await tx.systemSetting.upsert({
         where: { key },
-        create: { key, valueJson, description: body.description ?? LIMIT_DESCRIPTIONS[key], updatedById: actorId },
+        create: { key, valueJson, description: body.description ?? LIMIT_DESCRIPTIONS[key] ?? (key === "DOCUMENT_AI_ANALYSIS_ENABLED" ? "Belge analizi OpenAI kullansın mı (0 = kapalı, 1 = açık)" : undefined), updatedById: actorId },
         update: { valueJson, description: body.description, updatedById: actorId },
       });
 

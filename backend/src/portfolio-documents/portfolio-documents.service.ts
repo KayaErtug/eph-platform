@@ -44,6 +44,7 @@ const ALLOWED_MIME_TYPES = [
 ];
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024;
+export const DOCUMENT_AI_SETTING_KEY = 'DOCUMENT_AI_ANALYSIS_ENABLED';
 const REJECT_REASON_PREFIX = '[BELGE_REDDEDILDI]';
 const REUPLOAD_REASON_PREFIX = '[YENIDEN_BELGE_ISTENDI]';
 
@@ -198,6 +199,7 @@ export class PortfolioDocumentsService {
       mimeType: file.mimetype,
       buffer: file.buffer,
       authorityType,
+      aiEnabled: await this.isDocumentAiEnabled(),
       portfolioContext: {
         ownerName: unit.deedOwnerFullName,
         ownerPhone: unit.deedOwnerPhone,
@@ -902,6 +904,25 @@ export class PortfolioDocumentsService {
       throw new ForbiddenException(
         'Üyelik paketiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.',
       );
+    }
+  }
+
+  // DOCUMENT_AI_ANALYSIS_ENABLED: 1 = açık; kayıt yoksa, 1 değilse veya okunamazsa KAPALI.
+  private async isDocumentAiEnabled() {
+    try {
+      const row = await this.prisma.systemSetting.findUnique({
+        where: { key: DOCUMENT_AI_SETTING_KEY },
+        select: { valueJson: true },
+      });
+      const raw = row?.valueJson;
+      const candidate =
+        typeof raw === 'object' && raw !== null && !Array.isArray(raw)
+          ? (raw as { value?: unknown }).value
+          : raw;
+
+      return candidate === 1 || candidate === true;
+    } catch {
+      return false;
     }
   }
 
