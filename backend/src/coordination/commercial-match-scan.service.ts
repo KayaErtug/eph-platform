@@ -220,7 +220,7 @@ export class CommercialMatchScanService {
     const context = await this.context(type, sourceId, user, false);
     if (row.status === MatchScanAttemptStatus.COMPLETED && row.resultJson) {
       const result = await this.legacyReceipt(row, user, selection);
-      if ((result.billing?.walletOfficeId ?? null) !== (selection.walletSource === 'OFFICE' ? selection.walletOfficeId : null)) throw new ForbiddenException('Tekrar denemede PK hesabı değiştirilemez.');
+      if (selection.walletSource && (result.billing?.walletOfficeId ?? null) !== (selection.walletSource === 'OFFICE' ? selection.walletOfficeId : null)) throw new ForbiddenException('Tekrar denemede PK hesabı değiştirilemez.');
       return this.readable({ ...result, replayed: true, duplicateRequest: true, spent: 0, billing: { ...result.billing, charged: false } }, context, user);
     }
     if (row.status === MatchScanAttemptStatus.PROCESSING) {
@@ -412,7 +412,7 @@ export class CommercialMatchScanService {
     return { source, chargeUserId, walletOfficeId, balance: wallet.bakiye, active: wallet.aktifMi };
   }
   private selection(body: Record<string, unknown>): WalletSelection {
-    return { walletSource: String(body.walletSource || 'PERSONAL').toUpperCase(), walletOfficeId: String(body.walletOfficeId || '') || undefined };
+    return { walletSource: String(body.walletSource || '').toUpperCase() || undefined, walletOfficeId: String(body.walletOfficeId || '') || undefined };
   }
   private parseType(value: string): CommercialScanType {
     const type = String(value || '').trim().toUpperCase() as CommercialScanType;

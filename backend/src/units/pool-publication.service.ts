@@ -27,9 +27,9 @@ export class PoolPublicationService {
   constructor(private readonly prisma: PrismaService) {}
 
   private selection(input: PoolPublicationInput) {
-    const walletSource = clean(input.walletSource).toUpperCase() || 'PERSONAL';
+    const walletSource = clean(input.walletSource).toUpperCase() || undefined;
     const walletOfficeId = clean(input.walletOfficeId) || null;
-    if (walletSource !== 'PERSONAL' && walletSource !== 'OFFICE') throw new BadRequestException('Geçersiz PK kaynağı.');
+    if (walletSource && walletSource !== 'PERSONAL' && walletSource !== 'OFFICE') throw new BadRequestException('Geçersiz PK kaynağı.');
     if (walletSource === 'OFFICE' && !walletOfficeId) throw new BadRequestException('Ofis PK kaynağı için ofis seçilmelidir.');
     if (walletSource === 'PERSONAL' && walletOfficeId) throw new BadRequestException('Kişisel PK kaynağında ofis seçilemez.');
     return { walletSource, walletOfficeId };
@@ -42,9 +42,9 @@ export class PoolPublicationService {
   }
 
   private async wallet(db: PrismaService | Prisma.TransactionClient, userId: string, selection: ReturnType<PoolPublicationService['selection']>) {
-    const { chargeUserId } = await resolveOfficeWallet(db, userId, selection, db !== this.prisma);
+    const { chargeUserId, walletSource, walletOfficeId } = await resolveOfficeWallet(db, userId, selection, db !== this.prisma);
     const wallet = await db.kontorCuzdani.findUnique({ where: { kullaniciId: chargeUserId } });
-    return { chargeUserId, balance: wallet?.bakiye ?? 0, active: wallet?.aktifMi === true };
+    return { chargeUserId, walletSource, walletOfficeId, balance: wallet?.bakiye ?? 0, active: wallet?.aktifMi === true };
   }
 
   async quote(unit: PublicationUnit, userId: string, input: PoolPublicationInput = {}) {
@@ -54,7 +54,7 @@ export class PoolPublicationService {
     const alreadyPublished = unit.isPoolVisible && unit.approvalStatus === PortfolioApprovalStatus.HAVUZDA;
     const publicationCostPk = await readCost(this.prisma, 'COST_HAVUZ_PORTFOY_YAYIN');
     const costPk = alreadyPublished ? 0 : publicationCostPk;
-    return { costPk, balance: wallet.balance, eligible: alreadyPublished || (wallet.active && wallet.balance >= costPk), alreadyPublished, ...selection };
+    return { costPk, balance: wallet.balance, eligible: alreadyPublished || (wallet.active && wallet.balance >= costPk), alreadyPublished, walletSource: wallet.walletSource, walletOfficeId: wallet.walletOfficeId };
   }
 
   private audience(input: PoolPublicationInput) {
@@ -145,7 +145,7 @@ export class PoolPublicationService {
         if (audience.groupIds.length) await tx.poolAudienceUnitGroup.createMany({ data: audience.groupIds.map(groupId => ({ unitId: snapshot.id, groupId })), skipDuplicates: true });
       }
 
-      const billing = { requestId, costPk: alreadyPublished ? 0 : publicationCostPk, spent, operationId, previousBalance, remainingBalance, replayed: false, ...selection, chargeUserId: wallet.chargeUserId };
+      const billing = { requestId, costPk: alreadyPublished ? 0 : publicationCostPk, spent, operationId, previousBalance, remainingBalance, replayed: false, walletSource: wallet.walletSource, walletOfficeId: wallet.walletOfficeId, chargeUserId: wallet.chargeUserId };
       await tx.adminActionLog.create({ data: { actorId: user.id, targetUserId: current.project.ownerId, action: RECEIPT_ACTION, entityType: 'UNIT', entityId: snapshot.id, description: alreadyPublished ? 'Portföy zaten havuzda; yeni PK kesilmedi.' : 'Havuz yayını ve PK kesintisi aynı transaction içinde tamamlandı.', metadata: { requestId, fingerprint, billing } as Prisma.InputJsonValue } });
       if (!alreadyPublished) await tx.adminActionLog.create({ data: { actorId: user.id, targetUserId: current.project.ownerId, action: 'PORTFOLIO_DIRECT_POOL_PUBLISH_DOCUMENT_EXEMPTION', entityType: 'UNIT', entityId: snapshot.id, description: 'Portföy, geçici Tapu ve Yetki Belgesi muafiyeti kapsamında doğrudan havuzda yayınlandı.', metadata: { approvalStatusBefore: current.approvalStatus, approvalStatusAfter: PortfolioApprovalStatus.HAVUZDA, ownerRole: current.project.owner.role, temporaryDocumentExemption: true, publishedAt: publishedAt.toISOString(), spentPk: spent, requestId, operationId, walletSource: selection.walletSource, walletOfficeId: selection.walletOfficeId } } });
       return { ...unit, billing };

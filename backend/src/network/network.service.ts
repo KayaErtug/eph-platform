@@ -2369,8 +2369,8 @@ export class NetworkService {
               spent: payment.movement.miktar,
               previousBalance: payment.movement.oncekiBakiye,
               remainingBalance: payment.wallet.bakiye,
-              walletSource: 'PERSONAL' as const,
-              walletOfficeId: null,
+              walletSource: payment.walletSource,
+              walletOfficeId: payment.walletOfficeId,
               replayed: false as const,
             },
           };
@@ -2569,6 +2569,8 @@ export class NetworkService {
     return {
       wallet: updatedWallet,
       movement,
+      walletSource: selected.walletSource,
+      walletOfficeId: selected.walletOfficeId,
     };
   }
 

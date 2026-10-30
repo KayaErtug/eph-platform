@@ -55,7 +55,7 @@ export async function resolveOfficeWallet(db: OfficeDb, actorId: string, input: 
   const sharedMember = Boolean(affiliated && office?.ownerUserId && office.ownerUserId !== actorId && mode === 'SHARED');
   if (input.walletSource === 'PERSONAL' && sharedMember && confirmedSharing) throw new ForbiddenException('Ofisiniz ortak PK modunda. Güncel harcama hesabını seçin.');
   if (input.walletSource === 'OFFICE' && office?.ownerUserId !== actorId && mode !== 'SHARED') throw new ForbiddenException('Ofisiniz dağıtım modunda. Size aktarılan PK bakiyesini kullanın.');
-  const shared = input.walletSource === 'OFFICE' || (!input.walletSource && sharedMember && confirmedSharing);
+  const shared = input.walletSource === 'OFFICE' || (!input.walletSource && sharedMember);
   if (shared && office && office.ownerUserId !== actorId) {
     const policyJson = configuredPolicy?.valueJson as any;
     if (policyJson) {

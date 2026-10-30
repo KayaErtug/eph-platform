@@ -275,11 +275,11 @@ export class OfficeService {
   async getWalletQuote(
     userId: string,
     action?: string,
-    walletSource: "PERSONAL" | "OFFICE" = "PERSONAL",
+    walletSource?: "PERSONAL" | "OFFICE",
     walletOfficeId?: string,
   ) {
     if (walletSource === 'OFFICE' && !walletOfficeId) throw new BadRequestException('Ortak PK için ofis seçiniz.');
-    if (!['PERSONAL', 'OFFICE'].includes(walletSource) || (walletSource === 'PERSONAL' && walletOfficeId)) throw new BadRequestException('Geçersiz PK kaynağı.');
+    if ((walletSource && !['PERSONAL', 'OFFICE'].includes(walletSource)) || (walletSource === 'PERSONAL' && walletOfficeId)) throw new BadRequestException('Geçersiz PK kaynağı.');
     let costPk = 25;
     try {
       const setting =
