@@ -584,9 +584,11 @@ export class UnitsService {
     user: CurrentUserPayload,
     ownerId: string,
     approvalStatus?: PortfolioApprovalStatus | string | null,
+    officeAdvisorIds?: Set<string>,
   ) {
     if (this.isSuperAdmin(user)) return;
     if (this.isOwner(user, ownerId)) return;
+    if (officeAdvisorIds?.has(ownerId)) return;
 
     const normalizedStatus = String(approvalStatus || '').toUpperCase();
     const managerVisibleStatuses = new Set<PortfolioApprovalStatus>([
@@ -2143,7 +2145,9 @@ export class UnitsService {
       throw new NotFoundException('Portföy bulunamadı.');
     }
 
-    if (unit.project.ownerId !== user.id && !this.isSuperAdmin(user) && !this.isAdmin(user) && !this.isModerator(user) &&
+    const officeAdvisorIds = await getOfficeAdvisorIds(this.prisma, user?.id);
+
+    if (unit.project.ownerId !== user.id && !officeAdvisorIds.has(unit.project.ownerId) && !this.isSuperAdmin(user) && !this.isAdmin(user) && !this.isModerator(user) &&
         (unit.project.isActive === false || !countsAgainstActivePortfolioLimit(unit.status) || !unit.isPoolVisible)) {
       throw new NotFoundException('Bu ilan pasiftir veya erişiminiz bulunmuyor. Detayları görüntülenemez.');
     }
@@ -2153,13 +2157,14 @@ export class UnitsService {
       user,
       unit.project.ownerId,
       unit.approvalStatus,
+      officeAdvisorIds,
     );
 
     if (!this.isProjectVisibleInPortfolio(unit.project)) {
       throw new NotFoundException('Portföy bulunamadı.');
     }
 
-    return this.redactDoorAccessInfo(user, unit, await getOfficeAdvisorIds(this.prisma, user?.id));
+    return this.redactDoorAccessInfo(user, unit, officeAdvisorIds);
   }
 
   async findPortfolioApprovals(
