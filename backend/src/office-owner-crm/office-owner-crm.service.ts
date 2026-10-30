@@ -340,7 +340,7 @@ export class OfficeOwnerCrmService {
       summary: {
         teamCount: teams.length,
         teamLeaderCount,
-        advisorCount: officeUsers.length,
+        advisorCount: officeUsers.filter((item) => item.id !== office.ownerUserId).length,
         portfolioCount,
         authorizedPortfolioCount,
         poolPortfolioCount,
@@ -355,9 +355,11 @@ export class OfficeOwnerCrmService {
       },
       teams: teamSummaries,
       advisors: officeUsers.map((advisor) => {
-        const isTeamLeader = advisor.capabilities.some((item) => item.capability === Capability.TEAM_LEADER);
+        const isOfficeOwner = advisor.id === office.ownerUserId;
+        const isTeamLeader = !isOfficeOwner && advisor.capabilities.some((item) => item.capability === Capability.TEAM_LEADER);
 
         return {
+          isOfficeOwner,
           id: advisor.id,
           firstName: advisor.firstName,
           lastName: advisor.lastName,

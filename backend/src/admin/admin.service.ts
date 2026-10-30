@@ -1274,6 +1274,7 @@ export class AdminService {
         firstName: true,
         lastName: true,
         role: true,
+        officeId: true,
         capabilities: {
           select: { capability: true },
         },
@@ -1312,7 +1313,33 @@ export class AdminService {
         capabilitiesToRemove.includes(Capability.OFFICE_OWNER)
       );
 
+    // Tek doğruluk kaynağı Office.ownerUserId: yetki verilince kullanıcının ofisine bağlanır, kalkınca çözülür.
+    const grantsOwner = user.role === Role.EMLAKCI && capabilitiesToAdd.includes(Capability.OFFICE_OWNER);
+    const revokesOwner = capabilitiesToRemove.includes(Capability.OFFICE_OWNER);
+    const linkedOffice = grantsOwner && user.officeId
+      ? await this.prisma.office.findFirst({
+          where: { id: user.officeId, isActive: true },
+          select: { id: true, ownerUserId: true },
+        })
+      : null;
+
     await this.prisma.$transaction([
+      ...(linkedOffice
+        ? [
+            this.prisma.office.update({
+              where: { id: linkedOffice.id },
+              data: { ownerUserId: id },
+            }),
+          ]
+        : []),
+      ...(revokesOwner
+        ? [
+            this.prisma.office.updateMany({
+              where: { ownerUserId: id },
+              data: { ownerUserId: null },
+            }),
+          ]
+        : []),
       ...(capabilitiesToRemove.length
         ? [
             this.prisma.userCapability.deleteMany({
@@ -1401,6 +1428,10 @@ export class AdminService {
         newCapabilities: normalizedCapabilities,
         added: capabilitiesToAdd,
         removed: capabilitiesToRemove,
+        ...(linkedOffice
+          ? { officeId: linkedOffice.id, previousOfficeOwnerUserId: linkedOffice.ownerUserId }
+          : {}),
+        ...(grantsOwner && !linkedOffice ? { officeLink: "OFFICE_NOT_FOUND" } : {}),
       },
     });
 
@@ -1690,6 +1721,10 @@ export class AdminService {
               userId: id,
               capability: Capability.OFFICE_OWNER,
             },
+          });
+          await tx.office.updateMany({
+            where: { ownerUserId: id },
+            data: { ownerUserId: null },
           });
         }
 
