@@ -14,3 +14,6 @@ Tarih: 2026-10-30. Yerel değişiklik + commit; deploy/PM2 restart yapılmadı, 
 ## Kalan
 - `LIMIT_DENEME_GUN_SECENEKLERI` için kodda yedek değer yok (`LIMIT_LIST_DEFAULTS`'ta tanımlı değil); DB'de kayıt yoksa `limits` içinde görünmez. Mobil (`src/app/admin/users.tsx:239-245`) bu durumda mevcut yedeğine düşer. Yedek eklemek ya da kayıt oluşturmak ayrı karar.
 - Mobil okuma yolu `tariff.limits[].value` dizisini zaten destekliyor; cihazda doğrulanmadı.
+
+## EPH-63 (commit 66c44717)
+Pakete eklendi: `src\market\market-ticker.service.ts`, `src\market\market-ticker.service.spec.ts`, `srcdmindmin.service.ts` (güncel), `srcdmindmin.service.spec.ts`, `scripts\eph63_piyasa_ayarlar.sql`. Ayrıntı: `EPH59_DEPLOY_RAPOR.md` EK bölümü.
