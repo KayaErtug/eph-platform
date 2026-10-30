@@ -15,7 +15,7 @@ import { LinaModelSettingsService } from "../lina-model-settings.service";
 process.env.LINA_MASK_KEY = "test-anahtar";
 
 const ham = (patch: Partial<HamCikarim> = {}): HamCikarim => ({
-  niyet: "crm_kayit", adSoyad: null, telefon: null, email: null, rol: null, mulkTipi: null, il: null, ilce: null,
+  niyet: "crm_kayit", adSoyad: null, telefon: null, email: null, rol: null, amac: null, mulkTipi: null, il: null, ilce: null,
   mahalleler: [], mahalleDegistir: false, butceMin: null, butceMax: null, m2Min: null, m2Max: null, odaSayisi: null,
   odaEnAz: null, ozellikler: [], ozellikCikar: [], not: null, ...patch,
 });
@@ -82,8 +82,8 @@ describe("taslak mantığı", () => {
   });
 
   it("zorunlu alanlar: ad+soyad, rol, talep/iletişim", () => {
-    expect(missingRequired(bosAlanlar())).toHaveLength(3);
-    const a = { ...bosAlanlar(), adSoyad: "Melissa", rol: "alıcı" as const, telefon: "5331234567" };
+    expect(missingRequired(bosAlanlar())).toHaveLength(4);
+    const a = { ...bosAlanlar(), adSoyad: "Melissa", rol: "alıcı" as const, amac: "SATILIK" as const, telefon: "5331234567" };
     expect(missingRequired(a)).toEqual(["müşterinin soyadı"]);
     expect(missingRequired({ ...a, adSoyad: "Melissa Vargas" })).toEqual([]);
   });
@@ -136,6 +136,9 @@ describe("LinaLocationValidatorService", () => {
     new LinaLocationValidatorService({
       listRegions: (c: string) => (c === "TR" ? regions : ["Girne", "Lefkoşa"]),
       resolveLocationFromMessage: async (q: string) => resolve(q),
+    } as never, {
+      // İlçe uç noktası: yalnız "Merkezefendi" bilinir
+      findDistricts: async (q: string) => (q === "Merkezefendi" ? [{ province: "Denizli", district: "Merkezefendi" }] : []),
     } as never);
   const ok = (province: string, district: string, neighborhood?: string) => ({
     success: true, verificationLevel: neighborhood ? "NEIGHBORHOOD" : "DISTRICT", province, district, neighborhood,
@@ -149,8 +152,7 @@ describe("LinaLocationValidatorService", () => {
 
   it("il/ilçe/mahalle doğrulanır; il ilçeden tamamlanır", async () => {
     const v = make((q) =>
-      q === "Merkezefendi" ? ok("Denizli", "Merkezefendi")
-        : q === "Servergazi" ? ok("Denizli", "Merkezefendi", "Servergazi")
+      q === "Servergazi" ? ok("Denizli", "Merkezefendi", "Servergazi")
         : { success: false, alternatives: [] });
     const r = await v.validate({ il: null, ilce: "Merkezefendi", mahalleler: ["Servergazi Mahallesi", "Zzyyxx"] });
     expect(r).toMatchObject({ il: "Denizli", ilce: "Merkezefendi", mahalleler: ["Servergazi"], dogrulanamayan: ["Zzyyxx"] });

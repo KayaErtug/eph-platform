@@ -21,8 +21,8 @@ export const isConfirmWord = (text: string): boolean => CONFIRM_WORDS.test(comma
 export const isCancelWord = (text: string): boolean => CANCEL_WORDS.test(commandForm(text));
 
 // Taslak yokken bile CRM kaydı başlatmış olabilecek mesajları LLM'e göndermek için ucuz ön eleme (çıkarım değil).
-const CRM_HINT = /(crm|musteri|müşteri|alici|alıcı|satici|satıcı|kiraci|kiracı|kiraya ver|talep|arıyor|ariyor|aramakta|almak isti|satmak isti|kaydet|kayit|kayıt|ekle|olustur|oluştur|tlf|telefon)/i;
-export const mightBeCrmMessage = (text: string): boolean => CRM_HINT.test(String(text || ""));
+const CRM_HINT = /(crm|musteri|alici|satici|kiraci|kiraya ver|talep|ariyor|aramakta|almak isti|satmak isti|kaydet|kayit|ekle|olustur|tlf|telefon|numara|\bad[ıi]\b|soyad|butce|milyon|mahalle|\bm2\b|metrekare|\d\s*\+\s*\d|satilik|kiralik|datilik|daire|villa|arsa|\btl\b|₺)/;
+export const mightBeCrmMessage = (text: string): boolean => CRM_HINT.test(trNorm(String(text || "")));
 
 // ---- Ad soyad doğrulama ----
 const NAME_STOP = new Set([
@@ -78,6 +78,9 @@ export const mergeDraft = (current: CrmTaslakAlanlari, ham: HamCikarim, ctx: Mer
   if (ctx.telefon) next.telefon = ctx.telefon;
   if (ctx.email) next.email = ctx.email;
   if (ham.rol) next.rol = ham.rol;
+  if (ham.amac) next.amac = ham.amac;
+  // Rol amacı belirler (alıcı/satıcı -> satılık, kiracı/kiraya veren -> kiralık); açıkça söylenmemişse türetilir.
+  if (!next.amac && next.rol) next.amac = next.rol === "kiracı" || next.rol === "kiraya veren" ? "KIRALIK" : "SATILIK";
   if (ham.mulkTipi) next.mulkTipi = ham.mulkTipi;
 
   if (ctx.konum) {
@@ -137,15 +140,28 @@ export const hasTalepOrContact = (a: CrmTaslakAlanlari): boolean =>
       a.odaSayisi || a.ozellikler.length,
   );
 
-export const missingRequired = (a: CrmTaslakAlanlari): string[] => {
-  const missing: string[] = [];
+export type EksikKodu = "adSoyad" | "soyad" | "rol" | "amac" | "talep";
+
+export const missingKeys = (a: CrmTaslakAlanlari): EksikKodu[] => {
+  const keys: EksikKodu[] = [];
   const words = String(a.adSoyad || "").split(" ").filter(Boolean);
-  if (words.length === 0) missing.push("müşterinin adı ve soyadı");
-  else if (words.length < 2) missing.push("müşterinin soyadı");
-  if (!a.rol) missing.push("rolü (alıcı, satıcı, kiracı veya kiraya veren)");
-  if (!hasTalepOrContact(a)) missing.push("talep bilgisi (konum, bütçe, mülk tipi...) veya iletişim bilgisi (telefon/e-posta)");
-  return missing;
+  if (words.length === 0) keys.push("adSoyad");
+  else if (words.length < 2) keys.push("soyad");
+  if (!a.rol) keys.push("rol");
+  if (!a.amac) keys.push("amac");
+  if (!hasTalepOrContact(a)) keys.push("talep");
+  return keys;
 };
+
+const EKSIK_METNI: Record<EksikKodu, string> = {
+  adSoyad: "müşterinin adı ve soyadı",
+  soyad: "müşterinin soyadı",
+  rol: "rolü (alıcı, satıcı, kiracı veya kiraya veren)",
+  amac: "amacı (satılık mı kiralık mı)",
+  talep: "talep bilgisi (konum, bütçe, mülk tipi...) veya iletişim bilgisi (telefon/e-posta)",
+};
+
+export const missingRequired = (a: CrmTaslakAlanlari): string[] => missingKeys(a).map((k) => EKSIK_METNI[k]);
 
 // ---- Gösterim ----
 const money = (v: number): string => `${new Intl.NumberFormat("tr-TR").format(v)} TL`;
@@ -154,6 +170,7 @@ export const describeFields = (a: CrmTaslakAlanlari, mulkEtiketi: (t: string) =>
   const lines: string[] = [];
   if (a.adSoyad) lines.push(`Ad Soyad: ${a.adSoyad}`);
   if (a.rol) lines.push(`Rol: ${a.rol}`);
+  if (a.amac) lines.push(`Amaç: ${a.amac === "SATILIK" ? "satılık" : "kiralık"}`);
   if (a.telefon) lines.push(`Telefon: ${a.telefon}`);
   if (a.email) lines.push(`E-posta: ${a.email}`);
   if (a.mulkTipi) lines.push(`Mülk tipi: ${mulkEtiketi(a.mulkTipi)}`);
@@ -190,11 +207,20 @@ export const splitName = (adSoyad: string): { firstName: string; lastName: strin
 };
 
 // ---- LLM'in gerçekleşmemiş kayıt iddiası ----
-const WRITE_CLAIM = /(kaydettim|kaydedildi|not ettim|not aldım|not aldim|ekledim|eklendi|oluşturdum|olusturdum|oluşturuldu|olusturuldu|CRM['’]?e (?:ekledim|kaydettim))/i;
+const WRITE_CLAIM = /(kaydettim|kaydedildi|not ettim|not aldım|not aldim|ekledim|eklendi|oluşturdum|olusturdum|oluşturuldu|olusturuldu)/i;
 
 export const NO_WRITE_NOTICE =
-  "Not: Henüz hiçbir kayıt oluşturulmadı. Müşteriyi CRM'e eklemek için bilgileri yazın; taslağı hazırlayıp onayınıza sunarım.";
+  "Henüz kaydedilmedi. Müşteriyi CRM'e eklemek için bilgileri yazın; taslağı hazırlayıp onayınıza sunarım.";
 
-// Gerçek bir yazma sonucu yokken LLM cevabında "kaydettim/not ettim" geçerse düzeltme notu ekler.
-export const guardWriteClaims = (reply: string): string =>
-  WRITE_CLAIM.test(reply) && !reply.includes(NO_WRITE_NOTICE) ? `${reply.trim()}\n\n${NO_WRITE_NOTICE}` : reply;
+// Gerçek bir yazma sonucu yokken LLM cevabındaki "kaydettim/not ettim" cümleleri çıkarılır ve düzeltme notu eklenir.
+export const guardWriteClaims = (reply: string): string => {
+  if (!WRITE_CLAIM.test(reply)) return reply;
+  const kept = reply
+    .split(/(?<=[.!?])\s+/)
+    .filter((sentence) => !WRITE_CLAIM.test(sentence))
+    .join(" ")
+    .trim();
+  return kept ? `${kept}
+
+${NO_WRITE_NOTICE}` : NO_WRITE_NOTICE;
+};

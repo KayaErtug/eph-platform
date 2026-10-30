@@ -15,6 +15,7 @@ import {
   isDemandRole,
   mergeDraft,
   mightBeCrmMessage,
+  missingKeys,
   missingRequired,
   roleEnum,
   roleToIntent,
@@ -77,6 +78,39 @@ export class LinaDraftFlowService {
   async handle(
     body: LinaChatDto,
     user: LinaFlowUser,
+    sourceModule: LinaActionSourceModule,
+  ): Promise<LinaDraftFlowResult> {
+    const result = await this.handleTurn(body, user, sourceModule);
+    if (result.handled) await this.recordTurn(String(user?.id || ""), String(body?.message || ""), result);
+    return result;
+  }
+
+  // Yerel (LLM'siz) turlar dahil her taslak turu konuşma ve denetim tablolarına yazılır; mesaj maskelenmiş saklanır.
+  private async recordTurn(userId: string, message: string, result: LinaDraftFlowResult): Promise<void> {
+    try {
+      const masked = this.masking.mask(message, emptyMaskState()).text.slice(0, 4000);
+      const reply = String(result.message || "").slice(0, 4000);
+      const conversation = await this.prisma.linaKonusma.create({
+        data: { kullaniciId: userId, modul: "CRM", niyet: "MUSTERI_TAKIBI", kullaniciMesaji: masked, linaCevabi: reply },
+      });
+      await this.prisma.linaDenetim.create({
+        data: {
+          kullaniciId: userId,
+          konusmaId: conversation.id,
+          denetimTuru: "BILGI",
+          modul: "CRM",
+          baslik: `crm_taslak:${result.action || "tur"}`,
+          ekVeri: (result.data ?? {}) as Prisma.InputJsonValue,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(`LINA_TURN_LOG_FAILED:${error instanceof Error ? error.message.slice(0, 100) : "?"}`);
+    }
+  }
+
+  private async handleTurn(
+    body: LinaChatDto,
+    user: LinaFlowUser,
     _sourceModule: LinaActionSourceModule,
   ): Promise<LinaDraftFlowResult> {
     const userId = String(user?.id || "");
@@ -134,12 +168,13 @@ export class LinaDraftFlowService {
     const durum: TaslakDurumu = ready ? "ONAY_BEKLIYOR" : "AKTIF";
 
     const saved = await this.save(draft?.id, userId, merged, masked.state, durum);
-    return this.render(saved.id, merged, missing, sorular, ready, ham, konumGeldi);
+    const mukerrer = ready ? await this.findDuplicate(userId, merged) : null;
+    return this.render(saved.id, merged, missing, sorular, ready, ham, konumGeldi, mukerrer ? `${mukerrer.firstName} ${mukerrer.lastName}` : null);
   }
 
   // ---- Onay: yalnız DB'deki taslağı kaydeder ----
   private async confirm(
-    draft: { id: string; alanlar: Prisma.JsonValue; durum: string; sonSonuc: Prisma.JsonValue | null },
+    draft: { id: string; alanlar: Prisma.JsonValue; durum: string },
     user: LinaFlowUser,
   ): Promise<LinaDraftFlowResult> {
     const a = this.readFields(draft.alanlar);
@@ -155,21 +190,7 @@ export class LinaDraftFlowService {
     }
 
     const userId = String(user.id);
-    const sonSonuc = (draft.sonSonuc && typeof draft.sonSonuc === "object" ? draft.sonSonuc : {}) as Record<string, unknown>;
     const mukerrer = await this.findDuplicate(userId, a);
-
-    if (mukerrer && sonSonuc.mukerrerOnayli !== mukerrer.id) {
-      await this.prisma.linaTaslak.update({
-        where: { id: draft.id },
-        data: { sonSonuc: { mukerrerOnayli: mukerrer.id } as Prisma.InputJsonValue },
-      });
-      return this.reply(
-        `${mukerrer.firstName} ${mukerrer.lastName} zaten CRM kayıtlarınızda var. Yeni müşteri açmadan mevcut kaydına bu talebi eklemek için tekrar "Onayla" yazın, vazgeçmek için "İptal" yazın.`,
-        "crm_customer_create_with_interest",
-        true,
-        draft.id,
-      );
-    }
 
     try {
       const result = mukerrer
@@ -227,6 +248,7 @@ export class LinaDraftFlowService {
             minArea: a.m2Min ?? undefined,
             maxArea: a.m2Max ?? undefined,
             propertyTypes: a.mulkTipi ? [a.mulkTipi] : [],
+            interestStatuses: a.amac ? [a.amac] : [],
             roomCounts: odalar,
             features: a.ozellikler,
             purchaseIntent: roleToIntent(a.rol),
@@ -247,6 +269,7 @@ export class LinaDraftFlowService {
       district: a.ilce,
       neighborhood: a.mahalleler[0] || null,
       propertyTypes: a.mulkTipi ? [a.mulkTipi] : [],
+      statuses: a.amac ? [a.amac] : [],
       minBudget: a.butceMin,
       maxBudget: a.butceMax,
       minArea: a.m2Min,
@@ -261,6 +284,7 @@ export class LinaDraftFlowService {
   }
 
   private async findDuplicate(userId: string, a: CrmTaslakAlanlari) {
+    if (!a.adSoyad) return null;
     const digits = String(a.telefon || "").replace(/\D/g, "").slice(-10);
     const { firstName, lastName } = splitName(a.adSoyad as string);
     return this.prisma.customer.findFirst({
@@ -284,19 +308,21 @@ export class LinaDraftFlowService {
     ready: boolean,
     ham: HamCikarim,
     konumGeldi: boolean,
+    mukerrerAd: string | null,
   ): LinaDraftFlowResult {
     const alanlar = describeFields(a, (t) => this.mulkEtiketi(t));
     const lines: string[] = [];
     if (ready) {
       lines.push("Müşteri taslağı hazır. Kaydetmeden önce kontrol edin:");
       lines.push(...alanlar);
+      if (mukerrerAd) lines.push(`${mukerrerAd} zaten CRM kayıtlarınızda var. Güncelleyeyim mi? Yeni müşteri açılmaz, talep mevcut kayda eklenir.`);
       lines.push('Doğruysa "Onayla" yazın; düzeltmek için değişecek bilgiyi yazın; vazgeçmek için "İptal" yazın.');
     } else {
       if (alanlar.length) {
         lines.push("Taslağınızda şu an olanlar:", ...alanlar);
       }
       const sor = [...sorular];
-      if (missing.length) sor.push(`Kaydı tamamlamak için eksik: ${missing.join("; ")}.`);
+      if (missing.length) sor.push(`Eksik: ${missing.join("; ")}.`);
       if (!alanlar.length && !sor.length) sor.push("Müşterinin adı, soyadı ve rolünü (alıcı/satıcı/kiracı/kiraya veren) yazar mısınız?");
       lines.push(...sor);
       lines.push("Henüz kayıt oluşturulmadı.");
@@ -310,7 +336,14 @@ export class LinaDraftFlowService {
       action: "crm_customer_create",
       requiresConfirmation: ready,
       message: lines.join("\n"),
-      data: { taslakId, eksikler: missing, hazir: ready },
+      data: {
+        taslakId,
+        eksikler: missing,
+        eksikKodlar: missingKeys(a),
+        hazir: ready,
+        konumSorusu: sorular.length > 0,
+        mukerrer: Boolean(mukerrerAd),
+      },
     };
   }
 
@@ -369,7 +402,7 @@ export class LinaDraftFlowService {
   }
 
   private mulkEtiketi(type: string): string {
-    const text = type.toLocaleLowerCase("tr-TR").replace(/_/g, " ");
+    const text = type.toLowerCase().replace(/_/g, " "); // enum adı ASCII: tr-TR küçültme "I"yı "ı" yapardı
     return text.charAt(0).toLocaleUpperCase("tr-TR") + text.slice(1);
   }
 

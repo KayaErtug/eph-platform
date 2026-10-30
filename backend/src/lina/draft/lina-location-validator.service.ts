@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 
 import { EphLocationCatalogService } from "../catalog/eph-location-catalog.service";
+import { LinaGeoService } from "../geo/lina-geo.service";
 
 export type LinaLocationInput = { il: string | null; ilce: string | null; mahalleler: string[] };
 
@@ -60,7 +61,10 @@ type Found = { status: "ok" | "belirsiz" | "yok"; province?: string; district?: 
 
 @Injectable()
 export class LinaLocationValidatorService {
-  constructor(private readonly catalog: EphLocationCatalogService) {}
+  constructor(
+    private readonly catalog: EphLocationCatalogService,
+    private readonly geo: LinaGeoService,
+  ) {}
 
   async validate(input: LinaLocationInput): Promise<LinaLocationValidation> {
     const result: LinaLocationValidation = { il: null, ilce: null, mahalleler: [], dogrulanamayan: [], belirsiz: [] };
@@ -139,6 +143,7 @@ export class LinaLocationValidatorService {
     il: string | null,
     ilce: string | null,
   ): Promise<Found> {
+    if (level === "DISTRICT") return this.resolveDistrict(name, il);
     let resolved;
     try {
       resolved = await this.catalog.resolveLocationFromMessage(name);
@@ -146,17 +151,14 @@ export class LinaLocationValidatorService {
       return { status: "yok" };
     }
 
-    const unitOf = (district?: string, neighborhood?: string) => (level === "DISTRICT" ? district : neighborhood);
+    const unitOf = (_district?: string, neighborhood?: string) => neighborhood;
     const matches = (province?: string, district?: string, neighborhood?: string) =>
       (!il || !province || fuzzyEqual(province, il)) &&
-      (!ilce || level === "DISTRICT" || !district || fuzzyEqual(district, ilce)) &&
+      (!ilce || !district || fuzzyEqual(district, ilce)) &&
       fuzzyEqual(unitOf(district, neighborhood) || "", name);
 
     if (resolved.success) {
-      const levelOk =
-        level === "DISTRICT"
-          ? resolved.verificationLevel === "DISTRICT"
-          : resolved.verificationLevel === "NEIGHBORHOOD" || resolved.verificationLevel === "VILLAGE";
+      const levelOk = resolved.verificationLevel === "NEIGHBORHOOD" || resolved.verificationLevel === "VILLAGE";
       if (!levelOk) return { status: "yok" };
       const unit = resolved.neighborhood || resolved.village;
       if (matches(resolved.province, resolved.district, unit)) {
@@ -169,7 +171,7 @@ export class LinaLocationValidatorService {
     // Birden fazla eşleşme: il/ilçe ile daraltılınca tek sonuç kalırsa kabul edilir.
     const candidates = (resolved.alternatives || [])
       .map((text) => text.split(" / ").map((part) => part.trim()))
-      .filter((parts) => parts.length >= (level === "DISTRICT" ? 2 : 3))
+      .filter((parts) => parts.length >= 3)
       .map(([province, district, neighborhood]) => ({ province, district, neighborhood }))
       .filter((c) => matches(c.province, c.district, c.neighborhood));
     const unique = new Map<string, (typeof candidates)[number]>(
@@ -178,5 +180,24 @@ export class LinaLocationValidatorService {
     const only = unique.size === 1 ? [...unique.values()][0] : null;
     if (only && (il || ilce)) return { status: "ok", province: only.province, district: only.district, neighborhood: only.neighborhood };
     return { status: unique.size > 0 || (resolved.alternatives || []).length > 0 ? "belirsiz" : "yok" };
+  }
+
+  private async resolveDistrict(name: string, il: string | null): Promise<Found> {
+    let found: Array<{ province?: string; district: string }>;
+    try {
+      found = await this.geo.findDistricts(name);
+    } catch {
+      return { status: "yok" };
+    }
+    const named = found.filter((d) => fuzzyEqual(d.district, name));
+    const scoped = il ? named.filter((d) => !d.province || fuzzyEqual(d.province, il)) : named;
+    const unique = new Map(scoped.map((d) => [norm(`${d.province}|${d.district}`), d]));
+    if (unique.size === 1) {
+      const only = [...unique.values()][0];
+      return { status: "ok", province: only.province, district: only.district };
+    }
+    if (unique.size > 1) return { status: "belirsiz" };
+    // İlçe adı var ama verilen ilde değil: kullanıcıya sorulur.
+    return { status: named.length ? "belirsiz" : "yok" };
   }
 }

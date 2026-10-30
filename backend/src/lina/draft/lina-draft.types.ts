@@ -10,6 +10,9 @@ export const CRM_ROL_ESLEME: Record<CrmRolEtiketi, CustomerRole> = {
   "kiraya veren": CustomerRole.MAL_SAHIBI,
 };
 
+export const AMACLAR = ["SATILIK", "KIRALIK"] as const;
+export type CrmAmac = (typeof AMACLAR)[number];
+
 export const MULK_TIPLERI = Object.values(UnitType) as string[];
 
 // Taslağın kalıcı alanları. null = bilinmiyor (uydurulmaz).
@@ -18,6 +21,7 @@ export type CrmTaslakAlanlari = {
   telefon: string | null;
   email: string | null;
   rol: CrmRolEtiketi | null;
+  amac: CrmAmac | null;
   mulkTipi: string | null;
   il: string | null;
   ilce: string | null;
@@ -37,6 +41,7 @@ export const bosAlanlar = (): CrmTaslakAlanlari => ({
   telefon: null,
   email: null,
   rol: null,
+  amac: null,
   mulkTipi: null,
   il: null,
   ilce: null,
@@ -58,6 +63,7 @@ export type HamCikarim = {
   telefon: string | null;
   email: string | null;
   rol: CrmRolEtiketi | null;
+  amac: CrmAmac | null;
   mulkTipi: string | null;
   il: string | null;
   ilce: string | null;

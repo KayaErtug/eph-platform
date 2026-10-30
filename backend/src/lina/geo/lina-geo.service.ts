@@ -88,6 +88,14 @@ export class LinaGeoService {
     return this.empty("Türkiye API üzerinde net konum eşleşmesi bulunamadı.");
   }
 
+  // İlçe adını doğrudan ilçe uç noktasında arar (mahalle/köy eşleşmesine düşmez); aynı adlı ilçeleri il ile birlikte döndürür.
+  async findDistricts(name: string): Promise<Array<{ province?: string; district: string }>> {
+    const records = await this.searchAdministrativeUnit("districts", String(name || "").trim());
+    return records
+      .map((record) => ({ province: this.getProvinceName(record), district: this.getName(record, "district") }))
+      .filter((item) => item.district);
+  }
+
   buildPromptContext(location: LinaGeoResolvedLocation): string {
     if (!location.success) {
       return [
