@@ -221,6 +221,30 @@ describe('AdminService', () => {
       expect(res.value).toBeNull();
     });
 
+    it('MARKET_TUKETICI_KKDF_PCT 0 değerini kaydeder, audit eski -> yeni yazar', async () => {
+      const tx = mkTx(row('MARKET_TUKETICI_KKDF_PCT', 15));
+      tx.systemSetting.upsert.mockResolvedValue(row('MARKET_TUKETICI_KKDF_PCT', 0));
+      (prisma as any).$transaction = jest.fn((fn: any) => fn(tx));
+      const res: any = await service.updateSystemSetting('MARKET_TUKETICI_KKDF_PCT', { value: 0 }, sa);
+      expect(tx.systemSetting.upsert).toHaveBeenCalled();
+      expect(tx.auditLog.create.mock.calls[0][0].data.metadata).toEqual({ key: 'MARKET_TUKETICI_KKDF_PCT', previousValue: 15, newValue: 0 });
+      expect(res.value).toBe(0);
+    });
+
+    it.each([-1, 101, 'abc'])('MARKET_TUKETICI_BSMV_PCT geçersiz değer %p reddedilir', async (v) => {
+      (prisma as any).$transaction = jest.fn();
+      await expect(service.updateSystemSetting('MARKET_TUKETICI_BSMV_PCT', { value: v as any }, sa)).rejects.toThrow();
+    });
+
+    it('MARKET_TUKETICI_FAIZ_KAYNAK metin olarak kaydedilir, MARKET_TUKETICI_FAIZ_AYLIK 0 reddedilir', async () => {
+      const tx = mkTx(null);
+      tx.systemSetting.upsert.mockResolvedValue(row('MARKET_TUKETICI_FAIZ_KAYNAK', 'Banka'));
+      (prisma as any).$transaction = jest.fn((fn: any) => fn(tx));
+      const res: any = await service.updateSystemSetting('MARKET_TUKETICI_FAIZ_KAYNAK', { value: ' Banka ' }, sa);
+      expect(res.value).toBe('Banka');
+      await expect(service.updateSystemSetting('MARKET_TUKETICI_FAIZ_AYLIK', { value: 0 }, sa)).rejects.toThrow();
+    });
+
     it('MARKET_KONUT_FAIZ_AYLIK null ile silinir', async () => {
       const tx = mkTx(row('MARKET_KONUT_FAIZ_AYLIK', 2.74));
       (prisma as any).$transaction = jest.fn((fn: any) => fn(tx));

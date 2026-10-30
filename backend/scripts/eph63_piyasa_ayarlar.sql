@@ -1,0 +1,21 @@
+-- EPH-63: tüketici kredisi piyasa ayarları. ÇALIŞTIRILMADI. Mustafa abinin onayı şart (EPH_KURALLARI §7).
+-- Değer UYDURULMADI: faiz, KKDF ve BSMV için resmi kaynakla doğrulanmış güncel değer bulunamadı
+-- (aramalarda BSMV için %5 / %10 / %15 çelişkili çıktı; KKDF %15 ikincil kaynaklarda geçiyor, resmi teyit yok).
+-- Kayıt yoksa mobil tüketici faizi/vergi alanlarını göstermez, kullanıcı girer. Bu yüzden DEĞER GİRMEDEN çalıştırmayın.
+-- Süper admin aynı ayarları uygulamadaki yönetim ekranından anında değiştirebilir (audit log'lu); SQL yalnız ilk toplu giriş içindir.
+--
+-- 0) ÖNCE (salt okunur): mevcut durum
+--   SELECT "key","valueJson","updatedAt" FROM "SystemSetting" WHERE "key" LIKE 'MARKET_TUKETICI_%' ORDER BY 1;
+--
+-- 1) Değerleri doğrulayıp <...> yerlerini doldurun, yorum işaretlerini kaldırın:
+-- BEGIN;
+-- INSERT INTO "SystemSetting" ("id","key","valueJson","description","createdAt","updatedAt") VALUES
+--   ('eph63-MARKET_TUKETICI_FAIZ_AYLIK', 'MARKET_TUKETICI_FAIZ_AYLIK', '{"value": <AYLIK_FAIZ_YUZDE>}'::jsonb, 'Tüketici kredisi aylık faiz oranı (%)', now(), now()),
+--   ('eph63-MARKET_TUKETICI_FAIZ_KAYNAK', 'MARKET_TUKETICI_FAIZ_KAYNAK', '{"value": "<KAYNAK_ADI>"}'::jsonb, 'Tüketici kredisi faizinin kaynak adı', now(), now()),
+--   ('eph63-MARKET_TUKETICI_KKDF_PCT', 'MARKET_TUKETICI_KKDF_PCT', '{"value": <KKDF_YUZDE>}'::jsonb, 'Tüketici kredisi KKDF oranı (%)', now(), now()),
+--   ('eph63-MARKET_TUKETICI_BSMV_PCT', 'MARKET_TUKETICI_BSMV_PCT', '{"value": <BSMV_YUZDE>}'::jsonb, 'Tüketici kredisi BSMV oranı (%)', now(), now())
+-- ON CONFLICT ("key") DO NOTHING;
+-- COMMIT;
+--
+-- Geri alma (yalnız bu betikle eklenenler):
+-- DELETE FROM "SystemSetting" WHERE "id" LIKE 'eph63-MARKET_TUKETICI_%';

@@ -1,6 +1,6 @@
 import { COST_PREFIX, LIMIT_DEFAULTS, LIMIT_DESCRIPTIONS, LIMIT_LIST_DEFAULTS, LIMIT_PREFIX, isManagedCommercialKey, parseLimitList } from "../pricing/commercial-costs";
 import { readTrialPolicy, resolveInitialTrialDays } from "../pricing/trial-policy";
-import { MARKET_CODES, MARKET_LOAN_SETTING_KEY, MARKET_LOAN_SOURCE_KEY, MARKET_MANUAL_PREFIX } from "../market/market-ticker.service";
+import { MARKET_CODES, MARKET_CONSUMER_BSMV_KEY, MARKET_CONSUMER_KKDF_KEY, MARKET_CONSUMER_RATE_KEY, MARKET_CONSUMER_SOURCE_KEY, MARKET_LOAN_SETTING_KEY, MARKET_LOAN_SOURCE_KEY, MARKET_MANUAL_PREFIX, MARKET_TAX_KEYS, MARKET_TEXT_KEYS } from "../market/market-ticker.service";
 import {
   Injectable,
   NotFoundException,
@@ -3395,6 +3395,10 @@ export class AdminService {
     return {
       [MARKET_LOAN_SETTING_KEY]: "Konut kredisi aylık faiz oranı (%). Doluysa piyasa şeridinde otomatik kaynağın yerine geçer.",
       [MARKET_LOAN_SOURCE_KEY]: "Konut kredisi faizinin kaynak adı (ör. Akbank İlk Evim). Boşsa 'Yönetici' yazılır.",
+      [MARKET_CONSUMER_RATE_KEY]: "Tüketici kredisi aylık faiz oranı (%). Boşsa mobilde tüketici faizi gösterilmez (varsayılan yok).",
+      [MARKET_CONSUMER_SOURCE_KEY]: "Tüketici kredisi faizinin kaynak adı (ör. banka adı). Boşsa 'Yönetici' yazılır.",
+      [MARKET_CONSUMER_KKDF_KEY]: "Tüketici kredisi KKDF oranı (%, 0-100). Boşsa mobilde kullanıcı girer.",
+      [MARKET_CONSUMER_BSMV_KEY]: "Tüketici kredisi BSMV oranı (%, 0-100). Boşsa mobilde kullanıcı girer.",
       ...Object.fromEntries(MARKET_CODES.map((c) => [MARKET_MANUAL_PREFIX + c, `${c} elle değer. Doluysa piyasa şeridinde otomatik kaynağın yerine geçer (kaynak: Yönetici).`])),
     };
   }
@@ -3410,7 +3414,7 @@ export class AdminService {
     const inner = typeof raw === "object" && raw !== null && !Array.isArray(raw) ? raw.value : raw;
     const value: number | string | number[] = Array.isArray(inner)
       ? inner as number[]
-      : setting.key === MARKET_LOAN_SOURCE_KEY ? String(inner ?? "") : Number(inner);
+      : MARKET_TEXT_KEYS.includes(setting.key) ? String(inner ?? "") : Number(inner);
 
     return {
       key: setting.key,
@@ -3554,7 +3558,8 @@ export class AdminService {
     body: { value: number | string | null | number[]; description?: string },
     actor?: AdminActor,
   ) {
-    const isText = key === MARKET_LOAN_SOURCE_KEY;
+    const isText = MARKET_TEXT_KEYS.includes(key);
+    const isTax = MARKET_TAX_KEYS.includes(key);
     const isBlank = body?.value === null || (typeof body?.value === "string" && body.value.trim() === "");
     if (!isText && isBlank) return this.clearMarketSetting(key, defaultDescription, actor);
     let value: number | string;
@@ -3565,7 +3570,11 @@ export class AdminService {
       value = body.value.trim();
     } else {
       const n = typeof body?.value === "string" ? Number(body.value.replace(",", ".")) : body?.value;
-      if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) {
+      if (isTax) {
+        if (typeof n !== "number" || !Number.isFinite(n) || n < 0 || n > 100) {
+          throw new BadRequestException("Vergi oranı 0 ile 100 arasında bir sayı olmalıdır.");
+        }
+      } else if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) {
         throw new BadRequestException("Değer 0'dan büyük bir sayı olmalıdır.");
       }
       value = n;

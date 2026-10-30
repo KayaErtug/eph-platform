@@ -3,19 +3,38 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type TickerItem = { code: string; label: string; value: number; unit: string; changePct: number | null; source: string };
-type Loan = { monthlyRatePct: number; source: string; updatedAt: string };
+type Loan = {
+  monthlyRatePct: number | null;
+  source: string | null;
+  updatedAt: string | null;
+  consumerMonthlyRatePct?: number;
+  consumerSource?: string;
+  consumerUpdatedAt?: string;
+  kkdfPct?: number;
+  bsmvPct?: number;
+};
 type Cached<T> = { data: T; at: string };
 
 export const MARKET_LOAN_SETTING_KEY = 'MARKET_KONUT_FAIZ_AYLIK';
 export const MARKET_LOAN_SOURCE_KEY = 'MARKET_KONUT_FAIZ_KAYNAK';
+export const MARKET_CONSUMER_RATE_KEY = 'MARKET_TUKETICI_FAIZ_AYLIK';
+export const MARKET_CONSUMER_SOURCE_KEY = 'MARKET_TUKETICI_FAIZ_KAYNAK';
+export const MARKET_CONSUMER_KKDF_KEY = 'MARKET_TUKETICI_KKDF_PCT';
+export const MARKET_CONSUMER_BSMV_KEY = 'MARKET_TUKETICI_BSMV_PCT';
+// Metin değerli ayarlar; vergi oranlarında 0 geçerlidir (yüzde, 0-100).
+export const MARKET_TEXT_KEYS: readonly string[] = [MARKET_LOAN_SOURCE_KEY, MARKET_CONSUMER_SOURCE_KEY];
+export const MARKET_TAX_KEYS: readonly string[] = [MARKET_CONSUMER_KKDF_KEY, MARKET_CONSUMER_BSMV_KEY];
 export const MARKET_MANUAL_PREFIX = 'MARKET_MANUAL_';
-export const MARKET_CODES = ['USD', 'EUR', 'GBP', 'GRAM_ALTIN', 'CEYREK_ALTIN', 'BIST100'] as const;
+export const MARKET_CODES = ['USD', 'EUR', 'GBP', 'GRAM_ALTIN', 'CEYREK_ALTIN', 'YARIM_ALTIN', 'TAM_ALTIN', 'ONS_ALTIN', 'BIST100'] as const;
 const LABELS: Record<string, { label: string; unit: string }> = {
   USD: { label: 'Dolar', unit: '₺' },
   EUR: { label: 'Euro', unit: '₺' },
   GBP: { label: 'Sterlin', unit: '₺' },
   GRAM_ALTIN: { label: 'Gram Altın', unit: '₺' },
   CEYREK_ALTIN: { label: 'Çeyrek Altın', unit: '₺' },
+  YARIM_ALTIN: { label: 'Yarım Altın', unit: '₺' },
+  TAM_ALTIN: { label: 'Tam Altın', unit: '₺' },
+  ONS_ALTIN: { label: 'Ons Altın', unit: '$' },
   BIST100: { label: 'BIST 100', unit: 'puan' },
 };
 
@@ -27,6 +46,12 @@ const positive = (raw: unknown) => {
   const v = settingValue(raw);
   const n = typeof v === 'string' ? (v.trim() === '' ? NaN : Number(v.replace(',', '.'))) : Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
+};
+// Vergi oranı: 0 dahil, 100'e kadar yüzde.
+const percent = (raw: unknown) => {
+  const v = settingValue(raw);
+  const n = typeof v === 'string' ? (v.trim() === '' ? NaN : Number(v.replace(',', '.'))) : Number(v);
+  return typeof v !== 'boolean' && v !== null && Number.isFinite(n) && n >= 0 && n <= 100 ? n : null;
 };
 const FETCH_TIMEOUT_MS = 10_000;
 const TCMB_BASE = 'https://www.tcmb.gov.tr/kurlar';
@@ -108,11 +133,12 @@ export class MarketTickerService implements OnModuleInit {
 
   // Ücretsiz, anahtarsız: Truncgil Finans (serbest piyasa satış fiyatı, Change = kaynağın günlük değişimi).
   private async gold() {
-    const json = JSON.parse(await getText('https://finans.truncgil.com/v4/today.json'));
-    for (const [code, key, label] of [['GRAM_ALTIN', 'GRA', 'Gram Altın'], ['CEYREK_ALTIN', 'CEYREKALTIN', 'Çeyrek Altın']] as const) {
+    const json = JSON.parse(await getText('https://finans.truncgil.com/v4/today.json', { 'User-Agent': 'Mozilla/5.0' }));
+    for (const [code, key] of [['GRAM_ALTIN', 'GRA'], ['CEYREK_ALTIN', 'CEYREKALTIN'], ['YARIM_ALTIN', 'YARIMALTIN'], ['TAM_ALTIN', 'TAMALTIN'], ['ONS_ALTIN', 'ONS']] as const) {
       const row = json?.[key];
       const value = Number(row?.Selling);
-      if (value > 0) this.keep({ code, label, value: round(value, 2), unit: '₺', changePct: Number.isFinite(Number(row?.Change)) ? Number(row.Change) : null, source: 'Truncgil' });
+      const { label, unit } = LABELS[code];
+      if (value > 0) this.keep({ code, label, value: round(value, 2), unit, changePct: Number.isFinite(Number(row?.Change)) ? Number(row.Change) : null, source: 'Truncgil' });
     }
   }
 
@@ -142,17 +168,30 @@ export class MarketTickerService implements OnModuleInit {
   }
 
   private async loan(): Promise<Loan | null> {
-    const [row, src] = await Promise.all([
-      this.prisma.systemSetting.findUnique({ where: { key: MARKET_LOAN_SETTING_KEY }, select: { valueJson: true, updatedAt: true } }),
-      this.prisma.systemSetting.findUnique({ where: { key: MARKET_LOAN_SOURCE_KEY }, select: { valueJson: true } }),
-    ]);
+    const keys = [MARKET_LOAN_SETTING_KEY, MARKET_LOAN_SOURCE_KEY, MARKET_CONSUMER_RATE_KEY, MARKET_CONSUMER_SOURCE_KEY, MARKET_CONSUMER_KKDF_KEY, MARKET_CONSUMER_BSMV_KEY];
+    const [row, src, cRate, cSrc, kkdf, bsmv] = await Promise.all(
+      keys.map(key => this.prisma.systemSetting.findUnique({ where: { key }, select: { valueJson: true, updatedAt: true } })),
+    );
+    const text = (r: typeof src) => {
+      const v = settingValue(r?.valueJson);
+      return typeof v === 'string' && v.trim() ? v.trim() : 'Yönetici';
+    };
     const manual = row ? positive(row.valueJson) : null;
-    if (row && manual !== null) {
-      const text = settingValue(src?.valueJson);
-      const source = typeof text === 'string' && text.trim() ? text.trim() : 'Yönetici';
-      return { monthlyRatePct: manual, source, updatedAt: row.updatedAt.toISOString() };
-    }
-    return this.evds ? { monthlyRatePct: this.evds.data, source: 'TCMB EVDS', updatedAt: this.evds.at } : null;
+    const housing = row && manual !== null
+      ? { monthlyRatePct: manual, source: text(src), updatedAt: row.updatedAt.toISOString() }
+      : this.evds ? { monthlyRatePct: this.evds.data, source: 'TCMB EVDS', updatedAt: this.evds.at } : null;
+
+    // Tüketici kredisi: değer yalnız yönetici girişinden gelir; kayıt yoksa alan hiç dönmez (uydurma varsayılan yok).
+    const consumerRate = cRate ? positive(cRate.valueJson) : null;
+    const kkdfPct = kkdf ? percent(kkdf.valueJson) : null;
+    const bsmvPct = bsmv ? percent(bsmv.valueJson) : null;
+    const consumer = {
+      ...(consumerRate !== null && cRate ? { consumerMonthlyRatePct: consumerRate, consumerSource: text(cSrc), consumerUpdatedAt: cRate.updatedAt.toISOString() } : {}),
+      ...(kkdfPct !== null ? { kkdfPct } : {}),
+      ...(bsmvPct !== null ? { bsmvPct } : {}),
+    };
+    if (!housing && !Object.keys(consumer).length) return null;
+    return { monthlyRatePct: housing?.monthlyRatePct ?? null, source: housing?.source ?? null, updatedAt: housing?.updatedAt ?? null, ...consumer };
   }
 
   // MARKET_MANUAL_<KOD> varsa otomatik kaynağın yerine geçer.
@@ -177,7 +216,7 @@ export class MarketTickerService implements OnModuleInit {
     const cached = [...this.items.values()];
     const items = MARKET_CODES.map(code => manual.get(code)?.item ?? this.items.get(code)?.data).filter((i): i is TickerItem => Boolean(i));
     const loan = await this.loan();
-    const times = [...cached.map(c => c.at), ...[...manual.values()].map(m => m.at), ...(loan ? [loan.updatedAt] : [])].sort();
+    const times = [...cached.map(c => c.at), ...[...manual.values()].map(m => m.at), ...(loan ? [loan.updatedAt, loan.consumerUpdatedAt].filter((t): t is string => Boolean(t)) : [])].sort();
     return { updatedAt: times.length ? times[times.length - 1] : null, items, loan };
   }
 }
