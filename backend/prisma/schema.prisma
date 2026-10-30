@@ -4273,3 +4273,21 @@ model AdminEmailOutbox {
   @@index([status, availableAt])
   @@index([entityType, entityId])
 }
+
+// EPH-52: Lina kalıcı taslak (konuşma bazlı). Süreç-içi Map yerine; PM2 yeniden başlasa da kaybolmaz.
+model LinaTaslak {
+  id               String   @id @default(uuid())
+  kullaniciId      String
+  konusmaAnahtari  String   @default("varsayilan")
+  tur              String   @default("CRM_MUSTERI")
+  durum            String   @default("AKTIF")
+  alanlar          Json     @default("{}")
+  maskeEsleme      String?
+  sonSonuc         Json?
+  gecerlilikTarihi DateTime
+  olusturulmaTarihi DateTime @default(now())
+  guncellenmeTarihi DateTime @updatedAt
+
+  @@index([kullaniciId, durum])
+  @@index([gecerlilikTarihi])
+}

@@ -20,9 +20,9 @@ import { Request } from "express";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { LinaActionEngineService } from "./actions/lina-action-engine.service";
 import { LinaConfirmationGateService } from "./actions/lina-confirmation-gate.service";
-import { LinaCrmOwnerActionService } from "./actions/lina-crm-owner-action.service";
 import { LinaNaturalCommandService } from "./actions/lina-natural-command.service";
 import { LinaActionSourceModule } from "./actions/lina-action.types";
+import { LinaDraftFlowService } from "./draft/lina-draft-flow.service";
 import {
   LINA_ACTION_SOURCE_MODULES,
   normalizeLinaSourceModule,
@@ -61,12 +61,12 @@ export class LinaController {
     private readonly linaScopeService: LinaScopeService,
     private readonly linaMemoryService: LinaMemoryService,
     private readonly linaNetworkRequestDraftService: LinaNetworkRequestDraftService,
-    private readonly linaCrmOwnerActionService: LinaCrmOwnerActionService,
     private readonly linaActionEngineService: LinaActionEngineService,
     private readonly linaConfirmationGateService: LinaConfirmationGateService,
     private readonly linaNaturalCommandService: LinaNaturalCommandService,
     private readonly linaDistanceService: LinaDistanceService,
     private readonly linaTranscriptionService: LinaTranscriptionService,
+    private readonly linaDraftFlowService: LinaDraftFlowService,
   ) {}
 
   // Lina Temporary Passive Mode V1
@@ -124,9 +124,27 @@ export class LinaController {
     }
 
     const user = this.extractUser(request);
-    const scope = await this.linaScopeService.classify(body);
+    const scopeContext = await this.linaDraftFlowService.getScopeContext(user.id);
+    const scope = await this.linaScopeService.classify(body, scopeContext);
     if (scope === "OUT_OF_SCOPE") return this.linaScopeService.blockedReply();
     const sourceModule = this.normalizeSourceModule(body?.sourceModule);
+
+    // CRM müşteri/talep taslağı: kalıcı taslak + şemalı çıkarım; "Onayla" yalnız DB'deki taslağı kaydeder.
+    if (user.id && user.role) {
+      const draftResult = await this.linaDraftFlowService.handle(body, user, sourceModule);
+      if (draftResult.handled) {
+        return {
+          success: Boolean(draftResult.success),
+          message: draftResult.message || "Taslak güncellendi.",
+          provider: "local" as const,
+          kvkkFiltered: false,
+          detectedTypes: [],
+          action: draftResult.action,
+          requiresConfirmation: draftResult.requiresConfirmation ?? false,
+          data: draftResult.data,
+        };
+      }
+    }
     const normalizedMessage = this.linaNaturalCommandService.normalize(
       body?.message,
     );
@@ -135,7 +153,7 @@ export class LinaController {
     let confirmedGateExecution = false;
 
     if (user.id && user.role) {
-      const gateResult = this.linaConfirmationGateService.evaluate(
+      const gateResult = await this.linaConfirmationGateService.evaluate(
         normalizedMessage,
         user.id,
         sourceModule,
@@ -163,32 +181,8 @@ export class LinaController {
     }
 
     if (executionMessage !== String(body?.message || "").trim()) {
-      const executionScope = await this.linaScopeService.classify({ ...body, message: executionMessage });
+      const executionScope = await this.linaScopeService.classify({ ...body, message: executionMessage }, scopeContext);
       if (executionScope === "OUT_OF_SCOPE") return this.linaScopeService.blockedReply();
-    }
-
-    const ownerActionResult =
-      await this.linaCrmOwnerActionService.tryExecute(
-        executionMessage,
-        user,
-        sourceModule,
-        body?.history,
-      );
-
-    if (ownerActionResult.handled) {
-      return {
-        success: Boolean(ownerActionResult.success),
-        message:
-          ownerActionResult.message ||
-          "Lina işlemi tamamladı ancak sonuç mesajı oluşturamadı.",
-        provider: "local" as const,
-        kvkkFiltered: false,
-        detectedTypes: [],
-        action: ownerActionResult.action,
-        requiresConfirmation:
-          ownerActionResult.requiresConfirmation ?? false,
-        data: ownerActionResult.data,
-      };
     }
 
     const actionResult = await this.linaActionEngineService.tryExecute(

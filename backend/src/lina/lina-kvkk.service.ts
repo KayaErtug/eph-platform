@@ -19,7 +19,7 @@ export class LinaKvkkService {
     }> = [
       {
         type: 'phone',
-        regex: /(\+90|0)?\s?5\d{2}[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}/g,
+        regex: /(?<![\d.,])(?:\+?90[\s-]?|0)?\(?5\d{2}\)?[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}(?!\d)(?!\s*(?:tl|₺|lira|milyon|bin)(?![a-zçğıöşü]))/gi,
         replacement: '[telefon bilgisi gizlendi]',
       },
       {

@@ -74,6 +74,10 @@ export type LinaOpenAiCreateResponseRequest = {
   tools: LinaOpenAiFunctionTool[];
   toolChoice?: "auto" | "none" | "required";
   maxOutputTokens?: number;
+  /** Verilmezse sohbet modeli (LINA_CHAT_MODEL) kullanılır. */
+  model?: string;
+  /** Doluysa Responses API yapılandırılmış çıktı (strict JSON şema) ile çağrılır. */
+  jsonSchema?: { name: string; schema: Record<string, unknown> };
 };
 
 export type LinaOpenAiOrchestratorInput = {

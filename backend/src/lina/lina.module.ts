@@ -9,8 +9,12 @@ import { PropertyCardProfileModule } from "../property-card/property-card-profil
 
 import { LinaActionEngineService } from "./actions/lina-action-engine.service";
 import { LinaConfirmationGateService } from "./actions/lina-confirmation-gate.service";
-import { LinaCrmOwnerActionService } from "./actions/lina-crm-owner-action.service";
 import { LinaNaturalCommandService } from "./actions/lina-natural-command.service";
+import { LinaCrmExtractionService } from "./draft/lina-crm-extraction.service";
+import { LinaDraftFlowService } from "./draft/lina-draft-flow.service";
+import { LinaLocationValidatorService } from "./draft/lina-location-validator.service";
+import { LinaMaskingService } from "./draft/lina-masking.service";
+import { LinaModelSettingsService } from "./lina-model-settings.service";
 import { EphLocationCatalogService } from "./catalog/eph-location-catalog.service";
 import { EphSchemaCatalogService } from "./catalog/eph-schema-catalog.service";
 import { LinaUserContextService } from "./catalog/lina-user-context.service";
@@ -62,7 +66,6 @@ import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
     LinaScopeService,
     LinaActionEngineService,
     LinaConfirmationGateService,
-    LinaCrmOwnerActionService,
     LinaNaturalCommandService,
     LinaAccessService,
     LinaKvkkService,
@@ -83,6 +86,12 @@ import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
     LinaDocumentTkgmService,
     LinaV7PromptService,
 
+    LinaModelSettingsService,
+    LinaMaskingService,
+    LinaCrmExtractionService,
+    LinaLocationValidatorService,
+    LinaDraftFlowService,
+
     LinaUserContextService,
     EphLocationCatalogService,
     EphSchemaCatalogService,
@@ -102,7 +111,6 @@ import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
     LinaService,
     LinaActionEngineService,
     LinaConfirmationGateService,
-    LinaCrmOwnerActionService,
     LinaNaturalCommandService,
     LinaAccessService,
     LinaKvkkService,

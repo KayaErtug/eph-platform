@@ -1,5 +1,8 @@
 import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
+
+import { PrismaService } from "../../prisma/prisma.service";
 
 import { LinaActionSourceModule } from "./lina-action.types";
 
@@ -46,16 +49,54 @@ export type LinaConfirmationGateResult = {
 };
 
 const CONFIRMATION_TTL_MS = 5 * 60 * 1000;
+const PLAN_TUR = "ONAY_PLAN";
 
 @Injectable()
 export class LinaConfirmationGateService {
-  private readonly pendingPlans = new Map<string, PendingConfirmationPlan>();
+  // Bekleyen onay planı süreç belleğinde değil DB'de (LinaTaslak, tur=ONAY_PLAN) tutulur; PM2 yeniden başlasa da kaybolmaz.
+  constructor(private readonly prisma: PrismaService) {}
 
-  evaluate(
+  private async loadPlan(userId: string): Promise<PendingConfirmationPlan | null> {
+    const row = await this.prisma.linaTaslak.findFirst({
+      where: { kullaniciId: userId, tur: PLAN_TUR, durum: "AKTIF", gecerlilikTarihi: { gt: new Date() } },
+      orderBy: { guncellenmeTarihi: "desc" },
+    });
+    return row ? (row.alanlar as unknown as PendingConfirmationPlan) : null;
+  }
+
+  private async savePlan(plan: PendingConfirmationPlan): Promise<void> {
+    await this.dropPlan(plan.userId);
+    await this.prisma.linaTaslak.create({
+      data: {
+        kullaniciId: plan.userId,
+        tur: PLAN_TUR,
+        durum: "AKTIF",
+        alanlar: plan as unknown as Prisma.InputJsonValue,
+        gecerlilikTarihi: new Date(plan.expiresAt),
+      },
+    });
+  }
+
+  private async dropPlan(userId: string): Promise<void> {
+    await this.prisma.linaTaslak.updateMany({
+      where: { kullaniciId: userId, tur: PLAN_TUR, durum: "AKTIF" },
+      data: { durum: "KAPANDI" },
+    });
+  }
+
+  async evaluate(
     rawMessage: string,
     userId: string,
     sourceModule: LinaActionSourceModule,
-  ): LinaConfirmationGateResult {
+  ): Promise<LinaConfirmationGateResult> {
+    return this.evaluateAsync(rawMessage, userId, sourceModule);
+  }
+
+  private async evaluateAsync(
+    rawMessage: string,
+    userId: string,
+    sourceModule: LinaActionSourceModule,
+  ): Promise<LinaConfirmationGateResult> {
     const message = String(rawMessage || "")
       .replace(/\s+/g, " ")
       .trim();
@@ -64,14 +105,14 @@ export class LinaConfirmationGateService {
       return { handled: false };
     }
 
-    const pending = this.getLivePending(userId);
+    const pending = await this.loadPlan(userId);
 
     if (this.isCancellationWord(message)) {
       if (!pending) {
         return { handled: false };
       }
 
-      this.pendingPlans.delete(userId);
+      await this.dropPlan(userId);
 
       return {
         handled: true,
@@ -86,7 +127,7 @@ export class LinaConfirmationGateService {
         return { handled: false };
       }
 
-      this.pendingPlans.delete(userId);
+      await this.dropPlan(userId);
 
       return {
         handled: true,
@@ -117,7 +158,7 @@ export class LinaConfirmationGateService {
 
           pending.stage = "FINAL";
           pending.expiresAt = Date.now() + CONFIRMATION_TTL_MS;
-          this.pendingPlans.set(userId, pending);
+          await this.savePlan(pending);
 
           return {
             handled: true,
@@ -146,7 +187,7 @@ export class LinaConfirmationGateService {
         }
       }
 
-      this.pendingPlans.delete(userId);
+      await this.dropPlan(userId);
 
       return {
         handled: true,
@@ -157,7 +198,7 @@ export class LinaConfirmationGateService {
     }
 
     if (pending) {
-      this.pendingPlans.delete(userId);
+      await this.dropPlan(userId);
     }
 
     if (!this.looksLikeWriteCommand(message)) {
@@ -178,7 +219,7 @@ export class LinaConfirmationGateService {
       expiresAt: now + CONFIRMATION_TTL_MS,
     };
 
-    this.pendingPlans.set(userId, plan);
+    await this.savePlan(plan);
 
     const critical = this.isCriticalRisk(risk);
 
@@ -200,21 +241,6 @@ export class LinaConfirmationGateService {
       requiresConfirmation: true,
       data: this.buildConfirmationData(plan),
     };
-  }
-
-  private getLivePending(userId: string): PendingConfirmationPlan | null {
-    const pending = this.pendingPlans.get(userId);
-
-    if (!pending) {
-      return null;
-    }
-
-    if (pending.expiresAt < Date.now()) {
-      this.pendingPlans.delete(userId);
-      return null;
-    }
-
-    return pending;
   }
 
   private looksLikeWriteCommand(message: string): boolean {

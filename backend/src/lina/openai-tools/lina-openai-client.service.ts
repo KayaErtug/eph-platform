@@ -1,7 +1,10 @@
 import {
   Injectable,
   Logger,
+  Optional,
 } from "@nestjs/common";
+
+import { LinaModelSettingsService } from "../lina-model-settings.service";
 
 import {
   LinaOpenAiCreateResponseRequest,
@@ -22,6 +25,11 @@ export class LinaOpenAiClientService {
     process.env.LINA_OPENAI_MODEL?.trim() ||
     process.env.OPENAI_MODEL?.trim() ||
     "gpt-4.1-mini";
+
+  constructor(
+    @Optional()
+    private readonly modelSettings?: LinaModelSettingsService,
+  ) {}
 
   async createResponse(
     request: LinaOpenAiCreateResponseRequest,
@@ -44,8 +52,13 @@ export class LinaOpenAiClientService {
     );
 
     try {
+      const model =
+        request.model ||
+        (await this.modelSettings?.getChatModel().catch(() => null)) ||
+        this.model;
+
       const payload: Record<string, unknown> = {
-        model: this.model,
+        model,
         instructions: request.instructions,
         input: request.input,
         tool_choice:
@@ -57,6 +70,17 @@ export class LinaOpenAiClientService {
 
       if (request.tools.length > 0) {
         payload.tools = request.tools;
+      }
+
+      if (request.jsonSchema) {
+        payload.text = {
+          format: {
+            type: "json_schema",
+            name: request.jsonSchema.name,
+            schema: request.jsonSchema.schema,
+            strict: true,
+          },
+        };
       }
 
       const response = await fetch(

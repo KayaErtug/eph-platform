@@ -1,3 +1,4 @@
+import { guardWriteClaims } from "./draft/lina-draft-logic";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { LinaScopeService } from "./lina-scope.service";
@@ -169,7 +170,10 @@ export class LinaService {
       const provider = providerAnswer.provider;
       const rawAnswer = providerAnswer.content;
 
-      const outputFilter = this.linaKvkkService.filterText(rawAnswer);
+      // Serbest LLM cevabı hiçbir yazma sonucu taşımaz; "kaydettim/not ettim" iddiası düzeltilir.
+      const outputFilter = this.linaKvkkService.filterText(
+        portfolioFlowActive ? rawAnswer : guardWriteClaims(rawAnswer),
+      );
       const kvkkFiltered = outputFilter.filtered || inputFilter.filtered;
 
       await this.rememberPortfolioAssistantMessage(
