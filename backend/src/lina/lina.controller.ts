@@ -20,7 +20,7 @@ import { Request } from "express";
 import { LinaChatBudgetService, assertLinaBudget } from "./lina-chat-budget.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { LinaActionEngineService } from "./actions/lina-action-engine.service";
-import { LinaConfirmationGateService } from "./actions/lina-confirmation-gate.service";
+import { LinaConfirmationGateService, type LinaGateConfirmedDelete } from "./actions/lina-confirmation-gate.service";
 import { LinaNaturalCommandService } from "./actions/lina-natural-command.service";
 import { LinaActionSourceModule } from "./actions/lina-action.types";
 import { LinaDraftFlowService } from "./draft/lina-draft-flow.service";
@@ -158,6 +158,7 @@ export class LinaController {
 
     let executionMessage = normalizedMessage;
     let confirmedGateExecution = false;
+    let confirmedDelete: LinaGateConfirmedDelete | undefined;
 
     if (user.id && user.role) {
       const gateResult = await this.linaConfirmationGateService.evaluate(
@@ -185,6 +186,7 @@ export class LinaController {
       if (gateResult.executeMessage) {
         executionMessage = gateResult.executeMessage;
         confirmedGateExecution = true;
+        confirmedDelete = gateResult.confirmedDelete;
       }
     }
 
@@ -199,6 +201,7 @@ export class LinaController {
       user,
       sourceModule,
       body?.history,
+      confirmedDelete,
     );
 
     if (actionResult.handled) {

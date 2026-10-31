@@ -28,12 +28,21 @@ type PendingConfirmationPlan = {
   expiresAt: number;
 };
 
+// Internal hand-off only: never accepted from the HTTP DTO.
+export type LinaGateConfirmedDelete = {
+  planId: string;
+  userId: string;
+  sourceModule: LinaActionSourceModule;
+  command: string;
+};
+
 export type LinaConfirmationGateResult = {
   handled: boolean;
   success?: boolean;
   message?: string;
   requiresConfirmation?: boolean;
   executeMessage?: string;
+  confirmedDelete?: LinaGateConfirmedDelete;
   data?: {
     confirmation?: {
       id: string;
@@ -219,6 +228,9 @@ export class LinaConfirmationGateService {
         handled: true,
         success: true,
         executeMessage: pending.command,
+        ...(pending.risk === 'DELETE' && pending.stage === 'FINAL' ? {
+          confirmedDelete: { planId: pending.id, userId, sourceModule, command: pending.command },
+        } : {}),
         requiresConfirmation: false,
       };
     }

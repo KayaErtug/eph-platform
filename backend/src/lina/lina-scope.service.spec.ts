@@ -1,3 +1,4 @@
+import { LinaChatBudgetService } from "./lina-chat-budget.service";
 import { LinaScopeService, LINA_OUT_OF_SCOPE_MESSAGE } from './lina-scope.service';
 import { LinaController } from './lina.controller';
 import { LinaService } from './lina.service';
@@ -78,6 +79,7 @@ describe('Lina scope security boundary', () => {
 
   test.each(['ADMIN', 'SUPER_ADMIN', 'EMLAKCI'])('controller blocks actions and main response for %s', async role => {
     const controller = Object.create(LinaController.prototype) as LinaController;
+    Object.assign(controller, { chatBudget: new LinaChatBudgetService({ systemSetting: { findUnique: async () => ({ valueJson: 22000 }) } } as never) });
     const { scope } = makeScope();
     const calls = {
       linaScopeService: scope,
@@ -114,6 +116,7 @@ describe('Lina scope security boundary', () => {
 
   test('network draft blocks its response LLM', async () => {
     const controller = Object.create(LinaController.prototype) as LinaController;
+    Object.assign(controller, { chatBudget: new LinaChatBudgetService({ systemSetting: { findUnique: async () => ({ valueJson: 22000 }) } } as never) });
     const { scope } = makeScope();
     const draft = { create: jest.fn() };
     Object.assign(controller, { linaScopeService: scope, linaNetworkRequestDraftService: draft });
@@ -128,6 +131,7 @@ describe('Lina scope security boundary', () => {
     })) };
     const scope = new LinaScopeService(client as never, { filterText: (text: string) => ({ safeText: text }) } as never);
     const controller = Object.create(LinaController.prototype) as LinaController;
+    Object.assign(controller, { chatBudget: new LinaChatBudgetService({ systemSetting: { findUnique: async () => ({ valueJson: 22000 }) } } as never) });
     const expected = { success: true, draft: { maxBudget: 8000000 }, requiresApproval: true };
     const draft = { create: jest.fn().mockResolvedValue(expected) };
     Object.assign(controller, { linaScopeService: scope, linaNetworkRequestDraftService: draft });
@@ -149,6 +153,7 @@ describe('Lina scope security boundary', () => {
   test('draft form rejects a mixed request judged outside scope', async () => {
     const { scope, client } = makeScope('OUT_OF_SCOPE');
     const controller = Object.create(LinaController.prototype) as LinaController;
+    Object.assign(controller, { chatBudget: new LinaChatBudgetService({ systemSetting: { findUnique: async () => ({ valueJson: 22000 }) } } as never) });
     const draft = { create: jest.fn() };
     Object.assign(controller, { linaScopeService: scope, linaNetworkRequestDraftService: draft });
     const message = 'Denizli\'de daire arıyorum. Ayrıca Roma tarihini anlat.';
@@ -188,6 +193,7 @@ describe('Lina scope security boundary', () => {
 
   test('allowed requests retain existing action routing and identity', async () => {
     const controller = Object.create(LinaController.prototype) as LinaController;
+    Object.assign(controller, { chatBudget: new LinaChatBudgetService({ systemSetting: { findUnique: async () => ({ valueJson: 22000 }) } } as never) });
     const { scope } = makeScope();
     const execute = jest.fn().mockResolvedValue({ handled: true, success: true, action: 'match', message: 'EPH eşleştirmesi' });
     Object.assign(controller, {
@@ -200,6 +206,6 @@ describe('Lina scope security boundary', () => {
     const dto = { message: 'CRM müşterimle Havuz portföylerini eşleştir.', sourceModule: 'crm' as const };
     const user = { id: 'fixture', role: 'EMLAKCI' };
     expect(await controller.chat(dto, { user } as never)).toEqual(expect.objectContaining({ action: 'match' }));
-    expect(execute).toHaveBeenCalledWith(dto.message, { ...user, email: undefined }, 'crm', undefined);
+    expect(execute).toHaveBeenCalledWith(dto.message, { ...user, email: undefined }, 'crm', undefined, undefined);
   });
 });

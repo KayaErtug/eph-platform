@@ -21,6 +21,7 @@ import { NetworkService } from "../../network/network.service";
 import { getCardProfileBinding } from "../../property-card/property-card-profile.registry";
 import { LinaAuditService } from "../lina-audit.service";
 import { LinaNetworkRequestDraftService } from "../lina-network-request-draft.service";
+import type { LinaGateConfirmedDelete } from './lina-confirmation-gate.service';
 import {
   LinaActionExecutionResult,
   LinaActionHistoryItem,
@@ -140,6 +141,7 @@ export class LinaActionEngineService {
     rawUser: LinaActionUser | undefined,
     sourceModule: LinaActionSourceModule = "general",
     rawHistory: LinaActionHistoryItem[] = [],
+    confirmedDelete?: LinaGateConfirmedDelete,
   ): Promise<LinaActionExecutionResult> {
     const message = String(rawMessage || "").trim();
     const history = this.normalizeHistory(rawHistory);
@@ -198,7 +200,7 @@ export class LinaActionEngineService {
       }
 
       if (this.isCrmCustomerDeleteCommand(message)) {
-        return await this.prepareDeleteCrmCustomer(message, user, sourceModule);
+        return await this.prepareDeleteCrmCustomer(message, user, sourceModule, confirmedDelete);
       }
 
       if (this.isCrmStatusUpdateCommand(message)) {
@@ -955,6 +957,7 @@ export class LinaActionEngineService {
     message: string,
     user: LinaResolvedUser,
     sourceModule: LinaActionSourceModule,
+    confirmedDelete?: LinaGateConfirmedDelete,
   ): Promise<LinaActionExecutionResult> {
     const customerName = this.extractCustomerName(message, [
       "sil",
@@ -973,6 +976,10 @@ export class LinaActionEngineService {
     }
 
     const fullName = this.customerFullName(resolution.customer);
+    if (confirmedDelete?.planId && confirmedDelete.userId === user.id &&
+      confirmedDelete.sourceModule === sourceModule && confirmedDelete.command === message) {
+      return this.deleteCrmCustomer(resolution.customer.id, fullName, user, sourceModule);
+    }
     const now = Date.now();
 
     await this.savePending(user.id, PENDING_ACTION_KIND, {
@@ -1214,33 +1221,22 @@ export class LinaActionEngineService {
     }
 
     if (pending.type === "crm_customer_delete") {
-      assertLinaBudget();
-      await this.crmService.deleteCustomer(
-        pending.payload.customerId,
-        user.id,
-        user.role,
-      );
-
+      const result = await this.deleteCrmCustomer(pending.payload.customerId, pending.payload.customerName, user, sourceModule);
       await this.dropPending(user.id, PENDING_ACTION_KIND);
-      this.audit(
-        user,
-        sourceModule,
-        "crm_customer_delete",
-        "success",
-        undefined,
-        3,
-      );
-
-      return {
-        handled: true,
-        success: true,
-        action: "crm_customer_delete",
-        message: `${pending.payload.customerName} adlı CRM kaydı silindi.`,
-      };
+      return result;
     }
 
     return { handled: false };
   }
+
+  private async deleteCrmCustomer(customerId: string, customerName: string, user: LinaResolvedUser,
+    sourceModule: LinaActionSourceModule): Promise<LinaActionExecutionResult> {
+    assertLinaBudget();
+    await this.crmService.deleteCustomer(customerId, user.id, user.role);
+    this.audit(user, sourceModule, 'crm_customer_delete', 'success', undefined, 3);
+    return { handled: true, success: true, action: 'crm_customer_delete', message: `${customerName} adlı CRM kaydı silindi.` };
+  }
+
   private async resolveCustomer(
     nameQuery: string,
     user: LinaResolvedUser,
