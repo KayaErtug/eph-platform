@@ -3,9 +3,46 @@ import {
   Injectable,
   Logger,
   ServiceUnavailableException,
+  UnprocessableEntityException,
 } from "@nestjs/common";
 
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
+const MIN_AUDIO_BYTES = 2 * 1024;
+export const UNINTELLIGIBLE_AUDIO_MESSAGE =
+  "Sesinizi anlayamadım, lütfen tekrar deneyin.";
+export const TRANSCRIPTION_HINT_PROMPT =
+  "Türkçe emlak CRM sesli komutu. EPH, Emlak Portföy Havuzu, Lina, CRM, Pamukkale, Merkezefendi, mahalle, portföy, müşteri, alıcı, satıcı, kiracı, görev ve toplantı gibi gayrimenkul terimlerini doğru yaz.";
+
+function normalizeSpeech(value: string): string {
+  return value
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Sessiz/boş kayıtta model ipucu (prompt) metnini geri yankılayabilir; bunu konuşma sayma.
+export function isUnintelligibleTranscript(
+  text: string,
+  hint: string = TRANSCRIPTION_HINT_PROMPT,
+): boolean {
+  const normalized = normalizeSpeech(text);
+  if (!normalized || normalized.split(" ").length < 2) return true;
+
+  const normalizedHint = normalizeSpeech(hint);
+  if (normalized === normalizedHint) return true;
+  if (normalized.length >= 15 && normalizedHint.includes(normalized)) return true;
+  if (normalizedHint.length >= 15 && normalized.includes(normalizedHint)) return true;
+
+  const words = normalized.split(" ");
+  if (words.length >= 4) {
+    const hintWords = new Set(normalizedHint.split(" "));
+    const shared = words.filter((word) => hintWords.has(word)).length;
+    if (shared / words.length >= 0.9) return true;
+  }
+
+  return false;
+}
 const DEFAULT_TRANSCRIPTION_ENDPOINT =
   "https://api.openai.com/v1/audio/transcriptions";
 const DEFAULT_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe";
@@ -73,10 +110,7 @@ export class LinaTranscriptionService {
       form.append("file", blob, filename);
       form.append("model", model);
       form.append("language", "tr");
-      form.append(
-        "prompt",
-        "Türkçe emlak CRM sesli komutu. EPH, Emlak Portföy Havuzu, Lina, CRM, Pamukkale, Merkezefendi, mahalle, portföy, müşteri, alıcı, satıcı, kiracı, görev ve toplantı gibi gayrimenkul terimlerini doğru yaz.",
-      );
+      form.append("prompt", TRANSCRIPTION_HINT_PROMPT);
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -111,10 +145,8 @@ export class LinaTranscriptionService {
 
       const text = String(parsed.text || "").trim();
 
-      if (!text) {
-        throw new BadRequestException(
-          "Ses kaydında anlaşılır bir konuşma bulunamadı.",
-        );
+      if (isUnintelligibleTranscript(text)) {
+        throw new UnprocessableEntityException(UNINTELLIGIBLE_AUDIO_MESSAGE);
       }
 
       return {
@@ -135,6 +167,7 @@ export class LinaTranscriptionService {
 
       if (
         error instanceof BadRequestException ||
+        error instanceof UnprocessableEntityException ||
         error instanceof ServiceUnavailableException
       ) {
         throw error;
@@ -165,6 +198,10 @@ export class LinaTranscriptionService {
       throw new BadRequestException(
         "Ses kaydı en fazla 10 MB olabilir.",
       );
+    }
+
+    if (file.size < MIN_AUDIO_BYTES || file.buffer.length < MIN_AUDIO_BYTES) {
+      throw new UnprocessableEntityException(UNINTELLIGIBLE_AUDIO_MESSAGE);
     }
 
     const extension = this.extensionOf(file.originalname);
