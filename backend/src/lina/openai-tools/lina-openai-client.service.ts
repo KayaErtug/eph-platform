@@ -1,3 +1,4 @@
+import { linaFetchSignal } from "../lina-chat-budget.service";
 import {
   Injectable,
   Logger,
@@ -92,7 +93,7 @@ export class LinaOpenAiClientService {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(payload),
-          signal: controller.signal,
+          signal: linaFetchSignal(controller.signal),
         },
       );
 

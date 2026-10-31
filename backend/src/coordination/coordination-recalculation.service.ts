@@ -1,9 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { LinaGorevOnceligi, LinaModul, Role } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { CrmService } from '../crm/crm.service';
 import { readablePaidMatches, PaidMatchItem, ACTIVE_MATCH_UNIT, visiblePaidUnits } from '../matching/paid-match-report';
 import { NetworkService } from '../network/network.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { createHash } from 'node:crypto';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CommercialMatchScanService } from './commercial-match-scan.service';
 
 type CoordinationUser = { id?: string; role?: Role | string };
@@ -12,26 +14,39 @@ export type RequestScanOptions = { walletSource?: string; walletOfficeId?: strin
 @Injectable()
 export class CoordinationRecalculationService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService, private readonly crmService: CrmService,
-    private readonly networkService: NetworkService, private readonly paidScans: CommercialMatchScanService) {}
+    private readonly networkService: NetworkService, private readonly paidScans: CommercialMatchScanService,
+    private readonly notifications: NotificationsService) {}
 
   onModuleInit() {
     this.networkService.registerRequestMatchHandler(async (postId, ownerId) => {
-      await this.notify(ownerId, LinaModul.FORUM, 'Talep kaydedildi', postId, '/network');
+      const post = await this.prisma.networkPost.findUnique({ where: { id: postId } });
+      if (post?.isActive) await this.notify(ownerId, 'REQUEST', postId, post, `/network/${encodeURIComponent(postId)}`);
     });
     this.crmService.registerInterestMatchHandler(async interestId => {
       const interest = await this.prisma.customerInterest.findUnique({ where: { id: interestId },
         include: { customer: { select: { ownerId: true } } } });
-      if (interest?.isActive) await this.notify(interest.customer.ownerId, LinaModul.CRM, 'Müşteri talebi kaydedildi', interestId, '/crm');
+      if (interest?.isActive) await this.notify(interest.customer.ownerId, 'CRM', interestId, interest,
+        `/crm?customerId=${encodeURIComponent(interest.customerId)}&interestId=${encodeURIComponent(interestId)}`);
     });
   }
 
-  private notify(userId: string, module: LinaModul, title: string, relatedId: string, targetUrl: string) {
-    return this.prisma.linaBildirim.create({ data: {
-      kullaniciId: userId, modul: module, baslik: title, bildirimTuru: 'PAID_MATCH_SCAN_REQUIRED',
-      mesaj: 'Güncel eşleşmeler için ilgili ekrandan PK ücretini onaylayarak tarama başlatabilirsiniz.',
-      ilgiliKayitTuru: 'PAID_MATCH_SCAN_REQUIRED', ilgiliKayitId: relatedId,
-      hedefUrl: targetUrl, oncelik: LinaGorevOnceligi.NORMAL,
-    } });
+  private notify(userId: string, sourceType: 'REQUEST' | 'CRM', sourceId: string, record: any, actionUrl: string) {
+    // Only matching criteria participate: notes, lastMatchedAt and updatedAt do not create reminders.
+    const keys = ['type', 'city', 'district', 'neighborhood', 'budget', 'minBudget', 'maxBudget',
+      'minArea', 'maxArea', 'minRoom', 'maxRoom', 'areas', 'propertyTypes', 'roomCounts', 'features',
+      'cardProfileCriteria', 'priceCurrency', 'statuses', 'purchaseIntent', 'landSharePercent', 'tags'];
+    const canonical = (value: any): any => Array.isArray(value)
+      ? value.map(canonical).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
+      : value && typeof value === 'object'
+        ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+    const criteria = Object.fromEntries(keys.map(key => [key, canonical(record[key] ?? null)]));
+    const hash = createHash('sha256').update(JSON.stringify(criteria)).digest('hex');
+    return this.notifications.notify(userId, {
+      type: 'MATCH_SCAN_REMINDER', priority: 'BILGI',
+      title: 'Talebiniz için eşleşme taraması yapabilirsiniz',
+      body: 'Güncel eşleşmeler için ilgili ekrandan PK ücretini onaylayarak tarama başlatabilirsiniz.',
+      actionUrl, eventKey: `MATCH_SCAN_REMINDER:${sourceType}:${sourceId}:${hash}`,
+    });
   }
 
   async getMatchScanConfig(user: CoordinationUser, options: RequestScanOptions = {}) {
@@ -49,17 +64,17 @@ export class CoordinationRecalculationService implements OnModuleInit {
 
   async recalculateCrmInterest(_interestId: string, user: CoordinationUser) {
     await this.resolveUser(user);
-    throw new BadRequestException({ code: 'PAID_MATCH_REQUIRED', message: 'CRM Eşleşme ekranından güncel PK ücretini onaylayarak tarama başlatın.' });
+    throw new BadRequestException({ code: 'PAID_MATCH_REQUIRED', message: 'CRM EÅŸleÅŸme ekranÄ±ndan gÃ¼ncel PK Ã¼cretini onaylayarak tarama baÅŸlatÄ±n.' });
   }
 
   async previewRequestPoolMatches(_input: unknown, user: CoordinationUser) {
     await this.resolveUser(user);
-    throw new BadRequestException({ code: 'PAID_MATCH_REQUIRED', message: 'Ücretsiz canlı tarama kapalıdır. Talebi kaydedin; detay ekranından ücretli tarama başlatın.' });
+    throw new BadRequestException({ code: 'PAID_MATCH_REQUIRED', message: 'Ãœcretsiz canlÄ± tarama kapalÄ±dÄ±r. Talebi kaydedin; detay ekranÄ±ndan Ã¼cretli tarama baÅŸlatÄ±n.' });
   }
 
   async getAlerts(rawUser: CoordinationUser) {
     const user = await this.resolveUser(rawUser);
-    const global = user.role === Role.SUPER_ADMIN; // §0: süper admin küresel kapsam
+    const global = user.role === Role.SUPER_ADMIN; // Â§0: sÃ¼per admin kÃ¼resel kapsam
     const [interests, posts, scans] = await Promise.all([
       this.prisma.customerInterest.findMany({ where: { isActive: true, ...(global ? {} : { customer: { ownerId: user.id } }) },
         select: { id: true, title: true, updatedAt: true }, orderBy: { updatedAt: 'desc' }, take: 100 }),
@@ -78,7 +93,7 @@ export class CoordinationRecalculationService implements OnModuleInit {
       ...posts.map(record => ({ ...record, sourceType: 'REQUEST', type: 'REQUEST_POST_STALE', action: 'RECALCULATE_REQUEST_PORTFOLIOS' }))]
       .filter(record => !latest.has(record.sourceType + ':' + record.id) || record.updatedAt > latest.get(record.sourceType + ':' + record.id)!)
       .map(record => ({ type: record.type, entityId: record.id, title: record.title || 'Gayrimenkul talebi',
-        message: 'Kayıt değişti veya henüz taranmadı. Yeni eşleşmeler için PK ücretini onaylayın.',
+        message: 'KayÄ±t deÄŸiÅŸti veya henÃ¼z taranmadÄ±. Yeni eÅŸleÅŸmeler iÃ§in PK Ã¼cretini onaylayÄ±n.',
         updatedAt: record.updatedAt.toISOString(), action: record.action, requiresPaidScan: true }));
     return { count: alerts.length, alerts };
   }
@@ -130,7 +145,7 @@ export class CoordinationRecalculationService implements OnModuleInit {
         customer: item.customerId ? { id: item.customerId, name: item.customerName, interestId: item.interestId } :
           customer ? { id: customer.id, name: [customer.firstName, customer.lastName].filter(Boolean).join(' '), interestId: interest!.id } : null,
         request: request ? { id: item.reportSourceId, title: postMap.get(String(item.reportSourceId))?.title } : null,
-        asset: { ...item, isMine: item.isOwnPortfolio, type: item.type || item.unitType, ownerName: item.isOwnPortfolio ? 'Sizin portföyünüz' : 'EPH Üyesi' },
+        asset: { ...item, isMine: item.isOwnPortfolio, type: item.type || item.unitType, ownerName: item.isOwnPortfolio ? 'Sizin portfÃ¶yÃ¼nÃ¼z' : 'EPH Ãœyesi' },
       };
     });
     return { generatedAt: new Date().toISOString(), policyVersion: 'EPH_PAID_MATCH_V1', user: { id: user.id }, snapshot: true,
@@ -139,14 +154,14 @@ export class CoordinationRecalculationService implements OnModuleInit {
         customersFor: opportunities.filter(i => i.category === 'MUSTERILERIM_ICIN').length,
         portfoliosFor: opportunities.filter(i => i.category === 'PORTFOYLERIM_ICIN').length,
         requestsFor: opportunities.filter(i => i.category === 'TALEP_MERKEZIM').length }, opportunities,
-      warning: 'Yalnızca kayıtlı ücretli tarama sonuçları gösterilir. Güncel eşleşmeler için yeni PK onaylı tarama gerekir.' };
+      warning: 'YalnÄ±zca kayÄ±tlÄ± Ã¼cretli tarama sonuÃ§larÄ± gÃ¶sterilir. GÃ¼ncel eÅŸleÅŸmeler iÃ§in yeni PK onaylÄ± tarama gerekir.' };
   }
 
   private async resolveUser(rawUser: CoordinationUser) {
     const id = String(rawUser?.id || '').trim();
-    if (!id) throw new ForbiddenException('Giriş yapmalısınız.');
+    if (!id) throw new ForbiddenException('GiriÅŸ yapmalÄ±sÄ±nÄ±z.');
     const user = await this.prisma.user.findUnique({ where: { id }, select: { role: true } });
-    if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
+    if (!user) throw new NotFoundException('KullanÄ±cÄ± bulunamadÄ±.');
     return { id, role: user.role };
   }
 }

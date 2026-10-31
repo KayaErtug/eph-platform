@@ -1,3 +1,4 @@
+import { assertLinaBudget } from "../lina-chat-budget.service";
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
@@ -56,18 +57,19 @@ export class LinaConfirmationGateService {
   // Bekleyen onay planı süreç belleğinde değil DB'de (LinaTaslak, tur=ONAY_PLAN) tutulur; PM2 yeniden başlasa da kaybolmaz.
   constructor(private readonly prisma: PrismaService) {}
 
-  private async loadPlan(userId: string): Promise<PendingConfirmationPlan | null> {
+  private async loadPlan(userId: string, sourceModule: LinaActionSourceModule): Promise<PendingConfirmationPlan | null> {
     const row = await this.prisma.linaTaslak.findFirst({
-      where: { kullaniciId: userId, tur: PLAN_TUR, durum: "AKTIF", gecerlilikTarihi: { gt: new Date() } },
+      where: { kullaniciId: userId, tur: PLAN_TUR, durum: "AKTIF", alanlar: { path: ["sourceModule"], equals: sourceModule }, gecerlilikTarihi: { gt: new Date() } },
       orderBy: { guncellenmeTarihi: "desc" },
     });
-    return row ? (row.alanlar as unknown as PendingConfirmationPlan) : null;
+    return row ? { ...(row.alanlar as unknown as PendingConfirmationPlan), id: row.id } : null;
   }
 
   private async savePlan(plan: PendingConfirmationPlan): Promise<void> {
-    await this.dropPlan(plan.userId);
+    await this.dropPlan(plan.userId, plan.sourceModule);
     await this.prisma.linaTaslak.create({
       data: {
+        id: plan.id,
         kullaniciId: plan.userId,
         tur: PLAN_TUR,
         durum: "AKTIF",
@@ -77,9 +79,9 @@ export class LinaConfirmationGateService {
     });
   }
 
-  private async dropPlan(userId: string): Promise<void> {
+  private async dropPlan(userId: string, sourceModule: LinaActionSourceModule, id?: string): Promise<void> {
     await this.prisma.linaTaslak.updateMany({
-      where: { kullaniciId: userId, tur: PLAN_TUR, durum: "AKTIF" },
+      where: { id, kullaniciId: userId, tur: PLAN_TUR, durum: "AKTIF", alanlar: { path: ["sourceModule"], equals: sourceModule } },
       data: { durum: "KAPANDI" },
     });
   }
@@ -88,14 +90,16 @@ export class LinaConfirmationGateService {
     rawMessage: string,
     userId: string,
     sourceModule: LinaActionSourceModule,
+    confirmationId?: string,
   ): Promise<LinaConfirmationGateResult> {
-    return this.evaluateAsync(rawMessage, userId, sourceModule);
+    return this.evaluateAsync(rawMessage, userId, sourceModule, confirmationId);
   }
 
   private async evaluateAsync(
     rawMessage: string,
     userId: string,
     sourceModule: LinaActionSourceModule,
+    confirmationId?: string,
   ): Promise<LinaConfirmationGateResult> {
     const message = String(rawMessage || "")
       .replace(/\s+/g, " ")
@@ -105,14 +109,23 @@ export class LinaConfirmationGateService {
       return { handled: false };
     }
 
-    const pending = await this.loadPlan(userId);
+    assertLinaBudget();
+    const pending = await this.loadPlan(userId, sourceModule);
+    if (this.isConfirmationWord(message) || this.isCancellationWord(message) || this.isRevisionWord(message)) {
+      // Other domain flows own their own confirmation protocol.
+      if (!pending && !confirmationId) return { handled: false };
+      if (!pending || !confirmationId || pending.id !== confirmationId || pending.sourceModule !== sourceModule) {
+        return { handled: true, success: false, requiresConfirmation: false,
+          message: "Onay taslağı eşleşmedi veya süresi doldu. Lütfen işlemi yeniden hazırlayın." };
+      }
+    }
 
     if (this.isCancellationWord(message)) {
       if (!pending) {
         return { handled: false };
       }
 
-      await this.dropPlan(userId);
+      await this.dropPlan(userId, sourceModule, pending?.id);
 
       return {
         handled: true,
@@ -127,7 +140,7 @@ export class LinaConfirmationGateService {
         return { handled: false };
       }
 
-      await this.dropPlan(userId);
+      await this.dropPlan(userId, sourceModule, pending?.id);
 
       return {
         handled: true,
@@ -156,9 +169,15 @@ export class LinaConfirmationGateService {
             };
           }
 
+          const previous = { ...pending };
           pending.stage = "FINAL";
           pending.expiresAt = Date.now() + CONFIRMATION_TTL_MS;
-          await this.savePlan(pending);
+          const advanced = await this.prisma.linaTaslak.updateMany({
+            where: { id: pending.id, kullaniciId: userId, tur: PLAN_TUR, durum: "AKTIF",
+              gecerlilikTarihi: { gt: new Date() }, alanlar: { equals: previous as unknown as Prisma.InputJsonValue } },
+            data: { alanlar: pending as unknown as Prisma.InputJsonValue, gecerlilikTarihi: new Date(pending.expiresAt) },
+          });
+          if (advanced.count !== 1) return { handled: true, success: false, message: "Bu onay zaten işlendi. Güncel taslağı kontrol edin." };
 
           return {
             handled: true,
@@ -187,7 +206,14 @@ export class LinaConfirmationGateService {
         }
       }
 
-      await this.dropPlan(userId);
+      assertLinaBudget();
+      const consumed = await this.prisma.linaTaslak.updateMany({
+        where: { id: pending.id, kullaniciId: userId, tur: PLAN_TUR, durum: "AKTIF",
+          gecerlilikTarihi: { gt: new Date() }, alanlar: { equals: pending as unknown as Prisma.InputJsonValue } },
+        data: { durum: "KAPANDI" },
+      });
+      if (consumed.count !== 1) return { handled: true, success: false, requiresConfirmation: false,
+        message: "Bu onay zaten işlendi. İşlem tekrar çalıştırılmadı." };
 
       return {
         handled: true,
@@ -198,7 +224,7 @@ export class LinaConfirmationGateService {
     }
 
     if (pending) {
-      await this.dropPlan(userId);
+      await this.dropPlan(userId, sourceModule, pending?.id);
     }
 
     if (!this.looksLikeWriteCommand(message)) {

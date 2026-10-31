@@ -17,6 +17,7 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Request } from "express";
 
+import { LinaChatBudgetService, assertLinaBudget } from "./lina-chat-budget.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { LinaActionEngineService } from "./actions/lina-action-engine.service";
 import { LinaConfirmationGateService } from "./actions/lina-confirmation-gate.service";
@@ -57,6 +58,7 @@ type LinaEndOfDayDecisionBody = {
 @Controller("lina")
 export class LinaController {
   constructor(
+    private readonly chatBudget: LinaChatBudgetService,
     private readonly linaService: LinaService,
     private readonly linaScopeService: LinaScopeService,
     private readonly linaMemoryService: LinaMemoryService,
@@ -110,6 +112,10 @@ export class LinaController {
     @Body() body: LinaChatDto,
     @Req() request: RequestWithUser,
   ) {
+    return this.chatBudget.run(() => this.chatWithinBudget(body, request));
+  }
+
+  private async chatWithinBudget(body: LinaChatDto, request: RequestWithUser) {
     if (this.linaTemporarilyDisabled) {
       return {
         success: false,
@@ -129,6 +135,7 @@ export class LinaController {
     if (scope === "OUT_OF_SCOPE") return this.linaScopeService.blockedReply();
     const sourceModule = this.normalizeSourceModule(body?.sourceModule);
 
+    assertLinaBudget();
     // CRM müşteri/talep taslağı: kalıcı taslak + şemalı çıkarım; "Onayla" yalnız DB'deki taslağı kaydeder.
     if (user.id && user.role) {
       const draftResult = await this.linaDraftFlowService.handle(body, user, sourceModule);
@@ -157,6 +164,7 @@ export class LinaController {
         normalizedMessage,
         user.id,
         sourceModule,
+        body.confirmationId,
       );
 
       if (gateResult.handled && !gateResult.executeMessage) {
@@ -185,6 +193,7 @@ export class LinaController {
       if (executionScope === "OUT_OF_SCOPE") return this.linaScopeService.blockedReply();
     }
 
+    assertLinaBudget();
     const actionResult = await this.linaActionEngineService.tryExecute(
       executionMessage,
       user,

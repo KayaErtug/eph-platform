@@ -1,3 +1,4 @@
+import { LinaChatBudgetService, linaFetchSignal, assertLinaBudget } from "../lina-chat-budget.service";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
@@ -33,6 +34,7 @@ export type LinaOpenAiLiveGatewayResult = {
 @Injectable()
 export class LinaOpenAiLiveGatewayService {
   constructor(
+    private readonly budget: LinaChatBudgetService,
     private readonly configService:
       ConfigService,
     private readonly runtimeService:
@@ -116,6 +118,9 @@ export class LinaOpenAiLiveGatewayService {
       runtimeError: string;
     },
   ): Promise<LinaOpenAiLiveGatewayResult> {
+    assertLinaBudget();
+    const timeoutMs = await this.budget.readTimeoutMs();
+    assertLinaBudget();
     const apiKey =
       this.configService.get<string>(
         "OPENAI_API_KEY",
@@ -148,6 +153,7 @@ export class LinaOpenAiLiveGatewayService {
       "https://api.openai.com/v1/chat/completions",
       {
         method: "POST",
+        signal: linaFetchSignal(AbortSignal.timeout(timeoutMs)),
         headers: {
           Authorization:
             `Bearer ${apiKey}`,

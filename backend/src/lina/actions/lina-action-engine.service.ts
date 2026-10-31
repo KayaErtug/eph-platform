@@ -1,3 +1,4 @@
+import { assertLinaBudget } from "../lina-chat-budget.service";
 import { Injectable } from "@nestjs/common";
 import {
   ActivityType,
@@ -161,6 +162,7 @@ export class LinaActionEngineService {
       return { handled: false };
     }
 
+    assertLinaBudget();
     const confirmationResult = await this.handlePendingConfirmation(
       message,
       user,
@@ -211,6 +213,7 @@ export class LinaActionEngineService {
         return await this.createCrmActivity(message, user, sourceModule);
       }
 
+      assertLinaBudget();
       if (this.isCrmCustomerUpdateCommand(message)) {
         return await this.updateCrmCustomer(message, user, sourceModule);
       }
@@ -225,7 +228,7 @@ export class LinaActionEngineService {
       return {
         handled: true,
         success: false,
-        message: reason,
+        message: "İşlem şu anda tamamlanamadı. Lütfen tekrar deneyin.",
       };
     }
   }
@@ -562,6 +565,7 @@ export class LinaActionEngineService {
       };
     }
 
+    assertLinaBudget();
     const post = await this.networkService.create(plan.payload, user.id);
 
     this.audit(
@@ -876,6 +880,7 @@ export class LinaActionEngineService {
       };
     }
 
+    assertLinaBudget();
     const updated = (await this.crmService.updateCustomer(
       resolution.customer.id,
       user.id,
@@ -927,6 +932,7 @@ export class LinaActionEngineService {
       return resolution;
     }
 
+    assertLinaBudget();
     const updated = (await this.crmService.updateStatus(
       resolution.customer.id,
       user.id,
@@ -1023,6 +1029,7 @@ export class LinaActionEngineService {
     const title = this.extractTaskTitle(message, customerName);
     const dueDate = this.extractDueDate(message);
 
+    assertLinaBudget();
     const task = await this.crmService.addTask(
       resolution.customer.id,
       user.id,
@@ -1091,6 +1098,7 @@ export class LinaActionEngineService {
     }
 
     const type = this.extractActivityType(message);
+    assertLinaBudget();
     const activity = await this.crmService.addActivity(
       resolution.customer.id,
       user.id,
@@ -1206,6 +1214,7 @@ export class LinaActionEngineService {
     }
 
     if (pending.type === "crm_customer_delete") {
+      assertLinaBudget();
       await this.crmService.deleteCustomer(
         pending.payload.customerId,
         user.id,

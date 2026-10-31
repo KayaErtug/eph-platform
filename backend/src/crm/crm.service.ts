@@ -33,7 +33,7 @@ export class CrmService {
     this.interestMatchHandler = handler;
   }
 
-  private async refreshInterestMatches(interest: { id: string; isActive: boolean }) {
+  async refreshInterestMatches(interest: { id: string; isActive: boolean }) {
     if (!interest.isActive) return;
     try {
       if (!this.interestMatchHandler) throw new Error('Matching handler unavailable');
@@ -296,8 +296,8 @@ export class CrmService {
     return cleaned;
   }
 
-  private async findCustomerForAccess(customerId: string, userId: string, userRole: Role) {
-    const customer = await this.prisma.customer.findUnique({
+  private async findCustomerForAccess(customerId: string, userId: string, userRole: Role, db: Prisma.TransactionClient = this.prisma) {
+    const customer = await db.customer.findUnique({
       where: { id: customerId },
     });
 
@@ -473,8 +473,8 @@ export class CrmService {
   }
 
   // CRM Madde 19 Form Detail Sync V3
-  async createCustomer(userId: string, data: any) {
-    await this.ensureActiveCrmCapacity(userId);
+  async createCustomer(userId: string, data: any, tx?: Prisma.TransactionClient) {
+    await this.ensureActiveCrmCapacity(userId, tx);
     const normalizedCriteria = this.propertyCriteriaService.normalize({
       recordKind: 'DEMAND',
       source: 'CRM',
@@ -563,7 +563,7 @@ export class CrmService {
           ? [{ city: null, district: null, neighborhood: null }]
           : [];
 
-    return this.prisma.$transaction(async (transaction) => {
+    const persist = async (transaction: Prisma.TransactionClient) => {
       const customer = await transaction.customer.create({
         data: {
           ...this.cleanCustomerData({
@@ -615,7 +615,8 @@ export class CrmService {
           },
         },
       });
-    });
+    };
+    return tx ? persist(tx) : this.prisma.$transaction(persist);
   }
 
   async getCustomer(id: string, userId: string, userRole: Role) {
@@ -873,16 +874,16 @@ export class CrmService {
     });
   }
 
-  async addCustomerInterest(customerId: string, userId: string, userRole: Role, data: any) {
-    await this.findCustomerForAccess(customerId, userId, userRole);
+  async addCustomerInterest(customerId: string, userId: string, userRole: Role, data: any, tx?: Prisma.TransactionClient) {
+    await this.findCustomerForAccess(customerId, userId, userRole, tx);
 
-    const interest = await this.prisma.customerInterest.create({
+    const interest = await (tx || this.prisma).customerInterest.create({
       data: {
         ...this.cleanInterestData(data),
         customerId,
       } as Prisma.CustomerInterestUncheckedCreateInput,
     });
-    await this.refreshInterestMatches(interest);
+    if (!tx) await this.refreshInterestMatches(interest);
     return interest;
   }
 

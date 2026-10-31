@@ -1,3 +1,4 @@
+import { LinaChatBudgetService } from "./lina-chat-budget.service";
 import { Module } from "@nestjs/common";
 
 import { CrmModule } from "../crm/crm.module";
@@ -63,6 +64,7 @@ import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
     PrismaService,
 
     LinaService,
+    LinaChatBudgetService,
     LinaScopeService,
     LinaActionEngineService,
     LinaConfirmationGateService,

@@ -49,7 +49,11 @@ function setup() {
   function model(name: string) {
     return { findUnique: jest.fn(async ({ where }: any) => state[name].find((row: any) => fits(row, where)) || null),
       findFirst: jest.fn(async ({ where }: any) => state[name].find((row: any) => fits(row, where)) || null),
-      findMany: jest.fn(async ({ where, take }: any = {}) => state[name].filter((row: any) => fits(row, where)).slice(0, take || Infinity)) };
+      findMany: jest.fn(async ({ where, take, cursor, skip = 0 }: any = {}) => {
+        const rows = state[name].filter((row: any) => fits(row, where));
+        const start = cursor ? rows.findIndex((row: any) => row.id === cursor.id) + skip : 0;
+        return rows.slice(start, start + (take || rows.length));
+      }) };
   }
   db.systemSetting = { findUnique: jest.fn(async ({ where }: any) => where.key.startsWith('EPH_OFFICE_SPENDING_') ? { valueJson: { mode: state.officeMode, scanPermissions: state.scanPermissions } }
     : where.key === 'COST_ESLESME_TARAMA' && state.cost !== null ? { valueJson: state.cost } : null) };
@@ -108,6 +112,29 @@ describe('Paid matching: shared engine, atomic receipt and KontorService', () =>
     expect(t.state.attempts[0].status).toBe('COMPLETED');
   });
   it('quotes without computing or charging', async () => { const t = setup(); expect(await t.service.quote('CRM', 'interest', t.actor, {})).toMatchObject({ actorId: 'agent', costPk: 7, eligible: true }); expect(t.compute).not.toHaveBeenCalled(); expect(t.spend).not.toHaveBeenCalled(); });
+  it.each(['Denizli Merkezefendi', 'DENİZLİ MERKEZEFENDİ', 'merkezefendi'])('EPH90 F10 normalized district finds candidate: %s', async district => {
+    const t = setup(); t.interest.district = district;
+    const result: any = await t.service.scan('CRM', 'interest', t.actor, t.input);
+    expect(result.matches).toHaveLength(1); expect(result.matches[0].unitId).toBe('unit');
+  });
+  it('EPH90 F10 city-prefixed candidate district also matches bare demand', async () => {
+    const t = setup(); t.unit.project.district = 'Denizli Merkezefendi';
+    const result: any = await t.service.scan('CRM', 'interest', t.actor, t.input);
+    expect(result.matches).toHaveLength(1);
+  });
+  it('EPH90 F10 kat karsiligi accepts an unpriced candidate', async () => {
+    const t = setup(); t.interest.statuses = ['KAT_KARSILIGI']; t.interest.maxBudget = null as any;
+    t.unit.status = 'KAT_KARSILIGI'; t.unit.price = null as any;
+    const result: any = await t.service.scan('CRM', 'interest', t.actor, t.input);
+    expect(result.matches).toHaveLength(1); expect(result.matches[0].unitId).toBe('unit');
+  });
+  it('EPH90 F10 normalizes districts before applying the candidate limit across cursor pages', async () => {
+    const t = setup();
+    t.state.units = [...Array.from({ length: 2001 }, (_, i) => ({ ...t.unit, id: `other-${i}`,
+      project: { ...t.unit.project, district: 'Pamukkale' } })), t.unit];
+    const result: any = await t.service.scan('CRM', 'interest', t.actor, t.input);
+    expect(result.matches).toHaveLength(1); expect(result.matches[0].unitId).toBe('unit');
+  });
   it('zero results still produce a paid report', async () => { const t = setup(); t.unit.price = 6000000; expect(await t.service.scan('CRM', 'interest', t.actor, t.input)).toMatchObject({ spent: 7, matches: [] }); expect(t.state.movements).toHaveLength(1); });
   it('same completed ID returns zero new spend and never recomputes', async () => { const t = setup(); await t.service.scan('CRM', 'interest', t.actor, t.input); const count = t.compute.mock.calls.length; expect(await t.service.scan('CRM', 'interest', t.actor, t.input)).toMatchObject({ spent: 0, replayed: true, billing: { charged: false } }); expect(t.compute).toHaveBeenCalledTimes(count); expect(t.state.movements).toHaveLength(1); });
   it('two distinct confirmed scans charge separately', async () => { const t = setup(); await t.service.scan('CRM', 'interest', t.actor, t.input); await t.service.scan('CRM', 'interest', t.actor, { ...t.input, requestId: 'paid-match-key-0002' }); expect(t.state.wallets.agent.bakiye).toBe(86); });

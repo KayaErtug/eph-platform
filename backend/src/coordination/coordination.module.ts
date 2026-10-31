@@ -1,3 +1,4 @@
+import { NotificationsModule } from '../notifications/notifications.module';
 import { Module } from '@nestjs/common';
 
 import { AdminModule } from '../admin/admin.module';
@@ -19,6 +20,7 @@ import { CommercialMatchScanService } from './commercial-match-scan.service';
 @Module({
   imports: [
     PrismaModule,
+    NotificationsModule,
     CrmModule,
     NetworkModule,
     MatchingModule,

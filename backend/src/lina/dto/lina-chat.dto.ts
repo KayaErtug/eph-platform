@@ -32,6 +32,11 @@ export class LinaChatDto {
   sourceModule?: LinaChatSourceModule;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  confirmationId?: string;
+
+  @IsOptional()
   @IsBoolean()
   wantsVoice?: boolean;
 

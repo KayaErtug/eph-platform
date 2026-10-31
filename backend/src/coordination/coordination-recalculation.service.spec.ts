@@ -4,22 +4,23 @@ import { CoordinationRecalculationService } from './coordination-recalculation.s
 describe('Paid matching coordination and read-only hooks', () => {
   function setup() {
     const db: any = { user: { findUnique: jest.fn(async () => ({ role: Role.EMLAKCI })) },
-      customerInterest: { findUnique: jest.fn(async () => ({ isActive: true, customer: { ownerId: 'agent' } })), findMany: jest.fn(async () => []) },
-      networkPost: { findMany: jest.fn(async () => []) }, unit: { findMany: jest.fn(async () => []) },
+      customerInterest: { findUnique: jest.fn(async () => ({ isActive: true, customerId: 'customer', customer: { ownerId: 'agent' } })), findMany: jest.fn(async () => []) },
+      networkPost: { findUnique: jest.fn(async () => ({ isActive: true })), findMany: jest.fn(async () => []) }, unit: { findMany: jest.fn(async () => []) },
       matchScanAttempt: { findMany: jest.fn(async () => []) }, linaBildirim: { create: jest.fn(async () => ({})) } };
     const crm: any = { registerInterestMatchHandler: jest.fn() };
     const network: any = { registerRequestMatchHandler: jest.fn() };
     const paid: any = { config: jest.fn(async () => ({ costPk: 7 })), scan: jest.fn(async () => ({ ok: true })),
       history: jest.fn(async () => []), historyReceipt: jest.fn(async () => ({ matches: [] })) };
-    return { db, crm, network, paid, service: new CoordinationRecalculationService(db, crm, network, paid) };
+    const notifications: any = { notify: jest.fn(async () => ({})) };
+    return { db, crm, network, paid, notifications, service: new CoordinationRecalculationService(db, crm, network, paid, notifications) };
   }
   const user = { id: 'agent', role: Role.EMLAKCI };
   it('registers persistence notifications without starting a paid or free scan', async () => {
     const t = setup(); t.service.onModuleInit();
     await t.network.registerRequestMatchHandler.mock.calls[0][0]('post', 'agent');
     await t.crm.registerInterestMatchHandler.mock.calls[0][0]('interest');
-    expect(t.db.linaBildirim.create).toHaveBeenCalledTimes(2); expect(t.paid.scan).not.toHaveBeenCalled();
-    expect(t.db.linaBildirim.create.mock.calls[0][0].data.mesaj).toContain('PK ücretini onaylayarak');
+    expect(t.notifications.notify).toHaveBeenCalledTimes(2); expect(t.db.linaBildirim.create).not.toHaveBeenCalled(); expect(t.paid.scan).not.toHaveBeenCalled();
+    expect(t.notifications.notify.mock.calls[0][1].body).toContain('PK ücretini onaylayarak');
   });
   it('does not notify for an inactive CRM interest', async () => { const t = setup(); t.db.customerInterest.findUnique.mockResolvedValue({ isActive: false }); t.service.onModuleInit(); await t.crm.registerInterestMatchHandler.mock.calls[0][0]('interest'); expect(t.db.linaBildirim.create).not.toHaveBeenCalled(); });
   it('blocks legacy free preview and recalculation routes', async () => { const t = setup(); await expect(t.service.previewRequestPoolMatches({}, user)).rejects.toMatchObject({ response: { code: 'PAID_MATCH_REQUIRED' } }); await expect(t.service.recalculateCrmInterest('interest', user)).rejects.toMatchObject({ response: { code: 'PAID_MATCH_REQUIRED' } }); expect(t.paid.scan).not.toHaveBeenCalled(); });

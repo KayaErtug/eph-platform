@@ -307,12 +307,22 @@ export class CommercialMatchScanService {
       }
       return { matches: [...best.values()].sort((a, b) => b.matchScore - a.matchScore), evaluated: interests.length };
     }
-    const units = await this.prisma.unit.findMany({ where: { ...ACTIVE_MATCH_UNIT,
+    const units: any[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const batch = await this.prisma.unit.findMany({ where: { ...ACTIVE_MATCH_UNIT,
       AND: [visiblePaidUnits(user), { OR: context.demands.map(demand => this.candidateWhere(demand)) }],
       ...(user.role === Role.SUPER_ADMIN ? {} : { OR: [{ isPoolVisible: true }, { isPoolVisible: false, isSalesInventory: true, project: { ownerId: user.id } }] }),
       type: { in: [...new Set(context.demands.flatMap(demand => demand.propertyTypes || []))] as any } },
-      include: { project: true, images: { where: { isCover: true }, take: 1 } }, orderBy: { id: 'asc' }, take: MAX_CANDIDATES + 1 });
-    this.checkLimit(units.length);
+      include: { project: true, images: { where: { isCover: true }, take: 1 } }, orderBy: { id: 'asc' }, take: MAX_CANDIDATES + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) });
+      units.push(...batch.filter(unit => context.demands.some(demand => !demand.district ||
+        this.matchEngine.normalizeDistrict(demand.district, demand.city) ===
+        this.matchEngine.normalizeDistrict(unit.project.district, unit.project.city))));
+      this.checkLimit(units.length);
+      if (batch.length <= MAX_CANDIDATES) break;
+      cursor = batch[batch.length - 1].id;
+    }
     const unitMap = new Map(units.map(unit => [unit.id, unit]));
     const best = new Map<string, PaidMatchItem>();
     for (const demand of context.demands) {
@@ -328,10 +338,11 @@ export class CommercialMatchScanService {
   private candidateWhere(demand: EphMatchDemand): Prisma.UnitWhereInput {
     const currency = String(demand.priceCurrency || 'TRY').toUpperCase().replace(/^TL$/, 'TRY');
     const max = Number(demand.maxBudget ?? demand.budget), min = Number(demand.minBudget);
-    return { project: { city: { equals: String(demand.city), mode: 'insensitive' },
-      ...(demand.district ? { district: { equals: demand.district, mode: 'insensitive' as const } } : {}) },
+    const kat = demand.statuses?.includes('KAT_KARSILIGI') || demand.purchaseIntent === 'KAT_KARSILIGI';
+    // District is filtered with the engine normalizer before the candidate limit.
+    return { project: { city: { equals: String(demand.city), mode: 'insensitive' } },
       ...(demand.statuses?.length ? { status: { in: demand.statuses as any } } : {}),
-      price: { gt: 0, ...(Number.isFinite(max) && max > 0 ? { lte: max } : {}), ...(Number.isFinite(min) && min > 0 ? { gte: min } : {}) },
+      ...(!kat ? { price: { gt: 0, ...(Number.isFinite(max) && max > 0 ? { lte: max } : {}), ...(Number.isFinite(min) && min > 0 ? { gte: min } : {}) } } : {}),
       AND: [currency === 'TRY' ? { OR: [{ priceCurrency: null }, { priceCurrency: { in: ['TRY', 'TL'], mode: 'insensitive' } }] } :
         { priceCurrency: { equals: currency, mode: 'insensitive' } }],
     };

@@ -47,6 +47,7 @@ describe(
 
       service =
         new LinaOpenAiLiveGatewayService(
+          { readTimeoutMs: async () => 22000 } as any,
           configService,
           runtimeService,
         );

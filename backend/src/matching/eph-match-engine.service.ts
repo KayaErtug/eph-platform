@@ -217,6 +217,7 @@ export class EphMatchEngineService {
       return null;
     }
 
+    const katKarsiligi = demand.statuses?.includes('KAT_KARSILIGI') || demand.purchaseIntent === 'KAT_KARSILIGI';
     let paidAreaHard = true;
     if (options.paidScan) {
       const profile = demand.cardProfileCriteria as { priorities?: Record<string, string>; values?: Record<string, string[]> } | null;
@@ -231,11 +232,11 @@ export class EphMatchEngineService {
       }
       const currency = (value: unknown) => String(value || 'TRY').toUpperCase().replace(/^TL$/, 'TRY');
       const price = Number(unit.price);
-      if (!Number.isFinite(price) || price <= 0 || unit.isOffMarket || project.isActive === false ||
+      if ((!katKarsiligi && (!Number.isFinite(price) || price <= 0)) || unit.isOffMarket || project.isActive === false ||
         ['PASIF', 'SATILDI', 'KIRALANDII'].includes(String(unit.status)) ||
         currency(demand.priceCurrency) !== currency(unit.priceCurrency)) return null;
       const minBudget = this.toPositiveNumber(demand.minBudget);
-      if (minBudget !== null && price < minBudget) return null;
+      if (!katKarsiligi && minBudget !== null && price < minBudget) return null;
       const district = this.normalizeDistrict(demand.district, demand.city);
       const unitDistrict = this.normalizeDistrict(project.district, project.city);
       if (district && district !== unitDistrict) return null;
@@ -275,8 +276,8 @@ export class EphMatchEngineService {
 
     const priceMatch = this.calculatePriceMatch({
       unitPrice: Number(unit.price || 0),
-      minBudget: demand.minBudget,
-      maxBudget: demand.maxBudget ?? demand.budget,
+      minBudget: katKarsiligi ? null : demand.minBudget,
+      maxBudget: katKarsiligi ? null : demand.maxBudget ?? demand.budget,
       tolerance: priceTolerance,
     });
 
@@ -1236,7 +1237,7 @@ export class EphMatchEngineService {
       : null;
   }
 
-  private normalizeDistrict(
+  normalizeDistrict(
     value: unknown,
     city?: unknown,
   ) {

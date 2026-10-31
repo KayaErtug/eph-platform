@@ -1,3 +1,4 @@
+import { LinaChatBudgetService, linaFetchSignal } from "./lina-chat-budget.service";
 import { guardWriteClaims } from "./draft/lina-draft-logic";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -70,6 +71,7 @@ type LinaProviderAnswer = {
 @Injectable()
 export class LinaService {
   constructor(
+    private readonly chatBudget: LinaChatBudgetService,
     private readonly configService: ConfigService,
     private readonly linaAccessService: LinaAccessService,
     private readonly linaKvkkService: LinaKvkkService,
@@ -594,10 +596,12 @@ export class LinaService {
         text,
       );
 
+    const timeoutMs = await this.chatBudget.readTimeoutMs();
     const response = await fetch(
       "https://api.openai.com/v1/audio/speech",
       {
         method: "POST",
+        signal: linaFetchSignal(AbortSignal.timeout(timeoutMs)),
         headers: {
           Authorization:
             `Bearer ${apiKey}`,

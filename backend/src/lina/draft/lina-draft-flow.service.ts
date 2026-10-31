@@ -1,3 +1,4 @@
+import { assertLinaBudget } from "../lina-chat-budget.service";
 import { Injectable, Logger } from "@nestjs/common";
 import { CustomerInterestPriority, CustomerStatus, Prisma } from "@prisma/client";
 
@@ -190,13 +191,26 @@ export class LinaDraftFlowService {
     }
 
     const userId = String(user.id);
-    const mukerrer = await this.findDuplicate(userId, a);
-
     try {
-      const result = mukerrer
-        ? await this.addToExisting(mukerrer.id, userId, user.role, a)
-        : await this.createNew(userId, a);
-      await this.finish(draft.id, "KAYDEDILDI", { customerId: result.customerId, interestId: result.interestId });
+      const { result, mukerrer } = await this.prisma.$transaction(async tx => {
+        assertLinaBudget();
+        const claimed = await tx.linaTaslak.updateMany({
+          where: { id: draft.id, kullaniciId: userId, tur: TUR, durum: "ONAY_BEKLIYOR", gecerlilikTarihi: { gt: new Date() },
+            alanlar: { equals: draft.alanlar as Prisma.InputJsonValue } },
+          data: { durum: "ISLENIYOR" },
+        });
+        if (claimed.count !== 1) throw new Error("LINA_DRAFT_ALREADY_CONSUMED");
+        const mukerrer = await this.findDuplicate(userId, a, tx);
+        const result = mukerrer
+          ? await this.addToExisting(mukerrer.id, userId, user.role, a, tx)
+          : await this.createNew(userId, a, tx);
+        assertLinaBudget();
+        await this.finish(draft.id, "KAYDEDILDI", { customerId: result.customerId, interestId: result.interestId }, tx);
+        assertLinaBudget();
+        return { result, mukerrer };
+      });
+      if (result.interestId) await this.crmService.refreshInterestMatches({ id: result.interestId, isActive: true })
+        .catch(() => this.logger.warn("LINA_CRM_REMINDER_DEFERRED"));
       return {
         handled: true,
         success: true,
@@ -213,11 +227,11 @@ export class LinaDraftFlowService {
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Kayıt oluşturulamadı.";
       this.logger.warn(`LINA_CRM_COMMIT_FAILED:${reason.slice(0, 160)}`);
-      return this.reply(`Kayıt oluşturulamadı: ${reason}\nTaslağınız korunuyor.`, "crm_customer_create", true, draft.id);
+      return { ...this.reply("Kayıt oluşturulamadı. Lütfen taslağınızı kontrol edip tekrar deneyin.", "crm_customer_create", true, draft.id), success: false };
     }
   }
 
-  private async createNew(userId: string, a: CrmTaslakAlanlari) {
+  private async createNew(userId: string, a: CrmTaslakAlanlari, tx: Prisma.TransactionClient) {
     const { firstName, lastName } = splitName(a.adSoyad as string);
     const demand = isDemandRole(a.rol);
     const odalar = expandRooms(a.odaSayisi, a.odaEnAz);
@@ -257,11 +271,11 @@ export class LinaDraftFlowService {
             interestNotes: a.not || undefined,
           }
         : {}),
-    })) as { id: string; interests?: Array<{ id?: string }> };
+    }, tx)) as { id: string; interests?: Array<{ id?: string }> };
     return { customerId: customer.id, interestId: customer.interests?.[0]?.id };
   }
 
-  private async addToExisting(customerId: string, userId: string, role: string | undefined, a: CrmTaslakAlanlari) {
+  private async addToExisting(customerId: string, userId: string, role: string | undefined, a: CrmTaslakAlanlari, tx: Prisma.TransactionClient) {
     if (!isDemandRole(a.rol)) return { customerId, interestId: undefined };
     const interest = (await this.crmService.addCustomerInterest(customerId, userId, role as never, {
       title: this.interestTitle(a),
@@ -279,15 +293,15 @@ export class LinaDraftFlowService {
       purchaseIntent: roleToIntent(a.rol),
       notes: a.not,
       isActive: true,
-    })) as { id?: string };
+    }, tx)) as { id?: string };
     return { customerId, interestId: interest?.id };
   }
 
-  private async findDuplicate(userId: string, a: CrmTaslakAlanlari) {
+  private async findDuplicate(userId: string, a: CrmTaslakAlanlari, db: Prisma.TransactionClient = this.prisma) {
     if (!a.adSoyad) return null;
     const digits = String(a.telefon || "").replace(/\D/g, "").slice(-10);
     const { firstName, lastName } = splitName(a.adSoyad as string);
-    return this.prisma.customer.findFirst({
+    return db.customer.findFirst({
       where: {
         ownerId: userId,
         OR: [
@@ -372,6 +386,7 @@ export class LinaDraftFlowService {
   }
 
   private async save(id: string | undefined, userId: string, alanlar: CrmTaslakAlanlari, state: ReturnType<typeof emptyMaskState>, durum: TaslakDurumu) {
+    assertLinaBudget();
     const data = {
       alanlar: alanlar as unknown as Prisma.InputJsonValue,
       maskeEsleme: Object.keys(state.esleme).length ? this.masking.encrypt(state) : null,
@@ -380,14 +395,15 @@ export class LinaDraftFlowService {
       gecerlilikTarihi: new Date(Date.now() + DRAFT_TTL_MS),
     };
     return id
-      ? this.prisma.linaTaslak.update({ where: { id }, data })
+      ? this.prisma.linaTaslak.update({ where: { id, durum: { in: ["AKTIF", "ONAY_BEKLIYOR"] } }, data })
       : this.prisma.linaTaslak.create({ data: { ...data, kullaniciId: userId, tur: TUR } });
   }
 
   // Sonuçlanan taslakta kişisel veri (alanlar + maske eşlemesi) temizlenir.
-  private async finish(id: string, durum: TaslakDurumu, sonSonuc?: Record<string, unknown>) {
-    await this.prisma.linaTaslak.update({
-      where: { id },
+  private async finish(id: string, durum: TaslakDurumu, sonSonuc?: Record<string, unknown>, db: Prisma.TransactionClient = this.prisma) {
+    assertLinaBudget();
+    await db.linaTaslak.update({
+      where: { id, durum: durum === 'KAYDEDILDI' ? 'ISLENIYOR' : { in: ['AKTIF', 'ONAY_BEKLIYOR'] } },
       data: {
         durum,
         alanlar: bosAlanlar() as unknown as Prisma.InputJsonValue,
