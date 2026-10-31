@@ -1,25 +1,29 @@
 import { BadRequestException } from '@nestjs/common';
 import { KotaDonemi, Prisma, Role } from '@prisma/client';
+import { resolvePoolAccess } from './pool-access';
 
 export async function consumeMembershipQuota(tx: Prisma.TransactionClient, actorId: string, kind: 'TALEP' | 'HAVUZ') {
   const actor = await tx.user.findUnique({ where: { id: actorId }, select: { role: true, officeId: true } });
   if (!actor || actor.role === Role.SUPER_ADMIN) return;
-  const office = actor.officeId
+  const access = await resolvePoolAccess(tx, { id: actorId, role: actor.role });
+  const office = access.code === 'OFFICE_PACKAGE'
+    ? await tx.office.findUnique({ where: { id: access.officeId }, select: { id: true, ownerUserId: true } })
+    : actor.officeId
     ? await tx.office.findUnique({ where: { id: actor.officeId }, select: { id: true, ownerUserId: true } })
     : await tx.office.findFirst({ where: { ownerUserId: actorId, isActive: true }, select: { id: true, ownerUserId: true } });
   const userId = office?.ownerUserId || actorId;
   const now = new Date();
-  const membership = await tx.kullaniciUyelikPaketi.findFirst({
+  const membership = access.code === 'OFFICE_PACKAGE' ? null : await tx.kullaniciUyelikPaketi.findFirst({
     where: { kullaniciId: userId, durum: 'AKTIF', baslangicTarihi: { lte: now }, OR: [{ bitisTarihi: null }, { bitisTarihi: { gte: now } }] },
     orderBy: { baslangicTarihi: 'desc' },
   });
   const pack = membership ? await tx.uyelikPaketi.findUnique({ where: { id: membership.paketId } }) : null;
   let limit = kind === 'TALEP' ? pack?.aylikTalepLimiti : pack?.aylikHavuzGonderimLimiti;
   if (office) {
-    const sub = await tx.systemSetting.findUnique({ where: { key: `OFFICE_SUBSCRIPTION_${office.id}` } });
-    const code = (sub?.valueJson as Prisma.JsonObject | null)?.packageCode;
+    const sub = access.code === 'OFFICE_PACKAGE' ? null : await tx.systemSetting.findUnique({ where: { key: `OFFICE_SUBSCRIPTION_${office.id}` } });
+    const code = access.code === 'OFFICE_PACKAGE' ? access.packageCode : (sub?.valueJson as Prisma.JsonObject | null)?.packageCode;
     const setting = await tx.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' } });
-    const officePack = Array.isArray(setting?.valueJson) ? (setting.valueJson as Prisma.JsonObject[]).find((p) => p.code === code) : undefined;
+    const officePack = Array.isArray(setting?.valueJson) ? (setting.valueJson as Prisma.JsonObject[]).find((p) => typeof p?.code === 'string' && p.code.trim().toUpperCase() === String(code || '').trim().toUpperCase()) : undefined;
     const officeLimit = officePack?.[kind === 'TALEP' ? 'monthlyDemandLimit' : 'monthlyPoolLimit'];
     if (typeof officeLimit === 'number') limit = officeLimit;
   }

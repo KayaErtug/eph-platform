@@ -119,7 +119,7 @@ export class PoolPublicationService {
       let previousBalance = wallet.balance;
       let remainingBalance = wallet.balance;
       if (!alreadyPublished) {
-        await consumeMembershipQuota(tx, wallet.chargeUserId, 'HAVUZ');
+        await consumeMembershipQuota(tx, user.id, 'HAVUZ');
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`wallet:${wallet.chargeUserId}`}))`;
         await tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${wallet.chargeUserId} FOR UPDATE`;
         const lockedWallet = await tx.kontorCuzdani.findUnique({ where: { kullaniciId: wallet.chargeUserId } });

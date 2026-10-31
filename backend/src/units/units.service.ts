@@ -1,3 +1,4 @@
+import { resolvePoolAccess, type PoolMembershipAccess } from '../membership/pool-access';
 import { actorPaidWhere, resolveOfficeWallet } from '../office/office-wallet.rules';
 import { officeProfile, officeProfileKey } from '../office/office-profile';
 import { TextSafetyService } from '../text-safety/text-safety.service';
@@ -24,7 +25,6 @@ import {
   Role,
   UnitStatus,
   UnitType,
-  UyelikDurumu,
 } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
@@ -79,25 +79,6 @@ type PoolActionPayload = {
   message?: string;
   matchScore?: number;
   note?: string;
-};
-
-type PoolMembershipAccessCode =
-  | 'ACTIVE'
-  | 'SUPER_ADMIN'
-  | 'NO_MEMBERSHIP'
-  | 'NOT_STARTED'
-  | 'EXPIRED'
-  | 'PASSIVE'
-  | 'CANCELLED'
-  | 'PACKAGE_INACTIVE';
-
-type PoolMembershipAccess = {
-  allowed: boolean;
-  code: PoolMembershipAccessCode;
-  message: string;
-  packageCode: string | null;
-  packageName: string | null;
-  expiresAt: Date | null;
 };
 
 const unitInclude = {
@@ -420,154 +401,8 @@ export class UnitsService {
     return Boolean(user?.id && ownerId && user.id === ownerId);
   }
 
-  private async getPoolMembershipAccess(
-    user: CurrentUserPayload,
-  ): Promise<PoolMembershipAccess> {
-    if (this.isSuperAdmin(user)) {
-      return {
-        allowed: true,
-        code: 'SUPER_ADMIN',
-        message: 'Yazılım Ekibi Havuz işlem erişimi aktif.',
-        packageCode: 'SYSTEM',
-        packageName: 'Yazılım Ekibi',
-        expiresAt: null,
-      };
-    }
-
-    const now = new Date();
-
-    const [activeMembership, latestMembership] = await Promise.all([
-      this.prisma.kullaniciUyelikPaketi.findFirst({
-        where: {
-          kullaniciId: user.id,
-          durum: UyelikDurumu.AKTIF,
-          baslangicTarihi: {
-            lte: now,
-          },
-          OR: [
-            {
-              bitisTarihi: null,
-            },
-            {
-              bitisTarihi: {
-                gte: now,
-              },
-            },
-          ],
-        },
-        orderBy: {
-          baslangicTarihi: 'desc',
-        },
-      }),
-      this.prisma.kullaniciUyelikPaketi.findFirst({
-        where: {
-          kullaniciId: user.id,
-        },
-        orderBy: {
-          baslangicTarihi: 'desc',
-        },
-      }),
-    ]);
-
-    if (!activeMembership) {
-      if (!latestMembership) {
-        return {
-          allowed: false,
-          code: 'NO_MEMBERSHIP',
-          message:
-            'Havuz işlemleri için aktif üyelik gereklidir. Üyelik Merkezi üzerinden paket talebi oluşturabilirsiniz.',
-          packageCode: null,
-          packageName: null,
-          expiresAt: null,
-        };
-      }
-
-      if (
-        latestMembership.durum === UyelikDurumu.AKTIF &&
-        latestMembership.baslangicTarihi.getTime() > now.getTime()
-      ) {
-        return {
-          allowed: false,
-          code: 'NOT_STARTED',
-          message:
-            'Üyeliğiniz henüz başlamadığı için Havuz işlemleri kullanılamıyor.',
-          packageCode: null,
-          packageName: null,
-          expiresAt: latestMembership.bitisTarihi,
-        };
-      }
-
-      if (
-        latestMembership.durum === UyelikDurumu.SURESI_DOLDU ||
-        (latestMembership.durum === UyelikDurumu.AKTIF &&
-          latestMembership.bitisTarihi !== null &&
-          latestMembership.bitisTarihi.getTime() < now.getTime())
-      ) {
-        return {
-          allowed: false,
-          code: 'EXPIRED',
-          message:
-            'Üyelik süreniz dolduğu için Havuz işlemleri kilitlidir. Havuzu görüntülemeye devam edebilirsiniz.',
-          packageCode: null,
-          packageName: null,
-          expiresAt: latestMembership.bitisTarihi,
-        };
-      }
-
-      if (latestMembership.durum === UyelikDurumu.IPTAL) {
-        return {
-          allowed: false,
-          code: 'CANCELLED',
-          message:
-            'Üyeliğiniz iptal edildiği için Havuz işlemleri kullanılamıyor.',
-          packageCode: null,
-          packageName: null,
-          expiresAt: latestMembership.bitisTarihi,
-        };
-      }
-
-      return {
-        allowed: false,
-        code: 'PASSIVE',
-        message:
-          'Üyeliğiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.',
-        packageCode: null,
-        packageName: null,
-        expiresAt: latestMembership.bitisTarihi,
-      };
-    }
-
-    const membershipPackage = await this.prisma.uyelikPaketi.findUnique({
-      where: {
-        id: activeMembership.paketId,
-      },
-      select: {
-        paketKodu: true,
-        paketAdi: true,
-        aktifMi: true,
-      },
-    });
-
-    if (!membershipPackage || !membershipPackage.aktifMi) {
-      return {
-        allowed: false,
-        code: 'PACKAGE_INACTIVE',
-        message:
-          'Üyelik paketiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.',
-        packageCode: membershipPackage?.paketKodu || null,
-        packageName: membershipPackage?.paketAdi || null,
-        expiresAt: activeMembership.bitisTarihi,
-      };
-    }
-
-    return {
-      allowed: true,
-      code: 'ACTIVE',
-      message: 'Havuz işlem erişiminiz aktif.',
-      packageCode: membershipPackage.paketKodu,
-      packageName: membershipPackage.paketAdi,
-      expiresAt: activeMembership.bitisTarihi,
-    };
+  private getPoolMembershipAccess(user: CurrentUserPayload): Promise<PoolMembershipAccess> {
+    return resolvePoolAccess(this.prisma, user);
   }
 
   private async ensurePoolActionMembership(user: CurrentUserPayload) {

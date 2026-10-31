@@ -55,7 +55,7 @@ function harness() {
         return data;
       },
     },
-    office: { findFirst: async () => null, findUnique: async () => ({ id: 'office-1', ownerUserId: 'office-owner', isActive: officeActive }) },
+    office: { findMany: async () => officeActive && officeMember ? [{ id: 'office-1' }] : [], findFirst: async () => null, findUnique: async () => ({ id: 'office-1', ownerUserId: 'office-owner', isActive: officeActive }) },
     user: { findUnique: async () => ({ id: actor.id, role: 'EMLAKCI', officeId: officeMember ? 'office-1' : null }), findFirst: async () => officeMember ? { id: actor.id } : null },
     systemSetting: { findUnique: async ({ where }: any) => where.key.startsWith('EPH_OFFICE_SPENDING_') ? { valueJson: { mode: officeMode } } : null },
     poolAudienceGroup: { findMany: async () => [] },

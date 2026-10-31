@@ -1,3 +1,4 @@
+import { resolvePoolAccess } from '../membership/pool-access';
 import {
   BadRequestException,
   ForbiddenException,
@@ -8,7 +9,6 @@ import {
   PortfolioApprovalStatus,
   PortfolioAuthorityType,
   Prisma,
-  UyelikDurumu,
 } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -810,101 +810,10 @@ export class PortfolioDocumentsService {
     return 'Doğrulama Evrakı';
   }
 
-  private async ensurePoolActionMembership(
-    userId: string,
-    userRole?: string,
-  ) {
-    if (String(userRole || '').toUpperCase() === 'SUPER_ADMIN') {
-      return;
-    }
-
-    const now = new Date();
-
-    const [activeMembership, latestMembership] = await Promise.all([
-      this.prisma.kullaniciUyelikPaketi.findFirst({
-        where: {
-          kullaniciId: userId,
-          durum: UyelikDurumu.AKTIF,
-          baslangicTarihi: {
-            lte: now,
-          },
-          OR: [
-            {
-              bitisTarihi: null,
-            },
-            {
-              bitisTarihi: {
-                gte: now,
-              },
-            },
-          ],
-        },
-        orderBy: {
-          baslangicTarihi: 'desc',
-        },
-      }),
-      this.prisma.kullaniciUyelikPaketi.findFirst({
-        where: {
-          kullaniciId: userId,
-        },
-        orderBy: {
-          baslangicTarihi: 'desc',
-        },
-      }),
-    ]);
-
-    if (!activeMembership) {
-      if (!latestMembership) {
-        throw new ForbiddenException(
-          'Havuz işlemleri için aktif üyelik gereklidir. Üyelik Merkezi üzerinden paket talebi oluşturabilirsiniz.',
-        );
-      }
-
-      if (
-        latestMembership.durum === UyelikDurumu.AKTIF &&
-        latestMembership.baslangicTarihi.getTime() > now.getTime()
-      ) {
-        throw new ForbiddenException(
-          'Üyeliğiniz henüz başlamadığı için Havuz işlemleri kullanılamıyor.',
-        );
-      }
-
-      if (
-        latestMembership.durum === UyelikDurumu.SURESI_DOLDU ||
-        (latestMembership.durum === UyelikDurumu.AKTIF &&
-          latestMembership.bitisTarihi !== null &&
-          latestMembership.bitisTarihi.getTime() < now.getTime())
-      ) {
-        throw new ForbiddenException(
-          'Üyelik süreniz dolduğu için Havuz işlemleri kilitlidir. Havuzu görüntülemeye devam edebilirsiniz.',
-        );
-      }
-
-      if (latestMembership.durum === UyelikDurumu.IPTAL) {
-        throw new ForbiddenException(
-          'Üyeliğiniz iptal edildiği için Havuz işlemleri kullanılamıyor.',
-        );
-      }
-
-      throw new ForbiddenException(
-        'Üyeliğiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.',
-      );
-    }
-
-    const membershipPackage = await this.prisma.uyelikPaketi.findUnique({
-      where: {
-        id: activeMembership.paketId,
-      },
-      select: {
-        aktifMi: true,
-      },
-    });
-
-    if (!membershipPackage || !membershipPackage.aktifMi) {
-      throw new ForbiddenException(
-        'Üyelik paketiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.',
-      );
-    }
+  private async ensurePoolActionMembership(userId: string, userRole?: string) {
+    const access = await resolvePoolAccess(this.prisma, { id: userId, role: userRole });
+    if (!access.allowed) throw new ForbiddenException(access.message);
+    return access;
   }
 
   // DOCUMENT_AI_ANALYSIS_ENABLED: 1 = açık; kayıt yoksa, 1 değilse veya okunamazsa KAPALI.
