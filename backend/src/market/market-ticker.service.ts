@@ -63,6 +63,14 @@ const FX = [
 
 const round = (n: number, d = 4) => Number(n.toFixed(d));
 const pct = (now: number, prev: number) => (prev > 0 ? round(((now - prev) / prev) * 100, 2) : null);
+// Sayı ya da "$3.875,55" / "%-3,63" / "3875.55" biçimli metin → sayı.
+const trNumber = (raw: unknown): number => {
+  if (typeof raw === 'number') return raw;
+  if (typeof raw !== 'string') return NaN;
+  let s = raw.replace(/[^\d.,-]/g, '');
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  return s ? Number(s) : NaN;
+};
 
 async function getText(url: string, headers: Record<string, string> = {}) {
   const res = await fetch(url, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
@@ -136,9 +144,19 @@ export class MarketTickerService implements OnModuleInit {
     const json = JSON.parse(await getText('https://finans.truncgil.com/v4/today.json', { 'User-Agent': 'Mozilla/5.0' }));
     for (const [code, key] of [['GRAM_ALTIN', 'GRA'], ['CEYREK_ALTIN', 'CEYREKALTIN'], ['YARIM_ALTIN', 'YARIMALTIN'], ['TAM_ALTIN', 'TAMALTIN'], ['ONS_ALTIN', 'ONS']] as const) {
       const row = json?.[key];
-      const value = Number(row?.Selling);
+      let value = trNumber(row?.Selling);
+      let change = trNumber(row?.Change);
+      if (code === 'ONS_ALTIN' && !(value > 0)) {
+        try {
+          const legacy = JSON.parse(await getText('https://finans.truncgil.com/today.json', { 'User-Agent': 'Mozilla/5.0' }))?.ons;
+          value = trNumber(legacy?.['Satış']);
+          change = trNumber(legacy?.['Değişim']);
+        } catch (e) {
+          this.log.warn(`Ons altın yedek kaynak: ${String((e as Error)?.message || e)}`);
+        }
+      }
       const { label, unit } = LABELS[code];
-      if (value > 0) this.keep({ code, label, value: round(value, 2), unit, changePct: Number.isFinite(Number(row?.Change)) ? Number(row.Change) : null, source: 'Truncgil' });
+      if (value > 0) this.keep({ code, label, value: round(value, 2), unit, changePct: Number.isFinite(change) ? change : null, source: 'Truncgil' });
     }
   }
 
