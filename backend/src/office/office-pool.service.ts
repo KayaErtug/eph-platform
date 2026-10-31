@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, UnitStatus } from '@prisma/client';
+import { Prisma, Role, UnitStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 const SALE_STATUSES: UnitStatus[] = [UnitStatus.SATILIK, UnitStatus.DEVREN_SATILIK];
@@ -14,6 +14,7 @@ export class OfficePoolService {
     if (!office) throw new NotFoundException('Ofis bulunamadı.');
     const isOwner = office.ownerUserId === userId;
     const isMember = isOwner || !!(await this.prisma.user.findFirst({ where: { id: userId, officeId } }));
+    if (!isMember && (await this.prisma.user.findFirst({ where: { id: userId, role: Role.SUPER_ADMIN }, select: { id: true } }))) return { office, isOwner: true };
     if (!isMember) throw new ForbiddenException('Bu ofisin ortak portföy havuzuna erişim yetkiniz yok.');
     return { office, isOwner };
   }
@@ -48,7 +49,7 @@ export class OfficePoolService {
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       select: {
         id: true, type: true, roomCount: true, netArea: true, grossArea: true, price: true, priceCurrency: true,
-        status: true, hiddenFromOffice: true, updatedAt: true,
+        status: true, hiddenFromOffice: true, sharedWithSisters: true, updatedAt: true,
         images: { select: { url: true, supabaseUrl: true, isCover: true, sortOrder: true }, orderBy: [{ isCover: 'desc' }, { sortOrder: 'asc' }], take: 1 },
         project: { select: { name: true, city: true, district: true, neighborhood: true, ownerId: true, owner: { select: { id: true, firstName: true, lastName: true } } } },
       },
@@ -64,7 +65,8 @@ export class OfficePoolService {
           city: u.project.city, district: u.project.district, neighborhood: u.project.neighborhood,
           coverUrl: cover ? cover.supabaseUrl || cover.url : null,
           agent: { id: owner.id, fullName: `${owner.firstName ?? ''} ${owner.lastName ?? ''}`.trim() },
-          hiddenFromOffice: u.hiddenFromOffice, isMine: u.project.ownerId === userId, updatedAt: u.updatedAt,
+          hiddenFromOffice: u.hiddenFromOffice, sharedWithSisters: isOwner && u.sharedWithSisters === true,
+          isMine: u.project.ownerId === userId, updatedAt: u.updatedAt,
         };
       }),
       nextCursor: rows.length > take ? page[page.length - 1].id : null,
@@ -101,6 +103,6 @@ export class OfficePoolService {
     const unit = await this.prisma.unit.findUnique({ where: { id: unitId }, select: { id: true, project: { select: { ownerId: true } } } });
     if (!unit) throw new NotFoundException('Portföy bulunamadı.');
     if (unit.project.ownerId !== userId) throw new ForbiddenException('Yalnız portföyün sahibi ekipten gizleyebilir.');
-    return this.prisma.unit.update({ where: { id: unitId }, data: { hiddenFromOffice: hidden }, select: { id: true, hiddenFromOffice: true } });
+    return this.prisma.unit.update({ where: { id: unitId }, data: hidden ? { hiddenFromOffice: true, sharedWithSisters: false } : { hiddenFromOffice: false }, select: { id: true, hiddenFromOffice: true } });
   }
 }

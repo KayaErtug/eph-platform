@@ -181,9 +181,14 @@ model Office {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  code         String?  @unique
   owner        User?    @relation("OfficeOwner", fields: [ownerUserId], references: [id])
   teams        Team[]
   users        User[]   @relation("OfficeUsers")
+  sisterLinksA        OfficeSisterLink[]         @relation("SisterLinkA")
+  sisterLinksB        OfficeSisterLink[]         @relation("SisterLinkB")
+  sisterRequestsOwned SisterPrivateInfoRequest[] @relation("SisterRequestOwner")
+  sisterRequestsMade  SisterPrivateInfoRequest[] @relation("SisterRequestRequester")
 
   @@index([ownerUserId])
   @@index([city, district])
@@ -817,6 +822,8 @@ model Unit {
   adaNo                  String?
   parselNo               String?
   hiddenFromOffice       Boolean                      @default(false)
+  sharedWithSisters      Boolean                      @default(false)
+  sisterRequests         SisterPrivateInfoRequest[]
   customerProperties     CustomerProperty[]
   authorityLetters       EPHAuthorityLetter[]
   authorityDocuments     PortfolioAuthorityDocument[]
@@ -848,6 +855,75 @@ model Unit {
   @@index([isPoolVisible])
   @@index([availableCreditAmount])
   @@index([hiddenFromOffice])
+  @@index([sharedWithSisters])
+}
+
+enum SisterLinkStatus {
+  BEKLIYOR
+  AKTIF
+  REDDEDILDI
+  SONLANDI
+}
+
+enum SisterRequestStatus {
+  BEKLIYOR
+  ONAYLANDI
+  REDDEDILDI
+}
+
+// officeAId < officeBId (sirali tekil cift). Kullanici kimlikleri iliskisiz tutulur (User modeli degismez).
+model OfficeSisterLink {
+  id                 String           @id @default(uuid())
+  officeAId          String
+  officeBId          String
+  status             SisterLinkStatus @default(BEKLIYOR)
+  invitedByOfficeId  String
+  invitedByUserId    String
+  commissionSplitPct Int              @default(50)
+  createdAt          DateTime         @default(now())
+  respondedAt        DateTime?
+  endedAt            DateTime?
+  endedByUserId      String?
+  officeA            Office           @relation("SisterLinkA", fields: [officeAId], references: [id], onDelete: Cascade)
+  officeB            Office           @relation("SisterLinkB", fields: [officeBId], references: [id], onDelete: Cascade)
+
+  @@unique([officeAId, officeBId])
+  @@index([officeBId])
+  @@index([status])
+}
+
+model SisterPrivateInfoRequest {
+  id                String                       @id @default(uuid())
+  unitId            String
+  ownerOfficeId     String
+  requesterOfficeId String
+  requesterUserId   String
+  status            SisterRequestStatus          @default(BEKLIYOR)
+  decidedByUserId   String?
+  decidedAt         DateTime?
+  createdAt         DateTime                     @default(now())
+  unit              Unit                         @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  ownerOffice       Office                       @relation("SisterRequestOwner", fields: [ownerOfficeId], references: [id], onDelete: Cascade)
+  requesterOffice   Office                       @relation("SisterRequestRequester", fields: [requesterOfficeId], references: [id], onDelete: Cascade)
+  accessLogs        SisterPrivateInfoAccessLog[]
+
+  @@unique([unitId, requesterUserId])
+  @@index([ownerOfficeId, status])
+  @@index([requesterOfficeId])
+  @@index([requesterUserId])
+}
+
+model SisterPrivateInfoAccessLog {
+  id           String                   @id @default(uuid())
+  requestId    String
+  unitId       String
+  viewerUserId String
+  viewedAt     DateTime                 @default(now())
+  request      SisterPrivateInfoRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([unitId])
+  @@index([viewerUserId])
 }
 
 enum PoolAudienceMode {
