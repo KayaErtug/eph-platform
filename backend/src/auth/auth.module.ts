@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 
+import { AdminEmailModule } from '../admin-email/admin-email.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { InvitationsModule } from '../invitations/invitations.module';
 import { MailService } from '../mail.service';
 import { UsersModule } from '../users/users.module';
@@ -14,6 +16,7 @@ import { PhoneVerificationSecurityService } from './firebase/phone-verification-
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { PendingRegistrationService } from './registration/pending-registration.service';
+import { NewUserNotifierService } from './registration/new-user-notifier.service';
 import { RegistrationV2Service } from './registration/registration-v2.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
@@ -21,6 +24,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   imports: [
     UsersModule,
     InvitationsModule,
+    AdminEmailModule,
+    NotificationsModule,
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'sm-super-secret-jwt-key-degistirin',
@@ -30,6 +35,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   providers: [
     AuthService,
     RegistrationV2Service,
+    NewUserNotifierService,
     PendingRegistrationService,
 
     FirebasePhoneVerificationService,

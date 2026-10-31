@@ -62,6 +62,12 @@ export class AdminController {
     return this.adminService.getDashboardSummary(this.extractActor(request));
   }
 
+  @Get("users/new-summary")
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  getNewUserSummary() {
+    return this.adminService.getNewUserSummary();
+  }
+
   @Get("users")
   @RequirePermission("USER_VIEW")
   getUsers(

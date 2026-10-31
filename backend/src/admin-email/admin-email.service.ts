@@ -35,6 +35,15 @@ export class AdminEmailService implements OnApplicationBootstrap, OnModuleDestro
     try { await this.running; } finally { this.running = undefined; }
   }
 
+  /** Kuyruğa tek sefer ekler (eventKey benzersiz); gönderimi mevcut işçi yapar. */
+  async enqueue(event: { eventKey: string; category: string; entityType: string; entityId: string; title: string; summary: string }) {
+    await this.prisma.$executeRaw`
+      INSERT INTO "AdminEmailOutbox" ("id", "eventKey", "recipient", "category", "entityType", "entityId", "title", "summary", "updatedAt")
+      VALUES (${randomUUID()}, ${event.eventKey}, ${ADMIN_EMAIL_RECIPIENT}, ${event.category}, ${event.entityType}, ${event.entityId},
+        ${event.title}, ${event.summary}, CURRENT_TIMESTAMP)
+      ON CONFLICT ("eventKey") DO NOTHING`;
+  }
+
   private async enabled() {
     const rows = await this.prisma.$queryRaw<Array<{ enabled: boolean; recipient: string }>>`
       SELECT "enabled", "recipient" FROM "AdminEmailSetting" WHERE "id" = 'main'`;

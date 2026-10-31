@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
   Capability,
@@ -13,6 +13,7 @@ import { EmailVerificationV2Service } from '../email/email-verification-v2.servi
 import { PrismaService } from '../../prisma/prisma.service';
 import { UsersService } from '../../users/users.service';
 import { PendingRegistrationService } from './pending-registration.service';
+import { NewUserEvent, NewUserNotifierService } from './new-user-notifier.service';
 import { SupabaseService } from '../../supabase/supabase.service';
 
 type MailRegistrationType =
@@ -31,6 +32,7 @@ export class RegistrationV2Service {
     private readonly emailVerificationService: EmailVerificationV2Service,
     private readonly supabase: SupabaseService,
     private readonly jwtService: JwtService,
+    @Optional() private readonly newUserNotifier?: NewUserNotifierService,
   ) {}
 
   private normalizeEmail(email: string) {
@@ -360,7 +362,9 @@ export class RegistrationV2Service {
   }
 
   async completeRegistration(pendingRegistrationId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    // Yeni üye olayı tek noktadan, commit sonrası ve yalnız hesap bu çağrıda oluştuysa tetiklenir.
+    let created = null as NewUserEvent | null;
+    const result = await this.prisma.$transaction(async (tx) => {
       // Aynı oturum iki paralel tamamlamada iki kullanıcı/belge oluşturamaz.
       await tx.$queryRaw`SELECT "id" FROM "PendingRegistration" WHERE "id" = ${pendingRegistrationId} FOR UPDATE`;
       const pending = await tx.pendingRegistration.findUnique({ where: { id: pendingRegistrationId } });
@@ -485,6 +489,8 @@ export class RegistrationV2Service {
           data: { status: PendingRegistrationStatus.COMPLETED, completedAt: new Date() },
         });
 
+        created = { userId: user.id, firstName: '', lastName: '', role: Role.ADAY, isApproved: true, inviteCode: pending.inviteCode };
+
         const token = this.jwtService.sign({
           sub: user.id,
           email: user.email,
@@ -571,6 +577,17 @@ export class RegistrationV2Service {
         data: { status: PendingRegistrationStatus.COMPLETED, completedAt: new Date() },
       });
 
+      created = {
+        userId: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        city: user.city,
+        district: user.district,
+        inviteCode: pending.inviteCode,
+        isApproved: user.isApproved,
+      };
+
       return {
         success: true,
         flow: 'LEGACY',
@@ -582,5 +599,8 @@ export class RegistrationV2Service {
           'Telefon ve e-posta doğrulaması tamamlandı. Üyelik onay sürecine devam ediniz.',
       };
     });
+
+    if (created) this.newUserNotifier?.dispatch(created);
+    return result;
   }
 }

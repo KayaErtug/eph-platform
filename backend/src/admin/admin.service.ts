@@ -1,4 +1,5 @@
 import { COST_PREFIX, LIMIT_DEFAULTS, LIMIT_DESCRIPTIONS, LIMIT_LIST_DEFAULTS, LIMIT_PREFIX, isManagedCommercialKey, parseLimitList } from "../pricing/commercial-costs";
+import { NEW_USER_NOTIFY_KEYS } from "../auth/registration/new-user-notifier.service";
 import { readTrialPolicy, resolveInitialTrialDays } from "../pricing/trial-policy";
 import { MARKET_CODES, MARKET_CONSUMER_BSMV_KEY, MARKET_CONSUMER_KKDF_KEY, MARKET_CONSUMER_RATE_KEY, MARKET_CONSUMER_SOURCE_KEY, MARKET_LOAN_SETTING_KEY, MARKET_LOAN_SOURCE_KEY, MARKET_MANUAL_PREFIX, MARKET_TAX_KEYS, MARKET_TEXT_KEYS } from "../market/market-ticker.service";
 import {
@@ -3430,7 +3431,7 @@ export class AdminService {
 
     const settings = await this.prisma.systemSetting.findMany({
       where: {
-        OR: [{ key: { in: ["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK", "DOCUMENT_AI_ANALYSIS_ENABLED"] } }, { key: { startsWith: COST_PREFIX } }, { key: { startsWith: LIMIT_PREFIX } }, { key: { startsWith: "MARKET_" } }],
+        OR: [{ key: { in: ["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK", "DOCUMENT_AI_ANALYSIS_ENABLED", ...NEW_USER_NOTIFY_KEYS] } }, { key: { startsWith: COST_PREFIX } }, { key: { startsWith: LIMIT_PREFIX } }, { key: { startsWith: "MARKET_" } }],
       },
       orderBy: { key: "asc" },
     });
@@ -3454,7 +3455,41 @@ export class AdminService {
         list.push({ key, value: Array.isArray(fallback) ? [...fallback] : fallback as number, description, updatedAt: null, updatedById: null });
       } else if (!row.description) row.description = description;
     }
+    // Kaydı olmayan yeni üye bildirim anahtarları varsayılan açık (1) görünür.
+    for (const key of NEW_USER_NOTIFY_KEYS) {
+      if (!list.some((r) => r.key === key)) list.push({ key, value: 1, description: "Yeni üye kaydında süper admin bildirimi (0 = kapalı, 1 = açık)", updatedAt: null, updatedById: null });
+    }
     return list.sort((a, b) => a.key.localeCompare(b.key));
+  }
+
+  // GET /admin/users/new-summary: yeni üye özeti (yalnız ADMIN/SUPER_ADMIN; controller rol kontrolü).
+  async getNewUserSummary() {
+    const now = Date.now();
+    const live = { NOT: { firstName: "Silinmis" } };
+    const [last24h, last7d, pendingApproval, latest] = await Promise.all([
+      this.prisma.user.count({ where: { ...live, createdAt: { gte: new Date(now - 24 * 3600 * 1000) } } }),
+      this.prisma.user.count({ where: { ...live, createdAt: { gte: new Date(now - 7 * 24 * 3600 * 1000) } } }),
+      this.prisma.user.count({ where: { ...live, isVerified: true, isApproved: false } }),
+      this.prisma.user.findMany({
+        where: live,
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { id: true, firstName: true, lastName: true, role: true, city: true, createdAt: true, isApproved: true },
+      }),
+    ]);
+    return {
+      last24h,
+      last7d,
+      pendingApproval,
+      latest: latest.map((u) => ({
+        id: u.id,
+        fullName: `${u.firstName} ${u.lastName}`.trim(),
+        role: u.role,
+        city: u.city,
+        createdAt: u.createdAt,
+        status: u.isApproved ? "APPROVED" : "PENDING_APPROVAL",
+      })),
+    };
   }
 
   // GET /admin/trial-policy: mobilin süre/buton metinlerini sunucudan üretmesi için.
@@ -3487,7 +3522,7 @@ export class AdminService {
     if (Object.prototype.hasOwnProperty.call(LIMIT_LIST_DEFAULTS, key)) return this.updateLimitList(key, body, actor);
 
     const isCommercialCost = isManagedCommercialKey(key);
-    if (!isCommercialCost && !["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK", "DOCUMENT_AI_ANALYSIS_ENABLED"].includes(key)) {
+    if (!isCommercialCost && !["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK", "DOCUMENT_AI_ANALYSIS_ENABLED", ...NEW_USER_NOTIFY_KEYS].includes(key)) {
       throw new BadRequestException("Desteklenmeyen sistem ayarı.");
     }
 
@@ -3495,6 +3530,7 @@ export class AdminService {
       key.startsWith(LIMIT_PREFIX) ? 1 :
       isCommercialCost ||
       key === "DOCUMENT_AI_ANALYSIS_ENABLED" ||
+      NEW_USER_NOTIFY_KEYS.includes(key) ||
       key === "TRIAL_MAX_EXTENSIONS" ||
       key === "POOL_PRIVATE_INFO_COST" ||
       key === "MATCH_SCAN_COST_PK" ||
@@ -3507,7 +3543,7 @@ export class AdminService {
     if (!body || typeof body.value !== "number" || !Number.isSafeInteger(body.value) || body.value < minimum) {
       throw new BadRequestException(`Değer en az ${minimum} olan bir tam sayı olmalıdır.`);
     }
-    if (key === "DOCUMENT_AI_ANALYSIS_ENABLED" && body.value > 1) {
+    if ((key === "DOCUMENT_AI_ANALYSIS_ENABLED" || NEW_USER_NOTIFY_KEYS.includes(key)) && body.value > 1) {
       throw new BadRequestException("Değer 0 (kapalı) veya 1 (açık) olmalıdır.");
     }
     if (body.description !== undefined && typeof body.description !== "string") {
@@ -3519,7 +3555,7 @@ export class AdminService {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`system-setting:${key}`}))::text AS locked`;
       const existing = await tx.systemSetting.findUnique({ where: { key } });
       // Yönetilen (varsayılanı olan) anahtar henüz kayıtlı değilse ilk kayıt burada oluşur.
-      if (!existing && !isCommercialCost && key !== "DOCUMENT_AI_ANALYSIS_ENABLED") {
+      if (!existing && !isCommercialCost && key !== "DOCUMENT_AI_ANALYSIS_ENABLED" && !NEW_USER_NOTIFY_KEYS.includes(key)) {
         throw new NotFoundException("Sistem ayarı bulunamadı.");
       }
 
@@ -3530,7 +3566,7 @@ export class AdminService {
         : existing ? body.value : { value: body.value };
       const updated = await tx.systemSetting.upsert({
         where: { key },
-        create: { key, valueJson, description: body.description ?? LIMIT_DESCRIPTIONS[key] ?? (key === "DOCUMENT_AI_ANALYSIS_ENABLED" ? "Belge analizi OpenAI kullansın mı (0 = kapalı, 1 = açık)" : undefined), updatedById: actorId },
+        create: { key, valueJson, description: body.description ?? LIMIT_DESCRIPTIONS[key] ?? (key === "DOCUMENT_AI_ANALYSIS_ENABLED" ? "Belge analizi OpenAI kullansın mı (0 = kapalı, 1 = açık)" : NEW_USER_NOTIFY_KEYS.includes(key) ? "Yeni üye kaydında süper admin bildirimi (0 = kapalı, 1 = açık)" : undefined), updatedById: actorId },
         update: { valueJson, description: body.description, updatedById: actorId },
       });
 
