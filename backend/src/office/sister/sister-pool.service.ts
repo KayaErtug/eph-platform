@@ -123,19 +123,20 @@ export class SisterPoolService {
 
     const request = await this.prisma.sisterPrivateInfoRequest.findUnique({ where: { unitId_requesterUserId: { unitId: u.id, requesterUserId: actor.id } } });
     let privateInfo: { status: 'none' | 'pending' | 'approved' | 'rejected'; data?: Record<string, unknown> } = { status: 'none' };
-    if (request) {
+    const privateData = () => ({
+      ownerFullName: u.deedOwnerFullName, ownerPhone: u.deedOwnerPhone || u.contactPhone || null, whatsappPhone: u.whatsappPhone,
+      ownerEmail: u.deedOwnerEmail,
+      location: { address: u.project.address, latitude: u.project.latitude, longitude: u.project.longitude, adaNo: u.adaNo, parselNo: u.parselNo },
+    });
+    // §0: süper admin istek/onay aranmadan her şeyi görür. Erişim logu requestId zorunlu (FK) olduğundan süper admin için yazılmaz.
+    if (actor.isSuper) {
+      privateInfo = { status: 'approved', data: privateData() };
+    } else if (request) {
       if (request.status === SisterRequestStatus.BEKLIYOR) privateInfo = { status: 'pending' };
       else if (request.status === SisterRequestStatus.REDDEDILDI) privateInfo = { status: 'rejected' };
       else {
         await this.prisma.sisterPrivateInfoAccessLog.create({ data: { requestId: request.id, unitId: u.id, viewerUserId: actor.id } });
-        privateInfo = {
-          status: 'approved',
-          data: {
-            ownerFullName: u.deedOwnerFullName, ownerPhone: u.deedOwnerPhone || u.contactPhone || null, whatsappPhone: u.whatsappPhone,
-            ownerEmail: u.deedOwnerEmail,
-            location: { address: u.project.address, latitude: u.project.latitude, longitude: u.project.longitude, adaNo: u.adaNo, parselNo: u.parselNo },
-          },
-        };
+        privateInfo = { status: 'approved', data: privateData() };
       }
     }
     return {

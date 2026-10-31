@@ -313,6 +313,15 @@ describe('EPH-81 kardeş ofis ağı', () => {
       await expect(f.reqSvc.list('outsider', 'A', 'outgoing')).rejects.toBeInstanceOf(ForbiddenException);
       expect((await f.reqSvc.list('root', 'B', 'incoming') as any).items).toHaveLength(1);
     });
+    it('süper admin istek/onay olmadan özel bilgiyi görür; diğer roller etkilenmez', async () => {
+      const f = fixture();
+      await f.connect();
+      const d: any = await f.poolSvc.detail('root', 'A', 'u1');
+      expect(d.privateInfo.status).toBe('approved');
+      expect(d.privateInfo.data).toMatchObject({ ownerFullName: 'Ali Veli', ownerPhone: '0555 000', whatsappPhone: '0555 222', ownerEmail: 'ali@x.com', location: { address: 'Tam Adres 1' } });
+      expect(f.requests).toHaveLength(0);
+      expect((await f.poolSvc.detail('agentA', 'A', 'u1') as any).privateInfo).toEqual({ status: 'none' });
+    });
     it('süper admin her uç noktada işlem yapabilir', async () => {
       const f = fixture();
       const r: any = await f.linksSvc.invite('root', 'A', { code: 'OFS-222222' });
