@@ -816,6 +816,7 @@ model Unit {
   whatsappPhone          String?
   adaNo                  String?
   parselNo               String?
+  hiddenFromOffice       Boolean                      @default(false)
   customerProperties     CustomerProperty[]
   authorityLetters       EPHAuthorityLetter[]
   authorityDocuments     PortfolioAuthorityDocument[]
@@ -846,6 +847,7 @@ model Unit {
   @@index([approvalStatus])
   @@index([isPoolVisible])
   @@index([availableCreditAmount])
+  @@index([hiddenFromOffice])
 }
 
 enum PoolAudienceMode {

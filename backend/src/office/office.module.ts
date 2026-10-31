@@ -7,11 +7,13 @@ import { OfficeService } from "./office.service";
 
 import { OfficeManagementService } from './office-management.service';
 import { OfficeManagementController } from './office-management.controller';
+import { OfficePoolController } from './office-pool.controller';
+import { OfficePoolService } from './office-pool.service';
 
 @Module({
   imports: [PrismaModule, PushModule, NotificationsModule],
-  controllers: [OfficeController, OfficeManagementController],
-  providers: [OfficeService, OfficeManagementService],
+  controllers: [OfficeController, OfficeManagementController, OfficePoolController],
+  providers: [OfficeService, OfficeManagementService, OfficePoolService],
   exports: [OfficeService],
 })
 export class OfficeModule {}
