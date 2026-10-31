@@ -1,13 +1,37 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import {
+  LocalStorageDriver,
+  StoragePathError,
+  readLocalStorageConfig,
+} from './local-storage.driver';
 
 @Injectable()
 export class SupabaseService {
   private readonly logger = new Logger(SupabaseService.name);
-  private readonly supabase: SupabaseClient;
-  private readonly writeAuthMode: 'service-role' | 'anon';
+  private readonly supabase!: SupabaseClient;
+  private readonly writeAuthMode: 'service-role' | 'anon' | 'local' =
+    'local';
+  /** STORAGE_DRIVER=local ise dolu; yoksa (varsayılan supabase) null. */
+  readonly local: LocalStorageDriver | null = null;
 
   constructor() {
+    const driverName = String(process.env.STORAGE_DRIVER || 'supabase')
+      .trim()
+      .toLowerCase();
+
+    if (driverName !== 'local' && driverName !== 'supabase') {
+      throw new Error(
+        `STORAGE_DRIVER geçersiz: "${driverName}" (local | supabase).`,
+      );
+    }
+
+    if (driverName === 'local') {
+      this.local = new LocalStorageDriver(readLocalStorageConfig());
+      this.logger.log('Dosya depolama sürücüsü: local');
+      return;
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const ws = require('ws');
 
@@ -60,6 +84,10 @@ export class SupabaseService {
     file: Buffer,
     mimetype: string,
   ) {
+    if (this.local) {
+      return this.local.write(bucket, path, file);
+    }
+
     const maxAttempts = 3;
     let lastError: unknown;
 
@@ -107,6 +135,33 @@ export class SupabaseService {
   }
 
   async removeFile(bucket: string, paths: string[]) {
+    if (this.local) {
+      const removed: { name: string }[] = [];
+
+      for (const stored of paths) {
+        let rel: string;
+
+        try {
+          rel = this.resolveStoragePath(bucket, stored);
+        } catch {
+          // Eski Supabase kaydı / tanınmayan değer: sessizce geç.
+          continue;
+        }
+
+        try {
+          await this.local.remove(bucket, rel);
+          removed.push({ name: rel });
+        } catch (error) {
+          if (!(error instanceof StoragePathError)) {
+            throw error;
+          }
+          // Geçersiz/kök dışı yol: silinecek dosya yok sayılır.
+        }
+      }
+
+      return removed;
+    }
+
     const { data, error } = await this.supabase.storage
       .from(bucket)
       .remove(paths);
@@ -125,6 +180,10 @@ export class SupabaseService {
   }
 
   getPublicUrl(bucket: string, path: string) {
+    if (this.local) {
+      return this.local.publicUrl(bucket, path);
+    }
+
     const { data } = this.supabase.storage
       .from(bucket)
       .getPublicUrl(path);
@@ -150,6 +209,14 @@ export class SupabaseService {
       url = new URL(raw);
     } catch {
       throw new Error('Geçersiz Storage URL değeri.');
+    }
+
+    if (this.local) {
+      const localPath = this.local.pathFromLocalUrl(bucket, url);
+
+      if (localPath) {
+        return localPath;
+      }
     }
 
     const encodedBucket = encodeURIComponent(bucket);
@@ -203,6 +270,20 @@ export class SupabaseService {
       ),
     );
 
+    if (this.local) {
+      if (!this.local.isPrivateBucket(bucket)) {
+        return this.local.publicUrl(bucket, path);
+      }
+
+      if (!(await this.local.exists(bucket, path))) {
+        throw new Error(
+          `Dosya bulunamadı (bucket: ${bucket}; path: ${path}).`,
+        );
+      }
+
+      return this.local.signedUrl(bucket, path, safeExpiresIn);
+    }
+
     const { data, error } = await this.supabase.storage
       .from(bucket)
       .createSignedUrl(
@@ -223,7 +304,14 @@ export class SupabaseService {
     return data.signedUrl;
   }
 
-  getImageDomainUrl(path: string) {
+  getImageDomainUrl(path: string, bucket?: string) {
+    if (this.local) {
+      return this.local.publicUrl(
+        bucket || process.env.SUPABASE_STORAGE_BUCKET || 'portfolio-images',
+        path,
+      );
+    }
+
     const baseUrl =
       process.env.IMAGE_PUBLIC_BASE_URL ||
       'https://image.emlakportfoyhavuzu.com';

@@ -855,6 +855,20 @@ export class PortfolioDocumentsService {
       return fileUrl.slice(markerIndex + marker.length);
     }
 
+    // STORAGE_DRIVER=local: <MEDIA_PUBLIC_BASE_URL>/<bucket>/<path>
+    const localMarker = `/${this.bucket}/`;
+    const localIndex = fileUrl.indexOf(localMarker);
+
+    if (localIndex >= 0) {
+      try {
+        return decodeURIComponent(
+          fileUrl.slice(localIndex + localMarker.length).split('?')[0],
+        );
+      } catch {
+        return '';
+      }
+    }
+
     return '';
   }
 
