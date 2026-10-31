@@ -58,7 +58,7 @@ export class NewUserNotifierService {
     const [emailOn, pushOn] = await Promise.all([this.enabled(NOTIFY_NEW_USER_EMAIL_KEY), this.enabled(NOTIFY_NEW_USER_PUSH_KEY)]);
     await Promise.all([
       emailOn ? this.guard('EMAIL', event, () => this.adminEmail.enqueue({ eventKey, category: 'NEW_USER', entityType: 'User', entityId: event.userId, title, summary })) : null,
-      pushOn ? this.guard('PUSH', event, () => this.inApp(event, `${title} · ${role} · ${event.city || '-'}`)) : null,
+      this.guard('PUSH', event, () => this.inApp(event, `${title} · ${role} · ${event.city || '-'}`, pushOn)),
       this.guard('TELEGRAM', event, () => this.telegram(`${title}\n${summary}`)),
     ]);
   }
@@ -75,18 +75,25 @@ export class NewUserNotifierService {
     return !(row && (value === 0 || value === false || value === '0'));
   }
 
-  private async inApp(event: NewUserEvent, body: string) {
+  /** Bildirim Merkezi kaydı her zaman oluşur; push kapalıysa kayıt aynı işlemde DISABLED işaretlenir, cihaza gönderim yapılmaz. */
+  private async inApp(event: NewUserEvent, body: string, pushOn: boolean) {
     const admins = await this.prisma.user.findMany({ where: { role: Role.SUPER_ADMIN }, select: { id: true } });
     for (const admin of admins) {
-      await this.guard('PUSH', event, () => this.notifications.notify(admin.id, {
+      const input = {
         type: 'NEW_USER',
-        priority: 'ONEMLI',
+        priority: 'ONEMLI' as const,
         title: 'Yeni üye',
         body,
         // Dokununca yönetimdeki kullanıcı kartı: entityType=USER, entityId=userId.
         actionUrl: `/admin/users?entityType=USER&entityId=${encodeURIComponent(event.userId)}`,
         eventKey: `NEW_USER:${event.userId}:${admin.id}`,
-      }));
+      };
+      await this.guard('PUSH', event, () => pushOn
+        ? this.notifications.notify(admin.id, input)
+        : this.prisma.$transaction(async (tx) => {
+          await this.notifications.notify(admin.id, input, tx);
+          await tx.networkNotification.updateMany({ where: { eventKey: input.eventKey, pushStatus: 'PENDING' }, data: { pushStatus: 'DISABLED' } });
+        }));
     }
   }
 

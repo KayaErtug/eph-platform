@@ -10,6 +10,8 @@ function notifier(settings: Record<string, number> = {}) {
   const db: any = {
     systemSetting: { findUnique: jest.fn(async ({ where }) => (where.key in settings ? { valueJson: { value: settings[where.key] } } : null)) },
     user: { findMany: jest.fn(async () => [{ id: 'sa1' }, { id: 'sa2' }]) },
+    networkNotification: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    $transaction: jest.fn(async (cb: any) => cb(db)),
   };
   const email = { enqueue: jest.fn().mockResolvedValue(undefined) };
   const notifications = { notify: jest.fn().mockResolvedValue({}) };
@@ -43,16 +45,28 @@ describe('NewUserNotifierService', () => {
     });
   });
 
-  it('e-posta ayarı kapalıyken e-posta, push ayarı kapalıyken bildirim atlanır', async () => {
+  it('e-posta ayarı kapalıyken yalnız e-posta atlanır', async () => {
     const mailOff = notifier({ [NOTIFY_NEW_USER_EMAIL_KEY]: 0 });
     await mailOff.service.notify(event);
     expect(mailOff.email.enqueue).not.toHaveBeenCalled();
     expect(mailOff.notifications.notify).toHaveBeenCalled();
 
+  });
+
+  it('push ayarı kapalıyken kayıt oluşur ama push tetiklenmez; açıkken ikisi de olur', async () => {
     const pushOff = notifier({ [NOTIFY_NEW_USER_PUSH_KEY]: 0 });
     await pushOff.service.notify(event);
-    expect(pushOff.notifications.notify).not.toHaveBeenCalled();
     expect(pushOff.email.enqueue).toHaveBeenCalled();
+    expect(pushOff.notifications.notify).toHaveBeenCalledTimes(2);
+    // Kayıt işlem içinde (tx ile) oluşturulur: notify'ın deliver/push adımı çalışmaz.
+    expect(pushOff.notifications.notify.mock.calls[0][2]).toBe(pushOff.db);
+    expect(pushOff.db.networkNotification.updateMany).toHaveBeenCalledWith({ where: { eventKey: 'NEW_USER:u1:sa1', pushStatus: 'PENDING' }, data: { pushStatus: 'DISABLED' } });
+
+    const pushOn = notifier();
+    await pushOn.service.notify(event);
+    expect(pushOn.notifications.notify).toHaveBeenCalledTimes(2);
+    expect(pushOn.notifications.notify.mock.calls[0][2]).toBeUndefined();
+    expect(pushOn.db.networkNotification.updateMany).not.toHaveBeenCalled();
   });
 
   it('Telegram ortam değişkeni yoksa sessizce atlanır, varsa mesaj gider', async () => {
