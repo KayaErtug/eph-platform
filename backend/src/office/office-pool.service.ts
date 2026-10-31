@@ -18,13 +18,19 @@ export class OfficePoolService {
     return { office, isOwner };
   }
 
-  async pool(userId: string, officeId: string, query: { status?: string; q?: string; take?: string | number; cursor?: string } = {}) {
-    const { office, isOwner } = await this.access(userId, officeId);
+  // Shared by list and detail so both apply the same scope and visibility rule.
+  private scope(userId: string, officeId: string, office: { ownerUserId: string | null }, isOwner: boolean): Prisma.UnitWhereInput[] {
     const and: Prisma.UnitWhereInput[] = [
       { status: { not: UnitStatus.PASIF } },
       { project: { isActive: true, OR: [{ owner: { officeId } }, ...(office.ownerUserId ? [{ ownerId: office.ownerUserId }] : [])] } },
     ];
     if (!isOwner) and.push({ OR: [{ hiddenFromOffice: false }, { project: { ownerId: userId } }] });
+    return and;
+  }
+
+  async pool(userId: string, officeId: string, query: { status?: string; q?: string; take?: string | number; cursor?: string } = {}) {
+    const { office, isOwner } = await this.access(userId, officeId);
+    const and = this.scope(userId, officeId, office, isOwner);
     if (query.status === 'sale') and.push({ status: { in: SALE_STATUSES } });
     else if (query.status === 'rent') and.push({ status: { in: RENT_STATUSES } });
     else if (query.status) throw new BadRequestException('status yalnız sale veya rent olabilir.');
@@ -62,6 +68,30 @@ export class OfficePoolService {
         };
       }),
       nextCursor: rows.length > take ? page[page.length - 1].id : null,
+    };
+  }
+
+  async detail(userId: string, officeId: string, unitId: string) {
+    const { office, isOwner } = await this.access(userId, officeId);
+    const u = await this.prisma.unit.findFirst({
+      where: { AND: [{ id: unitId }, ...this.scope(userId, officeId, office, isOwner)] },
+      select: {
+        id: true, description: true, type: true, roomCount: true, netArea: true, grossArea: true, floor: true, floorLabel: true,
+        totalFloors: true, facades: true, features: true, price: true, priceCurrency: true, status: true, hiddenFromOffice: true, updatedAt: true,
+        images: { select: { id: true, url: true, supabaseUrl: true }, orderBy: [{ isCover: 'desc' }, { sortOrder: 'asc' }] },
+        project: { select: { name: true, city: true, district: true, neighborhood: true, ownerId: true, owner: { select: { id: true, firstName: true, lastName: true, phone: true } } } },
+      },
+    });
+    if (!u) throw new NotFoundException('Portföy bulunamadı.');
+    const owner = u.project.owner;
+    return {
+      id: u.id, title: u.project.name, description: u.description, type: u.type, roomCount: u.roomCount, netArea: u.netArea, grossArea: u.grossArea,
+      floor: u.floor, floorLabel: u.floorLabel, totalFloors: u.totalFloors, facades: u.facades, features: u.features,
+      price: u.price, priceCurrency: u.priceCurrency, status: u.status,
+      city: u.project.city, district: u.project.district, neighborhood: u.project.neighborhood,
+      images: u.images.map(i => ({ id: i.id, url: i.supabaseUrl || i.url })),
+      agent: { id: owner.id, fullName: `${owner.firstName ?? ''} ${owner.lastName ?? ''}`.trim(), phone: owner.phone },
+      hiddenFromOffice: u.hiddenFromOffice, isMine: u.project.ownerId === userId, updatedAt: u.updatedAt,
     };
   }
 
